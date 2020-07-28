@@ -279,3 +279,9 @@ def is_enabled(api):
         True if the API is enabled by the current backend.
     """
     return api in _enabled_apis
+
+def to_dgl_nd(data):
+    return zerocopy_to_dgl_ndarray(data)
+
+def from_dgl_nd(data):
+    return zerocopy_from_dgl_ndarray(data)

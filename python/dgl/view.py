@@ -266,7 +266,7 @@ class HeteroNodeView(object):
             ntype = None
         elif isinstance(key, tuple):
             nodes, ntype = key
-        elif isinstance(key, str):
+        elif key is None or isinstance(key, str):
             nodes = ALL
             ntype = key
         else:
@@ -277,8 +277,10 @@ class HeteroNodeView(object):
 
     def __call__(self, ntype=None):
         """Return the nodes."""
-        return F.arange(0, self._graph.number_of_nodes(ntype),
-                        dtype=self._graph._idtype_str)
+        ntid = self._typeid_getter(ntype)
+        return F.copy_to(F.arange(0, self._graph._graph.number_of_nodes(ntid),
+                                  dtype=self._graph.idtype),
+                         self._graph.device)
 
 class HeteroNodeDataView(MutableMapping):
     """The data view class when G.ndata[ntype] is called."""
@@ -337,6 +339,12 @@ class HeteroNodeDataView(MutableMapping):
             'can not be iterated.'
         return iter(self._graph._node_frames[self._ntid])
 
+    def keys(self):
+        return self._graph._node_frames[self._ntid].keys()
+
+    def values(self):
+        return self._graph._node_frames[self._ntid].values()
+
     def __repr__(self):
         if isinstance(self._ntype, list):
             ret = {}
@@ -366,6 +374,9 @@ class HeteroEdgeView(object):
                 raise DGLError('Currently only full slice ":" is supported')
             edges = ALL
             etype = None
+        elif key is None:
+            edges = ALL
+            etype = None
         elif isinstance(key, tuple):
             if len(key) == 3:
                 edges = ALL
@@ -373,7 +384,7 @@ class HeteroEdgeView(object):
             else:
                 edges = key
                 etype = None
-        elif isinstance(key, (str, tuple)):
+        elif isinstance(key, str):
             edges = ALL
             etype = key
         else:
@@ -443,6 +454,12 @@ class HeteroEdgeDataView(MutableMapping):
             'Current HeteroEdgeDataView has multiple edge types, ' \
             'can not be iterated.'
         return iter(self._graph._edge_frames[self._etid])
+
+    def keys(self):
+        return self._graph._edge_frames[self._etid].keys()
+
+    def values(self):
+        return self._graph._edge_frames[self._etid].values()
 
     def __repr__(self):
         if isinstance(self._etype, list):

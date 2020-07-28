@@ -161,26 +161,6 @@ IdArray UnaryElewise(IdArray lhs) {
 template IdArray UnaryElewise<kDLCPU, int32_t, arith::Neg>(IdArray lhs);
 template IdArray UnaryElewise<kDLCPU, int64_t, arith::Neg>(IdArray lhs);
 
-///////////////////////////// HStack /////////////////////////////
-
-template <DLDeviceType XPU, typename IdType>
-IdArray HStack(IdArray arr1, IdArray arr2) {
-  CHECK_EQ(arr1->shape[0], arr2->shape[0]);
-  const int64_t L = arr1->shape[0];
-  IdArray ret = NewIdArray(2 * L, DLContext{kDLCPU, 0}, arr1->dtype.bits);
-  const IdType* arr1_data = static_cast<IdType*>(arr1->data);
-  const IdType* arr2_data = static_cast<IdType*>(arr2->data);
-  IdType* ret_data = static_cast<IdType*>(ret->data);
-  for (int64_t i = 0; i < L; ++i) {
-    ret_data[i] = arr1_data[i];
-    ret_data[i + L] = arr2_data[i];
-  }
-  return ret;
-}
-
-template IdArray HStack<kDLCPU, int32_t>(IdArray arr1, IdArray arr2);
-template IdArray HStack<kDLCPU, int64_t>(IdArray arr1, IdArray arr2);
-
 ///////////////////////////// Full /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>

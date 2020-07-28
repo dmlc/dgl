@@ -28,38 +28,15 @@ def generate_rand_graph(n, connect_more=False, complete=False, add_self_loop=Fal
             arr[0] = 1
             arr[:, 0] = 1
     if add_self_loop:
-        g = dgl.DGLGraph(arr, readonly=False)
+        g = dgl.DGLGraphStale(arr, readonly=False)
         nodes = np.arange(g.number_of_nodes())
         g.add_edges(nodes, nodes)
         g.readonly()
     else:
-        g = dgl.DGLGraph(arr, readonly=True)
+        g = dgl.DGLGraphStale(arr, readonly=True)
     g.ndata['h1'] = F.randn((g.number_of_nodes(), 10))
     g.edata['h2'] = F.randn((g.number_of_edges(), 3))
     return g
-
-
-def test_self_loop():
-    n = 100
-    num_hops = 2
-    g = generate_rand_graph(n, complete=True)
-    nf = create_mini_batch(g, num_hops, add_self_loop=True)
-    for i in range(1, nf.num_layers):
-        in_deg = nf.layer_in_degree(i)
-        deg = F.copy_to(F.ones(in_deg.shape, dtype=F.int64), F.cpu()) * n
-        assert_array_equal(F.asnumpy(in_deg), F.asnumpy(deg))
-
-    g = generate_rand_graph(n, complete=True, add_self_loop=True)
-    g = dgl.to_simple_graph(g)
-    nf = create_mini_batch(g, num_hops, add_self_loop=True)
-    for i in range(nf.num_blocks):
-        parent_eid = F.asnumpy(nf.block_parent_eid(i))
-        parent_nid = F.asnumpy(nf.layer_parent_nid(i + 1))
-        # The loop eid in the parent graph must exist in the block parent eid.
-        parent_loop_eid = F.asnumpy(g.edge_ids(parent_nid, parent_nid))
-        assert len(parent_loop_eid) == len(parent_nid)
-        for eid in parent_loop_eid:
-            assert eid in parent_eid
 
 
 def create_mini_batch(g, num_hops, add_self_loop=False):

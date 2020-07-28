@@ -94,6 +94,7 @@ def main(args):
 
     if use_cuda:
         model.cuda()
+        g = g.to('cuda:%d' % args.gpu)
 
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)

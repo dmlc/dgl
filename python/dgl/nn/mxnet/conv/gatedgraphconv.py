@@ -76,7 +76,7 @@ class GatedGraphConv(nn.Block):
             is the output feature size.
         """
         with graph.local_scope():
-            assert graph.is_homograph(), \
+            assert graph.is_homogeneous(), \
                 "not a homograph; convert it with to_homo and pass in the edge type as argument"
             zero_pad = nd.zeros((feat.shape[0], self._out_feats - feat.shape[1]),
                                 ctx=feat.context)
@@ -86,7 +86,8 @@ class GatedGraphConv(nn.Block):
                 graph.ndata['h'] = feat
                 for i in range(self._n_etypes):
                     eids = (etypes.asnumpy() == i).nonzero()[0]
-                    eids = nd.from_numpy(eids, zero_copy=True)
+                    eids = nd.from_numpy(eids, zero_copy=True).as_in_context(
+                        feat.context).astype(graph.idtype)
                     if len(eids) > 0:
                         graph.apply_edges(
                             lambda edges: {'W_e*h': self.linears[i](edges.src['h'])},

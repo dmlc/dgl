@@ -1,8 +1,9 @@
 import dgl
 import backend as F
 import unittest
+from test_utils import parametrize_dtype
 
-def tree1():
+def tree1(idtype):
     """Generate a tree
          0
         / \
@@ -11,7 +12,7 @@ def tree1():
      3   4
     Edges are from leaves to root.
     """
-    g = dgl.DGLGraph()
+    g = dgl.DGLGraph().astype(idtype).to(F.ctx())
     g.add_nodes(5)
     g.add_edge(3, 1)
     g.add_edge(4, 1)
@@ -21,7 +22,7 @@ def tree1():
     g.edata['h'] = F.randn((4, 10))
     return g
 
-def tree2():
+def tree2(idtype):
     """Generate a tree
          1
         / \
@@ -30,7 +31,7 @@ def tree2():
      2   0
     Edges are from leaves to root.
     """
-    g = dgl.DGLGraph()
+    g = dgl.DGLGraph().astype(idtype).to(F.ctx())
     g.add_nodes(5)
     g.add_edge(2, 4)
     g.add_edge(0, 4)
@@ -40,16 +41,17 @@ def tree2():
     g.edata['h'] = F.randn((4, 10))
     return g
 
-def test_batch_unbatch():
-    t1 = tree1()
-    t2 = tree2()
+@parametrize_dtype
+def test_batch_unbatch(idtype):
+    t1 = tree1(idtype)
+    t2 = tree2(idtype)
 
     bg = dgl.batch([t1, t2])
     assert bg.number_of_nodes() == 10
     assert bg.number_of_edges() == 8
     assert bg.batch_size == 2
-    assert bg.batch_num_nodes == [5, 5]
-    assert bg.batch_num_edges == [4, 4]
+    assert F.allclose(bg.batch_num_nodes(), F.tensor([5, 5]))
+    assert F.allclose(bg.batch_num_edges(), F.tensor([4, 4]))
 
     tt1, tt2 = dgl.unbatch(bg)
     assert F.allclose(t1.ndata['h'], tt1.ndata['h'])
@@ -57,16 +59,17 @@ def test_batch_unbatch():
     assert F.allclose(t2.ndata['h'], tt2.ndata['h'])
     assert F.allclose(t2.edata['h'], tt2.edata['h'])
 
-def test_batch_unbatch1():
-    t1 = tree1()
-    t2 = tree2()
+@parametrize_dtype
+def test_batch_unbatch1(idtype):
+    t1 = tree1(idtype)
+    t2 = tree2(idtype)
     b1 = dgl.batch([t1, t2])
     b2 = dgl.batch([t2, b1])
     assert b2.number_of_nodes() == 15
     assert b2.number_of_edges() == 12
     assert b2.batch_size == 3
-    assert b2.batch_num_nodes == [5, 5, 5]
-    assert b2.batch_num_edges == [4, 4, 4]
+    assert F.allclose(b2.batch_num_nodes(), F.tensor([5, 5, 5]))
+    assert F.allclose(b2.batch_num_edges(), F.tensor([4, 4, 4]))
 
     s1, s2, s3 = dgl.unbatch(b2)
     assert F.allclose(t2.ndata['h'], s1.ndata['h'])
@@ -76,40 +79,14 @@ def test_batch_unbatch1():
     assert F.allclose(t2.ndata['h'], s3.ndata['h'])
     assert F.allclose(t2.edata['h'], s3.edata['h'])
 
-    # Test batching readonly graphs
-    t1.readonly()
-    t2.readonly()
-    t1_was_readonly = t1.is_readonly
-    t2_was_readonly = t2.is_readonly
-    bg = dgl.batch([t1, t2])
-
-    assert t1.is_readonly == t1_was_readonly
-    assert t2.is_readonly == t2_was_readonly
-    assert bg.number_of_nodes() == 10
-    assert bg.number_of_edges() == 8
-    assert bg.batch_size == 2
-    assert bg.batch_num_nodes == [5, 5]
-    assert bg.batch_num_edges == [4, 4]
-
-    rs1, rs2 = dgl.unbatch(bg)
-    assert F.allclose(rs1.edges()[0], t1.edges()[0])
-    assert F.allclose(rs1.edges()[1], t1.edges()[1])
-    assert F.allclose(rs2.edges()[0], t2.edges()[0])
-    assert F.allclose(rs2.edges()[1], t2.edges()[1])
-    assert F.allclose(rs1.nodes(), t1.nodes())
-    assert F.allclose(rs2.nodes(), t2.nodes())
-    assert F.allclose(t1.ndata['h'], rs1.ndata['h'])
-    assert F.allclose(t1.edata['h'], rs1.edata['h'])
-    assert F.allclose(t2.ndata['h'], rs2.ndata['h'])
-    assert F.allclose(t2.edata['h'], rs2.edata['h'])
-
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
-def test_batch_unbatch_frame():
+@parametrize_dtype
+def test_batch_unbatch_frame(idtype):
     """Test module of node/edge frames of batched/unbatched DGLGraphs.
     Also address the bug mentioned in https://github.com/dmlc/dgl/issues/1475.
     """
-    t1 = tree1()
-    t2 = tree2()
+    t1 = tree1(idtype)
+    t2 = tree2(idtype)
     N1 = t1.number_of_nodes()
     E1 = t1.number_of_edges()
     N2 = t2.number_of_nodes()
@@ -140,12 +117,13 @@ def test_batch_unbatch_frame():
     assert F.allclose(_g2.ndata['h'], F.zeros((N2, D)))
     assert F.allclose(_g2.edata['h'], F.zeros((E2, D)))
 
-def test_batch_unbatch2():
+@parametrize_dtype
+def test_batch_unbatch2(idtype):
     # test setting/getting features after batch
-    a = dgl.DGLGraph()
+    a = dgl.DGLGraph().astype(idtype).to(F.ctx())
     a.add_nodes(4)
     a.add_edges(0, [1, 2, 3])
-    b = dgl.DGLGraph()
+    b = dgl.DGLGraph().astype(idtype).to(F.ctx())
     b.add_nodes(3)
     b.add_edges(0, [1, 2])
     c = dgl.batch([a, b])
@@ -154,46 +132,31 @@ def test_batch_unbatch2():
     assert F.allclose(c.ndata['h'], F.ones((7, 1)))
     assert F.allclose(c.edata['w'], F.ones((5, 1)))
 
-def test_batch_send_then_recv():
-    t1 = tree1()
-    t2 = tree2()
+@parametrize_dtype
+def test_batch_send_and_recv(idtype):
+    t1 = tree1(idtype)
+    t2 = tree2(idtype)
 
     bg = dgl.batch([t1, t2])
-    bg.register_message_func(lambda edges: {'m' : edges.src['h']})
-    bg.register_reduce_func(lambda nodes: {'h' : F.sum(nodes.mailbox['m'], 1)})
+    _mfunc = lambda edges: {'m' : edges.src['h']}
+    _rfunc = lambda nodes: {'h' : F.sum(nodes.mailbox['m'], 1)}
     u = [3, 4, 2 + 5, 0 + 5]
     v = [1, 1, 4 + 5, 4 + 5]
 
-    bg.send((u, v))
-    bg.recv([1, 9]) # assuming recv takes in unique nodes
+    bg.send_and_recv((u, v), _mfunc, _rfunc)
 
     t1, t2 = dgl.unbatch(bg)
     assert F.asnumpy(t1.ndata['h'][1]) == 7
     assert F.asnumpy(t2.ndata['h'][4]) == 2
 
-def test_batch_send_and_recv():
-    t1 = tree1()
-    t2 = tree2()
+@parametrize_dtype
+def test_batch_propagate(idtype):
+    t1 = tree1(idtype)
+    t2 = tree2(idtype)
 
     bg = dgl.batch([t1, t2])
-    bg.register_message_func(lambda edges: {'m' : edges.src['h']})
-    bg.register_reduce_func(lambda nodes: {'h' : F.sum(nodes.mailbox['m'], 1)})
-    u = [3, 4, 2 + 5, 0 + 5]
-    v = [1, 1, 4 + 5, 4 + 5]
-
-    bg.send_and_recv((u, v))
-
-    t1, t2 = dgl.unbatch(bg)
-    assert F.asnumpy(t1.ndata['h'][1]) == 7
-    assert F.asnumpy(t2.ndata['h'][4]) == 2
-
-def test_batch_propagate():
-    t1 = tree1()
-    t2 = tree2()
-
-    bg = dgl.batch([t1, t2])
-    bg.register_message_func(lambda edges: {'m' : edges.src['h']})
-    bg.register_reduce_func(lambda nodes: {'h' : F.sum(nodes.mailbox['m'], 1)})
+    _mfunc = lambda edges: {'m' : edges.src['h']}
+    _rfunc = lambda nodes: {'h' : F.sum(nodes.mailbox['m'], 1)}
     # get leaves.
 
     order = []
@@ -208,19 +171,20 @@ def test_batch_propagate():
     v = [0, 0, 1 + 5, 1 + 5]
     order.append((u, v))
 
-    bg.prop_edges(order)
+    bg.prop_edges(order, _mfunc, _rfunc)
     t1, t2 = dgl.unbatch(bg)
 
     assert F.asnumpy(t1.ndata['h'][0]) == 9
     assert F.asnumpy(t2.ndata['h'][1]) == 5
 
-def test_batched_edge_ordering():
-    g1 = dgl.DGLGraph()
+@parametrize_dtype
+def test_batched_edge_ordering(idtype):
+    g1 = dgl.DGLGraph().astype(idtype).to(F.ctx())
     g1.add_nodes(6)
     g1.add_edges([4, 4, 2, 2, 0], [5, 3, 3, 1, 1])
     e1 = F.randn((5, 10))
     g1.edata['h'] = e1
-    g2 = dgl.DGLGraph()
+    g2 = dgl.DGLGraph().astype(idtype).to(F.ctx())
     g2.add_nodes(6)
     g2.add_edges([0, 1 ,2 ,5, 4 ,5], [1, 2, 3, 4, 3, 0])
     e2 = F.randn((6, 10))
@@ -230,14 +194,15 @@ def test_batched_edge_ordering():
     r2 = g1.edata['h'][g1.edge_id(4, 5)]
     assert F.array_equal(r1, r2)
 
-def test_batch_no_edge():
-    g1 = dgl.DGLGraph()
+@parametrize_dtype
+def test_batch_no_edge(idtype):
+    g1 = dgl.DGLGraph().astype(idtype).to(F.ctx())
     g1.add_nodes(6)
     g1.add_edges([4, 4, 2, 2, 0], [5, 3, 3, 1, 1])
-    g2 = dgl.DGLGraph()
+    g2 = dgl.DGLGraph().astype(idtype).to(F.ctx())
     g2.add_nodes(6)
     g2.add_edges([0, 1, 2, 5, 4, 5], [1 ,2 ,3, 4, 3, 0])
-    g3 = dgl.DGLGraph()
+    g3 = dgl.DGLGraph().astype(idtype).to(F.ctx())
     g3.add_nodes(1)  # no edges
     g = dgl.batch([g1, g3, g2]) # should not throw an error
 
