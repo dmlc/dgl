@@ -4483,7 +4483,7 @@ class DGLHeteroGraph(object):
         device(type='cpu')
         """
         if device is None or self.device == device:
-            return utils.to_int32_graph_if_on_gpu(self)
+            return self
 
         ret = copy.copy(self)
 
@@ -4513,8 +4513,6 @@ class DGLHeteroGraph(object):
             new_bne = {k : F.copy_to(num, device, **kwargs)
                        for k, num in self._batch_num_edges.items()}
             ret._batch_num_edges = new_bne
-
-        ret = utils.to_int32_graph_if_on_gpu(ret)
 
         return ret
 
