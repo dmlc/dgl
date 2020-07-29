@@ -109,9 +109,7 @@ def _gspmm(gidx, op, reduce_op, u, e):
 
     Notes
     -----
-    This function does not handle gradients, and for scalar input features,
-    we expand its dimension with an additional dimension of length one. (e.g.
-    (90,) to (90, 1) for a graph with 90 nodes/edges).
+    This function does not handle gradients.
     """
     if gidx.number_of_etypes() != 1:
         raise DGLError("We only support gspmm on graph with one edge type")
@@ -192,9 +190,7 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
 
     Notes
     -----
-    This function does not handle gradients, and for scalar input features,
-    we expand its dimension with an additional dimension of length one. (e.g.
-    (90,) to (90, 1) for a graph with 90 nodes/edges).
+    This function does not handle gradients.
     """
     if gidx.number_of_etypes() != 1:
         raise DGLError("We only support gsddmm on graph with one edge type")

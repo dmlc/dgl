@@ -1,8 +1,8 @@
 .. _apibackend:
 
-.. currentmodule:: dgl.backend
+.. currentmodule:: dgl.ops
 
-dgl.backend
+dgl.ops
 ==================================
 
 Frame-agnostic operators for message passing on graphs.
@@ -36,7 +36,7 @@ here, you can enjoy the same convenience on other frameworks by similar usage):
 
    >>> import dgl
    >>> import torch as th
-   >>> import dgl.backend as F
+   >>> import dgl.ops as F
    >>> g = dgl.graph(([0, 0, 0, 1, 1, 2], [0, 1, 2, 1, 2, 2]))  # 3 nodes, 6 edges
    >>> x = th.ones(3, 2, requires_grad=True)
    >>> x
@@ -87,6 +87,7 @@ graph.
 .. autosummary::
     :toctree: ../../generated/
 
+    gspmm
     u_add_e_sum
     u_sub_e_sum
     u_mul_e_sum
@@ -130,7 +131,7 @@ The following is an example showing how GSDDMM works:
 
    >>> import dgl
    >>> import torch as th
-   >>> import dgl.backend as F
+   >>> import dgl.ops as F
    >>> g = dgl.graph(([0, 0, 0, 1, 1, 2], [0, 1, 2, 1, 2, 2]))  # 3 nodes, 6 edges
    >>> x = th.ones(3, 2, requires_grad=True)
    >>> x
@@ -193,6 +194,7 @@ The following is an example showing how GSDDMM works:
 .. autosummary::
     :toctree: ../../generated/
 
+    gsddmm
     u_add_v
     u_sub_v
     u_mul_v
@@ -227,3 +229,46 @@ The following is an example showing how GSDDMM works:
     copy_v
 
 Like GSpMM, GSDDMM operators support both homograph and bipartite graph.
+
+Relation with Message Passing APIs
+----------------------------------
+
+``dgl.update_all`` and ``dgl.apply_edges`` calls with built-in message/reduce functions
+would be dispatched into function calls of operators defined in ``dgl.ops``:
+
+    >>> import dgl
+    >>> import torch as th
+    >>> import dgl.ops as F
+    >>> import dgl.function as fn
+    >>> g = dgl.rand_graph(100, 1000)   # create a DGLGraph with 100 nodes and 1000 edges.
+    >>> x = th.rand(100, 20)            # node features.
+    >>> e = th.rand(1000, 20)
+    >>>
+    >>> # dgl.update_all + builtin functions
+    >>> g.srcdata['x'] = x              # srcdata is the same as ndata for graphs with one node type.
+    >>> g.edata['e'] = e
+    >>> g.update_all(fn.u_mul_e('x', 'e', 'm'), fn.sum('m', 'y'))
+    >>> y = g.dstdata['y']              # dstdata is the same as ndata for graphs with one node type.
+    >>>
+    >>> # use GSpMM operators defined in dgl.ops directly
+    >>> y = F.u_mul_e_sum(g, x, e)
+    >>>
+    >>> # dgl.apply_edges + builtin functions
+    >>> g.srcdata['x'] = x
+    >>> g.dstdata['y'] = y
+    >>> g.apply_edges(fn.u_dot_v('x', 'y', 'z'))
+    >>> z = g.edata['z']
+    >>>
+    >>> # use GSDDMM operators defined in dgl.ops directly
+    >>> z = F.u_dot_v(g, x, y)
+
+It up to user to decide whether to use message-passing APIs or GSpMM/GSDDMM operators, and both
+of them have the same efficiency. Programs written in message-passing APIs look more like DGL-style
+but in some cases calling GSpMM/GSDDMM operators is more concise (e.g. `edge_softmax
+<https://github.com/dmlc/dgl/blob/master/python/dgl/nn/pytorch/softmax.py/>`_ function
+provided by dgl).
+
+Note that on PyTorch all operators defined in ``dgl.ops`` support higher-order gradients, so as
+message passing APIs because they entirely depend on these operators.
+
+
