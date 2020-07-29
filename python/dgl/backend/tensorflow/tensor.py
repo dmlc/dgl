@@ -63,7 +63,8 @@ def initialize_context():
     tf.zeros(1)
 
 def as_scalar(data):
-    return data.numpy().asscalar()
+    data = data.numpy()
+    return data if np.isscalar(data) else data.asscalar()
 
 
 def get_preferred_sparse_format():
@@ -384,7 +385,7 @@ def full_1d(length, fill_value, dtype, ctx):
 
 
 def nonzero_1d(input):
-    nonzero_bool = (input != False)
+    nonzero_bool = tf.cast(input, tf.bool)
     return tf.reshape(tf.where(nonzero_bool), (-1, ))
 
 
@@ -417,6 +418,8 @@ def zerocopy_from_numpy(np_array):
 def zerocopy_to_dgl_ndarray(input):
     return nd.from_dlpack(zerocopy_to_dlpack(input))
 
+def zerocopy_to_dgl_ndarray_for_write(input):
+    return zerocopy_to_dgl_ndarray(input)
 
 def zerocopy_from_dgl_ndarray(input):
     return zerocopy_from_dlpack(input.to_dlpack())

@@ -1263,6 +1263,21 @@ def zerocopy_to_dgl_ndarray(input):
     """
     pass
 
+def zerocopy_to_dgl_ndarray_for_write(input):
+    """Zerocopy a framework-specific Tensor to dgl.ndarray.NDArray
+    that is ready for write (required in MXNet).
+
+    Parameters
+    ----------
+    input : Tensor
+
+    Returns
+    -------
+    dgl.ndarray.NDArray
+    """
+    pass
+
+
 def zerocopy_from_dgl_ndarray(input):
     """Zerocopy a dgl.ndarray.NDArray to framework-specific Tensor
 
@@ -1350,6 +1365,79 @@ def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
         The result.
     """
     pass
+
+def gspmm(g, op, reduce_op, lhs_data, rhs_data):
+    r""" Generalized Sparse Matrix Multiplication interface.
+    It fuses two steps into one kernel.
+    (1) Computes messages by :attr:`op` source node and edge features.
+    (2) Aggregate the messages by :attr:`reduce_op` as the features on destination nodes.
+
+    .. math::
+        x_v = \psi_{(u, v, e)\in \mathcal{G}}(\rho(x_u, x_e))
+
+    where :math:`x_v` is the returned feature on destination nodes, and :math`x_u`,
+    :math:`x_e` refers to :attr:`u`, :attr:`e` respectively. :math:`\rho` means binary
+    operator :attr:`op` and :math:`\psi` means reduce operator :attr:`reduce_op`,
+    :math:`\mathcal{G}` is the graph we apply gspmm on: :attr:`g`.
+
+    Note that this function does not handle gradients.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The input graph.
+    op : str
+        The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``,
+        ``copy_lhs``, ``copy_rhs``.
+    reduce_op : str
+        Reduce operator, could be ``sum``, ``max``, ``min``.
+    lhs_data : tensor or None
+        The left operand, could be None if it's not required by the op.
+    rhs_data : tensor or None
+        The right operand, could be None if it's not required by the op.
+
+    Returns
+    -------
+    tensor
+        The result tensor.
+    """
+    pass
+
+def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
+    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
+    It computes edge features by :attr:`op` lhs features and rhs features.
+
+    .. math::
+        x_{e} = \phi(x_{lhs}, x_{rhs}), \forall (u,e,v)\in \mathcal{G}
+
+    where :math:`x_{e}` is the returned feature on edges and :math:`x_u`,
+    :math:`x_v` refers to :attr:`u`, :attr:`v` respectively. :math:`\phi`
+    is the binary operator :attr:`op`, and :math:`\mathcal{G}` is the graph
+    we apply gsddmm on: :attr:`g`. $lhs$ and $rhs$ are one of $u,v,e$'s.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The input graph.
+    op : str
+        Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``,
+        ``copy_lhs``, ``copy_rhs``.
+    lhs_data : tensor or None
+        The left operand, could be None if it's not required by op.
+    rhs_data : tensor or None
+        The right operand, could be None if it's not required by op.
+    lhs_target: str
+        Choice of `u`(source), `e`(edge) or `v`(destination) for left operand.
+    rhs_target: str
+        Choice of `u`(source), `e`(edge) or `v`(destination) for right operand.
+
+    Returns
+    -------
+    tensor
+        The result tensor.
+    """
+    pass
+
 
 ###############################################################################
 # Other interfaces

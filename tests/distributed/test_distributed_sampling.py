@@ -16,21 +16,18 @@ from dgl.distributed import DistGraphServer, DistGraph
 
 
 def start_server(rank, tmpdir, disable_shared_mem, graph_name):
-    import dgl
-    g = DistGraphServer(rank, "rpc_ip_config.txt", 1, graph_name,
+    g = DistGraphServer(rank, "rpc_ip_config.txt", 1,
                         tmpdir / (graph_name + '.json'), disable_shared_mem=disable_shared_mem)
     g.start()
 
 
 def start_sample_client(rank, tmpdir, disable_shared_mem):
-    import dgl
     gpb = None
     if disable_shared_mem:
-        _, _, _, gpb = load_partition(tmpdir / 'test_sampling.json', rank)
+        _, _, _, gpb, _ = load_partition(tmpdir / 'test_sampling.json', rank)
     dist_graph = DistGraph("rpc_ip_config.txt", "test_sampling", gpb=gpb)
     sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
-    dgl.distributed.shutdown_servers()
-    dgl.distributed.finalize_client()
+    dgl.distributed.exit_client()
     return sampled_graph
 
 
@@ -74,6 +71,7 @@ def check_rpc_sampling(tmpdir, num_server):
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 def test_rpc_sampling():
     import tempfile
+    os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_sampling(Path(tmpdirname), 2)
 
@@ -108,7 +106,7 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
     orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64)
     orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64)
     for i in range(num_server):
-        part, _, _, _ = load_partition(tmpdir / 'test_sampling.json', i)
+        part, _, _, _, _ = load_partition(tmpdir / 'test_sampling.json', i)
         orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
         orig_eid[part.edata[dgl.EID]] = part.edata['orig_id']
 
@@ -126,19 +124,44 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 def test_rpc_sampling_shuffle():
     import tempfile
+    os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_sampling_shuffle(Path(tmpdirname), 2)
         check_rpc_sampling_shuffle(Path(tmpdirname), 1)
 
+def check_standalone_sampling(tmpdir):
+    g = CitationGraphDataset("cora")[0]
+    g.readonly()
+    num_parts = 1
+    num_hops = 1
+    partition_graph(g, 'test_sampling', num_parts, tmpdir,
+                    num_hops=num_hops, part_method='metis', reshuffle=False)
+
+    dist_graph = DistGraph(None, "test_sampling", conf_file=tmpdir / 'test_sampling.json')
+    sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
+
+    src, dst = sampled_graph.edges()
+    assert sampled_graph.number_of_nodes() == g.number_of_nodes()
+    assert np.all(F.asnumpy(g.has_edges_between(src, dst)))
+    eids = g.edge_ids(src, dst)
+    assert np.array_equal(
+        F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
+
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
+def test_standalone_sampling():
+    import tempfile
+    os.environ['DGL_DIST_MODE'] = 'standalone'
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        check_standalone_sampling(Path(tmpdirname))
+
 def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
-    import dgl
     gpb = None
     if disable_shared_mem:
-        _, _, _, gpb = load_partition(tmpdir / 'test_in_subgraph.json', rank)
+        _, _, _, gpb, _ = load_partition(tmpdir / 'test_in_subgraph.json', rank)
     dist_graph = DistGraph("rpc_ip_config.txt", "test_in_subgraph", gpb=gpb)
     sampled_graph = dgl.distributed.in_subgraph(dist_graph, nodes)
-    dgl.distributed.shutdown_servers()
-    dgl.distributed.finalize_client()
+    dgl.distributed.exit_client()
     return sampled_graph
 
 
@@ -184,12 +207,16 @@ def check_rpc_in_subgraph(tmpdir, num_server):
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 def test_rpc_in_subgraph():
     import tempfile
+    os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_in_subgraph(Path(tmpdirname), 2)
 
 if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
+        os.environ['DGL_DIST_MODE'] = 'standalone'
+        check_standalone_sampling(Path(tmpdirname))
+        os.environ['DGL_DIST_MODE'] = 'distributed'
         check_rpc_in_subgraph(Path(tmpdirname), 2)
         check_rpc_sampling_shuffle(Path(tmpdirname), 1)
         check_rpc_sampling_shuffle(Path(tmpdirname), 2)
