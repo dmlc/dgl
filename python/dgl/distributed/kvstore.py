@@ -871,7 +871,7 @@ class KVClient(object):
             rpc.send_request(server_id, request)
         # recv reponse from all the server nodes
         for _ in range(self._server_count):
-            reponse rpc.recv_response()
+            reponse = rpc.recv_response()
             assert response.msg = ROLE_MSG
 
     @property
