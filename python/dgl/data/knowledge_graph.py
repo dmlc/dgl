@@ -343,6 +343,7 @@ class FB15k237Dataset(KnowledgeGraphDataset):
     Number of relation types: 237
     Number of reversed relation types: 237
     Label Split: Train: 272115 ,Valid: 17535, Test: 20466
+
     Parameters
     ----------
     reverse : bool
@@ -369,6 +370,7 @@ class FB15k237Dataset(KnowledgeGraphDataset):
             - ndata['ntype']: node type. All 0 in this dataset
         num_nodes: Number of nodes
         num_rels: Number of relation types
+
     Examples
     ----------
     >>> dataset = FB15k237Dataset()
@@ -417,6 +419,7 @@ class FB15kDataset(KnowledgeGraphDataset):
     Number of relation types: 1,345
     Number of reversed relation types: 1,345
     Label Split: Train: 483142 ,Valid: 50000, Test: 59071
+
     Parameters
     ----------
     reverse : bool
@@ -443,6 +446,7 @@ class FB15kDataset(KnowledgeGraphDataset):
             - ndata['ntype']: node type. All 0 in this dataset
         num_nodes: Number of nodes
         num_rels: Number of relation types
+
     Examples
     ----------
     >>> dataset = FB15kDataset()
@@ -502,6 +506,7 @@ class WN18Dataset(KnowledgeGraphDataset):
         Whether to reload the dataset. Default: False
     verbose: bool
         Whether to print out progress information. Default: True.
+
     Returns
     ----------
     WN18Dataset object with three properties:
@@ -516,6 +521,7 @@ class WN18Dataset(KnowledgeGraphDataset):
             - ndata['ntype']: node type. All 0 in this dataset
         num_nodes: Number of nodes
         num_rels: Number of relation types
+
     Examples
     ----------
     >>> dataset = WN18Dataset()
