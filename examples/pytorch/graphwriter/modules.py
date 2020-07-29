@@ -148,6 +148,7 @@ class GraphTrans(nn.Module):
 
     def forward(self, ent, ent_mask, ent_len, rel, rel_mask, graphs):
         device = ent.device
+        graphs = graphs.to(device)
         ent_mask = (ent_mask==0) # reverse mask
         rel_mask = (rel_mask==0)
         init_h = []
