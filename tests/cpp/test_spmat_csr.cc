@@ -241,6 +241,7 @@ TEST(SpmatTest, CSRGetData) {
   _TestCSRGetData<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
   _TestCSRGetData<int32_t>(GPU);
+  _TestCSRGetData<int64_t>(GPU);
 #endif
 }
 
@@ -443,6 +444,7 @@ TEST(SpmatTest, CSRSliceMatrix) {
   _TestCSRSliceMatrix<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
   _TestCSRSliceMatrix<int32_t>(GPU);
+  _TestCSRSliceMatrix<int64_t>(GPU);
 #endif
 }
 
@@ -459,6 +461,7 @@ TEST(SpmatTest, CSRHasDuplicate) {
   _TestCSRHasDuplicate<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
   _TestCSRHasDuplicate<int32_t>(GPU);
+  _TestCSRHasDuplicate<int64_t>(GPU);
 #endif
 }
 
