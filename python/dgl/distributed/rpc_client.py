@@ -100,6 +100,7 @@ def get_local_usable_addr():
 INITIALIZED = False
 
 def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
+    print("CONNECT")
     """Connect this client to server.
 
     Parameters
@@ -218,8 +219,9 @@ def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='so
     ctx = mp.get_context("spawn")
     global SAMPLER_POOL
     global NUM_SAMPLER_WORKERS
-    SAMPLER_POOL = ctx.Pool(
-        num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size, net_type))
+    if num_workers > 0:
+        SAMPLER_POOL = ctx.Pool(
+            num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size, net_type))
     NUM_SAMPLER_WORKERS = num_workers
     connect_to_server(ip_config, max_queue_size, net_type)
 
