@@ -506,7 +506,7 @@ class DeleteDataRequest(rpc.Request):
         res = DeleteDataResponse(DELETE_MSG)
         return res
 
-REGISTER_ROLE = 901240
+REGISTER_ROLE = 901241
 ROLE_MSG = "Register_Role"
 
 class RegisterRoleResponse(rpc.Response):
