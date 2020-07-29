@@ -717,6 +717,7 @@ class KVServer(object):
 
     @property
     def role(self):
+        """Get client role"""
         return self._role
 
     @property
