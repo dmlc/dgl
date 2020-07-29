@@ -265,6 +265,7 @@ TEST(SpmatTest, COOSort) {
   _TestCOOSort<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
   _TestCOOSort<int32_t>(GPU);
+  _TestCOOSort<int64_t>(GPU);
 #endif
 }
 
