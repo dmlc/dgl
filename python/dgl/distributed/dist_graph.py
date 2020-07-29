@@ -12,7 +12,7 @@ from .kvstore import KVServer, KVClient
 from .standalone_kvstore import KVClient as SA_KVClient
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
-from .partition import load_partition
+from .partition import load_partition, load_partition_book
 from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
 from .graph_partition_book import NODE_PART_POLICY, EDGE_PART_POLICY
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
@@ -24,28 +24,32 @@ from .dist_tensor import DistTensor, _get_data_name
 
 INIT_GRAPH = 800001
 
-def InitGraphRequest(rpc.Request):
+class InitGraphRequest(rpc.Request):
     """ Init graph on the backup servers.
 
     When the backup server starts, they don't load the graph structure.
     This request tells the backup servers that they can map to the graph structure
     with shared memory.
     """
-    def __init__(self, graph_name):
+    def __init__(self, graph_name, data_names):
         self._graph_name = graph_name
+        self._data_names = data_names
 
     def __getstate__(self):
-        return self._graph_name
+        return self._graph_name, self._data_names
 
     def __setstate__(self, state):
-        self._graph_name = state
+        self._graph_name, self._data_names = state
 
     def process_request(self, server_state):
         if server_state.graph is None:
             server_state.graph = _get_graph_from_shared_mem(self._graph_name)
+            for name in self._data_names:
+                policy = NODE_PART_POLICY if _is_ndata_name(name) else EDGE_PART_POLICY
+                self.init_data(name=name, policy_str=policy)
         return InitGraphResponse(self._graph_name)
 
-def InitGraphResponse(rpc.Response):
+class InitGraphResponse(rpc.Response):
     """ Ack the init graph request
     """
     def __init__(self, graph_name):
@@ -263,7 +267,6 @@ class DistGraphServer(KVServer):
             if not disable_shared_mem:
                 self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)
 
-        # Init kvstore.
         if not disable_shared_mem:
             self.gpb.shared_memory(graph_name)
         assert self.gpb.partid == self.part_id
@@ -279,13 +282,6 @@ class DistGraphServer(KVServer):
                 self.init_data(name=_get_data_name(name, EDGE_PART_POLICY),
                                policy_str=EDGE_PART_POLICY,
                                data_tensor=edge_feats[name])
-        else:
-            for name in node_feats:
-                self.init_data(name=_get_data_name(name, NODE_PART_POLICY),
-                               policy_str=NODE_PART_POLICY)
-            for name in edge_feats:
-                self.init_data(name=_get_data_name(name, EDGE_PART_POLICY),
-                               policy_str=EDGE_PART_POLICY)
 
     def start(self):
         """ Start graph store server.
@@ -354,8 +350,9 @@ class DistGraph:
             if self._gpb is None:
                 self._gpb = gpb
 
+            data_names = self._client.data_name_list()
             for server_id in range(self._client.num_servers):
-                rpc.send_request(server_id, InitGraphRequest(graph_name))
+                rpc.send_request(server_id, InitGraphRequest(graph_name, data_names))
             for server_id in range(self._client.num_servers):
                 rpc.recv_response()
             self._client.barrier()
