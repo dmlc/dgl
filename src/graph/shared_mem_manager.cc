@@ -120,8 +120,8 @@ bool SharedMemManager::CreateFromSharedMem<COOMatrix>(COOMatrix *coo,
 template <>
 bool SharedMemManager::CreateFromSharedMem<CSRMatrix>(CSRMatrix *csr,
                                                       std::string name) {
-  CreateFromSharedMem(&csr->indices, name + "_indices");
   CreateFromSharedMem(&csr->indptr, name + "_indptr");
+  CreateFromSharedMem(&csr->indices, name + "_indices");
   CreateFromSharedMem(&csr->data, name + "_data");
   strm_->Read(&csr->num_rows);
   strm_->Read(&csr->num_cols);
