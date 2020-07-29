@@ -207,7 +207,8 @@ class BarrierRequest(rpc.Request):
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
-        kv_store.barrier_count[self.role] += 1
+        count = kv_store.barrier_count[self.role]
+        kv_store.barrier_count[self.role] = count + 1
         if kv_store.barrier_count[self.role] == len(kv_store.role[self.role]):
             kv_store.barrier_count[self.role] = 0
             res_list = []
