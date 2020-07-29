@@ -872,7 +872,7 @@ class KVClient(object):
         # recv reponse from all the server nodes
         for _ in range(self._server_count):
             reponse = rpc.recv_response()
-            assert response.msg = ROLE_MSG
+            assert response.msg == ROLE_MSG
 
     @property
     def client_id(self):
