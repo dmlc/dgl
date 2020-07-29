@@ -511,7 +511,7 @@ class SkipGramModel(nn.Module):
         valid_seeds = torch.LongTensor(dataset.valid_seeds)
         valid_embedding = self.u_embeddings.weight.cpu().data.index_select(0, 
             valid_seeds)
-        embedding.index_add_(0, valid_seeds, self.u_embeddings.weight.cpu().data)
+        embedding.index_add_(0, valid_seeds, valid_embedding)
 
         if self.norm:
             embedding /= torch.sqrt(torch.sum(embedding.mul(embedding), 1) + 1e-6).unsqueeze(1)
