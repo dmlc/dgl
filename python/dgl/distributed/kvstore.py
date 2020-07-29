@@ -547,7 +547,7 @@ class RegisterRoleRequest(rpc.Request):
         role = kv_store.role
         if self.role not in role:
             role[self.role] = set()
-        role[self.role].add(client_id)
+        role[self.role].add(self.client_id)
         res = RegisterRoleResponse(ROLE_MSG)
         return res
 
