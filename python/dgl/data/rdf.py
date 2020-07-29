@@ -377,6 +377,7 @@ class RDFGraphDataset(DGLBuiltinDataset):
         return idx
 
     def has_cache(self):
+        """check if there is a processed data"""
         graph_path = os.path.join(self.save_path,
                                   self.save_name + '.bin')
         info_path = os.path.join(self.save_path,
@@ -535,18 +536,6 @@ def _get_id(dict, key):
         id = len(dict)
         dict[key] = id
     return id
-
-def save_strlist(filename, strlist):
-    with open(filename, 'w') as f:
-        for s in strlist:
-            f.write(s + '\n')
-
-def load_strlist(filename):
-    with open(filename, 'r') as f:
-        ret = []
-        for line in f:
-            ret.append(line.strip())
-        return ret
 
 class AIFBDataset(RDFGraphDataset):
     r"""AIFB dataset.
