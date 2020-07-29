@@ -506,6 +506,51 @@ class DeleteDataRequest(rpc.Request):
         res = DeleteDataResponse(DELETE_MSG)
         return res
 
+REGISTER_ROLE = 901240
+ROLE_MSG = "Register_Role"
+
+class RegisterRoleResponse(rpc.response):
+    """Send a confirmation signal (just a short string message)
+    of RegisterRoleRequest to client.
+    """
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __getstate__(self):
+        return self.msg
+
+    def __setstate__(self, state):
+        self.msg = state
+
+class RegisterRoleRequest(rpc.request):
+    """Send client id and role to server
+
+    Parameters
+    ----------
+    client_id : int
+        ID of client
+    role : str
+        role of client
+    """
+    def __init__(self, client_id, role):
+        self.client_id = client_id
+        self.role = role
+
+    def __getstate__(self):
+        return self.client_id, self.role
+
+    def __setstate__(self, state):
+        self.client_id, self.role = state
+
+    def process_request(self, server_state):
+        kv_store = server_state.kv_store
+        role = kv_store.role
+        if self.role not in role:
+            role[self.role] = set()
+        role[self.role].add(client_id)
+        res = RegisterRoleResponse(ROLE_MSG)
+        return res
+
 ############################ KVServer ###############################
 
 def default_push_handler(target, name, id_tensor, data_tensor):
@@ -604,6 +649,9 @@ class KVServer(object):
         rpc.register_service(DELETE_DATA,
                              DeleteDataRequest,
                              DeleteDataResponse)
+        rpc.register_service(REGISTER_ROLE,
+                             RegisterRoleRequest,
+                             RegisterRoleResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
         # Store the partition information with specified data name
@@ -624,6 +672,8 @@ class KVServer(object):
         # push and pull handler
         self._push_handlers = {}
         self._pull_handlers = {}
+        # store client role
+        self._role = {}
 
     @property
     def server_id(self):
@@ -664,6 +714,10 @@ class KVServer(object):
     def push_handlers(self):
         """Get push handler"""
         return self._push_handlers
+
+    @property
+    def role(self):
+        return self._role
 
     @property
     def pull_handlers(self):
@@ -748,8 +802,10 @@ class KVClient(object):
     ----------
     ip_config : str
         Path of IP configuration file.
+    role : str
+        We can set different role for kvstore.
     """
-    def __init__(self, ip_config):
+    def __init__(self, ip_config, role='default'):
         assert rpc.get_rank() != -1, 'Please invoke rpc.connect_to_server() \
         before creating KVClient.'
         assert os.path.exists(ip_config), 'Cannot open file: %s' % ip_config
@@ -784,6 +840,9 @@ class KVClient(object):
         rpc.register_service(DELETE_DATA,
                              DeleteDataRequest,
                              DeleteDataResponse)
+        rpc.register_service(REGISTER_ROLE,
+                             RegisterRoleRequest,
+                             RegisterRoleResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
         # Store the partition information with specified data name
@@ -805,6 +864,15 @@ class KVClient(object):
         # push and pull handler
         self._pull_handlers = {}
         self._push_handlers = {}
+        # register role on each server
+        self._role = role
+        request = RegisterRoleRequest(self._client_id, self._role)
+        for server_id in range(self._server_count):
+            rpc.send_request(server_id, request)
+        # recv reponse from all the server nodes
+        for _ in range(self._server_count):
+            reponse rpc.recv_response()
+            assert response.msg = ROLE_MSG
 
     @property
     def client_id(self):
