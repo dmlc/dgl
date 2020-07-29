@@ -6,9 +6,9 @@ the Semantic Web"
 import os
 from collections import OrderedDict
 import itertools
-import rdflib as rdf
 import abc
 import re
+import rdflib as rdf
 
 import networkx as nx
 import numpy as np
@@ -16,10 +16,8 @@ import numpy as np
 import dgl
 import dgl.backend as F
 from .dgl_dataset import DGLBuiltinDataset
-from .utils import download, extract_archive, get_download_dir
-from .utils import save_graphs, load_graphs, save_info, load_info, makedirs, _get_dgl_url
+from .utils import save_graphs, load_graphs, save_info, load_info, _get_dgl_url
 from .utils import generate_mask_tensor, idx2mask, deprecate_property, deprecate_class
-from ..utils import retry_method_with_fix
 
 __all__ = ['AIFB', 'MUTAG', 'BGS', 'AM', 'AIFBDataset', 'MUTAGDataset', 'BGSDataset', 'AMDataset']
 
@@ -39,8 +37,8 @@ class Entity:
     cls : str
         Type of this entity
     """
-    def __init__(self, id, cls):
-        self.id = id
+    def __init__(self, e_id, cls):
+        self.id = e_id
         self.cls = cls
 
     def __str__(self):
@@ -128,8 +126,19 @@ class RDFGraphDataset(DGLBuiltinDataset):
         self.process_raw_tuples(raw_tuples, self.raw_path)
 
     def load_raw_tuples(self, root_path):
+        """Loading raw RDF dataset
+
+        Parameters
+        ----------
+        root_path : str
+            Root path containing the data
+
+        Returns
+        -------
+            Loaded rdf data
+        """
         raw_rdf_graphs = []
-        for i, filename in enumerate(os.listdir(root_path)):
+        for _, filename in enumerate(os.listdir(root_path)):
             fmt = None
             if filename.endswith('nt'):
                 fmt = 'nt'
@@ -144,6 +153,15 @@ class RDFGraphDataset(DGLBuiltinDataset):
         return itertools.chain(*raw_rdf_graphs)
 
     def process_raw_tuples(self, raw_tuples, root_path):
+        """Processing raw RDF dataset
+
+        Parameters
+        ----------
+        raw_tuples:
+            Raw rdf tuples
+        root_path: str
+            Root path containing the data
+        """
         mg = nx.MultiDiGraph()
         ent_classes = OrderedDict()
         rel_classes = OrderedDict()
@@ -233,6 +251,29 @@ class RDFGraphDataset(DGLBuiltinDataset):
         self._test_idx = F.tensor(test_idx)
 
     def build_graph(self, mg, src, dst, ntid, etid, ntypes, etypes):
+        """Build the graphs
+
+        Parameters
+        ----------
+        mg: MultiDiGraph
+            Input graph
+        src: Numpy array
+            Source nodes
+        dst: Numpy array
+            Destination nodes
+        ntid: Numpy array
+            Node types for each node
+        etid: Numpy array
+            Edge types for each edge
+        ntypes: list
+            Node types
+        etypes: list
+            Edge types
+
+        Returns
+        -------
+        g: DGLGraph
+        """
         # create homo graph
         if self.verbose:
             print('Creating one whole graph ...')
@@ -265,6 +306,26 @@ class RDFGraphDataset(DGLBuiltinDataset):
         return hg
 
     def load_data_split(self, ent2id, root_path):
+        """Load data split
+
+        Parameters
+        ----------
+        ent2id: func
+            A function mapping entity to id
+        root_path: str
+            Root path containing the data
+
+        Return
+        ------
+        train_idx: Numpy array
+            Training set
+        test_idx: Numpy array
+            Testing set
+        labels: Numpy array
+            Labels
+        num_classes: int
+            Number of classes
+        """
         label_dict = {}
         labels = np.zeros((self._hg.number_of_nodes(self.predict_category),)) - 1
         train_idx = self.parse_idx_file(
@@ -280,6 +341,24 @@ class RDFGraphDataset(DGLBuiltinDataset):
         return train_idx, test_idx, labels, num_classes
 
     def parse_idx_file(self, filename, ent2id, label_dict, labels):
+        """Parse idx files
+
+        Parameters
+        ----------
+        filename: str
+            File to parse
+        ent2id: func
+            A function mapping entity to id
+        label_dict: dict
+            Map label to label id
+        labels: dict
+            Map entity id to label id
+
+        Return
+        ------
+        idx: list
+            Entity idss
+        """
         idx = []
         with open(filename, 'r') as f:
             for i, line in enumerate(f):

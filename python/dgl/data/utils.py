@@ -5,11 +5,10 @@ import os
 import sys
 import hashlib
 import warnings
-import numpy as np
-import warnings
 import requests
 import pickle
 import errno
+import numpy as np
 
 from .graph_serialize import save_graphs, load_graphs, load_labels
 from .tensor_serialize import save_tensors, load_tensors
