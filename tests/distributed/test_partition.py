@@ -115,7 +115,6 @@ def test_partition():
 
 def test_hetero_partition():
     g = create_random_graph(10000)
-    g = dgl.as_heterograph(g)
     check_partition(g, 'metis', True)
     check_partition(g, 'metis', False)
     check_partition(g, 'random', True)
