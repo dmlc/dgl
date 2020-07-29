@@ -816,6 +816,11 @@ class KVClient(object):
         """Get machine ID"""
         return self._machine_id
 
+    @property
+    def num_servers(self):
+        """Get the number of servers"""
+        return self._server_count
+
     def barrier(self):
         """Barrier for all client nodes.
 
