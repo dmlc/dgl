@@ -509,7 +509,7 @@ class DeleteDataRequest(rpc.Request):
 REGISTER_ROLE = 901240
 ROLE_MSG = "Register_Role"
 
-class RegisterRoleResponse(rpc.response):
+class RegisterRoleResponse(rpc.Response):
     """Send a confirmation signal (just a short string message)
     of RegisterRoleRequest to client.
     """
@@ -522,7 +522,7 @@ class RegisterRoleResponse(rpc.response):
     def __setstate__(self, state):
         self.msg = state
 
-class RegisterRoleRequest(rpc.request):
+class RegisterRoleRequest(rpc.Request):
     """Send client id and role to server
 
     Parameters
