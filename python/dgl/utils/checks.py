@@ -2,9 +2,8 @@
 # pylint: disable=invalid-name
 from __future__ import absolute_import, division
 
-from ..base import DGLError, dgl_warning
+from ..base import DGLError
 from .. import backend as F
-from .internal import to_dgl_context
 
 def prepare_tensor(g, data, name):
     """Convert the data to ID tensor and check its ID type and context.
