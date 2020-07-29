@@ -23,7 +23,7 @@ from .rpc_server import start_server
 from .dist_tensor import DistTensor, _get_data_name
 
 def _copy_graph_to_shared_mem(g, graph_name):
-    new_g = g.shared_memory(graph_name, formats=('csc',))
+    new_g = g.shared_memory(graph_name, formats='csc')
     # We should share the node/edge data to the client explicitly instead of putting them
     # in the KVStore because some of the node/edge data may be duplicated.
     local_node_path = _get_ndata_path(graph_name, 'inner_node')

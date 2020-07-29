@@ -4839,7 +4839,7 @@ class DGLHeteroGraph(object):
         ----------
         name : str
             The name of the shared memory.
-        formats : list of str (optional)
+        formats : str or a list of str (optional)
             Desired formats to be materialized.
 
         Returns
@@ -4849,7 +4849,8 @@ class DGLHeteroGraph(object):
         """
         assert len(name) > 0, "The name of shared memory cannot be empty"
         assert len(formats) > 0
-        assert isinstance(formats, (list, tuple)), 'formats must be a list or a tuple'
+        if isinstance(formats, str):
+            formats = [formats]
         for fmt in formats:
             assert fmt in ("coo", "csr", "csc"), '{} is not coo, csr or csc'.format(fmt)
         gidx = self._graph.shared_memory(name, self.ntypes, self.etypes, formats)
