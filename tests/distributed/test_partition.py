@@ -14,11 +14,7 @@ import random
 
 def create_random_graph(n):
     arr = (spsp.random(n, n, density=0.001, format='coo', random_state=100) != 0).astype(np.int64)
-    arr = arr.tocoo()
-    row = F.tensor(arr.row, dtype=F.int64)
-    col = F.tensor(arr.col, dtype=F.int64)
-    ig = create_unitgraph_from_coo(1, n, n, row, col, ['coo', 'csr', 'csc'])
-    return dgl.DGLGraph(ig)
+    return dgl.graph(arr)
 
 def check_partition(g, part_method, reshuffle):
     g.ndata['labels'] = F.arange(0, g.number_of_nodes())

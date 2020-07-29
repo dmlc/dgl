@@ -51,11 +51,7 @@ def get_local_usable_addr():
 
 def create_random_graph(n):
     arr = (spsp.random(n, n, density=0.001, format='coo', random_state=100) != 0).astype(np.int64)
-    arr = arr.tocoo()
-    row = F.tensor(arr.row, dtype=F.int64)
-    col = F.tensor(arr.col, dtype=F.int64)
-    ig = create_unitgraph_from_coo(1, n, n, row, col, ['coo', 'csr', 'csc'])
-    return dgl.DGLGraph(ig)
+    return dgl.graph(arr)
 
 def run_server(graph_name, server_id, num_clients, shared_mem):
     g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients,
