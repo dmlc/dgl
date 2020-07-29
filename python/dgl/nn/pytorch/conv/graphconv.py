@@ -13,16 +13,16 @@ from ....utils import expand_as_pair
 class GraphConv(nn.Module):
     r"""Apply graph convolution over an input signal.
 
-    Graph convolution is introduced in `GCN <https://arxiv.org/abs/1609.02907>`__
-    and can be described as below:
+    Graph convolution was introduced in `GCN <https://arxiv.org/abs/1609.02907>`__
+    and mathematically is defined as follows:
 
     .. math::
       h_i^{(l+1)} = \sigma(b^{(l)} + \sum_{j\in\mathcal{N}(i)}\frac{1}{c_{ij}}h_j^{(l)}W^{(l)})
 
-    where :math:`\mathcal{N}(i)` is the neighbor set of node :math:`i`. :math:`c_{ij}` is equal
-    to the product of the square root of node degrees:
-    :math:`\sqrt{|\mathcal{N}(i)|}\sqrt{|\mathcal{N}(j)|}`. :math:`\sigma` is an activation
-    function.
+    where :math:`\mathcal{N}(i)` is the set of neighbors of node :math:`i`,
+    :math:`c_{ij}` is the product of the square root of node degrees
+    (i.e.,  :math:`c_{ij} = \sqrt{|\mathcal{N}(i)|}\sqrt{|\mathcal{N}(j)|}`,
+    and :math:`\sigma` is an activation function.
 
     The model parameters are initialized as in the
     `original implementation <https://github.com/tkipf/gcn/blob/master/gcn/layers.py>`__ where
@@ -31,23 +31,26 @@ class GraphConv(nn.Module):
 
     Notes
     -----
-    Zero in-degree nodes could lead to invalid normalizer. A common practice
-    to avoid this is to add a self-loop for each node in the graph if it is homogeneous,
-    which can be achieved by:
+    Zero in-degree nodes will lead to invalid normalizer. A common practice
+    to avoid this is to add a self-loop for each node in the graph if it is
+    homogeneous, which can be achieved by:
 
-    >>> g = ... # some DGLGraph
+    >>> g = ... # a DGLGraph
     >>> dgl.add_self_loop(g)
 
-    If we can't do the above in advance for some reason, we need to set add_self_loop to ``True``.
+    If we can't do the above in advance for some reason, we need to set
+    add_self_loop to ``True``.
 
-    For heterogeneous graph, it doesn't make sense to add self-loop. Then we need to filter out the destination nodes with zero in-degree when use in downstream.
+    For heterogeneous graph, it doesn't make sense to add self-loop.
+    Then we need to filter out the destination nodes with zero in-degree
+    when use in downstream.
 
     Parameters
     ----------
     in_feats : int
-        Input feature size.
+        Input feature size; i.e, the number of dimensions of :math:`h_j^{(l)}`.
     out_feats : int
-        Output feature size.
+        Output feature size; i.e., the number of dimensions of :math:`h_i^{(l+1)}`.
     norm : str, optional
         How to apply the normalizer. If is `'right'`, divide the aggregated messages
         by each node's in-degrees, which is equivalent to averaging the received messages.
@@ -62,9 +65,11 @@ class GraphConv(nn.Module):
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
     allow_zero_in_degree: bool, optional
-        If there are 0-in-degree nodes in the graph, output for those nodes will be invalid (all zeros in our implementation).
-        This is harmful for some applications causing silent performance regression. Thus we will let the code break if
-        we detect 0-in-degree nodes. However, we provide the flexibilty to suppress this check by setting ``True`` to this param.
+        If there are 0-in-degree nodes in the graph, output for those nodes will be invalid
+        since no message will be passed to those nodes. This is harmful for some applications
+        causing silent performance regression. Thus we will let the code break if we detect
+        0-in-degree nodes in input graph. However, we provide the flexibilty to suppress this check
+        by setting ``True`` to this param.
 
     Attributes
     ----------
