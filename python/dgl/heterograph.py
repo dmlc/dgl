@@ -268,9 +268,6 @@ class DGLHeteroGraph(object):
                 self._etype2canonical[ety] = self._canonical_etypes[i]
         self._etypes_invmap = {t : i for i, t in enumerate(self._canonical_etypes)}
 
-        # Cached metagraph in networkx
-        self._nx_metagraph = None
-
         # node and edge frame
         if node_frames is None:
             node_frames = [None] * len(self._ntypes)
@@ -322,7 +319,7 @@ class DGLHeteroGraph(object):
                           for i in range(len(self.ntypes))}
             nedge_dict = {self.canonical_etypes[i] : self._graph.number_of_edges(i)
                           for i in range(len(self.etypes))}
-            meta = str(self.metagraph.edges(keys=True))
+            meta = str(self.metagraph().edges(keys=True))
             return ret.format(node=nnode_dict, edge=nedge_dict, meta=meta)
 
     def __copy__(self):
@@ -947,7 +944,6 @@ class DGLHeteroGraph(object):
         else:
             return self.ntypes
 
-    @property
     def metagraph(self):
         """Return the metagraph as networkx.MultiDiGraph.
 
@@ -964,7 +960,7 @@ class DGLHeteroGraph(object):
         >>> follows_g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
         >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 1, 1]), 'user', 'plays', 'game')
         >>> g = dgl.hetero_from_relations([follows_g, plays_g])
-        >>> meta_g = g.metagraph
+        >>> meta_g = g.metagraph()
 
         The metagraph then has two nodes and two edges.
 
@@ -977,13 +973,12 @@ class DGLHeteroGraph(object):
         >>> meta_g.number_of_edges()
         2
         """
-        if self._nx_metagraph is None:
-            nx_graph = self._graph.metagraph.to_networkx()
-            self._nx_metagraph = nx.MultiDiGraph()
-            for u_v in nx_graph.edges:
-                srctype, etype, dsttype = self.canonical_etypes[nx_graph.edges[u_v]['id']]
-                self._nx_metagraph.add_edge(srctype, dsttype, etype)
-        return self._nx_metagraph
+        nx_graph = self._graph.metagraph.to_networkx()
+        nx_metagraph = nx.MultiDiGraph()
+        for u_v in nx_graph.edges:
+            srctype, etype, dsttype = self.canonical_etypes[nx_graph.edges[u_v]['id']]
+            nx_metagraph.add_edge(srctype, dsttype, etype)
+        return nx_metagraph
 
     def to_canonical_etype(self, etype):
         """Convert edge type to canonical etype: (srctype, etype, dsttype).
@@ -5252,7 +5247,7 @@ class DGLBlock(DGLHeteroGraph):
                              for ntype in self.dsttypes}
             nedge_dict = {etype : self.number_of_edges(etype)
                           for etype in self.canonical_etypes}
-            meta = str(self.metagraph.edges(keys=True))
+            meta = str(self.metagraph().edges(keys=True))
             return ret.format(
                 srcnode=nsrcnode_dict, dstnode=ndstnode_dict, edge=nedge_dict, meta=meta)
 
