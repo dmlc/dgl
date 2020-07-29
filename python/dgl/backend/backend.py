@@ -1377,7 +1377,7 @@ def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
     """
     pass
 
-def gspmm(g, op, reduce_op, lhs_data, rhs_data):
+def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     r""" Generalized Sparse Matrix Multiplication interface.
     It fuses two steps into one kernel.
     (1) Computes messages by :attr:`op` source node and edge features.
@@ -1395,7 +1395,7 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    gidx : HeteroGraphIndex
         The input graph.
     op : str
         The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``,
@@ -1414,7 +1414,7 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     """
     pass
 
-def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
+def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
     It computes edge features by :attr:`op` lhs features and rhs features.
 
@@ -1428,7 +1428,7 @@ def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    gidx : HeteroGraphIndex
         The input graph.
     op : str
         Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``,
