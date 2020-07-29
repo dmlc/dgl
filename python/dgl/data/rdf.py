@@ -221,9 +221,11 @@ class RDFGraphDataset(DGLBuiltinDataset):
         test_mask = idx2mask(test_idx, self._hg.number_of_nodes(self.predict_category))
         labels = F.tensor(labels, F.data_type_dict['int64'])
 
-        self._train_mask = generate_mask_tensor(train_mask)
-        self._test_mask = generate_mask_tensor(test_mask)
-        self._labels = labels
+        train_mask = generate_mask_tensor(train_mask)
+        test_mask = generate_mask_tensor(test_mask)
+        self._hg.nodes[self.predict_category].data['train_mask'] = train_mask
+        self._hg.nodes[self.predict_category].data['test_mask'] = test_mask
+        self._hg.nodes[self.predict_category].data['labels'] = labels
         self._num_classes = num_classes
 
         # save for compatability
@@ -312,9 +314,6 @@ class RDFGraphDataset(DGLBuiltinDataset):
                                   self.save_name + '.bin')
         info_path = os.path.join(self.save_path,
                                  self.save_name + '.pkl')
-        self._hg.nodes[self.predict_category].data['train_mask'] = self._train_mask
-        self._hg.nodes[self.predict_category].data['test_mask'] = self._test_mask
-        self._hg.nodes[self.predict_category].data['labels'] = self._labels
         save_graphs(str(graph_path), self._hg)
         save_info(str(info_path), {'num_classes': self.num_classes,
                                    'predict_category': self.predict_category})
@@ -331,24 +330,19 @@ class RDFGraphDataset(DGLBuiltinDataset):
         self._num_classes = info['num_classes']
         self._predict_category = info['predict_category']
         self._hg = graphs[0]
-        train_mask = self._hg.nodes[self.predict_category].data.pop('train_mask')
-        test_mask = self._hg.nodes[self.predict_category].data.pop('test_mask')
+        train_mask = self._hg.nodes[self.predict_category].data['train_mask']
+        test_mask = self._hg.nodes[self.predict_category].data['test_mask']
+        self._labels = self._hg.nodes[self.predict_category].data['labels']
 
         train_idx = F.nonzero_1d(train_mask)
         test_idx = F.nonzero_1d(test_mask)
-        self._train_mask = train_mask
-        self._test_mask = test_mask
         self._train_idx = train_idx
         self._test_idx = test_idx
-        self._labels = self._hg.nodes[self.predict_category].data.pop('labels')
 
     def __getitem__(self, idx):
         r"""Gets the graph object
         """
         g = self._hg
-        g.nodes[self.predict_category].data['train_mask'] = self._train_mask
-        g.nodes[self.predict_category].data['test_mask'] = self._test_mask
-        g.nodes[self.predict_category].data['labels'] = self._labels
         return g
 
     def __len__(self):

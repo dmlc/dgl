@@ -72,13 +72,13 @@ def main(args):
         val_idx = train_idx
 
     # calculate norm for each edge type and store in edge
-    for canonical_etypes in hg.canonical_etypes:
-        u, v, eid = hg.all_edges(form='all', etype=canonical_etypes)
+    for canonical_etype in hg.canonical_etypes:
+        u, v, eid = hg.all_edges(form='all', etype=canonical_etype)
         v = v.asnumpy()
         _, inverse_index, count = np.unique(v, return_inverse=True, return_counts=True)
         degrees = count[inverse_index]
         norm = np.ones(eid.shape[0]) / degrees
-        hg.edges[canonical_etypes].data['norm'] = mx.nd.expand_dims(mx.nd.array(norm), axis=1)
+        hg.edges[canonical_etype].data['norm'] = mx.nd.expand_dims(mx.nd.array(norm), axis=1)
 
     # get target category id
     category_id = len(hg.ntypes)
