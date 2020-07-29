@@ -286,27 +286,12 @@ class DGLHeteroGraph(object):
                        for i, frame in enumerate(edge_frames)]
         self._edge_frames = edge_frames
 
-    def __getstate__(self):
-        metainfo = (self._ntypes, self._etypes, self._canonical_etypes,
-                    self._srctypes_invmap, self._dsttypes_invmap,
-                    self._is_unibipartite, self._etype2canonical, self._etypes_invmap)
-        return (self._graph, metainfo,
-                self._node_frames, self._edge_frames,
-                self._batch_num_nodes, self._batch_num_edges)
-
     def __setstate__(self, state):
         # Compatibility check
         # TODO: version the storage
-        if isinstance(state, tuple) and len(state) == 6:
-            # DGL >= 0.5
-            #TODO(minjie): too many states in python; should clean up and lower to C
-            self._nx_metagraph = None
-            (self._graph, metainfo, self._node_frames, self._edge_frames,
-             self._batch_num_nodes, self._batch_num_edges) = state
-            (self._ntypes, self._etypes, self._canonical_etypes,
-             self._srctypes_invmap, self._dsttypes_invmap,
-             self._is_unibipartite, self._etype2canonical,
-             self._etypes_invmap) = metainfo
+        if isinstance(state, dict):
+            # Since 0.5 we use the default __dict__ method
+            self.__dict__.update(state)
         elif isinstance(state, tuple) and len(state) == 5:
             # DGL == 0.4.3
             dgl_warning("The object is pickled with DGL == 0.4.3.  "
@@ -345,20 +330,7 @@ class DGLHeteroGraph(object):
         #TODO(minjie): too many states in python; should clean up and lower to C
         cls = type(self)
         obj = cls.__new__(cls)
-        obj._graph = self._graph
-        obj._batch_num_nodes = self._batch_num_nodes
-        obj._batch_num_edges = self._batch_num_edges
-        obj._ntypes = self._ntypes
-        obj._etypes = self._etypes
-        obj._canonical_etypes = self._canonical_etypes
-        obj._srctypes_invmap = self._srctypes_invmap
-        obj._dsttypes_invmap = self._dsttypes_invmap
-        obj._is_unibipartite = self._is_unibipartite
-        obj._etype2canonical = self._etype2canonical
-        obj._etypes_invmap = self._etypes_invmap
-        obj._nx_metagraph = self._nx_metagraph
-        obj._node_frames = self._node_frames
-        obj._edge_frames = self._edge_frames
+        obj.__dict__.update(self.__dict__)
         return obj
 
     #################################################################
