@@ -193,26 +193,25 @@ class BarrierRequest(rpc.Request):
 
     Parameters
     ----------
-    msg : string
-        string msg
+    role : string
+        client role
     """
-    def __init__(self, msg):
-        self.msg = msg
+    def __init__(self, role):
+        self.role = role
 
     def __getstate__(self):
-        return self.msg
+        return self.role
 
     def __setstate__(self, state):
-        self.msg = state
+        self.role = state
 
     def process_request(self, server_state):
-        assert self.msg == BARRIER_MSG
         kv_store = server_state.kv_store
-        kv_store.barrier_count = kv_store.barrier_count + 1
-        if kv_store.barrier_count == kv_store.num_clients:
-            kv_store.barrier_count = 0
+        kv_store.barrier_count[self.role] += 1
+        if kv_store.barrier_count[self.role] == len(kv_store.role[self.role]):
+            kv_store.barrier_count[self.role] = 0
             res_list = []
-            for target_id in range(kv_store.num_clients):
+            for target_id in kv_store.role[self.role]:
                 res_list.append((target_id, BarrierResponse(BARRIER_MSG)))
             return res_list
         return None
@@ -547,6 +546,7 @@ class RegisterRoleRequest(rpc.Request):
         role = kv_store.role
         if self.role not in role:
             role[self.role] = set()
+            kv_store.barrier_count[self.role] = 0
         role[self.role].add(self.client_id)
         res = RegisterRoleResponse(ROLE_MSG)
         return res
@@ -668,7 +668,7 @@ class KVServer(object):
         # We assume partition_id is equal to machine_id
         self._part_id = self._machine_id
         self._num_clients = num_clients
-        self._barrier_count = 0
+        self._barrier_count = {}
         # push and pull handler
         self._push_handlers = {}
         self._pull_handlers = {}
@@ -889,7 +889,7 @@ class KVClient(object):
 
         This API will be blocked untill all the clients invoke this API.
         """
-        request = BarrierRequest(BARRIER_MSG)
+        request = BarrierRequest(self._role)
         # send request to all the server nodes
         for server_id in range(self._server_count):
             rpc.send_request(server_id, request)
