@@ -97,7 +97,7 @@ class RDFGraphDataset(DGLBuiltinDataset):
     predict_category : str
         Predict category.
     print_every : int, optional
-        Log for every X tuples.
+        Preprocessing log for every X tuples.
     insert_reverse : bool, optional
         If true, add reverse edge and reverse relations to the final graph.
     raw_dir : str
@@ -320,6 +320,7 @@ class RDFGraphDataset(DGLBuiltinDataset):
                                    'predict_category': self.predict_category})
 
     def load(self):
+        """load the graph list and the labels from disk"""
         graph_path = os.path.join(self.save_path,
                                   self.save_name + '.bin')
         info_path = os.path.join(self.save_path,
@@ -475,23 +476,21 @@ def load_strlist(filename):
         return ret
 
 class AIFBDataset(RDFGraphDataset):
-    """AIFB dataset.
+    r"""AIFB dataset.
      AIFB DataSet is a Semantic Web (RDF) dataset used as a benchmark in
      data mining.  It records the organizational structure of AIFB at the
      University of Karlsruhe.
     Statistics
     ===
-    Nodes: 19717
-    Edges: 88651
-    Node Types: xxx
-    Edge Types: xxx
-    Target Category:
-    Number of Classes: xx
-    Label Split: Train: xx ,Valid: xx, Test: xx
+    Nodes: 7262
+    Edges: 48810 (including reverse edges)
+    Target Category: Personen
+    Number of Classes: 4
+    Label Split: Train: 140, Test: 36
     Parameters
     -----------
     print_every: int
-        Log for every X tuples. Default: 10000.
+        Preprocessing log for every X tuples. Default: 10000.
     insert_reverse: bool
         If true, add reverse edge and reverse relations to the final graph. Default: True.
     raw_dir : str
@@ -505,7 +504,10 @@ class AIFBDataset(RDFGraphDataset):
     ===
     AIFBDataset object with three properties:
         graph: A Heterogenous graph containing the
-            graph structure, node features and labels.
+               graph structure, node features and labels.
+            - ndata['train_mask']: mask for training node set
+            - ndata['test_mask']: mask for testing node set
+            - ndata['labels']: mask for labels
         predict_category: The category name to run the node classification
             prediction.
         num_of_class: number of publication categories
@@ -514,7 +516,13 @@ class AIFBDataset(RDFGraphDataset):
     Examples
     --------
     >>> dataset = dgl.data.rdf.AIFBDataset()
-    >>> print(dataset.graph)
+    >>> graph = dataset[0]
+    >>> category = dataset.predict_category
+    >>> num_classes = dataset.num_classes
+    >>>
+    >>> train_mask = g.nodes[category].data.pop('train_mask')
+    >>> test_mask = g.nodes[category].data.pop('test_mask')
+    >>> labels = g.nodes[category].data.pop('labels')
     """
 
     employs = rdf.term.URIRef("http://swrc.ontoware.org/ontology#employs")
@@ -587,20 +595,18 @@ class AIFB(AIFBDataset):
 
 
 class MUTAGDataset(RDFGraphDataset):
-    """MUTAG dataset.
+    r"""MUTAG dataset.
     Statistics
     ===
-    Nodes: 19717
-    Edges: 88651
-    Node Types: xxx
-    Edge Types: xxx
-    Target Category:
-    Number of Classes:
-    Label Split: Train: xx ,Valid: xx, Test: xx
+    Nodes: 27163
+    Edges: 148100 (including reverse edges)
+    Target Category: d
+    Number of Classes: 2
+    Label Split: Train: 272, Test: 68
     Parameters
     -----------
     print_every: int
-        Log for every X tuples. Default: 10000.
+        Preprocessing log for every X tuples. Default: 10000.
     insert_reverse: bool
         If true, add reverse edge and reverse relations to the final graph. Default: True.
     raw_dir : str
@@ -614,7 +620,10 @@ class MUTAGDataset(RDFGraphDataset):
     ===
     MUTAGDataset object with three properties:
         graph: A Heterogenous graph containing the
-            graph structure, node features and labels.
+               graph structure, node features and labels.
+            - ndata['train_mask']: mask for training node set
+            - ndata['test_mask']: mask for testing node set
+            - ndata['labels']: mask for labels
         predict_category: The category name to run the node classification
             prediction.
         num_of_class: number of publication categories
@@ -622,8 +631,14 @@ class MUTAGDataset(RDFGraphDataset):
 
     Examples
     --------
-    >>> dataset = dgl.data.rdf.MUTAG()
-    >>> print(dataset.graph)
+    >>> dataset = dgl.data.rdf.MUTAGDataset()
+    >>> graph = dataset[0]
+    >>> category = dataset.predict_category
+    >>> num_classes = dataset.num_classes
+    >>>
+    >>> train_mask = g.nodes[category].data.pop('train_mask')
+    >>> test_mask = g.nodes[category].data.pop('test_mask')
+    >>> labels = g.nodes[category].data.pop('labels')
     """
 
     d_entity = re.compile("d[0-9]")
@@ -726,17 +741,15 @@ class BGSDataset(RDFGraphDataset):
     term is CURRENT or DEPRECATED.
     Statistics
     ===
-    Nodes: xxx
-    Edges: xxx
-    Node Types: xxx
-    Edge Types: xxx
-    Target Category:
-    Number of Classes: xx
-    Label Split: Train: xx ,Valid: xx, Test: xx
+    Nodes: 94806
+    Edges: 672884 (including reverse edges)
+    Target Category: Lexicon/NamedRockUnit
+    Number of Classes: 2
+    Label Split: Train: 117, Test: 29
     Parameters
     -----------
     print_every: int
-        Log for every X tuples. Default: 10000.
+        Preprocessing log for every X tuples. Default: 10000.
     insert_reverse: bool
         If true, add reverse edge and reverse relations to the final graph. Default: True.
     raw_dir : str
@@ -750,15 +763,24 @@ class BGSDataset(RDFGraphDataset):
     ===
     BGSDataset object with three properties:
         graph: A Heterogenous graph containing the
-            graph structure, node features and labels.
+               graph structure, node features and labels.
+            - ndata['train_mask']: mask for training node set
+            - ndata['test_mask']: mask for testing node set
+            - ndata['labels']: mask for labels
         predict_category: The category name to run the node classification
             prediction.
         num_of_class: number of publication categories
             for the classification task.
     Examples
     --------
-    >>> dataset = dgl.data.rdf.BGS()
-    >>> print(dataset.graph)
+    >>> dataset = dgl.data.rdf.BGSDataset()
+    >>> graph = dataset[0]
+    >>> category = dataset.predict_category
+    >>> num_classes = dataset.num_classes
+    >>>
+    >>> train_mask = g.nodes[category].data.pop('train_mask')
+    >>> test_mask = g.nodes[category].data.pop('test_mask')
+    >>> labels = g.nodes[category].data.pop('labels')
     """
 
     lith = rdf.term.URIRef("http://data.bgs.ac.uk/ref/Lexicon/hasLithogenesis")
@@ -852,18 +874,16 @@ class AMDataset(RDFGraphDataset):
 
     Statistics
     ===
-    Nodes: xxx
-    Edges: xxx
-    Node Types: xxx
-    Edge Types: xxx
-    Target Category:
-    Number of Classes:
-    Label Split: Train: xx ,Valid: xx, Test: xx
+    Nodes: 881680
+    Edges: 5668682 (including reverse edges)
+    Target Category: proxy
+    Number of Classes: 11
+    Label Split: Train: 802, Test: 198
 
     Parameters
     -----------
     print_every: int
-        Log for every X tuples. Default: 10000.
+        Preprocessing log for every X tuples. Default: 10000.
     insert_reverse: bool
         If true, add reverse edge and reverse relations to the final graph. Default: True.
     raw_dir : str
@@ -878,7 +898,10 @@ class AMDataset(RDFGraphDataset):
     ===
     AMDataset object with three properties:
         graph: A Heterogenous graph containing the
-            graph structure, node features and labels.
+               graph structure, node features and labels.
+            - ndata['train_mask']: mask for training node set
+            - ndata['test_mask']: mask for testing node set
+            - ndata['labels']: mask for labels
         predict_category: The category name to run the node classification
             prediction.
         num_of_class: number of publication categories
@@ -886,8 +909,14 @@ class AMDataset(RDFGraphDataset):
 
     Examples
     --------
-    >>> dataset = dgl.data.rdf.AM()
-    >>> print(dataset.graph)
+    >>> dataset = dgl.data.rdf.AMDataset()
+    >>> graph = dataset[0]
+    >>> category = dataset.predict_category
+    >>> num_classes = dataset.num_classes
+    >>>
+    >>> train_mask = g.nodes[category].data.pop('train_mask')
+    >>> test_mask = g.nodes[category].data.pop('test_mask')
+    >>> labels = g.nodes[category].data.pop('labels')
     """
 
     objectCategory = rdf.term.URIRef("http://purl.org/collections/nl/am/objectCategory")
