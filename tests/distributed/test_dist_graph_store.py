@@ -203,13 +203,16 @@ def check_server_client(shared_mem):
     # We cannot run multiple servers and clients on the same machine.
     serv_ps = []
     ctx = mp.get_context('spawn')
-    for serv_id in range(1):
-        p = ctx.Process(target=run_server, args=(graph_name, serv_id, 1, shared_mem))
+    num_clients = 2
+    num_servers = 2
+    for serv_id in range(num_servers):
+        p = ctx.Process(target=run_server, args=(graph_name, serv_id,
+                                                 num_clients, shared_mem))
         serv_ps.append(p)
         p.start()
 
     cli_ps = []
-    for cli_id in range(1):
+    for cli_id in range(num_clients):
         print('start client', cli_id)
         p = ctx.Process(target=run_client, args=(graph_name, cli_id, g.number_of_nodes(),
                                                  g.number_of_edges()))
@@ -351,7 +354,7 @@ def test_split_even():
 def prepare_dist():
     ip_config = open("kv_ip_config.txt", "w")
     ip_addr = get_local_usable_addr()
-    ip_config.write('%s 1\n' % ip_addr)
+    ip_config.write('%s 2\n' % ip_addr)
     ip_config.close()
 
 if __name__ == '__main__':
