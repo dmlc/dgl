@@ -162,8 +162,7 @@ class InitDataRequest(rpc.Request):
                                policy_str=self.policy_str,
                                data_tensor=data_tensor)
         else:
-            kv_store.init_data(name=self.name,
-                               policy_str=self.policy_str)
+            kv_store.init_data(name=self.name, policy_str=self.policy_str)
         res = InitDataResponse(INIT_MSG)
         return res
 
@@ -962,6 +961,19 @@ class KVClient(object):
         self._full_data_shape[name] = tuple(shape)
         self._pull_handlers[name] = default_pull_handler
         self._push_handlers[name] = default_push_handler
+
+        # Now we need to tell the backup server the new tensor.
+        if self._client_id % num_clients_per_part == 0:
+            request = SendMetaToBackupRequest(name, F.reverse_data_type_dict[dtype],
+                                              part_shape, part_policy.policy_str)
+            # send request to all the backup server nodes
+            for i in range(self._group_count-1):
+                server_id = self._machine_id * self._group_count + i + 1
+                rpc.send_request(server_id, request)
+            # recv response from all the backup server nodes
+            for _ in range(self._group_count-1):
+                response = rpc.recv_response()
+                assert response.msg == SEND_META_TO_BACKUP_MSG
         self.barrier()
 
     def delete_data(self, name):
@@ -977,7 +989,7 @@ class KVClient(object):
         self.barrier()
         part_policy = self._part_policy[name]
         num_partitions = part_policy.partition_book.num_partitions()
-        num_clients_per_part = rpc.get_num_client() / num_partitions
+        num_clients_per_part = rpc.get_num_client() // num_partitions
         if self._client_id % num_clients_per_part == 0:
             # send request to every server nodes
             request = DeleteDataRequest(name)
