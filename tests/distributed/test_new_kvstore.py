@@ -287,6 +287,7 @@ def start_client_mul_role(i, num_clients):
     else:
         kvclient = dgl.distributed.KVClient(ip_config='kv_ip_mul_config.txt', role='sampler')
     kvclient.map_shared_data(partition_book=gpb)
+    kvclient.register_push_handler('data_0', add_push)
     time.sleep(2)
     id_tensor = F.tensor([0,2,4], F.int64)
     data_tensor = F.tensor([[6.,6.],[6.,6.],[6.,6.]], F.float32)
