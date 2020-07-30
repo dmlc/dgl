@@ -42,21 +42,22 @@ class MiniGCDataset(DGLDataset):
     **The dataset instance is an iterable**
 
     >>> len(data)
+    100
     >>> g, label = data[64]
     >>> g
-    Graph(num_nodes=17, num_edges=289,
+    Graph(num_nodes=20, num_edges=82,
           ndata_schemes={}
           edata_schemes={})
     >>> label
-    tensor(6)
+    tensor(5)
 
     **Batch the graphs and labels for mini-batch training**
 
-    >>> graphs, labels = zip(*data)
+    >>> graphs, labels = zip(*[data[i] for i in range(16)])
     >>> batched_graphs = dgl.batch(graphs)
     >>> batched_labels = torch.tensor(labels)
     >>> batched_graphs
-    Graph(num_nodes=1124, num_edges=6698,
+    Graph(num_nodes=356, num_edges=1060,
           ndata_schemes={}
           edata_schemes={})
     """
