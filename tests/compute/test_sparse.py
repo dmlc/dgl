@@ -101,8 +101,6 @@ sddmm_shapes = [
 @parametrize_dtype
 def test_spmm(idtype, g, shp, msg, reducer):
     g = g.astype(idtype).to(F.ctx())
-    if dgl.backend.backend_name == 'tensorflow' and (reducer in ['min', 'max']):
-        pytest.skip()  # tensorflow dlpack has problem writing into int32 arrays on GPU.
     print(g)
     print(g.idtype)
 
