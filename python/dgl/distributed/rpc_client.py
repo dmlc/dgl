@@ -218,6 +218,9 @@ def get_sampler_pool():
     """Return the sampler pool and num_workers"""
     return SAMPLER_POOL, NUM_SAMPLER_WORKERS
 
+def debug_str():
+    print("DEBUGBEUGBUEGBU")
+
 def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Init rpc service"""
     try:
@@ -226,12 +229,17 @@ def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='so
         global NUM_SAMPLER_WORKERS
         if num_workers > 0:
             print("pre pool")
+            # SAMPLER_POOL = ctx.Pool(
+            #     num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size, net_type))
             SAMPLER_POOL = ctx.Pool(
-                num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size, net_type))
+                num_workers, initializer=debug_str, initargs=(,))
+            
             print("after pool")
         NUM_SAMPLER_WORKERS = num_workers
         print("before connect")
         connect_to_server(ip_config, max_queue_size, net_type)
+        print("join?")
+        SAMPLER_POOL.join()
     except Exception as e:
         print(e)
         import traceback
