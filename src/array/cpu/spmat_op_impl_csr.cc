@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file array/cpu/spmat_op_impl.cc
- * \brief Sparse matrix operator CPU implementation
+ * \file array/cpu/spmat_op_impl_csr.cc
+ * \brief CSR matrix operator CPU implementation
  */
 #include <dgl/array.h>
 #include <vector>
@@ -164,30 +164,7 @@ void CollectDataFromSorted(const IdType *indices_data, const IdType *data,
 }
 
 template <DLDeviceType XPU, typename IdType>
-NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
-  std::vector<IdType> ret_vec;
-  const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
-  const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
-  const IdType* data = CSRHasData(csr)? static_cast<IdType*>(csr.data->data) : nullptr;
-  if (csr.sorted) {
-    CollectDataFromSorted<XPU, IdType>(indices_data, data,
-                                       indptr_data[row], indptr_data[row + 1],
-                                       col, &ret_vec);
-  } else {
-    for (IdType i = indptr_data[row]; i < indptr_data[row+1]; ++i) {
-      if (indices_data[i] == col) {
-        ret_vec.push_back(data? data[i] : i);
-      }
-    }
-  }
-  return NDArray::FromVector(ret_vec, csr.data->ctx);
-}
-
-template NDArray CSRGetData<kDLCPU, int32_t>(CSRMatrix, int64_t, int64_t);
-template NDArray CSRGetData<kDLCPU, int64_t>(CSRMatrix, int64_t, int64_t);
-
-template <DLDeviceType XPU, typename IdType>
-NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
+IdArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
   const int64_t rowlen = rows->shape[0];
   const int64_t collen = cols->shape[0];
 
@@ -203,26 +180,45 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
   const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
   const IdType* data = CSRHasData(csr)? static_cast<IdType*>(csr.data->data) : nullptr;
 
-  std::vector<IdType> ret_vec;
+  const int64_t retlen = std::max(rowlen, collen);
+  IdArray ret = Full(-1, retlen, rows->dtype.bits, rows->ctx);
+  IdType* ret_data = ret.Ptr<IdType>();
 
-  for (int64_t i = 0, j = 0; i < rowlen && j < collen; i += row_stride, j += col_stride) {
-    const IdType row_id = row_data[i], col_id = col_data[j];
-    CHECK(row_id >= 0 && row_id < csr.num_rows) << "Invalid row index: " << row_id;
-    CHECK(col_id >= 0 && col_id < csr.num_cols) << "Invalid col index: " << col_id;
-    if (csr.sorted) {
-      CollectDataFromSorted<XPU, IdType>(indices_data, data,
-                                         indptr_data[row_id], indptr_data[row_id + 1],
-                                         col_id, &ret_vec);
-    } else {
-      for (IdType i = indptr_data[row_id]; i < indptr_data[row_id+1]; ++i) {
-        if (indices_data[i] == col_id) {
-          ret_vec.push_back(data? data[i] : i);
+  // NOTE: In most cases, the input csr is already sorted. If not, we might need to
+  //   consider sorting it especially when the number of (row, col) pairs is large.
+  //   Need more benchmarks to justify the choice.
+
+  if (csr.sorted) {
+    // use binary search on each row
+#pragma omp parallel for
+    for (int64_t p = 0; p < retlen; ++p) {
+      const IdType row_id = row_data[p * row_stride], col_id = col_data[p * col_stride];
+      CHECK(row_id >= 0 && row_id < csr.num_rows) << "Invalid row index: " << row_id;
+      CHECK(col_id >= 0 && col_id < csr.num_cols) << "Invalid col index: " << col_id;
+      const IdType *start_ptr = indices_data + indptr_data[row_id];
+      const IdType *end_ptr = indices_data + indptr_data[row_id + 1];
+      auto it = std::lower_bound(start_ptr, end_ptr, col_id);
+      if (it != end_ptr && *it == col_id) {
+        const IdType idx = it - indices_data;
+        ret_data[p] = data? data[idx] : idx;
+      }
+    }
+  } else {
+    // linear search on each row
+#pragma omp parallel for
+    for (int64_t p = 0; p < retlen; ++p) {
+      const IdType row_id = row_data[p * row_stride], col_id = col_data[p * col_stride];
+      CHECK(row_id >= 0 && row_id < csr.num_rows) << "Invalid row index: " << row_id;
+      CHECK(col_id >= 0 && col_id < csr.num_cols) << "Invalid col index: " << col_id;
+      for (IdType idx = indptr_data[row_id]; idx < indptr_data[row_id + 1]; ++idx) {
+        if (indices_data[idx] == col_id) {
+          ret_data[p] = data? data[idx] : idx;
+          break;
         }
       }
     }
   }
-
-  return NDArray::FromVector(ret_vec, csr.data->ctx);
+  return ret;
 }
 
 template NDArray CSRGetData<kDLCPU, int32_t>(CSRMatrix csr, NDArray rows, NDArray cols);
@@ -491,8 +487,6 @@ template CSRMatrix CSRSliceRows<kDLCPU, int64_t>(CSRMatrix , NDArray);
 
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols) {
-  CHECK_SAME_DTYPE(csr.indices, rows);
-  CHECK_SAME_DTYPE(csr.indices, cols);
   IdHashMap<IdType> hashmap(cols);
   const int64_t new_nrows = rows->shape[0];
   const int64_t new_ncols = cols->shape[0];

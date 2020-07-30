@@ -13,6 +13,7 @@ from . import container
 from . import distributed
 from . import random
 from . import sampling
+from . import ops
 
 from ._ffi.runtime_ctypes import TypeCode
 from ._ffi.function import register_func, get_global_func, list_global_func_names, extract_ext_funcs
@@ -20,11 +21,12 @@ from ._ffi.base import DGLError, __version__
 
 from .base import ALL, NTYPE, NID, ETYPE, EID
 from .readout import *
-from .batched_heterograph import *
+from .batch import *
 from .convert import *
-from .graph import DGLGraph, batch, unbatch
+from .graph import DGLGraph as DGLGraphStale
 from .generators import *
 from .heterograph import DGLHeteroGraph
+from .heterograph import DGLHeteroGraph as DGLGraph  # pylint: disable=reimported
 from .nodeflow import *
 from .traversal import *
 from .transform import *

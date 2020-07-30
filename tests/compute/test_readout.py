@@ -1,252 +1,225 @@
 import dgl
+import numpy as np
 import backend as F
 import networkx as nx
 import unittest
+import pytest
+from test_utils.graph_cases import get_cases
+from utils import parametrize_dtype
 
-def test_simple_readout():
-    g1 = dgl.DGLGraph()
-    g1.add_nodes(3)
-    g2 = dgl.DGLGraph()
-    g2.add_nodes(4) # no edges
-    g1.add_edges([0, 1, 2], [2, 0, 1])
+@parametrize_dtype
+def test_sum_case1(idtype):
+    # NOTE: If you want to update this test case, remember to update the docstring
+    #  example too!!!
+    g1 = dgl.graph(([0, 1], [1, 0]), idtype=idtype, device=F.ctx())
+    g1.ndata['h'] = F.tensor([1., 2.])
+    g2 = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    g2.ndata['h'] = F.tensor([1., 2., 3.])
+    bg = dgl.batch([g1, g2])
+    bg.ndata['w'] = F.tensor([.1, .2, .1, .5, .2])
+    assert F.allclose(F.tensor([3.]), dgl.sum_nodes(g1, 'h'))
+    assert F.allclose(F.tensor([3., 6.]), dgl.sum_nodes(bg, 'h'))
+    assert F.allclose(F.tensor([.5, 1.7]), dgl.sum_nodes(bg, 'h', 'w'))
 
-    n1 = F.randn((3, 5))
-    n2 = F.randn((4, 5))
-    e1 = F.randn((3, 5))
-    s1 = F.sum(n1, 0)   # node sums
-    s2 = F.sum(n2, 0)
-    se1 = F.sum(e1, 0)  # edge sums
-    m1 = F.mean(n1, 0)  # node means
-    m2 = F.mean(n2, 0)
-    me1 = F.mean(e1, 0) # edge means
-    w1 = F.randn((3,))
-    w2 = F.randn((4,))
-    max1 = F.max(n1, 0)
-    max2 = F.max(n2, 0)
-    maxe1 = F.max(e1, 0)
-    ws1 = F.sum(n1 * F.unsqueeze(w1, 1), 0)
-    ws2 = F.sum(n2 * F.unsqueeze(w2, 1), 0)
-    wm1 = F.sum(n1 * F.unsqueeze(w1, 1), 0) / F.sum(F.unsqueeze(w1, 1), 0)
-    wm2 = F.sum(n2 * F.unsqueeze(w2, 1), 0) / F.sum(F.unsqueeze(w2, 1), 0)
-    g1.ndata['x'] = n1
-    g2.ndata['x'] = n2
-    g1.ndata['w'] = w1
-    g2.ndata['w'] = w2
-    g1.edata['x'] = e1
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
+@pytest.mark.parametrize('reducer', ['sum', 'max', 'mean'])
+def test_reduce_readout(g, idtype, reducer):
+    g = g.astype(idtype).to(F.ctx())
+    g.ndata['h'] = F.randn((g.number_of_nodes(), 3))
+    g.edata['h'] = F.randn((g.number_of_edges(), 2))
 
-    assert F.allclose(dgl.sum_nodes(g1, 'x'), s1)
-    assert F.allclose(dgl.sum_nodes(g1, 'x', 'w'), ws1)
-    assert F.allclose(dgl.sum_edges(g1, 'x'), se1)
-    assert F.allclose(dgl.mean_nodes(g1, 'x'), m1)
-    assert F.allclose(dgl.mean_nodes(g1, 'x', 'w'), wm1)
-    assert F.allclose(dgl.mean_edges(g1, 'x'), me1)
-    assert F.allclose(dgl.max_nodes(g1, 'x'), max1)
-    assert F.allclose(dgl.max_edges(g1, 'x'), maxe1)
+    # Test.1: node readout
+    x = dgl.readout_nodes(g, 'h', op=reducer)
+    # check correctness
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        sx = dgl.readout_nodes(sg, 'h', op=reducer)
+        subx.append(sx)
+    assert F.allclose(x, F.cat(subx, dim=0))
 
-    g = dgl.batch([g1, g2])
-    s = dgl.sum_nodes(g, 'x')
-    m = dgl.mean_nodes(g, 'x')
-    max_bg = dgl.max_nodes(g, 'x')
-    assert F.allclose(s, F.stack([s1, s2], 0))
-    assert F.allclose(m, F.stack([m1, m2], 0))
-    assert F.allclose(max_bg, F.stack([max1, max2], 0))
-    ws = dgl.sum_nodes(g, 'x', 'w')
-    wm = dgl.mean_nodes(g, 'x', 'w')
-    assert F.allclose(ws, F.stack([ws1, ws2], 0))
-    assert F.allclose(wm, F.stack([wm1, wm2], 0))
-    s = dgl.sum_edges(g, 'x')
-    m = dgl.mean_edges(g, 'x')
-    max_bg_e = dgl.max_edges(g, 'x')
-    assert F.allclose(s, F.stack([se1, F.zeros(5)], 0))
-    assert F.allclose(m, F.stack([me1, F.zeros(5)], 0))
-    # TODO(zihao): fix -inf issue
-    # assert F.allclose(max_bg_e, F.stack([maxe1, F.zeros(5)], 0)) 
+    x = getattr(dgl, '{}_nodes'.format(reducer))(g, 'h')
+    # check correctness
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        sx = getattr(dgl, '{}_nodes'.format(reducer))(sg, 'h')
+        subx.append(sx)
+    assert F.allclose(x, F.cat(subx, dim=0))
 
+    # Test.2: edge readout
+    x = dgl.readout_edges(g, 'h', op=reducer)
+    # check correctness
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        sx = dgl.readout_edges(sg, 'h', op=reducer)
+        subx.append(sx)
+    assert F.allclose(x, F.cat(subx, dim=0))
 
-def test_topk_nodes():
-    # test#1: basic
-    g0 = dgl.DGLGraph(nx.path_graph(14))
+    x = getattr(dgl, '{}_edges'.format(reducer))(g, 'h')
+    # check correctness
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        sx = getattr(dgl, '{}_edges'.format(reducer))(sg, 'h')
+        subx.append(sx)
+    assert F.allclose(x, F.cat(subx, dim=0))
 
-    feat0 = F.randn((g0.number_of_nodes(), 10))
-    g0.ndata['x'] = feat0
-    # to test the case where k > number of nodes.
-    dgl.topk_nodes(g0, 'x', 20, idx=-1)
-    # test correctness
-    val, indices = dgl.topk_nodes(g0, 'x', 5, idx=-1)
-    ground_truth = F.reshape(
-        F.argsort(F.slice_axis(feat0, -1, 9, 10), 0, True)[:5], (5,))
-    assert F.allclose(ground_truth, indices)
-    g0.ndata.pop('x')
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
+@pytest.mark.parametrize('reducer', ['sum', 'max', 'mean'])
+def test_weighted_reduce_readout(g, idtype, reducer):
+    g = g.astype(idtype).to(F.ctx())
+    g.ndata['h'] = F.randn((g.number_of_nodes(), 3))
+    g.ndata['w'] = F.randn((g.number_of_nodes(), 1))
+    g.edata['h'] = F.randn((g.number_of_edges(), 2))
+    g.edata['w'] = F.randn((g.number_of_edges(), 1))
 
-    # test#2: batched graph
-    g1 = dgl.DGLGraph(nx.path_graph(12))
-    feat1 = F.randn((g1.number_of_nodes(), 10))
+    # Test.1: node readout
+    x = dgl.readout_nodes(g, 'h', 'w', op=reducer)
+    # check correctness
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        sx = dgl.readout_nodes(sg, 'h', 'w', op=reducer)
+        subx.append(sx)
+    assert F.allclose(x, F.cat(subx, dim=0))
 
-    bg = dgl.batch([g0, g1])
-    bg.ndata['x'] = F.cat([feat0, feat1], 0)
-    # to test the case where k > number of nodes.
-    dgl.topk_nodes(bg, 'x', 16, idx=1)
-    # test correctness
-    val, indices = dgl.topk_nodes(bg, 'x', 6, descending=False, idx=0)
-    ground_truth_0 = F.reshape(
-        F.argsort(F.slice_axis(feat0, -1, 0, 1), 0, False)[:6], (6,))
-    ground_truth_1 = F.reshape(
-        F.argsort(F.slice_axis(feat1, -1, 0, 1), 0, False)[:6], (6,))
-    ground_truth = F.stack([ground_truth_0, ground_truth_1], 0)
-    assert F.allclose(ground_truth, indices)
+    x = getattr(dgl, '{}_nodes'.format(reducer))(g, 'h', 'w')
+    # check correctness
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        sx = getattr(dgl, '{}_nodes'.format(reducer))(sg, 'h', 'w')
+        subx.append(sx)
+    assert F.allclose(x, F.cat(subx, dim=0))
 
-    # test idx=None
-    val, indices = dgl.topk_nodes(bg, 'x', 6, descending=True)
-    assert F.allclose(val, F.stack([F.topk(feat0, 6, 0), F.topk(feat1, 6, 0)], 0))
+    # Test.2: edge readout
+    x = dgl.readout_edges(g, 'h', 'w', op=reducer)
+    # check correctness
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        sx = dgl.readout_edges(sg, 'h', 'w', op=reducer)
+        subx.append(sx)
+    assert F.allclose(x, F.cat(subx, dim=0))
 
+    x = getattr(dgl, '{}_edges'.format(reducer))(g, 'h', 'w')
+    # check correctness
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        sx = getattr(dgl, '{}_edges'.format(reducer))(sg, 'h', 'w')
+        subx.append(sx)
+    assert F.allclose(x, F.cat(subx, dim=0))
 
-def test_topk_edges():
-    # test#1: basic
-    g0 = dgl.DGLGraph(nx.path_graph(14))
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
+@pytest.mark.parametrize('descending', [True, False])
+def test_topk(g, idtype, descending):
+    g = g.astype(idtype).to(F.ctx())
+    g.ndata['x'] = F.randn((g.number_of_nodes(), 3))
 
-    feat0 = F.randn((g0.number_of_edges(), 10))
-    g0.edata['x'] = feat0
-    # to test the case where k > number of edges.
-    dgl.topk_edges(g0, 'x', 30, idx=-1)
-    # test correctness
-    val, indices = dgl.topk_edges(g0, 'x', 7, idx=-1)
-    ground_truth = F.reshape(
-        F.argsort(F.slice_axis(feat0, -1, 9, 10), 0, True)[:7], (7,))
-    assert F.allclose(ground_truth, indices)
-    g0.edata.pop('x')
+    # Test.1: to test the case where k > number of nodes.
+    dgl.topk_nodes(g, 'x', 100, sortby=-1)
 
-    # test#2: batched graph
-    g1 = dgl.DGLGraph(nx.path_graph(12))
-    feat1 = F.randn((g1.number_of_edges(), 10))
+    # Test.2: test correctness
+    min_nnodes = F.asnumpy(g.batch_num_nodes()).min()
+    if min_nnodes <= 1:
+        return
+    k = min_nnodes - 1
+    val, indices = dgl.topk_nodes(g, 'x', k, descending=descending, sortby=-1)
+    print(k)
+    print(g.ndata['x'])
+    print('val', val)
+    print('indices', indices)
+    subg = dgl.unbatch(g)
+    subval, subidx = [], []
+    for sg in subg:
+        subx = F.asnumpy(sg.ndata['x'])
+        ai = np.argsort(subx[:,-1:].flatten())
+        if descending:
+            ai = np.ascontiguousarray(ai[::-1])
+        subx = np.expand_dims(subx[ai[:k]], 0)
+        subval.append(F.tensor(subx))
+        subidx.append(F.tensor(np.expand_dims(ai[:k], 0)))
+    print(F.cat(subval, dim=0))
+    assert F.allclose(val, F.cat(subval, dim=0))
+    assert F.allclose(indices, F.cat(subidx, dim=0))
 
-    bg = dgl.batch([g0, g1])
-    bg.edata['x'] = F.cat([feat0, feat1], 0)
-    # to test the case where k > number of edges.
-    dgl.topk_edges(bg, 'x', 33, idx=1)
-    # test correctness
-    val, indices = dgl.topk_edges(bg, 'x', 4, descending=False, idx=0)
-    ground_truth_0 = F.reshape(
-        F.argsort(F.slice_axis(feat0, -1, 0, 1), 0, False)[:4], (4,))
-    ground_truth_1 = F.reshape(
-        F.argsort(F.slice_axis(feat1, -1, 0, 1), 0, False)[:4], (4,))
-    ground_truth = F.stack([ground_truth_0, ground_truth_1], 0)
-    assert F.allclose(ground_truth, indices)
+    # Test.3: sorby=None
+    dgl.topk_nodes(g, 'x', k, sortby=None)
 
-    # test idx=None
-    val, indices = dgl.topk_edges(bg, 'x', 6, descending=True)
-    assert F.allclose(val, F.stack([F.topk(feat0, 6, 0), F.topk(feat1, 6, 0)], 0))
+    g.edata['x'] = F.randn((g.number_of_edges(), 3))
 
-def test_softmax_nodes():
-    # test#1: basic
-    g0 = dgl.DGLGraph(nx.path_graph(9))
+    # Test.4: topk edges where k > number of edges.
+    dgl.topk_edges(g, 'x', 100, sortby=-1)
 
-    feat0 = F.randn((g0.number_of_nodes(), 10))
-    g0.ndata['x'] = feat0
-    ground_truth = F.softmax(feat0, dim=0)
-    assert F.allclose(dgl.softmax_nodes(g0, 'x'), ground_truth)
-    g0.ndata.pop('x')
+    # Test.5: topk edges test correctness
+    min_nedges = F.asnumpy(g.batch_num_edges()).min()
+    if min_nedges <= 1:
+        return
+    k = min_nedges - 1
+    val, indices = dgl.topk_edges(g, 'x', k, descending=descending, sortby=-1)
+    print(k)
+    print(g.edata['x'])
+    print('val', val)
+    print('indices', indices)
+    subg = dgl.unbatch(g)
+    subval, subidx = [], []
+    for sg in subg:
+        subx = F.asnumpy(sg.edata['x'])
+        ai = np.argsort(subx[:,-1:].flatten())
+        if descending:
+            ai = np.ascontiguousarray(ai[::-1])
+        subx = np.expand_dims(subx[ai[:k]], 0)
+        subval.append(F.tensor(subx))
+        subidx.append(F.tensor(np.expand_dims(ai[:k], 0)))
+    print(F.cat(subval, dim=0))
+    assert F.allclose(val, F.cat(subval, dim=0))
+    assert F.allclose(indices, F.cat(subidx, dim=0))
 
-    # test#2: batched graph
-    g1 = dgl.DGLGraph(nx.path_graph(5))
-    g2 = dgl.DGLGraph(nx.path_graph(3))
-    g3 = dgl.DGLGraph()
-    g4 = dgl.DGLGraph(nx.path_graph(10))
-    bg = dgl.batch([g0, g1, g2, g3, g4])
-    feat1 = F.randn((g1.number_of_nodes(), 10))
-    feat2 = F.randn((g2.number_of_nodes(), 10))
-    feat4 = F.randn((g4.number_of_nodes(), 10))
-    bg.ndata['x'] = F.cat([feat0, feat1, feat2, feat4], 0)
-    ground_truth = F.cat([
-        F.softmax(feat0, 0),
-        F.softmax(feat1, 0),
-        F.softmax(feat2, 0),
-        F.softmax(feat4, 0)
-    ], 0)
-    assert F.allclose(dgl.softmax_nodes(bg, 'x'), ground_truth)
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
+def test_softmax(g, idtype):
+    g = g.astype(idtype).to(F.ctx())
+    g.ndata['h'] = F.randn((g.number_of_nodes(), 3))
+    g.edata['h'] = F.randn((g.number_of_edges(), 2))
 
-def test_softmax_edges():
-    # test#1: basic
-    g0 = dgl.DGLGraph(nx.path_graph(10))
+    # Test.1: node readout
+    x = dgl.softmax_nodes(g, 'h')
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        subx.append(F.softmax(sg.ndata['h'], dim=0))
+    assert F.allclose(x, F.cat(subx, dim=0))
 
-    feat0 = F.randn((g0.number_of_edges(), 10))
-    g0.edata['x'] = feat0
-    ground_truth = F.softmax(feat0, dim=0)
-    assert F.allclose(dgl.softmax_edges(g0, 'x'), ground_truth)
-    g0.edata.pop('x')
+    # Test.2: edge readout
+    x = dgl.softmax_edges(g, 'h')
+    subg = dgl.unbatch(g)
+    subx = []
+    for sg in subg:
+        subx.append(F.softmax(sg.edata['h'], dim=0))
+    assert F.allclose(x, F.cat(subx, dim=0))
 
-    # test#2: batched graph
-    g1 = dgl.DGLGraph(nx.path_graph(5))
-    g2 = dgl.DGLGraph(nx.path_graph(3))
-    g3 = dgl.DGLGraph()
-    g4 = dgl.DGLGraph(nx.path_graph(10))
-    bg = dgl.batch([g0, g1, g2, g3, g4])
-    feat1 = F.randn((g1.number_of_edges(), 10))
-    feat2 = F.randn((g2.number_of_edges(), 10))
-    feat4 = F.randn((g4.number_of_edges(), 10))
-    bg.edata['x'] = F.cat([feat0, feat1, feat2, feat4], 0)
-    ground_truth = F.cat([
-        F.softmax(feat0, 0),
-        F.softmax(feat1, 0),
-        F.softmax(feat2, 0),
-        F.softmax(feat4, 0)
-    ], 0)
-    assert F.allclose(dgl.softmax_edges(bg, 'x'), ground_truth)
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
+def test_broadcast(idtype, g):
+    g = g.astype(idtype).to(F.ctx())
+    gfeat = F.randn((g.batch_size, 3))
 
-def test_broadcast_nodes():
-    # test#1: basic
-    g0 = dgl.DGLGraph(nx.path_graph(10))
-    feat0 = F.randn((1, 40))
-    ground_truth = F.stack([feat0] * g0.number_of_nodes(), 0)
-    assert F.allclose(dgl.broadcast_nodes(g0, feat0), ground_truth)
+    # Test.0: broadcast_nodes
+    g.ndata['h'] = dgl.broadcast_nodes(g, gfeat)
+    subg = dgl.unbatch(g)
+    for i, sg in enumerate(subg):
+        assert F.allclose(sg.ndata['h'],
+                F.repeat(F.reshape(gfeat[i], (1,3)), sg.number_of_nodes(), dim=0))
 
-    # test#2: batched graph
-    g1 = dgl.DGLGraph(nx.path_graph(3))
-    g2 = dgl.DGLGraph()
-    g3 = dgl.DGLGraph(nx.path_graph(12))
-    bg = dgl.batch([g0, g1, g2, g3])
-    feat1 = F.randn((1, 40))
-    feat2 = F.randn((1, 40))
-    feat3 = F.randn((1, 40))
-    ground_truth = F.cat(
-        [feat0] * g0.number_of_nodes() +\
-        [feat1] * g1.number_of_nodes() +\
-        [feat2] * g2.number_of_nodes() +\
-        [feat3] * g3.number_of_nodes(), 0
-    )
-    assert F.allclose(dgl.broadcast_nodes(
-        bg, F.cat([feat0, feat1, feat2, feat3], 0)
-    ), ground_truth)
-
-def test_broadcast_edges():
-    # test#1: basic
-    g0 = dgl.DGLGraph(nx.path_graph(10))
-    feat0 = F.randn((1, 40))
-    ground_truth = F.stack([feat0] * g0.number_of_edges(), 0)
-    assert F.allclose(dgl.broadcast_edges(g0, feat0), ground_truth)
-
-    # test#2: batched graph
-    g1 = dgl.DGLGraph(nx.path_graph(3))
-    g2 = dgl.DGLGraph()
-    g3 = dgl.DGLGraph(nx.path_graph(12))
-    bg = dgl.batch([g0, g1, g2, g3])
-    feat1 = F.randn((1, 40))
-    feat2 = F.randn((1, 40))
-    feat3 = F.randn((1, 40))
-    ground_truth = F.cat(
-        [feat0] * g0.number_of_edges() +\
-        [feat1] * g1.number_of_edges() +\
-        [feat2] * g2.number_of_edges() +\
-        [feat3] * g3.number_of_edges(), 0
-    )
-    assert F.allclose(dgl.broadcast_edges(
-        bg, F.cat([feat0, feat1, feat2, feat3], 0)
-    ), ground_truth)
-
-if __name__ == '__main__':
-    test_simple_readout()
-    test_topk_nodes()
-    test_topk_edges()
-    test_softmax_nodes()
-    test_softmax_edges()
-    test_broadcast_nodes()
-    test_broadcast_edges()
+    # Test.1: broadcast_edges
+    g.edata['h'] = dgl.broadcast_edges(g, gfeat)
+    subg = dgl.unbatch(g)
+    for i, sg in enumerate(subg):
+        assert F.allclose(sg.edata['h'],
+                F.repeat(F.reshape(gfeat[i], (1,3)), sg.number_of_edges(), dim=0))

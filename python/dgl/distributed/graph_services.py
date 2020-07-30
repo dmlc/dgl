@@ -132,8 +132,7 @@ def merge_graphs(res_list, num_nodes):
         src_tensor = res_list[0].global_src
         dst_tensor = res_list[0].global_dst
         eid_tensor = res_list[0].global_eids
-    g = graph((src_tensor, dst_tensor),
-              restrict_format='coo', num_nodes=num_nodes)
+    g = graph((src_tensor, dst_tensor), num_nodes=num_nodes)
     g.edata[EID] = eid_tensor
     return g
 
@@ -218,8 +217,9 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     ----------
     g : DistGraph
         The distributed graph.
-    nodes : tensor
-        Node ids to sample neighbors from.
+    nodes : tensor or dict
+        Node ids to sample neighbors from. If it's a dict, it should contain only
+        one key-value pair to make this API consistent with dgl.sampling.sample_neighbors.
     fanout : int
         The number of sampled neighbors for each node.
     edge_dir : str, optional
@@ -238,6 +238,9 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         ``nodes``. The sampled subgraph has the same metagraph as the original
         one.
     """
+    if isinstance(nodes, dict):
+        assert len(nodes) == 1, 'The distributed sampler only supports one node type for now.'
+        nodes = list(nodes.values())[0]
     def issue_remote_req(node_ids):
         return SamplingRequest(node_ids, fanout, edge_dir=edge_dir,
                                prob=prob, replace=replace)
@@ -267,6 +270,9 @@ def in_subgraph(g, nodes):
     DGLHeteroGraph
         The subgraph.
     """
+    if isinstance(nodes, dict):
+        assert len(nodes) == 1, 'The distributed in_subgraph only supports one node type for now.'
+        nodes = list(nodes.values())[0]
     def issue_remote_req(node_ids):
         return InSubgraphRequest(node_ids)
     def local_access(local_g, partition_book, local_nids):

@@ -22,7 +22,7 @@ import dgl
 from dgl import DGLGraph
 from functools import partial
 
-from dgl.data.rdf import AIFB, MUTAG, BGS, AM
+from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from model import RelGraphEmbedLayer
 from dgl.nn import RelGraphConv
 from utils import thread_wrapped_func
@@ -419,11 +419,11 @@ def main(args, devices):
     # load graph data
     ogb_dataset = False
     if args.dataset == 'aifb':
-        dataset = AIFB()
+        dataset = AIFBDataset()
     elif args.dataset == 'mutag':
-        dataset = MUTAG()
+        dataset = MUTAGDataset()
     elif args.dataset == 'bgs':
-        dataset = BGS()
+        dataset = BGSDataset()
     elif args.dataset == 'am':
         dataset = AM()
     elif args.dataset == 'ogbn-mag':
@@ -491,13 +491,13 @@ def main(args, devices):
 
     # calculate norm for each edge type and store in edge
     if args.global_norm is False:
-        for canonical_etypes in hg.canonical_etypes:
-            u, v, eid = hg.all_edges(form='all', etype=canonical_etypes)
+        for canonical_etype in hg.canonical_etypes:
+            u, v, eid = hg.all_edges(form='all', etype=canonical_etype)
             _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
             degrees = count[inverse_index]
             norm = th.ones(eid.shape[0]) / degrees
             norm = norm.unsqueeze(1)
-            hg.edges[canonical_etypes].data['norm'] = norm
+            hg.edges[canonical_etype].data['norm'] = norm
 
     # get target category id
     category_id = len(hg.ntypes)

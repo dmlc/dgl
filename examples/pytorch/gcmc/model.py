@@ -32,7 +32,7 @@ class GCMCGraphConv(nn.Module):
         super(GCMCGraphConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
-        self.device = device 
+        self.device = device
         self.dropout = nn.Dropout(dropout_rate)
 
         if weight:
@@ -210,7 +210,7 @@ class GCMCLayer(nn.Module):
 
     def partial_to(self, device):
         """Put parameters into device except W_r
-        
+
         Parameters
         ----------
         device : torch device

@@ -54,7 +54,10 @@ class NeighborSampler(object):
                 if len(eids) > 0:
                     old_frontier = frontier
                     frontier = dgl.remove_edges(old_frontier, eids)
-                    frontier.edata['weights'] = old_frontier.edata['weights'][frontier.edata[dgl.EID]]
+                    #print(old_frontier)
+                    #print(frontier)
+                    #print(frontier.edata['weights'])
+                    #frontier.edata['weights'] = old_frontier.edata['weights'][frontier.edata[dgl.EID]]
             block = compact_and_copy(frontier, seeds)
             seeds = block.srcdata[dgl.NID]
             blocks.insert(0, block)

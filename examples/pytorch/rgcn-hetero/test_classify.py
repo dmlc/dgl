@@ -11,21 +11,22 @@ from entity_classify import EntityClassify
 def main(args):
     # load graph data
     if args.dataset == 'aifb':
-        dataset = AIFB()
+        dataset = AIFBDataset()
     elif args.dataset == 'mutag':
-        dataset = MUTAG()
+        dataset = MUTAGDataset()
     elif args.dataset == 'bgs':
-        dataset = BGS()
+        dataset = BGSDataset()
     elif args.dataset == 'am':
-        dataset = AM()
+        dataset = AMDataset()
     else:
         raise ValueError()
 
-    g = dataset.graph
+    g = dataset[0]
     category = dataset.predict_category
     num_classes = dataset.num_classes
-    test_idx = dataset.test_idx
-    labels = dataset.labels
+    test_mask = g.nodes[category].data.pop('test_mask')
+    test_idx = th.nonzero(test_mask).squeeze()
+    labels = g.nodes[category].data.pop('labels')
 
     # check cuda
     use_cuda = args.gpu >= 0 and th.cuda.is_available()
@@ -33,6 +34,7 @@ def main(args):
         th.cuda.set_device(args.gpu)
         labels = labels.cuda()
         test_idx = test_idx.cuda()
+        g = g.to('cuda:%d' % args.gpu)
 
     # create model
     model = EntityClassify(g,
@@ -41,7 +43,6 @@ def main(args):
                            num_bases=args.n_bases,
                            num_hidden_layers=args.n_layers - 2,
                            use_self_loop=args.use_self_loop)
-    # training loop
     model.load_state_dict(th.load(args.model_path))
     if use_cuda:
         model.cuda()
@@ -53,7 +54,7 @@ def main(args):
     test_acc = th.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
     print("Test Acc: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
     print()
-    
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN')
     parser.add_argument("--n-hidden", type=int, default=16,

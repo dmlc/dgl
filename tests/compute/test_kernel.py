@@ -71,7 +71,7 @@ def generate_feature(g, broadcast='none', binary_op='none'):
             u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
             e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3)))
             v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
-    return u, v, e
+    return F.astype(u, F.float32), F.astype(v, F.float32), F.astype(e, F.float32)
 
 
 def test_copy_src_reduce():
@@ -80,9 +80,10 @@ def test_copy_src_reduce():
         # NOTE(zihao): add self-loop to avoid zero-degree nodes.
         # https://github.com/dmlc/dgl/issues/761
         g.add_edges(g.nodes(), g.nodes())
+        g = g.to(F.ctx())
         hu, hv, he = generate_feature(g, 'none', 'none')
         if partial:
-            nid = F.tensor(list(range(0, 100, 2)))
+            nid = F.tensor(list(range(0, 100, 2)), g.idtype)
 
         g.ndata['u'] = F.attach_grad(F.clone(hu))
         g.ndata['v'] = F.attach_grad(F.clone(hv))
@@ -141,9 +142,10 @@ def test_copy_edge_reduce():
         g = dgl.DGLGraph(nx.erdos_renyi_graph(100, 0.1))
         # NOTE(zihao): add self-loop to avoid zero-degree nodes.
         g.add_edges(g.nodes(), g.nodes())
+        g = g.to(F.ctx())
         hu, hv, he = generate_feature(g, 'none', 'none')
         if partial:
-            nid = F.tensor(list(range(0, 100, 2)))
+            nid = F.tensor(list(range(0, 100, 2)), g.idtype)
 
         g.ndata['u'] = F.attach_grad(F.clone(hu))
         g.ndata['v'] = F.attach_grad(F.clone(hv))
@@ -348,7 +350,8 @@ def test_all_binary_builtins():
     g.add_edge(18, 1)
     g.add_edge(19, 0)
     g.add_edge(19, 1)
-    nid = F.tensor([0, 1, 4, 5, 7, 12, 14, 15, 18, 19])
+    g = g.to(F.ctx())
+    nid = F.tensor([0, 1, 4, 5, 7, 12, 14, 15, 18, 19], g.idtype)
     target = ["u", "v", "e"]
 
     for lhs, rhs in product(target, target):
