@@ -176,7 +176,7 @@ class GINDataset(DGLBuiltinDataset):
                     # add self loop
                     if self.self_loop:
                         m_edges += 1
-                        g.add_edge(j, j)
+                        g.add_edges(j, j)
 
                     if (j + 1) % 10 == 0 and self.verbose is True:
                         print(
@@ -196,7 +196,7 @@ class GINDataset(DGLBuiltinDataset):
                 if len(self.nlabel_dict) > 1:
                     self.nlabels_flag = True
 
-                assert len(g) == n_nodes
+                assert g.number_of_nodes() == n_nodes
 
                 # update statistics of graphs
                 self.n += n_nodes
