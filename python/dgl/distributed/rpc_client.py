@@ -236,7 +236,7 @@ def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='so
             # SAMPLER_POOL = ctx.Pool(
             #     num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size, net_type))
             SAMPLER_POOL = ctx.Pool(
-                num_workers, initializer=debug_str, initargs=())
+                num_workers, initializer=debug_str)
             # SAMPLER_POOL.join()
             print("after pool")
         NUM_SAMPLER_WORKERS = num_workers
