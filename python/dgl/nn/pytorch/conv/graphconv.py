@@ -13,6 +13,8 @@ from ....utils import expand_as_pair
 class GraphConv(nn.Module):
     r"""Apply graph convolution over an input signal.
 
+    Description
+    -----------
     Graph convolution was introduced in `GCN <https://arxiv.org/abs/1609.02907>`__
     and mathematically is defined as follows:
 
@@ -23,11 +25,6 @@ class GraphConv(nn.Module):
     :math:`c_{ij}` is the product of the square root of node degrees
     (i.e.,  :math:`c_{ij} = \sqrt{|\mathcal{N}(i)|}\sqrt{|\mathcal{N}(j)|}`,
     and :math:`\sigma` is an activation function.
-
-    The model parameters are initialized as in the
-    `original implementation <https://github.com/tkipf/gcn/blob/master/gcn/layers.py>`__ where
-    the weight :math:`W^{(l)}` is initialized using Glorot uniform initialization
-    and the bias is initialized to be zero.
 
     Parameters
     ----------
@@ -45,15 +42,22 @@ class GraphConv(nn.Module):
         without a weight matrix.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
-    activation: callable activation function/layer or None, optional
+    activation : callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
-    allow_zero_in_degree: bool, optional
+    allow_zero_in_degree : bool, optional
         If there are 0-in-degree nodes in the graph, output for those nodes will be invalid
         since no message will be passed to those nodes. This is harmful for some applications
-        causing silent performance regression. Thus we will let the code break if we detect
-        0-in-degree nodes in input graph. However, we provide the flexibilty to suppress this check
-        by setting ``True`` to this param and let users handle it by themselves.
+        causing silent performance regression. This module will raise a DGLError if it detects
+        0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
+        and let the users handle it by themselves.
+
+    Attributes
+    ----------
+    weight : torch.Tensor
+        The learnable weight tensor.
+    bias : torch.Tensor
+        The learnable bias tensor.
 
     Notes
     -----
@@ -64,13 +68,13 @@ class GraphConv(nn.Module):
     >>> g = ... # a DGLGraph
     >>> g = dgl.transform.add_self_loop(g)
 
-    If we can not do the above before calling conv or if the graph is heterogeneous,
-    we need to set ``allow_zero_in_degree`` to ``True`` to unblock the running and handle
-    zere-in-degree nodes by ourselves. A common practise to handle this is to filter out
-    the nodes with zere-in-degree when use after conv.
+    Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
+    since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree`` to ``True``
+    for those cases to unblock the code and handle zere-in-degree nodes manually. A common
+    practise to handle this is to filter out the nodes with zere-in-degree when use after conv.
 
     Examples
-    -----
+    --------
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
@@ -147,7 +151,16 @@ class GraphConv(nn.Module):
         self._activation = activation
 
     def reset_parameters(self):
-        """Reinitialize learnable parameters."""
+        r"""Reinitialize learnable parameters.
+
+        Notes
+        -----
+        The model parameters are initialized as in the
+        `original implementation <https://github.com/tkipf/gcn/blob/master/gcn/layers.py>`
+        __ where the weight :math:`W^{(l)}` is initialized using Glorot uniform initialization
+        and the bias is initialized to be zero.
+
+        """
         if self.weight is not None:
             init.xavier_uniform_(self.weight)
         if self.bias is not None:
@@ -155,14 +168,6 @@ class GraphConv(nn.Module):
 
     def forward(self, graph, feat, weight=None):
         r"""Compute graph convolution.
-
-        Notes
-        -----
-        * Input shape: :math:`(N, *, \text{in_feats})` where * means any number of additional
-          dimensions, :math:`N` is the number of nodes.
-        * Output shape: :math:`(N, *, \text{out_feats})` where all but the last dimension are
-          the same shape as the input.
-        * Weight shape: :math:`(\text{in_feats}, \text{out_feats})`.
 
         Parameters
         ----------
@@ -174,9 +179,6 @@ class GraphConv(nn.Module):
             where :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
             If a pair of torch.Tensor is given, the pair must contain two tensors of shape
             :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
-
-            Note that in the special case of graph convolutional networks, if a pair of
-            tensors is given, the latter element will not participate in computation.
         weight : torch.Tensor, optional
             Optional external weight tensor.
 
@@ -184,14 +186,33 @@ class GraphConv(nn.Module):
         -------
         torch.Tensor
             The output feature
+
+        Raises
+        ------
+        DGLError
+            Case 1:
+            If there are 0-in-degree nodes in the input graph, it will raise DGLError
+            since no message will be passed to those nodes. This will cause invalid output.
+            The error can be ignored by setting ``allow_zero_in_degree`` parameter to ``True``.
+
+            Case 2:
+            External weight is provided while at the same time the module has defined its own weight parameter.
+
+        Notes
+        -----
+        * Input shape: :math:`(N, *, \text{in_feats})` where * means any number of additional
+          dimensions, :math:`N` is the number of nodes.
+        * Output shape: :math:`(N, *, \text{out_feats})` where all but the last dimension are
+          the same shape as the input.
+        * Weight shape: :math:`(\text{in_feats}, \text{out_feats})`.
         """
         with graph.local_scope():
             if not self._allow_zero_in_degree:
                 if (graph.in_degrees() == 0).any():
                     raise DGLError('There are 0-in-degree nodes in the graph, output for those nodes will be invalid.'
                                    'This is harmful for some applications, causing silent performance regression.'
-                                   'We suggest adding self-loop on the input graph by calling `g = transform.add_self_loop(g)`.'
-                                   'If we want to suppress this check, we can assign allow_zero_in_degree to be `True` when constructing this module.')
+                                   'Adding self-loop on the input graph by calling `g = transform.add_self_loop(g)` will resolve the issue.'
+                                   'Setting ``allow_zero_in_degree`` to be `True` when constructing this module will suppress the check and let the code run.')
 
             # (BarclayII) For RGCN on heterogeneous graphs we need to support GCN on bipartite.
             feat_src, feat_dst = expand_as_pair(feat, graph)
