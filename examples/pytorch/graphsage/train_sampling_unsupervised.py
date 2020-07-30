@@ -62,14 +62,7 @@ class SAGE(nn.Module):
     def forward(self, blocks, x):
         h = x
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):
-            # We need to first copy the representation of nodes on the RHS from the
-            # appropriate nodes on the LHS.
-            # Note that the shape of h is (num_nodes_LHS, D) and the shape of h_dst
-            # would be (num_nodes_RHS, D)
-            h_dst = h[:block.number_of_dst_nodes()]
-            # Then we compute the updated representation on the RHS.
-            # The shape of h now becomes (num_nodes_RHS, D)
-            h = layer(block, (h, h_dst))
+            h = layer(block, h)
             if l != len(self.layers) - 1:
                 h = self.activation(h)
                 h = self.dropout(h)
@@ -98,6 +91,7 @@ class SAGE(nn.Module):
                 g,
                 th.arange(g.number_of_nodes()),
                 sampler,
+                device='cuda',
                 batch_size=args.batch_size,
                 shuffle=True,
                 drop_last=False,
@@ -107,8 +101,7 @@ class SAGE(nn.Module):
                 block = blocks[0]
 
                 h = x[input_nodes].to(device)
-                h_dst = h[:block.number_of_dst_nodes()]
-                h = layer(block, (h, h_dst))
+                h = layer(block, h)
                 if l != len(self.layers) - 1:
                     h = self.activation(h)
                     h = self.dropout(h)
@@ -251,6 +244,9 @@ def run(proc_id, n_gpus, args, devices, data):
             batch_inputs = load_subtensor(g, input_nodes, device)
             d_step = time.time()
 
+            pos_graph = pos_graph.to(device)
+            neg_graph = neg_graph.to(device)
+            blocks = [block.to(device) for block in blocks]
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, pos_graph, neg_graph)

@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from functools import partial
 
 import dgl
-from dgl.data.rdf import AIFB, MUTAG, BGS, AM
+from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from model import EntityClassify, RelGraphEmbed
 
 def extract_embed(node_embed, input_nodes):
@@ -23,18 +23,17 @@ def extract_embed(node_embed, input_nodes):
         emb[ntype] = node_embed[ntype][nid]
     return emb
 
-def evaluate(model, loader, node_embed, labels, category, use_cuda):
+def evaluate(model, loader, node_embed, labels, category, device):
     model.eval()
     total_loss = 0
     total_acc = 0
     count = 0
     for input_nodes, seeds, blocks in loader:
+        blocks = [blk.to(device) for blk in blocks]
         seeds = seeds[category]
         emb = extract_embed(node_embed, input_nodes)
-        lbl = labels[seeds]
-        if use_cuda:
-            emb = {k : e.cuda() for k, e in emb.items()}
-            lbl = lbl.cuda()
+        emb = {k : e.to(device) for k, e in emb.items()}
+        lbl = labels[seeds].to(device)
         logits = model(emb, blocks)[category]
         loss = F.cross_entropy(logits, lbl)
         acc = th.sum(logits.argmax(dim=1) == lbl).item()
@@ -46,22 +45,24 @@ def evaluate(model, loader, node_embed, labels, category, use_cuda):
 def main(args):
     # load graph data
     if args.dataset == 'aifb':
-        dataset = AIFB()
+        dataset = AIFBDataset()
     elif args.dataset == 'mutag':
-        dataset = MUTAG()
+        dataset = MUTAGDataset()
     elif args.dataset == 'bgs':
-        dataset = BGS()
+        dataset = BGSDataset()
     elif args.dataset == 'am':
-        dataset = AM()
+        dataset = AMDataset()
     else:
         raise ValueError()
 
-    g = dataset.graph
+    g = dataset[0]
     category = dataset.predict_category
     num_classes = dataset.num_classes
-    train_idx = dataset.train_idx
-    test_idx = dataset.test_idx
-    labels = dataset.labels
+    train_mask = g.nodes[category].data.pop('train_mask')
+    test_mask = g.nodes[category].data.pop('test_mask')
+    train_idx = th.nonzero(train_mask).squeeze()
+    test_idx = th.nonzero(test_mask).squeeze()
+    labels = g.nodes[category].data.pop('labels')
 
     # split dataset into train, validate, test
     if args.validation:
@@ -71,9 +72,11 @@ def main(args):
         val_idx = train_idx
 
     # check cuda
+    device = 'cpu'
     use_cuda = args.gpu >= 0 and th.cuda.is_available()
     if use_cuda:
         th.cuda.set_device(args.gpu)
+        device = 'cuda:%d' % args.gpu
 
     train_label = labels[train_idx]
     val_label = labels[val_idx]
@@ -127,6 +130,7 @@ def main(args):
             t0 = time.time()
 
         for i, (input_nodes, seeds, blocks) in enumerate(loader):
+            blocks = [blk.to(device) for blk in blocks]
             seeds = seeds[category]     # we only predict the nodes with type "category"
             batch_tic = time.time()
             emb = extract_embed(node_embed, input_nodes)
@@ -146,7 +150,7 @@ def main(args):
         if epoch > 3:
             dur.append(time.time() - t0)
 
-        val_loss, val_acc = evaluate(model, val_loader, node_embed, labels, category, use_cuda)
+        val_loss, val_acc = evaluate(model, val_loader, node_embed, labels, category, device)
         print("Epoch {:05d} | Valid Acc: {:.4f} | Valid loss: {:.4f} | Time: {:.4f}".
               format(epoch, val_acc, val_loss, np.average(dur)))
     print()

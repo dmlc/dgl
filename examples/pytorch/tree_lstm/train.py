@@ -77,14 +77,14 @@ def main(args):
         t_epoch = time.time()
         model.train()
         for step, batch in enumerate(train_loader):
-            g = batch.graph
+            g = batch.graph.to(device)
             n = g.number_of_nodes()
             h = th.zeros((n, args.h_size)).to(device)
             c = th.zeros((n, args.h_size)).to(device)
             if step >= 3:
                 t0 = time.time() # tik
 
-            logits = model(batch, h, c)
+            logits = model(batch, g, h, c)
             logp = F.log_softmax(logits, 1)
             loss = F.nll_loss(logp, batch.label, reduction='sum')
 
@@ -98,7 +98,7 @@ def main(args):
             if step > 0 and step % args.log_every == 0:
                 pred = th.argmax(logits, 1)
                 acc = th.sum(th.eq(batch.label, pred))
-                root_ids = [i for i in range(batch.graph.number_of_nodes()) if batch.graph.out_degree(i)==0]
+                root_ids = [i for i in range(g.number_of_nodes()) if g.out_degree(i)==0]
                 root_acc = np.sum(batch.label.cpu().data.numpy()[root_ids] == pred.cpu().data.numpy()[root_ids])
 
                 print("Epoch {:05d} | Step {:05d} | Loss {:.4f} | Acc {:.4f} | Root Acc {:.4f} | Time(s) {:.4f}".format(
@@ -110,17 +110,17 @@ def main(args):
         root_accs = []
         model.eval()
         for step, batch in enumerate(dev_loader):
-            g = batch.graph
+            g = batch.graph.to(device)
             n = g.number_of_nodes()
             with th.no_grad():
                 h = th.zeros((n, args.h_size)).to(device)
                 c = th.zeros((n, args.h_size)).to(device)
-                logits = model(batch, h, c)
+                logits = model(batch, g, h, c)
 
             pred = th.argmax(logits, 1)
             acc = th.sum(th.eq(batch.label, pred)).item()
             accs.append([acc, len(batch.label)])
-            root_ids = [i for i in range(batch.graph.number_of_nodes()) if batch.graph.out_degree(i)==0]
+            root_ids = [i for i in range(g.number_of_nodes()) if g.out_degree(i)==0]
             root_acc = np.sum(batch.label.cpu().data.numpy()[root_ids] == pred.cpu().data.numpy()[root_ids])
             root_accs.append([root_acc, len(root_ids)])
 
@@ -148,17 +148,17 @@ def main(args):
     root_accs = []
     model.eval()
     for step, batch in enumerate(test_loader):
-        g = batch.graph
+        g = batch.graph.to(device)
         n = g.number_of_nodes()
         with th.no_grad():
             h = th.zeros((n, args.h_size)).to(device)
             c = th.zeros((n, args.h_size)).to(device)
-            logits = model(batch, h, c)
+            logits = model(batch, g, h, c)
 
         pred = th.argmax(logits, 1)
         acc = th.sum(th.eq(batch.label, pred)).item()
         accs.append([acc, len(batch.label)])
-        root_ids = [i for i in range(batch.graph.number_of_nodes()) if batch.graph.out_degree(i)==0]
+        root_ids = [i for i in range(g.number_of_nodes()) if g.out_degree(i)==0]
         root_acc = np.sum(batch.label.cpu().data.numpy()[root_ids] == pred.cpu().data.numpy()[root_ids])
         root_accs.append([root_acc, len(root_ids)])
 
@@ -172,7 +172,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', type=int, default=-1)
     parser.add_argument('--seed', type=int, default=41)
-    parser.add_argument('--batch-size', type=int, default=25)
+    parser.add_argument('--batch-size', type=int, default=20)
     parser.add_argument('--child-sum', action='store_true')
     parser.add_argument('--x-size', type=int, default=300)
     parser.add_argument('--h-size', type=int, default=150)

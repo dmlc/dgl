@@ -3,7 +3,7 @@
 import torch as th
 
 from ...base import ALL, is_all
-from ... import backend as F
+from ... import ops as F
 
 __all__ = ['edge_softmax']
 
@@ -43,13 +43,11 @@ class EdgeSoftmax(th.autograd.Function):
         # remember to save the graph to backward cache before making it
         # a local variable
         if not is_all(eids):
-            g = g.edge_subgraph(eids.long())
-
+            g = g.edge_subgraph(eids.type(g.idtype), preserve_nodes=True)
         score_max = F.copy_e_max(g, score)
         score = th.exp(F.e_sub_v(g, score, score_max))
         score_sum = F.copy_e_sum(g, score)
         out = F.e_div_v(g, score, score_sum)
-
         ctx.backward_cache = g
         ctx.save_for_backward(out)
         return out

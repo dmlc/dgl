@@ -235,13 +235,13 @@
   CHECK_IF((value)->ndim == (_ndim), "ndim", value_name, _ndim)
 
 #define CHECK_SAME_DTYPE(VAR1, VAR2)                                            \
-  CHECK(VAR1->dtype == VAR2->dtype)                                             \
+  CHECK((VAR1)->dtype == (VAR2)->dtype)                                         \
     << "Expected " << (#VAR2) << " to be the same type as " << (#VAR1) << "("   \
     << (VAR1)->dtype << ")"                                                     \
     << ". But got " << (VAR2)->dtype << ".";
 
 #define CHECK_SAME_CONTEXT(VAR1, VAR2)                                                      \
-  CHECK(VAR1->ctx == VAR2->ctx)                                                             \
+  CHECK((VAR1)->ctx == (VAR2)->ctx)                                                         \
     << "Expected " << (#VAR2) << " to have the same device context as " << (#VAR1) << "("   \
     << (VAR1)->ctx << ")"                                                                   \
     << ". But got " << (VAR2)->ctx << ".";

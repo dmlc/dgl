@@ -26,7 +26,9 @@ will be able to access the partitioned data.
 
 ### Step 3: Launch distributed jobs
 
-First make sure that the master node has the right permission to ssh to all the other nodes. Then run script:
+First make sure that the master node has the right permission to ssh to all the other nodes. Change the `ip_config.txt` file by using your own instance IP.
+
+Then run script:
 
 ```bash
 python3 ~/dgl/tools/launch.py \

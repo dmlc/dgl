@@ -161,6 +161,7 @@ def main(args):
             node_id, deg = node_id.cuda(), deg.cuda()
             edge_type, edge_norm = edge_type.cuda(), edge_norm.cuda()
             data, labels = data.cuda(), labels.cuda()
+            g = g.to(args.gpu)
 
         t0 = time.time()
         embed = model(g, node_id, edge_type, edge_norm)

@@ -122,6 +122,7 @@ def evaluate(args, dev_id, net, dataset, dataloader, segment='valid'):
             dataset.valid_truths[pair_graph.edata[dgl.EID]] if segment == 'valid' else \
             dataset.test_truths[pair_graph.edata[dgl.EID]]
 
+        frontier = frontier.to(dev_id)
         head_feat = head_feat.to(dev_id)
         tail_feat = tail_feat.to(dev_id)
         with th.no_grad():
@@ -238,6 +239,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
         {str(k): th.arange(dataset.train_enc_graph.number_of_edges(etype=str(k)))
          for k in dataset.possible_rating_values},
         sampler,
+        device='cuda',
         exclude='reverse_types',
         reverse_etypes=reverse_types,
         return_eids=True,
@@ -250,6 +252,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
             dataset.valid_dec_graph,
             th.arange(dataset.valid_dec_graph.number_of_edges()),
             sampler,
+            device='cuda',
             g_sampling=dataset.valid_enc_graph,
             return_eids=True,
             batch_size=args.minibatch_size,
@@ -259,6 +262,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
             dataset.test_dec_graph,
             th.arange(dataset.test_dec_graph.number_of_edges()),
             sampler,
+            device='cuda',
             g_sampling=dataset.test_enc_graph,
             return_eids=True,
             batch_size=args.minibatch_size,
@@ -314,6 +318,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
 
             head_feat = head_feat.to(dev_id)
             tail_feat = tail_feat.to(dev_id)
+            frontier = frontier.to(dev_id)
 
             pred_ratings = net(compact_g, frontier, head_feat, tail_feat, dataset.possible_rating_values)
             loss = rating_loss_net(pred_ratings, true_relation_labels.to(dev_id)).mean()

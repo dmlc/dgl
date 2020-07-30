@@ -81,7 +81,7 @@ class SAGE(nn.Module):
                 num_workers=args.num_workers)
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
-                block = blocks[0]
+                block = blocks[0].to(device)
 
                 h = x[input_nodes].to(device)
                 h_dst = h[:block.number_of_dst_nodes()]
@@ -174,6 +174,9 @@ def run(args, device, data):
         for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
             tic_step = time.time()
 
+            # copy block to gpu
+            blocks = [blk.to(device) for blk in blocks]
+
             # Load the input features as well as output labels
             batch_inputs, batch_labels = load_subtensor(g, labels, seeds, input_nodes, device)
 
@@ -239,8 +242,6 @@ if __name__ == '__main__':
     train_idx, val_idx, test_idx = splitted_idx['train'], splitted_idx['valid'], splitted_idx['test']
     graph, labels = data[0]
     labels = labels[:, 0]
-
-    graph = dgl.as_heterograph(graph)
 
     in_feats = graph.ndata['feat'].shape[1]
     n_classes = (labels.max() + 1).item()

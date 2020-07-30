@@ -3,7 +3,7 @@ import math
 import networkx as nx
 import numpy as np
 
-from ..graph import DGLGraph
+from .. import convert
 
 __all__ = ['MiniGCDataset']
 
@@ -77,7 +77,7 @@ class MiniGCDataset(object):
         self._gen_circular_ladder(self.num_graphs - len(self.graphs))
         # preprocess
         for i in range(self.num_graphs):
-            self.graphs[i] = DGLGraph(self.graphs[i])
+            self.graphs[i] = convert.graph(self.graphs[i])
             # add self edges
             nodes = self.graphs[i].nodes()
             self.graphs[i].add_edges(nodes, nodes)

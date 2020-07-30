@@ -12,6 +12,7 @@
 #include <vector>
 #include <utility>
 #include <tuple>
+#include <string>
 #include "./types.h"
 #include "./array_ops.h"
 #include "./spmat.h"
@@ -163,15 +164,45 @@ inline bool COOHasData(COOMatrix csr) {
  */
 std::pair<bool, bool> COOIsSorted(COOMatrix coo);
 
-/*! \brief Get data. The return type is an ndarray due to possible duplicate entries. */
-runtime::NDArray COOGetData(COOMatrix , int64_t row, int64_t col);
-
 /*!
  * \brief Get the data and the row,col indices for each returned entries.
+ *
+ * The operator supports matrix with duplicate entries and all the matched entries
+ * will be returned. The operator assumes there is NO duplicate (row, col) pair
+ * in the given input. Otherwise, the returned result is undefined.
+ *
  * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ * \param mat Sparse matrix
+ * \param rows Row index
+ * \param cols Column index
+ * \return Three arrays {rows, cols, data}
  */
 std::vector<runtime::NDArray> COOGetDataAndIndices(
-    COOMatrix , runtime::NDArray rows, runtime::NDArray cols);
+    COOMatrix mat, runtime::NDArray rows, runtime::NDArray cols);
+
+/*! \brief Get data. The return type is an ndarray due to possible duplicate entries. */
+inline runtime::NDArray COOGetAllData(COOMatrix mat, int64_t row, int64_t col) {
+  IdArray rows = VecToIdArray<int64_t>({row}, mat.row->dtype.bits, mat.row->ctx);
+  IdArray cols = VecToIdArray<int64_t>({col}, mat.row->dtype.bits, mat.row->ctx);
+  const auto& rst = COOGetDataAndIndices(mat, rows, cols);
+  return rst[2];
+}
+
+/*!
+ * \brief Get the data for each (row, col) pair.
+ *
+ * The operator supports matrix with duplicate entries but only one matched entry
+ * will be returned for each (row, col) pair. Support duplicate input (row, col)
+ * pairs.
+ *
+ * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ *
+ * \param mat Sparse matrix.
+ * \param rows Row index.
+ * \param cols Column index.
+ * \return Data array. The i^th element is the data of (rows[i], cols[i])
+ */
+runtime::NDArray COOGetData(COOMatrix mat, runtime::NDArray rows, runtime::NDArray cols);
 
 /*! \brief Return a transposed COO matrix */
 COOMatrix COOTranspose(COOMatrix coo);

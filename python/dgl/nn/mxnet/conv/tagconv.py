@@ -77,7 +77,7 @@ class TAGConv(gluon.Block):
             is size of output feature.
         """
         with graph.local_scope():
-            assert graph.is_homograph(), 'Graph is not homogeneous'
+            assert graph.is_homogeneous(), 'Graph is not homogeneous'
 
             degs = graph.in_degrees().astype('float32')
             norm = mx.nd.power(mx.nd.clip(degs, a_min=1, a_max=float("inf")), -0.5)

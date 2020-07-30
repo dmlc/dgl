@@ -5,8 +5,8 @@ import numpy as np
 import os, sys
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
 from ..utils import retry_method_with_fix
-from ..graph import DGLGraph
-
+from .. import backend as F
+from .. import convert
 
 class RedditDataset(object):
     def __init__(self, self_loop=False):
@@ -31,14 +31,13 @@ class RedditDataset(object):
         # graph
         coo_adj = sp.load_npz(os.path.join(
             self._extract_dir, "reddit{}_graph.npz".format(self._self_loop_str)))
-        self.graph = DGLGraph(coo_adj, readonly=True)
+        self.graph = convert.graph(coo_adj)
         # features and labels
         reddit_data = np.load(os.path.join(self._extract_dir, "reddit_data.npz"))
         self.features = reddit_data["feature"]
         self.labels = reddit_data["label"]
         self.num_labels = 41
         # tarin/val/test indices
-        node_ids = reddit_data["node_ids"]
         node_types = reddit_data["node_types"]
         self.train_mask = (node_types == 1)
         self.val_mask = (node_types == 2)
@@ -55,13 +54,12 @@ class RedditDataset(object):
 
     def __getitem__(self, idx):
         assert idx == 0, "Reddit Dataset only has one graph"
-        g = self.graph
-        g.ndata['train_mask'] = self.train_mask
-        g.ndata['val_mask'] = self.val_mask
-        g.ndata['test_mask'] = self.test_mask
-        g.ndata['feat'] = self.features
-        g.ndata['label'] = self.labels
-        return g
+        self.graph.ndata['train_mask'] = F.tensor(self.train_mask, dtype=F.bool)
+        self.graph.ndata['val_mask'] = F.tensor(self.val_mask, dtype=F.bool)
+        self.graph.ndata['test_mask'] = F.tensor(self.test_mask, dtype=F.bool)
+        self.graph.ndata['feat'] = F.tensor(self.features, dtype=F.float32)
+        self.graph.ndata['label'] = F.tensor(self.labels, dtype=F.int64)
+        return self.graph
     
     def __len__(self):
         return 1
