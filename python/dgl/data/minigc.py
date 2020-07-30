@@ -7,7 +7,6 @@ from .dgl_dataset import DGLDataset
 from .utils import save_graphs, load_graphs, makedirs
 from .. import backend as F
 from ..convert import graph as dgl_graph
-from ..graph import batch as graph_batch
 from ..transform import add_self_loop
 
 __all__ = ['MiniGCDataset']
@@ -108,7 +107,7 @@ class MiniGCDataset(DGLDataset):
         # preprocess
         for i in range(self.num_graphs):
             # convert to Graph, and add self loops
-            self.graphs[i] = add_self_loop(dgl.graph(self.graphs[i]))
+            self.graphs[i] = add_self_loop(dgl_graph(self.graphs[i]))
         self.labels = F.tensor(np.array(self.labels).astype(np.int))
 
     def _gen_cycle(self, n):
