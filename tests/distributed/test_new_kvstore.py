@@ -129,6 +129,23 @@ def start_server(server_id, num_clients):
                                  num_clients=num_clients,
                                  server_state=server_state)
 
+def start_server_mul_role(server_id, num_clients):
+    # Init kvserver
+    kvserver = dgl.distributed.KVServer(server_id=server_id,
+                                        ip_config='kv_ip_mul_config.txt',
+                                        num_clients=num_clients)
+    kvserver.add_part_policy(node_policy)
+    if kvserver.is_backup_server():
+        kvserver.init_data('data_0', 'node')
+    else:
+        kvserver.init_data('data_0', 'node', data_0)
+    # start server
+    server_state = dgl.distributed.ServerState(kv_store=kvserver, local_g=None, partition_book=None)
+    dgl.distributed.start_server(server_id=server_id,
+                                 ip_config='kv_ip_mul_config.txt',
+                                 num_clients=num_clients,
+                                 server_state=server_state)
+
 def start_client(num_clients):
     # Note: connect to server first !
     dgl.distributed.connect_to_server(ip_config='kv_ip_config.txt')
@@ -261,6 +278,33 @@ def start_client(num_clients):
     # clean up
     kvclient.barrier()
 
+def start_client_mul_role(i, num_clients):
+    # Note: connect to server first !
+    dgl.distributed.connect_to_server(ip_config='kv_ip_mul_config.txt')
+    # Init kvclient
+    if i % 2 == 0:
+        kvclient = dgl.distributed.KVClient(ip_config='kv_ip_mul_config.txt', role='trainer')
+    else:
+        kvclient = dgl.distributed.KVClient(ip_config='kv_ip_mul_config.txt', role='sampler')
+    kvclient.map_shared_data(partition_book=gpb)
+    time.sleep(2)
+    id_tensor = F.tensor([0,2,4], F.int64)
+    data_tensor = F.tensor([[6.,6.],[6.,6.],[6.,6.]], F.float32)
+    if i == 2: # block one trainer
+        time.sleep(2)
+    kvclient.barrier()
+    kvclient.push(name='data_0',
+                  id_tensor=id_tensor,
+                  data_tensor=data_tensor)
+    res = kvclient.pull(name='data_0', id_tensor=id_tensor)
+    if kvclient.role == 'sampler':
+        target = data_tensor * (num_clients / 2)
+        assert_array_equal(F.asnumpy(res), F.asnumpy(target))
+    else:
+        target = data_tensor * num_clients
+        assert_array_equal(F.asnumpy(res), F.asnumpy(target))
+    time.sleep(3)
+
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
 def test_kv_store():
     ip_config = open("kv_ip_config.txt", "w")
@@ -285,6 +329,31 @@ def test_kv_store():
     for i in range(num_servers):
         pserver_list[i].join()
 
+@unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
+def test_kv_multi_role():
+    ip_config = open("kv_ip_mul_config.txt", "w")
+    num_servers = 2
+    num_clients = 10
+    ip_addr = get_local_usable_addr()
+    ip_config.write('{} {}\n'.format(ip_addr, num_servers))
+    ip_config.close()
+    ctx = mp.get_context('spawn')
+    pserver_list = []
+    pclient_list = []
+    for i in range(num_servers):
+        pserver = ctx.Process(target=start_server_mul_role, args=(i, num_clients))
+        pserver.start()
+        pserver_list.append(pserver)
+    for i in range(num_clients):
+        pclient = ctx.Process(target=start_client_mul_role, args=(i, num_clients))
+        pclient.start()
+        pclient_list.append(pclient)
+    for i in range(num_clients):
+        pclient_list[i].join()
+    for i in range(num_servers):
+        pserver_list[i].join()
+
 if __name__ == '__main__':
     test_partition_policy()
     test_kv_store()
+    test_kv_multi_role()
