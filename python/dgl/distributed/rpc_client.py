@@ -225,9 +225,12 @@ def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='so
         global SAMPLER_POOL
         global NUM_SAMPLER_WORKERS
         if num_workers > 0:
+            print("pre pool")
             SAMPLER_POOL = ctx.Pool(
                 num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size, net_type))
+            print("after pool")
         NUM_SAMPLER_WORKERS = num_workers
+        print("before connect")
         connect_to_server(ip_config, max_queue_size, net_type)
     except Exception as e:
         print(e)

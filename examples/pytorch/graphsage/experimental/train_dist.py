@@ -12,6 +12,7 @@ from dgl.data import register_data_args, load_data
 from dgl.data.utils import load_graphs
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
+from dgl.distributed import DistDataLoader
 
 import torch as th
 import torch.nn as nn
@@ -75,7 +76,7 @@ class DistSAGE(SAGE):
             sampler = NeighborSampler(g, [-1], dgl.distributed.sample_neighbors)
             print('|V|={}, eval batch size: {}'.format(g.number_of_nodes(), batch_size))
             # Create PyTorch DataLoader for constructing blocks
-            dataloader = DataLoader(
+            dataloader = DistDataLoader(
                 dataset=nodes,
                 batch_size=batch_size,
                 collate_fn=sampler.sample_blocks,
@@ -217,6 +218,12 @@ def run(args, device, data):
 def main(args):
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
+
+    os.environ['DGL_DIST_MODE'] = 'distributed'
+    print("START1111")
+    print("NUM_WORKERS:{}".format(args.num_workers))
+    dgl.distributed.init_rpc(args.ip_config, num_workers=args.num_workers)
+    print("DONE")
     g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, conf_file=args.conf_path)
     print('rank:', g.rank())
 
@@ -261,11 +268,16 @@ if __name__ == '__main__':
     parser.add_argument('--eval-every', type=int, default=5)
     parser.add_argument('--lr', type=float, default=0.003)
     parser.add_argument('--dropout', type=float, default=0.5)
-    parser.add_argument('--num-workers', type=int, default=0,
+    parser.add_argument('--num-workers', type=int, default=4,
         help="Number of sampling processes. Use 0 for no extra process.")
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
     args = parser.parse_args()
 
-    print(args)
-    main(args)
+    try:
+        print(args)
+        main(args)
+    except Exception as e:
+        print(e)
+        import traceback
+        traceback.print_exc()
