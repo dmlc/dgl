@@ -610,13 +610,13 @@ class AIFBDataset(RDFGraphDataset):
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
-            return Entity(id=str(term), cls="_Literal")
+            return Entity(e_id=str(term), cls="_Literal")
         if isinstance(term, rdf.BNode):
             return None
         entstr = str(term)
         if entstr.startswith(self.entity_prefix):
             sp = entstr.split('/')
-            return Entity(id=sp[5], cls=sp[3])
+            return Entity(e_id=sp[5], cls=sp[3])
         else:
             return None
 
@@ -732,7 +732,7 @@ class MUTAGDataset(RDFGraphDataset):
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
-            return Entity(id=str(term), cls="_Literal")
+            return Entity(e_id=str(term), cls="_Literal")
         elif isinstance(term, rdf.BNode):
             return None
         entstr = str(term)
@@ -744,7 +744,7 @@ class MUTAGDataset(RDFGraphDataset):
                 cls = 'bond'
             else:
                 cls = None
-            return Entity(id=inst, cls=cls)
+            return Entity(e_id=inst, cls=cls)
         else:
             return None
 
@@ -881,7 +881,7 @@ class BGSDataset(RDFGraphDataset):
             # instance
             cls = '%s/%s' % (sp[4], sp[5])
             inst = sp[6]
-            return Entity(id=inst, cls=cls)
+            return Entity(e_id=inst, cls=cls)
         else:
             return None
 
@@ -1006,7 +1006,7 @@ class AMDataset(RDFGraphDataset):
         if isinstance(term, rdf.Literal):
             return None
         elif isinstance(term, rdf.BNode):
-            return Entity(id=str(term), cls='_BNode')
+            return Entity(e_id=str(term), cls='_BNode')
         entstr = str(term)
         if entstr.startswith(self.entity_prefix):
             sp = entstr.split('/')
@@ -1018,7 +1018,7 @@ class AMDataset(RDFGraphDataset):
             else:
                 cls = 'TYPE'
                 inst = spp
-            return Entity(id=inst, cls=cls)
+            return Entity(e_id=inst, cls=cls)
         else:
             return None
 
