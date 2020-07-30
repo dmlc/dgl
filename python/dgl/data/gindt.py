@@ -22,7 +22,7 @@ class GINDataset(DGLBuiltinDataset):
     The dataset contains the compact format of popular graph kernel datasets, which includes:
     MUTAG, COLLAB, IMDBBINARY, IMDBMULTI, NCI1, PROTEINS, PTC, REDDITBINARY, REDDITMULTI5K
     This datset class processes all data sets listed above. For more graph kernel datasets,
-    see :class:`TUDataset`
+    see :class:`TUDataset`.
 
     Paramters
     ---------
@@ -51,15 +51,15 @@ class GINDataset(DGLBuiltinDataset):
           ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float64)}
           edata_schemes={})
     >>> label
-    1
+    tensor(1)
 
     **Batch the graphs and labels for mini-batch training**
 
-    >>> graphs, labels = zip(*data)
+    >>> graphs, labels = zip(*[data[i] for i in range(16)])
     >>> batched_graphs = dgl.batch(graphs)
     >>> batched_labels = torch.tensor(labels)
     >>> batched_graphs
-    Graph(num_nodes=3371, num_edges=7442,
+    Graph(num_nodes=330, num_edges=748,
           ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float64)}
           edata_schemes={})
     """
@@ -224,6 +224,7 @@ class GINDataset(DGLBuiltinDataset):
 
                 self.graphs.append(g)
 
+        self.labels = F.tensor(self.labels)
         # if no attr
         if not self.nattrs_flag:
             if self.verbose:
@@ -291,7 +292,7 @@ class GINDataset(DGLBuiltinDataset):
         def save(self):
             graph_path = os.path.join(self.save_path, 'gin_{}.bin'.format(self.name))
             info_path = os.path.join(self.save_path, 'gin_{}.pkl'.format(self.name))
-            label_dict = {'labels': F.tensor(self.labels)}
+            label_dict = {'labels': self.labels}
             info_dict = {'N': self.N,
                          'n': self.n,
                          'm': self.m,
