@@ -866,16 +866,12 @@ class KVClient(object):
         # push and pull handler
         self._pull_handlers = {}
         self._push_handlers = {}
-        # register role on each server
+        # register role on server-0
         self._role = role
         request = RegisterRoleRequest(self._client_id, self._role)
-        for server_id in range(self._server_count):
-            rpc.send_request(server_id, request)
-        # recv reponse from all the server nodes
-        for _ in range(self._server_count):
-            response = rpc.recv_response()
-            assert response.msg == ROLE_MSG
-        self.barrier()
+        rpc.send_request(0, request)
+        response = rpc.recv_response()
+        assert response.msg == ROLE_MSG
 
     @property
     def client_id(self):
@@ -898,13 +894,9 @@ class KVClient(object):
         This API will be blocked untill all the clients invoke this API.
         """
         request = BarrierRequest(self._role)
-        # send request to all the server nodes
-        for server_id in range(self._server_count):
-            rpc.send_request(server_id, request)
-        # recv response from all the server nodes
-        for _ in range(self._server_count):
-            response = rpc.recv_response()
-            assert response.msg == BARRIER_MSG
+        rpc.send_request(0, request)
+        response = rpc.recv_response()
+        assert response.msg == BARRIER_MSG
 
     def register_push_handler(self, name, func):
         """Register UDF push function.
