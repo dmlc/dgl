@@ -425,7 +425,7 @@ def main(args, devices):
     elif args.dataset == 'bgs':
         dataset = BGSDataset()
     elif args.dataset == 'am':
-        dataset = AM()
+        dataset = AMDataset()
     elif args.dataset == 'ogbn-mag':
         dataset = DglNodePropPredDataset(name=args.dataset)
         ogb_dataset = True
@@ -471,15 +471,17 @@ def main(args, devices):
             node_feats = [None] * num_of_ntype
     else:
         # Load from hetero-graph
-        hg = dataset.graph
+        hg = dataset[0]
 
         num_rels = len(hg.canonical_etypes)
         num_of_ntype = len(hg.ntypes)
         category = dataset.predict_category
         num_classes = dataset.num_classes
-        train_idx = dataset.train_idx
-        test_idx = dataset.test_idx
-        labels = dataset.labels
+        train_mask = hg.nodes[category].data.pop('train_mask')
+        test_mask = hg.nodes[category].data.pop('test_mask')
+        labels = hg.nodes[category].data.pop('labels')
+        train_idx = th.nonzero(train_mask).squeeze()
+        test_idx = th.nonzero(test_mask).squeeze()
         node_feats = [None] * num_of_ntype
 
         # split dataset into train, validate, test

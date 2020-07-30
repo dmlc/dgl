@@ -249,6 +249,7 @@ class RDFGraphDataset(DGLBuiltinDataset):
         # save for compatability
         self._train_idx = F.tensor(train_idx)
         self._test_idx = F.tensor(test_idx)
+        self._labels = labels
 
     def build_graph(self, mg, src, dst, ntid, etid, ntypes, etypes):
         """Build the graphs
