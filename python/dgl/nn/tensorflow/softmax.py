@@ -11,7 +11,7 @@ __all__ = ['edge_softmax']
 def edge_softmax_real(graph, score, eids=ALL):
     """Edge Softmax function"""
     if not is_all(eids):
-        graph = graph.edge_subgraph(tf.cast(eids, graph.idtype))
+        graph = graph.edge_subgraph(tf.cast(eids, graph.idtype), preserve_nodes=True)
     gidx = graph._graph
     score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
     score = tf.math.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))

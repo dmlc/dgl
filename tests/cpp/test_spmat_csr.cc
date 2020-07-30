@@ -241,6 +241,7 @@ TEST(SpmatTest, CSRGetData) {
   _TestCSRGetData<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
   _TestCSRGetData<int32_t>(GPU);
+  _TestCSRGetData<int64_t>(GPU);
 #endif
 }
 
@@ -287,11 +288,12 @@ void _TestCSRTranspose(DLContext ctx) {
   ASSERT_TRUE(ArrayEQ<IDX>(csr_t.data, td));
 }
 
-TEST(SpmatTest, TestCSRTranspose) {
+TEST(SpmatTest, CSRTranspose) {
   _TestCSRTranspose<int32_t>(CPU);
   _TestCSRTranspose<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
   _TestCSRTranspose<int32_t>(GPU);
+  _TestCSRTranspose<int64_t>(GPU);
 #endif
 }
 
@@ -335,6 +337,7 @@ TEST(SpmatTest, CSRToCOO) {
   _TestCSRToCOO<int64_t>(CPU);
 #if DGL_USE_CUDA
   _TestCSRToCOO<int32_t>(GPU);
+  _TestCSRToCOO<int64_t>(GPU);
 #endif
 }
 
@@ -441,6 +444,7 @@ TEST(SpmatTest, CSRSliceMatrix) {
   _TestCSRSliceMatrix<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
   _TestCSRSliceMatrix<int32_t>(GPU);
+  _TestCSRSliceMatrix<int64_t>(GPU);
 #endif
 }
 
@@ -457,6 +461,7 @@ TEST(SpmatTest, CSRHasDuplicate) {
   _TestCSRHasDuplicate<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
   _TestCSRHasDuplicate<int32_t>(GPU);
+  _TestCSRHasDuplicate<int64_t>(GPU);
 #endif
 }
 
@@ -480,6 +485,7 @@ TEST(SpmatTest, CSRSort) {
   _TestCSRSort<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
   _TestCSRSort<int32_t>(GPU);
+  _TestCSRSort<int64_t>(GPU);
 #endif
 }
 
