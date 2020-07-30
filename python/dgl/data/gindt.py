@@ -18,10 +18,12 @@ from ..convert import graph as dgl_graph
 class GINDataset(DGLBuiltinDataset):
     """Datasets for Graph Isomorphism Network (GIN)
     Adapted from https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip.
+
     The dataset contains the compact format of popular graph kernel datasets, which includes:
     MUTAG, COLLAB, IMDBBINARY, IMDBMULTI, NCI1, PROTEINS, PTC, REDDITBINARY, REDDITMULTI5K
     This datset class processes all data sets listed above. For more graph kernel datasets,
     see :class:`TUDataset`
+
     Paramters
     ---------
     name: str
@@ -30,20 +32,36 @@ class GINDataset(DGLBuiltinDataset):
         'IMDBBINARY', 'IMDBMULTI', \
         'NCI1', 'PROTEINS', 'PTC', \
         'REDDITBINARY', 'REDDITMULTI5K')
-    self_loop: boolean
+    self_loop: bool
         add self to self edge if true
-    degree_as_nlabel: boolean
+    degree_as_nlabel: bool
         take node degree as label and feature if true
-    Returns
-    -------
-    GINDataset object as an iterable for dataloader.
+
     Examples
     --------
     >>> data = GINDataset(name='MUTAG', self_loop=False)
-    >>> data[0]
-    (Graph(num_nodes=23, num_edges=54,
-           ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float64)}
-           edata_schemes={}), 0)
+
+    **The dataset instance is an iterable**
+
+    >>> len(data)
+    188
+    >>> g, label = data[128]
+    >>> g
+    Graph(num_nodes=13, num_edges=26,
+          ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float64)}
+          edata_schemes={})
+    >>> label
+    1
+
+    **Batch the graphs and labels for mini-batch training*
+
+    >>> graphs, labels = zip(*data)
+    >>> batched_graphs = dgl.batch(graphs)
+    >>> batched_labels = torch.tensor(labels)
+    >>> batched_graphs
+    Graph(num_nodes=3371, num_edges=7442,
+          ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float64)}
+          edata_schemes={})
     """
 
     def __init__(self, name, self_loop, degree_as_nlabel=False,
@@ -98,11 +116,13 @@ class GINDataset(DGLBuiltinDataset):
         return len(self.graphs)
 
     def __getitem__(self, idx):
-        """Get the i^th sample.
+        """Get the idx-th sample.
+
         Paramters
         ---------
         idx : int
             The sample index.
+
         Returns
         -------
         (dgl.Graph, int)
