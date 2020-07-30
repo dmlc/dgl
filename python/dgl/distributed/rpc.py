@@ -1113,9 +1113,9 @@ class ClientBarrierRequest(Request):
 
     def process_request(self, server_state):
         barrier_count = _CAPI_DGLRPCGetBarrierCount()
-        _CAPI_DGLRPCGetBarrierCount(barrier_count+1)
+        _CAPI_DGLRPCSetBarrierCount(barrier_count+1)
         if barrier_count+1 == get_num_client():
-            _CAPI_DGLRPCGetBarrierCount(0)
+            _CAPI_DGLRPCSetBarrierCount(0)
             res_list = []
             for target_id in range(get_num_client()):
                 res_list.append((target_id, ClientBarrierResponse()))
