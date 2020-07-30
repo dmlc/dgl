@@ -5,9 +5,10 @@ import os
 import sys
 import hashlib
 import warnings
-import numpy as np
-import warnings
 import requests
+import pickle
+import errno
+import numpy as np
 
 import pickle
 import errno
