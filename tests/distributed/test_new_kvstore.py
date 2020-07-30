@@ -286,12 +286,10 @@ def start_client_mul_role(i, num_clients):
         kvclient = dgl.distributed.KVClient(ip_config='kv_ip_mul_config.txt', role='trainer')
     else:
         kvclient = dgl.distributed.KVClient(ip_config='kv_ip_mul_config.txt', role='sampler')
-    kvclient.map_shared_data(partition_book=gpb)
     if i == 2: # block one trainer
-        time.sleep(2)
+        time.sleep(5)
     kvclient.barrier()
-    print(i)
-    print("------")
+    print("i: %d role: %s" % i, kvclient.role)
     time.sleep(3)
 
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
