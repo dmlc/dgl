@@ -58,7 +58,7 @@ For message-passing, we do not guarantee the determinism only in following cases
 1. The backward phase of Min/Max reduce function (we depend on ``scatter_add_`` operator in backend frameworks,
    and it's not guaranteed to be deterministic).
 2. Message Passing on ``DGLGraph``'s with restricted format ``COO`` (this will only happen when user specifies
-   ``formats='coo'``, normal users should not specify ``formats`` argument, which is only designed for expert
-   users to handle extremely large graph).
+   ``formats='coo'`` when creating the graph, normal users should not specify ``formats`` argument, which is
+   only designed for expert users to handle extremely large graph).
 
 Note that though operators above are not deterministic, the difference across multiple runs is quite small.
