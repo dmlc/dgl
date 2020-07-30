@@ -882,7 +882,7 @@ class KVClient(object):
     def role(self):
         """Get client role"""
         return self._role
-    
+
     @property
     def machine_id(self):
         """Get machine ID"""
