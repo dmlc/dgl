@@ -289,7 +289,7 @@ def start_client_mul_role(i, num_clients):
     if i == 2: # block one trainer
         time.sleep(5)
     kvclient.barrier()
-    print("i: %d role: %s" % i, kvclient.role)
+    print("i: %d role: %s", % (i, kvclient.role))
     time.sleep(3)
 
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
