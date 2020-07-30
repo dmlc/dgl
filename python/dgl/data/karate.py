@@ -2,7 +2,7 @@
 """
 import numpy as np
 import networkx as nx
-from ..graph import DGLGraph
+from .. import convert
 
 
 class KarateClub(object):
@@ -19,7 +19,7 @@ class KarateClub(object):
         kG = nx.karate_club_graph()
         self.label = np.asarray(
             [kG.nodes[i]['club'] != 'Mr. Hi' for i in kG.nodes]).astype(np.int64)
-        g = DGLGraph(kG)
+        g = convert.graph(kG)
         g.ndata['label'] = self.label
         self.data = [g]
 
