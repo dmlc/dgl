@@ -62,13 +62,14 @@ class MiniGCDataset(DGLDataset):
           edata_schemes={})
     """
 
-    def __init__(self, num_graphs, min_num_v, max_num_v, seed=None,
+    def __init__(self, num_graphs, min_num_v, max_num_v, seed=0,
                  save_graph=True, force_reload=False, verbose=False):
         self.num_graphs = num_graphs
         self.min_num_v = min_num_v
         self.max_num_v = max_num_v
         self.seed = seed
         self.save_graph = save_graph
+        self.params_hash = abs(hash((num_graphs, min_num_v, max_num_v, seed)))
 
         super(MiniGCDataset, self).__init__(name="minigc",
                                             force_reload=force_reload,
@@ -97,7 +98,7 @@ class MiniGCDataset(DGLDataset):
         return self.graphs[idx], self.labels[idx]
 
     def has_cache(self):
-        graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
+        graph_path = os.path.join(self.save_path, 'dgl_graph_{}.bin'.format(self.params_hash))
         if os.path.exists(graph_path):
             return True
 
@@ -106,11 +107,11 @@ class MiniGCDataset(DGLDataset):
     def save(self):
         """save the graph list and the labels"""
         if self.save_graph:
-            graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
+            graph_path = os.path.join(self.save_path, 'dgl_graph_{}.bin'.format(self.params_hash))
             save_graphs(str(graph_path), self.graphs, {'labels': self.labels})
 
     def load(self):
-        graphs, label_dict = load_graphs(os.path.join(self.save_path, 'dgl_graph.bin'))
+        graphs, label_dict = load_graphs(os.path.join(self.save_path, 'dgl_graph_{}.bin'.format(self.params_hash)))
         self.graphs = graphs
         self.labels = label_dict['labels']
 
