@@ -872,7 +872,6 @@ class KVClient(object):
         rpc.send_request(0, request)
         response = rpc.recv_response()
         assert response.msg == ROLE_MSG
-        self.barrier()
 
     @property
     def client_id(self):

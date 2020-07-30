@@ -151,6 +151,7 @@ def start_client(num_clients):
     dgl.distributed.connect_to_server(ip_config='kv_ip_config.txt')
     # Init kvclient
     kvclient = dgl.distributed.KVClient(ip_config='kv_ip_config.txt')
+    time.sleep(2)
     assert dgl.distributed.get_num_client() == num_clients
     kvclient.init_data(name='data_1', 
                        shape=F.shape(data_1), 
@@ -266,6 +267,7 @@ def start_client(num_clients):
     kvclient.register_push_handler('data_3', add_push)
     kvclient.map_shared_data(partition_book=gpb)
     data_tensor = F.tensor([[6.,6.],[6.,6.],[6.,6.]], F.float32)
+    kvclient.barrier()
     time.sleep(kvclient.client_id + 1)
     print("add...")
     kvclient.push(name='data_3',
@@ -284,6 +286,7 @@ def start_client_mul_role(i, num_clients):
         kvclient = dgl.distributed.KVClient(ip_config='kv_ip_mul_config.txt', role='trainer')
     else:
         kvclient = dgl.distributed.KVClient(ip_config='kv_ip_mul_config.txt', role='sampler')
+    time.sleep(2)
     if i == 2: # block one trainer
         time.sleep(5)
     kvclient.barrier()
