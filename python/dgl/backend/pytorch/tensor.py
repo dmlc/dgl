@@ -9,7 +9,7 @@ import numbers
 from torch.utils import dlpack
 
 from ... import ndarray as nd
-from ... import kernel as K
+from ..._deprecate import kernel as K
 from ...function.base import TargetCode
 from ...base import dgl_warning
 

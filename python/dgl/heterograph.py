@@ -12,7 +12,7 @@ from . import graph_index
 from . import heterograph_index
 from . import utils
 from . import backend as F
-from .runtime import ir, scheduler, Runtime, GraphAdapter
+from ._deprecate.runtime import ir, scheduler, Runtime, GraphAdapter
 from .frame import Frame, FrameRef, frame_like
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
 from .base import ALL, SLICE_FULL, NTYPE, NID, ETYPE, EID, is_all, DGLError, dgl_warning
@@ -4344,7 +4344,7 @@ class DGLHeteroGraph(object):
                 return F.nonzero_1d(mask)
             else:
                 v = utils.prepare_tensor(self, nodes, 'nodes')
-                return F.boolean_mask(v, mask[v])
+                return F.boolean_mask(v, F.gather_row(mask, v))
 
     def filter_edges(self, predicate, edges=ALL, etype=None):
         """Return a tensor of edge IDs with the given edge type that satisfy
@@ -4391,7 +4391,7 @@ class DGLHeteroGraph(object):
                     e = self.edge_ids(edges[0], edges[1], etype=etype)
                 else:
                     e = utils.prepare_tensor(self, edges, 'edges')
-                return F.boolean_mask(e, mask[e])
+                return F.boolean_mask(e, F.gather_row(mask, e))
 
     def readonly(self, readonly_state=True):
         """Deprecated: DGLGraph will always be mutable."""

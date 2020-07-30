@@ -5,7 +5,7 @@ import datetime
 
 from .utils import get_download_dir, download, extract_archive, loadtxt
 from ..utils import retry_method_with_fix
-from ..graph import DGLGraph
+from .. import convert
 
 
 class GDELT(object):
@@ -78,12 +78,10 @@ class GDELT(object):
         if idx >= len(self) or idx < 0:
             raise IndexError("Index out of range")
         i = idx + self.start_time
-        g = DGLGraph()
-        g.add_nodes(self.num_nodes)
         row_mask = self.time_index <= i
         edges = self.data[row_mask][:, [0, 2]]
         rate = self.data[row_mask][:, 1]
-        g.add_edges(edges[:, 0], edges[:, 1])
+        g = convert.graph((edges[:, 0], edges[:, 1]))
         g.edata['rel_type'] = rate.reshape(-1, 1)
         return g
 
