@@ -29,22 +29,6 @@ class GraphConv(nn.Module):
     the weight :math:`W^{(l)}` is initialized using Glorot uniform initialization
     and the bias is initialized to be zero.
 
-    Notes
-    -----
-    Zero in-degree nodes will lead to invalid normalizer. A common practice
-    to avoid this is to add a self-loop for each node in the graph if it is
-    homogeneous, which can be achieved by:
-
-    >>> g = ... # a DGLGraph
-    >>> dgl.add_self_loop(g)
-
-    If we can't do the above in advance for some reason, we need to set
-    add_self_loop to ``True``.
-
-    For heterogeneous graph, it doesn't make sense to add self-loop.
-    Then we need to filter out the destination nodes with zero in-degree
-    when use in downstream.
-
     Parameters
     ----------
     in_feats : int
@@ -69,14 +53,21 @@ class GraphConv(nn.Module):
         since no message will be passed to those nodes. This is harmful for some applications
         causing silent performance regression. Thus we will let the code break if we detect
         0-in-degree nodes in input graph. However, we provide the flexibilty to suppress this check
-        by setting ``True`` to this param.
+        by setting ``True`` to this param and let users handle it by themselves.
 
-    Attributes
-    ----------
-    weight : torch.Tensor
-        The learnable weight tensor.
-    bias : torch.Tensor
-        The learnable bias tensor.
+    Notes
+    -----
+    Zero in-degree nodes will lead to invalid output value. A common practice
+    to avoid this is to add a self-loop for each node in the graph if it is
+    homogeneous, which can be achieved by:
+
+    >>> g = ... # a DGLGraph
+    >>> g = dgl.transform.add_self_loop(g)
+
+    If we can not do the above before calling conv or if the graph is heterogeneous,
+    we need to set ``allow_zero_in_degree`` to ``True`` to unblock the running and handle
+    zere-in-degree nodes by ourselves. A common practise to handle this is to filter out
+    the nodes with zere-in-degree when use after conv.
 
     Examples
     -----
@@ -87,40 +78,42 @@ class GraphConv(nn.Module):
 
     Case 1: Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> g = dgl.transform.add_self_loop(g)
     >>> feat = th.ones(6, 10)
     >>> conv = GraphConv(10, 2, norm='both', weight=True, bias=True)
     >>> res = conv(g, feat)
     >>> print(res)
-    tensor([[ 0.6438, -0.3395],
-            [ 0.9104, -0.4801],
-            [ 0.9104, -0.4801],
-            [ 1.0990, -0.5795],
-            [ 0.9104, -0.4801],
-            [ 0.0000,  0.0000]], grad_fn=<AddBackward0>)
-    >>> # Add self-loop example
-    >>> conv = GraphConv(10, 2, norm='both', weight=True, bias=True, add_self_loop=True)
+    tensor([[ 1.3326, -0.2797],
+            [ 1.4673, -0.3080],
+            [ 1.3326, -0.2797],
+            [ 1.6871, -0.3541],
+            [ 1.7711, -0.3717],
+            [ 1.0375, -0.2178]], grad_fn=<AddBackward0>)
+    >>> # allow_zero_in_degree example
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> conv = GraphConv(10, 2, norm='both', weight=True, bias=True, allow_zero_in_degree=True)
     >>> res = conv(g, feat)
     >>> print(res)
-    tensor([[-2.5718,  0.0102],
-            [-2.8316,  0.0113],
-            [-2.5718,  0.0102],
-            [-3.2559,  0.0129],
-            [-3.4180,  0.0136],
-            [-2.0022,  0.0080]], grad_fn=<AddBackward0>)
+    tensor([[-0.2473, -0.4631],
+            [-0.3497, -0.6549],
+            [-0.3497, -0.6549],
+            [-0.4221, -0.7905],
+            [-0.3497, -0.6549],
+            [ 0.0000,  0.0000]], grad_fn=<AddBackward0>)
 
     Case 2: Unidirectional bipartite graph
-    >>> u = [0, 0, 1]
-    >>> v = [2, 3, 2]
+    >>> u = [0, 1, 0, 0, 1]
+    >>> v = [0, 1, 2, 3, 2]
     >>> g = dgl.bipartite((u, v))
     >>> u_fea = th.rand(2, 5)
     >>> v_fea = th.rand(4, 5)
     >>> conv = GraphConv(5, 2, norm='both', weight=True, bias=True)
     >>> res = conv(g, (u_fea, v_fea))
     >>> res
-    tensor([[ 0.0000,  0.0000],
-        [ 0.0000,  0.0000],
-        [-1.3650, -0.1034],
-        [-0.6330,  0.1292]], grad_fn=<AddBackward0>)
+    tensor([[-0.2994,  0.6106],
+            [-0.4482,  0.5540],
+            [-0.5287,  0.8235],
+            [-0.2994,  0.6106]], grad_fn=<AddBackward0>)
     """
     def __init__(self,
                  in_feats,
