@@ -38,7 +38,9 @@ CSRMatrix CSRTranspose<kDLGPU, int32_t>(CSRMatrix csr) {
   const int32_t* indices_ptr = static_cast<int32_t*>(indices->data);
   const void* data_ptr = data->data;
 
-  NDArray t_indptr = aten::NewIdArray(csr.num_cols + 1, ctx, bits);
+  // (BarclayII) csr2csc doesn't seem to clear the content of cscColPtr if nnz == 0.
+  // We need to do it ourselves.
+  NDArray t_indptr = aten::Full(0, csr.num_cols + 1, bits, ctx);
   NDArray t_indices = aten::NewIdArray(nnz, ctx, bits);
   NDArray t_data = aten::NewIdArray(nnz, ctx, bits);
   int32_t* t_indptr_ptr = static_cast<int32_t*>(t_indptr->data);
