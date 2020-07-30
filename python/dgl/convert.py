@@ -148,10 +148,7 @@ def graph(data,
     g = create_from_edges(u, v, ntype, etype, ntype, urange, vrange,
                           validate, formats=formats)
 
-    if device is None:
-        return utils.to_int32_graph_if_on_gpu(g)
-    else:
-        return g.to(device)
+    return g.to(device)
 
 def bipartite(data,
               utype='_U', etype='_E', vtype='_V',
@@ -300,10 +297,7 @@ def bipartite(data,
         u, v, utype, etype, vtype, urange, vrange, validate,
         formats=formats)
 
-    if device is None:
-        return utils.to_int32_graph_if_on_gpu(g)
-    else:
-        return g.to(device)
+    return g.to(device)
 
 def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
     """Create a heterograph from graphs representing connections of each relation.
