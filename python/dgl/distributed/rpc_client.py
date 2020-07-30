@@ -212,8 +212,8 @@ def _init_rpc(ip_config, max_queue_size, net_type):
         print("11111")
         with open("~/rpcclient.log", "w") as f:
             f.write("1111112")
-            connect_to_server(ip_config, max_queue_size, net_type)
-            f.write("2222222")
+        connect_to_server(ip_config, max_queue_size, net_type)
+        f.write("2222222")
     except Exception as e:
         print(e)
 
@@ -224,12 +224,12 @@ def get_sampler_pool():
 def debug_str():
     import sys
     import os
-    fout = open("/home/ubuntu/"+str(os.getpid()) + ".out", "a", buffering=0)
-    ferr = open("/home/ubuntu/"+str(os.getpid()) + "_error.out", "a", buffering=0)
+    # fout = open("/home/ubuntu/"+str(os.getpid()) + ".out", "a", buffering=0)
+    # ferr = open("/home/ubuntu/"+str(os.getpid()) + "_error.out", "a", buffering=0)
     print("DEBUGBEUGBUEGBU")
-    fout.write("BDEUBDUEIBDEUBG")
-    fout.flush()
-    fout.close()
+    # fout.write("BDEUBDUEIBDEUBG")
+    # fout.flush()
+    # fout.close()
 
 def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Init rpc service"""
@@ -240,10 +240,10 @@ def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='so
         if num_workers > 0:
             print("pre pool")
             print(num_workers)
-            SAMPLER_POOL = ctx.Pool(
-                num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size, net_type))
             # SAMPLER_POOL = ctx.Pool(
-            #     num_workers, initializer=debug_str)
+            #     num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size, net_type))
+            SAMPLER_POOL = ctx.Pool(
+                num_workers, initializer=debug_str)
             # SAMPLER_POOL.join()
             print("after pool")
         NUM_SAMPLER_WORKERS = num_workers
