@@ -98,8 +98,8 @@ def prepare_mp(g):
 
     This is a workaround before full shared memory support on heterogeneous graphs.
     """
-    g.in_degree(0)
-    g.out_degree(0)
+    g.in_degrees(0)
+    g.out_degrees(0)
     g.find_edges([0])
 
 def compute_acc(pred, labels):
