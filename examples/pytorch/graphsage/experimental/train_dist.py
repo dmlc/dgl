@@ -219,7 +219,11 @@ def main(args):
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
 
-    os.environ['DGL_DIST_MODE'] = 'distributed'
+    import multiprocessing, logging
+    logger = multiprocessing.log_to_stderr()
+    logger.setLevel(logging.DEBUG)
+
+    # os.environ['DGL_DIST_MODE'] = 'distributed'
     print("START1111")
     print("NUM_WORKERS:{}".format(args.num_workers))
     dgl.distributed.init_rpc(args.ip_config, num_workers=args.num_workers)
