@@ -210,6 +210,7 @@ def _close():
 def _init_rpc(ip_config, max_queue_size, net_type):
     try:
         print("11111")
+
         with open("~/rpcclient.log", "w") as f:
             f.write("1111112")
         connect_to_server(ip_config, max_queue_size, net_type)
@@ -224,9 +225,11 @@ def get_sampler_pool():
 def debug_str():
     import sys
     import os
+    print("DEBUGBEUGBUEGBU")
+    sys.stdout.flush()
     # fout = open("/home/ubuntu/"+str(os.getpid()) + ".out", "a", buffering=0)
     # ferr = open("/home/ubuntu/"+str(os.getpid()) + "_error.out", "a", buffering=0)
-    print("DEBUGBEUGBUEGBU")
+
     # fout.write("BDEUBDUEIBDEUBG")
     # fout.flush()
     # fout.close()
