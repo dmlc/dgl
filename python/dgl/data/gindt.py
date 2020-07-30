@@ -97,6 +97,8 @@ class GINDataset(DGLBuiltinDataset):
         self.nattrs_flag = False
         self.nlabels_flag = False
 
+        self.params_hash = abs(hash((name, self_loop, degree_as_nlabel)))
+
         super(GINDataset, self).__init__(name=name, url=gin_url,
                                          raw_dir=raw_dir, force_reload=force_reload, verbose=verbose)
 
@@ -290,8 +292,8 @@ class GINDataset(DGLBuiltinDataset):
                     self.nlabel_dict, self.ndegree_dict))
 
         def save(self):
-            graph_path = os.path.join(self.save_path, 'gin_{}.bin'.format(self.name))
-            info_path = os.path.join(self.save_path, 'gin_{}.pkl'.format(self.name))
+            graph_path = os.path.join(self.save_path, 'gin_{}_{}.bin'.format(self.name, self.params_hash))
+            info_path = os.path.join(self.save_path, 'gin_{}_{}.pkl'.format(self.name, self.params_hash))
             label_dict = {'labels': self.labels}
             info_dict = {'N': self.N,
                          'n': self.n,
@@ -310,8 +312,8 @@ class GINDataset(DGLBuiltinDataset):
             save_info(str(info_path), info_dict)
 
         def load(self):
-            graph_path = os.path.join(self.save_path, 'gin_{}.bin'.format(self.name))
-            info_path = os.path.join(self.save_path, 'gin_{}.pkl'.format(self.name))
+            graph_path = os.path.join(self.save_path, 'gin_{}_{}.bin'.format(self.name, self.params_hash))
+            info_path = os.path.join(self.save_path, 'gin_{}_{}.pkl'.format(self.name, self.params_hash))
             graphs, label_dict = load_graphs(str(graph_path))
             info_dict = load_info(str(info_path))
 
@@ -332,8 +334,8 @@ class GINDataset(DGLBuiltinDataset):
             self.degree_as_nlabel = info_dict['degree_as_nlabel']
 
         def has_cache(self):
-            graph_path = os.path.join(self.save_path, 'gin_{}.bin'.format(self.name))
-            info_path = os.path.join(self.save_path, 'gin_{}.pkl'.format(self.name))
+            graph_path = os.path.join(self.save_path, 'gin_{}_{}.bin'.format(self.name, self.params_hash))
+            info_path = os.path.join(self.save_path, 'gin_{}_{}.pkl'.format(self.name, self.params_hash))
             if os.path.exists(graph_path) and os.path.exists(info_path):
                 return True
             return False
