@@ -91,14 +91,13 @@ class SAGE(nn.Module):
                 g,
                 th.arange(g.number_of_nodes()),
                 sampler,
-                device='cuda',
                 batch_size=args.batch_size,
                 shuffle=True,
                 drop_last=False,
                 num_workers=args.num_workers)
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
-                block = blocks[0]
+                block = blocks[0].to(device)
 
                 h = x[input_nodes].to(device)
                 h = layer(block, h)

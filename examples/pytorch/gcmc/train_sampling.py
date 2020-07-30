@@ -239,7 +239,6 @@ def run(proc_id, n_gpus, args, devices, dataset):
         {str(k): th.arange(dataset.train_enc_graph.number_of_edges(etype=str(k)))
          for k in dataset.possible_rating_values},
         sampler,
-        device='cuda',
         exclude='reverse_types',
         reverse_etypes=reverse_types,
         return_eids=True,
@@ -252,7 +251,6 @@ def run(proc_id, n_gpus, args, devices, dataset):
             dataset.valid_dec_graph,
             th.arange(dataset.valid_dec_graph.number_of_edges()),
             sampler,
-            device='cuda',
             g_sampling=dataset.valid_enc_graph,
             return_eids=True,
             batch_size=args.minibatch_size,
@@ -262,7 +260,6 @@ def run(proc_id, n_gpus, args, devices, dataset):
             dataset.test_dec_graph,
             th.arange(dataset.test_dec_graph.number_of_edges()),
             sampler,
-            device='cuda',
             g_sampling=dataset.test_enc_graph,
             return_eids=True,
             batch_size=args.minibatch_size,
@@ -312,7 +309,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
             head_feat, tail_feat, blocks = load_subtensor(
                 input_nodes, pair_graph, blocks, dataset, dataset.train_enc_graph)
             frontier = blocks[0]
-            compact_g = flatten_etypes(pair_graph, dataset, 'train')
+            compact_g = flatten_etypes(pair_graph, dataset, 'train').to(dev_id)
             true_relation_labels = compact_g.edata['label']
             true_relation_ratings = compact_g.edata['rating']
 
