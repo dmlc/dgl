@@ -27,26 +27,22 @@ INIT_GRAPH = 800001
 class InitGraphRequest(rpc.Request):
     """ Init graph on the backup servers.
 
-    When the backup server starts, they don't load the graph structure and node/edge data.
-    This request tells the backup servers that they can map to the graph structure and
-    node/edge data with shared memory.
+    When the backup server starts, they don't load the graph structure.
+    This request tells the backup servers that they can map to the graph structure
+    with shared memory.
     """
-    def __init__(self, graph_name, data_names):
+    def __init__(self, graph_name):
         self._graph_name = graph_name
-        self._data_names = data_names
 
     def __getstate__(self):
-        return self._graph_name, self._data_names
+        return self._graph_name
 
     def __setstate__(self, state):
-        self._graph_name, self._data_names = state
+        self._graph_name = state
 
     def process_request(self, server_state):
         if server_state.graph is None:
             server_state.graph = _get_graph_from_shared_mem(self._graph_name)
-            for name in self._data_names:
-                policy = NODE_PART_POLICY if _is_ndata_name(name) else EDGE_PART_POLICY
-                self.init_data(name=name, policy_str=policy)
         return InitGraphResponse(self._graph_name)
 
 class InitGraphResponse(rpc.Response):
@@ -350,11 +346,9 @@ class DistGraph:
             if self._gpb is None:
                 self._gpb = gpb
 
-            # Tell the backup servers to load the graph structure and node/edge data
-            # from shared memory.
-            data_names = self._client.data_name_list()
+            # Tell the backup servers to load the graph structure from shared memory.
             for server_id in range(self._client.num_servers):
-                rpc.send_request(server_id, InitGraphRequest(graph_name, data_names))
+                rpc.send_request(server_id, InitGraphRequest(graph_name))
             for server_id in range(self._client.num_servers):
                 rpc.recv_response()
             self._client.barrier()
