@@ -49,11 +49,16 @@ COOMatrix CSRToCOO<kDLGPU, int32_t>(CSRMatrix csr) {
 
 /*!
  * \brief Repeat elements
+ * \param val Value to repeat
+ * \param repeats Number of repeats for each value
+ * \param pos The position of the output buffer to write the value.
+ * \param out Output buffer.
+ * \param length Number of values
  *
  * For example:
  * val = [3, 0, 1]
  * repeats = [1, 0, 2]
- * pos = [0, 1, 1]
+ * pos = [0, 1, 1]  # write to output buffer position 0, 1, 1
  * then,
  * out = [3, 1, 1]
  */
