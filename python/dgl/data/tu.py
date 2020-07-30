@@ -71,6 +71,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
         self.hidden_size = hidden_size
         self.max_allow_node = max_allow_node
         self.use_pandas = use_pandas
+        self.params_hash = abs(hash((name, use_pandas, hidden_size, max_allow_node)))
         super(LegacyTUDataset, self).__init__(name=name, url=url, raw_dir=raw_dir, force_reload=force_reload, verbose=verbose)
 
     def process(self):
@@ -152,8 +153,8 @@ class LegacyTUDataset(DGLBuiltinDataset):
         self.graph_labels = F.tensor(self.graph_labels)
 
     def save(self):
-        graph_path = os.path.join(self.save_path, 'legacy_tu_{}.bin'.format(self.name))
-        info_path = os.path.join(self.save_path, 'legacy_tu_{}.pkl'.format(self.name))
+        graph_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.bin'.format(self.name, self.params_hash))
+        info_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.pkl'.format(self.name, self.params_hash))
         label_dict = {'labels': self.graph_labels}
         info_dict = {'max_num_node': self.max_num_node,
                      'num_labels': self.num_labels}
@@ -161,8 +162,8 @@ class LegacyTUDataset(DGLBuiltinDataset):
         save_info(str(info_path), info_dict)
 
     def load(self):
-        graph_path = os.path.join(self.save_path, 'legacy_tu_{}.bin'.format(self.name))
-        info_path = os.path.join(self.save_path, 'legacy_tu_{}.pkl'.format(self.name))
+        graph_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.bin'.format(self.name, self.params_hash))
+        info_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.pkl'.format(self.name, self.params_hash))
         graphs, label_dict = load_graphs(str(graph_path))
         info_dict = load_info(str(info_path))
 
@@ -172,8 +173,8 @@ class LegacyTUDataset(DGLBuiltinDataset):
         self.num_labels = info_dict['num_labels']
 
     def has_cache(self):
-        graph_path = os.path.join(self.save_path, 'legacy_tu_{}.bin'.format(self.name))
-        info_path = os.path.join(self.save_path, 'legacy_tu_{}.pkl'.format(self.name))
+        graph_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.bin'.format(self.name, self.params_hash))
+        info_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.pkl'.format(self.name, self.params_hash))
         if os.path.exists(graph_path) and os.path.exists(info_path):
             return True
         return False
