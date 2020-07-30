@@ -22,6 +22,7 @@ from .rpc_server import start_server
 from .dist_tensor import DistTensor, _get_data_name
 
 def _copy_graph_to_shared_mem(g, graph_name):
+    print(graph_name)
     new_g = g.shared_memory(graph_name, formats='csc')
     # We should share the node/edge data to the client explicitly instead of putting them
     # in the KVStore because some of the node/edge data may be duplicated.
@@ -252,6 +253,8 @@ class DistGraphServer(KVServer):
         # start server
         server_state = ServerState(kv_store=self, local_g=self.client_g, partition_book=self.gpb)
         print('start graph service on server ' + str(self.server_id))
+        import sys
+        sys.stdout.flush()
         start_server(server_id=self.server_id, ip_config=self.ip_config,
                      num_clients=self.num_clients, server_state=server_state)
 
@@ -323,9 +326,11 @@ class DistGraph:
     def _init(self):
         ip_config, graph_name, gpb = self.ip_config, self.graph_name, self._gpb_input
         self._client = KVClient(ip_config)
+        import time
+        time.sleep(3)
         g = _get_graph_from_shared_mem(graph_name)
         if g is not None:
-            self._g = as_heterograph(g)
+            self._g = g
         else:
             self._g = None
         self._gpb = get_shared_mem_partition_book(graph_name, self._g)
