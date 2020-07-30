@@ -2,10 +2,10 @@
 from __future__ import absolute_import
 from functools import partial
 
-from .._ffi.function import _init_api
-from .. import backend as F
+from ..._ffi.function import _init_api
+from ... import backend as F
 from ..udf import NodeBatch, EdgeBatch
-from .. import utils
+from ... import utils
 
 from . import ir
 from .ir import var
@@ -314,4 +314,4 @@ def _create_per_bkt_efunc(apply_func, deg, u, v, eid, canonical_etype=(None, Non
         return {k: _reshape_back(v) for k, v in apply_func(ebatch).items()}
     return _efunc_wrapper
 
-_init_api("dgl.runtime.degree_bucketing")
+_init_api("dgl._deprecate.runtime.degree_bucketing")

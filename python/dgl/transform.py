@@ -18,7 +18,7 @@ from .partition import partition_graph_with_halo as hetero_partition_graph_with_
 from .partition import metis_partition as hetero_metis_partition
 
 # TO BE DEPRECATED
-from .graph import DGLGraph as DGLGraphStale
+from ._deprecate.graph import DGLGraph as DGLGraphStale
 from .graph_index import _get_halo_subgraph_inner_node
 
 __all__ = [
