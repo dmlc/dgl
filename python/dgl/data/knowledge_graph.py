@@ -58,22 +58,8 @@ class KnowledgeGraphDataset(DGLBuiltinDataset):
 
     def process(self):
         """
-        The original knowledge base is stored as an RDF file, and this function
-        performs preprocessing.
-
-        An object of this class has 5 member attributes needed for link
-        prediction:
-
-        num_nodes: int
-            number of entities of knowledge base
-        num_rels: int
-            number of relations (including reverse relation) of knowledge base
-        train: numpy.array
-            all relation triplets (src, rel, dst) for training
-        valid: numpy.array
-            all relation triplets (src, rel, dst) for validation
-        test: numpy.array
-            all relation triplets (src, rel, dst) for testing
+        The original knowledge base is stored in triplets.
+        This function will parse these triplets and build the DGLGraph.
         """
         root_path = self.raw_path
         entity_path = os.path.join(root_path, 'entities.dict')
@@ -453,16 +439,16 @@ class FB15k237Dataset(KnowledgeGraphDataset):
 
         Return
         -------
-            dgl.DGLGraph
-                The graph contain
-                - edata['e_type']: edge relation type
-                - edata['train_edge_mask']: positive training edge mask
-                - edata['val_edge_mask']: positive validation edge mask
-                - edata['test_edge_mask']: positive testing edge mask
-                - edata['train_mask']: training edge set mask (include reversed training edges)
-                - edata['val_mask']: validation edge set mask (include reversed validation edges)
-                - edata['test_mask']: testing edge set mask (include reversed testing edges)
-                - ndata['ntype']: node type. All 0 in this dataset
+        dgl.DGLGraph
+            The graph contain
+            - edata['e_type']: edge relation type
+            - edata['train_edge_mask']: positive training edge mask
+            - edata['val_edge_mask']: positive validation edge mask
+            - edata['test_edge_mask']: positive testing edge mask
+            - edata['train_mask']: training edge set mask (include reversed training edges)
+            - edata['val_mask']: validation edge set mask (include reversed validation edges)
+            - edata['test_mask']: testing edge set mask (include reversed testing edges)
+            - ndata['ntype']: node type. All 0 in this dataset
         """
         return super(FB15k237Dataset, self).__getitem__(idx)
 
@@ -576,16 +562,16 @@ class FB15kDataset(KnowledgeGraphDataset):
 
         Return
         -------
-            dgl.DGLGraph
-                The graph contain
-                - edata['e_type']: edge relation type
-                - edata['train_edge_mask']: positive training edge mask
-                - edata['val_edge_mask']: positive validation edge mask
-                - edata['test_edge_mask']: positive testing edge mask
-                - edata['train_mask']: training edge set mask (include reversed training edges)
-                - edata['val_mask']: validation edge set mask (include reversed validation edges)
-                - edata['test_mask']: testing edge set mask (include reversed testing edges)
-                - ndata['ntype']: node type. All 0 in this dataset
+        dgl.DGLGraph
+            The graph contain
+            - edata['e_type']: edge relation type
+            - edata['train_edge_mask']: positive training edge mask
+            - edata['val_edge_mask']: positive validation edge mask
+            - edata['test_edge_mask']: positive testing edge mask
+            - edata['train_mask']: training edge set mask (include reversed training edges)
+            - edata['val_mask']: validation edge set mask (include reversed validation edges)
+            - edata['test_mask']: testing edge set mask (include reversed testing edges)
+            - ndata['ntype']: node type. All 0 in this dataset
         """
         return super(FB15kDataset, self).__getitem__(idx)
 
@@ -698,16 +684,16 @@ class WN18Dataset(KnowledgeGraphDataset):
 
         Return
         -------
-            dgl.DGLGraph
-                The graph contain
-                - edata['e_type']: edge relation type
-                - edata['train_edge_mask']: positive training edge mask
-                - edata['val_edge_mask']: positive validation edge mask
-                - edata['test_edge_mask']: positive testing edge mask
-                - edata['train_mask']: training edge set mask (include reversed training edges)
-                - edata['val_mask']: validation edge set mask (include reversed validation edges)
-                - edata['test_mask']: testing edge set mask (include reversed testing edges)
-                - ndata['ntype']: node type. All 0 in this dataset
+        dgl.DGLGraph
+            The graph contain
+            - edata['e_type']: edge relation type
+            - edata['train_edge_mask']: positive training edge mask
+            - edata['val_edge_mask']: positive validation edge mask
+            - edata['test_edge_mask']: positive testing edge mask
+            - edata['train_mask']: training edge set mask (include reversed training edges)
+            - edata['val_mask']: validation edge set mask (include reversed validation edges)
+            - edata['test_mask']: testing edge set mask (include reversed testing edges)
+            - ndata['ntype']: node type. All 0 in this dataset
         """
         return super(WN18Dataset, self).__getitem__(idx)
 
@@ -727,7 +713,7 @@ def load_data(dataset):
 
     Return
     ------
-        The dataset object.
+    The dataset object.
     """
     if dataset == 'wn18':
         return WN18Dataset()
