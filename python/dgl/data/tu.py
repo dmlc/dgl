@@ -179,7 +179,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
         return False
 
     def __getitem__(self, idx):
-        """Get the i^th sample.
+        """Get the idx-th sample.
         Paramters
         ---------
         idx : int
@@ -337,7 +337,7 @@ class TUDataset(DGLBuiltinDataset):
         return False
 
     def __getitem__(self, idx):
-        """Get the i^th sample.
+        """Get the idx-th sample.
         Paramters
         ---------
         idx : int
