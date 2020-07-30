@@ -221,8 +221,8 @@ def get_sampler_pool():
 def debug_str():
     import sys
     import os        
-    sys.stdout = open("~/"+str(os.getpid()) + ".out", "a", buffering=0)
-    sys.stderr = open("~/"+str(os.getpid()) + "_error.out", "a", buffering=0)
+    sys.stdout = open("/home/ubuntu/"+str(os.getpid()) + ".out", "a", buffering=0)
+    sys.stderr = open("/home/ubuntu/"+str(os.getpid()) + "_error.out", "a", buffering=0)
     print("DEBUGBEUGBUEGBU")
 
 def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
