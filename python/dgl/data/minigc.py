@@ -13,6 +13,7 @@ __all__ = ['MiniGCDataset']
 
 class MiniGCDataset(DGLDataset):
     """The dataset class.
+
     The datset contains 8 different types of graphs.
     * class 0 : cycle graph
     * class 1 : star graph
@@ -22,8 +23,7 @@ class MiniGCDataset(DGLDataset):
     * class 5 : grid graph
     * class 6 : clique graph
     * class 7 : circular ladder graph
-    .. note::
-        This dataset class is compatible with pytorch's :class:`Dataset` class.
+
     Parameters
     ----------
     num_graphs: int
@@ -34,6 +34,31 @@ class MiniGCDataset(DGLDataset):
         Maximum number of nodes for graphs
     seed : int, default is None
         Random seed for data generation
+
+    Examples
+    --------
+    >>> data = MiniGCDataset(100, 16, 32, seed=0)
+
+    **The dataset instance is an iterable**
+
+    >>> len(data)
+    >>> g, label = data[64]
+    >>> g
+    Graph(num_nodes=17, num_edges=289,
+          ndata_schemes={}
+          edata_schemes={})
+    >>> label
+    tensor(6)
+
+    **Batch the graphs and labels for mini-batch training**
+
+    >>> graphs, labels = zip(*data)
+    >>> batched_graphs = dgl.batch(graphs)
+    >>> batched_labels = torch.tensor(labels)
+    >>> batched_graphs
+    Graph(num_nodes=1124, num_edges=6698,
+          ndata_schemes={}
+          edata_schemes={})
     """
 
     def __init__(self, num_graphs, min_num_v, max_num_v, seed=None,
@@ -58,7 +83,7 @@ class MiniGCDataset(DGLDataset):
         return len(self.graphs)
 
     def __getitem__(self, idx):
-        """Get the i^th sample.
+        """Get the idx-th sample.
         Paramters
         ---------
         idx : int
