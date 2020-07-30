@@ -234,7 +234,7 @@ def debug_str():
 def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Init rpc service"""
     try:
-        ctx = mp.get_context("fork")
+        ctx = mp.get_context("spawn")
         global SAMPLER_POOL
         global NUM_SAMPLER_WORKERS
         if num_workers > 0:
