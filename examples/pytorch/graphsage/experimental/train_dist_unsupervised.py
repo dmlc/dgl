@@ -33,12 +33,13 @@ class NegativeSampler(object):
         return self.neg_nseeds[th.randint(self.neg_nseeds.shape[0], (num_samples,))]
 
 class NeighborSampler(object):
-    def __init__(self, g, fanouts, neg_nseeds, sample_neighbors, num_negs):
+    def __init__(self, g, fanouts, neg_nseeds, sample_neighbors, num_negs, remove_edge):
         self.g = g
         self.fanouts = fanouts
         self.sample_neighbors = sample_neighbors
         self.neg_sampler = NegativeSampler(g, neg_nseeds)
         self.num_negs = num_negs
+        self.remove_edge = remove_edge
 
     def sample_blocks(self, seed_edges):
         n_edges = len(seed_edges)
@@ -63,12 +64,13 @@ class NeighborSampler(object):
         for fanout in self.fanouts:
             # For each seed node, sample ``fanout`` neighbors.
             frontier = self.sample_neighbors(self.g, seeds, fanout, replace=True)
-            # Remove all edges between heads and tails, as well as heads and neg_tails.
-            _, _, edge_ids = frontier.edge_ids(
-                th.cat([heads, tails, neg_heads, neg_tails]),
-                th.cat([tails, heads, neg_tails, neg_heads]),
-                return_uv=True)
-            frontier = dgl.remove_edges(frontier, edge_ids)
+            if self.remove_edge:
+                # Remove all edges between heads and tails, as well as heads and neg_tails.
+                _, _, edge_ids = frontier.edge_ids(
+                    th.cat([heads, tails, neg_heads, neg_tails]),
+                    th.cat([tails, heads, neg_tails, neg_heads]),
+                    return_uv=True)
+                frontier = dgl.remove_edges(frontier, edge_ids)
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
 
@@ -197,6 +199,17 @@ def generate_emb(model, g, inputs, batch_size, device):
 def compute_acc(emb, labels, train_nids, val_nids, test_nids):
     """
     Compute the accuracy of prediction given the labels.
+    
+    We will fist train a LogisticRegression model using the trained embeddings,
+    the training set, validation set and test set is provided as the arguments.
+
+    The final result is predicted by the lr model.
+
+    emb: The pretrained embeddings
+    labels: The ground truth
+    train_nids: The training set node ids
+    val_nids: The validation set node ids
+    test_nids: The test set node ids
     """
 
     emb = emb[np.arange(labels.shape[0])].cpu().numpy()
@@ -210,18 +223,16 @@ def compute_acc(emb, labels, train_nids, val_nids, test_nids):
     lr.fit(emb[train_nids], labels[train_nids])
 
     pred = lr.predict(emb)
-    f1_micro_eval = skm.f1_score(labels[val_nids], pred[val_nids], average='micro')
-    f1_micro_test = skm.f1_score(labels[test_nids], pred[test_nids], average='micro')
-    f1_macro_eval = skm.f1_score(labels[val_nids], pred[val_nids], average='macro')
-    f1_macro_test = skm.f1_score(labels[test_nids], pred[test_nids], average='macro')
-    return f1_micro_eval, f1_micro_test, f1_macro_eval, f1_macro_test
+    eval_acc = skm.accuracy_score(labels[val_nids], pred[val_nids])
+    test_acc = skm.accuracy_score(labels[test_nids], pred[test_nids])
+    return eval_acc, test_acc
 
 def run(args, device, data):
     # Unpack data
     train_eids, train_nids, in_feats, g, global_train_nid, global_valid_nid, global_test_nid, labels = data
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], train_nids,
-                              dgl.distributed.sample_neighbors, args.num_negs)
+                              dgl.distributed.sample_neighbors, args.num_negs, args.remove_edge)
 
     # Create PyTorch DataLoader for constructing blocks
     dataloader = DataLoader(
@@ -300,6 +311,8 @@ def run(args, device, data):
             step_time.append(step_t)
             iter_tput.append(pos_edges / step_t)
             num_seeds += pos_edges
+            if step > 1000:
+                break
             if step % args.log_every == 0:
                 print('[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f} s' \
                         '| sample {:.3f} | copy {:.3f} | forward {:.3f} | backward {:.3f} | update {:.3f}'.format(
@@ -313,13 +326,12 @@ def run(args, device, data):
         epoch += 1
 
         if args.standalone:
-            pred = generate_emb(model,  g, g.ndata['features'], args.batch_size_eval, device)
+            pred = generate_emb(model,g, g.ndata['features'], args.batch_size_eval, device)
         else:
             pred = generate_emb(model.module, g, g.ndata['features'], args.batch_size_eval, device)
         if g.rank() == 0:
-            f1_micro_eval, f1_micro_test, f1_macro_eval, f1_macro_test = compute_acc(pred, labels, global_train_nid, global_valid_nid, global_test_nid)
-            print('f1 micro eval {:.4f} f1 micro test {:.4f}, f1 macro eval {:.4f} f1 macro test {:.4f}'.format(
-                f1_micro_eval, f1_micro_test, f1_macro_eval, f1_macro_test))
+            eval_acc, test_acc = compute_acc(pred, labels, global_train_nid, global_valid_nid, global_test_nid)
+            print('eval acc {:.4f}; test acc {:.4f}'.format(eval_acc, test_acc))
 
         # sync for eval and test
         if not args.standalone:
@@ -345,16 +357,22 @@ def main(args):
     print('rank:', g.rank())
     print('number of edges', g.number_of_edges())
 
-    train_eids = dgl.distributed.edge_split(th.arange(g.number_of_edges()), g.get_partition_book(), force_even=True)
-    train_nids = dgl.distributed.node_split(th.arange(g.number_of_nodes()), g.get_partition_book())
-    global_train_nid = g.ndata['train_mask'][np.arange(g.number_of_nodes())]
-    global_valid_nid = g.ndata['val_mask'][np.arange(g.number_of_nodes())]
-    global_test_nid = g.ndata['test_mask'][np.arange(g.number_of_nodes())]
+    train_eids = dgl.distributed.edge_split(th.ones((g.number_of_edges(),), dtype=th.bool), g.get_partition_book(), force_even=True)
+    train_nids = dgl.distributed.node_split(th.ones((g.number_of_nodes(),), dtype=th.bool), g.get_partition_book())
+    global_train_nid = th.LongTensor(np.nonzero(g.ndata['train_mask'][np.arange(g.number_of_nodes())]))
+    global_valid_nid = th.LongTensor(np.nonzero(g.ndata['val_mask'][np.arange(g.number_of_nodes())]))
+    global_test_nid = th.LongTensor(np.nonzero(g.ndata['test_mask'][np.arange(g.number_of_nodes())]))
     labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
     device = th.device('cpu')
 
     # Pack data
     in_feats = g.ndata['features'].shape[1]
+    global_train_nid = global_train_nid.squeeze()
+    global_valid_nid = global_valid_nid.squeeze()
+    global_test_nid = global_test_nid.squeeze()
+    print("number of train {}".format(global_train_nid.shape[0]))
+    print("number of valid {}".format(global_valid_nid.shape[0]))
+    print("number of test {}".format(global_test_nid.shape[0]))
     data = train_eids, train_nids, in_feats, g, global_train_nid, global_valid_nid, global_test_nid, labels
     run(args, device, data)
     print("parent ends")
@@ -387,6 +405,8 @@ if __name__ == '__main__':
     parser.add_argument('--num-negs', type=int, default=1)
     parser.add_argument('--neg-share', default=False, action='store_true',
         help="sharing neg nodes for positive nodes")
+    parser.add_argument('--remove-edge', default=False, action='store_true',
+        help="whether to remove edges during sampling")
     args = parser.parse_args()
 
     print(args)
