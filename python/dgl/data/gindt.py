@@ -53,7 +53,7 @@ class GINDataset(DGLBuiltinDataset):
     >>> label
     1
 
-    **Batch the graphs and labels for mini-batch training*
+    **Batch the graphs and labels for mini-batch training**
 
     >>> graphs, labels = zip(*data)
     >>> batched_graphs = dgl.batch(graphs)
