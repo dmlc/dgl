@@ -16,8 +16,8 @@ from ..frame import FrameRef, Frame, Scheme, sync_frame_initializer
 from .. import graph_index
 from .runtime import ir, scheduler, Runtime, GraphAdapter
 from .. import utils
-from ..view import NodeView, EdgeView
-from ..udf import NodeBatch, EdgeBatch
+from .view import NodeView, EdgeView
+from .udf import NodeBatch, EdgeBatch
 
 __all__ = ['DGLGraph', 'batch', 'unbatch']
 

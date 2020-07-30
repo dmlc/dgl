@@ -7,7 +7,7 @@ from ...base import DGLError
 from ... import backend as F
 from ...frame import frame_like, FrameRef
 from ...function.base import BuiltinFunction
-from ...udf import EdgeBatch, NodeBatch
+from ..udf import EdgeBatch, NodeBatch
 from ... import ndarray as nd
 
 from . import ir

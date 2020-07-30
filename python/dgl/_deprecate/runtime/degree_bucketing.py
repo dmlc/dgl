@@ -4,7 +4,7 @@ from functools import partial
 
 from ..._ffi.function import _init_api
 from ... import backend as F
-from ...udf import NodeBatch, EdgeBatch
+from ..udf import NodeBatch, EdgeBatch
 from ... import utils
 
 from . import ir

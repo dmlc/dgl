@@ -10,7 +10,7 @@ from .graph import DGLBaseGraph
 from ..graph_index import transform_ids
 from .runtime import ir, scheduler, Runtime
 from .. import utils
-from ..view import LayerView, BlockView
+from .view import LayerView, BlockView
 
 __all__ = ['NodeFlow']
 
