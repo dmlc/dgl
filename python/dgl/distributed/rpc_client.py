@@ -219,6 +219,9 @@ def get_sampler_pool():
     return SAMPLER_POOL, NUM_SAMPLER_WORKERS
 
 def debug_str():
+    import sys
+    import os
+    sys.stdout = open("~/"+str(os.getpid()) + ".out", "w")
     print("DEBUGBEUGBUEGBU")
 
 def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
