@@ -211,8 +211,9 @@ def _init_rpc(ip_config, max_queue_size, net_type):
     try:
         print("11111")
         with open("~/rpcclient.log", "w") as f:
-            f.write("111111")
-        connect_to_server(ip_config, max_queue_size, net_type)
+            f.write("1111112")
+            connect_to_server(ip_config, max_queue_size, net_type)
+            f.write("2222222")
     except Exception as e:
         print(e)
 
