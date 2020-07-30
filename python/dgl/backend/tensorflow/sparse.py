@@ -85,8 +85,7 @@ def _muldiv(op, x):
 def _addsub(op, x):
     return -x if op == 'sub' else x
 
-def gspmm_real(g, op, reduce_op, X, Y):
-    gidx = g._graph
+def gspmm_real(gidx, op, reduce_op, X, Y):
     out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
 
     def grad(dZ):
@@ -136,18 +135,17 @@ def gspmm_real(g, op, reduce_op, X, Y):
         return dX, dY
     return out, grad
 
-def gspmm(g, op, reduce_op, X, Y):
+def gspmm(gidx, op, reduce_op, X, Y):
     @tf.custom_gradient
     def _lambda(X, Y):
-        return gspmm_real(g, op, reduce_op, X, Y)
+        return gspmm_real(gidx, op, reduce_op, X, Y)
     if X is None:
         X = tf.zeros(())
     if Y is None:
         Y = tf.zeros(())
     return _lambda(X, Y)
 
-def gsddmm_real(g, op, X, Y, lhs_target, rhs_target):
-    gidx = g._graph
+def gsddmm_real(gidx, op, X, Y, lhs_target, rhs_target):
     out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
 
     def grad(dZ):
@@ -196,10 +194,10 @@ def gsddmm_real(g, op, X, Y, lhs_target, rhs_target):
         return dX, dY
     return out, grad
 
-def gsddmm(g, op, X, Y, lhs_target='u', rhs_target='v'):
+def gsddmm(gidx, op, X, Y, lhs_target='u', rhs_target='v'):
     @tf.custom_gradient
     def _lambda(X, Y):
-        return gsddmm_real(g, op, X, Y, lhs_target, rhs_target)
+        return gsddmm_real(gidx, op, X, Y, lhs_target, rhs_target)
     if X is None:
         X = tf.zeros(())
     if Y is None:

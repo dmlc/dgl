@@ -12,7 +12,7 @@ from . import graph_index
 from . import heterograph_index
 from . import utils
 from . import backend as F
-from .runtime import ir, scheduler, Runtime, GraphAdapter
+from ._deprecate.runtime import ir, scheduler, Runtime, GraphAdapter
 from .frame import Frame, FrameRef, frame_like
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
 from .base import ALL, SLICE_FULL, NTYPE, NID, ETYPE, EID, is_all, DGLError, dgl_warning
@@ -268,9 +268,6 @@ class DGLHeteroGraph(object):
                 self._etype2canonical[ety] = self._canonical_etypes[i]
         self._etypes_invmap = {t : i for i, t in enumerate(self._canonical_etypes)}
 
-        # Cached metagraph in networkx
-        self._nx_metagraph = None
-
         # node and edge frame
         if node_frames is None:
             node_frames = [None] * len(self._ntypes)
@@ -286,27 +283,12 @@ class DGLHeteroGraph(object):
                        for i, frame in enumerate(edge_frames)]
         self._edge_frames = edge_frames
 
-    def __getstate__(self):
-        metainfo = (self._ntypes, self._etypes, self._canonical_etypes,
-                    self._srctypes_invmap, self._dsttypes_invmap,
-                    self._is_unibipartite, self._etype2canonical, self._etypes_invmap)
-        return (self._graph, metainfo,
-                self._node_frames, self._edge_frames,
-                self._batch_num_nodes, self._batch_num_edges)
-
     def __setstate__(self, state):
         # Compatibility check
         # TODO: version the storage
-        if isinstance(state, tuple) and len(state) == 6:
-            # DGL >= 0.5
-            #TODO(minjie): too many states in python; should clean up and lower to C
-            self._nx_metagraph = None
-            (self._graph, metainfo, self._node_frames, self._edge_frames,
-             self._batch_num_nodes, self._batch_num_edges) = state
-            (self._ntypes, self._etypes, self._canonical_etypes,
-             self._srctypes_invmap, self._dsttypes_invmap,
-             self._is_unibipartite, self._etype2canonical,
-             self._etypes_invmap) = metainfo
+        if isinstance(state, dict):
+            # Since 0.5 we use the default __dict__ method
+            self.__dict__.update(state)
         elif isinstance(state, tuple) and len(state) == 5:
             # DGL == 0.4.3
             dgl_warning("The object is pickled with DGL == 0.4.3.  "
@@ -337,7 +319,7 @@ class DGLHeteroGraph(object):
                           for i in range(len(self.ntypes))}
             nedge_dict = {self.canonical_etypes[i] : self._graph.number_of_edges(i)
                           for i in range(len(self.etypes))}
-            meta = str(self.metagraph.edges(keys=True))
+            meta = str(self.metagraph().edges(keys=True))
             return ret.format(node=nnode_dict, edge=nedge_dict, meta=meta)
 
     def __copy__(self):
@@ -345,20 +327,7 @@ class DGLHeteroGraph(object):
         #TODO(minjie): too many states in python; should clean up and lower to C
         cls = type(self)
         obj = cls.__new__(cls)
-        obj._graph = self._graph
-        obj._batch_num_nodes = self._batch_num_nodes
-        obj._batch_num_edges = self._batch_num_edges
-        obj._ntypes = self._ntypes
-        obj._etypes = self._etypes
-        obj._canonical_etypes = self._canonical_etypes
-        obj._srctypes_invmap = self._srctypes_invmap
-        obj._dsttypes_invmap = self._dsttypes_invmap
-        obj._is_unibipartite = self._is_unibipartite
-        obj._etype2canonical = self._etype2canonical
-        obj._etypes_invmap = self._etypes_invmap
-        obj._nx_metagraph = self._nx_metagraph
-        obj._node_frames = self._node_frames
-        obj._edge_frames = self._edge_frames
+        obj.__dict__.update(self.__dict__)
         return obj
 
     #################################################################
@@ -975,7 +944,6 @@ class DGLHeteroGraph(object):
         else:
             return self.ntypes
 
-    @property
     def metagraph(self):
         """Return the metagraph as networkx.MultiDiGraph.
 
@@ -992,7 +960,7 @@ class DGLHeteroGraph(object):
         >>> follows_g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
         >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 1, 1]), 'user', 'plays', 'game')
         >>> g = dgl.hetero_from_relations([follows_g, plays_g])
-        >>> meta_g = g.metagraph
+        >>> meta_g = g.metagraph()
 
         The metagraph then has two nodes and two edges.
 
@@ -1005,13 +973,12 @@ class DGLHeteroGraph(object):
         >>> meta_g.number_of_edges()
         2
         """
-        if self._nx_metagraph is None:
-            nx_graph = self._graph.metagraph.to_networkx()
-            self._nx_metagraph = nx.MultiDiGraph()
-            for u_v in nx_graph.edges:
-                srctype, etype, dsttype = self.canonical_etypes[nx_graph.edges[u_v]['id']]
-                self._nx_metagraph.add_edge(srctype, dsttype, etype)
-        return self._nx_metagraph
+        nx_graph = self._graph.metagraph.to_networkx()
+        nx_metagraph = nx.MultiDiGraph()
+        for u_v in nx_graph.edges:
+            srctype, etype, dsttype = self.canonical_etypes[nx_graph.edges[u_v]['id']]
+            nx_metagraph.add_edge(srctype, dsttype, etype)
+        return nx_metagraph
 
     def to_canonical_etype(self, etype):
         """Convert edge type to canonical etype: (srctype, etype, dsttype).
@@ -4377,7 +4344,7 @@ class DGLHeteroGraph(object):
                 return F.nonzero_1d(mask)
             else:
                 v = utils.prepare_tensor(self, nodes, 'nodes')
-                return F.boolean_mask(v, mask[v])
+                return F.boolean_mask(v, F.gather_row(mask, v))
 
     def filter_edges(self, predicate, edges=ALL, etype=None):
         """Return a tensor of edge IDs with the given edge type that satisfy
@@ -4424,7 +4391,7 @@ class DGLHeteroGraph(object):
                     e = self.edge_ids(edges[0], edges[1], etype=etype)
                 else:
                     e = utils.prepare_tensor(self, edges, 'edges')
-                return F.boolean_mask(e, mask[e])
+                return F.boolean_mask(e, F.gather_row(mask, e))
 
     def readonly(self, readonly_state=True):
         """Deprecated: DGLGraph will always be mutable."""
@@ -4837,7 +4804,7 @@ class DGLHeteroGraph(object):
         ----------
         name : str
             The name of the shared memory.
-        formats : list of str (optional)
+        formats : str or a list of str (optional)
             Desired formats to be materialized.
 
         Returns
@@ -4847,8 +4814,10 @@ class DGLHeteroGraph(object):
         """
         assert len(name) > 0, "The name of shared memory cannot be empty"
         assert len(formats) > 0
+        if isinstance(formats, str):
+            formats = [formats]
         for fmt in formats:
-            assert fmt in ("coo", "csr", "csc")
+            assert fmt in ("coo", "csr", "csc"), '{} is not coo, csr or csc'.format(fmt)
         gidx = self._graph.shared_memory(name, self.ntypes, self.etypes, formats)
         return DGLHeteroGraph(gidx, self.ntypes, self.etypes)
 
@@ -5278,7 +5247,7 @@ class DGLBlock(DGLHeteroGraph):
                              for ntype in self.dsttypes}
             nedge_dict = {etype : self.number_of_edges(etype)
                           for etype in self.canonical_etypes}
-            meta = str(self.metagraph.edges(keys=True))
+            meta = str(self.metagraph().edges(keys=True))
             return ret.format(
                 srcnode=nsrcnode_dict, dstnode=ndstnode_dict, edge=nedge_dict, meta=meta)
 

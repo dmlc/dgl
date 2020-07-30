@@ -322,6 +322,10 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
 
 std::tuple<HeteroGraphPtr, std::vector<std::string>, std::vector<std::string>>
     HeteroGraph::CreateFromSharedMem(const std::string &name) {
+  bool exist = SharedMemory::Exist(name);
+  if (!exist) {
+    return std::make_tuple(nullptr, std::vector<std::string>(), std::vector<std::string>());
+  }
   auto mem = std::make_shared<SharedMemory>(name);
   auto mem_buf = mem->Open(SHARED_MEM_METAINFO_SIZE_MAX);
   dmlc::MemoryFixedSizeStream strm(mem_buf, SHARED_MEM_METAINFO_SIZE_MAX);

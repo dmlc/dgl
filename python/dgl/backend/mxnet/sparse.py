@@ -3,7 +3,7 @@ import numpy as np
 from mxnet import nd
 from ...sparse import _gspmm, _gsddmm
 from ...base import dgl_warning
-from .tensor import asnumpy, copy_to, zerocopy_from_numpy, context
+from .tensor import asnumpy, copy_to, zerocopy_from_numpy, context, to_backend_ctx
 
 def _scatter_nd(index, src, n_rows):
     assert index.shape == src.shape
@@ -95,9 +95,9 @@ def _addsub(op, x):
     return -x if op == 'sub' else x
 
 class GSpMM(mx.autograd.Function):
-    def __init__(self, g, op, reduce_op):
+    def __init__(self, gidx, op, reduce_op):
         super(GSpMM, self).__init__()
-        self.gidx = g._graph
+        self.gidx = gidx
         self.op = op
         self.reduce_op = reduce_op
 
@@ -154,18 +154,19 @@ class GSpMM(mx.autograd.Function):
         self.saved_tensors = None
         return dX, dY
 
-def gspmm(g, op, reduce_op, lhs_data, rhs_data):
-    func = GSpMM(g, op, reduce_op)
+def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
+    func = GSpMM(gidx, op, reduce_op)
+    ctx = to_backend_ctx(gidx.ctx)
     if lhs_data is None:
-        lhs_data = nd.zeros((1,), ctx=g.device)
+        lhs_data = nd.zeros((1,), ctx=ctx)
     if rhs_data is None:
-        rhs_data = nd.zeros((1,), ctx=g.device)
+        rhs_data = nd.zeros((1,), ctx=ctx)
     return func(lhs_data, rhs_data)
 
 class GSDDMM(mx.autograd.Function):
-    def __init__(self, g, op, lhs_target, rhs_target):
+    def __init__(self, gidx, op, lhs_target, rhs_target):
         super(GSDDMM, self).__init__()
-        self.gidx = g._graph
+        self.gidx = gidx
         self.op = op
         self.lhs_target = lhs_target
         self.rhs_target = rhs_target
@@ -225,10 +226,11 @@ class GSDDMM(mx.autograd.Function):
         self.saved_tensors = None
         return dX, dY
 
-def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
-    func = GSDDMM(g, op, lhs_target, rhs_target)
+def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
+    func = GSDDMM(gidx, op, lhs_target, rhs_target)
+    ctx = to_backend_ctx(gidx.ctx)
     if lhs_data is None:
-        lhs_data = nd.zeros((1,), ctx=g.device)
+        lhs_data = nd.zeros((1,), ctx=ctx)
     if rhs_data is None:
-        rhs_data = nd.zeros((1,), ctx=g.device)
+        rhs_data = nd.zeros((1,), ctx=ctx)
     return func(lhs_data, rhs_data)

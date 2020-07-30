@@ -16,7 +16,7 @@ __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
 'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call', \
 'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', \
-'get_num_client', 'set_num_client']
+'get_num_client', 'set_num_client', 'client_barrier']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
@@ -899,6 +899,13 @@ def recv_rpc_message(timeout=0):
     _CAPI_DGLRPCRecvRPCMessage(timeout, msg)
     return msg
 
+def client_barrier():
+    """Barrier all client processes"""
+    req = ClientBarrierRequest()
+    send_request(0, req)
+    res = recv_response()
+    assert res.msg == 'barrier'
+
 def finalize_server():
     """Finalize resources of current server
     """
@@ -1024,6 +1031,7 @@ class ShutDownRequest(Request):
         self.client_id = state
 
     def process_request(self, server_state):
+        assert self.client_id == 0
         finalize_server()
         return 'exit'
 
@@ -1066,5 +1074,51 @@ class GetNumberClientsRequest(Request):
     def process_request(self, server_state):
         res = GetNumberClientsResponse(get_num_client())
         return res
+
+CLIENT_BARRIER = 22454
+
+class ClientBarrierResponse(Response):
+    """Send the barrier confirmation to client
+
+    Parameters
+    ----------
+    msg : str
+        string msg
+    """
+    def __init__(self, msg='barrier'):
+        self.msg = msg
+
+    def __getstate__(self):
+        return self.msg
+
+    def __setstate__(self, state):
+        self.msg = state
+
+class ClientBarrierRequest(Request):
+    """Send the barrier information to server
+
+    Parameters
+    ----------
+    msg : str
+        string msg
+    """
+    def __init__(self, msg='barrier'):
+        self.msg = msg
+
+    def __getstate__(self):
+        return self.msg
+
+    def __setstate__(self, state):
+        self.msg = state
+
+    def process_request(self, server_state):
+        _CAPI_DGLRPCSetBarrierCount(_CAPI_DGLRPCGetBarrierCount()+1)
+        if _CAPI_DGLRPCGetBarrierCount() == get_num_client():
+            _CAPI_DGLRPCSetBarrierCount(0)
+            res_list = []
+            for target_id in range(get_num_client()):
+                res_list.append((target_id, ClientBarrierResponse()))
+            return res_list
+        return None
 
 _init_api("dgl.distributed.rpc")
