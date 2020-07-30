@@ -11,10 +11,8 @@ from ..utils import retry_method_with_fix
 from ..convert import graph as dgl_graph
 
 class LegacyTUDataset(DGLBuiltinDataset):
-    r"""
-    TUDataset contains lots of graph kernel datasets for graph classification.
-    Use provided node feature by default. If no feature provided, use one-hot node label instead.
-    If neither labels provided, use constant for node feature.
+    r"""LegacyTUDataset contains lots of graph kernel datasets for graph classification.
+
     Parameters
     ----------
     name : str
@@ -30,19 +28,40 @@ class LegacyTUDataset(DGLBuiltinDataset):
     max_allow_node : int
         Remove graphs that contains more nodes than `max_allow_node`.
         Default : None
-    Returns
-    -------
-    LegacyTUDataset object as an iterable for dataloader.
+
     Examples
     --------
     >>> data = LegacyTUDataset('DD')
-    >>> data[0]
-    (Graph(num_nodes=327, num_edges=1798,
-          ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64), 'feat': Scheme(shape=(89,), dtype=torch.float64)}
-          edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}), 0)
+
+    **The dataset instance is an iterable**
+
+    >>> len(data)
+    1178
+    >>> g, label = data[1024]
+    >>> g
+    Graph(num_nodes=88, num_edges=410,
+          ndata_schemes={'feat': Scheme(shape=(89,), dtype=torch.float64), '_ID': Scheme(shape=(), dtype=torch.int64)}
+          edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
+    >>> label
+    tensor(1)
+
+    **Batch the graphs and labels for mini-batch training*
+
+    >>> graphs, labels = zip(*[data[i] for i in range(16)])
+    >>> batched_graphs = dgl.batch(graphs)
+    >>> batched_labels = torch.tensor(labels)
+    >>> batched_graphs
+    Graph(num_nodes=9539, num_edges=47382,
+          ndata_schemes={'feat': Scheme(shape=(89,), dtype=torch.float64), '_ID': Scheme(shape=(), dtype=torch.int64)}
+          edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
+
+    Notes
+    -----
+    LegacyTUDataset uses provided node feature by default. If no feature provided, it uses one-hot node label instead.
+    If neither labels provided, it uses constant for node feature.
     """
 
-    _url = r"https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
+    _url = r"https://www.chrsmrrs.com/graphkerneldatasets/{}.zip"
 
     def __init__(self, name, use_pandas=False,
                  hidden_size=10, max_allow_node=None,
@@ -130,11 +149,12 @@ class LegacyTUDataset(DGLBuiltinDataset):
                 print("after pruning graphs that are too big : ", len(self.graph_lists))
             self.graph_labels = [self.graph_labels[i] for i in preserve_idx]
             self.max_num_node = self.max_allow_node
+        self.graph_labels = F.tensor(self.graph_labels)
 
     def save(self):
         graph_path = os.path.join(self.save_path, 'legacy_tu_{}.bin'.format(self.name))
         info_path = os.path.join(self.save_path, 'legacy_tu_{}.pkl'.format(self.name))
-        label_dict = {'labels': F.tensor(self.graph_labels)}
+        label_dict = {'labels': self.graph_labels}
         info_dict = {'max_num_node': self.max_num_node,
                      'num_labels': self.num_labels}
         save_graphs(str(graph_path), self.graph_lists, label_dict)
@@ -200,26 +220,46 @@ class LegacyTUDataset(DGLBuiltinDataset):
 class TUDataset(DGLBuiltinDataset):
     r"""
     TUDataset contains lots of graph kernel datasets for graph classification.
-    Graphs may have node labels, node attributes, edge labels, and edge attributes,
-    varing from different dataset.
+
     Parameters
     ----------
     name : str
         Dataset Name, such as `ENZYMES`, `DD`, `COLLAB`, `MUTAG`, can be the 
         datasets name on https://ls11-www.cs.tu-dortmund.de/staff/morris/graphkerneldatasets.
-    Returns
-    -------
-    TUDataset object as an iterable for dataloader.
+
     Examples
     --------
     >>> data = TUDataset('DD')
-    >>> data[0]
-    (Graph(num_nodes=327, num_edges=1798,
+
+    **The dataset instance is an iterable**
+
+    >>> len(data)
+    188
+    >>> g, label = data[1024]
+    >>> g
+    Graph(num_nodes=88, num_edges=410,
+          ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64), 'node_labels': Scheme(shape=(1,), dtype=torch.int64)}
+          edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
+    >>> label
+    tensor([1])
+
+    **Batch the graphs and labels for mini-batch training*
+
+    >>> graphs, labels = zip(*[data[i] for i in range(16)])
+    >>> batched_graphs = dgl.batch(graphs)
+    >>> batched_labels = torch.tensor(labels)
+    >>> batched_graphs
+    Graph(num_nodes=9539, num_edges=47382,
           ndata_schemes={'node_labels': Scheme(shape=(1,), dtype=torch.int64), '_ID': Scheme(shape=(), dtype=torch.int64)}
-          edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}), tensor([0]))
+          edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
+
+    Notes
+    -----
+    Graphs may have node labels, node attributes, edge labels, and edge attributes,
+    varing from different dataset. This class does not perform additional process.
     """
 
-    _url = r"https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
+    _url = r"https://www.chrsmrrs.com/graphkerneldatasets/{}.zip"
 
     def __init__(self, name, raw_dir=None, force_reload=False, verbose=False):
         url = self._url.format(name)
@@ -248,7 +288,7 @@ class TUDataset(DGLBuiltinDataset):
                 self.max_num_node = len(node_idx[0])
 
         self.num_labels = max(DS_graph_labels) + 1
-        self.graph_labels = DS_graph_labels
+        self.graph_labels = F.tensor(DS_graph_labels)
 
         self.attr_dict = {
             'node_labels': ('ndata', 'node_labels'),
@@ -262,19 +302,17 @@ class TUDataset(DGLBuiltinDataset):
                 data = loadtxt(self._file_path(filename),
                                delimiter=',').astype(int)
                 if 'label' in filename:
-                    data = self._idx_from_zero(data)
+                    data = F.tensor(self._idx_from_zero(data))
                 getattr(g, field_name[0])[field_name[1]] = data
             except IOError:
                 pass
 
         self.graph_lists = [g.subgraph(node_idx) for node_idx in node_idx_list]
-        for g in self.graph_lists:
-            g.copy_from_parent()
 
     def save(self):
         graph_path = os.path.join(self.save_path, 'tu_{}.bin'.format(self.name))
         info_path = os.path.join(self.save_path, 'tu_{}.pkl'.format(self.name))
-        label_dict = {'labels': F.tensor(self.graph_labels)}
+        label_dict = {'labels': self.graph_labels}
         info_dict = {'max_num_node': self.max_num_node,
                      'num_labels': self.num_labels}
         save_graphs(str(graph_path), self.graph_lists, label_dict)
