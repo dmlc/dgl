@@ -11,7 +11,7 @@ from ....utils import expand_as_pair
 
 # pylint: disable=W0235
 class GraphConv(nn.Module):
-    r"""Apply graph convolution over an input signal.
+    r"""
 
     Description
     -----------
