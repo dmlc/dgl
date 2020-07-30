@@ -1,16 +1,16 @@
 """Class for NodeFlow data structure."""
 from __future__ import absolute_import
 
-from ._ffi.object import register_object, ObjectBase
-from ._ffi.function import _init_api
-from .base import ALL, is_all, DGLError, dgl_warning
-from . import backend as F
-from .frame import Frame, FrameRef
+from .._ffi.object import register_object, ObjectBase
+from .._ffi.function import _init_api
+from ..base import ALL, is_all, DGLError, dgl_warning
+from .. import backend as F
+from ..frame import Frame, FrameRef
 from .graph import DGLBaseGraph
-from .graph_index import transform_ids
+from ..graph_index import transform_ids
 from .runtime import ir, scheduler, Runtime
-from . import utils
-from .view import LayerView, BlockView
+from .. import utils
+from ..view import LayerView, BlockView
 
 __all__ = ['NodeFlow']
 
@@ -1053,4 +1053,4 @@ def _update_frame(frame, names, ids, new_frame):
         # This will raise error for tensorflow, because inplace update is not supported
         frame.update_rows(ids, FrameRef(Frame(col_dict)), inplace=True)
 
-_init_api("dgl.nodeflow", __name__)
+_init_api("dgl._deprecate.nodeflow", __name__)

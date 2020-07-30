@@ -10,9 +10,9 @@ from ..._ffi.function import _init_api
 from ..._ffi.object import register_object, ObjectBase
 from ..._ffi.ndarray import empty
 from ... import utils
-from ...nodeflow import NodeFlow
+from ..._deprecate.nodeflow import NodeFlow
 from ... import backend as F
-from ...graph import DGLGraph as DGLGraphStale
+from ..._deprecate.graph import DGLGraph as DGLGraphStale
 from ...base import NID, EID, dgl_warning
 
 try:

@@ -9,15 +9,15 @@ from functools import wraps
 import networkx as nx
 
 import dgl
-from .base import ALL, NID, EID, is_all, DGLError, dgl_warning
-from . import backend as F
-from . import init
-from .frame import FrameRef, Frame, Scheme, sync_frame_initializer
-from . import graph_index
+from ..base import ALL, NID, EID, is_all, DGLError, dgl_warning
+from .. import backend as F
+from .. import init
+from ..frame import FrameRef, Frame, Scheme, sync_frame_initializer
+from .. import graph_index
 from .runtime import ir, scheduler, Runtime, GraphAdapter
-from . import utils
-from .view import NodeView, EdgeView
-from .udf import NodeBatch, EdgeBatch
+from .. import utils
+from ..view import NodeView, EdgeView
+from ..udf import NodeBatch, EdgeBatch
 
 __all__ = ['DGLGraph', 'batch', 'unbatch']
 

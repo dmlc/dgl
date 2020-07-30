@@ -23,12 +23,13 @@ from .base import ALL, NTYPE, NID, ETYPE, EID
 from .readout import *
 from .batch import *
 from .convert import *
-from .graph import DGLGraph as DGLGraphStale
 from .generators import *
 from .heterograph import DGLHeteroGraph
 from .heterograph import DGLHeteroGraph as DGLGraph  # pylint: disable=reimported
-from .nodeflow import *
 from .traversal import *
 from .transform import *
 from .propagate import *
 from .udf import NodeBatch, EdgeBatch
+
+from ._deprecate.graph import DGLGraph as DGLGraphStale
+from ._deprecate.nodeflow import *
