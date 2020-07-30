@@ -152,9 +152,6 @@ def start_client(ip_config):
         assert res.integer == INTEGER
         assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
 
-    # clean up
-    time.sleep(2)
-
 def test_serialize():
     from dgl.distributed.rpc import serialize_to_payload, deserialize_from_payload
     SERVICE_ID = 12345
