@@ -208,7 +208,11 @@ def _close():
     rpc.finalize_receiver()
 
 def _init_rpc(ip_config, max_queue_size, net_type):
-    connect_to_server(ip_config, max_queue_size, net_type)
+    try:
+        print("11111")
+        connect_to_server(ip_config, max_queue_size, net_type)
+    except Exception as e:
+        print(e)
 
 def get_sampler_pool():
     """Return the sampler pool and num_workers"""
@@ -216,14 +220,20 @@ def get_sampler_pool():
 
 def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Init rpc service"""
-    ctx = mp.get_context("spawn")
-    global SAMPLER_POOL
-    global NUM_SAMPLER_WORKERS
-    if num_workers > 0:
-        SAMPLER_POOL = ctx.Pool(
-            num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size, net_type))
-    NUM_SAMPLER_WORKERS = num_workers
-    connect_to_server(ip_config, max_queue_size, net_type)
+    try:
+        ctx = mp.get_context("spawn")
+        global SAMPLER_POOL
+        global NUM_SAMPLER_WORKERS
+        if num_workers > 0:
+            SAMPLER_POOL = ctx.Pool(
+                num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size, net_type))
+        NUM_SAMPLER_WORKERS = num_workers
+        connect_to_server(ip_config, max_queue_size, net_type)
+    except Exception as e:
+        print(e)
+        import traceback
+        traceback.print_exc()
+        raise e
 
 def exit_client():
     """Register exit callback.
