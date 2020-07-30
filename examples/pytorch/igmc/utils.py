@@ -107,13 +107,13 @@ def get_neighbor_nodes_labels(ind, graph, mode="bipartite",
         # 1. neighbor nodes sampling
         dist = 0
         nodes = th.stack(ind)
-        dists = nodes.zeros_like(nodes) 
+        dists = th.zeros_like(nodes) 
         visited = th.unique(nodes)
         fringe = th.unique(nodes)
 
         for dist in range(1, hop+1):
             fringe = graph.in_edges(fringe)[0]    
-            fringe = th.from_numpy(np.setdiffed(fringe.numpy(), visited.numpy()))
+            fringe = th.from_numpy(np.setdiff1d(fringe.numpy(), visited.numpy()))
             visited = th.unique(th.cat([visited, fringe]))
 
             if sample_ratio < 1.0:
