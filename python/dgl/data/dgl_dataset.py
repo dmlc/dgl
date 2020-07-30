@@ -39,16 +39,23 @@ class DGLDataset(object):
     save_dir : str
         Directory to save the processed dataset.
         Default: same as raw_dir
+    hash_key : tuple
+        A tuple of values as the input for the hash function.
+        Users can distinguish instances (and their caches on the disk)
+        from the same dataset class by comparing the hash values.
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
         Whether to print out progress information
     """
-    def __init__(self, name, url=None, raw_dir=None, save_dir=None, force_reload=False, verbose=False):
+    def __init__(self, name, url=None, raw_dir=None, save_dir=None,
+                 hash_key=(), force_reload=False, verbose=False):
         self._name = name
         self._url = url
         self._force_reload = force_reload
         self._verbose = verbose
+        self._hash_key = hask_key
+        self._hash = self._get_hash()
 
         # if no dir is provided, the default dgl download dir is used.
         if raw_dir is None:
@@ -148,6 +155,9 @@ class DGLDataset(object):
             if self.verbose:
                 print('Done saving data into cached files.')
 
+    def _get_hash(self):
+        return abs(hash(self._hash_key))
+
     @property
     def url(self):
         r"""Get url to download the raw dataset.
@@ -191,6 +201,12 @@ class DGLDataset(object):
         """
         return self._verbose
 
+    @property
+    def hash(self):
+        r"""Hash value for the dataset.
+        """
+        return self._hash
+
     @abc.abstractmethod
     def __getitem__(self, idx):
         r"""Gets the data object at index.
@@ -215,16 +231,21 @@ class DGLBuiltinDataset(DGLDataset):
         downloaded data or the directory that
         already stores the input data.
         Default: ~/.dgl/
+    hash_key : tuple
+        A tuple of values as the input for the hash function.
+        Users can distinguish instances (and their caches on the disk)
+        from the same dataset class by comparing the hash values.
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose: bool
         Whether to print out progress information. Default: False
     """
-    def __init__(self, name, url, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, name, url, raw_dir=None, hash_key=(), force_reload=False, verbose=False):
         super(DGLBuiltinDataset, self).__init__(name,
                                                 url=url,
                                                 raw_dir=raw_dir,
                                                 save_dir=None,
+                                                hash_key=hash_key,
                                                 force_reload=force_reload,
                                                 verbose=verbose)
 
