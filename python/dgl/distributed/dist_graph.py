@@ -27,9 +27,9 @@ INIT_GRAPH = 800001
 class InitGraphRequest(rpc.Request):
     """ Init graph on the backup servers.
 
-    When the backup server starts, they don't load the graph structure.
-    This request tells the backup servers that they can map to the graph structure
-    with shared memory.
+    When the backup server starts, they don't load the graph structure and node/edge data.
+    This request tells the backup servers that they can map to the graph structure and
+    node/edge data with shared memory.
     """
     def __init__(self, graph_name, data_names):
         self._graph_name = graph_name
@@ -350,6 +350,8 @@ class DistGraph:
             if self._gpb is None:
                 self._gpb = gpb
 
+            # Tell the backup servers to load the graph structure and node/edge data
+            # from shared memory.
             data_names = self._client.data_name_list()
             for server_id in range(self._client.num_servers):
                 rpc.send_request(server_id, InitGraphRequest(graph_name, data_names))

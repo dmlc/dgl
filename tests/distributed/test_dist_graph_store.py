@@ -157,7 +157,8 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
         optimizer.step()
         with F.no_grad():
             feats = emb(nids)
-        #assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * math.sqrt(2) * -lr)
+        if num_clients == 1:
+            assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * math.sqrt(2) * -lr)
         rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
         feats1 = emb(rest)
         assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))

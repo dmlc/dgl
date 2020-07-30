@@ -72,6 +72,7 @@ class DistTensor:
             init_func = _default_init_data
         exist_names = g._client.data_name_list()
         # If a user doesn't provide a name, we generate a name ourselves.
+        # We need to generate the name in a deterministic way.
         if name is None:
             assert not persistent, 'We cannot generate anonymous persistent distributed tensors'
             name = 'anonymous-' + str(len(exist_names) + 1)
