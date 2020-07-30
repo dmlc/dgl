@@ -162,6 +162,8 @@ def load_partition_book(conf_file, part_id, graph=None):
     with open(conf_file) as conf_f:
         part_metadata = json.load(conf_f)
     assert 'num_parts' in part_metadata, 'num_parts does not exist.'
+    assert part_metadata['num_parts'] > part_id, \
+            'part {} is out of range (#parts: {})'.format(part_id, part_metadata['num_parts'])
     num_parts = part_metadata['num_parts']
     assert 'num_nodes' in part_metadata, "cannot get the number of nodes of the global graph."
     assert 'num_edges' in part_metadata, "cannot get the number of edges of the global graph."
