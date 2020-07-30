@@ -286,7 +286,7 @@ def start_client_mul_role(i, num_clients):
         print('init i:%d role: trainer' % i)
         kvclient = dgl.distributed.KVClient(ip_config='kv_ip_mul_config.txt', role='trainer')
     else:
-        print('init i:%d role: trainer' % i)
+        print('init i:%d role: sampler' % i)
         kvclient = dgl.distributed.KVClient(ip_config='kv_ip_mul_config.txt', role='sampler')
     time.sleep(3)
     if i == 2: # block one trainer
