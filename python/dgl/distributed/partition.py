@@ -138,6 +138,9 @@ def load_partition(conf_file, part_id):
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
 
     gpb, graph_name = load_partition_book(conf_file, part_id, graph)
+    nids = F.boolean_mask(graph.ndata[NID], graph.ndata['inner_node'])
+    partids = gpb.nid2partid(nids)
+    assert np.all(F.asnumpy(partids == part_id)), 'load a wrong partition'
     return graph, node_feats, edge_feats, gpb, graph_name
 
 def load_partition_book(conf_file, part_id, graph=None):
