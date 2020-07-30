@@ -311,8 +311,6 @@ def run(args, device, data):
             step_time.append(step_t)
             iter_tput.append(pos_edges / step_t)
             num_seeds += pos_edges
-            if step > 1000:
-                break
             if step % args.log_every == 0:
                 print('[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f} s' \
                         '| sample {:.3f} | copy {:.3f} | forward {:.3f} | backward {:.3f} | update {:.3f}'.format(
