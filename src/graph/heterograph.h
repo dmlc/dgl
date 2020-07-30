@@ -15,6 +15,7 @@
 #include <vector>
 #include <set>
 #include <tuple>
+#include <memory>
 #include "./unit_graph.h"
 #include "shared_mem_manager.h"
 

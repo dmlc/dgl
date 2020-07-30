@@ -11,7 +11,7 @@ import numpy as np
 import os
 
 from ... import ndarray as nd
-from ... import kernel as K
+from ..._deprecate import kernel as K
 from ...function.base import TargetCode
 
 if not os.getenv("USE_TFDLPACK", False):

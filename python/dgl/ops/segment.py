@@ -1,9 +1,9 @@
 """Segment aggregation operators implemented using DGL graph."""
 
-from .base import DGLError
-from . import backend as F
-from . import convert
-from . import function as fn
+from ..base import DGLError
+from .. import backend as F
+from .. import convert
+from .. import function as fn
 
 def segment_reduce(seglen, value, reducer='sum'):
     """Segment reduction operator.

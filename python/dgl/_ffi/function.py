@@ -284,7 +284,7 @@ def _init_api_prefix(module_name, prefix):
     module = sys.modules[module_name]
 
     for name in list_global_func_names():
-        if name.startswith("_"):
+        if not name.startswith('_deprecate') and name.startswith("_"):
             continue
         name_split = name.rsplit('.', 1)
         if name_split[0] != prefix:
