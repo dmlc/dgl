@@ -57,6 +57,24 @@ class KnowledgeGraphDataset(DGLBuiltinDataset):
         extract_archive(tgz_path, self.raw_path)
 
     def process(self):
+        """
+        The original knowledge base is stored as an RDF file, and this function
+        performs preprocessing.
+
+        An object of this class has 5 member attributes needed for link
+        prediction:
+
+        num_nodes: int
+            number of entities of knowledge base
+        num_rels: int
+            number of relations (including reverse relation) of knowledge base
+        train: numpy.array
+            all relation triplets (src, rel, dst) for training
+        valid: numpy.array
+            all relation triplets (src, rel, dst) for validation
+        test: numpy.array
+            all relation triplets (src, rel, dst) for testing
+        """
         root_path = self.raw_path
         entity_path = os.path.join(root_path, 'entities.dict')
         relation_path = os.path.join(root_path, 'relations.dict')
@@ -331,14 +349,37 @@ def build_knowledge_graph(num_nodes, num_rels, train, valid, test, reverse=True)
     return g, (etype, ntype, train_edge_mask, valid_edge_mask, test_edge_mask, train_mask, valid_mask, test_mask)
 
 class FB15k237Dataset(KnowledgeGraphDataset):
-    r"""FB15k237 link prediction dataset
+    r"""FB15k237 link prediction dataset.
+
+    .. deprecated:: 0.5.0
+        `train` is deprecated, it is replaced by:
+            >>> dataset = FB15k237Dataset()
+            >>> graph = dataset[0]
+            >>> train_mask = graph.edata['train_mask']
+            >>> train_idx = th.nonzero(train_mask).squeeze()
+            >>> src, dst = graph.edges(train_idx)
+            >>> rel = graph.edata['etype'][train_idx]
+        `valid` is deprecated, it is replaced by:
+            >>> dataset = FB15k237Dataset()
+            >>> graph = dataset[0]
+            >>> val_mask = graph.edata['val_mask']
+            >>> val_idx = th.nonzero(val_mask).squeeze()
+            >>> src, dst = graph.edges(val_idx)
+            >>> rel = graph.edata['etype'][val_idx]
+        `test` is deprecated, it is replaced by:
+            >>> dataset = FB15k237Dataset()
+            >>> graph = dataset[0]
+            >>> test_mask = graph.edata['test_mask']
+            >>> test_idx = th.nonzero(test_mask).squeeze()
+            >>> src, dst = graph.edges(test_idx)
+            >>> rel = graph.edata['etype'][test_idx]
+
     FB15k-237 is a subset of FB15k where inverse
     relations are removed. When creating the dataset,
     a reverse edge with reversed relation types are
     created for each edge by default.
 
-    Statistics
-    ----------
+    FB15k237 dataset statistics:
     Nodes: 14541
     Number of relation types: 237
     Number of reversed relation types: 237
@@ -356,20 +397,18 @@ class FB15k237Dataset(KnowledgeGraphDataset):
     verbose: bool
         Whether to print out progress information. Default: True.
 
-    Returns
+    Attributes
     ----------
-    FB15k237Dataset object with three properties:
-        graph: A Homogeneous graph contain
-            - edata['e_type']: edge relation type
-            - edata['train_edge_mask']: positive training edge mask
-            - edata['val_edge_mask']: positive validation edge mask
-            - edata['test_edge_mask']: positive testing edge mask
-            - edata['train_mask']: training edge set mask (include reversed training edges)
-            - edata['val_mask']: validation edge set mask (include reversed validation edges)
-            - edata['test_mask']: testing edge set mask (include reversed testing edges)
-            - ndata['ntype']: node type. All 0 in this dataset
-        num_nodes: Number of nodes
-        num_rels: Number of relation types
+    num_nodes: int
+        Number of nodes
+    num_rels: int
+        Number of relation types
+    train: numpy array
+        A numpy array of triplets (src, rel, dst) for the training graph
+    valid: numpy array
+        A numpy array of triplets (src, rel, dst) for the validation graph
+    test: numpy array
+        A numpy array of triplets (src, rel, dst) for the test graph
 
     Examples
     ----------
@@ -404,8 +443,59 @@ class FB15k237Dataset(KnowledgeGraphDataset):
         name = 'FB15k-237'
         super(FB15k237Dataset, self).__init__(name, reverse, raw_dir, force_reload, verbose)
 
+    def __getitem__(self, idx):
+        r"""Gets the graph object
+
+        Parameters
+        -----------
+        idx: int
+            Item index, FB15k237Dataset has only one graph object
+
+        Return
+        -------
+            dgl.DGLGraph
+                The graph contain
+                - edata['e_type']: edge relation type
+                - edata['train_edge_mask']: positive training edge mask
+                - edata['val_edge_mask']: positive validation edge mask
+                - edata['test_edge_mask']: positive testing edge mask
+                - edata['train_mask']: training edge set mask (include reversed training edges)
+                - edata['val_mask']: validation edge set mask (include reversed validation edges)
+                - edata['test_mask']: testing edge set mask (include reversed testing edges)
+                - ndata['ntype']: node type. All 0 in this dataset
+        """
+        return super(FB15k237Dataset, self).__getitem__(idx)
+
+    def __len__(self):
+        r"""The number of graphs in the dataset."""
+        return super(FB15k237Dataset, self).__len__(idx)
+
 class FB15kDataset(KnowledgeGraphDataset):
-    r"""FB15k link prediction dataset
+    r"""FB15k link prediction dataset.
+
+    .. deprecated:: 0.5.0
+        `train` is deprecated, it is replaced by:
+            >>> dataset = FB15kDataset()
+            >>> graph = dataset[0]
+            >>> train_mask = graph.edata['train_mask']
+            >>> train_idx = th.nonzero(train_mask).squeeze()
+            >>> src, dst = graph.edges(train_idx)
+            >>> rel = graph.edata['etype'][train_idx]
+        `valid` is deprecated, it is replaced by:
+            >>> dataset = FB15kDataset()
+            >>> graph = dataset[0]
+            >>> val_mask = graph.edata['val_mask']
+            >>> val_idx = th.nonzero(val_mask).squeeze()
+            >>> src, dst = graph.edges(val_idx)
+            >>> rel = graph.edata['etype'][val_idx]
+        `test` is deprecated, it is replaced by:
+            >>> dataset = FB15kDataset()
+            >>> graph = dataset[0]
+            >>> test_mask = graph.edata['test_mask']
+            >>> test_idx = th.nonzero(test_mask).squeeze()
+            >>> src, dst = graph.edges(test_idx)
+            >>> rel = graph.edata['etype'][test_idx]
+
     The FB15K dataset was introduced in http://papers.nips.cc/paper/5071-translating-embeddings-for-modeling-multi-relational-data.pdf,
     It is a subset of Freebase which contains about
     14,951 entities with 1,345 different relations.
@@ -413,8 +503,7 @@ class FB15kDataset(KnowledgeGraphDataset):
     reversed relation types are created for each edge
     by default.
 
-    Statistics
-    ----------
+    FB15k dataset statistics:
     Nodes: 14,951
     Number of relation types: 1,345
     Number of reversed relation types: 1,345
@@ -432,20 +521,18 @@ class FB15kDataset(KnowledgeGraphDataset):
     verbose: bool
         Whether to print out progress information. Default: True.
 
-    Returns
-    --------
-    FB15kDataset object with three properties:
-        graph: A Homogeneous graph contain
-            - edata['e_type']: edge relation type
-            - edata['train_edge_mask']: positive training edge mask
-            - edata['val_edge_mask']: positive validation edge mask
-            - edata['test_edge_mask']: positive testing edge mask
-            - edata['train_mask']: training edge set mask (include reversed training edges)
-            - edata['val_mask']: validation edge set mask (include reversed validation edges)
-            - edata['test_mask']: testing edge set mask (include reversed testing edges)
-            - ndata['ntype']: node type. All 0 in this dataset
-        num_nodes: Number of nodes
-        num_rels: Number of relation types
+    Attributes
+    ----------
+    num_nodes: int
+        Number of nodes
+    num_rels: int
+        Number of relation types
+    train: numpy array
+        A numpy array of triplets (src, rel, dst) for the training graph
+    valid: numpy array
+        A numpy array of triplets (src, rel, dst) for the validation graph
+    test: numpy array
+        A numpy array of triplets (src, rel, dst) for the test graph
 
     Examples
     ----------
@@ -479,8 +566,58 @@ class FB15kDataset(KnowledgeGraphDataset):
         name = 'FB15k'
         super(FB15kDataset, self).__init__(name, reverse, raw_dir, force_reload, verbose)
 
+    def __getitem__(self, idx):
+        r"""Gets the graph object
+
+        Parameters
+        -----------
+        idx: int
+            Item index, FB15kDataset has only one graph object
+
+        Return
+        -------
+            dgl.DGLGraph
+                The graph contain
+                - edata['e_type']: edge relation type
+                - edata['train_edge_mask']: positive training edge mask
+                - edata['val_edge_mask']: positive validation edge mask
+                - edata['test_edge_mask']: positive testing edge mask
+                - edata['train_mask']: training edge set mask (include reversed training edges)
+                - edata['val_mask']: validation edge set mask (include reversed validation edges)
+                - edata['test_mask']: testing edge set mask (include reversed testing edges)
+                - ndata['ntype']: node type. All 0 in this dataset
+        """
+        return super(FB15kDataset, self).__getitem__(idx)
+
+    def __len__(self):
+        r"""The number of graphs in the dataset."""
+        return super(FB15kDataset, self).__len__(idx)
+
 class WN18Dataset(KnowledgeGraphDataset):
-    r""" WN18 dataset.
+    r""" WN18 link prediction dataset.
+
+    .. deprecated:: 0.5.0
+        `train` is deprecated, it is replaced by:
+            >>> dataset = WN18Dataset()
+            >>> graph = dataset[0]
+            >>> train_mask = graph.edata['train_mask']
+            >>> train_idx = th.nonzero(train_mask).squeeze()
+            >>> src, dst = graph.edges(train_idx)
+            >>> rel = graph.edata['etype'][train_idx]
+        `valid` is deprecated, it is replaced by:
+            >>> dataset = WN18Dataset()
+            >>> graph = dataset[0]
+            >>> val_mask = graph.edata['val_mask']
+            >>> val_idx = th.nonzero(val_mask).squeeze()
+            >>> src, dst = graph.edges(val_idx)
+            >>> rel = graph.edata['etype'][val_idx]
+        `test` is deprecated, it is replaced by:
+            >>> dataset = WN18Dataset()
+            >>> graph = dataset[0]
+            >>> test_mask = graph.edata['test_mask']
+            >>> test_idx = th.nonzero(test_mask).squeeze()
+            >>> src, dst = graph.edges(test_idx)
+            >>> rel = graph.edata['etype'][test_idx]
 
     The WN18 dataset was introduced in http://papers.nips.cc/paper/5071-translating-embeddings-for-modeling-multi-relational-data.pdf,
     It included the full 18 relations scraped from
@@ -488,8 +625,7 @@ class WN18Dataset(KnowledgeGraphDataset):
     the dataset, a reverse edge with reversed relation
     types are created for each edge by default.
 
-    Statistics
-    ----------
+    WN18 dataset tatistics:
     Nodes: 40943
     Number of relation types: 18
     Number of reversed relation types: 18
@@ -507,20 +643,18 @@ class WN18Dataset(KnowledgeGraphDataset):
     verbose: bool
         Whether to print out progress information. Default: True.
 
-    Returns
+    Attributes
     ----------
-    WN18Dataset object with three properties:
-        graph: A Homogeneous graph contain
-            - edata['e_type']: edge relation type
-            - edata['train_edge_mask']: positive training edge mask
-            - edata['val_edge_mask']: positive validation edge mask
-            - edata['test_edge_mask']: positive testing edge mask
-            - edata['train_mask']: training edge set mask (include reversed training edges)
-            - edata['val_mask']: validation edge set mask (include reversed validation edges)
-            - edata['test_mask']: testing edge set mask (include reversed testing edges)
-            - ndata['ntype']: node type. All 0 in this dataset
-        num_nodes: Number of nodes
-        num_rels: Number of relation types
+    num_nodes: int
+        Number of nodes
+    num_rels: int
+        Number of relation types
+    train: numpy array
+        A numpy array of triplets (src, rel, dst) for the training graph
+    valid: numpy array
+        A numpy array of triplets (src, rel, dst) for the validation graph
+    test: numpy array
+        A numpy array of triplets (src, rel, dst) for the test graph
 
     Examples
     ----------
@@ -554,7 +688,47 @@ class WN18Dataset(KnowledgeGraphDataset):
         name = 'wn18'
         super(WN18Dataset, self).__init__(name, reverse, raw_dir, force_reload, verbose)
 
+    def __getitem__(self, idx):
+        r"""Gets the graph object
+
+        Parameters
+        -----------
+        idx: int
+            Item index, WN18Dataset has only one graph object
+
+        Return
+        -------
+            dgl.DGLGraph
+                The graph contain
+                - edata['e_type']: edge relation type
+                - edata['train_edge_mask']: positive training edge mask
+                - edata['val_edge_mask']: positive validation edge mask
+                - edata['test_edge_mask']: positive testing edge mask
+                - edata['train_mask']: training edge set mask (include reversed training edges)
+                - edata['val_mask']: validation edge set mask (include reversed validation edges)
+                - edata['test_mask']: testing edge set mask (include reversed testing edges)
+                - ndata['ntype']: node type. All 0 in this dataset
+        """
+        return super(WN18Dataset, self).__getitem__(idx)
+
+    def __len__(self):
+        r"""The number of graphs in the dataset."""
+        return super(WN18Dataset, self).__len__(idx)
+
 def load_data(dataset):
+    r"""Load knowledge graph dataset for RGCN link prediction tasks
+
+    It supports three datasets: wn18, FB15k and FB15k-237
+
+    Parameters
+    ----------
+    dataset: str
+        The name of the dataset to load.
+
+    Return
+    ------
+        The dataset object.
+    """
     if dataset == 'wn18':
         return WN18Dataset()
     elif dataset == 'FB15k':
