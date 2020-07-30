@@ -45,7 +45,7 @@ edge_map = F.tensor([0,0,0,0,0,0,0], F.int64)
 global_nid = F.tensor([0,1,2,3,4,5], F.int64)
 global_eid = F.tensor([0,1,2,3,4,5,6], F.int64)
 
-g = dgl.graph()
+g = dgl.DGLGraph()
 g.add_nodes(6)
 g.add_edges(0, 1) # 0
 g.add_edges(0, 2) # 1
