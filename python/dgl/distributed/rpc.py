@@ -16,7 +16,7 @@ __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
 'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call', \
 'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', \
-'get_num_client', 'set_num_client']
+'get_num_client', 'set_num_client', 'client_barrier']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
@@ -1112,9 +1112,8 @@ class ClientBarrierRequest(Request):
         self.msg = state
 
     def process_request(self, server_state):
-        barrier_count = _CAPI_DGLRPCGetBarrierCount()
-        _CAPI_DGLRPCSetBarrierCount(barrier_count+1)
-        if barrier_count+1 == get_num_client():
+        _CAPI_DGLRPCSetBarrierCount(_CAPI_DGLRPCGetBarrierCount()+1)
+        if _CAPI_DGLRPCGetBarrierCount() == get_num_client():
             _CAPI_DGLRPCSetBarrierCount(0)
             res_list = []
             for target_id in range(get_num_client()):
