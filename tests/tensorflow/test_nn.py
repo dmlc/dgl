@@ -247,7 +247,7 @@ def test_partial_edge_softmax():
     grad = F.randn((300, 1))
     import numpy as np
     eids = np.random.choice(900, 300, replace=False).astype('int64')
-    eids = F.zerocopy_from_numpy(eids)
+    eids = F.tensor(eids)
     # compute partial edge softmax
     with tf.GradientTape() as tape:
         tape.watch(score)
@@ -255,7 +255,7 @@ def test_partial_edge_softmax():
         grads = tape.gradient(y_1, [score])
     grad_1 = grads[0]
     # compute edge softmax on edge subgraph
-    subg = g.edge_subgraph(eids)
+    subg = g.edge_subgraph(eids, preserve_nodes=True)
     with tf.GradientTape() as tape:
         tape.watch(score)
         y_2 = nn.edge_softmax(subg, score)
@@ -348,8 +348,8 @@ def test_rgcn():
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True)
     rgc_basis_low.weight = rgc_basis.weight
     rgc_basis_low.w_comp = rgc_basis.w_comp
-    h = tf.constant(np.random.randint(0, I, (100,)))
-    r = tf.constant(etype)
+    h = tf.constant(np.random.randint(0, I, (100,))) * 1
+    r = tf.constant(etype) * 1
     h_new = rgc_basis(g, h, r)
     h_new_low = rgc_basis_low(g, h, r)
     assert list(h_new.shape) == [100, O]

@@ -3,6 +3,7 @@ import numpy as np
 from .tensor import tensor, copy_to, context
 from ...sparse import _gspmm, _gsddmm
 
+
 def _scatter_nd(index, src, n_rows):
     assert index.shape == src.shape
     shp = index.shape
@@ -22,6 +23,7 @@ def _scatter_nd(index, src, n_rows):
     rst = tf.reshape(tf.scatter_nd(new_idx, src, (stride * n_rows,)), (n_rows, *shp[1:]))
     return rst
 
+
 def _gather_nd(index, src):
     shp = index.shape
     ctx = context(src)
@@ -40,6 +42,7 @@ def _gather_nd(index, src):
     print(src, new_idx)
     rst = tf.reshape(tf.gather(src, new_idx), shp)
     return rst
+
 
 def _reduce_grad(grad, shape):
     """Reduce gradient on the broadcast dimension
@@ -71,6 +74,7 @@ def _reduce_grad(grad, shape):
     grad = tf.reduce_sum(grad, axis=reduce_idx_tensor, keepdims=True)
     return tf.reshape(grad, shape)
 
+
 def _need_reduce_last_dim(ufeat, efeat):
     """Indicates whether to reduce the last dimension on edges
     in the backward pass of spmm,
@@ -79,14 +83,16 @@ def _need_reduce_last_dim(ufeat, efeat):
     eshp = efeat.shape
     return ushp[1:-1] == eshp[1:-1] and eshp[-1] == 1 and ushp[-1] > 1
 
+
 def _muldiv(op, x):
     return 1. / x if op == 'div' else x
+
 
 def _addsub(op, x):
     return -x if op == 'sub' else x
 
-def gspmm_real(g, op, reduce_op, X, Y):
-    gidx = g._graph
+
+def gspmm_real(gidx, op, reduce_op, X, Y):
     out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
 
     def grad(dZ):
@@ -136,18 +142,19 @@ def gspmm_real(g, op, reduce_op, X, Y):
         return dX, dY
     return out, grad
 
-def gspmm(g, op, reduce_op, X, Y):
+
+def gspmm(gidx, op, reduce_op, X, Y):
     @tf.custom_gradient
     def _lambda(X, Y):
-        return gspmm_real(g, op, reduce_op, X, Y)
+        return gspmm_real(gidx, op, reduce_op, X, Y)
     if X is None:
         X = tf.zeros(())
     if Y is None:
         Y = tf.zeros(())
     return _lambda(X, Y)
 
-def gsddmm_real(g, op, X, Y, lhs_target, rhs_target):
-    gidx = g._graph
+
+def gsddmm_real(gidx, op, X, Y, lhs_target, rhs_target):
     out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
 
     def grad(dZ):
@@ -183,23 +190,26 @@ def gsddmm_real(g, op, X, Y, lhs_target, rhs_target):
                         dY = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ * X)[0]
                     else:  # rhs_target = !lhs_target
                         dY = _gspmm(_gidx, 'mul', 'sum', X, dZ)[0]
-                    if op == 'div': dY = -dY / (Y ** 2)
+                    if op == 'div':
+                        dY = -dY / (Y ** 2)
             else:
                 if op in ['add', 'sub', 'copy_rhs']:
                     dY = _addsub(op, dZ)
                 else:  # mul, div, dot
                     dY = _gsddmm(gidx, 'mul', dZ, X, 'e', lhs_target)
-                    if op == 'div': dY = -dY / (Y ** 2)
+                    if op == 'div':
+                        dY = -dY / (Y ** 2)
             dY = _reduce_grad(dY, Y.shape)
         else:
             dY = tf.zeros_like(Y)
         return dX, dY
     return out, grad
 
-def gsddmm(g, op, X, Y, lhs_target='u', rhs_target='v'):
+
+def gsddmm(gidx, op, X, Y, lhs_target='u', rhs_target='v'):
     @tf.custom_gradient
     def _lambda(X, Y):
-        return gsddmm_real(g, op, X, Y, lhs_target, rhs_target)
+        return gsddmm_real(gidx, op, X, Y, lhs_target, rhs_target)
     if X is None:
         X = tf.zeros(())
     if Y is None:

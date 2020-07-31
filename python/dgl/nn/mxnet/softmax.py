@@ -2,7 +2,7 @@
 # pylint: disable= no-member, arguments-differ, access-member-before-definition, unpacking-non-sequence
 import mxnet as mx
 
-from ... import backend as F
+from ... import ops as F
 from ...base import ALL, is_all
 
 __all__ = ['edge_softmax']

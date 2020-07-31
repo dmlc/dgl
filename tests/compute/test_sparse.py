@@ -1,4 +1,4 @@
-from dgl.backend import gspmm, gsddmm
+from dgl.ops import gspmm, gsddmm
 from utils import parametrize_dtype
 import dgl
 import random
@@ -70,15 +70,12 @@ udf_reduce = {
 
 graphs = [
 #    dgl.rand_graph(30, 0),
-    dgl.rand_graph(100, 30),
-    dgl.rand_graph(100, 3000),
-    dgl.rand_bipartite(80, 160, 3000)
+    dgl.rand_graph(30, 100),
+    dgl.rand_bipartite(30, 40, 300)
 ]
 
 spmm_shapes = [
     ((1, 2, 1, 3, 1), (4, 1, 3, 1, 1)),
-    ((5, 3, 1, 7), (1, 3, 7, 1)),
-    ((1, 3, 1), (4, 1, 3)),
     ((3, 3), (1, 3)),
     ((1,), (3,)),
     ((3,), (1,)),
@@ -89,7 +86,6 @@ sddmm_shapes = [
     ((1, 2, 1, 3, 1), (4, 1, 3, 1, 1)),
     ((5, 3, 1, 7), (1, 3, 7, 7)),
     ((1, 3, 3), (4, 1, 3)),
-    ((3, 3), (1, 3)),
     ((3,), (3,)),
     ((1,), (1,))
 ]
@@ -101,8 +97,6 @@ sddmm_shapes = [
 @parametrize_dtype
 def test_spmm(idtype, g, shp, msg, reducer):
     g = g.astype(idtype).to(F.ctx())
-    if dgl.backend.backend_name == 'tensorflow' and (reducer in ['min', 'max']):
-        pytest.skip()  # tensorflow dlpack has problem writing into int32 arrays on GPU.
     print(g)
     print(g.idtype)
 
