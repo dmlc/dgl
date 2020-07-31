@@ -29,6 +29,13 @@ class LegacyTUDataset(DGLBuiltinDataset):
         Remove graphs that contains more nodes than `max_allow_node`.
         Default : None
 
+    Attributes
+    ----------
+    max_num_node : int
+        Maximum number of nodes
+    num_labels : int
+        Number of classes
+
     Examples
     --------
     >>> data = LegacyTUDataset('DD')
@@ -71,8 +78,10 @@ class LegacyTUDataset(DGLBuiltinDataset):
         self.hidden_size = hidden_size
         self.max_allow_node = max_allow_node
         self.use_pandas = use_pandas
-        self.params_hash = abs(hash((name, use_pandas, hidden_size, max_allow_node)))
-        super(LegacyTUDataset, self).__init__(name=name, url=url, raw_dir=raw_dir, force_reload=force_reload, verbose=verbose)
+        self.hash = abs(hash((name, use_pandas, hidden_size, max_allow_node)))
+        super(LegacyTUDataset, self).__init__(name=name, url=url, raw_dir=raw_dir,
+                                              hash_key=(name, use_pandas, hidden_size, max_allow_node),
+                                              force_reload=force_reload, verbose=verbose)
 
     def process(self):
         self.data_mode = None
@@ -153,8 +162,8 @@ class LegacyTUDataset(DGLBuiltinDataset):
         self.graph_labels = F.tensor(self.graph_labels)
 
     def save(self):
-        graph_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.bin'.format(self.name, self.params_hash))
-        info_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.pkl'.format(self.name, self.params_hash))
+        graph_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.bin'.format(self.name, self.hash))
+        info_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.pkl'.format(self.name, self.hash))
         label_dict = {'labels': self.graph_labels}
         info_dict = {'max_num_node': self.max_num_node,
                      'num_labels': self.num_labels}
@@ -162,8 +171,8 @@ class LegacyTUDataset(DGLBuiltinDataset):
         save_info(str(info_path), info_dict)
 
     def load(self):
-        graph_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.bin'.format(self.name, self.params_hash))
-        info_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.pkl'.format(self.name, self.params_hash))
+        graph_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.bin'.format(self.name, self.hash))
+        info_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.pkl'.format(self.name, self.hash))
         graphs, label_dict = load_graphs(str(graph_path))
         info_dict = load_info(str(info_path))
 
@@ -173,8 +182,8 @@ class LegacyTUDataset(DGLBuiltinDataset):
         self.num_labels = info_dict['num_labels']
 
     def has_cache(self):
-        graph_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.bin'.format(self.name, self.params_hash))
-        info_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.pkl'.format(self.name, self.params_hash))
+        graph_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.bin'.format(self.name, self.hash))
+        info_path = os.path.join(self.save_path, 'legacy_tu_{}_{}.pkl'.format(self.name, self.hash))
         if os.path.exists(graph_path) and os.path.exists(info_path):
             return True
         return False
@@ -227,6 +236,13 @@ class TUDataset(DGLBuiltinDataset):
     name : str
         Dataset Name, such as `ENZYMES`, `DD`, `COLLAB`, `MUTAG`, can be the 
         datasets name on https://ls11-www.cs.tu-dortmund.de/staff/morris/graphkerneldatasets.
+
+    Attributes
+    ----------
+    max_num_node : int
+        Maximum number of nodes
+    num_labels : int
+        Number of classes
 
     Examples
     --------
