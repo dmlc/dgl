@@ -553,7 +553,7 @@ class RegisterRoleRequest(rpc.Request):
         for each_role in role :
             total_count += len(each_role)
         if total_count == kv_store.num_clients:
-            target_list = []
+            res_list = []
             for target_id in range(kv_store.num_clients):
                 res_list.append((target_id, RegisterRoleResponse(ROLE_MSG)))
             return res_list
