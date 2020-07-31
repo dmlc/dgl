@@ -294,6 +294,7 @@ def test_standalone():
                   conf_file='/tmp/dist_graph/{}.json'.format(graph_name))
     check_dist_graph(dist_g, g.number_of_nodes(), g.number_of_edges())
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_find_edges():
     os.environ['DGL_DIST_MODE'] = 'distributed'
     check_find_edges(True)
