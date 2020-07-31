@@ -5,7 +5,7 @@ import datetime
 
 from .utils import get_download_dir, download, extract_archive
 from ..utils import retry_method_with_fix
-from ..graph import DGLGraph
+from .. import convert
 
 
 class BitcoinOTC(object):
@@ -49,12 +49,10 @@ class BitcoinOTC(object):
         time_index = np.around(
             (data[:, 3] - data[:, 3].min())/delta).astype(np.int64)
         for i in range(time_index.max()):
-            g = DGLGraph()
-            g.add_nodes(num_nodes)
             row_mask = time_index <= i
             edges = data[row_mask][:, 0:2]
             rate = data[row_mask][:, 2]
-            g.add_edges(edges[:, 0], edges[:, 1])
+            g = convert.graph((edges[:, 0], edges[:, 1]))
             g.edata['h'] = rate.reshape(-1, 1)
             self.graphs.append(g)
 

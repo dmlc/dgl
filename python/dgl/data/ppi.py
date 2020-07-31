@@ -8,7 +8,7 @@ from networkx.readwrite import json_graph
 
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
 from ..utils import retry_method_with_fix
-from ..graph import DGLGraph
+from ..convert import from_networkx
 
 _url = 'dataset/ppi.zip'
 
@@ -54,13 +54,13 @@ class PPIDataset(object):
           numpy.ndarry object, it's shape is [n, v],
           n is the number of nodes, v is the feature's dimension;
         train/test/valid_labels.npy=> the labels of the input nodes, it
-          is a numpy ndarry, it's like[[0, 0, 1, ... 0], 
+          is a numpy ndarry, it's like[[0, 0, 1, ... 0],
           [0, 1, 1, 0 ...1]], shape of it is n*h, n is the number of nodes,
           h is the label's dimension;
         train/test/valid/_graph_id.npy => the element in it indicates which
           graph the nodes belong to, it is a one dimensional numpy.ndarray
           object and the length of it is equal the number of nodes,
-          it's like [1, 1, 2, 1...20]. 
+          it's like [1, 1, 2, 1...20].
         """
         print('Loading G...')
         if self.mode == 'train':
@@ -68,21 +68,21 @@ class PPIDataset(object):
                 g_data = json.load(jsonfile)
             self.labels = np.load('{}/ppi/train_labels.npy'.format(self._dir))
             self.features = np.load('{}/ppi/train_feats.npy'.format(self._dir))
-            self.graph = DGLGraph(nx.DiGraph(json_graph.node_link_graph(g_data)))
+            self.graph = from_networkx(nx.DiGraph(json_graph.node_link_graph(g_data)))
             self.graph_id = np.load('{}/ppi/train_graph_id.npy'.format(self._dir))
         if self.mode == 'valid':
             with open('{}/ppi/valid_graph.json'.format(self._dir)) as jsonfile:
                 g_data = json.load(jsonfile)
             self.labels = np.load('{}/ppi/valid_labels.npy'.format(self._dir))
             self.features = np.load('{}/ppi/valid_feats.npy'.format(self._dir))
-            self.graph = DGLGraph(nx.DiGraph(json_graph.node_link_graph(g_data)))
+            self.graph = from_networkx(nx.DiGraph(json_graph.node_link_graph(g_data)))
             self.graph_id = np.load('{}/ppi/valid_graph_id.npy'.format(self._dir))
         if self.mode == 'test':
             with open('{}/ppi/test_graph.json'.format(self._dir)) as jsonfile:
                 g_data = json.load(jsonfile)
             self.labels = np.load('{}/ppi/test_labels.npy'.format(self._dir))
             self.features = np.load('{}/ppi/test_feats.npy'.format(self._dir))
-            self.graph = DGLGraph(nx.DiGraph(json_graph.node_link_graph(g_data)))
+            self.graph = from_networkx(nx.DiGraph(json_graph.node_link_graph(g_data)))
             self.graph_id = np.load('{}/ppi/test_graph_id.npy'.format(self._dir))
 
     def _preprocess(self):

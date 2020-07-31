@@ -6,7 +6,7 @@ import warnings
 
 from .utils import get_download_dir, download, extract_archive, loadtxt
 from ..utils import retry_method_with_fix
-from ..graph import DGLGraph
+from .. import convert
 
 
 class ICEWS18(object):
@@ -75,12 +75,10 @@ class ICEWS18(object):
         start_time = time_index[time_index != -1].min()
         end_time = time_index.max()
         for i in range(start_time, end_time+1):
-            g = DGLGraph()
-            g.add_nodes(num_nodes)
             row_mask = time_index <= i
             edges = data[row_mask][:, [0, 2]]
             rate = data[row_mask][:, 1]
-            g.add_edges(edges[:, 0], edges[:, 1])
+            g = convert.graph((edges[:, 0], edges[:, 1]))
             g.edata['rel_type'] = rate.reshape(-1, 1)
             self.graphs.append(g)
 

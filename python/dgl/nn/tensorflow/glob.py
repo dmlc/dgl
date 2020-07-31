@@ -148,7 +148,7 @@ class SortPooling(layers.Layer):
             feat = tf.sort(feat, -1)
             graph.ndata['h'] = feat
             # Sort nodes according to their last features.
-            ret = tf.reshape(topk_nodes(graph, 'h', self.k, idx=-1)[0], (
+            ret = tf.reshape(topk_nodes(graph, 'h', self.k, sortby=-1)[0], (
                 -1, self.k * feat.shape[-1]))
             return ret
 

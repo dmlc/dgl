@@ -17,7 +17,7 @@ def check_random_walk(g, metapath, traces, ntypes, prob=None):
                 traces[i, j], traces[i, j+1], etype=metapath[j])
             if prob is not None and prob in g.edges[metapath[j]].data:
                 p = F.asnumpy(g.edges[metapath[j]].data['p'])
-                eids = g.edge_id(traces[i, j], traces[i, j+1], etype=metapath[j])
+                eids = g.edge_ids(traces[i, j], traces[i, j+1], etype=metapath[j])
                 assert p[eids] != 0
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU random walk not implemented")
@@ -113,6 +113,7 @@ def test_pack_traces():
     assert F.array_equal(result[2], F.tensor([2, 7], dtype=F.int64))
     assert F.array_equal(result[3], F.tensor([0, 2], dtype=F.int64))
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_pinsage_sampling():
     def _test_sampler(g, sampler, ntype):
         neighbor_g = sampler(F.tensor([0, 2], dtype=F.int64))
@@ -228,7 +229,7 @@ def _test_sample_neighbors(hypersparse):
             assert subg.number_of_edges() == 4
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(v))) == {0, 1}
-            assert F.array_equal(g.has_edges_between(u, v), F.ones((4,), dtype=F.int64))
+            assert F.array_equal(F.astype(g.has_edges_between(u, v), F.int64), F.ones((4,), dtype=F.int64))
             assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
             edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
             if not replace:
@@ -258,7 +259,7 @@ def _test_sample_neighbors(hypersparse):
             assert subg.number_of_edges() == num_edges
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(v))) == {0, 2}
-            assert F.array_equal(g.has_edges_between(u, v), F.ones((num_edges,), dtype=F.int64))
+            assert F.array_equal(F.astype(g.has_edges_between(u, v), F.int64), F.ones((num_edges,), dtype=F.int64))
             assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
             edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
             if not replace:
@@ -326,7 +327,7 @@ def _test_sample_neighbors_outedge(hypersparse):
             assert subg.number_of_edges() == 4
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(u))) == {0, 1}
-            assert F.array_equal(g.has_edges_between(u, v), F.ones((4,), dtype=F.int64))
+            assert F.array_equal(F.astype(g.has_edges_between(u, v), F.int64), F.ones((4,), dtype=F.int64))
             assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
             edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
             if not replace:
@@ -356,7 +357,7 @@ def _test_sample_neighbors_outedge(hypersparse):
             assert subg.number_of_edges() == num_edges
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(u))) == {0, 2}
-            assert F.array_equal(g.has_edges_between(u, v), F.ones((num_edges,), dtype=F.int64))
+            assert F.array_equal(F.astype(g.has_edges_between(u, v), F.int64), F.ones((num_edges,), dtype=F.int64))
             assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
             edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
             if not replace:

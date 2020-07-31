@@ -10,7 +10,7 @@ np.random.seed(42)
 
 def generate_rand_graph(n):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
-    return dgl.DGLGraph(arr, readonly=True)
+    return dgl.DGLGraphStale(arr, readonly=True)
 
 def test_create_full():
     g = generate_rand_graph(100)
@@ -171,7 +171,7 @@ def test_nonuniform_neighbor_sampler():
         if edge not in edges:
             edges.append(edge)
     src, dst = zip(*edges)
-    g = dgl.DGLGraph()
+    g = dgl.DGLGraphStale()
     g.add_nodes(100)
     g.add_edges(src, dst)
     g.readonly()
