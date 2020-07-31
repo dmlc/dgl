@@ -807,6 +807,10 @@ class CoraBinary(DGLBuiltinDataset):
         """
         return (self.graphs[i], self.pmpds[i], self.labels[i])
 
+    @property
+    def save_name(self):
+        return self.name + '_dgl_graph'
+
     @staticmethod
     def collate_fn(cur):
         graphs, pmpds, labels = zip(*cur)
