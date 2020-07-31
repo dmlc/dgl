@@ -253,24 +253,13 @@ def test_scipy_adjmat():
     g.add_nodes(10)
     g.add_edges(range(9), range(1, 10))
 
-    adj_0 = g.adjacency_matrix_scipy()
-    adj_1 = g.adjacency_matrix_scipy(fmt='coo')
+    adj_0 = g.adj(scipy_fmt='csr')
+    adj_1 = g.adj(scipy_fmt='coo')
     assert np.array_equal(adj_0.toarray(), adj_1.toarray())
 
-    adj_t0 = g.adjacency_matrix_scipy(transpose=True)
-    adj_t_1 = g.adjacency_matrix_scipy(transpose=True, fmt='coo')
+    adj_t0 = g.adj(transpose=True, scipy_fmt='csr')
+    adj_t_1 = g.adj(transpose=True, scipy_fmt='coo')
     assert np.array_equal(adj_0.toarray(), adj_1.toarray())
-
-    g.readonly()
-    adj_2 = g.adjacency_matrix_scipy()
-    adj_3 = g.adjacency_matrix_scipy(fmt='coo')
-    assert np.array_equal(adj_2.toarray(), adj_3.toarray())
-    assert np.array_equal(adj_0.toarray(), adj_2.toarray())
-
-    adj_t2 = g.adjacency_matrix_scipy(transpose=True)
-    adj_t3 = g.adjacency_matrix_scipy(transpose=True, fmt='coo')
-    assert np.array_equal(adj_t2.toarray(), adj_t3.toarray())
-    assert np.array_equal(adj_t0.toarray(), adj_t2.toarray())
 
 def test_incmat():
     g = dgl.DGLGraph()
