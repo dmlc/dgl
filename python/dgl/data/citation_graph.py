@@ -172,7 +172,14 @@ class CitationGraphDataset(DGLBuiltinDataset):
 
         info = load_info(str(info_path))
         self._g = graphs[0]
-        self._graph = nx.DiGraph(to_networkx(self._g))
+        graph = graph.clone()
+        graph.pop('train_mask')
+        graph.pop('val_mask')
+        graph.pop('test_mask')
+        graph.pop('feat')
+        graph.pop('label')
+        graph = to_networkx(graph)
+        self._graph = nx.DiGraph(graph)
 
         self._num_labels = info['num_labels']
         self._g.ndata['train_mask'] = generate_mask_tensor(self._g.ndata['train_mask'].numpy())
