@@ -26,12 +26,22 @@ def is_all(arg):
     """Return true if the argument is a special symbol for all nodes or edges."""
     return isinstance(arg, str) and arg == ALL
 
+_default_formatwarning = warnings.formatwarning
+
+class DGLWarning(UserWarning):
+    pass
+
 # pylint: disable=unused-argument
-def dgl_warning_format(message, category, filename, lineno, file=None, line=None):
+def dgl_warning_format(message, category, filename, lineno, line=None):
     """Format DGL warnings."""
-    return "DGL Warning: {}\n".format(message)
+    if isinstance(category, DGLWarning):
+        return "DGL Warning: {}\n".format(message)
+    else:
+        return _default_formatwarning(message, category, filename, lineno, line=None)
+
+def dgl_warning(message, category=DGLWarning, stacklevel=1):
+    return warnings.warn(message, category=category, stacklevel=1)
 
 warnings.formatwarning = dgl_warning_format
-dgl_warning = warnings.warn  # pylint: disable=invalid-name
 
 _init_internal_api()
