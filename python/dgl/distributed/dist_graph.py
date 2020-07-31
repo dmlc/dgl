@@ -324,18 +324,12 @@ class DistGraph:
             self._num_edges += int(part_md['num_edges'])
 
     def _init(self):
-        ip_config, graph_name, gpb = self.ip_config, self.graph_name, self._gpb_input
-        self._client = KVClient(ip_config)
-        import time
-        time.sleep(3)
-        g = _get_graph_from_shared_mem(graph_name)
-        if g is not None:
-            self._g = g
-        else:
-            self._g = None
-        self._gpb = get_shared_mem_partition_book(graph_name, self._g)
+        self._client = KVClient(self.ip_config)
+        self._g = _get_graph_from_shared_mem(self.graph_name)
+        self._gpb = get_shared_mem_partition_book(self.graph_name, self._g)
         if self._gpb is None:
-            self._gpb = gpb
+            self._gpb = self._gpb_input
+        self._client.barrier()
         self._client.map_shared_data(self._gpb)
 
     def __getstate__(self):
