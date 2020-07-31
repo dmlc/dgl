@@ -90,16 +90,19 @@ IdArray Add(IdArray lhs, IdArray rhs);
 IdArray Sub(IdArray lhs, IdArray rhs);
 IdArray Mul(IdArray lhs, IdArray rhs);
 IdArray Div(IdArray lhs, IdArray rhs);
+IdArray Mod(IdArray lhs, IdArray rhs);
 
 IdArray Add(IdArray lhs, int64_t rhs);
 IdArray Sub(IdArray lhs, int64_t rhs);
 IdArray Mul(IdArray lhs, int64_t rhs);
 IdArray Div(IdArray lhs, int64_t rhs);
+IdArray Mod(IdArray lhs, int64_t rhs);
 
 IdArray Add(int64_t lhs, IdArray rhs);
 IdArray Sub(int64_t lhs, IdArray rhs);
 IdArray Mul(int64_t lhs, IdArray rhs);
 IdArray Div(int64_t lhs, IdArray rhs);
+IdArray Mod(int64_t lhs, IdArray rhs);
 
 IdArray Neg(IdArray array);
 
@@ -303,6 +306,17 @@ IdArray CumSum(IdArray array, bool prepend_zero = false);
  * \return A 1D index array storing the positions of the non zero values.
  */
 IdArray NonZero(NDArray array);
+
+/*!
+ * \brief Sort the ID vector in ascending order.
+ *
+ * It performs both sort and arg_sort (returning the sorted index). The sorted index
+ * is always in int64.
+ *
+ * \param array Input array.
+ * \return A pair of arrays: sorted values and sorted index to the original position.
+ */
+std::pair<IdArray, IdArray> Sort(IdArray array);
 
 /*!
  * \brief Return a string that prints out some debug information.
