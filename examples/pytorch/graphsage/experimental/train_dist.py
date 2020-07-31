@@ -109,7 +109,7 @@ def run(args, device, data):
                               dgl.distributed.sample_neighbors)
 
     # Create PyTorch DataLoader for constructing blocks
-    dataloader = DistDataLoader(
+    dataloader = DataLoader(
         dataset=train_nid.numpy(),
         batch_size=args.batch_size,
         collate_fn=sampler.sample_blocks,
@@ -219,9 +219,9 @@ def main(args):
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
 
-    # import multiprocessing, logging
-    # logger = multiprocessing.log_to_stderr()
-    # logger.setLevel(logging.DEBUG)
+    import multiprocessing, logging
+    logger = multiprocessing.log_to_stderr()
+    logger.setLevel(logging.DEBUG)
 
     # os.environ['DGL_DIST_MODE'] = 'distributed'
     print("START1111")
