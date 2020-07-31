@@ -6,12 +6,17 @@ from torch import nn
 from .... import transform
 from .... import function as fn
 from ....ops import edge_softmax
+from ....base import DGLError
 from ..utils import Identity
 from ....utils import expand_as_pair
 
 # pylint: enable=W0235
 class GATConv(nn.Module):
-    r"""Apply `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__
+    r"""
+
+    Description
+    -----------
+    Apply `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__
     over an input signal.
 
     .. math::
@@ -25,30 +30,17 @@ class GATConv(nn.Module):
 
         e_{ij}^{l} = \mathrm{LeakyReLU}\left(\vec{a}^T [W h_{i} \| W h_{j}]\right)
 
-    Notes
-    -----
-    Zero in degree nodes could lead to invalid output. A common practice
-    to avoid this is to add a self-loop for each node in the graph if it's homogeneous,
-    which can be achieved by:
-
-    >>> g = ... # some homogeneous graph
-    >>> dgl.add_self_loop(g)
-
-    If we can't do the above in advance for some reason, we need to set add_self_loop to ``True``.
-
-    For heterogeneous graph, it doesn't make sense to add self-loop. Then we need to filter out the destination nodes with zero in-degree when use in downstream.
-
     Parameters
     ----------
-    in_feats : int or tuple
-        Input feature size.
+    in_feats : int, or pair of ints
+        Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
 
         GATConv can be applied on homogeneous graph and unidirectional `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`. If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
         a scalar is given, the source and destination node feature size would take the
         same value.
     out_feats : int
-        Output feature size.
+        Output feature size; i.e, the number of dimensions of :math:`h_i^{(l+1)}`.
     num_heads : int
         Number of heads in Multi-Head Attention.
     feat_drop : float, optional
@@ -62,13 +54,29 @@ class GATConv(nn.Module):
     activation : callable activation function/layer or None, optional.
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
-    add_self_loop: bool, optional
-        Add self-loop to graph when compute Conv. For efficiency purpose, We recommend adding
-        self_loop in graph construction phase to reduce duplicated operations. If we can't do that, we
-        can to set add_self_loop to ``True`` here.
+    allow_zero_in_degree : bool, optional
+        If there are 0-in-degree nodes in the graph, output for those nodes will be invalid
+        since no message will be passed to those nodes. This is harmful for some applications
+        causing silent performance regression. This module will raise a DGLError if it detects
+        0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
+        and let the users handle it by themselves.
 
-    Example
-    -------
+    Notes
+    -----
+    Zero in-degree nodes will lead to invalid output value. A common practice
+    to avoid this is to add a self-loop for each node in the graph if it is
+    homogeneous, which can be achieved by:
+
+    >>> g = ... # a DGLGraph
+    >>> g = dgl.add_self_loop(g)
+
+    Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
+    since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree`` to ``True``
+    for those cases to unblock the code and handle zere-in-degree nodes manually. A common
+    practise to handle this is to filter out the nodes with zere-in-degree when use after conv.
+
+    Examples
+    --------
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
@@ -76,58 +84,59 @@ class GATConv(nn.Module):
 
     Case 1: Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> g = dgl.add_self_loop(g)
     >>> feat = th.ones(6, 10)
     >>> gatconv = GATConv(10, 2, num_heads=3)
     >>> res = gatconv(g, feat)
     >>> res
-    tensor([[[ 0.6757,  1.9971],
-            [ 1.6249,  0.8834],
-            [-0.3886,  1.1685]],
+    tensor([[[ 3.4570,  1.8634],
+            [ 1.3805, -0.0762],
+            [ 1.0390, -1.1479]],
 
-            [[ 0.6757,  1.9971],
-            [ 1.6249,  0.8834],
-            [-0.3886,  1.1685]],
+            [[ 3.4570,  1.8634],
+            [ 1.3805, -0.0762],
+            [ 1.0390, -1.1479]],
 
-            [[ 0.6757,  1.9971],
-            [ 1.6249,  0.8834],
-            [-0.3886,  1.1685]],
+            [[ 3.4570,  1.8634],
+            [ 1.3805, -0.0762],
+            [ 1.0390, -1.1479]],
 
-            [[ 0.6757,  1.9971],
-            [ 1.6249,  0.8834],
-            [-0.3886,  1.1685]],
+            [[ 3.4570,  1.8634],
+            [ 1.3805, -0.0762],
+            [ 1.0390, -1.1479]],
 
-            [[ 0.6757,  1.9971],
-            [ 1.6249,  0.8834],
-            [-0.3886,  1.1685]],
+            [[ 3.4570,  1.8634],
+            [ 1.3805, -0.0762],
+            [ 1.0390, -1.1479]],
 
-            [[ 0.0000,  0.0000],
-            [ 0.0000,  0.0000],
-            [ 0.0000,  0.0000]]], grad_fn=<BinaryReduceBackward>)
+            [[ 3.4570,  1.8634],
+            [ 1.3805, -0.0762],
+            [ 1.0390, -1.1479]]], grad_fn=<BinaryReduceBackward>)
 
     Case 2: Unidirectional bipartite graph
-    >>> u = [0, 0, 1]
-    >>> v = [2, 3, 2]
+    >>> u = [0, 1, 0, 0, 1]
+    >>> v = [0, 1, 2, 3, 2]
     >>> g = dgl.bipartite((u, v))
     >>> u_feat = th.tensor(np.random.rand(2, 5).astype(np.float32))
     >>> v_feat = th.tensor(np.random.rand(4, 10).astype(np.float32))
     >>> gatconv = GATConv((5,10), 2, 3)
     >>> res = gatconv(g, (u_feat, v_feat))
     >>> res
-    tensor([[[ 0.0000,  0.0000],
-            [ 0.0000,  0.0000],
-            [ 0.0000,  0.0000]],
+    tensor([[[-0.6066,  1.0268],
+            [-0.5945, -0.4801],
+            [ 0.1594,  0.3825]],
 
-            [[ 0.0000,  0.0000],
-            [ 0.0000,  0.0000],
-            [ 0.0000,  0.0000]],
+            [[ 0.0268,  1.0783],
+            [ 0.5041, -1.3025],
+            [ 0.6568,  0.7048]],
 
-            [[ 1.0881, -0.3323],
-            [ 1.7442,  0.8530],
-            [-1.8164,  0.6611]],
+            [[-0.2688,  1.0543],
+            [-0.0315, -0.9016],
+            [ 0.3943,  0.5347]],
 
-            [[ 1.0297, -0.3236],
-            [ 1.5585,  0.4965],
-            [-1.6956,  0.4543]]], grad_fn=<BinaryReduceBackward>)
+            [[-0.6066,  1.0268],
+            [-0.5945, -0.4801],
+            [ 0.1594,  0.3825]]], grad_fn=<BinaryReduceBackward>)
     """
     def __init__(self,
                  in_feats,
@@ -137,12 +146,13 @@ class GATConv(nn.Module):
                  attn_drop=0.,
                  negative_slope=0.2,
                  residual=False,
-                 activation=None):
+                 activation=None,
+                 allow_zero_in_degree=False):
         super(GATConv, self).__init__()
         self._num_heads = num_heads
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
-        self._add_self_loop = add_self_loop
+        self._allow_zero_in_degree = allow_zero_in_degree
         if isinstance(in_feats, tuple):
             self.fc_src = nn.Linear(
                 self._in_src_feats, out_feats * num_heads, bias=False)
@@ -168,7 +178,17 @@ class GATConv(nn.Module):
         self.activation = activation
 
     def reset_parameters(self):
-        """Reinitialize learnable parameters."""
+        """
+
+        Description
+        -----------
+        Reinitialize learnable parameters.
+
+        Notes
+        -----
+        The fc weights :math:`W^{(l)}` are initialized using Glorot uniform initialization.
+        The attention weights are using xavier initialization method.
+        """
         gain = nn.init.calculate_gain('relu')
         nn.init.xavier_normal_(self.fc.weight, gain=gain)
         nn.init.xavier_normal_(self.attn_l, gain=gain)
@@ -177,7 +197,11 @@ class GATConv(nn.Module):
             nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
 
     def forward(self, graph, feat):
-        r"""Compute graph attention network layer.
+        r"""
+
+        Description
+        -----------
+        Compute graph attention network layer.
 
         Parameters
         ----------
@@ -194,10 +218,21 @@ class GATConv(nn.Module):
         torch.Tensor
             The output feature of shape :math:`(N, H, D_{out})` where :math:`H`
             is the number of heads, and :math:`D_{out}` is size of output feature.
+
+        Raises
+        ------
+        DGLError
+            If there are 0-in-degree nodes in the input graph, it will raise DGLError
+            since no message will be passed to those nodes. This will cause invalid output.
+            The error can be ignored by setting ``allow_zero_in_degree`` parameter to ``True``.
         """
         with graph.local_scope():
-            if self._add_self_loop:
-                graph = transform.add_self_loop(graph)
+            if not self._allow_zero_in_degree:
+                if (graph.in_degrees() == 0).any():
+                    raise DGLError('There are 0-in-degree nodes in the graph, output for those nodes will be invalid.'
+                                   'This is harmful for some applications, causing silent performance regression.'
+                                   'Adding self-loop on the input graph by calling `g = dgl.add_self_loop(g)` will resolve the issue.'
+                                   'Setting ``allow_zero_in_degree`` to be `True` when constructing this module will suppress the check and let the code run.')
 
             if isinstance(feat, tuple):
                 h_src = self.feat_drop(feat[0])

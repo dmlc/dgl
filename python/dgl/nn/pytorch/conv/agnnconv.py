@@ -4,9 +4,9 @@ import torch as th
 from torch import nn
 from torch.nn import functional as F
 
-from .... import transform
 from .... import function as fn
 from ....ops import edge_softmax
+from ....base import DGLError
 from ....utils import expand_as_pair
 
 
@@ -27,10 +27,12 @@ class AGNNConv(nn.Module):
     .. math::
         P_{ij} = \mathrm{softmax}_i ( \beta \cdot \cos(h_i^l, h_j^l))
 
+    where :math:\beta is a single scalar parameter.
+
     Parameters
     ----------
     init_beta : float, optional
-        The :math:`\beta` in the formula.
+        The :math:`\beta` in the formula, a single scalar parameter.
     learn_beta : bool, optional
         If True, :math:`\beta` will be learnable parameter.
     allow_zero_in_degree : bool, optional
@@ -47,7 +49,7 @@ class AGNNConv(nn.Module):
     homogeneous, which can be achieved by:
 
     >>> g = ... # a DGLGraph
-    >>> g = dgl.transform.add_self_loop(g)
+    >>> g = dgl.add_self_loop(g)
 
     Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
     since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree`` to ``True``
@@ -62,6 +64,7 @@ class AGNNConv(nn.Module):
     >>> from dgl.nn import AGNNConv
     >>>
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> g = dgl.add_self_loop(g)
     >>> feat = th.ones(6, 10)
     >>> conv = AGNNConv()
     >>> res = conv(g, feat)
@@ -71,7 +74,7 @@ class AGNNConv(nn.Module):
             [1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
             [1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
             [1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
-            [0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]],
+            [1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]],
         grad_fn=<BinaryReduceBackward>)
     """
     def __init__(self,
@@ -86,7 +89,11 @@ class AGNNConv(nn.Module):
             self.register_buffer('beta', th.Tensor([init_beta]))
 
     def forward(self, graph, feat):
-        r"""Compute AGNN layer.
+        r"""
+
+        Description
+        -----------
+        Compute AGNN layer.
 
         Parameters
         ----------
@@ -96,7 +103,7 @@ class AGNNConv(nn.Module):
             The input feature of shape :math:`(N, *)` :math:`N` is the
             number of nodes, and :math:`*` could be of any shape.
             If a pair of torch.Tensor is given, the pair must contain two tensors of shape
-            :math:`(N_{in}, *)` and :math:`(N_{out}, *)`, the the :math:`*` in the later
+            :math:`(N_{in}, *)` and :math:`(N_{out}, *)`, the :math:`*` in the later
             tensor must equal the previous one.
 
         Returns
@@ -104,13 +111,20 @@ class AGNNConv(nn.Module):
         torch.Tensor
             The output feature of shape :math:`(N, *)` where :math:`*`
             should be the same as input shape.
+
+        Raises
+        ------
+        DGLError
+            If there are 0-in-degree nodes in the input graph, it will raise DGLError
+            since no message will be passed to those nodes. This will cause invalid output.
+            The error can be ignored by setting ``allow_zero_in_degree`` parameter to ``True``.
         """
         with graph.local_scope():
             if not self._allow_zero_in_degree:
                 if (graph.in_degrees() == 0).any():
                     raise DGLError('There are 0-in-degree nodes in the graph, output for those nodes will be invalid.'
                                    'This is harmful for some applications, causing silent performance regression.'
-                                   'Adding self-loop on the input graph by calling `g = transform.add_self_loop(g)` will resolve the issue.'
+                                   'Adding self-loop on the input graph by calling `g = dgl.add_self_loop(g)` will resolve the issue.'
                                    'Setting ``allow_zero_in_degree`` to be `True` when constructing this module will suppress the check and let the code run.')
 
             feat_src, feat_dst = expand_as_pair(feat, graph)

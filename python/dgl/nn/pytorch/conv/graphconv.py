@@ -4,7 +4,6 @@ import torch as th
 from torch import nn
 from torch.nn import init
 
-from .... import transform
 from .... import function as fn
 from ....base import DGLError
 from ....utils import expand_as_pair
@@ -66,7 +65,7 @@ class GraphConv(nn.Module):
     homogeneous, which can be achieved by:
 
     >>> g = ... # a DGLGraph
-    >>> g = dgl.transform.add_self_loop(g)
+    >>> g = dgl.add_self_loop(g)
 
     Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
     since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree`` to ``True``
@@ -82,7 +81,7 @@ class GraphConv(nn.Module):
 
     Case 1: Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
-    >>> g = dgl.transform.add_self_loop(g)
+    >>> g = dgl.add_self_loop(g)
     >>> feat = th.ones(6, 10)
     >>> conv = GraphConv(10, 2, norm='both', weight=True, bias=True)
     >>> res = conv(g, feat)
@@ -151,7 +150,11 @@ class GraphConv(nn.Module):
         self._activation = activation
 
     def reset_parameters(self):
-        r"""Reinitialize learnable parameters.
+        r"""
+
+        Description
+        -----------
+        Reinitialize learnable parameters.
 
         Notes
         -----
@@ -167,7 +170,11 @@ class GraphConv(nn.Module):
             init.zeros_(self.bias)
 
     def forward(self, graph, feat, weight=None):
-        r"""Compute graph convolution.
+        r"""
+
+        Description
+        -----------
+        Compute graph convolution.
 
         Parameters
         ----------
@@ -211,7 +218,7 @@ class GraphConv(nn.Module):
                 if (graph.in_degrees() == 0).any():
                     raise DGLError('There are 0-in-degree nodes in the graph, output for those nodes will be invalid.'
                                    'This is harmful for some applications, causing silent performance regression.'
-                                   'Adding self-loop on the input graph by calling `g = transform.add_self_loop(g)` will resolve the issue.'
+                                   'Adding self-loop on the input graph by calling `g = dgl.add_self_loop(g)` will resolve the issue.'
                                    'Setting ``allow_zero_in_degree`` to be `True` when constructing this module will suppress the check and let the code run.')
 
             # (BarclayII) For RGCN on heterogeneous graphs we need to support GCN on bipartite.

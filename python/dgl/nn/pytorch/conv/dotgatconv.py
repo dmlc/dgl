@@ -4,11 +4,16 @@ from torch import nn
 
 from .... import function as fn
 from ....ops import edge_softmax
+from ....base import DGLError
 from ....utils import expand_as_pair
 
 
 class DotGatConv(nn.Module):
-    r"""Apply dot product version of self attention in GCN.
+    r"""
+
+    Description
+    -----------
+    Apply dot product version of self attention in GCN.
 
         .. math::
             h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{i, j} h_j^{(l)}
@@ -24,8 +29,40 @@ class DotGatConv(nn.Module):
         features into the same dimension, so that when compute note features' similarity,
         we can use dot-product.
 
-    Example
-    -------
+    Parameters
+    ----------
+    in_feats : int, or pair of ints
+        Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
+
+        GATConv can be applied on homogeneous graph and unidirectional `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`. If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
+        specifies the input feature size on both the source and destination nodes.  If
+        a scalar is given, the source and destination node feature size would take the
+        same value.
+    out_feats : int
+        Output feature size; i.e, the number of dimensions of :math:`h_i^{(l+1)}`.
+    allow_zero_in_degree : bool, optional
+        If there are 0-in-degree nodes in the graph, output for those nodes will be invalid
+        since no message will be passed to those nodes. This is harmful for some applications
+        causing silent performance regression. This module will raise a DGLError if it detects
+        0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
+        and let the users handle it by themselves.
+
+    Notes
+    -----
+    Zero in-degree nodes will lead to invalid output value. A common practice
+    to avoid this is to add a self-loop for each node in the graph if it is
+    homogeneous, which can be achieved by:
+
+    >>> g = ... # a DGLGraph
+    >>> g = dgl.add_self_loop(g)
+
+    Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
+    since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree`` to ``True``
+    for those cases to unblock the code and handle zere-in-degree nodes manually. A common
+    practise to handle this is to filter out the nodes with zere-in-degree when use after conv.
+
+    Examples
+    --------
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
@@ -33,39 +70,40 @@ class DotGatConv(nn.Module):
 
     Case 1: Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> g = dgl.add_self_loop(g)
     >>> feat = th.ones(6, 10)
     >>> gatconv = DotGatConv(10, 2)
     >>> res = gatconv(g, feat)
     >>> res
-    tensor([[0.6101, 0.3370],
-            [0.6101, 0.3370],
-            [0.6101, 0.3370],
-            [0.6101, 0.3370],
-            [0.6101, 0.3370],
-            [0.0000, 0.0000]], grad_fn=<CopyReduceBackward>)
+    tensor([[-0.6958, -0.8752],
+            [-0.6958, -0.8752],
+            [-0.6958, -0.8752],
+            [-0.6958, -0.8752],
+            [-0.6958, -0.8752],
+            [-0.6958, -0.8752]], grad_fn=<CopyReduceBackward>)
 
     Case 2: Unidirectional bipartite graph
-    >>> u = [0, 0, 1]
-    >>> v = [2, 3, 2]
+    >>> u = [0, 1, 0, 0, 1]
+    >>> v = [0, 1, 2, 3, 2]
     >>> g = dgl.bipartite((u, v))
     >>> u_feat = th.tensor(np.random.rand(2, 5).astype(np.float32))
     >>> v_feat = th.tensor(np.random.rand(4, 10).astype(np.float32))
     >>> gatconv = DotGatConv((5,10), 2)
     >>> res = gatconv(g, (u_feat, v_feat))
     >>> res
-    tensor([[ 0.0000,  0.0000],
-            [ 0.0000,  0.0000],
-            [-0.1758,  0.1156],
-            [-0.1605, -0.0252]], grad_fn=<CopyReduceBackward>)
+    tensor([[ 0.4718,  0.0864],
+            [ 0.7099, -0.0335],
+            [ 0.5869,  0.0284],
+            [ 0.4718,  0.0864]], grad_fn=<CopyReduceBackward>)
     """
-
     def __init__(self,
                  in_feats,
-                 out_feats
-                 ):
+                 out_feats,
+                 allow_zero_in_degree=False):
         super(DotGatConv, self).__init__()
-        self._in_src_feats, self._in_ds错的t_feats = expand_as_pair(in_feats)
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
+        self._allow_zero_in_degree = allow_zero_in_degree
 
         if isinstance(in_feats, tuple):
             self.fc_src = nn.Linear(self._in_src_feats, self._out_feats, bias=False)
@@ -74,7 +112,11 @@ class DotGatConv(nn.Module):
             self.fc = nn.Linear(self._in_src_feats, self._out_feats, bias=False)
 
     def forward(self, graph, feat):
-        r"""Apply dot product version of self attention in GCN.
+        r"""
+
+        Description
+        -----------
+        Apply dot product version of self attention in GCN.
 
         Parameters
         ----------
@@ -91,9 +133,23 @@ class DotGatConv(nn.Module):
         torch.Tensor
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}` is size
             of output feature.
+
+        Raises
+        ------
+        DGLError
+            If there are 0-in-degree nodes in the input graph, it will raise DGLError
+            since no message will be passed to those nodes. This will cause invalid output.
+            The error can be ignored by setting ``allow_zero_in_degree`` parameter to ``True``.
         """
 
         graph = graph.local_var()
+
+        if not self._allow_zero_in_degree:
+            if (graph.in_degrees() == 0).any():
+                raise DGLError('There are 0-in-degree nodes in the graph, output for those nodes will be invalid.'
+                                'This is harmful for some applications, causing silent performance regression.'
+                                'Adding self-loop on the input graph by calling `g = dgl.add_self_loop(g)` will resolve the issue.'
+                                'Setting ``allow_zero_in_degree`` to be `True` when constructing this module will suppress the check and let the code run.')
 
         # check if feat is a tuple
         if isinstance(feat, tuple):

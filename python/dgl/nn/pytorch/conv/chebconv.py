@@ -9,7 +9,11 @@ from .... import laplacian_lambda_max, broadcast_nodes, function as fn
 
 
 class ChebConv(nn.Module):
-    r"""Chebyshev Spectral Graph Convolution layer from paper `Convolutional
+    r"""
+
+    Description
+    -----------
+    Chebyshev Spectral Graph Convolution layer from paper `Convolutional
     Neural Networks on Graphs with Fast Localized Spectral Filtering
     <https://arxiv.org/pdf/1606.09375.pdf>`__.
 
@@ -27,9 +31,9 @@ class ChebConv(nn.Module):
     Parameters
     ----------
     in_feats: int
-        Number of input features.
+        Dimension of input features :math:`h_i^{(l)}`.
     out_feats: int
-        Number of output features.
+        Dimension of output features :math:`h_i^{(l+1)}`.
     k : int
         Chebyshev filter size.
     activation : function, optional
@@ -48,7 +52,7 @@ class ChebConv(nn.Module):
     >>> import torch as th
     >>> from dgl.nn import ChebConv
     >>
-    >>> g = dgl.DGLGraph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
     >>> conv = ChebConv(10, 2, 2)
     >>> res = conv(g, feat)
@@ -75,7 +79,11 @@ class ChebConv(nn.Module):
         self.linear = nn.Linear(k * in_feats, out_feats, bias)
 
     def forward(self, graph, feat, lambda_max=None):
-        r"""Compute ChebNet layer.
+        r"""
+
+        Description
+        -----------
+        Compute ChebNet layer.
 
         Parameters
         ----------
