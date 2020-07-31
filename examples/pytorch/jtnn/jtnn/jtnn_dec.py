@@ -168,11 +168,11 @@ class DGLJTNNDecoder(nn.Module):
             u, v = mol_tree_batch.find_edges(eid)
 
             p_target_list = torch.zeros_like(root_out_degrees)
-            p_target_list[root_out_degrees > 0] = (1 - p).int()
+            p_target_list[root_out_degrees > 0] = (1 - p)
             p_target_list = p_target_list[root_out_degrees >= 0]
             p_targets.append(torch.tensor(p_target_list))
 
-            root_out_degrees -= (root_out_degrees == 0).int()
+            root_out_degrees -= (root_out_degrees == 0).long()
             root_out_degrees -= torch.tensor(np.isin(root_ids, v.cpu().numpy())).to(root_out_degrees)
 
             mol_tree_batch_lg.ndata.update(mol_tree_batch.edata)
@@ -209,7 +209,7 @@ class DGLJTNNDecoder(nn.Module):
         p_targets.append(torch.zeros(
             (root_out_degrees == 0).sum(),
             device=root_out_degrees.device,
-            dtype=torch.int32))
+            dtype=torch.int64))
 
         # Batch compute the stop/label prediction losses
         p_inputs = torch.cat(p_inputs, 0)

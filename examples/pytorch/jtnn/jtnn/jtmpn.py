@@ -93,9 +93,9 @@ def mol2dgl_single(cand_batch):
 
     return cand_graphs, torch.stack(atom_x), \
             torch.stack(bond_x) if len(bond_x) > 0 else torch.zeros(0), \
-            torch.IntTensor(tree_mess_source_edges), \
-            torch.IntTensor(tree_mess_target_edges), \
-            torch.IntTensor(tree_mess_target_nodes)
+            torch.LongTensor(tree_mess_source_edges), \
+            torch.LongTensor(tree_mess_target_edges), \
+            torch.LongTensor(tree_mess_target_nodes)
 
 
 mpn_loopy_bp_msg = DGLF.copy_src(src='msg', out='msg')
@@ -224,19 +224,19 @@ class DGLJTMPN(nn.Module):
                 tgt_u, tgt_v = tree_mess_tgt_edges.unbind(1)
                 src_u = src_u.to(mol_tree_batch.device)
                 src_v = src_v.to(mol_tree_batch.device)
-                eid = mol_tree_batch.edge_ids(src_u.int(), src_v.int()).long()
+                eid = mol_tree_batch.edge_ids(src_u, src_v)
                 alpha = mol_tree_batch.edata['m'][eid]
                 cand_graphs.edges[tgt_u, tgt_v].data['alpha'] = alpha
             else:
                 src_u, src_v = tree_mess_src_edges.unbind(1)
                 src_u = src_u.to(mol_tree_batch.device)
                 src_v = src_v.to(mol_tree_batch.device)
-                eid = mol_tree_batch.edge_ids(src_u.int(), src_v.int()).long()
+                eid = mol_tree_batch.edge_ids(src_u, src_v)
                 alpha = mol_tree_batch.edata['m'][eid]
                 node_idx = (tree_mess_tgt_nodes
                             .to(device=zero_node_state.device)[:, None]
                             .expand_as(alpha))
-                node_alpha = zero_node_state.clone().scatter_add(0, node_idx.long(), alpha)
+                node_alpha = zero_node_state.clone().scatter_add(0, node_idx, alpha)
                 cand_graphs.ndata['alpha'] = node_alpha
                 cand_graphs.apply_edges(
                     func=lambda edges: {'alpha': edges.src['alpha']},
