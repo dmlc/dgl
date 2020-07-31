@@ -16,25 +16,33 @@
 namespace dgl {
 namespace runtime {
 
-#ifndef _WIN32
 SharedMemory::SharedMemory(const std::string &name) {
+#ifndef _WIN32
   this->name = name;
   this->own = false;
   this->fd = -1;
   this->ptr = nullptr;
   this->size = 0;
+#else
+  LOG(FATAL) << "Shared memory is not supported on Windows.";
+#endif  // _WIN32
 }
 
 SharedMemory::~SharedMemory() {
+#ifndef _WIN32
   munmap(ptr, size);
   close(fd);
   if (own) {
     LOG(INFO) << "remove " << name << " for shared memory";
     shm_unlink(name.c_str());
   }
+#else
+  LOG(FATAL) << "Shared memory is not supported on Windows.";
+#endif  // _WIN32
 }
 
 void *SharedMemory::CreateNew(size_t size) {
+#ifndef _WIN32
   this->own = true;
 
   int flag = O_RDWR|O_CREAT;
@@ -47,9 +55,13 @@ void *SharedMemory::CreateNew(size_t size) {
   CHECK_NE(ptr, MAP_FAILED)
       << "Failed to map shared memory. mmap failed with error " << strerror(errno);
   return ptr;
+#else
+  LOG(FATAL) << "Shared memory is not supported on Windows.";
+#endif  // _WIN32
 }
 
 void *SharedMemory::Open(size_t size) {
+#ifndef _WIN32
   int flag = O_RDWR;
   fd = shm_open(name.c_str(), flag, S_IRUSR | S_IWUSR);
   CHECK_NE(fd, -1) << "fail to open " << name << ": " << strerror(errno);
@@ -57,9 +69,13 @@ void *SharedMemory::Open(size_t size) {
   CHECK_NE(ptr, MAP_FAILED)
       << "Failed to map shared memory. mmap failed with error " << strerror(errno);
   return ptr;
+#else
+  LOG(FATAL) << "Shared memory is not supported on Windows.";
+#endif  // _WIN32
 }
 
 bool SharedMemory::Exist(const std::string &name) {
+#ifndef _WIN32
   int fd = shm_open(name.c_str(), O_RDONLY, S_IRUSR | S_IWUSR);
   if (fd >= 0) {
     close(fd);
@@ -67,8 +83,10 @@ bool SharedMemory::Exist(const std::string &name) {
   } else {
     return false;
   }
-}
+#else
+  LOG(FATAL) << "Shared memory is not supported on Windows.";
 #endif  // _WIN32
+}
 
 }  // namespace runtime
 }  // namespace dgl

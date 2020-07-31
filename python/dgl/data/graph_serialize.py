@@ -1,7 +1,7 @@
 """For Graph Serialization"""
 from __future__ import absolute_import
 import os
-from ..graph import DGLGraph
+from .._deprecate.graph import DGLGraph
 from ..heterograph import DGLHeteroGraph
 from .._ffi.object import ObjectBase, register_object
 from .._ffi.function import _init_api

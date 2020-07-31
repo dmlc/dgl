@@ -89,7 +89,7 @@ class FixedRadiusNNGraph(nn.Module):
             src_idx = inv_idx[:src.shape[0]]
             dst_idx = inv_idx[src.shape[0]:]
 
-            g = dgl.DGLGraph((src_idx.cpu(), dst_idx.cpu()), readonly=True)
+            g = dgl.graph((src_idx, dst_idx))
             g.ndata['pos'] = pos[i][uniq]
             g.ndata['center'] = center[uniq]
             if feat is not None:

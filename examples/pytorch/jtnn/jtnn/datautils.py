@@ -84,9 +84,9 @@ class JTNNDataset(Dataset):
             cand_graphs = []
             atom_x_dec = torch.zeros(0, ATOM_FDIM_DEC)
             bond_x_dec = torch.zeros(0, BOND_FDIM_DEC)
-            tree_mess_src_e = torch.zeros(0, 2).long()
-            tree_mess_tgt_e = torch.zeros(0, 2).long()
-            tree_mess_tgt_n = torch.zeros(0).long()
+            tree_mess_src_e = torch.zeros(0, 2).int()
+            tree_mess_tgt_e = torch.zeros(0, 2).int()
+            tree_mess_tgt_n = torch.zeros(0).int()
 
         # prebuild the stereoisomers
         cands = mol_tree.stereo_cands
@@ -143,7 +143,7 @@ class JTNNCollator(object):
         mol_trees = _unpack_field(examples, 'mol_tree')
         wid = _unpack_field(examples, 'wid')
         for _wid, mol_tree in zip(wid, mol_trees):
-            mol_tree.ndata['wid'] = torch.LongTensor(_wid)
+            mol_tree.graph.ndata['wid'] = torch.LongTensor(_wid)
 
         # TODO: either support pickling or get around ctypes pointers using scipy
         # batch molecule graphs
@@ -176,7 +176,7 @@ class JTNNCollator(object):
             tree_mess_src_e[i] += n_tree_nodes
             tree_mess_tgt_n[i] += n_graph_nodes
             n_graph_nodes += sum(g.number_of_nodes() for g in cand_graphs[i])
-            n_tree_nodes += mol_trees[i].number_of_nodes()
+            n_tree_nodes += mol_trees[i].graph.number_of_nodes()
             cand_batch_idx.extend([i] * len(cand_graphs[i]))
         tree_mess_tgt_e = torch.cat(tree_mess_tgt_e)
         tree_mess_src_e = torch.cat(tree_mess_src_e)

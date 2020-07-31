@@ -27,13 +27,8 @@ def main(args):
         for epoch in range(args.epochs):
             model.train()
             for i, g in enumerate(train_dataloader):
-                g.ndata['q'] = g.ndata['q'].to(device)
-                g.ndata['a'] = g.ndata['a'].to(device)
-                g.ndata['row'] = g.ndata['row'].to(device)
-                g.ndata['col'] = g.ndata['col'].to(device)
-
+                g = g.to(device)
                 _, loss = model(g)
-
                 opt.zero_grad()
                 loss.backward()
                 opt.step()
@@ -46,11 +41,7 @@ def main(args):
             dev_loss = []
             dev_res = []
             for g in dev_dataloader:
-                g.ndata['q'] = g.ndata['q'].to(device)
-                g.ndata['a'] = g.ndata['a'].to(device)
-                g.ndata['row'] = g.ndata['row'].to(device)
-                g.ndata['col'] = g.ndata['col'].to(device)
-
+                g = g.to(device)
                 target = g.ndata['a']
                 target = target.view([-1, 81])
 
@@ -85,11 +76,7 @@ def main(args):
         test_loss = []
         test_res = []
         for g in test_dataloader:
-            g.ndata['q'] = g.ndata['q'].to(device)
-            g.ndata['a'] = g.ndata['a'].to(device)
-            g.ndata['row'] = g.ndata['row'].to(device)
-            g.ndata['col'] = g.ndata['col'].to(device)
-
+            g = g.to(device)
             target = g.ndata['a']
             target = target.view([-1, 81])
 

@@ -11,7 +11,6 @@
 namespace dgl {
 namespace runtime {
 
-#ifndef _WIN32
 /*
  * \brief This class owns shared memory.
  *
@@ -79,7 +78,6 @@ class SharedMemory {
    */
   static bool Exist(const std::string &name);
 };
-#endif  // _WIN32
 
 }  // namespace runtime
 }  // namespace dgl

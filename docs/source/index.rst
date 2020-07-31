@@ -101,7 +101,7 @@ a useful manual for in-depth developers.
 
    api/python/graph
    api/python/heterograph
-   api/python/backend
+   api/python/ops
    api/python/readout
    api/python/batch_heterograph
    api/python/nn

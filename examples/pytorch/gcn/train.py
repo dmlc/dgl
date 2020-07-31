@@ -67,6 +67,8 @@ def main(args):
         g.add_edges_from(zip(g.nodes(), g.nodes()))
     g = DGLGraph(g)
     n_edges = g.number_of_edges()
+    if cuda:
+        g = g.to(args.gpu)
     # normalization
     degs = g.in_degrees().float()
     norm = torch.pow(degs, -0.5)
