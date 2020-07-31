@@ -14,12 +14,12 @@ import os, sys
 from .utils import save_graphs, load_graphs, save_info, load_info, makedirs, _get_dgl_url
 from .utils import generate_mask_tensor
 from .utils import deprecate_property, deprecate_function
+from .dgl_dataset import DGLBuiltinDataset
 from .. import convert
 from .. import batch
 from .. import backend as F
 from ..convert import graph as dgl_graph
 from ..convert import to_networkx
-from ..graph import batch as graph_batch
 
 backend = os.environ.get('DGLBACKEND', 'pytorch')
 
@@ -127,20 +127,21 @@ class CitationGraphDataset(DGLBuiltinDataset):
         g.ndata['label'] = F.tensor(labels)
         g.ndata['feat'] = F.tensor(_preprocess_features(features), dtype=F.data_type_dict['float32'])
         self._num_labels = onehot_labels.shape[1]
+        self._labels = labels
         self._g = g
 
         if self.verbose:
             print('Finished data loading and preprocessing.')
-            print('  NumNodes: {}'.format(self.g.number_of_nodes()))
-            print('  NumEdges: {}'.format(self.g.number_of_edges()))
-            print('  NumFeats: {}'.format(self.g.ndata['feat'].shape[1]))
+            print('  NumNodes: {}'.format(self._g.number_of_nodes()))
+            print('  NumEdges: {}'.format(self._g.number_of_edges()))
+            print('  NumFeats: {}'.format(self._g.ndata['feat'].shape[1]))
             print('  NumClasses: {}'.format(self.num_labels))
             print('  NumTrainingSamples: {}'.format(
-                F.nonzero_1d(self.g.ndata['train_mask']).shape[0]))
+                F.nonzero_1d(self._g.ndata['train_mask']).shape[0]))
             print('  NumValidationSamples: {}'.format(
-                F.nonzero_1d(self.g.ndata['val_mask']).shape[0]))
+                F.nonzero_1d(self._g.ndata['val_mask']).shape[0]))
             print('  NumTestSamples: {}'.format(
-                F.nonzero_1d(self.g.ndata['test_mask']).shape[0]))
+                F.nonzero_1d(self._g.ndata['test_mask']).shape[0]))
 
     def has_cache(self):
         graph_path = os.path.join(self.save_path,
@@ -159,7 +160,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
                                   self.save_name + '.bin')
         info_path = os.path.join(self.save_path,
                                  self.save_name + '.pkl')
-        save_graphs(str(graph_path), self.g)
+        save_graphs(str(graph_path), self._g)
         save_info(str(info_path), {'num_labels': self.num_labels})
 
     def load(self):
@@ -171,24 +172,26 @@ class CitationGraphDataset(DGLBuiltinDataset):
 
         info = load_info(str(info_path))
         self._g = graphs[0]
-        self._graph = to_networkx(self._g)
+        self._graph = nx.DiGraph(to_networkx(self._g))
 
         self._num_labels = info['num_labels']
         self._g.ndata['train_mask'] = generate_mask_tensor(self._g.ndata['train_mask'].numpy())
         self._g.ndata['val_mask'] = generate_mask_tensor(self._g.ndata['val_mask'].numpy())
         self._g.ndata['test_mask'] = generate_mask_tensor(self._g.ndata['test_mask'].numpy())
+        # hack for mxnet compatability
+        self._labels = F.asnumpy(self.g.ndata['label'])
 
         if self.verbose:
-            print('  NumNodes: {}'.format(self.g.number_of_nodes()))
-            print('  NumEdges: {}'.format(self.g.number_of_edges()))
-            print('  NumFeats: {}'.format(self.g.ndata['feat'].shape[1]))
+            print('  NumNodes: {}'.format(self._g.number_of_nodes()))
+            print('  NumEdges: {}'.format(self._g.number_of_edges()))
+            print('  NumFeats: {}'.format(self._g.ndata['feat'].shape[1]))
             print('  NumClasses: {}'.format(self.num_labels))
             print('  NumTrainingSamples: {}'.format(
-                F.nonzero_1d(self.g.ndata['train_mask']).shape[0]))
+                F.nonzero_1d(self._g.ndata['train_mask']).shape[0]))
             print('  NumValidationSamples: {}'.format(
-                F.nonzero_1d(self.g.ndata['val_mask']).shape[0]))
+                F.nonzero_1d(self._g.ndata['val_mask']).shape[0]))
             print('  NumTestSamples: {}'.format(
-                F.nonzero_1d(self.g.ndata['test_mask']).shape[0]))
+                F.nonzero_1d(self._g.ndata['test_mask']).shape[0]))
 
     def __getitem__(self, idx):
         assert idx == 0, "This dataset has only one graph"
@@ -216,27 +219,27 @@ class CitationGraphDataset(DGLBuiltinDataset):
     @property
     def train_mask(self):
         deprecate_property('dataset.train_mask', 'g.ndata[\'train_mask\']')
-        return self.g.ndata['train_mask']
+        return self._g.ndata['train_mask']
 
     @property
     def val_mask(self):
         deprecate_property('dataset.val_mask', 'g.ndata[\'val_mask\']')
-        return self.g.ndata['val_mask']
+        return self._g.ndata['val_mask']
 
     @property
     def test_mask(self):
         deprecate_property('dataset.test_mask', 'g.ndata[\'test_mask\']')
-        return self.g.ndata['test_mask']
+        return self._g.ndata['test_mask']
 
     @property
     def labels(self):
         deprecate_property('dataset.label', 'g.ndata[\'label\']')
-        return self.g.ndata['label']
+        return self._labels
 
     @property
     def features(self):
         deprecate_property('dataset.feat', 'g.ndata[\'feat\']')
-        return self.g.ndata['feat']
+        return self._g.ndata['feat']
 
 def _preprocess_features(features):
     """Row-normalize feature matrix and convert to tuple representation"""
