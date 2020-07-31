@@ -43,6 +43,7 @@ else:
     def zerocopy_from_dlpack(input):
         return tfdlpack.from_dlpack(input)
 
+
 def data_type_dict():
     return {'float16': tf.float16,
             'float32': tf.float32,
@@ -54,8 +55,10 @@ def data_type_dict():
             'int64': tf.int64,
             'bool' : tf.bool}
 
+
 def cpu():
     return "/cpu:0"
+
 
 def tensor(data, dtype=None):
     if isinstance(data, tf.Tensor):
@@ -68,12 +71,15 @@ def tensor(data, dtype=None):
             data = [data]
         return tf.convert_to_tensor(data, dtype=dtype)
 
+
 def initialize_context():
     tf.zeros(1)
+
 
 def as_scalar(data):
     data = data.numpy()
     return data if np.isscalar(data) else data.item()
+
 
 def get_preferred_sparse_format():
     """Get the preferred sparse matrix format supported by the backend.
@@ -127,6 +133,7 @@ def device_type(ctx):
 def device_id(ctx):
     return tf.DeviceSpec.from_string(ctx).device_index
 
+
 def to_backend_ctx(dglctx):
     dev_type = dglctx.device_type
     if dev_type == 1:
@@ -135,6 +142,7 @@ def to_backend_ctx(dglctx):
         return "/gpu:%d" % (dglctx.device_id)
     else:
         raise ValueError('Unsupported DGL device context:', dglctx)
+
 
 def astype(input, ty):
     return tf.cast(input, dtype=ty)
@@ -226,8 +234,10 @@ def argtopk(input, k, dim, descending=True):
 def exp(input):
     return tf.exp(input)
 
+
 def sqrt(input):
     return tf.sqrt(input)
+
 
 def softmax(input, dim=-1):
     return tf.math.softmax(input, axis=dim)
@@ -274,6 +284,7 @@ def narrow_row(x, start, stop):
 def scatter_row(data, row_index, value):
     row_index = tf.expand_dims(row_index, 1)
     return tf.tensor_scatter_nd_update(data, row_index, value)
+
 
 def index_add_inplace(data, row_idx, value):
     raise NotImplementedError("Tensorflow doesn't support inplace index_add")
@@ -436,8 +447,10 @@ def zerocopy_to_dgl_ndarray(data):
     else:
         return nd.from_dlpack(zerocopy_to_dlpack(data))
 
+
 def zerocopy_to_dgl_ndarray_for_write(input):
     return zerocopy_to_dgl_ndarray(input)
+
 
 def zerocopy_from_dgl_ndarray(input):
     return zerocopy_from_dlpack(input.to_dlpack())
@@ -575,6 +588,7 @@ def copy_reduce_real(reducer, graph, target, in_data, out_size, in_map,
             return grad_in
     return out_data, grad
 
+
 def _reduce_grad(grad, shape):
     """Reduce gradient on the broadcast dimension
 
@@ -612,6 +626,7 @@ def _reduce_grad(grad, shape):
 def sync():
     context = context().context()
     context.async_wait()
+
 
 class GradContext:
     def __init__(self):
@@ -693,8 +708,10 @@ def backward(x, head_gradient=None):
 def grad(x):
     return cgrad.grad(x)
 
+
 def is_no_grad(x):
     return cgrad.is_no_grad(x)
+
 
 def is_recording():
     raise NotImplementedError("Tensorflow doesn't support is_recording")
