@@ -20,7 +20,7 @@ from . import rpc
 from .rpc_client import connect_to_server
 from .server_state import ServerState
 from .rpc_server import start_server
-from .graph_services import find_edges
+from .graph_services import find_edges as dist_find_edges
 from .dist_tensor import DistTensor, _get_data_name
 from ..transform import as_heterograph
 
@@ -471,7 +471,7 @@ class DistGraph:
         tensor
             The destination node ID array.
         """
-        return find_edges(self, edges)
+        return dist_find_edges(self, edges)
 
     def get_partition_book(self):
         """Get the partition information.

@@ -225,6 +225,56 @@ def check_server_client(shared_mem):
 
     print('clients have terminated')
 
+def find_edges_client(graph_name, part_id, num_nodes, num_edges):
+    time.sleep(3)
+    gpb, graph_name = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
+                                          part_id, None)
+    g = DistGraph("kv_ip_config.txt", graph_name, gpb=gpb)
+    eids = F.tensor(np.random.randint(num_edges, size=100))
+    u = g.edata['u'][eids]
+    v = g.edata['v'][eids]
+
+    du, dv = g.find_edges(eids)
+    assert F.array_equal(u, du)
+    assert F.array_equal(v, dv)
+
+def check_find_edges(shared_mem):
+    prepare_dist()
+    g = create_random_graph(10000)
+    u, v = g.all_edges()
+
+    # Partition the graph
+    num_parts = 1
+    g.edata['u'] = u
+    g.edata['v'] = v
+    graph_name = 'dist_graph_find_edges_test'
+    partition_graph(g, graph_name, num_parts, '/tmp/dist_graph')
+
+    # let's just test on one partition for now.
+    # We cannot run multiple servers and clients on the same machine.
+    serv_ps = []
+    ctx = mp.get_context('spawn')
+    for serv_id in range(1):
+        p = ctx.Process(target=run_server, args=(graph_name, serv_id, 1, shared_mem))
+        serv_ps.append(p)
+        p.start()
+
+    cli_ps = []
+    for cli_id in range(1):
+        print('start client', cli_id)
+        p = ctx.Process(target=find_edges_client, args=(graph_name, cli_id, g.number_of_nodes(),
+                                                        g.number_of_edges()))
+        p.start()
+        cli_ps.append(p)
+
+    for p in cli_ps:
+        p.join()
+
+    for p in serv_ps:
+        p.join()
+
+    print('clients have terminated')
+
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_server_client():
     os.environ['DGL_DIST_MODE'] = 'distributed'
@@ -244,6 +294,11 @@ def test_standalone():
     dist_g = DistGraph("kv_ip_config.txt", graph_name,
                   conf_file='/tmp/dist_graph/{}.json'.format(graph_name))
     check_dist_graph(dist_g, g.number_of_nodes(), g.number_of_edges())
+
+def test_find_edges():
+    os.environ['DGL_DIST_MODE'] = 'distributed'
+    check_find_edges(True)
+    check_find_edges(False)
 
 def test_split():
     prepare_dist()
@@ -361,3 +416,4 @@ if __name__ == '__main__':
     test_split_even()
     test_server_client()
     test_standalone()
+    test_find_edges()
