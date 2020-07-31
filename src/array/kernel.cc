@@ -70,16 +70,15 @@ void SpMM(const std::string& op, const std::string& reduce,
           NDArray ufeat,
           NDArray efeat,
           NDArray out,
-          std::vector<NDArray> out_aux,
-          SparseFormat format) {
+          std::vector<NDArray> out_aux) {
   // TODO(zihao): format tuning
-  format = SparseFormat::kCSR;
+  SparseFormat format = graph->SelectFormat(0, csc_code);
   const auto& bcast = CalcBcastOff(op, ufeat, efeat);
 
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SpMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_TYPE_SWITCH(out->dtype, DType, "Feature data", {
-        if (format == SparseFormat::kCSR) {
+        if (format == SparseFormat::kCSC) {
           SpMMCsr<XPU, IdType, DType>(
               op, reduce, bcast, graph->GetCSCMatrix(0),
               ufeat, efeat, out, out_aux);
@@ -88,7 +87,7 @@ void SpMM(const std::string& op, const std::string& reduce,
               op, reduce, bcast, graph->GetCOOMatrix(0),
               ufeat, efeat, out, out_aux);
         } else {
-          LOG(FATAL) << "SpMM only supports CSR and COO foramts";
+          LOG(FATAL) << "SpMM only supports CSC and COO foramts";
         }
       });
     });
@@ -102,11 +101,10 @@ void SDDMM(const std::string& op,
            NDArray rhs,
            NDArray out,
            int lhs_target,
-           int rhs_target,
-           SparseFormat format) {
+           int rhs_target) {
   // TODO(zihao): format tuning
-  format = SparseFormat::kCOO;
-  const auto& bcast = CalcBcastOff(op, lhs, rhs);
+  SparseFormat format = graph->SelectFormat(0, coo_code);
+  const auto &bcast = CalcBcastOff(op, lhs, rhs);
 
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SDDMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
@@ -150,7 +148,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
         {0, 1, 2, 2, 2},
         {U, E, V, ArgU, ArgE},
         {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
-    SpMM(op, reduce_op, graph.sptr(), U, E, V, {ArgU, ArgE}, SparseFormat::kAny);
+    SpMM(op, reduce_op, graph.sptr(), U, E, V, {ArgU, ArgE});
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMM")
@@ -173,7 +171,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMM")
         {lhs_target, rhs_target, 1},
         {lhs, rhs, out},
         {"U_data", "E_data", "V_data"});
-    SDDMM(op, graph.sptr(), lhs, rhs, out, lhs_target, rhs_target, SparseFormat::kAny);
+    SDDMM(op, graph.sptr(), lhs, rhs, out, lhs_target, rhs_target);
   });
 
 }  // namespace aten

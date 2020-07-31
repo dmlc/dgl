@@ -77,6 +77,7 @@ def train(model, G):
                 best_test_acc.item(),
             ))
 
+device = torch.device("cuda:0")
 
 G = dgl.heterograph({
         ('paper', 'written-by', 'author') : data['PvsA'],
@@ -87,8 +88,6 @@ G = dgl.heterograph({
         ('subject', 'has', 'paper') : data['PvsL'].transpose(),
     })
 print(G)
-
-
 
 pvc = data['PvsC'].tocsr()
 p_selected = pvc.tocoo()
@@ -103,26 +102,30 @@ train_idx = torch.tensor(shuffle[0:800]).long()
 val_idx = torch.tensor(shuffle[800:900]).long()
 test_idx = torch.tensor(shuffle[900:]).long()
 
-
-
-
-device = torch.device("cuda:0")
-G.node_dict = {}
-G.edge_dict = {}
+node_dict = {}
+edge_dict = {}
 for ntype in G.ntypes:
-    G.node_dict[ntype] = len(G.node_dict)
+    node_dict[ntype] = len(node_dict)
 for etype in G.etypes:
-    G.edge_dict[etype] = len(G.edge_dict)
-    G.edges[etype].data['id'] = torch.ones(G.number_of_edges(etype), dtype=torch.long) * G.edge_dict[etype] 
-    
+    edge_dict[etype] = len(edge_dict)
+    G.edges[etype].data['id'] = torch.ones(G.number_of_edges(etype), dtype=torch.long) * edge_dict[etype] 
+
 #     Random initialize input feature
 for ntype in G.ntypes:
-    emb = nn.Parameter(torch.Tensor(G.number_of_nodes(ntype), 256), requires_grad = False).to(device)
+    emb = nn.Parameter(torch.Tensor(G.number_of_nodes(ntype), 256), requires_grad = False)
     nn.init.xavier_uniform_(emb)
     G.nodes[ntype].data['inp'] = emb
-    
-    
-model = HGT(G, n_inp=args.n_inp, n_hid=args.n_hid, n_out=labels.max().item()+1, n_layers=2, n_heads=4, use_norm = True).to(device)
+
+G = G.to(device)
+
+model = HGT(G,
+            node_dict, edge_dict,
+            n_inp=args.n_inp,
+            n_hid=args.n_hid,
+            n_out=labels.max().item()+1,
+            n_layers=2,
+            n_heads=4,
+            use_norm = True).to(device)
 optimizer = torch.optim.AdamW(model.parameters())
 scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, total_steps=args.n_epoch, max_lr = args.max_lr)
 print('Training HGT with #param: %d' % (get_n_params(model)))
@@ -131,7 +134,10 @@ train(model, G)
 
 
 
-model = HeteroRGCN(G, in_size=args.n_inp, hidden_size=args.n_hid, out_size=labels.max().item()+1).to(device)
+model = HeteroRGCN(G,
+                   in_size=args.n_inp,
+                   hidden_size=args.n_hid,
+                   out_size=labels.max().item()+1).to(device)
 optimizer = torch.optim.AdamW(model.parameters())
 scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, total_steps=args.n_epoch, max_lr = args.max_lr)
 print('Training RGCN with #param: %d' % (get_n_params(model)))
@@ -139,7 +145,13 @@ train(model, G)
 
 
 
-model = HGT(G, n_inp=args.n_inp, n_hid=args.n_hid, n_out=labels.max().item()+1, n_layers=0, n_heads=4).to(device)
+model = HGT(G,
+            node_dict, edge_dict,
+            n_inp=args.n_inp,
+            n_hid=args.n_hid,
+            n_out=labels.max().item()+1,
+            n_layers=0,
+            n_heads=4).to(device)
 optimizer = torch.optim.AdamW(model.parameters())
 scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, total_steps=args.n_epoch, max_lr = args.max_lr)
 print('Training MLP with #param: %d' % (get_n_params(model)))

@@ -9,7 +9,7 @@ import sklearn.preprocessing
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dgl import DGLGraph
+import dgl
 from dgl.data import register_data_args
 from torch.utils.tensorboard import SummaryWriter
 
@@ -75,11 +75,19 @@ def main(args):
             n_test_samples))
     # create GCN model
     g = data.graph
+    g = dgl.graph(g)
     if args.self_loop and not args.dataset.startswith('reddit'):
-        g.remove_edges_from(nx.selfloop_edges(g))
-        g.add_edges_from(zip(g.nodes(), g.nodes()))
+        g = dgl.remove_self_loop(g)
+        g = dgl.add_self_loop(g)
         print("adding self-loop edges")
-    g = DGLGraph(g, readonly=True)
+    # metis only support int64 graph
+    g = g.long()
+    g.ndata['features'] = features
+    g.ndata['labels'] = labels
+    g.ndata['train_mask'] = train_mask
+
+    cluster_iterator = ClusterIter(
+        args.dataset, g, args.psize, args.batch_size, train_nid, use_pp=args.use_pp)
 
     # set device for dataset tensors
     if args.gpu < 0:
@@ -87,22 +95,12 @@ def main(args):
     else:
         cuda = True
         torch.cuda.set_device(args.gpu)
-        features = features.cuda()
-        labels = labels.cuda()
-        train_mask = train_mask.cuda()
         val_mask = val_mask.cuda()
         test_mask = test_mask.cuda()
+        g = g.to(args.gpu)
 
     print(torch.cuda.get_device_name(0))
-
-    g.ndata['features'] = features
-    g.ndata['labels'] = labels
-    g.ndata['train_mask'] = train_mask
     print('labels shape:', labels.shape)
-
-    cluster_iterator = ClusterIter(
-        args.dataset, g, args.psize, args.batch_size, train_nid, use_pp=args.use_pp)
-
     print("features shape, ", features.shape)
 
     model = GraphSAGE(in_feats,
@@ -146,7 +144,7 @@ def main(args):
     for epoch in range(args.n_epochs):
         for j, cluster in enumerate(cluster_iterator):
             # sync with upper level training graph
-            cluster.copy_from_parent()
+            cluster = cluster.to(torch.cuda.current_device())
             model.train()
             # forward
             pred = model(cluster)

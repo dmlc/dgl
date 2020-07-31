@@ -131,13 +131,12 @@ def test_rpc_sampling_shuffle():
 
 def check_standalone_sampling(tmpdir):
     g = CitationGraphDataset("cora")[0]
-    g.readonly()
     num_parts = 1
     num_hops = 1
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
                     num_hops=num_hops, part_method='metis', reshuffle=False)
 
-    dist_graph = DistGraph(None, "test_sampling", conf_file=tmpdir / 'test_sampling.json')
+    dist_graph = DistGraph(None, "test_sampling", part_config=tmpdir / 'test_sampling.json')
     sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
 
     src, dst = sampled_graph.edges()
@@ -193,7 +192,6 @@ def check_rpc_in_subgraph(tmpdir, num_server):
         p.join()
 
     src, dst = sampled_graph.edges()
-    g = dgl.as_heterograph(g)
     assert sampled_graph.number_of_nodes() == g.number_of_nodes()
     subg1 = dgl.in_subgraph(g, nodes)
     src1, dst1 = subg1.edges()

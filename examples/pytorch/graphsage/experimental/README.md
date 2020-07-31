@@ -21,20 +21,33 @@ python3 partition_graph.py --dataset ogb-product --num_parts 4 --balance_train -
 
 ### Step 2: copy the partitioned data to the cluster
 
-When copying data to the cluster, we recommend users to copy the partitioned data to NFS so that all worker machines
-will be able to access the partitioned data.
+DGL provides a script for copying partitioned data to the cluster. The command below copies partition data
+to the machines in the cluster. The configuration of the cluster is defined by `ip_config.txt`,
+The data is copied to `~/graphsage/ogb-product` on each of the remote machines. `--part_config`
+specifies the location of the partitioned data in the local machine (a user only needs to specify
+the location of the partition configuration file).
+```bash
+python3 ~/dgl/tools/copy_partitions.py --ip_config ip_config.txt \
+			--workspace ~/graphsage --rel_data_path ogb-product \
+			--part_config data/ogb-product.json 
+```
+
+**Note**: users need to make sure that the master node has right permission to ssh to all the other nodes.
+
+Users need to copy the training script to the workspace directory on remote machines as well.
 
 ### Step 3: Launch distributed jobs
 
-First make sure that the master node has the right permission to ssh to all the other nodes. Then run script:
+DGL provides a script to launch the training job in the cluster. `part_config` and `ip_config`
+specify relative paths to the path of the workspace.
 
 ```bash
 python3 ~/dgl/tools/launch.py \
---workspace ~/dgl/examples/pytorch/graphsage/experimental \
+--workspace ~/graphsage/ \
 --num_client 4 \
---conf_path data/ogb-product.json \
+--part_config ogb-product/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 30 --batch-size 1000 --lr 0.1 --num-client 4"
+"python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 30 --batch-size 1000"
 ```
 
 ## Distributed code runs in the standalone mode

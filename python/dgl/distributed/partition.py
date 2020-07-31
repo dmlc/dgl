@@ -340,13 +340,21 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                 len(local_nodes), len(local_edges)))
             tot_num_inner_edges += len(local_edges)
             for name in g.ndata:
+                if name in [NID, 'inner_node']:
+                    continue
                 node_feats[name] = F.gather_row(g.ndata[name], local_nodes)
             for name in g.edata:
+                if name in [EID, 'inner_edge']:
+                    continue
                 edge_feats[name] = F.gather_row(g.edata[name], local_edges)
         else:
             for name in g.ndata:
+                if name in [NID, 'inner_node']:
+                    continue
                 node_feats[name] = g.ndata[name]
             for name in g.edata:
+                if name in [EID, 'inner_edge']:
+                    continue
                 edge_feats[name] = g.edata[name]
 
         part_dir = os.path.join(out_path, "part" + str(part_id))
