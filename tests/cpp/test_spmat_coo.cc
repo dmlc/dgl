@@ -180,6 +180,7 @@ TEST(SpmatTest, COOToCSR) {
   _TestCOOToCSR<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
   _TestCOOToCSR<int32_t>(GPU);
+  _TestCOOToCSR<int64_t>(GPU);
 #endif
 }
 
@@ -265,6 +266,7 @@ TEST(SpmatTest, COOSort) {
   _TestCOOSort<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
   _TestCOOSort<int32_t>(GPU);
+  _TestCOOSort<int64_t>(GPU);
 #endif
 }
 
