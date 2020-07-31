@@ -11,7 +11,7 @@ import copy
 
 def copy_file(file_name, ip, workspace):
     print('copy {} to {}'.format(file_name, ip + ':' + workspace + '/'))
-    cmd = 'scp -o StrictHostKeyChecking=no ' + file_name + ' ' + ip + ':' + workspace + '/'
+    cmd = 'rsync -e \"ssh -o StrictHostKeyChecking=no\" -arvc ' + file_name + ' ' + ip + ':' + workspace + '/'
     subprocess.check_call(cmd, shell = True)
 
 def exec_cmd(ip, cmd):
