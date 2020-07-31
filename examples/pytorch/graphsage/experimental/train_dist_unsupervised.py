@@ -323,17 +323,18 @@ def run(args, device, data):
             g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), num_seeds, num_inputs))
         epoch += 1
 
-        if args.standalone:
-            pred = generate_emb(model,g, g.ndata['features'], args.batch_size_eval, device)
-        else:
-            pred = generate_emb(model.module, g, g.ndata['features'], args.batch_size_eval, device)
-        if g.rank() == 0:
-            eval_acc, test_acc = compute_acc(pred, labels, global_train_nid, global_valid_nid, global_test_nid)
-            print('eval acc {:.4f}; test acc {:.4f}'.format(eval_acc, test_acc))
+    # evaluate the embedding using LogisticRegression
+    if args.standalone:
+        pred = generate_emb(model,g, g.ndata['features'], args.batch_size_eval, device)
+    else:
+        pred = generate_emb(model.module, g, g.ndata['features'], args.batch_size_eval, device)
+    if g.rank() == 0:
+        eval_acc, test_acc = compute_acc(pred, labels, global_train_nid, global_valid_nid, global_test_nid)
+        print('eval acc {:.4f}; test acc {:.4f}'.format(eval_acc, test_acc))
 
-        # sync for eval and test
-        if not args.standalone:
-            th.distributed.barrier()
+    # sync for eval and test
+    if not args.standalone:
+        th.distributed.barrier()
 
     if not args.standalone:
         g._client.barrier()
