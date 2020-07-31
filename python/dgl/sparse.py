@@ -141,13 +141,17 @@ def _gspmm(gidx, op, reduce_op, u, e):
             arg_u = F.zeros(v_shp, idtype, ctx)
         if use_e:
             arg_e = F.zeros(v_shp, idtype, ctx)
+    arg_u_nd = to_dgl_nd_for_write(arg_u)
+    arg_e_nd = to_dgl_nd_for_write(arg_e)
     if gidx.number_of_edges(0) > 0:
         _CAPI_DGLKernelSpMM(gidx, op, reduce_op,
                             to_dgl_nd(u if use_u else None),
                             to_dgl_nd(e if use_e else None),
                             to_dgl_nd_for_write(v),
-                            to_dgl_nd_for_write(arg_u),
-                            to_dgl_nd_for_write(arg_e))
+                            arg_u_nd,
+                            arg_e_nd)
+    arg_u = None if arg_u is None else F.zerocopy_from_dgl_ndarray(arg_u_nd)
+    arg_e = None if arg_e is None else F.zerocopy_from_dgl_ndarray(arg_e_nd)
     if (expand_u or not use_u) and (expand_e or not use_e):
         v = F.squeeze(v, -1)
     return v, (arg_u, arg_e)
