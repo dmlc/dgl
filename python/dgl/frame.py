@@ -431,6 +431,9 @@ class Frame(MutableMapping):
         If the data contains new keys (new columns) that do not exist in
         this frame, add a new column.
 
+        The ``rowids`` shall not contain duplicates. Otherwise, the behavior
+        is undefined.
+
         Parameters
         ----------
         rowids : Tensor
@@ -553,8 +556,8 @@ class Frame(MutableMapping):
     def subframe(self, rowids):
         """Return a new frame whose columns are subcolumns of this frame.
 
-        The given row IDs should be within range [0, self.num_rows), and should contain
-        no duplicates. Otherwise, the behavior is undefined.
+        The given row IDs should be within range [0, self.num_rows), and allow
+        duplicate IDs.
 
         Parameters
         ----------
