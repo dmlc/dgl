@@ -15,7 +15,12 @@ namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRTranspose(CSRMatrix csr) {
-  CHECK(sizeof(IdType) == 4) << "CUDA CSR2CSC does not support int64.";
+  LOG(FATAL) << "Unreachable codes";
+  return {};
+}
+
+template <>
+CSRMatrix CSRTranspose<kDLGPU, int32_t>(CSRMatrix csr) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   // allocate cusparse handle if needed
   if (!thr_entry->cusparse_handle) {
@@ -80,6 +85,11 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
   return CSRMatrix(csr.num_cols, csr.num_rows,
                    t_indptr, t_indices, t_data,
                    false);
+}
+
+template <>
+CSRMatrix CSRTranspose<kDLGPU, int64_t>(CSRMatrix csr) {
+  return COOToCSR(COOTranspose(CSRToCOO(csr, false)));
 }
 
 template CSRMatrix CSRTranspose<kDLGPU, int32_t>(CSRMatrix csr);

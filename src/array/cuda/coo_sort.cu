@@ -18,10 +18,14 @@ namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
 void COOSort_(COOMatrix* coo, bool sort_column) {
+  LOG(FATAL) << "Unreachable codes";
+}
+
+template <>
+void COOSort_<kDLGPU, int32_t>(COOMatrix* coo, bool sort_column) {
   // TODO(minjie): Current implementation is based on cusparse which only supports
   //   int32_t. To support int64_t, we could use the Radix sort algorithm provided
   //   by CUB.
-  CHECK(sizeof(IdType) == 4) << "CUDA COOSort does not support int64.";
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   auto device = runtime::DeviceAPI::Get(coo->row->ctx);
   // allocate cusparse handle if needed
@@ -63,7 +67,7 @@ void COOSort_(COOMatrix* coo, bool sort_column) {
   if (sort_column) {
     // First create a row indptr array and then call csrsort
     int32_t* indptr = static_cast<int32_t*>(
-        device->AllocWorkspace(row->ctx, (coo->num_rows + 1) * sizeof(IdType)));
+        device->AllocWorkspace(row->ctx, (coo->num_rows + 1) * sizeof(int32_t)));
     CUSPARSE_CALL(cusparseXcoo2csr(
           thr_entry->cusparse_handle,
           row_ptr,
@@ -99,6 +103,20 @@ void COOSort_(COOMatrix* coo, bool sort_column) {
 
   coo->row_sorted = true;
   coo->col_sorted = sort_column;
+}
+
+template <>
+void COOSort_<kDLGPU, int64_t>(COOMatrix* coo, bool sort_column) {
+  // Always sort the COO to be both row and column sorted.
+  IdArray pos = coo->row * coo->num_cols + coo->col;
+  const auto& sorted = Sort(pos);
+  coo->row = sorted.first / coo->num_cols;
+  coo->col = sorted.first % coo->num_cols;
+  if (aten::COOHasData(*coo))
+    coo->data = IndexSelect(coo->data, sorted.second);
+  else
+    coo->data = AsNumBits(sorted.second, coo->row->dtype.bits);
+  coo->row_sorted = coo->col_sorted = true;
 }
 
 template void COOSort_<kDLGPU, int32_t>(COOMatrix* coo, bool sort_column);
