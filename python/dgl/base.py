@@ -29,6 +29,7 @@ def is_all(arg):
 _default_formatwarning = warnings.formatwarning
 
 class DGLWarning(UserWarning):
+    """DGL Warning class."""
     pass
 
 # pylint: disable=unused-argument
@@ -40,6 +41,7 @@ def dgl_warning_format(message, category, filename, lineno, line=None):
         return _default_formatwarning(message, category, filename, lineno, line=None)
 
 def dgl_warning(message, category=DGLWarning, stacklevel=1):
+    """DGL warning wrapper that defaults to ``DGLWarning`` instead of ``UserWarning`` category."""
     return warnings.warn(message, category=category, stacklevel=1)
 
 warnings.formatwarning = dgl_warning_format
