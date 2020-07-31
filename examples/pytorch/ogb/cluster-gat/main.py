@@ -135,6 +135,11 @@ def evaluate(model, g, labels, val_nid, test_nid, batch_size, device):
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid]), compute_acc(pred[test_nid], labels[test_nid]), pred
 
+def model_param_summary(model):
+    """ Count the model parameters """
+    cnt = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print("Total Params {}".format(cnt))
+
 #### Entry point
 def run(args, device, data):
     # Unpack data
@@ -143,6 +148,7 @@ def run(args, device, data):
 
     # Define model and optimizer
     model = GAT(in_feats, args.num_heads, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
+    model_param_summary(model)
     model = model.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)
 
