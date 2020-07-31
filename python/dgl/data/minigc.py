@@ -32,8 +32,19 @@ class MiniGCDataset(DGLDataset):
         Minimum number of nodes for graphs
     max_num_v: int
         Maximum number of nodes for graphs
-    seed : int, default is None
+    seed : int, default is 0
         Random seed for data generation
+
+    Attributes
+    ----------
+    num_graphs : int
+        Number of graphs
+    min_num_v : int
+        The minimum number of nodes
+    max_num_v : int
+        The maximum number of nodes
+    num_classes : int
+        The number of classes
 
     Examples
     --------
@@ -69,9 +80,8 @@ class MiniGCDataset(DGLDataset):
         self.max_num_v = max_num_v
         self.seed = seed
         self.save_graph = save_graph
-        self.params_hash = abs(hash((num_graphs, min_num_v, max_num_v, seed)))
 
-        super(MiniGCDataset, self).__init__(name="minigc",
+        super(MiniGCDataset, self).__init__(name="minigc", hash_key=(num_graphs, min_num_v, max_num_v, seed),
                                             force_reload=force_reload,
                                             verbose=verbose)
 
@@ -98,7 +108,7 @@ class MiniGCDataset(DGLDataset):
         return self.graphs[idx], self.labels[idx]
 
     def has_cache(self):
-        graph_path = os.path.join(self.save_path, 'dgl_graph_{}.bin'.format(self.params_hash))
+        graph_path = os.path.join(self.save_path, 'dgl_graph_{}.bin'.format(self.hash))
         if os.path.exists(graph_path):
             return True
 
@@ -107,11 +117,11 @@ class MiniGCDataset(DGLDataset):
     def save(self):
         """save the graph list and the labels"""
         if self.save_graph:
-            graph_path = os.path.join(self.save_path, 'dgl_graph_{}.bin'.format(self.params_hash))
+            graph_path = os.path.join(self.save_path, 'dgl_graph_{}.bin'.format(self.hash))
             save_graphs(str(graph_path), self.graphs, {'labels': self.labels})
 
     def load(self):
-        graphs, label_dict = load_graphs(os.path.join(self.save_path, 'dgl_graph_{}.bin'.format(self.params_hash)))
+        graphs, label_dict = load_graphs(os.path.join(self.save_path, 'dgl_graph_{}.bin'.format(self.hash)))
         self.graphs = graphs
         self.labels = label_dict['labels']
 
