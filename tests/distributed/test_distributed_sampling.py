@@ -249,12 +249,12 @@ if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ['DGL_DIST_MODE'] = 'standalone'
-        #check_standalone_sampling(Path(tmpdirname))
+        check_standalone_sampling(Path(tmpdirname))
         os.environ['DGL_DIST_MODE'] = 'distributed'
-        #check_rpc_in_subgraph(Path(tmpdirname), 2)
-        #check_rpc_sampling_shuffle(Path(tmpdirname), 1)
-        #check_rpc_sampling_shuffle(Path(tmpdirname), 2)
-        #check_rpc_sampling(Path(tmpdirname), 2)
-        #check_rpc_sampling(Path(tmpdirname), 1)
+        check_rpc_in_subgraph(Path(tmpdirname), 2)
+        check_rpc_sampling_shuffle(Path(tmpdirname), 1)
+        check_rpc_sampling_shuffle(Path(tmpdirname), 2)
+        check_rpc_sampling(Path(tmpdirname), 2)
+        check_rpc_sampling(Path(tmpdirname), 1)
         check_rpc_find_edges(Path(tmpdirname), 2)
         check_rpc_find_edges(Path(tmpdirname), 1)
