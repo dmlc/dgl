@@ -333,10 +333,10 @@ class Frame(MutableMapping):
 
         Returns
         -------
-        Column
-            The column.
+        Tensor
+            Column data.
         """
-        return self._columns[name]
+        return self._columns[name].data
 
     def __setitem__(self, name, data):
         """Update the whole column.
@@ -424,6 +424,27 @@ class Frame(MutableMapping):
             raise DGLError('Expected data to have %d rows, got %d.' %
                            (self.num_rows, len(col)))
         self._columns[name] = col
+
+    def update_row(self, rowids, data):
+        """Update the feature data of the given rows.
+
+        If the data contains new keys (new columns) that do not exist in
+        this frame, add a new column.
+
+        Parameters
+        ----------
+        rowids : Tensor
+            Row Ids.
+        data : dict[str, Tensor]
+            Row data.
+        """
+        for key, val in data.items():
+            if key not in self:
+                scheme = infer_scheme(val)
+                ctx = F.context(val)
+                self.add_column(self, key, scheme, ctx)
+        for key, val in data.items():
+            self._columns[key].update(rowids, val)
 
     def _append(self, other):
         # NOTE: `other` can be empty.
@@ -545,7 +566,7 @@ class Frame(MutableMapping):
         Frame
             A new subframe.
         """
-        subcols = {k : col.subcolumn(rowids) for k, col in self._columns}
+        subcols = {k : col.subcolumn(rowids) for k, col in self._columns.items()}
         return Frame(subcols, len(rowids))
 
 class _FrameRef(MutableMapping):

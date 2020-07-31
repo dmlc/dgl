@@ -3137,7 +3137,7 @@ class DGLHeteroGraph(object):
         if is_all(u):
             self._node_frames[ntid].update(data)
         else:
-            self._node_frames[ntid].subframe(u).update(data)
+            self._node_frames[ntid].update_row(u, data)
 
     def _get_n_repr(self, ntid, u):
         """Get node(s) representation of a single node type.
@@ -3239,11 +3239,9 @@ class DGLHeteroGraph(object):
 
         # set
         if is_all(eid):
-            # update column
             self._edge_frames[etid].update(data)
         else:
-            # update row
-            self._edge_frames[etid].subframe(eid).update(data)
+            self._edge_frames[etid].update_row(eid, data)
 
     def _get_e_repr(self, etid, edges):
         """Internal API to get edge features.
