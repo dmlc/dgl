@@ -183,6 +183,6 @@ class EdgeDataLoader(DataLoader):
                 collator_kwargs[k] = v
             else:
                 dataloader_kwargs[k] = v
-        self.collator = NodeCollator(g, eids, block_sampler, **collator_kwargs)
+        self.collator = EdgeCollator(g, eids, block_sampler, **collator_kwargs)
         super().__init__(
             self.collator.dataset, collate_fn=self.collator.collate, **dataloader_kwargs)
