@@ -221,7 +221,7 @@ def get_sampler_pool():
     return SAMPLER_POOL, NUM_SAMPLER_WORKERS
 
 
-def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
+def init_rpc(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Init rpc service"""
     ctx = mp.get_context("spawn")
     global SAMPLER_POOL
