@@ -1260,9 +1260,11 @@ class KVClient(object):
 KVCLIENT = None
 
 def init_kvstore(ip_config, role='default'):
+    """initialize KVStore"""
     global KVCLIENT
     if KVCLIENT is None:
         KVCLIENT = KVClient(ip_config, role)
 
 def get_kvstore():
+    """get the KVClient"""
     return KVCLIENT
