@@ -13,7 +13,7 @@ from . import heterograph_index
 from . import utils
 from . import backend as F
 from ._deprecate.runtime import ir, scheduler, Runtime, GraphAdapter
-from .frame import Frame, FrameRef, frame_like
+from .frame import Frame, frame_like
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
 from .base import ALL, SLICE_FULL, NTYPE, NID, ETYPE, EID, is_all, DGLError, dgl_warning
 from ._ffi.function import _init_api
@@ -181,11 +181,11 @@ class DGLHeteroGraph(object):
         and its SRC node types and DST node types are given as in the pair.
     etypes : list of str
         Edge type list. ``etypes[i]`` stores the name of edge type i.
-    node_frames : list of FrameRef, optional
+    node_frames : list[Frame], optional
         Node feature storage. If None, empty frame is created.
         Otherwise, ``node_frames[i]`` stores the node features
         of node type i. (default: None)
-    edge_frames : list of FrameRef, optional
+    edge_frames : list[Frame], optional
         Edge feature storage. If None, empty frame is created.
         Otherwise, ``edge_frames[i]`` stores the edge features
         of edge type i. (default: None)
@@ -271,14 +271,14 @@ class DGLHeteroGraph(object):
         # node and edge frame
         if node_frames is None:
             node_frames = [None] * len(self._ntypes)
-        node_frames = [FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
+        node_frames = [Frame(num_rows=self._graph.number_of_nodes(i))
                        if frame is None else frame
                        for i, frame in enumerate(node_frames)]
         self._node_frames = node_frames
 
         if edge_frames is None:
             edge_frames = [None] * len(self._etypes)
-        edge_frames = [FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
+        edge_frames = [Frame(num_rows=self._graph.number_of_edges(i))
                        if frame is None else frame
                        for i, frame in enumerate(edge_frames)]
         self._edge_frames = edge_frames
@@ -2423,12 +2423,10 @@ class DGLHeteroGraph(object):
         """Internal function to create a subgraph."""
         node_frames = []
         for i, ind_nodes in enumerate(induced_nodes):
-            subframe = self._node_frames[i][utils.toindex(ind_nodes, self._idtype_str)]
-            node_frames.append(FrameRef(Frame(subframe, num_rows=len(ind_nodes))))
+            node_frames.append(self._node_frames[i].subframe(ind_nodes))
         edge_frames = []
         for i, ind_edges in enumerate(induced_edges):
-            subframe = self._edge_frames[i][utils.toindex(ind_edges, self._idtype_str)]
-            edge_frames.append(FrameRef(Frame(subframe, num_rows=len(ind_edges))))
+            edge_frames.append(self._edge_frames[i].subframe(ind_edges))
 
         hsg = DGLHeteroGraph(sgi.graph, self._ntypes, self._etypes, node_frames, edge_frames)
         for ntype, induced_nid in zip(self.ntypes, induced_nodes):
@@ -3101,7 +3099,7 @@ class DGLHeteroGraph(object):
         etid = self.get_etype_id(etype)
         self._edge_frames[etid].set_initializer(initializer, field)
 
-    def _set_n_repr(self, ntid, u, data, inplace=False):
+    def _set_n_repr(self, ntid, u, data):
         """Internal API to set node features.
 
         `data` is a dictionary from the feature name to feature tensor. Each tensor
@@ -3120,9 +3118,6 @@ class DGLHeteroGraph(object):
             The node(s).
         data : dict of tensor
             Node representation.
-        inplace : bool, optional
-            If True, update will be done in place, but autograd will break.
-            (Default: False)
         """
         if is_all(u):
             num_nodes = self._graph.number_of_nodes(ntid)
@@ -3140,11 +3135,9 @@ class DGLHeteroGraph(object):
                                ' same device.'.format(key, F.context(val), self.device))
 
         if is_all(u):
-            for key, val in data.items():
-                self._node_frames[ntid][key] = val
+            self._node_frames[ntid].update(data)
         else:
-            u = utils.toindex(u, self._idtype_str)
-            self._node_frames[ntid].update_rows(u, data, inplace=inplace)
+            self._node_frames[ntid].subframe(u).update(data)
 
     def _get_n_repr(self, ntid, u):
         """Get node(s) representation of a single node type.
@@ -3167,8 +3160,7 @@ class DGLHeteroGraph(object):
             return dict(self._node_frames[ntid])
         else:
             u = utils.prepare_tensor(self, u, 'u')
-            u = utils.toindex(u, self._idtype_str)
-            return self._node_frames[ntid].select_rows(u)
+            return self._node_frames[ntid].subframe(u)
 
     def _pop_n_repr(self, ntid, key):
         """Internal API to get and remove the specified node feature.
@@ -3248,12 +3240,10 @@ class DGLHeteroGraph(object):
         # set
         if is_all(eid):
             # update column
-            for key, val in data.items():
-                self._edge_frames[etid][key] = val
+            self._edge_frames[etid].update(data)
         else:
             # update row
-            eid = utils.toindex(eid, self._idtype_str)
-            self._edge_frames[etid].update_rows(eid, data, inplace=inplace)
+            self._edge_frames[etid].subframe(eid).update(data)
 
     def _get_e_repr(self, etid, edges):
         """Internal API to get edge features.
@@ -3285,8 +3275,7 @@ class DGLHeteroGraph(object):
         if is_all(eid):
             return dict(self._edge_frames[etid])
         else:
-            eid = utils.toindex(eid, self._idtype_str)
-            return self._edge_frames[etid].select_rows(eid)
+            return self._edge_frames[etid].subframe(eid)
 
     def _pop_e_repr(self, etid, key):
         """Get and remove the specified edge repr of a single edge type.
@@ -3381,7 +3370,7 @@ class DGLHeteroGraph(object):
             The node type. Can be omitted if there is only one node type
             in the graph. (Default: None)
         inplace : bool, optional
-            If True, update will be done in place, but autograd will break.
+            DEPRECATED. If True, update will be done in place, but autograd will break.
             (Default: False)
 
         Examples
@@ -3398,16 +3387,16 @@ class DGLHeteroGraph(object):
         --------
         apply_edges
         """
+        if inplace:
+            raise DGLError('The `inplace` option is removed in v0.5.')
         ntid = self.get_ntype_id(ntype)
-        if is_all(v):
-            v = F.arange(0, self.number_of_nodes(ntype), self.idtype)
-        else:
+        if not is_all(v):
             v = utils.prepare_tensor(self, v, 'v')
-        with ir.prog() as prog:
-            v_ntype = utils.toindex(v, self._idtype_str)
-            scheduler.schedule_apply_nodes(v_ntype, func, self._node_frames[ntid],
-                                           inplace=inplace, ntype=self._ntypes[ntid])
-            Runtime.run(prog)
+            ndata = self._node_frames[ntid][v]
+        else:
+            ndata = self._node_frames[ntid]
+        nbatch = NodeBatch(self, v, ndata, ntype)
+        func(nbatch)
 
     def apply_edges(self, func, edges=ALL, etype=None, inplace=False):
         """Apply the function on the edges with the same type to update their
@@ -4462,13 +4451,13 @@ class DGLHeteroGraph(object):
         new_nframes = []
         for nframe in self._node_frames:
             new_feats = {k : F.copy_to(feat, device, **kwargs) for k, feat in nframe.items()}
-            new_nframes.append(FrameRef(Frame(new_feats, num_rows=nframe.num_rows)))
+            new_nframes.append(Frame(new_feats, num_rows=nframe.num_rows))
         ret._node_frames = new_nframes
 
         new_eframes = []
         for eframe in self._edge_frames:
             new_feats = {k : F.copy_to(feat, device, **kwargs) for k, feat in eframe.items()}
-            new_eframes.append(FrameRef(Frame(new_feats, num_rows=eframe.num_rows)))
+            new_eframes.append(Frame(new_feats, num_rows=eframe.num_rows))
         ret._edge_frames = new_eframes
 
         # 2. Copy misc info

@@ -6,10 +6,10 @@ from collections.abc import MutableMapping
 
 import numpy as np
 
-from . import backend as F
-from .base import DGLError, dgl_warning
-from .init import zero_initializer
-from . import utils
+from .. import backend as F
+from ..base import DGLError, dgl_warning
+from ..init import zero_initializer
+from .. import utils
 
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
@@ -53,122 +53,108 @@ def infer_scheme(tensor):
 class Column(object):
     """A column is a compact store of features of multiple nodes/edges.
 
-    It batches all the feature tensors together along the first dimension
-    as one dense tensor.
-    
-    The column can optionally have an index tensor I.
-    In this case, the i^th feature is stored in ``storage[index[i]]``.
-    The column class implements a Copy-On-Read semantics -- the index
-    select operation happens upon the first read of the feature data.
-    This is useful when one extracts a subset of the feature data
-    but wishes the actual index select happens on-demand. 
+    Currently, we use one dense tensor to batch all the feature tensors
+    together (along the first dimension).
 
     Parameters
     ----------
-    storage : Tensor
-        The feature data storage.
+    data : Tensor
+        The initial data of the column.
     scheme : Scheme, optional
         The scheme of the column. Will be inferred if not provided.
-    index : Tensor, optional
-        The row index to the feature data storage. None means an
-        identity mapping.
 
     Attributes
     ----------
-    storage : Tensor
-        Feature data storage.
     data : Tensor
-        Feature data of this column.
+        The data of the column.
     scheme : Scheme
         The scheme of the column.
-    index : Tensor
-        Index tensor
     """
-    def __init__(self, storage, scheme=None, index=None):
-        self.storage = storage
-        self.scheme = scheme if scheme else infer_scheme(storage)
-        self.index = index
+    def __init__(self, data, scheme=None):
+        self.data = data
+        self.scheme = scheme if scheme else infer_scheme(data)
 
     def __len__(self):
-        """The number of features (number of rows) in this column."""
-        if self.index is None:
-            return F.shape(self.storage)[0]
-        else:
-            return len(self.index)
+        """The column length."""
+        return F.shape(self.data)[0]
 
     @property
     def shape(self):
         """Return the scheme shape (feature shape) of this column."""
         return self.scheme.shape
 
-    @property
-    def data(self):
-        """Return the feature data. Perform index selecting if needed."""
-        if self.index is not None:
-            self.storage = F.gather_row(self.storage, self.index)
-            self.index = None
-        return self.storage
-
-    @data.setter
-    def data(self, val):
-        """Update the column data."""
-        self.index = None
-        self.storage = val
-
-    def __getitem__(self, rowids):
-        """Return the feature data given the rowids.
-
-        The operation triggers index selection.
+    def __getitem__(self, idx):
+        """Return the feature data given the index.
 
         Parameters
         ----------
-        rowids : Tensor
-            Row ID tensor.
+        idx : utils.Index
+            The index.
 
         Returns
         -------
         Tensor
             The feature data
         """
-        return F.gather_row(self.data, rwoids)
+        if idx.slice_data() is not None:
+            slc = idx.slice_data()
+            return F.narrow_row(self.data, slc.start, slc.stop)
+        else:
+            user_idx = idx.tousertensor(F.context(self.data))
+            return F.gather_row(self.data, user_idx)
 
-    def __setitem__(self, rowids, feats):
+    def __setitem__(self, idx, feats):
         """Update the feature data given the index.
 
         The update is performed out-placely so it can be used in autograd mode.
-        The operation triggers index selection.
+        For inplace write, please use ``update``.
 
         Parameters
         ----------
-        rowids : Tensor
-            Row IDs.
+        idx : utils.Index or slice
+            The index.
         feats : Tensor
-            New features.
+            The new features.
         """
-        self.update(idx, feats)
+        self.update(idx, feats, inplace=False)
 
-    def update(self, rowids, feats):
+    def update(self, idx, feats, inplace):
         """Update the feature data given the index.
 
         Parameters
         ----------
-        rowids : Tensor
-            Row IDs.
+        idx : utils.Index
+            The index.
         feats : Tensor
-            New features.
+            The new features.
+        inplace : bool
+            If true, use inplace write.
         """
         feat_scheme = infer_scheme(feats)
         if feat_scheme != self.scheme:
             raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
                            % (feat_scheme, self.scheme))
-        self.data = F.scatter_row(self.data, rowids, feats)
+
+        if inplace:
+            idx = idx.tousertensor(F.context(self.data))
+            F.scatter_row_inplace(self.data, idx, feats)
+        elif idx.slice_data() is not None:
+            # for contiguous indices narrow+concat is usually faster than scatter row
+            slc = idx.slice_data()
+            parts = [feats]
+            if slc.start > 0:
+                parts.insert(0, F.narrow_row(self.data, 0, slc.start))
+            if slc.stop < len(self):
+                parts.append(F.narrow_row(self.data, slc.stop, len(self)))
+            self.data = F.cat(parts, dim=0)
+        else:
+            idx = idx.tousertensor(F.context(self.data))
+            self.data = F.scatter_row(self.data, idx, feats)
 
     def extend(self, feats, feat_scheme=None):
         """Extend the feature data.
 
-        The operation triggers index selection.
-
-        Parameters
+         Parameters
         ----------
         feats : Tensor
             The new features.
@@ -182,45 +168,18 @@ class Column(object):
             raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
                            % (feat_scheme, self.scheme))
 
+        feats = F.copy_to(feats, F.context(self.data))
         self.data = F.cat([self.data, feats], dim=0)
 
     def clone(self):
-        """Return a shallow copy of this column."""
-        return Column(self.storage, self.scheme, self.index)
-
-    def deepclone(self):
-        """Return a deepcopy of this column.
-
-        The operation triggers index selection.
-        """
+        """Return a deepcopy of this column."""
         return Column(F.clone(self.data), self.scheme)
-
-    def subcolumn(self, rowids):
-        """Return a subcolumn.
-
-        If the self column has an index tensor, it will create a new index instead of
-        performing index selection.
-
-        Parameters
-        ----------
-        rowids : Tensor
-            Row IDs.
-
-        Returns
-        -------
-        Column
-            Sub-column
-        """
-        if self.index is None:
-            return Column(self.storage, self.scheme, rowids)
-        else:
-            return Column(self.storage, self.scheme, F.gather_row(self.index, rowids))
 
     @staticmethod
     def create(data):
         """Create a new column using the given data."""
         if isinstance(data, Column):
-            return data.clone()
+            return Column(data.data, data.scheme)
         else:
             return Column(data)
 
@@ -230,7 +189,7 @@ class Column(object):
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
 
-    The frame is a dictionary from feature names to feature columns.
+    The frame is a dictionary from feature fields to feature columns.
     All columns should have the same number of rows (i.e. the same first dimension).
 
     Parameters
@@ -238,33 +197,36 @@ class Frame(MutableMapping):
     data : dict-like, optional
         The frame data in dictionary. If the provided data is another frame,
         this frame will NOT share columns with the given frame. So any out-place
-        update on one will not reflect to the other.
-    num_rows : int, optional
+        update on one will not reflect to the other. The inplace update will
+        be seen by both. This follows the semantic of python's container.
+    num_rows : int, optional [default=0]
         The number of rows in this frame. If ``data`` is provided and is not empty,
         ``num_rows`` will be ignored and inferred from the given data.
     """
-    def __init__(self, data=None, num_rows=None):
+    def __init__(self, data=None, num_rows=0):
         if data is None:
             self._columns = dict()
-            self._num_rows = 0 if num_rows is None else num_rows 
+            self._num_rows = num_rows
         else:
-            assert not isinstance(data, Frame)  # sanity check for code refactor
             # Note that we always create a new column for the given data.
             # This avoids two frames accidentally sharing the same column.
             self._columns = {k : Column.create(v) for k, v in data.items()}
-            self._num_rows = num_rows
-            # infer num_rows & sanity check
+            if isinstance(data, (Frame, FrameRef)):
+                self._num_rows = data.num_rows
+            elif len(self._columns) != 0:
+                self._num_rows = len(next(iter(self._columns.values())))
+            else:
+                self._num_rows = num_rows
+            # sanity check
             for name, col in self._columns.items():
-                if self._num_rows is None:
-                    self._num_rows = len(col)
-                elif len(col) != self._num_rows:
+                if len(col) != self._num_rows:
                     raise DGLError('Expected all columns to have same # rows (%d), '
                                    'got %d on %r.' % (self._num_rows, len(col), name))
-
         # Initializer for empty values. Initializer is a callable.
         # If is none, then a warning will be raised
         # in the first call and zero initializer will be used later.
         self._initializers = {}  # per-column initializers
+        self._remote_init_builder = None
         self._default_initializer = None
 
     def _set_zero_default_initializer(self):
@@ -303,6 +265,39 @@ class Frame(MutableMapping):
             self._default_initializer = initializer
         else:
             self._initializers[column] = initializer
+
+    def set_remote_init_builder(self, builder):
+        """Set an initializer builder to create a remote initializer for a new column to a frame.
+
+        NOTE(minjie): This is a temporary solution. Will be replaced by KVStore in the future.
+
+        The builder is a callable that returns an initializer. The returned initializer
+        is also a callable that returns a tensor given a local tensor and tensor name.
+
+        Parameters
+        ----------
+        builder : callable
+            The builder to construct a remote initializer.
+        """
+        self._remote_init_builder = builder
+
+    def get_remote_initializer(self, name):
+        """Get a remote initializer.
+
+        NOTE(minjie): This is a temporary solution. Will be replaced by KVStore in the future.
+
+        Parameters
+        ----------
+        name : string
+            The column name.
+        """
+        if self._remote_init_builder is None:
+            return None
+
+        if self.get_initializer(name) is None:
+            self._set_zero_default_initializer()
+        initializer = self.get_initializer(name)
+        return self._remote_init_builder(initializer, name)
 
     @property
     def schemes(self):
@@ -378,11 +373,17 @@ class Frame(MutableMapping):
             dgl_warning('Column "%s" already exists. Ignore adding this column again.' % name)
             return
 
-        if self.get_initializer(name) is None:
-            self._set_zero_default_initializer()
-        initializer = self.get_initializer(name)
-        init_data = initializer((self.num_rows,) + scheme.shape, scheme.dtype,
-                                ctx, slice(0, self.num_rows))
+        # If the data is backed by a remote server, we need to move data
+        # to the remote server.
+        initializer = self.get_remote_initializer(name)
+        if initializer is not None:
+            init_data = initializer((self.num_rows,) + scheme.shape, scheme.dtype, ctx)
+        else:
+            if self.get_initializer(name) is None:
+                self._set_zero_default_initializer()
+            initializer = self.get_initializer(name)
+            init_data = initializer((self.num_rows,) + scheme.shape, scheme.dtype,
+                                    ctx, slice(0, self.num_rows))
         self._columns[name] = Column(init_data, scheme)
 
     def add_rows(self, num_rows):
@@ -419,6 +420,13 @@ class Frame(MutableMapping):
         data : Column or data convertible to Column
             The column data.
         """
+        # If the data is backed by a remote server, we need to move data
+        # to the remote server.
+        initializer = self.get_remote_initializer(name)
+        if initializer is not None:
+            new_data = initializer(F.shape(data), F.dtype(data), F.context(data))
+            new_data[:] = data
+            data = new_data
         col = Column.create(data)
         if len(col) != self.num_rows:
             raise DGLError('Expected data to have %d rows, got %d.' %
@@ -426,6 +434,8 @@ class Frame(MutableMapping):
         self._columns[name] = col
 
     def _append(self, other):
+        assert self._remote_init_builder is None, \
+                "We don't support append if data in the frame is mapped from a remote server."
         # NOTE: `other` can be empty.
         if self.num_rows == 0:
             # if no rows in current frame; append is equivalent to
@@ -507,6 +517,7 @@ class Frame(MutableMapping):
         """
         newframe = Frame(self._columns, self._num_rows)
         newframe._initializers = self._initializers
+        newframe._remote_init_builder = self._remote_init_builder
         newframe._default_initializer = self._default_initializer
         return newframe
 
@@ -523,32 +534,13 @@ class Frame(MutableMapping):
         Frame
             A deep-cloned frame.
         """
-        newframe = Frame({k : col.deepclone() for k, col in self._columns.items()},
-                         self._num_rows)
+        newframe = Frame({k : col.clone() for k, col in self._columns.items()}, self._num_rows)
         newframe._initializers = self._initializers
+        newframe._remote_init_builder = self._remote_init_builder
         newframe._default_initializer = self._default_initializer
         return newframe
 
-    def subframe(self, rowids):
-        """Return a new frame whose columns are subcolumns of this frame.
-
-        The given row IDs should be within range [0, self.num_rows), and should contain
-        no duplicates. Otherwise, the behavior is undefined.
-
-        Parameters
-        ----------
-        rowids : Tensor
-            Row IDs
-
-        Returns
-        -------
-        Frame
-            A new subframe.
-        """
-        subcols = {k : col.subcolumn(rowids) for k, col in self._columns}
-        return Frame(subcols, len(rowids))
-
-class _FrameRef(MutableMapping):
+class FrameRef(MutableMapping):
     """Reference object to a frame on a subset of rows.
 
     Parameters
@@ -744,9 +736,9 @@ class _FrameRef(MutableMapping):
         --------
         update
         """
-        self.update_data(key, val)
+        self.update_data(key, val, inplace=False)
 
-    def update_data(self, key, val):
+    def update_data(self, key, val, inplace):
         """Update the data in the frame.
 
         If the provided key is string, the corresponding column data will be updated.
@@ -756,7 +748,8 @@ class _FrameRef(MutableMapping):
         If the provided key is an index, the corresponding rows will be updated. The
         value provided should be a dictionary of string to the data of each column.
 
-        All updates are performed out-placely to be work with autograd.
+        All updates are performed out-placely to be work with autograd. For inplace
+        update, use ``update_column`` or ``update_rows``.
 
         Parameters
         ----------
@@ -764,19 +757,21 @@ class _FrameRef(MutableMapping):
             The key.
         val : Tensor or dict of tensors
             The value.
+        inplace: bool
+            If True, update will be done in place
         """
         if not isinstance(key, (str, utils.Index)):
             raise DGLError('Argument "key" must be either str or utils.Index type.')
         if isinstance(key, str):
-            self.update_column(key, val)
+            self.update_column(key, val, inplace=inplace)
         elif key.is_slice(0, self.num_rows):
             # shortcut for updating all the rows
             for colname, col in val.items():
-                self.update_column(colname, col)
+                self.update_column(colname, col, inplace=inplace)
         else:
-            self.update_rows(key, val)
+            self.update_rows(key, val, inplace=inplace)
 
-    def update_column(self, name, data):
+    def update_column(self, name, data, inplace):
         """Update the column.
 
         If this frameref spans the whole column of the underlying frame, this is
@@ -792,6 +787,8 @@ class _FrameRef(MutableMapping):
             The column name.
         data : Tensor
             The update data.
+        inplace : bool
+            True if the update is performed inplacely.
         """
         if self.is_span_whole_column():
             if self.num_columns == 0:
@@ -803,7 +800,7 @@ class _FrameRef(MutableMapping):
                 ctx = F.context(data)
                 self._frame.add_column(name, infer_scheme(data), ctx)
             fcol = self._frame[name]
-            fcol.update(self._index, data)
+            fcol.update(self._index, data, inplace)
 
     def add_rows(self, num_rows):
         """Add blank rows to the underlying frame.
@@ -832,7 +829,7 @@ class _FrameRef(MutableMapping):
             newdata = F.arange(self.num_rows, self.num_rows + num_rows)
             self._index = utils.toindex(F.cat([selfidxdata, newdata], dim=0))
 
-    def update_rows(self, query, data):
+    def update_rows(self, query, data, inplace):
         """Update the rows.
 
         If the provided data has new column, it will be added to the frame.
@@ -847,15 +844,17 @@ class _FrameRef(MutableMapping):
             The rows to be updated.
         data : dict-like
             The row data.
+        inplace : bool
+            True if the update is performed inplace.
         """
         rows = self._getrows(query)
         for key, col in data.items():
             if key not in self:
                 # add new column
                 tmpref = FrameRef(self._frame, rows)
-                tmpref.update_column(key, col)
+                tmpref.update_column(key, col, inplace)
             else:
-                self._frame[key].update(rows, col)
+                self._frame[key].update(rows, col, inplace)
 
     def __delitem__(self, key):
         """Delete data in the frame.

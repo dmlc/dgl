@@ -1,6 +1,8 @@
 """User-defined function related data structures."""
 from __future__ import absolute_import
 
+from .base import is_all
+
 class EdgeBatch(object):
     """The class that can represent a batch of edges.
 
@@ -101,23 +103,24 @@ class EdgeBatch(object):
         return self._canonical_etype
 
 class NodeBatch(object):
-    """The class that can represent a batch of nodes.
+    """The class to represent a batch of nodes.
 
     Parameters
     ----------
-    nodes : utils.Index
-        The node ids.
-    data : dict
-        The node features, in the form of ``dict``
-        with ``str`` keys and ``tensor`` values
-    msgs : dict, optional
-        The messages, , in the form of ``dict``
-        with ``str`` keys and ``tensor`` values
+    graph : DGLGraph
+        Graph object.
+    nodes : Tensor or ALL
+        Node ids.
+    data : dict[str, Tensor]
+        Node feature data.
+    msgs : dict[str, Tensor], optional
+        Messages data.
     ntype : str, optional
         The node type of this node batch, if running
         on a heterograph.
     """
-    def __init__(self, nodes, data, msgs=None, ntype=None):
+    def __init__(self, graph, nodes, data, msgs=None, ntype=None):
+        self._graph = graph
         self._nodes = nodes
         self._data = data
         self._msgs = msgs
@@ -156,7 +159,10 @@ class NodeBatch(object):
         tensor
             The nodes.
         """
-        return self._nodes.tousertensor()
+        if is_all(self._nodes):
+            return self._graph.number_of_nodes(self._ntype)
+        else:
+            return self._nodes
 
     def batch_size(self):
         """Return the number of nodes in this batch.
