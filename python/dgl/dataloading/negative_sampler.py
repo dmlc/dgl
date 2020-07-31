@@ -1,6 +1,5 @@
 """Negative samplers"""
 from collections.abc import Mapping
-import numpy as np
 from .. import backend as F
 
 class _BaseNegativeSampler(object):

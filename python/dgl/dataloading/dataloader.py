@@ -30,7 +30,7 @@ def _tensor_or_dict_to_numpy(ids):
 
 def _locate_eids_to_exclude(frontier_parent_eids, exclude_eids):
     """Find the edges whose IDs in parent graph appeared in exclude_eids.
-    
+
     Note that both arguments are numpy arrays or numpy dicts.
     """
     if isinstance(frontier_parent_eids, Mapping):
@@ -103,6 +103,8 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
         return _find_exclude_eids_with_reverse_id(g, eids, kwargs['reverse_eid_map'])
     elif exclude_mode == 'reverse_types':
         return _find_exclude_eids_with_reverse_types(g, eids, kwargs['reverse_etype_map'])
+    else:
+        raise ValueError('unsupported mode {}'.format(exclude_mode))
 
 
 class BlockSampler(object):

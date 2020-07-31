@@ -6,7 +6,6 @@ from ..base import DGLError, EID
 from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from .. import utils
-from .. import transform
 
 __all__ = [
     'sample_neighbors',
