@@ -34,8 +34,8 @@ def _assert_is_identical_hetero(g, g2):
     assert g.canonical_etypes == g2.canonical_etypes
 
     # check if two metagraphs are identical
-    for edges, features in g.metagraph.edges(keys=True).items():
-        assert g2.metagraph.edges(keys=True)[edges] == features
+    for edges, features in g.metagraph().edges(keys=True).items():
+        assert g2.metagraph().edges(keys=True)[edges] == features
 
     # check if node ID spaces and feature spaces are equal
     for ntype in g.ntypes:

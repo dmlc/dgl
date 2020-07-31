@@ -224,7 +224,7 @@ def test_query(idtype):
     assert set(canonical_etypes) == set(g.canonical_etypes)
 
     # metagraph
-    mg = g.metagraph
+    mg = g.metagraph()
     assert set(g.ntypes) == set(mg.nodes)
     etype_triplets = [(u, v, e) for u, v, e in mg.edges(keys=True)]
     assert set([

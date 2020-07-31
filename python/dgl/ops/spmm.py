@@ -43,6 +43,7 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     """
     return gspmm_internal(g._graph, op, reduce_op, lhs_data, rhs_data)
 
+
 def _gen_spmm_func(binary_op, reduce_op):
     name = "u_{}_e_{}".format(binary_op, reduce_op)
     docstring = """Generalized SpMM function.
@@ -81,6 +82,7 @@ def _gen_spmm_func(binary_op, reduce_op):
     func.__name__ = name
     func.__doc__ = docstring
     return func
+
 
 def _gen_copy_reduce_func(binary_op, reduce_op):
 
@@ -126,6 +128,7 @@ def _gen_copy_reduce_func(binary_op, reduce_op):
     func.__doc__ = docstring(binary_op)
     return func
 
+
 def _register_spmm_func():
     """Register spmm functions"""
     for binary_op in ["add", "sub", "mul", "div", "copy_u", "copy_e"]:
@@ -136,5 +139,6 @@ def _register_spmm_func():
                 func = _gen_spmm_func(binary_op, reduce_op)
             setattr(sys.modules[__name__], func.__name__, func)
             __all__.append(func.__name__)
+
 
 _register_spmm_func()

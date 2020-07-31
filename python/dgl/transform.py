@@ -18,7 +18,7 @@ from .partition import partition_graph_with_halo as hetero_partition_graph_with_
 from .partition import metis_partition as hetero_metis_partition
 
 # TO BE DEPRECATED
-from .graph import DGLGraph as DGLGraphStale
+from ._deprecate.graph import DGLGraph as DGLGraphStale
 from .graph_index import _get_halo_subgraph_inner_node
 
 __all__ = [
@@ -387,7 +387,7 @@ def khop_adj(g, k):
             [1., 3., 3., 1., 0.],
             [0., 1., 3., 3., 1.]])
     """
-    adj_k = g.adjacency_matrix_scipy(return_edge_ids=False) ** k
+    adj_k = g.adj(scipy_fmt=g.formats()['created'][0]) ** k
     return F.tensor(adj_k.todense().astype(np.float32))
 
 def khop_graph(g, k):
@@ -436,7 +436,7 @@ def khop_graph(g, k):
              edata_schemes={})
     """
     n = g.number_of_nodes()
-    adj_k = g.adjacency_matrix_scipy(transpose=True, return_edge_ids=False) ** k
+    adj_k = g.adj(transpose=True, scipy_fmt=g.formats()['created'][0]) ** k
     adj_k = adj_k.tocoo()
     multiplicity = adj_k.data
     row = np.repeat(adj_k.row, multiplicity)
@@ -688,7 +688,7 @@ def laplacian_lambda_max(g):
     rst = []
     for g_i in g_arr:
         n = g_i.number_of_nodes()
-        adj = g_i.adjacency_matrix_scipy(return_edge_ids=False).astype(float)
+        adj = g_i.adj(scipy_fmt=g_i.formats()['created'][0]).astype(float)
         norm = sparse.diags(F.asnumpy(g_i.in_degrees()).clip(1) ** -0.5, dtype=float)
         laplacian = sparse.eye(n) - norm * adj * norm
         rst.append(sparse.linalg.eigs(laplacian, 1, which='LM',

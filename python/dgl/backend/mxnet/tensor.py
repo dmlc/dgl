@@ -9,7 +9,7 @@ import mxnet.ndarray as nd
 import numbers
 import builtins
 from ... import ndarray as dglnd
-from ... import kernel as K
+from ..._deprecate import kernel as K
 from ...function.base import TargetCode
 
 MX_VERSION = LooseVersion(mx.__version__)
