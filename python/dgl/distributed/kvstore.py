@@ -550,9 +550,8 @@ class RegisterRoleRequest(rpc.Request):
             kv_store.barrier_count[self.role] = 0
         role[self.role].add(self.client_id)
         total_count = 0
-        for each_role in role:
-            total_count += len(each_role)
-        print('total_count:%d num_clients: %d' % (total_count, kv_store.num_clients))
+        for key in role:
+            total_count += len(role[key])
         if total_count == kv_store.num_clients:
             res_list = []
             for target_id in range(kv_store.num_clients):
