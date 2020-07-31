@@ -1,4 +1,5 @@
 """DGL PyTorch DataLoaders"""
+import inspect
 from torch.utils.data import DataLoader
 from ..dataloader import NodeCollator, EdgeCollator
 
@@ -14,8 +15,10 @@ class NodeDataLoader(DataLoader):
         The node set to compute outputs.
     block_sampler : :py:class:`~dgl.dataloading.BlockSampler`
         The neighborhood sampler.
+    return_eids : bool, default False
+        Whether to return the edge IDs of the original graph in the sampled block.
     kwargs : dict
-        Arguments being passed to `torch.utils.data.DataLoader`.
+        Arguments being passed to ``torch.utils.data.DataLoader``.
 
     Examples
     --------
@@ -29,9 +32,19 @@ class NodeDataLoader(DataLoader):
     >>> for input_nodes, output_nodes, blocks in dataloader:
     ...     train_on(input_nodes, output_nodes, blocks)
     """
+    collator_arglist = inspect.getfullargspec(NodeCollator).args
+
     def __init__(self, g, nids, block_sampler, **kwargs):
-        self.collator = NodeCollator(g, nids, block_sampler)
-        super().__init__(self.collator.dataset, collate_fn=self.collator.collate, **kwargs)
+        collator_kwargs = {}
+        dataloader_kwargs = {}
+        for k, v in kwargs.items():
+            if k in self.collator_arglist:
+                collator_kwargs[k] = v
+            else:
+                dataloader_kwargs[k] = v
+        self.collator = NodeCollator(g, nids, block_sampler, **collator_kwargs)
+        super().__init__(
+            self.collator.dataset, collate_fn=self.collator.collate, **dataloader_kwargs)
 
 class EdgeDataLoader(DataLoader):
     """PyTorch dataloader for batch-iterating over a set of edges, generating the list
@@ -48,6 +61,11 @@ class EdgeDataLoader(DataLoader):
         The neighborhood sampler.
     g_sampling : DGLHeteroGraph, optional
         The graph where neighborhood sampling is performed.
+
+        One may wish to iterate over the edges in one graph while perform sampling in
+        another graph.  This may be the case for iterating over validation and test
+        edge set while perform neighborhood sampling on the graph formed by only
+        the training edge set.
 
         If None, assume to be the same as ``g``.
     exclude : str, optional
@@ -67,6 +85,8 @@ class EdgeDataLoader(DataLoader):
         The negative sampler.
 
         See the docstring in :py:class:`~dgl.dataloading.EdgeCollator`.
+    return_eids : bool, default False
+        Whether to return the edge IDs of the original graph in the sampled block.
     kwargs : dict
         Arguments being passed to `torch.utils.data.DataLoader`.
 
@@ -153,11 +173,16 @@ class EdgeDataLoader(DataLoader):
 
     * Link prediction on heterogeneous graph: RGCN for link prediction.
     """
-    def __init__(self, g, eids, block_sampler, g_sampling=None, exclude=None, reverse_eids=None,
-                 reverse_etypes=None, negative_sampler=None, return_eids=False, **kwargs):
-        self.collator = EdgeCollator(
-            g, eids, block_sampler,
-            g_sampling=g_sampling, exclude=exclude, reverse_eids=reverse_eids,
-            reverse_etypes=reverse_etypes, negative_sampler=negative_sampler,
-            return_eids=return_eids)
-        super().__init__(self.collator.dataset, collate_fn=self.collator.collate, **kwargs)
+    collator_arglist = inspect.getfullargspec(EdgeCollator).args
+
+    def __init__(self, g, eids, block_sampler, **kwargs):
+        collator_kwargs = {}
+        dataloader_kwargs = {}
+        for k, v in kwargs.items():
+            if k in self.collator_arglist:
+                collator_kwargs[k] = v
+            else:
+                dataloader_kwargs[k] = v
+        self.collator = NodeCollator(g, eids, block_sampler, **collator_kwargs)
+        super().__init__(
+            self.collator.dataset, collate_fn=self.collator.collate, **dataloader_kwargs)

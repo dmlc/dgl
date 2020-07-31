@@ -22,9 +22,29 @@ def assign_block_eids(block, frontier):
             block.edges[etype].data[EID]]
     return block
 
+def _tensor_or_dict_to_numpy(ids):
+    if isinstance(ids, Mapping):
+        return {k: F.zerocopy_to_numpy(v) for k, v in ids.items()}
+    else:
+        return F.zerocopy_to_numpy(ids)
+
+def _locate_eids_to_exclude(frontier_parent_eids, exclude_eids):
+    """Find the edges whose IDs in parent graph appeared in exclude_eids.
+    
+    Note that both arguments are numpy arrays or numpy dicts.
+    """
+    if isinstance(frontier_parent_eids, Mapping):
+        result = {
+            k: np.isin(frontier_parent_eids[k], exclude_eids[k]).nonzero()[0]
+            for k in frontier_parent_eids.keys() if k in exclude_eids.keys()}
+        return {k: F.zerocopy_from_numpy(v) for k, v in result.items()}
+    else:
+        result = np.isin(frontier_parent_eids, exclude_eids).nonzero()[0]
+        return F.zerocopy_from_numpy(result)
+
 def _find_exclude_eids_with_reverse_id(g, eids, reverse_eid_map):
-    eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
     if isinstance(eids, Mapping):
+        eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
         exclude_eids = {
             k: F.cat([v, F.gather_row(reverse_eid_map[k], v)], 0)
             for k, v in eids.items()}
@@ -182,12 +202,20 @@ class BlockSampler(object):
         For the concept of frontiers and blocks, please refer to User Guide Section 6.
         """
         blocks = []
+        exclude_eids = (
+            _tensor_or_dict_to_numpy(exclude_eids) if exclude_eids is not None else None)
         for block_id in reversed(range(self.num_hops)):
             frontier = self.sample_frontier(block_id, g, seed_nodes)
             # Removing edges from the frontier for link prediction training falls
             # into the category of frontier postprocessing
             if exclude_eids is not None:
-                frontier = transform.remove_edges(frontier, exclude_eids)
+                parent_eids = _tensor_or_dict_to_numpy(frontier.edata[EID])
+                located_eids = _locate_eids_to_exclude(parent_eids, exclude_eids)
+                if not isinstance(located_eids, Mapping):
+                    frontier = transform.remove_edges(frontier, located_eids)
+                else:
+                    for k, v in located_eids.items():
+                        frontier = transform.remove_edges(frontier, v, etype=k)
 
             block = transform.to_block(frontier, seed_nodes)
             if return_eids:
@@ -470,7 +498,7 @@ class EdgeCollator(Collator):
         self.g = g
         if not isinstance(eids, Mapping):
             assert len(g.etypes) == 1, \
-                "eids should be a dict of edge type and ids for graph with multiple edge types"
+                "eids should be a dict of etype and ids for graph with multiple etypes"
         self.eids = eids
         self.block_sampler = block_sampler
 
@@ -532,6 +560,7 @@ class EdgeCollator(Collator):
             items = F.zerocopy_from_numpy(np.asarray(items))
 
         pair_graph = self.g.edge_subgraph(items, preserve_nodes=True)
+        induced_edges = pair_graph.edata[EID]
 
         neg_srcdst = self.negative_sampler(self.g, items)
         if not isinstance(neg_srcdst, Mapping):
@@ -540,11 +569,12 @@ class EdgeCollator(Collator):
                 'please return a dict in negative sampler.'
             neg_srcdst = {self.g.canonical_etypes[0]: neg_srcdst}
         neg_edges = {
-            etype: neg_srcdst.get(etype, ()) for etype in self.g.canonical_etypes}
+            etype: neg_srcdst.get(etype, []) for etype in self.g.canonical_etypes}
         neg_pair_graph = heterograph(
             neg_edges, {ntype: self.g.number_of_nodes(ntype) for ntype in self.g.ntypes})
 
         pair_graph, neg_pair_graph = transform.compact_graphs([pair_graph, neg_pair_graph])
+        pair_graph.edata[EID] = induced_edges
 
         seed_nodes = pair_graph.ndata[NID]
 

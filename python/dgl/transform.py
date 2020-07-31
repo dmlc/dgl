@@ -249,6 +249,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
             "There will be no difference between readonly and non-readonly DGLGraph")
 
     canonical_etypes = g.canonical_etypes
+    num_nodes_dict = {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes}
     # fast path
     if ignore_bipartite is False:
         subgs = {}
@@ -261,7 +262,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
             u, v = g.edges(form='uv', order='eid', etype=c_etype)
             subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
 
-        new_g = convert.heterograph(subgs)
+        new_g = convert.heterograph(subgs, num_nodes_dict=num_nodes_dict)
     else:
         subgs = {}
         for c_etype in canonical_etypes:
@@ -272,7 +273,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
                 u, v = g.edges(form='uv', order='eid', etype=c_etype)
                 subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
 
-        new_g = convert.heterograph(subgs)
+        new_g = convert.heterograph(subgs, num_nodes_dict=num_nodes_dict)
 
     # handle features
     if copy_ndata:
