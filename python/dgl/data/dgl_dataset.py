@@ -55,7 +55,7 @@ class DGLDataset(object):
         self._url = url
         self._force_reload = force_reload
         self._verbose = verbose
-        self._hash_key = hask_key
+        self._hash_key = hash_key
         self._hash = self._get_hash()
 
         # if no dir is provided, the default dgl download dir is used.
