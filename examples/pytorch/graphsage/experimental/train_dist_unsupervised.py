@@ -341,9 +341,6 @@ def run(args, device, data):
         # save features into file
         if g.rank() == 0:
             th.save(pred, 'emb.pt')
-
-        dgl.distributed.shutdown_servers()
-        dgl.distributed.finalize_client()
     else:
         feat = g.ndata['features']
         th.save(pred, 'emb.pt')
