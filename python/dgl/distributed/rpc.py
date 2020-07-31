@@ -1031,6 +1031,7 @@ class ShutDownRequest(Request):
         self.client_id = state
 
     def process_request(self, server_state):
+        assert self.client_id == 0
         finalize_server()
         return 'exit'
 

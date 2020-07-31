@@ -1069,6 +1069,7 @@ class KVClient(object):
             Store the partition information
         """
         # Get shared data from server side
+        self.barrier()
         request = GetSharedDataRequest(GET_SHARED_MSG)
         rpc.send_request(self._main_server_id, request)
         response = rpc.recv_response()
@@ -1110,6 +1111,7 @@ class KVClient(object):
                 response = rpc.recv_response()
                 assert response.msg == SEND_META_TO_BACKUP_MSG
             self._data_name_list.add(name)
+        self.barrier()
 
     def data_name_list(self):
         """Get all the data name"""
