@@ -4,7 +4,7 @@ import os
 
 from .utils import get_download_dir, download
 from ..utils import retry_method_with_fix
-from ..graph import DGLGraph
+from .. import convert
 
 class QM7b(object):
     """
@@ -36,11 +36,8 @@ class QM7b(object):
         num_graphs = labels.shape[0]
         self.label = labels
         for i in range(num_graphs):
-            g = DGLGraph()
             edge_list = feats[i].nonzero()
-            num_nodes = np.max(edge_list) + 1
-            g.add_nodes(num_nodes)
-            g.add_edges(edge_list[0], edge_list[1])
+            g = convert.graph(edge_list)
             g.edata['h'] = feats[i][edge_list[0], edge_list[1]].reshape(-1, 1)
             self.graphs.append(g)
         

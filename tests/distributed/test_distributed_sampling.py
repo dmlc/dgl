@@ -167,7 +167,6 @@ def test_rpc_sampling_shuffle():
 
 def check_standalone_sampling(tmpdir):
     g = CitationGraphDataset("cora")[0]
-    g.readonly()
     num_parts = 1
     num_hops = 1
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
@@ -229,7 +228,6 @@ def check_rpc_in_subgraph(tmpdir, num_server):
         p.join()
 
     src, dst = sampled_graph.edges()
-    g = dgl.as_heterograph(g)
     assert sampled_graph.number_of_nodes() == g.number_of_nodes()
     subg1 = dgl.in_subgraph(g, nodes)
     src1, dst1 = subg1.edges()

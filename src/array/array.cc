@@ -63,6 +63,8 @@ IdArray AsNumBits(IdArray arr, uint8_t bits) {
     << static_cast<int>(bits) << ".";
   if (arr->dtype.bits == bits)
     return arr;
+  if (arr.NumElements() == 0)
+    return NewIdArray(arr->shape[0], arr->ctx, bits);
   IdArray ret;
   ATEN_XPU_SWITCH_CUDA(arr->ctx.device_type, XPU, "AsNumBits", {
     ATEN_ID_TYPE_SWITCH(arr->dtype, IdType, {
@@ -76,20 +78,20 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
   IdArray ret;
   CHECK_SAME_CONTEXT(lhs, rhs);
   CHECK_SAME_DTYPE(lhs, rhs);
-  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, "HStack", {
-    ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
-      ret = impl::HStack<XPU, IdType>(lhs, rhs);
-    });
-  });
-  return ret;
-}
-
-IdArray NonZero(BoolArray bool_arr) {
-  IdArray ret;
-  ATEN_XPU_SWITCH(bool_arr->ctx.device_type, XPU, "NonZero", {
-    ATEN_ID_TYPE_SWITCH(bool_arr->dtype, IdType, {
-      ret = impl::NonZero<XPU, IdType>(bool_arr);
-    });
+  CHECK_EQ(lhs->shape[0], rhs->shape[0]);
+  auto device = runtime::DeviceAPI::Get(lhs->ctx);
+  const auto& ctx = lhs->ctx;
+  ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
+    const int64_t len = lhs->shape[0];
+    ret = NewIdArray(2 * len, lhs->ctx, lhs->dtype.bits);
+    device->CopyDataFromTo(lhs.Ptr<IdType>(), 0,
+                           ret.Ptr<IdType>(), 0,
+                           len * sizeof(IdType),
+                           ctx, ctx, lhs->dtype, nullptr);
+    device->CopyDataFromTo(rhs.Ptr<IdType>(), 0,
+                           ret.Ptr<IdType>(), len * sizeof(IdType),
+                           len * sizeof(IdType),
+                           ctx, ctx, lhs->dtype, nullptr);
   });
   return ret;
 }
@@ -159,6 +161,22 @@ NDArray Scatter(NDArray array, IdArray indices) {
     });
   });
   return ret;
+}
+
+void Scatter_(IdArray index, NDArray value, NDArray out) {
+  CHECK_SAME_DTYPE(value, out);
+  CHECK_SAME_CONTEXT(index, value);
+  CHECK_SAME_CONTEXT(index, out);
+  CHECK_EQ(value->shape[0], index->shape[0]);
+  if (index->shape[0] == 0)
+    return;
+  ATEN_XPU_SWITCH_CUDA(value->ctx.device_type, XPU, "Scatter_", {
+    ATEN_DTYPE_SWITCH(value->dtype, DType, "values", {
+      ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
+        impl::Scatter_<XPU, DType, IdType>(index, value, out);
+      });
+    });
+  });
 }
 
 NDArray Repeat(NDArray array, IdArray repeats) {
@@ -259,6 +277,30 @@ IdArray CumSum(IdArray array, bool prepend_zero) {
   return ret;
 }
 
+IdArray NonZero(NDArray array) {
+  IdArray ret;
+  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "NonZero", {
+    ATEN_ID_TYPE_SWITCH(array->dtype, DType, {
+      ret = impl::NonZero<XPU, DType>(array);
+    });
+  });
+  return ret;
+}
+
+std::pair<IdArray, IdArray> Sort(IdArray array) {
+  if (array.NumElements() == 0) {
+    IdArray idx = NewIdArray(0, array->ctx, 64);
+    return std::make_pair(array, idx);
+  }
+  std::pair<IdArray, IdArray> ret;
+  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "Sort", {
+    ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
+      ret = impl::Sort<XPU, IdType>(array);
+    });
+  });
+  return ret;
+}
+
 std::string ToDebugString(NDArray array) {
   std::ostringstream oss;
   NDArray a = array.CopyTo(DLContext{kDLCPU, 0});
@@ -300,7 +342,7 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
 
 bool CSRHasDuplicate(CSRMatrix csr) {
   bool ret = false;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRHasDuplicate", {
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRHasDuplicate", {
     ret = impl::CSRHasDuplicate<XPU, IdType>(csr);
   });
   return ret;
@@ -353,23 +395,13 @@ bool CSRIsSorted(CSRMatrix csr) {
   return ret;
 }
 
-NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
-  CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
-  CHECK(col >= 0 && col < csr.num_cols) << "Invalid col index: " << col;
-  NDArray ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetData", {
-    ret = impl::CSRGetData<XPU, IdType>(csr, row, col);
-  });
-  return ret;
-}
-
 NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
   NDArray ret;
   CHECK_SAME_DTYPE(csr.indices, rows);
   CHECK_SAME_DTYPE(csr.indices, cols);
   CHECK_SAME_CONTEXT(csr.indices, rows);
   CHECK_SAME_CONTEXT(csr.indices, cols);
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetData", {
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetData", {
     ret = impl::CSRGetData<XPU, IdType>(csr, rows, cols);
   });
   return ret;
@@ -382,7 +414,7 @@ std::vector<NDArray> CSRGetDataAndIndices(
   CHECK_SAME_CONTEXT(csr.indices, rows);
   CHECK_SAME_CONTEXT(csr.indices, cols);
   std::vector<NDArray> ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRGetDataAndIndices", {
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetDataAndIndices", {
     ret = impl::CSRGetDataAndIndices<XPU, IdType>(csr, rows, cols);
   });
   return ret;
@@ -443,7 +475,7 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, NDArray rows, NDArray cols) {
   CHECK_SAME_CONTEXT(csr.indices, rows);
   CHECK_SAME_CONTEXT(csr.indices, cols);
   CSRMatrix ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRSliceMatrix", {
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRSliceMatrix", {
     ret = impl::CSRSliceMatrix<XPU, IdType>(csr, rows, cols);
   });
   return ret;
@@ -583,19 +615,19 @@ std::pair<NDArray, NDArray> COOGetRowDataAndIndices(COOMatrix coo, int64_t row) 
   return ret;
 }
 
-NDArray COOGetData(COOMatrix coo, int64_t row, int64_t col) {
-  NDArray ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetData", {
-    ret = impl::COOGetData<XPU, IdType>(coo, row, col);
-  });
-  return ret;
-}
-
 std::vector<NDArray> COOGetDataAndIndices(
     COOMatrix coo, NDArray rows, NDArray cols) {
   std::vector<NDArray> ret;
   ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetDataAndIndices", {
     ret = impl::COOGetDataAndIndices<XPU, IdType>(coo, rows, cols);
+  });
+  return ret;
+}
+
+NDArray COOGetData(COOMatrix coo, NDArray rows, NDArray cols) {
+  NDArray ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetData", {
+    ret = impl::COOGetData<XPU, IdType>(coo, rows, cols);
   });
   return ret;
 }
@@ -969,6 +1001,16 @@ DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLExistSharedMemArray")
 #else
     *rv = false;
 #endif  // _WIN32
+  });
+
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLArrayCastToSigned")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    NDArray array = args[0];
+    CHECK_EQ(array->dtype.code, kDLUInt);
+    std::vector<int64_t> shape(array->shape, array->shape + array->ndim);
+    DLDataType dtype = array->dtype;
+    dtype.code = kDLInt;
+    *rv = array.CreateView(shape, dtype, 0);
   });
 
 }  // namespace aten

@@ -77,6 +77,7 @@ class SAGE(nn.Module):
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0]
 
+                block = block.to(device)
                 h = x[input_nodes].to(device)
                 h = layer(block, h)
                 if l != len(self.layers) - 1:
@@ -171,6 +172,7 @@ def run(args, device, data):
 
             # Load the input features as well as output labels
             batch_inputs, batch_labels = load_subtensor(train_g, seeds, input_nodes, device)
+            blocks = [block.to(device) for block in blocks]
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)

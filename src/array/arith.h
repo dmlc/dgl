@@ -46,6 +46,13 @@ struct Div {
   }
 };
 
+struct Mod {
+  template <typename T>
+  static DGLINLINE DGLDEVICE T Call(const T& t1, const T& t2) {
+    return t1 % t2;
+  }
+};
+
 struct GT {
   template <typename T>
   static DGLINLINE DGLDEVICE bool Call(const T& t1, const T& t2) {

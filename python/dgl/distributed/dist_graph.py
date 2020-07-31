@@ -4,12 +4,12 @@ from collections.abc import MutableMapping
 import os
 import numpy as np
 
-from ..graph import DGLGraph
+from ..heterograph import DGLHeteroGraph
+from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID
 from .kvstore import KVServer, KVClient
 from .standalone_kvstore import KVClient as SA_KVClient
-from ..graph_index import from_shared_mem_graph_index
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
 from .partition import load_partition
@@ -22,14 +22,9 @@ from .server_state import ServerState
 from .rpc_server import start_server
 from .graph_services import find_edges as dist_find_edges
 from .dist_tensor import DistTensor, _get_data_name
-from ..transform import as_heterograph
-
-def _get_graph_path(graph_name):
-    return "/" + graph_name
 
 def _copy_graph_to_shared_mem(g, graph_name):
-    gidx = g._graph.copyto_shared_mem(_get_graph_path(graph_name))
-    new_g = DGLGraph(gidx)
+    new_g = g.shared_memory(graph_name, formats='csc')
     # We should share the node/edge data to the client explicitly instead of putting them
     # in the KVStore because some of the node/edge data may be duplicated.
     local_node_path = _get_ndata_path(graph_name, 'inner_node')
@@ -86,11 +81,10 @@ def _get_graph_from_shared_mem(graph_name):
     The client can access the graph structure and some metadata on nodes and edges directly
     through shared memory to reduce the overhead of data access.
     '''
-    gidx = from_shared_mem_graph_index(_get_graph_path(graph_name))
-    if gidx is None:
-        return gidx
-
-    g = DGLGraph(gidx)
+    g, ntypes, etypes = heterograph_index.create_heterograph_from_shared_memory(graph_name)
+    if g is None:
+        return None
+    g = DGLHeteroGraph(g, ntypes, etypes)
     g.ndata['inner_node'] = _get_shared_mem_ndata(g, graph_name, 'inner_node')
     g.edata['inner_edge'] = _get_shared_mem_edata(g, graph_name, 'inner_edge')
     g.ndata[NID] = _get_shared_mem_ndata(g, graph_name, NID)
@@ -307,7 +301,7 @@ class DistGraph:
                     'The standalone mode can only work with the graph data with one partition'
             if self._gpb is None:
                 self._gpb = gpb
-            self._g = as_heterograph(g)
+            self._g = g
             for name in node_feats:
                 self._client.add_data(_get_data_name(name, NODE_PART_POLICY), node_feats[name])
             for name in edge_feats:
@@ -316,11 +310,7 @@ class DistGraph:
         else:
             connect_to_server(ip_config=ip_config)
             self._client = KVClient(ip_config)
-            g = _get_graph_from_shared_mem(graph_name)
-            if g is not None:
-                self._g = as_heterograph(g)
-            else:
-                self._g = None
+            self._g = _get_graph_from_shared_mem(graph_name)
             self._gpb = get_shared_mem_partition_book(graph_name, self._g)
             if self._gpb is None:
                 self._gpb = gpb

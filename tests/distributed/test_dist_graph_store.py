@@ -9,7 +9,7 @@ from scipy import sparse as spsp
 from numpy.testing import assert_array_equal
 from multiprocessing import Process, Manager, Condition, Value
 import multiprocessing as mp
-from dgl.graph_index import create_graph_index
+from dgl.heterograph_index import create_unitgraph_from_coo
 from dgl.data.utils import load_graphs, save_graphs
 from dgl.distributed import DistGraphServer, DistGraph
 from dgl.distributed import partition_graph, load_partition, load_partition_book, node_split, edge_split
@@ -50,9 +50,8 @@ def get_local_usable_addr():
     return ip_addr + ' ' + str(port)
 
 def create_random_graph(n):
-    arr = (spsp.random(n, n, density=0.001, format='coo') != 0).astype(np.int64)
-    ig = create_graph_index(arr, readonly=True)
-    return dgl.DGLGraph(ig)
+    arr = (spsp.random(n, n, density=0.001, format='coo', random_state=100) != 0).astype(np.int64)
+    return dgl.graph(arr)
 
 def run_server(graph_name, server_id, num_clients, shared_mem):
     g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients,
@@ -65,7 +64,7 @@ def emb_init(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
 
 def rand_init(shape, dtype):
-    return F.tensor(np.random.normal(size=shape))
+    return F.tensor(np.random.normal(size=shape), F.float32)
 
 def run_client(graph_name, part_id, num_nodes, num_edges):
     time.sleep(5)

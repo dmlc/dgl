@@ -3,8 +3,10 @@ import torch.nn as nn
 import rdkit.Chem as Chem
 import torch.nn.functional as F
 from .chemutils import get_mol
-from dgl import DGLGraph, mean_nodes
+import dgl
+from dgl import mean_nodes
 import dgl.function as DGLF
+from .nnutils import line_graph
 
 ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca',
              'Fe', 'Al', 'I', 'B', 'K', 'Se', 'Zn', 'H', 'Cu', 'Mn', 'unknown']
@@ -41,11 +43,9 @@ def mol2dgl_single(smiles):
     mol = get_mol(smiles)
     n_atoms = mol.GetNumAtoms()
     n_bonds = mol.GetNumBonds()
-    graph = DGLGraph()
     for i, atom in enumerate(mol.GetAtoms()):
         assert i == atom.GetIdx()
         atom_x.append(atom_features(atom))
-    graph.add_nodes(n_atoms)
 
     bond_src = []
     bond_dst = []
@@ -60,8 +60,7 @@ def mol2dgl_single(smiles):
         bond_src.append(end_idx)
         bond_dst.append(begin_idx)
         bond_x.append(features)
-    graph.add_edges(bond_src, bond_dst)
-
+    graph = dgl.graph((bond_src, bond_dst), num_nodes=n_atoms)
     n_edges += n_bonds
     return graph, torch.stack(atom_x), \
             torch.stack(bond_x) if len(bond_x) > 0 else torch.zeros(0)
@@ -123,7 +122,7 @@ class DGLMPN(nn.Module):
     def forward(self, mol_graph):
         n_samples = mol_graph.batch_size
 
-        mol_line_graph = mol_graph.line_graph(backtracking=False, shared=True)
+        mol_line_graph = line_graph(mol_graph, backtracking=False, shared=True)
 
         n_nodes = mol_graph.number_of_nodes()
         n_edges = mol_graph.number_of_edges()
@@ -170,6 +169,7 @@ class DGLMPN(nn.Module):
                 self.loopy_bp_updater,
             )
 
+        mol_graph.edata.update(mol_line_graph.ndata)
         mol_graph.update_all(
             mpn_gather_msg,
             mpn_gather_reduce,
