@@ -61,9 +61,9 @@ def _check_neighbor_sampling_dataloader(g, nids, dl, mode):
     seeds = {k: F.cat(v, 0) for k, v in seeds.items()}
     for k, v in seeds.items():
         if k in nids:
-            seed_set = set(nids[k])
+            seed_set = set(F.asnumpy(nids[k]))
         elif isinstance(k, tuple) and k[1] in nids:
-            seed_set = set(nids[k[1]])
+            seed_set = set(F.asnumpy(nids[k[1]]))
         else:
             continue
 
@@ -73,7 +73,7 @@ def _check_neighbor_sampling_dataloader(g, nids, dl, mode):
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_neighbor_sampler_dataloader():
     g = dgl.graph([(0,1),(0,2),(0,3),(1,3),(1,4)],
-            'user', 'follow', num_nodes=6)
+            'user', 'follow', num_nodes=6).long()
     g = dgl.to_bidirected(g)
     reverse_eids = F.tensor([5, 6, 7, 8, 9, 0, 1, 2, 3, 4], dtype=F.int64)
     g_sampler1 = dgl.dataloading.MultiLayerNeighborSampler([2, 2])
@@ -83,7 +83,7 @@ def test_neighbor_sampler_dataloader():
         ('user', 'follow', 'user'): [(0, 1), (0, 2), (0, 3), (1, 0), (1, 2), (1, 3), (2, 0)],
         ('user', 'followed-by', 'user'): [(1, 0), (2, 0), (3, 0), (0, 1), (2, 1), (3, 1), (0, 2)],
         ('user', 'play', 'game'): [(0, 0), (1, 1), (1, 2), (3, 0), (5, 2)],
-        ('game', 'played-by', 'user'): [(0, 0), (1, 1), (2, 1), (0, 3), (2, 5)]})
+        ('game', 'played-by', 'user'): [(0, 0), (1, 1), (2, 1), (0, 3), (2, 5)]}).long()
     hg_sampler1 = dgl.dataloading.MultiLayerNeighborSampler(
         [{'play': 1, 'played-by': 1, 'follow': 2, 'followed-by': 1}] * 2)
     hg_sampler2 = dgl.dataloading.MultiLayerNeighborSampler([None, None])
@@ -93,7 +93,9 @@ def test_neighbor_sampler_dataloader():
     graphs = []
     nids = []
     modes = []
-    for seeds, sampler in product([[0, 1, 2, 3, 5], [4, 5]], [g_sampler1, g_sampler2]):
+    for seeds, sampler in product(
+            [F.tensor([0, 1, 2, 3, 5], dtype=F.int64), F.tensor([4, 5], dtype=F.int64)],
+            [g_sampler1, g_sampler2]):
         collators.append(dgl.dataloading.NodeCollator(g, seeds, sampler, return_eids=True))
         graphs.append(g)
         nids.append({'user': seeds})
@@ -124,8 +126,8 @@ def test_neighbor_sampler_dataloader():
         modes.append('link')
 
     for seeds, sampler in product(
-            [{'user': [0, 1, 3, 5], 'game': [0, 1, 2]},
-             {'user': [4, 5], 'game': [0, 1, 2]}],
+            [{'user': F.tensor([0, 1, 3, 5], dtype=F.int64), 'game': F.tensor([0, 1, 2], dtype=F.int64)},
+             {'user': F.tensor([4, 5], dtype=F.int64), 'game': F.tensor([0, 1, 2], dtype=F.int64)}],
             [hg_sampler1, hg_sampler2]):
         collators.append(dgl.dataloading.NodeCollator(hg, seeds, sampler, return_eids=True))
         graphs.append(hg)
@@ -133,8 +135,8 @@ def test_neighbor_sampler_dataloader():
         modes.append('node')
 
     for seeds, sampler in product(
-            [{'follow': [0, 1, 3, 5], 'play': [1, 3]},
-             {'follow': [4, 5], 'play': [1, 3]}],
+            [{'follow': F.tensor([0, 1, 3, 5], dtype=F.int64), 'play': F.tensor([1, 3], dtype=F.int64)},
+             {'follow': F.tensor([4, 5], dtype=F.int64), 'play': F.tensor([1, 3], dtype=F.int64)}],
             [hg_sampler1, hg_sampler2]):
         collators.append(dgl.dataloading.EdgeCollator(hg, seeds, sampler, return_eids=True))
         graphs.append(hg)
