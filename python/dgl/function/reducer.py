@@ -5,8 +5,8 @@ from __future__ import absolute_import
 import sys
 
 from .base import BuiltinFunction, TargetCode
-from ..runtime import ir
-from ..runtime.ir import var
+from .._deprecate.runtime import ir
+from .._deprecate.runtime.ir import var
 
 
 class ReduceFunction(BuiltinFunction):

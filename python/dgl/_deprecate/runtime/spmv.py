@@ -2,11 +2,11 @@
 from __future__ import absolute_import
 from functools import partial
 
-from ..base import DGLError
-from .. import backend as F
-from .. import utils
-from .. import ndarray as nd
-from ..heterograph_index import create_unitgraph_from_coo
+from ...base import DGLError
+from ... import backend as F
+from ... import utils
+from ... import ndarray as nd
+from ...heterograph_index import create_unitgraph_from_coo
 
 from . import ir
 from .ir import var

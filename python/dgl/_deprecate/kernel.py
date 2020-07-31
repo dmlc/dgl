@@ -1,8 +1,8 @@
 """Module for dgl kernels for graph computation."""
 from __future__ import absolute_import
 
-from ._ffi.function import _init_api
-from . import ndarray as nd
+from .._ffi.function import _init_api
+from .. import ndarray as nd
 
 # pylint: disable=invalid-name
 def infer_binary_feature_shape(op, lhs, rhs):
@@ -414,4 +414,4 @@ def backward_copy_reduce(reducer, G, target,
         X, out, grad_out, grad_X,
         X_rows, out_rows)
 
-_init_api("dgl.kernel")
+_init_api("dgl._deprecate.kernel")
