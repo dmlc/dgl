@@ -18,48 +18,52 @@ HeteroGraphPtr CreateHeteroGraph(
 
 HeteroGraphPtr CreateFromCOO(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray row, IdArray col, SparseFormat restrict_format) {
+    IdArray row, IdArray col, dgl_format_code_t formats) {
   auto unit_g = UnitGraph::CreateFromCOO(
-      num_vtypes, num_src, num_dst, row, col, restrict_format);
+      num_vtypes, num_src, num_dst, row, col, formats);
   return HeteroGraphPtr(new HeteroGraph(unit_g->meta_graph(), {unit_g}));
 }
 
 HeteroGraphPtr CreateFromCOO(
     int64_t num_vtypes, const aten::COOMatrix& mat,
-    SparseFormat restrict_format) {
-  auto unit_g = UnitGraph::CreateFromCOO(num_vtypes, mat, restrict_format);
+    dgl_format_code_t formats) {
+  auto unit_g = UnitGraph::CreateFromCOO(num_vtypes, mat, formats);
   return HeteroGraphPtr(new HeteroGraph(unit_g->meta_graph(), {unit_g}));
 }
 
 HeteroGraphPtr CreateFromCSR(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray indptr, IdArray indices, IdArray edge_ids,
-    SparseFormat restrict_format) {
+    dgl_format_code_t formats) {
   auto unit_g = UnitGraph::CreateFromCSR(
-      num_vtypes, num_src, num_dst, indptr, indices, edge_ids, restrict_format);
+      num_vtypes, num_src, num_dst, indptr, indices, edge_ids, formats);
   return HeteroGraphPtr(new HeteroGraph(unit_g->meta_graph(), {unit_g}));
 }
 
 HeteroGraphPtr CreateFromCSR(
     int64_t num_vtypes, const aten::CSRMatrix& mat,
-    SparseFormat restrict_format) {
-  auto unit_g = UnitGraph::CreateFromCSR(num_vtypes, mat, restrict_format);
-  return HeteroGraphPtr(new HeteroGraph(unit_g->meta_graph(), {unit_g}));
+    dgl_format_code_t formats) {
+  auto unit_g = UnitGraph::CreateFromCSR(num_vtypes, mat, formats);
+  auto ret = HeteroGraphPtr(new HeteroGraph(
+      unit_g->meta_graph(),
+      {unit_g}));
+  return HeteroGraphPtr(new HeteroGraph(unit_g->meta_graph(),
+                                                       {unit_g}));
 }
 
 HeteroGraphPtr CreateFromCSC(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray indptr, IdArray indices, IdArray edge_ids,
-    SparseFormat restrict_format) {
+    dgl_format_code_t formats) {
   auto unit_g = UnitGraph::CreateFromCSC(
-      num_vtypes, num_src, num_dst, indptr, indices, edge_ids, restrict_format);
+      num_vtypes, num_src, num_dst, indptr, indices, edge_ids, formats);
   return HeteroGraphPtr(new HeteroGraph(unit_g->meta_graph(), {unit_g}));
 }
 
 HeteroGraphPtr CreateFromCSC(
     int64_t num_vtypes, const aten::CSRMatrix& mat,
-    SparseFormat restrict_format) {
-  auto unit_g = UnitGraph::CreateFromCSC(num_vtypes, mat, restrict_format);
+    dgl_format_code_t formats) {
+  auto unit_g = UnitGraph::CreateFromCSC(num_vtypes, mat, formats);
   return HeteroGraphPtr(new HeteroGraph(unit_g->meta_graph(), {unit_g}));
 }
 

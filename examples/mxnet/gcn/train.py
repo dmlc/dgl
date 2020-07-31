@@ -5,7 +5,7 @@ import networkx as nx
 import mxnet as mx
 from mxnet import gluon
 
-from dgl import DGLGraph
+import dgl
 from dgl.data import register_data_args, load_data
 
 from gcn import GCN
@@ -58,7 +58,7 @@ def main(args):
     if args.self_loop:
         g.remove_edges_from(nx.selfloop_edges(g))
         g.add_edges_from(zip(g.nodes(), g.nodes()))
-    g = DGLGraph(g)
+    g = dgl.graph(g).to(ctx)
     # normalization
     degs = g.in_degrees().astype('float32')
     norm = mx.nd.power(degs, -0.5)

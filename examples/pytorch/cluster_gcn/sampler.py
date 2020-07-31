@@ -31,7 +31,6 @@ class ClusterIter(object):
         """
         self.use_pp = use_pp
         self.g = g.subgraph(seed_nid)
-        self.g.copy_from_parent()
 
         # precalc the aggregated features from training graph only
         if use_pp:

@@ -9,6 +9,7 @@ The folder contains training module and inferencing module (beam decoder) for Tr
 - networkx
 - tqdm
 - requests
+- matplotlib
 
 ## Usage
 

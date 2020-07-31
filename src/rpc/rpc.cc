@@ -207,6 +207,17 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetMsgSeq")
   RPCContext::ThreadLocal()->msg_seq = msg_seq;
 });
 
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetBarrierCount")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  *rv = RPCContext::ThreadLocal()->barrier_count;
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetBarrierCount")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  const int32_t count = args[0];
+  RPCContext::ThreadLocal()->barrier_count = count;
+});
+
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetMachineID")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   *rv = RPCContext::ThreadLocal()->machine_id;

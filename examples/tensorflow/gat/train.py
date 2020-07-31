@@ -66,7 +66,7 @@ def main(args):
         g = data.graph
         # add self loop
         g.remove_edges_from(nx.selfloop_edges(g))
-        g = DGLGraph(g)
+        g = DGLGraph(g).to(device)
         g.add_edges(g.nodes(), g.nodes())
         n_edges = g.number_of_edges()
         # create model
