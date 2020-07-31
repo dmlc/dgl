@@ -549,8 +549,15 @@ class RegisterRoleRequest(rpc.Request):
             role[self.role] = set()
             kv_store.barrier_count[self.role] = 0
         role[self.role].add(self.client_id)
-        res = RegisterRoleResponse(ROLE_MSG)
-        return res
+        total_count = 0
+        for each_role in role :
+            total_count += len(each_role)
+        if total_count == kv_store.num_clients:
+            target_list = []
+            for target_id in range(kv_store.num_clients):
+                res_list.append((target_id, RegisterRoleResponse(ROLE_MSG)))
+            return res_list
+        return None
 
 ############################ KVServer ###############################
 
