@@ -7,6 +7,7 @@ from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
 
+
 def infer_broadcast_shape(op, shp1, shp2):
     r"""Check the shape validity, and infer the output shape given input shape and operator.
     Note the both :attr:`shp1`, :attr:`shp2` and the returned shape are feature
@@ -53,13 +54,16 @@ def infer_broadcast_shape(op, shp1, shp2):
     rst = tuple(max(d1, d2) for d1, d2 in zip(pad_shp1, pad_shp2))
     return rst[:-1] + (1,) if op == "dot" else rst
 
+
 def to_dgl_nd(x):
     """Convert framework-specific tensor/None to dgl ndarray."""
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray(x)
 
+
 def to_dgl_nd_for_write(x):
     """Convert framework-specific tensor/None to dgl ndarray for write."""
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
+
 
 target_mapping = {
     'u': 0,
@@ -69,6 +73,7 @@ target_mapping = {
     'edge': 1,
     'dst': 2
 }
+
 
 def _gspmm(gidx, op, reduce_op, u, e):
     r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
@@ -150,11 +155,20 @@ def _gspmm(gidx, op, reduce_op, u, e):
                             to_dgl_nd_for_write(v),
                             arg_u_nd,
                             arg_e_nd)
+    # NOTE(zihao): actually we can avoid the following step, because arg_*_nd
+    # refers to the data that stores arg_*. After we call _CAPI_DGLKernelSpMM,
+    # arg_* should have already been changed. But we found this doesn't work
+    # under Tensorflow when index type is int32. (arg_u and arg_e would be
+    # all zero).
+    # The workaround is proposed by Jinjing, and we still need to investigate
+    # where the problem is.
     arg_u = None if arg_u is None else F.zerocopy_from_dgl_ndarray(arg_u_nd)
     arg_e = None if arg_e is None else F.zerocopy_from_dgl_ndarray(arg_e_nd)
+    # To deal with scalar node/edge features.
     if (expand_u or not use_u) and (expand_e or not use_e):
         v = F.squeeze(v, -1)
     return v, (arg_u, arg_e)
+
 
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
@@ -228,5 +242,6 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     if (expand_lhs or not use_lhs) and (expand_rhs or not use_rhs):
         out = F.squeeze(out, -1)
     return out
+
 
 _init_api("dgl.sparse")
