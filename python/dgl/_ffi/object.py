@@ -28,7 +28,13 @@ def _new_object(cls):
 
 
 class ObjectBase(_ObjectBase):
-    """ObjectBase is the base class of all DGL CAPI object."""
+    """ObjectBase is the base class of all DGL CAPI object.
+
+    The core attribute is ``handle``, which is a C raw pointer.  It must be initialized
+    via ``__init_handle_by_constructor__``.
+
+    Note that the same handle **CANNOT** be shared across multiple ObjectBase instances.
+    """
     def __dir__(self):
         plist = ctypes.POINTER(ctypes.c_char_p)()
         size = ctypes.c_uint()

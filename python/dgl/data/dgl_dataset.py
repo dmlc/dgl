@@ -4,6 +4,7 @@
 from __future__ import absolute_import
 
 import os, sys
+import abc
 from .utils import download, extract_archive, get_download_dir, makedirs
 from ..utils import retry_method_with_fix
 
@@ -37,7 +38,7 @@ class DGLDataset(object):
         Default: ~/.dgl/
     save_dir : str
         Directory to save the processed dataset.
-        Default: ~/.dgl/
+        Default: same as raw_dir
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -190,14 +191,16 @@ class DGLDataset(object):
         """
         return self._verbose
 
+    @abc.abstractmethod
     def __getitem__(self, idx):
         r"""Gets the data object at index.
         """
-        raise NotImplementedError
+        pass
 
+    @abc.abstractmethod
     def __len__(self):
         r"""The number of examples in the dataset."""
-        raise NotImplementedError
+        pass
 
 class DGLBuiltinDataset(DGLDataset):
     r"""The Basic DGL Builtin Dataset.
