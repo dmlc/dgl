@@ -4,6 +4,7 @@ import os
 import socket
 import multiprocessing as mp
 import atexit
+import traceback
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
@@ -100,7 +101,6 @@ def get_local_usable_addr():
 INITIALIZED = False
 
 def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
-    print("CONNECT")
     """Connect this client to server.
 
     Parameters
@@ -191,13 +191,15 @@ def finalize_client():
     global INITIALIZED
     INITIALIZED = False
 
+
 def shutdown_servers():
     """Issue commands to remote servers to shut them down.
+
     Raises
     ------
     ConnectionError : If anything wrong with the connection.
     """
-    if rpc.get_rank() == 0: # Only client_0 issue this command
+    if rpc.get_rank() == 0:  # Only client_0 issue this command
         req = rpc.ShutDownRequest(rpc.get_rank())
         for server_id in range(rpc.get_num_server()):
             rpc.send_request(server_id, req)
@@ -205,69 +207,30 @@ def shutdown_servers():
 SAMPLER_POOL = None
 NUM_SAMPLER_WORKERS = 0
 
-def _close():
-    """Finalize client and close servers when finished"""
-    rpc.finalize_sender()
-    rpc.finalize_receiver()
 
 def _init_rpc(ip_config, max_queue_size, net_type):
-
-    import sys
     try:
-        print("11111")
-
-        # with open("~/rpcclient.log", "w") as f:
-            # f.write("1111112")
-
-        sys.stdout.flush()
         connect_to_server(ip_config, max_queue_size, net_type)
-
-        sys.stdout.flush()
-        # f.write("2222222")
     except Exception as e:
-        print(e)
-        sys.stdout.flush()
+        print(e, flush=True)
+        traceback.print_exc()
+        raise e
 
 def get_sampler_pool():
     """Return the sampler pool and num_workers"""
     return SAMPLER_POOL, NUM_SAMPLER_WORKERS
 
-def debug_str():
-    import sys
-    import os
-    print("DEBUGBEUGBUEGBU")
-    # fout = open("/home/ubuntu/"+str(os.getpid()) + ".out", "a", buffering=0)
-    # ferr = open("/home/ubuntu/"+str(os.getpid()) + "_error.out", "a", buffering=0)
-
-    # fout.write("BDEUBDUEIBDEUBG")
-    # fout.flush()
-    # fout.close()
 
 def init_rpc(ip_config, num_workers, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Init rpc service"""
-    try:
-        ctx = mp.get_context("spawn")
-        global SAMPLER_POOL
-        global NUM_SAMPLER_WORKERS
-        if num_workers > 0:
-            print("pre pool")
-            print(num_workers)
-            SAMPLER_POOL = ctx.Pool(
-                num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size, net_type))
-            # SAMPLER_POOL = ctx.Pool(
-            #     num_workers, initializer=debug_str)
-            # SAMPLER_POOL.join()
-            print("after pool")
-        NUM_SAMPLER_WORKERS = num_workers
-        print("before connect")
-        connect_to_server(ip_config, max_queue_size, net_type)
-        print("join?")
-        # SAMPLER_POOL.join()
-    except Exception as e:
-        print(e)
-        import traceback
-        traceback.print_exc()
-        raise e
+    ctx = mp.get_context("spawn")
+    global SAMPLER_POOL
+    global NUM_SAMPLER_WORKERS
+    if num_workers > 0:
+        SAMPLER_POOL = ctx.Pool(
+            num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size, net_type))
+    NUM_SAMPLER_WORKERS = num_workers
+    connect_to_server(ip_config, max_queue_size, net_type)
 
 def exit_client():
     """Register exit callback.
