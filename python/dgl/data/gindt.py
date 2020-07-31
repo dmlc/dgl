@@ -97,9 +97,7 @@ class GINDataset(DGLBuiltinDataset):
         self.nattrs_flag = False
         self.nlabels_flag = False
 
-        self.params_hash = abs(hash((name, self_loop, degree_as_nlabel)))
-
-        super(GINDataset, self).__init__(name=name, url=gin_url,
+        super(GINDataset, self).__init__(name=name, url=gin_url, hash_key=(name, self_loop, degree_as_nlabel),
                                          raw_dir=raw_dir, force_reload=force_reload, verbose=verbose)
 
     @property
@@ -291,51 +289,52 @@ class GINDataset(DGLBuiltinDataset):
                     self.n / self.N, self.m / self.N, self.glabel_dict,
                     self.nlabel_dict, self.ndegree_dict))
 
-        def save(self):
-            graph_path = os.path.join(self.save_path, 'gin_{}_{}.bin'.format(self.name, self.params_hash))
-            info_path = os.path.join(self.save_path, 'gin_{}_{}.pkl'.format(self.name, self.params_hash))
-            label_dict = {'labels': self.labels}
-            info_dict = {'N': self.N,
-                         'n': self.n,
-                         'm': self.m,
-                         'self_loop': self_loop,
-                         'gclasses': self.glcasses,
-                         'nclasses': self.nclasses,
-                         'eclasses': self.eclasses,
-                         'dim_nfeats': self.dim_nfeats,
-                         'degree_as_nlabel': self.degree_as_nlabel,
-                         'glabel_dict': self.glabel_dict,
-                         'nlabel_dict': self.nlabel_dict,
-                         'elabel_dict': self.elabel_dict,
-                         'ndegree_dict': self.ndegree_dict}
-            save_graphs(str(graph_path), self.graph_lists, label_dict)
-            save_info(str(info_path), info_dict)
+    def save(self):
+        graph_path = os.path.join(self.save_path, 'gin_{}_{}.bin'.format(self.name, self.hash))
+        info_path = os.path.join(self.save_path, 'gin_{}_{}.pkl'.format(self.name, self.hash))
+        label_dict = {'labels': self.labels}
+        info_dict = {'N': self.N,
+                     'n': self.n,
+                     'm': self.m,
+                     'self_loop': self.self_loop,
+                     'gclasses': self.gclasses,
+                     'nclasses': self.nclasses,
+                     'eclasses': self.eclasses,
+                     'dim_nfeats': self.dim_nfeats,
+                     'degree_as_nlabel': self.degree_as_nlabel,
+                     'glabel_dict': self.glabel_dict,
+                     'nlabel_dict': self.nlabel_dict,
+                     'elabel_dict': self.elabel_dict,
+                     'ndegree_dict': self.ndegree_dict}
+        save_graphs(str(graph_path), self.graphs, label_dict)
+        save_info(str(info_path), info_dict)
 
-        def load(self):
-            graph_path = os.path.join(self.save_path, 'gin_{}_{}.bin'.format(self.name, self.params_hash))
-            info_path = os.path.join(self.save_path, 'gin_{}_{}.pkl'.format(self.name, self.params_hash))
-            graphs, label_dict = load_graphs(str(graph_path))
-            info_dict = load_info(str(info_path))
+    def load(self):
+        graph_path = os.path.join(self.save_path, 'gin_{}_{}.bin'.format(self.name, self.hash))
+        info_path = os.path.join(self.save_path, 'gin_{}_{}.pkl'.format(self.name, self.hash))
+        graphs, label_dict = load_graphs(str(graph_path))
+        info_dict = load_info(str(info_path))
 
-            self.graphs = graphs
-            self.labels = label_dict['labels']
+        self.graphs = graphs
+        self.labels = label_dict['labels']
 
-            self.N = info_dict['N']
-            self.n = info_dict['n']
-            self.m = info_dict['m']
-            self.gclasses = info_dict['gclasses']
-            self.nclasses = info_dict['nclasses']
-            self.eclasses = info_dict['eclasses']
-            self.dim_nfeats = info_dict['dim_nfeats']
-            self.glabel_dict = info_dict['glabel_dict']
-            self.nlabel_dict = info_dict['nlabel_dict']
-            self.elabel_dict = info_dict['elabel_dict']
-            self.ndegree_dict = info_dict['ndegree_dict']
-            self.degree_as_nlabel = info_dict['degree_as_nlabel']
+        self.N = info_dict['N']
+        self.n = info_dict['n']
+        self.m = info_dict['m']
+        self.self_loop = info_dict['self_loop']
+        self.gclasses = info_dict['gclasses']
+        self.nclasses = info_dict['nclasses']
+        self.eclasses = info_dict['eclasses']
+        self.dim_nfeats = info_dict['dim_nfeats']
+        self.glabel_dict = info_dict['glabel_dict']
+        self.nlabel_dict = info_dict['nlabel_dict']
+        self.elabel_dict = info_dict['elabel_dict']
+        self.ndegree_dict = info_dict['ndegree_dict']
+        self.degree_as_nlabel = info_dict['degree_as_nlabel']
 
-        def has_cache(self):
-            graph_path = os.path.join(self.save_path, 'gin_{}_{}.bin'.format(self.name, self.params_hash))
-            info_path = os.path.join(self.save_path, 'gin_{}_{}.pkl'.format(self.name, self.params_hash))
-            if os.path.exists(graph_path) and os.path.exists(info_path):
-                return True
-            return False
+    def has_cache(self):
+        graph_path = os.path.join(self.save_path, 'gin_{}_{}.bin'.format(self.name, self.hash))
+        info_path = os.path.join(self.save_path, 'gin_{}_{}.pkl'.format(self.name, self.hash))
+        if os.path.exists(graph_path) and os.path.exists(info_path):
+            return True
+        return False
