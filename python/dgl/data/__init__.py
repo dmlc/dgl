@@ -27,7 +27,6 @@ def register_data_args(parser):
         help=
         "The input dataset. Can be cora, citeseer, pubmed, syn(synthetic dataset) or reddit"
     )
-    citegrh.register_args(parser)
 
 
 def load_data(args):
@@ -37,8 +36,6 @@ def load_data(args):
         return citegrh.load_citeseer()
     elif args.dataset == 'pubmed':
         return citegrh.load_pubmed()
-    elif args.dataset == 'syn':
-        return citegrh.load_synthetic(args)
     elif args.dataset is not None and args.dataset.startswith('reddit'):
         return RedditDataset(self_loop=('self-loop' in args.dataset))
     else:
