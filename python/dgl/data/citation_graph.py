@@ -735,13 +735,13 @@ class CoraBinary(DGLBuiltinDataset):
             for line in f.readlines():
                 if line.startswith('graph'):
                     if len(elist) != 0:
-                        self.graphs.append(DGLGraph(elist))
+                        self.graphs.append(dgl_graph(elist))
                     elist = []
                 else:
                     u, v = line.strip().split(' ')
                     elist.append((int(u), int(v)))
             if len(elist) != 0:
-                self.graphs.append(DGLGraph(elist))
+                self.graphs.append(dgl_graph(elist))
         with open("{}/pmpds.pkl".format(root), 'rb') as f:
             self.pmpds = _pickle_load(f)
         self.labels = []
