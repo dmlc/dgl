@@ -8,6 +8,7 @@ import traceback
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
+from .kvstore import init_kvstore
 
 if os.name != 'nt':
     import fcntl
@@ -208,9 +209,12 @@ SAMPLER_POOL = None
 NUM_SAMPLER_WORKERS = 0
 
 
-def _init_rpc(ip_config, max_queue_size, net_type):
+def _init_rpc(ip_config, max_queue_size, net_type, role):
+    ''' This init function is called in the worker processes.
+    '''
     try:
         connect_to_server(ip_config, max_queue_size, net_type)
+        init_kvstore(ip_config, role)
     except Exception as e:
         print(e, flush=True)
         traceback.print_exc()
@@ -228,7 +232,8 @@ def init_rpc(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type='
     global NUM_SAMPLER_WORKERS
     if num_workers > 0:
         SAMPLER_POOL = ctx.Pool(
-            num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size, net_type))
+            num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size,
+                                                          net_type, 'sampler'))
     NUM_SAMPLER_WORKERS = num_workers
     connect_to_server(ip_config, max_queue_size, net_type)
 

@@ -8,7 +8,7 @@ from ..heterograph import DGLHeteroGraph
 from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID
-from .kvstore import KVServer, KVClient
+from .kvstore import KVServer, KVClient, init_kvstore, get_kvstore
 from .standalone_kvstore import KVClient as SA_KVClient
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
@@ -321,7 +321,10 @@ class DistGraph:
             self._num_edges += int(part_md['num_edges'])
 
     def _init(self):
-        self._client = KVClient(self.ip_config)
+        # Init KVStore client if it's not initialized yet.
+        init_kvstore(self.ip_config)
+        self._client = get_kvstore()
+
         self._g = _get_graph_from_shared_mem(self.graph_name)
         self._gpb = get_shared_mem_partition_book(self.graph_name, self._g)
         if self._gpb is None:

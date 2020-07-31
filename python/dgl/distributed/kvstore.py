@@ -1249,3 +1249,13 @@ class KVClient(object):
         """Used by sort response list
         """
         return elem.server_id
+
+KVCLIENT = None
+
+def init_kvstore(ip_config, role='default'):
+    global KVCLIENT
+    if KVCLIENT is None:
+        KVCLIENT = KVClient(ip_config, role)
+
+def get_kvstore():
+    return KVCLIENT
