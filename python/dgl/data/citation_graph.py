@@ -179,7 +179,6 @@ class CitationGraphDataset(DGLBuiltinDataset):
         self._g.ndata['val_mask'] = generate_mask_tensor(self._g.ndata['val_mask'].numpy())
         self._g.ndata['test_mask'] = generate_mask_tensor(self._g.ndata['test_mask'].numpy())
         # hack for mxnet compatability
-        self._labels = F.asnumpy(self.g.ndata['label'])
 
         if self.verbose:
             print('  NumNodes: {}'.format(self._g.number_of_nodes()))
@@ -219,22 +218,22 @@ class CitationGraphDataset(DGLBuiltinDataset):
     @property
     def train_mask(self):
         deprecate_property('dataset.train_mask', 'g.ndata[\'train_mask\']')
-        return self._g.ndata['train_mask']
+        return F.asnumpy(self._g.ndata['train_mask'])
 
     @property
     def val_mask(self):
         deprecate_property('dataset.val_mask', 'g.ndata[\'val_mask\']')
-        return self._g.ndata['val_mask']
+        return F.asnumpy(self._g.ndata['val_mask'])
 
     @property
     def test_mask(self):
         deprecate_property('dataset.test_mask', 'g.ndata[\'test_mask\']')
-        return self._g.ndata['test_mask']
+        return F.asnumpy(self._g.ndata['test_mask'])
 
     @property
     def labels(self):
         deprecate_property('dataset.label', 'g.ndata[\'label\']')
-        return self._labels
+        return F.asnumpy(self._g.ndata['label'])
 
     @property
     def features(self):
@@ -321,13 +320,13 @@ class CoraGraphDataset(CitationGraphDataset):
         Number of label classes
     graph: networkx.DiGraph
         Graph structure
-    train_mask: Tensor
+    train_mask: Numpy array
         Mask of training nodes
-    val_mask: Tensor
+    val_mask: Numpy array
         Mask of validation nodes
-    test_mask: Tensor
+    test_mask: Numpy array
         Mask of test nodes
-    labels: Tensor
+    labels: Numpy array
         Ground truth labels of each node
     features: Tensor
         Node features
@@ -443,13 +442,13 @@ class CiteseerGraphDataset(CitationGraphDataset):
         Number of label classes
     graph: networkx.DiGraph
         Graph structure
-    train_mask: Tensor
+    train_mask: Numpy array
         Mask of training nodes
-    val_mask: Tensor
+    val_mask: Numpy array
         Mask of validation nodes
-    test_mask: Tensor
+    test_mask: Numpy array
         Mask of test nodes
-    labels: Tensor
+    labels: Numpy array
         Ground truth labels of each node
     features: Tensor
         Node features
@@ -568,13 +567,13 @@ class PubmedGraphDataset(CitationGraphDataset):
         Number of label classes
     graph: networkx.DiGraph
         Graph structure
-    train_mask: Tensor
+    train_mask: Numpy array
         Mask of training nodes
-    val_mask: Tensor
+    val_mask: Numpy array
         Mask of validation nodes
-    test_mask: Tensor
+    test_mask: Numpy array
         Mask of test nodes
-    labels: Tensor
+    labels: Numpy array
         Ground truth labels of each node
     features: Tensor
         Node features
@@ -711,7 +710,7 @@ class CoraBinary(DGLBuiltinDataset):
     verbose: bool
         Whether to print out progress information. Default: True.
     """
-    def __init__(self):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=True):
         name = 'cora_binary'
         url = _get_dgl_url('dataset/cora_binary.zip')
         super(CoraBinary, self).__init__(name,
