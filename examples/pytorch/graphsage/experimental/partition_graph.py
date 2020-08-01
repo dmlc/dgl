@@ -20,8 +20,6 @@ if __name__ == '__main__':
                            help='turn the graph into an undirected graph.')
     argparser.add_argument('--balance_edges', action='store_true',
                            help='balance the number of edges in each partition.')
-    argparser.add_argument('--num_hops', type=int, default=1,
-                           help='number of hops')
     args = argparser.parse_args()
 
     start = time.time()
