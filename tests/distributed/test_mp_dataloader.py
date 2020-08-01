@@ -26,7 +26,8 @@ class NeighborSampler(object):
         blocks = []
         for fanout in self.fanouts:
             # For each seed node, sample ``fanout`` neighbors.
-            frontier = self.sample_neighbors(self.g, seeds, fanout, replace=True)
+            frontier = self.sample_neighbors(
+                self.g, seeds, fanout, replace=True)
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
             # Obtain the seed nodes for next layer.
@@ -34,6 +35,7 @@ class NeighborSampler(object):
 
             blocks.insert(0, block)
         return blocks
+
 
 def start_server(rank, tmpdir, disable_shared_mem, num_clients):
     import dgl
@@ -65,8 +67,8 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers):
         collate_fn=sampler.sample_blocks,
         shuffle=True,
         drop_last=False,
-        num_workers=4) 
-    
+        num_workers=4)
+
     dist_graph._init()
     for epoch in range(3):
         for idx, blocks in enumerate(dataloader):
@@ -76,6 +78,7 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers):
 
     dataloader.close()
     dgl.distributed.exit_client()
+
 
 def main(tmpdir, num_server):
     ip_config = open("mp_ip_config.txt", "w")
@@ -108,9 +111,10 @@ def main(tmpdir, num_server):
 
 # Wait non shared memory graph store
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 def test_dist_dataloader(tmpdir):
     main(Path(tmpdir), 3)
+
 
 if __name__ == "__main__":
     import tempfile
