@@ -26,13 +26,8 @@ class GATConv(nn.Module):
 
     Parameters
     ----------
-    in_feats : int, or pair of ints
+    in_feats : int
         Input feature size.
-
-        If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
-        specifies the input feature size on both the source and destination nodes.  If
-        a scalar is given, the source and destination node feature size would take the
-        same value.
     out_feats : int
         Output feature size.
     num_heads : int
@@ -62,14 +57,8 @@ class GATConv(nn.Module):
         self._num_heads = num_heads
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
-        if isinstance(in_feats, tuple):
-            self.fc_src = nn.Linear(
-                self._in_src_feats, out_feats * num_heads, bias=False)
-            self.fc_dst = nn.Linear(
-                self._in_dst_feats, out_feats * num_heads, bias=False)
-        else:
-            self.fc = nn.Linear(
-                self._in_src_feats, out_feats * num_heads, bias=False)
+        self.fc = nn.Linear(
+            self._in_src_feats, out_feats * num_heads, bias=False)
         self.attn_l = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
         self.attn_r = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
         self.feat_drop = nn.Dropout(feat_drop)
@@ -124,8 +113,8 @@ class GATConv(nn.Module):
                 h_src = h_dst = self.feat_drop(feat)
                 feat_src = feat_dst = self.fc(h_src).view(
                     -1, self._num_heads, self._out_feats)
-            if graph.is_block:
-                feat_dst = feat_src[:graph.number_of_dst_nodes()]
+                if graph.is_block:
+                    feat_dst = feat_src[:graph.number_of_dst_nodes()]
             # NOTE: GAT paper uses "first concatenation then linear projection"
             # to compute attention scores, while ours is "first projection then
             # addition", the two approaches are mathematically equivalent:
