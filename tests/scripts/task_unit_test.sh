@@ -38,5 +38,5 @@ python3 -m pytest -v --junitxml=pytest_backend.xml tests/$DGLBACKEND || fail "ba
 export OMP_NUM_THREADS=1
 if [ $2 != "gpu" ]; then
     python3 -m pip install pytest-xdist
-    python3 -m pytest -v --junitxml=pytest_distributed.xml --forked tests/distributed || fail "distributed"
+    CUDA_VISIBLE_DEVICES=-1 python3 -m pytest -v --junitxml=pytest_distributed.xml --forked tests/distributed || fail "distributed"
 fi
