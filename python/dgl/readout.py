@@ -3,7 +3,7 @@ from __future__ import absolute_import
 
 from .base import DGLError
 from . import backend as F
-from . import segment
+from .ops import segment
 
 __all__ = ['readout_nodes', 'readout_edges',
            'sum_nodes', 'sum_edges', 'mean_nodes', 'mean_edges',

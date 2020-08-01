@@ -76,9 +76,9 @@ Test-bd: P2-8xlarge
 ### Link Prediction
 FB15k-237: MRR 0.151 (DGL), 0.158 (paper)
 ```
-python3 link_predict.py -d FB15k-237 --gpu 0 --raw
+python3 link_predict.py -d FB15k-237 --gpu 0 --eval-protocol raw
 ```
 FB15k-237: Filtered-MRR 0.2044
 ```
-python3 link_predict.py -d FB15k-237 --gpu 0 --filtered
+python3 link_predict.py -d FB15k-237 --gpu 0 --eval-protocol filtered
 ```

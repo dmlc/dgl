@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
-from .nnutils import cuda
+from .nnutils import cuda, line_graph
 import rdkit.Chem as Chem
-from dgl import DGLGraph, mean_nodes
+import dgl
+from dgl import mean_nodes
 import dgl.function as DGLF
 import os
 
@@ -50,12 +51,11 @@ def mol2dgl_single(cand_batch):
 
         ctr_node = mol_tree.nodes_dict[ctr_node_id]
         ctr_bid = ctr_node['idx']
-        g = DGLGraph()
+        mol_tree_graph = getattr(mol_tree, 'graph', mol_tree)
 
         for i, atom in enumerate(mol.GetAtoms()):
             assert i == atom.GetIdx()
             atom_x.append(atom_features(atom))
-        g.add_nodes(n_atoms)
 
         bond_src = []
         bond_dst = []
@@ -78,24 +78,24 @@ def mol2dgl_single(cand_batch):
             x_bid = mol_tree.nodes_dict[x_nid - 1]['idx'] if x_nid > 0 else -1
             y_bid = mol_tree.nodes_dict[y_nid - 1]['idx'] if y_nid > 0 else -1
             if x_bid >= 0 and y_bid >= 0 and x_bid != y_bid:
-                if mol_tree.has_edge_between(x_bid, y_bid):
+                if mol_tree_graph.has_edges_between(x_bid, y_bid):
                     tree_mess_target_edges.append((begin_idx + n_nodes, end_idx + n_nodes))
                     tree_mess_source_edges.append((x_bid, y_bid))
                     tree_mess_target_nodes.append(end_idx + n_nodes)
-                if mol_tree.has_edge_between(y_bid, x_bid):
+                if mol_tree_graph.has_edges_between(y_bid, x_bid):
                     tree_mess_target_edges.append((end_idx + n_nodes, begin_idx + n_nodes))
                     tree_mess_source_edges.append((y_bid, x_bid))
                     tree_mess_target_nodes.append(begin_idx + n_nodes)
 
         n_nodes += n_atoms
-        g.add_edges(bond_src, bond_dst)
+        g = dgl.graph((bond_src, bond_dst), num_nodes=n_atoms)
         cand_graphs.append(g)
 
     return cand_graphs, torch.stack(atom_x), \
             torch.stack(bond_x) if len(bond_x) > 0 else torch.zeros(0), \
-            torch.LongTensor(tree_mess_source_edges), \
-            torch.LongTensor(tree_mess_target_edges), \
-            torch.LongTensor(tree_mess_target_nodes)
+            torch.IntTensor(tree_mess_source_edges), \
+            torch.IntTensor(tree_mess_target_edges), \
+            torch.IntTensor(tree_mess_target_nodes)
 
 
 mpn_loopy_bp_msg = DGLF.copy_src(src='msg', out='msg')
@@ -174,7 +174,7 @@ class DGLJTMPN(nn.Module):
 
         n_samples = len(cand_graphs)
 
-        cand_line_graph = cand_graphs.line_graph(backtracking=False, shared=True)
+        cand_line_graph = line_graph(cand_graphs, backtracking=False, shared=True)
 
         n_nodes = cand_graphs.number_of_nodes()
         n_edges = cand_graphs.number_of_edges()
@@ -222,20 +222,27 @@ class DGLJTMPN(nn.Module):
             if PAPER:
                 src_u, src_v = tree_mess_src_edges.unbind(1)
                 tgt_u, tgt_v = tree_mess_tgt_edges.unbind(1)
-                alpha = mol_tree_batch.edges[src_u, src_v].data['m']
+                src_u = src_u.to(mol_tree_batch.device)
+                src_v = src_v.to(mol_tree_batch.device)
+                eid = mol_tree_batch.edge_ids(src_u.int(), src_v.int()).long()
+                alpha = mol_tree_batch.edata['m'][eid]
                 cand_graphs.edges[tgt_u, tgt_v].data['alpha'] = alpha
             else:
                 src_u, src_v = tree_mess_src_edges.unbind(1)
-                alpha = mol_tree_batch.edges[src_u, src_v].data['m']
+                src_u = src_u.to(mol_tree_batch.device)
+                src_v = src_v.to(mol_tree_batch.device)
+                eid = mol_tree_batch.edge_ids(src_u.int(), src_v.int()).long()
+                alpha = mol_tree_batch.edata['m'][eid]
                 node_idx = (tree_mess_tgt_nodes
                             .to(device=zero_node_state.device)[:, None]
                             .expand_as(alpha))
-                node_alpha = zero_node_state.clone().scatter_add(0, node_idx, alpha)
+                node_alpha = zero_node_state.clone().scatter_add(0, node_idx.long(), alpha)
                 cand_graphs.ndata['alpha'] = node_alpha
                 cand_graphs.apply_edges(
                     func=lambda edges: {'alpha': edges.src['alpha']},
                 )
 
+        cand_line_graph.ndata.update(cand_graphs.edata)
         for i in range(self.depth - 1):
             cand_line_graph.update_all(
                 mpn_loopy_bp_msg,
@@ -243,6 +250,7 @@ class DGLJTMPN(nn.Module):
                 self.loopy_bp_updater,
             )
 
+        cand_graphs.edata.update(cand_line_graph.ndata)
         cand_graphs.update_all(
             mpn_gather_msg,
             mpn_gather_reduce,

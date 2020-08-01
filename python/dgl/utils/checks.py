@@ -2,9 +2,8 @@
 # pylint: disable=invalid-name
 from __future__ import absolute_import, division
 
-from ..base import DGLError, dgl_warning
+from ..base import DGLError
 from .. import backend as F
-from .internal import to_dgl_context
 
 def prepare_tensor(g, data, name):
     """Convert the data to ID tensor and check its ID type and context.
@@ -129,14 +128,3 @@ def check_all_same_schema(feat_dict_list, keys, name):
                                ' and feature size, but got\n\t{} {}\nand\n\t{} {}.'.format(
                                    name, k, F.dtype(t1), F.shape(t1)[1:],
                                    F.dtype(t2), F.shape(t2)[1:]))
-
-def to_int32_graph_if_on_gpu(g):
-    """Convert to int32 graph if the input graph is on GPU."""
-    # device_type 2 is an internal code for GPU
-    if to_dgl_context(g.device).device_type == 2 and g.idtype == F.int64:
-        dgl_warning('Automatically cast a GPU int64 graph to int32.\n'
-                    ' To suppress the warning, call DGLGraph.int() first\n'
-                    ' or specify the ``device`` argument when creating the graph.')
-        return g.int()
-    else:
-        return g

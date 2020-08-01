@@ -211,7 +211,7 @@ class PinSAGESampler(RandomWalkNeighborSampler):
     """
     def __init__(self, G, ntype, other_type, random_walk_length, random_walk_restart_prob,
                  num_random_walks, num_neighbors, weight_column='weights'):
-        metagraph = G.metagraph
+        metagraph = G.metagraph()
         fw_etype = list(metagraph[ntype][other_type])[0]
         bw_etype = list(metagraph[other_type][ntype])[0]
         super().__init__(G, random_walk_length,
