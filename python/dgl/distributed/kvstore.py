@@ -1268,6 +1268,7 @@ def init_kvstore(ip_config, role='default'):
         KVCLIENT = KVClient(ip_config, role)
 
 def close_kvstore():
+    """Close the current KVClient"""
     global KVCLIENT
     KVCLIENT = None
 
