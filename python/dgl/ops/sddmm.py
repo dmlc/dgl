@@ -6,6 +6,7 @@ from ..backend import gsddmm as gsddmm_internal
 
 __all__ = ['gsddmm', 'copy_u', 'copy_v']
 
+
 def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
     It computes edge features by :attr:`op` lhs features and rhs features.
@@ -42,6 +43,7 @@ def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     """
     return gsddmm_internal(
         g._graph, op, lhs_data, rhs_data, lhs_target, rhs_target)
+
 
 def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
     name = "{}_{}_{}".format(lhs_target, binary_op, rhs_target)
@@ -87,6 +89,7 @@ def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
     func.__doc__ = docstring
     return func
 
+
 def _register_sddmm_func():
     """Register sddmm functions"""
     target = ["u", "v", "e"]
@@ -96,6 +99,7 @@ def _register_sddmm_func():
                 func = _gen_sddmm_func(lhs, rhs, binary_op)
                 setattr(sys.modules[__name__], func.__name__, func)
                 __all__.append(func.__name__)
+
 
 def copy_u(g, x):
     r"""Generalized SDDMM function that copies source node features to edges.
@@ -118,6 +122,7 @@ def copy_u(g, x):
     """
     return gsddmm(g, 'copy_lhs', x, None)
 
+
 def copy_v(g, x):
     r"""Generalized SDDMM function that copies destination node features to edges.
 
@@ -138,5 +143,6 @@ def copy_v(g, x):
     This function supports autograd (computing input gradients given the output gradient).
     """
     return gsddmm(g, 'copy_rhs', None, x)
+
 
 _register_sddmm_func()
