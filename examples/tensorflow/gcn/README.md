@@ -2,8 +2,8 @@ Graph Convolutional Networks (GCN)
 ============
 
 - Paper link: [https://arxiv.org/abs/1609.02907](https://arxiv.org/abs/1609.02907)
-- Author's code repo: [https://github.com/tkipf/gcn](https://github.com/tkipf/gcn). Note that the original code is 
-implemented with Tensorflow for the paper. 
+- Author's code repo: [https://github.com/tkipf/gcn](https://github.com/tkipf/gcn). Note that the original code is
+implemented with Tensorflow for the paper.
 
 Dependencies
 ------------
@@ -12,6 +12,7 @@ Dependencies
 
 ``bash
 pip install tensorflow requests
+export DGLBACKEND=tensorflow
 ``
 
 Codes
