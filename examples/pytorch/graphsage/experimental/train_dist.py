@@ -316,10 +316,5 @@ if __name__ == '__main__':
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
     args = parser.parse_args()
 
-    try:
-        print(args)
-        main(args)
-    except Exception as e:
-        print(e)
-        import traceback
-        traceback.print_exc()
+    print(args)
+    main(args)
