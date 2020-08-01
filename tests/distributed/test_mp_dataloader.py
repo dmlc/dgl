@@ -75,8 +75,7 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers):
             print(idx)
 
     dataloader.close()
-    dgl.distributed.exit_client()    
-    dgl.distributed.kvstore.close_kvstore()
+    dgl.distributed.exit_client()
 
 def main(tmpdir, num_server):
     ip_config = open("mp_ip_config.txt", "w")
