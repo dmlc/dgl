@@ -11,7 +11,7 @@ import backend as F
 import time
 from utils import get_local_usable_addr
 from pathlib import Path
-
+import pytest
 from dgl.distributed import DistGraphServer, DistGraph
 
 
@@ -29,6 +29,7 @@ def start_sample_client(rank, tmpdir, disable_shared_mem):
     dist_graph = DistGraph("rpc_ip_config.txt", "test_sampling", gpb=gpb)
     sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
     dgl.distributed.exit_client()
+    dgl.distributed.kvstore.close_kvstore()
     return sampled_graph
 
 
@@ -123,12 +124,12 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
 # Wait non shared memory graph store
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
-def test_rpc_sampling_shuffle():
+@pytest.mark.parametrize("num_server", [1, 2])
+def test_rpc_sampling_shuffle(num_server):
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
-        check_rpc_sampling_shuffle(Path(tmpdirname), 2)
-        check_rpc_sampling_shuffle(Path(tmpdirname), 1)
+        check_rpc_sampling_shuffle(Path(tmpdirname), num_server)
 
 def check_standalone_sampling(tmpdir):
     g = CitationGraphDataset("cora")[0]

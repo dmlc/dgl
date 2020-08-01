@@ -207,6 +207,8 @@ class BarrierRequest(rpc.Request):
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
+        print(kv_store)
+        print(kv_store.barrier_count)
         count = kv_store.barrier_count[self.role]
         kv_store.barrier_count[self.role] = count + 1
         if kv_store.barrier_count[self.role] == len(kv_store.role[self.role]):
@@ -1264,6 +1266,10 @@ def init_kvstore(ip_config, role='default'):
     global KVCLIENT
     if KVCLIENT is None:
         KVCLIENT = KVClient(ip_config, role)
+
+def close_kvstore():
+    global KVCLIENT
+    KVCLIENT = None
 
 def get_kvstore():
     """get the KVClient"""
