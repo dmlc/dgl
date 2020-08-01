@@ -8,7 +8,11 @@ from .. import utils
 
 
 class RelGraphConv(nn.Module):
-    r"""Relational graph convolution layer.
+    r"""
+
+    Description
+    -----------
+    Relational graph convolution layer.
 
     Relational graph convolution is introduced in "`Modeling Relational Data with Graph
     Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
@@ -46,11 +50,11 @@ class RelGraphConv(nn.Module):
     Parameters
     ----------
     in_feat : int
-        Input feature size.
+        Input feature size; i.e, the number of dimensions of :math:`h_j^{(l)}`.
     out_feat : int
-        Output feature size.
+        Output feature size; i.e., the number of dimensions of :math:`h_i^{(l+1)}`.
     num_rels : int
-        Number of relations.
+        Number of relations. .
     regularizer : str
         Which weight regularizer to use "basis" or "bdd".
         "basis" is short for basis-diagonal-decomposition.
@@ -62,7 +66,7 @@ class RelGraphConv(nn.Module):
     activation : callable, optional
         Activation function. Default: None.
     self_loop : bool, optional
-        True to include self loop message. Default: False.
+        True to include self loop message. Default: True.
     low_mem : bool, optional
         True to use low memory implementation of relation message passing function. Default: False.
         This option trades speed with memory consumption, and will slowdown the forward/backward.
@@ -72,8 +76,8 @@ class RelGraphConv(nn.Module):
     layer_norm: float, optional
         Add layer norm. Default: False
     
-    Example
-    -----
+    Examples
+    --------
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
@@ -87,23 +91,23 @@ class RelGraphConv(nn.Module):
     >>> etype = th.tensor(np.array([0,1,2,0,1,2]).astype(np.int64))
     >>> res = conv(g, feat, etype)
     >>> res
-    tensor([[-1.2279, -0.2183],
-            [-1.5015,  0.9176],
-            [-1.2279, -0.2183],
-            [ 0.7081,  1.2584],
-            [-1.5015,  0.9176],
-            [ 0.0000,  0.0000]], grad_fn=<AddBackward0>)
+    tensor([[ 0.3996, -2.3303],
+            [-0.4323, -0.1440],
+            [ 0.3996, -2.3303],
+            [ 2.1046, -2.8654],
+            [-0.4323, -0.1440],
+            [-0.1309, -1.0000]], grad_fn=<AddBackward0>)
 
     # One-hot input
     >>> one_hot_feat = th.tensor(np.array([0,1,2,3,4,5]).astype(np.int64))
     >>> res = conv(g, one_hot_feat, etype)
     >>> res
-    tensor([[-0.1925,  0.2755],
-            [-0.4811,  0.1721],
-            [ 0.3348, -0.2788],
-            [-1.3472, -0.4563],
-            [ 0.3348, -0.2788],
-            [ 0.0000,  0.0000]], grad_fn=<AddBackward0>)
+    tensor([[ 0.5925,  0.0985],
+            [-0.3953,  0.8408],
+            [-0.9819,  0.5284],
+            [-1.0085, -0.1721],
+            [ 0.5962,  1.2002],
+            [ 0.0365, -0.3532]], grad_fn=<AddBackward0>)
     """
     def __init__(self,
                  in_feat,
@@ -113,7 +117,7 @@ class RelGraphConv(nn.Module):
                  num_bases=None,
                  bias=True,
                  activation=None,
-                 self_loop=False,
+                 self_loop=True,
                  low_mem=False,
                  dropout=0.0,
                  layer_norm=False):
@@ -237,7 +241,12 @@ class RelGraphConv(nn.Module):
         return {'msg': msg}
 
     def forward(self, g, x, etypes, norm=None):
-        """ Forward computation
+        """
+
+        Description
+        -----------
+
+        Forward computation
 
         Parameters
         ----------

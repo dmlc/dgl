@@ -6,12 +6,17 @@ from torch.nn import init
 
 from .... import transform
 from .... import function as fn
+from ....base import DGLError
 from ..utils import Identity
 from ....utils import expand_as_pair
 
 
 class GMMConv(nn.Module):
-    r"""The Gaussian Mixture Model Convolution layer from `Geometric Deep
+    r"""
+
+    Description
+    -----------
+    The Gaussian Mixture Model Convolution layer from `Geometric Deep
     Learning on Graphs and Manifolds using Mixture Model CNNs
     <http://openaccess.thecvf.com/content_cvpr_2017/papers/Monti_Geometric_Deep_Learning_CVPR_2017_paper.pdf>`__.
 
@@ -22,19 +27,6 @@ class GMMConv(nn.Module):
         w_k(u) = \exp\left(-\frac{1}{2}(u-\mu_k)^T \Sigma_k^{-1} (u - \mu_k)\right)
 
     where :math:`\mu` denotes the pseudo-coordinates between a vertex and one of its neighbor, :math:`\Sigma_k^{-1}` and :math:`\mu_k` are learnable parameters representing the covariance matrix and mean vector of a Gaussian kernel.
-
-    Notes
-    -----
-    Zero in degree nodes could lead to invalid output. A common practice
-    to avoid this is to add a self-loop for each node in the graph if it's homogeneous,
-    which can be achieved by:
-
-    >>> g = ... # some homogeneous graph
-    >>> dgl.add_self_loop(g)
-
-    If we can't do the above in advance for some reason, we need to set add_self_loop to ``True``.
-
-    For heterogeneous graph, it doesn't make sense to add self-loop. Then we need to filter out the destination nodes with zero in-degree when use in downstream.
 
     Parameters
     ----------
@@ -52,14 +44,29 @@ class GMMConv(nn.Module):
         If True, use residual connection inside this layer. Default: ``False``.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
-    add_self_loop: bool, optional
-        Add self-loop to graph when compute Conv. If no self-loop is added, the feature for a node with zero
-        in-degree will be all zero after Conv. This is harmful for some applications. We recommend adding
-        self_loop in graph construction phase to reduce duplicated operations. If we can't do that, we
-        need to set add_self_loop to ``True`` here.
+    allow_zero_in_degree : bool, optional
+        If there are 0-in-degree nodes in the graph, output for those nodes will be invalid
+        since no message will be passed to those nodes. This is harmful for some applications
+        causing silent performance regression. This module will raise a DGLError if it detects
+        0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
+        and let the users handle it by themselves.
 
-    Example
-    -------
+    Notes
+    -----
+    Zero in-degree nodes will lead to invalid output value. A common practice
+    to avoid this is to add a self-loop for each node in the graph if it is
+    homogeneous, which can be achieved by:
+
+    >>> g = ... # a DGLGraph
+    >>> g = dgl.add_self_loop(g)
+
+    Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
+    since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree`` to ``True``
+    for those cases to unblock the code and handle zere-in-degree nodes manually. A common
+    practise to handle this is to filter out the nodes with zere-in-degree when use after conv.
+
+    Examples
+    --------
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
@@ -67,32 +74,33 @@ class GMMConv(nn.Module):
 
     Case 1: Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> g = dgl.add_self_loop(g)
     >>> feat = th.ones(6, 10)
     >>> conv = GMMConv(10, 2, 3, 2, 'mean')
-    >>> pseudo = th.ones(6, 3)
+    >>> pseudo = th.ones(12, 3)
     >>> res = conv(g, feat, pseudo)
     >>> res
-    tensor([[0.1388, 0.7694],
-            [0.1388, 0.7694],
-            [0.1388, 0.7694],
-            [0.1388, 0.7694],
-            [0.1388, 0.7694],
-            [0.0000, 0.0000]], grad_fn=<AddBackward0>)
+    tensor([[-0.3462, -0.2654],
+            [-0.3462, -0.2654],
+            [-0.3462, -0.2654],
+            [-0.3462, -0.2654],
+            [-0.3462, -0.2654],
+            [-0.3462, -0.2654]], grad_fn=<AddBackward0>)
 
     Case 2: Unidirectional bipartite graph
-    >>> u = [0, 0, 1]
-    >>> v = [2, 3, 2]
+    >>> u = [0, 1, 0, 0, 1]
+    >>> v = [0, 1, 2, 3, 2]
     >>> g = dgl.bipartite((u, v))
     >>> u_fea = th.rand(2, 5)
     >>> v_fea = th.rand(4, 10)
-    >>> pseudo = th.ones(3, 3)
+    >>> pseudo = th.ones(5, 3)
     >>> conv = GMMConv((10, 5), 2, 3, 2, 'mean')
     >>> res = conv(g, (u_fea, v_fea), pseudo)
     >>> res
-    tensor([[ 0.0000,  0.0000],
-            [ 0.0000,  0.0000],
-            [ 0.0049,  0.0347],
-            [ 0.1355, -0.0765]], grad_fn=<AddBackward0>)
+    tensor([[-0.1107, -0.1559],
+            [-0.1646, -0.2326],
+            [-0.1377, -0.1943],
+            [-0.1107, -0.1559]], grad_fn=<AddBackward0>)
     """
     def __init__(self,
                  in_feats,
@@ -136,7 +144,19 @@ class GMMConv(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        """Reinitialize learnable parameters."""
+        r"""
+
+        Description
+        -----------
+        Reinitialize learnable parameters.
+
+        Notes
+        -----
+        The fc parameters are initialized using Glorot uniform initialization
+        and the bias is initialized to be zero.
+        The mu weight is initialized using normal distribution and
+        inv_sigma is initialized with constant value 1.0.
+        """
         gain = init.calculate_gain('relu')
         init.xavier_normal_(self.fc.weight, gain=gain)
         if isinstance(self.res_fc, nn.Linear):
@@ -147,7 +167,11 @@ class GMMConv(nn.Module):
             init.zeros_(self.bias.data)
 
     def forward(self, graph, feat, pseudo):
-        """Compute Gaussian Mixture Model Convolution layer.
+        """
+
+        Description
+        -----------
+        Compute Gaussian Mixture Model Convolution layer.
 
         Parameters
         ----------
@@ -168,11 +192,22 @@ class GMMConv(nn.Module):
         torch.Tensor
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is the output feature size.
+
+        Raises
+        ------
+        DGLError
+            If there are 0-in-degree nodes in the input graph, it will raise DGLError
+            since no message will be passed to those nodes. This will cause invalid output.
+            The error can be ignored by setting ``allow_zero_in_degree`` parameter to ``True``.
         """
         with graph.local_scope():
-            if self._add_self_loop:
-                graph = transform.add_self_loop(graph)
- 
+            if not self._allow_zero_in_degree:
+                if (graph.in_degrees() == 0).any():
+                    raise DGLError('There are 0-in-degree nodes in the graph, output for those nodes will be invalid.'
+                                   'This is harmful for some applications, causing silent performance regression.'
+                                   'Adding self-loop on the input graph by calling `g = dgl.add_self_loop(g)` will resolve the issue.'
+                                   'Setting ``allow_zero_in_degree`` to be `True` when constructing this module will suppress the check and let the code run.')
+
             feat_src, feat_dst = expand_as_pair(feat, graph)
             graph.srcdata['h'] = self.fc(feat_src).view(-1, self._n_kernels, self._out_feats)
             E = graph.number_of_edges()

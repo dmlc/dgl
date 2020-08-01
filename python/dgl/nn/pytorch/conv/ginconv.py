@@ -4,11 +4,16 @@ import torch as th
 from torch import nn
 
 from .... import function as fn
+from ....base import DGLError
 from ....utils import expand_as_pair
 
 
 class GINConv(nn.Module):
-    r"""Graph Isomorphism Network layer from paper `How Powerful are Graph
+    r"""
+
+    Description
+    -----------
+    Graph Isomorphism Network layer from paper `How Powerful are Graph
     Neural Networks? <https://arxiv.org/pdf/1810.00826.pdf>`__.
 
     .. math::
@@ -27,6 +32,26 @@ class GINConv(nn.Module):
         Initial :math:`\epsilon` value, default: ``0``.
     learn_eps : bool, optional
         If True, :math:`\epsilon` will be a learnable parameter.
+    allow_zero_in_degree : bool, optional
+        If there are 0-in-degree nodes in the graph, output for those nodes will be invalid
+        since no message will be passed to those nodes. This is harmful for some applications
+        causing silent performance regression. This module will raise a DGLError if it detects
+        0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
+        and let the users handle it by themselves.
+
+    Notes
+    -----
+    Zero in-degree nodes will lead to invalid output value if aggregator_type is not `sum` or `mean`.
+    A common practice to avoid this is to add a self-loop for each node in the graph if it is
+    homogeneous, which can be achieved by:
+
+    >>> g = ... # a DGLGraph
+    >>> g = dgl.add_self_loop(g)
+
+    Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
+    since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree`` to ``True``
+    for those cases to unblock the code and handle zere-in-degree nodes manually. A common
+    practise to handle this is to filter out the nodes with zere-in-degree when use after conv.
 
     Example
     -------
@@ -36,31 +61,34 @@ class GINConv(nn.Module):
     >>> from dgl.nn import GINConv
     >>>
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> g = dgl.add_self_loop(g)
     >>> feat = th.ones(6, 10)
     >>> lin = th.nn.Linear(10, 10)
-    >>> conv = GINConv(lin, 'mean')
+    >>> conv = GINConv(lin, 'max')
     >>> res = conv(g, feat)
     >>> res
-    tensor([[-0.3140, -0.0219, -1.5205,  0.4218,  0.8428,  0.6709, -1.0817, -1.6427,
-            1.5138,  0.8704],
-            [-0.3140, -0.0219, -1.5205,  0.4218,  0.8428,  0.6709, -1.0817, -1.6427,
-            1.5138,  0.8704],
-            [-0.3140, -0.0219, -1.5205,  0.4218,  0.8428,  0.6709, -1.0817, -1.6427,
-            1.5138,  0.8704],
-            [-0.3140, -0.0219, -1.5205,  0.4218,  0.8428,  0.6709, -1.0817, -1.6427,
-            1.5138,  0.8704],
-            [-0.3140, -0.0219, -1.5205,  0.4218,  0.8428,  0.6709, -1.0817, -1.6427,
-            1.5138,  0.8704],
-            [-0.1895,  0.1438, -0.8263,  0.1299,  0.3834,  0.4899, -0.6838, -0.7136,
-            0.6493,  0.4531]], grad_fn=<AddmmBackward>)
+    tensor([[ 1.2330, -0.1572,  0.0622, -3.1567, -2.2414, -0.7275,  0.6311,  1.0396,
+            1.7008, -1.2468],
+            [ 1.2330, -0.1572,  0.0622, -3.1567, -2.2414, -0.7275,  0.6311,  1.0396,
+            1.7008, -1.2468],
+            [ 1.2330, -0.1572,  0.0622, -3.1567, -2.2414, -0.7275,  0.6311,  1.0396,
+            1.7008, -1.2468],
+            [ 1.2330, -0.1572,  0.0622, -3.1567, -2.2414, -0.7275,  0.6311,  1.0396,
+            1.7008, -1.2468],
+            [ 1.2330, -0.1572,  0.0622, -3.1567, -2.2414, -0.7275,  0.6311,  1.0396,
+            1.7008, -1.2468],
+            [ 1.2330, -0.1572,  0.0622, -3.1567, -2.2414, -0.7275,  0.6311,  1.0396,
+            1.7008, -1.2468]], grad_fn=<AddmmBackward>)
     """
     def __init__(self,
                  apply_func,
                  aggregator_type,
                  init_eps=0,
-                 learn_eps=False):
+                 learn_eps=False,
+                 allow_zero_in_degree=False):
         super(GINConv, self).__init__()
         self.apply_func = apply_func
+        self._aggregator_type = aggregator_type
         if aggregator_type == 'sum':
             self._reducer = fn.sum
         elif aggregator_type == 'max':
@@ -74,9 +102,14 @@ class GINConv(nn.Module):
             self.eps = th.nn.Parameter(th.FloatTensor([init_eps]))
         else:
             self.register_buffer('eps', th.FloatTensor([init_eps]))
+        self._allow_zero_in_degree = allow_zero_in_degree
 
     def forward(self, graph, feat):
-        r"""Compute Graph Isomorphism Network layer.
+        r"""
+
+        Description
+        -----------
+        Compute Graph Isomorphism Network layer.
 
         Parameters
         ----------
@@ -97,8 +130,22 @@ class GINConv(nn.Module):
             :math:`D_{out}` is the output dimensionality of ``apply_func``.
             If ``apply_func`` is None, :math:`D_{out}` should be the same
             as input dimensionality.
+
+        Raises
+        ------
+        DGLError
+            If there are 0-in-degree nodes in the input graph, it will raise DGLError
+            since no message will be passed to those nodes. This will cause invalid output.
+            The error can be ignored by setting ``allow_zero_in_degree`` parameter to ``True``.
         """
         with graph.local_scope():
+            if not self._allow_zero_in_degree:
+                if (graph.in_degrees() == 0).any() and (self._aggregator_type not in ['sum', 'mean']):
+                    raise DGLError('There are 0-in-degree nodes in the graph, output for those nodes will be invalid.'
+                                   'This is harmful for some applications, causing silent performance regression.'
+                                   'Adding self-loop on the input graph by calling `g = dgl.add_self_loop(g)` will resolve the issue.'
+                                   'Setting ``allow_zero_in_degree`` to be `True` when constructing this module will suppress the check and let the code run.')
+
             feat_src, feat_dst = expand_as_pair(feat, graph)
             graph.srcdata['h'] = feat_src
             graph.update_all(fn.copy_u('h', 'm'), self._reducer('m', 'neigh'))

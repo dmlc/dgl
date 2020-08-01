@@ -7,7 +7,11 @@ from .... import function as fn
 
 
 class TAGConv(nn.Module):
-    r"""Topology Adaptive Graph Convolutional layer from paper `Topology
+    r"""
+
+    Description
+    -----------
+    Topology Adaptive Graph Convolutional layer from paper `Topology
     Adaptive Graph Convolutional Networks <https://arxiv.org/pdf/1710.10370.pdf>`__.
 
     .. math::
@@ -73,12 +77,25 @@ class TAGConv(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        """Reinitialize learnable parameters."""
+        r"""
+
+        Description
+        -----------
+        Reinitialize learnable parameters.
+
+        Notes
+        -----
+        The model parameters are initialized using Glorot uniform initialization.
+        """
         gain = nn.init.calculate_gain('relu')
         nn.init.xavier_normal_(self.lin.weight, gain=gain)
 
     def forward(self, graph, feat):
-        r"""Compute topology adaptive graph convolution.
+        r"""
+
+        Description
+        -----------
+        Compute topology adaptive graph convolution.
 
         Parameters
         ----------

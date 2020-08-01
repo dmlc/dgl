@@ -162,7 +162,6 @@ class GraphConv(nn.Module):
         `original implementation <https://github.com/tkipf/gcn/blob/master/gcn/layers.py>`
         __ where the weight :math:`W^{(l)}` is initialized using Glorot uniform initialization
         and the bias is initialized to be zero.
-
         """
         if self.weight is not None:
             init.xavier_uniform_(self.weight)

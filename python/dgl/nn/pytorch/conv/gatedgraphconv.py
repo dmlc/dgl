@@ -8,7 +8,11 @@ from .... import function as fn
 
 
 class GatedGraphConv(nn.Module):
-    r"""Gated Graph Convolution layer from paper `Gated Graph Sequence
+    r"""
+
+    Description
+    -----------
+    Gated Graph Convolution layer from paper `Gated Graph Sequence
     Neural Networks <https://arxiv.org/pdf/1511.05493.pdf>`__.
 
     .. math::
@@ -21,11 +25,11 @@ class GatedGraphConv(nn.Module):
     Parameters
     ----------
     in_feats : int
-        Input feature size.
+        Input feature size; i.e, the number of dimensions of :math:`x_i`.
     out_feats : int
-        Output feature size.
+        Output feature size; i.e., the number of dimensions of :math:`h_i^{(t+1)}`.
     n_steps : int
-        Number of recurrent steps.
+        Number of recurrent steps; i.e, the :math:`t` in the above formula.
     n_etypes : int
         Number of edge types.
     bias : bool
@@ -75,7 +79,17 @@ class GatedGraphConv(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        """Reinitialize learnable parameters."""
+        r"""
+
+        Description
+        -----------
+        Reinitialize learnable parameters.
+
+        Notes
+        -----
+        The model parameters are initialized using Glorot uniform initialization
+        and the bias is initialized to be zero.
+        """
         gain = init.calculate_gain('relu')
         self.gru.reset_parameters()
         for linear in self.linears:
@@ -83,7 +97,11 @@ class GatedGraphConv(nn.Module):
             init.zeros_(linear.bias)
 
     def forward(self, graph, feat, etypes):
-        """Compute Gated Graph Convolution layer.
+        """
+
+        Description
+        -----------
+        Compute Gated Graph Convolution layer.
 
         Parameters
         ----------
