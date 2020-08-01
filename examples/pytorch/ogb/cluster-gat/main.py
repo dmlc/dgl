@@ -95,8 +95,6 @@ class GAT(nn.Module):
                     drop_last=False,
                     num_workers=args.num_workers)
 
-            layer.fc_src = layer.fc
-            layer.fc_dst = layer.fc
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0].to(device)
                 h = x[input_nodes].to(device)

@@ -4,7 +4,6 @@ import torch as th
 from torch import nn
 
 from .... import function as fn
-from .... import ops as F
 from ..softmax import edge_softmax
 from ..utils import Identity
 from ....utils import expand_as_pair
@@ -139,21 +138,17 @@ class GATConv(nn.Module):
             # which further speeds up computation and saves memory footprint.
             el = (feat_src * self.attn_l).sum(dim=-1).unsqueeze(-1)
             er = (feat_dst * self.attn_r).sum(dim=-1).unsqueeze(-1)
-            #graph.srcdata.update({'ft': feat_src, 'el': el})
-            #graph.dstdata.update({'er': er})
+            graph.srcdata.update({'ft': feat_src, 'el': el})
+            graph.dstdata.update({'er': er})
             # compute edge attention, el and er are a_l Wh_i and a_r Wh_j respectively.
-            #graph.apply_edges(fn.u_add_v('el', 'er', 'e'))
-            e = F.u_add_v(graph, el, er)
-            #e = self.leaky_relu(graph.edata.pop('e'))
-            e = self.leaky_relu(e)
+            graph.apply_edges(fn.u_add_v('el', 'er', 'e'))
+            e = self.leaky_relu(graph.edata.pop('e'))
             # compute softmax
-            #graph.edata['a'] = self.attn_drop(edge_softmax(graph, e))
-            a = self.attn_drop(edge_softmax(graph, e))
+            graph.edata['a'] = self.attn_drop(edge_softmax(graph, e))
             # message passing
-            #graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
-            #                 fn.sum('m', 'ft'))
-            #rst = graph.dstdata['ft']
-            rst = F.u_mul_e_sum(graph, feat_src, a)
+            graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
+                             fn.sum('m', 'ft'))
+            rst = graph.dstdata['ft']
             # residual
             if self.res_fc is not None:
                 resval = self.res_fc(h_dst).view(h_dst.shape[0], -1, self._out_feats)
