@@ -345,7 +345,7 @@ class CoraGraphDataset(CitationGraphDataset):
     Examples
     --------
     >>> dataset = CoraGraphDataset()
-    >>> g = dataset.graph
+    >>> g = dataset[0]
     >>> num_class = g.num_labels
     >>>
     >>> # get node feature
@@ -470,7 +470,7 @@ class CiteseerGraphDataset(CitationGraphDataset):
     Examples
     --------
     >>> dataset = CiteseerGraphDataset()
-    >>> g = dataset.graph
+    >>> g = dataset[0]
     >>> num_class = g.num_labels
     >>>
     >>> # get node feature
@@ -592,7 +592,7 @@ class PubmedGraphDataset(CitationGraphDataset):
     Examples
     --------
     >>> dataset = PubmedGraphDataset()
-    >>> g = dataset.graph
+    >>> g = dataset[0]
     >>> num_class = g.num_of_class
     >>>
     >>> # get node feature
