@@ -3,6 +3,7 @@ from ...sparse import _gspmm, _gsddmm
 
 __all__ = ['gspmm', 'gsddmm']
 
+
 def _reduce_grad(grad, shape):
     """Reduce gradient on the broadcast dimension
     If there is broadcast in forward pass, gradients need to be reduced on
@@ -34,6 +35,7 @@ def _reduce_grad(grad, shape):
         grad = grad.sum(dim=tuple(reduce_idx), keepdim=True)
     return grad.view(-1, *shape[1:])
 
+
 def _need_reduce_last_dim(ufeat, efeat):
     """Indicates whether to reduce the last dimension on edges
     in the backward pass of spmm,
@@ -42,11 +44,14 @@ def _need_reduce_last_dim(ufeat, efeat):
     eshp = efeat.shape
     return ushp[1:-1] == eshp[1:-1] and eshp[-1] == 1 and ushp[-1] > 1
 
+
 def _muldiv(op, x):
     return 1. / x if op == 'div' else x
 
+
 def _addsub(op, x):
     return -x if op == 'sub' else x
+
 
 class GSpMM(th.autograd.Function):
     @staticmethod
@@ -69,15 +74,17 @@ class GSpMM(th.autograd.Function):
                     dX = gspmm(g_rev, 'copy_lhs', 'sum', dZ, Y)
                 elif op == 'copy_lhs':
                     dX = gspmm(g_rev, 'copy_lhs', 'sum', dZ, None)
-            else:
-                dX = th.zeros((X.shape[0],) + dZ.shape[1:], dtype=X.dtype, device=X.device)
+            else:  # max/min
+                dX = th.zeros((X.shape[0],) + dZ.shape[1:],
+                              dtype=X.dtype, device=X.device)
                 if op in ['mul', 'div']:
-                    dX.scatter_add_(0, argX.long(),
-                                    _muldiv(op, Y.expand(-1, *dZ.shape[1:]).gather(0, argY.long())) * dZ)
+                    grad = _muldiv(op, Y.expand(-1, *dZ.shape[1:]).gather(
+                        0, argY.long())) * dZ
+                    dX.scatter_add_(0, argX.long(), grad)
                 elif op in ['add', 'sub', 'copy_lhs']:
                     dX.scatter_add_(0, argX.long(), dZ)
             dX = _reduce_grad(dX, X.shape)
-        else:
+        else:  # X has not gradient
             dX = None
         if op != 'copy_lhs' and ctx.needs_input_grad[4]:
             if reduce_op == 'sum':
@@ -85,21 +92,26 @@ class GSpMM(th.autograd.Function):
                     dY = gsddmm(gidx, 'dot', X, dZ)
                 elif op in ['mul', 'div']:
                     dY = gsddmm(gidx, 'mul', X, dZ)
-                    if op == 'div': dY = -dY / (Y ** 2)
+                    if op == 'div':
+                        dY = -dY / (Y ** 2)
                 elif op in ['add', 'sub', 'copy_rhs']:
                     dY = gsddmm(gidx, 'copy_rhs', X, _addsub(op, dZ))
-            else:
-                dY = th.zeros((Y.shape[0],) + dZ.shape[1:], dtype=Y.dtype, device=Y.device)
+            else:  # max/min
+                dY = th.zeros((Y.shape[0],) + dZ.shape[1:],
+                              dtype=Y.dtype, device=Y.device)
                 if op in ['mul',  'div']:
-                    dY.scatter_add_(0, argY.long(),
-                                    X.expand(-1, *dZ.shape[1:]).gather(0, argX.long()) * dZ)
-                    if op == 'div': dY = -dY / (Y ** 2)
+                    grad = X.expand(-1, *dZ.shape[1:]).gather(
+                        0, argX.long()) * dZ
+                    dY.scatter_add_(0, argY.long(), grad)
+                    if op == 'div':
+                        dY = -dY / (Y ** 2)
                 elif op in ['add', 'sub', 'copy_rhs']:
                     dY.scatter_add_(0, argY.long(), _addsub(op, dZ))
             dY = _reduce_grad(dY, Y.shape)
-        else:
+        else:  # Y has no gradient
             dY = None
         return None, None, None, dX, dY
+
 
 class GSDDMM(th.autograd.Function):
     @staticmethod
@@ -159,9 +171,10 @@ class GSDDMM(th.autograd.Function):
             dY = None
         return None, None, dX, dY, None, None
 
+
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     return GSpMM.apply(gidx, op, reduce_op, lhs_data, rhs_data)
 
+
 def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     return GSDDMM.apply(gidx, op, lhs_data, rhs_data, lhs_target, rhs_target)
-

@@ -497,8 +497,8 @@ def test_gat_conv(g, idtype):
 def test_gat_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    gat = nn.GATConv((5, 10), 2, 4)
-    feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 10)))
+    gat = nn.GATConv(5, 2, 4)
+    feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
     gat = gat.to(ctx)
     h = gat(g, feat)
     assert h.shape == (g.number_of_dst_nodes(), 4, 2)
