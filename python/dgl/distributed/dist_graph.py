@@ -255,11 +255,11 @@ class DistGraphServer(KVServer):
         # Load graph partition data.
         if self.is_backup_server():
             # The backup server doesn't load the graph partition. It'll initialized afterwards.
-            self.gpb, graph_name = load_partition_book(conf_file, self.part_id)
+            self.gpb, graph_name = load_partition_book(part_config, self.part_id)
             self.client_g = None
         else:
             self.client_g, node_feats, edge_feats, self.gpb, \
-                    graph_name = load_partition(conf_file, self.part_id)
+                    graph_name = load_partition(part_config, self.part_id)
             print('load ' + graph_name)
             if not disable_shared_mem:
                 self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)

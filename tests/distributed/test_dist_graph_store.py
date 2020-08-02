@@ -247,7 +247,7 @@ def test_standalone():
     partition_graph(g, graph_name, num_parts, '/tmp/dist_graph')
     dist_g = DistGraph("kv_ip_config.txt", graph_name,
                        part_config='/tmp/dist_graph/{}.json'.format(graph_name))
-    check_dist_graph(dist_g, g.number_of_nodes(), g.number_of_edges())
+    check_dist_graph(dist_g, 1, g.number_of_nodes(), g.number_of_edges())
 
 def test_split():
     #prepare_dist()
