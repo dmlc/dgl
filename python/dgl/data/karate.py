@@ -26,8 +26,7 @@ class KarateClubDataset(DGLDataset):
     networks after its use by Michelle Girvan and Mark Newman in 2002.
     Official website: http://konect.cc/networks/ucidata-zachary/
 
-    Statistics
-    ----------
+    Karate Club dataset statistics:
     Nodes: 34
     Edges: 156
     Number of Classes: 2
