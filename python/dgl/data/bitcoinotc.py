@@ -138,6 +138,12 @@ class BitcoinOTCDataset(DGLBuiltinDataset):
 
     @property
     def is_temporal(self):
+        r""" Are the graphs temporal graphs
+
+        Returns
+        -------
+        bool
+        """
         return True
 
     def _extract_gz(self, file, target_dir, overwrite=False):
