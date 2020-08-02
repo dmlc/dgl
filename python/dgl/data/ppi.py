@@ -12,7 +12,21 @@ from ..convert import from_networkx
 
 
 class PPIDataset(DGLBuiltinDataset):
-    """ Protein-Protein Interaction dataset for inductive node classification
+    r""" Protein-Protein Interaction dataset for inductive node classification
+
+    .. deprecated:: 0.5.0
+        `lables` is deprecated, it is replaced by:
+            >>> dataset = PPIDataset()
+            >>> for g in dataset:
+            ....    labels = g.ndata['label']
+            ....
+            >>>
+        `features` is deprecated, it is replaced by:
+            >>> dataset = PPIDataset()
+            >>> for g in dataset:
+            ....    features = g.ndata['feat']
+            ....
+            >>>
 
     A toy Protein-Protein Interaction network dataset. The dataset contains
     24 graphs. The average number of nodes per graph is 2372. Each node has
@@ -21,8 +35,7 @@ class PPIDataset(DGLBuiltinDataset):
 
     Reference: http://snap.stanford.edu/graphsage/
 
-    Statistics
-    ----------
+    PPI dataset statistics:
     Train examples: 20
     Valid examples: 2
     Test examples: 2
@@ -30,31 +43,36 @@ class PPIDataset(DGLBuiltinDataset):
     Parameters
     ----------
     mode : str
-        Must be one of ('train', 'valid', 'test'). Default: 'train'
+        Must be one of ('train', 'valid', 'test').
+        Default: 'train'
     raw_dir : str
         Raw file directory to download/contains the input data directory.
         Default: ~/.dgl/
     force_reload : bool
-        Whether to reload the dataset. Default: False
+        Whether to reload the dataset.
+        Default: False
     verbose: bool
-        Whether to print out progress information. Default: True.
+        Whether to print out progress information.
+        Default: True.
 
-    Returns
-    -------
-    PPIDataset object with two properties
-        graphs: list of DGLGraph objects that contains graph structure, node features and node labels:
-            - ndata['feat']: node features
-            - ndata['label']: nodel labels
-        graph: DGLGraph, the graph of the dataset
-        num_labels: int, number of labels for each node
+    Attributes
+    ----------
+    num_labels : int
+        Number of labels for each node
+    labels : Tensor
+        Node labels
+    features : Tensor
+        Node features
+
     Examples
     --------
-    >>> data = PPIDataset(mode='valid')
-    >>> num_labels = data.num_labels
-    >>> for g, _ in data:
+    >>> dataset = PPIDataset(mode='valid')
+    >>> num_labels = dataset.num_labels
+    >>> for g in dataset:
     ....    feat = g.ndata['feat']
     ....    label = g.ndata['label']
     ....    # your code here
+    >>>
     """
     def __init__(self, mode='train', raw_dir=None, force_reload=False, verbose=False):
         assert mode in ['train', 'valid', 'test']
@@ -140,7 +158,7 @@ class PPIDataset(DGLBuiltinDataset):
         return len(self.graphs)
 
     def __getitem__(self, item):
-        """Get the i^th sample.
+        """Get the item^th sample.
 
         Parameters
         ---------
@@ -150,7 +168,9 @@ class PPIDataset(DGLBuiltinDataset):
         Returns
         -------
         dgl.DGLGraph
-            The graph
+            graph structure, node features and node labels.
+            - ndata['feat']: node features
+            - ndata['label']: nodel labels
         """
         return self.graphs[item]
 
@@ -160,7 +180,7 @@ class LegacyPPIDataset(PPIDataset):
     """
 
     def __getitem__(self, item):
-        """Get the i^th sample.
+        """Get the item^th sample.
 
         Paramters
         ---------
@@ -169,7 +189,7 @@ class LegacyPPIDataset(PPIDataset):
 
         Returns
         -------
-        (dgl.DGLGraph, ndarray, ndarray)
+        (dgl.DGLGraph, Tensor, Tensor)
             The graph, features and its label.
         """
 
