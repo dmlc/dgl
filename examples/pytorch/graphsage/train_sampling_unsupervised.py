@@ -22,14 +22,20 @@ import sklearn.metrics as skm
 from utils import thread_wrapped_func
 
 class NegativeSampler(object):
-    def __init__(self, g, k):
+    def __init__(self, g, k, neg_share=False):
         self.weights = g.in_degrees().float() ** 0.75
         self.k = k
+        self.neg_share = neg_share
 
     def __call__(self, g, eids):
         src, _ = g.find_edges(eids)
+        n = len(src)
+        if self.neg_share and n % self.k == 0:
+            dst = self.weights.multinomial(n, replacement=True)
+            dst = dst.view(-1, 1, self.k).expand(-1, self.k, -1).flatten()
+        else:
+            dst = self.weights.multinomial(n, replacement=True)
         src = src.repeat_interleave(self.k)
-        dst = self.weights.multinomial(len(src), replacement=True)
         return src, dst
 
 def load_subtensor(g, input_nodes, device):
@@ -203,7 +209,7 @@ def run(proc_id, n_gpus, args, devices, data):
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
     dataloader = dgl.dataloading.EdgeDataLoader(
-        g, train_seeds, sampler, exclude='reverse',
+        g, train_seeds, sampler, exclude='reverse_id',
         # For each edge with ID e in Reddit dataset, the reverse edge is e ± |E|/2.
         reverse_eids=th.cat([
             th.arange(n_edges // 2, n_edges),
@@ -330,7 +336,7 @@ if __name__ == '__main__':
     argparser.add_argument('--num-workers', type=int, default=0,
         help="Number of sampling processes. Use 0 for no extra process.")
     args = argparser.parse_args()
-    
+
     devices = list(map(int, args.gpu.split(',')))
 
     main(args, devices)
