@@ -64,7 +64,7 @@ class NeighborSampler(object):
         neg_graph = dgl.graph((neg_heads, neg_tails), num_nodes=self.g.number_of_nodes())
         pos_graph, neg_graph = dgl.compact_graphs([pos_graph, neg_graph])
 
-        # Obtain the node IDs being used in either pos_graph or neg_graph.  Since they
+        # Obtain the node IDs being used in either pos_graph or neg_graph. Since they
         # are compacted together, pos_graph and neg_graph share the same compacted node
         # space.
         seeds = pos_graph.ndata[dgl.NID]
@@ -381,7 +381,7 @@ if __name__ == '__main__':
     argparser.add_argument('--num-workers', type=int, default=0,
         help="Number of sampling processes. Use 0 for no extra process.")
     args = argparser.parse_args()
-    
+
     devices = list(map(int, args.gpu.split(',')))
 
     main(args, devices)

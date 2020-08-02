@@ -249,6 +249,7 @@ class RDFGraphDataset(DGLBuiltinDataset):
         # save for compatability
         self._train_idx = F.tensor(train_idx)
         self._test_idx = F.tensor(test_idx)
+        self._labels = labels
 
     def build_graph(self, mg, src, dst, ntid, etid, ntypes, etypes):
         """Build the graphs
@@ -638,17 +639,17 @@ class AIFBDataset(RDFGraphDataset):
 
         Return
         -------
-            dgl.DGLGraph
-                graph structure, node features and labels.
-                - ndata['train_mask']: mask for training node set
-                - ndata['test_mask']: mask for testing node set
-                - ndata['labels']: mask for labels
+        dgl.DGLGraph
+            graph structure, node features and labels.
+            - ndata['train_mask']: mask for training node set
+            - ndata['test_mask']: mask for testing node set
+            - ndata['labels']: mask for labels
         """
         return super(AIFBDataset, self).__getitem__(idx)
 
     def __len__(self):
         r"""The number of graphs in the dataset."""
-        return super(AIFBDataset, self).__len__(idx)
+        return super(AIFBDataset, self).__len__()
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
@@ -801,17 +802,17 @@ class MUTAGDataset(RDFGraphDataset):
 
         Return
         -------
-            dgl.DGLGraph
-                graph structure, node features and labels.
-                - ndata['train_mask']: mask for training node set
-                - ndata['test_mask']: mask for testing node set
-                - ndata['labels']: mask for labels
+        dgl.DGLGraph
+            graph structure, node features and labels.
+            - ndata['train_mask']: mask for training node set
+            - ndata['test_mask']: mask for testing node set
+            - ndata['labels']: mask for labels
         """
         return super(MUTAGDataset, self).__getitem__(idx)
 
     def __len__(self):
         r"""The number of graphs in the dataset."""
-        return super(MUTAGDataset, self).__len__(idx)
+        return super(MUTAGDataset, self).__len__()
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
@@ -980,17 +981,17 @@ class BGSDataset(RDFGraphDataset):
 
         Return
         -------
-            dgl.DGLGraph
-                graph structure, node features and labels.
-                - ndata['train_mask']: mask for training node set
-                - ndata['test_mask']: mask for testing node set
-                - ndata['labels']: mask for labels
+        dgl.DGLGraph
+            graph structure, node features and labels.
+            - ndata['train_mask']: mask for training node set
+            - ndata['test_mask']: mask for testing node set
+            - ndata['labels']: mask for labels
         """
         return super(BGSDataset, self).__getitem__(idx)
 
     def __len__(self):
         r"""The number of graphs in the dataset."""
-        return super(BGSDataset, self).__len__(idx)
+        return super(BGSDataset, self).__len__()
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
@@ -1155,17 +1156,17 @@ class AMDataset(RDFGraphDataset):
 
         Return
         -------
-            dgl.DGLGraph
-                graph structure, node features and labels.
-                - ndata['train_mask']: mask for training node set
-                - ndata['test_mask']: mask for testing node set
-                - ndata['labels']: mask for labels
+        dgl.DGLGraph
+            graph structure, node features and labels.
+            - ndata['train_mask']: mask for training node set
+            - ndata['test_mask']: mask for testing node set
+            - ndata['labels']: mask for labels
         """
         return super(AMDataset, self).__getitem__(idx)
 
     def __len__(self):
         r"""The number of graphs in the dataset."""
-        return super(AMDataset, self).__len__(idx)
+        return super(AMDataset, self).__len__()
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
