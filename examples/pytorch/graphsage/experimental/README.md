@@ -15,7 +15,6 @@ export PYTHONPATH=$PYTHONPATH:..
 In this example, we partition the OGB product graph into 4 parts with Metis. The partitions are balanced with respect to
 the number of nodes, the number of edges and the number of labelled nodes.
 ```bash
-# partition graph
 python3 partition_graph.py --dataset ogb-product --num_parts 4 --balance_train --balance_edges
 ```
 
@@ -50,6 +49,17 @@ python3 ~/dgl/tools/launch.py \
 "python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 30 --batch-size 1000"
 ```
 
+To run unsupervised training:
+
+```bash
+python3 ~/dgl/tools/launch.py \
+--workspace ~/dgl/examples/pytorch/graphsage/experimental \
+--num_client 4 \
+--conf_path data/ogb-product.json \
+--ip_config ip_config.txt \
+"python3 train_dist_unsupervised.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --batch-size 1000 --num-client 4"
+```
+
 ## Distributed code runs in the standalone mode
 
 The standalone mode is mainly used for development and testing. The procedure to run the code is much simpler.
@@ -63,8 +73,16 @@ python3 partition_graph.py --dataset ogb-product --num_parts 1
 
 ### Step 2: run the training script
 
+To run supervised training:
+
 ```bash
 python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --batch-size 1000 --conf_path data/ogb-product.json --standalone
+```
+
+To run unsupervised training:
+
+```bash
+python3 train_dist_unsupervised.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --batch-size 1000 --conf_path data/ogb-product.json --standalone
 ```
 
 Note: please ensure that all environment variables shown above are unset if they were set for testing distributed training.
