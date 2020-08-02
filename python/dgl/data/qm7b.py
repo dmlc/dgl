@@ -88,7 +88,8 @@ class QM7bDataset(DGLDataset):
         for i in range(num_graphs):
             edge_list = feats[i].nonzero()
             g = dgl_graph(edge_list)
-            g.edata['h'] = feats[i][edge_list[0], edge_list[1]].reshape(-1, 1)
+            g.edata['h'] = F.tensor(feats[i][edge_list[0], edge_list[1]].reshape(-1, 1),
+                                    dtype=F.data_type_dict['float32'])
             graphs.append(g)
         return graphs, labels
 
@@ -125,7 +126,7 @@ class QM7bDataset(DGLDataset):
 
         Returns
         -------
-        (dgl.DGLGraph, )
+        (dgl.DGLGraph, Tensor)
         """
         return self.graphs[idx], self.label[idx]
 
