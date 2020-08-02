@@ -12,10 +12,13 @@ __all__ = ['KarateClubDataset', 'KarateClub']
 
 
 class KarateClubDataset(DGLDataset):
-    r"""
+    r""" Karate Club dataset for Node Classification
 
-    Description
-    -----------
+    .. deprecated:: 0.5.0
+        `data` is deprecated, it is replaced by:
+            >>> dataset = KarateClubDataset()
+            >>> g = dataset[0]
+
     Zachary's karate club is a social network of a university
     karate club, described in the paper "An Information Flow
     Model for Conflict and Fission in Small Groups" by Wayne W. Zachary.
@@ -33,20 +36,15 @@ class KarateClubDataset(DGLDataset):
     ----------
     num_classes : int
         Number of node classes
-
-    Returns
-    -------
-    KarateClubDataset
+    data : list
+        A list of DGLGraph objects
 
     Examples
     --------
-    >>> data = KarateClubDataset()
-    >>> data.num_classes
-    2
-    >>> g = data[0]
-    >>> g.ndata
-    {'label': tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1,
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 1])}
+    >>> dataset = KarateClubDataset()
+    >>> num_classes = dataset.num_classes
+    >>> g = dataset[0]
+    >>> labels = g.ndata['label']
     """
     def __init__(self):
         super(KarateClubDataset, self).__init__(name='karate_club')
@@ -72,10 +70,24 @@ class KarateClubDataset(DGLDataset):
         return self._data
 
     def __getitem__(self, idx):
+        r""" Get graph object
+
+        Parameters
+        ----------
+        idx : int
+            Item index, KarateClubDataset has only one graph object
+
+        Returns
+        -------
+        dgl.DGLGraph
+            graph structure and labels.
+            - ndata['label']: ground truth labels
+        """
         assert idx == 0, "This dataset has only one graph"
         return self._graph
 
     def __len__(self):
+        r"""The number of graphs in the dataset."""
         return 1
 
 
