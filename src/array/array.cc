@@ -287,6 +287,20 @@ IdArray NonZero(NDArray array) {
   return ret;
 }
 
+std::pair<IdArray, IdArray> Sort(IdArray array) {
+  if (array.NumElements() == 0) {
+    IdArray idx = NewIdArray(0, array->ctx, 64);
+    return std::make_pair(array, idx);
+  }
+  std::pair<IdArray, IdArray> ret;
+  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "Sort", {
+    ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
+      ret = impl::Sort<XPU, IdType>(array);
+    });
+  });
+  return ret;
+}
+
 std::string ToDebugString(NDArray array) {
   std::ostringstream oss;
   NDArray a = array.CopyTo(DLContext{kDLCPU, 0});

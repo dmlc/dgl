@@ -3,7 +3,7 @@ import numpy as np
 import os
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
 from ..utils import retry_method_with_fix
-from ..graph import DGLGraph
+from .. import convert
 
 __all__=["AmazonCoBuy", "Coauthor", 'CoraFull']
 
@@ -59,10 +59,9 @@ class GNNBenchmarkDataset(object):
                 labels = loader['labels']
             else:
                 labels = None
-        g = DGLGraph()
-        g.add_nodes(num_nodes)
-        g.add_edges(adj_matrix.row, adj_matrix.col)
-        g.add_edges(adj_matrix.col, adj_matrix.row)
+        row = np.hstack([adj_matrix.row, adj_matrix.col])
+        col = np.hstack([adj_matrix.col, adj_matrix.row])
+        g = convert.graph((row, col))
         g.ndata['feat'] = attr_matrix
         g.ndata['label'] = labels
         return g     

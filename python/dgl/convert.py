@@ -15,6 +15,7 @@ __all__ = [
     'graph',
     'bipartite',
     'hetero_from_relations',
+    'hetero_from_shared_memory',
     'heterograph',
     'to_hetero',
     'to_homo',
@@ -147,10 +148,7 @@ def graph(data,
     g = create_from_edges(u, v, ntype, etype, ntype, urange, vrange,
                           validate, formats=formats)
 
-    if device is None:
-        return utils.to_int32_graph_if_on_gpu(g)
-    else:
-        return g.to(device)
+    return g.to(device)
 
 def bipartite(data,
               utype='_U', etype='_E', vtype='_V',
@@ -299,10 +297,7 @@ def bipartite(data,
         u, v, utype, etype, vtype, urange, vrange, validate,
         formats=formats)
 
-    if device is None:
-        return utils.to_int32_graph_if_on_gpu(g)
-    else:
-        return g.to(device)
+    return g.to(device)
 
 def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
     """Create a heterograph from graphs representing connections of each relation.
@@ -413,6 +408,24 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
             retg.nodes[ntype].data.update(rgrh.nodes[ntype].data)
         retg._edge_frames[i].update(rgrh._edge_frames[0])
     return retg
+
+def hetero_from_shared_memory(name):
+    """Create a heterograph from shared memory with the given name.
+
+    The newly created graph will have the same node types and edge types as the original graph.
+    But it does not have node features or edges features.
+
+    Paramaters
+    ----------
+    name : str
+        The name of the share memory
+
+    Returns
+    -------
+    HeteroGraph (in shared memory)
+    """
+    g, ntypes, etypes = heterograph_index.create_heterograph_from_shared_memory(name)
+    return DGLHeteroGraph(g, ntypes, etypes)
 
 def heterograph(data_dict,
                 num_nodes_dict=None,

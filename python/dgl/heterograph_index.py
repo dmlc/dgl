@@ -233,6 +233,33 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroCopyTo(self, ctx.device_type, ctx.device_id)
 
+    def shared_memory(self, name, ntypes=None, etypes=None, formats=('coo', 'csr', 'csc')):
+        """Return a copy of this graph in shared memory
+
+        Parameters
+        ----------
+        name : str
+            The name of the shared memory.
+        ntypes : list of str
+            Name of node types
+        etypes : list of str
+            Name of edge types
+        format : list of str
+            Desired formats to be materialized.
+
+        Returns
+        -------
+        HeteroGraphIndex
+            The graph index in shared memory
+        """
+        assert len(name) > 0, "The name of shared memory cannot be empty"
+        assert len(formats) > 0
+        for fmt in formats:
+            assert fmt in ("coo", "csr", "csc")
+        ntypes = [] if ntypes is None else ntypes
+        etypes = [] if etypes is None else etypes
+        return _CAPI_DGLHeteroCopyToSharedMem(self, name, ntypes, etypes, formats)
+
     def is_multigraph(self):
         """Return whether the graph is a multigraph
         The time cost will be O(E)
@@ -495,7 +522,6 @@ class HeteroGraphIndex(ObjectBase):
         eid = F.from_dgl_nd(edge_array(2))
         return src, dst, eid
 
-    @utils.cached_member(cache='_cache', prefix='edges')
     def edges(self, etype, order=None):
         """Return all the edges
 
@@ -794,7 +820,6 @@ class HeteroGraphIndex(ObjectBase):
         eids = [F.to_dgl_nd(edges) for edges in induced_edges]
         return _CAPI_DGLHeteroEdgeSubgraph(self, eids, preserve_nodes)
 
-    @utils.cached_member(cache='_cache', prefix='unitgraph')
     def get_unitgraph(self, etype, ctx):
         """Create a unitgraph graph from given edge type and copy to the given device
         context.
@@ -885,7 +910,6 @@ class HeteroGraphIndex(ObjectBase):
         """Create all sparse matrices allowed for the graph."""
         return _CAPI_DGLHeteroCreateFormat(self)
 
-    @utils.cached_member(cache='_cache', prefix='reverse')
     def reverse(self):
         """Reverse the heterogeneous graph adjacency
 
@@ -1025,6 +1049,25 @@ def create_heterograph_from_relations(metagraph, rel_graphs, num_nodes_per_type)
     else:
         return _CAPI_DGLHeteroCreateHeteroGraphWithNumNodes(
             metagraph, rel_graphs, num_nodes_per_type.todgltensor())
+
+def create_heterograph_from_shared_memory(name):
+    """Create a heterograph from shared memory with the given name.
+
+    Paramaters
+    ----------
+    name : str
+        The name of the share memory
+
+    Returns
+    -------
+    HeteroGraphIndex (in shared memory)
+    ntypes : list of str
+        Names of node types
+    etypes : list of str
+        Names of edge types
+    """
+    g, ntypes, etypes = _CAPI_DGLHeteroCreateFromSharedMem(name)
+    return g, list(ntypes), list(etypes)
 
 def joint_union(metagraph, gidx_list):
     """Return a joint union of the input heterographs.
