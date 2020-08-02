@@ -16,7 +16,7 @@ from .gindt import GINDataset
 from .bitcoinotc import BitcoinOTC
 from .gdelt import GDELT
 from .icews18 import ICEWS18
-from .qm7b import QM7b
+from .qm7b import QM7b, QM7bDataset
 from .dgl_dataset import DGLDataset, DGLBuiltinDataset
 from .citation_graph import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 
