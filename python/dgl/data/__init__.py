@@ -11,12 +11,13 @@ from .reddit import RedditDataset
 from .ppi import PPIDataset, LegacyPPIDataset
 from .tu import TUDataset, LegacyTUDataset
 from .gnn_benckmark import AmazonCoBuy, CoraFull, Coauthor
-from .karate import KarateClub
+from .karate import KarateClub, KarateClubDataset
 from .gindt import GINDataset
 from .bitcoinotc import BitcoinOTC
 from .gdelt import GDELT
 from .icews18 import ICEWS18
 from .qm7b import QM7b
+from .dgl_dataset import DGLDataset, DGLBuiltinDataset
 from .citation_graph import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 
 
