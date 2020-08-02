@@ -20,6 +20,7 @@ from . import rpc
 from .rpc_client import connect_to_server
 from .server_state import ServerState
 from .rpc_server import start_server
+from .graph_services import find_edges as dist_find_edges
 from .dist_tensor import DistTensor, _get_data_name
 
 def _copy_graph_to_shared_mem(g, graph_name):
@@ -442,6 +443,25 @@ class DistGraph:
             # all ranks of the clients in the same machine are in a contiguous range.
             client_id_in_part = rpc.get_rank() % num_client_per_part
             return int(self._gpb.partid * num_client_per_part + client_id_in_part)
+
+    def find_edges(self, edges):
+        """ Given an edge ID array, return the source
+        and destination node ID array ``s`` and ``d``.  ``s[i]`` and ``d[i]``
+        are source and destination node ID for edge ``eid[i]``.
+
+        Parameters
+        ----------
+        edges : tensor
+            The edge ID array.
+
+        Returns
+        -------
+        tensor
+            The source node ID array.
+        tensor
+            The destination node ID array.
+        """
+        return dist_find_edges(self, edges)
 
     def get_partition_book(self):
         """Get the partition information.
