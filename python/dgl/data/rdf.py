@@ -73,7 +73,7 @@ class RDFGraphDataset(DGLBuiltinDataset):
 
     Attributes
     ----------
-    graph : dgl.DGLHeteroGraph
+    graph : dgl.DGLraph
         Graph structure
     num_classes : int
         Number of classes to predict
@@ -427,7 +427,7 @@ class RDFGraphDataset(DGLBuiltinDataset):
         return g
 
     def __len__(self):
-        r"""The number of examples in the dataset."""
+        r"""The number of graphs in the dataset."""
         return 1
 
     @property
@@ -539,17 +539,34 @@ def _get_id(dict, key):
     return id
 
 class AIFBDataset(RDFGraphDataset):
-    r"""AIFB dataset.
-     AIFB DataSet is a Semantic Web (RDF) dataset used as a benchmark in
-     data mining.  It records the organizational structure of AIFB at the
-     University of Karlsruhe.
-    Statistics
-    ===
+    r"""AIFB dataset for node classification task
+
+    .. deprecated:: 0.5.0
+        `graph` is deprecated, it is replaced by:
+            >>> dataset = AIFBDataset()
+            >>> graph = dataset[0]
+        `train_idx` is deprecated, it can be replaced by:
+            >>> dataset = AIFBDataset()
+            >>> graph = dataset[0]
+            >>> train_mask = graph.nodes[dataset.category].data['train_mask']
+            >>> train_idx = th.nonzero(train_mask).squeeze()
+        `test_idx` is deprecated, it can be replaced by:
+            >>> dataset = AIFBDataset()
+            >>> graph = dataset[0]
+            >>> test_mask = graph.nodes[dataset.category].data['test_mask']
+            >>> test_idx = th.nonzero(test_mask).squeeze()
+
+    AIFB DataSet is a Semantic Web (RDF) dataset used as a benchmark in
+    data mining.  It records the organizational structure of AIFB at the
+    University of Karlsruhe.
+
+    AIFB dataset statistics:
     Nodes: 7262
     Edges: 48810 (including reverse edges)
     Target Category: Personen
     Number of Classes: 4
     Label Split: Train: 140, Test: 36
+
     Parameters
     -----------
     print_every: int
@@ -563,18 +580,21 @@ class AIFBDataset(RDFGraphDataset):
         Whether to reload the dataset. Default: False
     verbose: bool
       Whether to print out progress information. Default: True.
-    Returns
-    ===
-    AIFBDataset object with three properties:
-        graph: A Heterogenous graph containing the
-               graph structure, node features and labels.
-            - ndata['train_mask']: mask for training node set
-            - ndata['test_mask']: mask for testing node set
-            - ndata['labels']: mask for labels
-        predict_category: The category name to run the node classification
-            prediction.
-        num_of_class: number of publication categories
-            for the classification task.
+
+    Attributes
+    ----------
+    num_classes : int
+        Number of classes to predict
+    predict_category : str
+        The entity category (node type) that has labels for prediction
+    labels : Tensor
+        All the labels of the entities in ``predict_category``
+    graph : dgl.DGLGraph
+        Graph structure
+    train_idx : Tensor
+        Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
+    test_idx : Tensor
+        Entity IDs for testing. All IDs are local IDs w.r.t. to ``predict_category``.
 
     Examples
     --------
@@ -608,6 +628,28 @@ class AIFBDataset(RDFGraphDataset):
                                           raw_dir=raw_dir,
                                           force_reload=force_reload,
                                           verbose=verbose)
+
+    def __getitem__(self, idx):
+        r"""Gets the graph object
+
+        Parameters
+        -----------
+        idx: int
+            Item index, AIFBDataset has only one graph object
+
+        Return
+        -------
+        dgl.DGLGraph
+            graph structure, node features and labels.
+            - ndata['train_mask']: mask for training node set
+            - ndata['test_mask']: mask for testing node set
+            - ndata['labels']: mask for labels
+        """
+        return super(AIFBDataset, self).__getitem__(idx)
+
+    def __len__(self):
+        r"""The number of graphs in the dataset."""
+        return super(AIFBDataset, self).__len__()
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
@@ -658,14 +700,30 @@ class AIFB(AIFBDataset):
 
 
 class MUTAGDataset(RDFGraphDataset):
-    r"""MUTAG dataset.
-    Statistics
-    ===
+    r"""MUTAG dataset for node classification task
+
+    .. deprecated:: 0.5.0
+        `graph` is deprecated, it is replaced by:
+            >>> dataset = MUTAGDataset()
+            >>> graph = dataset[0]
+        `train_idx` is deprecated, it can be replaced by:
+            >>> dataset = MUTAGDataset()
+            >>> graph = dataset[0]
+            >>> train_mask = graph.nodes[dataset.category].data['train_mask']
+            >>> train_idx = th.nonzero(train_mask).squeeze()
+        `test_idx` is deprecated, it can be replaced by:
+            >>> dataset = MUTAGDataset()
+            >>> graph = dataset[0]
+            >>> test_mask = graph.nodes[dataset.category].data['test_mask']
+            >>> test_idx = th.nonzero(test_mask).squeeze()
+
+    Mutag dataset statistics:
     Nodes: 27163
     Edges: 148100 (including reverse edges)
     Target Category: d
     Number of Classes: 2
     Label Split: Train: 272, Test: 68
+
     Parameters
     -----------
     print_every: int
@@ -679,18 +737,21 @@ class MUTAGDataset(RDFGraphDataset):
         Whether to reload the dataset. Default: False
     verbose: bool
       Whether to print out progress information. Default: True.
-    Returns
-    ===
-    MUTAGDataset object with three properties:
-        graph: A Heterogenous graph containing the
-               graph structure, node features and labels.
-            - ndata['train_mask']: mask for training node set
-            - ndata['test_mask']: mask for testing node set
-            - ndata['labels']: mask for labels
-        predict_category: The category name to run the node classification
-            prediction.
-        num_of_class: number of publication categories
-            for the classification task.
+
+    Attributes
+    ----------
+    num_classes : int
+        Number of classes to predict
+    predict_category : str
+        The entity category (node type) that has labels for prediction
+    labels : Tensor
+        All the labels of the entities in ``predict_category``
+    graph : dgl.DGLGraph
+        Graph structure
+    train_idx : Tensor
+        Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
+    test_idx : Tensor
+        Entity IDs for testing. All IDs are local IDs w.r.t. to ``predict_category``.
 
     Examples
     --------
@@ -730,6 +791,28 @@ class MUTAGDataset(RDFGraphDataset):
                                            raw_dir=raw_dir,
                                            force_reload=force_reload,
                                            verbose=verbose)
+
+    def __getitem__(self, idx):
+        r"""Gets the graph object
+
+        Parameters
+        -----------
+        idx: int
+            Item index, MUTAGDataset has only one graph object
+
+        Return
+        -------
+        dgl.DGLGraph
+            graph structure, node features and labels.
+            - ndata['train_mask']: mask for training node set
+            - ndata['test_mask']: mask for testing node set
+            - ndata['labels']: mask for labels
+        """
+        return super(MUTAGDataset, self).__getitem__(idx)
+
+    def __len__(self):
+        r"""The number of graphs in the dataset."""
+        return super(MUTAGDataset, self).__len__()
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
@@ -796,19 +879,36 @@ class MUTAG(MUTAGDataset):
                                     verbose)
 
 class BGSDataset(RDFGraphDataset):
-    """BGS dataset.
+    r"""BGS dataset for node classification task
+
+    .. deprecated:: 0.5.0
+        `graph` is deprecated, it is replaced by:
+            >>> dataset = BGSDataset()
+            >>> graph = dataset[0]
+        `train_idx` is deprecated, it can be replaced by:
+            >>> dataset = BGSDataset()
+            >>> graph = dataset[0]
+            >>> train_mask = graph.nodes[dataset.category].data['train_mask']
+            >>> train_idx = th.nonzero(train_mask).squeeze()
+        `test_idx` is deprecated, it can be replaced by:
+            >>> dataset = BGSDataset()
+            >>> graph = dataset[0]
+            >>> test_mask = graph.nodes[dataset.category].data['test_mask']
+            >>> test_idx = th.nonzero(test_mask).squeeze()
+
     BGS namespace convention:
     http://data.bgs.ac.uk/(ref|id)/<Major Concept>/<Sub Concept>/INSTANCE
     We ignored all literal nodes and the relations connecting them in the
     output graph. We also ignored the relation used to mark whether a
     term is CURRENT or DEPRECATED.
-    Statistics
-    ===
+
+    BGS dataset statistics:
     Nodes: 94806
     Edges: 672884 (including reverse edges)
     Target Category: Lexicon/NamedRockUnit
     Number of Classes: 2
     Label Split: Train: 117, Test: 29
+
     Parameters
     -----------
     print_every: int
@@ -822,18 +922,22 @@ class BGSDataset(RDFGraphDataset):
         Whether to reload the dataset. Default: False
     verbose: bool
       Whether to print out progress information. Default: True.
-    Returns
-    ===
-    BGSDataset object with three properties:
-        graph: A Heterogenous graph containing the
-               graph structure, node features and labels.
-            - ndata['train_mask']: mask for training node set
-            - ndata['test_mask']: mask for testing node set
-            - ndata['labels']: mask for labels
-        predict_category: The category name to run the node classification
-            prediction.
-        num_of_class: number of publication categories
-            for the classification task.
+
+    Attributes
+    ----------
+    num_classes : int
+        Number of classes to predict
+    predict_category : str
+        The entity category (node type) that has labels for prediction
+    labels : Tensor
+        All the labels of the entities in ``predict_category``
+    graph : dgl.DGLGraph
+        Graph structure
+    train_idx : Tensor
+        Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
+    test_idx : Tensor
+        Entity IDs for testing. All IDs are local IDs w.r.t. to ``predict_category``.
+
     Examples
     --------
     >>> dataset = dgl.data.rdf.BGSDataset()
@@ -866,6 +970,28 @@ class BGSDataset(RDFGraphDataset):
                                          raw_dir=raw_dir,
                                          force_reload=force_reload,
                                          verbose=verbose)
+
+    def __getitem__(self, idx):
+        r"""Gets the graph object
+
+        Parameters
+        -----------
+        idx: int
+            Item index, BGSDataset has only one graph object
+
+        Return
+        -------
+        dgl.DGLGraph
+            graph structure, node features and labels.
+            - ndata['train_mask']: mask for training node set
+            - ndata['test_mask']: mask for testing node set
+            - ndata['labels']: mask for labels
+        """
+        return super(BGSDataset, self).__getitem__(idx)
+
+    def __len__(self):
+        r"""The number of graphs in the dataset."""
+        return super(BGSDataset, self).__len__()
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
@@ -928,15 +1054,30 @@ class BGS(BGSDataset):
 
 
 class AMDataset(RDFGraphDataset):
-    """AM dataset.
+    """AM dataset. for node classification task
+
+    .. deprecated:: 0.5.0
+        `graph` is deprecated, it is replaced by:
+            >>> dataset = AMDataset()
+            >>> graph = dataset[0]
+        `train_idx` is deprecated, it can be replaced by:
+            >>> dataset = AMDataset()
+            >>> graph = dataset[0]
+            >>> train_mask = graph.nodes[dataset.category].data['train_mask']
+            >>> train_idx = th.nonzero(train_mask).squeeze()
+        `test_idx` is deprecated, it can be replaced by:
+            >>> dataset = AMDataset()
+            >>> graph = dataset[0]
+            >>> test_mask = graph.nodes[dataset.category].data['test_mask']
+            >>> test_idx = th.nonzero(test_mask).squeeze()
+
     Namespace convention:
     Instance: http://purl.org/collections/nl/am/<type>-<id>
     Relation: http://purl.org/collections/nl/am/<name>
     We ignored all literal nodes and the relations connecting them in the
     output graph.
 
-    Statistics
-    ===
+    AM dataset statistics:
     Nodes: 881680
     Edges: 5668682 (including reverse edges)
     Target Category: proxy
@@ -957,18 +1098,20 @@ class AMDataset(RDFGraphDataset):
     verbose: bool
       Whether to print out progress information. Default: True.
 
-    Returns
-    ===
-    AMDataset object with three properties:
-        graph: A Heterogenous graph containing the
-               graph structure, node features and labels.
-            - ndata['train_mask']: mask for training node set
-            - ndata['test_mask']: mask for testing node set
-            - ndata['labels']: mask for labels
-        predict_category: The category name to run the node classification
-            prediction.
-        num_of_class: number of publication categories
-            for the classification task.
+    Attributes
+    ----------
+    num_classes : int
+        Number of classes to predict
+    predict_category : str
+        The entity category (node type) that has labels for prediction
+    labels : Tensor
+        All the labels of the entities in ``predict_category``
+    graph : dgl.DGLGraph
+        Graph structure
+    train_idx : Tensor
+        Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
+    test_idx : Tensor
+        Entity IDs for testing. All IDs are local IDs w.r.t. to ``predict_category``.
 
     Examples
     --------
@@ -1002,6 +1145,28 @@ class AMDataset(RDFGraphDataset):
                                         raw_dir=raw_dir,
                                         force_reload=force_reload,
                                         verbose=verbose)
+
+    def __getitem__(self, idx):
+        r"""Gets the graph object
+
+        Parameters
+        -----------
+        idx: int
+            Item index, AMDataset has only one graph object
+
+        Return
+        -------
+        dgl.DGLGraph
+            graph structure, node features and labels.
+            - ndata['train_mask']: mask for training node set
+            - ndata['test_mask']: mask for testing node set
+            - ndata['labels']: mask for labels
+        """
+        return super(AMDataset, self).__getitem__(idx)
+
+    def __len__(self):
+        r"""The number of graphs in the dataset."""
+        return super(AMDataset, self).__len__()
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):

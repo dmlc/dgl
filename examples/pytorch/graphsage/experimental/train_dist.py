@@ -21,8 +21,6 @@ import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 from pyinstrument import Profiler
 
-from train_sampling import run, SAGE, compute_acc, evaluate, load_subtensor
-
 class NeighborSampler(object):
     def __init__(self, g, fanouts, sample_neighbors):
         self.g = g
@@ -43,11 +41,29 @@ class NeighborSampler(object):
             blocks.insert(0, block)
         return blocks
 
-class DistSAGE(SAGE):
+class DistSAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes, n_layers,
                  activation, dropout):
-        super(DistSAGE, self).__init__(in_feats, n_hidden, n_classes, n_layers,
-                                       activation, dropout)
+        super().__init__()
+        self.n_layers = n_layers
+        self.n_hidden = n_hidden
+        self.n_classes = n_classes
+        self.layers = nn.ModuleList()
+        self.layers.append(dglnn.SAGEConv(in_feats, n_hidden, 'mean'))
+        for i in range(1, n_layers - 1):
+            self.layers.append(dglnn.SAGEConv(n_hidden, n_hidden, 'mean'))
+        self.layers.append(dglnn.SAGEConv(n_hidden, n_classes, 'mean'))
+        self.dropout = nn.Dropout(dropout)
+        self.activation = activation
+
+    def forward(self, blocks, x):
+        h = x
+        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
+            h = layer(block, h)
+            if l != len(self.layers) - 1:
+                h = self.activation(h)
+                h = self.dropout(h)
+        return h
 
     def inference(self, g, x, batch_size, device):
         """
@@ -100,9 +116,40 @@ class DistSAGE(SAGE):
             g.barrier()
         return y
 
+def compute_acc(pred, labels):
+    """
+    Compute the accuracy of prediction given the labels.
+    """
+    labels = labels.long()
+    return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
+
+def evaluate(model, g, inputs, labels, val_nid, test_nid, batch_size, device):
+    """
+    Evaluate the model on the validation set specified by ``val_nid``.
+    g : The entire graph.
+    inputs : The features of all the nodes.
+    labels : The labels of all the nodes.
+    val_nid : the node Ids for validation.
+    batch_size : Number of nodes to compute at the same time.
+    device : The GPU device to evaluate on.
+    """
+    model.eval()
+    with th.no_grad():
+        pred = model.inference(g, inputs, batch_size, device)
+    model.train()
+    return compute_acc(pred[val_nid], labels[val_nid]), compute_acc(pred[test_nid], labels[test_nid])
+
+def load_subtensor(g, seeds, input_nodes, device):
+    """
+    Copys features and labels of a set of nodes onto GPU.
+    """
+    batch_inputs = g.ndata['features'][input_nodes].to(device)
+    batch_labels = g.ndata['labels'][seeds].to(device)
+    return batch_inputs, batch_labels
+
 def run(args, device, data):
     # Unpack data
-    train_nid, val_nid, in_feats, n_classes, g = data
+    train_nid, val_nid, test_nid, in_feats, n_classes, g = data
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')],
                               dgl.distributed.sample_neighbors)
@@ -204,9 +251,10 @@ def run(args, device, data):
 
         if epoch % args.eval_every == 0 and epoch != 0:
             start = time.time()
-            eval_acc = evaluate(model.module, g, g.ndata['features'],
-                                g.ndata['labels'], val_nid, args.batch_size_eval, device)
-            print('Part {}, Eval Acc {:.4f}, time: {:.4f}'.format(g.rank(), eval_acc, time.time() - start))
+            val_acc, test_acc = evaluate(model.module, g, g.ndata['features'],
+                                         g.ndata['labels'], val_nid, test_nid, args.batch_size_eval, device)
+            print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc,
+                                                                                  time.time() - start))
 
     profiler.stop()
     print(profiler.output_text(unicode=True, color=True))
@@ -217,7 +265,7 @@ def run(args, device, data):
 def main(args):
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
-    g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, conf_file=args.conf_path)
+    g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, part_config=args.conf_path)
     print('rank:', g.rank())
 
     pb = g.get_partition_book()
@@ -236,7 +284,7 @@ def main(args):
 
     # Pack data
     in_feats = g.ndata['features'].shape[1]
-    data = train_nid, val_nid, in_feats, n_classes, g
+    data = train_nid, val_nid, test_nid, in_feats, n_classes, g
     run(args, device, data)
     print("parent ends")
 

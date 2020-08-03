@@ -1,9 +1,10 @@
 """Segment aggregation operators implemented using DGL graph."""
 
-from .base import DGLError
-from . import backend as F
-from . import convert
-from . import function as fn
+from ..base import DGLError
+from .. import backend as F
+from .. import convert
+from .. import function as fn
+
 
 def segment_reduce(seglen, value, reducer='sum'):
     """Segment reduction operator.
@@ -53,6 +54,7 @@ def segment_reduce(seglen, value, reducer='sum'):
     g.srcdata['h'] = value
     g.update_all(fn.copy_u('h', 'm'), getattr(fn, reducer)('m', 'h'))
     return g.dstdata['h']
+
 
 def segment_softmax(seglen, value):
     """Performa softmax on each segment.

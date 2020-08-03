@@ -522,7 +522,6 @@ class HeteroGraphIndex(ObjectBase):
         eid = F.from_dgl_nd(edge_array(2))
         return src, dst, eid
 
-    @utils.cached_member(cache='_cache', prefix='edges')
     def edges(self, etype, order=None):
         """Return all the edges
 
@@ -821,7 +820,6 @@ class HeteroGraphIndex(ObjectBase):
         eids = [F.to_dgl_nd(edges) for edges in induced_edges]
         return _CAPI_DGLHeteroEdgeSubgraph(self, eids, preserve_nodes)
 
-    @utils.cached_member(cache='_cache', prefix='unitgraph')
     def get_unitgraph(self, etype, ctx):
         """Create a unitgraph graph from given edge type and copy to the given device
         context.
@@ -912,7 +910,6 @@ class HeteroGraphIndex(ObjectBase):
         """Create all sparse matrices allowed for the graph."""
         return _CAPI_DGLHeteroCreateFormat(self)
 
-    @utils.cached_member(cache='_cache', prefix='reverse')
     def reverse(self):
         """Reverse the heterogeneous graph adjacency
 

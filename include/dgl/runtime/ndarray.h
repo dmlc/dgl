@@ -603,14 +603,18 @@ dgl::runtime::NDArray operator * (const dgl::runtime::NDArray& a1,
                                   const dgl::runtime::NDArray& a2);
 dgl::runtime::NDArray operator / (const dgl::runtime::NDArray& a1,
                                   const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator % (const dgl::runtime::NDArray& a1,
+                                  const dgl::runtime::NDArray& a2);
 dgl::runtime::NDArray operator + (const dgl::runtime::NDArray& a1, int64_t rhs);
 dgl::runtime::NDArray operator - (const dgl::runtime::NDArray& a1, int64_t rhs);
 dgl::runtime::NDArray operator * (const dgl::runtime::NDArray& a1, int64_t rhs);
 dgl::runtime::NDArray operator / (const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator % (const dgl::runtime::NDArray& a1, int64_t rhs);
 dgl::runtime::NDArray operator + (int64_t lhs, const dgl::runtime::NDArray& a2);
 dgl::runtime::NDArray operator - (int64_t lhs, const dgl::runtime::NDArray& a2);
 dgl::runtime::NDArray operator * (int64_t lhs, const dgl::runtime::NDArray& a2);
 dgl::runtime::NDArray operator / (int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator % (int64_t lhs, const dgl::runtime::NDArray& a2);
 dgl::runtime::NDArray operator - (const dgl::runtime::NDArray& array);
 
 dgl::runtime::NDArray operator > (const dgl::runtime::NDArray& a1,
