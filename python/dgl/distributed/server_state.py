@@ -42,7 +42,7 @@ class ServerState:
 
     def __init__(self, kv_store, local_g, partition_book):
         self._kv_store = kv_store
-        self.graph = local_g
+        self._graph = local_g
         self.partition_book = partition_book
 
     @property

@@ -1,7 +1,6 @@
 """Define distributed tensor."""
 
 import os
-import uuid
 
 from .graph_partition_book import PartitionPolicy, NODE_PART_POLICY, EDGE_PART_POLICY
 from .rpc_client import is_initialized
@@ -71,13 +70,15 @@ class DistTensor:
 
         if init_func is None:
             init_func = _default_init_data
+        exist_names = g._client.data_name_list()
         # If a user doesn't provide a name, we generate a name ourselves.
+        # We need to generate the name in a deterministic way.
         if name is None:
             assert not persistent, 'We cannot generate anonymous persistent distributed tensors'
-            name = uuid.uuid4().hex[:10]
+            name = 'anonymous-' + str(len(exist_names) + 1)
         self._name = _get_data_name(name, part_policy.policy_str)
         self._persistent = persistent
-        if self._name not in g._client.data_name_list():
+        if self._name not in exist_names:
             g._client.init_data(self._name, shape, dtype, part_policy, init_func)
             self._owner = True
         else:
