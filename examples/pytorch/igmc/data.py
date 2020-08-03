@@ -146,7 +146,9 @@ class MovieLens(object):
         self.train_graph.edata['etype'] = th.cat([self.train_rating_values, self.train_rating_values]).to(th.long)
         
         # add refex feature
-        # self.train_graph.ndata['refex'] = extract_refex_feature(self.train_graph)
+        # refex_features = extract_refex_feature(self.train_graph)
+        # print("refex features shape: {}".format(refex_features.numpy().shape))
+        # self.train_graph.ndata['refex'] = refex_features
 
     @property
     def num_rating(self):

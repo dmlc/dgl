@@ -225,22 +225,34 @@ def MinMaxScaling(x, dim=0):
     x = (x - x.min(dim=dim, keepdim=True)[0]) / (dist + 1e-7)
     return x
 
+def prune_feature(old_feature, new_feature, threshold):
+    idx_to_drop = np.array([])
+    for i in range(old_feature.shape[1]):
+        for j in range(new_feature.shape[1]):
+            corr = np.corrcoef(old_feature[:, i], new_feature[:, j])
+            if abs(corr[0, 1]) > threshold:
+                idx_to_drop = np.append(idx_to_drop, j)
+        idx_to_keep = np.setdiff1d(np.arange(new_feature.shape[1]), idx_to_drop)
+        new_feature = new_feature[:, idx_to_keep]
+        idx_to_drop = np.array([])
+    return new_feature
+
 def get_recursive_feature(graph, basic_feature, n_iter=1):
     with graph.local_scope():
 
-        init_feature = basic_feature
-        recursive_feature = []
+        recursive_feature = [basic_feature]
         for iter_idx in range(n_iter):
-            graph.srcdata['h'] = init_feature
+            graph.srcdata['h'] = recursive_feature[-1]
             graph.update_all(fn.copy_u('h', 'msg'), fn.mean('msg', 'neigh_mean'))
             graph.update_all(fn.copy_u('h', 'msg'), fn.sum('msg', 'neigh_sum'))
 
-            init_feature = th.cat([graph.dstdata['neigh_mean'], 
+            iter_feature = th.cat([graph.dstdata['neigh_mean'], 
                                    graph.dstdata['neigh_sum']], dim=1)
             # there is no feature pruning at the moment
-            recursive_feature.append(init_feature)
+            iter_feature = prune_feature(recursive_feature[-1], iter_feature, threshold=0.5)
+            recursive_feature.append(iter_feature)
         
-        return th.cat(recursive_feature, dim=1)
+        return th.cat(recursive_feature[1:], dim=1)
 
 def get_ego_feature(graph):
     ego_feature = []
