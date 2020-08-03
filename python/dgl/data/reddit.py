@@ -178,7 +178,7 @@ class RedditDataset(DGLBuiltinDataset):
     @property
     def num_labels(self):
         deprecate_property('dataset.num_labels', 'dataset.num_classes')
-        return 41
+        return self.num_classes
 
     @property
     def graph(self):
