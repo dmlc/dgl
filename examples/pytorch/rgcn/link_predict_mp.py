@@ -69,6 +69,7 @@ class LinkPredict(nn.Module):
     def forward_full(self, blocks, feats):
         h = feats
         for layer, block in zip(self.layers, blocks):
+            block = block.int()
             block = block.to(self.device)
             h = layer(block, h, block.edata['etype'], block.edata['norm'])
 
@@ -77,6 +78,7 @@ class LinkPredict(nn.Module):
     def forward(self, p_blocks, p_feats, n_blocks=None, n_feats=None, p_g=None, n_g=None):
         p_h = p_feats
         for layer, block in zip(self.layers, p_blocks):
+            block = block.int()
             block = block.to(self.device)
             p_h = layer(block, p_h, block.edata['etype'], block.edata['norm'])
 
@@ -85,6 +87,7 @@ class LinkPredict(nn.Module):
 
         n_h = n_feats
         for layer, block in zip(self.layers, n_blocks):
+            block = block.int()
             block = block.to(self.device)
             n_h = layer(block, n_h, block.edata['etype'], block.edata['norm'])
 
@@ -206,19 +209,14 @@ class LinkRankSampler:
             nseeds = th.randint(self.num_edges, (bsize,))
             nseeds = self.neg_edges[nseeds]
 
-        print(nseeds.shape)
         g = self.g
         fanouts = self.fanouts
         assert len(g.canonical_etypes) == 1
-        p_subg = g.edge_subgraph(pseeds)
-        n_subg = g.edge_subgraph(nseeds)
+        p_g = g.edge_subgraph(pseeds)
+        n_g = g.edge_subgraph(nseeds)
 
-        p_g = dgl.compact_graphs(p_subg)
-        n_g = dgl.compact_graphs(n_subg)
-        p_g.edata['etype'] = g.edata['etype'][p_subg.edata[dgl.EID]]
-
-        pg_seed = p_subg.ndata[dgl.NID][p_g.ndata[dgl.NID]]
-        ng_seed = n_subg.ndata[dgl.NID][n_g.ndata[dgl.NID]]
+        pg_seed = p_g.ndata[dgl.NID]
+        ng_seed = n_g.ndata[dgl.NID]
 
         p_blocks = []
         n_blocks = []
@@ -350,7 +348,7 @@ def fullgraph_eval(g, embed_layer, model, device, node_feats, dim_size,
             in_feats = embed_layer(block[0].srcdata[dgl.NID].to(device),
                                    block[0].srcdata['ntype'].to(device),
                                    node_feats)
-            mb_feats = model(block, in_feats, block.edata['etype'], block.edata['norm'])
+            mb_feats = model(block, in_feats)
             embs[block[-1].dstdata[dgl.NID]] = mb_feats.cpu()
 
         mrr = 0
@@ -453,7 +451,7 @@ def fullgraph_eval(g, embed_layer, model, device, node_feats, dim_size,
                     false_neg_comp = th.full((n_v_ec.shape[0],), 0, device=device)
                     for idx_ec in range(n_v_ec.shape[0]):
                         sn_v_ec = n_v_ec[idx_ec]
-                        eid_ec = g.edge_id(u_ec, sn_v_ec, return_array=True)
+                        _, _, eid_ec = g.edge_ids(u_ec.unsqueeze(dim=0), sn_v_ec.unsqueeze(dim=0), return_uv=True)
                         etype_ec = g.edata['etype'][eid_ec]
                         loc_ec = etype_ec == etype
                         eid_ec = eid_ec[loc_ec]
@@ -468,7 +466,7 @@ def fullgraph_eval(g, embed_layer, model, device, node_feats, dim_size,
                     false_neg_comp = th.full((n_u_ec.shape[0],), 0, device=device)
                     for idx_ec in range(n_u_ec.shape[0]):
                         sn_u_ec = n_u_ec[idx_ec]
-                        eid_ec = g.edge_id(sn_u_ec, v_ec, return_array=True)
+                        _, _, eid_ec = g.edge_ids(sn_u_ec.unsqueeze(dim=0), v_ec.unsqueeze(dim=0), return_uv=True)
                         etype_ec = g.edata['etype'][eid_ec]
                         loc_ec = etype_ec == etype
                         eid_ec = eid_ec[loc_ec]

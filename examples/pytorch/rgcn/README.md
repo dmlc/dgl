@@ -68,3 +68,17 @@ FB15k-237: Filtered-MRR 0.2044
 ```
 python3 link_predict.py -d FB15k-237 --gpu 0 --eval-protocol filtered
 ```
+
+### Link Prediction with Minibatch and Neighbor Sampling
+wn18:
+```
+Average MRR: 0.7898
+Average MR: 50.28
+Average HITS@1: 0.6795
+Average HITS@3: 0.8889
+Average HITS@10: 0.9485
+```
+```
+python3 link_predict_mp.py --low-mem --lr 0.00165 --n-bases 2 --n-layers 1 --n-epochs 20 --fanout -1 --batch-size 256 --regularization-coef 1e-4 --valid-neg-cnt 1000 --test-neg-cnt -1 --use-self-loop --num-worker 4 --n-hidden 200 --dropout 0.2 --dataset wn18
+```
+
