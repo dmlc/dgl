@@ -43,7 +43,7 @@ class DGLDataset(object):
         A tuple of values as the input for the hash function.
         Users can distinguish instances (and their caches on the disk)
         from the same dataset class by comparing the hash values.
-        Default: (), the corresponding hash value is 3527539
+        Default: (), the corresponding hash value is 'f9065fa7'.
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -162,9 +162,11 @@ class DGLDataset(object):
 
         Example
         -------
-        >>> hash_value = self._get_hash((10, False, True))
+        Assume `self._hash_key = (10, False, True)`
+
+        >>> hash_value = self._get_hash()
         >>> hash_value
-        a770b222
+        'a770b222'
         """
         self._hash_func.update(str(self._hash_key).encode('utf-8'))
         return self._hash_func.hexdigest()[:8]
