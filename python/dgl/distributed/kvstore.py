@@ -438,6 +438,10 @@ class SendMetaToBackupRequest(rpc.Request):
         data shape
     policy_str : str
         partition-policy string, e.g., 'edge' or 'node'.
+    pull_handler : callable
+        The callback function when data is pulled from kvstore.
+    push_handler : callable
+        The callback function when data is pushed to kvstore.
     """
     def __init__(self, name, dtype, shape, policy_str, pull_handler, push_handler):
         self.name = name
