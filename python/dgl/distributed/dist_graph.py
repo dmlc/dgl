@@ -241,6 +241,8 @@ class DistGraphServer(KVServer):
         The server ID (start from 0).
     ip_config : str
         Path of IP configuration file.
+    server_count : int
+        Server count on each machine.
     num_clients : int
         Total number of client nodes.
     part_config : string
@@ -248,7 +250,7 @@ class DistGraphServer(KVServer):
     disable_shared_mem : bool
         Disable shared memory.
     '''
-    def __init__(self, server_id, ip_config, num_clients, part_config, disable_shared_mem=False):
+    def __init__(self, server_id, ip_config, server_count, num_clients, part_config, disable_shared_mem=False):
         super(DistGraphServer, self).__init__(server_id=server_id, ip_config=ip_config,
                                               num_clients=num_clients)
         self.ip_config = ip_config
@@ -280,13 +282,15 @@ class DistGraphServer(KVServer):
                                policy_str=EDGE_PART_POLICY,
                                data_tensor=edge_feats[name])
 
+        self.server_count = server_count
+
     def start(self):
         """ Start graph store server.
         """
         # start server
         server_state = ServerState(kv_store=self, local_g=self.client_g, partition_book=self.gpb)
         print('start graph service on server {} for part {}'.format(self.server_id, self.part_id))
-        start_server(server_id=self.server_id, ip_config=self.ip_config,
+        start_server(server_id=self.server_id, ip_config=self.ip_config, server_count=self.server_count,
                      num_clients=self.num_clients, server_state=server_state)
 
 class DistGraph:
@@ -315,6 +319,8 @@ class DistGraph:
     ----------
     ip_config : str
         Path of IP configuration file.
+    server_count : int
+        Server count on each machine.
     graph_name : str
         The name of the graph. This name has to be the same as the one used in DistGraphServer.
     gpb : PartitionBook
@@ -322,7 +328,7 @@ class DistGraph:
     part_config : str
         The partition config file. It's used in the standalone mode.
     '''
-    def __init__(self, ip_config, graph_name, gpb=None, part_config=None):
+    def __init__(self, ip_config, server_count, graph_name, gpb=None, part_config=None):
         if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
             assert part_config is not None, \
                     'When running in the standalone model, the partition config file is required'
@@ -340,8 +346,8 @@ class DistGraph:
                 self._client.add_data(_get_data_name(name, EDGE_PART_POLICY), edge_feats[name])
             rpc.set_num_client(1)
         else:
-            connect_to_server(ip_config=ip_config)
-            self._client = KVClient(ip_config)
+            connect_to_server(ip_config=ip_config, server_count=server_count)
+            self._client = KVClient(ip_config, server_count)
             self._g = _get_graph_from_shared_mem(graph_name)
             self._gpb = get_shared_mem_partition_book(graph_name, self._g)
             if self._gpb is None:
