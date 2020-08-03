@@ -98,9 +98,9 @@ def get_local_usable_addr():
 
 INITIALIZED = False
 
-def connect_to_server(ip_config, 
-                      server_count, 
-                      max_queue_size=MAX_QUEUE_SIZE, 
+def connect_to_server(ip_config,
+                      server_count,
+                      max_queue_size=MAX_QUEUE_SIZE,
                       net_type='socket'):
     """Connect this client to server.
 
