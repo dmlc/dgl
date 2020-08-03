@@ -88,12 +88,14 @@ class GraphConv(gluon.Block):
     >>> conv.initialize(ctx=mx.cpu(0))
     >>> res = conv(g, feat)
     >>> print(res)
-    tensor([[ 1.3326, -0.2797],
-            [ 1.4673, -0.3080],
-            [ 1.3326, -0.2797],
-            [ 1.6871, -0.3541],
-            [ 1.7711, -0.3717],
-            [ 1.0375, -0.2178]], grad_fn=<AddBackward0>)
+    [[1.0209361  0.22472616]
+    [1.1240715  0.24742813]
+    [1.0209361  0.22472616]
+    [1.2924911  0.28450024]
+    [1.3568745  0.29867214]
+    [0.7948386  0.17495811]]
+    <NDArray 6x2 @cpu(0)>
+
     >>> # allow_zero_in_degree example
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> conv = GraphConv(10, 2, norm='both', weight=True, bias=True, allow_zero_in_degree=True)
@@ -104,7 +106,7 @@ class GraphConv(gluon.Block):
     [1.0209361  0.22472616]
     [1.2924911  0.28450024]
     [1.3568745  0.29867214]
-    [0.7948386  0.17495811]]
+    [0.  0.]]
     <NDArray 6x2 @cpu(0)>
 
     Case 2: Unidirectional bipartite graph

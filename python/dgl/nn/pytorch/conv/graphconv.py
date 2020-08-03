@@ -183,8 +183,8 @@ class GraphConv(nn.Module):
             If a torch.Tensor is given, it represents the input feature of shape
             :math:`(N, D_{in})`
             where :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
-            If a pair of torch.Tensor is given, the pair must contain two tensors of shape
-            :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
+            If a pair of torch.Tensor is given, which is the case for bipartite graph, the pair
+            must contain two tensors of shape :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
         weight : torch.Tensor, optional
             Optional external weight tensor.
 
