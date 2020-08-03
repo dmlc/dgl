@@ -20,6 +20,7 @@
 #include <vector>
 #include <algorithm>
 #include <utility>
+#include <memory>
 #include "../../c_api_common.h"
 
 using dgl::runtime::NDArray;

@@ -152,22 +152,60 @@ COOGetRowDataAndIndices<kDLCPU, int64_t>(COOMatrix, int64_t);
 ///////////////////////////// COOGetData /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
-NDArray COOGetData(COOMatrix coo, int64_t row, int64_t col) {
-  CHECK(row >= 0 && row < coo.num_rows) << "Invalid row index: " << row;
-  CHECK(col >= 0 && col < coo.num_cols) << "Invalid col index: " << col;
-  std::vector<IdType> ret_vec;
-  const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
-  const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
-  const IdType* data = COOHasData(coo) ? static_cast<IdType*>(coo.data->data) : nullptr;
-  for (IdType i = 0; i < coo.row->shape[0]; ++i) {
-    if (coo_row_data[i] == row && coo_col_data[i] == col)
-      ret_vec.push_back(data ? data[i] : i);
+IdArray COOGetData(COOMatrix coo, IdArray rows, IdArray cols) {
+  const int64_t rowlen = rows->shape[0];
+  const int64_t collen = cols->shape[0];
+  CHECK((rowlen == collen) || (rowlen == 1) || (collen == 1))
+    << "Invalid row and col Id array:" << rows << " " << cols;
+  const int64_t row_stride = (rowlen == 1 && collen != 1) ? 0 : 1;
+  const int64_t col_stride = (collen == 1 && rowlen != 1) ? 0 : 1;
+  const IdType* row_data = rows.Ptr<IdType>();
+  const IdType* col_data = cols.Ptr<IdType>();
+
+  const IdType* coo_row = coo.row.Ptr<IdType>();
+  const IdType* coo_col = coo.col.Ptr<IdType>();
+  const IdType* data = COOHasData(coo) ? coo.data.Ptr<IdType>() : nullptr;
+  const int64_t nnz = coo.row->shape[0];
+
+  const int64_t retlen = std::max(rowlen, collen);
+  IdArray ret = Full(-1, retlen, rows->dtype.bits, rows->ctx);
+  IdType* ret_data = ret.Ptr<IdType>();
+
+  // TODO(minjie): We might need to consider sorting the COO beforehand especially
+  //   when the number of (row, col) pairs is large. Need more benchmarks to justify
+  //   the choice.
+
+  if (coo.row_sorted) {
+#pragma omp parallel for
+    for (int64_t p = 0; p < retlen; ++p) {
+      const IdType row_id = row_data[p * row_stride], col_id = col_data[p * col_stride];
+      auto it = std::lower_bound(coo_row, coo_row + nnz, row_id);
+      for (; it < coo_row + nnz && *it == row_id; ++it) {
+        const auto idx = it - coo_row;
+        if (coo_col[idx] == col_id) {
+          ret_data[p] = data? data[idx] : idx;
+          break;
+        }
+      }
+    }
+  } else {
+#pragma omp parallel for
+    for (int64_t p = 0; p < retlen; ++p) {
+      const IdType row_id = row_data[p * row_stride], col_id = col_data[p * col_stride];
+      for (int64_t idx = 0; idx < nnz; ++idx) {
+        if (coo_row[idx] == row_id && coo_col[idx] == col_id) {
+          ret_data[p] = data? data[idx] : idx;
+          break;
+        }
+      }
+    }
   }
-  return NDArray::FromVector(ret_vec);
+
+  return ret;
 }
 
-template NDArray COOGetData<kDLCPU, int32_t>(COOMatrix, int64_t, int64_t);
-template NDArray COOGetData<kDLCPU, int64_t>(COOMatrix, int64_t, int64_t);
+template IdArray COOGetData<kDLCPU, int32_t>(COOMatrix, IdArray, IdArray);
+template IdArray COOGetData<kDLCPU, int64_t>(COOMatrix, IdArray, IdArray);
 
 ///////////////////////////// COOGetDataAndIndices /////////////////////////////
 

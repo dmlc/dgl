@@ -5,6 +5,7 @@ import time
 import tempfile
 import os
 import pytest
+import unittest
 
 from dgl import DGLGraph
 import dgl
@@ -34,6 +35,7 @@ def construct_graph(n, is_hetero):
     return g_list
 
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @pytest.mark.parametrize('is_hetero', [True, False])
 def test_graph_serialize_with_feature(is_hetero):
     num_graphs = 100
@@ -75,6 +77,7 @@ def test_graph_serialize_with_feature(is_hetero):
     os.unlink(path)
 
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @pytest.mark.parametrize('is_hetero', [True, False])
 def test_graph_serialize_without_feature(is_hetero):
     num_graphs = 100
@@ -102,6 +105,7 @@ def test_graph_serialize_without_feature(is_hetero):
 
     os.unlink(path)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @pytest.mark.parametrize('is_hetero', [True, False])
 def test_graph_serialize_with_labels(is_hetero):
     num_graphs = 100
@@ -212,10 +216,10 @@ def test_load_old_files2():
     assert np.allclose(F.asnumpy(load_edges[1]), edges1)
 
 
-def create_heterographs(index_dtype):
+def create_heterographs(idtype):
     g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), 'user',
-                    'follows', index_dtype=index_dtype, restrict_format='any')
-    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', index_dtype=index_dtype, restrict_format='csr')
+                    'follows', idtype=idtype)
+    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', idtype=idtype).formats('csr')
     g_x.nodes['user'].data['h'] = F.randn((4, 3))
     g_x.edges['follows'].data['w'] = F.randn((3, 2))
     g_y.nodes['user'].data['hh'] = F.ones((4, 5))
@@ -223,11 +227,11 @@ def create_heterographs(index_dtype):
     g = dgl.hetero_from_relations([g_x, g_y])
     return [g, g_x, g_y]
 
-def create_heterographs2(index_dtype):
+def create_heterographs2(idtype):
     g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), 'user',
-                    'follows', index_dtype=index_dtype, restrict_format='any')
-    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', index_dtype=index_dtype, restrict_format='csr')
-    g_z = dgl.bipartite(([0, 1, 3], [2, 3, 4]), 'user', 'knows', 'knowledge', index_dtype=index_dtype)
+                    'follows', idtype=idtype)
+    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', idtype=idtype).formats('csr')
+    g_z = dgl.bipartite(([0, 1, 3], [2, 3, 4]), 'user', 'knows', 'knowledge', idtype=idtype)
     g_x.nodes['user'].data['h'] = F.randn((4, 3))
     g_x.edges['follows'].data['w'] = F.randn((3, 2))
     g_y.nodes['user'].data['hh'] = F.ones((4, 5))
@@ -253,16 +257,17 @@ def test_deserialize_old_heterograph_file():
 def create_old_heterograph_files():
     path = os.path.join(
         os.path.dirname(__file__), "data/hetero1.bin")
-    g_list0 = create_heterographs("int64") + create_heterographs("int32")
+    g_list0 = create_heterographs(F.int64) + create_heterographs(F.int32)
     labels_dict = {"graph_label": F.ones(54)}
     save_graphs(path, g_list0, labels_dict)
 
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_serialize_heterograph():
     f = tempfile.NamedTemporaryFile(delete=False)
     path = f.name
     f.close()
-    g_list0 = create_heterographs2("int64") + create_heterographs2("int32")
+    g_list0 = create_heterographs2(F.int64) + create_heterographs2(F.int32)
     save_graphs(path, g_list0)
 
     g_list, _ = load_graphs(path)
@@ -271,8 +276,9 @@ def test_serialize_heterograph():
     for i in range(len(g_list0)):
         for j, etypes in enumerate(g_list0[i].canonical_etypes):
             assert g_list[i].canonical_etypes[j] == etypes
-    assert g_list[1].restrict_format() == 'any'
-    assert g_list[2].restrict_format() == 'csr'
+    #assert g_list[1].restrict_format() == 'any'
+    #assert g_list[2].restrict_format() == 'csr'
+
     assert g_list[4].idtype == F.int32
     assert np.allclose(
         F.asnumpy(g_list[2].nodes['user'].data['hh']), np.ones((4, 5)))
@@ -291,15 +297,16 @@ def test_serialize_heterograph():
 
     os.unlink(path)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @pytest.mark.skip(reason="lack of permission on CI")
 def test_serialize_heterograph_s3():
     path = "s3://dglci-data-test/graph2.bin"
-    g_list0 = create_heterographs("int64") + create_heterographs("int32")
+    g_list0 = create_heterographs(F.int64) + create_heterographs(F.int32)
     save_graphs(path, g_list0)
 
     g_list = load_graphs(path, [0, 2, 5])
     assert g_list[0].idtype == F.int64
-    assert g_list[1].restrict_format() == 'csr'
+    #assert g_list[1].restrict_format() == 'csr'
     assert np.allclose(
         F.asnumpy(g_list[1].nodes['user'].data['hh']), np.ones((4, 5)))
     assert np.allclose(

@@ -39,7 +39,7 @@ def submit_jobs(args, udf_command):
     # launch server tasks
     server_cmd = 'DGL_ROLE=server'
     server_cmd = server_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(args.num_client)
-    server_cmd = server_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.conf_path)
+    server_cmd = server_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.part_config)
     server_cmd = server_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
     for i in range(len(hosts)*server_count_per_machine):
         ip, _ = hosts[int(i / server_count_per_machine)]
@@ -50,7 +50,7 @@ def submit_jobs(args, udf_command):
     # launch client tasks
     client_cmd = 'DGL_DIST_MODE="distributed" DGL_ROLE=client'
     client_cmd = client_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(args.num_client)
-    client_cmd = client_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.conf_path)
+    client_cmd = client_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.part_config)
     client_cmd = client_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
     if os.environ.get('OMP_NUM_THREADS') is not None:
         client_cmd = client_cmd + ' ' + 'OMP_NUM_THREADS=' + os.environ.get('OMP_NUM_THREADS')
@@ -63,11 +63,15 @@ def submit_jobs(args, udf_command):
     torch_cmd = torch_cmd + ' ' + '--node_rank=' + str(0)
     torch_cmd = torch_cmd + ' ' + '--master_addr=' + str(hosts[0][0])
     torch_cmd = torch_cmd + ' ' + '--master_port=' + str(1234)
-
     for node_id, host in enumerate(hosts):
         ip, _ = host
         new_torch_cmd = torch_cmd.replace('node_rank=0', 'node_rank='+str(node_id))
-        new_udf_command = udf_command.replace('python3', 'python3 ' + new_torch_cmd)
+        if 'python3' in udf_command:
+            new_udf_command = udf_command.replace('python3', 'python3 ' + new_torch_cmd)
+        elif 'python2' in udf_command:
+            new_udf_command = udf_command.replace('python2', 'python2 ' + new_torch_cmd)
+        else:
+            new_udf_command = udf_command.replace('python', 'python ' + new_torch_cmd)
         cmd = client_cmd + ' ' + new_udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         execute_remote(cmd, ip, thread_list)
@@ -81,19 +85,18 @@ def main():
                         help='Path of user directory of distributed tasks. \
                         This is used to specify a destination location where \
                         the contents of current directory will be rsyncd')
-    parser.add_argument('--num_client', type=int, 
+    parser.add_argument('--num_client', type=int,
                         help='Total number of client processes in the cluster')
-    parser.add_argument('--conf_path', type=str, 
-                        help='The path to the partition config file. This path can be \
-                        a remote path like s3 and dgl will download this file automatically')
-    parser.add_argument('--ip_config', type=str, 
-                        help='The file for IP configuration for server processes')
+    parser.add_argument('--part_config', type=str,
+                        help='The file (in workspace) of the partition config')
+    parser.add_argument('--ip_config', type=str,
+                        help='The file (in workspace) of IP configuration for server processes')
     args, udf_command = parser.parse_known_args()
     assert len(udf_command) == 1, 'Please provide user command line.'
     assert args.num_client > 0, '--num_client must be a positive number.'
     udf_command = str(udf_command[0])
     if 'python' not in udf_command:
-        raise RuntimeError("DGL launch can only support: python ...")
+        raise RuntimeError("DGL launching script can only support Python executable file.")
     submit_jobs(args, udf_command)
 
 def signal_handler(signal, frame):

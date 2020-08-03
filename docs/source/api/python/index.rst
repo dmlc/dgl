@@ -10,7 +10,7 @@ API Reference
    batch_heterograph
    nn
    init
-   backend
+   ops
    function
    traversal
    propagate

@@ -74,11 +74,11 @@ def construct_graph():
     f_1.close()
     f_2.close()
 
-    pa = dgl.bipartite((paper_author_src, paper_author_dst), 'paper', 'pa', 'author')
-    ap = dgl.bipartite((paper_author_dst, paper_author_src), 'author', 'ap', 'paper')
-    pc = dgl.bipartite((paper_conf_src, paper_conf_dst), 'paper', 'pc', 'conf')
-    cp = dgl.bipartite((paper_conf_dst, paper_conf_src), 'conf', 'cp', 'paper')
-    hg = dgl.hetero_from_relations([pa, ap, pc, cp])
+    hg = dgl.heterograph({
+        ('paper', 'pa', 'author') : (paper_author_src, paper_author_dst),
+        ('author', 'ap', 'paper') : (paper_author_dst, paper_author_src),
+        ('paper', 'pc', 'conf') : (paper_conf_src, paper_conf_dst),
+        ('conf', 'cp', 'paper') : (paper_conf_dst, paper_conf_src)})
     return hg, author_names, conf_names, paper_names
 
 #"conference - paper - Author - paper - conference" metapath sampling

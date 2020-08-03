@@ -37,9 +37,6 @@ IdArray BinaryElewise(IdType lhs, IdArray rhs);
 template <DLDeviceType XPU, typename IdType, typename Op>
 IdArray UnaryElewise(IdArray array);
 
-template <DLDeviceType XPU, typename IdType>
-IdArray HStack(IdArray arr1, IdArray arr2);
-
 template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray IndexSelect(NDArray array, IdArray index);
 
@@ -49,8 +46,14 @@ DType IndexSelect(NDArray array, int64_t index);
 template <DLDeviceType XPU, typename DType>
 IdArray NonZero(BoolArray bool_arr);
 
+template <DLDeviceType XPU, typename DType>
+std::pair<IdArray, IdArray> Sort(IdArray array);
+
 template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray Scatter(NDArray array, IdArray indices);
+
+template <DLDeviceType XPU, typename DType, typename IdType>
+void Scatter_(IdArray index, NDArray value, NDArray out);
 
 template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray Repeat(NDArray array, IdArray repeats);
@@ -69,6 +72,9 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
 
 template <DLDeviceType XPU, typename IdType>
 IdArray CumSum(IdArray array, bool prepend_zero);
+
+template <DLDeviceType XPU, typename IdType>
+IdArray NonZero(NDArray array);
 
 // sparse arrays
 
@@ -95,9 +101,6 @@ runtime::NDArray CSRGetRowData(CSRMatrix csr, int64_t row);
 
 template <DLDeviceType XPU, typename IdType>
 bool CSRIsSorted(CSRMatrix csr);
-
-template <DLDeviceType XPU, typename IdType>
-runtime::NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col);
 
 template <DLDeviceType XPU, typename IdType>
 runtime::NDArray CSRGetData(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
@@ -181,11 +184,11 @@ std::pair<runtime::NDArray, runtime::NDArray>
 COOGetRowDataAndIndices(COOMatrix coo, int64_t row);
 
 template <DLDeviceType XPU, typename IdType>
-runtime::NDArray COOGetData(COOMatrix coo, int64_t row, int64_t col);
-
-template <DLDeviceType XPU, typename IdType>
 std::vector<runtime::NDArray> COOGetDataAndIndices(
     COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
+
+template <DLDeviceType XPU, typename IdType>
+runtime::NDArray COOGetData(COOMatrix mat, runtime::NDArray rows, runtime::NDArray cols);
 
 template <DLDeviceType XPU, typename IdType>
 COOMatrix COOTranspose(COOMatrix coo);

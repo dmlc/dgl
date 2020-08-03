@@ -111,6 +111,10 @@ void _TestArith(DLContext ctx) {
   c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], 10);
+  c = (-a) % b;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], 3);
 
   const int val = -3;
   c = aten::Add(a, val);
@@ -129,6 +133,11 @@ void _TestArith(DLContext ctx) {
   c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], 3);
+  c = b % 3;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], 1);
+
   c = aten::Add(val, b);
   c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
@@ -145,6 +154,10 @@ void _TestArith(DLContext ctx) {
   c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], 0);
+  c = 3 % b;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], 3);
 
   a = aten::Range(0, N, sizeof(IDX)*8, ctx);
   c = a < 50;
@@ -179,7 +192,7 @@ void _TestArith(DLContext ctx) {
 
 }
 
-TEST(ArrayTest, TestArith) {
+TEST(ArrayTest, Arith) {
   _TestArith<int32_t>(CPU);
   _TestArith<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
@@ -189,19 +202,23 @@ TEST(ArrayTest, TestArith) {
 };
 
 template <typename IDX>
-void _TestHStack() {
-  IdArray a = aten::Range(0, 100, sizeof(IDX)*8, CTX);
-  IdArray b = aten::Range(100, 200, sizeof(IDX)*8, CTX);
-  IdArray c = aten::HStack(a, b);
+void _TestHStack(DLContext ctx) {
+  IdArray a = aten::Range(0, 100, sizeof(IDX)*8, ctx);
+  IdArray b = aten::Range(100, 200, sizeof(IDX)*8, ctx);
+  IdArray c = aten::HStack(a, b).CopyTo(aten::CPU);
   ASSERT_EQ(c->ndim, 1);
   ASSERT_EQ(c->shape[0], 200);
   for (int i = 0; i < 200; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], i);
 }
 
-TEST(ArrayTest, TestHStack) {
-  _TestHStack<int32_t>();
-  _TestHStack<int64_t>();
+TEST(ArrayTest, HStack) {
+  _TestHStack<int32_t>(CPU);
+  _TestHStack<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestHStack<int32_t>(GPU);
+  _TestHStack<int64_t>(GPU);
+#endif
 }
 
 template <typename IDX>
@@ -1238,6 +1255,61 @@ TEST(ArrayTest, CumSum) {
 #endif
 }
 
+template <typename IDX, typename D>
+void _TestScatter_(DLContext ctx) {
+  IdArray out = aten::Full(1, 10, 8*sizeof(IDX), ctx);
+  IdArray idx = aten::VecToIdArray(std::vector<IDX>({2, 3, 9}), sizeof(IDX)*8, ctx);
+  IdArray val = aten::VecToIdArray(std::vector<IDX>({-20, 30, 90}), sizeof(IDX)*8, ctx);
+  aten::Scatter_(idx, val, out);
+  IdArray tout = aten::VecToIdArray(std::vector<IDX>({1, 1, -20, 30, 1, 1, 1, 1, 1, 90}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(out, tout));
+}
+
+TEST(ArrayTest, Scatter_) {
+  _TestScatter_<int32_t, int32_t>(CPU);
+  _TestScatter_<int64_t, int32_t>(CPU);
+  _TestScatter_<int32_t, int64_t>(CPU);
+  _TestScatter_<int64_t, int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestScatter_<int32_t, int32_t>(GPU);
+  _TestScatter_<int64_t, int32_t>(GPU);
+  _TestScatter_<int32_t, int64_t>(GPU);
+  _TestScatter_<int64_t, int64_t>(GPU);
+#endif
+}
+
+template <typename IDX>
+void _TestNonZero(DLContext ctx) {
+  auto val = aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 0, -10, 0, 0, 23}), sizeof(IDX)*8, ctx);
+  auto idx = aten::NonZero(val);
+  auto tidx = aten::VecToIdArray(std::vector<int64_t>({1, 2, 4, 7}), 64, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, tidx));
+
+  val = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+  idx = aten::NonZero(val);
+  tidx = aten::VecToIdArray(std::vector<int64_t>({}), 64, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, tidx));
+
+  val = aten::VecToIdArray(std::vector<IDX>({0, 0, 0, 0}), sizeof(IDX)*8, ctx);
+  idx = aten::NonZero(val);
+  tidx = aten::VecToIdArray(std::vector<int64_t>({}), 64, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, tidx));
+
+  val = aten::Full(1, 3, sizeof(IDX)*8, ctx);
+  idx = aten::NonZero(val);
+  tidx = aten::VecToIdArray(std::vector<int64_t>({0, 1, 2}), 64, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, tidx));
+}
+
+TEST(ArrayTest, NonZero) {
+  _TestNonZero<int32_t>(CPU);
+  _TestNonZero<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestNonZero<int32_t>(GPU);
+  _TestNonZero<int64_t>(GPU);
+#endif
+}
+
 template <typename IdType>
 void _TestLineGraphCOO(DLContext ctx) {
   /*
@@ -1268,17 +1340,17 @@ void _TestLineGraphCOO(DLContext ctx) {
    *      [0, 0, 0, 0, 0, 0]]
    */
   IdArray a_row =
-    aten::VecToIdArray(std::vector<IdType>({0, 1, 1, 2, 2, 3}), sizeof(IdType)*8, CTX);
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 1, 2, 2, 3}), sizeof(IdType)*8, ctx);
   IdArray a_col =
-    aten::VecToIdArray(std::vector<IdType>({2, 0, 2, 0, 1, 3}), sizeof(IdType)*8, CTX);
+    aten::VecToIdArray(std::vector<IdType>({2, 0, 2, 0, 1, 3}), sizeof(IdType)*8, ctx);
   IdArray b_row =
-    aten::VecToIdArray(std::vector<IdType>({0, 1, 2, 4}), sizeof(IdType)*8, CTX);
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 2, 4}), sizeof(IdType)*8, ctx);
   IdArray b_col =
-    aten::VecToIdArray(std::vector<IdType>({4, 0, 3, 1}), sizeof(IdType)*8, CTX);
+    aten::VecToIdArray(std::vector<IdType>({4, 0, 3, 1}), sizeof(IdType)*8, ctx);
   IdArray c_row =
-    aten::VecToIdArray(std::vector<IdType>({0, 0, 1, 2, 2, 3, 4, 4}), sizeof(IdType)*8, CTX);
+    aten::VecToIdArray(std::vector<IdType>({0, 0, 1, 2, 2, 3, 4, 4}), sizeof(IdType)*8, ctx);
   IdArray c_col =
-    aten::VecToIdArray(std::vector<IdType>({3, 4, 0, 3, 4, 0, 1, 2}), sizeof(IdType)*8, CTX);
+    aten::VecToIdArray(std::vector<IdType>({3, 4, 0, 3, 4, 0, 1, 2}), sizeof(IdType)*8, ctx);
 
   const aten::COOMatrix &coo_a = aten::COOMatrix(
     4,
@@ -1306,15 +1378,15 @@ void _TestLineGraphCOO(DLContext ctx) {
   ASSERT_FALSE(l_coo2.col_sorted);
 
   IdArray a_data =
-    aten::VecToIdArray(std::vector<IdType>({4, 5, 0, 1, 2, 3}), sizeof(IdType)*8, CTX);
+    aten::VecToIdArray(std::vector<IdType>({4, 5, 0, 1, 2, 3}), sizeof(IdType)*8, ctx);
   b_row =
-    aten::VecToIdArray(std::vector<IdType>({4, 5, 0, 2}), sizeof(IdType)*8, CTX);
+    aten::VecToIdArray(std::vector<IdType>({4, 5, 0, 2}), sizeof(IdType)*8, ctx);
   b_col =
-    aten::VecToIdArray(std::vector<IdType>({2, 4, 1, 5}), sizeof(IdType)*8, CTX);
+    aten::VecToIdArray(std::vector<IdType>({2, 4, 1, 5}), sizeof(IdType)*8, ctx);
   c_row =
-    aten::VecToIdArray(std::vector<IdType>({4, 4, 5, 0, 0, 1, 2, 2}), sizeof(IdType)*8, CTX);
+    aten::VecToIdArray(std::vector<IdType>({4, 4, 5, 0, 0, 1, 2, 2}), sizeof(IdType)*8, ctx);
   c_col =
-    aten::VecToIdArray(std::vector<IdType>({1, 2, 4, 1, 2, 4, 5, 0}), sizeof(IdType)*8, CTX);
+    aten::VecToIdArray(std::vector<IdType>({1, 2, 4, 1, 2, 4, 5, 0}), sizeof(IdType)*8, ctx);
   const aten::COOMatrix &coo_ad = aten::COOMatrix(
     4,
     4,
@@ -1346,14 +1418,42 @@ TEST(LineGraphTest, LineGraphCOO) {
 }
 
 template <typename IDX>
-void _TestNonZero() {
-  BoolArray a = aten::VecToIdArray(std::vector<IDX>({1, 0, 1, 1, 0, 0, 1}));
-  IdArray indices = aten::NonZero(a);
-  IdArray expected = aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 6}));
-  ASSERT_TRUE(ArrayEQ<IDX>(indices, expected));
+void _TestSort(DLContext ctx) {
+  // case 1
+  IdArray a =
+    aten::VecToIdArray(std::vector<IDX>({8, 6, 7, 5, 3, 0, 9}), sizeof(IDX)*8, ctx);
+  IdArray sorted_a =
+    aten::VecToIdArray(std::vector<IDX>({0, 3, 5, 6, 7, 8, 9}), sizeof(IDX)*8, ctx);
+  IdArray sorted_idx =
+    aten::VecToIdArray(std::vector<IDX>({5, 4, 3, 1, 2, 0, 6}), 64, ctx);
+
+  IdArray sorted, idx;
+  std::tie(sorted, idx) = aten::Sort(a);
+  ASSERT_TRUE(ArrayEQ<IDX>(sorted, sorted_a));
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, sorted_idx));
+
+  // case 2: empty array
+  a = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+  sorted_a = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+  sorted_idx = aten::VecToIdArray(std::vector<IDX>({}), 64, ctx);
+  std::tie(sorted, idx) = aten::Sort(a);
+  ASSERT_TRUE(ArrayEQ<IDX>(sorted, sorted_a));
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, sorted_idx));
+
+  // case 3: array with one element
+  a = aten::VecToIdArray(std::vector<IDX>({2}), sizeof(IDX)*8, ctx);
+  sorted_a = aten::VecToIdArray(std::vector<IDX>({2}), sizeof(IDX)*8, ctx);
+  sorted_idx = aten::VecToIdArray(std::vector<IDX>({0}), 64, ctx);
+  std::tie(sorted, idx) = aten::Sort(a);
+  ASSERT_TRUE(ArrayEQ<IDX>(sorted, sorted_a));
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, sorted_idx));
 }
 
-TEST(ArrayTest, NonZero) {
-  _TestNonZero<int32_t>();
-  _TestNonZero<int64_t>();
+TEST(ArrayTest, Sort) {
+  _TestSort<int32_t>(CPU);
+  _TestSort<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestSort<int32_t>(GPU);
+  _TestSort<int64_t>(GPU);
+#endif
 }
