@@ -166,6 +166,8 @@ class CoraFullDataset(GNNBenchmarkDataset):
     ----------
     num_classes : int
         Number of classes for each node.
+    data : list
+        A list of DGLGraph objects
 
     Examples
     --------
@@ -223,6 +225,8 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
     ----------
     num_classes : int
         Number of classes for each node.
+    data : list
+        A list of DGLGraph objects
 
     Examples
     --------
@@ -280,6 +284,8 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
     ----------
     num_classes : int
         Number of classes for each node.
+    data : list
+        A list of DGLGraph objects
 
     Examples
     --------
@@ -336,6 +342,8 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
     ----------
     num_classes : int
         Number of classes for each node.
+    data : list
+        A list of DGLGraph objects
 
     Examples
     --------
@@ -392,6 +400,8 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
     ----------
     num_classes : int
         Number of classes for each node.
+    data : list
+        A list of DGLGraph objects
 
     Examples
     --------
