@@ -29,9 +29,7 @@ class SSTDataset(DGLBuiltinDataset):
             ....    # your code here
             ....
             >>>
-        `num_vocabs` is deprecated, it is replaced by:
-            >>> dataset = SSTDataset()
-            >>> vocab_size = dataset.vocab_size
+        `num_vocabs` is deprecated, it is replaced by `vocab_size`
 
     Each sample is the constituency tree of a sentence. The leaf nodes
     represent words. The word is a int value stored in the ``x`` feature field.
@@ -78,6 +76,8 @@ class SSTDataset(DGLBuiltinDataset):
     pretrained_emb: Tensor
         Pretrained glove embedding with respect the vocabulary.
     vocab_size : int
+        The size of the vocabulary
+    num_vocabs : int
         The size of the vocabulary
 
     Notes
@@ -262,7 +262,7 @@ class SSTDataset(DGLBuiltinDataset):
     @property
     def num_vocabs(self):
         deprecate_property('dataset.num_vocabs', 'dataset.vocab_size')
-        return len(self.vocab)
+        return self.vocab_size
 
     @property
     def vocab_size(self):
