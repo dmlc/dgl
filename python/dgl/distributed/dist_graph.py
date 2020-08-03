@@ -251,7 +251,7 @@ class DistGraphServer(KVServer):
         Disable shared memory.
     '''
     def __init__(self, server_id, ip_config, server_count, num_clients, part_config, disable_shared_mem=False):
-        super(DistGraphServer, self).__init__(server_id=server_id, ip_config=ip_config,
+        super(DistGraphServer, self).__init__(server_id=server_id, ip_config=ip_config, server_count=server_count,
                                               num_clients=num_clients)
         self.ip_config = ip_config
         # Load graph partition data.
