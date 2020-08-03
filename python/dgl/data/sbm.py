@@ -8,7 +8,6 @@ import numpy.random as npr
 import scipy as sp
 
 from .dgl_dataset import DGLDataset
-from ..utils import Index
 from ..convert import graph as dgl_graph
 from .. import batch
 from .utils import save_info, save_graphs, load_info, load_graphs
@@ -123,8 +122,7 @@ class SBMMixtureDataset(DGLDataset):
             raise RuntimeError()
         self._graphs = [dgl_graph(sbm(self._n_communities, self._block_size, *x)) for x in pq]
         self._line_graphs = [g.line_graph(backtracking=False) for g in self._graphs]
-        in_degrees = lambda g: g.in_degrees(
-            Index(np.arange(0, g.number_of_nodes()))).unsqueeze(1).float()
+        in_degrees = lambda g: g.in_degrees().float()
         self._graph_degrees = [in_degrees(g) for g in self._graphs]
         self._line_graph_degrees = [in_degrees(lg) for lg in self._line_graphs]
         self._pm_pds = list(zip(*[g.edges() for g in self._graphs]))[0]
