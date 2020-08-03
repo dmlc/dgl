@@ -48,7 +48,7 @@ class GDELTDataset(DGLBuiltinDataset):
     end_time : int
         End time of the temporal graph
     is_temporal : bool
-        Is the dataset contains temporal graphs
+        Does the dataset contain temporal graphs
 
     Examples
     ----------
@@ -125,13 +125,13 @@ class GDELTDataset(DGLBuiltinDataset):
         """
         return self._end_time
 
-    def __getitem__(self, idx):
-        r""" Get graph by index
+    def __getitem__(self, t):
+        r""" Get graph by with events before time `t + self.start_time`
 
         Parameters
         ----------
-        idx : int
-            Item index
+        t : int
+            Time, its value must be in range [0, `self.end_time` - `self.start_time`]
 
         Returns
         -------
@@ -139,9 +139,9 @@ class GDELTDataset(DGLBuiltinDataset):
             graph structure and edge feature
             - edata['rel_type']: edge type
         """
-        if idx >= len(self) or idx < 0:
+        if t >= len(self) or t < 0:
             raise IndexError("Index out of range")
-        i = idx + self.start_time
+        i = t + self.start_time
         row_mask = self.time_index <= i
         edges = self.data[row_mask][:, [0, 2]]
         rate = self.data[row_mask][:, 1]
@@ -155,7 +155,7 @@ class GDELTDataset(DGLBuiltinDataset):
 
     @property
     def is_temporal(self):
-        r""" Is the dataset contains temporal graphs
+        r""" Does the dataset contain temporal graphs
 
         Returns
         -------
