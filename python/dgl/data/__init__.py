@@ -4,7 +4,7 @@ from __future__ import absolute_import
 from . import citation_graph as citegrh
 from .citation_graph import CoraBinary, CitationGraphDataset
 from .minigc import *
-from .tree import *
+from .tree import SST, SSTDataset
 from .utils import *
 from .sbm import SBMMixture
 from .reddit import RedditDataset
@@ -14,7 +14,7 @@ from .gnn_benckmark import AmazonCoBuy, CoraFull, Coauthor
 from .karate import KarateClub, KarateClubDataset
 from .gindt import GINDataset
 from .bitcoinotc import BitcoinOTC, BitcoinOTCDataset
-from .gdelt import GDELT
+from .gdelt import GDELT, GDELTDataset
 from .icews18 import ICEWS18, ICEWS18Dataset
 from .qm7b import QM7b, QM7bDataset
 from .dgl_dataset import DGLDataset, DGLBuiltinDataset
