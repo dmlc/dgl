@@ -140,6 +140,9 @@ void CSRSort_<kDLGPU, int64_t>(CSRMatrix* csr) {
   csr->sorted = true;
   csr->indices = new_indices;
   csr->data = new_data;
+
+  // free resources
+  device->FreeWorkspace(ctx, workspace);
 }
 
 template void CSRSort_<kDLGPU, int32_t>(CSRMatrix* csr);
