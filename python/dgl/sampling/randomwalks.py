@@ -60,9 +60,11 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     Examples
     --------
     The following creates a homogeneous graph:
+
     >>> g1 = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 0), (3, 0)], 'user', 'follow')
 
     Normal random walk:
+
     >>> dgl.sampling.random_walk(g1, [0, 1, 2, 0], length=4)
     (tensor([[0, 1, 2, 0, 1],
              [1, 3, 0, 1, 3],
@@ -74,6 +76,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     in every path.  In this case, it is returning all 0 (``user``).
 
     Random walk with restart:
+
     >>> dgl.sampling.random_walk_with_restart(g1, [0, 1, 2, 0], length=4, restart_prob=0.5)
     (tensor([[ 0, -1, -1, -1, -1],
              [ 1,  3,  0, -1, -1],
@@ -81,6 +84,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
              [ 0, -1, -1, -1, -1]]), tensor([0, 0, 0, 0, 0]))
 
     Non-uniform random walk:
+
     >>> g1.edata['p'] = torch.FloatTensor([1, 0, 1, 1, 1])     # disallow going from 1 to 2
     >>> dgl.sampling.random_walk(g1, [0, 1, 2, 0], length=4, prob='p')
     (tensor([[0, 1, 3, 0, 1],
@@ -89,6 +93,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
              [0, 1, 3, 0, 1]]), tensor([0, 0, 0, 0, 0]))
 
     Metapath-based random walk:
+
     >>> g2 = dgl.heterograph({
     ...     ('user', 'follow', 'user'): [(0, 1), (1, 2), (1, 3), (2, 0), (3, 0)],
     ...     ('user', 'view', 'item'): [(0, 0), (0, 1), (1, 1), (2, 2), (3, 2), (3, 1)],
@@ -102,6 +107,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
 
     Metapath-based random walk, with restarts only on items (i.e. after traversing a "view"
     relationship):
+
     >>> dgl.sampling.random_walk(
     ...     g2, [0, 1, 2, 0], metapath=['follow', 'view', 'viewed-by'] * 2,
     ...     restart_prob=torch.FloatTensor([0, 0.5, 0, 0, 0.5, 0]))
@@ -211,6 +217,7 @@ def pack_traces(traces, types):
 
     The third and fourth tensor indicates the length and the offset of each path.  With these
     tensors it is easy to obtain the i-th random walk path with:
+
     >>> vids = concat_vids.split(lengths.tolist())
     >>> vtypes = concat_vtypes.split(lengths.tolist())
     >>> vids[1], vtypes[1]

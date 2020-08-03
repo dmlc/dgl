@@ -30,6 +30,7 @@ class MultiLayerNeighborSampler(BlockSampler):
     To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
     a homogeneous graph where each node takes messages from all neighbors (assume
     the backend is PyTorch):
+
     >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
     >>> collator = dgl.dataloading.NodeCollator(g, train_nid, sampler)
     >>> dataloader = torch.utils.data.DataLoader(
@@ -39,12 +40,14 @@ class MultiLayerNeighborSampler(BlockSampler):
     ...     train_on(blocks)
 
     If we wish to gather from 5 neighbors on the first layer, 10 neighbors on the second,
-    and 15 layers on the third:
+    and 15 neighbors on the third:
+
     >>> sampler = dgl.dataloading.NeighborSampler([5, 10, 15])
 
     If training on a heterogeneous graph and you want different number of neighbors for each
     edge type, one should instead provide a list of dicts.  Each dict would specify the
     number of neighbors to pick per edge type.
+
     >>> sampler = dgl.dataloading.NeighborSampler([
     ...     {('user', 'follows', 'user'): 5,
     ...      ('user', 'plays', 'game'): 4,

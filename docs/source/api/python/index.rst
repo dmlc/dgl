@@ -17,6 +17,7 @@ API Reference
    udf
    sampler
    sampling
+   dataloading
    data
    transform
    graph_store

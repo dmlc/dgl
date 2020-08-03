@@ -25,6 +25,7 @@ class NodeDataLoader(DataLoader):
     To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
     a homogeneous graph where each node takes messages from all neighbors (assume
     the backend is PyTorch):
+
     >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
     >>> dataloader = dgl.dataloading.NodeDataLoader(
     ...     g, train_nid, sampler,
@@ -99,17 +100,20 @@ class EdgeDataLoader(DataLoader):
     Say that you have an array of source node IDs ``src`` and another array of destination
     node IDs ``dst``.  One can make it bidirectional by adding another set of edges
     that connects from ``dst`` to ``src``:
+
     >>> g = dgl.graph((torch.cat([src, dst]), torch.cat([dst, src])))
 
     One can then know that the ID difference of an edge and its reverse edge is ``|E|``,
     where ``|E|`` is the length of your source/destination array.  The reverse edge
     mapping can be obtained by
+
     >>> E = len(src)
     >>> reverse_eids = torch.cat([torch.arange(E, 2 * E), torch.arange(0, E)])
 
     Note that the sampled edges as well as their reverse edges are removed from
     computation dependencies of the incident nodes.  This is a common trick to avoid
     information leakage.
+
     >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
     >>> dataloader = dgl.dataloading.EdgeDataLoader(
     ...     g, train_eid, sampler, exclude='reverse',
@@ -121,6 +125,7 @@ class EdgeDataLoader(DataLoader):
     To train a 3-layer GNN for link prediction on a set of edges ``train_eid`` on a
     homogeneous graph where each node takes messages from all neighbors (assume the
     backend is PyTorch), with 5 uniformly chosen negative samples per edge:
+
     >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
     >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
     >>> dataloader = dgl.dataloading.EdgeDataLoader(
@@ -135,12 +140,14 @@ class EdgeDataLoader(DataLoader):
     user-item clicks, representated by a user array ``user`` and an item array ``item``.
     You may want to build a heterogeneous graph with a user-click-item relation and an
     item-clicked-by-user relation.
+
     >>> g = dgl.heterograph({
     ...     ('user', 'click', 'item'): (user, item),
     ...     ('item', 'clicked-by', 'user'): (item, user)})
 
     To train a 3-layer GNN for edge classification on a set of edges ``train_eid`` with
     type ``click``, you can write
+
     >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
     >>> dataloader = dgl.dataloading.EdgeDataLoader(
     ...     g, {'click': train_eid}, sampler, exclude='reverse_types',
@@ -151,6 +158,7 @@ class EdgeDataLoader(DataLoader):
 
     To train a 3-layer GNN for link prediction on a set of edges ``train_eid`` with type
     ``click``, you can write
+
     >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
     >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
     >>> dataloader = dgl.dataloading.EdgeDataLoader(
