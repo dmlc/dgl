@@ -42,7 +42,7 @@ def start_find_edges_client(rank, tmpdir, disable_shared_mem, eids):
 def check_rpc_sampling(tmpdir, num_server):
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
-        ip_config.write('{} 1\n'.format(get_local_usable_addr()))
+        ip_config.write('{}\n'.format(get_local_usable_addr()))
     ip_config.close()
 
     g = CitationGraphDataset("cora")[0]
@@ -78,7 +78,7 @@ def check_rpc_sampling(tmpdir, num_server):
 def check_rpc_find_edges(tmpdir, num_server):
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
-        ip_config.write('{} 1\n'.format(get_local_usable_addr()))
+        ip_config.write('{}\n'.format(get_local_usable_addr()))
     ip_config.close()
 
     g = CitationGraphDataset("cora")[0]
@@ -114,7 +114,7 @@ def test_rpc_sampling():
 def check_rpc_sampling_shuffle(tmpdir, num_server):
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
-        ip_config.write('{} 1\n'.format(get_local_usable_addr()))
+        ip_config.write('{}\n'.format(get_local_usable_addr()))
     ip_config.close()
 
     g = CitationGraphDataset("cora")[0]
@@ -203,7 +203,7 @@ def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
 def check_rpc_in_subgraph(tmpdir, num_server):
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
-        ip_config.write('{} 1\n'.format(get_local_usable_addr()))
+        ip_config.write('{}\n'.format(get_local_usable_addr()))
     ip_config.close()
 
     g = CitationGraphDataset("cora")[0]
