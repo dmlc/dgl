@@ -265,7 +265,7 @@ def run(args, device, data):
 def main(args):
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
-    g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, part_config=args.conf_path)
+    g = dgl.distributed.DistGraph(args.ip_config, args.server_count, args.graph_name, part_config=args.conf_path)
     print('rank:', g.rank())
 
     pb = g.get_partition_book()
@@ -296,6 +296,7 @@ if __name__ == '__main__':
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
     parser.add_argument('--conf_path', type=str, help='The path to the partition config file')
     parser.add_argument('--num-client', type=int, help='The number of clients')
+    parser.add_argument('--server-count', type=int, help='Server count on each machine.')
     parser.add_argument('--n-classes', type=int, help='the number of classes')
     parser.add_argument('--gpu', type=int, default=0,
         help="GPU device ID. Use -1 for CPU training")

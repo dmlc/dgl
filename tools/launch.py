@@ -41,6 +41,7 @@ def submit_jobs(args, udf_command):
     server_cmd = server_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(args.num_client)
     server_cmd = server_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.part_config)
     server_cmd = server_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
+    server_cmd = server_cmd + ' ' + 'DGL_SERVER_COUNT=' + str(args.server_count)
     for i in range(len(hosts)*server_count_per_machine):
         ip, _ = hosts[int(i / server_count_per_machine)]
         cmd = server_cmd + ' ' + 'DGL_SERVER_ID=' + str(i)
@@ -52,6 +53,7 @@ def submit_jobs(args, udf_command):
     client_cmd = client_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(args.num_client)
     client_cmd = client_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.part_config)
     client_cmd = client_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
+    client_cmd = client_cmd + ' ' + 'DGL_SERVER_COUNT=' + str(args.server_count)
     if os.environ.get('OMP_NUM_THREADS') is not None:
         client_cmd = client_cmd + ' ' + 'OMP_NUM_THREADS=' + os.environ.get('OMP_NUM_THREADS')
     if os.environ.get('PYTHONPATH') is not None:
@@ -87,6 +89,8 @@ def main():
                         the contents of current directory will be rsyncd')
     parser.add_argument('--num_client', type=int,
                         help='Total number of client processes in the cluster')
+    parser.add_argument('--server_count', type=int,
+                        help='Server count on each machine.')
     parser.add_argument('--part_config', type=str,
                         help='The file (in workspace) of the partition config')
     parser.add_argument('--ip_config', type=str,
