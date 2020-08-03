@@ -151,6 +151,7 @@ def start_client(num_clients):
     dgl.distributed.connect_to_server(ip_config='kv_ip_config.txt')
     # Init kvclient
     kvclient = dgl.distributed.KVClient(ip_config='kv_ip_config.txt')
+    kvclient.map_shared_data(partition_book=gpb)
     assert dgl.distributed.get_num_client() == num_clients
     kvclient.init_data(name='data_1', 
                        shape=F.shape(data_1), 
@@ -162,8 +163,6 @@ def start_client(num_clients):
                        dtype=F.dtype(data_2), 
                        part_policy=node_policy,
                        init_func=init_zero_func)
-
-    kvclient.map_shared_data(partition_book=gpb)
     
     # Test data_name_list
     name_list = kvclient.data_name_list()
@@ -264,7 +263,6 @@ def start_client(num_clients):
                        part_policy=node_policy,
                        init_func=init_zero_func)
     kvclient.register_push_handler('data_3', add_push)
-    kvclient.map_shared_data(partition_book=gpb)
     data_tensor = F.tensor([[6.,6.],[6.,6.],[6.,6.]], F.float32)
     kvclient.barrier()
     time.sleep(kvclient.client_id + 1)
