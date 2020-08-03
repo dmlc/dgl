@@ -9,11 +9,12 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 import dgl
-from dgl.data.tree import SST, SSTBatch
+from dgl.data.tree import SSTDataset
 
 from tree_lstm import TreeLSTM
 
 SSTBatch = collections.namedtuple('SSTBatch', ['graph', 'mask', 'wordid', 'label'])
+
 def batcher(device):
     def batcher_dev(batch):
         batch_trees = dgl.batch(batch)
@@ -36,24 +37,24 @@ def main(args):
     if cuda:
         th.cuda.set_device(args.gpu)
 
-    trainset = SST()
+    trainset = SSTDataset()
     train_loader = DataLoader(dataset=trainset,
                               batch_size=args.batch_size,
                               collate_fn=batcher(device),
                               shuffle=True,
                               num_workers=0)
-    devset = SST(mode='dev')
+    devset = SSTDataset(mode='dev')
     dev_loader = DataLoader(dataset=devset,
                             batch_size=100,
                             collate_fn=batcher(device),
                             shuffle=False,
                             num_workers=0)
 
-    testset = SST(mode='test')
+    testset = SSTDataset(mode='test')
     test_loader = DataLoader(dataset=testset,
                              batch_size=100, collate_fn=batcher(device), shuffle=False, num_workers=0)
 
-    model = TreeLSTM(trainset.num_vocabs,
+    model = TreeLSTM(trainset.vocab_size,
                      args.x_size,
                      args.h_size,
                      trainset.num_classes,
@@ -61,7 +62,7 @@ def main(args):
                      cell_type='childsum' if args.child_sum else 'nary',
                      pretrained_emb = trainset.pretrained_emb).to(device)
     print(model)
-    params_ex_emb =[x for x in list(model.parameters()) if x.requires_grad and x.size(0)!=trainset.num_vocabs]
+    params_ex_emb =[x for x in list(model.parameters()) if x.requires_grad and x.size(0)!=trainset.vocab_size]
     params_emb = list(model.embedding.parameters())
 
     for p in params_ex_emb:
