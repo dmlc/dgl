@@ -72,13 +72,13 @@ class SBMMixtureDataset(DGLDataset):
     n_communities : int
         Number of communities.
     k : int, optional
-        Multiplier.
+        Multiplier. Default: 2
     avg_deg : int, optional
-        Average degree.
+        Average degree. Default: 3
     pq : list of pair of nonnegative float or str, optional
-        Random densities.
+        Random densities. Default: Appendix_C
     rng : numpy.random.RandomState, optional
-        Random number generator.
+        Random number generator. Default: None
 
     Raises
     ------
