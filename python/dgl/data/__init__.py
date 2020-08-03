@@ -15,7 +15,7 @@ from .karate import KarateClub, KarateClubDataset
 from .gindt import GINDataset
 from .bitcoinotc import BitcoinOTC, BitcoinOTCDataset
 from .gdelt import GDELT
-from .icews18 import ICEWS18
+from .icews18 import ICEWS18, ICEWS18Dataset
 from .qm7b import QM7b, QM7bDataset
 from .dgl_dataset import DGLDataset, DGLBuiltinDataset
 from .citation_graph import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
