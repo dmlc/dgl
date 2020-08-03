@@ -67,4 +67,5 @@ def subgraph_collate_fn(g, batch):
     g1.ndata['feat'] = g.ndata['feat'][nid]
     g1.ndata['labels'] = g.ndata['labels'][nid]
     g1.ndata['train_mask'] = g.ndata['train_mask'][nid]
+    g1.create_format_()
     return g1
