@@ -198,7 +198,7 @@ def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_in_subgraph.json', rank)
     dist_graph = DistGraph("rpc_ip_config.txt", "test_in_subgraph", gpb=gpb)
     sampled_graph = dgl.distributed.in_subgraph(dist_graph, nodes)
-    dgl.distributed.exit_client()    
+    dgl.distributed.exit_client()
     return sampled_graph
 
 

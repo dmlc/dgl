@@ -155,8 +155,8 @@ def run(args, device, data):
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')],
                               dgl.distributed.sample_neighbors)
 
-    # Create PyTorch DataLoader for constructing blocks
-    dataloader = DataLoader(
+    # Create DataLoader for constructing blocks
+    dataloader = DistDataLoader(
         dataset=train_nid.numpy(),
         batch_size=args.batch_size,
         collate_fn=sampler.sample_blocks,
@@ -267,17 +267,8 @@ def main(args):
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
 
-    import multiprocessing, logging
-    logger = multiprocessing.log_to_stderr()
-    logger.setLevel(logging.DEBUG)
-
-    # os.environ['DGL_DIST_MODE'] = 'distributed'
-    print("START1111")
-    print("NUM_WORKERS:{}".format(args.num_workers))
     dgl.distributed.init_rpc(args.ip_config, num_workers=args.num_workers)
-    print("DONE")
     g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, part_config=args.conf_path)
-    print('rank:', g.rank())
 
     pb = g.get_partition_book()
     train_nid = dgl.distributed.node_split(g.ndata['train_mask'], pb, force_even=True)
@@ -326,10 +317,5 @@ if __name__ == '__main__':
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
     args = parser.parse_args()
 
-    try:
-        print(args)
-        main(args)
-    except Exception as e:
-        print(e)
-        import traceback
-        traceback.print_exc()
+    print(args)
+    main(args)

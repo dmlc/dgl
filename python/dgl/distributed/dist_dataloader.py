@@ -40,6 +40,13 @@ def _exit():
     time.sleep(1)
 
 
+def enable_mp_debug():
+    """Print multiprocessing debug information"""
+    import multiprocessing
+    import logging
+    logger = multiprocessing.log_to_stderr()
+    logger.setLevel(logging.DEBUG)
+
 class DistDataLoader:
     """DGL customized multiprocessing dataloader"""
 
@@ -62,7 +69,8 @@ class DistDataLoader:
             will be smaller. (default: ``False``)
         queue_size (int): Size of multiprocessing queue
         """
-        assert num_workers > 0
+        assert num_workers > 0, "DistDataloader only supports num_workers>0 for now. if you \
+            want to use single process dataloader, please use PyTorch dataloader for now"
         if queue_size is None:
             queue_size = num_workers * 4
         self.queue_size = queue_size
