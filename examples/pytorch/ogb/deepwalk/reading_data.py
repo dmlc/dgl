@@ -116,10 +116,7 @@ def make_undirected(G):
     return G
 
 def find_connected_nodes(G):
-    nodes = []
-    for n in G.nodes():
-        if G.out_degree(n) > 0:
-            nodes.append(n.item())
+    nodes = G.out_degrees().nonzero().squeeze(-1)
     return nodes
 
 class DeepwalkDataset:
@@ -188,7 +185,7 @@ class DeepwalkDataset:
 
         # negative table for true negative sampling
         if not fast_neg:
-            node_degree = np.array(list(map(lambda x: self.G.out_degree(x), self.valid_seeds)))
+            node_degree = self.G.out_degrees(self.valid_seeds).numpy()
             node_degree = np.power(node_degree, 0.75)
             node_degree /= np.sum(node_degree)
             node_degree = np.array(node_degree * 1e8, dtype=np.int)
@@ -224,6 +221,5 @@ class DeepwalkSampler(object):
         self.walk_length = walk_length
     
     def sample(self, seeds):
-        walks = dgl.contrib.sampling.random_walk(self.G, seeds, 
-            1, self.walk_length-1)
+        walks = dgl.sampling.random_walk(self.G, seeds, length=self.walk_length-1)[0]
         return walks
