@@ -162,6 +162,29 @@ class NeighborSampler:
             blocks.insert(0, block)
         return seeds, blocks
 
+def evaluate(model, embed_layer, eval_loader, node_feats):
+    model.eval()
+    embed_layer.eval()
+    eval_logits = []
+    eval_seeds = []
+ 
+    with th.no_grad():
+        for sample_data in tqdm.tqdm(eval_loader):
+            th.cuda.empty_cache()
+            seeds, blocks = sample_data
+            feats = embed_layer(blocks[0].srcdata[dgl.NID],
+                    blocks[0].srcdata[dgl.NTYPE],
+                    blocks[0].srcdata['type_id'],
+                    node_feats)
+            logits = model(blocks, feats)
+            eval_logits.append(logits.cpu().detach())
+            eval_seeds.append(seeds.cpu().detach())
+    eval_logits = th.cat(eval_logits)
+    eval_seeds = th.cat(eval_seeds)
+ 
+    return eval_logits, eval_seeds
+
+
 @thread_wrapped_func
 def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
     dev_id = devices[proc_id]
@@ -279,20 +302,15 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
 
     for epoch in range(args.n_epochs):
         model.train()
+        embed_layer.train()
 
         for i, sample_data in enumerate(loader):
             seeds, blocks = sample_data
             t0 = time.time()
-            if args.mix_cpu_gpu is False:
-                feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                                    blocks[0].srcdata[dgl.NTYPE],
-                                    blocks[0].srcdata['type_id'],
-                                    node_feats)
-            else:
-                feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                                    blocks[0].srcdata[dgl.NTYPE],
-                                    blocks[0].srcdata['type_id'],
-                                    node_feats)
+            feats = embed_layer(blocks[0].srcdata[dgl.NID],
+                                blocks[0].srcdata[dgl.NTYPE],
+                                blocks[0].srcdata['type_id'],
+                                node_feats)
             logits = model(blocks, feats)
             loss = F.cross_entropy(logits, labels[seeds])
             t1 = time.time()
@@ -315,81 +333,38 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
         print("Epoch {:05d}:{:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".
             format(epoch, i, forward_time[-1], backward_time[-1]))
 
-        # only process 0 will do the evaluation
         if (queue is not None) or (proc_id == 0):
-            model.eval()
-            eval_logits = []
-            eval_seeds = []
-            with th.no_grad():
-                for sample_data in tqdm.tqdm(val_loader):
-                    th.cuda.empty_cache()
-                    seeds, blocks = sample_data
-                    if args.mix_cpu_gpu is False:
-                        feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                                            blocks[0].srcdata[dgl.NTYPE],
-                                            blocks[0].srcdata['type_id'],
-                                            node_feats)
-                    else:
-                        feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                                            blocks[0].srcdata[dgl.NTYPE],
-                                            blocks[0].srcdata['type_id'],
-                                            node_feats)
-                    logits = model(blocks, feats)
-                    eval_logits.append(logits.cpu().detach())
-                    eval_seeds.append(seeds.cpu().detach())
-                eval_logits = th.cat(eval_logits)
-                eval_seeds = th.cat(eval_seeds)
-                if queue is not None:
-                    queue.put((eval_logits, eval_seeds))
+            val_logits, val_seeds = evaluate(model, embed_layer, val_loader, node_feats)
+            if queue is not None:
+                queue.put((val_logits, val_seeds))
 
+            # gather evaluation result from multiple processes
             if proc_id == 0:
                 if queue is not None:
-                    eval_logits = []
-                    eval_seeds = []
+                    val_logits = []
+                    val_seeds = []
                     for i in range(n_gpus):
                         log = queue.get()
                         val_l, val_s = log
-                        eval_logits.append(val_l)
-                        eval_seeds.append(val_s)
-                    eval_logits = th.cat(eval_logits)
-                    eval_seeds = th.cat(eval_seeds)
-                val_loss = F.cross_entropy(eval_logits, labels[eval_seeds].cpu()).item()
-                val_acc = th.sum(eval_logits.argmax(dim=1) == labels[eval_seeds].cpu()).item() / len(eval_seeds)
+                        val_logits.append(val_l)
+                        val_seeds.append(val_s)
+                    val_logits = th.cat(val_logits)
+                    val_seeds = th.cat(val_seeds)
+                val_loss = F.cross_entropy(val_logits, labels[val_seeds].cpu()).item()
+                val_acc = th.sum(val_logits.argmax(dim=1) == labels[val_seeds].cpu()).item() / len(val_seeds)
 
                 print("Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
                         format(val_acc, val_loss))
         if n_gpus > 1:
             th.distributed.barrier()
-    print()
 
     # only process 0 will do the evaluation
     if (queue is not None) or (proc_id == 0):
-        model.eval()
-        test_logits = []
-        test_seeds = []
-        with th.no_grad():
-            for sample_data in tqdm.tqdm(test_loader):
-                th.cuda.empty_cache()
-                seeds, blocks = sample_data
-                if args.mix_cpu_gpu is False:
-                    feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                                        blocks[0].srcdata[dgl.NTYPE],
-                                        blocks[0].srcdata['type_id'],
-                                        node_feats)
-                else:
-                    feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                                        blocks[0].srcdata[dgl.NTYPE],
-                                        blocks[0].srcdata['type_id'],
-                                        node_feats)
-                logits = model(blocks, feats)
-                test_logits.append(logits.cpu().detach())
-                test_seeds.append(seeds.cpu().detach())
-            test_logits = th.cat(test_logits)
-            test_seeds = th.cat(test_seeds)
+        test_logits, test_seeds = evaluate(model, embed_layer, test_loader, node_feats)
+        if queue is not None:
+            queue.put((test_logits, test_seeds))
 
-            if queue is not None:
-                queue.put((test_logits, test_seeds))
-
+        # gather evaluation result from multiple processes
         if proc_id == 0:
             if queue is not None:
                 test_logits = []
@@ -484,7 +459,9 @@ def main(args, devices):
         test_idx = th.nonzero(test_mask).squeeze()
         node_feats = [None] * num_of_ntype
 
-        # split dataset into train, validate, test
+        # AIFB, MUTAG, BGS and AM datasets do not provide validation set split.
+        # Split train set into train and validation if args.validation is set
+        # otherwise use train set as the validation set.
         if args.validation:
             val_idx = train_idx[:len(train_idx) // 5]
             train_idx = train_idx[len(train_idx) // 5:]
