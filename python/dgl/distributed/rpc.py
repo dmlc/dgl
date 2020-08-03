@@ -22,17 +22,24 @@ REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
 SERVICE_ID_TO_PROPERTY = {}
 
-def read_ip_config(filename):
+DEFUALT_PORT = 30050
+
+def read_ip_config(filename, server_count):
     """Read network configuration information of server from file.
 
-    The format of configuration file should be:
+    For exampple, the following TXT shows a 4-machine configuration:
 
-        [ip] [base_port] [server_count]
+        172.31.40.143
+        172.31.36.140
+        172.31.47.147
+        172.31.30.180
 
-        172.31.40.143 30050 2
-        172.31.36.140 30050 2
-        172.31.47.147 30050 2
-        172.31.30.180 30050 2
+    Users can also set user-specified port for this network configuration. For example:
+
+        172.31.40.143 20090
+        172.31.36.140 20090
+        172.31.47.147 20090
+        172.31.30.180 20090
 
     Note that, DGL supports multiple backup servers that shares data with each others
     on the same machine via shared-memory tensor. The server_count should be >= 1. For example,
@@ -43,15 +50,17 @@ def read_ip_config(filename):
     ----------
     filename : str
         Path of IP configuration file.
+    server_count : int
+        Server count on each machine.
 
     Returns
     -------
     dict
         server namebook.
         The key is server_id (int)
-        The value is [machine_id, ip, port, group_count] ([int, str, int, int])
+        The value is [machine_id, ip, port, server_count] ([int, str, int, int])
 
-        e.g.,
+        For example:
 
           {0:[0, '172.31.40.143', 30050, 2],
            1:[0, '172.31.40.143', 30051, 2],
@@ -63,19 +72,26 @@ def read_ip_config(filename):
            7:[3, '172.31.30.180', 30051, 2]}
     """
     assert len(filename) > 0, 'filename cannot be empty.'
+    assert server_count > 0, 'server_count (%d) must be a positive number.' % server_count
     server_namebook = {}
     try:
         server_id = 0
         machine_id = 0
         lines = [line.rstrip('\n') for line in open(filename)]
         for line in lines:
-            ip_addr, port, server_count = line.split(' ')
-            for s_count in range(int(server_count)):
-                server_namebook[server_id] = \
-                [int(machine_id), ip_addr, int(port)+s_count, int(server_count)]
+            result = line.split(' ')
+            if len(result) == 2:
+                port = int(result[1])
+            elif len(result) == 1:
+                port = DEFUALT_PORT
+            else:
+                raise RuntimeError('length of result can only be 1 or 2.')
+            ip_addr = result[0]
+            for s_count in range(server_count):
+                server_namebook[server_id] = [machine_id, ip_addr, port+s_count, server_count]
                 server_id += 1
             machine_id += 1
-    except ValueError:
+    except RuntimeError:
         print("Error: data format on each line should be: [ip] [base_port] [server_count]")
     return server_namebook
 

@@ -628,12 +628,15 @@ class KVServer(object):
         ID of current server (starts from 0).
     ip_config : str
         Path of IP configuration file.
+    server_count : int
+        Server count on each machine.
     num_clients : int
         Total number of KVClients that will be connected to the KVServer.
     """
-    def __init__(self, server_id, ip_config, num_clients):
+    def __init__(self, server_id, ip_config, server_count, num_clients):
         assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
         assert os.path.exists(ip_config), 'Cannot open file: %s' % ip_config
+        assert server_count > 0, 'server_count (%d) must be a positive number.' % server_count
         assert num_clients >= 0, 'num_clients (%d) cannot be a negative number.' % num_clients
         # Register services on server
         rpc.register_service(KVSTORE_PULL,
@@ -676,7 +679,7 @@ class KVServer(object):
         self._part_policy = {}
         # Basic information
         self._server_id = server_id
-        self._server_namebook = rpc.read_ip_config(ip_config)
+        self._server_namebook = rpc.read_ip_config(ip_config, server_count)
         assert server_id in self._server_namebook, \
                 'Trying to start server {}, but there are {} servers in the config file'.format(
                     server_id, len(self._server_namebook))
@@ -820,13 +823,16 @@ class KVClient(object):
     ----------
     ip_config : str
         Path of IP configuration file.
+    server_count : int
+        Server count on each machine.
     role : str
         We can set different role for kvstore.
     """
-    def __init__(self, ip_config, role='default'):
+    def __init__(self, ip_config, server_count, role='default'):
         assert rpc.get_rank() != -1, 'Please invoke rpc.connect_to_server() \
         before creating KVClient.'
         assert os.path.exists(ip_config), 'Cannot open file: %s' % ip_config
+        assert server_count > 0, 'server_count (%d) must be a positive number.' % server_count
         # Register services on client
         rpc.register_service(KVSTORE_PULL,
                              PullRequest,
@@ -870,7 +876,7 @@ class KVClient(object):
         # Store all the data name
         self._data_name_list = set()
         # Basic information
-        self._server_namebook = rpc.read_ip_config(ip_config)
+        self._server_namebook = rpc.read_ip_config(ip_config, server_count)
         self._server_count = len(self._server_namebook)
         self._group_count = self._server_namebook[0][3]
         self._machine_count = int(self._server_count / self._group_count)
