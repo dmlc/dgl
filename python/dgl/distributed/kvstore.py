@@ -162,8 +162,7 @@ class InitDataRequest(rpc.Request):
                                policy_str=self.policy_str,
                                data_tensor=data_tensor)
         else:
-            kv_store.init_data(name=self.name,
-                               policy_str=self.policy_str)
+            kv_store.init_data(name=self.name, policy_str=self.policy_str)
         res = InitDataResponse(INIT_MSG)
         return res
 
@@ -193,26 +192,26 @@ class BarrierRequest(rpc.Request):
 
     Parameters
     ----------
-    msg : string
-        string msg
+    role : string
+        client role
     """
-    def __init__(self, msg):
-        self.msg = msg
+    def __init__(self, role):
+        self.role = role
 
     def __getstate__(self):
-        return self.msg
+        return self.role
 
     def __setstate__(self, state):
-        self.msg = state
+        self.role = state
 
     def process_request(self, server_state):
-        assert self.msg == BARRIER_MSG
         kv_store = server_state.kv_store
-        kv_store.barrier_count = kv_store.barrier_count + 1
-        if kv_store.barrier_count == kv_store.num_clients:
-            kv_store.barrier_count = 0
+        count = kv_store.barrier_count[self.role]
+        kv_store.barrier_count[self.role] = count + 1
+        if kv_store.barrier_count[self.role] == len(kv_store.role[self.role]):
+            kv_store.barrier_count[self.role] = 0
             res_list = []
-            for target_id in range(kv_store.num_clients):
+            for target_id in kv_store.role[self.role]:
                 res_list.append((target_id, BarrierResponse(BARRIER_MSG)))
             return res_list
         return None
@@ -439,18 +438,26 @@ class SendMetaToBackupRequest(rpc.Request):
         data shape
     policy_str : str
         partition-policy string, e.g., 'edge' or 'node'.
+    pull_handler : callable
+        The callback function when data is pulled from kvstore.
+    push_handler : callable
+        The callback function when data is pushed to kvstore.
     """
-    def __init__(self, name, dtype, shape, policy_str):
+    def __init__(self, name, dtype, shape, policy_str, pull_handler, push_handler):
         self.name = name
         self.dtype = dtype
         self.shape = shape
         self.policy_str = policy_str
+        self.pull_handler = pull_handler
+        self.push_handler = push_handler
 
     def __getstate__(self):
-        return self.name, self.dtype, self.shape, self.policy_str
+        return self.name, self.dtype, self.shape, self.policy_str, self.pull_handler, \
+                self.push_handler
 
     def __setstate__(self, state):
-        self.name, self.dtype, self.shape, self.policy_str = state
+        self.name, self.dtype, self.shape, self.policy_str, self.pull_handler, \
+                self.push_handler = state
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
@@ -460,6 +467,8 @@ class SendMetaToBackupRequest(rpc.Request):
             dlpack = shared_data.to_dlpack()
             kv_store.data_store[self.name] = F.zerocopy_from_dlpack(dlpack)
             kv_store.part_policy[self.name] = kv_store.find_policy(self.policy_str)
+            kv_store.pull_handlers[self.name] = self.pull_handler
+            kv_store.push_handlers[self.name] = self.push_handler
         res = SendMetaToBackupResponse(SEND_META_TO_BACKUP_MSG)
         return res
 
@@ -505,6 +514,59 @@ class DeleteDataRequest(rpc.Request):
         del kv_store.pull_handlers[self.name]
         res = DeleteDataResponse(DELETE_MSG)
         return res
+
+REGISTER_ROLE = 901241
+ROLE_MSG = "Register_Role"
+
+class RegisterRoleResponse(rpc.Response):
+    """Send a confirmation signal (just a short string message)
+    of RegisterRoleRequest to client.
+    """
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __getstate__(self):
+        return self.msg
+
+    def __setstate__(self, state):
+        self.msg = state
+
+class RegisterRoleRequest(rpc.Request):
+    """Send client id and role to server
+
+    Parameters
+    ----------
+    client_id : int
+        ID of client
+    role : str
+        role of client
+    """
+    def __init__(self, client_id, role):
+        self.client_id = client_id
+        self.role = role
+
+    def __getstate__(self):
+        return self.client_id, self.role
+
+    def __setstate__(self, state):
+        self.client_id, self.role = state
+
+    def process_request(self, server_state):
+        kv_store = server_state.kv_store
+        role = kv_store.role
+        if self.role not in role:
+            role[self.role] = set()
+            kv_store.barrier_count[self.role] = 0
+        role[self.role].add(self.client_id)
+        total_count = 0
+        for key in role:
+            total_count += len(role[key])
+        if total_count == kv_store.num_clients:
+            res_list = []
+            for target_id in range(kv_store.num_clients):
+                res_list.append((target_id, RegisterRoleResponse(ROLE_MSG)))
+            return res_list
+        return None
 
 ############################ KVServer ###############################
 
@@ -604,6 +666,9 @@ class KVServer(object):
         rpc.register_service(DELETE_DATA,
                              DeleteDataRequest,
                              DeleteDataResponse)
+        rpc.register_service(REGISTER_ROLE,
+                             RegisterRoleRequest,
+                             RegisterRoleResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
         # Store the partition information with specified data name
@@ -620,10 +685,12 @@ class KVServer(object):
         # We assume partition_id is equal to machine_id
         self._part_id = self._machine_id
         self._num_clients = num_clients
-        self._barrier_count = 0
+        self._barrier_count = {}
         # push and pull handler
         self._push_handlers = {}
         self._pull_handlers = {}
+        # store client role
+        self._role = {}
 
     @property
     def server_id(self):
@@ -664,6 +731,11 @@ class KVServer(object):
     def push_handlers(self):
         """Get push handler"""
         return self._push_handlers
+
+    @property
+    def role(self):
+        """Get client role"""
+        return self._role
 
     @property
     def pull_handlers(self):
@@ -748,8 +820,10 @@ class KVClient(object):
     ----------
     ip_config : str
         Path of IP configuration file.
+    role : str
+        We can set different role for kvstore.
     """
-    def __init__(self, ip_config):
+    def __init__(self, ip_config, role='default'):
         assert rpc.get_rank() != -1, 'Please invoke rpc.connect_to_server() \
         before creating KVClient.'
         assert os.path.exists(ip_config), 'Cannot open file: %s' % ip_config
@@ -784,6 +858,9 @@ class KVClient(object):
         rpc.register_service(DELETE_DATA,
                              DeleteDataRequest,
                              DeleteDataResponse)
+        rpc.register_service(REGISTER_ROLE,
+                             RegisterRoleRequest,
+                             RegisterRoleResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
         # Store the partition information with specified data name
@@ -805,6 +882,12 @@ class KVClient(object):
         # push and pull handler
         self._pull_handlers = {}
         self._push_handlers = {}
+        # register role on server-0
+        self._role = role
+        request = RegisterRoleRequest(self._client_id, self._role)
+        rpc.send_request(0, request)
+        response = rpc.recv_response()
+        assert response.msg == ROLE_MSG
 
     @property
     def client_id(self):
@@ -812,23 +895,29 @@ class KVClient(object):
         return self._client_id
 
     @property
+    def role(self):
+        """Get client role"""
+        return self._role
+
+    @property
     def machine_id(self):
         """Get machine ID"""
         return self._machine_id
+
+    @property
+    def num_servers(self):
+        """Get the number of servers"""
+        return self._server_count
 
     def barrier(self):
         """Barrier for all client nodes.
 
         This API will be blocked untill all the clients invoke this API.
         """
-        request = BarrierRequest(BARRIER_MSG)
-        # send request to all the server nodes
-        for server_id in range(self._server_count):
-            rpc.send_request(server_id, request)
-        # recv response from all the server nodes
-        for _ in range(self._server_count):
-            response = rpc.recv_response()
-            assert response.msg == BARRIER_MSG
+        request = BarrierRequest(self._role)
+        rpc.send_request(0, request)
+        response = rpc.recv_response()
+        assert response.msg == BARRIER_MSG
 
     def register_push_handler(self, name, func):
         """Register UDF push function.
@@ -957,6 +1046,21 @@ class KVClient(object):
         self._full_data_shape[name] = tuple(shape)
         self._pull_handlers[name] = default_pull_handler
         self._push_handlers[name] = default_push_handler
+
+        # Now we need to tell the backup server the new tensor.
+        if self._client_id % num_clients_per_part == 0:
+            request = SendMetaToBackupRequest(name, F.reverse_data_type_dict[dtype],
+                                              part_shape, part_policy.policy_str,
+                                              self._pull_handlers[name],
+                                              self._push_handlers[name])
+            # send request to all the backup server nodes
+            for i in range(self._group_count-1):
+                server_id = self._machine_id * self._group_count + i + 1
+                rpc.send_request(server_id, request)
+            # recv response from all the backup server nodes
+            for _ in range(self._group_count-1):
+                response = rpc.recv_response()
+                assert response.msg == SEND_META_TO_BACKUP_MSG
         self.barrier()
 
     def delete_data(self, name):
@@ -972,7 +1076,7 @@ class KVClient(object):
         self.barrier()
         part_policy = self._part_policy[name]
         num_partitions = part_policy.partition_book.num_partitions()
-        num_clients_per_part = rpc.get_num_client() / num_partitions
+        num_clients_per_part = rpc.get_num_client() // num_partitions
         if self._client_id % num_clients_per_part == 0:
             # send request to every server nodes
             request = DeleteDataRequest(name)
@@ -1033,7 +1137,9 @@ class KVClient(object):
         # Send meta data to backup servers
         for name, meta in response.meta.items():
             shape, dtype, policy_str = meta
-            request = SendMetaToBackupRequest(name, dtype, shape, policy_str)
+            request = SendMetaToBackupRequest(name, dtype, shape, policy_str,
+                                              self._pull_handlers[name],
+                                              self._push_handlers[name])
             # send request to all the backup server nodes
             for i in range(self._group_count-1):
                 server_id = self._machine_id * self._group_count + i + 1

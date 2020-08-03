@@ -12,7 +12,7 @@ from .rpc_server import start_server
 from .rpc_client import connect_to_server, exit_client
 from .kvstore import KVServer, KVClient
 from .server_state import ServerState
-from .graph_services import sample_neighbors, in_subgraph
+from .graph_services import sample_neighbors, in_subgraph, find_edges
 
 if os.environ.get('DGL_ROLE', 'client') == 'server':
     assert os.environ.get('DGL_SERVER_ID') is not None, \
