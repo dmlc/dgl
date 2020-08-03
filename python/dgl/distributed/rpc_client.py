@@ -8,7 +8,7 @@ import traceback
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
-from .kvstore import init_kvstore
+from .kvstore import init_kvstore, close_kvstore
 
 if os.name != 'nt':
     import fcntl
@@ -237,6 +237,7 @@ def init_rpc(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type='
     NUM_SAMPLER_WORKERS = num_workers
     connect_to_server(ip_config, max_queue_size, net_type)
 
+
 def exit_client():
     """Register exit callback.
     """
@@ -244,7 +245,9 @@ def exit_client():
     rpc.client_barrier()
     shutdown_servers()
     finalize_client()
+    close_kvstore()
     atexit.unregister(exit_client)
+
 
 def is_initialized():
     """Is RPC initialized?

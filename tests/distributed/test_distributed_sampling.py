@@ -11,7 +11,7 @@ import backend as F
 import time
 from utils import get_local_usable_addr
 from pathlib import Path
-
+import pytest
 from dgl.distributed import DistGraphServer, DistGraph
 
 
@@ -159,12 +159,12 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
 # Wait non shared memory graph store
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
-def test_rpc_sampling_shuffle():
+@pytest.mark.parametrize("num_server", [1, 2])
+def test_rpc_sampling_shuffle(num_server):
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
-        check_rpc_sampling_shuffle(Path(tmpdirname), 2)
-        check_rpc_sampling_shuffle(Path(tmpdirname), 1)
+        check_rpc_sampling_shuffle(Path(tmpdirname), num_server)
 
 def check_standalone_sampling(tmpdir):
     g = CitationGraphDataset("cora")[0]
@@ -172,7 +172,7 @@ def check_standalone_sampling(tmpdir):
     num_hops = 1
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
                     num_hops=num_hops, part_method='metis', reshuffle=False)
-
+    os.environ['DGL_DIST_MODE'] = 'standalone'
     dist_graph = DistGraph(None, "test_sampling", part_config=tmpdir / 'test_sampling.json')
     sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
 
@@ -198,7 +198,7 @@ def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_in_subgraph.json', rank)
     dist_graph = DistGraph("rpc_ip_config.txt", "test_in_subgraph", gpb=gpb)
     sampled_graph = dgl.distributed.in_subgraph(dist_graph, nodes)
-    dgl.distributed.exit_client()
+    dgl.distributed.exit_client()    
     return sampled_graph
 
 

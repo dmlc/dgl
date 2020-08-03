@@ -8,7 +8,7 @@ from ..heterograph import DGLHeteroGraph
 from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID
-from .kvstore import KVServer, KVClient, init_kvstore, get_kvstore
+from .kvstore import KVServer, init_kvstore, get_kvstore
 from .standalone_kvstore import KVClient as SA_KVClient
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
