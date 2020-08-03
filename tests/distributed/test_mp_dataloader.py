@@ -49,6 +49,7 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers):
     import dgl
     import torch as th
     os.environ['DGL_DIST_MODE'] = 'distributed'
+    dgl.distributed.rpc.reset()
     dgl.distributed.init_rpc("mp_ip_config.txt", num_workers=4)
     gpb = None
     if disable_shared_mem:
