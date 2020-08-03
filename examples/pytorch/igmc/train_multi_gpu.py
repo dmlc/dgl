@@ -163,7 +163,8 @@ def train(proc_id, n_gpus, args, devices, movielens):
         test_loader = th.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, 
                                 num_workers=args.num_workers, collate_fn=collate_movielens)
 
-    model = IGMC(in_feats=(args.hop+1)*2,
+    in_feats = (args.hop+1)*2 # + movielens.train_graph.ndata['refex'].shape[1]
+    model = IGMC(in_feats=in_feats, 
                  latent_dim=[32, 32, 32, 32],
                  num_relations=5, #dataset_base.num_rating, 
                  num_bases=4, 
@@ -279,7 +280,7 @@ def config():
     local_time = time.strftime('%y%m%d%H%M', time.localtime())
     args.save_dir = os.path.join(
         file_dir, 'log/{}_{}_{}_{}'.format(
-            args.data_name, local_time, args.save_appendix, val_test_appendix
+            args.data_name, args.save_appendix, val_test_appendix, local_time
         )
     )
     if not os.path.exists(args.save_dir):

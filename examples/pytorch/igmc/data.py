@@ -9,6 +9,7 @@ import torch as th
 
 import dgl 
 from dgl.data.utils import download, extract_archive, get_download_dir
+from utils import extract_refex_feature
 
 _urls = {
     'ml-100k' : 'http://files.grouplens.org/datasets/movielens/ml-100k.zip',
@@ -143,6 +144,9 @@ class MovieLens(object):
         self.train_graph = dgl.graph((th.cat([self.train_rating_pairs[0], self.train_rating_pairs[1]]), 
                                       th.cat([self.train_rating_pairs[1], self.train_rating_pairs[0]])))
         self.train_graph.edata['etype'] = th.cat([self.train_rating_values, self.train_rating_values]).to(th.long)
+        
+        # add refex feature
+        # self.train_graph.ndata['refex'] = extract_refex_feature(self.train_graph)
 
     @property
     def num_rating(self):

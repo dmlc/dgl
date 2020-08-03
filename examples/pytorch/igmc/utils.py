@@ -7,7 +7,9 @@ warnings.simplefilter('ignore', sp.SparseEfficiencyWarning)
 
 import numpy as np
 import torch as th
+import torch.nn.functional as F
 import dgl 
+import dgl.function as fn
 
 class MetricLogger(object):
     def __init__(self, save_dir, log_interval):
@@ -19,16 +21,16 @@ class MetricLogger(object):
         with open(os.path.join(self.save_dir, 'log.txt'), 'a') as f:
             f.write('Epoch {}, train loss {:.4f}, test rmse {:.6f}\n'.format(
                 epoch, train_loss, test_rmse))
-        if type(epoch) == int and epoch % self.log_interval == 0:
-            print('Saving model states...')
-            model_name = os.path.join(self.save_dir, 'model_checkpoint{}.pth'.format(epoch))
-            optimizer_name = os.path.join(
-                self.save_dir, 'optimizer_checkpoint{}.pth'.format(epoch)
-            )
-            if model is not None:
-                th.save(model.state_dict(), model_name)
-            if optimizer is not None:
-                th.save(optimizer.state_dict(), optimizer_name)
+        # if type(epoch) == int and epoch % self.log_interval == 0:
+        #     print('Saving model states...')
+        #     model_name = os.path.join(self.save_dir, 'model_checkpoint{}.pth'.format(epoch))
+        #     optimizer_name = os.path.join(
+        #         self.save_dir, 'optimizer_checkpoint{}.pth'.format(epoch)
+        #     )
+        #     if model is not None:
+        #         th.save(model.state_dict(), model_name)
+        #     if optimizer is not None:
+        #         th.save(optimizer.state_dict(), optimizer_name)
 
 def torch_total_param_num(net):
     return sum([np.prod(p.shape) for p in net.parameters()])
@@ -185,6 +187,7 @@ def get_neighbor_nodes_labels(ind, graph, mode="bipartite",
         raise NotImplementedError
     return nodes, node_labels
 
+# @profile
 def subgraph_extraction_labeling(ind, graph, mode="bipartite", 
                                  hop=1, sample_ratio=1.0, max_nodes_per_hop=200):
 
@@ -193,16 +196,21 @@ def subgraph_extraction_labeling(ind, graph, mode="bipartite",
                                                    hop, sample_ratio, max_nodes_per_hop)
 
     subgraph = graph.subgraph(nodes)
+
     if mode == "bipartite":
         subgraph.ndata['x'] = one_hot(node_labels, (hop+1)*2)
     elif mode == "homo":
         subgraph.ndata['x'] = one_hot(node_labels, hop+1)
     elif mode == "grail":
         subgraph.ndata['x'] = th.cat([one_hot(node_labels[:, 0], hop+1), 
-                                      one_hot(node_labels[:, 1], hop+1)], dim=1)
+                                    one_hot(node_labels[:, 1], hop+1)], dim=1)
     else:
         raise NotImplementedError
-    
+    # subgraph.ndata['x'] = th.cat([subgraph.ndata['x'], subgraph.ndata['refex']], dim=1)
+
+    # refex_feature = extract_refex_feature(subgraph).to(th.float)
+    # subgraph.ndata['x'] = th.cat([subgraph.ndata['x'], refex_feature], dim=1)
+
     # set edge weight to zero as to remove links between target nodes in training process
     subgraph.edata['weight'] = th.ones(subgraph.number_of_edges())
     su = subgraph.nodes()[subgraph.ndata[dgl.NID]==ind[0]]
@@ -211,3 +219,79 @@ def subgraph_extraction_labeling(ind, graph, mode="bipartite",
     subgraph.edata['weight'][target_edges] = 0
 
     return subgraph
+
+def MinMaxScaling(x, dim=0):
+    dist = x.max(dim=dim, keepdim=True)[0] - x.min(dim=dim, keepdim=True)[0]
+    x = (x - x.min(dim=dim, keepdim=True)[0]) / (dist + 1e-7)
+    return x
+
+def get_recursive_feature(graph, basic_feature, n_iter=1):
+    with graph.local_scope():
+
+        init_feature = basic_feature
+        recursive_feature = []
+        for iter_idx in range(n_iter):
+            graph.srcdata['h'] = init_feature
+            graph.update_all(fn.copy_u('h', 'msg'), fn.mean('msg', 'neigh_mean'))
+            graph.update_all(fn.copy_u('h', 'msg'), fn.sum('msg', 'neigh_sum'))
+
+            init_feature = th.cat([graph.dstdata['neigh_mean'], 
+                                   graph.dstdata['neigh_sum']], dim=1)
+            # there is no feature pruning at the moment
+            recursive_feature.append(init_feature)
+        
+        return th.cat(recursive_feature, dim=1)
+
+def get_ego_feature(graph):
+    ego_feature = []
+    for node in graph.nodes():
+        neighs = graph.in_edges(node)[0]
+        nodes = th.cat([node.view(1), neighs])
+
+        internal_degree = th.tensor(graph.subgraph(nodes).number_of_edges(), dtype=th.float32)
+        overall_degree = th.sum(graph.in_degrees(nodes), dtype=th.float32)
+        # there 32 isolated nodes in train graph
+        external_degree = overall_degree - internal_degree
+        if overall_degree == 0:
+            overall_degree = th.tensor(float('inf'))
+            external_degree = th.tensor(0.)
+        ego_feature.append(th.cat([internal_degree.view(1), 
+                                   external_degree.view(1), 
+                                   (internal_degree/overall_degree).view(1),
+                                   (external_degree/overall_degree).view(1)]))
+    return th.stack(ego_feature)
+
+def get_local_feature(graph):
+    degree = graph.in_degrees().to(th.float32)
+    return degree.unsqueeze(1)
+
+def get_basic_feature(graph, normalize=True):
+    local_feature = get_local_feature(graph)
+    ego_feature = get_ego_feature(graph)
+    basic_feature = th.cat([local_feature, ego_feature], dim=1)
+    if normalize:
+        basic_feature = MinMaxScaling(basic_feature, dim=0)
+    return basic_feature
+
+def extract_refex_feature(graph):
+    basic_feature = get_basic_feature(graph, normalize=True)
+    recursive_feature = get_recursive_feature(graph, basic_feature, n_iter=1)
+    return th.cat([basic_feature, recursive_feature], dim=1)
+
+if __name__ == "__main__":
+    import time
+    from data import MovieLens
+    movielens = MovieLens("ml-100k", testing=True)
+
+    train_edges = movielens.train_rating_pairs
+    train_graph = movielens.train_graph
+
+    idx = 0
+    u, v = train_edges[0][idx], train_edges[1][idx]
+    subgraph = subgraph_extraction_labeling(
+                    (u, v), train_graph, 
+                    hop=1, sample_ratio=1.0, max_nodes_per_hop=200)
+    # t_start = time.time()
+    # refex_feature = extract_refex_feature(train_graph).to(th.float)
+    # print("Epoch time={:.2f}".format(time.time()-t_start))
+    pass
