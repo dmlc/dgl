@@ -162,8 +162,7 @@ class InitDataRequest(rpc.Request):
                                policy_str=self.policy_str,
                                data_tensor=data_tensor)
         else:
-            kv_store.init_data(name=self.name,
-                               policy_str=self.policy_str)
+            kv_store.init_data(name=self.name, policy_str=self.policy_str)
         res = InitDataResponse(INIT_MSG)
         return res
 
@@ -439,18 +438,26 @@ class SendMetaToBackupRequest(rpc.Request):
         data shape
     policy_str : str
         partition-policy string, e.g., 'edge' or 'node'.
+    pull_handler : callable
+        The callback function when data is pulled from kvstore.
+    push_handler : callable
+        The callback function when data is pushed to kvstore.
     """
-    def __init__(self, name, dtype, shape, policy_str):
+    def __init__(self, name, dtype, shape, policy_str, pull_handler, push_handler):
         self.name = name
         self.dtype = dtype
         self.shape = shape
         self.policy_str = policy_str
+        self.pull_handler = pull_handler
+        self.push_handler = push_handler
 
     def __getstate__(self):
-        return self.name, self.dtype, self.shape, self.policy_str
+        return self.name, self.dtype, self.shape, self.policy_str, self.pull_handler, \
+                self.push_handler
 
     def __setstate__(self, state):
-        self.name, self.dtype, self.shape, self.policy_str = state
+        self.name, self.dtype, self.shape, self.policy_str, self.pull_handler, \
+                self.push_handler = state
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
@@ -460,6 +467,8 @@ class SendMetaToBackupRequest(rpc.Request):
             dlpack = shared_data.to_dlpack()
             kv_store.data_store[self.name] = F.zerocopy_from_dlpack(dlpack)
             kv_store.part_policy[self.name] = kv_store.find_policy(self.policy_str)
+            kv_store.pull_handlers[self.name] = self.pull_handler
+            kv_store.push_handlers[self.name] = self.push_handler
         res = SendMetaToBackupResponse(SEND_META_TO_BACKUP_MSG)
         return res
 
@@ -895,6 +904,11 @@ class KVClient(object):
         """Get machine ID"""
         return self._machine_id
 
+    @property
+    def num_servers(self):
+        """Get the number of servers"""
+        return self._server_count
+
     def barrier(self):
         """Barrier for all client nodes.
 
@@ -1032,6 +1046,21 @@ class KVClient(object):
         self._full_data_shape[name] = tuple(shape)
         self._pull_handlers[name] = default_pull_handler
         self._push_handlers[name] = default_push_handler
+
+        # Now we need to tell the backup server the new tensor.
+        if self._client_id % num_clients_per_part == 0:
+            request = SendMetaToBackupRequest(name, F.reverse_data_type_dict[dtype],
+                                              part_shape, part_policy.policy_str,
+                                              self._pull_handlers[name],
+                                              self._push_handlers[name])
+            # send request to all the backup server nodes
+            for i in range(self._group_count-1):
+                server_id = self._machine_id * self._group_count + i + 1
+                rpc.send_request(server_id, request)
+            # recv response from all the backup server nodes
+            for _ in range(self._group_count-1):
+                response = rpc.recv_response()
+                assert response.msg == SEND_META_TO_BACKUP_MSG
         self.barrier()
 
     def delete_data(self, name):
@@ -1047,7 +1076,7 @@ class KVClient(object):
         self.barrier()
         part_policy = self._part_policy[name]
         num_partitions = part_policy.partition_book.num_partitions()
-        num_clients_per_part = rpc.get_num_client() / num_partitions
+        num_clients_per_part = rpc.get_num_client() // num_partitions
         if self._client_id % num_clients_per_part == 0:
             # send request to every server nodes
             request = DeleteDataRequest(name)
@@ -1108,7 +1137,9 @@ class KVClient(object):
         # Send meta data to backup servers
         for name, meta in response.meta.items():
             shape, dtype, policy_str = meta
-            request = SendMetaToBackupRequest(name, dtype, shape, policy_str)
+            request = SendMetaToBackupRequest(name, dtype, shape, policy_str,
+                                              self._pull_handlers[name],
+                                              self._push_handlers[name])
             # send request to all the backup server nodes
             for i in range(self._group_count-1):
                 server_id = self._machine_id * self._group_count + i + 1

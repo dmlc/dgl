@@ -66,15 +66,15 @@ def emb_init(shape, dtype):
 def rand_init(shape, dtype):
     return F.tensor(np.random.normal(size=shape), F.float32)
 
-def run_client(graph_name, part_id, num_nodes, num_edges):
+def run_client(graph_name, part_id, num_clients, num_nodes, num_edges):
     time.sleep(5)
     dgl.distributed.init_rpc("kv_ip_config.txt")
     gpb, graph_name = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                                           part_id, None)
     g = DistGraph("kv_ip_config.txt", graph_name, gpb=gpb)
-    check_dist_graph(g, num_nodes, num_edges)
+    check_dist_graph(g, num_clients, num_nodes, num_edges)
 
-def check_dist_graph(g, num_nodes, num_edges):
+def check_dist_graph(g, num_clients, num_nodes, num_edges):
     # Test API
     assert g.number_of_nodes() == num_nodes
     assert g.number_of_edges() == num_edges
@@ -130,7 +130,8 @@ def check_dist_graph(g, num_nodes, num_edges):
         loss.backward()
         optimizer.step()
         feats = emb(nids)
-        assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * -lr)
+        if num_clients == 1:
+            assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * -lr)
         rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
         feats1 = emb(rest)
         assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
@@ -138,7 +139,7 @@ def check_dist_graph(g, num_nodes, num_edges):
         policy = dgl.distributed.PartitionPolicy('node', g.get_partition_book())
         grad_sum = dgl.distributed.DistTensor(g, (g.number_of_nodes(),), F.float32,
                                               'emb1_sum', policy)
-        assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)))
+        assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)) * num_clients)
         assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
 
         emb = DistEmbedding(g, g.number_of_nodes(), 1, 'emb2', emb_init)
@@ -157,7 +158,8 @@ def check_dist_graph(g, num_nodes, num_edges):
         optimizer.step()
         with F.no_grad():
             feats = emb(nids)
-        assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * math.sqrt(2) * -lr)
+        if num_clients == 1:
+            assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * math.sqrt(2) * -lr)
         rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
         feats1 = emb(rest)
         assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
@@ -189,8 +191,8 @@ def check_dist_graph(g, num_nodes, num_edges):
 
     print('end')
 
-def check_server_client(shared_mem):
-    prepare_dist()
+def check_server_client(shared_mem, num_servers, num_clients):
+    prepare_dist(num_servers)
     g = create_random_graph(10000)
 
     # Partition the graph
@@ -204,15 +206,16 @@ def check_server_client(shared_mem):
     # We cannot run multiple servers and clients on the same machine.
     serv_ps = []
     ctx = mp.get_context('spawn')
-    for serv_id in range(1):
-        p = ctx.Process(target=run_server, args=(graph_name, serv_id, 1, shared_mem))
+    for serv_id in range(num_servers):
+        p = ctx.Process(target=run_server, args=(graph_name, serv_id,
+                                                 num_clients, shared_mem))
         serv_ps.append(p)
         p.start()
 
     cli_ps = []
-    for cli_id in range(1):
+    for cli_id in range(num_clients):
         print('start client', cli_id)
-        p = ctx.Process(target=run_client, args=(graph_name, cli_id, g.number_of_nodes(),
+        p = ctx.Process(target=run_client, args=(graph_name, 0, num_clients, g.number_of_nodes(),
                                                  g.number_of_edges()))
         p.start()
         cli_ps.append(p)
@@ -228,8 +231,10 @@ def check_server_client(shared_mem):
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_server_client():
     os.environ['DGL_DIST_MODE'] = 'distributed'
-    check_server_client(True)
-    check_server_client(False)
+    check_server_client(True, 1, 1)
+    check_server_client(False, 1, 1)
+    check_server_client(True, 2, 2)
+    check_server_client(False, 2, 2)
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_standalone():
@@ -242,11 +247,11 @@ def test_standalone():
     g.edata['features'] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
     partition_graph(g, graph_name, num_parts, '/tmp/dist_graph')
     dist_g = DistGraph("kv_ip_config.txt", graph_name,
-                  conf_file='/tmp/dist_graph/{}.json'.format(graph_name))
-    check_dist_graph(dist_g, g.number_of_nodes(), g.number_of_edges())
+                       part_config='/tmp/dist_graph/{}.json'.format(graph_name))
+    check_dist_graph(dist_g, 1, g.number_of_nodes(), g.number_of_edges())
 
 def test_split():
-    prepare_dist()
+    #prepare_dist()
     g = create_random_graph(10000)
     num_parts = 4
     num_hops = 2
@@ -291,7 +296,7 @@ def test_split():
         assert np.all(np.sort(edges1) == np.sort(F.asnumpy(edges5)))
 
 def test_split_even():
-    prepare_dist()
+    #prepare_dist(1)
     g = create_random_graph(10000)
     num_parts = 4
     num_hops = 2
@@ -349,10 +354,10 @@ def test_split_even():
     assert np.all(all_nodes == F.asnumpy(all_nodes2))
     assert np.all(all_edges == F.asnumpy(all_edges2))
 
-def prepare_dist():
+def prepare_dist(num_servers):
     ip_config = open("kv_ip_config.txt", "w")
     ip_addr = get_local_usable_addr()
-    ip_config.write('%s 1\n' % ip_addr)
+    ip_config.write('{} {}\n'.format(ip_addr, num_servers))
     ip_config.close()
 
 if __name__ == '__main__':

@@ -17,15 +17,12 @@ import torch.nn.functional as F
 import argparse
 from sklearn.metrics import f1_score
 from gat import GAT
-from dgl.data.ppi import LegacyPPIDataset
+from dgl.data.ppi import PPIDataset
 from torch.utils.data import DataLoader
 
-def collate(sample):
-    graphs, feats, labels =map(list, zip(*sample))
+def collate(graphs):
     graph = dgl.batch(graphs)
-    feats = torch.from_numpy(np.concatenate(feats))
-    labels = torch.from_numpy(np.concatenate(labels))
-    return graph, feats, labels
+    return graph
 
 def evaluate(feats, model, subgraph, labels, loss_fcn):
     with torch.no_grad():
@@ -54,15 +51,15 @@ def main(args):
     # define loss function
     loss_fcn = torch.nn.BCEWithLogitsLoss()
     # create the dataset
-    train_dataset = LegacyPPIDataset(mode='train')
-    valid_dataset = LegacyPPIDataset(mode='valid')
-    test_dataset = LegacyPPIDataset(mode='test')
+    train_dataset = PPIDataset(mode='train')
+    valid_dataset = PPIDataset(mode='valid')
+    test_dataset = PPIDataset(mode='test')
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, collate_fn=collate)
     valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, collate_fn=collate)
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size, collate_fn=collate)
-    n_classes = train_dataset.labels.shape[1]
-    num_feats = train_dataset.features.shape[1]
-    g = train_dataset.graph
+    g = train_dataset[0]
+    n_classes = train_dataset.num_labels
+    num_feats = g.ndata['feat'].shape[1]
     g = g.to(device)
     heads = ([args.num_heads] * args.num_layers) + [args.num_out_heads]
     # define the model
@@ -83,16 +80,13 @@ def main(args):
     for epoch in range(args.epochs):
         model.train()
         loss_list = []
-        for batch, data in enumerate(train_dataloader):
-            subgraph, feats, labels = data
+        for batch, subgraph in enumerate(train_dataloader):
             subgraph = subgraph.to(device)
-            feats = feats.to(device)
-            labels = labels.to(device)
             model.g = subgraph
             for layer in model.gat_layers:
                 layer.g = subgraph
-            logits = model(feats.float())
-            loss = loss_fcn(logits, labels.float())
+            logits = model(subgraph.ndata['feat'].float())
+            loss = loss_fcn(logits, subgraph.ndata['label'])
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
