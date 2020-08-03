@@ -56,7 +56,7 @@ def find_lib_path(name=None, search_path=None, optional=False):
         else:
             raise ValueError("type(search_path)={} is invalid".format(type(search_path)))
     dll_path = [str(x.absolute()) if isinstance(x, pathlib.Path)
-            else os.path.abspath(x) for x in dll_path]
+                else os.path.abspath(x) for x in dll_path]
 
     if name is None:
         if sys.platform.startswith('win32'):
