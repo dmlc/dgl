@@ -245,7 +245,7 @@ def test_standalone():
     g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
     g.edata['features'] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
     partition_graph(g, graph_name, num_parts, '/tmp/dist_graph')
-    dist_g = DistGraph("kv_ip_config.txt", server_count=1, graph_name,
+    dist_g = DistGraph("kv_ip_config.txt", 1, graph_name,
                        part_config='/tmp/dist_graph/{}.json'.format(graph_name))
     check_dist_graph(dist_g, 1, g.number_of_nodes(), g.number_of_edges())
 
