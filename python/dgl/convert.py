@@ -1016,8 +1016,12 @@ def create_from_edges(u, v,
     else:
         num_ntypes = 2
 
-    hgidx = heterograph_index.create_unitgraph_from_coo(
-        num_ntypes, urange, vrange, u, v, formats)
+    if 'coo' in formats:
+        hgidx = heterograph_index.create_unitgraph_from_coo(
+            num_ntypes, urange, vrange, u, v, formats)
+    else:
+        hgidx = heterograph_index.create_unitgraph_from_coo(
+            num_ntypes, urange, vrange, u, v, ['coo']).formats(formats)
     if utype == vtype:
         return DGLHeteroGraph(hgidx, [utype], [etype])
     else:
