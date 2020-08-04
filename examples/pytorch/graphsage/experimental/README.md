@@ -78,13 +78,13 @@ python3 partition_graph.py --dataset ogb-product --num_parts 1
 To run supervised training:
 
 ```bash
-python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --server_count 1 --num-epochs 3 --batch-size 1000 --part_config data/ogb-product.json --standalone
+python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --server-count 1 --num-epochs 3 --batch-size 1000 --part_config data/ogb-product.json --standalone
 ```
 
 To run unsupervised training:
 
 ```bash
-python3 train_dist_unsupervised.py --graph-name ogb-product --ip_config ip_config.txt --server_count 1 --num-epochs 3 --batch-size 1000 --part_config data/ogb-product.json --standalone
+python3 train_dist_unsupervised.py --graph-name ogb-product --ip_config ip_config.txt --server-count 1 --num-epochs 3 --batch-size 1000 --part_config data/ogb-product.json --standalone
 ```
 
 Note: please ensure that all environment variables shown above are unset if they were set for testing distributed training.
