@@ -6,7 +6,6 @@ import atexit
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
-from .dist_context import INITIALIZED
 
 if os.name != 'nt':
     import fcntl
@@ -175,10 +174,9 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     rpc.send_request(0, get_client_num_req)
     res = rpc.recv_response()
     rpc.set_num_client(res.num_client)
-    from .dist_context import exit_client
+    from .dist_context import exit_client, set_initialized
     atexit.register(exit_client)
-    global INITIALIZED
-    INITIALIZED = True
+    set_initialized()
 
 def shutdown_servers():
     """Issue commands to remote servers to shut them down.

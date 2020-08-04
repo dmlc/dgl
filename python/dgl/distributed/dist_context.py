@@ -12,6 +12,11 @@ SAMPLER_POOL = None
 NUM_SAMPLER_WORKERS = 0
 INITIALIZED = False
 
+def set_initialized(value=True):
+    """Set the initialized state of rpc"""
+    global INITIALIZED
+    INITIALIZED = value
+
 
 def get_sampler_pool():
     """Return the sampler pool and num_workers"""
