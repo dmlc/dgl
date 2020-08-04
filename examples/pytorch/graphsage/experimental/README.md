@@ -55,7 +55,7 @@ To run unsupervised training:
 
 ```bash
 python3 ~/dgl/tools/launch.py \
---workspace ~/dgl/examples/pytorch/graphsage/experimental \
+--workspace ~/graphsage/ \
 --num_client 4 \
 --server_count 1 \
 --part_config data/ogb-product.json \
