@@ -103,8 +103,22 @@ Mini graph classification dataset
 `````````````````````````````````
 
 .. autoclass:: MiniGCDataset
-    :members: __getitem__, __len__, num_classes
+    :members: __getitem__, __len__
 
+TU dataset
+``````````
+
+.. autoclass:: TUDataset
+    :members: __getitem__, __len__
+
+.. autoclass:: LegacyTUDataset
+    :members: __getitem__, __len__
+
+GIN dataset
+```````````
+
+.. autoclass:: GINDataset
+    :members: __getitem__, __len__
 
 Graph kernel dataset
 ````````````````````

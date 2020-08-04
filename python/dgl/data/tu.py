@@ -204,6 +204,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
         return g, self.graph_labels[idx]
 
     def __len__(self):
+        """Return the number of graphs in the dataset."""
         return len(self.graph_lists)
 
     def _file_path(self, category):
@@ -369,6 +370,7 @@ class TUDataset(DGLBuiltinDataset):
         return g, self.graph_labels[idx]
 
     def __len__(self):
+        """Return the number of graphs in the dataset."""
         return len(self.graph_lists)
 
     def _file_path(self, category):
