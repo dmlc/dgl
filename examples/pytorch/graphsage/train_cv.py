@@ -147,18 +147,6 @@ class NeighborSampler(object):
             hist_blocks.insert(0, hist_block)
         return blocks, hist_blocks
 
-def prepare_mp(g):
-    """
-    Explicitly materialize the CSR, CSC and COO representation of the given graph
-    so that they could be shared via copy-on-write to sampler workers and GPU
-    trainers.
-
-    This is a workaround before full shared memory support on heterogeneous graphs.
-    """
-    g.in_degree(0)
-    g.out_degree(0)
-    g.find_edges([0])
-
 def compute_acc(pred, labels):
     """
     Compute the accuracy of prediction given the labels.
@@ -324,16 +312,15 @@ if __name__ == '__main__':
 
     # load reddit data
     data = RedditDataset(self_loop=True)
-    train_mask = data.train_mask
-    val_mask = data.val_mask
-    features = th.Tensor(data.features)
+    n_classes = data.num_classes
+    g = data[0]
+    features = g.ndata['feat']
     in_feats = features.shape[1]
-    labels = th.LongTensor(data.labels)
-    n_classes = data.num_labels
-    # Construct graph
-    g = dgl.graph(data.graph.all_edges())
+    labels = g.ndata['label']
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
     g.ndata['features'] = features
-    prepare_mp(g)
+    g.create_format_()
     # Pack data
     data = train_mask, val_mask, in_feats, labels, n_classes, g
 
