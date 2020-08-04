@@ -58,7 +58,7 @@ python3 ~/dgl/tools/launch.py \
 --workspace ~/graphsage/ \
 --num_client 4 \
 --server_count 1 \
---part_config data/ogb-product.json \
+--part_config ogb-product/ogb-product.json \
 --ip_config ip_config.txt \
 "python3 ~/dgl/examples/pytorch/graphsage/experimental/train_dist_unsupervised.py --graph-name ogb-product --ip_config ip_config.txt --server-count 1 --num-epochs 3 --batch-size 1000 --num-client 4"
 ```
