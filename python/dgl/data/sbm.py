@@ -74,8 +74,14 @@ class SBMMixtureDataset(DGLDataset):
         Multiplier. Default: 2
     avg_deg : int, optional
         Average degree. Default: 3
+    pq : list of pair of nonnegative float or str, optional
+        Random densities. Default: Appendix_C
     rng : numpy.random.RandomState, optional
         Random number generator. Default: None
+
+    Raises
+    ------
+    RuntimeError is raised if pq is not a list or string.
 
     Examples
     --------
@@ -91,6 +97,7 @@ class SBMMixtureDataset(DGLDataset):
                  n_communities,
                  k=2,
                  avg_deg=3,
+                 pq='Appendix_C',
                  rng=None):
         self._n_graphs = n_graphs
         self._n_nodes = n_nodes
@@ -99,13 +106,20 @@ class SBMMixtureDataset(DGLDataset):
         self._block_size = n_nodes // n_communities
         self._k = k
         self._avg_deg = avg_deg
+        self._pq = pq
         self._rng = rng
         super(SBMMixtureDataset, self).__init__(name='sbmmixture',
-                                                hash_key=(n_graphs, n_nodes, n_communities, k, avg_deg, rng))
+                                                hash_key=(n_graphs, n_nodes, n_communities, k, avg_deg, pq, rng))
 
     def process(self):
-        pq = [self._appendix_c() for _ in range(self._n_graphs)]
-
+        pq = self._pq
+        if type(pq) is list:
+            assert len(pq) == self._n_graphs
+        elif type(pq) is str:
+            generator = {'Appendix_C': self._appendix_c}[pq]
+            pq = [generator() for _ in range(self._n_graphs)]
+        else:
+            raise RuntimeError()
         self._graphs = [dgl_graph(sbm(self._n_communities, self._block_size, *x)) for x in pq]
         self._line_graphs = [g.line_graph(backtracking=False) for g in self._graphs]
         in_degrees = lambda g: g.in_degrees().float()
