@@ -196,7 +196,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
             The sample index.
         Returns
         -------
-        (dgl.Graph, int)
+        (dgl.DGLGraph, int)
             Graph with node feature stored in `feat` field and node label in `node_label` if available.
             And its label.
         """
@@ -362,7 +362,7 @@ class TUDataset(DGLBuiltinDataset):
             The sample index.
         Returns
         -------
-        (dgl.Graph, int)
+        (dgl.DGLGraph, int)
             Graph with node feature stored in `feat` field and node label in `node_label` if available.
             And its label.
         """

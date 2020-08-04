@@ -143,7 +143,7 @@ class MiniGCDataset(DGLDataset):
         self._gen_circular_ladder(self.num_graphs - len(self.graphs))
         # preprocess
         for i in range(self.num_graphs):
-            # convert to Graph, and add self loops
+            # convert to DGLGraph, and add self loops
             self.graphs[i] = add_self_loop(dgl_graph(self.graphs[i]))
         self.labels = F.tensor(np.array(self.labels).astype(np.int))
 

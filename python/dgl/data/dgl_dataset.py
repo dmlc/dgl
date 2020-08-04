@@ -48,6 +48,26 @@ class DGLDataset(object):
         Whether to reload the dataset. Default: False
     verbose : bool
         Whether to print out progress information
+
+    Attributes
+    ----------
+    url : str
+        The URL to download the dataset
+    name : str
+        The dataset name
+    raw_dir : str
+        Raw file directory contains the input data folder
+    raw_path : str
+        Directory contains the input data files.
+        By default raw_path = os.path.join(self.raw_dir, self.name)
+    save_dir : str
+        Directory to save the processed dataset
+    save_path : str
+        Filr path to save the processed dataset
+    verbose : bool
+        Whether to print information
+    hash : str
+        Hash value for the dataset and the setting.
     """
     def __init__(self, name, url=None, raw_dir=None, save_dir=None,
                  hash_key=(), force_reload=False, verbose=False):
@@ -185,13 +205,13 @@ class DGLDataset(object):
 
     @property
     def raw_dir(self):
-        r"""Raw file directory contains the input data directory.
+        r"""Raw file directory contains the input data folder.
         """
         return self._raw_dir
 
     @property
     def raw_path(self):
-        r"""File directory contains the input data.
+        r"""Directory contains the input data files.
             By default raw_path = os.path.join(self.raw_dir, self.name)
         """
         return os.path.join(self.raw_dir, self.name)
@@ -216,7 +236,7 @@ class DGLDataset(object):
 
     @property
     def hash(self):
-        r"""Hash value for the dataset.
+        r"""Hash value for the dataset and the setting.
         """
         return self._hash
 
