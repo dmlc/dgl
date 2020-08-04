@@ -51,7 +51,8 @@ def sbm(n_blocks, block_size, p, q, rng=None):
 
 class SBMMixture:
     """ Symmetric Stochastic Block Model Mixture
-    Please refer to Appendix C of "Supervised Community Detection with Hierarchical Graph Neural Networks" (https://arxiv.org/abs/1705.08415) for details.
+    Please refer to Appendix C of `Supervised Community Detection with
+    Hierarchical Graph Neural Networks <https://arxiv.org/abs/1705.08415>`_ for details.
 
     Parameters
     ----------

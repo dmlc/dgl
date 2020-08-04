@@ -17,10 +17,8 @@ class ICEWS18Dataset(DGLBuiltinDataset):
     groups, sectors and nation states). This Dataset consists of events
     from 1/1/2018 to 10/31/2018 (24 hours time granularity).
     Reference:
-        - `Recurrent Event Network for Reasoning over Temporal
-        Knowledge Graphs <https://arxiv.org/abs/1904.05530>`_
-        - `ICEWS Coded Event Data
-           <https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/28075>`_
+        - `Recurrent Event Network for Reasoning over Temporal Knowledge Graphs <https://arxiv.org/abs/1904.05530>`_
+        - `ICEWS Coded Event Data <https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/28075>`_
 
     Statistics
     ----------

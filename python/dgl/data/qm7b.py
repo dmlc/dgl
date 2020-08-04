@@ -16,7 +16,7 @@ class QM7bDataset(DGLDataset):
     This dataset consists of 7,211 molecules with 14 regression targets.
     Nodes means atoms and edges means bonds. Edge data 'h' means
     the entry of Coulomb matrix.
-    Reference: http://quantum-machine.org/datasets/
+    Reference: `<http://quantum-machine.org/datasets/>`_
 
     Statistics
     ----------
@@ -73,10 +73,6 @@ class QM7bDataset(DGLDataset):
 
     def process(self):
         mat_path = self.raw_path + '.mat'
-        if not check_sha1(mat_path, self._sha1_str):
-            raise UserWarning('File {} is downloaded but the content hash does not match.'
-                              'The repo may be outdated or download may be incomplete. '
-                              'Otherwise you can create an issue for it.'.format(self.name))
         self.graphs, self.label = self._load_graph(mat_path)
 
     def _load_graph(self, filename):
@@ -110,6 +106,10 @@ class QM7bDataset(DGLDataset):
     def download(self):
         file_path = os.path.join(self.raw_dir, self.name + '.mat')
         download(self.url, path=file_path)
+        if not check_sha1(file_path, self._sha1_str):
+            raise UserWarning('File {} is downloaded but the content hash does not match.'
+                              'The repo may be outdated or download may be incomplete. '
+                              'Otherwise you can create an issue for it.'.format(self.name))
 
     @property
     def num_labels(self):

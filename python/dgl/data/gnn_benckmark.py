@@ -143,7 +143,7 @@ class CoraFullDataset(GNNBenchmarkDataset):
     Unsupervised Inductive Learning via Ranking`.
     Nodes represent paper and edges represent citations.
 
-    Reference: https://github.com/shchur/gnn-benchmark#datasets
+    Reference: `<https://github.com/shchur/gnn-benchmark#datasets>`_
 
     Statistics
     ----------
@@ -202,7 +202,7 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
     co-authored a paper; node features represent paper keywords for each author’s papers, and class
     labels indicate most active fields of study for each author.
 
-    Reference: https://github.com/shchur/gnn-benchmark#datasets
+    Reference: `<https://github.com/shchur/gnn-benchmark#datasets>`_
 
     Statistics
     ----------
@@ -261,7 +261,7 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
     co-authored a paper; node features represent paper keywords for each author’s papers, and class
     labels indicate most active fields of study for each author.
 
-    Reference: https://github.com/shchur/gnn-benchmark#datasets
+    Reference: `<https://github.com/shchur/gnn-benchmark#datasets>`_
 
     Statistics
     ----------
@@ -319,7 +319,7 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
     where nodes represent goods, edges indicate that two goods are frequently bought together, node
     features are bag-of-words encoded product reviews, and class labels are given by the product category.
 
-    Reference: https://github.com/shchur/gnn-benchmark#datasets
+    Reference: `<https://github.com/shchur/gnn-benchmark#datasets>`_
 
     Statistics
     ----------
@@ -377,7 +377,7 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
     where nodes represent goods, edges indicate that two goods are frequently bought together, node
     features are bag-of-words encoded product reviews, and class labels are given by the product category.
 
-    Reference: https://github.com/shchur/gnn-benchmark#datasets
+    Reference: `<https://github.com/shchur/gnn-benchmark#datasets>`_
 
     Statistics
     ----------

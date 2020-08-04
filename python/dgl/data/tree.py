@@ -37,7 +37,7 @@ class SSTDataset(DGLBuiltinDataset):
     Each node also has a sentiment annotation: 5 classes (very negative,
     negative, neutral, positive and very positive). The sentiment label is a
     int value stored in the ``y`` feature field.
-    Official site: http://nlp.stanford.edu/sentiment/index.html
+    Official site: `<http://nlp.stanford.edu/sentiment/index.html>`_
 
     Statistics
     ----------
@@ -101,9 +101,8 @@ class SSTDataset(DGLBuiltinDataset):
     19536
     >>> train_data[0]
     Graph(num_nodes=71, num_edges=70,
-         ndata_schemes={'x': Scheme(shape=(), dtype=torch.int64), 'y': Scheme(shape=(),
-          dtype=torch.int64), 'mask': Scheme(shape=(), dtype=torch.int64)}
-         edata_schemes={})
+      ndata_schemes={'x': Scheme(shape=(), dtype=torch.int64), 'y': Scheme(shape=(), dtype=torch.int64), 'mask': Scheme(shape=(), dtype=torch.int64)}
+      edata_schemes={})
     >>> for tree in train_data:
     ...     input_ids = tree.ndata['x']
     ...     labels = tree.ndata['y']

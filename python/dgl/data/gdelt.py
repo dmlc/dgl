@@ -19,9 +19,8 @@ class GDELTDataset(DGLBuiltinDataset):
 
     Reference:
         - `Recurrent Event Network for Reasoning over Temporal
-            Knowledge Graphs` <https://arxiv.org/abs/1904.05530>
-        - `The Global Database of Events, Language, and Tone (GDELT) `
-       <https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/28075>
+            Knowledge Graphs <https://arxiv.org/abs/1904.05530>`_
+        - `The Global Database of Events, Language, and Tone (GDELT) <https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/28075>`_
 
     Statistics
     ----------
