@@ -1,4 +1,5 @@
 """Torch modules for GCNII"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import torch
 import torch.nn as nn
 import math
