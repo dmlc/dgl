@@ -6,8 +6,7 @@ References:
 """
 import torch
 import torch.nn as nn
-# from dgl.nn.pytorch import GraphConvII
-from graphconvii import GraphConvII
+from dgl.nn.pytorch import GraphConvII
 
 class GCNII(nn.Module):
     def __init__(self,

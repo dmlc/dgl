@@ -116,7 +116,7 @@ def main(args):
             dur.append(time.time() - t0)
 
         val_loss, val_acc = evaluate(model, g, features, labels, val_mask)
-        if epoch % 100 == 0:
+        if epoch % 10 == 0:
             print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Val Loss {:.4f} | Accuracy {:.4f} | "
                   "ETputs(KTEPS) {:.2f}". format(epoch, np.mean(dur), loss.item(), val_loss, 
                                                  val_acc, n_edges / np.mean(dur) / 1000))
@@ -142,7 +142,7 @@ if __name__ == '__main__':
     register_data_args(parser)
     parser.add_argument("--dropout", type=float, default=0.6,
             help="dropout probability")
-    parser.add_argument("--gpu", type=int, default=0,
+    parser.add_argument("--gpu", type=int, default=-1,
             help="gpu")
     parser.add_argument("--lr", type=float, default=1e-2,
             help="learning rate")
@@ -154,19 +154,11 @@ if __name__ == '__main__':
             help="number of hidden gcn layers")
     parser.add_argument('--wd1', type=float, default=0.01, help='weight decay (L2 loss on conv layer parameters).')
     parser.add_argument('--wd2', type=float, default=5e-4, help='weight decay (L2 loss on dense layer parameters).')
-    parser.add_argument('--patience', type=int, default=100, help='Patience')
+    parser.add_argument('--patience', type=int, default=100, help='patience')
     parser.add_argument('--alpha', type=float, default=0.1, help='alpha_l')
     parser.add_argument('--lamda', type=float, default=0.5, help='lamda.')
-    parser.set_defaults(self_loop=False)
+    parser.set_defaults(self_loop=True)
     args = parser.parse_args()
     print(args)
 
-    # main(args)
-
-    test_acc=[]
-    k = 10
-    for i in range(k):
-        test_acc.append(main(args))
-    avg = sum(acc_test)/len(acc_test)
-    sd = ((sum([(i-avg)**2 for i in acc_test])/(len(acc_test)-1)))**0.5
-    print(avg, sd)
+    main(args)

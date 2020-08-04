@@ -33,6 +33,6 @@ python3 train.py --dataset citeseer --gpu 0 --n-layers 32 --n-hidden 256 --lamda
 python3 train.py --dataset pubmed --gpu 0 --n-layers 16 --n-hidden 256 --lamda 0.4 --dropout 0.5 --wd1 5e-4
 ```
 
-* cora: 85.52(0.28) (paper: 85.5)
-* citeseer: 0.715 (paper: 73.4)
-* pubmed: 0.793 (paper: 80.3)
+* cora:		85.46(0.44)		paper: 85.5
+* citeseer:	73.32(0.63)		paper: 73.4
+* pubmed:	80.08(0.54)		paper: 80.3

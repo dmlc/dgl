@@ -24,7 +24,6 @@ class GraphConvII(nn.Module):
     >>> g = ... # some DGLGraph
     >>> g.add_edges(g.nodes(), g.nodes())
 
-
     Parameters
     ----------
     in_size : int

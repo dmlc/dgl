@@ -9,6 +9,7 @@ from .gatconv import GATConv
 from .ginconv import GINConv
 from .gmmconv import GMMConv
 from .graphconv import GraphConv
+from .graphconvii import GraphConvII
 from .nnconv import NNConv
 from .relgraphconv import RelGraphConv
 from .sageconv import SAGEConv
