@@ -109,6 +109,13 @@ std::vector<runtime::NDArray> CSRGetDataAndIndices(
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRTranspose(CSRMatrix csr);
 
+// Partition CSR
+template <typename IdType>
+std::vector<IdArray> partition1D(CSRMatrix csr, int64_t num_cols_per_partition);
+
+template <typename IdType>
+COOMatrix partition2D(CSRMatrix csr);
+
 // Convert CSR to COO
 template <DLDeviceType XPU, typename IdType>
 COOMatrix CSRToCOO(CSRMatrix csr);
