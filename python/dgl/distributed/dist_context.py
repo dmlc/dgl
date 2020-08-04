@@ -1,16 +1,17 @@
 """Initialize the distributed services"""
 
+import multiprocessing as mp
+import traceback
+import atexit
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
 from .kvstore import init_kvstore, close_kvstore
 from .rpc_client import connect_to_server, shutdown_servers
-import multiprocessing as mp
-import traceback
-import atexit
 
 SAMPLER_POOL = None
 NUM_SAMPLER_WORKERS = 0
 INITIALIZED = False
+
 
 def get_sampler_pool():
     """Return the sampler pool and num_workers"""
@@ -59,6 +60,7 @@ def is_initialized():
     """Is RPC initialized?
     """
     return INITIALIZED
+
 
 def exit_client():
     """Register exit callback.

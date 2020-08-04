@@ -6,6 +6,7 @@ import atexit
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
+from .dist_context import INITIALIZED
 
 if os.name != 'nt':
     import fcntl
