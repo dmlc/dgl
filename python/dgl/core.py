@@ -131,8 +131,8 @@ def invoke_gspmm(graph, mfunc, rfunc, *, srcdata=None, dstdata=None, edata=None)
 def message_passing(g, mfunc, rfunc, afunc):
     if g.number_of_edges() == 0:
         # No message passing is triggered.
-        return
-    if is_builtin(mfunc) and is_builtin(rfunc):
+        ndata = {}
+    elif is_builtin(mfunc) and is_builtin(rfunc):
         ndata = invoke_gspmm(g, mfunc, rfunc)
     else:
         # message phase

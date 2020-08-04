@@ -3202,6 +3202,9 @@ class DGLHeteroGraph(object):
         etype = self.canonical_etypes[etid]
         # edge IDs
         eid = utils.parse_edges_arg_to_eid(self, edges, etid, 'edges')
+        if len(eid) == 0:
+            # no computation
+            return
         u, v = self.find_edges(eid)
         # call message passing onsubgraph
         ndata = core.message_passing(_create_compute_graph(self, u, v, eid),
@@ -3404,6 +3407,9 @@ class DGLHeteroGraph(object):
         if inplace:
             raise DGLError('The `inplace` option is removed in v0.5.')
         v = utils.prepare_tensor(self, v, 'v')
+        if len(v) == 0:
+            # no computation
+            return
         etid = self.get_etype_id(etype)
         _, dtid = self._graph.metagraph.find_edge(etid)
         etype = self.canonical_etypes[etid]
@@ -4727,13 +4733,24 @@ def _create_compute_graph(graph, u, v, eid, recv_nodes=None):
     """
     ctx = F.context(u)
     idtype = F.dtype(u)
-    unique_src, src_map = utils.relabel(u)
-    if recv_nodes is None:
-        unique_dst, dst_map = utils.relabel(v)
+
+    if len(u) == 0:
+        # The computation graph has no edge and will not trigger message
+        # passing. However, because of the apply node phase, we still construct
+        # an empty graph to continue.
+        unique_src = new_u = new_v = u
+        assert recv_nodes is not None
+        unique_dst, _ = utils.relabel(recv_nodes)
     else:
-        unique_dst, dst_map = utils.relabel(recv_nodes)
-    new_u = F.gather_row(src_map, u)
-    new_v = F.gather_row(dst_map, v)
+        # relabel u and v to starting from 0
+        unique_src, src_map = utils.relabel(u)
+        if recv_nodes is None:
+            unique_dst, dst_map = utils.relabel(v)
+        else:
+            unique_dst, dst_map = utils.relabel(recv_nodes)
+        new_u = F.gather_row(src_map, u)
+        new_v = F.gather_row(dst_map, v)
+
     srctype, etype, dsttype = graph.canonical_etypes[0]
     # create graph
     hgidx = heterograph_index.create_unitgraph_from_coo(

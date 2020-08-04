@@ -333,16 +333,16 @@ def test_update_all_0deg():
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
-        return {'h' : nodes.data['h'] + F.sum(nodes.mailbox['m'], 1)}
+        return {'x' : nodes.data['h'] + F.sum(nodes.mailbox['m'], 1)}
     def _apply(nodes):
-        return {'h' : nodes.data['h'] * 2}
+        return {'x' : nodes.data['x'] * 2}
     def _init2(shape, dtype, ctx, ids):
         return 2 + F.zeros(shape, dtype, ctx)
-    g.set_n_initializer(_init2, 'h')
+    g.set_n_initializer(_init2, 'x')
     old_repr = F.randn((5, 5))
     g.ndata['h'] = old_repr
     g.update_all(_message, _reduce, _apply)
-    new_repr = g.ndata['h']
+    new_repr = g.ndata['x']
     # the first row of the new_repr should be the sum of all the node
     # features; while the 0-deg nodes should be initialized by the
     # initializer and applied with UDF.
@@ -353,9 +353,8 @@ def test_update_all_0deg():
     g = DGLGraph()
     g = g.to(F.ctx())
     g.add_nodes(5)
-    g.set_n_initializer(_init2, 'h')
     g.ndata['h'] = old_repr
-    g.update_all(_message, _reduce, _apply)
+    g.update_all(_message, _reduce, lambda nodes : {'h' : nodes.data['h'] * 2})
     new_repr = g.ndata['h']
     # should fallback to apply
     assert F.allclose(new_repr, 2*old_repr)
@@ -368,17 +367,17 @@ def test_pull_0deg():
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
-        return {'h' : nodes.data['h'] + F.sum(nodes.mailbox['m'], 1)}
+        return {'x' : nodes.data['h'] + F.sum(nodes.mailbox['m'], 1)}
     def _apply(nodes):
-        return {'h' : nodes.data['h'] * 2}
+        return {'x' : nodes.data['x'] * 2}
     def _init2(shape, dtype, ctx, ids):
         return 2 + F.zeros(shape, dtype, ctx)
-    g.set_n_initializer(_init2, 'h')
+    g.set_n_initializer(_init2, 'x')
     # test#1: pull both 0deg and non-0deg nodes
     old = F.randn((2, 5))
     g.ndata['h'] = old
     g.pull([0, 1], _message, _reduce, _apply)
-    new = g.ndata.pop('h')
+    new = g.ndata['x']
     # 0deg check: initialized with the func and got applied
     assert F.allclose(new[0], F.full_1d(5, 4, dtype=F.float32))
     # non-0deg check
@@ -387,8 +386,8 @@ def test_pull_0deg():
     # test#2: pull only 0deg node
     old = F.randn((2, 5))
     g.ndata['h'] = old
-    g.pull(0, _message, _reduce, _apply)
-    new = g.ndata.pop('h')
+    g.pull(0, _message, _reduce, lambda nodes : {'h' : nodes.data['h'] * 2})
+    new = g.ndata['h']
     # 0deg check: fallback to apply
     assert F.allclose(new[0], 2*old[0])
     # non-0deg check: not touched
@@ -640,8 +639,6 @@ if __name__ == '__main__':
     #test_nx_conversion()
     test_batch_setter_getter()
     test_batch_setter_autograd()
-    test_batch_send()
-    test_batch_recv()
     test_apply_nodes()
     test_apply_edges()
     test_update_routines()

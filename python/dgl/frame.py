@@ -570,7 +570,10 @@ class Frame(MutableMapping):
             A new subframe.
         """
         subcols = {k : col.subcolumn(rowids) for k, col in self._columns.items()}
-        return Frame(subcols, len(rowids))
+        subf = Frame(subcols, len(rowids))
+        subf._initializers = self._initializers
+        subf._default_initializer = self._default_initializer
+        return subf
 
 class _FrameRef(MutableMapping):
     """Reference object to a frame on a subset of rows.
