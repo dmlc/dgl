@@ -75,9 +75,14 @@ class SBMMixtureDataset(DGLDataset):
     avg_deg : int, optional
         Average degree. Default: 3
     pq : list of pair of nonnegative float or str, optional
-        Random densities. Default: Appendix_C
+        Random densities. This parameter is for future extension,
+        for now it's always using the default value.
+        Default: Appendix_C
     rng : numpy.random.RandomState, optional
-        Random number generator. Default: None
+        Random number generator. If not given, it's numpy.random.RandomState() with `seed=None`,
+        which read data from /dev/urandom (or the Windows analogue) if available or seed from
+        the clock otherwise.
+        Default: None
 
     Raises
     ------
@@ -161,7 +166,7 @@ class SBMMixtureDataset(DGLDataset):
         return len(self._graphs)
 
     def __getitem__(self, idx):
-        r""" Get graph by index
+        r""" Get one example by index
 
         Parameters
         ----------
@@ -170,7 +175,16 @@ class SBMMixtureDataset(DGLDataset):
 
         Returns
         -------
-        (dgl.DGLGraph, dgl.DGLGraph, numpy.ndarray, numpy.ndarray, numpy.ndarray)
+        graph : dgl.DGLGraph
+            The original graph
+        line_graph : dgl.DGLGraph
+            The line graph of `graph`
+        graph_degree : numpy.ndarray
+            In degrees for each node in `graph`
+        line_graph_degree : numpy.ndarray
+            In degrees for each node in `line_graph`
+        pm_pd : numpy.ndarray
+            Edge indicator matrices Pm and Pd
         """
         return self._graphs[idx], self._line_graphs[idx], \
                 self._graph_degrees[idx], self._line_graph_degrees[idx], self._pm_pds[idx]
@@ -184,7 +198,36 @@ class SBMMixtureDataset(DGLDataset):
             return q, p
 
     def collate_fn(self, x):
-        r"""collate function for dataloader"""
+        r""" The `collate` function for dataloader
+
+        Parameters
+        ----------
+        x : tuple
+            a batch of data that contains
+            graph : dgl.DGLGraph
+                The original graph
+            line_graph : dgl.DGLGraph
+                The line graph of `graph`
+            graph_degree : numpy.ndarray
+                In degrees for each node in `graph`
+            line_graph_degree : numpy.ndarray
+                In degrees for each node in `line_graph`
+            pm_pd : numpy.ndarray
+                Edge indicator matrices Pm and Pd
+
+        Returns
+        -------
+        g_batch : dgl.DGLGraph
+            Batched graphs
+        lg_batch : dgl.DGLGraph
+            Batched line graphs
+        degg_batch : numpy.ndarray
+            A batch of in degrees for each node in `g_batch`
+        deglg_batch : numpy.ndarray
+            A batch of in degrees for each node in `lg_batch`
+        pm_pd_batch : numpy.ndarray
+            A batch of edge indicator matrices Pm and Pd
+        """
         g, lg, deg_g, deg_lg, pm_pd = zip(*x)
         g_batch = batch.batch(g)
         lg_batch = batch.batch(lg)
