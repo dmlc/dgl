@@ -15,7 +15,7 @@ For evaluatation we follow the code mlp.py provided by ogb [here](https://github
 ## Used config
 ogbl-collab
 ```
-python3 deepwalk.py --ogbl_name ogbl-collab --load_from_ogbl --save_in_pt --output_emb_file embedding.pt --num_walks 50 --window_size 20 --walk_length 40 --lr 0.1 --negative 1 --neg_weight 1 --lap_norm 0.005 --mix --gpus 0 --num_threads 4 --print_interval 2000 --print_loss --batch_size 32
+python3 deepwalk.py --ogbl_name ogbl-collab --load_from_ogbl --save_in_pt --output_emb_file collab-embedding.pt --num_walks 50 --window_size 2 --walk_length 40 --lr 0.1 --negative 1 --neg_weight 1 --lap_norm 0.01 --mix --gpus 0 --num_threads 4 --print_interval 2000 --print_loss --batch_size 128 --use_context_weight
 cd ./ogb/blob/master/examples/linkproppred/collab/
 cp embedding_pt_file_path ./
 python3 mlp.py --device 0 --runs 10 --use_node_embedding
