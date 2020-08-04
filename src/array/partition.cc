@@ -26,7 +26,7 @@ std::vector<IdArray> partition1D(CSRMatrix csr, int64_t num_cols_per_partition) 
   const int64_t N = csr.num_cols;
   const int64_t nnz = csr.indices->shape[0];
   const IdType *indptr = csr.indptr.Ptr<IdType>();
-  const IdType *indices = csr.indices.Ptr<IdType>();
+  IdType *indices = csr.indices.Ptr<IdType>();
   const IdType *data = csr.data.Ptr<IdType>();
   // partitioned csr
   int64_t num_col_partitions = (N + num_cols_per_partition - 1) / num_cols_per_partition;
@@ -60,7 +60,7 @@ std::vector<IdArray> partition1D(CSRMatrix csr, int64_t num_cols_per_partition) 
     }
     ret_indptr_data[j * (M + 1) - 1] = count;
   }
-  return { ret_indptr, ret_indices, ret_eid }
+  return { ret_indptr, ret_indices, ret_eid };
 }
 
 template std::vector<IdArray> partition1D<int64_t>(CSRMatrix csr, int64_t num_cols_per_partition);
@@ -74,7 +74,7 @@ std::vector<IdArray> partition2D(CSRMatrix csr, int64_t num_rows_per_partition, 
   const int64_t N = csr.num_cols;
   const int64_t nnz = csr.indices->shape[0];
   const IdType *indptr = csr.indptr.Ptr<IdType>();
-  const IdType *indices = csr.indices.Ptr<IdType>();
+  IdType *indices = csr.indices.Ptr<IdType>();
   const IdType *data = csr.data.Ptr<IdType>();
   // partitioned csr
   int64_t num_col_partitions = (N + num_cols_per_partition - 1) / num_cols_per_partition;
@@ -120,7 +120,7 @@ std::vector<IdArray> partition2D(CSRMatrix csr, int64_t num_rows_per_partition, 
       }
     }
   }
-  return {ret_row, ret_col, ret_eid}
+  return {ret_row, ret_col, ret_eid};
 }
 
 
