@@ -445,7 +445,7 @@ class Frame(MutableMapping):
             if key not in self:
                 scheme = infer_scheme(val)
                 ctx = F.context(val)
-                self.add_column(self, key, scheme, ctx)
+                self.add_column(key, scheme, ctx)
         for key, val in data.items():
             self._columns[key].update(rowids, val)
 

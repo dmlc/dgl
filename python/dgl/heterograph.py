@@ -3011,6 +3011,7 @@ class DGLHeteroGraph(object):
         if inplace:
             raise DGLError('The `inplace` option is removed in v0.5.')
         etid = self.get_etype_id(etype)
+        stid, dtid = self._graph.metagraph.find_edge(etid)
         etype = self.canonical_etypes[etid]
         g = self if etype is None else self[etype]
         if is_all(edges):
@@ -3189,22 +3190,19 @@ class DGLHeteroGraph(object):
                 [0.],
                 [1.]])
         """
+        if inplace:
+            raise DGLError('The `inplace` option is removed in v0.5.')
         # edge type
         etid = self.get_etype_id(etype)
         _, dtid = self._graph.metagraph.find_edge(etid)
         etype = self.canonical_etypes[etid]
         # edge IDs
         eid = utils.parse_edges_arg_to_eid(self, edges, etid, 'edges')
-        dstnodes = F.unique(self.find_edges(eid)[1])
-        # call message passing on subgraph
-        g = self.edge_subgraph({etype : eid}, preserve_nodes=True)
-        ndata = core.message_passing(g, message_func, reduce_func)
-        # apply phase
-        if apply_node_func is not None:
-            ndata.update(g.dstdata)  # incorporate original node features
-            ndata = core.invoke_node_udf(g, dstnodes, g.dsttypes[0], apply_node_func, ndata)
-        # slice out dstnodes' ndata
-        ndata = Frame(ndata).subframe(dstnodes)
+        u, v = self.find_edges(eid)
+        # call message passing onsubgraph
+        ndata = core.message_passing(_create_compute_graph(self, u, v, eid),
+                                     message_func, reduce_func, apply_node_func)
+        dstnodes = F.unique(v)
         self._set_n_repr(dtid, dstnodes, ndata)
         
     def multi_send_and_recv(self, etype_dict, cross_reducer, apply_node_func=None, inplace=False):
@@ -3399,12 +3397,17 @@ class DGLHeteroGraph(object):
                 [1.],
                 [1.]])
         """
+        if inplace:
+            raise DGLError('The `inplace` option is removed in v0.5.')
+        v = utils.prepare_tensor(self, v, 'v')
         etid = self.get_etype_id(etype)
         _, dtid = self._graph.metagraph.find_edge(etid)
         etype = self.canonical_etypes[etid]
-        g = self[etype].in_subgraph(v)
-        ndata = core.message_passing(g, message_func, reduce_func)
-        assert False, 'need to slice ndata with v'
+        g = self if etype is None else self[etype]
+        # call message passing on subgraph
+        src, dst, eid = g.in_edges(v, form='all')
+        ndata = core.message_passing(_create_compute_graph(self, src, dst, eid, v),
+                                     message_func, reduce_func, apply_node_func)
         self._set_n_repr(dtid, v, ndata)
 
     def multi_pull(self, v, etype_dict, cross_reducer, apply_node_func=None, inplace=False):
@@ -3560,6 +3563,8 @@ class DGLHeteroGraph(object):
                 [0.],
                 [0.]])
         """
+        if inplace:
+            raise DGLError('The `inplace` option is removed in v0.5.')
         edges = self.out_edges(u, form='eid', etype=etype)
         self.send_and_recv(edges, message_func, reduce_func, apply_node_func, etype=etype)
 
@@ -3620,11 +3625,7 @@ class DGLHeteroGraph(object):
         etype = self.canonical_etypes[etid]
         _, dtid = self._graph.metagraph.find_edge(etid)
         g = self if etype is None else self[etype]
-        ndata = core.message_passing(g, message_func, reduce_func)
-        # apply phase
-        if apply_node_func is not None:
-            ndata.update(g.dstdata)  # incorporate original node features
-            ndata = core.invoke_node_udf(g, ALL, g.dsttypes[0], apply_node_func, ndata)
+        ndata = core.message_passing(g, message_func, reduce_func, apply_node_func)
         self._set_n_repr(dtid, ALL, ndata)
 
     def multi_update_all(self, etype_dict, cross_reducer, apply_node_func=None):
@@ -4684,5 +4685,65 @@ class DGLBlock(DGLHeteroGraph):
             meta = str(self.metagraph().edges(keys=True))
             return ret.format(
                 srcnode=nsrcnode_dict, dstnode=ndstnode_dict, edge=nedge_dict, meta=meta)
+
+
+def _create_compute_graph(graph, u, v, eid, recv_nodes=None):
+    """Create a computation graph from the given edges.
+
+    The compute graph is a uni-directional bipartite graph with only
+    one edge type. There is no orphan destination nodes, i.e., all the
+    dst nodes have at least one in-coming edge.
+
+    Similar to subgraph extraction, it stores the original node IDs
+    in the srcdata[NID] and dstdata[NID] and extracts features accordingly.
+    Edges are not relabeled.
+
+    This function is typically used during message passing to generate
+    a graph that contains only the active set of edges.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The input graph.
+    u : Tensor
+        Src nodes.
+    v : Tensor
+        Dst nodes.
+    eid : Tensor
+        Edge IDs.
+    recv_nodes : Tensor
+        Nodes that receive messages. If None, it is equal to unique(v).
+        Otherwise, it must be a super set of v and can contain nodes
+        that have no in-coming edges.
+
+    Returns
+    -------
+    DGLGraph
+        A computation graph.
+    """
+    ctx = F.context(u)
+    idtype = F.dtype(u)
+    unique_src, src_map = utils.relabel(u)
+    if recv_nodes is None:
+        unique_dst, dst_map = utils.relabel(v)
+    else:
+        unique_dst, dst_map = utils.relabel(recv_nodes)
+    new_u = F.gather_row(src_map, u)
+    new_v = F.gather_row(dst_map, v)
+    srctype, etype, dsttype = graph.canonical_etypes[0]
+    # create graph
+    hgidx = heterograph_index.create_unitgraph_from_coo(
+        2, len(unique_src), len(unique_dst), new_u, new_v, ['coo', 'csr', 'csc'])
+    # create frame
+    srcframe = graph._node_frames[graph.get_ntype_id(srctype)].subframe(unique_src)
+    srcframe[NID] = unique_src
+    dstframe = graph._node_frames[graph.get_ntype_id(dsttype)].subframe(unique_dst)
+    dstframe[NID] = unique_dst
+    eframe = graph._edge_frames[0].subframe(eid)
+    eframe[EID] = eid
+    
+    return DGLHeteroGraph(hgidx, ([srctype], [dsttype]), [etype],
+                          node_frames=[srcframe, dstframe],
+                          edge_frames=[eframe])
 
 _init_api("dgl.heterograph")

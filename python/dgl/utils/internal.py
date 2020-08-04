@@ -10,7 +10,6 @@ from ..base import DGLError, dgl_warning
 from .. import backend as F
 from .. import ndarray as nd
 
-
 class InconsistentDtypeException(DGLError):
     """Exception class for inconsistent dtype between graph and tensor"""
     def __init__(self, msg='', *args, **kwargs): #pylint: disable=W1113
@@ -708,3 +707,43 @@ def compensate(ids, origin_ids):
                          ids,
                          F.full_1d(len(ids), 0, F.dtype(ids), F.context(ids)))
     return F.tensor(F.nonzero_1d(mask), dtype=F.dtype(ids))
+
+def relabel(x):
+    """Relabel the input ids to continuous ids that starts from zero.
+
+    Ids are assigned new ids according to their ascending order.
+
+    Examples
+    --------
+    >>> x = [1, 5, 3, 6]
+    >>> n2o, o2n = build_relabel_map(x)
+    >>> n2o
+    [1, 3, 5, 6]
+    >>> o2n
+    [n/a, 0, n/a, 1, n/a, 2, 3]
+
+    "n/a" will be filled with 0
+
+    Parameters
+    ----------
+    x : Tensor
+        ID tensor.
+
+    Returns
+    -------
+    new_to_old : Tensor
+        The mapping from new id to old id.
+    old_to_new : Tensor
+        The mapping from old id to new id. It is a vector of length MAX(x).
+        One can use advanced indexing to convert an old id tensor to a
+        new id tensor: new_id = old_to_new[old_id]
+    """
+    unique_x = F.unique(x)
+    map_len = F.as_scalar(F.max(unique_x, dim=0)) + 1
+    ctx = F.context(x)
+    dtype = F.dtype(x)
+    old_to_new = F.zeros((map_len,), dtype=dtype, ctx=ctx)
+    old_to_new = F.scatter_row(old_to_new, unique_x,
+                               F.copy_to(F.arange(0, len(unique_x), dtype), ctx))
+    return unique_x, old_to_new
+
