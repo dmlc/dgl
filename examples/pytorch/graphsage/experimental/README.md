@@ -26,9 +26,10 @@ The data is copied to `~/graphsage/ogb-product` on each of the remote machines. 
 specifies the location of the partitioned data in the local machine (a user only needs to specify
 the location of the partition configuration file).
 ```bash
-python3 ~/dgl/tools/copy_partitions.py --ip_config ip_config.txt \
-			--workspace ~/graphsage --rel_data_path ogb-product \
-			--part_config data/ogb-product.json 
+python3 ~/dgl/tools/copy_partitions.py \
+--ip_config ip_config.txt \
+--workspace ~/graphsage --rel_data_path ogb-product \
+--part_config data/ogb-product.json 
 ```
 
 **Note**: users need to make sure that the master node has right permission to ssh to all the other nodes.
@@ -47,7 +48,7 @@ python3 ~/dgl/tools/launch.py \
 --server_count 1 \
 --part_config ogb-product/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --server-count 1 --num-epochs 30 --batch-size 1000"
+"python3 ~/dgl/examples/pytorch/graphsage/experimental/train_dist.py --graph-name ogb-product --ip_config ip_config.txt --server-count 1 --num-epochs 30 --batch-size 1000"
 ```
 
 To run unsupervised training:
@@ -59,7 +60,7 @@ python3 ~/dgl/tools/launch.py \
 --server_count 1 \
 --part_config data/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 train_dist_unsupervised.py --graph-name ogb-product --ip_config ip_config.txt --server-count 1 --num-epochs 3 --batch-size 1000 --num-client 4"
+"python3 ~/dgl/examples/pytorch/graphsage/experimental/train_dist_unsupervised.py --graph-name ogb-product --ip_config ip_config.txt --server-count 1 --num-epochs 3 --batch-size 1000 --num-client 4"
 ```
 
 ## Distributed code runs in the standalone mode
