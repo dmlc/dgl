@@ -440,65 +440,6 @@ def test_repr():
     repr_string = g.__repr__()
     print(repr_string)
 
-
-def test_group_apply_edges():
-    def edge_udf(edges):
-        h = F.sum(edges.data['feat'] * (edges.src['h'] + edges.dst['h']), dim=2)
-        normalized_feat = F.softmax(h, dim=1)
-        return {"norm_feat": normalized_feat}
-
-    g = DGLGraph()
-    g = g.to(F.ctx())
-    g.add_nodes(10)
-    g.add_edges(0, [1, 2, 3, 4, 5, 6, 7, 8])
-    g.add_edges(1, [2, 3, 4, 6, 7, 8])
-    g.add_edges(2, [2, 3, 4, 5, 6, 7, 8])
-
-    g.ndata['h'] = F.randn((g.number_of_nodes(), D))
-    g.edata['feat'] = F.randn((g.number_of_edges(), D))
-
-    def _test(group_by):
-        g.group_apply_edges(group_by=group_by, func=edge_udf)
-        if group_by == 'src':
-            u, v, eid = g.out_edges(1, form='all')
-        else:
-            u, v, eid = g.in_edges(5, form='all')
-        out_feat = g.edges[eid].data['norm_feat']
-        result = (g.nodes[u].data['h'] + g.nodes[v].data['h']) * g.edges[eid].data['feat']
-        result = F.softmax(F.sum(result, dim=1), dim=0)
-        assert F.allclose(out_feat, result)
-
-    # test group by source nodes
-    _test('src')
-
-    # test group by destination nodes
-    _test('dst')
-
-
-# GitHub issue #1036
-@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
-def test_group_apply_edges2():
-    m = ssp.random(10, 10, 0.2)
-    g = DGLGraph(m, readonly=True)
-    g = g.to(F.ctx())
-    g.ndata['deg'] = g.in_degrees()
-    g.ndata['id'] = F.arange(0, g.number_of_nodes(), g.idtype)
-    g.edata['id'] = F.arange(0, g.number_of_edges(), g.idtype)
-
-    def apply(edges):
-        w = edges.data['id']
-        n_nodes, deg = w.shape
-
-        dst = edges.dst['id'][:, 0]
-        # TODO: tmp hack
-        eid1 = F.asnumpy(g.in_edges(dst, 'eid')).reshape(n_nodes, deg).sort(1)
-        eid2 = F.asnumpy(edges.data['id']).sort(1)
-        assert np.array_equal(eid1, eid2)
-        return {'id2': w}
-
-    g.group_apply_edges('dst', apply, inplace=True)
-
-
 def test_local_var():
     g = DGLGraph(nx.path_graph(5))
     g = g.to(F.ctx())
@@ -642,8 +583,6 @@ if __name__ == '__main__':
     test_apply_nodes()
     test_apply_edges()
     test_update_routines()
-    test_recv_0deg()
-    test_recv_0deg_newfld()
     test_update_all_0deg()
     test_pull_0deg()
     test_send_multigraph()

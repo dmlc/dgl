@@ -450,6 +450,7 @@ class Frame(MutableMapping):
             self._columns[key].update(rowids, val)
 
     def _append(self, other):
+        """Append ``other`` frame to ``self`` frame."""
         # NOTE: `other` can be empty.
         if self.num_rows == 0:
             # if no rows in current frame; append is equivalent to
@@ -457,7 +458,7 @@ class Frame(MutableMapping):
             self._columns = {key: Column.create(data) for key, data in other.items()}
         else:
             # pad columns that are not provided in the other frame with initial values
-            for key, col in self.items():
+            for key, col in self._columns.items():
                 if key in other:
                     continue
                 scheme = col.scheme
@@ -470,7 +471,7 @@ class Frame(MutableMapping):
                                        slice(self._num_rows, self._num_rows + other.num_rows))
                 other[key] = new_data
             # append other to self
-            for key, col in other.items():
+            for key, col in other._columns.items():
                 if key not in self._columns:
                     # the column does not exist; init a new column
                     self.add_column(key, col.scheme, F.context(col.data))
