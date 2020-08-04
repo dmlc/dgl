@@ -480,7 +480,8 @@ class FB15kDataset(KnowledgeGraphDataset):
             >>> src, dst = graph.edges(test_idx)
             >>> rel = graph.edata['etype'][test_idx]
 
-    The FB15K dataset was introduced in http://papers.nips.cc/paper/5071-translating-embeddings-for-modeling-multi-relational-data.pdf,
+    The FB15K dataset was introduced in `Translating Embeddings for Modeling
+    Multi-relational Data <http://papers.nips.cc/paper/5071-translating-embeddings-for-modeling-multi-relational-data.pdf>`_.
     It is a subset of Freebase which contains about
     14,951 entities with 1,345 different relations.
     When creating the dataset, a reverse edge with
@@ -603,7 +604,8 @@ class WN18Dataset(KnowledgeGraphDataset):
             >>> src, dst = graph.edges(test_idx)
             >>> rel = graph.edata['etype'][test_idx]
 
-    The WN18 dataset was introduced in http://papers.nips.cc/paper/5071-translating-embeddings-for-modeling-multi-relational-data.pdf,
+    The WN18 dataset was introduced in `Translating Embeddings for Modeling
+    Multi-relational Data <http://papers.nips.cc/paper/5071-translating-embeddings-for-modeling-multi-relational-data.pdf>`_.
     It included the full 18 relations scraped from
     WordNet for roughly 41,000 synsets. When creating
     the dataset, a reverse edge with reversed relation
