@@ -2,13 +2,10 @@
 
 import os
 import socket
-import multiprocessing as mp
 import atexit
-import traceback
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
-from .kvstore import init_kvstore, close_kvstore
 
 if os.name != 'nt':
     import fcntl
@@ -99,7 +96,6 @@ def get_local_usable_addr():
 
     return ip_addr + ':' + str(port)
 
-INITIALIZED = False
 
 def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Connect this client to server.
@@ -178,20 +174,10 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     rpc.send_request(0, get_client_num_req)
     res = rpc.recv_response()
     rpc.set_num_client(res.num_client)
+    from .dist_context import exit_client
     atexit.register(exit_client)
     global INITIALIZED
     INITIALIZED = True
-
-def finalize_client():
-    """Release resources of this client."""
-    rpc.finalize_sender()
-    rpc.finalize_receiver()
-    if SAMPLER_POOL is not None:
-        SAMPLER_POOL.close()
-        SAMPLER_POOL.join()
-    global INITIALIZED
-    INITIALIZED = False
-
 
 def shutdown_servers():
     """Issue commands to remote servers to shut them down.
@@ -204,52 +190,3 @@ def shutdown_servers():
         req = rpc.ShutDownRequest(rpc.get_rank())
         for server_id in range(rpc.get_num_server()):
             rpc.send_request(server_id, req)
-
-SAMPLER_POOL = None
-NUM_SAMPLER_WORKERS = 0
-
-
-def _init_rpc(ip_config, max_queue_size, net_type, role):
-    ''' This init function is called in the worker processes.
-    '''
-    try:
-        connect_to_server(ip_config, max_queue_size, net_type)
-        init_kvstore(ip_config, role)
-    except Exception as e:
-        print(e, flush=True)
-        traceback.print_exc()
-        raise e
-
-def get_sampler_pool():
-    """Return the sampler pool and num_workers"""
-    return SAMPLER_POOL, NUM_SAMPLER_WORKERS
-
-
-def init_rpc(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
-    """Init rpc service"""
-    ctx = mp.get_context("spawn")
-    global SAMPLER_POOL
-    global NUM_SAMPLER_WORKERS
-    if num_workers > 0:
-        SAMPLER_POOL = ctx.Pool(
-            num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size,
-                                                          net_type, 'sampler'))
-    NUM_SAMPLER_WORKERS = num_workers
-    connect_to_server(ip_config, max_queue_size, net_type)
-
-
-def exit_client():
-    """Register exit callback.
-    """
-    # Only client with rank_0 will send shutdown request to servers.
-    rpc.client_barrier()
-    shutdown_servers()
-    finalize_client()
-    close_kvstore()
-    atexit.unregister(exit_client)
-
-
-def is_initialized():
-    """Is RPC initialized?
-    """
-    return INITIALIZED

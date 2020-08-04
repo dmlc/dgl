@@ -5,7 +5,7 @@ import time
 import traceback
 
 from . import exit_client
-from .rpc_client import get_sampler_pool
+from .dist_context import get_sampler_pool
 from .. import backend as F
 
 __all__ = ["DistDataLoader"]
@@ -23,12 +23,10 @@ def call_collate_fn(next_data):
     return 1
 
 
-def init_fn(collate_fn, queue, sig_queue):
+def init_fn(collate_fn, queue):
     """Initialize setting collate function and mp.Queue in the subprocess"""
     global DGL_GLOBAL_COLLATE_FN
     global DGL_GLOBAL_MP_QUEUE
-    global DGL_SIG_QUEUE
-    DGL_SIG_QUEUE = sig_queue
     DGL_GLOBAL_MP_QUEUE = queue
     DGL_GLOBAL_COLLATE_FN = collate_fn
     time.sleep(1)
@@ -80,12 +78,11 @@ class DistDataLoader:
         self.num_workers = num_workers
         self.m = mp.Manager()
         self.queue = self.m.Queue(maxsize=queue_size)
-        self.sig_queue = self.m.Queue(maxsize=num_workers)
         self.drop_last = drop_last
-        self.send_idxs = 0
         self.recv_idxs = 0
         self.started = False
         self.shuffle = shuffle
+        self.is_closed = False
 
         self.pool, num_sampler_workers = get_sampler_pool()
         if self.pool is None:
@@ -96,7 +93,7 @@ class DistDataLoader:
         results = []
         for _ in range(num_workers):
             results.append(self.pool.apply_async(
-                init_fn, args=(collate_fn, self.queue, self.sig_queue)))
+                init_fn, args=(collate_fn, self.queue)))
             time.sleep(0.1)
         for res in results:
             res.get()
@@ -132,7 +129,6 @@ class DistDataLoader:
         else:
             async_result = self.pool.apply_async(
                 call_collate_fn, args=(next_data, ))
-            self.send_idxs += 1
             return async_result
 
     def _next_data(self):
@@ -157,3 +153,8 @@ class DistDataLoader:
             self.pool.apply_async(_exit)
             time.sleep(0.1)
         self.pool.close()
+        self.is_closed = True
+
+    def __del__(self):
+        if not self.is_closed:
+            self.close()

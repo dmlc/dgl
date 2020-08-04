@@ -12,7 +12,7 @@ from utils import get_local_usable_addr
 from pathlib import Path
 from dgl.distributed import DistGraphServer, DistGraph, DistDataLoader
 import pytest
-
+import backend as F
 
 class NeighborSampler(object):
     def __init__(self, g, fanouts, sample_neighbors):
@@ -45,43 +45,61 @@ def start_server(rank, tmpdir, disable_shared_mem, num_clients):
     g.start()
 
 
-def start_client(rank, tmpdir, disable_shared_mem, num_workers):
+def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
     import dgl
     import torch as th
     os.environ['DGL_DIST_MODE'] = 'distributed'
-    dgl.distributed.rpc.reset()
-    dgl.distributed.init_rpc("mp_ip_config.txt", num_workers=4)
+    dgl.distributed.initialize("mp_ip_config.txt", num_workers=4)
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_sampling.json', rank)
-    train_nid = th.arange(202)
+    num_nodes_to_sample = 202
+    batch_size = 32
+    train_nid = th.arange(num_nodes_to_sample)
     dist_graph = DistGraph("mp_ip_config.txt", "test_mp", gpb=gpb)
 
     # Create sampler
     sampler = NeighborSampler(dist_graph, [5, 10],
                               dgl.distributed.sample_neighbors)
 
-    # Create PyTorch DataLoader for constructing blocks
+    # Create DataLoader for constructing blocks
     dataloader = DistDataLoader(
         dataset=train_nid.numpy(),
-        batch_size=32,
+        batch_size=batch_size,
         collate_fn=sampler.sample_blocks,
-        shuffle=True,
-        drop_last=False,
+        shuffle=False,
+        drop_last=drop_last,
         num_workers=4)
 
-    dist_graph._init()
-    for epoch in range(3):
-        for idx, blocks in enumerate(dataloader):
-            print(blocks)
-            print(blocks[1].edges())
-            print(idx)
+    groundtruth_g = CitationGraphDataset("cora")[0]
+    max_nid = []
 
+    for epoch in range(2):
+        for idx, blocks in zip(range(0, num_nodes_to_sample, batch_size), dataloader):
+            block = blocks[-1]
+            o_src, o_dst =  block.edges()
+            src_nodes_id = block.srcdata[dgl.NID][o_src]
+            print(src_nodes_id)            
+            dst_nodes_id = block.dstdata[dgl.NID][o_dst]
+            print(dst_nodes_id)
+            has_edges = groundtruth_g.has_edges_between(src_nodes_id, dst_nodes_id)
+            assert np.all(F.asnumpy(has_edges))
+            print(np.unique(np.sort(F.asnumpy(dst_nodes_id))))
+            max_nid.append(np.max(F.asnumpy(dst_nodes_id)))
+            # assert np.all(np.unique(np.sort(F.asnumpy(dst_nodes_id))) == np.arange(idx, batch_size))
+        if drop_last:
+            assert np.max(max_nid) == num_nodes_to_sample - 1 - num_nodes_to_sample % batch_size
+        else:
+            assert np.max(max_nid) == num_nodes_to_sample - 1
     dataloader.close()
     dgl.distributed.exit_client()
 
 
-def main(tmpdir, num_server):
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@pytest.mark.parametrize("num_server", [3])
+@pytest.mark.parametrize("drop_last", [True, False])
+def test_dist_dataloader(tmpdir, num_server, drop_last):
     ip_config = open("mp_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{} 1\n'.format(get_local_usable_addr()))
@@ -106,18 +124,11 @@ def main(tmpdir, num_server):
         pserver_list.append(p)
 
     time.sleep(3)
-    sampled_graph = start_client(0, tmpdir, num_server > 1, num_workers)
+    sampled_graph = start_client(0, tmpdir, num_server > 1, num_workers, drop_last)
     for p in pserver_list:
         p.join()
-
-# Wait non shared memory graph store
-@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-def test_dist_dataloader(tmpdir):
-    main(Path(tmpdir), 3)
-
 
 if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
-        main(Path(tmpdirname), 3)
+        test_dist_dataloader(Path(tmpdirname), 3, True)

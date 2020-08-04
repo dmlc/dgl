@@ -267,7 +267,7 @@ def main(args):
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
 
-    dgl.distributed.init_rpc(args.ip_config, num_workers=args.num_workers)
+    dgl.distributed.initialize(args.ip_config, num_workers=args.num_workers)
     g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, part_config=args.conf_path)
 
     pb = g.get_partition_book()
