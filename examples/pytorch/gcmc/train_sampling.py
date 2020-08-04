@@ -214,18 +214,6 @@ def thread_wrapped_func(func):
             raise exception.__class__(trace)
     return decorated_function
 
-def prepare_mp(g):
-    """
-    Explicitly materialize the CSR, CSC and COO representation of the given graph
-    so that they could be shared via copy-on-write to sampler workers and GPU
-    trainers.
-    This is a workaround before full shared memory support on heterogeneous graphs.
-    """
-    for etype in g.canonical_etypes:
-        g.in_degree(0, etype=etype)
-        g.out_degree(0, etype=etype)
-        g.find_edges([0], etype=etype)
-
 def config():
     parser = argparse.ArgumentParser(description='GCMC')
     parser.add_argument('--seed', default=123, type=int)
@@ -468,8 +456,8 @@ if __name__ == '__main__':
         run(0, n_gpus, args, devices, dataset)
     # multi gpu
     else:
-        prepare_mp(dataset.train_enc_graph)
-        prepare_mp(dataset.train_dec_graph)
+        dataset.train_enc_graph.create_format_()
+        dataset.train_dec_graph.create_format_()
         procs = []
         for proc_id in range(n_gpus):
             p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, dataset))
