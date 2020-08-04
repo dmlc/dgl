@@ -100,7 +100,7 @@ class SSTDataset(DGLBuiltinDataset):
     >>> train_data.vocab_size
     19536
     >>> train_data[0]
-    DGLGraph(num_nodes=71, num_edges=70,
+    Graph(num_nodes=71, num_edges=70,
          ndata_schemes={'x': Scheme(shape=(), dtype=torch.int64), 'y': Scheme(shape=(),
           dtype=torch.int64), 'mask': Scheme(shape=(), dtype=torch.int64)}
          edata_schemes={})
