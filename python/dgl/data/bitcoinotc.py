@@ -18,7 +18,7 @@ class BitcoinOTCDataset(DGLBuiltinDataset):
     a platform called Bitcoin OTC. Since Bitcoin users are anonymous,
     there is a need to maintain a record of users' reputation to prevent
     transactions with fraudulent and risky users.
-    Offical website: https://snap.stanford.edu/data/soc-sign-bitcoin-otc.html
+    Offical website: `<https://snap.stanford.edu/data/soc-sign-bitcoin-otc.html>`_
 
     Bitcoin OTC dataset statistics:
     Nodes: 5,881

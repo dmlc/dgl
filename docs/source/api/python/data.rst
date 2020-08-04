@@ -43,14 +43,14 @@ Stanford sentiment treebank dataset
 
 For more information about the dataset, see `Sentiment Analysis <https://nlp.stanford.edu/sentiment/index.html>`__.
 
-.. autoclass:: SST
+.. autoclass:: SSTDataset
     :members: __getitem__, __len__
 
 
 Karate club dataset
 ```````````````````````````````````
 
-.. autoclass:: KarateClub
+.. autoclass:: KarateClubDataset
     :members: __getitem__, __len__
 
 
@@ -100,42 +100,48 @@ RDF datasets
 CoraFull dataset
 ```````````````````````````````````
 
-.. autoclass:: CoraFull
+.. autoclass:: CoraFullDataset
     :members: __getitem__, __len__
 
 
 Amazon Co-Purchase dataset
 ```````````````````````````````````
 
-.. autoclass:: AmazonCoBuy
+.. autoclass:: AmazonCoBuyComputerDataset
+    :members: __getitem__, __len__
+
+.. autoclass:: AmazonCoBuyPhotoDataset
     :members: __getitem__, __len__
 
 
 Coauthor dataset
 ```````````````````````````````````
 
-.. autoclass:: Coauthor
+.. autoclass:: CoauthorCSDataset
+    :members: __getitem__, __len__
+
+.. autoclass:: CoauthorPhysicsDataset
     :members: __getitem__, __len__
 
 
 BitcoinOTC dataset
 ```````````````````````````````````
 
-.. autoclass:: BitcoinOTC
+.. autoclass:: BitcoinOTCDataset
     :members: __getitem__, __len__
 
 
 ICEWS18 dataset
 ```````````````````````````````````
 
-.. autoclass:: ICEWS18
+.. autoclass:: ICEWS18Dataset
     :members: __getitem__, __len__
 
 
 QM7b dataset
 ```````````````````````````````````
 
-.. autoclass:: QM7b
+.. autoclass:: QM7bDataset
     :members: __getitem__, __len__
 
 
@@ -143,7 +149,7 @@ QM7b dataset
 GDELT dataset
 ```````````````````````````````````
 
-.. autoclass:: GDELT
+.. autoclass:: GDELTDataset
     :members: __getitem__, __len__
 
 
@@ -191,3 +197,18 @@ Protein-Protein Interaction dataset
 
 .. autoclass:: PPIDataset
     :members: __getitem__, __len__
+
+
+Reddit dataset
+```````````````````````````````````
+
+.. autoclass:: RedditDataset
+    :members: __getitem__, __len__
+
+
+Symmetric Stochastic Block Model Mixture dataset
+```````````````````````````````````
+
+.. autoclass:: SBMMixtureDataset
+    :members: __getitem__, __len__, collate_fn
+

@@ -33,7 +33,7 @@ class PPIDataset(DGLBuiltinDataset):
     50 features and 121 labels. 20 graphs for training, 2 for validation
     and 2 for testing.
 
-    Reference: http://snap.stanford.edu/graphsage/
+    Reference: `<http://snap.stanford.edu/graphsage/>`_
 
     PPI dataset statistics:
     Train examples: 20

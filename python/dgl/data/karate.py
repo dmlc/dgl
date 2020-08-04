@@ -24,7 +24,7 @@ class KarateClubDataset(DGLDataset):
     Model for Conflict and Fission in Small Groups" by Wayne W. Zachary.
     The network became a popular example of community structure in
     networks after its use by Michelle Girvan and Mark Newman in 2002.
-    Official website: http://konect.cc/networks/ucidata-zachary/
+    Official website: `<http://konect.cc/networks/ucidata-zachary/>`_
 
     Karate Club dataset statistics:
     Nodes: 34

@@ -49,7 +49,7 @@ class RedditDataset(DGLBuiltinDataset):
     posts with an average degree of 492. We use the first 20 days for training and the
     remaining days for testing (with 30% used for validation).
 
-    Reference: http://snap.stanford.edu/graphsage/
+    Reference: `<http://snap.stanford.edu/graphsage/>`_
 
     Statistics
     ----------
