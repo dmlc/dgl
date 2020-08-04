@@ -17,7 +17,7 @@ class GraphConvII(nn.Module):
                    \left((1-{\beta})I_n+{\beta}W^{l}\right) \right)
         \tilde{P} &= \tilde{D}^{-1/2}\tilde{A}\tilde{D}^{-1/2}
         \beta &= \log(\lambda/l+1)
-    
+
     Notes
     -----
     Zero in degree nodes could lead to invalid normalizer. A common practice
@@ -80,7 +80,7 @@ class GraphConvII(nn.Module):
             self.register_parameter('bias', None)
         self.reset_parameters()
         self._activation = activation
-    
+
     def reset_parameters(self):
         """Reinitialize learnable parameters."""
         if self.weight is not None:
@@ -152,5 +152,5 @@ class GraphConvII(nn.Module):
 
             if self._activation is not None:
                 rst = self._activation(rst)
-            
+
             return rst
