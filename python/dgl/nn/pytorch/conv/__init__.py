@@ -25,4 +25,4 @@ from .cfconv import CFConv
 __all__ = ['GraphConv', 'GATConv', 'TAGConv', 'RelGraphConv', 'SAGEConv',
            'SGConv', 'APPNPConv', 'GINConv', 'GatedGraphConv', 'GMMConv',
            'ChebConv', 'AGNNConv', 'NNConv', 'DenseGraphConv', 'DenseSAGEConv',
-           'DenseChebConv', 'EdgeConv', 'AtomicConv', 'CFConv']
+           'DenseChebConv', 'EdgeConv', 'AtomicConv', 'CFConv', 'GraphConvII']
