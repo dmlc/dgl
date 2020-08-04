@@ -2,7 +2,7 @@
 # pylint: disable= no-member, arguments-differ, access-member-before-definition, unpacking-non-sequence
 import mxnet as mx
 
-from ... import backend as F
+from ... import ops as F
 from ...base import ALL, is_all
 
 __all__ = ['edge_softmax']
@@ -28,7 +28,7 @@ class EdgeSoftmax(mx.autograd.Function):
     def __init__(self, g, eids):
         super(EdgeSoftmax, self).__init__()
         if not is_all(eids):
-            g = g.edge_subgraph(eids.astype(g.idtype))
+            g = g.edge_subgraph(eids.astype(g.idtype), preserve_nodes=True)
         self.g = g
 
     def forward(self, score):

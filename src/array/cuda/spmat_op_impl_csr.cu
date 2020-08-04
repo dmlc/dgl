@@ -375,7 +375,9 @@ __global__ void _SegmentMaskKernel(
  * of each needle so that the insertion still gives sorted order.
  *
  * It essentially perform binary search to find lower bound for each needle
- * elements.
+ * elements. Require the largest elements in the hay is larger than the given
+ * needle elements. Commonly used in searching for row IDs of a given set of
+ * coordinates.
  */
 template <typename IdType>
 __global__ void _SortedSearchKernel(
@@ -435,11 +437,11 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray row, NDArray co
   IdArray ret_row = NewIdArray(idx->shape[0], ctx, nbits);
   const int nt2 = cuda::FindNumThreads(idx->shape[0]);
   const int nb2 = (idx->shape[0] + nt - 1) / nt;
+<<<<<<< HEAD
   _SortedSearchKernel<<<nb, nt, 0, thr_entry->stream>>>(
-      csr.indptr.Ptr<IdType>(), csr.num_rows,
-      idx.Ptr<IdType>(), idx->shape[0],
+=======
+  _SortedSearchKernel<<<nb2, nt2, 0, thr_entry->stream>>>(
       ret_row.Ptr<IdType>());
-
   // Column & data can be obtained by index select.
   IdArray ret_col = IndexSelect(csr.indices, idx);
   IdArray ret_data = CSRHasData(csr)? IndexSelect(csr.data, idx) : idx;

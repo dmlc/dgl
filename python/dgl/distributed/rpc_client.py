@@ -128,6 +128,9 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     rpc.register_service(rpc.GET_NUM_CLIENT,
                          rpc.GetNumberClientsRequest,
                          rpc.GetNumberClientsResponse)
+    rpc.register_service(rpc.CLIENT_BARRIER,
+                         rpc.ClientBarrierRequest,
+                         rpc.ClientBarrierResponse)
     rpc.register_ctrl_c()
     server_namebook = rpc.read_ip_config(ip_config)
     num_servers = len(server_namebook)
@@ -199,6 +202,7 @@ def exit_client():
     """Register exit callback.
     """
     # Only client with rank_0 will send shutdown request to servers.
+    rpc.client_barrier()
     shutdown_servers()
     finalize_client()
     atexit.unregister(exit_client)

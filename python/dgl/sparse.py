@@ -9,6 +9,7 @@ from . import backend as F
 import tvm
 from featgraph.module import gsddmm, gspmm
 
+
 def infer_broadcast_shape(op, shp1, shp2):
     r"""Check the shape validity, and infer the output shape given input shape and operator.
     Note the both :attr:`shp1`, :attr:`shp2` and the returned shape are feature
@@ -110,9 +111,11 @@ def to_dgl_nd(x):
     """Convert framework-specific tensor/None to dgl ndarray."""
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray(x)
 
+
 def to_dgl_nd_for_write(x):
     """Convert framework-specific tensor/None to dgl ndarray for write."""
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
+
 
 target_mapping = {
     'u': 0,
@@ -165,9 +168,7 @@ def _gspmm(gidx, op, reduce_op, u, e):
 
     Notes
     -----
-    This function does not handle gradients, and for scalar input features,
-    we expand its dimension with an additional dimension of length one. (e.g.
-    (90,) to (90, 1) for a graph with 90 nodes/edges).
+    This function does not handle gradients.
     """
     if gidx.number_of_etypes() != 1:
         raise DGLError("We only support gsddmm on graph with one edge type")
@@ -257,6 +258,7 @@ def _gspmm(gidx, op, reduce_op, u, e):
     v = v.view(v_shp)
     return v, (arg_u, arg_e)
 
+
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
     takes the result of :attr:`op` on source node feature and destination node
@@ -295,9 +297,7 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
 
     Notes
     -----
-    This function does not handle gradients, and for scalar input features,
-    we expand its dimension with an additional dimension of length one. (e.g.
-    (90,) to (90, 1) for a graph with 90 nodes/edges).
+    This function does not handle gradients.
     """
     if gidx.number_of_etypes() != 1:
         raise DGLError("We only support gsddmm on graph with one edge type")

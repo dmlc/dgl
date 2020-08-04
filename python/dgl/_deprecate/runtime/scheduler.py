@@ -1,20 +1,19 @@
 """For different schedulers"""
 from __future__ import absolute_import
 
-from .. import utils
-from .._ffi.function import _init_api
-from ..base import DGLError
-from .. import backend as F
-from ..frame import frame_like, FrameRef
-from ..function.base import BuiltinFunction
+from ... import utils
+from ..._ffi.function import _init_api
+from ...base import DGLError
+from ... import backend as F
+from ...frame import frame_like, FrameRef
+from ...function.base import BuiltinFunction
 from ..udf import EdgeBatch, NodeBatch
+from ... import ndarray as nd
 
 from . import ir
 from .ir import var
 from . import degree_bucketing as db
 from . import spmv
-
-from .. import ndarray as nd
 
 __all__ = [
     "schedule_send",
@@ -1050,4 +1049,4 @@ def _build_idx_map(idx, nbits):
     old_to_new = F.zerocopy_to_dgl_ndarray(old_to_new)
     return utils.CtxCachedObject(lambda ctx: nd.array(old_to_new, ctx=ctx))
 
-_init_api("dgl.runtime.scheduler")
+_init_api("dgl._deprecate.runtime.scheduler")

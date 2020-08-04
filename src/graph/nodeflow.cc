@@ -77,7 +77,7 @@ std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph, const std::st
   }
 }
 
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetBlockAdj")
+DGL_REGISTER_GLOBAL("_deprecate.nodeflow._CAPI_NodeFlowGetBlockAdj")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
     std::string format = args[1];

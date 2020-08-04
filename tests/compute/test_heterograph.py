@@ -82,13 +82,13 @@ def create_test_heterograph3(idtype):
     wishes_nx.add_edge('u2', 'g0', id=1)
 
     follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows',
-            idtype=idtype, device=device).formats('coo')
+            idtype=idtype, device=device, formats='coo')
     plays_g = dgl.bipartite([(0, 0), (1, 0), (2, 1), (1, 1)], 'user', 'plays', 'game',
-            idtype=idtype, device=device).formats('coo')
+            idtype=idtype, device=device, formats='coo')
     wishes_g = dgl.bipartite([(0, 1), (2, 0)], 'user', 'wishes', 'game',
-            idtype=idtype, device=device).formats('coo')
+            idtype=idtype, device=device, formats='coo')
     develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game',
-            idtype=idtype, device=device).formats('coo')
+            idtype=idtype, device=device, formats='coo')
     g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
     assert g.idtype == idtype
     assert g.device == device
@@ -224,7 +224,7 @@ def test_query(idtype):
     assert set(canonical_etypes) == set(g.canonical_etypes)
 
     # metagraph
-    mg = g.metagraph
+    mg = g.metagraph()
     assert set(g.ntypes) == set(mg.nodes)
     etype_triplets = [(u, v, e) for u, v, e in mg.edges(keys=True)]
     assert set([
@@ -1332,7 +1332,7 @@ def test_subgraph(idtype):
     if F._default_context_str != 'gpu':
         # TODO(minjie): enable this later
         for fmt in ['csr', 'csc', 'coo']:
-            g = dgl.graph([(0, 1), (1, 2)]).formats(fmt)
+            g = dgl.graph([(0, 1), (1, 2)], formats=fmt)
             sg = g.subgraph({g.ntypes[0]: [1, 0]})
             nids = F.asnumpy(sg.ndata[dgl.NID])
             assert np.array_equal(nids, np.array([1, 0]))
@@ -1866,7 +1866,7 @@ def test_dtype_cast(idtype):
 @parametrize_dtype
 def test_format(idtype):
     # single relation
-    g = dgl.graph([(0, 0), (1, 1), (0, 1), (2, 0)], idtype=idtype, device=F.ctx()).formats('coo')
+    g = dgl.graph([(0, 0), (1, 1), (0, 1), (2, 0)], idtype=idtype, device=F.ctx(), formats='coo')
     assert g.formats()['created'] == ['coo']
     assert len(g.formats()['not created']) == 0
     try:
@@ -1886,7 +1886,7 @@ def test_format(idtype):
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (1, 1), (2, 1)],
         ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
-        }, idtype=idtype, device=F.ctx()).formats('csr')
+        }, idtype=idtype, device=F.ctx(), formats='csr')
     user_feat = F.randn((g['follows'].number_of_src_nodes(), 5))
     g['follows'].srcdata['h'] = user_feat
     assert g.formats()['created'] == ['csr']
