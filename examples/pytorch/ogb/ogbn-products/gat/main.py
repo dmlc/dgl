@@ -108,7 +108,7 @@ class GAT(nn.Module):
                 num_workers=args.num_workers)
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
-                block = blocks[0].to(device)
+                block = blocks[0].int().to(device)
 
                 h = x[input_nodes].to(device)
                 h_dst = h[:block.number_of_dst_nodes()]
@@ -123,17 +123,6 @@ class GAT(nn.Module):
 
             x = y
         return y
-
-def prepare_mp(g):
-    """
-    Explicitly materialize the CSR, CSC and COO representation of the given graph
-    so that they could be shared via copy-on-write to sampler workers and GPU
-    trainers.
-    This is a workaround before full shared memory support on heterogeneous graphs.
-    """
-    g.request_format('csr')
-    g.request_format('coo')
-    g.request_format('csc')
 
 def compute_acc(pred, labels):
     """
@@ -277,7 +266,7 @@ if __name__ == '__main__':
 
     in_feats = graph.ndata['feat'].shape[1]
     n_classes = (labels.max() + 1).item()
-    prepare_mp(graph)
+    graph.create_format_()
     # Pack data
     data = train_idx, val_idx, test_idx, in_feats, labels, n_classes, graph, args.head
 
