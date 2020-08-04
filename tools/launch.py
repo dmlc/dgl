@@ -29,10 +29,15 @@ def submit_jobs(args, udf_command):
     ip_config = args.workspace + '/' + args.ip_config
     with open(ip_config) as f:
         for line in f:
-            ip, port, count = line.strip().split(' ')
-            port = int(port)
-            count = int(count)
-            server_count_per_machine = count
+            result = line.strip().split(' ')
+            if len(result) == 2:
+                ip = result[0]
+                port = int(result[1])
+            elif len(result) == 1:
+                ip = result[0]
+            else:
+                raise RuntimeError("Format error of ip_config.")
+            server_count_per_machine = args.server_count
             hosts.append((ip, port))
     assert args.num_client % len(hosts) == 0
     client_count_per_machine = int(args.num_client / len(hosts))
