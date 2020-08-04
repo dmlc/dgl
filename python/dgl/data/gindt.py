@@ -17,7 +17,7 @@ from ..convert import graph as dgl_graph
 
 class GINDataset(DGLBuiltinDataset):
     """Datasets for Graph Isomorphism Network (GIN)
-    Adapted from https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip.
+    Adapted from `<https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip>`_.
 
     The dataset contains the compact format of popular graph kernel datasets, which includes:
     MUTAG, COLLAB, IMDBBINARY, IMDBMULTI, NCI1, PROTEINS, PTC, REDDITBINARY, REDDITMULTI5K
