@@ -32,7 +32,7 @@ DGL dataset
 .. autoclass:: DGLDataset
     :members: download, save, load, process, has_cache, __getitem__, __len__
 
-DGL Builtin Dataset
+DGL builtin dataset
 ```````````````````
 
 .. autoclass:: DGLBuiltinDataset
@@ -47,18 +47,54 @@ For more information about the dataset, see `Sentiment Analysis <https://nlp.sta
     :members: __getitem__, __len__
 
 
-Karate Club dataset
+Karate club dataset
 ```````````````````````````````````
 
 .. autoclass:: KarateClub
     :members: __getitem__, __len__
 
 
-Citation Network dataset
+Citation network dataset
 ```````````````````````````````````
 
-.. autoclass:: CitationGraphDataset
+.. autoclass:: CoraGraphDataset
     :members: __getitem__, __len__
+
+.. autoclass:: CiteseerGraphDataset
+    :members: __getitem__, __len__
+
+.. autoclass:: PubmedGraphDataset
+    :members: __getitem__, __len__
+
+
+Knowlege graph dataset
+```````````````````````````````````
+
+.. autoclass:: FB15k237Dataset
+    :members: __getitem__, __len__
+
+.. autoclass:: FB15kDataset
+    :members: __getitem__, __len__
+
+.. autoclass:: WN18Dataset
+    :members: __getitem__, __len__
+
+
+RDF datasets
+```````````````````````````````````
+
+.. autoclass:: AIFBDataset
+    :members: __getitem__, __len__
+
+.. autoclass:: MUTAGDataset
+    :members: __getitem__, __len__
+
+.. autoclass:: BGSDataset
+    :members: __getitem__, __len__
+
+.. autoclass:: AMDataset
+    :members: __getitem__, __len__
+
 
 
 CoraFull dataset
