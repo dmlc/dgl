@@ -95,17 +95,6 @@ class SAGE(nn.Module):
             x = y
         return y
 
-def prepare_mp(g):
-    """
-    Explicitly materialize the CSR, CSC and COO representation of the given graph
-    so that they could be shared via copy-on-write to sampler workers and GPU
-    trainers.
-    This is a workaround before full shared memory support on heterogeneous graphs.
-    """
-    g.in_degree(0)
-    g.out_degree(0)
-    g.find_edges([0])
-
 def compute_acc(pred, labels):
     """
     Compute the accuracy of prediction given the labels.
@@ -245,7 +234,7 @@ if __name__ == '__main__':
 
     in_feats = graph.ndata['feat'].shape[1]
     n_classes = (labels.max() + 1).item()
-    prepare_mp(graph)
+    graph.create_format_()
     # Pack data
     data = train_idx, val_idx, test_idx, in_feats, labels, n_classes, graph
 
