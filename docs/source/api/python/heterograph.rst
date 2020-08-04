@@ -16,6 +16,8 @@ Conversion to and from heterogeneous graphs
     :toctree: ../../generated/
 
     graph
+    from_scipy
+    from_networkx
     bipartite
     hetero_from_relations
     heterograph
