@@ -133,8 +133,7 @@ def run(args, device, data):
         # blocks.
         tic_start = time.time()
         for step, cluster in enumerate(cluster_iterator):
-            #cluster.copy_from_parent()
-            #cluster.ndata['train_mask'] = g.ndata['train_mask'][cluster.ndata[dgl.NID]]
+            cluster = cluster.int().to(device)
             mask = cluster.ndata['train_mask'].to(device)
             if mask.sum() == 0:
                 continue
@@ -184,14 +183,14 @@ if __name__ == '__main__':
     argparser = argparse.ArgumentParser("multi-gpu training")
     argparser.add_argument('--gpu', type=int, default=0,
         help="GPU device ID. Use -1 for CPU training")
-    argparser.add_argument('--num-epochs', type=int, default=20)
+    argparser.add_argument('--num-epochs', type=int, default=30)
     argparser.add_argument('--num-hidden', type=int, default=256)
     argparser.add_argument('--num-layers', type=int, default=3)
     argparser.add_argument('--batch-size', type=int, default=32)
     argparser.add_argument('--val-batch-size', type=int, default=10000)
     argparser.add_argument('--log-every', type=int, default=20)
     argparser.add_argument('--eval-every', type=int, default=1)
-    argparser.add_argument('--lr', type=float, default=0.003)
+    argparser.add_argument('--lr', type=float, default=0.001)
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--save-pred', type=str, default='')
     argparser.add_argument('--wd', type=float, default=0)
@@ -229,7 +228,7 @@ if __name__ == '__main__':
     cluster_iter_data = ClusterIter(
                     'ogbn-products', graph, args.num_partitions, args.batch_size, th.cat([train_idx, val_idx, test_idx]))
     idx = th.arange(args.num_partitions // args.batch_size)
-    cluster_iterator = DataLoader(cluster_iter_data, batch_size=32, shuffle=True, pin_memory=True, num_workers=0, collate_fn=partial(subgraph_collate_fn, graph))
+    cluster_iterator = DataLoader(cluster_iter_data, batch_size=32, shuffle=True, pin_memory=True, num_workers=4, collate_fn=partial(subgraph_collate_fn, graph))
 
     in_feats = graph.ndata['feat'].shape[1]
     print(in_feats)

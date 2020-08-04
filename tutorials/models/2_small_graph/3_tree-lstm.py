@@ -48,15 +48,19 @@ Tutorial: Tree-LSTM in DGL
 # at the first one.
 #
 
+from collections import namedtuple
+
 import dgl
-from dgl.data.tree import SST
-from dgl.data import SSTBatch
+from dgl.data.tree import SSTDataset
+
+
+SSTBatch = namedtuple('SSTBatch', ['graph', 'mask', 'wordid', 'label'])
 
 # Each sample in the dataset is a constituency tree. The leaf nodes
 # represent words. The word is an int value stored in the "x" field.
 # The non-leaf nodes have a special word PAD_WORD. The sentiment
 # label is stored in the "y" feature field.
-trainset = SST(mode='tiny')  # the "tiny" set has only five trees
+trainset = SSTDataset(mode='tiny')  # the "tiny" set has only five trees
 tiny_sst = trainset.trees
 num_vocabs = trainset.num_vocabs
 num_classes = trainset.num_classes
