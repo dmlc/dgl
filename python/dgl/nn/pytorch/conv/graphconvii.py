@@ -1,19 +1,20 @@
 """Torch modules for GCNII"""
 # pylint: disable= no-member, arguments-differ, invalid-name
+import math
 import torch
 import torch.nn as nn
-import math
 
 from .... import function as fn
 from ....base import DGLError
 
 class GraphConvII(nn.Module):
-    r"""Graph Convolution Networks with Initial residual connection 
-    and Identity mapping (GCNII) layer from paper `Simple and Deep 
+    r"""Graph Convolution Networks with Initial residual connection
+    and Identity mapping (GCNII) layer from paper `Simple and Deep
     Graph Convolutional Networks <https://arxiv.org/pdf/1810.05997.pdf>`__.
 
     .. math::
-        H^{l+1} &= \sigma\left( \left((1-{\alpha})\tilde{P}H^{l}+{\alpha}H^{0}\right) \left((1-{\beta})I_n+{\beta}W^{l}\right) \right)
+        H^{l+1} &= \sigma\left( \left((1-{\alpha})\tilde{P}H^{l}+{\alpha}H^{0}\right)
+                   \left((1-{\beta})I_n+{\beta}W^{l}\right) \right)
         \tilde{P} &= \tilde{D}^{-1/2}\tilde{A}\tilde{D}^{-1/2}
         \beta &= \log(\lambda/l+1)
     
@@ -34,14 +35,14 @@ class GraphConvII(nn.Module):
     lamda : float
         Ratio of identity mapping with decay :math:`\lambda`.
     norm : bool, optional
-        Whether to apply the normalizer. 
+        Whether to apply the normalizer.
         Default is `True` as in the paper.
     weight : bool, optional
-        Whether to use the weight matrix :math:`W`. 
+        Whether to use the weight matrix :math:`W`.
         If False then only identity mapping.
         Default is `True` as in the paper.
     bias : bool, optional
-        If True, adds a learnable bias to the output before activation. 
+        If True, adds a learnable bias to the output before activation.
         Default is `False` as in the paper.
     activation : callable activation function/layer or None, optional
         If not None, applies an activation function to the output.
@@ -93,7 +94,7 @@ class GraphConvII(nn.Module):
 
         Notes
         -----
-        * Input shape: :math:`(N, *, \text{in_size})` where * means any number 
+        * Input shape: :math:`(N, *, \text{in_size})` where * means any number
           of additional dimensions, :math:`N` is the number of nodes.
         * Output shape: :math:`(N, *, \text{in_size})` the SAME as the input.
         * Weight shape: :math:`(\text{in_size}, \text{out_size})`.
