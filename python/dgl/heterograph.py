@@ -2967,8 +2967,12 @@ class DGLHeteroGraph(object):
         if inplace:
             raise DGLError('The `inplace` option is removed in v0.5.')
         ntid = self.get_ntype_id(ntype)
+        if is_all(v):
+            v = self.nodes(ntype)
+        else:
+            v = utils.prepare_tensor(self, v, 'v')
         ndata = self._get_n_repr(ntid, v)
-        ndata = core.invoke_node_udf(self, v, ntype, func, ndata)
+        ndata = core.invoke_node_udf(self, ntype, func, ndata, orig_nid=v)
         self._set_n_repr(ntid, v, ndata)
 
     def apply_edges(self, func, edges=ALL, etype=None, inplace=False):
