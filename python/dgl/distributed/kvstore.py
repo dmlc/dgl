@@ -160,8 +160,8 @@ class InitDataRequest(rpc.Request):
         # We should see requests from multiple clients. We need to ignore the duplicated
         # reqeusts.
         if self.name in kv_store.data_store:
-            assert F.shape(kv_store.data_store[self.name]) == self.shape
-            assert F.dtype(kv_store.data_stroe[self.name]) == self.dtype
+            assert tuple(F.shape(kv_store.data_store[self.name])) == tuple(self.shape)
+            assert F.reverse_data_type_dict[F.dtype(kv_store.data_store[self.name])] == self.dtype
             assert kv_store.part_policy[self.name].policy_str == self.policy_str
         else:
             if not kv_store.is_backup_server():
@@ -478,8 +478,8 @@ class SendMetaToBackupRequest(rpc.Request):
             kv_store.pull_handlers[self.name] = self.pull_handler
             kv_store.push_handlers[self.name] = self.push_handler
         else:
-            assert F.shape(kv_store.data_store[self.name]) == self.shape
-            assert F.dtype(kv_store.data_stroe[self.name]) == self.dtype
+            assert tuple(F.shape(kv_store.data_store[self.name])) == tuple(self.shape)
+            assert F.reverse_data_type_dict[F.dtype(kv_store.data_store[self.name])] == self.dtype
             assert kv_store.part_policy[self.name].policy_str == self.policy_str
             assert kv_store.pull_handlers[self.name] == self.pull_handler
             assert kv_store.push_handlers[self.name] == self.push_handler
