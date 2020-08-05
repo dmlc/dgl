@@ -28,7 +28,6 @@ __all__ = [
     'reverse',
     'to_bidirected',
     'to_bidirected_stale',
-    'is_simple_graph',
     'add_reverse_edges',
     'laplacian_lambda_max',
     'knn_graph',
@@ -220,14 +219,14 @@ def to_bidirected(g, readonly=True):
                 "unidirectional bipartite graphs" \
                 ", but {} is unidirectional bipartite".format(c_etype)
 
-    assert g.is_multigraph() == False, "to_bidirected only support simple graph"
+    assert g.is_multigraph is False, "to_bidirected only support simple graph"
 
     g = add_reverse_edges(g, copy_ndata=False, copy_edata=False)
     g = to_simple(g, return_counts=None, copy_ndata=False, copy_edata=False)
     return g
 
 def add_reverse_edges(g, readonly=None, copy_ndata=True,
-                  copy_edata=False, ignore_bipartite=False):
+                      copy_edata=False, ignore_bipartite=False):
     r"""Add reverse edges to a graph
 
     For a graph with edges :math:`(i_1, j_1), \cdots, (i_n, j_n)`, this
