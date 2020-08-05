@@ -3,7 +3,7 @@
 
 from __future__ import absolute_import
 
-import os, sys
+import os, sys, hashlib
 import abc
 from .utils import download, extract_archive, get_download_dir, makedirs
 from ..utils import retry_method_with_fix
@@ -43,7 +43,7 @@ class DGLDataset(object):
         A tuple of values as the input for the hash function.
         Users can distinguish instances (and their caches on the disk)
         from the same dataset class by comparing the hash values.
-        Default: (), the corresponding hash value is 3527539
+        Default: (), the corresponding hash value is 'f9065fa7'.
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -56,6 +56,7 @@ class DGLDataset(object):
         self._force_reload = force_reload
         self._verbose = verbose
         self._hash_key = hash_key
+        self._hash_func = hashlib.sha1()
         self._hash = self._get_hash()
 
         # if no dir is provided, the default dgl download dir is used.
@@ -161,11 +162,14 @@ class DGLDataset(object):
 
         Example
         -------
-        >>> hash_value = self._get_hash((10, False, True))
+        Assume `self._hash_key = (10, False, True)`
+
+        >>> hash_value = self._get_hash()
         >>> hash_value
-        6299899980521991026
+        'a770b222'
         """
-        return abs(hash(self._hash_key))
+        self._hash_func.update(str(self._hash_key).encode('utf-8'))
+        return self._hash_func.hexdigest()[:8]
 
     @property
     def url(self):
