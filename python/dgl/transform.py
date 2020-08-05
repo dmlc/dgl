@@ -59,29 +59,74 @@ def pairwise_squared_distance(x):
 
 #pylint: disable=invalid-name
 def knn_graph(x, k):
-    """Transforms the given point set to a directed graph, whose coordinates
-    are given as a matrix. The predecessors of each point are its k-nearest
-    neighbors.
+    """Convert a tensor into k-nearest-neighbor (KNN) graph(s).
 
-    If a 3D tensor is given instead, then each row would be transformed into
-    a separate graph.  The graphs will be unioned.
+    The function transforms the coordinates/features of a point set
+    into a directed homogeneous graph.  The coordinates of the point
+    set is specified as a matrix whose rows correspond to points and
+    columns correspond to coordinate/feature dimensions.
+
+    The nodes of the returned graph correspond to the points.  An edge
+    exists if the source node is one of the k-nearest neighbors of the
+    destination node.
+
+    If you give a 3D tensor, then each submatrix will be transformed
+    into a separate graph. The graphs will be unioned into a large
+    graph of multiple connected components.
 
     Parameters
     ----------
-    x : Tensor
+    x : 2D or 3D Tensor
         The input tensor.
 
-        If 2D, each row of ``x`` corresponds to a node.
+        * If 2D, ``x[i]`` corresponds to the i-th node in the KNN graph.
 
-        If 3D, a k-NN graph would be constructed for each row.  Then
-        the graphs are unioned.
+        * If 3D, ``x[i]`` corresponds to the i-th KNN graph and
+          ``x[i][j]`` corresponds to the j-th node in the i-th KNN graph.
     k : int
-        The number of neighbors
+        The number of nearest neighbors per node.
 
     Returns
     -------
     DGLGraph
-        The graph.  The node IDs are in the same order as ``x``.
+        The graph. The node IDs are in the same order as ``x``.
+
+    Examples
+    --------
+
+    The following examples use PyTorch backend.
+
+    >>> import dgl
+    >>> import torch
+
+    When ``x`` is a 2D tensor, a single KNN graph is constructed.
+
+    >>> x = torch.tensor([[0.0, 0.0, 1.0],
+    >>>                   [1.0, 0.5, 0.5],
+    >>>                   [0.5, 0.2, 0.2],
+    >>>                   [0.3, 0.2, 0.4]])
+    >>> knn_g = dgl.knn_graph(x, 2)
+    >>> # Each node has two predecessors
+    >>> knn_g.edges()
+    >>> (tensor([0, 1, 2, 2, 2, 3, 3, 3]), tensor([0, 1, 1, 2, 3, 0, 2, 3]))
+
+    When ``x`` is a 3D tensor, multiple KNN graphs are constructed
+    and then unioned into a graph of multiple connected components.
+
+    >>> x1 = torch.tensor([[0.0, 0.0, 1.0],
+    >>>                    [1.0, 0.5, 0.5],
+    >>>                    [0.5, 0.2, 0.2],
+    >>>                    [0.3, 0.2, 0.4]])
+    >>> x2 = torch.tensor([[0.0, 1.0, 1.0],
+    >>>                    [0.3, 0.3, 0.3],
+    >>>                    [0.4, 0.4, 1.0],
+    >>>                    [0.3, 0.8, 0.2]])
+    >>> x = torch.stack([x1, x2], dim=0)
+    >>> knn_g = dgl.knn_graph(x, 2)
+    >>> # Each node has two predecessors
+    >>> knn_g.edges()
+    (tensor([0, 1, 2, 2, 2, 3, 3, 3, 4, 5, 5, 5, 6, 6, 7, 7]),
+     tensor([0, 1, 1, 2, 3, 0, 2, 3, 4, 5, 6, 7, 4, 6, 5, 7]))
     """
     if F.ndim(x) == 2:
         x = F.unsqueeze(x, 0)
@@ -106,28 +151,56 @@ def knn_graph(x, k):
 
 #pylint: disable=invalid-name
 def segmented_knn_graph(x, k, segs):
-    """Transforms the given point set to a directed graph, whose coordinates
-    are given as a matrix.  The predecessors of each point are its k-nearest
-    neighbors.
+    """Convert a tensor into multiple k-nearest-neighbor (KNN) graph(s)
+    with different number of nodes.
 
-    The matrices are concatenated along the first axis, and are segmented by
-    ``segs``.  Each block would be transformed into a separate graph.  The
-    graphs will be unioned.
+    Each chunk of ``x`` contains coordinates/features of a point set. 
+    ``segs`` specifies the number of points in each point set. The 
+    function constructs a KNN graph for each point set, where the predecessors 
+    of each point are its k-nearest neighbors. All KNN graphs will 
+    then be unioned into a graph with multiple connected components.
 
     Parameters
     ----------
-    x : Tensor
-        The input tensor.
+    x : 2D Tensor
+        Coordinates/features of points.
     k : int
-        The number of neighbors
-    segs : iterable of int
-        Number of points of each point set.
-        Must sum up to the number of rows in ``x``.
+        The number of nearest neighbors per node.
+    segs : list of int
+        Number of points in each point set. The numbers in ``segs`` 
+        must sum up to the number of rows in ``x``.
 
     Returns
     -------
     DGLGraph
-        The graph.  The node IDs are in the same order as ``x``.
+        The graph. The node IDs are in the same order as ``x``.
+
+    Examples
+    --------
+
+    The following examples use PyTorch backend.
+    
+    >>> import dgl
+    >>> import torch
+
+    In the example below, the first point set has three points 
+    and the second point set has four points.
+
+    >>> # Features/coordinates of the first point set
+    >>> x1 = torch.tensor([[0.0, 0.5, 0.2],
+    >>>                    [0.1, 0.3, 0.2],
+    >>>                    [0.4, 0.2, 0.2]])
+    >>> # Features/coordinates of the second point set
+    >>> x2 = torch.tensor([[0.3, 0.2, 0.1],
+    >>>                    [0.5, 0.2, 0.3],
+    >>>                    [0.1, 0.1, 0.2],
+    >>>                    [0.6, 0.3, 0.3]])
+    >>> x = torch.cat([x1, x2], dim=0)
+    >>> segs = [x1.shape[0], x2.shape[0]]
+    >>> knn_g = dgl.segmented_knn_graph(x, 2, segs)
+    >>> knn_g.edges()
+    (tensor([0, 0, 1, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6]),
+     tensor([0, 1, 0, 1, 2, 2, 3, 5, 4, 6, 3, 5, 4, 6]))
     """
     n_total_points, _ = F.shape(x)
     offset = np.insert(np.cumsum(segs), 0, 0)
