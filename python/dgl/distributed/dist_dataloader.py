@@ -36,9 +36,9 @@ def init_fn(collate_fn, queue):
     return 1
 
 
-def _exit():
-    exit_client()
-    time.sleep(1)
+# def _exit():
+#     exit_client()
+#     time.sleep(1)
 
 
 def enable_mp_debug():
@@ -103,7 +103,6 @@ class DistDataLoader:
         self.expected_idxs = len(dataset) // self.batch_size
         if not self.drop_last and len(dataset) % self.batch_size != 0:
             self.expected_idxs += 1
-        atexit.register(self.close)
 
     def __next__(self):
         if not self.started:
@@ -148,10 +147,3 @@ class DistDataLoader:
         ret = self.dataset[self.current_pos:end_pos]
         self.current_pos = end_pos
         return ret
-
-    def close(self):
-        """Finalize the connection with server and close pool"""
-        for _ in range(self.num_workers):
-            self.pool.apply_async(_exit)
-        self.pool.close()
-        self.is_closed = True

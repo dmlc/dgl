@@ -3,6 +3,7 @@
 import multiprocessing as mp
 import traceback
 import atexit
+import time
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
 from .kvstore import init_kvstore, close_kvstore
@@ -65,12 +66,28 @@ def finalize_client():
     """Release resources of this client."""
     rpc.finalize_sender()
     rpc.finalize_receiver()
-    if SAMPLER_POOL is not None:
-        SAMPLER_POOL.close()
-        SAMPLER_POOL.join()
     global INITIALIZED
     INITIALIZED = False
 
+
+def _exit():
+    exit_client()
+    time.sleep(1)
+
+
+def finalize_worker():
+    """Finalize workers
+       Python's multiprocessing pool will not call atexit function when close
+    """
+    if SAMPLER_POOL is not None:
+        for _ in range(NUM_SAMPLER_WORKERS):
+            SAMPLER_POOL.apply_async(_exit)
+            time.sleep(0.1) # This is necessary but I don't know why
+        SAMPLER_POOL.close()
+
+def join_finalize_worker():
+    if SAMPLER_POOL is not None:
+        SAMPLER_POOL.join()
 
 def is_initialized():
     """Is RPC initialized?
@@ -82,8 +99,10 @@ def exit_client():
     """Register exit callback.
     """
     # Only client with rank_0 will send shutdown request to servers.
+    finalize_worker() # finalize workers should be earilier than barrier
     rpc.client_barrier()
     shutdown_servers()
     finalize_client()
+    join_finalize_worker()
     close_kvstore()
     atexit.unregister(exit_client)

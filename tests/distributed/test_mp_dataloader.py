@@ -68,8 +68,7 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
         batch_size=batch_size,
         collate_fn=sampler.sample_blocks,
         shuffle=False,
-        drop_last=drop_last,
-        num_workers=4)
+        drop_last=drop_last)
 
     groundtruth_g = CitationGraphDataset("cora")[0]
     max_nid = []
@@ -79,9 +78,7 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
             block = blocks[-1]
             o_src, o_dst =  block.edges()
             src_nodes_id = block.srcdata[dgl.NID][o_src]
-            print(src_nodes_id)            
             dst_nodes_id = block.dstdata[dgl.NID][o_dst]
-            print(dst_nodes_id)
             has_edges = groundtruth_g.has_edges_between(src_nodes_id, dst_nodes_id)
             assert np.all(F.asnumpy(has_edges))
             print(np.unique(np.sort(F.asnumpy(dst_nodes_id))))
@@ -91,9 +88,6 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
             assert np.max(max_nid) == num_nodes_to_sample - 1 - num_nodes_to_sample % batch_size
         else:
             assert np.max(max_nid) == num_nodes_to_sample - 1
-    # del dist_graph
-    # dataloader.close()
-    # dgl.distributed.exit_client()
 
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
@@ -126,9 +120,6 @@ def test_dist_dataloader(tmpdir, num_server, drop_last):
 
     time.sleep(3)
     sampled_graph = start_client(0, tmpdir, num_server > 1, num_workers, drop_last)
-    # Use atexit to close the server
-    # for p in pserver_list:
-    #     p.join()
 
 if __name__ == "__main__":
     import tempfile
