@@ -62,6 +62,12 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     DGLGraph
         A sampled subgraph containing only the sampled neighboring edges.
 
+    Notes
+    -----
+    The input graph must be on CPU; graphs on GPU is not supported.
+
+    The returned graph is on CPU.
+
     Examples
     --------
     Assume that you have the following graph
@@ -182,6 +188,12 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
     -------
     DGLGraph
         A sampled subgraph containing only the sampled neighboring edges.
+
+    Notes
+    -----
+    The input graph must be on CPU; graphs on GPU is not supported.
+
+    The returned graph is on CPU.
 
     Examples
     --------

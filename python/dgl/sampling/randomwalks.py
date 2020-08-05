@@ -67,6 +67,12 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
         A 1-dimensional node type ID tensor with shape ``(len(metapath) + 1)``.
         The type IDs match the ones in the original graph ``g``.
 
+    Notes
+    -----
+    The input graph must be on CPU; graphs on GPU is not supported.
+
+    The returned tensors are on CPU.
+
     Examples
     --------
     The following creates a homogeneous graph:
@@ -196,6 +202,12 @@ def pack_traces(traces, types):
         Length of each trace in the original traces tensor.
     offsets : Tensor
         Offset of each trace in the originial traces tensor in the new concatenated tensor.
+
+    Notes
+    -----
+    The input tensors must be on CPU; tensors on GPU is not supported.
+
+    The returned tensors are on CPU.
 
     Examples
     --------

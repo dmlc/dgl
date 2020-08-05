@@ -92,6 +92,10 @@ def knn_graph(x, k):
     DGLGraph
         The graph. The node IDs are in the same order as ``x``.
 
+    Notes
+    -----
+    The graph will be created on CPU, regardless of the context of input ``x``.
+
     Examples
     --------
 
@@ -155,11 +159,13 @@ def segmented_knn_graph(x, k, segs):
     """Convert a tensor into multiple k-nearest-neighbor (KNN) graph(s)
     with different number of nodes.
 
-    Each chunk of ``x`` contains coordinates/features of a point set. 
-    ``segs`` specifies the number of points in each point set. The 
-    function constructs a KNN graph for each point set, where the predecessors 
-    of each point are its k-nearest neighbors. All KNN graphs will 
+    Each chunk of ``x`` contains coordinates/features of a point set.
+    ``segs`` specifies the number of points in each point set. The
+    function constructs a KNN graph for each point set, where the predecessors
+    of each point are its k-nearest neighbors. All KNN graphs will
     then be unioned into a graph with multiple connected components.
+
+    The graph created will be on CPU, regardless of input context.
 
     Parameters
     ----------
@@ -168,7 +174,7 @@ def segmented_knn_graph(x, k, segs):
     k : int
         The number of nearest neighbors per node.
     segs : list of int
-        Number of points in each point set. The numbers in ``segs`` 
+        Number of points in each point set. The numbers in ``segs``
         must sum up to the number of rows in ``x``.
 
     Returns
@@ -176,15 +182,19 @@ def segmented_knn_graph(x, k, segs):
     DGLGraph
         The graph. The node IDs are in the same order as ``x``.
 
+    Notes
+    -----
+    The graph will be created on CPU, regardless of the context of input ``x``.
+
     Examples
     --------
 
     The following examples use PyTorch backend.
-    
+
     >>> import dgl
     >>> import torch
 
-    In the example below, the first point set has three points 
+    In the example below, the first point set has three points
     and the second point set has four points.
 
     >>> # Features/coordinates of the first point set
@@ -354,8 +364,6 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
     on the node features of the new graph to avoid feature corruption.
     On the contrary, edge features are concatenated,
     and they are not shared due to concatenation.
-    For concrete examples, refer to the ``Examples`` section below.
-
 
     Examples
     --------
@@ -366,11 +374,9 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
     >>> bg1.edges()
     (tensor([0, 0, 0, 1]), tensor([0, 1, 0, 0]))
 
-    To remove duplicate edges, see :func:to_simple
-
     **Heterographs with Multiple Edge Types**
 
-    g = dgl.heterograph({
+    >>> g = dgl.heterograph({
     >>>     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2, 2]), th.tensor([1, 1, 2, 1, 0])),
     >>>     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1])),
     >>>     ('user', 'follows', 'user'): (th.tensor([1, 2, 1), th.tensor([0, 0, 0]))
@@ -378,7 +384,7 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
     >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
     >>> g.edges['wins'].data['h'] = th.tensor([0, 1, 2, 3, 4])
 
-    The add_reverse_edges operation is applied to the subgraph
+    The :py:func:`add_reverse_edges` operation is applied to the subgraph
     corresponding to ('user', 'wins', 'user') and the
     subgraph corresponding to ('user', 'follows', 'user).
     The unidirectional bipartite subgraph ('user', 'plays', 'game')
@@ -452,50 +458,57 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
 def line_graph(g, backtracking=True, shared=False):
     """Return the line graph of this graph.
 
-    The graph should be an directed homogeneous graph. Aother type of graphs
-    are not supported right now.
+    The line graph ``L(G)`` of a given graph ``G`` is defined as another graph where
+    the nodes in ``L(G)`` maps to the edges in ``G``.  For any pair of edges ``(u, v)``
+    and ``(v, w)`` in ``G``, the corresponding node of edge ``(u, v)`` in ``L(G)`` will
+    have an edge connecting to the corresponding node of edge ``(v, w)``.
 
-    All node features and edge features are not copied to the output
+    The graph should be a homogeneous graph.
 
     Parameters
     ----------
     g : DGLGraph
         Input graph.
     backtracking : bool, optional
-        Whether the pair of (v, u) (u, v) edges are treated as linked. Default True.
+        If False, the line graph node corresponding to edge ``(u, v)`` will not have
+        an edge connecting to the line graph node corresponding to edge ``(v, u)``.
+
+        Default: True.
     shared : bool, optional
         Whether to copy the edge features of the original graph as the node features
         of the result line graph.
 
     Returns
     -------
-    G : DGLHeteroGraph
+    G : DGLGraph
         The line graph of this graph.
 
-    Examples:
-    A = [[0, 0, 1],
+    Examples
+    --------
+    Assume that the graph has the following adjacency matrix: ::
+
+       A = [[0, 0, 1],
             [1, 0, 1],
             [1, 1, 0]]
+
     >>> g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 'user', 'follows')
     >>> lg = g.line_graph()
     >>> lg
-    ... Graph(num_nodes=5, num_edges=8,
-    ... ndata_schemes={}
-    ... edata_schemes={})
+    Graph(num_nodes=5, num_edges=8,
+    ndata_schemes={}
+    edata_schemes={})
     >>> lg.edges()
-    ... (tensor([0, 0, 1, 2, 2, 3, 4, 4]), tensor([3, 4, 0, 3, 4, 0, 1, 2]))
-    >>>
+    (tensor([0, 0, 1, 2, 2, 3, 4, 4]), tensor([3, 4, 0, 3, 4, 0, 1, 2]))
     >>> lg = g.line_graph(backtracking=False)
     >>> lg
-    ... Graph(num_nodes=5, num_edges=4,
-    ... ndata_schemes={}
-    ... edata_schemes={})
+    Graph(num_nodes=5, num_edges=4,
+    ndata_schemes={}
+    edata_schemes={})
     >>> lg.edges()
-    ... (tensor([0, 1, 2, 4]), tensor([4, 0, 3, 1]))
-
+    (tensor([0, 1, 2, 4]), tensor([4, 0, 3, 1]))
     """
     assert g.is_homogeneous(), \
-        'line_heterograph only support directed homogeneous graph right now'
+        'only homogeneous graph is supported'
     lg = DGLHeteroGraph(_CAPI_DGLHeteroLineGraph(g._graph, backtracking))
     if shared:
         # copy edge features
@@ -709,7 +722,7 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
     (tensor([1, 2]), tensor([0, 2]))
     >>> rg.edges(etype='plays')
     (tensor([2, 1, 1]), tensor([1, 2, 1]))
-    >>> rg.nodes['game'].data['hv]
+    >>> rg.nodes['game'].data['hv']
     tensor([[1.],
             [1.],
             [1.]])
