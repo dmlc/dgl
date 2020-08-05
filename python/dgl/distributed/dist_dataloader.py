@@ -43,11 +43,17 @@ def enable_mp_debug():
 
 
 class DistDataLoader:
-    """DGL customized multiprocessing dataloader"""
+    """DGL customized multiprocessing dataloader, which is designed for using with DistGraph."""
 
     def __init__(self, dataset, batch_size, shuffle=False, collate_fn=None, drop_last=False,
                  queue_size=None):
         """
+        This class will utilize the worker process created by dgl.distributed.initialize function
+        
+        Note that the iteration order is not guaranteed with this class. For example,
+         if dataset = [1, 2, 3, 4], batch_size = 2 and shuffle = False, the order of [1, 2]
+         and [3, 4] is not guaranteed.
+
         dataset (Dataset): dataset from which to load the data.
         batch_size (int, optional): how many samples per batch to load
             (default: ``1``).
@@ -60,7 +66,7 @@ class DistDataLoader:
             if the dataset size is not divisible by the batch size. If ``False`` and
             the size of dataset is not divisible by the batch size, then the last batch
             will be smaller. (default: ``False``)
-        queue_size (int): Size of multiprocessing queue
+        queue_size (int, optional): Size of multiprocessing queue
         """
         self.pool, num_workers = get_sampler_pool()
         assert num_workers > 0, "DistDataloader only supports num_workers>0 for now. if you \

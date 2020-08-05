@@ -265,6 +265,7 @@ def main(args):
 
     dgl.distributed.initialize(args.ip_config, num_workers=args.num_workers)
     g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, part_config=args.conf_path)
+    print('rank:', g.rank())
 
     pb = g.get_partition_book()
     train_nid = dgl.distributed.node_split(g.ndata['train_mask'], pb, force_even=True)

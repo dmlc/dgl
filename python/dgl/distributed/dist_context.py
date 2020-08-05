@@ -100,7 +100,7 @@ def exit_client():
     """Register exit callback.
     """
     # Only client with rank_0 will send shutdown request to servers.
-    finalize_worker() # finalize workers should be earilier than barrier
+    finalize_worker() # finalize workers should be earilier than barrier, and non-blocking
     rpc.client_barrier()
     shutdown_servers()
     finalize_client()
