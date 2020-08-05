@@ -671,7 +671,7 @@ def graph_edit_distance(G1, G2,
                         node_substitution_cost=None, edge_substitution_cost=None, 
                         G1_node_deletion_cost=None, G2_node_insertion_cost=None,
                         G1_edge_deletion_cost=None, G2_edge_insertion_cost=None,
-                        algorithm='beam', max_beam_size=100):
+                        algorithm='bipartite', max_beam_size=100):
     
     """Returns GED (graph edit distance) between DGLGraphs G1 and G2.
 
