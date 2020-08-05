@@ -91,8 +91,9 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
             assert np.max(max_nid) == num_nodes_to_sample - 1 - num_nodes_to_sample % batch_size
         else:
             assert np.max(max_nid) == num_nodes_to_sample - 1
-    dataloader.close()
-    dgl.distributed.exit_client()
+    # del dist_graph
+    # dataloader.close()
+    # dgl.distributed.exit_client()
 
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
@@ -125,8 +126,9 @@ def test_dist_dataloader(tmpdir, num_server, drop_last):
 
     time.sleep(3)
     sampled_graph = start_client(0, tmpdir, num_server > 1, num_workers, drop_last)
-    for p in pserver_list:
-        p.join()
+    # Use atexit to close the server
+    # for p in pserver_list:
+    #     p.join()
 
 if __name__ == "__main__":
     import tempfile

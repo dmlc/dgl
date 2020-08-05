@@ -94,7 +94,6 @@ class DistDataLoader:
         for _ in range(num_workers):
             results.append(self.pool.apply_async(
                 init_fn, args=(collate_fn, self.queue)))
-            time.sleep(0.1)
         for res in results:
             res.get()
 
@@ -151,10 +150,5 @@ class DistDataLoader:
         """Finalize the connection with server and close pool"""
         for _ in range(self.num_workers):
             self.pool.apply_async(_exit)
-            time.sleep(0.1)
         self.pool.close()
         self.is_closed = True
-
-    def __del__(self):
-        if not self.is_closed:
-            self.close()
