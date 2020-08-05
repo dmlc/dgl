@@ -149,87 +149,6 @@ def segmented_knn_graph(x, k, segs):
     g = convert.graph(adj)
     return g
 
-def is_simple_graph(g):
-    """ Check whether g is a simple graph.
-
-    The function returns True if g is a simple graph, otherwise returns False.
-
-    For a heterograph with multiple edge types, we can treat edges corresponding
-    to each type as a separate graph and check whether each of them is a simple
-    graph. If one of them is not a simple graph, False is returned.
-
-    Parameters
-    ----------
-    g : DGLGraph
-        The input graph.
-
-    Returns
-    -------
-    bool
-
-    Examples
-    --------
-    The following examples use PyTorch backend.
-
-    **Simple graph**
-
-    >>> import dgl
-    >>> import torch as th
-    >>> g = dgl.graph((th.tensor([0, 1, 2]), th.tensor([1, 2, 0])))
-    >>> is_simple = dgl.is_simple_graph(g)
-    >>> is_simple
-    True
-
-    ** Multi graph**
-
-    >>> g = dgl.graph((th.tensor([0, 1, 2, 2]), th.tensor([1, 2, 0, 0])))
-    >>> is_simple = dgl.is_simple_graph(g)
-    >>> is_simple
-    False
-
-    **Heterographs with Multiple Edge Types**
-
-    >>> g = dgl.heterograph({
-    >>>     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2]), th.tensor([1, 1, 2, 0])),
-    >>>     ('user', 'follows', 'user'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
-    >>> })
-    >>> is_simple = dgl.is_simple_graph(g)
-    >>> is_simple
-    True
-
-    >>> g = dgl.heterograph({
-    >>>     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2]), th.tensor([1, 1, 2, 0])),
-    >>>     ('user', 'follows', 'user'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 2]))
-    >>> })
-    >>> is_simple = dgl.is_simple_graph(g)
-    >>> is_simple
-    False
-    """
-    # check for simple graph
-    for c_etype in g.canonical_etypes:
-        if g.number_of_edges(etype=c_etype) <= 1:
-            continue
-        u, v = g.edges(etype=c_etype)
-        sort_idx = F.argsort(v, dim=0, descending=False)
-        u = u[sort_idx]
-        v = v[sort_idx]
-        sort_idx = F.argsort(u, dim=0, descending=False)
-        u = u[sort_idx]
-        v = v[sort_idx]
-        u_h = u[:-1]
-        v_h = v[:-1]
-        u_t = u[1:]
-        v_t = v[1:]
-        u_same = F.tensor((u_h == u_t), dtype=F.int32)
-        v_same = F.tensor((v_h == v_t), dtype=F.int32)
-        same = (u_same + v_same) > 1
-
-        print(same)
-        if F.sum(same, dim=0) > 0:
-            return False
-
-    return True
-
 def to_bidirected(g, readonly=True):
     r""" Convert the graph to a bidirected one.
 
@@ -291,13 +210,17 @@ def to_bidirected(g, readonly=True):
     >>> bg1.edges(etype='follows')
     (tensor([1, 1, 2]), tensor([1, 2, 1]))
     """
+    if readonly is not None:
+        dgl_warning("Parameter readonly is deprecated" \
+            "There will be no difference between readonly and non-readonly DGLGraph")
+
     for c_etype in g.canonical_etypes:
         if c_etype[0] != c_etype[2]:
             assert False, "to_bidirected is not well defined for " \
                 "unidirectional bipartite graphs" \
                 ", but {} is unidirectional bipartite".format(c_etype)
 
-    assert is_simple_graph(g) is True, "to_bidirected only support simple graph"
+    assert g.is_multigraph() == False, "to_bidirected only support simple graph"
 
     g = add_reverse_edges(g, copy_ndata=False, copy_edata=False)
     g = to_simple(g, return_counts=None, copy_ndata=False, copy_edata=False)

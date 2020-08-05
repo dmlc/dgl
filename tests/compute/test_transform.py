@@ -234,28 +234,6 @@ def test_reverse_shared_frames(idtype):
     assert F.allclose(g.edges[[0, 2], [1, 1]].data['h'],
                       rg.edges[[1, 1], [0, 2]].data['h'])
 
-def test_is_simple_graph():
-    # homogeneous graph
-    g = dgl.graph([])
-    assert dgl.is_simple_graph(g) is True
-    g = dgl.graph((F.tensor([0, 1, 3, 1]), F.tensor([1, 2, 0, 1])))
-    assert dgl.is_simple_graph(g) is True
-    g = dgl.graph((F.tensor([0, 1, 3, 1]), F.tensor([1, 2, 0, 2])))
-    assert dgl.is_simple_graph(g) is False
-
-    # heterogeneous graph
-    g = dgl.heterograph({
-        ('user', 'wins', 'user'): (F.tensor([0, 2, 0, 2]), F.tensor([1, 1, 2, 0])),
-        ('user', 'plays', 'game'): (F.tensor([1, 2, 1]), F.tensor([2, 1, 1])),
-    })
-    assert dgl.is_simple_graph(g) is True
-    g = dgl.heterograph({
-        ('user', 'wins', 'user'): (F.tensor([0, 2, 0, 2, 2]), F.tensor([1, 1, 2, 1, 0])),
-        ('user', 'plays', 'game'): (F.tensor([1, 2, 1]), F.tensor([2, 1, 1])),
-        ('user', 'follows', 'user'): (F.tensor([1, 2, 1]), F.tensor([0, 0, 0]))
-    })
-    assert dgl.is_simple_graph(g) is False
-
 def test_to_bidirected():
     # homogeneous graph
     elist = [(0, 0), (0, 1), (1, 0),
