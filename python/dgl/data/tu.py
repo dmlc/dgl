@@ -16,7 +16,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
     Parameters
     ----------
     name : str
-        Dataset Name, such as `ENZYMES`, `DD`, `COLLAB`, `MUTAG`, can be the 
+        Dataset Name, such as ``ENZYMES``, ``DD``, ``COLLAB``, ``MUTAG``, can be the 
         datasets name on `<https://ls11-www.cs.tu-dortmund.de/staff/morris/graphkerneldatasets>`_.
     use_pandas : bool
         Numpy's file read function has performance issue when file is large,
@@ -24,10 +24,10 @@ class LegacyTUDataset(DGLBuiltinDataset):
         Default: False
     hidden_size : int
         Some dataset doesn't contain features.
-        Use constant node features initialization instead, with hidden size as `hidden_size`.
+        Use constant node features initialization instead, with hidden size as ``hidden_size``.
         Default : 10
     max_allow_node : int
-        Remove graphs that contains more nodes than `max_allow_node`.
+        Remove graphs that contains more nodes than ``max_allow_node``.
         Default : None
 
     Attributes
@@ -41,7 +41,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
     --------
     >>> data = LegacyTUDataset('DD')
 
-    **The dataset instance is an iterable**
+    The dataset instance is an iterable
 
     >>> len(data)
     1178
@@ -53,7 +53,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
     >>> label
     tensor(1)
 
-    **Batch the graphs and labels for mini-batch training*
+    Batch the graphs and labels for mini-batch training
 
     >>> graphs, labels = zip(*[data[i] for i in range(16)])
     >>> batched_graphs = dgl.batch(graphs)
@@ -191,14 +191,16 @@ class LegacyTUDataset(DGLBuiltinDataset):
 
     def __getitem__(self, idx):
         """Get the idx-th sample.
-        Paramters
+
+        Parameters
         ---------
         idx : int
             The sample index.
+
         Returns
         -------
-        (dgl.DGLGraph, int)
-            Graph with node feature stored in `feat` field and node label in `node_label` if available.
+        :class:`dgl.DGLGraph`, int
+            Graph with node feature stored in ``feat`` field and node label in ``node_label`` if available.
             And its label.
         """
         g = self.graph_lists[idx]
@@ -236,7 +238,7 @@ class TUDataset(DGLBuiltinDataset):
     Parameters
     ----------
     name : str
-        Dataset Name, such as `ENZYMES`, `DD`, `COLLAB`, `MUTAG`, can be the 
+        Dataset Name, such as ``ENZYMES``, ``DD``, ``COLLAB``, ``MUTAG``, can be the 
         datasets name on `<https://ls11-www.cs.tu-dortmund.de/staff/morris/graphkerneldatasets>`_.
 
     Attributes
@@ -250,7 +252,7 @@ class TUDataset(DGLBuiltinDataset):
     --------
     >>> data = TUDataset('DD')
 
-    **The dataset instance is an iterable**
+    The dataset instance is an iterable
 
     >>> len(data)
     188
@@ -262,7 +264,7 @@ class TUDataset(DGLBuiltinDataset):
     >>> label
     tensor([1])
 
-    **Batch the graphs and labels for mini-batch training*
+    Batch the graphs and labels for mini-batch training
 
     >>> graphs, labels = zip(*[data[i] for i in range(16)])
     >>> batched_graphs = dgl.batch(graphs)
@@ -357,14 +359,16 @@ class TUDataset(DGLBuiltinDataset):
 
     def __getitem__(self, idx):
         """Get the idx-th sample.
-        Paramters
+
+        Parameters
         ---------
         idx : int
             The sample index.
+
         Returns
         -------
-        (dgl.DGLGraph, int)
-            Graph with node feature stored in `feat` field and node label in `node_label` if available.
+        :class:`dgl.DGLGraph`, int
+            Graph with node feature stored in ``feat`` field and node label in ``node_label`` if available.
             And its label.
         """
         g = self.graph_lists[idx]
