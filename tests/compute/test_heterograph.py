@@ -1204,44 +1204,6 @@ def test_level2(idtype):
     with pytest.raises(DGLError):
         g.send_and_recv([2, 3], mfunc, rfunc)
 
-    # test multi
-    g.multi_send_and_recv(
-        {'plays' : (g.edges(etype='plays'), mfunc, rfunc),
-         ('user', 'wishes', 'game'): (g.edges(etype='wishes'), mfunc, rfunc2)},
-        'sum')
-    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[3., 3.], [3., 3.]]))
-
-    # test multi
-    g.multi_send_and_recv(
-        {'plays' : (g.edges(etype='plays'), mfunc, rfunc, afunc),
-         ('user', 'wishes', 'game'): (g.edges(etype='wishes'), mfunc, rfunc2)},
-        'sum', afunc)
-    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[5., 5.], [5., 5.]]))
-
-    # test cross reducer
-    g.nodes['user'].data['h'] = F.randn((3, 2))
-    for cred in ['sum', 'max', 'min', 'mean']:
-        g.multi_send_and_recv(
-            {'plays' : (g.edges(etype='plays'), mfunc, rfunc, afunc),
-             'wishes': (g.edges(etype='wishes'), mfunc, rfunc2)},
-            cred, afunc)
-        y = g.nodes['game'].data['y']
-        g['plays'].send_and_recv(g.edges(etype='plays'), mfunc, rfunc, afunc)
-        y1 = g.nodes['game'].data['y']
-        g['wishes'].send_and_recv(g.edges(etype='wishes'), mfunc, rfunc2)
-        y2 = g.nodes['game'].data['y']
-        yy = get_redfn(cred)(F.stack([y1, y2], 0), 0)
-        yy = yy + 1  # final afunc
-        assert F.array_equal(y, yy)
-
-    # test fail case
-    # fail because cannot infer ntype
-    with pytest.raises(DGLError):
-        g.multi_send_and_recv(
-            {'plays' : (g.edges(etype='plays'), mfunc, rfunc),
-             'follows': (g.edges(etype='follows'), mfunc, rfunc2)},
-            'sum')
-
     g.nodes['game'].data.clear()
 
     #############################################################
@@ -1261,49 +1223,6 @@ def test_level2(idtype):
     # test fail case
     with pytest.raises(DGLError):
         g.pull(1, mfunc, rfunc)
-
-    # test multi
-    g.multi_pull(
-        1,
-        {'plays' : (mfunc, rfunc),
-         ('user', 'wishes', 'game'): (mfunc, rfunc2)},
-        'sum')
-    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[0., 0.], [3., 3.]]))
-
-    # test multi
-    g.multi_pull(
-        1,
-        {'plays' : (mfunc, rfunc, afunc),
-         ('user', 'wishes', 'game'): (mfunc, rfunc2)},
-        'sum', afunc)
-    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[0., 0.], [5., 5.]]))
-
-    # test cross reducer
-    g.nodes['user'].data['h'] = F.randn((3, 2))
-    for cred in ['sum', 'max', 'min', 'mean']:
-        g.multi_pull(
-            1,
-            {'plays' : (mfunc, rfunc, afunc),
-             'wishes': (mfunc, rfunc2)},
-            cred, afunc)
-        y = g.nodes['game'].data['y']
-        g['plays'].pull(1, mfunc, rfunc, afunc)
-        y1 = g.nodes['game'].data['y']
-        g['wishes'].pull(1, mfunc, rfunc2)
-        y2 = g.nodes['game'].data['y']
-        g.nodes['game'].data['y'] = get_redfn(cred)(F.stack([y1, y2], 0), 0)
-        g.apply_nodes(afunc, 1, ntype='game')
-        yy = g.nodes['game'].data['y']
-        assert F.array_equal(y, yy)
-
-    # test fail case
-    # fail because cannot infer ntype
-    with pytest.raises(DGLError):
-        g.multi_pull(
-            1,
-            {'plays' : (mfunc, rfunc),
-             'follows': (mfunc, rfunc2)},
-            'sum')
 
     g.nodes['game'].data.clear()
 
@@ -1469,7 +1388,7 @@ def test_empty_heterograph(idtype):
 
 def test_types_in_function():
     def mfunc1(edges):
-        assert edges.canonical_etype == ('user', 'follow', 'user')
+        assert edges.etype == ('user', 'follow', 'user')
         return {}
 
     def rfunc1(nodes):
@@ -1481,11 +1400,11 @@ def test_types_in_function():
         return F.zeros((3,))
 
     def filter_edges1(edges):
-        assert edges.canonical_etype == ('user', 'follow', 'user')
+        assert edges.etype == ('user', 'follow', 'user')
         return F.zeros((2,))
 
     def mfunc2(edges):
-        assert edges.canonical_etype == ('user', 'plays', 'game')
+        assert edges.etype == ('user', 'plays', 'game')
         return {}
 
     def rfunc2(nodes):
@@ -1497,7 +1416,7 @@ def test_types_in_function():
         return F.zeros((3,))
 
     def filter_edges2(edges):
-        assert edges.canonical_etype == ('user', 'plays', 'game')
+        assert edges.etype == ('user', 'plays', 'game')
         return F.zeros((2,))
 
     g = dgl.graph([(0, 1), (1, 2)], 'user', 'follow')

@@ -150,7 +150,9 @@ def message_passing(g, mfunc, rfunc, afunc):
             ndata = invoke_udf_reduce(g, rfunc, msgdata, orig_nid=orig_nid)
     # apply phase
     if afunc is not None:
-        ndata.update(g.dstdata)  # incorporate original node features
+        for k, v in g.dstdata.items():   # include original node features
+            if k not in ndata:
+                ndata[k] = v
         orig_nid = g.dstdata.get(NID, None)
         ndata = invoke_node_udf(g, g.dsttypes[0], afunc, ndata, orig_nid=orig_nid)
     return ndata
