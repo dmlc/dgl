@@ -48,6 +48,9 @@ IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr) {
   idx_t options[METIS_NOPTIONS];
   METIS_SetDefaultOptions(options);
   options[METIS_OPTION_ONDISK] = 1;
+  options[METIS_OPTION_NITER] = 1;
+  options[METIS_OPTION_NIPARTS]=1;
+  options[METIS_OPTION_DROPEDGES]=1;
 
   int ret = METIS_PartGraphKway(
     &nvtxs,  // The number of vertices
