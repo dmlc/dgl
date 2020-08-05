@@ -12,19 +12,18 @@ __all__ = [
     'pack_traces']
 
 def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob=None):
-    """Generate random walk traces from an array of seed nodes (or starting nodes),
-    based on the given metapath.
+    """Generate random walk traces from an array of starting nodes based on the given metapath.
 
-    For a single seed node, ``num_traces`` traces would be generated.  A trace would
+    For a single starting node, ``num_traces`` traces would be generated.  A trace would
 
-    1. Start from the given seed and set ``t`` to 0.
+    1. Start from the given node and set ``t`` to 0.
     2. Pick and traverse along edge type ``metapath[t]`` from the current node.
     3. If no edge can be found, halt.  Otherwise, increment ``t`` and go to step 2.
 
     The returned traces all have length ``len(metapath) + 1``, where the first node
-    is the seed node itself.
+    is the starting node itself.
 
-    If a random walk stops in advance, the trace is padded with -1 to have the same
+    If a random walk stops in advance, DGL pads the trace with -1 to have the same
     length.
 
     Parameters
@@ -35,26 +34,37 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
         Node ID tensor from which the random walk traces starts.
     metapath : list[str or tuple of str], optional
         Metapath, specified as a list of edge types.
-        If omitted, we assume that ``g`` only has one node & edge type.  In this
+
+        Mutually exclusive with ``length``.
+
+        If omitted, DGL assumes that ``g`` only has one node & edge type.  In this
         case, the argument ``length`` specifies the length of random walk traces.
     length : int, optional
         Length of random walks.
-        Affects only when ``metapath`` is omitted.
+
+        Mutually exclusive with ``metapath``.
+
+        Only used when ``metapath`` is None.
     prob : str, optional
         The name of the edge feature tensor on the graph storing the (unnormalized)
         probabilities associated with each edge for choosing the next node.
-        The feature tensor must be non-negative.
-        If omitted, we assume the neighbors are picked uniformly.
+
+        The feature tensor must be non-negative and the sum of the probabilities
+        must be positive for the outbound edges of all nodes (although they don't have
+        to sum up to one).  The result will be undefined otherwise.
+
+        If omitted, DGL assumes that the neighbors are picked uniformly.
     restart_prob : float or Tensor, optional
-        Probability to stop at each step.
+        Probability to terminate the current trace before each transition.
+
         If a tensor is given, ``restart_prob`` should have the same length as ``metapath``.
 
     Returns
     -------
     traces : Tensor
-        A 2-dimensional node ID tensor with shape (num_seeds, len(metapath) + 1).
+        A 2-dimensional node ID tensor with shape ``(num_seeds, len(metapath) + 1)``.
     types : Tensor
-        A 1-dimensional node type ID tensor with shape (len(metapath) + 1).
+        A 1-dimensional node type ID tensor with shape ``(len(metapath) + 1)``.
         The type IDs match the ones in the original graph ``g``.
 
     Examples
