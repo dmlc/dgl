@@ -36,27 +36,32 @@ std::vector<IdArray> partition1D(CSRMatrix csr, int64_t num_cols_per_partition) 
   IdType *ret_indptr_data = static_cast<IdType *>(ret_indptr->data);
   IdType *ret_indices_data = static_cast<IdType *>(ret_indices->data);
   IdType *ret_eid_data = static_cast<IdType *>(ret_eid->data);
-  // memo
-  std::vector<int64_t> memo(indptr, indptr + M);
+  // keep left pointer
+  std::vector<int64_t> left(M, 0);
+  // keep postition
+  std::vector<int64_t> pos(indptr, indptr + M);
   int64_t count = 0;
   for (int64_t j = 1; j <= num_col_partitions; j++) {
     int64_t col_end = (j * num_cols_per_partition) < N ? (j * num_cols_per_partition) : N;
+    #pragma omp parallel for
     for (int64_t i = 0; i < M; i++) {
       // binary search the col_end
       // assume the indices are sorted
-      int64_t l = memo[i];
+      int64_t l = pos[i];
       int64_t r = indptr[i + 1];
-      ret_indptr_data[(j - 1) * (M + 1) + i] = count;
-      if (l == r)
+      left[i] = l;
+      if (l == r) {
+        pos[i] = l;
         continue;
-      IdType *pos = std::lower_bound(indices + l, indices + r, col_end);
-      // update memo
-      memo[i] = pos - indices;
-      // update count, copy data
-      int64_t num_elem = pos - (indices + l);
-      std::copy(indices + l, pos, ret_indices_data + count);
-      std::copy(data + l, data + (pos - indices), ret_eid_data + count);
-      count += num_elem;
+      }
+      IdType *pivot = std::lower_bound(indices + l, indices + r, col_end);
+      pos[i] = pivot - indices;
+    }
+    for (int64_t i = 0; i < M; i++) {
+      ret_indptr_data[(j - 1) * (M + 1) + i] = count;
+      std::copy(indices + left[i], indices + pos[i], ret_indices_data + count);
+      std::copy(data + left[i], data + pos[i], ret_eid_data + count);
+      count += pos[i] - left[i];
     }
     ret_indptr_data[j * (M + 1) - 1] = count;
   }
@@ -85,37 +90,44 @@ std::vector<IdArray> partition2D(CSRMatrix csr, int64_t num_rows_per_partition, 
   IdType *ret_row_data = static_cast<IdType *>(ret_row->data);
   IdType *ret_col_data = static_cast<IdType *>(ret_col->data);
   IdType *ret_eid_data = static_cast<IdType *>(ret_eid->data);
-  // memo
-  std::vector<IdType *> memo(num_rows_per_partition, nullptr);
+  // keep left pointer
+  std::vector<int64_t> left(num_rows_per_partition, 0);
+  // keep position
+  std::vector<int64_t> pos(num_rows_per_partition, 0);
   int64_t count = 0;
   for (int64_t i = 0; i < num_row_partitions; i++) {
     // for each row parition
     int64_t row_start = i * num_rows_per_partition;
     int64_t row_end = row_start + num_rows_per_partition;
     row_end = row_end > M ? M : row_end;
-    // initialize memo
+    // initialize left pointer
     for (int64_t r = row_start; r < row_end; r++) {
-      memo[r - row_start] = indices + indptr[r];
+      pos[r - row_start] = indptr[r];
     }
     // for each col partition
     for (int64_t j = 1; j <= num_col_partitions; j++) {
       int64_t col_end = (j * num_cols_per_partition) < N ? (j * num_cols_per_partition) : N;
-      // for each row in the patition
-      for (int64_t ri = row_start; ri < row_end; ri++) {
+      // perform binary search in parallel
+      #pragma omp parallel for
+      for (int64_t ri = 0; ri < row_end - row_start; ri++) {
         // binary search the col_end
         // assume the indices are sorted
-        IdType *l = memo[ri - row_start];
-        IdType *r = indices + indptr[ri + 1];
-        if (l == r)
+        int64_t l = pos[ri];
+        int64_t r = indptr[ri + row_start + 1];
+        left[ri] = l;
+        if (l == r) {
+          pos[ri] = l;
           continue;
-        IdType *pos = std::lower_bound(l, r, col_end);
-        // update memo
-        memo[ri - row_start] = pos;
-        // update count, copy data
-        int64_t num_elem = pos - l;
-        std::copy(l, pos, ret_col_data + count);
-        std::copy(data + (l - indices), data + (pos - indices), ret_eid_data + count);
-        std::fill(ret_row_data + count, ret_row_data + count + num_elem, ri);
+        }
+        IdType *pivot = std::lower_bound(indices + l, indices + r, col_end);
+        pos[ri] = pivot - indices;
+      }
+      // update count and copy data sequentially
+      for (int64_t ri = 0; ri < row_end - row_start; ri++) {
+        int64_t num_elem = pos[ri] - left[ri];
+        std::copy(indices + left[ri], indices + pos[ri], ret_col_data + count);
+        std::copy(data + left[ri], data + pos[ri], ret_eid_data + count);
+        std::fill(ret_row_data + count, ret_row_data + count + num_elem, ri + row_start);
         count += num_elem;
       }
     }
