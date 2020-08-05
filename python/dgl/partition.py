@@ -177,7 +177,7 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
     # The METIS runs on the symmetric graph to generate the node assignment to partitions.
     from .transform import to_bidirected # avoid cyclic import
     start = time.time()
-    sym_g = to_bidirected(g, copy_ndata=False)
+    sym_g = to_bidirected(g)
     print('Convert a graph into a bidirected graph: {:.3f} seconds'.format(
         time.time() - start))
     vwgt = []

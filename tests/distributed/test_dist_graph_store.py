@@ -68,6 +68,7 @@ def rand_init(shape, dtype):
 
 def run_client(graph_name, part_id, num_clients, num_servers, num_nodes, num_edges):
     time.sleep(5)
+    dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                                           part_id, None)
     g = DistGraph("kv_ip_config.txt", num_servers, graph_name, gpb=gpb)

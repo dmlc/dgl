@@ -95,6 +95,12 @@ def read_ip_config(filename, server_count):
         print("Error: data format on each line should be: [ip] [base_port]")
     return server_namebook
 
+
+def reset():
+    """Reset the rpc context
+    """
+    _CAPI_DGLRPCReset()
+
 def create_sender(max_queue_size, net_type):
     """Create rpc sender of this process.
 
