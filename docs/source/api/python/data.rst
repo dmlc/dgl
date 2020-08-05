@@ -167,14 +167,14 @@ Protein-Protein Interaction dataset
 
 
 Reddit dataset
-```````````````````````````````````
+``````````````
 
 .. autoclass:: RedditDataset
     :members: __getitem__, __len__
 
 
 Symmetric Stochastic Block Model Mixture dataset
-```````````````````````````````````
+````````````````````````````````````````````````
 
 .. autoclass:: SBMMixtureDataset
     :members: __getitem__, __len__, collate_fn

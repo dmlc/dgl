@@ -59,7 +59,7 @@ class DGLDataset(object):
         Raw file directory contains the input data folder
     raw_path : str
         Directory contains the input data files.
-        By default raw_path = os.path.join(self.raw_dir, self.name)
+        Default : ``os.path.join(self.raw_dir, self.name)``
     save_dir : str
         Directory to save the processed dataset
     save_path : str
@@ -95,7 +95,7 @@ class DGLDataset(object):
 
         It is recommended to download the to the :obj:`self.raw_dir`
         folder. Can be ignored if the dataset is
-        already in self.raw_dir
+        already in :obj:`self.raw_dir`.
         """
         pass
 
@@ -103,9 +103,9 @@ class DGLDataset(object):
         r"""Overwite to realize your own logic of
         saving the processed dataset into files.
 
-        It is recommended to use dgl.utils.data.save_graphs
+        It is recommended to use ``dgl.utils.data.save_graphs``
         to save dgl graph into files and use
-        dgl.utils.data.save_info to save extra
+        ``dgl.utils.data.save_info`` to save extra
         information into files.
         """
         pass
@@ -114,9 +114,9 @@ class DGLDataset(object):
         r"""Overwite to realize your own logic of
         loading the saved dataset from files.
 
-        It is recommended to use dgl.utils.data.load_graphs
+        It is recommended to use ``dgl.utils.data.load_graphs``
         to load dgl graph from files and use
-        dgl.utils.data.load_info to load extra information
+        ``dgl.utils.data.load_info`` to load extra information
         into python dict object.
         """
         pass
@@ -136,9 +136,9 @@ class DGLDataset(object):
 
     @retry_method_with_fix(download)
     def _download(self):
-        r"""Download dataset by calling self.download() if the dataset does not exists under self.raw_path.
-            By default self.raw_path = os.path.join(self.raw_dir, self.name)
-            One can overwrite raw_path() function to change the path.
+        r"""Download dataset by calling ``self.download()`` if the dataset does not exists under ``self.raw_path``.
+            By default ``self.raw_path = os.path.join(self.raw_dir, self.name)``
+            One can overwrite ``raw_path()`` function to change the path.
         """
         if os.path.exists(self.raw_path):  # pragma: no cover
             return

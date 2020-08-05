@@ -17,7 +17,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
     ----------
     name : str
         Dataset Name, such as ``ENZYMES``, ``DD``, ``COLLAB``, ``MUTAG``, can be the 
-        datasets name on `<https://ls11-www.cs.tu-dortmund.de/staff/morris/graphkerneldatasets>`_.
+        datasets name on `<https://chrsmrrs.github.io/datasets/docs/datasets/>`_.
     use_pandas : bool
         Numpy's file read function has performance issue when file is large,
         using pandas can be faster.
@@ -239,7 +239,7 @@ class TUDataset(DGLBuiltinDataset):
     ----------
     name : str
         Dataset Name, such as ``ENZYMES``, ``DD``, ``COLLAB``, ``MUTAG``, can be the 
-        datasets name on `<https://ls11-www.cs.tu-dortmund.de/staff/morris/graphkerneldatasets>`_.
+        datasets name on `<https://chrsmrrs.github.io/datasets/docs/datasets/>`_.
 
     Attributes
     ----------

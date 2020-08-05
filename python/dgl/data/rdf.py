@@ -937,7 +937,7 @@ class BGSDataset(RDFGraphDataset):
             >>> test_idx = th.nonzero(test_mask).squeeze()
 
     BGS namespace convention:
-    http://data.bgs.ac.uk/(ref|id)/<Major Concept>/<Sub Concept>/INSTANCE
+    ``http://data.bgs.ac.uk/(ref|id)/<Major Concept>/<Sub Concept>/INSTANCE``.
     We ignored all literal nodes and the relations connecting them in the
     output graph. We also ignored the relation used to mark whether a
     term is CURRENT or DEPRECATED.
@@ -1129,8 +1129,10 @@ class AMDataset(RDFGraphDataset):
             >>> test_idx = th.nonzero(test_mask).squeeze()
 
     Namespace convention:
-    Instance: http://purl.org/collections/nl/am/<type>-<id>
-    Relation: http://purl.org/collections/nl/am/<name>
+
+    - Instance: ``http://purl.org/collections/nl/am/<type>-<id>``
+    - Relation: ``http://purl.org/collections/nl/am/<name>``
+
     We ignored all literal nodes and the relations connecting them in the
     output graph.
 
