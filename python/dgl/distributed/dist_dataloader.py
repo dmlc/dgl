@@ -3,6 +3,7 @@
 import multiprocessing as mp
 import time
 import traceback
+import atexit
 
 from . import exit_client
 from .dist_context import get_sampler_pool
@@ -102,6 +103,7 @@ class DistDataLoader:
         self.expected_idxs = len(dataset) // self.batch_size
         if not self.drop_last and len(dataset) % self.batch_size != 0:
             self.expected_idxs += 1
+        atexit.register(self.close)
 
     def __next__(self):
         if not self.started:

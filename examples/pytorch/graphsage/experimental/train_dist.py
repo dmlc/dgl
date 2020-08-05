@@ -161,8 +161,7 @@ def run(args, device, data):
         batch_size=args.batch_size,
         collate_fn=sampler.sample_blocks,
         shuffle=True,
-        drop_last=False,
-        num_workers=args.num_workers)
+        drop_last=False)
 
     # Define model and optimizer
     model = DistSAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
@@ -259,9 +258,6 @@ def run(args, device, data):
 
     profiler.stop()
     print(profiler.output_text(unicode=True, color=True))
-    # clean up
-    if not args.standalone:
-        g._client.barrier()
 
 def main(args):
     if not args.standalone:
