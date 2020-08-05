@@ -29,6 +29,8 @@ def init_fn(collate_fn, queue):
     global DGL_GLOBAL_MP_QUEUE
     DGL_GLOBAL_MP_QUEUE = queue
     DGL_GLOBAL_COLLATE_FN = collate_fn
+    # sleep here is to ensure this function is executed in all worker processes
+    # probably need better solution in the future
     time.sleep(1)
     return 1
 
@@ -39,24 +41,24 @@ def _exit():
 
 
 def enable_mp_debug():
-    """Print multiprocessing debug information"""
+    """Print multiprocessing debug information. This is only 
+    for debug usage"""
     import logging
     logger = multiprocessing.log_to_stderr()
     logger.setLevel(logging.DEBUG)
 
+
 class DistDataLoader:
     """DGL customized multiprocessing dataloader"""
 
-    def __init__(self, dataset, batch_size, shuffle=False,
-                 num_workers=1, collate_fn=None, drop_last=False,
+    def __init__(self, dataset, batch_size, shuffle=False, collate_fn=None, drop_last=False,
                  queue_size=None):
         """
         dataset (Dataset): dataset from which to load the data.
         batch_size (int, optional): how many samples per batch to load
             (default: ``1``).
-        num_workers (int, optional): how many subprocesses to use for data
-            loading. ``0`` means that the data will be loaded in the main process.
-            (default: ``0``)
+        shuffle (bool, optional): set to ``True`` to have the data reshuffled
+            at every epoch (default: ``False``).
         collate_fn (callable, optional): merges a list of samples to form a
             mini-batch of Tensor(s).  Used when using batched loading from a
             map-style dataset.
@@ -66,6 +68,7 @@ class DistDataLoader:
             will be smaller. (default: ``False``)
         queue_size (int): Size of multiprocessing queue
         """
+        self.pool, num_workers = get_sampler_pool()
         assert num_workers > 0, "DistDataloader only supports num_workers>0 for now. if you \
             want to use single process dataloader, please use PyTorch dataloader for now"
         if queue_size is None:
@@ -84,13 +87,11 @@ class DistDataLoader:
         self.shuffle = shuffle
         self.is_closed = False
 
-        self.pool, num_sampler_workers = get_sampler_pool()
         if self.pool is None:
             ctx = mp.get_context("spawn")
             self.pool = ctx.Pool(num_workers)
-        else:
-            assert num_sampler_workers == num_workers, "Num workers should be the same"
         results = []
+
         for _ in range(num_workers):
             results.append(self.pool.apply_async(
                 init_fn, args=(collate_fn, self.queue)))

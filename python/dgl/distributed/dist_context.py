@@ -36,7 +36,18 @@ def _init_rpc(ip_config, max_queue_size, net_type, role):
 
 
 def initialize(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
-    """Init rpc service"""
+    """Init rpc service
+    ip_config: str
+        File path of ip_config file
+    num_workers: int
+        Number of worker process to be created
+    max_queue_size : int
+        Maximal size (bytes) of client queue buffer (~20 GB on default).
+        Note that the 20 GB is just an upper-bound and DGL uses zero-copy and
+        it will not allocate 20GB memory at once.
+    net_type : str
+        Networking type. Current options are: 'socket'.
+    """
     rpc.reset()
     ctx = mp.get_context("spawn")
     global SAMPLER_POOL
