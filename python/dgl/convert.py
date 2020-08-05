@@ -25,7 +25,7 @@ __all__ = [
     'to_networkx',
 ]
 
-def graph(data,
+def graph(data, *,
           num_nodes=None,
           idtype=None,
           device=None,
@@ -237,7 +237,7 @@ def bipartite(data,
     ['user', 'game']
     >>> g.etypes
     ['plays']
-    >>> g.canonical_etypes
+    >>> g.relations
     [('user', 'plays', 'game')]
     >>> g.number_of_nodes('user')
     2
@@ -403,7 +403,7 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
         ntype_set = set()
         for rgrh in rel_graphs:
             assert len(rgrh.etypes) == 1
-            stype, etype, dtype = rgrh.canonical_etypes[0]
+            stype, etype, dtype = rgrh.relations[0]
             ntype_set.add(stype)
             ntype_set.add(dtype)
         ntypes = list(sorted(ntype_set))
@@ -412,7 +412,7 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
         num_nodes_per_type = utils.toindex([num_nodes_per_type[ntype] for ntype in ntypes], "int64")
     ntype_dict = {ntype: i for i, ntype in enumerate(ntypes)}
     for rgrh in rel_graphs:
-        stype, etype, dtype = rgrh.canonical_etypes[0]
+        stype, etype, dtype = rgrh.relations[0]
         meta_edges_src.append(ntype_dict[stype])
         meta_edges_dst.append(ntype_dict[dtype])
         etypes.append(etype)
@@ -549,7 +549,7 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
     to have the same type ID 0, but one has (0, 1) and the other as (2, 3) as the
     (src, dst) type IDs. In this case, the function will "split" edge type 0 into two types:
     (0, ty_A, 1) and (2, ty_B, 3). In another word, these two edges share the same edge
-    type name, but can be distinguished by a canonical edge type tuple.
+    type name, but can be distinguished by a relation tuple.
 
     Parameters
     ----------
@@ -709,14 +709,14 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
             rows = F.copy_to(F.tensor(ntype2ngrp[ntype]), F.context(data))
             hg._node_frames[ntid][key] = F.gather_row(data, rows)
     for key, data in G.edata.items():
-        for etid in range(len(hg.canonical_etypes)):
+        for etid in range(len(hg.relations)):
             rows = F.copy_to(F.tensor(edge_groups[etid]), F.context(data))
             hg._edge_frames[etid][key] = F.gather_row(data, rows)
 
     for ntid, ntype in enumerate(hg.ntypes):
         hg._node_frames[ntid][NID] = F.tensor(ntype2ngrp[ntype])
 
-    for etid in range(len(hg.canonical_etypes)):
+    for etid in range(len(hg.relations)):
         hg._edge_frames[etid][EID] = F.tensor(edge_groups[etid])
 
     return hg
@@ -777,7 +777,7 @@ def to_homo(G):
         ntype_ids.append(F.full_1d(num_nodes, ntype_id, F.int64, F.cpu()))
         nids.append(F.arange(0, num_nodes, G.idtype))
 
-    for etype_id, etype in enumerate(G.canonical_etypes):
+    for etype_id, etype in enumerate(G.relations):
         srctype, _, dsttype = etype
         src, dst = G.all_edges(etype=etype, order='eid')
         num_edges = len(src)

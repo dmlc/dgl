@@ -164,7 +164,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
 
     utils.check_all_same_device(graphs, 'graphs')
     utils.check_all_same_idtype(graphs, 'graphs')
-    relations = graphs[0].canonical_etypes
+    relations = graphs[0].relations
     idtype = graphs[0].idtype
     device = graphs[0].device
 
@@ -193,7 +193,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
 
     # Compute batch num edges
     bne = {}
-    for etype in graphs[0].canonical_etypes:
+    for etype in graphs[0].relations:
         bne[etype] = F.cat([g.batch_num_edges(etype) for g in graphs], 0)
     retg.set_batch_num_edges(bne)
 
@@ -206,7 +206,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
 
     # Batch edge feature
     if edata is not None:
-        for etype in graphs[0].canonical_etypes:
+        for etype in graphs[0].relations:
             feat_dicts = [g.edges[etype].data for g in graphs if g.number_of_edges(etype) > 0]
             ret_feat = _batch_feat_dicts(feat_dicts, edata, 'edges[{}].data'.format(etype))
             retg.edges[etype].data.update(ret_feat)
@@ -362,14 +362,14 @@ def unbatch(g, node_split=None, edge_split=None):
 
     # Parse edge_split
     if edge_split is None:
-        edge_split = {etype : g.batch_num_edges(etype) for etype in g.canonical_etypes}
+        edge_split = {etype : g.batch_num_edges(etype) for etype in g.relations}
     elif not isinstance(edge_split, Mapping):
         if len(g.etypes) != 1:
             raise DGLError('Must provide a dictionary for argument edge_split when'
                            ' there are multiple edge types.')
-        edge_split = {g.canonical_etypes[0] : edge_split}
-    if edge_split.keys() != set(g.canonical_etypes):
-        raise DGLError('Must specify edge_split for each canonical edge type.')
+        edge_split = {g.relations[0] : edge_split}
+    if edge_split.keys() != set(g.relations):
+        raise DGLError('Must specify edge_split for each relation.')
     for split in edge_split.values():
         if num_split is not None and num_split != len(split):
             raise DGLError('All edge_split and edge_split must specify the same number'
@@ -381,7 +381,7 @@ def unbatch(g, node_split=None, edge_split=None):
 
     # Split edges for each relation
     edge_dict_per = [{} for i in range(num_split)]
-    for rel in g.canonical_etypes:
+    for rel in g.relations:
         srctype, etype, dsttype = rel
         srcnid_off = dstnid_off = 0
         u, v = g.edges(order='eid', etype=rel)
@@ -406,7 +406,7 @@ def unbatch(g, node_split=None, edge_split=None):
                 subg.nodes[ntype].data[key] = subf
 
     # Unbatch edge features
-    for etype in g.canonical_etypes:
+    for etype in g.relations:
         for key, feat in g.edges[etype].data.items():
             subfeats = F.split(feat, edge_split[etype], 0)
             for subg, subf in zip(gs, subfeats):

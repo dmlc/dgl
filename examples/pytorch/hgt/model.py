@@ -86,7 +86,7 @@ class HGTLayer(nn.Module):
     def forward(self, G, h):
         with G.local_scope():
             node_dict, edge_dict = self.node_dict, self.edge_dict
-            for srctype, etype, dsttype in G.canonical_etypes:
+            for srctype, etype, dsttype in G.relations:
                 k_linear = self.k_linears[node_dict[srctype]]
                 v_linear = self.v_linears[node_dict[srctype]] 
                 q_linear = self.q_linears[node_dict[dsttype]]
@@ -151,7 +151,7 @@ class HeteroRGCNLayer(nn.Module):
     def forward(self, G, feat_dict):
         # The input is a dictionary of node features for each type
         funcs = {}
-        for srctype, etype, dsttype in G.canonical_etypes:
+        for srctype, etype, dsttype in G.relations:
             # Compute W_r * h
             Wh = self.weight[etype](feat_dict[srctype])
             # Save it in graph for message passing

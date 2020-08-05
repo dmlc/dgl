@@ -223,7 +223,7 @@ def metapath_random_walk(hg, etypes, seeds, num_traces):
         DeprecationWarning)
     if len(etypes) == 0:
         raise ValueError('empty metapath')
-    if hg.to_canonical_etype(etypes[0])[0] != hg.to_canonical_etype(etypes[-1])[2]:
+    if hg.to_relation(etypes[0])[0] != hg.to_relation(etypes[-1])[2]:
         raise ValueError('beginning and ending node type mismatch')
     if len(seeds) == 0:
         return []

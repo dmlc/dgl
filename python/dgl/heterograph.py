@@ -103,7 +103,7 @@ class DGLHeteroGraph(object):
 
     Node type names must be distinct (no two types have the same name). Edge types could
     have the same name but they must be distinguishable by the ``(src_type, edge_type, dst_type)``
-    triplet (called *canonical edge type*).
+    triplet (called *relation*).
 
     For example, suppose a graph that has two types of relation "user-watches-movie"
     and "user-watches-TV" as follows:
@@ -300,7 +300,7 @@ class DGLHeteroGraph(object):
                    '      metagraph={meta})')
             nnode_dict = {self.ntypes[i] : self._graph.number_of_nodes(i)
                           for i in range(len(self.ntypes))}
-            nedge_dict = {self.canonical_etypes[i] : self._graph.number_of_edges(i)
+            nedge_dict = {self.relations[i] : self._graph.number_of_edges(i)
                           for i in range(len(self.etypes))}
             meta = str(self.metagraph().edges(keys=True))
             return ret.format(node=nnode_dict, edge=nedge_dict, meta=meta)
@@ -425,7 +425,7 @@ class DGLHeteroGraph(object):
                 num_nodes_per_type.append(self.number_of_nodes(c_ntype))
 
         relation_graphs = []
-        for c_etype in self.canonical_etypes:
+        for c_etype in self.relations:
             # src or dst == ntype, update the relation graph
             if self.get_ntype_id(c_etype[0]) == ntid or self.get_ntype_id(c_etype[2]) == ntid:
                 u, v = self.edges(form='uv', order='eid', etype=c_etype)
@@ -585,7 +585,7 @@ class DGLHeteroGraph(object):
         if len(v) == 1 and len(u) > 1:
             v = F.full_1d(len(u), F.as_scalar(v), dtype=F.dtype(v), ctx=F.context(v))
 
-        u_type, e_type, v_type = self.to_canonical_etype(etype)
+        u_type, e_type, v_type = self.to_relation(etype)
         # if end nodes of adding edges does not exists
         # use add_nodes to add new nodes first.
         num_of_u = self.number_of_nodes(u_type)
@@ -610,7 +610,7 @@ class DGLHeteroGraph(object):
             num_nodes_per_type.append(self.number_of_nodes(ntype))
         # update graph idx
         relation_graphs = []
-        for c_etype in self.canonical_etypes:
+        for c_etype in self.relations:
             # the target edge type
             if c_etype == (u_type, e_type, v_type):
                 old_u, old_v = self.edges(form='uv', order='eid', etype=c_etype)
@@ -712,8 +712,8 @@ class DGLHeteroGraph(object):
 
         # edge_subgraph
         edges = {}
-        u_type, e_type, v_type = self.to_canonical_etype(etype)
-        for c_etype in self.canonical_etypes:
+        u_type, e_type, v_type = self.to_relation(etype)
+        for c_etype in self.relations:
             # the target edge type
             if c_etype == (u_type, e_type, v_type):
                 origin_eids = self.edges(form='eid', order='eid', etype=c_etype)
@@ -890,22 +890,25 @@ class DGLHeteroGraph(object):
 
     @property
     def canonical_etypes(self):
-        """Return the list of canonical edge types of this graph.
+        """DEPRECATED: use dgl.DGLGraph.relations instead."""
+        raise DGLError("dgl.DGLGraph.canonical_etypes is deprecated. "
+                       "Use dgl.DGLGraph.relations instead.")
 
-        A canonical edge type is a tuple of string (src_type, edge_type, dst_type).
+    @property
+    def relations(self):
+        """Return the relations of the graph.
 
-        Returns
-        -------
-        list of 3-tuples
+        A relation is a 3-tuple of strings ``src_type, edge_type, dst_type``, where
+        ``src_type``, ``edge_type``, ``dst_type`` are separately the type of source
+        nodes, edges and destination nodes.
 
         Examples
         --------
-
         >>> g = dgl.heterograph({
         >>>     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
         >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1])
         >>> })
-        >>> g.canonical_etypes
+        >>> g.relations
         [('user', 'follows', 'user'), ('user', 'plays', 'game')]
         """
         return self._canonical_etypes
@@ -963,28 +966,44 @@ class DGLHeteroGraph(object):
         nx_graph = self._graph.metagraph.to_networkx()
         nx_metagraph = nx.MultiDiGraph()
         for u_v in nx_graph.edges:
-            srctype, etype, dsttype = self.canonical_etypes[nx_graph.edges[u_v]['id']]
+            srctype, etype, dsttype = self.relations[nx_graph.edges[u_v]['id']]
             nx_metagraph.add_edge(srctype, dsttype, etype)
         return nx_metagraph
 
     def to_canonical_etype(self, etype):
-        """Convert edge type to canonical etype: (srctype, etype, dsttype).
+        """DEPRECATED: use dgl.DGLGraph.to_relation instead."""
+        raise DGLError("dgl.DGLGraph.to_canonical_etype is deprecated. "
+                       "Use dgl.DGLGraph.to_relation instead.")
 
-        The input can already be a canonical tuple.
+    def to_relation(self, etype):
+        """Convert an edge type to the corresponding relation in the graph.
+
+        A relation is a 3-tuple of strings ``src_type, edge_type, dst_type``, where
+        ``src_type``, ``edge_type``, ``dst_type`` are separately the type of source
+        nodes, edges and destination nodes.
 
         Parameters
         ----------
-        etype : str or tuple of str
-            Edge type
+        etype : str or 3-tuple of str
+            If :attr:`etype` is an edge type (str), it returns the corresponding relation in the
+            graph. If :attr:`etype` is already a relation (3-tuple of str), it returns
+            :attr:`etype`.
 
         Returns
         -------
-        tuple of str
+        3-tuple of str
+            The relation corresponding to the edge type.
+
+        Notes
+        -----
+        If :attr:`etype` is an edge type, the API expects it to occur only once in the graph. For
+        example, in a graph with relations ``('A', 'follows', 'B')``, ``('A', 'follows', 'C')``
+        and ``('B', 'watches', 'D')``, ``'follows'`` is an invalid value for :attr:`etype` while
+        ``'watches'`` is a valid one.
 
         Examples
         --------
-
-        Instantiate a heterograph.
+        Create a heterograph.
 
         >>> g = dgl.heterograph({
         >>>     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
@@ -992,15 +1011,16 @@ class DGLHeteroGraph(object):
         >>>     ('developer', 'follows', 'game'): ([0, 1], [0, 1])
         >>> })
 
-        Get canonical edge types.
+        Get the relations of it.
 
-        >>> g.to_canonical_etype('plays')
+        >>> g.to_relation('plays')
         ('user', 'plays', 'game')
-        >>> g.to_canonical_etype(('user', 'plays', 'game'))
+        >>> g.to_relation(('user', 'plays', 'game'))
         ('user', 'plays', 'game')
-        >>> g.to_canonical_etype('follows')
-        DGLError: Edge type "follows" is ambiguous.
-        Please use canonical etype type in the form of (srctype, etype, dsttype)
+
+        See Also
+        --------
+        relations
         """
         if etype is None:
             if len(self.etypes) != 1:
@@ -1014,8 +1034,8 @@ class DGLHeteroGraph(object):
             if ret is None:
                 raise DGLError('Edge type "{}" does not exist.'.format(etype))
             if len(ret) == 0:
-                raise DGLError('Edge type "%s" is ambiguous. Please use canonical etype '
-                               'type in the form of (srctype, etype, dsttype)' % etype)
+                raise DGLError('Edge type "%s" is ambiguous. Please use relation '
+                               'in the form of (srctype, etype, dsttype)' % etype)
             return ret
 
     def get_ntype_id(self, ntype):
@@ -1122,7 +1142,7 @@ class DGLHeteroGraph(object):
                 raise DGLError('Edge type name must be specified if there are more than one '
                                'edge types.')
             return 0
-        etid = self._etypes_invmap.get(self.to_canonical_etype(etype), None)
+        etid = self._etypes_invmap.get(self.to_relation(etype), None)
         if etid is None:
             raise DGLError('Edge type "{}" does not exist.'.format(etype))
         return etid
@@ -1161,14 +1181,14 @@ class DGLHeteroGraph(object):
         """TBD"""
         if self._batch_num_edges is None:
             self._batch_num_edges = {}
-            for ty in self.canonical_etypes:
+            for ty in self.relations:
                 bne = F.copy_to(F.tensor([self.number_of_edges(ty)], F.int64), self.device)
                 self._batch_num_edges[ty] = bne
         if etype is None:
             if len(self.etypes) != 1:
                 raise DGLError('Edge type name must be specified if there are more than one '
                                'edge types.')
-            etype = self.canonical_etypes[0]
+            etype = self.relations[0]
         return self._batch_num_edges[etype]
 
     def set_batch_num_edges(self, val):
@@ -1176,7 +1196,7 @@ class DGLHeteroGraph(object):
         if not isinstance(val, Mapping):
             if len(self.etypes) != 1:
                 raise DGLError('Must provide a dictionary when there are multiple edge types.')
-            val = {self.canonical_etypes[0] : val}
+            val = {self.relations[0] : val}
         self._batch_num_edges = val
 
     #################################################################
@@ -1513,7 +1533,7 @@ class DGLHeteroGraph(object):
         ``'feat'``, it is not included in the dictionary.
 
         Note: When the graph has multiple edge type, The key used in
-        ``g.edata['feat']`` should be the canonical_etypes, i.e.
+        ``g.edata['feat']`` should be the relations, i.e.
         (h_ntype, r_type, t_ntype).
 
         Examples
@@ -1562,10 +1582,10 @@ class DGLHeteroGraph(object):
         --------
         edges
         """
-        if len(self.canonical_etypes) == 1:
+        if len(self.relations) == 1:
             return HeteroEdgeDataView(self, None, ALL)
         else:
-            return HeteroEdgeDataView(self, self.canonical_etypes, ALL)
+            return HeteroEdgeDataView(self, self.relations, ALL)
 
     def _find_etypes(self, key):
         etypes = [
@@ -1586,12 +1606,12 @@ class DGLHeteroGraph(object):
         bipartite (with two node types and one edge type) graph, transformed from
         the original heterogeneous graph.
 
-        If there is only one canonical edge type found, then the returned relation
+        If there is only one relation found, then the returned relation
         slice would be a subgraph induced from the original graph.  That is, it is
         equivalent to ``self.edge_type_subgraph(etype)``.  The node and edge features
         of the returned graph would be shared with thew original graph.
 
-        If there are multiple canonical edge type found, then the source/edge/destination
+        If there are multiple relations found, then the source/edge/destination
         node types would be a *concatenation* of original node/edge types.  The
         new source/destination node type would have the concatenation determined by
         :func:`dgl.combine_names() <dgl.combine_names>` called on original source/destination
@@ -2349,7 +2369,7 @@ class DGLHeteroGraph(object):
         >>> g.in_degrees(etype='follows')
         tensor([0, 1, 2])
         """
-        dsttype = self.to_canonical_etype(etype)[2]
+        dsttype = self.to_relation(etype)[2]
         etid = self.get_etype_id(etype)
         if is_all(v):
             v = self.dstnodes(dsttype)
@@ -2407,7 +2427,7 @@ class DGLHeteroGraph(object):
         --------
         out_degree
         """
-        srctype = self.to_canonical_etype(etype)[0]
+        srctype = self.to_relation(etype)[0]
         etid = self.get_etype_id(etype)
         if is_all(u):
             u = self.srcnodes(srctype)
@@ -2435,7 +2455,7 @@ class DGLHeteroGraph(object):
             ndata[NID] = induced_nid
             for key in orig_ndata:
                 ndata[key] = F.gather_row(orig_ndata[key], induced_nid)
-        for etype, induced_eid in zip(self.canonical_etypes, induced_edges):
+        for etype, induced_eid in zip(self.relations, induced_edges):
             edata = hsg.edges[etype].data
             orig_edata = self.edges[etype].data
             edata[EID] = induced_eid
@@ -2645,9 +2665,9 @@ class DGLHeteroGraph(object):
         if self.is_block:
             raise DGLError('Extracting subgraph from a block graph is not allowed.')
         if not isinstance(edges, Mapping):
-            assert len(self.canonical_etypes) == 1, \
+            assert len(self.relations) == 1, \
                 'need a dict of edge type and IDs for graph with multiple edge types'
-            edges = {self.canonical_etypes[0]: edges}
+            edges = {self.relations[0]: edges}
 
         def _process_edges(etype, e):
             if F.is_tensor(e) and F.dtype(e) == F.bool:
@@ -2655,10 +2675,10 @@ class DGLHeteroGraph(object):
             else:
                 return utils.prepare_tensor(self, e, 'edges["{}"]'.format(etype))
 
-        edges = {self.to_canonical_etype(etype): e for etype, e in edges.items()}
+        edges = {self.to_relation(etype): e for etype, e in edges.items()}
         induced_edges = [
             _process_edges(cetype, edges.get(cetype, []))
-            for cetype in self.canonical_etypes]
+            for cetype in self.relations]
         sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes)
         induced_nodes = sgi.induced_nodes
 
@@ -3226,7 +3246,7 @@ class DGLHeteroGraph(object):
             u, v = edges
             u = utils.prepare_tensor(self, u, 'edges[0]')
             v = utils.prepare_tensor(self, v, 'edges[1]')
-            eid = self.edge_ids(u, v, etype=self.canonical_etypes[etid])
+            eid = self.edge_ids(u, v, etype=self.relations[etid])
         else:
             eid = utils.prepare_tensor(self, edges, 'edges')
 
@@ -3282,7 +3302,7 @@ class DGLHeteroGraph(object):
             u, v = edges
             u = utils.prepare_tensor(self, u, 'edges[0]')
             v = utils.prepare_tensor(self, v, 'edges[1]')
-            eid = self.edge_ids(u, v, etype=self.canonical_etypes[etid])
+            eid = self.edge_ids(u, v, etype=self.relations[etid])
         else:
             eid = utils.prepare_tensor(self, edges, 'edges')
 
@@ -4391,7 +4411,7 @@ class DGLHeteroGraph(object):
         """
         with self.local_scope():
             self.apply_edges(lambda ebatch: {'_mask' : predicate(ebatch)}, edges, etype)
-            etype = self.canonical_etypes[0] if etype is None else etype
+            etype = self.relations[0] if etype is None else etype
             mask = self.edges[etype].data['_mask']
             if is_all(edges):
                 return F.nonzero_1d(mask)
@@ -4520,14 +4540,14 @@ class DGLHeteroGraph(object):
 
         # Clone the graph structure
         meta_edges = []
-        for s_ntype, _, d_ntype in self.canonical_etypes:
+        for s_ntype, _, d_ntype in self.relations:
             meta_edges.append((self.get_ntype_id(s_ntype), self.get_ntype_id(d_ntype)))
 
         metagraph = graph_index.from_edge_list(meta_edges, True)
         # rebuild graph idx
         num_nodes_per_type = [self.number_of_nodes(c_ntype) for c_ntype in self.ntypes]
         relation_graphs = [self._graph.get_relation_graph(self.get_etype_id(c_etype))
-                           for c_etype in self.canonical_etypes]
+                           for c_etype in self.relations]
         ret._graph = heterograph_index.create_heterograph_from_relations(
             metagraph, relation_graphs, utils.toindex(num_nodes_per_type, "int64"))
 
@@ -4985,7 +5005,7 @@ def infer_ntype_from_dict(graph, etype_dict):
     """
     ntype = None
     for ety in etype_dict:
-        _, _, dty = graph.to_canonical_etype(ety)
+        _, _, dty = graph.to_relation(ety)
         if ntype is None:
             ntype = dty
         if ntype != dty:
@@ -5213,7 +5233,7 @@ class AdaptedHeteroGraph(GraphAdapter):
     @property
     def canonical_etype(self):
         """Canonical edge type."""
-        return self.graph.canonical_etypes[self.etid]
+        return self.graph.relations[self.etid]
 
 
 def check_same_dtype(graph_dtype, tensor):
@@ -5255,7 +5275,7 @@ class DGLBlock(DGLHeteroGraph):
             ndstnode_dict = {ntype : self.number_of_dst_nodes(ntype)
                              for ntype in self.dsttypes}
             nedge_dict = {etype : self.number_of_edges(etype)
-                          for etype in self.canonical_etypes}
+                          for etype in self.relations}
             meta = str(self.metagraph().edges(keys=True))
             return ret.format(
                 srcnode=nsrcnode_dict, dstnode=ndstnode_dict, edge=nedge_dict, meta=meta)

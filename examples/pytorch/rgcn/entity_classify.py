@@ -58,8 +58,7 @@ def main(args):
     # Load from hetero-graph
     hg = dataset[0]
 
-    num_rels = len(hg.canonical_etypes)
-    num_of_ntype = len(hg.ntypes)
+    num_rels = len(hg.relations)
     category = dataset.predict_category
     num_classes = dataset.num_classes
     train_mask = hg.nodes[category].data.pop('train_mask')
@@ -76,13 +75,13 @@ def main(args):
         val_idx = train_idx
 
     # calculate norm for each edge type and store in edge
-    for canonical_etype in hg.canonical_etypes:
-        u, v, eid = hg.all_edges(form='all', etype=canonical_etype)
+    for relation in hg.relations:
+        u, v, eid = hg.all_edges(form='all', etype=relation)
         _, inverse_index, count = torch.unique(v, return_inverse=True, return_counts=True)
         degrees = count[inverse_index]
         norm = torch.ones(eid.shape[0]).float() / degrees.float()
         norm = norm.unsqueeze(1)
-        hg.edges[canonical_etype].data['norm'] = norm
+        hg.edges[relation].data['norm'] = norm
 
     # get target category id
     category_id = len(hg.ntypes)

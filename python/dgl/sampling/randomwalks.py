@@ -110,7 +110,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
              [ 2,  0,  1,  1,  3,  2,  2],
              [ 0,  1,  1,  3,  0,  0,  0]]), tensor([0, 0, 1, 0, 0, 1, 0]))
     """
-    n_etypes = len(g.canonical_etypes)
+    n_etypes = len(g.relations)
     n_ntypes = len(g.ntypes)
 
     if metapath is None:
@@ -128,10 +128,10 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
 
     # Load the probability tensor from the edge frames
     if prob is None:
-        p_nd = [nd.array([], ctx=nodes.ctx) for _ in g.canonical_etypes]
+        p_nd = [nd.array([], ctx=nodes.ctx) for _ in g.relations]
     else:
         p_nd = []
-        for etype in g.canonical_etypes:
+        for etype in g.relations:
             if prob in g.edges[etype].data:
                 prob_nd = F.zerocopy_to_dgl_ndarray(g.edges[etype].data[prob])
                 if prob_nd.ctx != nodes.ctx:

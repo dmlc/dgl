@@ -67,7 +67,7 @@ class GCMCSampler:
 
         # 1. Get the head and tail nodes from both the decoder and encoder graphs.
         head_id, tail_id = dec_graph.find_edges(edge_ids)
-        utype, _, vtype = enc_graph.canonical_etypes[0]
+        utype, _, vtype = enc_graph.relations[0]
         subg = []
         true_rel_ratings = []
         true_rel_labels = []

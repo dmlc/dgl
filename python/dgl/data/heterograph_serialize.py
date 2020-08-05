@@ -35,7 +35,7 @@ class HeteroGraphData(ObjectBase):
     def create(g):
         edata_list = []
         ndata_list = []
-        for etype in g.canonical_etypes:
+        for etype in g.relations:
             edata_list.append(tensor_dict_to_ndarray_dict(g.edges[etype].data))
         for ntype in g.ntypes:
             ndata_list.append(tensor_dict_to_ndarray_dict(g.nodes[ntype].data))
