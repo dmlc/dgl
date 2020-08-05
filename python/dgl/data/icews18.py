@@ -12,20 +12,23 @@ class ICEWS18Dataset(DGLBuiltinDataset):
     r""" ICEWS18 dataset for temporal graph
 
     Integrated Crisis Early Warning System (ICEWS18)
+
     Event data consists of coded interactions between socio-political
     actors (i.e., cooperative or hostile actions between individuals,
     groups, sectors and nation states). This Dataset consists of events
     from 1/1/2018 to 10/31/2018 (24 hours time granularity).
+
     Reference:
+
         - `Recurrent Event Network for Reasoning over Temporal Knowledge Graphs <https://arxiv.org/abs/1904.05530>`_
         - `ICEWS Coded Event Data <https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/28075>`_
 
-    Statistics
-    ----------
-    Train examples: 240
-    Valid examples: 30
-    Test examples: 34
-    Nodes per graph: 23033
+    Statistics：
+
+    - Train examples: 240
+    - Valid examples: 30
+    - Test examples: 34
+    - Nodes per graph: 23033
 
     Parameters
     ----------
@@ -109,14 +112,21 @@ class ICEWS18Dataset(DGLBuiltinDataset):
 
         Returns
         -------
-        dgl.DGLGraph
-            graph structure and edge feature
-            - edata['rel_type']: edge type
+        :class:`dgl.DGLGraph`
+
+            The graph contains:
+
+            - ``edata['rel_type']``: edge type
         """
         return self._graphs[idx]
 
     def __len__(self):
-        r"""Number of graphs in the dataset"""
+        r"""Number of graphs in the dataset.
+
+        Return
+        -------
+        int
+        """
         return len(self._graphs)
 
     @property

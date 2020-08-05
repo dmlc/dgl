@@ -16,15 +16,16 @@ class QM7bDataset(DGLDataset):
     This dataset consists of 7,211 molecules with 14 regression targets.
     Nodes means atoms and edges means bonds. Edge data 'h' means
     the entry of Coulomb matrix.
+
     Reference: `<http://quantum-machine.org/datasets/>`_
 
-    Statistics
-    ----------
-    Number of graphs: 7,211
-    Number of regression targets: 14
-    Average number of nodes: 15
-    Average number of edges: 245
-    Edge feature size: 1
+    Statistics:
+
+    - Number of graphs: 7,211
+    - Number of regression targets: 14
+    - Average number of nodes: 15
+    - Average number of edges: 245
+    - Edge feature size: 1
 
     Parameters
     ----------
@@ -126,12 +127,17 @@ class QM7bDataset(DGLDataset):
 
         Returns
         -------
-        (dgl.DGLGraph, Tensor)
+        (:class:`dgl.DGLGraph`, Tensor)
         """
         return self.graphs[idx], self.label[idx]
 
     def __len__(self):
-        r"""Number of graphs in the dataset"""
+        r"""Number of graphs in the dataset.
+
+        Return
+        -------
+        int
+        """
         return len(self.graphs)
 
 

@@ -542,15 +542,21 @@ class AIFBDataset(RDFGraphDataset):
     r"""AIFB dataset for node classification task
 
     .. deprecated:: 0.5.0
-        `graph` is deprecated, it is replaced by:
+
+        - ``graph`` is deprecated, it is replaced by:
+
             >>> dataset = AIFBDataset()
             >>> graph = dataset[0]
-        `train_idx` is deprecated, it can be replaced by:
+
+        - ``train_idx`` is deprecated, it can be replaced by:
+
             >>> dataset = AIFBDataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.nodes[dataset.category].data['train_mask']
             >>> train_idx = th.nonzero(train_mask).squeeze()
-        `test_idx` is deprecated, it can be replaced by:
+
+        - ``test_idx`` is deprecated, it can be replaced by:
+
             >>> dataset = AIFBDataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.nodes[dataset.category].data['test_mask']
@@ -561,11 +567,15 @@ class AIFBDataset(RDFGraphDataset):
     University of Karlsruhe.
 
     AIFB dataset statistics:
-    Nodes: 7262
-    Edges: 48810 (including reverse edges)
-    Target Category: Personen
-    Number of Classes: 4
-    Label Split: Train: 140, Test: 36
+
+    - Nodes: 7262
+    - Edges: 48810 (including reverse edges)
+    - Target Category: Personen
+    - Number of Classes: 4
+    - Label Split:
+
+        - Train: 140
+        - Test: 36
 
     Parameters
     -----------
@@ -589,7 +599,7 @@ class AIFBDataset(RDFGraphDataset):
         The entity category (node type) that has labels for prediction
     labels : Tensor
         All the labels of the entities in ``predict_category``
-    graph : dgl.DGLGraph
+    graph : :class:`dgl.DGLGraph`
         Graph structure
     train_idx : Tensor
         Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
@@ -639,16 +649,23 @@ class AIFBDataset(RDFGraphDataset):
 
         Return
         -------
-        dgl.DGLGraph
-            graph structure, node features and labels.
-            - ndata['train_mask']: mask for training node set
-            - ndata['test_mask']: mask for testing node set
-            - ndata['labels']: mask for labels
+        :class:`dgl.DGLGraph`
+
+            The graph contains:
+
+            - ``ndata['train_mask']``: mask for training node set
+            - ``ndata['test_mask']``: mask for testing node set
+            - ``ndata['labels']``: mask for labels
         """
         return super(AIFBDataset, self).__getitem__(idx)
 
     def __len__(self):
-        r"""The number of graphs in the dataset."""
+        r"""The number of graphs in the dataset.
+
+        Return
+        -------
+        int
+        """
         return super(AIFBDataset, self).__len__()
 
     def parse_entity(self, term):
@@ -703,26 +720,36 @@ class MUTAGDataset(RDFGraphDataset):
     r"""MUTAG dataset for node classification task
 
     .. deprecated:: 0.5.0
-        `graph` is deprecated, it is replaced by:
+
+        - ``graph`` is deprecated, it is replaced by:
+
             >>> dataset = MUTAGDataset()
             >>> graph = dataset[0]
-        `train_idx` is deprecated, it can be replaced by:
+
+        - ``train_idx`` is deprecated, it can be replaced by:
+
             >>> dataset = MUTAGDataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.nodes[dataset.category].data['train_mask']
             >>> train_idx = th.nonzero(train_mask).squeeze()
-        `test_idx` is deprecated, it can be replaced by:
+
+        - ``test_idx`` is deprecated, it can be replaced by:
+
             >>> dataset = MUTAGDataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.nodes[dataset.category].data['test_mask']
             >>> test_idx = th.nonzero(test_mask).squeeze()
 
     Mutag dataset statistics:
-    Nodes: 27163
-    Edges: 148100 (including reverse edges)
-    Target Category: d
-    Number of Classes: 2
-    Label Split: Train: 272, Test: 68
+
+    - Nodes: 27163
+    - Edges: 148100 (including reverse edges)
+    - Target Category: d
+    - Number of Classes: 2
+    - Label Split:
+
+        - Train: 272
+        - Test: 68
 
     Parameters
     -----------
@@ -746,7 +773,7 @@ class MUTAGDataset(RDFGraphDataset):
         The entity category (node type) that has labels for prediction
     labels : Tensor
         All the labels of the entities in ``predict_category``
-    graph : dgl.DGLGraph
+    graph : :class:`dgl.DGLGraph`
         Graph structure
     train_idx : Tensor
         Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
@@ -802,16 +829,23 @@ class MUTAGDataset(RDFGraphDataset):
 
         Return
         -------
-        dgl.DGLGraph
-            graph structure, node features and labels.
-            - ndata['train_mask']: mask for training node set
-            - ndata['test_mask']: mask for testing node set
-            - ndata['labels']: mask for labels
+        :class:`dgl.DGLGraph`
+
+            The graph contains:
+
+            - ``ndata['train_mask']``: mask for training node set
+            - ``ndata['test_mask']``: mask for testing node set
+            - ``ndata['labels']``: mask for labels
         """
         return super(MUTAGDataset, self).__getitem__(idx)
 
     def __len__(self):
-        r"""The number of graphs in the dataset."""
+        r"""The number of graphs in the dataset.
+
+        Return
+        -------
+        int
+        """
         return super(MUTAGDataset, self).__len__()
 
     def parse_entity(self, term):
@@ -882,15 +916,21 @@ class BGSDataset(RDFGraphDataset):
     r"""BGS dataset for node classification task
 
     .. deprecated:: 0.5.0
-        `graph` is deprecated, it is replaced by:
+
+        - ``graph`` is deprecated, it is replaced by:
+
             >>> dataset = BGSDataset()
             >>> graph = dataset[0]
-        `train_idx` is deprecated, it can be replaced by:
+
+        - ``train_idx`` is deprecated, it can be replaced by:
+
             >>> dataset = BGSDataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.nodes[dataset.category].data['train_mask']
             >>> train_idx = th.nonzero(train_mask).squeeze()
-        `test_idx` is deprecated, it can be replaced by:
+
+        - ``test_idx`` is deprecated, it can be replaced by:
+
             >>> dataset = BGSDataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.nodes[dataset.category].data['test_mask']
@@ -903,11 +943,15 @@ class BGSDataset(RDFGraphDataset):
     term is CURRENT or DEPRECATED.
 
     BGS dataset statistics:
-    Nodes: 94806
-    Edges: 672884 (including reverse edges)
-    Target Category: Lexicon/NamedRockUnit
-    Number of Classes: 2
-    Label Split: Train: 117, Test: 29
+
+    - Nodes: 94806
+    - Edges: 672884 (including reverse edges)
+    - Target Category: Lexicon/NamedRockUnit
+    - Number of Classes: 2
+    - Label Split:
+
+        - Train: 117
+        - Test: 29
 
     Parameters
     -----------
@@ -931,7 +975,7 @@ class BGSDataset(RDFGraphDataset):
         The entity category (node type) that has labels for prediction
     labels : Tensor
         All the labels of the entities in ``predict_category``
-    graph : dgl.DGLGraph
+    graph : :class:`dgl.DGLGraph`
         Graph structure
     train_idx : Tensor
         Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
@@ -981,16 +1025,23 @@ class BGSDataset(RDFGraphDataset):
 
         Return
         -------
-        dgl.DGLGraph
-            graph structure, node features and labels.
-            - ndata['train_mask']: mask for training node set
-            - ndata['test_mask']: mask for testing node set
-            - ndata['labels']: mask for labels
+        :class:`dgl.DGLGraph`
+
+            The graph contains:
+
+            - ``ndata['train_mask']``: mask for training node set
+            - ``ndata['test_mask']``: mask for testing node set
+            - ``ndata['labels']``: mask for labels
         """
         return super(BGSDataset, self).__getitem__(idx)
 
     def __len__(self):
-        r"""The number of graphs in the dataset."""
+        r"""The number of graphs in the dataset.
+
+        Return
+        -------
+        int
+        """
         return super(BGSDataset, self).__len__()
 
     def parse_entity(self, term):
@@ -1057,15 +1108,21 @@ class AMDataset(RDFGraphDataset):
     """AM dataset. for node classification task
 
     .. deprecated:: 0.5.0
-        `graph` is deprecated, it is replaced by:
+
+        - ``graph`` is deprecated, it is replaced by:
+
             >>> dataset = AMDataset()
             >>> graph = dataset[0]
-        `train_idx` is deprecated, it can be replaced by:
+
+        - ``train_idx`` is deprecated, it can be replaced by:
+
             >>> dataset = AMDataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.nodes[dataset.category].data['train_mask']
             >>> train_idx = th.nonzero(train_mask).squeeze()
-        `test_idx` is deprecated, it can be replaced by:
+
+        - ``test_idx`` is deprecated, it can be replaced by:
+
             >>> dataset = AMDataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.nodes[dataset.category].data['test_mask']
@@ -1078,11 +1135,15 @@ class AMDataset(RDFGraphDataset):
     output graph.
 
     AM dataset statistics:
-    Nodes: 881680
-    Edges: 5668682 (including reverse edges)
-    Target Category: proxy
-    Number of Classes: 11
-    Label Split: Train: 802, Test: 198
+
+    - Nodes: 881680
+    - Edges: 5668682 (including reverse edges)
+    - Target Category: proxy
+    - Number of Classes: 11
+    - Label Split:
+
+        - Train: 802
+        - Test: 198
 
     Parameters
     -----------
@@ -1106,7 +1167,7 @@ class AMDataset(RDFGraphDataset):
         The entity category (node type) that has labels for prediction
     labels : Tensor
         All the labels of the entities in ``predict_category``
-    graph : dgl.DGLGraph
+    graph : :class:`dgl.DGLGraph`
         Graph structure
     train_idx : Tensor
         Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
@@ -1156,16 +1217,23 @@ class AMDataset(RDFGraphDataset):
 
         Return
         -------
-        dgl.DGLGraph
-            graph structure, node features and labels.
-            - ndata['train_mask']: mask for training node set
-            - ndata['test_mask']: mask for testing node set
-            - ndata['labels']: mask for labels
+        :class:`dgl.DGLGraph`
+
+            The graph contains:
+
+            - ``ndata['train_mask']``: mask for training node set
+            - ``ndata['test_mask']``: mask for testing node set
+            - ``ndata['labels']``: mask for labels
         """
         return super(AMDataset, self).__getitem__(idx)
 
     def __len__(self):
-        r"""The number of graphs in the dataset."""
+        r"""The number of graphs in the dataset.
+
+        Return
+        -------
+        int
+        """
         return super(AMDataset, self).__len__()
 
     def parse_entity(self, term):

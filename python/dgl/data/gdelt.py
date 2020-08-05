@@ -18,15 +18,15 @@ class GDELTDataset(DGLBuiltinDataset):
     (15 minutes time granularity).
 
     Reference:
-        - `Recurrent Event Network for Reasoning over Temporal
-            Knowledge Graphs <https://arxiv.org/abs/1904.05530>`_
+
+        - `Recurrent Event Network for Reasoning over Temporal Knowledge Graphs <https://arxiv.org/abs/1904.05530>`_
         - `The Global Database of Events, Language, and Tone (GDELT) <https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/28075>`_
 
-    Statistics
-    ----------
-    Train examples: 2,304
-    Valid examples: 288
-    Test examples: 384
+    Statistics:
+
+    - Train examples: 2,304
+    - Valid examples: 288
+    - Test examples: 384
 
     Parameters
     ----------
@@ -134,9 +134,11 @@ class GDELTDataset(DGLBuiltinDataset):
 
         Returns
         -------
-        dgl.DGLGraph
-            graph structure and edge feature
-            - edata['rel_type']: edge type
+        :class:`dgl.DGLGraph`
+
+            The graph contains:
+
+            - ``edata['rel_type']``: edge type
         """
         if t >= len(self) or t < 0:
             raise IndexError("Index out of range")
@@ -149,7 +151,12 @@ class GDELTDataset(DGLBuiltinDataset):
         return g
 
     def __len__(self):
-        r"""Number of graphs in the dataset"""
+        r"""Number of graphs in the dataset.
+
+        Return
+        -------
+        int
+        """
         return self._end_time - self._start_time + 1
 
     @property
