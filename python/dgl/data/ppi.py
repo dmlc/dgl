@@ -15,13 +15,17 @@ class PPIDataset(DGLBuiltinDataset):
     r""" Protein-Protein Interaction dataset for inductive node classification
 
     .. deprecated:: 0.5.0
-        `lables` is deprecated, it is replaced by:
+
+        - ``lables`` is deprecated, it is replaced by:
+
             >>> dataset = PPIDataset()
             >>> for g in dataset:
             ....    labels = g.ndata['label']
             ....
             >>>
-        `features` is deprecated, it is replaced by:
+
+        - ``features`` is deprecated, it is replaced by:
+
             >>> dataset = PPIDataset()
             >>> for g in dataset:
             ....    features = g.ndata['feat']
@@ -35,10 +39,11 @@ class PPIDataset(DGLBuiltinDataset):
 
     Reference: `<http://snap.stanford.edu/graphsage/>`_
 
-    PPI dataset statistics:
-    Train examples: 20
-    Valid examples: 2
-    Test examples: 2
+    Statistics:
+
+    - Train examples: 20
+    - Valid examples: 2
+    - Test examples: 2
 
     Parameters
     ----------
@@ -167,10 +172,11 @@ class PPIDataset(DGLBuiltinDataset):
 
         Returns
         -------
-        dgl.DGLGraph
+        :class:`dgl.DGLGraph`
             graph structure, node features and node labels.
-            - ndata['feat']: node features
-            - ndata['label']: nodel labels
+
+            - ``ndata['feat']``: node features
+            - ``ndata['label']``: node labels
         """
         return self.graphs[item]
 
