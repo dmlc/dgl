@@ -179,6 +179,7 @@ def test_copy_edge_reduce():
         def _print_error(a, b):
             print("ERROR: Test copy_edge_{} partial: {}".
                   format(red, partial))
+            return
             for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
                 if not np.allclose(x, y):
                     print('@{} {} v.s. {}'.format(i, x, y))
@@ -189,6 +190,7 @@ def test_copy_edge_reduce():
         if not F.allclose(e_grad1, e_grad2):
             print('edge gradient')
             _print_error(e_grad1, e_grad2)
+        print(e_grad1.shape, e_grad2.shape)
         assert(F.allclose(e_grad1, e_grad2))
 
     _test('sum', False)
