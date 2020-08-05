@@ -15,29 +15,43 @@ class RedditDataset(DGLBuiltinDataset):
     r""" Reddit dataset for community detection (node classification)
 
     .. deprecated:: 0.5.0
-        `graph` is deprecated, it is replaced by:
+
+        - ``graph`` is deprecated, it is replaced by:
+
             >>> dataset = RedditDataset()
             >>> graph = dataset[0]
-        `num_labels` is deprecated, it is replaced by:
+
+        - ``num_labels`` is deprecated, it is replaced by:
+
             >>> dataset = RedditDataset()
             >>> num_classes = dataset.num_classes
-        `train_mask` is deprecated, it is replaced by:
+
+        - ``train_mask`` is deprecated, it is replaced by:
+
             >>> dataset = RedditDataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.ndata['train_mask']
-        `val_mask` is deprecated, it is replaced by:
+
+        - ``val_mask`` is deprecated, it is replaced by:
+
             >>> dataset = RedditDataset()
             >>> graph = dataset[0]
             >>> val_mask = graph.ndata['val_mask']
-        `test_mask` is deprecated, it is replaced by:
+
+        - ``test_mask`` is deprecated, it is replaced by:
+
             >>> dataset = RedditDataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.ndata['test_mask']
-        `features` is deprecated, it is replaced by:
+
+        - ``features`` is deprecated, it is replaced by:
+
             >>> dataset = RedditDataset()
             >>> graph = dataset[0]
             >>> features = graph.ndata['feat']
-        `labels` is deprecated, it is replaced by:
+
+        - ``labels`` is deprecated, it is replaced by:
+
             >>> dataset = RedditDataset()
             >>> graph = dataset[0]
             >>> labels = graph.ndata['label']
@@ -52,13 +66,13 @@ class RedditDataset(DGLBuiltinDataset):
     Reference: `<http://snap.stanford.edu/graphsage/>`_
 
     Statistics
-    ----------
-    Nodes: 232,965
-    Edges: 114,615,892
-    Node feature size: 602
-    Number of training samples: 153,431
-    Number of validation samples: 23,831
-    Number of test samples: 55,703
+
+    - Nodes: 232,965
+    - Edges: 114,615,892
+    - Node feature size: 602
+    - Number of training samples: 153,431
+    - Number of validation samples: 23,831
+    - Number of test samples: 55,703
 
     Parameters
     ----------
@@ -76,7 +90,7 @@ class RedditDataset(DGLBuiltinDataset):
     ----------
     num_classes : int
         Number of classes for each node
-    graph : dgl.DGLGraph
+    graph : :class:`dgl.DGLGraph`
         Graph of the dataset
     num_labels : int
         Number of classes for each node
@@ -220,13 +234,14 @@ class RedditDataset(DGLBuiltinDataset):
 
         Returns
         -------
-        dgl.DGLGraph
-            graph structure, node labels, node features and splitting masks
-            - ndata['label']: node label
-            - ndata['feat']: node feature
-            - ndata['train_mask']： mask for training node set
-            - ndata['val_mask']: mask for validation node set
-            - ndata['test_mask']: mask for test node set
+        :class:`dgl.DGLGraph`
+            graph structure, node labels, node features and splitting masks:
+
+            - ``ndata['label']``: node label
+            - ``ndata['feat']``: node feature
+            - ``ndata['train_mask']``： mask for training node set
+            - ``ndata['val_mask']``: mask for validation node set
+            - ``ndata['test_mask']:`` mask for test node set
         """
         assert idx == 0, "Reddit Dataset only has one graph"
         return self._graph

@@ -59,8 +59,7 @@ def sbm(n_blocks, block_size, p, q, rng=None):
 class SBMMixtureDataset(DGLDataset):
     r""" Symmetric Stochastic Block Model Mixture
 
-    Reference: Appendix C of "Supervised Community Detection with Hierarchical
-               Graph Neural Networks" (https://arxiv.org/abs/1705.08415).
+    Reference: Appendix C of `Supervised Community Detection with Hierarchical Graph Neural Networks <https://arxiv.org/abs/1705.08415>`_
 
     Parameters
     ----------
@@ -175,15 +174,15 @@ class SBMMixtureDataset(DGLDataset):
 
         Returns
         -------
-        graph : dgl.DGLGraph
+        graph: :class:`dgl.DGLGraph`
             The original graph
-        line_graph : dgl.DGLGraph
+        line_graph: :class:`dgl.DGLGraph`
             The line graph of `graph`
-        graph_degree : numpy.ndarray
+        graph_degree: numpy.ndarray
             In degrees for each node in `graph`
-        line_graph_degree : numpy.ndarray
+        line_graph_degree: numpy.ndarray
             In degrees for each node in `line_graph`
-        pm_pd : numpy.ndarray
+        pm_pd: numpy.ndarray
             Edge indicator matrices Pm and Pd
         """
         return self._graphs[idx], self._line_graphs[idx], \
@@ -203,29 +202,30 @@ class SBMMixtureDataset(DGLDataset):
         Parameters
         ----------
         x : tuple
-            a batch of data that contains
-            graph : dgl.DGLGraph
+            a batch of data that contains:
+
+            - graph: :class:`dgl.DGLGraph`
                 The original graph
-            line_graph : dgl.DGLGraph
+            - line_graph: :class:`dgl.DGLGraph`
                 The line graph of `graph`
-            graph_degree : numpy.ndarray
+            - graph_degree: numpy.ndarray
                 In degrees for each node in `graph`
-            line_graph_degree : numpy.ndarray
+            - line_graph_degree: numpy.ndarray
                 In degrees for each node in `line_graph`
-            pm_pd : numpy.ndarray
+            - pm_pd: numpy.ndarray
                 Edge indicator matrices Pm and Pd
 
         Returns
         -------
-        g_batch : dgl.DGLGraph
+        g_batch: :class:`dgl.DGLGraph`
             Batched graphs
-        lg_batch : dgl.DGLGraph
+        lg_batch: :class:`dgl.DGLGraph`
             Batched line graphs
-        degg_batch : numpy.ndarray
+        degg_batch: numpy.ndarray
             A batch of in degrees for each node in `g_batch`
-        deglg_batch : numpy.ndarray
+        deglg_batch: numpy.ndarray
             A batch of in degrees for each node in `lg_batch`
-        pm_pd_batch : numpy.ndarray
+        pm_pd_batch: numpy.ndarray
             A batch of edge indicator matrices Pm and Pd
         """
         g, lg, deg_g, deg_lg, pm_pd = zip(*x)
