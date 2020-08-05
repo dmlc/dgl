@@ -9,7 +9,7 @@ import sklearn.preprocessing
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dgl import DGLGraph
+import dgl
 from dgl.data import register_data_args
 from torch.utils.tensorboard import SummaryWriter
 
@@ -30,34 +30,26 @@ def main(args):
 
     # load and preprocess dataset
     data = load_data(args)
+    g = data.g
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
+    test_mask = g.ndata['test_mask']
+    labels = g.ndata['label']
 
-    train_nid = np.nonzero(data.train_mask)[0].astype(np.int64)
+    train_nid = np.nonzero(train_mask.data.numpy())[0].astype(np.int64)
 
     # Normalize features
     if args.normalize:
-        train_feats = data.features[train_nid]
+        feats = g.ndata['feat']
+        train_feats = feats[train_mask]
         scaler = sklearn.preprocessing.StandardScaler()
-        scaler.fit(train_feats)
-        features = scaler.transform(data.features)
-    else:
-        features = data.features
+        scaler.fit(train_feats.data.numpy())
+        features = scaler.transform(feats.data.numpy())
+        g.ndata['feat'] = torch.FloatTensor(features)
 
-    features = torch.FloatTensor(features)
-    if not multitask:
-        labels = torch.LongTensor(data.labels)
-    else:
-        labels = torch.FloatTensor(data.labels)
-    if hasattr(torch, 'BoolTensor'):
-        train_mask = torch.BoolTensor(data.train_mask)
-        val_mask = torch.BoolTensor(data.val_mask)
-        test_mask = torch.BoolTensor(data.test_mask)
-    else:
-        train_mask = torch.ByteTensor(data.train_mask)
-        val_mask = torch.ByteTensor(data.val_mask)
-        test_mask = torch.ByteTensor(data.test_mask)
-    in_feats = features.shape[1]
-    n_classes = data.num_labels
-    n_edges = data.graph.number_of_edges()
+    in_feats = g.ndata['feat'].shape[1]
+    n_classes = data.num_classes
+    n_edges = g.number_of_edges()
 
     n_train_samples = train_mask.int().sum().item()
     n_val_samples = val_mask.int().sum().item()
@@ -74,12 +66,15 @@ def main(args):
             n_val_samples,
             n_test_samples))
     # create GCN model
-    g = data.graph
     if args.self_loop and not args.dataset.startswith('reddit'):
-        g.remove_edges_from(nx.selfloop_edges(g))
-        g.add_edges_from(zip(g.nodes(), g.nodes()))
+        g = dgl.remove_self_loop(g)
+        g = dgl.add_self_loop(g)
         print("adding self-loop edges")
-    g = DGLGraph(g, readonly=True)
+    # metis only support int64 graph
+    g = g.long()
+
+    cluster_iterator = ClusterIter(
+        args.dataset, g, args.psize, args.batch_size, train_nid, use_pp=args.use_pp)
 
     # set device for dataset tensors
     if args.gpu < 0:
@@ -87,23 +82,12 @@ def main(args):
     else:
         cuda = True
         torch.cuda.set_device(args.gpu)
-        features = features.cuda()
-        labels = labels.cuda()
-        train_mask = train_mask.cuda()
         val_mask = val_mask.cuda()
         test_mask = test_mask.cuda()
+        g = g.to(args.gpu)
 
-    print(torch.cuda.get_device_name(0))
-
-    g.ndata['features'] = features
-    g.ndata['labels'] = labels
-    g.ndata['train_mask'] = train_mask
-    print('labels shape:', labels.shape)
-
-    cluster_iterator = ClusterIter(
-        args.dataset, g, args.psize, args.batch_size, train_nid, use_pp=args.use_pp)
-
-    print("features shape, ", features.shape)
+    print('labels shape:', g.ndata['label'].shape)
+    print("features shape, ", g.ndata['feat'].shape)
 
     model = GraphSAGE(in_feats,
                       args.n_hidden,
@@ -138,19 +122,20 @@ def main(args):
     # set train_nids to cuda tensor
     if cuda:
         train_nid = torch.from_numpy(train_nid).cuda()
-    print("current memory after model before training",
-          torch.cuda.memory_allocated(device=train_nid.device) / 1024 / 1024)
+        print("current memory after model before training",
+              torch.cuda.memory_allocated(device=train_nid.device) / 1024 / 1024)
     start_time = time.time()
     best_f1 = -1
 
     for epoch in range(args.n_epochs):
         for j, cluster in enumerate(cluster_iterator):
             # sync with upper level training graph
-            cluster.copy_from_parent()
+            if cuda:
+                cluster = cluster.to(torch.cuda.current_device())
             model.train()
             # forward
             pred = model(cluster)
-            batch_labels = cluster.ndata['labels']
+            batch_labels = cluster.ndata['label']
             batch_train_mask = cluster.ndata['train_mask']
             loss = loss_f(pred[batch_train_mask],
                           batch_labels[batch_train_mask])

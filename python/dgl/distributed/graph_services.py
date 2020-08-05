@@ -4,16 +4,17 @@ from collections import namedtuple
 from .rpc import Request, Response, send_requests_to_machine, recv_responses
 from ..sampling import sample_neighbors as local_sample_neighbors
 from ..transform import in_subgraph as local_in_subgraph
-from . import register_service
+from .rpc import register_service
 from ..convert import graph
 from ..base import NID, EID
 from ..utils import toindex
 from .. import backend as F
 
-__all__ = ['sample_neighbors', 'in_subgraph']
+__all__ = ['sample_neighbors', 'in_subgraph', 'find_edges']
 
 SAMPLING_SERVICE_ID = 6657
 INSUBGRAPH_SERVICE_ID = 6658
+EDGES_SERVICE_ID = 6659
 
 class SubgraphResponse(Response):
     """The response for sampling and in_subgraph"""
@@ -29,6 +30,19 @@ class SubgraphResponse(Response):
     def __getstate__(self):
         return self.global_src, self.global_dst, self.global_eids
 
+class FindEdgeResponse(Response):
+    """The response for sampling and in_subgraph"""
+
+    def __init__(self, global_src, global_dst, order_id):
+        self.global_src = global_src
+        self.global_dst = global_dst
+        self.order_id = order_id
+
+    def __setstate__(self, state):
+        self.global_src, self.global_dst, self.order_id = state
+
+    def __getstate__(self):
+        return self.global_src, self.global_dst, self.order_id
 
 def _sample_neighbors(local_g, partition_book, seed_nodes, fan_out, edge_dir, prob, replace):
     """ Sample from local partition.
@@ -49,6 +63,17 @@ def _sample_neighbors(local_g, partition_book, seed_nodes, fan_out, edge_dir, pr
     global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
     return global_src, global_dst, global_eids
 
+def _find_edges(local_g, partition_book, seed_edges):
+    """Given an edge ID array, return the source
+        and destination node ID array ``s`` and ``d`` in the local partition.
+    """
+    local_eids = partition_book.eid2localeid(seed_edges, partition_book.partid)
+    local_eids = F.astype(local_eids, local_g.idtype)
+    local_src, local_dst = local_g.find_edges(local_eids)
+    global_nid_mapping = local_g.ndata[NID]
+    global_src = global_nid_mapping[local_src]
+    global_dst = global_nid_mapping[local_dst]
+    return global_src, global_dst
 
 def _in_subgraph(local_g, partition_book, seed_nodes):
     """ Get in subgraph from local partition.
@@ -94,6 +119,25 @@ class SamplingRequest(Request):
                                                                 self.prob, self.replace)
         return SubgraphResponse(global_src, global_dst, global_eids)
 
+class EdgesRequest(Request):
+    """Edges Request"""
+
+    def __init__(self, edge_ids, order_id):
+        self.edge_ids = edge_ids
+        self.order_id = order_id
+
+    def __setstate__(self, state):
+        self.edge_ids, self.order_id = state
+
+    def __getstate__(self):
+        return self.edge_ids, self.order_id
+
+    def process_request(self, server_state):
+        local_g = server_state.graph
+        partition_book = server_state.partition_book
+        global_src, global_dst = _find_edges(local_g, partition_book, self.edge_ids)
+
+        return FindEdgeResponse(global_src, global_dst, self.order_id)
 
 class InSubgraphRequest(Request):
     """InSubgraph Request"""
@@ -132,8 +176,7 @@ def merge_graphs(res_list, num_nodes):
         src_tensor = res_list[0].global_src
         dst_tensor = res_list[0].global_dst
         eid_tensor = res_list[0].global_eids
-    g = graph((src_tensor, dst_tensor),
-              restrict_format='coo', num_nodes=num_nodes)
+    g = graph((src_tensor, dst_tensor), num_nodes=num_nodes)
     g.edata[EID] = eid_tensor
     return g
 
@@ -218,8 +261,9 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     ----------
     g : DistGraph
         The distributed graph.
-    nodes : tensor
-        Node ids to sample neighbors from.
+    nodes : tensor or dict
+        Node ids to sample neighbors from. If it's a dict, it should contain only
+        one key-value pair to make this API consistent with dgl.sampling.sample_neighbors.
     fanout : int
         The number of sampled neighbors for each node.
     edge_dir : str, optional
@@ -238,6 +282,9 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         ``nodes``. The sampled subgraph has the same metagraph as the original
         one.
     """
+    if isinstance(nodes, dict):
+        assert len(nodes) == 1, 'The distributed sampler only supports one node type for now.'
+        nodes = list(nodes.values())[0]
     def issue_remote_req(node_ids):
         return SamplingRequest(node_ids, fanout, edge_dir=edge_dir,
                                prob=prob, replace=replace)
@@ -245,6 +292,98 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         return _sample_neighbors(local_g, partition_book, local_nids,
                                  fanout, edge_dir, prob, replace)
     return _distributed_access(g, nodes, issue_remote_req, local_access)
+
+def _distributed_edge_access(g, edges, issue_remote_req, local_access):
+    """A routine that fetches local edges from distributed graph.
+
+    The source and destination nodes of local edges are stored in the local
+    machine and others are stored on remote machines. This code will issue
+    remote access requests first before fetching data from the local machine.
+    In the end, we combine the data from the local machine and remote machines.
+
+    Parameters
+    ----------
+    g : DistGraph
+        The distributed graph
+    edges : tensor
+        The edges to find their source and destination nodes.
+    issue_remote_req : callable
+        The function that issues requests to access remote data.
+    local_access : callable
+        The function that reads data on the local machine.
+
+    Returns
+    -------
+    tensor
+        The source node ID array.
+    tensor
+        The destination node ID array.
+    """
+    req_list = []
+    partition_book = g.get_partition_book()
+    edges = toindex(edges).tousertensor()
+    partition_id = partition_book.eid2partid(edges)
+    local_eids = None
+    reorder_idx = []
+    for pid in range(partition_book.num_partitions()):
+        mask = (partition_id == pid)
+        edge_id = F.boolean_mask(edges, mask)
+        reorder_idx.append(F.nonzero_1d(mask))
+        if pid == partition_book.partid and g.local_partition is not None:
+            assert local_eids is None
+            local_eids = edge_id
+        elif len(edge_id) != 0:
+            req = issue_remote_req(edge_id, pid)
+            req_list.append((pid, req))
+
+    # send requests to the remote machine.
+    msgseq2pos = None
+    if len(req_list) > 0:
+        msgseq2pos = send_requests_to_machine(req_list)
+
+    # handle edges in local partition.
+    src_ids = F.zeros_like(edges)
+    dst_ids = F.zeros_like(edges)
+    if local_eids is not None:
+        src, dst = local_access(g.local_partition, partition_book, local_eids)
+        src_ids = F.scatter_row(src_ids, reorder_idx[partition_book.partid], src)
+        dst_ids = F.scatter_row(dst_ids, reorder_idx[partition_book.partid], dst)
+
+    # receive responses from remote machines.
+    if msgseq2pos is not None:
+        results = recv_responses(msgseq2pos)
+        for result in results:
+            src = result.global_src
+            dst = result.global_dst
+            src_ids = F.scatter_row(src_ids, reorder_idx[result.order_id], src)
+            dst_ids = F.scatter_row(dst_ids, reorder_idx[result.order_id], dst)
+    return src_ids, dst_ids
+
+def find_edges(g, edge_ids):
+    """ Given an edge ID array, return the source and destination
+    node ID array ``s`` and ``d`` from a distributed graph.
+    ``s[i]`` and ``d[i]`` are source and destination node ID for
+    edge ``eid[i]``.
+
+    Parameters
+    ----------
+    g : DistGraph
+        The distributed graph.
+    edges : tensor
+        The edge ID array.
+
+    Returns
+    -------
+    tensor
+        The source node ID array.
+    tensor
+        The destination node ID array.
+    """
+    def issue_remove_req(edge_ids, order_id):
+        return EdgesRequest(edge_ids, order_id)
+    def local_access(local_g, partition_book, edge_ids):
+        return _find_edges(local_g, partition_book, edge_ids)
+    return _distributed_edge_access(g, edge_ids, issue_remove_req, local_access)
 
 def in_subgraph(g, nodes):
     """Extract the subgraph containing only the in edges of the given nodes.
@@ -267,6 +406,9 @@ def in_subgraph(g, nodes):
     DGLHeteroGraph
         The subgraph.
     """
+    if isinstance(nodes, dict):
+        assert len(nodes) == 1, 'The distributed in_subgraph only supports one node type for now.'
+        nodes = list(nodes.values())[0]
     def issue_remote_req(node_ids):
         return InSubgraphRequest(node_ids)
     def local_access(local_g, partition_book, local_nids):
@@ -274,4 +416,5 @@ def in_subgraph(g, nodes):
     return _distributed_access(g, nodes, issue_remote_req, local_access)
 
 register_service(SAMPLING_SERVICE_ID, SamplingRequest, SubgraphResponse)
+register_service(EDGES_SERVICE_ID, EdgesRequest, FindEdgeResponse)
 register_service(INSUBGRAPH_SERVICE_ID, InSubgraphRequest, SubgraphResponse)

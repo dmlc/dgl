@@ -4,30 +4,62 @@ from collections.abc import MutableMapping
 import os
 import numpy as np
 
-from ..graph import DGLGraph
+from ..heterograph import DGLHeteroGraph
+from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID
 from .kvstore import KVServer, KVClient
 from .standalone_kvstore import KVClient as SA_KVClient
-from ..graph_index import from_shared_mem_graph_index
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
-from .partition import load_partition
+from .partition import load_partition, load_partition_book
 from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
-from .. import utils
+from .graph_partition_book import NODE_PART_POLICY, EDGE_PART_POLICY
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from . import rpc
 from .rpc_client import connect_to_server
 from .server_state import ServerState
 from .rpc_server import start_server
-from ..transform import as_heterograph
+from .graph_services import find_edges as dist_find_edges
+from .dist_tensor import DistTensor, _get_data_name
 
-def _get_graph_path(graph_name):
-    return "/" + graph_name
+INIT_GRAPH = 800001
+
+class InitGraphRequest(rpc.Request):
+    """ Init graph on the backup servers.
+
+    When the backup server starts, they don't load the graph structure.
+    This request tells the backup servers that they can map to the graph structure
+    with shared memory.
+    """
+    def __init__(self, graph_name):
+        self._graph_name = graph_name
+
+    def __getstate__(self):
+        return self._graph_name
+
+    def __setstate__(self, state):
+        self._graph_name = state
+
+    def process_request(self, server_state):
+        if server_state.graph is None:
+            server_state.graph = _get_graph_from_shared_mem(self._graph_name)
+        return InitGraphResponse(self._graph_name)
+
+class InitGraphResponse(rpc.Response):
+    """ Ack the init graph request
+    """
+    def __init__(self, graph_name):
+        self._graph_name = graph_name
+
+    def __getstate__(self):
+        return self._graph_name
+
+    def __setstate__(self, state):
+        self._graph_name = state
 
 def _copy_graph_to_shared_mem(g, graph_name):
-    gidx = g._graph.copyto_shared_mem(_get_graph_path(graph_name))
-    new_g = DGLGraph(gidx)
+    new_g = g.shared_memory(graph_name, formats='csc')
     # We should share the node/edge data to the client explicitly instead of putting them
     # in the KVStore because some of the node/edge data may be duplicated.
     local_node_path = _get_ndata_path(graph_name, 'inner_node')
@@ -43,27 +75,13 @@ FIELD_DICT = {'inner_node': F.int64,
               NID: F.int64,
               EID: F.int64}
 
-def _get_ndata_name(name):
-    ''' This is to get the name of node data in the kvstore.
-
-    KVStore doesn't understand node data or edge data. We'll use a prefix to distinguish them.
-    '''
-    return 'node:' + name
-
-def _get_edata_name(name):
-    ''' This is to get the name of edge data in the kvstore.
-
-    KVStore doesn't understand node data or edge data. We'll use a prefix to distinguish them.
-    '''
-    return 'edge:' + name
-
 def _is_ndata_name(name):
     ''' Is this node data in the kvstore '''
-    return name[:5] == 'node:'
+    return name[:5] == NODE_PART_POLICY + ':'
 
 def _is_edata_name(name):
     ''' Is this edge data in the kvstore '''
-    return name[:5] == 'edge:'
+    return name[:5] == EDGE_PART_POLICY + ':'
 
 def _get_shared_mem_ndata(g, graph_name, name):
     ''' Get shared-memory node data from DistGraph server.
@@ -98,74 +116,15 @@ def _get_graph_from_shared_mem(graph_name):
     The client can access the graph structure and some metadata on nodes and edges directly
     through shared memory to reduce the overhead of data access.
     '''
-    gidx = from_shared_mem_graph_index(_get_graph_path(graph_name))
-    if gidx is None:
-        return gidx
-
-    g = DGLGraph(gidx)
+    g, ntypes, etypes = heterograph_index.create_heterograph_from_shared_memory(graph_name)
+    if g is None:
+        return None
+    g = DGLHeteroGraph(g, ntypes, etypes)
     g.ndata['inner_node'] = _get_shared_mem_ndata(g, graph_name, 'inner_node')
     g.edata['inner_edge'] = _get_shared_mem_edata(g, graph_name, 'inner_edge')
     g.ndata[NID] = _get_shared_mem_ndata(g, graph_name, NID)
     g.edata[EID] = _get_shared_mem_edata(g, graph_name, EID)
     return g
-
-class DistTensor:
-    ''' Distributed tensor.
-
-    This is a wrapper to access a tensor stored in multiple machines.
-    This wrapper provides an interface similar to the local tensor.
-
-    Parameters
-    ----------
-    g : DistGraph
-        The distributed graph object.
-    name : string
-        The name of the tensor.
-    part_policy : PartitionPolicy
-        The partition policy of the tensor
-    '''
-    def __init__(self, g, name, part_policy):
-        self.kvstore = g._client
-        self._name = name
-        dtype, shape, _ = g._client.get_data_meta(name)
-        self._shape = shape
-        self._dtype = dtype
-        self._part_policy = part_policy
-
-    def __getitem__(self, idx):
-        idx = utils.toindex(idx)
-        idx = idx.tousertensor()
-        return self.kvstore.pull(name=self._name, id_tensor=idx)
-
-    def __setitem__(self, idx, val):
-        idx = utils.toindex(idx)
-        idx = idx.tousertensor()
-        # TODO(zhengda) how do we want to support broadcast (e.g., G.ndata['h'][idx] = 1).
-        self.kvstore.push(name=self._name, id_tensor=idx, data_tensor=val)
-
-    def __len__(self):
-        return self._shape[0]
-
-    @property
-    def part_policy(self):
-        ''' Return the partition policy '''
-        return self._part_policy
-
-    @property
-    def shape(self):
-        ''' Return the shape of the distributed tensor. '''
-        return self._shape
-
-    @property
-    def dtype(self):
-        ''' Return the data type of the distributed tensor. '''
-        return self._dtype
-
-    @property
-    def name(self):
-        ''' Return the name of the distributed tensor '''
-        return self._name
-
 
 class NodeDataView(MutableMapping):
     """The data view class when dist_graph.ndata[...].data is called.
@@ -177,26 +136,25 @@ class NodeDataView(MutableMapping):
         # When this is created, the server may already load node data. We need to
         # initialize the node data in advance.
         names = g._get_all_ndata_names()
-        policy = PartitionPolicy("node", g.get_partition_book())
-        self._data = {name: DistTensor(g, _get_ndata_name(name), policy) for name in names}
+        policy = PartitionPolicy(NODE_PART_POLICY, g.get_partition_book())
+        self._data = {}
+        for name in names:
+            name1 = _get_data_name(name, policy.policy_str)
+            dtype, shape, _ = g._client.get_data_meta(name1)
+            # We create a wrapper on the existing tensor in the kvstore.
+            self._data[name] = DistTensor(g, shape, dtype, name, part_policy=policy)
 
     def _get_names(self):
         return list(self._data.keys())
-
-    def _add(self, name):
-        policy = PartitionPolicy("node", self._graph.get_partition_book())
-        self._data[name] = DistTensor(self._graph, _get_ndata_name(name), policy)
 
     def __getitem__(self, key):
         return self._data[key]
 
     def __setitem__(self, key, val):
-        raise DGLError("DGL doesn't support assignment. "
-                       + "Please call init_ndata to initialize new node data.")
+        self._data[key] = val
 
     def __delitem__(self, key):
-        #TODO(zhengda) how to delete data in the kvstore.
-        raise NotImplementedError("delete node data isn't supported yet")
+        del self._data[key]
 
     def __len__(self):
         # The number of node data may change. Let's count it every time we need them.
@@ -224,26 +182,25 @@ class EdgeDataView(MutableMapping):
         # When this is created, the server may already load edge data. We need to
         # initialize the edge data in advance.
         names = g._get_all_edata_names()
-        policy = PartitionPolicy("edge", g.get_partition_book())
-        self._data = {name: DistTensor(g, _get_edata_name(name), policy) for name in names}
+        policy = PartitionPolicy(EDGE_PART_POLICY, g.get_partition_book())
+        self._data = {}
+        for name in names:
+            name1 = _get_data_name(name, policy.policy_str)
+            dtype, shape, _ = g._client.get_data_meta(name1)
+            # We create a wrapper on the existing tensor in the kvstore.
+            self._data[name] = DistTensor(g, shape, dtype, name, part_policy=policy)
 
     def _get_names(self):
         return list(self._data.keys())
-
-    def _add(self, name):
-        policy = PartitionPolicy("edge", self._graph.get_partition_book())
-        self._data[name] = DistTensor(self._graph, _get_edata_name(name), policy)
 
     def __getitem__(self, key):
         return self._data[key]
 
     def __setitem__(self, key, val):
-        raise DGLError("DGL doesn't support assignment. "
-                       + "Please call init_edata to initialize new edge data.")
+        self._data[key] = val
 
     def __delitem__(self, key):
-        #TODO(zhengda) how to delete data in the kvstore.
-        raise NotImplementedError("delete edge data isn't supported yet")
+        del self._data[key]
 
     def __len__(self):
         # The number of edge data may change. Let's count it every time we need them.
@@ -286,53 +243,51 @@ class DistGraphServer(KVServer):
         Path of IP configuration file.
     num_clients : int
         Total number of client nodes.
-    conf_file : string
+    part_config : string
         The path of the config file generated by the partition tool.
     disable_shared_mem : bool
         Disable shared memory.
     '''
-    def __init__(self, server_id, ip_config, num_clients, conf_file, disable_shared_mem=False):
+    def __init__(self, server_id, ip_config, num_clients, part_config, disable_shared_mem=False):
         super(DistGraphServer, self).__init__(server_id=server_id, ip_config=ip_config,
                                               num_clients=num_clients)
         self.ip_config = ip_config
         # Load graph partition data.
-        self.client_g, node_feats, edge_feats, self.gpb, graph_name = load_partition(conf_file,
-                                                                                     server_id)
-        print('load ' + graph_name)
-        if not disable_shared_mem:
-            self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)
+        if self.is_backup_server():
+            # The backup server doesn't load the graph partition. It'll initialized afterwards.
+            self.gpb, graph_name = load_partition_book(part_config, self.part_id)
+            self.client_g = None
+        else:
+            self.client_g, node_feats, edge_feats, self.gpb, \
+                    graph_name = load_partition(part_config, self.part_id)
+            print('load ' + graph_name)
+            if not disable_shared_mem:
+                self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name)
 
-        # Init kvstore.
         if not disable_shared_mem:
             self.gpb.shared_memory(graph_name)
-        assert self.gpb.partid == server_id
-        self.add_part_policy(PartitionPolicy('node', self.gpb))
-        self.add_part_policy(PartitionPolicy('edge', self.gpb))
+        assert self.gpb.partid == self.part_id
+        self.add_part_policy(PartitionPolicy(NODE_PART_POLICY, self.gpb))
+        self.add_part_policy(PartitionPolicy(EDGE_PART_POLICY, self.gpb))
 
         if not self.is_backup_server():
             for name in node_feats:
-                self.init_data(name=_get_ndata_name(name), policy_str='node',
+                self.init_data(name=_get_data_name(name, NODE_PART_POLICY),
+                               policy_str=NODE_PART_POLICY,
                                data_tensor=node_feats[name])
             for name in edge_feats:
-                self.init_data(name=_get_edata_name(name), policy_str='edge',
+                self.init_data(name=_get_data_name(name, EDGE_PART_POLICY),
+                               policy_str=EDGE_PART_POLICY,
                                data_tensor=edge_feats[name])
-        else:
-            for name in node_feats:
-                self.init_data(name=_get_ndata_name(name), policy_str='node')
-            for name in edge_feats:
-                self.init_data(name=_get_edata_name(name), policy_str='edge')
 
     def start(self):
         """ Start graph store server.
         """
         # start server
         server_state = ServerState(kv_store=self, local_g=self.client_g, partition_book=self.gpb)
-        print('start graph service on server ' + str(self.server_id))
+        print('start graph service on server {} for part {}'.format(self.server_id, self.part_id))
         start_server(server_id=self.server_id, ip_config=self.ip_config,
                      num_clients=self.num_clients, server_state=server_state)
-
-def _default_init_data(shape, dtype):
-    return F.zeros(shape, dtype, F.cpu())
 
 class DistGraph:
     ''' The DistGraph client.
@@ -364,37 +319,39 @@ class DistGraph:
         The name of the graph. This name has to be the same as the one used in DistGraphServer.
     gpb : PartitionBook
         The partition book object
-    conf_file : str
+    part_config : str
         The partition config file. It's used in the standalone mode.
     '''
-    def __init__(self, ip_config, graph_name, gpb=None, conf_file=None):
+    def __init__(self, ip_config, graph_name, gpb=None, part_config=None):
         if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
-            assert conf_file is not None, \
+            assert part_config is not None, \
                     'When running in the standalone model, the partition config file is required'
             self._client = SA_KVClient()
             # Load graph partition data.
-            g, node_feats, edge_feats, self._gpb, _ = load_partition(conf_file, 0)
+            g, node_feats, edge_feats, self._gpb, _ = load_partition(part_config, 0)
             assert self._gpb.num_partitions() == 1, \
                     'The standalone mode can only work with the graph data with one partition'
             if self._gpb is None:
                 self._gpb = gpb
-            self._g = as_heterograph(g)
+            self._g = g
             for name in node_feats:
-                self._client.add_data(_get_ndata_name(name), node_feats[name])
+                self._client.add_data(_get_data_name(name, NODE_PART_POLICY), node_feats[name])
             for name in edge_feats:
-                self._client.add_data(_get_edata_name(name), edge_feats[name])
+                self._client.add_data(_get_data_name(name, EDGE_PART_POLICY), edge_feats[name])
             rpc.set_num_client(1)
         else:
             connect_to_server(ip_config=ip_config)
             self._client = KVClient(ip_config)
-            g = _get_graph_from_shared_mem(graph_name)
-            if g is not None:
-                self._g = as_heterograph(g)
-            else:
-                self._g = None
+            self._g = _get_graph_from_shared_mem(graph_name)
             self._gpb = get_shared_mem_partition_book(graph_name, self._g)
             if self._gpb is None:
                 self._gpb = gpb
+
+            # Tell the backup servers to load the graph structure from shared memory.
+            for server_id in range(self._client.num_servers):
+                rpc.send_request(server_id, InitGraphRequest(graph_name))
+            for server_id in range(self._client.num_servers):
+                rpc.recv_response()
             self._client.barrier()
             self._client.map_shared_data(self._gpb)
 
@@ -406,69 +363,6 @@ class DistGraph:
         for part_md in self._gpb.metadata():
             self._num_nodes += int(part_md['num_nodes'])
             self._num_edges += int(part_md['num_edges'])
-
-
-    def init_ndata(self, name, shape, dtype, init_func=None):
-        '''Initialize node data
-
-        This initializes the node data in the distributed graph storage.
-        Users can provide a init function to initialize data. The signature of
-        the init function is
-
-        ```
-        def init_func(shape, dtype)
-        ```
-        The inputs are the shape and data type and the output is a tensor with
-        the initialized values.
-
-        Parameters
-        ----------
-        name : string
-            The name of the node data.
-        shape : tuple
-            The shape of the node data.
-        dtype : dtype
-            The data type of the node data.
-        init_func : callable
-            The function to initialize the data
-        '''
-        assert shape[0] == self.number_of_nodes()
-        if init_func is None:
-            init_func = _default_init_data
-        policy = PartitionPolicy('node', self._gpb)
-        self._client.init_data(_get_ndata_name(name), shape, dtype, policy, init_func)
-        self._ndata._add(name)
-
-    def init_edata(self, name, shape, dtype, init_func=None):
-        '''Initialize edge data
-
-        This initializes the edge data in the distributed graph storage.
-        Users can provide a init function to initialize data. The signature of
-        the init function is
-
-        ```
-        def init_func(shape, dtype)
-        ```
-        The inputs are the shape and data type and the output is a tensor with
-        the initialized values.
-
-        Parameters
-        ----------
-        name : string
-            The name of the edge data.
-        shape : tuple
-            The shape of the edge data.
-        dtype : dtype
-            The data type of the edge data.
-        init_func : callable
-            The function to initialize the data
-        '''
-        assert shape[0] == self.number_of_edges()
-        if init_func is None:
-            init_func = _default_init_data
-        policy = PartitionPolicy('edge', self._gpb)
-        self._client.init_data(_get_edata_name(name), shape, dtype, policy, init_func)
-        self._edata._add(name)
 
     @property
     def local_partition(self):
@@ -506,6 +400,42 @@ class DistGraph:
             The data view in the distributed graph storage.
         """
         return self._edata
+
+    @property
+    def ntypes(self):
+        """Return the list of node types of this graph.
+
+        Returns
+        -------
+        list of str
+
+        Examples
+        --------
+
+        >>> g = DistGraph("ip_config.txt", "test")
+        >>> g.ntypes
+        ['_U']
+        """
+        # Currently, we only support a graph with one node type.
+        return ['_U']
+
+    @property
+    def etypes(self):
+        """Return the list of edge types of this graph.
+
+        Returns
+        -------
+        list of str
+
+        Examples
+        --------
+
+        >>> g = DistGraph("ip_config.txt", "test")
+        >>> g.etypes
+        ['_E']
+        """
+        # Currently, we only support a graph with one edge type.
+        return ['_E']
 
     def number_of_nodes(self):
         """Return the number of nodes"""
@@ -552,6 +482,25 @@ class DistGraph:
             client_id_in_part = rpc.get_rank() % num_client_per_part
             return int(self._gpb.partid * num_client_per_part + client_id_in_part)
 
+    def find_edges(self, edges):
+        """ Given an edge ID array, return the source
+        and destination node ID array ``s`` and ``d``.  ``s[i]`` and ``d[i]``
+        are source and destination node ID for edge ``eid[i]``.
+
+        Parameters
+        ----------
+        edges : tensor
+            The edge ID array.
+
+        Returns
+        -------
+        tensor
+            The source node ID array.
+        tensor
+            The destination node ID array.
+        """
+        return dist_find_edges(self, edges)
+
     def get_partition_book(self):
         """Get the partition information.
 
@@ -561,6 +510,13 @@ class DistGraph:
             Object that stores all kinds of partition information.
         """
         return self._gpb
+
+    def barrier(self):
+        '''Barrier for all client nodes.
+
+        This API will be blocked untill all the clients invoke this API.
+        '''
+        self._client.barrier()
 
     def _get_all_ndata_names(self):
         ''' Get the names of all node data.
@@ -672,7 +628,7 @@ def _split_even(partition_book, rank, elements):
         return eles[offsets[rank-1]:offsets[rank]]
 
 
-def node_split(nodes, partition_book, rank=None, force_even=False):
+def node_split(nodes, partition_book=None, rank=None, force_even=True):
     ''' Split nodes and return a subset for the local rank.
 
     This function splits the input nodes based on the partition book and
@@ -708,6 +664,10 @@ def node_split(nodes, partition_book, rank=None, force_even=False):
         The vector of node Ids that belong to the rank.
     '''
     num_nodes = 0
+    if not isinstance(nodes, DistTensor):
+        assert partition_book is not None, 'Regular tensor requires a partition book.'
+    elif partition_book is None:
+        partition_book = nodes.part_policy.partition_book
     for part in partition_book.metadata():
         num_nodes += part['num_nodes']
     assert len(nodes) == num_nodes, \
@@ -719,7 +679,7 @@ def node_split(nodes, partition_book, rank=None, force_even=False):
         local_nids = partition_book.partid2nids(partition_book.partid)
         return _split_local(partition_book, rank, nodes, local_nids)
 
-def edge_split(edges, partition_book, rank=None, force_even=False):
+def edge_split(edges, partition_book=None, rank=None, force_even=True):
     ''' Split edges and return a subset for the local rank.
 
     This function splits the input edges based on the partition book and
@@ -755,6 +715,10 @@ def edge_split(edges, partition_book, rank=None, force_even=False):
         The vector of edge Ids that belong to the rank.
     '''
     num_edges = 0
+    if not isinstance(edges, DistTensor):
+        assert partition_book is not None, 'Regular tensor requires a partition book.'
+    elif partition_book is None:
+        partition_book = edges.part_policy.partition_book
     for part in partition_book.metadata():
         num_edges += part['num_edges']
     assert len(edges) == num_edges, \
@@ -766,3 +730,5 @@ def edge_split(edges, partition_book, rank=None, force_even=False):
         # Get all edges that belong to the rank.
         local_eids = partition_book.partid2eids(partition_book.partid)
         return _split_local(partition_book, rank, edges, local_eids)
+
+rpc.register_service(INIT_GRAPH, InitGraphRequest, InitGraphResponse)

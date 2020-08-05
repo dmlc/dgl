@@ -4,6 +4,10 @@ import torch.nn.functional as F
 from torch.nn import init
 import random
 import numpy as np
+import torch.multiprocessing as mp
+from torch.multiprocessing import Queue
+
+from utils import thread_wrapped_func
 
 def init_emb2pos_index(walk_length, window_size, batch_size):
     ''' select embedding of positive nodes from a batch of node embeddings
@@ -72,25 +76,8 @@ def init_emb2neg_index(walk_length, window_size, negative, batch_size):
 
     return index_emb_negu, index_emb_negv
 
-def init_grad_avg(walk_length, window_size, batch_size):
-    ''' averaging graidents by specific weights
-    '''
-    grad_avg = []
-    for b in range(batch_size):
-        for i in range(walk_length):
-            if i < window_size:
-                grad_avg.append(1. / float(i+window_size))
-            elif i >= walk_length - window_size:
-                grad_avg.append(1. / float(walk_length - i - 1 + window_size))
-            else:
-                grad_avg.append(0.5 / window_size)
-
-    # [num_pos * batch_size]
-    return torch.Tensor(grad_avg).unsqueeze(1)
-
 def init_weight(walk_length, window_size, batch_size):
-    ''' select nodes' gradients from gradient matrix
-    '''
+    ''' init context weight '''
     weight = []
     for b in range(batch_size):
         for i in range(walk_length):
@@ -123,6 +110,20 @@ def adam(grad, state_sum, nodes, lr, device, only_gpu):
 
     return grad
 
+@thread_wrapped_func
+def async_update(num_threads, model, queue):
+    """ asynchronous embedding update """
+    torch.set_num_threads(num_threads)
+    while True:
+        (grad_u, grad_v, grad_v_neg, nodes, neg_nodes) = queue.get()
+        if grad_u is None:
+            return
+        with torch.no_grad():
+            model.u_embeddings.weight.data.index_add_(0, nodes.view(-1), grad_u)
+            model.v_embeddings.weight.data.index_add_(0, nodes.view(-1), grad_v)
+            if neg_nodes is not None:
+                model.v_embeddings.weight.data.index_add_(0, neg_nodes.view(-1), grad_v_neg)
+
 class SkipGramModel(nn.Module):
     """ Negative sampling based skip-gram """
     def __init__(self, 
@@ -138,13 +139,12 @@ class SkipGramModel(nn.Module):
         negative,
         lr,
         lap_norm,
-        adam,
-        sgd,
-        avg_sgd,
         fast_neg,
         record_loss,
         norm,
         use_context_weight,
+        async_update,
+        num_threads,
         ):
         """ initialize embedding on CPU 
 
@@ -162,10 +162,11 @@ class SkipGramModel(nn.Module):
         neg_weight float : negative weight
         lr float : initial learning rate
         lap_norm float : weight of laplacian normalization
-        adam bool : use adam for embedding updation
-        sgd bool : use sgd for embedding updation
-        avg_sgd bool : average gradients of sgd for embedding updation
         fast_neg bool : do negative sampling inside a batch
+        record_loss bool : print the loss during training
+        norm bool : do normalizatin on the embedding after training
+        use_context_weight : give different weights to the nodes in a context window
+        async_update : asynchronous training
         """
         super(SkipGramModel, self).__init__()
         self.emb_size = emb_size
@@ -180,13 +181,12 @@ class SkipGramModel(nn.Module):
         self.negative = negative
         self.lr = lr
         self.lap_norm = lap_norm
-        self.adam = adam
-        self.sgd = sgd
-        self.avg_sgd = avg_sgd
         self.fast_neg = fast_neg
         self.record_loss = record_loss
         self.norm = norm
         self.use_context_weight = use_context_weight
+        self.async_update = async_update
+        self.num_threads = num_threads
         
         # initialize the device as cpu
         self.device = torch.device("cpu")
@@ -215,12 +215,11 @@ class SkipGramModel(nn.Module):
             self.walk_length,
             self.window_size,
             self.batch_size)
-        if self.fast_neg:
-            self.index_emb_negu, self.index_emb_negv = init_emb2neg_index(
-                self.walk_length,
-                self.window_size,
-                self.negative,
-                self.batch_size)
+        self.index_emb_negu, self.index_emb_negv = init_emb2neg_index(
+            self.walk_length,
+            self.window_size,
+            self.negative,
+            self.batch_size)
 
         if self.use_context_weight:
             self.context_weight = init_weight(
@@ -228,16 +227,9 @@ class SkipGramModel(nn.Module):
                 self.window_size,
                 self.batch_size)
 
-        # coefficients for averaging the gradients
-        if self.avg_sgd:
-            self.grad_avg = init_grad_avg(
-                self.walk_length,
-                self.window_size,
-                self.batch_size)
         # adam
-        if self.adam:
-            self.state_sum_u = torch.zeros(self.emb_size)
-            self.state_sum_v = torch.zeros(self.emb_size)
+        self.state_sum_u = torch.zeros(self.emb_size)
+        self.state_sum_v = torch.zeros(self.emb_size)
 
         # gradients of nodes in batch_walks
         self.grad_u, self.grad_v = init_empty_grad(
@@ -245,13 +237,25 @@ class SkipGramModel(nn.Module):
             self.walk_length,
             self.batch_size)
 
+    def create_async_update(self):
+        """ Set up the async update subprocess.
+        """
+        self.async_q = Queue(1)
+        self.async_p = mp.Process(target=async_update, args=(self.num_threads, self, self.async_q))
+        self.async_p.start()
+
+    def finish_async_update(self):
+        """ Notify the async update subprocess to quit.
+        """
+        self.async_q.put((None, None, None, None, None))
+        self.async_p.join()
+
     def share_memory(self):
         """ share the parameters across subprocesses """
         self.u_embeddings.weight.share_memory_()
         self.v_embeddings.weight.share_memory_()
-        if self.adam:
-            self.state_sum_u.share_memory_()
-            self.state_sum_v.share_memory_()
+        self.state_sum_u.share_memory_()
+        self.state_sum_v.share_memory_()
 
     def set_device(self, gpu_id):
         """ set gpu device """
@@ -262,13 +266,10 @@ class SkipGramModel(nn.Module):
             self.logsigmoid_table = self.logsigmoid_table.to(self.device)
         self.index_emb_posu = self.index_emb_posu.to(self.device)
         self.index_emb_posv = self.index_emb_posv.to(self.device)
-        if self.fast_neg:
-            self.index_emb_negu = self.index_emb_negu.to(self.device)
-            self.index_emb_negv = self.index_emb_negv.to(self.device)
+        self.index_emb_negu = self.index_emb_negu.to(self.device)
+        self.index_emb_negv = self.index_emb_negv.to(self.device)
         self.grad_u = self.grad_u.to(self.device)
         self.grad_v = self.grad_v.to(self.device)
-        if self.avg_sgd:
-            self.grad_avg = self.grad_avg.to(self.device)
         if self.use_context_weight:
             self.context_weight = self.context_weight.to(self.device)
 
@@ -278,9 +279,8 @@ class SkipGramModel(nn.Module):
         self.set_device(gpu_id)
         self.u_embeddings = self.u_embeddings.cuda(gpu_id)
         self.v_embeddings = self.v_embeddings.cuda(gpu_id)
-        if self.adam:
-            self.state_sum_u = self.state_sum_u.to(self.device)
-            self.state_sum_v = self.state_sum_v.to(self.device)
+        self.state_sum_u = self.state_sum_u.to(self.device)
+        self.state_sum_v = self.state_sum_v.to(self.device)
 
     def fast_sigmoid(self, score):
         """ do fast sigmoid by looking up in a pre-defined table """
@@ -292,7 +292,7 @@ class SkipGramModel(nn.Module):
         idx = torch.floor((score + 6.01) / 0.01).long()
         return self.logsigmoid_table[idx]
 
-    def fast_learn(self, batch_walks, lr, neg_nodes=None):
+    def fast_learn(self, batch_walks, neg_nodes=None):
         """ Learn a batch of random walks in a fast way. It has the following features:
             1. It calculating the gradients directly without the forward operation.
             2. It does sigmoid by a looking up table.
@@ -317,8 +317,7 @@ class SkipGramModel(nn.Module):
         lr = 0.01
         neg_nodes = None
         """
-        if self.adam:
-            lr = self.lr
+        lr = self.lr
 
         # [batch_size, walk_length]
         if isinstance(batch_walks, list):
@@ -427,40 +426,35 @@ class SkipGramModel(nn.Module):
 
         ## Update
         nodes = nodes.view(-1)
-        if self.avg_sgd:
-            # since the times that a node are performed backward propagation are different, 
-            # we need to average the gradients by different weight.
-            # e.g. for sequence [1, 2, 3, ...] with window_size = 5, we have positive node 
-            # pairs [(1,2), (1, 3), (1,4), ...]. To average the gradients for each node, we
-            # perform weighting on the gradients of node pairs. 
-            # The weights are: [1/5, 1/5, ..., 1/6, ..., 1/10, ..., 1/6, ..., 1/5].
-            if bs < self.batch_size:
-                grad_avg = init_grad_avg(
-                    self.walk_length,
-                    self.window_size,
-                    bs).to(self.device)
-            else:
-                grad_avg = self.grad_avg
-            grad_u = grad_avg * grad_u * lr
-            grad_v = grad_avg * grad_v * lr
-        elif self.sgd:
-            grad_u = grad_u * lr
-            grad_v = grad_v * lr
-        elif self.adam:
-            # use adam optimizer
-            grad_u = adam(grad_u, self.state_sum_u, nodes, lr, self.device, self.only_gpu)
-            grad_v = adam(grad_v, self.state_sum_v, nodes, lr, self.device, self.only_gpu)
+
+        # use adam optimizer
+        grad_u = adam(grad_u, self.state_sum_u, nodes, lr, self.device, self.only_gpu)
+        grad_v = adam(grad_v, self.state_sum_v, nodes, lr, self.device, self.only_gpu)
+        if neg_nodes is not None:
+            grad_v_neg = adam(grad_v_neg, self.state_sum_v, neg_nodes, lr, self.device, self.only_gpu)
 
         if self.mixed_train:
             grad_u = grad_u.cpu()
             grad_v = grad_v.cpu()
             if neg_nodes is not None:
                 grad_v_neg = grad_v_neg.cpu()
+            else:
+                grad_v_neg = None
+
+            if self.async_update:
+                grad_u.share_memory_()
+                grad_v.share_memory_()
+                nodes.share_memory_()
+                if neg_nodes is not None:
+                    neg_nodes.share_memory_()
+                    grad_v_neg.share_memory_()
+                self.async_q.put((grad_u, grad_v, grad_v_neg, nodes, neg_nodes))
         
-        self.u_embeddings.weight.data.index_add_(0, nodes.view(-1), grad_u)
-        self.v_embeddings.weight.data.index_add_(0, nodes.view(-1), grad_v)            
-        if neg_nodes is not None:
-            self.v_embeddings.weight.data.index_add_(0, neg_nodes.view(-1), lr * grad_v_neg)
+        if not self.async_update:
+            self.u_embeddings.weight.data.index_add_(0, nodes.view(-1), grad_u)
+            self.v_embeddings.weight.data.index_add_(0, nodes.view(-1), grad_v)            
+            if neg_nodes is not None:
+                self.v_embeddings.weight.data.index_add_(0, neg_nodes.view(-1), grad_v_neg)
         return
 
     def forward(self, pos_u, pos_v, neg_v):
@@ -512,13 +506,12 @@ class SkipGramModel(nn.Module):
             self.save_embedding_pt_dgl_graph(dataset, file_name)
 
     def save_embedding_pt_dgl_graph(self, dataset, file_name):
-        """ For ogb leaderboard.
-        """
+        """ For ogb leaderboard """
         embedding = torch.zeros_like(self.u_embeddings.weight.cpu().data)
         valid_seeds = torch.LongTensor(dataset.valid_seeds)
         valid_embedding = self.u_embeddings.weight.cpu().data.index_select(0, 
             valid_seeds)
-        embedding.index_add_(0, valid_seeds, self.u_embeddings.weight.cpu().data)
+        embedding.index_add_(0, valid_seeds, valid_embedding)
 
         if self.norm:
             embedding /= torch.sqrt(torch.sum(embedding.mul(embedding), 1) + 1e-6).unsqueeze(1)

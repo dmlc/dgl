@@ -6,7 +6,7 @@ This is a direct modification from https://github.com/wengong-jin/icml18-jtnn
 Dependencies
 --------------
 * PyTorch 0.4.1+
-* RDKit
+* RDKit=2018.09.3.0
 * requests
 
 How to run

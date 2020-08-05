@@ -3,9 +3,11 @@ import numpy as np
 from mxnet import nd
 from ...sparse import _gspmm, _gsddmm
 from ...base import dgl_warning
-from .tensor import asnumpy, copy_to, zerocopy_from_numpy, context
+from .tensor import asnumpy, copy_to, zerocopy_from_numpy, context, to_backend_ctx
+
 
 def _scatter_nd(index, src, n_rows):
+    """Similar to PyTorch's scatter nd on first dimension."""
     assert index.shape == src.shape
     dgl_warning("MXNet do not support scatter_add, fallback to numpy.")
     ctx = context(src)
@@ -30,7 +32,9 @@ def _scatter_nd(index, src, n_rows):
     rst = copy_to(zerocopy_from_numpy(rst), ctx)
     return rst
 
+
 def _gather_nd(index, src):
+    """Similar to PyTorch's gather nd on first dimension."""
     ctx = context(src)
     shp = index.shape
     ndim = src.ndim
@@ -48,17 +52,20 @@ def _gather_nd(index, src):
     rst = nd.take(src, new_idx).reshape(shp)
     return rst
 
+
 def _reduce_grad(grad, shape):
     """Reduce gradient on the broadcast dimension
     If there is broadcast in forward pass, gradients need to be reduced on
     broadcast dimension. This function checks the input tensor shape and
     gradient shape and perform the reduction.
+
     Parameters
     ----------
     grad: Tensor
         Gradient tensor
     shape: tuple
         Shape of input tensor
+
     Returns
     -------
     Tensor
@@ -78,16 +85,28 @@ def _reduce_grad(grad, shape):
     grad = grad.sum(axis=tuple(reduce_idx), keepdims=True)
     return grad.reshape(shape)
 
+
+def _need_reduce_last_dim(ufeat, efeat):
+    """Indicates whether to reduce the last dimension on edges
+    in the backward pass of spmm,
+    if so, use dot instead of mul."""
+    ushp = ufeat.shape
+    eshp = efeat.shape
+    return ushp[1:-1] == eshp[1:-1] and eshp[-1] == 1 and ushp[-1] > 1
+
+
 def _muldiv(op, x):
     return 1. / x if op == 'div' else x
+
 
 def _addsub(op, x):
     return -x if op == 'sub' else x
 
+
 class GSpMM(mx.autograd.Function):
-    def __init__(self, g, op, reduce_op):
+    def __init__(self, gidx, op, reduce_op):
         super(GSpMM, self).__init__()
-        self.gidx = g._graph
+        self.gidx = gidx
         self.op = op
         self.reduce_op = reduce_op
 
@@ -100,8 +119,7 @@ class GSpMM(mx.autograd.Function):
         ctx = context(dZ)
         X, Y, argX, argY = self.saved_tensors
         gidx, op, reduce_op = self.gidx, self.op, self.reduce_op
-        dX, dY = nd.empty((), ctx=ctx), nd.empty((), ctx=ctx)
-        if op != 'copy_rhs' and X.grad is not None:
+        if op != 'copy_rhs':
             g_rev = gidx.reverse()
             if reduce_op == 'sum':
                 if op in ['mul', 'div']:
@@ -119,11 +137,16 @@ class GSpMM(mx.autograd.Function):
                 elif op in ['add', 'sub', 'copy_lhs']:
                     dX = _scatter_nd(argX, dZ, X.shape[0])
             dX = _reduce_grad(dX, X.shape)
-        if op != 'copy_lhs' and Y.grad is not None:
+        else:
+            dX = nd.zeros_like(X)
+        if op != 'copy_lhs':
             if reduce_op == 'sum':
-                if op in ['mul', 'div']:
+                if op == 'mul' and _need_reduce_last_dim(X, Y):
+                    dY = _gsddmm(gidx, 'dot', X, dZ)
+                elif op in ['mul', 'div']:
                     dY = _gsddmm(gidx, 'mul', X, dZ)
-                    if op == 'div': dY = -dY / (Y ** 2)
+                    if op == 'div':
+                        dY = -dY / (Y ** 2)
                 elif op in ['add', 'sub', 'copy_rhs']:
                     dY = _gsddmm(gidx, 'copy_rhs', X, _addsub(op, dZ))
             else:
@@ -132,21 +155,31 @@ class GSpMM(mx.autograd.Function):
                         argY,
                         _gather_nd(argX, X.broadcast_to((X.shape[0], *dZ.shape[1:]))) * dZ,
                         Y.shape[0])
-                    if op == 'div': dY = -dY / (Y ** 2)
+                    if op == 'div':
+                        dY = -dY / (Y ** 2)
                 elif op in ['add', 'sub', 'copy_rhs']:
                     dY = _scatter_nd(argY, _addsub(op, dZ), Y.shape[0])
             dY = _reduce_grad(dY, Y.shape)
+        else:
+            dY = nd.zeros_like(Y)
         self.saved_tensors = None
         return dX, dY
 
-def gspmm(g, op, reduce_op, lhs_data, rhs_data):
-    func = GSpMM(g, op, reduce_op)
+
+def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
+    func = GSpMM(gidx, op, reduce_op)
+    ctx = to_backend_ctx(gidx.ctx)
+    if lhs_data is None:
+        lhs_data = nd.zeros((1,), ctx=ctx)
+    if rhs_data is None:
+        rhs_data = nd.zeros((1,), ctx=ctx)
     return func(lhs_data, rhs_data)
 
+
 class GSDDMM(mx.autograd.Function):
-    def __init__(self, g, op, lhs_target, rhs_target):
+    def __init__(self, gidx, op, lhs_target, rhs_target):
         super(GSDDMM, self).__init__()
-        self.gidx = g._graph
+        self.gidx = gidx
         self.op = op
         self.lhs_target = lhs_target
         self.rhs_target = rhs_target
@@ -161,7 +194,6 @@ class GSDDMM(mx.autograd.Function):
         X, Y = self.saved_tensors
         gidx, op = self.gidx, self.op
         lhs_target, rhs_target = self.lhs_target, self.rhs_target
-        dX, dY = nd.empty((), ctx=ctx), nd.empty((), ctx=ctx)
         if op != 'copy_rhs':
             if lhs_target in ['u', 'v']:
                 _gidx = gidx if self.lhs_target == 'v' else gidx.reverse()
@@ -180,6 +212,8 @@ class GSDDMM(mx.autograd.Function):
                 else:  # mul, div, dot
                     dX = _gsddmm(gidx, 'mul', dZ, _muldiv(op, Y), 'e', rhs_target)
             dX = _reduce_grad(dX, X.shape)
+        else:
+            dX = nd.zeros_like(X)
         if op != 'copy_lhs':
             if self.rhs_target in ['u', 'v']:
                 _gidx = gidx if rhs_target == 'v' else gidx.reverse()
@@ -192,17 +226,27 @@ class GSDDMM(mx.autograd.Function):
                         dY = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ * X)[0]
                     else:  # rhs_target = !lhs_target
                         dY = _gspmm(_gidx, 'mul', 'sum', X, dZ)[0]
-                    if op == 'div': dY = -dY / (Y ** 2)
+                    if op == 'div':
+                        dY = -dY / (Y ** 2)
             else:
                 if op in ['add', 'sub', 'copy_rhs']:
                     dY = _addsub(op, dZ)
                 else:  # mul, div, dot
                     dY = _gsddmm(gidx, 'mul', dZ, X, 'e', lhs_target)
-                    if op == 'div': dY = -dY / (Y ** 2)
+                    if op == 'div':
+                        dY = -dY / (Y ** 2)
             dY = _reduce_grad(dY, Y.shape)
+        else:
+            dY = nd.zeros_like(Y)
         self.saved_tensors = None
         return dX, dY
 
-def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
-    func = GSDDMM(g, op, lhs_target, rhs_target)
+
+def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
+    func = GSDDMM(gidx, op, lhs_target, rhs_target)
+    ctx = to_backend_ctx(gidx.ctx)
+    if lhs_data is None:
+        lhs_data = nd.zeros((1,), ctx=ctx)
+    if rhs_data is None:
+        rhs_data = nd.zeros((1,), ctx=ctx)
     return func(lhs_data, rhs_data)

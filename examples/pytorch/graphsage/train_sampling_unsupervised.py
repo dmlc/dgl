@@ -64,7 +64,7 @@ class NeighborSampler(object):
         neg_graph = dgl.graph((neg_heads, neg_tails), num_nodes=self.g.number_of_nodes())
         pos_graph, neg_graph = dgl.compact_graphs([pos_graph, neg_graph])
 
-        # Obtain the node IDs being used in either pos_graph or neg_graph.  Since they
+        # Obtain the node IDs being used in either pos_graph or neg_graph. Since they
         # are compacted together, pos_graph and neg_graph share the same compacted node
         # space.
         seeds = pos_graph.ndata[dgl.NID]
@@ -121,14 +121,7 @@ class SAGE(nn.Module):
     def forward(self, blocks, x):
         h = x
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):
-            # We need to first copy the representation of nodes on the RHS from the
-            # appropriate nodes on the LHS.
-            # Note that the shape of h is (num_nodes_LHS, D) and the shape of h_dst
-            # would be (num_nodes_RHS, D)
-            h_dst = h[:block.number_of_dst_nodes()]
-            # Then we compute the updated representation on the RHS.
-            # The shape of h now becomes (num_nodes_RHS, D)
-            h = layer(block, (h, h_dst))
+            h = layer(block, h)
             if l != len(self.layers) - 1:
                 h = self.activation(h)
                 h = self.dropout(h)
@@ -156,11 +149,11 @@ class SAGE(nn.Module):
                 end = start + batch_size
                 batch_nodes = nodes[start:end]
                 block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
+                block = block.to(device)
                 input_nodes = block.srcdata[dgl.NID]
 
                 h = x[input_nodes].to(device)
-                h_dst = h[:block.number_of_dst_nodes()]
-                h = layer(block, (h, h_dst))
+                h = layer(block, h)
                 if l != len(self.layers) - 1:
                     h = self.activation(h)
                     h = self.dropout(h)
@@ -301,6 +294,9 @@ def run(proc_id, n_gpus, args, devices, data):
             batch_inputs = load_subtensor(g, input_nodes, device)
             d_step = time.time()
 
+            pos_graph = pos_graph.to(device)
+            neg_graph = neg_graph.to(device)
+            blocks = [block.to(device) for block in blocks]
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, pos_graph, neg_graph)
@@ -335,15 +331,13 @@ def run(proc_id, n_gpus, args, devices, data):
 def main(args, devices):
     # load reddit data
     data = RedditDataset(self_loop=True)
-    train_mask = data.train_mask
-    val_mask = data.val_mask
-    test_mask = data.test_mask
-    features = th.Tensor(data.features)
+    n_classes = data.num_classes
+    g = data[0]
+    features = g.ndata['feat']
     in_feats = features.shape[1]
-    labels = th.LongTensor(data.labels)
-    n_classes = data.num_labels
-    # Construct graph
-    g = dgl.graph(data.graph.all_edges())
+    labels = g.ndata['label']
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
     g.ndata['features'] = features
     # Pack data
     data = train_mask, val_mask, test_mask, in_feats, labels, n_classes, g
@@ -385,7 +379,7 @@ if __name__ == '__main__':
     argparser.add_argument('--num-workers', type=int, default=0,
         help="Number of sampling processes. Use 0 for no extra process.")
     args = argparser.parse_args()
-    
+
     devices = list(map(int, args.gpu.split(',')))
 
     main(args, devices)
