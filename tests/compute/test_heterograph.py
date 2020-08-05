@@ -1385,8 +1385,8 @@ def test_empty_heterograph(idtype):
     assert g.number_of_edges('develops') == 2
     assert g.number_of_nodes('developer') == 2
 
-
-def test_types_in_function():
+@parametrize_dtype
+def test_types_in_function(idtype):
     def mfunc1(edges):
         assert edges.etype == ('user', 'follow', 'user')
         return {}
@@ -1419,7 +1419,7 @@ def test_types_in_function():
         assert edges.etype == ('user', 'plays', 'game')
         return F.zeros((2,))
 
-    g = dgl.graph([(0, 1), (1, 2)], 'user', 'follow')
+    g = dgl.graph([(0, 1), (1, 2)], 'user', 'follow', idtype=idtype, device=F.ctx())
     g.apply_nodes(rfunc1)
     g.apply_edges(mfunc1)
     g.update_all(mfunc1, rfunc1)
@@ -1429,7 +1429,7 @@ def test_types_in_function():
     g.filter_nodes(filter_nodes1)
     g.filter_edges(filter_edges1)
 
-    g = dgl.bipartite([(0, 1), (1, 2)], 'user', 'plays', 'game')
+    g = dgl.bipartite([(0, 1), (1, 2)], 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
     g.apply_nodes(rfunc2, ntype='game')
     g.apply_edges(mfunc2)
     g.update_all(mfunc2, rfunc2)
