@@ -28,6 +28,8 @@ __all__ = [
     'reverse',
     'to_bidirected',
     'to_bidirected_stale',
+    'is_simple_graph',
+    'add_reverse_edges',
     'laplacian_lambda_max',
     'knn_graph',
     'segmented_knn_graph',
@@ -147,19 +149,172 @@ def segmented_knn_graph(x, k, segs):
     g = convert.graph(adj)
     return g
 
-def to_bidirected(g, readonly=None, copy_ndata=True,
-                  copy_edata=False, ignore_bipartite=False):
-    r"""Convert the graph to a bidirected one.
+def is_simple_graph(g):
+    """ Check whether g is a simple graph.
 
-    For a graph with edges :math:`(i_1, j_1), \cdots, (i_n, j_n)`, this
-    function creates a new graph with edges
-    :math:`(i_1, j_1), \cdots, (i_n, j_n), (j_1, i_1), \cdots, (j_n, i_n)`.
+    The function returns True if g is a simple graph, otherwise returns False.
+
+    For a heterograph with multiple edge types, we can treat edges corresponding
+    to each type as a separate graph and check whether each of them is a simple
+    graph. If one of them is not a simple graph, False is returned.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+
+    Returns
+    -------
+    bool
+
+    Examples
+    --------
+    The following examples use PyTorch backend.
+
+    **Simple graph**
+
+    >>> import dgl
+    >>> import torch as th
+    >>> g = dgl.graph((th.tensor([0, 1, 2]), th.tensor([1, 2, 0])))
+    >>> is_simple = dgl.is_simple_graph(g)
+    >>> is_simple
+    True
+
+    ** Multi graph**
+
+    >>> g = dgl.graph((th.tensor([0, 1, 2, 2]), th.tensor([1, 2, 0, 0])))
+    >>> is_simple = dgl.is_simple_graph(g)
+    >>> is_simple
+    False
+
+    **Heterographs with Multiple Edge Types**
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2]), th.tensor([1, 1, 2, 0])),
+    >>>     ('user', 'follows', 'user'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
+    >>> })
+    >>> is_simple = dgl.is_simple_graph(g)
+    >>> is_simple
+    True
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2]), th.tensor([1, 1, 2, 0])),
+    >>>     ('user', 'follows', 'user'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 2]))
+    >>> })
+    >>> is_simple = dgl.is_simple_graph(g)
+    >>> is_simple
+    False
+    """
+    # check for simple graph
+    for c_etype in g.canonical_etypes:
+        if g.number_of_edges(etype=c_etype) <= 1:
+            continue
+        u, v = g.edges(etype=c_etype)
+        sort_idx = F.argsort(v, dim=0, descending=False)
+        u = u[sort_idx]
+        v = v[sort_idx]
+        sort_idx = F.argsort(u, dim=0, descending=False)
+        u = u[sort_idx]
+        v = v[sort_idx]
+        u_h = u[:-1]
+        v_h = v[:-1]
+        u_t = u[1:]
+        v_t = v[1:]
+        u_same = F.tensor((u_h == u_t), dtype=F.int32)
+        v_same = F.tensor((v_h == v_t), dtype=F.int32)
+        same = (u_same + v_same) > 1
+
+        print(same)
+        if F.sum(same, dim=0) > 0:
+            return False
+
+    return True
+
+def to_bidirected(g, readonly=True):
+    r""" Convert the graph to a bidirected one.
+
+    The function generates a new graph with no node/edge feature.
+    If g has an edge for i->j but no edge for j->i, then the
+    returned graph will have both i->j and j->i.
 
     For a heterograph with multiple edge types, we can treat edges corresponding
     to each type as a separate graph and convert the graph to a bidirected one
     for each of them.
 
     Since **to_bidirected is not well defined for unidirectional bipartite graphs**,
+    an error will be raised if an edge type of the input heterograph is for a
+    unidirectional bipartite graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+    readonly : bool, default to be True
+        Deprecated. There will be no difference between readonly and non-readonly
+
+    Notes
+    -----
+    Please make sure g is a single graph, otherwise the return value is undefined.
+
+    Returns
+    -------
+    dgl.DGLGraph
+        The bidirected graph
+
+    Examples
+    --------
+    The following examples use PyTorch backend.
+
+    >>> import dgl
+    >>> import torch as th
+    >>> g = dgl.graph((th.tensor([0, 1, 2]), th.tensor([1, 2, 0])))
+    >>> bg1 = dgl.to_bidirected(g)
+    >>> bg1.edges()
+    (tensor([0, 1, 2, 1, 2, 0]), tensor([1, 2, 0, 0, 1, 2]))
+
+    The graph already have i->j and j->i
+
+    >>> g = dgl.graph((th.tensor([0, 1, 2, 0]), th.tensor([1, 2, 0, 2])))
+    >>> bg1 = dgl.to_bidirected(g)
+    >>> bg1.edges()
+    (tensor([0, 1, 2, 1, 2, 0]), tensor([1, 2, 0, 0, 1, 2]))
+
+    **Heterographs with Multiple Edge Types**
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2]), th.tensor([1, 1, 2, 0])),
+    >>>     ('user', 'follows', 'user'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
+    >>> })
+    >>> bg1 = dgl.to_bidirected(g)
+    >>> bg1.edges(etype='wins')
+    (tensor([0, 0, 1, 1, 2, 2]), tensor([1, 2, 0, 2, 0, 1]))
+    >>> bg1.edges(etype='follows')
+    (tensor([1, 1, 2]), tensor([1, 2, 1]))
+    """
+    for c_etype in g.canonical_etypes:
+        if c_etype[0] != c_etype[2]:
+            assert False, "to_bidirected is not well defined for " \
+                "unidirectional bipartite graphs" \
+                ", but {} is unidirectional bipartite".format(c_etype)
+
+    assert is_simple_graph(g) is True, "to_bidirected only support simple graph"
+
+    g = add_reverse_edges(g, copy_ndata=False, copy_edata=False)
+    g = to_simple(g, return_counts=None, copy_ndata=False, copy_edata=False)
+    return g
+
+def add_reverse_edges(g, readonly=None, copy_ndata=True,
+                  copy_edata=False, ignore_bipartite=False):
+    r"""Add reverse edges to a graph
+
+    For a graph with edges :math:`(i_1, j_1), \cdots, (i_n, j_n)`, this
+    function creates a new graph with edges
+    :math:`(i_1, j_1), \cdots, (i_n, j_n), (j_1, i_1), \cdots, (j_n, i_n)`.
+
+    For a heterograph with multiple edge types, we can treat edges corresponding
+    to each type as a separate graph and add reverse edges for each of them.
+
+    Since **add_reverse_edges is not well defined for unidirectional bipartite graphs**,
     an error will be raised if an edge type of the input heterograph is for a
     unidirectional bipartite graph. We can simply skip the edge types corresponding
     to unidirectional bipartite graphs by specifying ``ignore_bipartite=True``.
@@ -171,14 +326,14 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
     readonly : bool, default to be True
         Deprecated. There will be no difference between readonly and non-readonly
     copy_ndata: bool, optional
-        If True, the node features of the bidirected graph are copied from
-        the original graph. If False, the bidirected
-        graph will not have any node features.
+        If True, the node features of the new graph are copied from
+        the original graph. If False, the new graph will not have any
+        node features.
         (Default: True)
     copy_edata: bool, optional
         If True, the features of the reversed edges will be identical to
         the original ones."
-        If False, the bidirected graph will not have any edge
+        If False, the new graph will not have any edge
         features.
         (Default: False)
     ignore_bipartite: bool, optional
@@ -189,8 +344,8 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
 
     Returns
     -------
-    DGLGraph
-        The bidirected graph
+    dgl.DGLGraph
+        The graph with reversed edges added.
 
     Notes
     -----
@@ -208,7 +363,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
     **Homographs**
 
     >>> g = dgl.graph(th.tensor([0, 0]), th.tensor([0, 1]))
-    >>> bg1 = dgl.to_bidirected(g)
+    >>> bg1 = dgl.add_reverse_edges(g)
     >>> bg1.edges()
     (tensor([0, 0, 0, 1]), tensor([0, 1, 0, 0]))
 
@@ -224,14 +379,14 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
     >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
     >>> g.edges['wins'].data['h'] = th.tensor([0, 1, 2, 3, 4])
 
-    The to_bidirected operation is applied to the subgraph
+    The add_reverse_edges operation is applied to the subgraph
     corresponding to ('user', 'wins', 'user') and the
     subgraph corresponding to ('user', 'follows', 'user).
     The unidirectional bipartite subgraph ('user', 'plays', 'game')
     is ignored. Both the node features and edge features
     are shared.
 
-    >>> bg = dgl.to_bidirected(g, copy_ndata=True,
+    >>> bg = dgl.add_reverse_edges(g, copy_ndata=True,
                                copy_edata=True, ignore_bipartite=True)
     >>> bg.edges(('user', 'wins', 'user'))
     (tensor([0, 2, 0, 2, 2, 1, 1, 2, 1, 0]), tensor([1, 1, 2, 1, 0, 0, 2, 0, 2, 2]))
@@ -254,7 +409,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
         subgs = {}
         for c_etype in canonical_etypes:
             if c_etype[0] != c_etype[2]:
-                assert False, "to_bidirected is not well defined for " \
+                assert False, "add_reverse_edges is not well defined for " \
                     "unidirectional bipartite graphs" \
                     ", but {} is unidirectional bipartite".format(c_etype)
 
