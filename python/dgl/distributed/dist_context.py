@@ -86,6 +86,7 @@ def finalize_worker():
         SAMPLER_POOL.close()
 
 def join_finalize_worker():
+    """join the worker close process"""
     if SAMPLER_POOL is not None:
         SAMPLER_POOL.join()
 

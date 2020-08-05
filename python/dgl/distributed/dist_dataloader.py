@@ -3,9 +3,7 @@
 import multiprocessing as mp
 import time
 import traceback
-import atexit
 
-from . import exit_client
 from .dist_context import get_sampler_pool
 from .. import backend as F
 
@@ -34,11 +32,6 @@ def init_fn(collate_fn, queue):
     # probably need better solution in the future
     time.sleep(1)
     return 1
-
-
-# def _exit():
-#     exit_client()
-#     time.sleep(1)
 
 
 def enable_mp_debug():
