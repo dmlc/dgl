@@ -135,7 +135,12 @@ def _gen_copy_reduce_func(binary_op, reduce_op):
     return func
 
 def _register_spmm_func():
-    """Register spmm functions"""
+    """Register spmm functions
+
+    - Binary operation plus reduction between u and e: u_[]_e_[]
+    - Copy u plus reduction: copy_u_[]
+    - Copy e plus reduction: copy_e_[]
+    """
     for binary_op in ["add", "sub", "mul", "div", "copy_u", "copy_e"]:
         for reduce_op in ["sum", "max", "min", "mean"]:
             if binary_op.startswith("copy"):

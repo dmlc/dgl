@@ -132,9 +132,12 @@ def message_passing(g, mfunc, rfunc, afunc):
     if g.number_of_edges() == 0:
         # No message passing is triggered.
         ndata = {}
-    elif is_builtin(mfunc) and is_builtin(rfunc):
+    elif (is_builtin(mfunc) and is_builtin(rfunc) and
+            getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name), None) is not None):
+        # invoke fused message passing
         ndata = invoke_gspmm(g, mfunc, rfunc)
     else:
+        # invoke message passing in two separate steps
         # message phase
         if is_builtin(mfunc):
             msgdata = invoke_gsddmm(g, mfunc)
