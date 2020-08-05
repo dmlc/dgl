@@ -223,8 +223,6 @@ def to_bidirected(g, readonly=None, copy_ndata=False):
                 "unidirectional bipartite graphs" \
                 ", but {} is unidirectional bipartite".format(c_etype)
 
-    assert g.is_multigraph is False, "to_bidirected only support simple graph"
-
     g = add_reverse_edges(g, copy_ndata=copy_ndata, copy_edata=False)
     g = to_simple(g, return_counts=None, copy_ndata=copy_ndata, copy_edata=False)
     return g
