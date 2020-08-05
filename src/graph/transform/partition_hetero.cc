@@ -22,11 +22,21 @@ class HaloHeteroSubgraph : public HeteroSubgraph {
 };
 
 HeteroGraphPtr ReorderUnitGraph(UnitGraphPtr ug, IdArray new_order) {
+  auto format = ug->GetCreatedFormats();
   // We only need to reorder one of the graph structure.
-  // Only to in_csr for now
-  auto csrmat = ug->GetCSRMatrix(0);
-  auto new_csrmat = aten::CSRReorder(csrmat, new_order, new_order);
-  return UnitGraph::CreateFromCSR(ug->NumVertexTypes(), new_csrmat);
+  if (format & csc_code) {
+    auto cscmat = ug->GetCSCMatrix(0);
+    auto new_cscmat = aten::CSRReorder(cscmat, new_order, new_order);
+    return UnitGraph::CreateFromCSC(ug->NumVertexTypes(), new_cscmat, ug->GetAllowedFormats());
+  } else if (format & csr_code) {
+    auto csrmat = ug->GetCSRMatrix(0);
+    auto new_csrmat = aten::CSRReorder(csrmat, new_order, new_order);
+    return UnitGraph::CreateFromCSR(ug->NumVertexTypes(), new_csrmat, ug->GetAllowedFormats());
+  } else {
+    auto coomat = ug->GetCOOMatrix(0);
+    auto new_coomat = aten::COOReorder(coomat, new_order, new_order);
+    return UnitGraph::CreateFromCOO(ug->NumVertexTypes(), new_coomat, ug->GetAllowedFormats());
+  }
 }
 
 HaloHeteroSubgraph GetSubgraphWithHalo(std::shared_ptr<HeteroGraph> hg,
