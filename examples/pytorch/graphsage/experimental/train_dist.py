@@ -97,8 +97,7 @@ class DistSAGE(nn.Module):
                 batch_size=batch_size,
                 collate_fn=sampler.sample_blocks,
                 shuffle=False,
-                drop_last=False,
-                num_workers=args.num_workers)
+                drop_last=False)
 
             for blocks in tqdm.tqdm(dataloader):
                 block = blocks[0]
