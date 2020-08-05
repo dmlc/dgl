@@ -246,11 +246,13 @@ class SSTDataset(DGLBuiltinDataset):
 
         Returns
         -------
-        dgl.DGLGraph
-            graph structure, word id for each node, node labels and masks
-            - ndata['x']: word id of the node
-            - ndata['y']: label of the node
-            - ndata['mask']: 1 if the node is a leaf, otherwise 0
+        :class:`dgl.DGLGraph`
+
+            graph structure, word id for each node, node labels and masks.
+
+            - ``ndata['x']``: word id of the node
+            - ``ndata['y']:`` label of the node
+            - ``ndata['mask']``: 1 if the node is a leaf, otherwise 0
         """
         return self._trees[idx]
 

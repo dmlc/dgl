@@ -15,7 +15,9 @@ class KarateClubDataset(DGLDataset):
     r""" Karate Club dataset for Node Classification
 
     .. deprecated:: 0.5.0
-        `data` is deprecated, it is replaced by:
+
+        ``data`` is deprecated, it is replaced by:
+
             >>> dataset = KarateClubDataset()
             >>> g = dataset[0]
 
@@ -27,16 +29,17 @@ class KarateClubDataset(DGLDataset):
     Official website: `<http://konect.cc/networks/ucidata-zachary/>`_
 
     Karate Club dataset statistics:
-    Nodes: 34
-    Edges: 156
-    Number of Classes: 2
+
+    - Nodes: 34
+    - Edges: 156
+    - Number of Classes: 2
 
     Attributes
     ----------
     num_classes : int
         Number of node classes
     data : list
-        A list of DGLGraph objects
+        A list of :class:`dgl.DGLGraph` objects
 
     Examples
     --------
@@ -78,9 +81,11 @@ class KarateClubDataset(DGLDataset):
 
         Returns
         -------
-        dgl.DGLGraph
+        :class:`dgl.DGLGraph`
+
             graph structure and labels.
-            - ndata['label']: ground truth labels
+
+            - ``ndata['label']``: ground truth labels
         """
         assert idx == 0, "This dataset has only one graph"
         return self._graph
