@@ -88,6 +88,8 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
             assert np.max(max_nid) == num_nodes_to_sample - 1 - num_nodes_to_sample % batch_size
         else:
             assert np.max(max_nid) == num_nodes_to_sample - 1
+    
+    dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
