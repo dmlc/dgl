@@ -291,15 +291,8 @@ def test_all_binary_builtins():
             lhs_grad_2 = F.grad(target_feature_switch(g, lhs))
             rhs_grad_2 = F.grad(target_feature_switch(g, rhs))
 
-        if reducer == 'prod':
-            # increase tolerance for prod reducer
-            # NOTE(zihao) as far as I know prod reducer has never
-            # been used in any gnn models.
-            rtol = 1e-2
-            atol = 1e-2
-        else:
-            rtol = 1e-4
-            atol = 1e-4
+        rtol = 1e-4
+        atol = 1e-4
 
         def _print_error(a, b):
             print("ERROR: Test {}_{}_{}_{} broadcast: {} partial: {}".
@@ -358,7 +351,7 @@ def test_all_binary_builtins():
         if lhs == rhs:
             continue
         for binary_op in ["add", "sub", "mul", "div", "dot"]:
-            for reducer in ["sum", "max", "min", "prod", "mean"]:
+            for reducer in ["sum", "max", "min", "mean"]:
                 for broadcast in ["none", lhs, rhs]:
                     for partial in [False, True]:
                         _test(g, lhs, rhs, binary_op, reducer, partial, nid,
@@ -368,4 +361,3 @@ if __name__ == '__main__':
     test_copy_src_reduce()
     test_copy_edge_reduce()
     test_all_binary_builtins()
-

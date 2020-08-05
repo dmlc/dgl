@@ -1,6 +1,7 @@
 """dgl spmm operator module."""
 import sys
 from ..backend import gspmm as gspmm_internal
+from .. import backend as F
 
 __all__ = ['gspmm']
 
@@ -30,7 +31,7 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
         The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``,
         ``copy_lhs``, ``copy_rhs``.
     reduce_op : str
-        Reduce operator, could be ``sum``, ``max``, ``min``.
+        Reduce operator, could be ``sum``, ``max``, ``min``, ``mean``.
     lhs_data : tensor or None
         The left operand, could be None if it's not required by the op.
     rhs_data : tensor or None
@@ -41,7 +42,14 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     tensor
         The result tensor.
     """
-    return gspmm_internal(g._graph, op, reduce_op, lhs_data, rhs_data)
+    if reduce_op == 'mean':
+        ret = gspmm_internal(g._graph, op, 'sum', lhs_data, rhs_data)
+        ret_shape = F.shape(ret)
+        deg = F.astype(g.in_degrees(), F.dtype(ret))
+        deg_shape = (ret_shape[0],) + (1,) * (len(ret_shape) - 1)
+        return ret / F.reshape(deg, deg_shape)
+    else:
+        return gspmm_internal(g._graph, op, reduce_op, lhs_data, rhs_data)
 
 def _gen_spmm_func(binary_op, reduce_op):
     name = "u_{}_e_{}".format(binary_op, reduce_op)
@@ -129,7 +137,7 @@ def _gen_copy_reduce_func(binary_op, reduce_op):
 def _register_spmm_func():
     """Register spmm functions"""
     for binary_op in ["add", "sub", "mul", "div", "copy_u", "copy_e"]:
-        for reduce_op in ["sum", "max", "min"]:
+        for reduce_op in ["sum", "max", "min", "mean"]:
             if binary_op.startswith("copy"):
                 func = _gen_copy_reduce_func(binary_op, reduce_op)
             else:
