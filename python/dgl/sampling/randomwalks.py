@@ -60,7 +60,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     Examples
     --------
     The following creates a homogeneous graph:
-    >>> g1 = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 0), (3, 0)], 'user', 'follow')
+    >>> g1 = dgl.graph(([0, 1, 1, 2, 3], [1, 2, 3, 0, 0]))
 
     Normal random walk:
     >>> dgl.sampling.random_walk(g1, [0, 1, 2, 0], length=4)
@@ -71,7 +71,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
 
     The first tensor indicates the random walk path for each seed node.
     The j-th element in the second tensor indicates the node type ID of the j-th node
-    in every path.  In this case, it is returning all 0 (``user``).
+    in every path.  In this case, it is returning all 0.
 
     Random walk with restart:
     >>> dgl.sampling.random_walk_with_restart(g1, [0, 1, 2, 0], length=4, restart_prob=0.5)

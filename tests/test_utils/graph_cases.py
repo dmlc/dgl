@@ -92,11 +92,11 @@ def random_dglgraph(size):
     return dgl.DGLGraph(nx.erdos_renyi_graph(size, 0.3))
 
 def random_graph(size):
-    return dgl.graph(nx.erdos_renyi_graph(size, 0.3))
+    return dgl.from_networkx(nx.erdos_renyi_graph(size, 0.3))
 
 def random_bipartite(size_src, size_dst):
     return dgl.bipartite(ssp.random(size_src, size_dst, 0.1))
 
 def random_block(size):
-    g = dgl.graph(nx.erdos_renyi_graph(size, 0.1))
+    g = dgl.from_networkx(nx.erdos_renyi_graph(size, 0.1))
     return dgl.to_block(g, np.unique(F.zerocopy_to_numpy(g.edges()[1])))

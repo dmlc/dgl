@@ -68,11 +68,7 @@ def generate_graph(idtype=F.int64, grad=False):
 
 @parametrize_dtype
 def test_isolated_nodes(idtype):
-    g = dgl.graph([(0, 1), (1, 2)], num_nodes=5, idtype=idtype, device=F.ctx())
-    assert g.number_of_nodes() == 5
-
-    # Test backward compatibility
-    g = dgl.graph([(0, 1), (1, 2)], card=5, idtype=idtype, device=F.ctx())
+    g = dgl.graph([[0, 1], [1, 2]], num_nodes=5, idtype=idtype, device=F.ctx())
     assert g.number_of_nodes() == 5
 
     g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays',

@@ -125,7 +125,7 @@ class GINDataset(DGLBuiltinDataset):
 
         Returns
         -------
-        (dgl.Graph, int)
+        (dgl.DGLGraph, int)
             The graph and its label.
         """
         return self.graphs[idx], self.labels[idx]

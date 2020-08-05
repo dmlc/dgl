@@ -207,7 +207,7 @@ def to_bidirected(g, readonly=None, copy_ndata=True,
     --------
     **Homographs**
 
-    >>> g = dgl.graph(th.tensor([0, 0]), th.tensor([0, 1]))
+    >>> g = dgl.graph((th.tensor([0, 0]), th.tensor([0, 1])))
     >>> bg1 = dgl.to_bidirected(g)
     >>> bg1.edges()
     (tensor([0, 0, 0, 1]), tensor([0, 1, 0, 0]))
@@ -322,7 +322,7 @@ def line_graph(g, backtracking=True, shared=False):
     A = [[0, 0, 1],
             [1, 0, 1],
             [1, 1, 0]]
-    >>> g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 'user', 'follows')
+    >>> g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]))
     >>> lg = g.line_graph()
     >>> lg
     ... Graph(num_nodes=5, num_edges=8,
@@ -1693,7 +1693,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
     Examples
     --------
     Converting a homogeneous graph to a block as described above:
-    >>> g = dgl.graph([(0, 1), (1, 2), (2, 3)])
+    >>> g = dgl.graph(([0, 1, 2], [1, 2, 3]))
     >>> block = dgl.to_block(g, torch.LongTensor([3, 2]))
 
     The right hand side nodes would be exactly the same as the ones given: [3, 2].

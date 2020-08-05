@@ -89,15 +89,15 @@ ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes, bool includ
  * * \c count : The array of edge occurrences per edge type.
  * * \c edge_map : The mapping from original edge IDs to new edge IDs per edge type.
  *
- * \note Example: consider the following graph:
+ * \note Example: consider a graph with the following edges
  *
- *     g = dgl.graph([(0, 1), (1, 3), (2, 2), (1, 3), (1, 4), (1, 4)])
+ *     [(0, 1), (1, 3), (2, 2), (1, 3), (1, 4), (1, 4)]
  *
  * Then ToSimpleGraph(g) would yield the following elements:
  *
- * * The first element would be the simple graph itself:
+ * * The first element would be the simple graph itself with the following edges
  *
- *       simple_g = dgl.graph([(0, 1), (1, 3), (1, 4), (2, 2)])
+ *       [(0, 1), (1, 3), (1, 4), (2, 2)]
  *
  * * The second element is an array \c count.  \c count[i] stands for the number of edges
  *   connecting simple_g.src[i] and simple_g.dst[i] in the original graph.

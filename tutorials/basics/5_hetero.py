@@ -192,9 +192,7 @@ print(pa_g.number_of_edges())  # Only one edge type, the edge type argument coul
 # :class:`DGLGraph`.
 
 # Paper-citing-paper graph is a homogeneous graph
-pp_g = dgl.heterograph({('paper', 'citing', 'paper') : data['PvsP']})
-# equivalent (shorter) API for creating homogeneous graph
-pp_g = dgl.graph(data['PvsP'], 'paper', 'cite')
+pp_g = dgl.heterograph({('paper', 'citing', 'paper') : data['PvsP'].nonzero()})
 
 # All the ntype and etype arguments could be omitted because the behavior is unambiguous.
 print(pp_g.number_of_nodes())

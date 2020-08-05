@@ -297,7 +297,7 @@ def uniform_attention(g, shape):
 @parametrize_dtype
 def test_edge_softmax(idtype):
     # Basic
-    g = dgl.graph(nx.path_graph(3))
+    g = dgl.from_networkx(nx.path_graph(3))
     g = g.astype(idtype).to(F.ctx())
     edata = F.ones((g.number_of_edges(), 1))
     a = nn.edge_softmax(g, edata)

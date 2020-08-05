@@ -102,7 +102,7 @@ class MiniGCDataset(DGLDataset):
             The sample index.
         Returns
         -------
-        (dgl.Graph, int)
+        (dgl.DGLGraph, int)
             The graph and its label.
         """
         return self.graphs[idx], self.labels[idx]

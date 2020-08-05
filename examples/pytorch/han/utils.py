@@ -136,8 +136,8 @@ def load_acm(remove_self_loop):
 
     # Adjacency matrices for meta path based neighbors
     # (Mufei): I verified both of them are binary adjacency matrices with self loops
-    author_g = dgl.graph(data['PAP'], ntype='paper', etype='author')
-    subject_g = dgl.graph(data['PLP'], ntype='paper', etype='subject')
+    author_g = dgl.from_scipy(data['PAP'])
+    subject_g = dgl.from_scipy(data['PLP'])
     gs = [author_g, subject_g]
 
     train_idx = torch.from_numpy(data['train_idx']).long().squeeze(0)

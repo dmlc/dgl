@@ -744,9 +744,10 @@ def to_homo(G):
     Examples
     --------
 
-    >>> follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
-    >>> devs_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
-    >>> hetero_g = dgl.hetero_from_relations([follows_g, devs_g])
+    >>> hetero_g = dgl.heterograph({
+    >>>     ('user', 'follows', 'user'): [[0, 1], [1, 2]],
+    >>>     ('developer', 'develops', 'game'): [[0, 1], [0, 1]]
+    >>> })
     >>> homo_g = dgl.to_homo(hetero_g)
     >>> homo_g.ndata
     {'_TYPE': tensor([0, 0, 0, 1, 1, 2, 2]), '_ID': tensor([0, 1, 2, 0, 1, 0, 1])}
@@ -809,7 +810,8 @@ def from_scipy(sp_mat,
                ntype='_N', etype='_E',
                eweight_name=None,
                formats=['coo', 'csr', 'csc'],
-               idtype=None):
+               idtype=None,
+               device=None):
     """Create a DGLGraph from a SciPy sparse matrix.
 
     Parameters

@@ -133,7 +133,8 @@ def test_pinsage_sampling():
     sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2, 
         [('item', 'bought-by', 'user'), ('user', 'bought', 'item')])
     _test_sampler(g, sampler, 'item')
-    g = dgl.graph([(0, 0), (0, 1), (1, 0), (1, 1), (2, 2), (2, 3), (3, 2), (3, 3)])
+    g = dgl.graph(([0, 0, 1, 1, 2, 2, 3, 3],
+                   [0, 1, 0, 1, 2, 3, 2, 3]))
     sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2)
     _test_sampler(g, sampler, g.ntypes[0])
     g = dgl.heterograph({
@@ -147,68 +148,62 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
     if hypersparse:
         # should crash if allocated a CSR
         card = 1 << 50
-        card2 = (1 << 50, 1 << 50)
     else:
         card = None
-        card2 = None
-    
+
     if reverse:
-        g = dgl.graph([(0,1),(0,2),(0,3),(1,0),(1,2),(1,3),(2,0)],
-                'user', 'follow', num_nodes=card)
-        g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
-        g1 = dgl.bipartite([(0,0),(1,0),(2,1),(2,3)], 'game', 'play', 'user', num_nodes=card2)
-        g1.edata['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
-        g2 = dgl.bipartite([(0,2),(1,2),(2,2),(0,1),(3,1),(0,0)], 'user', 'liked-by', 'game', num_nodes=card2)
-        g2.edata['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
-        g3 = dgl.bipartite([(0,0),(0,1),(0,2),(0,3)], 'coin', 'flips', 'user', num_nodes=card2)
-
-        hg = dgl.hetero_from_relations([g, g1, g2, g3])
+        g = dgl.graph(([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0]), num_nodes=card)
+        hg = dgl.heterograph({
+            ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2],
+                                          [1, 2, 3, 0, 2, 3, 0]),
+            ('game', 'play', 'user'): ([0, 1, 2, 2], [0, 0, 1, 3]),
+            ('user', 'liked-by', 'game'): ([0, 1, 2, 0, 3, 0], [2, 2, 2, 1, 1, 0]),
+            ('coin', 'flips', 'user'): ([0, 0, 0, 0], [0, 1, 2, 3])
+        }, {'user': card, 'game': card, 'coin': card})
     else:
-        g = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)],
-                'user', 'follow', num_nodes=card)
-        g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
-        g1 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game', num_nodes=card2)
-        g1.edata['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
-        g2 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user', num_nodes=card2)
-        g2.edata['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
-        g3 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', num_nodes=card2)
+        g = dgl.graph(([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]), num_nodes=card)
+        hg = dgl.heterograph({
+            ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0],
+                                         [0, 0, 0, 1, 1, 1, 2]),
+            ('user', 'play', 'game'): ([0, 0, 1, 3], [0, 1, 2, 2]),
+            ('game', 'liked-by', 'user'): ([2, 2, 2, 1, 1, 0], [0, 1, 2, 0, 3, 0]),
+            ('user', 'flips', 'coin'): ([0, 1, 2, 3], [0, 0, 0, 0])
+        }, {'user': card, 'game': card, 'coin': card})
+    hg.edges['follow'].data['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
+    hg.edges['play'].data['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
+    hg.edges['liked-by'].data['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
 
-        hg = dgl.hetero_from_relations([g, g1, g2, g3])
     return g, hg
 
 def _gen_neighbor_topk_test_graph(hypersparse, reverse):
     if hypersparse:
         # should crash if allocated a CSR
         card = 1 << 50
-        card2 = (1 << 50, 1 << 50)
     else:
         card = None
-        card2 = None
- 
+
     if reverse:
-        g = dgl.graph([(0,1),(0,2),(0,3),(1,0),(1,2),(1,3),(2,0)],
-                'user', 'follow')
-        g.edata['weight'] = F.tensor([.5, .3, 0., -5., 22., 0., 1.], dtype=F.float32)
-        g1 = dgl.bipartite([(0,0),(1,0),(2,1),(2,3)], 'game', 'play', 'user')
-        g1.edata['weight'] = F.tensor([.8, .5, .4, .5], dtype=F.float32)
-        g2 = dgl.bipartite([(0,2),(1,2),(2,2),(0,1),(3,1),(0,0)], 'user', 'liked-by', 'game')
-        g2.edata['weight'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
-        g3 = dgl.bipartite([(0,0),(0,1),(0,2),(0,3)], 'coin', 'flips', 'user')
-        g3.edata['weight'] = F.tensor([10, 2, 13, -1], dtype=F.float32)
-
-        hg = dgl.hetero_from_relations([g, g1, g2, g3])
+        g = dgl.graph(([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0]), num_nodes=card)
+        hg = dgl.heterograph({
+            ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2],
+                                          [1, 2, 3, 0, 2, 3, 0]),
+            ('game', 'play', 'user'): ([0, 1, 2, 2], [0, 0, 1, 3]),
+            ('user', 'liked-by', 'game'): ([0, 1, 2, 0, 3, 0], [2, 2, 2, 1, 1, 0]),
+            ('coin', 'flips', 'user'): ([0, 0, 0, 0], [0, 1, 2, 3])
+        })
     else:
-        g = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)],
-                'user', 'follow')
-        g.edata['weight'] = F.tensor([.5, .3, 0., -5., 22., 0., 1.], dtype=F.float32)
-        g1 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game')
-        g1.edata['weight'] = F.tensor([.8, .5, .4, .5], dtype=F.float32)
-        g2 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user')
-        g2.edata['weight'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
-        g3 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin')
-        g3.edata['weight'] = F.tensor([10, 2, 13, -1], dtype=F.float32)
-
-        hg = dgl.hetero_from_relations([g, g1, g2, g3])
+        g = dgl.graph(([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]), num_nodes=card)
+        hg = dgl.heterograph({
+            ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0],
+                                         [0, 0, 0, 1, 1, 1, 2]),
+            ('user', 'play', 'game'): ([0, 0, 1, 3], [0, 1, 2, 2]),
+            ('game', 'liked-by', 'user'): ([2, 2, 2, 1, 1, 0], [0, 1, 2, 0, 3, 0]),
+            ('user', 'flips', 'coin'): ([0, 1, 2, 3], [0, 0, 0, 0])
+        })
+    hg.edges['follow'].data['weight'] = F.tensor([.5, .3, 0., -5., 22., 0., 1.], dtype=F.float32)
+    hg.edges['play'].data['weight'] = F.tensor([.8, .5, .4, .5], dtype=F.float32)
+    hg.edges['liked-by'].data['weight'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
+    hg.edges['flips'].data['weight'] = F.tensor([10, 2, 13, -1], dtype=F.float32)
     return g, hg
 
 def _test_sample_neighbors(hypersparse):
@@ -541,7 +536,7 @@ def test_sample_neighbors_topk_outedge():
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_sample_neighbors_with_0deg():
-    g = dgl.graph([], num_nodes=5)
+    g = dgl.graph(([], []), num_nodes=5)
     sg = dgl.sampling.sample_neighbors(g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir='in', replace=False)
     assert sg.number_of_edges() == 0
     sg = dgl.sampling.sample_neighbors(g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir='in', replace=True)

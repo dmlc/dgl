@@ -36,7 +36,7 @@ def bfs_nodes_generator(graph, source, reverse=False):
              / \\
         0 - 1 - 3 - 5
 
-    >>> g = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
+    >>> g = dgl.graph(([0, 1, 1, 2, 2, 3], [1, 2, 3, 3, 4, 5]))
     >>> list(dgl.bfs_nodes_generator(g, 0))
     [tensor([0]), tensor([1]), tensor([2, 3]), tensor([4, 5])]
     """
@@ -80,7 +80,7 @@ def bfs_edges_generator(graph, source, reverse=False):
              / \\
         0 - 1 - 3 - 5
 
-    >>> g = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
+    >>> g = dgl.graph(([0, 1, 1, 2, 2, 3], [1, 2, 3, 3, 4, 5]))
     >>> list(dgl.bfs_edges_generator(g, 0))
     [tensor([0]), tensor([1, 2]), tensor([4, 5])]
     """
@@ -121,7 +121,7 @@ def topological_nodes_generator(graph, reverse=False):
              / \\
         0 - 1 - 3 - 5
 
-    >>> g = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
+    >>> g = dgl.graph(([0, 1, 1, 2, 2, 3], [1, 2, 3, 3, 4, 5]))
     >>> list(dgl.topological_nodes_generator(g))
     [tensor([0]), tensor([1]), tensor([2]), tensor([3, 4]), tensor([5])]
     """
@@ -169,7 +169,7 @@ def dfs_edges_generator(graph, source, reverse=False):
 
     Edge addition order [(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)]
 
-    >>> g = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
+    >>> g = dgl.graph(([0, 1, 1, 2, 2, 3], [1, 2, 3, 3, 4, 5]))
     >>> list(dgl.dfs_edges_generator(g, 0))
     [tensor([0]), tensor([1]), tensor([3]), tensor([5]), tensor([4])]
     """
@@ -243,7 +243,7 @@ def dfs_labeled_edges_generator(
 
     Edge addition order [(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)]
 
-    >>> g = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
+    >>> g = dgl.graph(([0, 1, 1, 2, 2, 3], [1, 2, 3, 3, 4, 5]))
     >>> list(dgl.dfs_labeled_edges_generator(g, 0, has_nontree_edge=True))
     (tensor([0]), tensor([1]), tensor([3]), tensor([5]), tensor([4]), tensor([2])),
     (tensor([0]), tensor([0]), tensor([0]), tensor([0]), tensor([0]), tensor([2]))
