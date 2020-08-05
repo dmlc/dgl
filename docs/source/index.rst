@@ -103,7 +103,6 @@ a useful manual for in-depth developers.
    api/python/heterograph
    api/python/ops
    api/python/readout
-   api/python/batch_heterograph
    api/python/nn
    api/python/function
    api/python/udf

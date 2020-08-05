@@ -807,40 +807,86 @@ def to_homo(G):
     return retg
 
 def from_scipy(sp_mat,
-               ntype='_N', etype='_E',
                eweight_name=None,
-               formats=['coo', 'csr', 'csc'],
                idtype=None,
                device=None):
-    """Create a DGLGraph from a SciPy sparse matrix.
+    """Create a graph from a SciPy sparse matrix.
 
     Parameters
     ----------
     sp_mat : SciPy sparse matrix
-        SciPy sparse matrix.
-    ntype : str
-        Type name for both source and destination nodes
-    etype : str
-        Type name for edges
+        The graph adjacency matrix. A nonzero entry of it ``sp_mat[i, j]``
+        indicates the existence of an edge from ``i`` to ``j``.
     eweight_name : str, optional
-        If given, the edge weights in the matrix will be
-        stored in ``edata[eweight_name]``.
-    formats : str or list of str
-        It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
-        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
-    idtype : int32, int64, optional
-        Integer ID type. Must be int32 or int64. Default: int64.
+        If given, DGL will store the nonzero values of :attr:`sp_mat` in ``edata[eweight_name]``
+        of the returned graph. By default, DGL will not store them.
+    idtype : int32 or int64, optional
+        The data type for storing the structure-related graph information such as node and
+        edge IDs. It should be a framework-specific data type object (e.g., torch.int32).
+        By default, DGL uses int64.
+    device : device context, optional
+        The device of the returned graph, which should be a framework-specific device object
+        (e.g., 'cpu'). By default, DGL uses CPU.
 
     Returns
     -------
-    g : DGLGraph
+    DGLGraph
+        The created graph.
+
+    Notes
+    -----
+    DGL internally maintains multiple copies of the graph structure in different sparse
+    formats and chooses the most efficient one depending on the computation invoked.
+    If memory usage becomes an issue in the case of large graphs, use
+    :func:`dgl.DGLGraph.formats` to restrict the allowed formats.
+
+    Examples
+    --------
+
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch
+    >>> from scipy.sparse import coo_matrix
+
+    Create a small three-edge graph.
+
+    >>> # Source nodes for edges (2, 1), (3, 2), (4, 3)
+    >>> src_ids = np.array([2, 3, 4])
+    >>> # Destination nodes for edges (2, 1), (3, 2), (4, 3)
+    >>> dst_ids = np.array([1, 2, 3])
+    >>> # Weight for edges (2, 1), (3, 2), (4, 3)
+    >>> eweight = np.array([0.2, 0.3, 0.5])
+    >>> sp_mat = coo_matrix((eweight, (src_ids, dst_ids)))
+    >>> g = dgl.from_scipy(sp_mat)
+
+    Retrieve the edge weights.
+
+    >>> g = dgl.from_scipy(sp_mat, eweight_name='w')
+    >>> g.edata['w']
+    tensor([[0.2000],
+            [0.3000],
+            [0.5000]], dtype=torch.float64)
+
+    Create a graph on the first GPU card with data type int32.
+
+    >>> g = dgl.from_scipy(sp_mat, idtype=torch.int32, device='cuda:0')
     """
+    # Sanity check
+    assert isinstance(sp_mat, spmatrix), \
+        'Expect data to be a SciPy sparse matrix, got {}'.format(type(sp_mat))
+    if idtype is not None:
+        assert idtype == F.int32 or idtype == F.int64, \
+            'Expect idtype to be a framework object of int32/int64, got {}'.format(idtype)
+
     u, v, urange, vrange = utils.graphdata2tensors(sp_mat, idtype)
-    g = create_from_edges(u, v, ntype, etype, ntype, urange, vrange,
-                          validate=False, formats=formats)
+    g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange)
     if eweight_name is not None:
-        g.edata[eweight_name] = F.tensor(sp_mat.data)
-    return g
+        eweight = sp_mat.data
+        eweight = np.reshape(eweight, (len(eweight), 1))
+        g.edata[eweight_name] = F.tensor(eweight)
+    return g.to(device)
 
 def from_networkx(nx_graph, *,
                   ntype='_N', etype='_E',
