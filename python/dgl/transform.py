@@ -148,7 +148,7 @@ def segmented_knn_graph(x, k, segs):
     g = convert.graph(adj)
     return g
 
-def to_bidirected(g, readonly=True, copy_ndata=False):
+def to_bidirected(g, readonly=None, copy_ndata=False):
     r""" Convert the graph to a bidirected one.
 
     The function generates a new graph with no edge features.
