@@ -4,6 +4,10 @@
  * \brief Call Metis partitioning
  */
 
+#if !defined(_WIN32)
+#include <GKlib.h>
+#endif  // !defined(_WIN32)
+
 #include <dgl/base_heterograph.h>
 #include <dgl/packed_func_ext.h>
 
@@ -13,6 +17,11 @@
 using namespace dgl::runtime;
 
 namespace dgl {
+
+#if !defined(_WIN32)
+gk_csr_t *Convert2GKCsr(const aten::CSRMatrix mat, bool is_row);
+aten::CSRMatrix Convert2DGLCsr(gk_csr_t *gk_csr, bool is_row);
+#endif  // !defined(_WIN32)
 
 namespace transform {
 
@@ -264,6 +273,34 @@ DGL_REGISTER_GLOBAL("partition._CAPI_GetHaloSubgraphInnerNodes_Hetero")
     auto gptr = std::dynamic_pointer_cast<HaloHeteroSubgraph>(g.sptr());
     CHECK(gptr) << "The input graph has to be HaloHeteroSubgraph";
     *rv = gptr->inner_nodes[0];
+  });
+
+
+DGL_REGISTER_GLOBAL("partition._CAPI_DGLMakeSymmetric_Hetero")
+  .set_body([](DGLArgs args, DGLRetValue *rv) {
+    HeteroGraphRef g = args[0];
+    auto hgptr = std::dynamic_pointer_cast<HeteroGraph>(g.sptr());
+    CHECK(hgptr) << "Invalid HeteroGraph object";
+    CHECK_EQ(hgptr->relation_graphs().size(), 1)
+      << "Metis partition only supports homogeneous graph";
+    auto ugptr = hgptr->relation_graphs()[0];
+
+#if !defined(_WIN32)
+    // TODO(zhengda) should we get whatever CSR exists in the graph.
+    gk_csr_t *gk_csr = Convert2GKCsr(ugptr->GetCSCMatrix(0), true);
+    gk_csr_t *sym_gk_csr = gk_csr_MakeSymmetric(gk_csr, GK_CSR_SYM_SUM);
+    auto mat = Convert2DGLCsr(sym_gk_csr, true);
+    gk_csr_Free(&gk_csr);
+    gk_csr_Free(&sym_gk_csr);
+
+    auto new_ugptr = UnitGraph::CreateFromCSC(ugptr->NumVertexTypes(), mat,
+                                              ugptr->GetAllowedFormats());
+    std::vector<HeteroGraphPtr> rel_graphs = {new_ugptr};
+    *rv = HeteroGraphRef(std::make_shared<HeteroGraph>(
+      hgptr->meta_graph(), rel_graphs, hgptr->NumVerticesPerType()));
+#else
+    LOG(FATAL) << "The fast version of making symmetric graph is not supported in Windows."
+#endif  // !defined(_WIN32)
   });
 
 }  // namespace transform

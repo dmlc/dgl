@@ -177,7 +177,10 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
     # The METIS runs on the symmetric graph to generate the node assignment to partitions.
     from .transform import to_bidirected, to_simple # avoid cyclic import
     start = time.time()
-    sym_g = to_bidirected(g)
+    sym_gidx = _CAPI_DGLMakeSymmetric_Hetero(g._graph)
+    sym_g = DGLHeteroGraph(gidx=sym_gidx, ntypes=['_N'], etypes=['_E'])
+    print('sym G: |V|={}, |E|={}'.format(sym_g.number_of_nodes(), sym_g.number_of_edges()))
+    #sym_g = to_bidirected(g)
     print('Convert a graph into a bidirected graph: {:.3f} seconds'.format(
         time.time() - start))
     vwgt = []

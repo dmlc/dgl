@@ -9,12 +9,13 @@
 #endif  // !defined(_WIN32)
 
 #include <dgl/graph_op.h>
+#include <dgl/base_heterograph.h>
+#include <dgl/packed_func_ext.h>
+#include "../c_api_common.h"
 
 namespace dgl {
 
 #if !defined(_WIN32)
-
-namespace {
 
 /*!
  * Convert DGL CSR to GKLib CSR.
@@ -96,8 +97,6 @@ aten::CSRMatrix Convert2DGLCsr(gk_csr_t *gk_csr, bool is_row) {
 
   return aten::CSRMatrix(gk_csr->nrows, gk_csr->ncols, indptr_arr, indices_arr, eids_arr);
 }
-
-}  // namespace
 
 #endif  // !defined(_WIN32)
 
