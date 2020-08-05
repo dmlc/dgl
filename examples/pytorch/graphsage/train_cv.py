@@ -176,7 +176,7 @@ def load_subtensor(g, labels, blocks, hist_blocks, dev_id, aggregation_on_device
     """
     blocks[0].srcdata['features'] = g.ndata['features'][blocks[0].srcdata[dgl.NID]]
     blocks[-1].dstdata['label'] = labels[blocks[-1].dstdata[dgl.NID]]
-    ret_blocks = [] 
+    ret_blocks = []
     ret_hist_blocks = []
     for i, (block, hist_block) in enumerate(zip(blocks, hist_blocks)):
         hist_col = 'features' if i == 0 else 'hist_%d' % i
@@ -257,9 +257,8 @@ def run(args, dev_id, data):
     for epoch in range(args.num_epochs):
         tic = time.time()
         model.train()
+        tic_step = time.time()
         for step, (blocks, hist_blocks) in enumerate(dataloader):
-            tic_step = time.time()
-
             # The nodes for input lies at the LHS side of the first block.
             # The nodes for output lies at the RHS side of the last block.
             input_nodes = blocks[0].srcdata[dgl.NID]
@@ -283,7 +282,7 @@ def run(args, dev_id, data):
                 acc = compute_acc(batch_pred, batch_labels)
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f}'.format(
                     epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:])))
-
+            tic_step = time.time()
         toc = time.time()
         print('Epoch Time(s): {:.4f}'.format(toc - tic))
         if epoch >= 5:
