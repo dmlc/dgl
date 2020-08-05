@@ -234,6 +234,7 @@ def test_reverse_shared_frames(idtype):
     assert F.allclose(g.edges[[0, 2], [1, 1]].data['h'],
                       rg.edges[[1, 1], [0, 2]].data['h'])
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_to_bidirected():
     # homogeneous graph
     elist = [(0, 0), (0, 1), (1, 0),
