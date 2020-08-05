@@ -90,13 +90,6 @@ class DistDataLoader:
         if self.pool is None:
             ctx = mp.get_context("spawn")
             self.pool = ctx.Pool(num_workers)
-        results = []
-
-        for _ in range(num_workers):
-            results.append(self.pool.apply_async(
-                init_fn, args=(collate_fn, self.queue)))
-        for res in results:
-            res.get()
 
         self.dataset = F.tensor(dataset)
         self.expected_idxs = len(dataset) // self.batch_size
@@ -120,6 +113,13 @@ class DistDataLoader:
     def __iter__(self):
         if self.shuffle:
             self.dataset = F.rand_shuffle(self.dataset)
+
+        results = []
+        for _ in range(self.num_workers):
+            results.append(self.pool.apply_async(
+                init_fn, args=(self.collate_fn, self.queue)))
+        for res in results:
+            res.get()
         return self
 
     def _request_next_batch(self):
