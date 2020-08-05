@@ -148,10 +148,10 @@ def segmented_knn_graph(x, k, segs):
     g = convert.graph(adj)
     return g
 
-def to_bidirected(g, readonly=True):
+def to_bidirected(g, readonly=True, copy_ndata=False):
     r""" Convert the graph to a bidirected one.
 
-    The function generates a new graph with no node/edge feature.
+    The function generates a new graph with no edge features.
     If g has an edge for i->j but no edge for j->i, then the
     returned graph will have both i->j and j->i.
 
@@ -169,10 +169,14 @@ def to_bidirected(g, readonly=True):
         The input graph.
     readonly : bool, default to be True
         Deprecated. There will be no difference between readonly and non-readonly
+    copy_ndata: bool, optional
+        If True, the node features of the bidirected graph are copied from the
+        original graph. If False, the bidirected graph will not have any node features.
+        (Default: False)
 
     Notes
     -----
-    Please make sure g is a single graph, otherwise the return value is undefined.
+    Please make sure g is a single graph.
 
     Returns
     -------
@@ -221,8 +225,8 @@ def to_bidirected(g, readonly=True):
 
     assert g.is_multigraph is False, "to_bidirected only support simple graph"
 
-    g = add_reverse_edges(g, copy_ndata=False, copy_edata=False)
-    g = to_simple(g, return_counts=None, copy_ndata=False, copy_edata=False)
+    g = add_reverse_edges(g, copy_ndata=copy_ndata, copy_edata=False)
+    g = to_simple(g, return_counts=None, copy_ndata=copy_ndata, copy_edata=False)
     return g
 
 def add_reverse_edges(g, readonly=None, copy_ndata=True,

@@ -257,6 +257,7 @@ def test_to_bidirected():
         ('user', 'wins', 'user'): elist1,
         ('user', 'follows', 'user'): elist2
     })
+    g.nodes['user'].data['h'] = F.ones((3, 1))
     elist1.append((1, 2))
     elist1 = set(elist1)
     elist2.append((1, 0))
@@ -270,6 +271,9 @@ def test_to_bidirected():
     src, dst = big.edges(etype='follows')
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == set(elist2)
+
+    big = dgl.to_bidirected(g, copy_ndata=True)
+    assert F.array_equal(g.nodes['user'].data['h'], big.nodes['user'].data['h'])
 
     # test multigraph
     g = dgl.graph((F.tensor([0, 1, 3, 1]), F.tensor([1, 2, 0, 2])))
