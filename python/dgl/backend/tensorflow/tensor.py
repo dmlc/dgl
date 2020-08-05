@@ -6,19 +6,20 @@ from distutils.version import LooseVersion
 import tensorflow as tf
 from tensorflow.python.eager import context
 import builtins
+import numbers
 import numpy as np
 import os
 
 from ... import ndarray as nd
-from ... import kernel as K
+from ..._deprecate import kernel as K
 from ...function.base import TargetCode
 
 if not os.getenv("USE_TFDLPACK", False):
     if LooseVersion(tf.__version__) < LooseVersion("2.2.0"):
         raise RuntimeError("DGL requires tensorflow>=2.2.0 for the official DLPack support.")
 
-    def zerocopy_to_dlpack(input):
-        return tf.experimental.dlpack.to_dlpack(input)
+    def zerocopy_to_dlpack(data):
+        return tf.experimental.dlpack.to_dlpack(data)
 
     def zerocopy_from_dlpack(dlpack_tensor):
         # TODO(Jinjing): Tensorflow requires memory to be 64-bytes aligned. We check the
@@ -42,6 +43,7 @@ else:
     def zerocopy_from_dlpack(input):
         return tfdlpack.from_dlpack(input)
 
+
 def data_type_dict():
     return {'float16': tf.float16,
             'float32': tf.float32,
@@ -53,18 +55,30 @@ def data_type_dict():
             'int64': tf.int64,
             'bool' : tf.bool}
 
+
 def cpu():
     return "/cpu:0"
 
+
 def tensor(data, dtype=None):
-    return tf.convert_to_tensor(data, dtype=dtype)
+    if isinstance(data, tf.Tensor):
+        if dtype is None or data.dtype == dtype:
+            return data
+        else:
+            return tf.cast(data, dtype=dtype)
+    else:
+        if isinstance(data, numbers.Number):
+            data = [data]
+        return tf.convert_to_tensor(data, dtype=dtype)
+
 
 def initialize_context():
     tf.zeros(1)
 
+
 def as_scalar(data):
     data = data.numpy()
-    return data if np.isscalar(data) else data.asscalar()
+    return data if np.isscalar(data) else data.item()
 
 
 def get_preferred_sparse_format():
@@ -109,8 +123,8 @@ def ndim(input):
 
 
 def context(input):
-    return input.device
-
+    spec = tf.DeviceSpec.from_string(input.device)
+    return "/{}:{}".format(spec.device_type.lower(), spec.device_index)
 
 def device_type(ctx):
     return tf.DeviceSpec.from_string(ctx).device_type.lower()
@@ -118,6 +132,7 @@ def device_type(ctx):
 
 def device_id(ctx):
     return tf.DeviceSpec.from_string(ctx).device_index
+
 
 def to_backend_ctx(dglctx):
     dev_type = dglctx.device_type
@@ -127,6 +142,7 @@ def to_backend_ctx(dglctx):
         return "/gpu:%d" % (dglctx.device_id)
     else:
         raise ValueError('Unsupported DGL device context:', dglctx)
+
 
 def astype(input, ty):
     return tf.cast(input, dtype=ty)
@@ -147,10 +163,14 @@ def copy_to(input, ctx, **kwargs):
 
 
 def sum(input, dim, keepdims=False):
+    if input.dtype == tf.bool:
+        input = tf.cast(input, tf.int32)
     return tf.reduce_sum(input, axis=dim, keepdims=keepdims)
 
 
 def reduce_sum(input):
+    if input.dtype == tf.bool:
+        input = tf.cast(input, tf.int32)
     return tf.reduce_sum(input)
 
 
@@ -214,8 +234,10 @@ def argtopk(input, k, dim, descending=True):
 def exp(input):
     return tf.exp(input)
 
+
 def sqrt(input):
     return tf.sqrt(input)
+
 
 def softmax(input, dim=-1):
     return tf.math.softmax(input, axis=dim)
@@ -234,7 +256,7 @@ def split(input, sizes_or_sections, dim):
 
 
 def repeat(input, repeats, dim):
-    return tf.keras.backend.repeat_elements(input, repeats, dim)
+    return tf.repeat(input, repeats, dim)
 
 
 def gather_row(data, row_index):
@@ -262,6 +284,7 @@ def narrow_row(x, start, stop):
 def scatter_row(data, row_index, value):
     row_index = tf.expand_dims(row_index, 1)
     return tf.tensor_scatter_nd_update(data, row_index, value)
+
 
 def index_add_inplace(data, row_idx, value):
     raise NotImplementedError("Tensorflow doesn't support inplace index_add")
@@ -312,7 +335,7 @@ def uniform(shape, dtype, ctx, low, high):
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, tf.Tensor):
-        max_len = as_scalar(lengths.max())
+        max_len = as_scalar(tf.reduce_max(lengths))
     else:
         max_len = builtins.max(lengths)
 
@@ -393,9 +416,9 @@ def sort_1d(input):
     return tf.sort(input), tf.cast(tf.argsort(input), dtype=tf.int64)
 
 
-def arange(start, stop, dtype="int64"):
+def arange(start, stop, dtype=tf.int64):
     with tf.device("/cpu:0"):
-        t = tf.range(start, stop, dtype=data_type_dict()[dtype])
+        t = tf.range(start, stop, dtype=dtype)
     return t
 
 
@@ -415,11 +438,19 @@ def zerocopy_from_numpy(np_array):
     return t
 
 
-def zerocopy_to_dgl_ndarray(input):
-    return nd.from_dlpack(zerocopy_to_dlpack(input))
+def zerocopy_to_dgl_ndarray(data):
+    if data.dtype == tf.int32 and device_type(data.device) == 'gpu':
+        # NOTE: TF doesn't keep int32 tensors on GPU due to legacy issues with
+        #   shape inference. Convert it to uint32 and cast it back afterwards.
+        data = tf.cast(data, tf.uint32)
+        return nd.cast_to_signed(nd.from_dlpack(zerocopy_to_dlpack(data)))
+    else:
+        return nd.from_dlpack(zerocopy_to_dlpack(data))
+
 
 def zerocopy_to_dgl_ndarray_for_write(input):
     return zerocopy_to_dgl_ndarray(input)
+
 
 def zerocopy_from_dgl_ndarray(input):
     return zerocopy_from_dlpack(input.to_dlpack())
@@ -437,56 +468,55 @@ def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
 
 def binary_reduce_real(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
                        out_size, lhs_map, rhs_map, out_map):
-    lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
-    rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
-    feat_shape = K.infer_binary_feature_shape(
-        binary_op, lhs_data_nd, rhs_data_nd)
-    out_shape = feat_shape
-    if binary_op == 'dot':
-        out_shape = feat_shape[:-1]
-    # out_data = lhs_data.new_empty((out_size,) + out_shape)
-    out_data = tf.zeros((out_size,) + out_shape, dtype=lhs_data.dtype)
-    out_data_nd = zerocopy_to_dgl_ndarray(out_data)
-    K.binary_op_reduce(
-        reducer if reducer != 'mean' else 'sum',
-        binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
-        out_data_nd, lhs_map[0], rhs_map[0], out_map[0])
-    # normalize if mean reducer
-    # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
-    if reducer == 'mean':
-        # degs = lhs_data.new_empty((out_data.shape[0],))
-        degs = tf.zeros((out_data.shape[0],), dtype=lhs_data.dtype)
-        degs_nd = zerocopy_to_dgl_ndarray(degs)
-        if lhs != TargetCode.DST:  # src or edge
-            target = lhs
-            n = lhs_data.shape[0]
-            in_map = lhs_map[0]
-        else:  # rhs != TargetCode.DST
-            target = rhs
-            n = rhs_data.shape[0]
-            in_map = rhs_map[0]
-        # in_ones = lhs_data.new_ones((n,))
-        in_ones = tf.ones((n,), dtype=lhs_data.dtype)
-        in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
-        K.copy_reduce(
-            'sum', graph, target, in_ones_nd, degs_nd, in_map, out_map[0])
-        # reshape
-        degs = tf.reshape(degs,
-                          (out_data.shape[0],) + (1,) * (out_data.ndim - 1))
-        degs = tf.clip_by_value(degs, clip_value_min=1,
-                                clip_value_max=np.inf)  # ???
-        out_data = out_data / degs
-    else:
-        degs = None
+    with tf.device(lhs_data.device):
+        lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
+        rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
+        feat_shape = K.infer_binary_feature_shape(
+            binary_op, lhs_data_nd, rhs_data_nd)
+        out_shape = feat_shape
+        if binary_op == 'dot':
+            out_shape = feat_shape[:-1]
+        out_data = tf.zeros((out_size,) + out_shape, dtype=lhs_data.dtype)
+        out_data_nd = zerocopy_to_dgl_ndarray(out_data)
+        K.binary_op_reduce(
+            reducer if reducer != 'mean' else 'sum',
+            binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
+            out_data_nd, lhs_map[0], rhs_map[0], out_map[0])
+        # normalize if mean reducer
+        # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
+        if reducer == 'mean':
+            degs = tf.zeros((out_data.shape[0],), dtype=lhs_data.dtype)
+            degs_nd = zerocopy_to_dgl_ndarray(degs)
+            if lhs != TargetCode.DST:  # src or edge
+                target = lhs
+                n = lhs_data.shape[0]
+                in_map = lhs_map[0]
+            else:  # rhs != TargetCode.DST
+                target = rhs
+                n = rhs_data.shape[0]
+                in_map = rhs_map[0]
+            in_ones = tf.ones((n,), dtype=lhs_data.dtype)
+            in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
+            K.copy_reduce(
+                'sum', graph, target, in_ones_nd, degs_nd, in_map, out_map[0])
+            # reshape
+            degs = tf.reshape(degs,
+                              (out_data.shape[0],) + (1,) * (out_data.ndim - 1))
+            degs = tf.clip_by_value(degs, clip_value_min=1,
+                                    clip_value_max=np.inf)  # ???
+            out_data = out_data / degs
+        else:
+            degs = None
 
     def grad(grad_out):
-        grad_lhs = None
-        grad_rhs = None
-        if reducer == 'mean':
-            grad_out = grad_out / degs
-        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
-        if True:
-            # grad_lhs = grad_out.new_empty((lhs_data_nd.shape[0],) + feat_shape)
+        with tf.device(grad_out.device):
+            grad_lhs = None
+            grad_rhs = None
+            if reducer == 'mean':
+                grad_out = grad_out / degs
+            grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
+
+            # comptue gradient for lhs
             grad_lhs = tf.zeros((lhs_data_nd.shape[0],) + feat_shape)
             K.backward_lhs_binary_op_reduce(
                 reducer if reducer != 'mean' else 'sum',
@@ -494,8 +524,8 @@ def binary_reduce_real(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
                 out_data_nd, grad_out_nd, zerocopy_to_dgl_ndarray(grad_lhs),
                 lhs_map[1], rhs_map[1], out_map[1])
             grad_lhs = _reduce_grad(grad_lhs, lhs_data_nd.shape)
-        if True:
-            # grad_rhs = grad_out.new_empty((rhs_data_nd.shape[0],) + feat_shape)
+
+            # compute gradient for rhs
             grad_rhs = tf.zeros((rhs_data_nd.shape[0],) + feat_shape)
             K.backward_rhs_binary_op_reduce(
                 reducer if reducer != 'mean' else 'sum',
@@ -504,7 +534,7 @@ def binary_reduce_real(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
                 lhs_map[1], rhs_map[1], out_map[1])
             grad_rhs = _reduce_grad(grad_rhs, rhs_data_nd.shape)
 
-        return grad_lhs, grad_rhs
+            return grad_lhs, grad_rhs
     return out_data, grad
 
 
@@ -519,47 +549,43 @@ def copy_reduce(reducer, graph, target, in_data, out_size, in_map=(None, None),
 
 def copy_reduce_real(reducer, graph, target, in_data, out_size, in_map,
                      out_map):
-    out_data = tf.zeros(
-        (out_size,) + tuple(in_data.shape[1:]), dtype=in_data.dtype)
-    in_data_nd = zerocopy_to_dgl_ndarray(in_data)
-    out_data_nd = zerocopy_to_dgl_ndarray(out_data)
-    K.copy_reduce(
-        reducer if reducer != 'mean' else 'sum',
-        graph, target, in_data_nd, out_data_nd, in_map[0], out_map[0])
-    # normalize if mean reducer
-    # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
-    if reducer == 'mean':
-        # in_ones = in_data.new_ones((in_data.shape[0],))
-        in_ones = tf.ones(in_data.shape[0], dtype=in_data.dtype)
-        # degs = in_data.new_empty((out_data.shape[0],))
-        degs = tf.zeros(out_data.shape[0], dtype=in_data.dtype)
-        in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
-        degs_nd = zerocopy_to_dgl_ndarray(degs)
+    with tf.device(in_data.device):
+        out_data = tf.zeros(
+            (out_size,) + tuple(in_data.shape[1:]), dtype=in_data.dtype)
+        in_data_nd = zerocopy_to_dgl_ndarray(in_data)
+        out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         K.copy_reduce(
-            'sum', graph, target, in_ones_nd, degs_nd, in_map[0], out_map[0])
-        # reshape
-        degs = tf.reshape(degs,
-                          (out_data.shape[0],) + (1,) * (out_data.ndim - 1))
-        degs = tf.clip_by_value(degs, clip_value_min=1,
-                                clip_value_max=np.inf)  # TODO: ???
-        out_data = out_data / degs
-    else:
-        degs = None
-    # save_for_backward can only save variables
+            reducer if reducer != 'mean' else 'sum',
+            graph, target, in_data_nd, out_data_nd, in_map[0], out_map[0])
+        # normalize if mean reducer
+        # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
+        if reducer == 'mean':
+            in_ones = tf.ones(in_data.shape[0], dtype=in_data.dtype)
+            degs = tf.zeros(out_data.shape[0], dtype=in_data.dtype)
+            in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
+            degs_nd = zerocopy_to_dgl_ndarray(degs)
+            K.copy_reduce(
+                'sum', graph, target, in_ones_nd, degs_nd, in_map[0], out_map[0])
+            # reshape
+            degs = tf.reshape(degs,
+                              (out_data.shape[0],) + (1,) * (out_data.ndim - 1))
+            degs = tf.clip_by_value(degs, clip_value_min=1,
+                                    clip_value_max=np.inf)  # TODO: ???
+            out_data = out_data / degs
+        else:
+            degs = None
 
     def grad(grad_out):
-        if reducer == 'mean':
-            grad_out = grad_out / degs
-        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
-        # if ctx.needs_input_grad[3]:
-        if True:
-            # grad_in = grad_out.new_empty(in_data_nd.shape)
+        with tf.device(grad_out.device):
+            if reducer == 'mean':
+                grad_out = grad_out / degs
+            grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
             grad_in = tf.zeros(in_data_nd.shape)
             K.backward_copy_reduce(
                 reducer if reducer != 'mean' else 'sum',
                 graph, target, in_data_nd, out_data_nd, grad_out_nd,
                 zerocopy_to_dgl_ndarray(grad_in), in_map[1], out_map[1])
-        return grad_in
+            return grad_in
     return out_data, grad
 
 
@@ -682,8 +708,13 @@ def backward(x, head_gradient=None):
 def grad(x):
     return cgrad.grad(x)
 
+
 def is_no_grad(x):
     return cgrad.is_no_grad(x)
+
+
+def is_recording():
+    raise NotImplementedError("Tensorflow doesn't support is_recording")
 
 no_grad = None
 

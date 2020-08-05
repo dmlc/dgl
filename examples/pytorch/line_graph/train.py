@@ -17,7 +17,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from dgl.data import SBMMixture
+from dgl.data import SBMMixtureDataset
 import gnn
 
 parser = argparse.ArgumentParser()
@@ -38,7 +38,7 @@ args = parser.parse_args()
 dev = th.device('cpu') if args.gpu < 0 else th.device('cuda:%d' % args.gpu)
 K = args.n_communities
 
-training_dataset = SBMMixture(args.n_graphs, args.n_nodes, K)
+training_dataset = SBMMixtureDataset(args.n_graphs, args.n_nodes, K)
 training_loader = DataLoader(training_dataset, args.batch_size,
                              collate_fn=training_dataset.collate_fn, drop_last=True)
 
@@ -67,8 +67,10 @@ def from_np(f, *args):
 @from_np
 def step(i, j, g, lg, deg_g, deg_lg, pm_pd):
     """ One step of training. """
-    deg_g = deg_g.to(dev)
-    deg_lg = deg_lg.to(dev)
+    g = g.to(dev)
+    lg = lg.to(dev)
+    deg_g = deg_g.to(dev).unsqueeze(1)
+    deg_lg = deg_lg.to(dev).unsqueeze(1)
     pm_pd = pm_pd.to(dev)
     t0 = time.time()
     z = model(g, lg, deg_g, deg_lg, pm_pd)
@@ -88,8 +90,10 @@ def step(i, j, g, lg, deg_g, deg_lg, pm_pd):
 
 @from_np
 def inference(g, lg, deg_g, deg_lg, pm_pd):
-    deg_g = deg_g.to(dev)
-    deg_lg = deg_lg.to(dev)
+    g = g.to(dev)
+    lg = lg.to(dev)
+    deg_g = deg_g.to(dev).unsqueeze(1)
+    deg_lg = deg_lg.to(dev).unsqueeze(1)
     pm_pd = pm_pd.to(dev)
 
     z = model(g, lg, deg_g, deg_lg, pm_pd)
@@ -101,7 +105,7 @@ def test():
     N = 1
     overlap_list = []
     for p, q in zip(p_list, q_list):
-        dataset = SBMMixture(N, args.n_nodes, K, pq=[[p, q]] * N)
+        dataset = SBMMixtureDataset(N, args.n_nodes, K, pq=[[p, q]] * N)
         loader = DataLoader(dataset, N, collate_fn=dataset.collate_fn)
         g, lg, deg_g, deg_lg, pm_pd = next(iter(loader))
         z = inference(g, lg, deg_g, deg_lg, pm_pd)

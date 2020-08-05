@@ -1,8 +1,6 @@
 """Server data"""
 
 from .._ffi.function import _init_api
-from ..graph import DGLGraph
-from ..transform import as_heterograph
 
 # Remove C++ bindings for now, since not used
 
@@ -44,7 +42,7 @@ class ServerState:
 
     def __init__(self, kv_store, local_g, partition_book):
         self._kv_store = kv_store
-        self.graph = local_g
+        self._graph = local_g
         self.partition_book = partition_book
 
     @property
@@ -63,10 +61,7 @@ class ServerState:
 
     @graph.setter
     def graph(self, graph):
-        if isinstance(graph, DGLGraph):
-            self._graph = as_heterograph(graph)
-        else:
-            self._graph = graph
+        self._graph = graph
 
 
 _init_api("dgl.distributed.server_state")

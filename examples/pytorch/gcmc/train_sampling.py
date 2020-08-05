@@ -51,7 +51,7 @@ class GCMCSampler:
 
         The input ``seeds`` represents the edges to compute prediction for. The sampling
         algorithm works as follows:
-        
+
           1. Get the head and tail nodes of the provided seed edges.
           2. For each head and tail node, extract the entire in-coming neighborhood.
           3. Copy the node features/embeddings from the full graph to the sampled subgraphs.
@@ -170,6 +170,7 @@ def evaluate(args, dev_id, net, dataset, dataloader, segment='valid'):
         compact_g, frontier, head_feat, tail_feat, \
                 _, true_relation_ratings = sample_data
 
+        frontier = frontier.to(dev_id)
         head_feat = head_feat.to(dev_id)
         tail_feat = tail_feat.to(dev_id)
         with th.no_grad():
@@ -212,18 +213,6 @@ def thread_wrapped_func(func):
             assert isinstance(exception, Exception)
             raise exception.__class__(trace)
     return decorated_function
-
-def prepare_mp(g):
-    """
-    Explicitly materialize the CSR, CSC and COO representation of the given graph
-    so that they could be shared via copy-on-write to sampler workers and GPU
-    trainers.
-    This is a workaround before full shared memory support on heterogeneous graphs.
-    """
-    for etype in g.canonical_etypes:
-        g.in_degree(0, etype=etype)
-        g.out_degree(0, etype=etype)
-        g.find_edges([0], etype=etype)
 
 def config():
     parser = argparse.ArgumentParser(description='GCMC')
@@ -352,11 +341,12 @@ def run(proc_id, n_gpus, args, devices, dataset):
         if epoch > 1:
             t0 = time.time()
         net.train()
-        for step, sample_data in enumerate(dataloader):           
+        for step, sample_data in enumerate(dataloader):
             compact_g, frontier, head_feat, tail_feat, \
                 true_relation_labels, true_relation_ratings = sample_data
             head_feat = head_feat.to(dev_id)
             tail_feat = tail_feat.to(dev_id)
+            frontier = frontier.to(dev_id)
 
             pred_ratings = net(compact_g, frontier, head_feat, tail_feat, dataset.possible_rating_values)
             loss = rating_loss_net(pred_ratings, true_relation_labels.to(dev_id)).mean()
@@ -466,8 +456,8 @@ if __name__ == '__main__':
         run(0, n_gpus, args, devices, dataset)
     # multi gpu
     else:
-        prepare_mp(dataset.train_enc_graph)
-        prepare_mp(dataset.train_dec_graph)
+        dataset.train_enc_graph.create_format_()
+        dataset.train_dec_graph.create_format_()
         procs = []
         for proc_id in range(n_gpus):
             p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, dataset))

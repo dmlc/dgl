@@ -1,28 +1,34 @@
 """Define sparse embedding and optimizer."""
 
 from .. import backend as F
+from .. import utils
+from .dist_tensor import DistTensor
+from .graph_partition_book import PartitionPolicy, NODE_PART_POLICY
 
-class SparseNodeEmbedding:
-    ''' Sparse embeddings in the distributed KVStore.
+class DistEmbedding:
+    '''Embeddings in the distributed training.
 
-    The sparse embeddings are only used as node embeddings.
+    By default, the embeddings are created for nodes in the graph.
 
     Parameters
     ----------
     g : DistGraph
         The distributed graph object.
+    num_embeddings : int
+        The number of embeddings
+    embedding_dim : int
+        The dimension size of embeddings.
     name : str
         The name of the embeddings
-    shape : tuple of int
-        The shape of the embedding. The first dimension should be the number of nodes.
-    initializer : callable
+    init_func : callable
         The function to create the initial data.
+    part_policy : PartitionPolicy
+        The partition policy.
 
     Examples
     --------
     >>> emb_init = lambda shape, dtype: F.zeros(shape, dtype, F.cpu())
-    >>> shape = (g.number_of_nodes(), 1)
-    >>> emb = dgl.distributed.SparseNodeEmbedding(g, 'emb1', shape, emb_init)
+    >>> emb = dgl.distributed.DistEmbedding(g, g.number_of_nodes(), 10)
     >>> optimizer = dgl.distributed.SparseAdagrad([emb], lr=0.001)
     >>> for blocks in dataloader:
     >>>     feats = emb(nids)
@@ -30,16 +36,21 @@ class SparseNodeEmbedding:
     >>>     loss.backward()
     >>>     optimizer.step()
     '''
-    def __init__(self, g, name, shape, initializer):
-        assert shape[0] == g.number_of_nodes()
-        g.init_ndata(name, shape, F.float32, initializer)
+    def __init__(self, g, num_embeddings, embedding_dim, name=None,
+                 init_func=None, part_policy=None):
+        if part_policy is None:
+            part_policy = PartitionPolicy(NODE_PART_POLICY, g.get_partition_book())
 
-        self._tensor = g.ndata[name]
+        self._tensor = DistTensor(g, (num_embeddings, embedding_dim), F.float32, name,
+                                  init_func, part_policy)
         self._trace = []
 
     def __call__(self, idx):
-        emb = F.attach_grad(self._tensor[idx])
-        self._trace.append((idx, emb))
+        idx = utils.toindex(idx).tousertensor()
+        emb = self._tensor[idx]
+        if F.is_recording():
+            emb = F.attach_grad(emb)
+            self._trace.append((idx, emb))
         return emb
 
 class SparseAdagradUDF:
@@ -92,7 +103,7 @@ class SparseAdagrad:
 
     Parameters
     ----------
-    params : list of SparseNodeEmbeddings
+    params : list of DistEmbeddings
         The list of sparse embeddings.
     lr : float
         The learning rate.

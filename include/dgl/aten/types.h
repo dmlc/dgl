@@ -32,6 +32,11 @@ typedef NDArray IntArray;
 typedef NDArray FloatArray;
 typedef NDArray TypeArray;
 
+namespace aten {
+
+static const DLContext CPU{kDLCPU, 0};
+
+}  // namespace aten
 }  // namespace dgl
 
 #endif  // DGL_ATEN_TYPES_H_

@@ -15,6 +15,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #endif  // !_WIN32
+#include <string.h>
+#include <errno.h>
 
 namespace dgl {
 namespace network {
@@ -182,6 +184,9 @@ int64_t TCPSocket::Send(const char * data, int64_t len_data) {
   do {  // retry if EINTR failure appears
     number_send = send(socket_, data, len_data, 0);
   } while (number_send == -1 && errno == EINTR);
+  if (number_send == -1) {
+    LOG(ERROR) << "send error: " << strerror(errno);
+  }
 
   return number_send;
 }
@@ -192,6 +197,9 @@ int64_t TCPSocket::Receive(char * buffer, int64_t size_buffer) {
   do {  // retry if EINTR failure appears
     number_recv = recv(socket_, buffer, size_buffer, 0);
   } while (number_recv == -1 && errno == EINTR);
+  if (number_recv == -1) {
+    LOG(ERROR) << "recv error: " << strerror(errno);
+  }
 
   return number_recv;
 }

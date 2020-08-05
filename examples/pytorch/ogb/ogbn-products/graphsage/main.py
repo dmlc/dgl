@@ -81,7 +81,7 @@ class SAGE(nn.Module):
                 num_workers=args.num_workers)
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
-                block = blocks[0]
+                block = blocks[0].int().to(device)
 
                 h = x[input_nodes].to(device)
                 h_dst = h[:block.number_of_dst_nodes()]
@@ -94,17 +94,6 @@ class SAGE(nn.Module):
 
             x = y
         return y
-
-def prepare_mp(g):
-    """
-    Explicitly materialize the CSR, CSC and COO representation of the given graph
-    so that they could be shared via copy-on-write to sampler workers and GPU
-    trainers.
-    This is a workaround before full shared memory support on heterogeneous graphs.
-    """
-    g.in_degree(0)
-    g.out_degree(0)
-    g.find_edges([0])
 
 def compute_acc(pred, labels):
     """
@@ -174,6 +163,9 @@ def run(args, device, data):
         for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
             tic_step = time.time()
 
+            # copy block to gpu
+            blocks = [blk.int().to(device) for blk in blocks]
+
             # Load the input features as well as output labels
             batch_inputs, batch_labels = load_subtensor(g, labels, seeds, input_nodes, device)
 
@@ -240,11 +232,9 @@ if __name__ == '__main__':
     graph, labels = data[0]
     labels = labels[:, 0]
 
-    graph = dgl.as_heterograph(graph)
-
     in_feats = graph.ndata['feat'].shape[1]
     n_classes = (labels.max() + 1).item()
-    prepare_mp(graph)
+    graph.create_format_()
     # Pack data
     data = train_idx, val_idx, test_idx, in_feats, labels, n_classes, graph
 
