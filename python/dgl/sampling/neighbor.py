@@ -15,45 +15,84 @@ __all__ = [
     'MultiLayerNeighborSampler']
 
 def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
-    """Sample from the neighbors of the given nodes and return the induced subgraph.
+    """Sample neighboring edges of the given nodes and return the induced subgraph.
 
-    When sampling with replacement, the sampled subgraph could have parallel edges.
-
-    For sampling without replace, if fanout > the number of neighbors, all the
-    neighbors are sampled.
+    For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
+    will be randomly chosen.  The graph returned will then contain all the nodes in the
+    original graph, but only the sampled edges.
 
     Node/edge features are not preserved. The original IDs of
     the sampled edges are stored as the `dgl.EID` feature in the returned graph.
 
     Parameters
     ----------
-    g : DGLHeteroGraph
-        Full graph structure.
+    g : DGLGraph
+        The graph
     nodes : tensor or dict
-        Node ids to sample neighbors from. The allowed types
-        are dictionary of node types to node id tensors, or simply node id tensor if
-        the given graph g has only one type of nodes.
-    fanout : int or dict[etype, int]
-        The number of sampled neighbors for each node on each edge type. Provide a dict
-        to specify different fanout values for each edge type.
+        Node IDs to sample neighbors from.
 
-        If -1 is given, select all the neighbors.  ``prob`` and ``replace`` will be
-        ignored in this case.
+        This argument can take a single ID tensor or a dictionary of node types and ID tensors.
+        If a single tensor is given, the graph must only have one type of nodes.
+    fanout : int or dict[etype, int]
+        The number of edges to be sampled for each node on each edge type.
+
+        This argument can take a single int or a dictionary of edge types and ints.
+        If a single int is given, DGL will sample this number of edges for each node for
+        every edge type.
+
+        If -1 is given for a single edge type, all the neighboring edges with that edge
+        type will be selected.
     edge_dir : str, optional
-        Edge direction ('in' or 'out'). If is 'in', sample from in edges. Otherwise,
-        sample from out edges.
+        Determines whether to sample inbound or outbound edges.
+
+        Can take either ``in`` for inbound edges or ``out`` for outbound edges.
     prob : str, optional
-        Feature name used as the probabilities associated with each neighbor of a node.
-        Its shape should be compatible with a scalar edge feature tensor.
+        Feature name used as the (unnormalized) probabilities associated with each
+        neighboring edge of a node.  The feature must have only one element for each
+        edge.
+
+        The features must be non-negative floats, and the sum of the features of
+        inbound/outbound edges for every node must be positive (though they don't have
+        to sum up to one).  Otherwise, the result will be undefined.
     replace : bool, optional
         If True, sample with replacement.
 
     Returns
     -------
-    DGLHeteroGraph
-        A sampled subgraph containing only the sampled neighbor edges from
-        ``nodes``. The sampled subgraph has the same metagraph as the original
-        one.
+    DGLGraph
+        A sampled subgraph containing only the sampled neighboring edges.
+
+    Examples
+    --------
+    Assume that you have the following graph
+
+    >>> g = dgl.graph(([0, 0, 1, 1, 2, 2], [1, 2, 0, 1, 2, 0]))
+
+    And the weights
+
+    >>> g.edata['prob'] = torch.FloatTensor([0., 1., 0., 1., 0., 1.])
+
+    To sample one inbound edge for node 0 and node 1:
+
+    >>> sg = dgl.sampling.sample_neighbors(g, [0, 1], 1)
+    >>> sg.edges(order='eid')
+    (tensor([1, 0]), tensor([0, 1]))
+    >>> sg.edata[dgl.EID]
+    tensor([2, 0])
+
+    To sample one inbound edge for node 0 and node 1 with probability in edge feature
+    ``prob``:
+
+    >>> sg = dgl.sampling.sample_neighbors(g, [0, 1], 1, prob='prob')
+    >>> sg.edges(order='eid')
+    (tensor([2, 1]), tensor([0, 1]))
+
+    With ``fanout`` greater than the number of actual neighbors and without replacement,
+    DGL will take all neighbors instead:
+
+    >>> sg = dgl.sampling.sample_neighbors(g, [0, 1], 3)
+    >>> sg.edges(order='eid')
+    (tensor([1, 2, 0, 1]), tensor([0, 0, 1, 1]))
     """
     if not isinstance(nodes, dict):
         if len(g.ntypes) > 1:
@@ -97,40 +136,60 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     return ret
 
 def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
-    """Select the neighbors with k-largest weights on the connecting edges for each given node.
+    """Select the neighboring edges with k-largest (or k-smallest) weights of the given
+    nodes and return the induced subgraph.
 
-    If k > the number of neighbors, all the neighbors are sampled.
+    For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
+    with the largest (or smallest when ``ascending == True``) weights will be chosen.
+    The graph returned will then contain all the nodes in the original graph, but only
+    the sampled edges.
 
     Node/edge features are not preserved. The original IDs of
     the sampled edges are stored as the `dgl.EID` feature in the returned graph.
 
     Parameters
     ----------
-    g : DGLHeteroGraph
-        Full graph structure.
+    g : DGLGraph
+        The graph
     k : int or dict[etype, int]
-        The K value.
+        The number of edges to be selected for each node on each edge type.
 
-        If -1 is given, select all the neighbors.
+        This argument can take a single int or a dictionary of edge types and ints.
+        If a single int is given, DGL will select this number of edges for each node for
+        every edge type.
+
+        If -1 is given for a single edge type, all the neighboring edges with that edge
+        type will be selected.
     weight : str
-        Feature name of the weights associated with each edge. Its shape should be
-        compatible with a scalar edge feature tensor.
+        Feature name of the weights associated with each edge.  The feature should have only
+        one element for each edge.  The feature can be either int32/64 or float32/64.
     nodes : tensor or dict, optional
-        Node ids to sample neighbors from. The allowed types
-        are dictionary of node types to node id tensors, or simply node id
-        tensor if the given graph g has only one type of nodes.
+        Node IDs to sample neighbors from.
+
+        This argument can take a single ID tensor or a dictionary of node types and ID tensors.
+        If a single tensor is given, the graph must only have one type of nodes.
+
+        If None, DGL will select the edges for all nodes.
     edge_dir : str, optional
-        Edge direction ('in' or 'out'). If is 'in', sample from in edges.
-        Otherwise, sample from out edges.
+        Determines whether to sample inbound or outbound edges.
+
+        Can take either ``in`` for inbound edges or ``out`` for outbound edges.
     ascending : bool, optional
-        If true, elements are sorted by ascending order, equivalent to find
-        the K smallest values. Otherwise, find K largest values.
+        If True, DGL will return edges with k-smallest weights instead of
+        k-largest weights.
 
     Returns
     -------
-    DGLHeteroGraph
-        A sampled subgraph by top k criterion. The sampled subgraph has the same
-        metagraph as the original one.
+    DGLGraph
+        A sampled subgraph containing only the sampled neighboring edges.
+
+    Examples
+    --------
+    >>> g = dgl.graph(([0, 0, 1, 1, 2, 2], [1, 2, 0, 1, 2, 0]))
+    >>> g.edata['weight'] = torch.FloatTensor([0, 1, 0, 1, 0, 1])
+    >>> sg = dgl.sampling.select_topk(g, 1, 'weight')
+    >>> sg.edges(order='eid')
+    (tensor([2, 1, 0]), tensor([0, 1, 2]))
     """
     # Rectify nodes to a dictionary
     if nodes is None:
