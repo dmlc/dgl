@@ -60,14 +60,14 @@ class IGMC(nn.Module):
         concat_states = []
         x = block.ndata['x']
         for conv in self.convs:
-            # edge weight zero denotes the edge dropped
+            # edge mask zero denotes the edge dropped
             x = th.tanh(conv(block, x, block.edata['etype'], 
-                             norm=block.edata['weight'].unsqueeze(1)))
+                             norm=block.edata['edge_mask'].unsqueeze(1)))
             concat_states.append(x)
         concat_states = th.cat(concat_states, 1)
         
-        users = block.ndata['x'][:, 0] == 1
-        items = block.ndata['x'][:, 1] == 1
+        users = block.ndata['nlabel'][:, 0] == 1
+        items = block.ndata['nlabel'][:, 1] == 1
         x = th.cat([concat_states[users], concat_states[items]], 1)
         # if self.side_features:
         #     x = th.cat([x, data.u_feature, data.v_feature], 1)
@@ -90,10 +90,10 @@ def edge_drop(graph, edge_dropout=0.2, training=True):
     if not training:
         return graph
 
-    # set edge weight to zero in directional mode
+    # set edge mask to zero in directional mode
     src, _ = graph.edges()
     to_drop = src.new_full((graph.number_of_edges(), ), edge_dropout, dtype=th.float)
     to_drop = th.bernoulli(to_drop).to(th.bool)
-    graph.edata['weight'][to_drop] = 0
+    graph.edata['edge_mask'][to_drop] = 0
 
     return graph
