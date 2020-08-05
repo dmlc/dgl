@@ -41,7 +41,7 @@ def _exit():
 
 
 def enable_mp_debug():
-    """Print multiprocessing debug information. This is only 
+    """Print multiprocessing debug information. This is only
     for debug usage"""
     import logging
     logger = multiprocessing.log_to_stderr()
