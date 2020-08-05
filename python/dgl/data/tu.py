@@ -199,7 +199,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
 
         Returns
         -------
-        :class:`dgl.DGLGraph`, int
+        (:class:`dgl.DGLGraph`, Tensor)
             Graph with node feature stored in ``feat`` field and node label in ``node_label`` if available.
             And its label.
         """
@@ -367,7 +367,7 @@ class TUDataset(DGLBuiltinDataset):
 
         Returns
         -------
-        :class:`dgl.DGLGraph`, int
+        (:class:`dgl.DGLGraph`, Tensor)
             Graph with node feature stored in ``feat`` field and node label in ``node_label`` if available.
             And its label.
         """

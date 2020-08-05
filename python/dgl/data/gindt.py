@@ -123,7 +123,7 @@ class GINDataset(DGLBuiltinDataset):
 
         Returns
         -------
-        :class:`dgl.Graph`, int
+        (:class:`dgl.Graph`, Tensor)
             The graph and its label.
         """
         return self.graphs[idx], self.labels[idx]
