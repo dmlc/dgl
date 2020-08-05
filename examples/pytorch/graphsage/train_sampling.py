@@ -89,18 +89,6 @@ class SAGE(nn.Module):
             x = y
         return y
 
-def prepare_mp(g):
-    """
-    Explicitly materialize the CSR, CSC and COO representation of the given graph
-    so that they could be shared via copy-on-write to sampler workers and GPU
-    trainers.
-
-    This is a workaround before full shared memory support on heterogeneous graphs.
-    """
-    g.in_degree(0)
-    g.out_degree(0)
-    g.find_edges([0])
-
 def compute_acc(pred, labels):
     """
     Compute the accuracy of prediction given the labels.
@@ -167,9 +155,8 @@ def run(args, device, data):
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
+        tic_step = time.time()
         for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
-            tic_step = time.time()
-
             # Load the input features as well as output labels
             batch_inputs, batch_labels = load_subtensor(train_g, seeds, input_nodes, device)
             blocks = [block.to(device) for block in blocks]
@@ -187,6 +174,7 @@ def run(args, device, data):
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB'.format(
                     epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc))
+            tic_step = time.time()
 
         toc = time.time()
         print('Epoch Time(s): {:.4f}'.format(toc - tic))
@@ -219,7 +207,7 @@ if __name__ == '__main__':
     argparser.add_argument('--inductive', action='store_true',
         help="Inductive learning setting")
     args = argparser.parse_args()
-    
+
     if args.gpu >= 0:
         device = th.device('cuda:%d' % args.gpu)
     else:
@@ -241,9 +229,9 @@ if __name__ == '__main__':
     else:
         train_g = val_g = test_g = g
 
-    prepare_mp(train_g)
-    prepare_mp(val_g)
-    prepare_mp(test_g)
+    train_g.create_format_()
+    val_g.create_format_()
+    test_g.create_format_()
     # Pack data
     data = in_feats, n_classes, train_g, val_g, test_g
 
