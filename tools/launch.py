@@ -39,7 +39,7 @@ def submit_jobs(args, udf_command):
     # launch server tasks
     server_cmd = 'DGL_ROLE=server'
     server_cmd = server_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(args.num_client)
-    server_cmd = server_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.conf_path)
+    server_cmd = server_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.part_config)
     server_cmd = server_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
     for i in range(len(hosts)*server_count_per_machine):
         ip, _ = hosts[int(i / server_count_per_machine)]
@@ -50,7 +50,7 @@ def submit_jobs(args, udf_command):
     # launch client tasks
     client_cmd = 'DGL_DIST_MODE="distributed" DGL_ROLE=client'
     client_cmd = client_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(args.num_client)
-    client_cmd = client_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.conf_path)
+    client_cmd = client_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.part_config)
     client_cmd = client_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
     if os.environ.get('OMP_NUM_THREADS') is not None:
         client_cmd = client_cmd + ' ' + 'OMP_NUM_THREADS=' + os.environ.get('OMP_NUM_THREADS')
@@ -85,11 +85,11 @@ def main():
                         help='Path of user directory of distributed tasks. \
                         This is used to specify a destination location where \
                         the contents of current directory will be rsyncd')
-    parser.add_argument('--num_client', type=int, 
+    parser.add_argument('--num_client', type=int,
                         help='Total number of client processes in the cluster')
-    parser.add_argument('--conf_path', type=str, 
-                        help='The file (in workspace) of the partition config file')
-    parser.add_argument('--ip_config', type=str, 
+    parser.add_argument('--part_config', type=str,
+                        help='The file (in workspace) of the partition config')
+    parser.add_argument('--ip_config', type=str,
                         help='The file (in workspace) of IP configuration for server processes')
     args, udf_command = parser.parse_known_args()
     assert len(udf_command) == 1, 'Please provide user command line.'
