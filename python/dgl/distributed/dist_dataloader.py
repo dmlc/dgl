@@ -49,7 +49,7 @@ class DistDataLoader:
                  queue_size=None):
         """
         This class will utilize the worker process created by dgl.distributed.initialize function
-        
+
         Note that the iteration order is not guaranteed with this class. For example,
          if dataset = [1, 2, 3, 4], batch_size = 2 and shuffle = False, the order of [1, 2]
          and [3, 4] is not guaranteed.
