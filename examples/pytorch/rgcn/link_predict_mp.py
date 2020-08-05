@@ -8,6 +8,7 @@ import argparse
 import itertools
 import numpy as np
 import time, gc
+import tqdm
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
@@ -75,8 +76,17 @@ class LinkPredict(nn.Module):
 
         return h
 
-    def forward(self, p_blocks, p_feats, n_blocks=None, n_feats=None, p_g=None, n_g=None):
+    def forward(self, p_blocks, p_feats, n_blocks=None, n_feats=None, p_g=None, n_g=None, sample='neighbor'):
         p_h = p_feats
+
+        # full subgraph
+        if sample == 'path':
+            p_blocks = p_blocks.int()
+            p_blocks = p_blocks.to(self.device)
+            for layer in self.layers:
+                p_h = layer(p_blocks, p_h, p_blocks.edata['etype'], p_blocks.edata['norm'])
+            return p_h
+
         for layer, block in zip(self.layers, p_blocks):
             block = block.int()
             block = block.to(self.device)
@@ -183,12 +193,62 @@ class NodeSampler:
             block.edata['etype'] = etypes
             block.edata['norm'] = norm
             curr = block.srcdata[dgl.NID]
-            blocks.insert(0, block)
+            blocks.insert(0, block.int())
 
         return blocks
 
+class LinkPathSampler:
+    def __init__(self, g, neg_edges, num_edges, num_neg, num_rel, is_train=True, keep_pos_edges=False):
+        self.g = g
+        self.neg_edges = neg_edges
+        self.num_edges = num_edges
+        self.num_neg = num_neg
+        self.num_rel = num_rel
+        self.is_train = is_train
+        self.keep_pos_edges = keep_pos_edges
 
-class LinkRankSampler:
+    def sample_blocks(self, seeds):
+        pseeds = th.tensor(seeds).long()
+        bsize = pseeds.shape[0]
+        if self.num_neg is not None:
+            nseeds = th.randint(self.num_edges, (self.num_neg,))
+            nseeds = self.neg_edges[nseeds]
+        else:
+            nseeds = th.randint(self.num_edges, (bsize,))
+            nseeds = self.neg_edges[nseeds]
+
+        g = self.g
+        p_u, p_v = g.find_edges(pseeds)
+        p_rel = g.edata['etype'][pseeds]
+        n_u, n_v = g.find_edges(nseeds)
+        n_rel = g.edata['etype'][nseeds]
+
+        subg = g.edge_subgraph(th.cat([pseeds, nseeds]), preserve_nodes=True)
+        subg.add_edges(th.cat([p_v, n_v]), th.cat([p_u, n_u]))
+        compact_subg = dgl.compact_graphs(subg)
+        compact_subg.ndata['ntype'] = g.ndata['ntype'][compact_subg.ndata[dgl.NID]]
+        compact_subg.edata['etype'] = th.cat([p_rel, n_rel, p_rel + self.num_rel, n_rel + self.num_rel])
+        # only half of the edges will be used as graph structure
+        pos_idx = np.random.choice(np.arange(bsize),
+                                   size=bsize//2, replace=False)
+        pos_idx = th.tensor(pos_idx).long()
+        u, v = compact_subg.edges()
+        p_u = u[th.arange(pseeds.shape[0])]
+        p_v = v[th.arange(pseeds.shape[0])]
+        n_u = u[th.arange(start=pseeds.shape[0], end=pseeds.shape[0]+nseeds.shape[0])]
+        n_v = v[th.arange(start=pseeds.shape[0], end=pseeds.shape[0]+nseeds.shape[0])]
+        compact_subg.remove_edges(pos_idx)
+
+        # calculate norm for compact_subg
+        in_deg = compact_subg.in_degrees(range(compact_subg.number_of_nodes())).float()
+        norm = 1.0 / in_deg
+        norm[th.isinf(norm)] = 0
+        compact_subg.ndata['norm'] = norm
+        compact_subg.apply_edges(lambda edges : {'norm' : edges.dst['norm']})
+        compact_subg.edata['norm'] = compact_subg.edata['norm'].unsqueeze(1)
+        return (bsize, compact_subg, p_u, p_v, n_u, n_v, p_rel)
+
+class LinkNeighborSampler:
     def __init__(self, g, neg_edges, num_edges, num_neg, fanouts,
         is_train=True, keep_pos_edges=False):
         self.g = g
@@ -251,96 +311,16 @@ class LinkRankSampler:
             n_block.edata['norm'] = n_norm
             p_curr = p_block.srcdata[dgl.NID]
             n_curr = n_block.srcdata[dgl.NID]
-            p_blocks.insert(0, p_block)
-            n_blocks.insert(0, n_block)
+            p_blocks.insert(0, p_block.int())
+            n_blocks.insert(0, n_block.int())
 
         return (bsize, p_g, n_g, p_blocks, n_blocks)
 
-def evaluate(embed_layer, model, dataloader, node_feats, bsize, neg_cnt, queue):
-    logs = []
+def fullgraph_eval(g, embed_layer, model, device, node_feats,
+    dim_size, minibatch_blocks, pos_eids, neg_eids, neg_cnt, queue, filterred_test):
     model.eval()
+    embed_layer.eval()
     t0 = time.time()
-
-    with th.no_grad():
-        for i, sample_data in enumerate(dataloader):
-            bsize, p_g, n_g, p_blocks, n_blocks = sample_data
-            p_feats = embed_layer(p_blocks[0].srcdata[dgl.NID],
-                                p_blocks[0].srcdata['ntype'],
-                                node_feats)
-            n_feats = embed_layer(n_blocks[0].srcdata[dgl.NID],
-                                n_blocks[0].srcdata['ntype'],
-                                node_feats)
-            p_head_emb, p_tail_emb, r_emb, n_head_emb, n_tail_emb, _, _ = \
-                model(p_blocks, p_feats, n_blocks, n_feats, p_g, n_g)
-
-            pos_score = calc_pos_score(p_head_emb, p_tail_emb, r_emb).view(-1,1)
-            t_neg_score = calc_neg_tail_score(p_head_emb,
-                                              n_tail_emb,
-                                              r_emb,
-                                              1,
-                                              bsize,
-                                              neg_cnt).squeeze(0)
-            h_neg_score = calc_neg_head_score(n_head_emb,
-                                              p_tail_emb,
-                                              r_emb,
-                                              1,
-                                              bsize,
-                                              neg_cnt).squeeze(0)
-            #pos_scores = F.logsigmoid(pos_score).reshape(bsize, -1)
-            #t_neg_score = F.logsigmoid(t_neg_score).reshape(bsize, neg_cnt)
-            #h_neg_score = F.logsigmoid(h_neg_score).reshape(bsize, neg_cnt)
-            # perturb object
-            scores = th.cat([pos_score, h_neg_score], dim=1)
-            scores = th.sigmoid(scores)
-            _, indices = th.sort(scores, dim=1, descending=True)
-            #rankings = th.sum(neg_scores >= pos_scores, dim=1) + 1
-            indices = th.nonzero(indices == 0)
-            rankings = indices[:, 1].view(-1) + 1
-            rankings = rankings.cpu().detach().numpy()
-            for ranking in rankings:
-                logs.append({
-                    'MRR': 1.0 / ranking,
-                    'MR': float(ranking),
-                    'HITS@1': 1.0 if ranking <= 1 else 0.0,
-                    'HITS@3': 1.0 if ranking <= 3 else 0.0,
-                    'HITS@10': 1.0 if ranking <= 10 else 0.0
-                })
-
-            # perturb subject
-            scores = th.cat([pos_score, t_neg_score], dim=1)
-            scores = th.sigmoid(scores)
-            _, indices = th.sort(scores, dim=1, descending=True)
-            #rankings = th.sum(neg_scores >= pos_scores, dim=1) + 1
-            indices = th.nonzero(indices == 0)
-            rankings = indices[:, 1].view(-1) + 1
-            rankings = rankings.cpu().detach().numpy()
-            for ranking in rankings:
-                logs.append({
-                    'MRR': 1.0 / ranking,
-                    'MR': float(ranking),
-                    'HITS@1': 1.0 if ranking <= 1 else 0.0,
-                    'HITS@3': 1.0 if ranking <= 3 else 0.0,
-                    'HITS@10': 1.0 if ranking <= 10 else 0.0
-                })
-
-    t1 = time.time()
-    print("Eval {} samples takes {} seconds".format(i * bsize, t1 - t0))
-
-    metrics = {}
-    if len(logs) > 0:
-        for metric in logs[0].keys():
-            metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
-    if queue is not None:
-        queue.put(logs)
-    else:
-        for k, v in metrics.items():
-            print('average {}: {}'.format(k, v))
-
-def fullgraph_eval(g, embed_layer, model, device, node_feats, dim_size,
-    minibatch_blocks, pos_eids, neg_eids, neg_cnt, queue, filterred_test):
-    model.eval()
-    t0 = time.time()
-
     logs = []
     embs = th.empty(g.number_of_nodes(), dim_size)
     with th.no_grad():
@@ -547,11 +527,20 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
         node_tids = node_tids.to(dev_id)
 
     # build dataloader for training, validation
-    train_sampler = LinkRankSampler(train_g,
-                                    train_neg_seeds,
-                                    num_train_edges,
-                                    num_neg=None,
-                                    fanouts=fanouts)
+    if args.sampler == 'neighbor':
+        train_sampler = LinkNeighborSampler(train_g,
+                                        train_neg_seeds,
+                                        num_train_edges,
+                                        num_neg=None,
+                                        fanouts=fanouts)
+    elif args.sampler == 'path':
+        train_sampler = LinkPathSampler(train_g,
+                                        train_neg_seeds,
+                                        num_train_edges,
+                                        num_neg=None,
+                                        num_rel=num_rels)
+    else:
+        assert 'Unsupported sampler {}'.format(args.sampler)
     dataloader = DataLoader(dataset=train_seeds,
                             batch_size=batch_size,
                             collate_fn=train_sampler.sample_blocks,
@@ -559,15 +548,11 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
                             pin_memory=True,
                             drop_last=True,
                             num_workers=args.num_workers)
-    valid_sampler = LinkRankSampler(valid_g,
-                                    valid_neg_seeds,
-                                    num_valid_edges,
-                                    num_neg=args.valid_neg_cnt,
-                                    fanouts=[None] * args.n_layers,
-                                    is_train=False)
-    valid_dataloader = DataLoader(dataset=valid_seeds,
-                                  batch_size=args.valid_batch_size,
-                                  collate_fn=valid_sampler.sample_blocks,
+
+    valid_sampler = NodeSampler(valid_g, fanouts=[None] * args.n_layers)
+    valid_dataloader = DataLoader(dataset=th.arange(test_g.number_of_nodes()),
+                                  batch_size=4 * 1024,
+                                  collate_fn=valid_sampler.sample_nodes,
                                   shuffle=False,
                                   pin_memory=True,
                                   drop_last=False,
@@ -583,6 +568,7 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
                                  pin_memory=True,
                                  drop_last=False,
                                  num_workers=args.num_workers)
+
 
     if n_gpus > 1:
         dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
@@ -631,16 +617,29 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
         if epoch > 1:
             t0 = time.time()
         for i, sample_data in enumerate(dataloader):
-            bsize, p_g, n_g, p_blocks, n_blocks = sample_data
-            p_feats = embed_layer(p_blocks[0].srcdata[dgl.NID].to(dev_id),
-                                  p_blocks[0].srcdata['ntype'].to(dev_id),
-                                  node_feats)
-            n_feats = embed_layer(n_blocks[0].srcdata[dgl.NID].to(dev_id),
-                                  n_blocks[0].srcdata['ntype'].to(dev_id),
-                                  node_feats)
+            if args.sampler == 'neighbor':
+                bsize, p_g, n_g, p_blocks, n_blocks = sample_data
+                p_feats = embed_layer(p_blocks[0].srcdata[dgl.NID].to(dev_id),
+                                    p_blocks[0].srcdata['ntype'].to(dev_id),
+                                    node_feats)
+                n_feats = embed_layer(n_blocks[0].srcdata[dgl.NID].to(dev_id),
+                                    n_blocks[0].srcdata['ntype'].to(dev_id),
+                                    node_feats)
 
-            p_head_emb, p_tail_emb, r_emb, n_head_emb, n_tail_emb, p_emb, n_emb = \
-                model(p_blocks, p_feats, n_blocks, n_feats, p_g, n_g)
+                p_head_emb, p_tail_emb, r_emb, n_head_emb, n_tail_emb, p_emb, n_emb = \
+                    model(p_blocks, p_feats, n_blocks, n_feats, p_g, n_g)
+            else:
+                bsize, g, p_u, p_v, n_u, n_v, rids = sample_data
+                in_feats = embed_layer(g.srcdata[dgl.NID].to(dev_id),
+                                       g.srcdata['ntype'].to(dev_id),
+                                       node_feats)
+                mb_feats = model(g, in_feats, sample=args.sampler)
+                p_head_emb = mb_feats[p_u]
+                p_tail_emb = mb_feats[p_v]
+                n_head_emb = mb_feats[n_u]
+                n_tail_emb = mb_feats[n_v]
+                r_emb = model.w_relation[rids]
+                p_emb = n_emb = mb_feats
 
             #n_shuffle_seed = th.randperm(n_head_emb.shape[0])
             #n_head_emb = n_head_emb[n_shuffle_seed]
@@ -676,13 +675,18 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
             print("Epoch {} takes {} seconds".format(epoch, dur))
 
         # We use multi-gpu evaluation to speed things up
-        evaluate(embed_layer,
-                 model,
-                 valid_dataloader,
-                 node_feats,
-                 args.valid_batch_size,
-                 args.valid_neg_cnt,
-                 queue)
+        fullgraph_eval(valid_g,
+                       embed_layer,
+                       model,
+                       dev_id,
+                       node_feats,
+                       args.n_hidden,
+                       valid_dataloader,
+                       valid_seeds,
+                       valid_neg_seeds,
+                       args.valid_neg_cnt,
+                       queue,
+                       False)
         if proc_id == 0 and queue is not None:
             logs = []
             for i in range(n_gpus):
@@ -729,18 +733,6 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
         for k, v in metrics.items():
             print('Test average {} : {}'.format(k, v))
         print("-----------------------------------------")
-
-def prepare_mp(g):
-    """
-    Explicitly materialize the CSR, CSC and COO representation of the given graph
-    so that they could be shared via copy-on-write to sampler workers and GPU
-    trainers.
-    This is a workaround before full shared memory support on heterogeneous graphs.
-    """
-    for etype in g.canonical_etypes:
-        g.in_degree(0, etype=etype)
-        g.out_degree(0, etype=etype)
-        g.find_edges([0], etype=etype)
 
 def main(args, devices):
     # load graph data
@@ -849,6 +841,10 @@ def main(args, devices):
     test_g.edata.pop('train_edge_mask')
     test_g.edata.pop('valid_edge_mask')
 
+    train_g.create_format_()
+    valid_g.create_format_()
+    test_g.create_format_()
+
     n_gpus = len(devices)
     # cpu
     if devices[0] == -1:
@@ -948,6 +944,8 @@ def config():
             help="Whether we do filterred evaluation in test")
     parser.add_argument("--relation-regularizer", default='basis',
             help="Relation weight regularizer")
+    parser.add_argument("--sampler", type=str, default='neighbor',
+            help="subgraph sampler")
 
     args = parser.parse_args()
 
