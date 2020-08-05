@@ -14,13 +14,13 @@ class DGLDataset(object):
     The following steps will are executed automatically:
 
       1. Check whether there is a dataset cache on disk
-      (already processed and stored on the disk) by
-      invoking ``has_cache()``. If true, goto 5.
+         (already processed and stored on the disk) by
+         invoking ``has_cache()``. If true, goto 5.
       2. Call ``download()`` to download the data.
       3. Call ``process()`` to process the data.
       4. Call ``save()`` to save the processed dataset on disk and goto 6.
       5. Call ``load()`` to load the processed dataset from disk.
-      6. Done
+      6. Done.
 
     Users can overwite these functions with their
     own data processing logic.
@@ -43,7 +43,7 @@ class DGLDataset(object):
         A tuple of values as the input for the hash function.
         Users can distinguish instances (and their caches on the disk)
         from the same dataset class by comparing the hash values.
-        Default: (), the corresponding hash value is 'f9065fa7'.
+        Default: (), the corresponding hash value is ``'f9065fa7'``.
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -255,6 +255,7 @@ class DGLBuiltinDataset(DGLDataset):
     r"""The Basic DGL Builtin Dataset.
 
     Parameters
+    ----------
     name : str
         Name of the dataset.
     url : str

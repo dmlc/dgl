@@ -23,13 +23,14 @@ class SSTDataset(DGLBuiltinDataset):
     r"""Stanford Sentiment Treebank dataset.
 
     .. deprecated:: 0.5.0
-        `trees` is deprecated, it is replaced by:
+        
+        - ``trees`` is deprecated, it is replaced by:
+
             >>> dataset = SSTDataset()
             >>> for tree in dataset:
             ....    # your code here
-            ....
-            >>>
-        `num_vocabs` is deprecated, it is replaced by `vocab_size`
+
+        - ``num_vocabs`` is deprecated, it is replaced by ``vocab_size``.
 
     Each sample is the constituency tree of a sentence. The leaf nodes
     represent words. The word is a int value stored in the ``x`` feature field.
@@ -39,12 +40,12 @@ class SSTDataset(DGLBuiltinDataset):
     int value stored in the ``y`` feature field.
     Official site: `<http://nlp.stanford.edu/sentiment/index.html>`_
 
-    Statistics
-    ----------
-    Train examples: 8,544
-    Dev examples: 1,101
-    Test examples: 2,210
-    Number of classes for each node: 5
+    Statistics:
+
+    - Train examples: 8,544
+    - Dev examples: 1,101
+    - Test examples: 2,210
+    - Number of classes for each node: 5
 
     Parameters
     ----------
@@ -108,7 +109,6 @@ class SSTDataset(DGLBuiltinDataset):
     ...     labels = tree.ndata['y']
     ...     mask = tree.ndata['mask']
     ...     # your code here
-    >>>
     """
 
     PAD_WORD = -1  # special pad word id

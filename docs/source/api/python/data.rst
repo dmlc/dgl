@@ -5,24 +5,6 @@ dgl.data
 
 .. currentmodule:: dgl.data
 
-Utils
------
-
-.. autosummary::
-    :toctree: ../../generated/
-
-    utils.get_download_dir
-    utils.download
-    utils.check_sha1
-    utils.extract_archive
-    utils.split_dataset
-    utils.save_graphs
-    utils.load_graphs
-    utils.load_labels
-
-.. autoclass:: dgl.data.utils.Subset
-    :members: __getitem__, __len__
-
 Dataset Classes
 ---------------
 
@@ -211,4 +193,22 @@ Symmetric Stochastic Block Model Mixture dataset
 
 .. autoclass:: SBMMixtureDataset
     :members: __getitem__, __len__, collate_fn
+
+Utils
+-----
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    utils.get_download_dir
+    utils.download
+    utils.check_sha1
+    utils.extract_archive
+    utils.split_dataset
+    utils.save_graphs
+    utils.load_graphs
+    utils.load_labels
+
+.. autoclass:: dgl.data.utils.Subset
+    :members: __getitem__, __len__
 
