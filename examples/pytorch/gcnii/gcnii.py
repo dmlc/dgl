@@ -22,8 +22,6 @@ class GCNII(nn.Module):
                  bias=False,
                  activation=None):
         super(GCNII, self).__init__()
-        if hidden_size == -1:
-            hidden_size = in_size
         self._activation = activation
         self.dense_layers = nn.ModuleList()
         self.conv_layers = nn.ModuleList()
@@ -44,9 +42,7 @@ class GCNII(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, graph, features):
-        device = features.device
-        h = features.to(device)
-        h = self.dropout(h)
+        h = self.dropout(features)
         h = self.dense_layers[0](h)
         h = self._activation(h)
         initial_feat = h
