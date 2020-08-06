@@ -11,72 +11,71 @@ from ..base import EID
 
 
 class RandomWalkNeighborSampler(object):
-    """PinSAGE-like sampler extended to any heterographs, given a metapath.
+    """PinSage-like neighbor sampler extended to any heterogeneous graphs.
 
-    Given a heterogeneous graph, this neighbor sampler would generate a homogeneous
-    graph where the neighbors of each node are the most commonly visited nodes of the
-    same type by random walk with restarts.  The random walk with restarts are based
-    on a given metapath, which should have the same beginning and ending node type.
+    Given a heterogeneous graph and a list of nodes, this callable will generate a homogeneous
+    graph where the neighbors of each given node are the most commonly visited nodes of the
+    same type by multiple random walks starting from that given node.  Each random walk consists
+    of multiple metapath-based traversals, with a probability of termination after each traversal.
 
-    The homogeneous graph also has a feature that stores the number of visits to
-    the corresponding neighbors from the seed nodes.
+    The edges of the returned homogeneous graph will connect to the given nodes from their most
+    commonly visited nodes, with a feature indicating the number of visits.
 
-    This is a generalization of PinSAGE sampler which only works on bidirectional
-    bipartite graphs.
+    The metapath must have the same beginning and ending node type to make the algorithm work.
+
+    This is a generalization of PinSAGE sampler which only works on bidirectional bipartite
+    graphs.
 
     Parameters
     ----------
-    G : DGLHeteroGraph
-        The heterogeneous graph.
-    random_walk_length : int
-        The maximum number of steps of random walk with restarts.
-
-        Note that here we consider a full traversal of the given metapath as a single
-        random walk "step" (i.e. a single step may consist of multiple hops).
+    G : DGLGraph
+        The graph.
+    num_traversals : int
+        The maximum number of metapath-based traversals for a single random walk.
 
         Usually considered a hyperparameter.
-    random_walk_restart_prob : int
-        Restart probability of random walk with restarts.
-
-        Note that the random walks only would halt after a full traversal of a metapath.
-        It will never halt in the middle of a metapath.
+    termination_prob : float
+        Termination probability after each metapath-based traversal.
 
         Usually considered a hyperparameter.
     num_random_walks : int
-        Number of random walks to try for each seed node.
+        Number of random walks to try for each given node.
 
         Usually considered a hyperparameter.
     num_neighbors : int
-        Number of neighbors to select for each seed.
+        Number of neighbors (or most commonly visited nodes) to select for each given node.
     metapath : list[str] or list[tuple[str, str, str]], optional
         The metapath.
 
-        If not given, assumes that the graph is homogeneous.
+        If not given, DGL assumes that the graph is homogeneous and the metapath consists
+        of one step over the single edge type.
     weight_column : str, default "weights"
-        The weight of each neighbor, stored as an edge feature.
+        The name of the edge feature to be stored on the returned graph with the number of
+        visits.
 
     Inputs
     ------
     seed_nodes : Tensor
-        A tensor of seed node IDs of node type ``ntype``.
+        A tensor of given node IDs of node type ``ntype`` to generate neighbors from.  The
+        node type ``ntype`` is the beginning and ending node type of the given metapath.
 
     Outputs
     -------
-    g : DGLHeteroGraph
-        A homogeneous graph constructed by selecting neighbors for each seed node according
-        to PinSAGE algorithm.
+    g : DGLGraph
+        A homogeneous graph constructed by selecting neighbors for each given node according
+        to the algorithm above.
 
     Examples
     --------
     See examples in :any:`PinSAGESampler`.
     """
-    def __init__(self, G, random_walk_length, random_walk_restart_prob,
+    def __init__(self, G, num_traversals, termination_prob,
                  num_random_walks, num_neighbors, metapath=None, weight_column='weights'):
         self.G = G
         self.weight_column = weight_column
         self.num_random_walks = num_random_walks
         self.num_neighbors = num_neighbors
-        self.random_walk_length = random_walk_length
+        self.num_traversals = num_traversals
 
         if metapath is None:
             if len(G.ntypes) > 1 or len(G.etypes) > 1:
@@ -90,9 +89,9 @@ class RandomWalkNeighborSampler(object):
 
         self.metapath_hops = len(metapath)
         self.metapath = metapath
-        self.full_metapath = metapath * random_walk_length
-        restart_prob = np.zeros(self.metapath_hops * random_walk_length)
-        restart_prob[self.metapath_hops::self.metapath_hops] = random_walk_restart_prob
+        self.full_metapath = metapath * num_traversals
+        restart_prob = np.zeros(self.metapath_hops * num_traversals)
+        restart_prob[self.metapath_hops::self.metapath_hops] = termination_prob
         self.restart_prob = F.zerocopy_from_numpy(restart_prob)
 
     # pylint: disable=no-member
@@ -101,7 +100,7 @@ class RandomWalkNeighborSampler(object):
         paths, _ = random_walk(
             self.G, seed_nodes, metapath=self.full_metapath, restart_prob=self.restart_prob)
         src = F.reshape(paths[:, self.metapath_hops::self.metapath_hops], (-1,))
-        dst = F.repeat(paths[:, 0], self.random_walk_length, 0)
+        dst = F.repeat(paths[:, 0], self.num_traversals, 0)
 
         src_mask = (src != -1)
         src = F.boolean_mask(src, src_mask)
@@ -120,60 +119,60 @@ class RandomWalkNeighborSampler(object):
 
 
 class PinSAGESampler(RandomWalkNeighborSampler):
-    """PinSAGE neighbor sampler.
+    """PinSAGE-like neighbor sampler.
 
-    Given a bidirectional bipartite graph, PinSAGE neighbor sampler would generate
-    a homogeneous graph where the neighbors of each node are the most commonly visited
-    nodes of the same type by random walk with restarts.
+    This callable works on a bidirectional bipartite graph with edge types
+    ``(ntype, fwtype, other_type)`` and ``(other_type, bwtype, ntype)`` (where ``ntype``,
+    ``fwtype``, ``bwtype`` and ``other_type`` could be arbitrary type names).  It will generate
+    a homogeneous graph of node type ``ntype`` where the neighbors of each given node are the
+    most commonly visited nodes of the same type by multiple random walks starting from that
+    given node.  Each random walk consists of multiple metapath-based traversals, with a
+    probability of termination after each traversal.  The metapath is always ``[fwtype, bwtype]``,
+    walking from node type ``ntype`` to node type ``other_type`` then back to ``ntype``.
+
+    The edges of the returned homogeneous graph will connect to the given nodes from their most
+    commonly visited nodes, with a feature indicating the number of visits.
 
     Parameters
     ----------
-    G : DGLHeteroGraph
+    G : DGLGraph
         The bidirectional bipartite graph.
 
         The graph should only have two node types: ``ntype`` and ``other_type``.
         The graph should only have two edge types, one connecting from ``ntype`` to
         ``other_type``, and another connecting from ``other_type`` to ``ntype``.
-
-        PinSAGE works on a bidirectional bipartite graph where for each edge
-        going from node u to node v, there exists an edge going from node v to node u.
     ntype : str
         The node type for which the graph would be constructed on.
     other_type : str
         The other node type.
-    random_walk_length : int
-        The maximum number of steps of random walk with restarts.
-
-        Note that here we consider traversing from ``ntype`` to ``other_type`` then back
-        to ``ntype`` as a single step (i.e. a single step consists of two hops).
+    num_traversals : int
+        The maximum number of metapath-based traversals for a single random walk.
 
         Usually considered a hyperparameter.
-    random_walk_restart_prob : int
-        Restart probability of random walk with restarts.
-
-        Note that the random walks only would halt on node type ``ntype``, and would
-        never halt on ``other_type``.
+    termination_prob : int
+        Termination probability after each metapath-based traversal.
 
         Usually considered a hyperparameter.
     num_random_walks : int
-        Number of random walks to try for each seed node.
+        Number of random walks to try for each given node.
 
         Usually considered a hyperparameter.
     num_neighbors : int
-        Number of neighbors to select for each seed.
+        Number of neighbors (or most commonly visited nodes) to select for each given node.
     weight_column : str, default "weights"
-        The weight of each neighbor, stored as an edge feature.
+        The name of the edge feature to be stored on the returned graph with the number of
+        visits.
 
     Inputs
     ------
     seed_nodes : Tensor
-        A tensor of seed node IDs of node type ``ntype``.
+        A tensor of given node IDs of node type ``ntype`` to generate neighbors from.
 
     Outputs
     -------
     g : DGLHeteroGraph
-        A homogeneous graph constructed by selecting neighbors for each seed node according
-        to PinSAGE algorithm.
+        A homogeneous graph constructed by selecting neighbors for each given node according
+        to PinSage algorithm.
 
     Examples
     --------
@@ -184,7 +183,7 @@ class PinSAGESampler(RandomWalkNeighborSampler):
     ...     ('A', 'AB', 'B'): g,
     ...     ('B', 'BA', 'A'): g.T})
 
-    Then we create a PinSAGE neighbor sampler that samples a graph of node type "A".  Each
+    Then we create a PinSage neighbor sampler that samples a graph of node type "A".  Each
     node would have (a maximum of) 10 neighbors.
 
     >>> sampler = dgl.sampling.PinSAGESampler(G, 'A', 'B', 3, 0.5, 200, 10)
@@ -202,18 +201,19 @@ class PinSAGESampler(RandomWalkNeighborSampler):
              2, 2, 2, 2, 2, 2]))
 
     For an end-to-end example of PinSAGE model, including sampling on multiple layers
-    and computing with the sampled graphs, please refer to [TODO]
+    and computing with the sampled graphs, please refer to our PinSage example
+    in ``examples/pytorch/pinsage``.
 
     References
     ----------
     Graph Convolutional Neural Networks for Web-Scale Recommender Systems
         Ying et al., 2018, https://arxiv.org/abs/1806.01973
     """
-    def __init__(self, G, ntype, other_type, random_walk_length, random_walk_restart_prob,
+    def __init__(self, G, ntype, other_type, num_traversals, termination_prob,
                  num_random_walks, num_neighbors, weight_column='weights'):
         metagraph = G.metagraph()
         fw_etype = list(metagraph[ntype][other_type])[0]
         bw_etype = list(metagraph[other_type][ntype])[0]
-        super().__init__(G, random_walk_length,
-                         random_walk_restart_prob, num_random_walks, num_neighbors,
+        super().__init__(G, num_traversals,
+                         termination_prob, num_random_walks, num_neighbors,
                          metapath=[fw_etype, bw_etype], weight_column=weight_column)

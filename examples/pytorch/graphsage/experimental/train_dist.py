@@ -12,6 +12,7 @@ from dgl.data import register_data_args, load_data
 from dgl.data.utils import load_graphs
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
+from dgl.distributed import DistDataLoader
 
 import torch as th
 import torch.nn as nn
@@ -91,7 +92,7 @@ class DistSAGE(nn.Module):
             sampler = NeighborSampler(g, [-1], dgl.distributed.sample_neighbors)
             print('|V|={}, eval batch size: {}'.format(g.number_of_nodes(), batch_size))
             # Create PyTorch DataLoader for constructing blocks
-            dataloader = DataLoader(
+            dataloader = DistDataLoader(
                 dataset=nodes,
                 batch_size=batch_size,
                 collate_fn=sampler.sample_blocks,
@@ -154,14 +155,13 @@ def run(args, device, data):
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')],
                               dgl.distributed.sample_neighbors)
 
-    # Create PyTorch DataLoader for constructing blocks
-    dataloader = DataLoader(
+    # Create DataLoader for constructing blocks
+    dataloader = DistDataLoader(
         dataset=train_nid.numpy(),
         batch_size=args.batch_size,
         collate_fn=sampler.sample_blocks,
         shuffle=True,
-        drop_last=False,
-        num_workers=args.num_workers)
+        drop_last=False)
 
     # Define model and optimizer
     model = DistSAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
@@ -258,13 +258,12 @@ def run(args, device, data):
 
     profiler.stop()
     print(profiler.output_text(unicode=True, color=True))
-    # clean up
-    if not args.standalone:
-        g._client.barrier()
 
 def main(args):
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
+
+    dgl.distributed.initialize(args.ip_config, num_workers=args.num_workers)
     g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, part_config=args.conf_path)
     print('rank:', g.rank())
 
@@ -309,7 +308,7 @@ if __name__ == '__main__':
     parser.add_argument('--eval-every', type=int, default=5)
     parser.add_argument('--lr', type=float, default=0.003)
     parser.add_argument('--dropout', type=float, default=0.5)
-    parser.add_argument('--num-workers', type=int, default=0,
+    parser.add_argument('--num-workers', type=int, default=4,
         help="Number of sampling processes. Use 0 for no extra process.")
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
