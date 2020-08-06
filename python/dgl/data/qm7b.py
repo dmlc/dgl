@@ -16,15 +16,16 @@ class QM7bDataset(DGLDataset):
     This dataset consists of 7,211 molecules with 14 regression targets.
     Nodes means atoms and edges means bonds. Edge data 'h' means
     the entry of Coulomb matrix.
-    Reference: http://quantum-machine.org/datasets/
 
-    Statistics
-    ----------
-    Number of graphs: 7,211
-    Number of regression targets: 14
-    Average number of nodes: 15
-    Average number of edges: 245
-    Edge feature size: 1
+    Reference: `<http://quantum-machine.org/datasets/>`_
+
+    Statistics:
+
+    - Number of graphs: 7,211
+    - Number of regression targets: 14
+    - Average number of nodes: 15
+    - Average number of edges: 245
+    - Edge feature size: 1
 
     Parameters
     ----------
@@ -73,10 +74,6 @@ class QM7bDataset(DGLDataset):
 
     def process(self):
         mat_path = self.raw_path + '.mat'
-        if not check_sha1(mat_path, self._sha1_str):
-            raise UserWarning('File {} is downloaded but the content hash does not match.'
-                              'The repo may be outdated or download may be incomplete. '
-                              'Otherwise you can create an issue for it.'.format(self.name))
         self.graphs, self.label = self._load_graph(mat_path)
 
     def _load_graph(self, filename):
@@ -110,6 +107,10 @@ class QM7bDataset(DGLDataset):
     def download(self):
         file_path = os.path.join(self.raw_dir, self.name + '.mat')
         download(self.url, path=file_path)
+        if not check_sha1(file_path, self._sha1_str):
+            raise UserWarning('File {} is downloaded but the content hash does not match.'
+                              'The repo may be outdated or download may be incomplete. '
+                              'Otherwise you can create an issue for it.'.format(self.name))
 
     @property
     def num_labels(self):
@@ -126,12 +127,17 @@ class QM7bDataset(DGLDataset):
 
         Returns
         -------
-        (dgl.DGLGraph, Tensor)
+        (:class:`dgl.DGLGraph`, Tensor)
         """
         return self.graphs[idx], self.label[idx]
 
     def __len__(self):
-        r"""Number of graphs in the dataset"""
+        r"""Number of graphs in the dataset.
+
+        Return
+        -------
+        int
+        """
         return len(self.graphs)
 
 
