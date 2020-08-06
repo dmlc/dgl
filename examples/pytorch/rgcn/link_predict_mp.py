@@ -212,7 +212,6 @@ class LinkPathSampler:
         p_u, p_v = subg.edges()
         subg = dgl.add_reverse_edges(subg, copy_ndata=True)
         subg.edata['etype'] = th.cat([p_rel, p_rel + self.num_rel])
-        print(subg.edata['etype'])
 
         # only half of the edges will be used as graph structure
         pos_idx = np.random.choice(np.arange(bsize),
@@ -615,8 +614,8 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
                 p_head_emb = mb_feats[p_u]
                 p_tail_emb = mb_feats[p_v]
 
-                nh_idx = th.randint(0, mb_feats.shape[0], p_head_emb.shape[0])
-                nt_idx = th.randint(0, mb_feats.shape[0], p_tail_emb.shape[0])
+                nh_idx = th.randint(low=0, high=mb_feats.shape[0], size=(p_head_emb.shape[0],))
+                nt_idx = th.randint(low=0, high=mb_feats.shape[0], size=(p_tail_emb.shape[0],))
                 n_head_emb = mb_feats[nh_idx]
                 n_tail_emb = mb_feats[nt_idx]
                 r_emb = model.w_relation[rids]
@@ -746,6 +745,10 @@ def main(args, devices):
     test_seeds = th.nonzero(test_seed_mask).squeeze()
     num_rels = dataset.num_rels
     edge_rels = num_rels * 2 # we add reverse edges
+
+    print("Train pos edges #{}".format(train_seeds.shape[0]))
+    print("Valid pos edges #{}".format(valid_seeds.shape[0]))
+    print("Test pos edges #{}".format(test_seeds.shape[0]))
 
     train_shuffle = th.randperm(train_seeds.shape[0])
     train_seeds = train_seeds[train_shuffle]
