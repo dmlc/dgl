@@ -6,7 +6,7 @@
 ## Dependencies
 
 * PyTorch 1.0+
-* DGL 0.3+
+* DGL 0.5+
 
 ## Codes
 
