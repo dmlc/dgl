@@ -128,3 +128,46 @@ def check_all_same_schema(feat_dict_list, keys, name):
                                ' and feature size, but got\n\t{} {}\nand\n\t{} {}.'.format(
                                    name, k, F.dtype(t1), F.shape(t1)[1:],
                                    F.dtype(t2), F.shape(t2)[1:]))
+
+def check_type(obj, otype, name, skip_none):
+    """Check whether the object is an instance of an expected type.
+
+    Parameters
+    ----------
+    obj : object
+        An arbitrary object.
+    otype : type
+        The expected type of the object.
+    name : str
+        Name of the object.
+    skip_none : bool
+        Whether to skip the check when obj is None.
+    """
+    if skip_none and obj is None:
+        return
+    if not isinstance(obj, otype):
+        raise DGLError('Expect {} to be an instance of {}, got {}'.format(name, otype, type(obj)))
+
+def check_all_same_type(olist, otype, name, skip_none):
+    """Check whether all objects in a list are instances of an expected type.
+
+    Parameters
+    ----------
+    olist : list
+        A list of objects.
+    otype : type
+        The expected type of the objects.
+    name : str
+        Name of this list for error message.
+    skip_none : bool
+        Whether to skip the check when olist is None.
+    """
+    if skip_none and olist is None:
+        return
+    if len(olist) == 0:
+        return
+    for idx in range(len(olist)):
+        obj = olist[idx]
+        if not isinstance(obj, otype):
+            raise DGLError('Expect all objects in {} to be an instance of {}, '
+                           'got {} for the {:d}-th object'.format(name, otype, type(obj), idx))

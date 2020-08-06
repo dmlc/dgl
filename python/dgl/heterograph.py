@@ -891,8 +891,9 @@ class DGLHeteroGraph(object):
     @property
     def canonical_etypes(self):
         """DEPRECATED: use dgl.DGLGraph.relations instead."""
-        raise DGLError("dgl.DGLGraph.canonical_etypes is deprecated. "
-                       "Use dgl.DGLGraph.relations instead.")
+        dgl_warning('dgl.DGLGraph.canonical_etypes is deprecated.\n'
+                    'Use dgl.DGLGraph.relations instead.')
+        return self.relations
 
     @property
     def relations(self):
@@ -972,8 +973,9 @@ class DGLHeteroGraph(object):
 
     def to_canonical_etype(self, etype):
         """DEPRECATED: use dgl.DGLGraph.to_relation instead."""
-        raise DGLError("dgl.DGLGraph.to_canonical_etype is deprecated. "
-                       "Use dgl.DGLGraph.to_relation instead.")
+        dgl_warning('dgl.DGLGraph.to_canonical_etype is deprecated.\n'
+                    'Use dgl.DGLGraph.to_relation instead.')
+        return self.to_relation(etype)
 
     def to_relation(self, etype):
         """Convert an edge type to the corresponding relation in the graph.
@@ -3336,12 +3338,13 @@ class DGLHeteroGraph(object):
     def from_networkx(self, nx_graph, node_attrs=None, edge_attrs=None):
         """DEPRECATED: please use
 
-            ``dgl.from_networkx(nx_graph, node_attrs, edge_attrs)``
+            ``dgl.from_networkx(nx_graph, node_attrs=node_attrs, edge_attrs=edge_attrs)``
 
         which will return a new graph created from the networkx graph.
         """
         raise DGLError('DGLGraph.from_networkx is deprecated. Please call the following\n\n'
-                       '\t dgl.from_networkx(nx_graph, node_attrs, edge_attrs)\n\n'
+                       '\t dgl.from_networkx(nx_graph, node_attrs=node_attrs, '
+                       'edge_attrs=edge_attrs)\n\n'
                        ', which creates a new DGLGraph from the networkx graph.')
 
     def from_scipy_sparse_matrix(self, spmat, multigraph=None):

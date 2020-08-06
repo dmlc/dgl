@@ -179,9 +179,7 @@ def _test_nx_conversion():
     n3 = F.randn((5, 4))
     e1 = F.randn((4, 5))
     e2 = F.randn((4, 7))
-    g = DGLGraph()
-    g.add_nodes(5)
-    g.add_edges([0,1,3,4], [2,4,0,3])
+    g = dgl.graph(([0, 1, 3, 4], [2, 4, 0, 3]))
     g.ndata.update({'n1': n1, 'n2': n2, 'n3': n3})
     g.edata.update({'e1': e1, 'e2': e2})
 

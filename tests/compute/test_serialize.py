@@ -19,7 +19,7 @@ def generate_rand_graph(n, is_hetero):
     arr = (sp.sparse.random(n, n, density=0.1,
                             format='coo') != 0).astype(np.int64)
     if is_hetero:
-        return dgl.graph(arr)
+        return dgl.from_scipy(arr)
     else:
         return DGLGraph(arr, readonly=True)
 

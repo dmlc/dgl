@@ -260,7 +260,7 @@ def test_to_bidirected():
     assert ('h' in bg.edata) is False
 
     # zero edge graph
-    g = dgl.graph([])
+    g = dgl.graph(([], []))
     bg = dgl.to_bidirected(g, copy_ndata=True, copy_edata=True)
 
     # heterogeneous graph
@@ -591,11 +591,13 @@ def test_reorder_nodes():
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_in_subgraph(idtype):
-    g1 = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)], 'user', 'follow', idtype=idtype)
-    g2 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game', idtype=idtype)
-    g3 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user', idtype=idtype)
-    g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', idtype=idtype)
-    hg = dgl.hetero_from_relations([g1, g2, g3, g4])
+    hg = dgl.heterograph({
+        ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]),
+        ('user', 'play', 'game'): ([0, 0, 1, 3], [0, 1, 2, 2]),
+        ('game', 'liked-by', 'user'): ([2, 2, 2, 1, 1, 0], [0, 1, 2, 0, 3, 0]),
+        ('user', 'flips', 'coin'): ([0, 1, 2, 3], [0, 0, 0, 0])
+    }, idtype=idtype)
+
     subg = dgl.in_subgraph(hg, {'user' : [0,1], 'game' : 0})
     assert subg.idtype == idtype
     assert len(subg.ntypes) == 3
@@ -617,11 +619,12 @@ def test_in_subgraph(idtype):
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_out_subgraph(idtype):
-    g1 = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)], 'user', 'follow', idtype=idtype)
-    g2 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game', idtype=idtype)
-    g3 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user', idtype=idtype)
-    g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', idtype=idtype)
-    hg = dgl.hetero_from_relations([g1, g2, g3, g4])
+    hg = dgl.heterograph({
+        ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]),
+        ('user', 'play', 'game'): ([0, 0, 1, 3], [0, 1, 2, 2]),
+        ('game', 'liked-by', 'user'): ([2, 2, 2, 1, 1, 0], [0, 1, 2, 0, 3, 0]),
+        ('user', 'flips', 'coin'): ([0, 1, 2, 3], [0, 0, 0, 0])
+    }, idtype=idtype)
     subg = dgl.out_subgraph(hg, {'user' : [0,1], 'game' : 0})
     assert subg.idtype == idtype
     assert len(subg.ntypes) == 3
@@ -657,8 +660,8 @@ def test_compact(idtype):
         ('user', 'likes', 'user'): [(1, 8), (8, 9)]},
         {'user': 20, 'game': 10}, idtype=idtype)
 
-    g3 = dgl.graph([(0, 1), (1, 2)], num_nodes=10, ntype='user', idtype=idtype)
-    g4 = dgl.graph([(1, 3), (3, 5)], num_nodes=10, ntype='user', idtype=idtype)
+    g3 = dgl.graph(((0, 1), (1, 2)), num_nodes=10, ntype='user', idtype=idtype)
+    g4 = dgl.graph(((1, 3), (3, 5)), num_nodes=10, ntype='user', idtype=idtype)
 
     def _check(g, new_g, induced_nodes):
         assert g.ntypes == new_g.ntypes
@@ -955,11 +958,11 @@ def test_remove_edges(idtype):
 
     for fmt in ['coo', 'csr', 'csc']:
         for edges_to_remove in [[2], [2, 2], [3, 2], [1, 3, 1, 2]]:
-            g = dgl.graph([(0, 1), (2, 3), (1, 2), (3, 4)], idtype=idtype).formats(fmt)
+            g = dgl.graph(([0, 2, 1, 3], [1, 3, 2, 4]), idtype=idtype).formats(fmt)
             g1 = dgl.remove_edges(g, F.tensor(edges_to_remove, idtype))
             check(g1, None, g, edges_to_remove)
 
-            g = dgl.graph(
+            g = dgl.from_scipy(
                 spsp.csr_matrix(([1, 1, 1, 1], ([0, 2, 1, 3], [1, 3, 2, 4])), shape=(5, 5)),
                 idtype=idtype).formats(fmt)
             g1 = dgl.remove_edges(g, F.tensor(edges_to_remove, idtype))
@@ -1040,7 +1043,7 @@ def test_add_edges(idtype):
     assert F.array_equal(g.edata['hh'], F.tensor([0, 0, 2, 2], dtype=idtype))
 
     # zero data graph
-    g = dgl.graph([], num_nodes=0, idtype=idtype, device=F.ctx())
+    g = dgl.graph(([], []), num_nodes=0, idtype=idtype, device=F.ctx())
     u = F.tensor([0, 1], dtype=idtype)
     v = F.tensor([2, 2], dtype=idtype)
     e_feat = {'h' : F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx()),
@@ -1161,7 +1164,7 @@ def test_add_nodes(idtype):
     assert F.array_equal(new_g.ndata['h'], F.tensor([1, 1, 1, 0], dtype=idtype))
 
     # zero node graph
-    g = dgl.graph([], num_nodes=3, idtype=idtype, device=F.ctx())
+    g = dgl.graph(([], []), num_nodes=3, idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.copy_to(F.tensor([1,1,1], dtype=idtype), ctx=F.ctx())
     g = dgl.add_nodes(g, 1, data={'h' : F.copy_to(F.tensor([2],  dtype=idtype), ctx=F.ctx())})
     assert g.number_of_nodes() == 4

@@ -37,7 +37,7 @@ def create_test_heterograph1(idtype):
     edges.extend([(0, 3), (1, 3), (2, 4), (1, 4)])  # plays
     edges.extend([(0, 4), (2, 3)])  # wishes
     edges.extend([(5, 3), (6, 4)])  # develops
-    edges = zip(*edges)
+    edges = tuple(zip(*edges))
     ntypes = F.tensor([0, 0, 0, 1, 1, 2, 2])
     etypes = F.tensor([0, 0, 1, 1, 1, 1, 2, 2, 3, 3])
     g0 = dgl.graph(edges, idtype=idtype, device=F.ctx())

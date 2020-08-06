@@ -4,6 +4,7 @@ with `test_basics.py` once DGLHeteroGraph is compatible with DGLGraph.
 import backend as F
 import dgl
 import networkx as nx
+import numpy as np
 from collections import defaultdict as ddict
 import unittest
 import pytest
@@ -68,7 +69,7 @@ def generate_graph(idtype=F.int64, grad=False):
 
 @parametrize_dtype
 def test_isolated_nodes(idtype):
-    g = dgl.graph([[0, 1], [1, 2]], num_nodes=5, idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 1], [1, 2]), num_nodes=5, idtype=idtype, device=F.ctx())
     assert g.number_of_nodes() == 5
 
     g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays',
@@ -219,7 +220,7 @@ def test_nx_conversion(idtype):
     n3 = F.randn((5, 4))
     e1 = F.randn((4, 5))
     e2 = F.randn((4, 7))
-    g = dgl.graph([(0,2),(1,4),(3,0),(4,3)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 1, 3, 4], [2, 4, 0, 3]), idtype=idtype, device=F.ctx())
     g.ndata.update({'n1': n1, 'n2': n2, 'n3': n3})
     g.edata.update({'e1': e1, 'e2': e2})
 
@@ -248,26 +249,7 @@ def test_nx_conversion(idtype):
     assert F.allclose(g.edata['e1'], e1)
     assert F.array_equal(g.edata['id'], F.arange(0, 4, F.dtype(g.edata['id'])))
 
-    # test conversion after modifying DGLGraph
-    # TODO(minjie): enable after mutation is supported
-    #g.pop_e_repr('id') # pop id so we don't need to provide id when adding edges
-    #new_n = F.randn((2, 3))
-    #new_e = F.randn((3, 5))
-    #g.add_nodes(2, data={'n1': new_n})
-    ## add three edges, one is a multi-edge
-    #g.add_edges([3, 6, 0], [4, 5, 2], data={'e1': new_e})
-    #n1 = F.cat((n1, new_n), 0)
-    #e1 = F.cat((e1, new_e), 0)
-    ## convert to networkx again
-    #nxg = g.to_networkx(node_attrs=['n1'], edge_attrs=['e1'])
-    #assert len(nxg) == 7
-    #assert nxg.size() == 7
-    #_check_nx_feature(nxg, {'n1': n1}, {'e1': e1})
-
     # now test convert from networkx without id in edge feature
-    # first pop id in edge feature
-    for _, _, attr in nxg.edges(data=True):
-        attr.pop('id')
     # test with a new graph
     g = dgl.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1'], idtype=idtype)
     # check graph size
@@ -284,6 +266,62 @@ def test_nx_conversion(idtype):
         edge_feat.append(F.unsqueeze(attr['e1'], 0))
     edge_feat = F.cat(edge_feat, 0)
     assert F.allclose(g.edata['e1'], edge_feat)
+
+    # test conversion after modifying DGLGraph
+    new_n = F.randn((2, 3))
+    new_e = F.randn((3, 5))
+    g.add_nodes(2, data={'n1': new_n})
+    # add three edges, one is a multi-edge
+    g.add_edges([3, 6, 0], [4, 5, 2], data={'e1': new_e})
+    n1 = F.cat((n1, new_n), 0)
+    e1 = F.cat((e1, new_e), 0)
+    # convert to networkx again
+    nxg = g.to_networkx(node_attrs=['n1'], edge_attrs=['e1'])
+    assert len(nxg) == 7
+    assert nxg.size() == 7
+    _check_nx_feature(nxg, {'n1': n1}, {'e1': e1})
+
+    # test using a pre-specified ordering of the edges.
+    nx_g = nx.DiGraph()
+    nx_g.add_nodes_from([0, 1, 2], feat1=np.zeros((3, 1)), feat2=np.ones((3, 1)))
+    nx_g.add_edge(1, 2, weight=np.ones((1, 1)), eid=np.array([1]))
+    nx_g.add_edge(2, 1, weight=np.ones((1, 1)), eid=np.array([0]))
+    g = dgl.from_networkx(nx_g, edge_id_attr_name='eid', idtype=idtype, device=F.ctx())
+    src, dst = g.edges()
+    assert F.allclose(src, F.tensor([2, 1], idtype))
+    assert F.allclose(dst, F.tensor([1, 2], idtype))
+
+    # test preserving the original node IDs
+    nx_g = nx.DiGraph()
+    nx_g.add_edges_from([(1, 2), (1, 3)])
+    g = dgl.from_networkx(nx_g, nid_name='raw_id', idtype=idtype, device=F.ctx())
+    assert F.allclose(g.ndata['raw_id'], F.tensor([1, 2, 3]))
+
+    # test creation from an undirected graph
+    nx_g = nx.Graph()
+    # Edges (0, 3) and (1, 2)
+    nx_g.add_edge(0, 3)
+    nx_g.add_edge(1, 2)
+    g = dgl.from_networkx(nx_g, idtype=idtype, device=F.ctx())
+    src, dst = g.edges()
+    assert F.allclose(src, F.tensor([0, 3, 1, 2], idtype))
+    assert F.allclose(dst, F.tensor([3, 0, 2, 1], idtype))
+
+    # test creation from a directed multigraph
+    nx_g = nx.MultiDiGraph()
+    nx_g.add_edges_from([(0, 1), (0, 1), (1, 2), (1, 3), (1, 3)])
+    g = dgl.from_networkx(nx_g, idtype=idtype, device=F.ctx())
+    src, dst = g.edges()
+    assert F.allclose(src, F.tensor([0, 0, 1, 1, 1], idtype))
+    assert F.allclose(dst, F.tensor([1, 1, 2, 3, 3], idtype))
+
+    # test creation from an undirected multigraph
+    nx_g = nx.MultiGraph()
+    nx_g.add_edges_from([(0, 1), (1, 0), (1, 2), (1, 3), (1, 3)])
+    g = dgl.from_networkx(nx_g, idtype=idtype, device=F.ctx())
+    src, dst = g.edges()
+    assert F.allclose(src, F.tensor([0, 0, 1, 1, 1, 1, 1, 2, 3, 3], idtype))
+    assert F.allclose(dst, F.tensor([1, 1, 0, 0, 2, 3, 3, 1, 1, 1], idtype))
 
 @parametrize_dtype
 def test_apply_nodes(idtype):
@@ -351,7 +389,7 @@ def test_update_routines(idtype):
 @parametrize_dtype
 def test_update_all_0deg(idtype):
     # test#1
-    g = dgl.graph([(1,0), (2,0), (3,0), (4,0)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([1, 2, 3, 4], [0, 0, 0, 0]), idtype=idtype, device=F.ctx())
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
@@ -372,7 +410,7 @@ def test_update_all_0deg(idtype):
     assert F.allclose(new_repr[0], 2 * F.sum(old_repr, 0))
 
     # test#2:
-    g = dgl.graph([], num_nodes=5, idtype=idtype, device=F.ctx())
+    g = dgl.graph(([], []), num_nodes=5, idtype=idtype, device=F.ctx())
     g.set_n_initializer(_init2, 'h')
     g.ndata['h'] = old_repr
     g.update_all(_message, _reduce, _apply)
@@ -382,7 +420,7 @@ def test_update_all_0deg(idtype):
 
 @parametrize_dtype
 def test_pull_0deg(idtype):
-    g = dgl.graph([(0,1)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0], [1]), idtype=idtype, device=F.ctx())
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
@@ -414,7 +452,7 @@ def test_pull_0deg(idtype):
 
 @parametrize_dtype
 def test_send_multigraph(idtype):
-    g = dgl.graph([(0,1), (0,1), (0,1), (2,1)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 0, 0, 2], [1, 1, 1, 1]), idtype=idtype, device=F.ctx())
 
     def _message_a(edges):
         return {'a': edges.data['a']}
@@ -473,7 +511,7 @@ def _test_dynamic_addition():
 
 @parametrize_dtype
 def test_repr(idtype):
-    G = dgl.graph([(0,1), (0,2), (1,2)], num_nodes=10, idtype=idtype, device=F.ctx())
+    G = dgl.graph(([0, 0, 1], [1, 2, 2]), num_nodes=10, idtype=idtype, device=F.ctx())
     repr_string = G.__repr__()
     print(repr_string)
     G.ndata['x'] = F.zeros((10, 5))
@@ -496,7 +534,7 @@ def test_group_apply_edges(idtype):
         elist.append((1, v))
     for v in [2, 3, 4, 5, 6, 7, 8]:
         elist.append((2, v))
-    g = dgl.graph(elist, idtype=idtype, device=F.ctx())
+    g = dgl.graph(tuple(zip(*elist)), idtype=idtype, device=F.ctx())
 
     g.ndata['h'] = F.randn((g.number_of_nodes(), D))
     g.edata['feat'] = F.randn((g.number_of_edges(), D))
@@ -520,7 +558,7 @@ def test_group_apply_edges(idtype):
 
 @parametrize_dtype
 def test_local_var(idtype):
-    g = dgl.graph([(0,1), (1,2), (2,3), (3,4)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]), idtype=idtype, device=F.ctx())
     g = g.to(F.ctx())
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
@@ -558,8 +596,7 @@ def test_local_var(idtype):
     assert 'ww' not in g.edata
 
     # test initializer1
-    g = dgl.graph([(0,1), (1,1)], idtype=idtype, device=F.ctx())
-    g = g.to(F.ctx())
+    g = dgl.graph(([0, 1], [1, 1]),idtype=idtype, device=F.ctx())
     g.set_n_initializer(dgl.init.zero_initializer)
     def foo(g):
         g = g.local_var()
@@ -580,7 +617,7 @@ def test_local_var(idtype):
 
 @parametrize_dtype
 def test_local_scope(idtype):
-    g = dgl.graph([(0,1), (1,2), (2,3), (3,4)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]), idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
     # test override
@@ -631,7 +668,7 @@ def test_local_scope(idtype):
     assert 'ww' not in g.edata
 
     # test initializer1
-    g = dgl.graph([(0,1), (1,1)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(((0, 1), (1, 1)), idtype=idtype, device=F.ctx())
     g.set_n_initializer(dgl.init.zero_initializer)
     def foo(g):
         with g.local_scope():

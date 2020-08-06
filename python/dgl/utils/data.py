@@ -84,7 +84,7 @@ def networkx2tensor(nx_graph, idtype, edge_id_attr_name='id'):
         src = [0] * num_edges
         dst = [0] * num_edges
         for u, v, attr in nx_graph.edges(data=True):
-            eid = attr[edge_id_attr_name]
+            eid = int(attr[edge_id_attr_name])
             src[eid] = u
             dst[eid] = v
     else:
@@ -97,7 +97,7 @@ def networkx2tensor(nx_graph, idtype, edge_id_attr_name='id'):
     dst = F.tensor(dst, idtype)
     return src, dst
 
-def graphdata2tensors(data, idtype=None, bipartite=False):
+def graphdata2tensors(data, idtype=None, bipartite=False, **kwargs):
     """Function to convert various types of data to edge tensors and infer
     the number of nodes.
 
@@ -134,10 +134,13 @@ def graphdata2tensors(data, idtype=None, bipartite=False):
     elif isinstance(data, sp.sparse.spmatrix):
         src, dst = scipy2tensor(data, idtype)
     elif isinstance(data, nx.Graph):
+        edge_id_attr_name = kwargs.get('edge_id_attr_name', None)
         if bipartite:
-            src, dst = networkxbipartite2tensors(data, idtype)
+            src, dst = networkxbipartite2tensors(
+                data, idtype, edge_id_attr_name=edge_id_attr_name)
         else:
-            src, dst = networkx2tensor(data, idtype)
+            src, dst = networkx2tensor(
+                data, idtype, edge_id_attr_name=edge_id_attr_name)
     else:
         raise DGLError('Unsupported graph data type:', type(data))
     infer_from_raw = infer_num_nodes(data, bipartite=bipartite)
@@ -188,7 +191,7 @@ def networkxbipartite2tensors(nx_graph, idtype, edge_id_attr_name='id'):
         src = [0] * num_edges
         dst = [0] * num_edges
         for u, v, attr in nx_graph.edges(data=True):
-            eid = attr[edge_id_attr_name]
+            eid = int(attr[edge_id_attr_name])
             src[eid] = top_map[u]
             dst[eid] = bottom_map[v]
     else:
