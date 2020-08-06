@@ -159,7 +159,6 @@ def test_copy_edge_reduce():
                 g.update_all(fn.copy_edge(edge='e', out='m'),
                              builtin[red](msg='m', out='r1'))
             r1 = g.ndata['r1']
-            print(type(r1))
             F.backward(F.reduce_sum(r1))
             e_grad1 = F.grad(g.edata['e'])
 
@@ -193,7 +192,7 @@ def test_copy_edge_reduce():
             _print_error(e_grad1, e_grad2)
         assert(F.allclose(e_grad1, e_grad2))
 
-    #_test('sum', False)
+    _test('sum', False)
     _test('max', False)
     _test('mean', False)
     _test('sum', True)
