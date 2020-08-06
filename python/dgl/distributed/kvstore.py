@@ -219,8 +219,8 @@ class BarrierRequest(rpc.Request):
         if kv_store.barrier_count[self.role] == len(kv_store.role[self.role]):
             kv_store.barrier_count[self.role] = 0
             res_list = []
-            for target_id in kv_store.role[self.role]:
-                res_list.append((target_id, BarrierResponse(BARRIER_MSG)))
+            for client_id, machine_id in kv_store.role[self.role]:
+                res_list.append((client_id, BarrierResponse(BARRIER_MSG)))
             return res_list
         return None
 
@@ -529,59 +529,6 @@ class DeleteDataRequest(rpc.Request):
         res = DeleteDataResponse(DELETE_MSG)
         return res
 
-REGISTER_ROLE = 901241
-ROLE_MSG = "Register_Role"
-
-class RegisterRoleResponse(rpc.Response):
-    """Send a confirmation signal (just a short string message)
-    of RegisterRoleRequest to client.
-    """
-    def __init__(self, msg):
-        self.msg = msg
-
-    def __getstate__(self):
-        return self.msg
-
-    def __setstate__(self, state):
-        self.msg = state
-
-class RegisterRoleRequest(rpc.Request):
-    """Send client id and role to server
-
-    Parameters
-    ----------
-    client_id : int
-        ID of client
-    role : str
-        role of client
-    """
-    def __init__(self, client_id, role):
-        self.client_id = client_id
-        self.role = role
-
-    def __getstate__(self):
-        return self.client_id, self.role
-
-    def __setstate__(self, state):
-        self.client_id, self.role = state
-
-    def process_request(self, server_state):
-        kv_store = server_state.kv_store
-        role = kv_store.role
-        if self.role not in role:
-            role[self.role] = set()
-            kv_store.barrier_count[self.role] = 0
-        role[self.role].add(self.client_id)
-        total_count = 0
-        for key in role:
-            total_count += len(role[key])
-        if total_count == kv_store.num_clients:
-            res_list = []
-            for target_id in range(kv_store.num_clients):
-                res_list.append((target_id, RegisterRoleResponse(ROLE_MSG)))
-            return res_list
-        return None
-
 ############################ KVServer ###############################
 
 def default_push_handler(target, name, id_tensor, data_tensor):
@@ -680,9 +627,6 @@ class KVServer(object):
         rpc.register_service(DELETE_DATA,
                              DeleteDataRequest,
                              DeleteDataResponse)
-        rpc.register_service(REGISTER_ROLE,
-                             RegisterRoleRequest,
-                             RegisterRoleResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
         # Store the partition information with specified data name
@@ -872,9 +816,6 @@ class KVClient(object):
         rpc.register_service(DELETE_DATA,
                              DeleteDataRequest,
                              DeleteDataResponse)
-        rpc.register_service(REGISTER_ROLE,
-                             RegisterRoleRequest,
-                             RegisterRoleResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
         # Store the partition information with specified data name
@@ -898,10 +839,6 @@ class KVClient(object):
         self._push_handlers = {}
         # register role on server-0
         self._role = role
-        request = RegisterRoleRequest(self._client_id, self._role)
-        rpc.send_request(0, request)
-        response = rpc.recv_response()
-        assert response.msg == ROLE_MSG
 
     @property
     def client_id(self):
@@ -1304,7 +1241,7 @@ class KVClient(object):
 
 KVCLIENT = None
 
-def init_kvstore(ip_config, role='default'):
+def init_kvstore(ip_config, role):
     """initialize KVStore"""
     global KVCLIENT
     if KVCLIENT is None:

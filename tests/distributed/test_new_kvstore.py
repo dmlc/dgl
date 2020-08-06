@@ -5,7 +5,7 @@ import socket
 from scipy import sparse as spsp
 import dgl
 import backend as F
-import unittest, pytest
+import unittest
 from dgl.graph_index import create_graph_index
 import multiprocessing as mp
 from numpy.testing import assert_array_equal
@@ -148,7 +148,7 @@ def start_server_mul_role(server_id, num_clients):
 
 def start_client(num_clients):
     # Note: connect to server first !
-    dgl.distributed.connect_to_server(ip_config='kv_ip_config.txt')
+    dgl.distributed.initialize(ip_config='kv_ip_config.txt')
     # Init kvclient
     kvclient = dgl.distributed.KVClient(ip_config='kv_ip_config.txt')
     kvclient.map_shared_data(partition_book=gpb)
@@ -275,18 +275,20 @@ def start_client(num_clients):
     data_tensor = data_tensor * num_clients
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
 
-def start_client_mul_role(i, num_clients):
-    # Note: connect to server first !
-    dgl.distributed.connect_to_server(ip_config='kv_ip_mul_config.txt')
-    # Init kvclient
-    if i % 2 == 0:
-        kvclient = dgl.distributed.KVClient(ip_config='kv_ip_mul_config.txt', role='trainer')
-    else:
-        kvclient = dgl.distributed.KVClient(ip_config='kv_ip_mul_config.txt', role='sampler')
-    if i == 2: # block one trainer
+def start_client_mul_role(i, num_workers):
+    # Initialize creates kvstore !
+    dgl.distributed.initialize(ip_config='kv_ip_mul_config.txt', num_workers=num_workers)
+    if i == 0: # block one trainer
         time.sleep(5)
+    kvclient = dgl.distributed.kvstore.get_kvstore()
     kvclient.barrier()
     print("i: %d role: %s" % (i, kvclient.role))
+
+    assert dgl.distributed.role.get_num_trainers() == 2
+    assert dgl.distributed.role.get_trainer_rank() < 2
+    print('trainer rank: %d, global rank: %d' % (dgl.distributed.role.get_trainer_rank(),
+                                                 dgl.distributed.role.get_global_rank()))
+    dgl.distributed.exit_client()
 
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
 def test_kv_store():
@@ -316,7 +318,10 @@ def test_kv_store():
 def test_kv_multi_role():
     ip_config = open("kv_ip_mul_config.txt", "w")
     num_servers = 2
-    num_clients = 10
+    num_trainers = 2
+    num_samplers = 2
+    # There are two trainer processes and each trainer process has two sampler processes.
+    num_clients = num_trainers * (1 + num_samplers)
     ip_addr = get_local_usable_addr()
     ip_config.write('{} {}\n'.format(ip_addr, num_servers))
     ip_config.close()
@@ -327,11 +332,11 @@ def test_kv_multi_role():
         pserver = ctx.Process(target=start_server_mul_role, args=(i, num_clients))
         pserver.start()
         pserver_list.append(pserver)
-    for i in range(num_clients):
-        pclient = ctx.Process(target=start_client_mul_role, args=(i, num_clients))
+    for i in range(num_trainers):
+        pclient = ctx.Process(target=start_client_mul_role, args=(i, num_samplers))
         pclient.start()
         pclient_list.append(pclient)
-    for i in range(num_clients):
+    for i in range(num_trainers):
         pclient_list[i].join()
     for i in range(num_servers):
         pserver_list[i].join()
