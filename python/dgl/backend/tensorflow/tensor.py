@@ -370,18 +370,6 @@ def pack_padded_tensor(input, lengths):
     return tf.concat(out_list, axis=0)
 
 
-def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
-    assert dim == 0  # Why we need dim for 1d?
-    return tf.math.unsorted_segment_sum(input, seg_id, n_segs)
-
-
-def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
-    assert dim == 0  # Why we need dim for 1d?
-    return tf.math.unsorted_segment_mean(input, seg_id, n_segs)
-
-# TODO: TF has unsorted_segment_max, which can accelerate _max_on on batched graph
-
-
 def boolean_mask(input, mask):
     return tf.boolean_mask(input, mask)
 
@@ -399,6 +387,9 @@ def logical_and(input1, input2):
 def clone(input):
     # TF tensor is always immutable so returning the input is safe.
     return input
+
+def clamp(data, min_val, max_val):
+    return tf.clip_by_value(data, min_val, max_val)
 
 def unique(input):
     return tf.unique(input).y

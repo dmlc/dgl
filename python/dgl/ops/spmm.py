@@ -1,5 +1,7 @@
 """dgl spmm operator module."""
 import sys
+
+from ..base import dgl_warning
 from ..backend import gspmm as gspmm_internal
 from .. import backend as F
 
@@ -60,7 +62,10 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     if reduce_op == 'mean':
         ret = gspmm_internal(g._graph, op, 'sum', lhs_data, rhs_data)
         ret_shape = F.shape(ret)
-        deg = F.astype(g.in_degrees(), F.dtype(ret))
+        deg = g.in_degrees()
+        if F.as_scalar(F.min(deg, dim=0)) == 0:
+            dgl_warning('Zero-degree node encountered in mean reducer.')
+        deg = F.astype(F.clamp(deg, 1, g.number_of_edges()), F.dtype(ret))
         deg_shape = (ret_shape[0],) + (1,) * (len(ret_shape) - 1)
         return ret / F.reshape(deg, deg_shape)
     else:
