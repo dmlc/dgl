@@ -51,6 +51,13 @@ def _addsub(op, x):
     return -x if op == 'sub' else x
 
 
+def _expand(x, shape):
+    padding_zeros = len(shape) + 1 - x.ndim
+    if padding_zeros > 0:
+        x = x.view((x.shape[0],) + (1,) * padding_zeros + x.shape[1:])
+    return x.expand(-1, *shape)
+
+
 class GSpMM(th.autograd.Function):
     @staticmethod
     def forward(ctx, gidx, op, reduce_op, X, Y):
@@ -76,7 +83,7 @@ class GSpMM(th.autograd.Function):
                 dX = th.zeros((X.shape[0],) + dZ.shape[1:],
                               dtype=X.dtype, device=X.device)
                 if op in ['mul', 'div']:
-                    grad = _muldiv(op, Y.expand(-1, *dZ.shape[1:]).gather(
+                    grad = _muldiv(op, _expand(Y, dZ.shape[1:]).gather(
                         0, argY.long())) * dZ
                     dX.scatter_add_(0, argX.long(), grad)
                 elif op in ['add', 'sub', 'copy_lhs']:
@@ -97,8 +104,9 @@ class GSpMM(th.autograd.Function):
             else:  # max/min
                 dY = th.zeros((Y.shape[0],) + dZ.shape[1:],
                               dtype=Y.dtype, device=Y.device)
+                print(X.shape, dZ.shape)
                 if op in ['mul',  'div']:
-                    grad = X.expand(-1, *dZ.shape[1:]).gather(
+                    grad = _expand(X, dZ.shape[1:]).gather(
                         0, argX.long()) * dZ
                     dY.scatter_add_(0, argY.long(), grad)
                     if op == 'div':
