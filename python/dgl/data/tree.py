@@ -23,13 +23,14 @@ class SSTDataset(DGLBuiltinDataset):
     r"""Stanford Sentiment Treebank dataset.
 
     .. deprecated:: 0.5.0
-        `trees` is deprecated, it is replaced by:
+        
+        - ``trees`` is deprecated, it is replaced by:
+
             >>> dataset = SSTDataset()
             >>> for tree in dataset:
             ....    # your code here
-            ....
-            >>>
-        `num_vocabs` is deprecated, it is replaced by `vocab_size`
+
+        - ``num_vocabs`` is deprecated, it is replaced by ``vocab_size``.
 
     Each sample is the constituency tree of a sentence. The leaf nodes
     represent words. The word is a int value stored in the ``x`` feature field.
@@ -37,14 +38,14 @@ class SSTDataset(DGLBuiltinDataset):
     Each node also has a sentiment annotation: 5 classes (very negative,
     negative, neutral, positive and very positive). The sentiment label is a
     int value stored in the ``y`` feature field.
-    Official site: http://nlp.stanford.edu/sentiment/index.html
+    Official site: `<http://nlp.stanford.edu/sentiment/index.html>`_
 
-    Statistics
-    ----------
-    Train examples: 8,544
-    Dev examples: 1,101
-    Test examples: 2,210
-    Number of classes for each node: 5
+    Statistics:
+
+    - Train examples: 8,544
+    - Dev examples: 1,101
+    - Test examples: 2,210
+    - Number of classes for each node: 5
 
     Parameters
     ----------
@@ -100,16 +101,14 @@ class SSTDataset(DGLBuiltinDataset):
     >>> train_data.vocab_size
     19536
     >>> train_data[0]
-    DGLGraph(num_nodes=71, num_edges=70,
-         ndata_schemes={'x': Scheme(shape=(), dtype=torch.int64), 'y': Scheme(shape=(),
-          dtype=torch.int64), 'mask': Scheme(shape=(), dtype=torch.int64)}
-         edata_schemes={})
+    Graph(num_nodes=71, num_edges=70,
+      ndata_schemes={'x': Scheme(shape=(), dtype=torch.int64), 'y': Scheme(shape=(), dtype=torch.int64), 'mask': Scheme(shape=(), dtype=torch.int64)}
+      edata_schemes={})
     >>> for tree in train_data:
     ...     input_ids = tree.ndata['x']
     ...     labels = tree.ndata['y']
     ...     mask = tree.ndata['mask']
     ...     # your code here
-    >>>
     """
 
     PAD_WORD = -1  # special pad word id
@@ -247,11 +246,13 @@ class SSTDataset(DGLBuiltinDataset):
 
         Returns
         -------
-        dgl.DGLGraph
-            graph structure, word id for each node, node labels and masks
-            - ndata['x']: word id of the node
-            - ndata['y']: label of the node
-            - ndata['mask']: 1 if the node is a leaf, otherwise 0
+        :class:`dgl.DGLGraph`
+
+            graph structure, word id for each node, node labels and masks.
+
+            - ``ndata['x']``: word id of the node
+            - ``ndata['y']:`` label of the node
+            - ``ndata['mask']``: 1 if the node is a leaf, otherwise 0
         """
         return self._trees[idx]
 

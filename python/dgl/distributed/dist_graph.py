@@ -8,7 +8,7 @@ from ..heterograph import DGLHeteroGraph
 from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID
-from .kvstore import KVServer, KVClient
+from .kvstore import KVServer, init_kvstore, get_kvstore
 from .standalone_kvstore import KVClient as SA_KVClient
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
@@ -17,7 +17,6 @@ from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
 from .graph_partition_book import NODE_PART_POLICY, EDGE_PART_POLICY
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from . import rpc
-from .rpc_client import connect_to_server
 from .server_state import ServerState
 from .rpc_server import start_server
 from .graph_services import find_edges as dist_find_edges
@@ -323,6 +322,9 @@ class DistGraph:
         The partition config file. It's used in the standalone mode.
     '''
     def __init__(self, ip_config, graph_name, gpb=None, part_config=None):
+        self.ip_config = ip_config
+        self.graph_name = graph_name
+        self._gpb_input = gpb
         if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
             assert part_config is not None, \
                     'When running in the standalone model, the partition config file is required'
@@ -340,24 +342,43 @@ class DistGraph:
                 self._client.add_data(_get_data_name(name, EDGE_PART_POLICY), edge_feats[name])
             rpc.set_num_client(1)
         else:
-            connect_to_server(ip_config=ip_config)
-            self._client = KVClient(ip_config)
-            self._g = _get_graph_from_shared_mem(graph_name)
-            self._gpb = get_shared_mem_partition_book(graph_name, self._g)
-            if self._gpb is None:
-                self._gpb = gpb
-
+            self._init()
             # Tell the backup servers to load the graph structure from shared memory.
             for server_id in range(self._client.num_servers):
                 rpc.send_request(server_id, InitGraphRequest(graph_name))
             for server_id in range(self._client.num_servers):
                 rpc.recv_response()
             self._client.barrier()
-            self._client.map_shared_data(self._gpb)
 
         self._ndata = NodeDataView(self)
         self._edata = EdgeDataView(self)
 
+        self._num_nodes = 0
+        self._num_edges = 0
+        for part_md in self._gpb.metadata():
+            self._num_nodes += int(part_md['num_nodes'])
+            self._num_edges += int(part_md['num_edges'])
+
+    def _init(self):
+        # Init KVStore client if it's not initialized yet.
+        init_kvstore(self.ip_config)
+        self._client = get_kvstore()
+
+        self._g = _get_graph_from_shared_mem(self.graph_name)
+        self._gpb = get_shared_mem_partition_book(self.graph_name, self._g)
+        if self._gpb is None:
+            self._gpb = self._gpb_input
+        self._client.map_shared_data(self._gpb)
+
+    def __getstate__(self):
+        return self.ip_config, self.graph_name, self._gpb_input
+
+    def __setstate__(self, state):
+        self.ip_config, self.graph_name, self._gpb_input = state
+        self._init()
+
+        self._ndata = NodeDataView(self)
+        self._edata = EdgeDataView(self)
         self._num_nodes = 0
         self._num_edges = 0
         for part_md in self._gpb.metadata():

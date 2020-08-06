@@ -1,12 +1,12 @@
 # Recurrent Relational Network (RRN)
 
 * Paper link: https://arxiv.org/abs/1711.08028
-* Author's code repo: https://github.com/rasmusbergpalm/recurrent-relational-networks.git
+* Author's code repo: https://github.com/rasmusbergpalm/recurrent-relational-networks
 
 ## Dependencies
 
 * PyTorch 1.0+
-* DGL 0.3+
+* DGL 0.5+
 
 ## Codes
 
