@@ -75,9 +75,9 @@ class KnowledgeGraphDataset(DGLBuiltinDataset):
         if self.verbose:
             print("# entities: {}".format(num_nodes))
             print("# relations: {}".format(num_rels))
-            print("# training edges: {}".format(len(train)))
-            print("# validation edges: {}".format(len(valid)))
-            print("# testing edges: {}".format(len(test)))
+            print("# training edges: {}".format(train.shape[0]))
+            print("# validation edges: {}".format(valid.shape[0]))
+            print("# testing edges: {}".format(test.shape[0]))
 
         # for compatability
         self._train = train
