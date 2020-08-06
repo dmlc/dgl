@@ -1089,7 +1089,6 @@ class KVClient(object):
         assert name in self._data_name_list, 'data name: %s not exists.' % name
         self.barrier()
         part_policy = self._part_policy[name]
-        num_partitions = part_policy.partition_book.num_partitions()
 
         # send request to every server nodes
         request = DeleteDataRequest(name)
