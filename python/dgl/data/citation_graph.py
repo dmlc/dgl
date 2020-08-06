@@ -273,26 +273,38 @@ class CoraGraphDataset(CitationGraphDataset):
     r""" Cora citation network dataset.
 
     .. deprecated:: 0.5.0
-        `graph` is deprecated, it is replaced by:
+
+        - ``graph`` is deprecated, it is replaced by:
+
             >>> dataset = CoraGraphDataset()
             >>> graph = dataset[0]
-        `train_mask` is deprecated, it is replaced by:
+
+        - ``train_mask`` is deprecated, it is replaced by:
+
             >>> dataset = CoraGraphDataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.ndata['train_mask']
-        `val_mask` is deprecated, it is replaced by:
+
+        - ``val_mask`` is deprecated, it is replaced by:
+
             >>> dataset = CoraGraphDataset()
             >>> graph = dataset[0]
             >>> val_mask = graph.ndata['val_mask']
-        `test_mask` is deprecated, it is replaced by:
+
+        - ``test_mask`` is deprecated, it is replaced by:
+
             >>> dataset = CoraGraphDataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.ndata['test_mask']
-        `labels` is deprecated, it is replaced by:
+
+        - ``labels`` is deprecated, it is replaced by:
+
             >>> dataset = CoraGraphDataset()
             >>> graph = dataset[0]
             >>> labels = graph.ndata['label']
-        `feat` is deprecated, it is replaced by:
+
+        - ``feat`` is deprecated, it is replaced by:
+
             >>> dataset = CoraGraphDataset()
             >>> graph = dataset[0]
             >>> feat = graph.ndata['feat']
@@ -304,12 +316,16 @@ class CoraGraphDataset(CitationGraphDataset):
     The task is to predict the category of
     certain paper.
 
-    Statistics
-    ----------
-    Nodes: 2708
-    Edges: 10556
-    Number of Classes: 7
-    Label Split: Train: 140 ,Valid: 500, Test: 1000
+    Statistics:
+
+    - Nodes: 2708
+    - Edges: 10556
+    - Number of Classes: 7
+    - Label split:
+
+        - Train: 140 
+        - Valid: 500
+        - Test: 1000
 
     Parameters
     ----------
@@ -319,7 +335,7 @@ class CoraGraphDataset(CitationGraphDataset):
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose: bool
-      Whether to print out progress information. Default: True.
+        Whether to print out progress information. Default: True.
 
     Attributes
     ----------
@@ -327,13 +343,13 @@ class CoraGraphDataset(CitationGraphDataset):
         Number of label classes
     graph: networkx.DiGraph
         Graph structure
-    train_mask: Numpy array
+    train_mask: numpy.ndarray
         Mask of training nodes
-    val_mask: Numpy array
+    val_mask: numpy.ndarray
         Mask of validation nodes
-    test_mask: Numpy array
+    test_mask: numpy.ndarray
         Mask of test nodes
-    labels: Numpy array
+    labels: numpy.ndarray
         Ground truth labels of each node
     features: Tensor
         Node features
@@ -377,13 +393,15 @@ class CoraGraphDataset(CitationGraphDataset):
 
         Return
         ------
-        dgl.DGLGraph
+        :class:`dgl.DGLGraph`
+
             graph structure, node features and labels.
-            - ndata['train_mask']： mask for training node set
-            - ndata['val_mask']: mask for validation node set
-            - ndata['test_mask']: mask for test node set
-            - ndata['feat']: node feature
-            - ndata['label']: ground truth labels
+
+            - ``ndata['train_mask']``： mask for training node set
+            - ``ndata['val_mask']``: mask for validation node set
+            - ``ndata['test_mask']``: mask for test node set
+            - ``ndata['feat']``: node feature
+            - ``ndata['label']``: ground truth labels
         """
         return super(CoraGraphDataset, self).__getitem__(idx)
 
@@ -395,26 +413,38 @@ class CiteseerGraphDataset(CitationGraphDataset):
     r""" Citeseer citation network dataset.
 
     .. deprecated:: 0.5.0
-        `graph` is deprecated, it is replaced by:
+
+        ``graph`` is deprecated, it is replaced by:
+
             >>> dataset = CiteseerGraphDataset()
             >>> graph = dataset[0]
-        `train_mask` is deprecated, it is replaced by:
+
+        ``train_mask`` is deprecated, it is replaced by:
+
             >>> dataset = CiteseerGraphDataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.ndata['train_mask']
-        `val_mask` is deprecated, it is replaced by:
+
+        ``val_mask`` is deprecated, it is replaced by:
+
             >>> dataset = CiteseerGraphDataset()
             >>> graph = dataset[0]
             >>> val_mask = graph.ndata['val_mask']
-        `test_mask` is deprecated, it is replaced by:
+
+        ``test_mask`` is deprecated, it is replaced by:
+
             >>> dataset = CiteseerGraphDataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.ndata['test_mask']
-        `labels` is deprecated, it is replaced by:
+
+        ``labels`` is deprecated, it is replaced by:
+
             >>> dataset = CiteseerGraphDataset()
             >>> graph = dataset[0]
             >>> labels = graph.ndata['label']
-        `feat` is deprecated, it is replaced by:
+
+        ``feat`` is deprecated, it is replaced by:
+
             >>> dataset = CiteseerGraphDataset()
             >>> graph = dataset[0]
             >>> feat = graph.ndata['feat']
@@ -426,12 +456,16 @@ class CiteseerGraphDataset(CitationGraphDataset):
     task. The task is to predict the category of
     certain publication.
 
-    Statistics
-    ----------
-    Nodes: 3327
-    Edges: 9228
-    Number of Classes: 6
-    Label Split: Train: 120 ,Valid: 500, Test: 1000
+    Statistics:
+
+    - Nodes: 3327
+    - Edges: 9228
+    - Number of Classes: 6
+    - Label Split:
+
+        - Train: 120
+        - Valid: 500
+        - Test: 1000
 
     Parameters
     -----------
@@ -441,7 +475,7 @@ class CiteseerGraphDataset(CitationGraphDataset):
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose: bool
-      Whether to print out progress information. Default: True.
+        Whether to print out progress information. Default: True.
 
     Attributes
     ----------
@@ -449,13 +483,13 @@ class CiteseerGraphDataset(CitationGraphDataset):
         Number of label classes
     graph: networkx.DiGraph
         Graph structure
-    train_mask: Numpy array
+    train_mask: numpy.ndarray
         Mask of training nodes
-    val_mask: Numpy array
+    val_mask: numpy.ndarray
         Mask of validation nodes
-    test_mask: Numpy array
+    test_mask: numpy.ndarray
         Mask of test nodes
-    labels: Numpy array
+    labels: numpy.ndarray
         Ground truth labels of each node
     features: Tensor
         Node features
@@ -502,13 +536,15 @@ class CiteseerGraphDataset(CitationGraphDataset):
 
         Return
         ------
-        dgl.DGLGraph
+        :class:`dgl.DGLGraph`
+
             graph structure, node features and labels.
-            - ndata['train_mask']： mask for training node set
-            - ndata['val_mask']: mask for validation node set
-            - ndata['test_mask']: mask for test node set
-            - ndata['feat']: node feature
-            - ndata['label']: ground truth labels
+
+            - ``ndata['train_mask']``： mask for training node set
+            - ``ndata['val_mask']``: mask for validation node set
+            - ``ndata['test_mask']``: mask for test node set
+            - ``ndata['feat']``: node feature
+            - ``ndata['label']``: ground truth labels
         """
         return super(CiteseerGraphDataset, self).__getitem__(idx)
 
@@ -520,26 +556,38 @@ class PubmedGraphDataset(CitationGraphDataset):
     r""" Pubmed citation network dataset.
 
     .. deprecated:: 0.5.0
-        `graph` is deprecated, it is replaced by:
+
+        ``graph`` is deprecated, it is replaced by:
+
             >>> dataset = PubmedGraphDataset()
             >>> graph = dataset[0]
-        `train_mask` is deprecated, it is replaced by:
+
+        ``train_mask`` is deprecated, it is replaced by:
+
             >>> dataset = PubmedGraphDataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.ndata['train_mask']
-        `val_mask` is deprecated, it is replaced by:
+
+        ``val_mask`` is deprecated, it is replaced by:
+
             >>> dataset = PubmedGraphDataset()
             >>> graph = dataset[0]
             >>> val_mask = graph.ndata['val_mask']
-        `test_mask` is deprecated, it is replaced by:
+
+        ``test_mask`` is deprecated, it is replaced by:
+
             >>> dataset = PubmedGraphDataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.ndata['test_mask']
-        `labels` is deprecated, it is replaced by:
+
+        ``labels`` is deprecated, it is replaced by:
+
             >>> dataset = PubmedGraphDataset()
             >>> graph = dataset[0]
             >>> labels = graph.ndata['label']
-        `feat` is deprecated, it is replaced by:
+
+        ``feat`` is deprecated, it is replaced by:
+
             >>> dataset = PubmedGraphDataset()
             >>> graph = dataset[0]
             >>> feat = graph.ndata['feat']
@@ -551,12 +599,16 @@ class PubmedGraphDataset(CitationGraphDataset):
     task. The task is to predict the category of
     certain publication.
 
-    Statistics
-    ----------
-    Nodes: 19717
-    Edges: 88651
-    Number of Classes: 3
-    Label Split: Train: 60 ,Valid: 500, Test: 1000
+    Statistics:
+
+    - Nodes: 19717
+    - Edges: 88651
+    - Number of Classes: 3
+    - Label Split:
+
+        - Train: 60
+        - Valid: 500
+        - Test: 1000
 
     Parameters
     -----------
@@ -566,7 +618,7 @@ class PubmedGraphDataset(CitationGraphDataset):
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose: bool
-      Whether to print out progress information. Default: True.
+        Whether to print out progress information. Default: True.
 
     Attributes
     ----------
@@ -574,13 +626,13 @@ class PubmedGraphDataset(CitationGraphDataset):
         Number of label classes
     graph: networkx.DiGraph
         Graph structure
-    train_mask: Numpy array
+    train_mask: numpy.ndarray
         Mask of training nodes
-    val_mask: Numpy array
+    val_mask: numpy.ndarray
         Mask of validation nodes
-    test_mask: Numpy array
+    test_mask: numpy.ndarray
         Mask of test nodes
-    labels: Numpy array
+    labels: numpy.ndarray
         Ground truth labels of each node
     features: Tensor
         Node features
@@ -624,13 +676,15 @@ class PubmedGraphDataset(CitationGraphDataset):
 
         Return
         ------
-        dgl.DGLGraph
+        :class:`dgl.DGLGraph`
+
             graph structure, node features and labels.
-            - ndata['train_mask']： mask for training node set
-            - ndata['val_mask']: mask for validation node set
-            - ndata['test_mask']: mask for test node set
-            - ndata['feat']: node feature
-            - ndata['label']: ground truth labels
+
+            - ``ndata['train_mask']``： mask for training node set
+            - ``ndata['val_mask']``: mask for validation node set
+            - ``ndata['test_mask']``: mask for test node set
+            - ``ndata['feat']``: node feature
+            - ``ndata['label']``: ground truth labels
         """
         return super(PubmedGraphDataset, self).__getitem__(idx)
 
