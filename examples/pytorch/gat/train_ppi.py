@@ -60,7 +60,7 @@ def main(args):
     g = train_dataset[0]
     n_classes = train_dataset.num_labels
     num_feats = g.ndata['feat'].shape[1]
-    g = g.to(device)
+    g = g.int().to(device)
     heads = ([args.num_heads] * args.num_layers) + [args.num_out_heads]
     # define the model
     model = GAT(g,
