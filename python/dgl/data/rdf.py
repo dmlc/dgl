@@ -622,8 +622,6 @@ class AIFBDataset(RDFGraphDataset):
     >>> labels = g.nodes[category].data.pop('labels')
     """
 
-    employs = rdf.term.URIRef("http://swrc.ontoware.org/ontology#employs")
-    affiliation = rdf.term.URIRef("http://swrc.ontoware.org/ontology#affiliation")
     entity_prefix = 'http://www.aifb.uni-karlsruhe.de/'
     relation_prefix = 'http://swrc.ontoware.org/'
 
@@ -633,6 +631,9 @@ class AIFBDataset(RDFGraphDataset):
                  raw_dir=None,
                  force_reload=False,
                  verbose=True):
+        import rdflib as rdf
+        self.employs = rdf.term.URIRef("http://swrc.ontoware.org/ontology#employs")
+        self.affiliation = rdf.term.URIRef("http://swrc.ontoware.org/ontology#affiliation")
         url = _get_dgl_url('dataset/rdf/aifb-hetero.zip')
         name = 'aifb-hetero'
         predict_category = 'Personen'
@@ -799,11 +800,6 @@ class MUTAGDataset(RDFGraphDataset):
     d_entity = re.compile("d[0-9]")
     bond_entity = re.compile("bond[0-9]")
 
-    is_mutagenic = rdf.term.URIRef("http://dl-learner.org/carcinogenesis#isMutagenic")
-    rdf_type = rdf.term.URIRef("http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
-    rdf_subclassof = rdf.term.URIRef("http://www.w3.org/2000/01/rdf-schema#subClassOf")
-    rdf_domain = rdf.term.URIRef("http://www.w3.org/2000/01/rdf-schema#domain")
-
     entity_prefix = 'http://dl-learner.org/carcinogenesis#'
     relation_prefix = entity_prefix
 
@@ -813,6 +809,12 @@ class MUTAGDataset(RDFGraphDataset):
                  raw_dir=None,
                  force_reload=False,
                  verbose=True):
+        import rdflib as rdf
+        self.is_mutagenic = rdf.term.URIRef("http://dl-learner.org/carcinogenesis#isMutagenic")
+        self.rdf_type = rdf.term.URIRef("http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+        self.rdf_subclassof = rdf.term.URIRef("http://www.w3.org/2000/01/rdf-schema#subClassOf")
+        self.rdf_domain = rdf.term.URIRef("http://www.w3.org/2000/01/rdf-schema#domain")
+
         url = _get_dgl_url('dataset/rdf/mutag-hetero.zip')
         name = 'mutag-hetero'
         predict_category = 'd'
@@ -998,7 +1000,6 @@ class BGSDataset(RDFGraphDataset):
     >>> labels = g.nodes[category].data.pop('labels')
     """
 
-    lith = rdf.term.URIRef("http://data.bgs.ac.uk/ref/Lexicon/hasLithogenesis")
     entity_prefix = 'http://data.bgs.ac.uk/'
     status_prefix = 'http://data.bgs.ac.uk/ref/CurrentStatus'
     relation_prefix = 'http://data.bgs.ac.uk/ref'
@@ -1009,9 +1010,11 @@ class BGSDataset(RDFGraphDataset):
                  raw_dir=None,
                  force_reload=False,
                  verbose=True):
+        import rdflib as rdf
         url = _get_dgl_url('dataset/rdf/bgs-hetero.zip')
         name = 'bgs-hetero'
         predict_category = 'Lexicon/NamedRockUnit'
+        self.lith = rdf.term.URIRef("http://data.bgs.ac.uk/ref/Lexicon/hasLithogenesis")
         super(BGSDataset, self).__init__(name, url, predict_category,
                                          print_every=print_every,
                                          insert_reverse=insert_reverse,
@@ -1192,8 +1195,6 @@ class AMDataset(RDFGraphDataset):
     >>> labels = g.nodes[category].data.pop('labels')
     """
 
-    objectCategory = rdf.term.URIRef("http://purl.org/collections/nl/am/objectCategory")
-    material = rdf.term.URIRef("http://purl.org/collections/nl/am/material")
     entity_prefix = 'http://purl.org/collections/nl/am/'
     relation_prefix = entity_prefix
 
@@ -1203,6 +1204,9 @@ class AMDataset(RDFGraphDataset):
                  raw_dir=None,
                  force_reload=False,
                  verbose=True):
+        import rdflib as rdf
+        self.objectCategory = rdf.term.URIRef("http://purl.org/collections/nl/am/objectCategory")
+        self.material = rdf.term.URIRef("http://purl.org/collections/nl/am/material")
         url = _get_dgl_url('dataset/rdf/am-hetero.zip')
         name = 'am-hetero'
         predict_category = 'proxy'
