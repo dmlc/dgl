@@ -193,6 +193,8 @@ Utils
     utils.save_graphs
     utils.load_graphs
     utils.load_labels
+    utils.save_info
+    utils.load_info
 
 .. autoclass:: dgl.data.utils.Subset
     :members: __getitem__, __len__
