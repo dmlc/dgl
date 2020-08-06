@@ -166,9 +166,9 @@ class KnowledgeGraphDataset(DGLBuiltinDataset):
         if self.verbose:
             print("# entities: {}".format(self.num_nodes))
             print("# relations: {}".format(self.num_rels))
-            print("# training edges: {}".format(len(train_idx)))
-            print("# validation edges: {}".format(len(valid_idx)))
-            print("# testing edges: {}".format(len(test_idx)))
+            print("# training edges: {}".format(train_idx.shape[0]))
+            print("# validation edges: {}".format(valid_idx.shape[0]))
+            print("# testing edges: {}".format(test_idx.shape[0]))
 
     @property
     def num_nodes(self):
