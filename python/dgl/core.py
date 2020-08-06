@@ -1,4 +1,5 @@
 """Implementation for core graph computation."""
+# pylint: disable=not-callable
 
 from .base import DGLError, is_all, NID, EID, ALL
 from . import backend as F
@@ -264,7 +265,7 @@ def message_passing(g, mfunc, rfunc, afunc):
         # No message passing is triggered.
         ndata = {}
     elif (is_builtin(mfunc) and is_builtin(rfunc) and
-            getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name), None) is not None):
+          getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name), None) is not None):
         # invoke fused message passing
         ndata = invoke_gspmm(g, mfunc, rfunc)
     else:

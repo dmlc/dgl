@@ -746,4 +746,3 @@ def relabel(x):
     old_to_new = F.scatter_row(old_to_new, unique_x,
                                F.copy_to(F.arange(0, len(unique_x), dtype), ctx))
     return unique_x, old_to_new
-

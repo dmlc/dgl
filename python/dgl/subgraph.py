@@ -14,10 +14,10 @@ from . import ndarray as nd
 from .heterograph import DGLHeteroGraph
 from . import utils
 
-__all__ = ['subgraph', 'edge_subgraph', 'node_type_subgraph', 'edge_type_subgraph',
+__all__ = ['node_subgraph', 'edge_subgraph', 'node_type_subgraph', 'edge_type_subgraph',
            'in_subgraph', 'out_subgraph']
 
-def subgraph(graph, nodes):
+def node_subgraph(graph, nodes):
     """Return the subgraph induced on given nodes.
 
     The metagraph of the returned subgraph is the same as the parent graph.
@@ -122,7 +122,7 @@ def subgraph(graph, nodes):
     induced_edges = sgi.induced_edges
     return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges)
 
-DGLHeteroGraph.subgraph = subgraph
+DGLHeteroGraph.subgraph = node_subgraph
 
 def edge_subgraph(graph, edges, preserve_nodes=False):
     """Return the subgraph induced on given edges.

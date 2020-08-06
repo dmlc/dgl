@@ -4,12 +4,9 @@ from __future__ import absolute_import
 from collections import namedtuple
 from collections.abc import MutableMapping
 
-import numpy as np
-
 from . import backend as F
 from .base import DGLError, dgl_warning
 from .init import zero_initializer
-from . import utils
 
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
@@ -55,13 +52,13 @@ class Column(object):
 
     It batches all the feature tensors together along the first dimension
     as one dense tensor.
-    
+
     The column can optionally have an index tensor I.
     In this case, the i^th feature is stored in ``storage[index[i]]``.
     The column class implements a Copy-On-Read semantics -- the index
     select operation happens upon the first read of the feature data.
     This is useful when one extracts a subset of the feature data
-    but wishes the actual index select happens on-demand. 
+    but wishes the actual index select happens on-demand.
 
     Parameters
     ----------
@@ -246,7 +243,7 @@ class Frame(MutableMapping):
     def __init__(self, data=None, num_rows=None):
         if data is None:
             self._columns = dict()
-            self._num_rows = 0 if num_rows is None else num_rows 
+            self._num_rows = 0 if num_rows is None else num_rows
         else:
             assert not isinstance(data, Frame)  # sanity check for code refactor
             # Note that we always create a new column for the given data.
@@ -575,6 +572,6 @@ class Frame(MutableMapping):
         subf._initializers = self._initializers
         subf._default_initializer = self._default_initializer
         return subf
-    
+
     def __repr__(self):
         return repr(dict(self))

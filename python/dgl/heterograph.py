@@ -3053,7 +3053,7 @@ class DGLHeteroGraph(object):
                                      message_func, reduce_func, apply_node_func)
         dstnodes = F.unique(v)
         self._set_n_repr(dtid, dstnodes, ndata)
-        
+
     def pull(self,
              v,
              message_func,
@@ -4414,9 +4414,6 @@ def _create_compute_graph(graph, u, v, eid, recv_nodes=None):
     DGLGraph
         A computation graph.
     """
-    ctx = F.context(u)
-    idtype = F.dtype(u)
-
     if len(u) == 0:
         # The computation graph has no edge and will not trigger message
         # passing. However, because of the apply node phase, we still construct
@@ -4445,7 +4442,7 @@ def _create_compute_graph(graph, u, v, eid, recv_nodes=None):
     dstframe[NID] = unique_dst
     eframe = graph._edge_frames[0].subframe(eid)
     eframe[EID] = eid
-    
+
     return DGLHeteroGraph(hgidx, ([srctype], [dsttype]), [etype],
                           node_frames=[srcframe, dstframe],
                           edge_frames=[eframe])
