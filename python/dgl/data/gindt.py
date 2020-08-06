@@ -17,21 +17,19 @@ from ..convert import graph as dgl_graph
 
 class GINDataset(DGLBuiltinDataset):
     """Datasets for Graph Isomorphism Network (GIN)
-    Adapted from https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip.
+    Adapted from `<https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip>`_.
 
-    The dataset contains the compact format of popular graph kernel datasets, which includes:
-    MUTAG, COLLAB, IMDBBINARY, IMDBMULTI, NCI1, PROTEINS, PTC, REDDITBINARY, REDDITMULTI5K
-    This datset class processes all data sets listed above. For more graph kernel datasets,
-    see :class:`TUDataset`.
+    The dataset contains the compact format of popular graph kernel datasets.
+    For more graph kernel datasets, see :class:`TUDataset`.
 
-    Paramters
+    Parameters
     ---------
     name: str
-        dataset name, one of below -
-        ('MUTAG', 'COLLAB', \
-        'IMDBBINARY', 'IMDBMULTI', \
-        'NCI1', 'PROTEINS', 'PTC', \
-        'REDDITBINARY', 'REDDITMULTI5K')
+        dataset name, one of
+        (``'MUTAG'``, ``'COLLAB'``, \
+        ``'IMDBBINARY'``, ``'IMDBMULTI'``, \
+        ``'NCI1'``, ``'PROTEINS'``, ``'PTC'``, \
+        ``'REDDITBINARY'``, ``'REDDITMULTI5K'``)
     self_loop: bool
         add self to self edge if true
     degree_as_nlabel: bool
@@ -41,7 +39,7 @@ class GINDataset(DGLBuiltinDataset):
     --------
     >>> data = GINDataset(name='MUTAG', self_loop=False)
 
-    **The dataset instance is an iterable**
+    The dataset instance is an iterable
 
     >>> len(data)
     188
@@ -53,7 +51,7 @@ class GINDataset(DGLBuiltinDataset):
     >>> label
     tensor(1)
 
-    **Batch the graphs and labels for mini-batch training**
+    Batch the graphs and labels for mini-batch training
 
     >>> graphs, labels = zip(*[data[i] for i in range(16)])
     >>> batched_graphs = dgl.batch(graphs)
@@ -118,14 +116,14 @@ class GINDataset(DGLBuiltinDataset):
     def __getitem__(self, idx):
         """Get the idx-th sample.
 
-        Paramters
+        Parameters
         ---------
         idx : int
             The sample index.
 
         Returns
         -------
-        (dgl.Graph, int)
+        (:class:`dgl.Graph`, Tensor)
             The graph and its label.
         """
         return self.graphs[idx], self.labels[idx]
