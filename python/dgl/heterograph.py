@@ -2960,7 +2960,6 @@ class DGLHeteroGraph(object):
         if inplace:
             raise DGLError('The `inplace` option is removed in v0.5.')
         etid = self.get_etype_id(etype)
-        stid, dtid = self._graph.metagraph.find_edge(etid)
         etype = self.canonical_etypes[etid]
         g = self if etype is None else self[etype]
         if is_all(edges):
