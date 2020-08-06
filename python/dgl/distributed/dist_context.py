@@ -1,9 +1,11 @@
 """Initialize the distributed services"""
 
+import os
 import multiprocessing as mp
 import traceback
 import atexit
 import time
+import torch as th
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
 from .kvstore import init_kvstore, close_kvstore
@@ -29,6 +31,8 @@ def _init_rpc(ip_config, max_queue_size, net_type, role):
     ''' This init function is called in the worker processes.
     '''
     try:
+        os.environ['OMP_NUM_THREADS'] = '1'
+        th.set_num_threads(1)
         connect_to_server(ip_config, max_queue_size, net_type)
         init_role(role)
         init_kvstore(ip_config, role)
