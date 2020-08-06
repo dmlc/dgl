@@ -8,7 +8,6 @@ import networkx as nx
 from . import backend as F
 from . import heterograph_index
 from .heterograph import DGLHeteroGraph, combine_frames
-from . import graph_index
 from . import utils
 from .base import NTYPE, ETYPE, NID, EID, DGLError, dgl_warning
 
@@ -322,114 +321,9 @@ def bipartite(data,
     return g.to(device)
 
 def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
-    """Create a heterograph from graphs representing connections of each relation.
-
-    The input is a list of heterographs where the ``i``th graph contains edges of type
-    :math:`(s_i, e_i, d_i)`.
-
-    If two graphs share a same node type, the number of nodes for the corresponding type
-    should be the same. See **Examples** for details.
-
-    Parameters
-    ----------
-    rel_graphs : list of DGLHeteroGraph
-        Each element corresponds to a heterograph for one (src, edge, dst) relation.
-    num_nodes_per_type : dict[str, Tensor], optional
-        Number of nodes per node type.  If not given, DGL will infer the number of nodes
-        from the given relation graphs.
-
-    Returns
-    -------
-    DGLHeteroGraph
-        A heterograph consisting of all relations.
-
-    Examples
-    --------
-
-    >>> import dgl
-    >>> follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
-    >>> plays_g = dgl.bipartite([(0, 0), (3, 1)], 'user', 'plays', 'game')
-    >>> devs_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
-    >>> g = dgl.hetero_from_relations([follows_g, plays_g, devs_g])
-
-    will raise an error as we have 3 nodes of type 'user' in follows_g and 4 nodes of type
-    'user' in plays_g.
-
-    We have two possible methods to avoid the construction.
-
-    **Method 1**: Manually specify the number of nodes for all types when constructing
-    the relation graphs.
-
-    >>> # A graph with 4 nodes of type 'user'
-    >>> follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', num_nodes=4)
-    >>> # A bipartite graph with 4 nodes of src type ('user') and 2 nodes of dst type ('game')
-    >>> plays_g = dgl.bipartite([(0, 0), (3, 1)], 'user', 'plays', 'game', num_nodes=(4, 2))
-    >>> devs_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
-    >>> g = dgl.hetero_from_relations([follows_g, plays_g, devs_g])
-    >>> print(g)
-    Graph(num_nodes={'user': 4, 'game': 2, 'developer': 2},
-          num_edges={('user', 'follows', 'user'): 2, ('user', 'plays', 'game'): 2,
-                     ('developer', 'develops', 'game'): 2},
-          metagraph=[('user', 'user'), ('user', 'game'), ('developer', 'game')])
-
-    ``devs_g`` does not have nodes of type ``'user'`` so no error will be raised.
-
-    **Method 2**: Construct a heterograph at once without intermediate relation graphs,
-    in which case we will infer the number of nodes for each type.
-
-    >>> g = dgl.heterograph({
-    >>>     ('user', 'follows', 'user'): [(0, 1), (1, 2)],
-    >>>     ('user', 'plays', 'game'): [(0, 0), (3, 1)],
-    >>>     ('developer', 'develops', 'game'): [(0, 0), (1, 1)]
-    >>> })
-    >>> print(g)
-    Graph(num_nodes={'user': 4, 'game': 2, 'developer': 2},
-          num_edges={('user', 'follows', 'user'): 2,
-                     ('user', 'plays', 'game'): 2,
-                     ('developer', 'develops', 'game'): 2},
-          metagraph=[('user', 'user'), ('user', 'game'), ('developer', 'game')])
-    """
-    utils.check_all_same_idtype(rel_graphs, 'rel_graphs')
-    utils.check_all_same_device(rel_graphs, 'rel_graphs')
-    # TODO(minjie): this API can be generalized as a union operation of the input graphs
-    # TODO(minjie): handle node/edge data
-    # infer meta graph
-    meta_edges_src, meta_edges_dst = [], []
-    ntypes = []
-    etypes = []
-    # TODO(BarclayII): I'm keeping the node type names sorted because even if
-    # the metagraph is the same, the same node type name in different graphs may
-    # map to different node type IDs.
-    # In the future, we need to lower the type names into C++.
-    if num_nodes_per_type is None:
-        ntype_set = set()
-        for rgrh in rel_graphs:
-            assert len(rgrh.etypes) == 1
-            stype, etype, dtype = rgrh.relations[0]
-            ntype_set.add(stype)
-            ntype_set.add(dtype)
-        ntypes = list(sorted(ntype_set))
-    else:
-        ntypes = list(sorted(num_nodes_per_type.keys()))
-        num_nodes_per_type = utils.toindex([num_nodes_per_type[ntype] for ntype in ntypes], "int64")
-    ntype_dict = {ntype: i for i, ntype in enumerate(ntypes)}
-    for rgrh in rel_graphs:
-        stype, etype, dtype = rgrh.relations[0]
-        meta_edges_src.append(ntype_dict[stype])
-        meta_edges_dst.append(ntype_dict[dtype])
-        etypes.append(etype)
-    # metagraph is DGLGraph, currently still using int64 as index dtype
-    metagraph = graph_index.from_coo(len(ntypes), meta_edges_src, meta_edges_dst, True)
-
-    # create graph index
-    hgidx = heterograph_index.create_heterograph_from_relations(
-        metagraph, [rgrh._graph for rgrh in rel_graphs], num_nodes_per_type)
-    retg = DGLHeteroGraph(hgidx, ntypes, etypes)
-    for i, rgrh in enumerate(rel_graphs):
-        for ntype in rgrh.ntypes:
-            retg.nodes[ntype].data.update(rgrh.nodes[ntype].data)
-        retg._edge_frames[i].update(rgrh._edge_frames[0])
-    return retg
+    """DEPRECATED: use dgl.heterograph instead."""
+    raise DGLError('dgl.hetero_from_relations is deprecated.\n\n'
+                   'Use dgl.heterograph instead.')
 
 def hetero_from_shared_memory(name):
     """Create a heterograph from shared memory with the given name.
@@ -588,9 +482,11 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
     Examples
     --------
 
-    >>> g1 = dgl.bipartite([(0, 1), (1, 2)], 'user', 'develops', 'activity')
-    >>> g2 = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
-    >>> hetero_g = dgl.hetero_from_relations([g1, g2])
+    >>> import dgl
+    >>> hetero_g = dgl.heterograph({
+    >>>     ('user', 'develops', 'activity'): ([0, 1], [1, 2]),
+    >>>     ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+    >>> })
     >>> print(hetero_g)
     Graph(num_nodes={'user': 2, 'activity': 3, 'developer': 2, 'game': 2},
           num_edges={('user', 'develops', 'activity'): 2, ('developer', 'develops', 'game'): 2},
@@ -680,26 +576,18 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
         etype_mask = (edge_ctids[None, :] == canonical_etids[:, None]).all(2)
     edge_groups = [etype_mask[i].nonzero()[0] for i in range(len(canonical_etids))]
 
-    rel_graphs = []
+    data_dict = dict()
+    num_nodes_dict = dict()
     for i, (stid, etid, dtid) in enumerate(canonical_etids):
         src_of_etype = src_local[edge_groups[i]]
         dst_of_etype = dst_local[edge_groups[i]]
-        if stid == dtid:
-            rel_graph = graph(
-                (src_of_etype, dst_of_etype), ntypes[stid], etypes[etid],
-                num_nodes=ntype_count[stid], validate=False,
-                idtype=idtype, device=device)
-        else:
-            rel_graph = bipartite(
-                (src_of_etype,
-                 dst_of_etype), ntypes[stid], etypes[etid], ntypes[dtid],
-                num_nodes=(ntype_count[stid], ntype_count[dtid]),
-                validate=False, idtype=idtype, device=device)
-        rel_graphs.append(rel_graph)
-
-    hg = hetero_from_relations(rel_graphs,
-                               {ntype: count for ntype, count in zip(
-                                   ntypes, ntype_count)})
+        data_dict[(ntypes[stid], etypes[etid], ntypes[dtid])] = \
+            (src_of_etype, dst_of_etype)
+        num_nodes_dict.update({
+            ntypes[stid]: ntype_count[stid],
+            ntypes[dtid]: ntype_count[dtid]
+        })
+    hg = heterograph(data_dict, num_nodes_dict, idtype=idtype, device=device)
 
     ntype2ngrp = {ntype : node_groups[ntid] for ntid, ntype in enumerate(ntypes)}
 

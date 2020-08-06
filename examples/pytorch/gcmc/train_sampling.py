@@ -68,7 +68,8 @@ class GCMCSampler:
         # 1. Get the head and tail nodes from both the decoder and encoder graphs.
         head_id, tail_id = dec_graph.find_edges(edge_ids)
         utype, _, vtype = enc_graph.relations[0]
-        subg = []
+        data_dict = dict()
+        num_nodes_dict = dict()
         true_rel_ratings = []
         true_rel_labels = []
         for possible_rating_value in possible_rating_values:
@@ -78,15 +79,12 @@ class GCMCSampler:
             true_rel_ratings.append(true_relation_ratings[idx_loc])
             if self.labels is not None:
                 true_rel_labels.append(true_relation_labels[idx_loc])
-            subg.append(dgl.bipartite((head, tail),
-                                        utype=utype,
-                                        etype=str(possible_rating_value),
-                                        vtype=vtype,
-                                        num_nodes=(enc_graph.number_of_nodes(utype),
-                                                   enc_graph.number_of_nodes(vtype))))
+            data_dict[(utype, str(possible_rating_value), vtype)] = (head, tail)
+            num_nodes_dict[utype] = enc_graph.number_of_nodes(utype)
+            num_nodes_dict[vtype] = enc_graph.number_of_nodes(vtype)
         # Convert the encoder subgraph to a more compact one by removing nodes that covered
         # by the seed edges.
-        g = dgl.hetero_from_relations(subg)
+        g = dgl.heterograph(data_dict, num_nodes_dict=num_nodes_dict)
         g = dgl.compact_graphs(g)
 
         # 2. For each head and tail node, extract the entire in-coming neighborhood.

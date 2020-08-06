@@ -217,14 +217,20 @@ def test_load_old_files2():
 
 
 def create_heterographs(idtype):
-    g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), 'user',
-                    'follows', idtype=idtype)
-    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', idtype=idtype).formats('csr')
-    g_x.nodes['user'].data['h'] = F.randn((4, 3))
-    g_x.edges['follows'].data['w'] = F.randn((3, 2))
-    g_y.nodes['user'].data['hh'] = F.ones((4, 5))
-    g_y.edges['knows'].data['ww'] = F.randn((2, 10))
-    g = dgl.hetero_from_relations([g_x, g_y])
+    g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), idtype=idtype)
+    g_y = dgl.graph(([0, 2], [2, 3]), idtype=idtype).formats('csr')
+    g_x.ndata['h'] = F.randn((4, 3))
+    g_x.edata['w'] = F.randn((3, 2))
+    g_y.ndata['hh'] = F.ones((4, 5))
+    g_y.edata['ww'] = F.randn((2, 10))
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 2], [1, 2, 3]),
+        ('user', 'knows', 'user'): ([0, 2], [2, 3])
+    }, idtype=idtype)
+    g.nodes['user'].data['h'] = g_x.ndata['h']
+    g.nodes['user'].data['hh'] = g_y.ndata['hh']
+    g.edges['follows'].data['w'] = g_x.edata['w']
+    g.edges['knows'].data['ww'] = g_y.edata['ww']
     return [g, g_x, g_y]
 
 def create_heterographs2(idtype):
@@ -232,11 +238,19 @@ def create_heterographs2(idtype):
                     'follows', idtype=idtype)
     g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', idtype=idtype).formats('csr')
     g_z = dgl.bipartite(([0, 1, 3], [2, 3, 4]), 'user', 'knows', 'knowledge', idtype=idtype)
-    g_x.nodes['user'].data['h'] = F.randn((4, 3))
-    g_x.edges['follows'].data['w'] = F.randn((3, 2))
-    g_y.nodes['user'].data['hh'] = F.ones((4, 5))
-    g_y.edges['knows'].data['ww'] = F.randn((2, 10))
-    g = dgl.hetero_from_relations([g_x, g_y, g_z])
+    g_x.ndata['h'] = F.randn((4, 3))
+    g_x.edata['w'] = F.randn((3, 2))
+    g_y.ndata['hh'] = F.ones((4, 5))
+    g_y.edata['ww'] = F.randn((2, 10))
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 2], [1, 2, 3]),
+        ('user', 'knows', 'user'): ([0, 2], [2, 3]),
+        ('user', 'knows', 'knowledge'): ([0, 1, 3], [2, 3, 4])
+    }, idtype=idtype)
+    g.nodes['user'].data['h'] = g_x.ndata['h']
+    g.edges['follows'].data['w'] = g_x.edata['w']
+    g.nodes['user'].data['hh'] = g_y.ndata['hh']
+    g.edges[('user', 'knows', 'user')].data['ww'] = g_y.edata['ww']
     return [g, g_x, g_y, g_z]
 
 def test_deserialize_old_heterograph_file():

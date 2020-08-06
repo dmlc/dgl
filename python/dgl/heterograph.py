@@ -108,9 +108,10 @@ class DGLHeteroGraph(object):
     For example, suppose a graph that has two types of relation "user-watches-movie"
     and "user-watches-TV" as follows:
 
-    >>> g0 = dgl.bipartite(([0, 1, 1], [1, 0, 1]), 'user', 'watches', 'movie')
-    >>> g1 = dgl.bipartite(([0, 1], [0, 1]), 'user', 'watches', 'TV')
-    >>> GG = dgl.hetero_from_relations([g0, g1]) # Merge the two graphs
+    >>> GG = dgl.heterograph({
+    >>>     ('user', 'watches', 'movie'): ([0, 1, 1], [1, 0, 1]),
+    >>>     ('user', 'watches', 'TV'): ([0, 1], [0, 1])
+    >>> })
 
     To distinguish between the two "watches" edge type, one must specify a full triplet:
 
@@ -1981,9 +1982,11 @@ class DGLHeteroGraph(object):
         --------
         The following example uses PyTorch backend.
 
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 1, 1]), 'user', 'plays', 'game')
-        >>> devs_g = dgl.bipartite(([0, 1], [0, 1]), 'developer', 'develops', 'game')
-        >>> g = dgl.hetero_from_relations([plays_g, devs_g])
+        >>> import dgl
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
+        >>>     ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+        >>> })
         >>> g.predecessors(0, 'plays')
         tensor([0, 1])
         >>> g.predecessors(0, 'develops')

@@ -304,7 +304,6 @@ def test_query(idtype):
     g = create_test_heterograph1(idtype)
     _test(g)
 
-    etypes = canonical_etypes
     edges = {
         ('user', 'follows', 'user'): ([0, 1], [1, 2]),
         ('user', 'plays', 'game'): ([0, 1, 2, 1], [0, 0, 1, 1]),
@@ -876,18 +875,14 @@ def test_flatten(idtype):
     check_mapping(g, fg)
 
     # Test another heterograph
-    g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), 'user', 'follows', idtype=idtype, device=F.ctx())
-    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', idtype=idtype, device=F.ctx())
-    g_x.nodes['user'].data['h'] = F.randn((4, 3))
-    g_x.edges['follows'].data['w'] = F.randn((3, 2))
-    g_y.nodes['user'].data['hh'] = F.randn((4, 5))
-    g_y.edges['knows'].data['ww'] = F.randn((2, 10))
-    g = dgl.hetero_from_relations([g_x, g_y])
-
-    assert F.array_equal(g.ndata['h'], g_x.ndata['h'])
-    assert F.array_equal(g.ndata['hh'], g_y.ndata['hh'])
-    assert F.array_equal(g.edges['follows'].data['w'], g_x.edata['w'])
-    assert F.array_equal(g.edges['knows'].data['ww'], g_y.edata['ww'])
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 2], [1, 2, 3]),
+        ('user', 'knows', 'user'): ([0, 2], [2, 3])
+    }, idtype=idtype, device=F.ctx())
+    g.nodes['user'].data['h'] = F.randn((4, 3))
+    g.edges['follows'].data['w'] = F.randn((3, 2))
+    g.nodes['user'].data['hh'] = F.randn((4, 5))
+    g.edges['knows'].data['ww'] = F.randn((2, 10))
 
     fg = g['user', :, 'user']
     assert fg.idtype == g.idtype
@@ -1785,29 +1780,32 @@ def test_bipartite(idtype):
     assert F.array_equal(g1.nodes['DST/B'].data['h'], g1.dstdata['h'])
 
     # more complicated bipartite
-    g2 = dgl.bipartite([(1, 0), (0, 0)], 'A', 'AC', 'C', idtype=idtype, device=F.ctx())
-    g3 = dgl.hetero_from_relations([g1, g2])
-    assert g3.is_unibipartite
-    assert g3.srctypes == ['A']
-    assert set(g3.dsttypes) == {'B', 'C'}
-    assert g3.number_of_nodes('A') == 2
-    assert g3.number_of_nodes('B') == 6
-    assert g3.number_of_nodes('C') == 1
-    assert g3.number_of_src_nodes('A') == 2
-    assert g3.number_of_src_nodes() == 2
-    assert g3.number_of_dst_nodes('B') == 6
-    assert g3.number_of_dst_nodes('C') == 1
-    g3.srcdata['h'] = F.randn((2, 5))
-    assert F.array_equal(g3.srcnodes['A'].data['h'], g3.srcdata['h'])
-    assert F.array_equal(g3.nodes['A'].data['h'], g3.srcdata['h'])
-    assert F.array_equal(g3.nodes['SRC/A'].data['h'], g3.srcdata['h'])
+    g2 = dgl.heterograph({
+        ('A', 'AB', 'B'): ([0, 0, 1], [1, 2, 5]),
+        ('A', 'AC', 'C'): ([1, 0], [0, 0])
+    }, idtype=idtype, device=F.ctx())
 
-    g4 = dgl.heterograph({
+    assert g2.is_unibipartite
+    assert g2.srctypes == ['A']
+    assert set(g2.dsttypes) == {'B', 'C'}
+    assert g2.number_of_nodes('A') == 2
+    assert g2.number_of_nodes('B') == 6
+    assert g2.number_of_nodes('C') == 1
+    assert g2.number_of_src_nodes('A') == 2
+    assert g2.number_of_src_nodes() == 2
+    assert g2.number_of_dst_nodes('B') == 6
+    assert g2.number_of_dst_nodes('C') == 1
+    g2.srcdata['h'] = F.randn((2, 5))
+    assert F.array_equal(g2.srcnodes['A'].data['h'], g2.srcdata['h'])
+    assert F.array_equal(g2.nodes['A'].data['h'], g2.srcdata['h'])
+    assert F.array_equal(g2.nodes['SRC/A'].data['h'], g2.srcdata['h'])
+
+    g3 = dgl.heterograph({
         ('A', 'AB', 'B'): [[0, 0, 1], [1, 2, 5]],
         ('A', 'AC', 'C'): [[1, 0], [0, 0]],
         ('A', 'AA', 'A'): [[0, 1], [0, 1]]
     }, idtype=idtype, device=F.ctx())
-    assert not g4.is_unibipartite
+    assert not g3.is_unibipartite
 
 @parametrize_dtype
 def test_dtype_cast(idtype):

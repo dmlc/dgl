@@ -186,11 +186,12 @@ def load_acm_raw(remove_self_loop):
     p_vs_t = p_vs_t[p_selected]
     p_vs_c = p_vs_c[p_selected]
 
-    pa = dgl.bipartite(p_vs_a, 'paper', 'pa', 'author')
-    ap = dgl.bipartite(p_vs_a.transpose(), 'author', 'ap', 'paper')
-    pl = dgl.bipartite(p_vs_l, 'paper', 'pf', 'field')
-    lp = dgl.bipartite(p_vs_l.transpose(), 'field', 'fp', 'paper')
-    hg = dgl.hetero_from_relations([pa, ap, pl, lp])
+    hg = dgl.heterograph({
+        ('paper', 'pa', 'author'): p_vs_a.nonzero(),
+        ('author', 'ap', 'paper'): p_vs_a.transpose.nonzero(),
+        ('paper', 'pf', 'field'): p_vs_l.nonzero(),
+        ('field', 'fp', 'paper'): p_vs_l.transpose().nonzero()
+    })
 
     features = torch.FloatTensor(p_vs_t.toarray())
 
