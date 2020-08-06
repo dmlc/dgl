@@ -116,7 +116,6 @@ class GSpMM(th.autograd.Function):
                 elif op in ['add', 'sub', 'copy_rhs']:
                     dY.scatter_add_(0, argY.long(), _addsub(op, dZ))
             dY = _reduce_grad(dY, Y.shape)
-            print('jesus2')
         else:  # Y has no gradient
             dY = None
         return None, None, None, dX, dY
