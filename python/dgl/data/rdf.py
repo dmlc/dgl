@@ -8,7 +8,10 @@ from collections import OrderedDict
 import itertools
 import abc
 import re
-import rdflib as rdf
+try:
+    import rdflib as rdf
+except ImportError:
+    pass
 
 import networkx as nx
 import numpy as np
@@ -112,6 +115,7 @@ class RDFGraphDataset(DGLBuiltinDataset):
                  raw_dir=None,
                  force_reload=False,
                  verbose=True):
+        import rdflib as rdf
         self._insert_reverse = insert_reverse
         self._print_every = print_every
         self._predict_category = predict_category
