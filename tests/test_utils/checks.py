@@ -13,7 +13,7 @@ def check_graph_equal(g1, g2, *,
     assert g1.etypes == g2.etypes
     assert g1.srctypes == g2.srctypes
     assert g1.dsttypes == g2.dsttypes
-    assert g1.relations == g2.relations
+    assert g1.canonical_etypes == g2.canonical_etypes
     assert g1.batch_size == g2.batch_size
 
     # check if two metagraphs are identical
@@ -23,7 +23,7 @@ def check_graph_equal(g1, g2, *,
     for nty in g1.ntypes:
         assert g1.number_of_nodes(nty) == g2.number_of_nodes(nty)
         assert F.allclose(g1.batch_num_nodes(nty), g2.batch_num_nodes(nty))
-    for ety in g1.relations:
+    for ety in g1.canonical_etypes:
         assert g1.number_of_edges(ety) == g2.number_of_edges(ety)
         assert F.allclose(g1.batch_num_edges(ety), g2.batch_num_edges(ety))
         src1, dst1, eid1 = g1.edges(etype=ety, form='all')
@@ -43,7 +43,7 @@ def check_graph_equal(g1, g2, *,
                 continue
             for feat_name in g1.nodes[nty].data.keys():
                 assert F.allclose(g1.nodes[nty].data[feat_name], g2.nodes[nty].data[feat_name])
-        for ety in g1.relations:
+        for ety in g1.canonical_etypes:
             if g1.number_of_edges(ety) == 0:
                 continue
             for feat_name in g2.edges[ety].data.keys():

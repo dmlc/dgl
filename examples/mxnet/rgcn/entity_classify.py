@@ -54,7 +54,7 @@ def main(args):
     # Load from hetero-graph
     hg = dataset[0]
 
-    num_rels = len(hg.relations)
+    num_rels = len(hg.canonical_etypes)
     category = dataset.predict_category
     num_classes = dataset.num_classes
     train_mask = hg.nodes[category].data.pop('train_mask')
@@ -71,13 +71,13 @@ def main(args):
         val_idx = train_idx
 
     # calculate norm for each edge type and store in edge
-    for relation in hg.relations:
-        u, v, eid = hg.all_edges(form='all', etype=relation)
+    for canonical_etype in hg.canonical_etypes:
+        u, v, eid = hg.all_edges(form='all', etype=canonical_etype)
         v = v.asnumpy()
         _, inverse_index, count = np.unique(v, return_inverse=True, return_counts=True)
         degrees = count[inverse_index]
         norm = np.ones(eid.shape[0]) / degrees
-        hg.edges[relation].data['norm'] = mx.nd.expand_dims(mx.nd.array(norm), axis=1)
+        hg.edges[canonical_etype].data['norm'] = mx.nd.expand_dims(mx.nd.array(norm), axis=1)
 
     # get target category id
     category_id = len(hg.ntypes)

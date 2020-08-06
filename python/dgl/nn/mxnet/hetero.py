@@ -140,7 +140,7 @@ class HeteroGraphConv(nn.Block):
         outputs = {nty : [] for nty in g.dsttypes}
         if isinstance(inputs, tuple):
             src_inputs, dst_inputs = inputs
-            for stype, etype, dtype in g.relations:
+            for stype, etype, dtype in g.canonical_etypes:
                 rel_graph = g[stype, etype, dtype]
                 if rel_graph.number_of_edges() == 0:
                     continue
@@ -153,7 +153,7 @@ class HeteroGraphConv(nn.Block):
                     **mod_kwargs.get(etype, {}))
                 outputs[dtype].append(dstdata)
         else:
-            for stype, etype, dtype in g.relations:
+            for stype, etype, dtype in g.canonical_etypes:
                 rel_graph = g[stype, etype, dtype]
                 if rel_graph.number_of_edges() == 0:
                     continue

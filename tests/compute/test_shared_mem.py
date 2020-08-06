@@ -26,7 +26,7 @@ def create_test_graph(idtype):
 def _assert_is_identical_hetero(g, g2):
     assert g.is_readonly == g2.is_readonly
     assert g.ntypes == g2.ntypes
-    assert g.relations == g2.relations
+    assert g.canonical_etypes == g2.canonical_etypes
 
     # check if two metagraphs are identical
     for edges, features in g.metagraph().edges(keys=True).items():
@@ -37,7 +37,7 @@ def _assert_is_identical_hetero(g, g2):
         assert g.number_of_nodes(ntype) == g2.number_of_nodes(ntype)
 
     # check if edge ID spaces and feature spaces are equal
-    for etype in g.relations:
+    for etype in g.canonical_etypes:
         src, dst = g.all_edges(etype=etype, order='eid')
         src2, dst2 = g2.all_edges(etype=etype, order='eid')
         assert F.array_equal(src, src2)

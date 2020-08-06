@@ -9,7 +9,7 @@ from test_utils import check_graph_equal
 def check_equivalence_between_heterographs(g1, g2, node_attrs=None, edge_attrs=None):
     assert g1.ntypes == g2.ntypes
     assert g1.etypes == g2.etypes
-    assert g1.relations == g2.relations
+    assert g1.canonical_etypes == g2.canonical_etypes
 
     for nty in g1.ntypes:
         assert g1.number_of_nodes(nty) == g2.number_of_nodes(nty)
@@ -18,7 +18,7 @@ def check_equivalence_between_heterographs(g1, g2, node_attrs=None, edge_attrs=N
         if len(g1._etype2canonical[ety]) > 0:
             assert g1.number_of_edges(ety) == g2.number_of_edges(ety)
 
-    for ety in g1.relations:
+    for ety in g1.canonical_etypes:
         assert g1.number_of_edges(ety) == g2.number_of_edges(ety)
         src1, dst1, eid1 = g1.edges(etype=ety, form='all')
         src2, dst2, eid2 = g2.edges(etype=ety, form='all')
@@ -59,7 +59,7 @@ def test_topology(idtype):
     assert bg.device == F.ctx()
     assert bg.ntypes == g2.ntypes
     assert bg.etypes == g2.etypes
-    assert bg.relations == g2.relations
+    assert bg.canonical_etypes == g2.canonical_etypes
     assert bg.batch_size == 2
 
     # Test number of nodes
@@ -71,7 +71,7 @@ def test_topology(idtype):
                 g1.number_of_nodes(ntype) + g2.number_of_nodes(ntype))
 
     # Test number of edges
-    for etype in bg.relations:
+    for etype in bg.canonical_etypes:
         assert F.asnumpy(bg.batch_num_edges(etype)).tolist() == [
             g1.number_of_edges(etype), g2.number_of_edges(etype)]
         assert bg.number_of_edges(etype) == (
@@ -130,7 +130,7 @@ def test_batching_batched(idtype):
     assert bg2.device == F.ctx()
     assert bg2.ntypes == g3.ntypes
     assert bg2.etypes == g3.etypes
-    assert bg2.relations == g3.relations
+    assert bg2.canonical_etypes == g3.canonical_etypes
     assert bg2.batch_size == 3
 
     # Test number of nodes
@@ -141,7 +141,7 @@ def test_batching_batched(idtype):
                 g1.number_of_nodes(ntype) + g2.number_of_nodes(ntype) + g3.number_of_nodes(ntype))
 
     # Test number of edges
-    for etype in bg2.relations:
+    for etype in bg2.canonical_etypes:
         assert F.asnumpy(bg2.batch_num_edges(etype)).tolist() == [
             g1.number_of_edges(etype), g2.number_of_edges(etype), g3.number_of_edges(etype)]
         assert bg2.number_of_edges(etype) == (
@@ -271,7 +271,7 @@ def test_empty_relation(idtype):
             g1.number_of_nodes(ntype), g2.number_of_nodes(ntype)]
 
     # Test number of edges
-    for etype in bg.relations:
+    for etype in bg.canonical_etypes:
         assert F.asnumpy(bg.batch_num_edges(etype)).tolist() == [
             g1.number_of_edges(etype), g2.number_of_edges(etype)]
 

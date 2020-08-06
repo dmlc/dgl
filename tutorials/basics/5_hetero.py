@@ -90,7 +90,7 @@ using the heterograph class and its associated API.
 # You can create a heterograph in DGL using the :func:`dgl.heterograph` API.
 # The argument to :func:`dgl.heterograph` is a dictionary. The keys are tuples
 # in the form of ``(srctype, edgetype, dsttype)`` specifying the relation name
-# and the two entity types it connects. Such tuples are called *relations*.
+# and the two entity types it connects. Such tuples are called *canonical edge types*
 # The values are data to initialize the graph structures, that is, which
 # nodes the edges actually connect.
 #
@@ -172,12 +172,12 @@ pa_g = dgl.bipartite(data['PvsA'], 'paper', 'written-by', 'author')
 
 print('Node types:', pa_g.ntypes)
 print('Edge types:', pa_g.etypes)
-print('Relations:', pa_g.relations)
+print('Canonical edge types:', pa_g.canonical_etypes)
 
 # Nodes and edges are assigned integer IDs starting from zero and each type has its own counting.
 # To distinguish the nodes and edges of different types, specify the type name as the argument.
 print(pa_g.number_of_nodes('paper'))
-# Relation name can be shortened to only one edge type name if it is
+# Canonical edge type name can be shortened to only one edge type name if it is
 # uniquely distinguishable.
 print(pa_g.number_of_edges(('paper', 'written-by', 'author')))
 print(pa_g.number_of_edges('written-by'))
@@ -188,11 +188,12 @@ print(pa_g.number_of_edges())  # Only one edge type, the edge type argument coul
 
 ###############################################################################
 # A homogeneous graph is just a special case of a heterograph with only one type
-# of node and edge. In this case, all the APIs are exactly the same as in
-# :class:`DGLGraph`.
+# of node and edge.
 
 # Paper-citing-paper graph is a homogeneous graph
 pp_g = dgl.heterograph({('paper', 'citing', 'paper') : data['PvsP'].nonzero()})
+# equivalent (shorter) API for creating homogeneous graph
+pp_g = dgl.from_scipy(data['PvsP'])
 
 # All the ntype and etype arguments could be omitted because the behavior is unambiguous.
 print(pp_g.number_of_nodes())
@@ -323,7 +324,7 @@ class HeteroRGCNLayer(nn.Module):
     def forward(self, G, feat_dict):
         # The input is a dictionary of node features for each type
         funcs = {}
-        for srctype, etype, dsttype in G.relations:
+        for srctype, etype, dsttype in G.canonical_etypes:
             # Compute W_r * h
             Wh = self.weight[etype](feat_dict[srctype])
             # Save it in graph for message passing

@@ -34,9 +34,9 @@ Querying metagraph structure
 
     DGLHeteroGraph.ntypes
     DGLHeteroGraph.etypes
-    DGLHeteroGraph.relations
+    DGLHeteroGraph.canonical_etypes
     DGLHeteroGraph.metagraph
-    DGLHeteroGraph.to_relation
+    DGLHeteroGraph.to_canonical_etype
     DGLHeteroGraph.get_ntype_id
     DGLHeteroGraph.get_etype_id
 

@@ -358,13 +358,13 @@ def main(args, devices):
         val_idx = train_idx
 
     # calculate norm for each edge type and store in edge
-    for relation in hg.relations:
-        u, v, eid = hg.all_edges(form='all', etype=relation)
+    for canonical_etype in hg.canonical_etypes:
+        u, v, eid = hg.all_edges(form='all', etype=canonical_etype)
         _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
         degrees = count[inverse_index]
         norm = th.ones(eid.shape[0]) / degrees
         norm = norm.unsqueeze(1)
-        hg.edges[relation].data['norm'] = norm
+        hg.edges[canonical_etype].data['norm'] = norm
 
     # get target category id
     category_id = len(hg.ntypes)

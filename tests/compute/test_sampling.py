@@ -8,8 +8,8 @@ def check_random_walk(g, metapath, traces, ntypes, prob=None):
     traces = F.asnumpy(traces)
     ntypes = F.asnumpy(ntypes)
     for j in range(traces.shape[1] - 1):
-        assert ntypes[j] == g.get_ntype_id(g.to_relation(metapath[j])[0])
-        assert ntypes[j + 1] == g.get_ntype_id(g.to_relation(metapath[j])[2])
+        assert ntypes[j] == g.get_ntype_id(g.to_canonical_etype(metapath[j])[0])
+        assert ntypes[j + 1] == g.get_ntype_id(g.to_canonical_etype(metapath[j])[2])
 
     for i in range(traces.shape[0]):
         for j in range(traces.shape[1] - 1):

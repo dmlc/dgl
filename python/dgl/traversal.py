@@ -42,7 +42,7 @@ def bfs_nodes_generator(graph, source, reverse=False):
     """
     assert isinstance(graph, DGLHeteroGraph), \
         'DGLGraph is deprecated, Please use DGLHeteroGraph'
-    assert len(graph.relations) == 1, \
+    assert len(graph.canonical_etypes) == 1, \
         'bfs_nodes_generator only support homogeneous graph'
     gidx = graph._graph
     source = utils.toindex(source, dtype=graph._idtype_str)
@@ -86,7 +86,7 @@ def bfs_edges_generator(graph, source, reverse=False):
     """
     assert isinstance(graph, DGLHeteroGraph), \
         'DGLGraph is deprecated, Please use DGLHeteroGraph'
-    assert len(graph.relations) == 1, \
+    assert len(graph.canonical_etypes) == 1, \
         'bfs_edges_generator only support homogeneous graph'
     gidx = graph._graph
     source = utils.toindex(source, dtype=graph._idtype_str)
@@ -127,7 +127,7 @@ def topological_nodes_generator(graph, reverse=False):
     """
     assert isinstance(graph, DGLHeteroGraph), \
         'DGLGraph is deprecated, Please use DGLHeteroGraph'
-    assert len(graph.relations) == 1, \
+    assert len(graph.canonical_etypes) == 1, \
         'topological_nodes_generator only support homogeneous graph'
     gidx = graph._graph
     ret = _CAPI_DGLTopologicalNodes_v2(gidx, reverse)

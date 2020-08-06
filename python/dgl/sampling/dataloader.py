@@ -18,7 +18,7 @@ def assign_block_eids(block, frontier, block_id, g, seed_nodes, *args, **kwargs)
     BlockSampler
     MultiLayerNeighborSampler
     """
-    for etype in block.relations:
+    for etype in block.canonical_etypes:
         block.edges[etype].data[EID] = frontier.edges[etype].data[EID][
             block.edges[etype].data[EID]]
     return block

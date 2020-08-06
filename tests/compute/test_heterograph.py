@@ -112,7 +112,7 @@ def test_create(idtype):
     g1 = create_test_heterograph1(idtype)
     g2 = create_test_heterograph2(idtype)
     assert set(g0.ntypes) == set(g1.ntypes) == set(g2.ntypes)
-    assert set(g0.relations) == set(g1.relations) == set(g2.relations)
+    assert set(g0.canonical_etypes) == set(g1.canonical_etypes) == set(g2.canonical_etypes)
 
     # create from nx complete bipartite graph
     nxg = nx.complete_bipartite_graph(3, 4)
@@ -179,7 +179,7 @@ def test_query(idtype):
     g = create_test_heterograph(idtype)
 
     ntypes = ['user', 'game', 'developer']
-    relations = [
+    canonical_etypes = [
         ('user', 'follows', 'user'),
         ('user', 'plays', 'game'),
         ('user', 'wishes', 'game'),
@@ -189,7 +189,7 @@ def test_query(idtype):
     # node & edge types
     assert set(ntypes) == set(g.ntypes)
     assert set(etypes) == set(g.etypes)
-    assert set(relations) == set(g.relations)
+    assert set(canonical_etypes) == set(g.canonical_etypes)
 
     # metagraph
     mg = g.metagraph()
@@ -201,7 +201,7 @@ def test_query(idtype):
         ('user', 'game', 'wishes'),
         ('developer', 'game', 'develops')]) == set(etype_triplets)
     for i in range(len(etypes)):
-        assert g.to_relation(etypes[i]) == relations[i]
+        assert g.to_canonical_etype(etypes[i]) == canonical_etypes[i]
 
     def _test(g):
         # number of nodes
