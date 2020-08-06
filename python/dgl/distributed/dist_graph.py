@@ -609,7 +609,7 @@ def _split_local(partition_book, rank, elements, local_eles):
 def _split_even(partition_book, rank, elements):
     ''' Split the input element list evenly.
     '''
-    num_clients = rpc.get_num_client()
+    num_clients = 4
     num_client_per_part = num_clients // partition_book.num_partitions()
     if rank is None:
         rank = rpc.get_rank()
