@@ -414,36 +414,36 @@ class CiteseerGraphDataset(CitationGraphDataset):
 
     .. deprecated:: 0.5.0
 
-        ``graph`` is deprecated, it is replaced by:
+        - ``graph`` is deprecated, it is replaced by:
 
             >>> dataset = CiteseerGraphDataset()
             >>> graph = dataset[0]
 
-        ``train_mask`` is deprecated, it is replaced by:
+        - ``train_mask`` is deprecated, it is replaced by:
 
             >>> dataset = CiteseerGraphDataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.ndata['train_mask']
 
-        ``val_mask`` is deprecated, it is replaced by:
+        - ``val_mask`` is deprecated, it is replaced by:
 
             >>> dataset = CiteseerGraphDataset()
             >>> graph = dataset[0]
             >>> val_mask = graph.ndata['val_mask']
 
-        ``test_mask`` is deprecated, it is replaced by:
+        - ``test_mask`` is deprecated, it is replaced by:
 
             >>> dataset = CiteseerGraphDataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.ndata['test_mask']
 
-        ``labels`` is deprecated, it is replaced by:
+        - ``labels`` is deprecated, it is replaced by:
 
             >>> dataset = CiteseerGraphDataset()
             >>> graph = dataset[0]
             >>> labels = graph.ndata['label']
 
-        ``feat`` is deprecated, it is replaced by:
+        - ``feat`` is deprecated, it is replaced by:
 
             >>> dataset = CiteseerGraphDataset()
             >>> graph = dataset[0]
@@ -557,36 +557,36 @@ class PubmedGraphDataset(CitationGraphDataset):
 
     .. deprecated:: 0.5.0
 
-        ``graph`` is deprecated, it is replaced by:
+        - ``graph`` is deprecated, it is replaced by:
 
             >>> dataset = PubmedGraphDataset()
             >>> graph = dataset[0]
 
-        ``train_mask`` is deprecated, it is replaced by:
+        - ``train_mask`` is deprecated, it is replaced by:
 
             >>> dataset = PubmedGraphDataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.ndata['train_mask']
 
-        ``val_mask`` is deprecated, it is replaced by:
+        - ``val_mask`` is deprecated, it is replaced by:
 
             >>> dataset = PubmedGraphDataset()
             >>> graph = dataset[0]
             >>> val_mask = graph.ndata['val_mask']
 
-        ``test_mask`` is deprecated, it is replaced by:
+        - ``test_mask`` is deprecated, it is replaced by:
 
             >>> dataset = PubmedGraphDataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.ndata['test_mask']
 
-        ``labels`` is deprecated, it is replaced by:
+        - ``labels`` is deprecated, it is replaced by:
 
             >>> dataset = PubmedGraphDataset()
             >>> graph = dataset[0]
             >>> labels = graph.ndata['label']
 
-        ``feat`` is deprecated, it is replaced by:
+        - ``feat`` is deprecated, it is replaced by:
 
             >>> dataset = PubmedGraphDataset()
             >>> graph = dataset[0]
