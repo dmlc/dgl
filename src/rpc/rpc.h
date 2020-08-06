@@ -96,6 +96,19 @@ struct RPCContext {
   static RPCContext *ThreadLocal() {
     return dmlc::ThreadLocalStore<RPCContext>::Get();
   }
+
+  /*! \brief Reset the RPC context */
+  static void Reset() {
+    auto* t = ThreadLocal();
+    t->rank = -1;
+    t->machine_id = -1;
+    t->num_machines = 0;
+    t->num_clients = 0;
+    t->barrier_count = 0;
+    t->num_servers_per_machine = 0;
+    t->sender = std::shared_ptr<network::Sender>();
+    t->receiver = std::shared_ptr<network::Receiver>();
+  }
 };
 
 /*! \brief RPC message data structure
