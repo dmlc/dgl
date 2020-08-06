@@ -13,7 +13,7 @@ def is_builtin(func):
     return isinstance(func, fn.BuiltinFunction)
 
 def invoke_node_udf(graph, ntype, func, ndata, *, orig_nid=None):
-    """Invoke user-defined node function on all the nodes in the graph.
+    """Invoke user-defined node function on the given ndata.
 
     Parameters
     ----------
@@ -249,11 +249,11 @@ def message_passing(g, mfunc, rfunc, afunc):
     ----------
     g : DGLGraph
         The input graph.
-    mfunc : callable
+    mfunc : callable or dgl.function.BuiltinFunction
         Message function.
-    rfunc : callable
+    rfunc : callable or dgl.function.BuiltinFunction
         Reduce function.
-    afunc : callable
+    afunc : callable or dgl.function.BuiltinFunction
         Apply function.
 
     Returns

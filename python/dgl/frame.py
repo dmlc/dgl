@@ -73,9 +73,12 @@ class Column(object):
     Attributes
     ----------
     storage : Tensor
-        Feature data storage.
+        The storage tensor. The storage tensor may not be the actual data
+        tensor of this column when the index tensor is not None.
+        This typically happens when the column is extracted from another
+        column using the `subcolumn` method.
     data : Tensor
-        Feature data of this column.
+        The actual data tensor of this column.
     scheme : Scheme
         The scheme of the column.
     index : Tensor
@@ -195,8 +198,10 @@ class Column(object):
     def subcolumn(self, rowids):
         """Return a subcolumn.
 
-        If the self column has an index tensor, it will create a new index instead of
-        performing index selection.
+        The resulting column will share the same storage as this column so this operation
+        is quite efficient. If the current column is also a sub-column (i.e., the
+        index tensor is not None), it slices the index tensor with the given
+        rowids as the index tensor of the resulting column.
 
         Parameters
         ----------

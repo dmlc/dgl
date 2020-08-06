@@ -4,6 +4,8 @@ import networkx as nx
 import numpy as np
 import backend as F
 from itertools import product
+from test_utils import parametrize_dtype, get_cases
+import pytest
 
 def udf_copy_src(edges):
     return {'m': edges.src['u']}
@@ -359,6 +361,16 @@ def test_all_binary_builtins():
                         print(lhs, rhs, binary_op, reducer, broadcast, partial)
                         _test(g, lhs, rhs, binary_op, reducer, partial, nid,
                               broadcast=broadcast)
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo-zero-degree']))
+def test_mean_zero_degree(g, idtype):
+    g = g.astype(idtype).to(F.ctx())
+    g.ndata['h'] = F.ones((g.number_of_nodes(), 3))
+    g.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'x'))
+    deg = F.asnumpy(g.in_degrees())
+    v = F.tensor(np.where(deg == 0)[0])
+    assert F.allclose(F.gather_row(g.ndata['x'], v), F.zeros((len(v), 3)))
 
 if __name__ == '__main__':
     test_copy_src_reduce()

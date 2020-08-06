@@ -2707,7 +2707,7 @@ class DGLHeteroGraph(object):
         and (D1, D2, ...) be the shape of the node representation tensor. The
         length of the given node ids must match B (i.e, len(u) == B).
 
-        All update will be done out of place to work with autograd.
+        All updates will be done out of place to work with autograd.
 
         Parameters
         ----------
@@ -2939,8 +2939,7 @@ class DGLHeteroGraph(object):
             The edge type. Can be omitted if there is only one edge type
             in the graph. (Default: None)
         inplace: bool, optional
-            **DEPRECATED**. If True, update will be done in place, but autograd will break.
-            (Default: False)
+            **DEPRECATED**. Must be False.
 
         Examples
         --------
@@ -3014,8 +3013,7 @@ class DGLHeteroGraph(object):
             The edge type. Can be omitted if there is only one edge type
             in the graph. (Default: None)
         inplace: bool, optional
-            **DEPRECATED**. If True, update will be done in place, but autograd will break.
-            (Default: False)
+            **DEPRECATED**. Must be False.
 
         Examples
         --------
@@ -3098,8 +3096,7 @@ class DGLHeteroGraph(object):
             The edge type. Can be omitted if there is only one edge type
             in the graph. (Default: None)
         inplace: bool, optional
-            **DEPRECATED**. If True, update will be done in place, but autograd will break.
-            (Default: False)
+            **DEPRECATED**. Must be False.
 
         Examples
         --------
@@ -3175,8 +3172,7 @@ class DGLHeteroGraph(object):
             The edge type. Can be omitted if there is only one edge type
             in the graph. (Default: None)
         inplace: bool, optional
-            If True, update will be done in place, but autograd will break.
-            (Default: False)
+            **DEPRECATED**. Must be False.
 
         Examples
         --------
@@ -3296,11 +3292,7 @@ class DGLHeteroGraph(object):
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`. (Default: None)
         inplace: bool, optional
-            If True, update will be done in place, but autograd will break.
-            (Default: False)
-
-        etype_dict : dict of callable
-            ``update_all`` arguments per edge type.
+            **DEPRECATED**. Must be False.
 
         Examples
         --------
@@ -4405,8 +4397,8 @@ def _create_compute_graph(graph, u, v, eid, recv_nodes=None):
         Edge IDs.
     recv_nodes : Tensor
         Nodes that receive messages. If None, it is equal to unique(v).
-        Otherwise, it must be a super set of v and can contain nodes
-        that have no in-coming edges.
+        Otherwise, it must be a superset of v and can contain nodes
+        that have no incoming edges.
 
     Returns
     -------
