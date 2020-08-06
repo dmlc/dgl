@@ -8,7 +8,7 @@ from ..heterograph import DGLHeteroGraph
 from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID
-from .kvstore import KVServer, init_kvstore, get_kvstore
+from .kvstore import KVServer, get_kvstore
 from .standalone_kvstore import KVClient as SA_KVClient
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
@@ -17,6 +17,7 @@ from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
 from .graph_partition_book import NODE_PART_POLICY, EDGE_PART_POLICY
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from . import rpc
+from . import role
 from .server_state import ServerState
 from .rpc_server import start_server
 from .graph_services import find_edges as dist_find_edges
@@ -360,10 +361,7 @@ class DistGraph:
             self._num_edges += int(part_md['num_edges'])
 
     def _init(self):
-        # Init KVStore client if it's not initialized yet.
-        init_kvstore(self.ip_config)
         self._client = get_kvstore()
-
         self._g = _get_graph_from_shared_mem(self.graph_name)
         self._gpb = get_shared_mem_partition_book(self.graph_name, self._g)
         if self._gpb is None:
@@ -488,20 +486,7 @@ class DistGraph:
         int
             The rank of the current graph store.
         '''
-        # If DistGraph doesn't have a local partition, it doesn't matter what rank
-        # it returns. There is no data locality any way, as long as the returned rank
-        # is unique in the system.
-        if self._g is None:
-            return rpc.get_rank()
-        else:
-            # If DistGraph has a local partition, we should be careful about the rank
-            # we return. We need to return a rank that node_split or edge_split can split
-            # the workload with respect to data locality.
-            num_client = rpc.get_num_client()
-            num_client_per_part = num_client // self._gpb.num_partitions()
-            # all ranks of the clients in the same machine are in a contiguous range.
-            client_id_in_part = rpc.get_rank() % num_client_per_part
-            return int(self._gpb.partid * num_client_per_part + client_id_in_part)
+        return role.get_global_rank()
 
     def find_edges(self, edges):
         """ Given an edge ID array, return the source
@@ -590,10 +575,12 @@ def _get_overlap(mask_arr, ids):
 def _split_local(partition_book, rank, elements, local_eles):
     ''' Split the input element list with respect to data locality.
     '''
-    num_clients = rpc.get_num_client()
+    num_clients = role.get_num_trainers()
     num_client_per_part = num_clients // partition_book.num_partitions()
     if rank is None:
-        rank = rpc.get_rank()
+        rank = role.get_trainer_rank()
+    assert rank < num_clients, \
+            'The input rank ({}) is incorrect. #Trainers: {}'.format(rank, num_clients)
     # all ranks of the clients in the same machine are in a contiguous range.
     client_id_in_part = rank  % num_client_per_part
     local_eles = _get_overlap(elements, local_eles)
@@ -609,11 +596,14 @@ def _split_local(partition_book, rank, elements, local_eles):
 def _split_even(partition_book, rank, elements):
     ''' Split the input element list evenly.
     '''
-    num_clients = rpc.get_num_client()
+    num_clients = role.get_num_trainers()
     num_client_per_part = num_clients // partition_book.num_partitions()
-    if rank is None:
-        rank = rpc.get_rank()
     # all ranks of the clients in the same machine are in a contiguous range.
+    if rank is None:
+        rank = role.get_trainer_rank()
+    assert rank < num_clients, \
+            'The input rank ({}) is incorrect. #Trainers: {}'.format(rank, num_clients)
+    # This conversion of rank is to make the new rank aligned with partitioning.
     client_id_in_part = rank  % num_client_per_part
     rank = client_id_in_part + num_client_per_part * partition_book.partid
 
