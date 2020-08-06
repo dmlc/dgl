@@ -614,6 +614,7 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
     print("start training...")
     for epoch in range(args.n_epochs):
         model.train()
+        embed_layer.train()
         if epoch > 1:
             t0 = time.time()
         for i, sample_data in enumerate(dataloader):
@@ -638,7 +639,10 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
                 p_tail_emb = mb_feats[p_v]
                 n_head_emb = mb_feats[n_u]
                 n_tail_emb = mb_feats[n_v]
-                r_emb = model.w_relation[rids]
+                if queue is None:
+                    r_emb = model.w_relation[rids]
+                else:
+                    r_emb = model.module.w_relation[rids]
                 p_emb = n_emb = mb_feats
 
             #n_shuffle_seed = th.randperm(n_head_emb.shape[0])
