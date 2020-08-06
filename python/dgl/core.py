@@ -38,6 +38,26 @@ def invoke_node_udf(graph, ntype, func, ndata, *, orig_nid=None):
     return func(nbatch)
 
 def invoke_edge_udf(graph, eid, etype, func, *, orig_eid=None):
+    """Invoke user-defined edge function on the given edges.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The input graph.
+    eid : Tensor
+        The IDs of the edges to invoke UDF on.
+    etype : (str, str, str)
+        Edge type.
+    func : callable
+        The user-defined function.
+    orig_eid : Tensor, optional
+        Original edge IDs. Useful if the input graph is an extracted subgraph.
+
+    Returns
+    -------
+    dict[str, Tensor]
+        Results from running the UDF.
+    """
     etid = graph.get_etype_id(etype)
     stid, dtid = graph._graph.metagraph.find_edge(etid)
     if is_all(eid):
@@ -52,7 +72,28 @@ def invoke_edge_udf(graph, eid, etype, func, *, orig_eid=None):
                        etype, srcdata, edata, dstdata)
     return func(ebatch)
 
-def invoke_udf_reduce(graph, func, msgdata, orig_nid=None):
+def invoke_udf_reduce(graph, func, msgdata, *, orig_nid=None):
+    """Invoke user-defined reduce function on all the nodes in the graph.
+
+    It analyzes the graph, groups nodes by their degrees and applies the UDF on each
+    group -- a strategy called *degree-bucketing*.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The input graph.
+    func : callable
+        The user-defined function.
+    msgdata : dict[str, Tensor]
+        Message data.
+    orig_nid : Tensor, optional
+        Original node IDs. Useful if the input graph is an extracted subgraph.
+
+    Returns
+    -------
+    dict[str, Tensor]
+        Results from running the UDF.
+    """
     degs = graph.in_degrees()
     nodes = graph.dstnodes()
     if orig_nid is None:
@@ -100,6 +141,21 @@ def invoke_udf_reduce(graph, func, msgdata, orig_nid=None):
     return retf
 
 def _bucketing(val):
+    """Internal function to create groups on the values.
+
+    Parameters
+    ----------
+    val : Tensor
+        Value tensor.
+
+    Returns
+    -------
+    unique_val : Tensor
+        Unique values.
+    bucketor : callable[Tensor -> list[Tensor]]
+        A bucketing function that splits the given tensor data as the same
+        way of how the :attr:`val` tensor is grouped.
+    """
     sorted_val, idx = F.sort_1d(val)
     unique_val = F.asnumpy(F.unique(sorted_val))
     bkt_idx = []
@@ -112,6 +168,20 @@ def _bucketing(val):
     return unique_val, bucketor
 
 def invoke_gsddmm(graph, func):
+    """Invoke g-SDDMM computation on the graph.
+
+    Parameters
+    ----------
+    graph :  DGLGraph
+        The input graph.
+    func : dgl.function.BaseMessageFunction
+        Built-in message function.
+
+    Returns
+    -------
+    dict[str, Tensor]
+        Results from the g-SDDMM computation.
+    """
     alldata = [graph.srcdata, graph.dstdata, graph.edata]
     if isinstance(func, fn.BinaryMessageFunction):
         x = alldata[func.lhs][func.lhs_field]
@@ -125,6 +195,28 @@ def invoke_gsddmm(graph, func):
     return {func.out_field : z}
 
 def invoke_gspmm(graph, mfunc, rfunc, *, srcdata=None, dstdata=None, edata=None):
+    """Invoke g-SPMM computation on the graph.
+
+    Parameters
+    ----------
+    graph :  DGLGraph
+        The input graph.
+    mfunc : dgl.function.BaseMessageFunction
+        Built-in message function.
+    rfunc : dgl.function.BaseReduceFunction
+        Built-in reduce function.
+    srcdata : dict[str, Tensor], optional
+        Source node feature data. If not provided, it use ``graph.srcdata``.
+    dstdata : dict[str, Tensor], optional
+        Destination node feature data. If not provided, it use ``graph.dstdata``.
+    edata : dict[str, Tensor], optional
+        Edge feature data. If not provided, it use ``graph.edata``.
+
+    Returns
+    -------
+    dict[str, Tensor]
+        Results from the g-SPMM computation.
+    """
     # sanity check
     if mfunc.out_field != rfunc.msg_field:
         raise DGLError('Invalid message ({}) and reduce ({}) function pairs.'
@@ -150,6 +242,24 @@ def invoke_gspmm(graph, mfunc, rfunc, *, srcdata=None, dstdata=None, edata=None)
     return {rfunc.out_field : z}
 
 def message_passing(g, mfunc, rfunc, afunc):
+    """Invoke message passing computation on the whole graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+    mfunc : callable
+        Message function.
+    rfunc : callable
+        Reduce function.
+    afunc : callable
+        Apply function.
+
+    Returns
+    -------
+    dict[str, Tensor]
+        Results from the message passing computation.
+    """
     if g.number_of_edges() == 0:
         # No message passing is triggered.
         ndata = {}
