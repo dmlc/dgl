@@ -107,7 +107,7 @@ def train(args):
 
     dataset.train_enc_graph = dataset.train_enc_graph.int().to(args.device)
     dataset.train_dec_graph = dataset.train_dec_graph.int().to(args.device)
-    dataset.valid_enc_graph = dataset.train_enc_graph.int().to(args.device)
+    dataset.valid_enc_graph = dataset.train_enc_graph
     dataset.valid_dec_graph = dataset.valid_dec_graph.int().to(args.device)
     dataset.test_enc_graph = dataset.test_enc_graph.int().to(args.device)
     dataset.test_dec_graph = dataset.test_dec_graph.int().to(args.device)
