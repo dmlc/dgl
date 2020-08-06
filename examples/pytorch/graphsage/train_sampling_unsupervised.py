@@ -149,7 +149,7 @@ class SAGE(nn.Module):
                 end = start + batch_size
                 batch_nodes = nodes[start:end]
                 block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
-                block = block.to(device)
+                block = block.int().to(device)
                 input_nodes = block.srcdata[dgl.NID]
 
                 h = x[input_nodes].to(device)
@@ -296,7 +296,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
             pos_graph = pos_graph.to(device)
             neg_graph = neg_graph.to(device)
-            blocks = [block.to(device) for block in blocks]
+            blocks = [block.int().to(device) for block in blocks]
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, pos_graph, neg_graph)
