@@ -11,6 +11,7 @@ import time
 import argparse
 import tqdm
 import traceback
+import math
 from _thread import start_new_thread
 from functools import wraps
 from dgl.data import RedditDataset
@@ -267,7 +268,7 @@ def run(proc_id, n_gpus, args, devices, data):
     val_mask = th.BoolTensor(val_mask)
 
     # Split train_nid
-    train_nid = th.split(train_nid, len(train_nid) // n_gpus)[proc_id]
+    train_nid = th.split(train_nid, math.ceil(len(train_nid) // n_gpus))[proc_id]
 
     # Create sampler
     sampler = NeighborSampler(g, [int(_) for _ in args.fan_out.split(',')])
