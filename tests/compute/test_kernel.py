@@ -354,7 +354,7 @@ def test_all_binary_builtins():
             continue
         for binary_op in ["add", "sub", "mul", "div"]:
             for reducer in ["sum", "max", "min", "mean"]:
-                for broadcast in ["none"]:#, lhs, rhs]:  # temporarily turn-off broadcasting
+                for broadcast in ["none", lhs, rhs]:
                     for partial in [False, True]:
                         print(lhs, rhs, binary_op, reducer, broadcast, partial)
                         _test(g, lhs, rhs, binary_op, reducer, partial, nid,

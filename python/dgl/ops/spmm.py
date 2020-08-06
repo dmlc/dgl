@@ -42,6 +42,21 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     tensor
         The result tensor.
     """
+    if op not in ['copy_lhs', 'copy_rhs']:
+        # Expand dims so that there will be no broadcasting issues with different
+        # number of dimensions. For example, given two shapes (N, 3, 1), (E, 5, 3, 4)
+        # that are valid broadcastable shapes, change them to (N, 1, 3, 1) and
+        # (E, 5, 3, 4)
+        lhs_shape = F.shape(lhs_data)
+        rhs_shape = F.shape(rhs_data)
+        if len(lhs_shape) != len(rhs_shape):
+            max_ndims = max(len(lhs_shape), len(rhs_shape))
+            lhs_pad_ndims = max_ndims - len(lhs_shape)
+            rhs_pad_ndims = max_ndims - len(rhs_shape)
+            new_lhs_shape = (lhs_shape[0],) + (1,) * lhs_pad_ndims + lhs_shape[1:]
+            new_rhs_shape = (rhs_shape[0],) + (1,) * rhs_pad_ndims + rhs_shape[1:]
+            lhs_data = F.reshape(lhs_data, new_lhs_shape)
+            rhs_data = F.reshape(rhs_data, new_rhs_shape)
     if reduce_op == 'mean':
         ret = gspmm_internal(g._graph, op, 'sum', lhs_data, rhs_data)
         ret_shape = F.shape(ret)
