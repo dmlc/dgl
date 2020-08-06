@@ -111,9 +111,8 @@ class LinkPredict(nn.Module):
         n_tail_emb = n_h[tail]
         return (p_head_emb, p_tail_emb, r_emb, n_head_emb, n_tail_emb, p_h, n_h)
 
-def regularization_loss(p_emb, n_emb, r_emb):
-    return th.mean(p_emb.pow(2)) + \
-            th.mean(n_emb.pow(2)) + \
+def regularization_loss(n_emb, r_emb):
+    return th.mean(n_emb.pow(2)) + \
             th.mean(r_emb.pow(2))
 
 def calc_pos_score(h_emb, t_emb, r_emb):
@@ -198,55 +197,37 @@ class NodeSampler:
         return blocks
 
 class LinkPathSampler:
-    def __init__(self, g, neg_edges, num_edges, num_neg, num_rel, is_train=True, keep_pos_edges=False):
+    def __init__(self, g, num_rel):
         self.g = g
-        self.neg_edges = neg_edges
-        self.num_edges = num_edges
-        self.num_neg = num_neg
         self.num_rel = num_rel
-        self.is_train = is_train
-        self.keep_pos_edges = keep_pos_edges
 
     def sample_blocks(self, seeds):
         pseeds = th.tensor(seeds).long()
         bsize = pseeds.shape[0]
-        if self.num_neg is not None:
-            nseeds = th.randint(self.num_edges, (self.num_neg,))
-            nseeds = self.neg_edges[nseeds]
-        else:
-            nseeds = th.randint(self.num_edges, (bsize,))
-            nseeds = self.neg_edges[nseeds]
 
         g = self.g
-        p_u, p_v = g.find_edges(pseeds)
         p_rel = g.edata['etype'][pseeds]
-        n_u, n_v = g.find_edges(nseeds)
-        n_rel = g.edata['etype'][nseeds]
 
-        subg = g.edge_subgraph(th.cat([pseeds, nseeds]), preserve_nodes=True)
-        subg.add_edges(th.cat([p_v, n_v]), th.cat([p_u, n_u]))
-        compact_subg = dgl.compact_graphs(subg)
-        compact_subg.ndata['ntype'] = g.ndata['ntype'][compact_subg.ndata[dgl.NID]]
-        compact_subg.edata['etype'] = th.cat([p_rel, n_rel, p_rel + self.num_rel, n_rel + self.num_rel])
+        subg = g.edge_subgraph(pseeds)
+        p_u, p_v = subg.edges()
+        subg = dgl.add_reverse_edges(subg, copy_ndata=True)
+        subg.edata['etype'] = th.cat([p_rel, p_rel + self.num_rel])
+        print(subg.edata['etype'])
+
         # only half of the edges will be used as graph structure
         pos_idx = np.random.choice(np.arange(bsize),
                                    size=bsize//2, replace=False)
         pos_idx = th.tensor(pos_idx).long()
-        u, v = compact_subg.edges()
-        p_u = u[th.arange(pseeds.shape[0])]
-        p_v = v[th.arange(pseeds.shape[0])]
-        n_u = u[th.arange(start=pseeds.shape[0], end=pseeds.shape[0]+nseeds.shape[0])]
-        n_v = v[th.arange(start=pseeds.shape[0], end=pseeds.shape[0]+nseeds.shape[0])]
-        compact_subg.remove_edges(pos_idx)
+        subg.remove_edges(pos_idx)
 
         # calculate norm for compact_subg
-        in_deg = compact_subg.in_degrees(range(compact_subg.number_of_nodes())).float()
+        in_deg = subg.in_degrees(range(subg.number_of_nodes())).float()
         norm = 1.0 / in_deg
         norm[th.isinf(norm)] = 0
-        compact_subg.ndata['norm'] = norm
-        compact_subg.apply_edges(lambda edges : {'norm' : edges.dst['norm']})
-        compact_subg.edata['norm'] = compact_subg.edata['norm'].unsqueeze(1)
-        return (bsize, compact_subg, p_u, p_v, n_u, n_v, p_rel)
+        subg.ndata['norm'] = norm
+        subg.apply_edges(lambda edges : {'norm' : edges.dst['norm']})
+        subg.edata['norm'] = subg.edata['norm'].unsqueeze(1)
+        return (bsize, subg, p_u, p_v, p_rel)
 
 class LinkNeighborSampler:
     def __init__(self, g, neg_edges, num_edges, num_neg, fanouts,
@@ -535,9 +516,6 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
                                         fanouts=fanouts)
     elif args.sampler == 'path':
         train_sampler = LinkPathSampler(train_g,
-                                        train_neg_seeds,
-                                        num_train_edges,
-                                        num_neg=None,
                                         num_rel=num_rels)
     else:
         assert 'Unsupported sampler {}'.format(args.sampler)
@@ -630,20 +608,18 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
                 p_head_emb, p_tail_emb, r_emb, n_head_emb, n_tail_emb, p_emb, n_emb = \
                     model(p_blocks, p_feats, n_blocks, n_feats, p_g, n_g)
             else:
-                bsize, g, p_u, p_v, n_u, n_v, rids = sample_data
+                bsize, g, p_u, p_v, rids = sample_data
                 in_feats = embed_layer(g.srcdata[dgl.NID].to(dev_id),
                                        g.srcdata['ntype'].to(dev_id),
                                        node_feats)
                 mb_feats = model(g, in_feats, sample=args.sampler)
                 p_head_emb = mb_feats[p_u]
                 p_tail_emb = mb_feats[p_v]
-                n_head_emb = mb_feats[n_u]
-                n_tail_emb = mb_feats[n_v]
-                if queue is None:
-                    r_emb = model.w_relation[rids]
-                else:
-                    r_emb = model.module.w_relation[rids]
-                p_emb = n_emb = mb_feats
+                nh_idx = th.randint(0, mb_feats.shape[0], p_head_emb.shape[0])
+                nt_idx = th.randint(0, mb_feats.shape[0], p_tail_emb.shape[0])
+                n_head_emb = mb_feats[nh_idx]
+                n_tail_emb = mb_feats[nt_idx]
+                r_emb = model.w_relation[rids]
 
             #n_shuffle_seed = th.randperm(n_head_emb.shape[0])
             #n_head_emb = n_head_emb[n_shuffle_seed]
@@ -657,10 +633,17 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
                                 int(batch_size / chunk_size),
                                 chunk_size,
                                 chunk_size)
-            if queue is None:
-                reg_loss = regularization_loss(p_emb, n_emb, model.w_relation)
+
+            if args.sampler == 'neighbor':
+                if queue is None:
+                    reg_loss = regularization_loss(th.cat([p_feats, n_feats]), model.w_relation)
+                else:
+                    reg_loss = regularization_loss(th.cat([p_feats, n_feats]), model.module.w_relation)
             else:
-                reg_loss = regularization_loss(p_emb, n_emb, model.module.w_relation)
+                if queue is None:
+                    reg_loss = regularization_loss(mb_feats, model.w_relation)
+                else:
+                    reg_loss = regularization_loss(mb_feats, model.module.w_relation)
             loss = pred_loss + args.regularization_coef * reg_loss
 
             print("pos {}, reg_loss {}".format(pred_loss.detach(),
@@ -678,32 +661,33 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
             dur = t1 - t0
             print("Epoch {} takes {} seconds".format(epoch, dur))
 
-        # We use multi-gpu evaluation to speed things up
-        fullgraph_eval(valid_g,
-                       embed_layer,
-                       model,
-                       dev_id,
-                       node_feats,
-                       args.n_hidden,
-                       valid_dataloader,
-                       valid_seeds,
-                       valid_neg_seeds,
-                       args.valid_neg_cnt,
-                       queue,
-                       False)
-        if proc_id == 0 and queue is not None:
-            logs = []
-            for i in range(n_gpus):
-                log = queue.get()
-                logs = logs + log
+        if epoch > 1 and epoch % 20 == 0:
+            # We use multi-gpu evaluation to speed things up
+            fullgraph_eval(valid_g,
+                        embed_layer,
+                        model,
+                        dev_id,
+                        node_feats,
+                        args.n_hidden,
+                        valid_dataloader,
+                        valid_seeds,
+                        valid_neg_seeds,
+                        args.valid_neg_cnt,
+                        queue,
+                        False)
+            if proc_id == 0 and queue is not None:
+                logs = []
+                for i in range(n_gpus):
+                    log = queue.get()
+                    logs = logs + log
 
-            metrics = {}
-            for metric in logs[0].keys():
-                metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
-            print("-------------- Eval result --------------")
-            for k, v in metrics.items():
-                print('Eval average {} : {}'.format(k, v))
-            print("-----------------------------------------")
+                metrics = {}
+                for metric in logs[0].keys():
+                    metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
+                print("-------------- Eval result --------------")
+                for k, v in metrics.items():
+                    print('Eval average {} : {}'.format(k, v))
+                print("-----------------------------------------")
 
         if n_gpus > 1:
             th.distributed.barrier()

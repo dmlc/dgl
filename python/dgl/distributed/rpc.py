@@ -79,6 +79,12 @@ def read_ip_config(filename):
         print("Error: data format on each line should be: [ip] [base_port] [server_count]")
     return server_namebook
 
+
+def reset():
+    """Reset the rpc context
+    """
+    _CAPI_DGLRPCReset()
+
 def create_sender(max_queue_size, net_type):
     """Create rpc sender of this process.
 
@@ -766,7 +772,9 @@ def send_requests_to_machine(target_and_requests):
         service_id = request.service_id
         msg_seq = incr_msg_seq()
         client_id = get_rank()
-        server_id = target
+
+        server_id = random.randint(target*get_num_server_per_machine(),
+                                   (target+1)*get_num_server_per_machine()-1)
         data, tensors = serialize_to_payload(request)
         msg = RPCMessage(service_id, msg_seq, client_id, server_id, data, tensors)
         send_rpc_message(msg, server_id)

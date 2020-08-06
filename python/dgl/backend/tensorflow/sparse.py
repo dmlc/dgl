@@ -39,7 +39,6 @@ def _gather_nd(index, src):
     new_idx = index * stride + copy_to(sum(offsets), ctx)
     src = tf.reshape(src, (-1,))
     new_idx = tf.reshape(new_idx, (-1))
-    print(src, new_idx)
     rst = tf.reshape(tf.gather(src, new_idx), shp)
     return rst
 
@@ -92,6 +91,13 @@ def _addsub(op, x):
     return -x if op == 'sub' else x
 
 
+def _expand(x, shape):
+    padding_zeros = len(shape) + 1 - x.ndim
+    if padding_zeros > 0:
+        x = tf.reshape(x, (x.shape[0],) + (1,) * padding_zeros + x.shape[1:])
+    return tf.broadcast_to(x, (x.shape[0], *shape))
+
+
 def gspmm_real(gidx, op, reduce_op, X, Y):
     out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
 
@@ -110,7 +116,7 @@ def gspmm_real(gidx, op, reduce_op, X, Y):
                 if op in ['mul', 'div']:
                     dX = _scatter_nd(
                         argX,
-                        _muldiv(op, _gather_nd(argY, tf.broadcast_to(Y, (Y.shape[0], *dZ.shape[1:])))) * dZ,
+                        _muldiv(op, _gather_nd(argY, _expand(Y, dZ.shape[1:]))) * dZ,
                         X.shape[0])
                 elif op in ['add', 'sub', 'copy_lhs']:
                     dX = _scatter_nd(argX, dZ, X.shape[0])
@@ -131,7 +137,7 @@ def gspmm_real(gidx, op, reduce_op, X, Y):
                 if op in ['mul',  'div']:
                     dY = _scatter_nd(
                         argY,
-                        _gather_nd(argX, tf.broadcast_to(X, (X.shape[0], *dZ.shape[1:]))) * dZ,
+                        _gather_nd(argX, _expand(X, dZ.shape[1:])) * dZ,
                         Y.shape[0])
                     if op == 'div': dY = -dY / (Y ** 2)
                 elif op in ['add', 'sub', 'copy_rhs']:
