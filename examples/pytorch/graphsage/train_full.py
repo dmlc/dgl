@@ -11,6 +11,7 @@ import networkx as nx
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import dgl
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 from dgl.nn.pytorch.conv import SAGEConv
@@ -60,14 +61,17 @@ def main(args):
     data = load_data(args)
     features = torch.FloatTensor(data.features)
     labels = torch.LongTensor(data.labels)
-    if hasattr(torch, 'BoolTensor'):
-        train_mask = torch.BoolTensor(data.train_mask)
-        val_mask = torch.BoolTensor(data.val_mask)
-        test_mask = torch.BoolTensor(data.test_mask)
-    else:
-        train_mask = torch.ByteTensor(data.train_mask)
-        val_mask = torch.ByteTensor(data.val_mask)
-        test_mask = torch.ByteTensor(data.test_mask)
+    #if hasattr(torch, 'BoolTensor'):
+    #    train_mask = torch.BoolTensor(data.train_mask)
+    #    val_mask = torch.BoolTensor(data.val_mask)
+    #    test_mask = torch.BoolTensor(data.test_mask)
+    #else:
+    #    train_mask = torch.ByteTensor(data.train_mask)
+    #    val_mask = torch.ByteTensor(data.val_mask)
+    #    test_mask = torch.ByteTensor(data.test_mask)
+    train_mask = data.train_mask
+    val_mask = data.val_mask
+    test_mask = data.test_mask
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
@@ -96,9 +100,10 @@ def main(args):
 
     # graph preprocess and calculate normalization factor
     g = data.graph
-    g.remove_edges_from(nx.selfloop_edges(g))
-    g = DGLGraph(g)
+    g = dgl.remove_self_loop(g)
     n_edges = g.number_of_edges()
+    if cuda:
+        g = g.int().to(args.gpu)
 
     # create GraphSAGE model
     model = GraphSAGE(g,
