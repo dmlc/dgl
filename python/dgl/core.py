@@ -8,9 +8,30 @@ from .udf import NodeBatch, EdgeBatch
 from . import ops
 
 def is_builtin(func):
+    """Return true if the function is a DGL builtin function."""
     return isinstance(func, fn.BuiltinFunction)
 
 def invoke_node_udf(graph, ntype, func, ndata, *, orig_nid=None):
+    """Invoke user-defined node function on all the nodes in the graph.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The input graph.
+    ntype : str
+        Node type.
+    func : callable
+        The user-defined function.
+    ndata : dict[str, Tensor]
+        Node feature data.
+    orig_nid : Tensor, optional
+        Original node IDs. Useful if the input graph is an extracted subgraph.
+
+    Returns
+    -------
+    dict[str, Tensor]
+        Results from running the UDF.
+    """
     if orig_nid is None:
         orig_nid = graph.nodes(ntype=ntype)
     nbatch = NodeBatch(graph, orig_nid, ntype, ndata)

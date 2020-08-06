@@ -283,7 +283,11 @@ def narrow_row(x, start, stop):
 
 def scatter_row(data, row_index, value):
     row_index = tf.expand_dims(row_index, 1)
-    return tf.tensor_scatter_nd_update(data, row_index, value)
+    # XXX(minjie): Normally, the copy_to here is unnecessary. However, TF has this
+    #   notorious legacy issue that int32 type data is always on CPU, which will
+    #   crash the program since DGL requires feature data to be on the same device
+    #   as graph structure.
+    return copy_to(tf.tensor_scatter_nd_update(data, row_index, value), data.device)
 
 
 def index_add_inplace(data, row_idx, value):
