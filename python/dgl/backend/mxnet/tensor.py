@@ -304,35 +304,6 @@ def pack_padded_tensor(input, lengths):
     index = nd.array(index, ctx=ctx)
     return gather_row(input.reshape(batch_size * max_len, -1), index)
 
-def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
-    # TODO: support other dimensions
-    assert dim == 0, 'MXNet only supports segment sum on first dimension'
-
-    # Use SPMV to simulate segment sum
-    ctx = input.context
-    n_inputs = input.shape[0]
-    input_shape_suffix = input.shape[1:]
-    input = input.reshape(n_inputs, -1)
-    n_range = nd.arange(n_inputs, dtype='int64').as_in_context(input.context)
-    w_nnz = nd.ones(n_inputs).as_in_context(input.context)
-    w_nid = nd.stack(seg_id, n_range, axis=0)
-    w = nd.sparse.csr_matrix((w_nnz, (seg_id, n_range)), (n_segs, n_inputs))
-    w = w.as_in_context(input.context)
-    y = nd.dot(w, input)
-    y = nd.reshape(y, (n_segs,) + input_shape_suffix)
-    return y
-
-def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
-    # TODO: support other dimensions
-    assert dim == 0, 'MXNet only supports segment mean on first dimension'
-
-    n_ones = nd.ones_like(seg_id).astype(input.dtype)
-    w = unsorted_1d_segment_sum(n_ones, seg_id, n_segs, 0)
-    w = nd.clip(w, a_min=1, a_max=np.inf)
-    y = unsorted_1d_segment_sum(input, seg_id, n_segs, dim)
-    y = y / w.reshape((-1,) + (1,) * (y.ndim - 1))
-    return y
-
 def boolean_mask(input, mask):
     return mx.contrib.nd.boolean_mask(input, mask)
 
@@ -347,6 +318,9 @@ def logical_and(input1, input2):
 
 def clone(input):
     return input.copy()
+
+def clamp(data, min_val, max_val):
+    return nd.clip(data, min_val, max_val)
 
 def unique(input):
     # TODO: fallback to numpy is unfortunate
