@@ -179,7 +179,7 @@ class GSDDMM(th.autograd.Function):
 
 class EdgeSoftmax(th.autograd.Function):
     @staticmethod
-    def forward(ctx, gidx, score, eids, group_by):
+    def forward(ctx, gidx, score, eids, norm_by):
         """Forward function.
 
         Pseudo-code:
@@ -197,7 +197,7 @@ class EdgeSoftmax(th.autograd.Function):
         # a local variable
         if not is_all(eids):
             gidx = gidx.edge_subgraph(eids.type(gidx.dtype), True)
-        if group_by == 'src':
+        if norm_by == 'src':
             gidx = gidx.reverse()
         score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
         score = th.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
@@ -239,5 +239,5 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     return GSDDMM.apply(gidx, op, lhs_data, rhs_data, lhs_target, rhs_target)
 
 
-def edge_softmax(gidx, logits, eids=ALL, group_by='dst'):
-    return EdgeSoftmax.apply(gidx, logits, eids, group_by)
+def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
+    return EdgeSoftmax.apply(gidx, logits, eids, norm_by)

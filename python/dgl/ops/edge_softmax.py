@@ -5,7 +5,7 @@ from ..base import ALL
 __all__ = ['edge_softmax']
 
 
-def edge_softmax(graph, logits, eids=ALL, group_by='dst'):
+def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
     r"""Compute edge softmax.
 
     For a node :math:`i`, edge softmax is an operation of computing
@@ -32,7 +32,7 @@ def edge_softmax(graph, logits, eids=ALL, group_by='dst'):
     eids : torch.Tensor or ALL, optional
         Edges on which to apply edge softmax. If ALL, apply edge
         softmax on all edges in the graph. Default: ALL.
-    group_by : str, could be `src` or `dst`
+    norm_by : str, could be `src` or `dst`
         Normalized by source nodes or destination nodes. Default: `dst`.
 
     Returns
@@ -81,7 +81,7 @@ def edge_softmax(graph, logits, eids=ALL, group_by='dst'):
 
     Apply edge softmax on g normalized by source nodes:
 
-    >>> edge_softmax(g, edata, group_by='src')
+    >>> edge_softmax(g, edata, norm_by='src')
     tensor([[0.3333],
             [0.3333],
             [0.3333],
@@ -98,4 +98,4 @@ def edge_softmax(graph, logits, eids=ALL, group_by='dst'):
         [0.5000]])
     """
     return edge_softmax_internal(graph._graph, logits,
-                                 eids=eids, group_by=group_by)
+                                 eids=eids, norm_by=norm_by)

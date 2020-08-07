@@ -1417,7 +1417,7 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     """
     pass
 
-def edge_softmax(gidx, logits, eids, group_by):
+def edge_softmax(gidx, logits, eids, norm_by):
     r"""Compute edge softmax.
 
     For a node :math:`i`, edge softmax is an operation of computing
@@ -1444,7 +1444,7 @@ def edge_softmax(gidx, logits, eids, group_by):
     eids : torch.Tensor or ALL, optional
         Edges on which to apply edge softmax. If ALL, apply edge
         softmax on all edges in the graph. Default: ALL.
-    group_by : str, could be `src` or `dst`
+    norm_by : str, could be `src` or `dst`
         Normalized by source nodes or destination nodes. Default: `dst`.
 
     Returns

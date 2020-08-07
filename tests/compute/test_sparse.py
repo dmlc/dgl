@@ -236,7 +236,7 @@ def test_edge_softmax(g, norm_by, shp, idtype):
     e1 = F.attach_grad(F.clone(edata))
 
     with F.record_grad():
-        score1 = edge_softmax(g, e1, group_by=norm_by)
+        score1 = edge_softmax(g, e1, norm_by=norm_by)
         F.backward(F.reduce_sum(score1))
         grad_edata = F.grad(e1)
 

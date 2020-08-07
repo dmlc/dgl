@@ -223,10 +223,10 @@ def gsddmm(gidx, op, X, Y, lhs_target='u', rhs_target='v'):
     return _lambda(X, Y)
 
 
-def edge_softmax_real(gidx, score, eids=ALL, group_by='dst'):
+def edge_softmax_real(gidx, score, eids=ALL, norm_by='dst'):
     if not is_all(eids):
         gidx = gidx.edge_subgraph(tf.cast(eids, gidx.dtype), True)
-    if group_by == 'src':
+    if norm_by == 'src':
         gidx = gidx.reverse()
     score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
     score = tf.math.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
@@ -242,9 +242,9 @@ def edge_softmax_real(gidx, score, eids=ALL, group_by='dst'):
     return out, edge_softmax_backward
 
 
-def edge_softmax(gidx, logits, eids=ALL, group_by='dst'):
+def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
     @tf.custom_gradient
     def _lambda(logits):
-        return edge_softmax_real(gidx, logits, eids, group_by)
+        return edge_softmax_real(gidx, logits, eids, norm_by)
     return _lambda(logits)
 
