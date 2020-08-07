@@ -12,19 +12,21 @@ def is_builtin(func):
     """Return true if the function is a DGL builtin function."""
     return isinstance(func, fn.BuiltinFunction)
 
-def invoke_node_udf(graph, ntype, func, ndata, *, orig_nid=None):
+def invoke_node_udf(graph, nid, ntype, func, *, ndata=None, orig_nid=None):
     """Invoke user-defined node function on the given ndata.
 
     Parameters
     ----------
     graph : DGLGraph
         The input graph.
+    eid : Tensor
+        The IDs of the nodes to invoke UDF on.
     ntype : str
         Node type.
     func : callable
         The user-defined function.
-    ndata : dict[str, Tensor]
-        Node feature data.
+    ndata : dict[str, Tensor], optional
+        If provided, apply the UDF on this ndata instead of the ndata of the graph.
     orig_nid : Tensor, optional
         Original node IDs. Useful if the input graph is an extracted subgraph.
 
@@ -33,9 +35,14 @@ def invoke_node_udf(graph, ntype, func, ndata, *, orig_nid=None):
     dict[str, Tensor]
         Results from running the UDF.
     """
-    if orig_nid is None:
-        orig_nid = graph.nodes(ntype=ntype)
-    nbatch = NodeBatch(graph, orig_nid, ntype, ndata)
+    ntid = graph.get_ntype_id(ntype)
+    if ndata is None:
+        if is_all(nid):
+            ndata = graph._node_frames[ntid]
+            nid = graph.nodes(ntype=ntype)
+        else:
+            ndata = graph._node_frames[ntid].subframe(nid)
+    nbatch = NodeBatch(graph, nid if orig_nid is None else orig_nid, ntype, ndata)
     return func(nbatch)
 
 def invoke_edge_udf(graph, eid, etype, func, *, orig_eid=None):
@@ -289,5 +296,5 @@ def message_passing(g, mfunc, rfunc, afunc):
             if k not in ndata:
                 ndata[k] = v
         orig_nid = g.dstdata.get(NID, None)
-        ndata = invoke_node_udf(g, g.dsttypes[0], afunc, ndata, orig_nid=orig_nid)
+        ndata = invoke_node_udf(g, ALL, g.dsttypes[0], afunc, ndata=ndata, orig_nid=orig_nid)
     return ndata

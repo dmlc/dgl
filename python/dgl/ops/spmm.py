@@ -64,7 +64,7 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
         ret_shape = F.shape(ret)
         deg = g.in_degrees()
         if F.as_scalar(F.min(deg, dim=0)) == 0:
-            dgl_warning('Zero-degree node encountered in mean reducer.')
+            dgl_warning('Zero-degree nodes encountered in mean reducer. Setting the mean to 0.')
         deg = F.astype(F.clamp(deg, 1, g.number_of_edges()), F.dtype(ret))
         deg_shape = (ret_shape[0],) + (1,) * (len(ret_shape) - 1)
         return ret / F.reshape(deg, deg_shape)

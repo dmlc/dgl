@@ -495,23 +495,7 @@ def _create_hetero_subgraph(parent, sgi, induced_nodes, induced_edges):
     DGLGraph
         Graph
     """
-    if induced_nodes is None:
-        node_frames = [nf.clone() for nf in parent._node_frames]
-    else:
-        node_frames = []
-        for i, ind_nodes in enumerate(induced_nodes):
-            subf = parent._node_frames[i].subframe(ind_nodes)
-            subf[NID] = ind_nodes
-            node_frames.append(subf)
-    if induced_edges is None:
-        edge_frames = [nf.clone() for nf in parent._edge_frames]
-    else:
-        edge_frames = []
-        for i, ind_edges in enumerate(induced_edges):
-            subf = parent._edge_frames[i].subframe(ind_edges)
-            subf[EID] = ind_edges
-            edge_frames.append(subf)
-
+    node_frames, edge_frames = utils.extract_subframes(parent, induced_nodes, induced_edges)
     hsg = DGLHeteroGraph(sgi.graph, parent.ntypes, parent.etypes,
                          node_frames, edge_frames)
     return hsg

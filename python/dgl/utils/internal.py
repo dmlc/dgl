@@ -6,7 +6,7 @@ from collections import defaultdict
 from functools import wraps
 import numpy as np
 
-from ..base import DGLError, dgl_warning
+from ..base import DGLError, dgl_warning, NID, EID
 from .. import backend as F
 from .. import ndarray as nd
 
@@ -746,3 +746,50 @@ def relabel(x):
     old_to_new = F.scatter_row(old_to_new, unique_x,
                                F.copy_to(F.arange(0, len(unique_x), dtype), ctx))
     return unique_x, old_to_new
+
+def extract_subframes(graph, nodes, edges):
+    """Extract node/edge features of the given nodes and edges from :attr:`graph`
+    and return them in frames.
+
+    Note that this function does not perform actual tensor memory copy but using `Frame.subframe`
+    to get the features. If :attr:`nodes` is None, it performs a shallow copy of the
+    original node frames that only copies the dictionary structure but not the tensor
+    contents.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph to extract features from.
+    nodes : list[Tensor] or None
+        Node IDs. If not None, the list length must be equal to the number of node types
+        in the graph. The returned frames store the node IDs in the ``dgl.NID`` field
+        unless it is None, which means the whole frame is shallow-copied.
+    edges : list[Tensor] or None
+        Edge IDs. If not None, the list length must be equal to the number of edge types
+        in the graph. The returned frames store the edge IDs in the ``dgl.NID`` field
+        unless it is None, which means the whole frame is shallow-copied.
+
+    Returns
+    -------
+    list[Frame]
+        Extracted node frames.
+    list[Frame]
+        Extracted edge frames.
+    """
+    if nodes is None:
+        node_frames = [nf.clone() for nf in graph._node_frames]
+    else:
+        node_frames = []
+        for i, ind_nodes in enumerate(nodes):
+            subf = graph._node_frames[i].subframe(ind_nodes)
+            subf[NID] = ind_nodes
+            node_frames.append(subf)
+    if edges is None:
+        edge_frames = [nf.clone() for nf in graph._edge_frames]
+    else:
+        edge_frames = []
+        for i, ind_edges in enumerate(edges):
+            subf = graph._edge_frames[i].subframe(ind_edges)
+            subf[EID] = ind_edges
+            edge_frames.append(subf)
+    return node_frames, edge_frames

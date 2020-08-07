@@ -82,7 +82,7 @@ def _gen_reduce_builtin(reducer):
     return func
 
 
-__all__ = ["SimpleReduceFunction"]
+__all__ = []
 
 
 def _register_builtin_reduce_func():

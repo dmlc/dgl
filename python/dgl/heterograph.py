@@ -2917,8 +2917,7 @@ class DGLHeteroGraph(object):
             v = self.nodes(ntype)
         else:
             v = utils.prepare_tensor(self, v, 'v')
-        ndata = self._get_n_repr(ntid, v)
-        ndata = core.invoke_node_udf(self, ntype, func, ndata, orig_nid=v)
+        ndata = core.invoke_node_udf(self, v, ntype, func, orig_nid=v)
         self._set_n_repr(ntid, v, ndata)
 
     def apply_edges(self, func, edges=ALL, etype=None, inplace=False):
@@ -4128,7 +4127,7 @@ class DGLHeteroGraph(object):
 
     def readonly(self, readonly_state=True):
         """Deprecated: DGLGraph will always be mutable."""
-        dgl_warning('DGLGraph.is_readonly is deprecated in v0.5.\n'
+        dgl_warning('DGLGraph.readonly is deprecated in v0.5.\n'
                     'DGLGraph now always supports mutable operations like add_nodes'
                     ' and add_edges.')
 
@@ -4375,10 +4374,7 @@ def _create_compute_graph(graph, u, v, eid, recv_nodes=None):
     """Create a computation graph from the given edges.
 
     The compute graph is a uni-directional bipartite graph with only
-    one edge type. There is no orphan destination nodes, i.e., all the
-    dst nodes have at least one in-coming edge.
-
-    Similar to subgraph extraction, it stores the original node IDs
+    one edge type. Similar to subgraph extraction, it stores the original node IDs
     in the srcdata[NID] and dstdata[NID] and extracts features accordingly.
     Edges are not relabeled.
 

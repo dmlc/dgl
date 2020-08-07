@@ -94,7 +94,7 @@ class EdgeBatch(object):
         return self.batch_size()
 
     @property
-    def etype(self):
+    def canonical_etype(self):
         """Return the canonical edge type (i.e. triplet of source, edge, and
         destination node type) for this edge batch."""
         return self._etype

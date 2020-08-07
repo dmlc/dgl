@@ -1594,7 +1594,7 @@ def test_empty_heterograph(idtype):
 @parametrize_dtype
 def test_types_in_function(idtype):
     def mfunc1(edges):
-        assert edges.etype == ('user', 'follow', 'user')
+        assert edges.canonical_etype == ('user', 'follow', 'user')
         return {}
 
     def rfunc1(nodes):
@@ -1606,11 +1606,11 @@ def test_types_in_function(idtype):
         return F.zeros((3,))
 
     def filter_edges1(edges):
-        assert edges.etype == ('user', 'follow', 'user')
+        assert edges.canonical_etype == ('user', 'follow', 'user')
         return F.zeros((2,))
 
     def mfunc2(edges):
-        assert edges.etype == ('user', 'plays', 'game')
+        assert edges.canonical_etype == ('user', 'plays', 'game')
         return {}
 
     def rfunc2(nodes):
@@ -1622,7 +1622,7 @@ def test_types_in_function(idtype):
         return F.zeros((3,))
 
     def filter_edges2(edges):
-        assert edges.etype == ('user', 'plays', 'game')
+        assert edges.canonical_etype == ('user', 'plays', 'game')
         return F.zeros((2,))
 
     g = dgl.graph([(0, 1), (1, 2)], 'user', 'follow', idtype=idtype, device=F.ctx())

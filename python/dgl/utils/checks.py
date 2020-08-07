@@ -64,7 +64,9 @@ def prepare_tensor_dict(g, data, name):
             for key, val in data.items()}
 
 def parse_edges_arg_to_eid(g, edges, etid, argname='edges'):
-    """Parse edges argument and return edge IDs.
+    """Parse the :attr:`edges` argument and return an edge ID tensor.
+
+    The resulting edge ID tensor has the same ID type and device of :attr:`g`.
 
     Parameters
     ----------
