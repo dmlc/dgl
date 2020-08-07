@@ -230,6 +230,14 @@ The following is an example showing how GSDDMM works:
 
 Like GSpMM, GSDDMM operators support both homograph and bipartite graph.
 
+Edge Softmax module
+-------------------
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    edge_softmax
+
 Relation with Message Passing APIs
 ----------------------------------
 
