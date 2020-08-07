@@ -209,31 +209,6 @@ def test_edge_softmax():
     # checkout gradient
     assert F.allclose(grads[0], grad_score)
     print(grads[0][:10], grad_score[:10])
-    
-    # Test 2
-    def generate_rand_graph(n):
-      arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
-      return dgl.DGLGraph(arr, readonly=True)
-    
-    g = generate_rand_graph(50).to(F.ctx())
-    a1 = F.randn((g.number_of_edges(), 1))
-    a2 = tf.identity(a1)
-    with tf.GradientTape() as tape:
-        tape.watch(a1)
-        g.edata['s'] = a1
-        g.group_apply_edges('dst', lambda edges: {'ss':F.softmax(edges.data['s'], 1)})
-        loss = tf.reduce_sum(g.edata['ss'])
-        a1_grad = tape.gradient(loss, [a1])[0]
-    
-    with tf.GradientTape() as tape:
-        tape.watch(a2)
-        builtin_sm = nn.edge_softmax(g, a2)
-        loss = tf.reduce_sum(builtin_sm)
-        a2_grad = tape.gradient(loss, [a2])[0]
-    print(a1_grad - a2_grad)
-    assert len(g.ndata) == 0
-    assert len(g.edata) == 2
-    assert F.allclose(a1_grad, a2_grad, rtol=1e-4, atol=1e-4) # Follow tolerance in unittest backend
 
 def test_partial_edge_softmax():
     g = dgl.DGLGraph().to(F.ctx())

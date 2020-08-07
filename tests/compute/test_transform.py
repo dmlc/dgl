@@ -57,7 +57,7 @@ def test_line_graph2(idtype):
     assert np.array_equal(F.asnumpy(col),
                           np.array([3, 4, 0, 3, 4, 0, 1, 2]))
 
-    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
         'user', 'follows', idtype=idtype).formats('csc')
     lg = dgl.line_graph(g)
     assert lg.number_of_nodes() == 5
@@ -234,12 +234,62 @@ def test_reverse_shared_frames(idtype):
     assert F.allclose(g.edges[[0, 2], [1, 1]].data['h'],
                       rg.edges[[1, 1], [0, 2]].data['h'])
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_to_bidirected():
+    # homogeneous graph
+    elist = [(0, 0), (0, 1), (1, 0),
+                (1, 1), (2, 1), (2, 2)]
+    num_edges = 7
+    g = dgl.graph(elist)
+    elist.append((1, 2))
+    elist = set(elist)
+    big = dgl.to_bidirected(g)
+    assert big.number_of_edges() == num_edges
+    src, dst = big.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == set(elist)
+
+    # heterogeneous graph
+    elist1 = [(0, 0), (0, 1), (1, 0),
+                (1, 1), (2, 1), (2, 2)]
+    elist2 = [(0, 0), (0, 1)]
+    g = dgl.heterograph({
+        ('user', 'wins', 'user'): elist1,
+        ('user', 'follows', 'user'): elist2
+    })
+    g.nodes['user'].data['h'] = F.ones((3, 1))
+    elist1.append((1, 2))
+    elist1 = set(elist1)
+    elist2.append((1, 0))
+    elist2 = set(elist2)
+    big = dgl.to_bidirected(g)
+    assert big.number_of_edges('wins') == 7
+    assert big.number_of_edges('follows') == 3
+    src, dst = big.edges(etype='wins')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == set(elist1)
+    src, dst = big.edges(etype='follows')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == set(elist2)
+
+    big = dgl.to_bidirected(g, copy_ndata=True)
+    assert F.array_equal(g.nodes['user'].data['h'], big.nodes['user'].data['h'])
+
+    # test multigraph
+    g = dgl.graph((F.tensor([0, 1, 3, 1]), F.tensor([1, 2, 0, 2])))
+    raise_error = False
+    try:
+        big = dgl.to_bidirected(g)
+    except:
+        raise_error = True
+    assert raise_error
+
+def test_add_reverse_edges():
     # homogeneous graph
     g = dgl.graph((F.tensor([0, 1, 3, 1]), F.tensor([1, 2, 0, 2])))
     g.ndata['h'] = F.tensor([[0.], [1.], [2.], [1.]])
     g.edata['h'] = F.tensor([[3.], [4.], [5.], [6.]])
-    bg = dgl.to_bidirected(g, copy_ndata=True, copy_edata=True)
+    bg = dgl.add_reverse_edges(g, copy_ndata=True, copy_edata=True)
     u, v = g.edges()
     ub, vb = bg.edges()
     assert F.array_equal(F.cat([u, v], dim=0), ub)
@@ -252,7 +302,7 @@ def test_to_bidirected():
     assert ('hh' in g.edata) is False
 
     # donot share ndata and edata
-    bg = dgl.to_bidirected(g, copy_ndata=False, copy_edata=False)
+    bg = dgl.add_reverse_edges(g, copy_ndata=False, copy_edata=False)
     ub, vb = bg.edges()
     assert F.array_equal(F.cat([u, v], dim=0), ub)
     assert F.array_equal(F.cat([v, u], dim=0), vb)
@@ -261,7 +311,7 @@ def test_to_bidirected():
 
     # zero edge graph
     g = dgl.graph([])
-    bg = dgl.to_bidirected(g, copy_ndata=True, copy_edata=True)
+    bg = dgl.add_reverse_edges(g, copy_ndata=True, copy_edata=True)
 
     # heterogeneous graph
     g = dgl.heterograph({
@@ -272,7 +322,7 @@ def test_to_bidirected():
     g.nodes['game'].data['hv'] = F.ones((3, 1))
     g.nodes['user'].data['hv'] = F.ones((3, 1))
     g.edges['wins'].data['h'] = F.tensor([0, 1, 2, 3, 4])
-    bg = dgl.to_bidirected(g, copy_ndata=True, copy_edata=True, ignore_bipartite=True)
+    bg = dgl.add_reverse_edges(g, copy_ndata=True, copy_edata=True, ignore_bipartite=True)
     assert F.array_equal(g.nodes['game'].data['hv'], bg.nodes['game'].data['hv'])
     assert F.array_equal(g.nodes['user'].data['hv'], bg.nodes['user'].data['hv'])
     u, v = g.all_edges(order='eid', etype=('user', 'wins', 'user'))
@@ -293,7 +343,7 @@ def test_to_bidirected():
     assert len(bg.edges['follows'].data) == 0
 
     # donot share ndata and edata
-    bg = dgl.to_bidirected(g, copy_ndata=False, copy_edata=False, ignore_bipartite=True)
+    bg = dgl.add_reverse_edges(g, copy_ndata=False, copy_edata=False, ignore_bipartite=True)
     assert len(bg.edges['wins'].data) == 0
     assert len(bg.edges['plays'].data) == 0
     assert len(bg.edges['follows'].data) == 0
@@ -311,6 +361,36 @@ def test_to_bidirected():
     ub, vb = bg.all_edges(order='eid', etype=('user', 'plays', 'game'))
     assert F.array_equal(u, ub)
     assert F.array_equal(v, vb)
+
+    # test the case when some nodes have zero degree
+    # homogeneous graph
+    g = dgl.graph((F.tensor([0, 1, 3, 1]), F.tensor([1, 2, 0, 2])), num_nodes=6)
+    g.ndata['h'] = F.tensor([[0.], [1.], [2.], [1.], [1.], [1.]])
+    g.edata['h'] = F.tensor([[3.], [4.], [5.], [6.]])
+    bg = dgl.add_reverse_edges(g, copy_ndata=True, copy_edata=True)
+    assert g.number_of_nodes() == bg.number_of_nodes()
+    assert F.array_equal(g.ndata['h'], bg.ndata['h'])
+    assert F.array_equal(F.cat([g.edata['h'], g.edata['h']], dim=0), bg.edata['h'])
+
+    # heterogeneous graph
+    g = dgl.heterograph({
+        ('user', 'wins', 'user'): (F.tensor([0, 2, 0, 2, 2]), F.tensor([1, 1, 2, 1, 0])),
+        ('user', 'plays', 'game'): (F.tensor([1, 2, 1]), F.tensor([2, 1, 1])),
+        ('user', 'follows', 'user'): (F.tensor([1, 2, 1]), F.tensor([0, 0, 0]))},
+        num_nodes_dict={
+            'user': 5,
+            'game': 3
+        })
+    g.nodes['game'].data['hv'] = F.ones((3, 1))
+    g.nodes['user'].data['hv'] = F.ones((5, 1))
+    g.edges['wins'].data['h'] = F.tensor([0, 1, 2, 3, 4])
+    bg = dgl.add_reverse_edges(g, copy_ndata=True, copy_edata=True, ignore_bipartite=True)
+    assert g.number_of_nodes('user') == bg.number_of_nodes('user')
+    assert g.number_of_nodes('game') == bg.number_of_nodes('game')
+    assert F.array_equal(g.nodes['game'].data['hv'], bg.nodes['game'].data['hv'])
+    assert F.array_equal(g.nodes['user'].data['hv'], bg.nodes['user'].data['hv'])
+    assert F.array_equal(F.cat([g.edges['wins'].data['h'], g.edges['wins'].data['h']], dim=0),
+                         bg.edges['wins'].data['h'])
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
@@ -587,61 +667,6 @@ def test_reorder_nodes():
         old_nid = orig_ids[nid]
         old_neighs2 = g.predecessors(old_nid)
         assert np.all(np.sort(old_neighs1) == np.sort(F.asnumpy(old_neighs2)))
-
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
-@parametrize_dtype
-def test_in_subgraph(idtype):
-    g1 = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)], 'user', 'follow', idtype=idtype)
-    g2 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game', idtype=idtype)
-    g3 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user', idtype=idtype)
-    g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', idtype=idtype)
-    hg = dgl.hetero_from_relations([g1, g2, g3, g4])
-    subg = dgl.in_subgraph(hg, {'user' : [0,1], 'game' : 0})
-    assert subg.idtype == idtype
-    assert len(subg.ntypes) == 3
-    assert len(subg.etypes) == 4
-    u, v = subg['follow'].edges()
-    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert F.array_equal(hg['follow'].edge_ids(u, v), subg['follow'].edata[dgl.EID])
-    assert edge_set == {(1,0),(2,0),(3,0),(0,1),(2,1),(3,1)}
-    u, v = subg['play'].edges()
-    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert F.array_equal(hg['play'].edge_ids(u, v), subg['play'].edata[dgl.EID])
-    assert edge_set == {(0,0)}
-    u, v = subg['liked-by'].edges()
-    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert F.array_equal(hg['liked-by'].edge_ids(u, v), subg['liked-by'].edata[dgl.EID])
-    assert edge_set == {(2,0),(2,1),(1,0),(0,0)}
-    assert subg['flips'].number_of_edges() == 0
-
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
-@parametrize_dtype
-def test_out_subgraph(idtype):
-    g1 = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)], 'user', 'follow', idtype=idtype)
-    g2 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game', idtype=idtype)
-    g3 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user', idtype=idtype)
-    g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', idtype=idtype)
-    hg = dgl.hetero_from_relations([g1, g2, g3, g4])
-    subg = dgl.out_subgraph(hg, {'user' : [0,1], 'game' : 0})
-    assert subg.idtype == idtype
-    assert len(subg.ntypes) == 3
-    assert len(subg.etypes) == 4
-    u, v = subg['follow'].edges()
-    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert edge_set == {(1,0),(0,1),(0,2)}
-    assert F.array_equal(hg['follow'].edge_ids(u, v), subg['follow'].edata[dgl.EID])
-    u, v = subg['play'].edges()
-    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert edge_set == {(0,0),(0,1),(1,2)}
-    assert F.array_equal(hg['play'].edge_ids(u, v), subg['play'].edata[dgl.EID])
-    u, v = subg['liked-by'].edges()
-    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert edge_set == {(0,0)}
-    assert F.array_equal(hg['liked-by'].edge_ids(u, v), subg['liked-by'].edata[dgl.EID])
-    u, v = subg['flips'].edges()
-    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert edge_set == {(0,0),(1,0)}
-    assert F.array_equal(hg['flips'].edge_ids(u, v), subg['flips'].edata[dgl.EID])
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 @parametrize_dtype

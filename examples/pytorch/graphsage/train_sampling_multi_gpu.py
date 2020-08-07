@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
+import math
 import argparse
 from dgl.data import RedditDataset
 from torch.nn.parallel import DistributedDataParallel
@@ -90,18 +91,6 @@ class SAGE(nn.Module):
             x = y
         return y
 
-def prepare_mp(g):
-    """
-    Explicitly materialize the CSR, CSC and COO representation of the given graph
-    so that they could be shared via copy-on-write to sampler workers and GPU
-    trainers.
-
-    This is a workaround before full shared memory support on heterogeneous graphs.
-    """
-    g.in_degrees(0)
-    g.out_degrees(0)
-    g.find_edges([0])
-
 def compute_acc(pred, labels):
     """
     Compute the accuracy of prediction given the labels.
@@ -157,7 +146,7 @@ def run(proc_id, n_gpus, args, devices, data):
     test_nid = test_mask.nonzero()[:, 0]
 
     # Split train_nid
-    train_nid = th.split(train_nid, len(train_nid) // n_gpus)[proc_id]
+    train_nid = th.split(train_nid, math.ceil(len(train_nid) // n_gpus))[proc_id]
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.sampling.MultiLayerNeighborSampler(
@@ -269,9 +258,9 @@ if __name__ == '__main__':
     else:
         train_g = val_g = test_g = g
 
-    prepare_mp(train_g)
-    prepare_mp(val_g)
-    prepare_mp(test_g)
+    train_g.create_format_()
+    val_g.create_format_()
+    test_g.create_format_()
     # Pack data
     data = in_feats, n_classes, train_g, val_g, test_g
 
