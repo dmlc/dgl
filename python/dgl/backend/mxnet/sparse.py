@@ -103,6 +103,13 @@ def _addsub(op, x):
     return -x if op == 'sub' else x
 
 
+def _expand(x, shape):
+    padding_zeros = len(shape) + 1 - x.ndim
+    if padding_zeros > 0:
+        x = x.reshape((x.shape[0],) + (1,) * padding_zeros + x.shape[1:])
+    return x.broadcast_to((x.shape[0], *shape))
+
+
 class GSpMM(mx.autograd.Function):
     def __init__(self, gidx, op, reduce_op):
         super(GSpMM, self).__init__()
@@ -132,7 +139,7 @@ class GSpMM(mx.autograd.Function):
                 if op in ['mul', 'div']:
                     dX = _scatter_nd(
                         argX,
-                        _muldiv(op, _gather_nd(argY, Y.broadcast_to((Y.shape[0], *dZ.shape[1:])))) * dZ,
+                        _muldiv(op, _gather_nd(argY, _expand(Y, dZ.shape[1:]))) * dZ,
                         X.shape[0])
                 elif op in ['add', 'sub', 'copy_lhs']:
                     dX = _scatter_nd(argX, dZ, X.shape[0])
@@ -153,7 +160,7 @@ class GSpMM(mx.autograd.Function):
                 if op in ['mul',  'div']:
                     dY = _scatter_nd(
                         argY,
-                        _gather_nd(argX, X.broadcast_to((X.shape[0], *dZ.shape[1:]))) * dZ,
+                        _gather_nd(argX, _expand(X, dZ.shape[1:])) * dZ,
                         Y.shape[0])
                     if op == 'div':
                         dY = -dY / (Y ** 2)
@@ -169,10 +176,17 @@ class GSpMM(mx.autograd.Function):
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     func = GSpMM(gidx, op, reduce_op)
     ctx = to_backend_ctx(gidx.ctx)
+    # XXX(minjie): There is a bug in MXNet's autograd system when one of the inputs
+    #   does not require gradient. Although it still invokes the backward function,
+    #   it does not set the gradient value to the correct buffer, resulting all the
+    #   input gradients to be zero. Fix this by enforcing all the inputs to require
+    #   gradients.
     if lhs_data is None:
         lhs_data = nd.zeros((1,), ctx=ctx)
+        lhs_data.attach_grad()
     if rhs_data is None:
         rhs_data = nd.zeros((1,), ctx=ctx)
+        rhs_data.attach_grad()
     return func(lhs_data, rhs_data)
 
 

@@ -245,19 +245,6 @@ def pack_padded_tensor(input, lengths):
     index = th.tensor(index).to(device)
     return gather_row(input.view(batch_size * max_len, -1), index)
 
-def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
-    y = th.zeros(n_segs, *input.shape[1:]).to(input)
-    seg_id = seg_id.view((-1,) + (1,) * (input.dim() - 1)).expand_as(input)
-    y = y.scatter_add_(dim, seg_id, input)
-    return y
-
-def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
-    w = unsorted_1d_segment_sum(th.ones_like(seg_id), seg_id, n_segs, 0).to(input)
-    w = w.clamp(min=1)   # remove 0 entries
-    y = unsorted_1d_segment_sum(input, seg_id, n_segs, dim)
-    y = y / w.view((-1,) + (1,) * (y.dim() - 1))
-    return y
-
 def boolean_mask(input, mask):
     if 'bool' not in str(mask.dtype):
         mask = th.tensor(mask, dtype=th.bool)
@@ -274,6 +261,9 @@ def logical_and(input1, input2):
 
 def clone(input):
     return input.clone()
+
+def clamp(data, min_val, max_val):
+    return th.clamp(data, min_val, max_val)
 
 def unique(input):
     if input.dtype == th.bool:

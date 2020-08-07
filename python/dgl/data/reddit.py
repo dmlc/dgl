@@ -15,29 +15,43 @@ class RedditDataset(DGLBuiltinDataset):
     r""" Reddit dataset for community detection (node classification)
 
     .. deprecated:: 0.5.0
-        `graph` is deprecated, it is replaced by:
+
+        - ``graph`` is deprecated, it is replaced by:
+
             >>> dataset = RedditDataset()
             >>> graph = dataset[0]
-        `num_labels` is deprecated, it is replaced by:
+
+        - ``num_labels`` is deprecated, it is replaced by:
+
             >>> dataset = RedditDataset()
             >>> num_classes = dataset.num_classes
-        `train_mask` is deprecated, it is replaced by:
+
+        - ``train_mask`` is deprecated, it is replaced by:
+
             >>> dataset = RedditDataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.ndata['train_mask']
-        `val_mask` is deprecated, it is replaced by:
+
+        - ``val_mask`` is deprecated, it is replaced by:
+
             >>> dataset = RedditDataset()
             >>> graph = dataset[0]
             >>> val_mask = graph.ndata['val_mask']
-        `test_mask` is deprecated, it is replaced by:
+
+        - ``test_mask`` is deprecated, it is replaced by:
+
             >>> dataset = RedditDataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.ndata['test_mask']
-        `features` is deprecated, it is replaced by:
+
+        - ``features`` is deprecated, it is replaced by:
+
             >>> dataset = RedditDataset()
             >>> graph = dataset[0]
             >>> features = graph.ndata['feat']
-        `labels` is deprecated, it is replaced by:
+
+        - ``labels`` is deprecated, it is replaced by:
+
             >>> dataset = RedditDataset()
             >>> graph = dataset[0]
             >>> labels = graph.ndata['label']
@@ -49,16 +63,16 @@ class RedditDataset(DGLBuiltinDataset):
     posts with an average degree of 492. We use the first 20 days for training and the
     remaining days for testing (with 30% used for validation).
 
-    Reference: http://snap.stanford.edu/graphsage/
+    Reference: `<http://snap.stanford.edu/graphsage/>`_
 
     Statistics
-    ----------
-    Nodes: 232,965
-    Edges: 114,615,892
-    Node feature size: 602
-    Number of training samples: 153,431
-    Number of validation samples: 23,831
-    Number of test samples: 55,703
+
+    - Nodes: 232,965
+    - Edges: 114,615,892
+    - Node feature size: 602
+    - Number of training samples: 153,431
+    - Number of validation samples: 23,831
+    - Number of test samples: 55,703
 
     Parameters
     ----------
@@ -76,15 +90,15 @@ class RedditDataset(DGLBuiltinDataset):
     ----------
     num_classes : int
         Number of classes for each node
-    graph : dgl.DGLGraph
+    graph : :class:`dgl.DGLGraph`
         Graph of the dataset
     num_labels : int
         Number of classes for each node
-    train_mask: Tensor
+    train_mask: numpy.ndarray
         Mask of training nodes
-    val_mask: Tensor
+    val_mask: numpy.ndarray
         Mask of validation nodes
-    test_mask: Tensor
+    test_mask: numpy.ndarray
         Mask of test nodes
     features : Tensor
         Node features
@@ -188,17 +202,17 @@ class RedditDataset(DGLBuiltinDataset):
     @property
     def train_mask(self):
         deprecate_property('dataset.train_mask', 'graph.ndata[\'train_mask\']')
-        return self._graph.ndata['train_mask']
+        return F.asnumpy(self._graph.ndata['train_mask'])
 
     @property
     def val_mask(self):
         deprecate_property('dataset.val_mask', 'graph.ndata[\'val_mask\']')
-        return self._graph.ndata['val_mask']
+        return F.asnumpy(self._graph.ndata['val_mask'])
 
     @property
     def test_mask(self):
         deprecate_property('dataset.test_mask', 'graph.ndata[\'test_mask\']')
-        return self._graph.ndata['test_mask']
+        return F.asnumpy(self._graph.ndata['test_mask'])
 
     @property
     def features(self):
@@ -220,13 +234,14 @@ class RedditDataset(DGLBuiltinDataset):
 
         Returns
         -------
-        dgl.DGLGraph
-            graph structure, node labels, node features and splitting masks
-            - ndata['label']: node label
-            - ndata['feat']: node feature
-            - ndata['train_mask']： mask for training node set
-            - ndata['val_mask']: mask for validation node set
-            - ndata['test_mask']: mask for test node set
+        :class:`dgl.DGLGraph`
+            graph structure, node labels, node features and splitting masks:
+
+            - ``ndata['label']``: node label
+            - ``ndata['feat']``: node feature
+            - ``ndata['train_mask']``： mask for training node set
+            - ``ndata['val_mask']``: mask for validation node set
+            - ``ndata['test_mask']:`` mask for test node set
         """
         assert idx == 0, "Reddit Dataset only has one graph"
         return self._graph

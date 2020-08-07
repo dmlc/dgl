@@ -104,16 +104,10 @@ def main(args):
         batch_size=args.batch_size, shuffle=True, num_workers=0)
 
     # validation sampler
+    # we do not use full neighbor to save computation resources
     val_sampler = dgl.sampling.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
     val_loader = dgl.sampling.NodeDataLoader(
         g, {category: val_idx}, val_sampler,
-        batch_size=args.batch_size, shuffle=True, num_workers=0)
-
-    # test sampler
-
-    test_sampler = dgl.sampling.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
-    test_loader = dgl.sampling.NodeDataLoader(
-        g, {category: test_idx}, test_sampler,
         batch_size=args.batch_size, shuffle=True, num_workers=0)
 
     # optimizer
