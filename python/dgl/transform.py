@@ -900,7 +900,7 @@ def laplacian_lambda_max(g):
                                       return_eigenvectors=False)[0].real)
     return rst
 
-def metapath_reachable_graph(g, metapath, copy_ndata=True):
+def metapath_reachable_graph(g, metapath):
     """Return a graph where the successors of any node ``u`` are nodes reachable from ``u`` by
     the given metapath.
 
@@ -923,13 +923,6 @@ def metapath_reachable_graph(g, metapath, copy_ndata=True):
         The input graph
     metapath : list[str or tuple of str]
         Metapath in the form of a list of edge types
-    copy_ndata : bool
-        If True, the node features of the returned graph are copied from the
-        original graph.
-
-        If False, the returned graph will not have any node features.
-
-        (Default: True)
 
     Returns
     -------
@@ -1443,7 +1436,7 @@ partition_graph_with_halo = hetero_partition_graph_with_halo
 metis_partition_assignment = hetero_metis_partition_assignment
 metis_partition = hetero_metis_partition
 
-def compact_graphs(graphs, always_preserve=None, copy_ndata=False, copy_edata=False):
+def compact_graphs(graphs, always_preserve=None):
     """Given a list of graphs with the same set of nodes, find and eliminate the common
     isolated nodes across all graphs.
 
@@ -1468,20 +1461,6 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=False, copy_edata=Fa
         node types would not be removed, regardless of whether they are isolated.
 
         If a Tensor is given, DGL assumes that all the graphs have one (same) node type.
-    copy_ndata: bool, optional
-        If True, the node features of the compacted graphs are copied from the
-        original graphs.
-
-        If False, the compacted graph will not have any node features.
-
-        (Default: True)
-    copy_edata: bool, optional
-        If True, the edge features of the compacted graphs are copied from the
-        original graphs.
-
-        If False, the compacted graph will not have any edge features.
-
-        (Default: False)
 
     Returns
     -------
