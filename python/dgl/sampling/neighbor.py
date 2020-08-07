@@ -6,7 +6,7 @@ from ..base import DGLError, EID
 from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from .. import utils
-from .. import transform
+from .. import subgraph as subg
 from .dataloader import BlockSampler, assign_block_eids
 
 __all__ = [
@@ -300,7 +300,7 @@ class MultiLayerNeighborSampler(BlockSampler):
     def sample_frontier(self, block_id, g, seed_nodes, *args, **kwargs):
         fanout = self.fanouts[block_id]
         if fanout is None:
-            frontier = transform.in_subgraph(g, seed_nodes)
+            frontier = subg.in_subgraph(g, seed_nodes)
         else:
             frontier = sample_neighbors(g, seed_nodes, fanout, replace=self.replace)
         return frontier

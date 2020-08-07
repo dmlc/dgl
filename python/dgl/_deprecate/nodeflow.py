@@ -5,7 +5,7 @@ from .._ffi.object import register_object, ObjectBase
 from .._ffi.function import _init_api
 from ..base import ALL, is_all, DGLError, dgl_warning
 from .. import backend as F
-from ..frame import Frame, FrameRef
+from .frame import Frame, FrameRef
 from .graph import DGLBaseGraph
 from ..graph_index import transform_ids
 from .runtime import ir, scheduler, Runtime

@@ -176,10 +176,17 @@ class GSpMM(mx.autograd.Function):
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     func = GSpMM(gidx, op, reduce_op)
     ctx = to_backend_ctx(gidx.ctx)
+    # XXX(minjie): There is a bug in MXNet's autograd system when one of the inputs
+    #   does not require gradient. Although it still invokes the backward function,
+    #   it does not set the gradient value to the correct buffer, resulting all the
+    #   input gradients to be zero. Fix this by enforcing all the inputs to require
+    #   gradients.
     if lhs_data is None:
         lhs_data = nd.zeros((1,), ctx=ctx)
+        lhs_data.attach_grad()
     if rhs_data is None:
         rhs_data = nd.zeros((1,), ctx=ctx)
+        rhs_data.attach_grad()
     return func(lhs_data, rhs_data)
 
 
