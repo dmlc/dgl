@@ -5,7 +5,7 @@ from ..base import ALL
 __all__ = ['edge_softmax']
 
 
-def edge_softmax(graph, logits, eids=ALL):
+def edge_softmax(graph, logits, eids=ALL, group_by='dst'):
     r"""Compute edge softmax.
 
     For a node :math:`i`, edge softmax is an operation of computing
@@ -17,19 +17,23 @@ def edge_softmax(graph, logits, eids=ALL):
     called logits in the context of softmax. :math:`\mathcal{N}(i)` is
     the set of nodes that have an edge to :math:`i`.
 
-    An example of using edge softmax is in
-    `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__ where
-    the attention weights are computed with such an edge softmax operation.
+    By default edge softmax is normalized by destination nodes(i.e. :math:`ij`
+    are incoming edges of `i` in the formula above). We also support edge
+    softmax normalized by source nodes(i.e. :math:`ij` are outgoing edges of
+    `i` in the formula). The previous case correspond to softmax in GAT and
+    Transformer, and the later case correspond to softmax in Capsule network.
 
     Parameters
     ----------
-    graph : DGLGraph
-        The graph to perform edge softmax
+    gidx : HeteroGraphIndex
+        The graph to perfor edge softmax on.
     logits : torch.Tensor
         The input edge feature
     eids : torch.Tensor or ALL, optional
         Edges on which to apply edge softmax. If ALL, apply edge
         softmax on all edges in the graph. Default: ALL.
+    group_by : str, could be `src` or `dst`
+        Normalized by source nodes or destination nodes. Default: `dst`.
 
     Returns
     -------
@@ -47,7 +51,7 @@ def edge_softmax(graph, logits, eids=ALL):
     The following example is written in PyTorch, for other backend frameworks
     the usage is similar.
 
-    >>> from dgl.nn.pytorch.softmax import edge_softmax
+    >>> from dgl.ops import edge_softmax
     >>> import dgl
     >>> import torch as th
 
@@ -75,6 +79,16 @@ def edge_softmax(graph, logits, eids=ALL):
         [0.3333],
         [0.3333]])
 
+    Apply edge softmax on g normalized by source nodes:
+
+    >>> edge_softmax(g, edata, group_by='src')
+    tensor([[0.3333],
+            [0.3333],
+            [0.3333],
+            [0.5000],
+            [0.5000],
+            [1.0000]])
+
     Apply edge softmax on first 4 edges of g:
 
     >>> edge_softmax(g, edata[:4], th.Tensor([0,1,2,3]))
@@ -83,4 +97,5 @@ def edge_softmax(graph, logits, eids=ALL):
         [1.0000],
         [0.5000]])
     """
-    return edge_softmax_internal(graph._graph, logits, eids=eids)
+    return edge_softmax_internal(graph._graph, logits,
+                                 eids=eids, group_by=group_by)

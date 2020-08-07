@@ -233,6 +233,9 @@ Like GSpMM, GSDDMM operators support both homograph and bipartite graph.
 Edge Softmax module
 -------------------
 
+We also provide framework agnostic edge softmax module which was frequently used in
+GNN-like structures, e.g. Graph Attention Network, Transformer, Capsule, etc.
+
 .. autosummary::
     :toctree: ../../generated/
 
@@ -272,9 +275,7 @@ would be dispatched into function calls of operators defined in ``dgl.ops``:
 
 It up to user to decide whether to use message-passing APIs or GSpMM/GSDDMM operators, and both
 of them have the same efficiency. Programs written in message-passing APIs look more like DGL-style
-but in some cases calling GSpMM/GSDDMM operators is more concise (e.g. `edge_softmax
-<https://github.com/dmlc/dgl/blob/master/python/dgl/nn/pytorch/softmax.py/>`_ function
-provided by dgl).
+but in some cases calling GSpMM/GSDDMM operators is more concise.
 
 Note that on PyTorch all operators defined in ``dgl.ops`` support higher-order gradients, so as
 message passing APIs because they entirely depend on these operators.

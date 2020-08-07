@@ -266,10 +266,12 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
 
 
 class EdgeSoftmax(mx.autograd.Function):
-    def __init__(self, gidx, eids):
+    def __init__(self, gidx, eids, group_by):
         super(EdgeSoftmax, self).__init__()
         if not is_all(eids):
             gidx = gidx.edge_subgraph(eids.astype(gidx.dtype), True)
+        if group_by == 'src':
+            gidx = gidx.reverse()
         self.gidx = gidx
 
     def forward(self, score):
@@ -317,6 +319,6 @@ class EdgeSoftmax(mx.autograd.Function):
         return grad_score
 
 
-def edge_softmax(gidx, logits, eids=ALL):
-    softmax_op = EdgeSoftmax(gidx, eids)
+def edge_softmax(gidx, logits, eids=ALL, group_by='dst'):
+    softmax_op = EdgeSoftmax(gidx, eids, group_by)
     return softmax_op(logits)

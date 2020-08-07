@@ -1417,7 +1417,7 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     """
     pass
 
-def edge_softmax(graph, logits, eids):
+def edge_softmax(gidx, logits, eids, group_by):
     r"""Compute edge softmax.
 
     For a node :math:`i`, edge softmax is an operation of computing
@@ -1429,19 +1429,23 @@ def edge_softmax(graph, logits, eids):
     called logits in the context of softmax. :math:`\mathcal{N}(i)` is
     the set of nodes that have an edge to :math:`i`.
 
-    An example of using edge softmax is in
-    `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__ where
-    the attention weights are computed with such an edge softmax operation.
+    By default edge softmax is normalized by destination nodes(i.e. :math:`ij`
+    are incoming edges of `i` in the formula above). We also support edge
+    softmax normalized by source nodes(i.e. :math:`ij` are outgoing edges of
+    `i` in the formula). The previous case correspond to softmax in GAT and
+    Transformer, and the later case correspond to softmax in Capsule network.
 
     Parameters
     ----------
-    graph : DGLGraph
-        The graph to perform edge softmax
+    gidx : HeteroGraphIndex
+        The graph to perfor edge softmax on.
     logits : torch.Tensor
         The input edge feature
     eids : torch.Tensor or ALL, optional
         Edges on which to apply edge softmax. If ALL, apply edge
         softmax on all edges in the graph. Default: ALL.
+    group_by : str, could be `src` or `dst`
+        Normalized by source nodes or destination nodes. Default: `dst`.
 
     Returns
     -------
