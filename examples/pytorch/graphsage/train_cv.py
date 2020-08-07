@@ -220,8 +220,8 @@ def run(args, dev_id, data):
 
     # Unpack data
     train_mask, val_mask, in_feats, labels, n_classes, g = data
-    train_nid = train_mask.nonzero()[:, 0]
-    val_nid = val_mask.nonzero()[:, 0]
+    train_nid = train_mask.nonzero().squeeze()
+    val_nid = val_mask.nonzero().squeeze()
 
     # Create sampler
     sampler = NeighborSampler(g, [int(_) for _ in args.fan_out.split(',')])

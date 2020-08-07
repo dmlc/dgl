@@ -94,9 +94,9 @@ def main(args):
         test_mask = test_mask.cuda()
         print("use cuda:", args.gpu)
 
-    train_nid = train_mask.nonzero()[:, 0]
-    val_nid = val_mask.nonzero()[:, 0]
-    test_nid = test_mask.nonzero()[:, 0]
+    train_nid = train_mask.nonzero().squeeze()
+    val_nid = val_mask.nonzero().squeeze()
+    test_nid = test_mask.nonzero().squeeze()
 
     # graph preprocess and calculate normalization factor
     g = dgl.remove_self_loop(g)

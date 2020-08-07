@@ -117,12 +117,9 @@ def main(args):
                 if cur_step == patience:
                     break
     test_score_list = []
-    for batch, test_data in enumerate(test_dataloader):
-        subgraph, feats, labels = test_data
+    for batch, subgraph in enumerate(test_dataloader):
         subgraph = subgraph.to(device)
-        feats = feats.to(device)
-        labels = labels.to(device)
-        test_score_list.append(evaluate(feats, model, subgraph, labels.float(), loss_fcn)[0])
+        test_score_list.append(evaluate(subgraph.ndata['feat'], model, subgraph, subgraph.ndata['label'], loss_fcn))
     print("Test F1-Score: {:.4f}".format(np.array(test_score_list).mean()))
 
 if __name__ == '__main__':
