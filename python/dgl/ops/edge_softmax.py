@@ -48,8 +48,6 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
 
     Examples
     --------
-    The following example is written in PyTorch, for other backend frameworks
-    the usage is similar.
 
     >>> from dgl.ops import edge_softmax
     >>> import dgl
