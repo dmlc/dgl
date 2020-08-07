@@ -410,6 +410,11 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
         dgl_warning("Parameter readonly is deprecated" \
             "There will be no difference between readonly and non-readonly DGLGraph")
 
+    # get node cnt for each ntype
+    num_nodes_dict = {}
+    for ntype in g.ntypes:
+        num_nodes_dict[ntype] = g.number_of_nodes(ntype)
+
     canonical_etypes = g.canonical_etypes
     # fast path
     if ignore_bipartite is False:
@@ -423,7 +428,7 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
             u, v = g.edges(form='uv', order='eid', etype=c_etype)
             subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
 
-        new_g = convert.heterograph(subgs)
+        new_g = convert.heterograph(subgs, num_nodes_dict=num_nodes_dict)
     else:
         subgs = {}
         for c_etype in canonical_etypes:
@@ -434,7 +439,7 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
                 u, v = g.edges(form='uv', order='eid', etype=c_etype)
                 subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
 
-        new_g = convert.heterograph(subgs)
+        new_g = convert.heterograph(subgs, num_nodes_dict=num_nodes_dict)
 
     # handle features
     if copy_ndata:
