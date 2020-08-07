@@ -145,6 +145,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLPartition1D")
   dgl_type_t etype = args[1];
   int64_t num_cols_per_partition = args[2];
   CSRMatrix csr = hg->GetCSRMatrix(etype);
+  csr = CSRSort(csr);
   ATEN_ID_TYPE_SWITCH(hg->DataType(), IdType, {
     *rv = ConvertNDArrayVectorToPackedFunc(
       partition1D<IdType>(csr, num_cols_per_partition)
@@ -159,6 +160,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLPartition2D")
   int64_t num_rows_per_partition = args[2];
   int64_t num_cols_per_partition = args[3];
   CSRMatrix csr = hg->GetCSRMatrix(etype);
+  csr = CSRSort(csr);
   ATEN_ID_TYPE_SWITCH(hg->DataType(), IdType, {
     *rv = ConvertNDArrayVectorToPackedFunc(
       partition2D<IdType>(csr, num_rows_per_partition, num_cols_per_partition)
