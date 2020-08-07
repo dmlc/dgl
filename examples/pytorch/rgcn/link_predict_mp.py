@@ -212,7 +212,6 @@ class LinkPathSampler:
         p_u, p_v = subg.edges()
         subg = dgl.add_reverse_edges(subg, copy_ndata=True)
         subg.edata['etype'] = th.cat([p_rel, p_rel + self.num_rel])
-        print(subg.edata['etype'])
 
         # only half of the edges will be used as graph structure
         pos_idx = np.random.choice(np.arange(bsize),
@@ -582,7 +581,8 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
 
     if n_gpus > 1:
         embed_layer = DistributedDataParallel(embed_layer, device_ids=[dev_id], output_device=dev_id)
-        model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id, find_unused_parameters=True)
+        #model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id, find_unused_parameters=True)
+        model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
 
     # optimizer
     all_params = itertools.chain(model.parameters(), embed_layer.parameters())
@@ -615,11 +615,14 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
                 mb_feats = model(g, in_feats, sample=args.sampler)
                 p_head_emb = mb_feats[p_u]
                 p_tail_emb = mb_feats[p_v]
-                nh_idx = th.randint(0, mb_feats.shape[0], p_head_emb.shape[0])
-                nt_idx = th.randint(0, mb_feats.shape[0], p_tail_emb.shape[0])
+                nh_idx = th.randint(low=0, high=mb_feats.shape[0], size=(p_head_emb.shape[0],))
+                nt_idx = th.randint(low=0, high=mb_feats.shape[0], size=(p_tail_emb.shape[0],))
                 n_head_emb = mb_feats[nh_idx]
                 n_tail_emb = mb_feats[nt_idx]
-                r_emb = model.w_relation[rids]
+                if queue is None:
+                    r_emb = model.w_relation[rids]
+                else:
+                    r_emb = model.module.w_relation[rids]
 
             #n_shuffle_seed = th.randperm(n_head_emb.shape[0])
             #n_head_emb = n_head_emb[n_shuffle_seed]
@@ -746,6 +749,10 @@ def main(args, devices):
     test_seeds = th.nonzero(test_seed_mask).squeeze()
     num_rels = dataset.num_rels
     edge_rels = num_rels * 2 # we add reverse edges
+
+    print("Train pos edges #{}".format(train_seeds.shape[0]))
+    print("Valid pos edges #{}".format(valid_seeds.shape[0]))
+    print("Test pos edges #{}".format(test_seeds.shape[0]))
 
     train_shuffle = th.randperm(train_seeds.shape[0])
     train_seeds = train_seeds[train_shuffle]
