@@ -1,3 +1,7 @@
+# LINE Example
+- Paper link: [here](https://arxiv.org/pdf/1503.03578)
+- Official implementation: [here](https://github.com/tangjianpku/LINE)
+
 ## How to load ogb data
 To load ogb dataset, you need to run the following command, which will output a network file, ogbn-products-net.txt:
 ```
