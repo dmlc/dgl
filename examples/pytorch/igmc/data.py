@@ -9,7 +9,7 @@ import torch as th
 
 import dgl 
 from dgl.data.utils import download, extract_archive, get_download_dir
-from utils import extract_refex_feature
+from refex import extract_refex_feature
 
 _urls = {
     'ml-100k' : 'http://files.grouplens.org/datasets/movielens/ml-100k.zip',

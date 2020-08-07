@@ -1,15 +1,11 @@
 import os
-import random
-
 import scipy.sparse as sp
 import warnings
 warnings.simplefilter('ignore', sp.SparseEfficiencyWarning)
 
 import numpy as np
 import torch as th
-import torch.nn.functional as F
 import dgl 
-import dgl.function as fn
 
 class MetricLogger(object):
     def __init__(self, save_dir, log_interval):
@@ -198,97 +194,28 @@ def subgraph_extraction_labeling(ind, graph, mode="bipartite",
     subgraph = graph.subgraph(nodes)
 
     if mode == "bipartite":
-        subgraph.ndata['x'] = one_hot(node_labels, (hop+1)*2)
+        subgraph.ndata['nlabel'] = one_hot(node_labels, (hop+1)*2)
     elif mode == "homo":
-        subgraph.ndata['x'] = one_hot(node_labels, hop+1)
+        subgraph.ndata['nlabel'] = one_hot(node_labels, hop+1)
     elif mode == "grail":
-        subgraph.ndata['x'] = th.cat([one_hot(node_labels[:, 0], hop+1), 
+        subgraph.ndata['nlabel'] = th.cat([one_hot(node_labels[:, 0], hop+1), 
                                     one_hot(node_labels[:, 1], hop+1)], dim=1)
     else:
         raise NotImplementedError
-    # subgraph.ndata['x'] = th.cat([subgraph.ndata['x'], subgraph.ndata['refex']], dim=1)
+    # subgraph.ndata['x'] = th.cat([subgraph.ndata['nlabel'], subgraph.ndata['refex']], dim=1)
+    subgraph.ndata['x'] = subgraph.ndata['nlabel']
 
     # refex_feature = extract_refex_feature(subgraph).to(th.float)
     # subgraph.ndata['x'] = th.cat([subgraph.ndata['x'], refex_feature], dim=1)
 
-    # set edge weight to zero as to remove links between target nodes in training process
-    subgraph.edata['weight'] = th.ones(subgraph.number_of_edges())
+    # set edge mask to zero as to remove links between target nodes in training process
+    subgraph.edata['edge_mask'] = th.ones(subgraph.number_of_edges())
     su = subgraph.nodes()[subgraph.ndata[dgl.NID]==ind[0]]
     sv = subgraph.nodes()[subgraph.ndata[dgl.NID]==ind[1]]
     _, _, target_edges = subgraph.edge_ids([su, sv], [sv, su], return_uv=True)
-    subgraph.edata['weight'][target_edges] = 0
+    subgraph.edata['edge_mask'][target_edges] = 0
 
     return subgraph
-
-def MinMaxScaling(x, dim=0):
-    dist = x.max(dim=dim, keepdim=True)[0] - x.min(dim=dim, keepdim=True)[0]
-    x = (x - x.min(dim=dim, keepdim=True)[0]) / (dist + 1e-7)
-    return x
-
-def prune_feature(old_feature, new_feature, threshold):
-    idx_to_drop = np.array([])
-    for i in range(old_feature.shape[1]):
-        for j in range(new_feature.shape[1]):
-            corr = np.corrcoef(old_feature[:, i], new_feature[:, j])
-            if abs(corr[0, 1]) > threshold:
-                idx_to_drop = np.append(idx_to_drop, j)
-        idx_to_keep = np.setdiff1d(np.arange(new_feature.shape[1]), idx_to_drop)
-        new_feature = new_feature[:, idx_to_keep]
-        idx_to_drop = np.array([])
-    return new_feature
-
-def get_recursive_feature(graph, basic_feature, n_iter=1):
-    with graph.local_scope():
-
-        recursive_feature = [basic_feature]
-        for iter_idx in range(n_iter):
-            graph.srcdata['h'] = recursive_feature[-1]
-            graph.update_all(fn.copy_u('h', 'msg'), fn.mean('msg', 'neigh_mean'))
-            graph.update_all(fn.copy_u('h', 'msg'), fn.sum('msg', 'neigh_sum'))
-
-            iter_feature = th.cat([graph.dstdata['neigh_mean'], 
-                                   graph.dstdata['neigh_sum']], dim=1)
-            # there is no feature pruning at the moment
-            iter_feature = prune_feature(recursive_feature[-1], iter_feature, threshold=0.5)
-            recursive_feature.append(iter_feature)
-        
-        return th.cat(recursive_feature[1:], dim=1)
-
-def get_ego_feature(graph):
-    ego_feature = []
-    for node in graph.nodes():
-        neighs = graph.in_edges(node)[0]
-        nodes = th.cat([node.view(1), neighs])
-
-        internal_degree = th.tensor(graph.subgraph(nodes).number_of_edges(), dtype=th.float32)
-        overall_degree = th.sum(graph.in_degrees(nodes), dtype=th.float32)
-        # there 32 isolated nodes in train graph
-        external_degree = overall_degree - internal_degree
-        if overall_degree == 0:
-            overall_degree = th.tensor(float('inf'))
-            external_degree = th.tensor(0.)
-        ego_feature.append(th.cat([internal_degree.view(1), 
-                                   external_degree.view(1), 
-                                   (internal_degree/overall_degree).view(1),
-                                   (external_degree/overall_degree).view(1)]))
-    return th.stack(ego_feature)
-
-def get_local_feature(graph):
-    degree = graph.in_degrees().to(th.float32)
-    return degree.unsqueeze(1)
-
-def get_basic_feature(graph, normalize=True):
-    local_feature = get_local_feature(graph)
-    ego_feature = get_ego_feature(graph)
-    basic_feature = th.cat([local_feature, ego_feature], dim=1)
-    if normalize:
-        basic_feature = MinMaxScaling(basic_feature, dim=0)
-    return basic_feature
-
-def extract_refex_feature(graph):
-    basic_feature = get_basic_feature(graph, normalize=True)
-    recursive_feature = get_recursive_feature(graph, basic_feature, n_iter=1)
-    return th.cat([basic_feature, recursive_feature], dim=1)
 
 if __name__ == "__main__":
     import time
