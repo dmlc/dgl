@@ -106,11 +106,10 @@ def knn_graph(x, k):
     When ``x`` is a 2D tensor, a single KNN graph is constructed.
 
     >>> x = torch.tensor([[0.0, 0.0, 1.0],
-    >>>                   [1.0, 0.5, 0.5],
-    >>>                   [0.5, 0.2, 0.2],
-    >>>                   [0.3, 0.2, 0.4]])
-    >>> knn_g = dgl.knn_graph(x, 2)
-    >>> # Each node has two predecessors
+    ...                   [1.0, 0.5, 0.5],
+    ...                   [0.5, 0.2, 0.2],
+    ...                   [0.3, 0.2, 0.4]])
+    >>> knn_g = dgl.knn_graph(x, 2)  # Each node has two predecessors
     >>> knn_g.edges()
     >>> (tensor([0, 1, 2, 2, 2, 3, 3, 3]), tensor([0, 1, 1, 2, 3, 0, 2, 3]))
 
@@ -118,16 +117,15 @@ def knn_graph(x, k):
     and then unioned into a graph of multiple connected components.
 
     >>> x1 = torch.tensor([[0.0, 0.0, 1.0],
-    >>>                    [1.0, 0.5, 0.5],
-    >>>                    [0.5, 0.2, 0.2],
-    >>>                    [0.3, 0.2, 0.4]])
+    ...                    [1.0, 0.5, 0.5],
+    ...                    [0.5, 0.2, 0.2],
+    ...                    [0.3, 0.2, 0.4]])
     >>> x2 = torch.tensor([[0.0, 1.0, 1.0],
-    >>>                    [0.3, 0.3, 0.3],
-    >>>                    [0.4, 0.4, 1.0],
-    >>>                    [0.3, 0.8, 0.2]])
+    ...                    [0.3, 0.3, 0.3],
+    ...                    [0.4, 0.4, 1.0],
+    ...                    [0.3, 0.8, 0.2]])
     >>> x = torch.stack([x1, x2], dim=0)
-    >>> knn_g = dgl.knn_graph(x, 2)
-    >>> # Each node has two predecessors
+    >>> knn_g = dgl.knn_graph(x, 2)  # Each node has two predecessors
     >>> knn_g.edges()
     (tensor([0, 1, 2, 2, 2, 3, 3, 3, 4, 5, 5, 5, 6, 6, 7, 7]),
      tensor([0, 1, 1, 2, 3, 0, 2, 3, 4, 5, 6, 7, 4, 6, 5, 7]))
@@ -194,13 +192,13 @@ def segmented_knn_graph(x, k, segs):
 
     >>> # Features/coordinates of the first point set
     >>> x1 = torch.tensor([[0.0, 0.5, 0.2],
-    >>>                    [0.1, 0.3, 0.2],
-    >>>                    [0.4, 0.2, 0.2]])
+    ...                    [0.1, 0.3, 0.2],
+    ...                    [0.4, 0.2, 0.2]])
     >>> # Features/coordinates of the second point set
     >>> x2 = torch.tensor([[0.3, 0.2, 0.1],
-    >>>                    [0.5, 0.2, 0.3],
-    >>>                    [0.1, 0.1, 0.2],
-    >>>                    [0.6, 0.3, 0.3]])
+    ...                    [0.5, 0.2, 0.3],
+    ...                    [0.1, 0.1, 0.2],
+    ...                    [0.6, 0.3, 0.3]])
     >>> x = torch.cat([x1, x2], dim=0)
     >>> segs = [x1.shape[0], x2.shape[0]]
     >>> knn_g = dgl.segmented_knn_graph(x, 2, segs)
@@ -238,7 +236,7 @@ def to_bidirected(g, readonly=None, copy_ndata=False):
     to each type as a separate graph and convert the graph to a bidirected one
     for each of them.
 
-    Since **``to_bidirected`` is not well defined for unidirectional bipartite graphs**,
+    Since **:func:`to_bidirected` is not well defined for unidirectional bipartite graphs**,
     an error will be raised if an edge type whose source node type is different from
     the destination node type exists.
 
@@ -246,16 +244,21 @@ def to_bidirected(g, readonly=None, copy_ndata=False):
     ----------
     g : DGLGraph
         The input graph.
-    readonly : bool, default to be True
+    readonly : bool
         Deprecated. There will be no difference between readonly and non-readonly
+
+        (Default: True)
     copy_ndata: bool, optional
         If True, the node features of the bidirected graph are copied from the
-        original graph. If False, the bidirected graph will not have any node features.
+        original graph.
+
+        If False, the bidirected graph will not have any node features.
+
         (Default: False)
 
     Returns
     -------
-    dgl.DGLGraph
+    DGLGraph
         The bidirected graph
 
     Notes
@@ -286,9 +289,9 @@ def to_bidirected(g, readonly=None, copy_ndata=False):
     **Heterographs with Multiple Edge Types**
 
     >>> g = dgl.heterograph({
-    >>>     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2]), th.tensor([1, 1, 2, 0])),
-    >>>     ('user', 'follows', 'user'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
-    >>> })
+    ...     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2]), th.tensor([1, 1, 2, 0])),
+    ...     ('user', 'follows', 'user'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
+    ... })
     >>> bg1 = dgl.to_bidirected(g)
     >>> bg1.edges(etype='wins')
     (tensor([0, 0, 1, 1, 2, 2]), tensor([1, 2, 0, 2, 0, 1]))
@@ -322,7 +325,7 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
     For a heterograph with multiple edge types, DGL treats the edges corresponding
     to each type as a separate graph and add reverse edges for each of them.
 
-    Since **``add_reverse_edges`` is not well defined for unidirectional bipartite graphs**,
+    Since **:func:`add_reverse_edges` is not well defined for unidirectional bipartite graphs**,
     an error will be raised if an edge type of the input heterograph is for a
     unidirectional bipartite graph.  DGL simply skips the edge types corresponding
     to unidirectional bipartite graphs by specifying ``ignore_bipartite=True``.
@@ -354,7 +357,7 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
 
     Returns
     -------
-    dgl.DGLGraph
+    DGLGraph
         The graph with reversed edges added.
 
     Notes
@@ -538,7 +541,7 @@ def khop_adj(g, k):
 
     Parameters
     ----------
-    g : dgl.DGLGraph
+    g : DGLGraph
         The input graph.
     k : int
         The :math:`k` in :math:`A^k`.
@@ -583,7 +586,7 @@ def khop_graph(g, k, copy_ndata=True):
 
     Parameters
     ----------
-    g : dgl.DGLGraph
+    g : DGLGraph
         The input graph.
     k : int
         The :math:`k` in `k`-hop graph.
@@ -597,7 +600,7 @@ def khop_graph(g, k, copy_ndata=True):
 
     Returns
     -------
-    dgl.DGLGraph
+    DGLGraph
         The returned ``DGLGraph``.
 
     Notes
@@ -661,12 +664,12 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
     If the original edge type is ``(A, B, C)``, its reverse will have edge type
     ``(C, B, A)``.
 
-    Given a :class:`dgl.DGLGraph` object, DGL returns another :class:`dgl.DGLGraph`
+    Given a :class:`DGLGraph` object, DGL returns another :class:`DGLGraph`
     object representing its reverse.
 
     Parameters
     ----------
-    g : dgl.DGLGraph
+    g : DGLGraph
         The input graph.
     copy_ndata: bool, optional
         If True, the node features of the reversed graph are copied from the
@@ -685,7 +688,7 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
 
     Return
     ------
-    dgl.DGLGraph
+    DGLGraph
         The reversed graph.
 
     Notes
@@ -745,16 +748,16 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
     **Heterographs with Multiple Edge Types**
 
     >>> g = dgl.heterograph({
-    >>>     ('user', 'follows', 'user'): (th.tensor([0, 2]), th.tensor([1, 2])),
-    >>>     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
-    >>> })
+    ...     ('user', 'follows', 'user'): (th.tensor([0, 2]), th.tensor([1, 2])),
+    ...     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
+    ... })
     >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
     >>> g.edges['plays'].data['he'] = th.zeros(3, 1)
 
     The reverse of the graph above can be obtained by combining the reverse of the
-    subgraph corresponding to ('user', 'follows', 'user') and the subgraph corresponding
-    to ('user', 'plays', 'game'). The reverse for a graph with relation (h, r, t) will
-    have relation (t, r, h).
+    subgraph corresponding to ``('user', 'follows', 'user')`` and the subgraph corresponding
+    to ``('user', 'plays', 'game')``.  The resulting graph will have edge types
+    ``('user', 'follows', 'user)`` and ``('user', 'plays', 'game')``.
 
     >>> rg = dgl.reverse(g, copy_ndata=True)
     >>> rg
@@ -837,8 +840,10 @@ def to_bidirected_stale(g, readonly=True):
     ----------
     g : DGLGraphStale
         The input graph.
-    readonly : bool, default to be True
+    readonly : bool
         Whether the returned bidirected graph is readonly or not.
+
+        (Default: True)
 
     Notes
     -----
@@ -1317,9 +1322,9 @@ def add_self_loop(g, etype=None):
 
     Notes
     -----
-    * ``add_self_loop`` adds self loops regardless of whether the self-loop already exists.
+    * :func:`add_self_loop` adds self loops regardless of whether the self-loop already exists.
     If you would like to have exactly one self-loop for every node, you would need to
-    call :py:func:`dgl.remove_self_loop` before invoking :py:func:`dgl.add_self_loop`.
+    call :func:`remove_self_loop` before invoking :func:`add_self_loop`.
 
     * Features for the new edges (self-loop edges) will be created with zeros.
 
@@ -1478,8 +1483,8 @@ def compact_graphs(graphs, always_preserve=None):
 
         All the returned graphs must be on CPU.
 
-    Bugs
-    ----
+    Notes
+    -----
     This function currently requires that the same node type of all graphs should have
     the same node type ID, i.e. the node types are *ordered* the same.
 
@@ -1533,6 +1538,7 @@ def compact_graphs(graphs, always_preserve=None):
         return []
     if graphs[0].is_block:
         raise DGLError('Compacting a block graph is not allowed.')
+    assert all(g.device == F.cpu() for g in graphs), 'all the graphs must be on CPU'
 
     # Ensure the node types are ordered the same.
     # TODO(BarclayII): we ideally need to remove this constraint.
@@ -1640,7 +1646,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
 
     Returns
     -------
-    DGLHeteroGraph
+    DGLBlock
         The new graph describing the block.
 
         The node IDs induced for each type in both sides would be stored in feature
@@ -1721,6 +1727,8 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
     --------
     User Guide Chapter 6
     """
+    assert g.device == F.cpu(), 'the graph must be on CPU'
+
     if dst_nodes is None:
         # Find all nodes that appeared as destinations
         dst_nodes = defaultdict(list)
@@ -2003,9 +2011,9 @@ def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True
     **Heterographs with Multiple Edge Types**
 
     >>> g = dgl.heterograph({
-    >>>     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2, 2]), th.tensor([1, 1, 2, 1, 0])),
-    >>>     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
-    >>> })
+    ...     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2, 2]), th.tensor([1, 1, 2, 1, 0])),
+    ...     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1]))
+    ... })
     >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
     >>> g.edges['plays'].data['he'] = th.zeros(3, 1)
 
@@ -2036,6 +2044,7 @@ def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True
     {('user', 'wins', 'user'): tensor([1, 2, 1, 1])
      ('user', 'plays', 'game'): tensor([1, 1, 1])}
     """
+    assert g.device == F.cpu(), 'the graph must be on CPU'
     if g.is_block:
         raise DGLError('Cannot convert a block graph to a simple graph.')
     simple_graph_index, counts, edge_maps = _CAPI_DGLToSimpleHetero(g._graph)

@@ -5,8 +5,6 @@ dgl.transform
 
 .. automodule:: dgl.transform
 
-Common algorithms on graphs.
-
 .. autosummary::
     :toctree: ../../generated/
 

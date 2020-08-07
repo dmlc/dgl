@@ -5,8 +5,6 @@ dgl.sampling
 
 .. automodule:: dgl.sampling
 
-Sampling algorithms on graphs.
-
 Random walk sampling functions
 ------------------------------
 
