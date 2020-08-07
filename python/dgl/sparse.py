@@ -56,57 +56,6 @@ def infer_broadcast_shape(op, shp1, shp2):
     rst = tuple(max(d1, d2) for d1, d2 in zip(pad_shp1, pad_shp2))
     return rst[:-1] + (1,) if op == "dot" else rst
 
-def use_bcast(op, lhs_shape, rhs_shape):
-    if op in ['copy_lhs', 'copy_rhs']:
-        return False
-    if len(lhs_shape) != len(rhs_shape):
-        return True
-    for i in range(len(lhs_shape)):
-        if lhs_shape[i] != rhs_shape[i]:
-            return True
-    return False
-
-def calc_bcast(op, lhs_shape, rhs_shape):
-    # remove first dimension to only consider feature
-    lhs_len, rhs_len = 1, 1
-    for v in lhs_shape[1:]:
-        lhs_len *= v
-    for v in rhs_shape[1:]:
-        rhs_len *= v
-    lhs_ndim, rhs_ndim = len(lhs_shape), len(rhs_shape)
-    if_bcast = use_bcast(op, lhs_shape[1:], rhs_shape[1:])
-    reduce_size = 1
-    lhs_off, rhs_off = [], []
-    rst_out_len = 1
-    if if_bcast:
-        max_ndim = max(lhs_ndim, rhs_ndim)-1
-        out_len = 1
-        j = 0
-        if op == 'dot':
-            j += 1
-            reduce_size = lhs_shape[lhs_ndim - 1]
-        stride_l, stride_r = 1, 1
-        lhs_off.append(0)
-        rhs_off.append(0)
-        while j < max_ndim:
-            dl = 1 if lhs_ndim - 1 - j < 1 else lhs_shape[lhs_ndim-1-j]
-            dr = 1 if rhs_ndim - 1 - j < 1 else rhs_shape[rhs_ndim-1-j]
-            for i in range(1, max(dl, dr)):
-                for k in range(out_len):
-                    lhs_off.append(lhs_off[k] + i * (i < dl) * stride_l)
-                    rhs_off.append(rhs_off[k] + i * (i < dr) * stride_r)
-            out_len *= max(dl, dr)
-            stride_l *= dl
-            stride_r *= dr
-            j += 1
-        rst_out_len = out_len
-    else:
-        rst_out_len = rhs_len if op == 'copy_rhs' else lhs_len
-        if op == 'dot':
-            reduce_size = lhs_shape[lhs_ndim-1]
-            rst_out_len //= reduce_size
-    return if_bcast, lhs_len, rhs_len, rst_out_len, reduce_size, lhs_off, rhs_off
-
 def to_dgl_nd(x):
     """Convert framework-specific tensor/None to dgl ndarray."""
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray(x)
@@ -115,7 +64,6 @@ def to_dgl_nd(x):
 def to_dgl_nd_for_write(x):
     """Convert framework-specific tensor/None to dgl ndarray for write."""
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
-
 
 target_mapping = {
     'u': 0,
@@ -176,7 +124,6 @@ def _gspmm(gidx, op, reduce_op, u, e):
     if nnz <= 0:
         return None
     indptr, indices, edge_mapping = map(lambda x: tvm.nd.from_dlpack(x.to_dlpack()), gidx.get_csc_dlpack(0))
-    # edge_mapping = F.zerocopy_from_dgl_ndarray(data).long()
     f_input = [indptr, indices]
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
@@ -194,68 +141,40 @@ def _gspmm(gidx, op, reduce_op, u, e):
     num_cols = gidx.number_of_nodes(srctype)
     target = F.device_type(ctx)
     key = (num_rows, num_cols, nnz, op, reduce_op, u_shp, e_shp, indice_type, feat_type, target)
+    print(key)
     if key not in compiled_gspmm_kernels:
-        if target == 'cuda':
-            tvm_ctx = tvm.gpu(0)
-        elif target == 'cpu':
+        if target == 'cpu':
             target = 'llvm'
-            tvm_ctx = tvm.cpu(0)
         v_shp = (num_rows, ) +\
             infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
-        if_bcast, lhs_len, rhs_len, out_len, _, lhs_off, rhs_off = \
-            calc_bcast(op, u_shp, e_shp)
         mod = gspmm.spmm(
             op, reduce_op, nnz, num_rows, num_cols,
-            lhs_len, rhs_len, out_len, indice_type, str(feat_type),
-            use_bcast=if_bcast, use_idx=True, target=target
+            u_shp[1:], e_shp[1:], v_shp[1:], indice_type, str(feat_type),
+            use_idx=True, target=target
         )
-        compiled = (mod, v_shp, lhs_len, rhs_len, out_len)
-        if if_bcast:
-            lhs_offset = tvm.nd.empty((out_len,), dtype=indice_type, ctx=tvm_ctx)
-            rhs_offset = tvm.nd.empty((out_len,), dtype=indice_type, ctx=tvm_ctx)
-            lhs_offset.copyfrom(lhs_off)
-            rhs_offset.copyfrom(rhs_off)
-            compiled += (lhs_offset, rhs_offset)
+        compiled = (mod, v_shp)
         compiled_gspmm_kernels[key] = compiled
     else:
         compiled = compiled_gspmm_kernels[key]
-    mod, v_shp, lhs_len, rhs_len, out_len = compiled[:5]
+    mod, v_shp = compiled
     if use_u:
-        u = u.view((u_shp[0], lhs_len))
         f_input.append(tvm.nd.from_dlpack(to_dgl_nd(u).to_dlpack()))
     if use_e:
-        e = e.view((e_shp[0], rhs_len))
         f_input.append(tvm.nd.from_dlpack(to_dgl_nd(e).to_dlpack()))
-    if len(compiled) > 5:
-        lhs_offset, rhs_offset = compiled[5], compiled[6]
-        f_input += [lhs_offset, rhs_offset]
     idtype = getattr(F, gidx.dtype)
     arg_u, arg_e = None, None
     use_cmp = reduce_op != 'sum'
     if use_cmp:
         if use_u:
             arg_u = F.zeros(v_shp, idtype, ctx)
-            arg_u = arg_u.view((v_shp[0], out_len))
             f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(arg_u).to_dlpack()))
         if use_e:
             arg_e = F.zeros(v_shp, idtype, ctx)
-            arg_e = arg_e.view((v_shp[0], out_len))
             f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(arg_e).to_dlpack()))
     f_input.append(tvm.nd.from_dlpack(edge_mapping.to_dlpack()))
     v = F.zeros(v_shp, feat_type, ctx)
-    v = v.view((v_shp[0], out_len))
     f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(v).to_dlpack()))
     mod(*f_input)
-    if use_u:
-        u = u.view(u_shp)
-        if use_cmp:
-            arg_u = arg_u.view(v_shp)
-    if use_e:
-        e = e.view(e_shp)
-        if use_cmp:
-            arg_e = arg_e.view(v_shp)
-            # arg_e = edge_mapping[arg_e.long()]
-    v = v.view(v_shp)
     return v, (arg_u, arg_e)
 
 
@@ -306,7 +225,19 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
         return None
     lhs_target = target_mapping[lhs_target]
     rhs_target = target_mapping[rhs_target]
-    row, col, _ = map(lambda x: tvm.nd.from_dlpack(x.to_dlpack()), gidx.get_coo_dlpack(0))
+    row, col, edge_id = gidx.get_coo_dlpack(0)
+    if op in ['copy_lhs', 'copy_rhs']:
+        t = lhs_target if op == 'copy_lhs' else rhs_target
+        if t == 0:
+            ind = F.zerocopy_from_dgl_ndarray(row).long()
+        elif t == 1:
+            if not edge_id:
+                return lhs if op == 'copy_lhs' else rhs
+            ind = F.zerocopy_from_dgl_ndarray(edge_id).long()
+        else:
+            ind = F.zerocopy_from_dgl_ndarray(col).long()
+        return lhs[ind] if op == 'copy_lhs' else rhs[ind]
+    row, col, edge_id = map(lambda x: tvm.nd.from_dlpack(x.to_dlpack()), [row, col, edge_id])
     f_input = []
     if lhs_target == 0 or rhs_target == 0:
         f_input.append(row)
@@ -318,10 +249,8 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     ctx = F.context(lhs) if use_lhs else F.context(rhs)
     if use_lhs and F.ndim(lhs) == 1:
         lhs = F.unsqueeze(lhs, -1)
-        # f_input.append(tvm.nd.from_dlpack(to_dgl_nd(lhs).to_dlpack()))
     if use_rhs and F.ndim(rhs) == 1:
         rhs = F.unsqueeze(rhs, -1)
-        # f_input.append(tvm.nd.from_dlpack(to_dgl_nd(rhs).to_dlpack()))
     lhs_shp = F.shape(lhs) if use_lhs else (0,)
     rhs_shp = F.shape(rhs) if use_rhs else (0,)
     indice_type = gidx.dtype
@@ -341,44 +270,23 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
             raise DGLError("We only support graph on cpu or gpu")
         out_shp = (gidx.number_of_edges(0), ) +\
             infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])
-        if_bcast, lhs_len, rhs_len, out_len, reduce_size, lhs_off, rhs_off = \
-            calc_bcast(op, lhs_shp, rhs_shp)
         mod = gsddmm.sddmm(
             op, nnz, num_rows, num_cols,
-            lhs_len, rhs_len, out_len, str(indice_type), str(feat_type),
-            reduce_size=reduce_size, lhs_target=lhs_target, 
-            rhs_target=rhs_target, use_bcast=if_bcast, target=target
+            lhs_shp[1:], rhs_shp[1:], out_shp[1:], str(indice_type), str(feat_type),
+            lhs_target=lhs_target, rhs_target=rhs_target, target=target
         )
-        compiled = (mod, out_shp, lhs_len, rhs_len, out_len)
-        if if_bcast:
-            lhs_offset = tvm.nd.empty((out_len,), dtype=indice_type, ctx=tvm_ctx)
-            rhs_offset = tvm.nd.empty((out_len,), dtype=indice_type, ctx=tvm_ctx)
-            lhs_offset.copyfrom(lhs_off)
-            rhs_offset.copyfrom(rhs_off)
-            compiled += (lhs_offset, rhs_offset)
+        compiled = (mod, out_shp)
         compiled_gsddmm_kernels[key] = compiled
     else:
         compiled = compiled_gsddmm_kernels[key]
-        print(compiled)
-    mod, out_shp, lhs_len, rhs_len, out_len = compiled[:5]
+    mod, out_shp = compiled
     if use_lhs:
-        lhs = lhs.view((lhs_shp[0], lhs_len))
         f_input.append(tvm.nd.from_dlpack(to_dgl_nd(lhs).to_dlpack()))
     if use_rhs:
-        rhs = rhs.view((rhs_shp[0], rhs_len))
         f_input.append(tvm.nd.from_dlpack(to_dgl_nd(rhs).to_dlpack()))
-    if len(compiled) > 5:
-        lhs_offset, rhs_offset = compiled[5], compiled[6]
-        f_input += [lhs_offset, rhs_offset]
     out = F.zeros(out_shp, feat_type, ctx)
-    out = out.view((out_shp[0], out_len))
     f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(out).to_dlpack()))
     mod(*f_input)
-    if use_lhs:
-        lhs = lhs.view(lhs_shp)
-    if use_rhs:
-        rhs = rhs.view(rhs_shp)
-    out = out.view(out_shp)
     return out
 
 _init_api("dgl.sparse")
