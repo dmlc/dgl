@@ -13,7 +13,7 @@ def is_builtin(func):
     return isinstance(func, fn.BuiltinFunction)
 
 def invoke_node_udf(graph, nid, ntype, func, *, ndata=None, orig_nid=None):
-    """Invoke user-defined node function on the given ndata.
+    """Invoke user-defined node function on the given nodes.
 
     Parameters
     ----------
