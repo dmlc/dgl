@@ -289,76 +289,6 @@ def test_set_trans():
     h2 = st_dec(bg, h1)
     assert h2.shape[0] == 3 and h2.shape[1] == 200 and h2.dim() == 2
 
-def uniform_attention(g, shape):
-    a = F.ones(shape)
-    target_shape = (g.number_of_edges(),) + (1,) * (len(shape) - 1)
-    return a / g.in_degrees(g.edges(order='eid')[1]).view(target_shape).float()
-
-@parametrize_dtype
-def test_edge_softmax(idtype):
-    # Basic
-    g = dgl.graph(nx.path_graph(3))
-    g = g.astype(idtype).to(F.ctx())
-    edata = F.ones((g.number_of_edges(), 1))
-    a = nn.edge_softmax(g, edata)
-    assert len(g.ndata) == 0
-    assert len(g.edata) == 0
-    assert F.allclose(a, uniform_attention(g, a.shape))
-
-    # Test higher dimension case
-    edata = F.ones((g.number_of_edges(), 3, 1))
-    a = nn.edge_softmax(g, edata)
-    assert len(g.ndata) == 0
-    assert len(g.edata) == 0
-    assert F.allclose(a, uniform_attention(g, a.shape))
-
-    # Test both forward and backward with PyTorch built-in softmax.
-    g = dgl.rand_graph(30, 900)
-    g = g.astype(idtype).to(F.ctx())
-
-    score = F.randn((900, 1))
-    score.requires_grad_()
-    grad = F.randn((900, 1))
-    y = F.softmax(score.view(30, 30), dim=0).view(-1, 1)
-    y.backward(grad)
-    grad_score = score.grad
-    score.grad.zero_()
-    y_dgl = nn.edge_softmax(g, score)
-    assert len(g.ndata) == 0
-    assert len(g.edata) == 0
-    # check forward
-    assert F.allclose(y_dgl, y)
-    y_dgl.backward(grad)
-    # checkout gradient
-    assert F.allclose(score.grad, grad_score)
-    print(score.grad[:10], grad_score[:10])
-    
-@parametrize_dtype
-def test_partial_edge_softmax(idtype):
-    g = dgl.rand_graph(30, 900)
-    g = g.astype(idtype).to(F.ctx())
-
-    score = F.randn((300, 1))
-    score.requires_grad_()
-    grad = F.randn((300, 1))
-    import numpy as np
-    eids = np.random.choice(900, 300, replace=False)
-    eids = F.tensor(eids, dtype=g.idtype)
-    # compute partial edge softmax
-    y_1 = nn.edge_softmax(g, score, eids)
-    y_1.backward(grad)
-    grad_1 = score.grad
-    score.grad.zero_()
-    # compute edge softmax on edge subgraph
-    subg = g.edge_subgraph(eids, preserve_nodes=True)
-    y_2 = nn.edge_softmax(subg, score)
-    y_2.backward(grad)
-    grad_2 = score.grad
-    score.grad.zero_()
-
-    assert F.allclose(y_1, y_2)
-    assert F.allclose(grad_1, grad_2)
-
 def test_rgcn():
     ctx = F.ctx()
     etype = []
@@ -936,8 +866,6 @@ def test_hetero_conv(agg, idtype):
 
 if __name__ == '__main__':
     test_graph_conv()
-    test_edge_softmax()
-    test_partial_edge_softmax()
     test_set2set()
     test_glob_att_pool()
     test_simple_pool()
