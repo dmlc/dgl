@@ -368,6 +368,7 @@ def test_add_reverse_edges():
     g.ndata['h'] = F.tensor([[0.], [1.], [2.], [1.], [1.], [1.]])
     g.edata['h'] = F.tensor([[3.], [4.], [5.], [6.]])
     bg = dgl.add_reverse_edges(g, copy_ndata=True, copy_edata=True)
+    assert g.number_of_nodes() == bg.number_of_nodes()
     assert F.array_equal(g.ndata['h'], bg.ndata['h'])
     assert F.array_equal(F.cat([g.edata['h'], g.edata['h']], dim=0), bg.edata['h'])
 
@@ -384,6 +385,8 @@ def test_add_reverse_edges():
     g.nodes['user'].data['hv'] = F.ones((5, 1))
     g.edges['wins'].data['h'] = F.tensor([0, 1, 2, 3, 4])
     bg = dgl.add_reverse_edges(g, copy_ndata=True, copy_edata=True, ignore_bipartite=True)
+    assert g.number_of_nodes('user') == bg.number_of_nodes('user')
+    assert g.number_of_nodes('game') == bg.number_of_nodes('game')
     assert F.array_equal(g.nodes['game'].data['hv'], bg.nodes['game'].data['hv'])
     assert F.array_equal(g.nodes['user'].data['hv'], bg.nodes['user'].data['hv'])
     assert F.array_equal(F.cat([g.edges['wins'].data['h'], g.edges['wins'].data['h']], dim=0),
