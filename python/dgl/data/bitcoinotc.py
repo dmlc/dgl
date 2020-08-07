@@ -18,13 +18,15 @@ class BitcoinOTCDataset(DGLBuiltinDataset):
     a platform called Bitcoin OTC. Since Bitcoin users are anonymous,
     there is a need to maintain a record of users' reputation to prevent
     transactions with fraudulent and risky users.
-    Offical website: https://snap.stanford.edu/data/soc-sign-bitcoin-otc.html
+
+    Offical website: `<https://snap.stanford.edu/data/soc-sign-bitcoin-otc.html>`_
 
     Bitcoin OTC dataset statistics:
-    Nodes: 5,881
-    Edges: 35,592
-    Range of edge weight: -10 to +10
-    Percentage of positive edges: 89%
+
+    - Nodes: 5,881
+    - Edges: 35,592
+    - Range of edge weight: -10 to +10
+    - Percentage of positive edges: 89%
 
     Parameters
     ----------
@@ -117,7 +119,12 @@ class BitcoinOTCDataset(DGLBuiltinDataset):
         return self._graphs
 
     def __len__(self):
-        r""" Number of graphs in the dataset """
+        r""" Number of graphs in the dataset.
+
+        Return
+        -------
+        int
+        """
         return len(self.graphs)
 
     def __getitem__(self, item):
@@ -130,9 +137,11 @@ class BitcoinOTCDataset(DGLBuiltinDataset):
 
         Returns
         -------
-        dgl.DGLGraph
-            The graph contains the graph structure and edge weights
-            - edata['h'] : edge weights
+        :class:`dgl.DGLGraph`
+
+            The graph contains:
+
+            - ``edata['h']`` : edge weights
         """
         return self.graphs[item]
 

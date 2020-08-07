@@ -5,7 +5,7 @@ from __future__ import absolute_import
 from abc import abstractmethod
 
 from .... import backend as F
-from ....frame import FrameRef, Frame
+from ...frame import FrameRef, Frame
 from .... import utils
 
 from .program import get_current_prog
