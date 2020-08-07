@@ -96,12 +96,9 @@ def main(args):
         if epoch % 5 == 0:
             score_list = []
             val_loss_list = []
-            for batch, valid_data in enumerate(valid_dataloader):
-                subgraph, feats, labels = valid_data
+            for batch, subgraph in enumerate(valid_dataloader):
                 subgraph = subgraph.to(device)
-                feats = feats.to(device)
-                labels = labels.to(device)
-                score, val_loss = evaluate(feats.float(), model, subgraph, labels.float(), loss_fcn)
+                score, val_loss = evaluate(subgraph.ndata['feat'], model, subgraph, subgraph.ndata['label'], loss_fcn)
                 score_list.append(score)
                 val_loss_list.append(val_loss)
             mean_score = np.array(score_list).mean()
