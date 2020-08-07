@@ -220,10 +220,8 @@ def run(args, dev_id, data):
 
     # Unpack data
     train_mask, val_mask, in_feats, labels, n_classes, g = data
-    train_nid = th.LongTensor(np.nonzero(train_mask)[0])
-    val_nid = th.LongTensor(np.nonzero(val_mask)[0])
-    train_mask = th.BoolTensor(train_mask)
-    val_mask = th.BoolTensor(val_mask)
+    train_nid = train_mask.nonzero()[:, 0]
+    val_nid = val_mask.nonzero()[:, 0]
 
     # Create sampler
     sampler = NeighborSampler(g, [int(_) for _ in args.fan_out.split(',')])
