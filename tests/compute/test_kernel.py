@@ -4,6 +4,8 @@ import networkx as nx
 import numpy as np
 import backend as F
 from itertools import product
+from test_utils import parametrize_dtype, get_cases
+import pytest
 
 def udf_copy_src(edges):
     return {'m': edges.src['u']}
@@ -179,6 +181,7 @@ def test_copy_edge_reduce():
         def _print_error(a, b):
             print("ERROR: Test copy_edge_{} partial: {}".
                   format(red, partial))
+            return
             for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
                 if not np.allclose(x, y):
                     print('@{} {} v.s. {}'.format(i, x, y))
@@ -291,19 +294,13 @@ def test_all_binary_builtins():
             lhs_grad_2 = F.grad(target_feature_switch(g, lhs))
             rhs_grad_2 = F.grad(target_feature_switch(g, rhs))
 
-        if reducer == 'prod':
-            # increase tolerance for prod reducer
-            # NOTE(zihao) as far as I know prod reducer has never
-            # been used in any gnn models.
-            rtol = 1e-2
-            atol = 1e-2
-        else:
-            rtol = 1e-4
-            atol = 1e-4
+        rtol = 1e-4
+        atol = 1e-4
 
         def _print_error(a, b):
             print("ERROR: Test {}_{}_{}_{} broadcast: {} partial: {}".
                   format(lhs, binary_op, rhs, reducer, broadcast, partial))
+            return
             if lhs == 'u':
                 lhs_data = hu
             elif lhs == 'v':
@@ -357,15 +354,25 @@ def test_all_binary_builtins():
     for lhs, rhs in product(target, target):
         if lhs == rhs:
             continue
-        for binary_op in ["add", "sub", "mul", "div", "dot"]:
-            for reducer in ["sum", "max", "min", "prod", "mean"]:
+        for binary_op in ["add", "sub", "mul", "div"]:
+            for reducer in ["sum", "max", "min", "mean"]:
                 for broadcast in ["none", lhs, rhs]:
                     for partial in [False, True]:
+                        print(lhs, rhs, binary_op, reducer, broadcast, partial)
                         _test(g, lhs, rhs, binary_op, reducer, partial, nid,
                               broadcast=broadcast)
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo-zero-degree']))
+def test_mean_zero_degree(g, idtype):
+    g = g.astype(idtype).to(F.ctx())
+    g.ndata['h'] = F.ones((g.number_of_nodes(), 3))
+    g.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'x'))
+    deg = F.asnumpy(g.in_degrees())
+    v = F.tensor(np.where(deg == 0)[0])
+    assert F.allclose(F.gather_row(g.ndata['x'], v), F.zeros((len(v), 3)))
 
 if __name__ == '__main__':
     test_copy_src_reduce()
     test_copy_edge_reduce()
     test_all_binary_builtins()
-

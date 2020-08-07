@@ -106,7 +106,6 @@ class GSpMM(th.autograd.Function):
             else:  # max/min
                 dY = th.zeros((Y.shape[0],) + dZ.shape[1:],
                               dtype=Y.dtype, device=Y.device)
-                print(X.shape, dZ.shape)
                 if op in ['mul',  'div']:
                     grad = _expand(X, dZ.shape[1:]).gather(
                         0, argX.long()) * dZ
