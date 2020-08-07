@@ -3,7 +3,7 @@
 import os
 
 from .graph_partition_book import PartitionPolicy, NODE_PART_POLICY, EDGE_PART_POLICY
-from .rpc_client import is_initialized
+from .dist_context import is_initialized
 from ..base import DGLError
 from .. import utils
 from .. import backend as F

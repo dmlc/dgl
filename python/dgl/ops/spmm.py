@@ -1,6 +1,9 @@
 """dgl spmm operator module."""
 import sys
+
+from ..base import dgl_warning
 from ..backend import gspmm as gspmm_internal
+from .. import backend as F
 
 __all__ = ['gspmm']
 
@@ -30,7 +33,7 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
         The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``,
         ``copy_lhs``, ``copy_rhs``.
     reduce_op : str
-        Reduce operator, could be ``sum``, ``max``, ``min``.
+        Reduce operator, could be ``sum``, ``max``, ``min``, ``mean``.
     lhs_data : tensor or None
         The left operand, could be None if it's not required by the op.
     rhs_data : tensor or None
@@ -41,7 +44,32 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     tensor
         The result tensor.
     """
-    return gspmm_internal(g._graph, op, reduce_op, lhs_data, rhs_data)
+    if op not in ['copy_lhs', 'copy_rhs']:
+        # Expand dims so that there will be no broadcasting issues with different
+        # number of dimensions. For example, given two shapes (N, 3, 1), (E, 5, 3, 4)
+        # that are valid broadcastable shapes, change them to (N, 1, 3, 1) and
+        # (E, 5, 3, 4)
+        lhs_shape = F.shape(lhs_data)
+        rhs_shape = F.shape(rhs_data)
+        if len(lhs_shape) != len(rhs_shape):
+            max_ndims = max(len(lhs_shape), len(rhs_shape))
+            lhs_pad_ndims = max_ndims - len(lhs_shape)
+            rhs_pad_ndims = max_ndims - len(rhs_shape)
+            new_lhs_shape = (lhs_shape[0],) + (1,) * lhs_pad_ndims + lhs_shape[1:]
+            new_rhs_shape = (rhs_shape[0],) + (1,) * rhs_pad_ndims + rhs_shape[1:]
+            lhs_data = F.reshape(lhs_data, new_lhs_shape)
+            rhs_data = F.reshape(rhs_data, new_rhs_shape)
+    if reduce_op == 'mean':
+        ret = gspmm_internal(g._graph, op, 'sum', lhs_data, rhs_data)
+        ret_shape = F.shape(ret)
+        deg = g.in_degrees()
+        if F.as_scalar(F.min(deg, dim=0)) == 0:
+            dgl_warning('Zero-degree nodes encountered in mean reducer. Setting the mean to 0.')
+        deg = F.astype(F.clamp(deg, 1, g.number_of_edges()), F.dtype(ret))
+        deg_shape = (ret_shape[0],) + (1,) * (len(ret_shape) - 1)
+        return ret / F.reshape(deg, deg_shape)
+    else:
+        return gspmm_internal(g._graph, op, reduce_op, lhs_data, rhs_data)
 
 
 def _gen_spmm_func(binary_op, reduce_op):
@@ -130,9 +158,14 @@ def _gen_copy_reduce_func(binary_op, reduce_op):
 
 
 def _register_spmm_func():
-    """Register spmm functions"""
+    """Register spmm functions
+
+    - Binary operation plus reduction between u and e: u_[]_e_[]
+    - Copy u plus reduction: copy_u_[]
+    - Copy e plus reduction: copy_e_[]
+    """
     for binary_op in ["add", "sub", "mul", "div", "copy_u", "copy_e"]:
-        for reduce_op in ["sum", "max", "min"]:
+        for reduce_op in ["sum", "max", "min", "mean"]:
             if binary_op.startswith("copy"):
                 func = _gen_copy_reduce_func(binary_op, reduce_op)
             else:
