@@ -121,7 +121,7 @@ class GAT(nn.Module):
         # compute edge attention
         graph.apply_edges(fn.u_dot_v('el', 'er', 'e'))
         e =  graph.edata.pop('e') / math.sqrt(self._out_feats * self._num_heads)
-        graph.edata['a'] = edge_softmax(graph, e).unsqueeze(-1)
+        graph.edata['a'] = edge_softmax(graph, e)
        # message passing
         graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                          fn.sum('m', 'ft2'))

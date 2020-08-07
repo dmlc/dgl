@@ -82,7 +82,7 @@ class NeighborSampler(object):
             block = dgl.to_block(frontier, seeds)
 
             # Pre-generate CSR format that it can be used in training directly
-            block.in_degree(0)
+            block.create_format_()
             # Obtain the seed nodes for next layer.
             seeds = block.srcdata[dgl.NID]
 
