@@ -206,24 +206,25 @@ class LinkPathSampler:
         bsize = pseeds.shape[0]
 
         g = self.g
-        p_rel = g.edata['etype'][pseeds]
-
         subg = g.edge_subgraph(pseeds)
         p_u, p_v = subg.edges()
-        subg = dgl.add_reverse_edges(subg, copy_ndata=True)
-        subg.edata['etype'] = th.cat([p_rel, p_rel + self.num_rel])
+        p_rel = subg.edata['etype']
 
         # only half of the edges will be used as graph structure
         pos_idx = np.random.choice(np.arange(bsize),
                                    size=bsize//2, replace=False)
         pos_idx = th.tensor(pos_idx).long()
-        subg.remove_edges(pos_idx)
+        subg = dgl.remove_edges(subg, pos_idx)
+        rels = subg.edata['etype']
+
+        subg = dgl.add_reverse_edges(subg, copy_ndata=True)
+        subg.edata['etype'] = th.cat([rels, rels + self.num_rel])
 
         # calculate norm for compact_subg
         in_deg = subg.in_degrees(range(subg.number_of_nodes())).float()
         norm = 1.0 / in_deg
         norm[th.isinf(norm)] = 0
-        subg.ndata['norm'] = norm
+        subg.ndata['norm'] = norm.long()
         subg.apply_edges(lambda edges : {'norm' : edges.dst['norm']})
         subg.edata['norm'] = subg.edata['norm'].unsqueeze(1)
         return (bsize, subg, p_u, p_v, p_rel)
@@ -578,6 +579,7 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
         model.cuda(dev_id)
         if args.mix_cpu_gpu is False:
             embed_layer.cuda(dev_id)
+            embed_layer.node_embeds.cuda(dev_id)
 
     if n_gpus > 1:
         embed_layer = DistributedDataParallel(embed_layer, device_ids=[dev_id], output_device=dev_id)
@@ -664,7 +666,7 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
             dur = t1 - t0
             print("Epoch {} takes {} seconds".format(epoch, dur))
 
-        if epoch > 1 and epoch % 20 == 0:
+        if epoch > 1 and epoch % 10 == 0:
             # We use multi-gpu evaluation to speed things up
             fullgraph_eval(valid_g,
                         embed_layer,
@@ -793,7 +795,7 @@ def main(args, devices):
         norm = norm.unsqueeze(1)
         valid_g.edata['norm'] = norm
     else:
-        valid_g.edata['norm'] = th.full((eid.shape[0],1), 1)
+        valid_g.edata['norm'] = th.full((eid.shape[0],1), 1).long()
         for rel_id in range(edge_rels):
             idx = (valid_g.edata['etype'] == rel_id)
             u_r = u[idx]
@@ -802,7 +804,7 @@ def main(args, devices):
             degrees = count[inverse_index]
             norm = th.ones(v_r.shape[0]) / degrees
             norm = norm.unsqueeze(1)
-            valid_g.edata['norm'][idx] = norm
+            valid_g.edata['norm'][idx] = norm.long()
     valid_g.edata['norm'].share_memory_()
     valid_g.edata['etype'].share_memory_()
     valid_g.ndata['ntype'].share_memory_()
@@ -818,9 +820,9 @@ def main(args, devices):
         degrees = count[inverse_index]
         norm = th.ones(v.shape[0]) / degrees
         norm = norm.unsqueeze(1)
-        test_g.edata['norm'] = norm
+        test_g.edata['norm'] = norm.long()
     else:
-        test_g.edata['norm'] = th.full((eid.shape[0],1), 1)
+        test_g.edata['norm'] = th.full((eid.shape[0],1), 1).long()
         for rel_id in range(edge_rels):
             idx = (test_g.edata['etype'] == rel_id)
             u_r = u[idx]
@@ -829,7 +831,7 @@ def main(args, devices):
             degrees = count[inverse_index]
             norm = th.ones(v_r.shape[0]) / degrees
             norm = norm.unsqueeze(1)
-            test_g.edata['norm'][idx] = norm
+            test_g.edata['norm'][idx] = norm.long()
     test_g.edata['norm'].share_memory_()
     test_g.edata['etype'].share_memory_()
     test_g.ndata['ntype'].share_memory_()

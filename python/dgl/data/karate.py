@@ -16,7 +16,7 @@ class KarateClubDataset(DGLDataset):
 
     .. deprecated:: 0.5.0
 
-        ``data`` is deprecated, it is replaced by:
+        - ``data`` is deprecated, it is replaced by:
 
             >>> dataset = KarateClubDataset()
             >>> g = dataset[0]

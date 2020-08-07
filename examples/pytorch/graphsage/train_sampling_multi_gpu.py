@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
+import math
 import argparse
 from dgl.data import RedditDataset
 from torch.nn.parallel import DistributedDataParallel
@@ -145,7 +146,7 @@ def run(proc_id, n_gpus, args, devices, data):
     test_nid = test_mask.nonzero()[:, 0]
 
     # Split train_nid
-    train_nid = th.split(train_nid, len(train_nid) // n_gpus)[proc_id]
+    train_nid = th.split(train_nid, math.ceil(len(train_nid) // n_gpus))[proc_id]
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.sampling.MultiLayerNeighborSampler(
