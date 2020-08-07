@@ -72,7 +72,7 @@ class EdgeBatch(object):
         Tensor
             Edge IDs.
         """
-        u, v = self._graph.find_edges(self._eid, etype=self.etype)
+        u, v = self._graph.find_edges(self._eid, etype=self.canonical_etype)
         return u, v, self._eid
 
     def batch_size(self):

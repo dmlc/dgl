@@ -6,7 +6,7 @@ For stochastic subgraph extraction, please see functions under :mod:`dgl.samplin
 from collections.abc import Mapping
 
 from ._ffi.function import _init_api
-from .base import NID, EID, DGLError
+from .base import DGLError
 from . import backend as F
 from . import graph_index
 from . import heterograph_index
