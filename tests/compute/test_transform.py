@@ -668,61 +668,6 @@ def test_reorder_nodes():
         old_neighs2 = g.predecessors(old_nid)
         assert np.all(np.sort(old_neighs1) == np.sort(F.asnumpy(old_neighs2)))
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
-@parametrize_dtype
-def test_in_subgraph(idtype):
-    g1 = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)], 'user', 'follow', idtype=idtype)
-    g2 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game', idtype=idtype)
-    g3 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user', idtype=idtype)
-    g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', idtype=idtype)
-    hg = dgl.hetero_from_relations([g1, g2, g3, g4])
-    subg = dgl.in_subgraph(hg, {'user' : [0,1], 'game' : 0})
-    assert subg.idtype == idtype
-    assert len(subg.ntypes) == 3
-    assert len(subg.etypes) == 4
-    u, v = subg['follow'].edges()
-    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert F.array_equal(hg['follow'].edge_ids(u, v), subg['follow'].edata[dgl.EID])
-    assert edge_set == {(1,0),(2,0),(3,0),(0,1),(2,1),(3,1)}
-    u, v = subg['play'].edges()
-    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert F.array_equal(hg['play'].edge_ids(u, v), subg['play'].edata[dgl.EID])
-    assert edge_set == {(0,0)}
-    u, v = subg['liked-by'].edges()
-    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert F.array_equal(hg['liked-by'].edge_ids(u, v), subg['liked-by'].edata[dgl.EID])
-    assert edge_set == {(2,0),(2,1),(1,0),(0,0)}
-    assert subg['flips'].number_of_edges() == 0
-
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
-@parametrize_dtype
-def test_out_subgraph(idtype):
-    g1 = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)], 'user', 'follow', idtype=idtype)
-    g2 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game', idtype=idtype)
-    g3 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user', idtype=idtype)
-    g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', idtype=idtype)
-    hg = dgl.hetero_from_relations([g1, g2, g3, g4])
-    subg = dgl.out_subgraph(hg, {'user' : [0,1], 'game' : 0})
-    assert subg.idtype == idtype
-    assert len(subg.ntypes) == 3
-    assert len(subg.etypes) == 4
-    u, v = subg['follow'].edges()
-    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert edge_set == {(1,0),(0,1),(0,2)}
-    assert F.array_equal(hg['follow'].edge_ids(u, v), subg['follow'].edata[dgl.EID])
-    u, v = subg['play'].edges()
-    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert edge_set == {(0,0),(0,1),(1,2)}
-    assert F.array_equal(hg['play'].edge_ids(u, v), subg['play'].edata[dgl.EID])
-    u, v = subg['liked-by'].edges()
-    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert edge_set == {(0,0)}
-    assert F.array_equal(hg['liked-by'].edge_ids(u, v), subg['liked-by'].edata[dgl.EID])
-    u, v = subg['flips'].edges()
-    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert edge_set == {(0,0),(1,0)}
-    assert F.array_equal(hg['flips'].edge_ids(u, v), subg['flips'].edata[dgl.EID])
-
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 @parametrize_dtype
 def test_compact(idtype):

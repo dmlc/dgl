@@ -43,8 +43,6 @@ __all__ = [
     'to_block',
     'to_simple',
     'to_simple_graph',
-    'in_subgraph',
-    'out_subgraph',
     'as_immutable_graph',
     'as_heterograph']
 
@@ -1907,90 +1905,6 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
         new_graph.edges[canonical_etype].data[EID] = induced_edges
 
     return new_graph
-
-def in_subgraph(g, nodes):
-    """Extract the subgraph containing only the in edges of the given nodes.
-
-    The subgraph keeps the same type schema and the cardinality of the original one.
-    Node/edge features are not preserved. The original IDs
-    the extracted edges are stored as the `dgl.EID` feature in the returned graph.
-
-    Parameters
-    ----------
-    g : DGLHeteroGraph
-        Full graph structure.
-    nodes : tensor or dict
-        Node ids to sample neighbors from. The allowed types
-        are dictionary of node types to node id tensors, or simply node id tensor if
-        the given graph g has only one type of nodes.
-
-    Returns
-    -------
-    DGLHeteroGraph
-        The subgraph.
-    """
-    if g.is_block:
-        raise DGLError('Extracting subgraph of a block graph is not allowed.')
-    if not isinstance(nodes, dict):
-        if len(g.ntypes) > 1:
-            raise DGLError("Must specify node type when the graph is not homogeneous.")
-        nodes = {g.ntypes[0] : nodes}
-    nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
-    nodes_all_types = []
-    for ntype in g.ntypes:
-        if ntype in nodes:
-            nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
-        else:
-            nodes_all_types.append(nd.NULL[g._idtype_str])
-
-    subgidx = _CAPI_DGLInSubgraph(g._graph, nodes_all_types)
-    induced_edges = subgidx.induced_edges
-    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
-    for i, etype in enumerate(ret.canonical_etypes):
-        ret.edges[etype].data[EID] = induced_edges[i]
-    return ret
-
-def out_subgraph(g, nodes):
-    """Extract the subgraph containing only the out edges of the given nodes.
-
-    The subgraph keeps the same type schema and the cardinality of the original one.
-    Node/edge features are not preserved. The original IDs
-    the extracted edges are stored as the `dgl.EID` feature in the returned graph.
-
-    Parameters
-    ----------
-    g : DGLHeteroGraph
-        Full graph structure.
-    nodes : tensor or dict
-        Node ids to sample neighbors from. The allowed types
-        are dictionary of node types to node id tensors, or simply node id tensor if
-        the given graph g has only one type of nodes.
-
-    Returns
-    -------
-    DGLHeteroGraph
-        The subgraph.
-    """
-    if g.is_block:
-        raise DGLError('Extracting subgraph of a block graph is not allowed.')
-    if not isinstance(nodes, dict):
-        if len(g.ntypes) > 1:
-            raise DGLError("Must specify node type when the graph is not homogeneous.")
-        nodes = {g.ntypes[0] : nodes}
-    nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
-    nodes_all_types = []
-    for ntype in g.ntypes:
-        if ntype in nodes:
-            nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
-        else:
-            nodes_all_types.append(nd.NULL[g._idtype_str])
-
-    subgidx = _CAPI_DGLOutSubgraph(g._graph, nodes_all_types)
-    induced_edges = subgidx.induced_edges
-    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
-    for i, etype in enumerate(ret.canonical_etypes):
-        ret.edges[etype].data[EID] = induced_edges[i]
-    return ret
 
 def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True, copy_edata=False):
     r"""Convert a graph to a simple graph without duplicate edges.
