@@ -216,12 +216,12 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
         vwgt = F.stack(vwgt, 1)
         shape = (np.prod(F.shape(vwgt),),)
         vwgt = F.reshape(vwgt, shape)
-        vwgt = F.zerocopy_to_dgl_ndarray(vwgt)
+        vwgt = F.to_dgl_nd(vwgt)
         print(
             'Construct multi-constraint weights: {:.3f} seconds'.format(time.time() - start))
     else:
         vwgt = F.zeros((0,), F.int64, F.cpu())
-        vwgt = F.zerocopy_to_dgl_ndarray(vwgt)
+        vwgt = F.to_dgl_nd(vwgt)
 
     start = time.time()
     node_part = _CAPI_DGLMetisPartition_Hetero(sym_g._graph, k, vwgt)
