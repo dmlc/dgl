@@ -80,9 +80,10 @@ class NeighborSampler(object):
             frontier = dgl.remove_edges(frontier, edge_ids)
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.to_block(frontier, seeds)
+            block = block.int()
 
             # Pre-generate CSR format that it can be used in training directly
-            block.in_degree(0)
+            block.create_format_()
             # Obtain the seed nodes for next layer.
             seeds = block.srcdata[dgl.NID]
 
@@ -149,6 +150,7 @@ class SAGE(nn.Module):
                 end = start + batch_size
                 batch_nodes = nodes[start:end]
                 block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
+                block = block.int()
                 block = block.to(device)
                 input_nodes = block.srcdata[dgl.NID]
 
@@ -342,6 +344,7 @@ def main(args, devices):
     val_mask = g.ndata['val_mask']
     test_mask = g.ndata['test_mask']
     g.ndata['features'] = features
+    g.create_format_()
     # Pack data
     data = train_mask, val_mask, test_mask, in_feats, labels, n_classes, g
 
