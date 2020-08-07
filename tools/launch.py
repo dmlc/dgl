@@ -7,6 +7,7 @@ import argparse
 import signal
 import logging
 import time
+import json
 from threading import Thread
 
 def execute_remote(cmd, ip, thread_list):
@@ -26,6 +27,8 @@ def submit_jobs(args, udf_command):
     hosts = []
     thread_list = []
     server_count_per_machine = 0
+
+    # Get the IP addresses of the cluster.
     ip_config = args.workspace + '/' + args.ip_config
     with open(ip_config) as f:
         for line in f:
@@ -34,9 +37,20 @@ def submit_jobs(args, udf_command):
             count = int(count)
             server_count_per_machine = count
             hosts.append((ip, port))
+
+    # Get partition info of the graph data
+    part_config = args.workspace + '/' + args.part_config
+    with open(part_config) as conf_f:
+        part_metadata = json.load(conf_f)
+    assert 'num_parts' in part_metadata, 'num_parts does not exist.'
+    # The number of partitions must match the number of machines in the cluster.
+    assert part_metadata['num_parts'] == len(hosts), \
+            'The number of graph partitions has to match the number of machines in the cluster.'
+
     tot_num_clients = args.num_trainers * (1 + args.num_samplers) * len(hosts)
     # launch server tasks
     server_cmd = 'DGL_ROLE=server'
+    server_cmd = server_cmd + ' ' + 'OMP_NUM_THREADS=1'
     server_cmd = server_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(tot_num_clients)
     server_cmd = server_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.part_config)
     server_cmd = server_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
