@@ -80,12 +80,12 @@ def train(model, G):
 device = torch.device("cuda:0")
 
 G = dgl.heterograph({
-        ('paper', 'written-by', 'author') : data['PvsA'],
-        ('author', 'writing', 'paper') : data['PvsA'].transpose(),
-        ('paper', 'citing', 'paper') : data['PvsP'],
-        ('paper', 'cited', 'paper') : data['PvsP'].transpose(),
-        ('paper', 'is-about', 'subject') : data['PvsL'],
-        ('subject', 'has', 'paper') : data['PvsL'].transpose(),
+        ('paper', 'written-by', 'author') : data['PvsA'].nonzero(),
+        ('author', 'writing', 'paper') : data['PvsA'].transpose().nonzero(),
+        ('paper', 'citing', 'paper') : data['PvsP'].nonzero(),
+        ('paper', 'cited', 'paper') : data['PvsP'].transpose().nonzero(),
+        ('paper', 'is-about', 'subject') : data['PvsL'].nonzero(),
+        ('subject', 'has', 'paper') : data['PvsL'].transpose().nonzero(),
     })
 print(G)
 

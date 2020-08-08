@@ -181,8 +181,8 @@ class PinSAGESampler(RandomWalkNeighborSampler):
 
     >>> g = scipy.sparse.random(3000, 5000, 0.003)
     >>> G = dgl.heterograph({
-    ...     ('A', 'AB', 'B'): g,
-    ...     ('B', 'BA', 'A'): g.T})
+    ...     ('A', 'AB', 'B'): g.nonzero(),
+    ...     ('B', 'BA', 'A'): g.T.nonzero()})
 
     Then we create a PinSAGE neighbor sampler that samples a graph of node type "A".  Each
     node would have (a maximum of) 10 neighbors.

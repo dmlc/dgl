@@ -107,31 +107,6 @@ ratings = dgl.heterograph(
      ('user', '-1', 'movie') : (np.array([2]), np.array([1]))})
 
 ###############################################################################
-# DGL supports creating a graph from a variety of data sources. The following
-# code creates the same graph as the above.
-#
-# Creating from scipy matrix
-import scipy.sparse as sp
-plus1 = sp.coo_matrix(([1, 1, 1], ([0, 0, 1], [0, 1, 0])), shape=(3, 2))
-minus1 = sp.coo_matrix(([1], ([2], [1])), shape=(3, 2))
-ratings = dgl.heterograph(
-    {('user', '+1', 'movie') : plus1,
-     ('user', '-1', 'movie') : minus1})
-
-# Creating from networkx graph
-import networkx as nx
-plus1 = nx.DiGraph()
-plus1.add_nodes_from(['u0', 'u1', 'u2'], bipartite=0)
-plus1.add_nodes_from(['m0', 'm1'], bipartite=1)
-plus1.add_edges_from([('u0', 'm0'), ('u0', 'm1'), ('u1', 'm0')])
-# To simplify the example, reuse the minus1 object.
-# This also means that you could use different sources of graph data
-# for different relationships.
-ratings = dgl.heterograph(
-    {('user', '+1', 'movie') : plus1,
-     ('user', '-1', 'movie') : minus1})
-
-###############################################################################
 # Manipulating heterograph
 # ------------------------
 # You can create a more realistic heterograph using the ACM dataset. To do this, first 
@@ -163,7 +138,7 @@ print('#Links:', data['PvsA'].nnz)
 ###############################################################################
 # Converting this SciPy matrix to a heterograph in DGL is straightforward.
 
-pa_g = dgl.heterograph({('paper', 'written-by', 'author') : data['PvsA']})
+pa_g = dgl.heterograph({('paper', 'written-by', 'author') : data['PvsA'].nonzero()})
 # equivalent (shorter) API for creating heterograph with two node types:
 pa_g = dgl.bipartite(data['PvsA'], 'paper', 'written-by', 'author')
 
@@ -206,12 +181,12 @@ print(pp_g.successors(3))
 # relationship to prepare for the later sections.
 
 G = dgl.heterograph({
-        ('paper', 'written-by', 'author') : data['PvsA'],
-        ('author', 'writing', 'paper') : data['PvsA'].transpose(),
-        ('paper', 'citing', 'paper') : data['PvsP'],
-        ('paper', 'cited', 'paper') : data['PvsP'].transpose(),
-        ('paper', 'is-about', 'subject') : data['PvsL'],
-        ('subject', 'has', 'paper') : data['PvsL'].transpose(),
+        ('paper', 'written-by', 'author') : data['PvsA'].nonzero(),
+        ('author', 'writing', 'paper') : data['PvsA'].transpose().nonzero(),
+        ('paper', 'citing', 'paper') : data['PvsP'].nonzero(),
+        ('paper', 'cited', 'paper') : data['PvsP'].transpose().nonzero(),
+        ('paper', 'is-about', 'subject') : data['PvsL'].nonzero(),
+        ('subject', 'has', 'paper') : data['PvsL'].transpose().nonzero(),
     })
 
 print(G)

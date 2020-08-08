@@ -46,18 +46,11 @@ def create_test_heterograph1(idtype):
     return dgl.to_hetero(g0, ['user', 'game', 'developer'], ['follows', 'plays', 'wishes', 'develops'])
 
 def create_test_heterograph2(idtype):
-    plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
-    wishes_nx = nx.DiGraph()
-    wishes_nx.add_nodes_from(['u0', 'u1', 'u2'], bipartite=0)
-    wishes_nx.add_nodes_from(['g0', 'g1'], bipartite=1)
-    wishes_nx.add_edge('u0', 'g1', id=0)
-    wishes_nx.add_edge('u2', 'g0', id=1)
-
     g = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
-        ('user', 'plays', 'game'): plays_spmat,
-        ('user', 'wishes', 'game'): wishes_nx,
-        ('developer', 'develops', 'game'): (F.tensor([0, 1]), F.tensor([0, 1])),
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2, 1], [0, 0, 1, 1]),
+        ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
+        ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
         }, idtype=idtype, device=F.ctx())
     assert g.idtype == idtype
     assert g.device == F.ctx()
@@ -79,9 +72,9 @@ def create_test_heterograph3(idtype):
 def create_test_heterograph4(idtype):
     g = dgl.heterograph({
         ('user', 'follows', 'user'): (F.tensor([0, 1, 1, 2, 2, 2], dtype=idtype),
-                                    F.tensor([0, 0, 1, 1, 2, 2], dtype=idtype)),
+                                      F.tensor([0, 0, 1, 1, 2, 2], dtype=idtype)),
         ('user', 'plays', 'game'): (F.tensor([0, 1], dtype=idtype),
-                                            F.tensor([0, 1], dtype=idtype))},
+                                    F.tensor([0, 1], dtype=idtype))},
         idtype=idtype, device=F.ctx())
     g.ndata['h'] = {'user' : F.copy_to(F.tensor([1, 1, 1], dtype=idtype), ctx=F.ctx()),
                     'game' : F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())}
@@ -92,7 +85,7 @@ def create_test_heterograph4(idtype):
 def create_test_heterograph5(idtype):
     g = dgl.heterograph({
         ('user', 'follows', 'user'): (F.tensor([1, 2], dtype=idtype),
-                                    F.tensor([0, 1], dtype=idtype)),
+                                      F.tensor([0, 1], dtype=idtype)),
         ('user', 'plays', 'game'): (F.tensor([0, 1], dtype=idtype),
                                     F.tensor([0, 1], dtype=idtype))},
         idtype=idtype, device=F.ctx())
@@ -133,9 +126,9 @@ def test_create(idtype):
 
     # test inferring number of nodes for heterograph
     g = dgl.heterograph({
-        ('l0', 'e0', 'l1'): [(0, 1), (0, 2)],
-        ('l0', 'e1', 'l2'): [(2, 2)],
-        ('l2', 'e2', 'l2'): [(1, 1), (3, 3)],
+        ('l0', 'e0', 'l1'): ([0, 0], [1, 2]),
+        ('l0', 'e1', 'l2'): ([2], [2]),
+        ('l2', 'e2', 'l2'): ([1, 3], [1, 3])
         }, idtype=idtype, device=device)
     assert g.number_of_nodes('l0') == 3
     assert g.number_of_nodes('l1') == 3
@@ -331,8 +324,8 @@ def test_hypersparse():
     N2 = 1 << 48
 
     g = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1)],
-        ('user', 'plays', 'game'): [(0, N2)]},
+        ('user', 'follows', 'user'): ([0], [1]),
+        ('user', 'plays', 'game'): ([0], [N2])},
         {'user': N1, 'game': N1},
         idtype=F.int64, device=F.ctx())
     assert g.number_of_nodes('user') == N1
@@ -396,15 +389,15 @@ def test_edge_ids():
     N2 = 1 << 48
 
     g = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1)],
-        ('user', 'plays', 'game'): [(0, N2)]},
+        ('user', 'follows', 'user'): ([0], [1]),
+        ('user', 'plays', 'game'): ([0], [N2])},
         {'user': N1, 'game': N1})
     with pytest.raises(DGLError):
         eid = g.edge_ids(0, 0, etype='follows')
 
     g2 = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (0, 1)],
-        ('user', 'plays', 'game'): [(0, N2)]},
+        ('user', 'follows', 'user'): ([0, 0], [1, 1]),
+        ('user', 'plays', 'game'): ([0], [N2])},
         {'user': N1, 'game': N1})
 
     eid = g2.edge_ids(0, 1, etype='follows')
@@ -509,7 +502,7 @@ def test_inc(idtype):
 def test_view(idtype):
     # test single node type
     g = dgl.heterograph({
-        ('user', 'follows', 'user'): [[0, 1], [1, 2]]
+        ('user', 'follows', 'user'): ([0, 1], [1, 2])
     }, idtype=idtype, device=F.ctx())
     f1 = F.randn((3, 6))
     g.ndata['h'] = f1
@@ -1588,24 +1581,18 @@ def test_empty_heterograph(idtype):
         assert g.number_of_edges('plays') == 0
         assert g.number_of_nodes('game') == 0
 
-    # empty edge list
-    assert_empty(dgl.heterograph({('user', 'plays', 'game'): []}))
     # empty src-dst pair
     assert_empty(dgl.heterograph({('user', 'plays', 'game'): ([], [])}))
-    # empty sparse matrix
-    assert_empty(dgl.heterograph({('user', 'plays', 'game'): ssp.coo_matrix((0, 0))}))
-    # empty networkx graph
-    assert_empty(dgl.heterograph({('user', 'plays', 'game'): nx.DiGraph()}))
 
-    g = dgl.heterograph({('user', 'follows', 'user'): []}, idtype=idtype, device=F.ctx())
+    g = dgl.heterograph({('user', 'follows', 'user'): ([], [])}, idtype=idtype, device=F.ctx())
     assert g.idtype == idtype
     assert g.device == F.ctx()
     assert g.number_of_nodes('user') == 0
     assert g.number_of_edges('follows') == 0
 
     # empty relation graph with others
-    g = dgl.heterograph({('user', 'plays', 'game'): [], ('developer', 'develops', 'game'): [
-                        (0, 0), (1, 1)]}, idtype=idtype, device=F.ctx())
+    g = dgl.heterograph({('user', 'plays', 'game'): ([], []), ('developer', 'develops', 'game'):
+        ([0, 1], [0, 1])}, idtype=idtype, device=F.ctx())
     assert g.idtype == idtype
     assert g.device == F.ctx()
     assert g.number_of_nodes('user') == 0
@@ -1698,7 +1685,7 @@ def test_stack_reduce(idtype):
 @parametrize_dtype
 def test_isolated_ntype(idtype):
     g = dgl.heterograph({
-        ('A', 'AB', 'B'): [(0, 1), (1, 2), (2, 3)]},
+        ('A', 'AB', 'B'): ([0, 1, 2], [1, 2, 3])},
         num_nodes_dict={'A': 3, 'B': 4, 'C': 4},
         idtype=idtype, device=F.ctx())
     assert g.number_of_nodes('A') == 3
@@ -1706,7 +1693,7 @@ def test_isolated_ntype(idtype):
     assert g.number_of_nodes('C') == 4
 
     g = dgl.heterograph({
-        ('A', 'AC', 'C'): [(0, 1), (1, 2), (2, 3)]},
+        ('A', 'AC', 'C'): ([0, 1, 2], [1, 2, 3])},
         num_nodes_dict={'A': 3, 'B': 4, 'C': 4},
         idtype=idtype, device=F.ctx())
     assert g.number_of_nodes('A') == 3
@@ -1735,23 +1722,23 @@ def test_ismultigraph(idtype):
     g4 = dgl.graph(([0, 0, 1], [1, 1, 2]), num_nodes=6, idtype=idtype, device=F.ctx())
     assert g4.is_multigraph == True
     g = dgl.heterograph({
-        ('A', 'AB', 'B'): [[0, 0, 1, 2], [1, 2, 5, 5]],
-        ('A', 'AA', 'A'): [[0, 1], [1, 2]]},
+        ('A', 'AB', 'B'): ([0, 0, 1, 2], [1, 2, 5, 5]),
+        ('A', 'AA', 'A'): ([0, 1], [1, 2])},
         {'A': 6, 'B': 6}, idtype=idtype, device=F.ctx())
     assert g.is_multigraph == False
     g = dgl.heterograph({
-        ('A', 'AB', 'B'): [[0, 0, 1, 2], [1, 2, 5, 5]],
-        ('A', 'AC', 'C'): [[0, 0, 0, 1], [1, 1, 2, 5]]},
+        ('A', 'AB', 'B'): ([0, 0, 1, 2], [1, 2, 5, 5]),
+        ('A', 'AC', 'C'): ([0, 0, 0, 1], [1, 1, 2, 5])},
         {'A': 6, 'B': 6, 'C': 6}, idtype=idtype, device=F.ctx())
     assert g.is_multigraph == True
     g = dgl.heterograph({
-        ('A', 'AB', 'B'): [[0, 0, 1, 2], [1, 2, 5, 5]],
-        ('A', 'AA', 'A'): [[0, 0, 1], [1, 1, 2]]},
+        ('A', 'AB', 'B'): ([0, 0, 1, 2], [1, 2, 5, 5]),
+        ('A', 'AA', 'A'): ([0, 0, 1], [1, 1, 2])},
         {'A': 6, 'B': 6}, idtype=idtype, device=F.ctx())
     assert g.is_multigraph == True
     g = dgl.heterograph({
-        ('A', 'AC', 'C'): [[0, 0, 0, 1], [1, 1, 2, 5]],
-        ('A', 'AA', 'A'): [[0, 1], [1, 2]]},
+        ('A', 'AC', 'C'): ([0, 0, 0, 1], [1, 1, 2, 5]),
+        ('A', 'AA', 'A'): ([0, 1], [1, 2])},
         {'A': 6, 'C': 6}, idtype=idtype, device=F.ctx())
     assert g.is_multigraph == True
 
@@ -1801,9 +1788,9 @@ def test_bipartite(idtype):
     assert F.array_equal(g2.nodes['SRC/A'].data['h'], g2.srcdata['h'])
 
     g3 = dgl.heterograph({
-        ('A', 'AB', 'B'): [[0, 0, 1], [1, 2, 5]],
-        ('A', 'AC', 'C'): [[1, 0], [0, 0]],
-        ('A', 'AA', 'A'): [[0, 1], [0, 1]]
+        ('A', 'AB', 'B'): ([0, 0, 1], [1, 2, 5]),
+        ('A', 'AC', 'C'): ([1, 0], [0, 0]),
+        ('A', 'AA', 'A'): ([0, 1], [0, 1])
     }, idtype=idtype, device=F.ctx())
     assert not g3.is_unibipartite
 
@@ -1834,9 +1821,9 @@ def test_format(idtype):
 
     # multiple relation
     g = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
-        ('user', 'plays', 'game'): [(0, 0), (1, 0), (1, 1), (2, 1)],
-        ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
+        ('developer', 'develops', 'game'): ([0, 1], [0, 1])
         }, idtype=idtype, device=F.ctx())
     user_feat = F.randn((g['follows'].number_of_src_nodes(), 5))
     g['follows'].srcdata['h'] = user_feat

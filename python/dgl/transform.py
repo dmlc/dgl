@@ -1172,7 +1172,7 @@ def remove_self_loop(g, etype=None):
     **Homogeneous Graphs or Heterogeneous Graphs with A Single Node Type**
 
     >>> g = dgl.graph((torch.tensor([0, 0, 0, 1]), torch.tensor([1, 0, 0, 2])),
-                        idtype=idtype, device=F.ctx())
+    >>>                idtype=idtype, device=F.ctx())
     >>> g.edata['he'] = torch.arange(4).float().reshape(-1, 1)
     >>> g = dgl.remove_self_loop(g)
     >>> g

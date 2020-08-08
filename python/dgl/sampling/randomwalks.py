@@ -90,9 +90,9 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
 
     Metapath-based random walk:
     >>> g2 = dgl.heterograph({
-    ...     ('user', 'follow', 'user'): [(0, 1), (1, 2), (1, 3), (2, 0), (3, 0)],
-    ...     ('user', 'view', 'item'): [(0, 0), (0, 1), (1, 1), (2, 2), (3, 2), (3, 1)],
-    ...     ('item', 'viewed-by', 'user'): [(0, 0), (1, 0), (1, 1), (2, 2), (2, 3), (1, 3)]})
+    ...     ('user', 'follow', 'user'): ([0, 1, 1, 2, 3], [1, 2, 3, 0, 0]),
+    ...     ('user', 'view', 'item'): ([0, 0, 1, 2, 3, 3], [0, 1, 1, 2, 2, 1]),
+    ...     ('item', 'viewed-by', 'user'): ([0, 1, 1, 2, 2, 1], [0, 0, 1, 2, 3, 3])
     >>> dgl.sampling.random_walk(
     ...     g2, [0, 1, 2, 0], metapath=['follow', 'view', 'viewed-by'] * 2)
     (tensor([[0, 1, 1, 1, 2, 2, 3],
@@ -184,9 +184,9 @@ def pack_traces(traces, types):
     Examples
     --------
     >>> g2 = dgl.heterograph({
-    ...     ('user', 'follow', 'user'): [(0, 1), (1, 2), (1, 3), (2, 0), (3, 0)],
-    ...     ('user', 'view', 'item'): [(0, 0), (0, 1), (1, 1), (2, 2), (3, 2), (3, 1)],
-    ...     ('item', 'viewed-by', 'user'): [(0, 0), (1, 0), (1, 1), (2, 2), (2, 3), (1, 3)]})
+    ...     ('user', 'follow', 'user'): ([0, 1, 1, 2, 3], [1, 2, 3, 0, 0]),
+    ...     ('user', 'view', 'item'): ([0, 0, 1, 2, 3, 3], [0, 1, 1, 2, 2, 1]),
+    ...     ('item', 'viewed-by', 'user'): ([0, 1, 1, 2, 2, 1], [0, 0, 1, 2, 3, 3])
     >>> traces, types = dgl.sampling.random_walk(
     ...     g2, [0, 0], metapath=['follow', 'view', 'viewed-by'] * 2,
     ...     restart_prob=torch.FloatTensor([0, 0.5, 0, 0, 0.5, 0]))

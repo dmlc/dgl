@@ -479,9 +479,9 @@ def myagg(alist, dsttype):
 @pytest.mark.parametrize('agg', ['sum', 'max', 'min', 'mean', 'stack', myagg])
 def test_hetero_conv(agg, idtype):
     g = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (0, 2), (2, 1), (1, 3)],
-        ('user', 'plays', 'game'): [(0, 0), (0, 2), (0, 3), (1, 0), (2, 2)],
-        ('store', 'sells', 'game'): [(0, 0), (0, 3), (1, 1), (1, 2)]},
+        ('user', 'follows', 'user'): ([0, 0, 2, 1], [1, 2, 1, 3]),
+        ('user', 'plays', 'game'): ([0, 0, 0, 1, 2], [0, 2, 3, 0, 2]),
+        ('store', 'sells', 'game'): ([0, 0, 1, 1], [0, 3, 1, 2])},
         idtype=idtype, device=F.ctx())
     conv = nn.HeteroGraphConv({
         'follows': nn.GraphConv(2, 3),

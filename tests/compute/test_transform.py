@@ -27,8 +27,7 @@ def test_line_graph1():
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_line_graph2(idtype):
-    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
-        'user', 'follows', idtype=idtype)
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), idtype=idtype)
     lg = dgl.line_graph(g)
     assert lg.number_of_nodes() == 5
     assert lg.number_of_edges() == 8
@@ -46,8 +45,7 @@ def test_line_graph2(idtype):
                           np.array([0, 1, 2, 4]))
     assert np.array_equal(F.asnumpy(col),
                           np.array([4, 0, 3, 1]))
-    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
-        'user', 'follows', idtype=idtype).formats('csr')
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), idtype=idtype).formats('csr')
     lg = dgl.line_graph(g)
     assert lg.number_of_nodes() == 5
     assert lg.number_of_edges() == 8
@@ -57,8 +55,7 @@ def test_line_graph2(idtype):
     assert np.array_equal(F.asnumpy(col),
                           np.array([3, 4, 0, 3, 4, 0, 1, 2]))
 
-    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 
-        'user', 'follows', idtype=idtype).formats('csc')
+    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), idtype=idtype).formats('csc')
     lg = dgl.line_graph(g)
     assert lg.number_of_nodes() == 5
     assert lg.number_of_edges() == 8
@@ -650,18 +647,18 @@ def test_out_subgraph(idtype):
 @parametrize_dtype
 def test_compact(idtype):
     g1 = dgl.heterograph({
-        ('user', 'follow', 'user'): [(1, 3), (3, 5)],
-        ('user', 'plays', 'game'): [(2, 4), (3, 4), (2, 5)],
-        ('game', 'wished-by', 'user'): [(6, 7), (5, 7)]},
+        ('user', 'follow', 'user'): ([1, 3], [3, 5]),
+        ('user', 'plays', 'game'): ([2, 3, 2], [4, 4, 5]),
+        ('game', 'wished-by', 'user'): ([6, 5], [7, 7])},
         {'user': 20, 'game': 10}, idtype=idtype)
 
     g2 = dgl.heterograph({
-        ('game', 'clicked-by', 'user'): [(3, 1)],
-        ('user', 'likes', 'user'): [(1, 8), (8, 9)]},
+        ('game', 'clicked-by', 'user'): ([3], [1]),
+        ('user', 'likes', 'user'): ([1, 8], [8, 9])},
         {'user': 20, 'game': 10}, idtype=idtype)
 
-    g3 = dgl.graph(((0, 1), (1, 2)), num_nodes=10, ntype='user', idtype=idtype)
-    g4 = dgl.graph(((1, 3), (3, 5)), num_nodes=10, ntype='user', idtype=idtype)
+    g3 = dgl.graph(((0, 1), (1, 2)), num_nodes=10, idtype=idtype)
+    g4 = dgl.graph(((1, 3), (3, 5)), num_nodes=10, idtype=idtype)
 
     def _check(g, new_g, induced_nodes):
         assert g.ntypes == new_g.ntypes
@@ -866,9 +863,9 @@ def test_to_block(idtype):
                 check(g, bg, ntype, etype, None, include_dst_in_src)
 
     g = dgl.heterograph({
-        ('A', 'AA', 'A'): [(0, 1), (2, 3), (1, 2), (3, 4)],
-        ('A', 'AB', 'B'): [(0, 1), (1, 3), (3, 5), (1, 6)],
-        ('B', 'BA', 'A'): [(2, 3), (3, 2)]}, idtype=idtype)
+        ('A', 'AA', 'A'): ([0, 2, 1, 3], [1, 3, 2, 4]),
+        ('A', 'AB', 'B'): ([0, 1, 3, 1], [1, 3, 5, 6]),
+        ('B', 'BA', 'A'): ([2, 3], [3, 2])}, idtype=idtype)
     g.nodes['A'].data['x'] = F.randn((5, 10))
     g.nodes['B'].data['x'] = F.randn((7, 5))
     g.edges['AA'].data['x'] = F.randn((4, 3))
@@ -969,9 +966,9 @@ def test_remove_edges(idtype):
             check(g1, None, g, edges_to_remove)
 
     g = dgl.heterograph({
-        ('A', 'AA', 'A'): [(0, 1), (2, 3), (1, 2), (3, 4)],
-        ('A', 'AB', 'B'): [(0, 1), (1, 3), (3, 5), (1, 6)],
-        ('B', 'BA', 'A'): [(2, 3), (3, 2)]}, idtype=idtype)
+        ('A', 'AA', 'A'): ([0, 2, 1, 3], [1, 3, 2, 4]),
+        ('A', 'AB', 'B'): ([0, 1, 3, 1], [1, 3, 5, 6]),
+        ('B', 'BA', 'A'): ([2, 3], [3, 2])}, idtype=idtype)
     g2 = dgl.remove_edges(g, {'AA': F.tensor([2], idtype), 'AB': F.tensor([3], idtype), 'BA': F.tensor([1], idtype)})
     check(g2, 'AA', g, [2])
     check(g2, 'AB', g, [3])

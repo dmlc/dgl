@@ -23,19 +23,19 @@ def check_random_walk(g, metapath, traces, ntypes, prob=None):
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU random walk not implemented")
 def test_random_walk():
     g1 = dgl.heterograph({
-        ('user', 'follow', 'user'): [(0, 1), (1, 2), (2, 0)]
+        ('user', 'follow', 'user'): ([0, 1, 2], [1, 2, 0])
         })
     g2 = dgl.heterograph({
-        ('user', 'follow', 'user'): [(0, 1), (1, 2), (1, 3), (2, 0), (3, 0)]
+        ('user', 'follow', 'user'): ([0, 1, 1, 2, 3], [1, 2, 3, 0, 0])
         })
     g3 = dgl.heterograph({
-        ('user', 'follow', 'user'): [(0, 1), (1, 2), (2, 0)],
-        ('user', 'view', 'item'): [(0, 0), (1, 1), (2, 2)],
-        ('item', 'viewed-by', 'user'): [(0, 0), (1, 1), (2, 2)]})
+        ('user', 'follow', 'user'): ([0, 1, 2], [1, 2, 0]),
+        ('user', 'view', 'item'): ([0, 1, 2], [0, 1, 2]),
+        ('item', 'viewed-by', 'user'): ([0, 1, 2], [0, 1, 2])})
     g4 = dgl.heterograph({
-        ('user', 'follow', 'user'): [(0, 1), (1, 2), (1, 3), (2, 0), (3, 0)],
-        ('user', 'view', 'item'): [(0, 0), (0, 1), (1, 1), (2, 2), (3, 2), (3, 1)],
-        ('item', 'viewed-by', 'user'): [(0, 0), (1, 0), (1, 1), (2, 2), (2, 3), (1, 3)]})
+        ('user', 'follow', 'user'): ([0, 1, 1, 2, 3], [1, 2, 3, 0, 0]),
+        ('user', 'view', 'item'): ([0, 0, 1, 2, 3, 3], [0, 1, 1, 2, 2, 1]),
+        ('item', 'viewed-by', 'user'): ([0, 1, 1, 2, 2, 1], [0, 0, 1, 2, 3, 3])})
 
     g2.edata['p'] = F.tensor([3, 0, 3, 3, 3], dtype=F.float32)
     g2.edata['p2'] = F.tensor([[3], [0], [3], [3], [3]], dtype=F.float32)
@@ -124,8 +124,8 @@ def test_pinsage_sampling():
         assert (2, 2) in uv or (3, 2) in uv
 
     g = dgl.heterograph({
-        ('item', 'bought-by', 'user'): [(0, 0), (0, 1), (1, 0), (1, 1), (2, 2), (2, 3), (3, 2), (3, 3)],
-        ('user', 'bought', 'item'): [(0, 0), (1, 0), (0, 1), (1, 1), (2, 2), (3, 2), (2, 3), (3, 3)]})
+        ('item', 'bought-by', 'user'): ([0, 0, 1, 1, 2, 2, 3, 3], [0, 1, 0, 1, 2, 3, 2, 3]),
+        ('user', 'bought', 'item'): ([0, 1, 0, 1, 2, 3, 2, 3], [0, 0, 1, 1, 2, 2, 3, 3])})
     sampler = dgl.sampling.PinSAGESampler(g, 'item', 'user', 4, 0.5, 3, 2)
     _test_sampler(g, sampler, 'item')
     sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2, ['bought-by', 'bought'])
@@ -138,9 +138,9 @@ def test_pinsage_sampling():
     sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2)
     _test_sampler(g, sampler, g.ntypes[0])
     g = dgl.heterograph({
-        ('A', 'AB', 'B'): [(0, 1), (2, 3)],
-        ('B', 'BC', 'C'): [(1, 2), (3, 1)],
-        ('C', 'CA', 'A'): [(2, 0), (1, 2)]})
+        ('A', 'AB', 'B'): ([0, 2], [1, 3]),
+        ('B', 'BC', 'C'): ([1, 3], [2, 1]),
+        ('C', 'CA', 'A'): ([2, 1], [0, 2])})
     sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2, ['AB', 'BC', 'CA'])
     _test_sampler(g, sampler, 'A')
 
@@ -155,7 +155,7 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
         g = dgl.graph(([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0]), num_nodes=card)
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2],
-                                          [1, 2, 3, 0, 2, 3, 0]),
+                                         [1, 2, 3, 0, 2, 3, 0]),
             ('game', 'play', 'user'): ([0, 1, 2, 2], [0, 0, 1, 3]),
             ('user', 'liked-by', 'game'): ([0, 1, 2, 0, 3, 0], [2, 2, 2, 1, 1, 0]),
             ('coin', 'flips', 'user'): ([0, 0, 0, 0], [0, 1, 2, 3])
@@ -186,7 +186,7 @@ def _gen_neighbor_topk_test_graph(hypersparse, reverse):
         g = dgl.graph(([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0]), num_nodes=card)
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2],
-                                          [1, 2, 3, 0, 2, 3, 0]),
+                                         [1, 2, 3, 0, 2, 3, 0]),
             ('game', 'play', 'user'): ([0, 1, 2, 2], [0, 0, 1, 3]),
             ('user', 'liked-by', 'game'): ([0, 1, 2, 0, 3, 0], [2, 2, 2, 1, 1, 0]),
             ('coin', 'flips', 'user'): ([0, 0, 0, 0], [0, 1, 2, 3])
