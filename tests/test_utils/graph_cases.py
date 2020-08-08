@@ -88,6 +88,11 @@ def block_graph1():
         })
     return dgl.to_block(g)
 
+@register_case(['clique'])
+def clique():
+    g = dgl.graph(([0, 0, 0, 1, 1, 1, 2, 2, 2], [0, 1, 2, 0, 1, 2, 0, 1, 2]))
+    return g
+
 def random_dglgraph(size):
     return dgl.DGLGraph(nx.erdos_renyi_graph(size, 0.3))
 

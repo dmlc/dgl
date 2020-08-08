@@ -62,32 +62,34 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
     sampler = NeighborSampler(dist_graph, [5, 10],
                               dgl.distributed.sample_neighbors)
 
-    # Create DataLoader for constructing blocks
-    dataloader = DistDataLoader(
-        dataset=train_nid.numpy(),
-        batch_size=batch_size,
-        collate_fn=sampler.sample_blocks,
-        shuffle=False,
-        drop_last=drop_last)
+    # We need to test creating DistDataLoader multiple times.
+    for i in range(2):
+        # Create DataLoader for constructing blocks
+        dataloader = DistDataLoader(
+            dataset=train_nid.numpy(),
+            batch_size=batch_size,
+            collate_fn=sampler.sample_blocks,
+            shuffle=False,
+            drop_last=drop_last)
 
-    groundtruth_g = CitationGraphDataset("cora")[0]
-    max_nid = []
+        groundtruth_g = CitationGraphDataset("cora")[0]
+        max_nid = []
 
-    for epoch in range(2):
-        for idx, blocks in zip(range(0, num_nodes_to_sample, batch_size), dataloader):
-            block = blocks[-1]
-            o_src, o_dst =  block.edges()
-            src_nodes_id = block.srcdata[dgl.NID][o_src]
-            dst_nodes_id = block.dstdata[dgl.NID][o_dst]
-            has_edges = groundtruth_g.has_edges_between(src_nodes_id, dst_nodes_id)
-            assert np.all(F.asnumpy(has_edges))
-            print(np.unique(np.sort(F.asnumpy(dst_nodes_id))))
-            max_nid.append(np.max(F.asnumpy(dst_nodes_id)))
-            # assert np.all(np.unique(np.sort(F.asnumpy(dst_nodes_id))) == np.arange(idx, batch_size))
-        if drop_last:
-            assert np.max(max_nid) == num_nodes_to_sample - 1 - num_nodes_to_sample % batch_size
-        else:
-            assert np.max(max_nid) == num_nodes_to_sample - 1
+        for epoch in range(2):
+            for idx, blocks in zip(range(0, num_nodes_to_sample, batch_size), dataloader):
+                block = blocks[-1]
+                o_src, o_dst =  block.edges()
+                src_nodes_id = block.srcdata[dgl.NID][o_src]
+                dst_nodes_id = block.dstdata[dgl.NID][o_dst]
+                has_edges = groundtruth_g.has_edges_between(src_nodes_id, dst_nodes_id)
+                assert np.all(F.asnumpy(has_edges))
+                print(np.unique(np.sort(F.asnumpy(dst_nodes_id))))
+                max_nid.append(np.max(F.asnumpy(dst_nodes_id)))
+                # assert np.all(np.unique(np.sort(F.asnumpy(dst_nodes_id))) == np.arange(idx, batch_size))
+            if drop_last:
+                assert np.max(max_nid) == num_nodes_to_sample - 1 - num_nodes_to_sample % batch_size
+            else:
+                assert np.max(max_nid) == num_nodes_to_sample - 1
     
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
