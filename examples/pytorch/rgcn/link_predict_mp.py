@@ -793,7 +793,7 @@ def main(args, devices):
         degrees = count[inverse_index]
         norm = th.ones(v.shape[0]) / degrees
         norm = norm.unsqueeze(1)
-        valid_g.edata['norm'] = norm
+        valid_g.edata['norm'] = norm.long()
     else:
         valid_g.edata['norm'] = th.full((eid.shape[0],1), 1).long()
         for rel_id in range(edge_rels):

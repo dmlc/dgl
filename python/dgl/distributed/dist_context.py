@@ -8,6 +8,7 @@ from . import rpc
 from .constants import MAX_QUEUE_SIZE
 from .kvstore import init_kvstore, close_kvstore
 from .rpc_client import connect_to_server, shutdown_servers
+from .role import init_role
 
 SAMPLER_POOL = None
 NUM_SAMPLER_WORKERS = 0
@@ -29,6 +30,7 @@ def _init_rpc(ip_config, max_queue_size, net_type, role):
     '''
     try:
         connect_to_server(ip_config, max_queue_size, net_type)
+        init_role(role)
         init_kvstore(ip_config, role)
     except Exception as e:
         print(e, flush=True)
@@ -59,7 +61,8 @@ def initialize(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type
                                                           net_type, 'sampler'))
     NUM_SAMPLER_WORKERS = num_workers
     connect_to_server(ip_config, max_queue_size, net_type)
-    init_kvstore(ip_config)
+    init_role('default')
+    init_kvstore(ip_config, 'default')
 
 
 def finalize_client():

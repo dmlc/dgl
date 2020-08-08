@@ -11,6 +11,7 @@ import networkx as nx
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import dgl
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 from dgl.nn.pytorch.conv import SAGEConv
@@ -48,12 +49,12 @@ class GraphSAGE(nn.Module):
         return h
 
 
-def evaluate(model, graph, features, labels, mask):
+def evaluate(model, graph, features, labels, nid):
     model.eval()
     with torch.no_grad():
         logits = model(graph, features)
-        logits = logits[mask]
-        labels = labels[mask]
+        logits = logits[nid]
+        labels = labels[nid]
         _, indices = torch.max(logits, dim=1)
         correct = torch.sum(indices == labels)
         return correct.item() * 1.0 / len(labels)
@@ -61,18 +62,14 @@ def evaluate(model, graph, features, labels, mask):
 def main(args):
     # load and preprocess dataset
     data = load_data(args)
-    features = torch.FloatTensor(data.features)
-    labels = torch.LongTensor(data.labels)
-    if hasattr(torch, 'BoolTensor'):
-        train_mask = torch.BoolTensor(data.train_mask)
-        val_mask = torch.BoolTensor(data.val_mask)
-        test_mask = torch.BoolTensor(data.test_mask)
-    else:
-        train_mask = torch.ByteTensor(data.train_mask)
-        val_mask = torch.ByteTensor(data.val_mask)
-        test_mask = torch.ByteTensor(data.test_mask)
+    g = data[0]
+    features = g.ndata['feat']
+    labels = g.ndata['label']
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
+    test_mask = g.ndata['test_mask']
     in_feats = features.shape[1]
-    n_classes = data.num_labels
+    n_classes = data.num_classes
     n_edges = data.graph.number_of_edges()
     print("""----Data statistics------'
       #Edges %d
@@ -97,11 +94,15 @@ def main(args):
         test_mask = test_mask.cuda()
         print("use cuda:", args.gpu)
 
+    train_nid = train_mask.nonzero().squeeze()
+    val_nid = val_mask.nonzero().squeeze()
+    test_nid = test_mask.nonzero().squeeze()
+
     # graph preprocess and calculate normalization factor
-    g = data.graph
-    g.remove_edges_from(nx.selfloop_edges(g))
-    g = DGLGraph(g)
+    g = dgl.remove_self_loop(g)
     n_edges = g.number_of_edges()
+    if cuda:
+        g = g.int().to(args.gpu)
 
     # create GraphSAGE model
     model = GraphSAGE(in_feats,
@@ -126,7 +127,7 @@ def main(args):
             t0 = time.time()
         # forward
         logits = model(g, features)
-        loss = F.cross_entropy(logits[train_mask], labels[train_mask])
+        loss = F.cross_entropy(logits[train_nid], labels[train_nid])
 
         optimizer.zero_grad()
         loss.backward()
@@ -135,13 +136,13 @@ def main(args):
         if epoch >= 3:
             dur.append(time.time() - t0)
 
-        acc = evaluate(model, g, features, labels, val_mask)
+        acc = evaluate(model, g, features, labels, val_nid)
         print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
               "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
                                             acc, n_edges / np.mean(dur) / 1000))
 
     print()
-    acc = evaluate(model, g, features, labels, test_mask)
+    acc = evaluate(model, g, features, labels, test_nid)
     print("Test Accuracy {:.4f}".format(acc))
 
 

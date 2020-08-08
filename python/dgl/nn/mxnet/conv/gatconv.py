@@ -6,7 +6,7 @@ from mxnet.gluon import nn
 from mxnet.gluon.contrib.nn import Identity
 
 from .... import function as fn
-from ..softmax import edge_softmax
+from ....ops import edge_softmax
 from ....utils import expand_as_pair
 
 #pylint: enable=W0235
