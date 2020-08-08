@@ -831,7 +831,6 @@ class KVClient(object):
         self._machine_count = int(self._server_count / self._group_count)
         self._client_id = rpc.get_rank()
         self._machine_id = rpc.get_machine_id()
-        self._num_clients = rpc.get_num_client()
         self._part_id = self._machine_id
         self._main_server_id = self._machine_id * self._group_count
         # push and pull handler
@@ -957,10 +956,6 @@ class KVClient(object):
         assert name not in self._data_name_list, 'data name: %s already exists.' % name
         self.barrier()
         shape = list(shape)
-        # One of the clients in each machine will issue requests to the local server.
-        assert rpc.get_num_client() % part_policy.partition_book.num_partitions() == 0, \
-                '#clients ({}) is not divisable by #partitions ({})'.format(
-                    rpc.get_num_client(), part_policy.partition_book.num_partitions())
 
         # Send request to the servers to initialize data.
         # The servers may handle the duplicated initializations.
@@ -1026,7 +1021,6 @@ class KVClient(object):
         assert name in self._data_name_list, 'data name: %s not exists.' % name
         self.barrier()
         part_policy = self._part_policy[name]
-        num_partitions = part_policy.partition_book.num_partitions()
 
         # send request to every server nodes
         request = DeleteDataRequest(name)
