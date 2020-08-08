@@ -113,4 +113,4 @@ def exit_client():
     close_kvstore()
     atexit.unregister(exit_client)
 
-_init_api("dgl.utils")
+_init_api("dgl.distributed.dist_context")
