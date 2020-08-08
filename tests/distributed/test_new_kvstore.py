@@ -147,6 +147,7 @@ def start_server_mul_role(server_id, num_clients):
                                  server_state=server_state)
 
 def start_client(num_clients):
+    os.environ['DGL_DIST_MODE'] = 'distributed'
     # Note: connect to server first !
     dgl.distributed.initialize(ip_config='kv_ip_config.txt')
     # Init kvclient
@@ -276,6 +277,7 @@ def start_client(num_clients):
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
 
 def start_client_mul_role(i, num_workers):
+    os.environ['DGL_DIST_MODE'] = 'distributed'
     # Initialize creates kvstore !
     dgl.distributed.initialize(ip_config='kv_ip_mul_config.txt', num_workers=num_workers)
     if i == 0: # block one trainer
