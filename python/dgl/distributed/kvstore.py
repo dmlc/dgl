@@ -206,12 +206,13 @@ class BarrierRequest(rpc.Request):
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
+        role = server_state.roles
         count = kv_store.barrier_count[self.role]
         kv_store.barrier_count[self.role] = count + 1
-        if kv_store.barrier_count[self.role] == len(kv_store.role[self.role]):
+        if kv_store.barrier_count[self.role] == len(role[self.role]):
             kv_store.barrier_count[self.role] = 0
             res_list = []
-            for client_id, _ in kv_store.role[self.role]:
+            for client_id, _ in role[self.role]:
                 res_list.append((client_id, BarrierResponse(BARRIER_MSG)))
             return res_list
         return None
@@ -633,8 +634,6 @@ class KVServer(object):
         # push and pull handler
         self._push_handlers = {}
         self._pull_handlers = {}
-        # store client role
-        self._role = {}
 
     @property
     def server_id(self):
@@ -675,11 +674,6 @@ class KVServer(object):
     def push_handlers(self):
         """Get push handler"""
         return self._push_handlers
-
-    @property
-    def role(self):
-        """Get client role"""
-        return self._role
 
     @property
     def pull_handlers(self):

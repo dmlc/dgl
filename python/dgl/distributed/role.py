@@ -4,6 +4,7 @@ Right now, the clients have different roles. Some clients work as samplers and
 some work as trainers.
 """
 
+import os
 import numpy as np
 
 from . import rpc
@@ -47,19 +48,19 @@ class RegisterRoleRequest(rpc.Request):
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
-        role = kv_store.role
+        role = server_state.roles
         if self.role not in role:
             role[self.role] = set()
-            kv_store.barrier_count[self.role] = 0
+            if kv_store is not None:
+                kv_store.barrier_count[self.role] = 0
         role[self.role].add((self.client_id, self.machine_id))
         total_count = 0
         for key in role:
             total_count += len(role[key])
         # Clients are blocked util all clients register their roles.
-        if total_count == kv_store.num_clients:
+        if total_count == rpc.get_num_client():
             res_list = []
-            for target_id in range(kv_store.num_clients):
-                print('send', target_id)
+            for target_id in range(rpc.get_num_client()):
                 res_list.append((target_id, RegisterRoleResponse(REG_ROLE_MSG)))
             return res_list
         return None
@@ -91,8 +92,7 @@ class GetRoleRequest(rpc.Request):
         self.msg = state
 
     def process_request(self, server_state):
-        kv_store = server_state.kv_store
-        return GetRoleResponse(kv_store.role)
+        return GetRoleResponse(server_state.roles)
 
 # The key is role, the value is a dict of mapping RPC rank to a rank within the role.
 PER_ROLE_RANK = {}
@@ -118,6 +118,15 @@ def init_role(role):
     """
     global CUR_ROLE
     CUR_ROLE = role
+
+    global PER_ROLE_RANK
+    global GLOBAL_RANK
+
+    if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
+        assert role == 'default'
+        GLOBAL_RANK[0] = 0
+        PER_ROLE_RANK['default'] = {0:0}
+
     # Register the current role. This blocks until all clients register themselves.
     client_id = rpc.get_rank()
     machine_id = rpc.get_machine_id()
@@ -137,8 +146,6 @@ def init_role(role):
     # For per-role rank, we ensure that all ranks within a machine is contiguous.
     # For global rank, we also ensure that all ranks within a machine are contiguous,
     # and all ranks within a role are contiguous.
-    global PER_ROLE_RANK
-    global GLOBAL_RANK
     global_rank = 0
 
     # We want to ensure that the global rank of the trainer process starts from 0.
