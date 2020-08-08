@@ -126,6 +126,7 @@ def init_role(role):
         assert role == 'default'
         GLOBAL_RANK[0] = 0
         PER_ROLE_RANK['default'] = {0:0}
+        return
 
     # Register the current role. This blocks until all clients register themselves.
     client_id = rpc.get_rank()
