@@ -1,6 +1,5 @@
 """Initialize the distributed services"""
 
-import os
 import multiprocessing as mp
 import traceback
 import atexit
