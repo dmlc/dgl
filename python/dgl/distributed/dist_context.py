@@ -10,6 +10,7 @@ from .constants import MAX_QUEUE_SIZE
 from .kvstore import init_kvstore, close_kvstore
 from .rpc_client import connect_to_server, shutdown_servers
 from .role import init_role
+from .._ffi.function import _init_api
 
 SAMPLER_POOL = None
 NUM_SAMPLER_WORKERS = 0
