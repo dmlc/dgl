@@ -58,7 +58,6 @@ def initialize(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type
     """
     rpc.reset()
     ctx = mp.get_context("spawn")
-    utils.set_num_threads(1)
     global SAMPLER_POOL
     global NUM_SAMPLER_WORKERS
     if num_workers > 0:
