@@ -211,7 +211,7 @@ class BarrierRequest(rpc.Request):
         if kv_store.barrier_count[self.role] == len(kv_store.role[self.role]):
             kv_store.barrier_count[self.role] = 0
             res_list = []
-            for client_id, machine_id in kv_store.role[self.role]:
+            for client_id, _ in kv_store.role[self.role]:
                 res_list.append((client_id, BarrierResponse(BARRIER_MSG)))
             return res_list
         return None
