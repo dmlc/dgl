@@ -47,7 +47,7 @@ CSRMatrix CSRTranspose<kDLGPU, int32_t>(CSRMatrix csr) {
   int32_t* t_indices_ptr = static_cast<int32_t*>(t_indices->data);
   void* t_data_ptr = t_data->data;
 
-#if __CUDA_API_VERSION >= 10010
+#if CUDART_VERSION >= 10010
   auto device = runtime::DeviceAPI::Get(csr.indptr->ctx);
   // workspace
   size_t workspace_size;
@@ -67,6 +67,7 @@ CSRMatrix CSRTranspose<kDLGPU, int32_t>(CSRMatrix csr) {
       csr.num_rows, csr.num_cols, nnz,
       data_ptr, indptr_ptr, indices_ptr,
       t_data_ptr, t_indptr_ptr, t_indices_ptr,
+      CUDA_R_32F,
       CUSPARSE_ACTION_NUMERIC,
       CUSPARSE_INDEX_BASE_ZERO,
       CUSPARSE_CSR2CSC_ALG1,  // see cusparse doc for reference
