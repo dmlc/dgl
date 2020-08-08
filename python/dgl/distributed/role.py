@@ -68,6 +68,7 @@ GET_ROLE = 700002
 GET_ROLE_MSG = "Get_Role"
 
 class GetRoleResponse(rpc.Response):
+    """Send the roles of all client processes"""
     def __init__(self, role):
         self.role = role
         self.msg = GET_ROLE_MSG
@@ -79,6 +80,7 @@ class GetRoleResponse(rpc.Response):
         self.role, self.msg = state
 
 class GetRoleRequest(rpc.Request):
+    """Send a request to get the roles of all client processes."""
     def __init__(self):
         self.msg = GET_ROLE_MSG
 
@@ -95,9 +97,27 @@ class GetRoleRequest(rpc.Request):
 # The key is role, the value is a dict of mapping RPC rank to a rank within the role.
 PER_ROLE_RANK = {}
 
+# The global rank of a client process. The client processes of the same role have
+# global ranks that fall in a contiguous range.
 GLOBAL_RANK = {}
 
+# The role of the current process
+CUR_ROLE = None
+
 def init_role(role):
+    """Initialize the role of the current process.
+
+    Each process is associated with a role so that we can determine what
+    function can be invoked in a process. For example, we do not allow some
+    functions in sampler processes.
+
+    The initialization includes registeration the role of the current process and
+    get the roles of all client processes. It also computes the rank of all client
+    processes in a deterministic way so that all clients will have the same rank for
+    the same client process.
+    """
+    global CUR_ROLE
+    CUR_ROLE = role
     # Register the current role. This blocks until all clients register themselves.
     client_id = rpc.get_rank()
     machine_id = rpc.get_machine_id()
@@ -148,15 +168,32 @@ def init_role(role):
                 per_role_rank += 1
 
 def get_global_rank():
+    """Get the global rank
+
+    The rank can globally identify the client process. For the client processes
+    of the same role, their ranks are in a contiguous range.
+    """
     return GLOBAL_RANK[rpc.get_rank()]
 
 def get_rank(role):
+    """Get the role-specific rank"""
     return PER_ROLE_RANK[role][rpc.get_rank()]
 
 def get_trainer_rank():
+    """Get the rank of the current trainer process.
+
+    This function can only be called in the trainer process. It will result in
+    an error if it's called in the process of other roles.
+    """
+    assert CUR_ROLE == 'default'
     return PER_ROLE_RANK['default'][rpc.get_rank()]
 
+def get_role():
+    """Get the role of the current process"""
+    return CUR_ROLE
+
 def get_num_trainers():
+    """Get the number of trainer processes"""
     return len(PER_ROLE_RANK['default'])
 
 rpc.register_service(REGISTER_ROLE, RegisterRoleRequest, RegisterRoleResponse)
