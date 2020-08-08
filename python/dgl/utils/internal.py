@@ -796,6 +796,13 @@ def extract_subframes(graph, nodes, edges):
     return node_frames, edge_frames
 
 def set_num_threads(num_threads):
+    """Set the number of OMP threads in the process.
+
+    Parameters
+    ----------
+    num_threads : int
+        The number of OMP threads in the process.
+    """
     _CAPI_DGLSetOMPThreads(num_threads)
 
 _init_api("dgl.utils.internal")
