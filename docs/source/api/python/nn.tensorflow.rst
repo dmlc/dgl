@@ -106,13 +106,3 @@ GlobalAttentionPooling
 .. autoclass:: dgl.nn.tensorflow.glob.GlobalAttentionPooling
     :members:
     :show-inheritance:
-
-    
-Utility Modules
-----------------------------------------
-    
-Edge Softmax
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: dgl.nn.tensorflow.softmax
-    :members: edge_softmax
