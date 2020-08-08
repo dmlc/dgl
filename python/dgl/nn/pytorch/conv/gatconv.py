@@ -4,7 +4,7 @@ import torch as th
 from torch import nn
 
 from .... import function as fn
-from ..softmax import edge_softmax
+from ....ops import edge_softmax
 from ..utils import Identity
 from ....utils import expand_as_pair
 
