@@ -13,7 +13,7 @@ using namespace dgl::runtime;
 
 namespace dgl {
 
-DGL_REGISTER_GLOBAL("distributed.dist_context._CAPI_DGLSetOMPThreads")
+DGL_REGISTER_GLOBAL("utils.internal._CAPI_DGLSetOMPThreads")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     int num_threads = args[0];
     omp_set_num_threads(num_threads);

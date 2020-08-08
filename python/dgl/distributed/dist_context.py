@@ -9,7 +9,7 @@ from .constants import MAX_QUEUE_SIZE
 from .kvstore import init_kvstore, close_kvstore
 from .rpc_client import connect_to_server, shutdown_servers
 from .role import init_role
-from .._ffi.function import _init_api
+from .. import utils
 
 SAMPLER_POOL = None
 NUM_SAMPLER_WORKERS = 0
@@ -30,7 +30,7 @@ def _init_rpc(ip_config, max_queue_size, net_type, role):
     ''' This init function is called in the worker processes.
     '''
     try:
-        _CAPI_DGLSetOMPThreads(1)
+        utils.set_num_threads(1)
         connect_to_server(ip_config, max_queue_size, net_type)
         init_role(role)
         init_kvstore(ip_config, role)
@@ -55,6 +55,7 @@ def initialize(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type
     """
     rpc.reset()
     ctx = mp.get_context("spawn")
+    utils.set_num_threads(1)
     global SAMPLER_POOL
     global NUM_SAMPLER_WORKERS
     if num_workers > 0:
@@ -112,5 +113,3 @@ def exit_client():
     join_finalize_worker()
     close_kvstore()
     atexit.unregister(exit_client)
-
-_init_api("dgl.distributed.dist_context")
