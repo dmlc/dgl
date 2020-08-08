@@ -9,6 +9,8 @@
 #if defined(__linux__)
 #include <unistd.h>
 #endif
+#include <chrono>
+#include <ctime>
 
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
@@ -371,6 +373,51 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetGlobalIDFromLocalPartition")
   *rv = res_tensor;
 });
 
+class pull_stats {
+  double copy_time[3];
+  long remote_bytes;
+  long local_bytes;
+  std::chrono::time_point<std::chrono::system_clock> start_time;
+public:
+  enum {
+    LOCAL_COPY,
+    REMOTE_NET_RECV,
+    REMOTE_DATACOPY,
+  };
+  pull_stats() {
+    memset(copy_time, 0, sizeof(copy_time));
+    remote_bytes = 0;
+    local_bytes = 0;
+  }
+
+  ~pull_stats() {
+    if (local_bytes > 0 || remote_bytes > 0) {
+      printf("local data copy: %.3f, remote net transmit: %.3f, remote data copy: %.3f\n",
+             copy_time[LOCAL_COPY], copy_time[REMOTE_NET_RECV], copy_time[REMOTE_DATACOPY]);
+      printf("copy %ld bytes locally, copy %ld bytes remotely\n", local_bytes, remote_bytes);
+    }
+  }
+
+  void add_local_copy(long bytes) {
+    local_bytes += bytes;
+  }
+
+  void add_remote_copy(long bytes) {
+    remote_bytes += bytes;
+  }
+
+  void start(int type) {
+    start_time = std::chrono::system_clock::now();
+  }
+
+  void end(int type) {
+    auto end_time = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end_time - start_time;
+    copy_time[type] += elapsed_seconds.count();
+  }
+};
+static pull_stats pull_stat;
+
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   // Input
@@ -450,6 +497,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
                                       local_data->dtype,
                                       DLContext{kDLCPU, 0});
   char* return_data = static_cast<char*>(res_tensor->data);
+  pull_stat.start(pull_stats::LOCAL_COPY);
   // Copy local data
 #pragma omp parallel for
   for (int64_t i = 0; i < local_ids.size(); ++i) {
@@ -460,10 +508,17 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
            local_data_char + local_ids[i] * row_size,
            row_size);
   }
+  pull_stat.end(pull_stats::LOCAL_COPY);
+  pull_stat.add_local_copy(local_ids.size() * row_size);
+
   // Recv remote message
   for (int i = 0; i < msg_count; ++i) {
     RPCMessage msg;
+    pull_stat.start(pull_stats::REMOTE_NET_RECV);
     RecvRPCMessage(&msg, 0);
+    pull_stat.end(pull_stats::REMOTE_NET_RECV);
+
+    pull_stat.start(pull_stats::REMOTE_DATACOPY);
     int part_id = msg.server_id / group_count;
     char* data_char = static_cast<char*>(msg.tensors[0]->data);
     dgl_id_t id_size = remote_ids[part_id].size();
@@ -472,6 +527,8 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
              data_char + n * row_size,
              row_size);
     }
+    pull_stat.end(pull_stats::REMOTE_DATACOPY);
+    pull_stat.add_remote_copy(id_size * row_size);
   }
   *rv = res_tensor;
 });
