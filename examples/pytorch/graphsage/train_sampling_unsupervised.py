@@ -350,7 +350,7 @@ def main(args, devices):
     n_gpus = len(devices)
     if devices[0] == -1:
         run(0, 0, args, ['cpu'], data)
-    if n_gpus == 1:
+    elif n_gpus == 1:
         run(0, n_gpus, args, devices, data)
     else:
         procs = []
