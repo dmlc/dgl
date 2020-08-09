@@ -515,6 +515,7 @@ def test_partition_with_halo():
         lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
         assert np.all(np.sort(F.asnumpy(subg.ndata['orig_id'])[lnode_ids]) == node_ids)
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
 def test_metis_partition():
     # TODO(zhengda) Metis fails to partition a small graph.

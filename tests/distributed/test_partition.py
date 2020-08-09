@@ -102,6 +102,7 @@ def check_partition(g, part_method, reshuffle):
         assert F.dtype(eid2pid) in (F.int32, F.int64)
         assert np.all(F.asnumpy(eid2pid) == edge_map)
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_partition():
     g = create_random_graph(10000)
     check_partition(g, 'metis', True)
@@ -109,6 +110,7 @@ def test_partition():
     check_partition(g, 'random', True)
     check_partition(g, 'random', False)
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_hetero_partition():
     g = create_random_graph(10000)
     check_partition(g, 'metis', True)
