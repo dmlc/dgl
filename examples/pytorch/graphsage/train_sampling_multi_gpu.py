@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
+import math
 import argparse
 from dgl.data import RedditDataset
 from torch.nn.parallel import DistributedDataParallel
@@ -78,7 +79,7 @@ class SAGE(nn.Module):
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0]
 
-                block = block.to(device)
+                block = block.int().to(device)
                 h = x[input_nodes].to(device)
                 h = layer(block, h)
                 if l != len(self.layers) - 1:
@@ -140,12 +141,12 @@ def run(proc_id, n_gpus, args, devices, data):
     train_mask = train_g.ndata['train_mask']
     val_mask = val_g.ndata['val_mask']
     test_mask = ~(test_g.ndata['train_mask'] | test_g.ndata['val_mask'])
-    train_nid = train_mask.nonzero()[:, 0]
-    val_nid = val_mask.nonzero()[:, 0]
-    test_nid = test_mask.nonzero()[:, 0]
+    train_nid = train_mask.nonzero().squeeze()
+    val_nid = val_mask.nonzero().squeeze()
+    test_nid = test_mask.nonzero().squeeze()
 
     # Split train_nid
-    train_nid = th.split(train_nid, len(train_nid) // n_gpus)[proc_id]
+    train_nid = th.split(train_nid, math.ceil(len(train_nid) // n_gpus))[proc_id]
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.sampling.MultiLayerNeighborSampler(
@@ -182,7 +183,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
             # Load the input features as well as output labels
             batch_inputs, batch_labels = load_subtensor(train_g, train_g.ndata['labels'], seeds, input_nodes, dev_id)
-            blocks = [block.to(dev_id) for block in blocks]
+            blocks = [block.int().to(dev_id) for block in blocks]
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, batch_labels)

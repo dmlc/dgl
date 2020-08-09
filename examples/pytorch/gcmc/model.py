@@ -340,7 +340,7 @@ class BiDecoder(nn.Module):
             for i in range(self._num_basis):
                 graph.nodes['user'].data['h'] = ufeat @ self.Ps[i]
                 graph.apply_edges(fn.u_dot_v('h', 'h', 'sr'))
-                basis_out.append(graph.edata['sr'].unsqueeze(1))
+                basis_out.append(graph.edata['sr'])
             out = th.cat(basis_out, dim=1)
             out = self.combine_basis(out)
         return out

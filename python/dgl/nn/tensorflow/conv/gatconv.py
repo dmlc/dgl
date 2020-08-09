@@ -5,7 +5,7 @@ from tensorflow.keras import layers
 import numpy as np
 
 from .... import function as fn
-from ..softmax import edge_softmax
+from ....ops import edge_softmax
 from ..utils import Identity
 
 # pylint: enable=W0235

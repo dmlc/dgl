@@ -77,6 +77,10 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
 }
 
 //////////////////////////// C APIs ////////////////////////////
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCReset")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  RPCContext::Reset();
+});
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
