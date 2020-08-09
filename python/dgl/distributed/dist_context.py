@@ -68,6 +68,8 @@ def initialize(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type
         SAMPLER_POOL = ctx.Pool(num_workers, initializer=_init_rpc,
                                 initargs=(ip_config, max_queue_size,
                                           net_type, 'sampler', num_worker_threads))
+    else:
+        SAMPLER_POOL = None
     NUM_SAMPLER_WORKERS = num_workers
     if not is_standalone:
         connect_to_server(ip_config, max_queue_size, net_type)
@@ -77,8 +79,9 @@ def initialize(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type
 
 def finalize_client():
     """Release resources of this client."""
-    rpc.finalize_sender()
-    rpc.finalize_receiver()
+    if  os.environ.get('DGL_DIST_MODE', 'standalone') != 'standalone':
+        rpc.finalize_sender()
+        rpc.finalize_receiver()
     global INITIALIZED
     INITIALIZED = False
 
@@ -100,8 +103,10 @@ def finalize_worker():
 
 def join_finalize_worker():
     """join the worker close process"""
+    global SAMPLER_POOL
     if SAMPLER_POOL is not None:
         SAMPLER_POOL.join()
+    SAMPLER_POOL = None
 
 def is_initialized():
     """Is RPC initialized?
@@ -115,7 +120,8 @@ def exit_client():
     # Only client with rank_0 will send shutdown request to servers.
     finalize_worker() # finalize workers should be earilier than barrier, and non-blocking
     rpc.client_barrier()
-    shutdown_servers()
+    if  os.environ.get('DGL_DIST_MODE', 'standalone') != 'standalone':
+        shutdown_servers()
     finalize_client()
     join_finalize_worker()
     close_kvstore()

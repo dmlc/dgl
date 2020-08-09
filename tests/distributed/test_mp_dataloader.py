@@ -90,6 +90,9 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
             else:
                 assert np.max(max_nid) == num_nodes_to_sample - 1
 
+    del dataloader
+    dgl.distributed.exit_client() # this is needed since there's two test here in one process
+
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
@@ -121,8 +124,6 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last):
 
     time.sleep(3)
     start_client(0, tmpdir, num_server > 1, num_workers, drop_last)
-
-    dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 if __name__ == "__main__":
     import tempfile
