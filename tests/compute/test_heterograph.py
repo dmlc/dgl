@@ -180,13 +180,13 @@ def test_create(idtype):
         )
     # bipartite graph
     def _test_validate_bipartite(card):
-        with pytest.raises(DGLError):
+        with pytest.raises(AssertionError):
             g = dgl.heterograph({
                 ('_U', '_E', '_V'): ([0, 0, 1, 1, 2], [1, 1, 2, 2, 3])
             }, {'_U': card[0], '_V': card[1]}, idtype=idtype, device=device)
 
-    _test_validate_bipartite((4, 4))
-    _test_validate_bipartite((3, 5))
+    _test_validate_bipartite((3, 3))
+    _test_validate_bipartite((2, 4))
 
     # test from_scipy
     num_nodes = 10
@@ -327,7 +327,12 @@ def test_query(idtype):
     _test(g)
     g = create_test_heterograph1(idtype)
     _test(g)
+    if F._default_context_str != 'gpu':
+        # XXX: CUDA COO operators have not been live yet.
+        g = create_test_heterograph2(idtype)
+        _test(g)
 
+    etypes = canonical_etypes
     edges = {
         ('user', 'follows', 'user'): ([0, 1], [1, 2]),
         ('user', 'plays', 'game'): ([0, 1, 2, 1], [0, 0, 1, 1]),
@@ -345,6 +350,10 @@ def test_query(idtype):
     _test(g)
     g = create_test_heterograph1(idtype)
     _test(g)
+    if F._default_context_str != 'gpu':
+        # XXX: CUDA COO operators have not been live yet.
+        g = create_test_heterograph2(idtype)
+        _test(g)
 
     # test repr
     print(g)
@@ -981,7 +990,7 @@ def test_to_device2(g, idtype):
 @parametrize_dtype
 def test_convert_bound(idtype):
     def _test_bipartite_bound(data, card):
-        with pytest.raises(DGLError):
+        with pytest.raises(AssertionError):
             dgl.heterograph({
                 ('_U', '_E', '_V'): data
             }, {'_U': card[0], '_V': card[1]}, idtype=idtype, device=F.ctx())
@@ -990,8 +999,8 @@ def test_convert_bound(idtype):
         with pytest.raises(DGLError):
             dgl.graph(data, num_nodes=card, idtype=idtype, device=F.ctx())
 
-    _test_bipartite_bound(([1, 2], [1, 2]), (3, 4))
-    _test_bipartite_bound(([0, 1], [1, 4]), (2, 5))
+    _test_bipartite_bound(([1, 2], [1, 2]), (2, 3))
+    _test_bipartite_bound(([0, 1], [1, 4]), (2, 3))
     _test_graph_bound(([1, 3], [1, 2]), 3)
     _test_graph_bound(([0, 1], [1, 3]), 3)
 
@@ -1077,7 +1086,7 @@ def test_convert(idtype):
     mg = nx.MultiDiGraph([
         ('user', 'movie', 'watches'),
         ('user', 'TV', 'watches')])
-    g = dgl.graph(((0, 1), (0, 2)), idtype=idtype, device=F.ctx())
+    g = dgl.graph(((0, 0), (1, 2)), idtype=idtype, device=F.ctx())
     g.ndata[dgl.NTYPE] = F.tensor([0, 1, 2])
     g.edata[dgl.ETYPE] = F.tensor([0, 0])
     for _mg in [None, mg]:
