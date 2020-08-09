@@ -19,6 +19,7 @@ from torch.utils.data import DataLoader
 import dgl
 import dgl.function as fn
 from dgl import DGLGraph
+import tqdm
 
 from dgl.data.knowledge_graph import load_data
 from dgl.nn import RelGraphConv
@@ -203,21 +204,25 @@ class LinkPathSampler:
 
     def sample_blocks(self, seeds):
         pseeds = th.tensor(seeds).long()
+        pseeds = pseeds.squeeze()
         bsize = pseeds.shape[0]
 
         g = self.g
         subg = g.edge_subgraph(pseeds)
         p_u, p_v = subg.edges()
         p_rel = subg.edata['etype']
+        org_nid = subg.ndata[dgl.NID]
 
         # only half of the edges will be used as graph structure
-        pos_idx = np.random.choice(np.arange(bsize),
+        pos_idx = np.random.choice(bsize,
                                    size=bsize//2, replace=False)
         pos_idx = th.tensor(pos_idx).long()
         subg = dgl.remove_edges(subg, pos_idx)
         rels = subg.edata['etype']
 
         subg = dgl.add_reverse_edges(subg, copy_ndata=True)
+        # dgl.NID and dgl.EID are not copy automatically
+        subg.ndata[dgl.NID] = org_nid
         subg.edata['etype'] = th.cat([rels, rels + self.num_rel])
 
         # calculate norm for compact_subg
@@ -305,7 +310,7 @@ def fullgraph_eval(g, embed_layer, model, device, node_feats,
     logs = []
     embs = th.empty(g.number_of_nodes(), dim_size)
     with th.no_grad():
-        for i, block in enumerate(minibatch_blocks):
+        for block in tqdm.tqdm(minibatch_blocks):
             in_feats = embed_layer(block[0].srcdata[dgl.NID].to(device),
                                    block[0].srcdata['ntype'].to(device),
                                    node_feats)
@@ -609,8 +614,8 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
                     model(p_blocks, p_feats, n_blocks, n_feats, p_g, n_g)
             else:
                 bsize, g, p_u, p_v, rids = sample_data
-                in_feats = embed_layer(g.srcdata[dgl.NID].to(dev_id),
-                                       g.srcdata['ntype'].to(dev_id),
+                in_feats = embed_layer(g.ndata[dgl.NID].to(dev_id),
+                                       g.ndata['ntype'].to(dev_id),
                                        node_feats)
                 mb_feats = model(g, in_feats, sample=args.sampler)
                 p_head_emb = mb_feats[p_u]
@@ -762,7 +767,7 @@ def main(args, devices):
         degrees = count[inverse_index]
         norm = th.ones(v.shape[0]) / degrees
         norm = norm.unsqueeze(1)
-        train_g.edata['norm'] = norm
+        train_g.edata['norm'] = norm.long()
     else:
         train_g.edata['norm'] = th.full((eid.shape[0],1), 1)
         for rel_id in range(edge_rels):
@@ -773,7 +778,7 @@ def main(args, devices):
             degrees = count[inverse_index]
             norm = th.ones(v_r.shape[0]) / degrees
             norm = norm.unsqueeze(1)
-            train_g.edata['norm'][idx] = norm
+            train_g.edata['norm'][idx] = norm.long()
     train_g.edata['norm'].share_memory_()
     train_g.edata['etype'].share_memory_()
     train_g.ndata['ntype'].share_memory_()
