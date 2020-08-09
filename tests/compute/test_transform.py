@@ -275,15 +275,6 @@ def test_to_bidirected():
     big = dgl.to_bidirected(g, copy_ndata=True)
     assert F.array_equal(g.nodes['user'].data['h'], big.nodes['user'].data['h'])
 
-    # test multigraph
-    g = dgl.graph((F.tensor([0, 1, 3, 1]), F.tensor([1, 2, 0, 2])))
-    raise_error = False
-    try:
-        big = dgl.to_bidirected(g)
-    except:
-        raise_error = True
-    assert raise_error
-
 def test_add_reverse_edges():
     # homogeneous graph
     g = dgl.graph((F.tensor([0, 1, 3, 1]), F.tensor([1, 2, 0, 2])))
