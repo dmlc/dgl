@@ -299,7 +299,7 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLMakeSymmetric_Hetero")
     *rv = HeteroGraphRef(std::make_shared<HeteroGraph>(
       hgptr->meta_graph(), rel_graphs, hgptr->NumVerticesPerType()));
 #else
-    LOG(FATAL) << "The fast version of making symmetric graph is not supported in Windows."
+    LOG(FATAL) << "The fast version of making symmetric graph is not supported in Windows.";
 #endif  // !defined(_WIN32)
   });
 
