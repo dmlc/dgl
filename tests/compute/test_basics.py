@@ -388,7 +388,7 @@ def test_update_all_0deg(idtype):
     assert F.allclose(new_repr[0], 2 * F.sum(old_repr, 0))
 
     # test#2: graph with no edge
-    g = dgl.graph([], num_nodes=5, idtype=idtype, device=F.ctx())
+    g = dgl.graph(([], []), num_nodes=5, idtype=idtype, device=F.ctx())
     g.ndata['h'] = old_repr
     g.update_all(_message, _reduce, lambda nodes : {'h' : nodes.data['h'] * 2})
     new_repr = g.ndata['h']
@@ -397,7 +397,7 @@ def test_update_all_0deg(idtype):
 
 @parametrize_dtype
 def test_pull_0deg(idtype):
-    g = dgl.graph([(0,1)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0], [1]), idtype=idtype, device=F.ctx())
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
@@ -463,7 +463,7 @@ def test_dynamic_addition():
 
 @parametrize_dtype
 def test_repr(idtype):
-    g = dgl.graph([(0,1), (0,2), (1,2)], num_nodes=10, idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 0, 1], [1, 2, 2]), num_nodes=10, idtype=idtype, device=F.ctx())
     repr_string = g.__repr__()
     print(repr_string)
     g.ndata['x'] = F.zeros((10, 5))
@@ -473,7 +473,7 @@ def test_repr(idtype):
 
 @parametrize_dtype
 def test_local_var(idtype):
-    g = dgl.graph([(0,1), (1,2), (2,3), (3,4)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]), idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
     # test override
@@ -510,7 +510,7 @@ def test_local_var(idtype):
     assert 'ww' not in g.edata
 
     # test initializer1
-    g = dgl.graph([(0,1), (1,1)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 1], [1, 1]), idtype=idtype, device=F.ctx())
     g.set_n_initializer(dgl.init.zero_initializer)
     def foo(g):
         g = g.local_var()
@@ -531,7 +531,7 @@ def test_local_var(idtype):
 
 @parametrize_dtype
 def test_local_scope(idtype):
-    g = dgl.graph([(0,1), (1,2), (2,3), (3,4)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]), idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
     # test override
@@ -582,7 +582,7 @@ def test_local_scope(idtype):
     assert 'ww' not in g.edata
 
     # test initializer1
-    g = dgl.graph([(0,1), (1,1)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 1], [1, 1]), idtype=idtype, device=F.ctx())
     g.set_n_initializer(dgl.init.zero_initializer)
     def foo(g):
         with g.local_scope():
@@ -603,11 +603,7 @@ def test_local_scope(idtype):
 
 @parametrize_dtype
 def test_isolated_nodes(idtype):
-    g = dgl.graph([(0, 1), (1, 2)], num_nodes=5, idtype=idtype, device=F.ctx())
-    assert g.number_of_nodes() == 5
-
-    # Test backward compatibility
-    g = dgl.graph([(0, 1), (1, 2)], card=5, idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 1], [1, 2]), num_nodes=5, idtype=idtype, device=F.ctx())
     assert g.number_of_nodes() == 5
 
     g = dgl.heterograph({
@@ -627,7 +623,7 @@ def test_isolated_nodes(idtype):
 
 @parametrize_dtype
 def test_send_multigraph(idtype):
-    g = dgl.graph([(0,1), (0,1), (0,1), (2,1)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 0, 0, 2], [1, 1, 1, 1]), idtype=idtype, device=F.ctx())
 
     def _message_a(edges):
         return {'a': edges.data['a']}

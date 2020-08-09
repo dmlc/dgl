@@ -12,7 +12,7 @@ def tree1(idtype):
      3   4
     Edges are from leaves to root.
     """
-    g = dgl.DGLGraph().astype(idtype).to(F.ctx())
+    g = dgl.graph(([], [])).astype(idtype).to(F.ctx())
     g.add_nodes(5)
     g.add_edge(3, 1)
     g.add_edge(4, 1)
@@ -31,7 +31,7 @@ def tree2(idtype):
      2   0
     Edges are from leaves to root.
     """
-    g = dgl.DGLGraph().astype(idtype).to(F.ctx())
+    g = dgl.graph(([], [])).astype(idtype).to(F.ctx())
     g.add_nodes(5)
     g.add_edge(2, 4)
     g.add_edge(0, 4)
@@ -120,10 +120,10 @@ def test_batch_unbatch_frame(idtype):
 @parametrize_dtype
 def test_batch_unbatch2(idtype):
     # test setting/getting features after batch
-    a = dgl.DGLGraph().astype(idtype).to(F.ctx())
+    a = dgl.graph(([], [])).astype(idtype).to(F.ctx())
     a.add_nodes(4)
     a.add_edges(0, [1, 2, 3])
-    b = dgl.DGLGraph().astype(idtype).to(F.ctx())
+    b = dgl.graph(([], [])).astype(idtype).to(F.ctx())
     b.add_nodes(3)
     b.add_edges(0, [1, 2])
     c = dgl.batch([a, b])
@@ -179,12 +179,12 @@ def test_batch_propagate(idtype):
 
 @parametrize_dtype
 def test_batched_edge_ordering(idtype):
-    g1 = dgl.DGLGraph().astype(idtype).to(F.ctx())
+    g1 = dgl.graph(([], [])).astype(idtype).to(F.ctx())
     g1.add_nodes(6)
     g1.add_edges([4, 4, 2, 2, 0], [5, 3, 3, 1, 1])
     e1 = F.randn((5, 10))
     g1.edata['h'] = e1
-    g2 = dgl.DGLGraph().astype(idtype).to(F.ctx())
+    g2 = dgl.graph(([], [])).astype(idtype).to(F.ctx())
     g2.add_nodes(6)
     g2.add_edges([0, 1 ,2 ,5, 4 ,5], [1, 2, 3, 4, 3, 0])
     e2 = F.randn((6, 10))
@@ -196,13 +196,13 @@ def test_batched_edge_ordering(idtype):
 
 @parametrize_dtype
 def test_batch_no_edge(idtype):
-    g1 = dgl.DGLGraph().astype(idtype).to(F.ctx())
+    g1 = dgl.graph(([], [])).astype(idtype).to(F.ctx())
     g1.add_nodes(6)
     g1.add_edges([4, 4, 2, 2, 0], [5, 3, 3, 1, 1])
-    g2 = dgl.DGLGraph().astype(idtype).to(F.ctx())
+    g2 = dgl.graph(([], [])).astype(idtype).to(F.ctx())
     g2.add_nodes(6)
     g2.add_edges([0, 1, 2, 5, 4, 5], [1 ,2 ,3, 4, 3, 0])
-    g3 = dgl.DGLGraph().astype(idtype).to(F.ctx())
+    g3 = dgl.graph(([], [])).astype(idtype).to(F.ctx())
     g3.add_nodes(1)  # no edges
     g = dgl.batch([g1, g3, g2]) # should not throw an error
 

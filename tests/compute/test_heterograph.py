@@ -185,8 +185,8 @@ def test_create(idtype):
                 ('_U', '_E', '_V'): ([0, 0, 1, 1, 2], [1, 1, 2, 2, 3])
             }, {'_U': card[0], '_V': card[1]}, idtype=idtype, device=device)
 
-    _test_validate_bipartite((3, 3))
-    _test_validate_bipartite((2, 4))
+    _test_validate_bipartite((4, 4))
+    _test_validate_bipartite((3, 5))
 
     # test from_scipy
     num_nodes = 10
@@ -990,8 +990,8 @@ def test_convert_bound(idtype):
         with pytest.raises(DGLError):
             dgl.graph(data, num_nodes=card, idtype=idtype, device=F.ctx())
 
-    _test_bipartite_bound(([1, 2], [1, 2]), (2, 3))
-    _test_bipartite_bound(([0, 1], [1, 4]), (2, 3))
+    _test_bipartite_bound(([1, 2], [1, 2]), (3, 4))
+    _test_bipartite_bound(([0, 1], [1, 4]), (2, 5))
     _test_graph_bound(([1, 3], [1, 2]), 3)
     _test_graph_bound(([0, 1], [1, 3]), 3)
 

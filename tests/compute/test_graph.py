@@ -29,10 +29,6 @@ def nx_input():
         g.add_edge(*e, id=i)
     return g
 
-def elist_input():
-    src, dst = edge_pair_input()
-    return list(zip(src, dst))
-
 def scipy_coo_input():
     src, dst = edge_pair_input()
     return sp.coo_matrix((np.ones((20,)), (src, dst)), shape=(10,10))
@@ -52,8 +48,11 @@ def gen_by_mutation():
     g.add_edges(src, dst)
     return g
 
-def gen_from_data(data, readonly, sort):
-    return dgl.DGLGraph(data, readonly=readonly, sort_csr=True)
+def gen_from_data(data):
+    if isinstance(data, sp.spmatrix):
+        return dgl.from_scipy(data)
+    if isinstance(data, nx.Graph):
+        return dgl.from_networkx(data)
 
 def test_query():
     def _test_one(g):
@@ -220,16 +219,13 @@ def test_query():
         eid = g.edge_id(0, 4)
 
     _test(gen_by_mutation())
-    _test(gen_from_data(elist_input(), False, False))
-    _test(gen_from_data(elist_input(), True, False))
-    _test(gen_from_data(elist_input(), True, True))
-    _test(gen_from_data(nx_input(), False, False))
-    _test(gen_from_data(nx_input(), True, False))
-    _test(gen_from_data(scipy_coo_input(), False, False))
-    _test(gen_from_data(scipy_coo_input(), True, False))
+    _test(gen_from_data(nx_input()))
+    _test(gen_from_data(nx_input()))
+    _test(gen_from_data(scipy_coo_input()))
+    _test(gen_from_data(scipy_coo_input()))
 
-    _test_csr(gen_from_data(scipy_csr_input(), False, False))
-    _test_csr(gen_from_data(scipy_csr_input(), True, False))
+    _test_csr(gen_from_data(scipy_csr_input()))
+    _test_csr(gen_from_data(scipy_csr_input()))
     _test_edge_ids()
 
 def test_mutation():

@@ -698,7 +698,7 @@ def to_homo(G):
         eids.append(F.arange(0, num_edges, G.idtype))
 
     retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)), num_nodes=total_num_nodes,
-                 validate=False, idtype=G.idtype, device=G.device)
+                 idtype=G.idtype, device=G.device)
 
     # copy features
     comb_nf = combine_frames(G._node_frames, range(len(G.ntypes)))

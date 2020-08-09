@@ -101,7 +101,7 @@ def knn_graph(x, k):
         (F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))),
         shape=(n_samples * n_points, n_samples * n_points))
 
-    return convert.graph(adj)
+    return convert.from_scipy(adj)
 
 #pylint: disable=invalid-name
 def segmented_knn_graph(x, k, segs):
@@ -814,12 +814,8 @@ def metapath_reachable_graph(g, metapath):
     adj = (adj != 0).tocsr()
     srctype = g.to_canonical_etype(metapath[0])[0]
     dsttype = g.to_canonical_etype(metapath[-1])[2]
-    if srctype == dsttype:
-        assert adj.shape[0] == adj.shape[1]
-        new_g = convert.graph(adj, ntype=srctype, idtype=g.idtype, device=g.device)
-    else:
-        new_g = convert.bipartite(adj, utype=srctype, vtype=dsttype,
-                                  idtype=g.idtype, device=g.device)
+    new_g = convert.heterograph({(srctype, '_E', dsttype): adj.nonzero()},
+                                idtype=g.idtype, device=g.device)
 
     # copy srcnode features
     for key, value in g.nodes[srctype].data.items():
