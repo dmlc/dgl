@@ -50,7 +50,7 @@ def submit_jobs(args, udf_command):
     tot_num_clients = args.num_trainers * (1 + args.num_samplers) * len(hosts)
     # launch server tasks
     server_cmd = 'DGL_ROLE=server'
-    server_cmd = server_cmd + ' ' + 'OMP_NUM_THREADS=1'
+    server_cmd = server_cmd + ' ' + 'OMP_NUM_THREADS=' + str(args.num_server_threads)
     server_cmd = server_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(tot_num_clients)
     server_cmd = server_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.part_config)
     server_cmd = server_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
@@ -106,6 +106,10 @@ def main():
                         help='The file (in workspace) of the partition config')
     parser.add_argument('--ip_config', type=str,
                         help='The file (in workspace) of IP configuration for server processes')
+    parser.add_argument('--num_server_threads', type=int, default=1,
+                        help='The number of OMP threads in the server process. \
+                        It should be small if server processes and trainer processes run on \
+                        the same machine. By default, it is 1.')
     args, udf_command = parser.parse_known_args()
     assert len(udf_command) == 1, 'Please provide user command line.'
     assert args.num_trainers > 0, '--num_trainers must be a positive number.'
