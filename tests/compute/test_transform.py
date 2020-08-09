@@ -3,6 +3,7 @@ import networkx as nx
 import numpy as np
 import dgl
 import dgl.function as fn
+import dgl.partition
 import backend as F
 from dgl.graph_index import from_scipy_sparse_matrix
 import unittest
@@ -640,7 +641,7 @@ def test_reorder_nodes():
     g = dgl.graph(create_large_graph_index(1000))
     new_nids = np.random.permutation(g.number_of_nodes())
     # TODO(zhengda) we need to test both CSR and COO.
-    new_g = dgl.transform.reorder_nodes(g, new_nids)
+    new_g = dgl.partition.reorder_nodes(g, new_nids)
     new_in_deg = new_g.in_degrees()
     new_out_deg = new_g.out_degrees()
     in_deg = g.in_degrees()
