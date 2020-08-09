@@ -44,8 +44,6 @@ __all__ = [
     'to_block',
     'to_simple',
     'to_simple_graph',
-    'in_subgraph',
-    'out_subgraph',
     'as_immutable_graph',
     'as_heterograph']
 
@@ -91,9 +89,9 @@ def knn_graph(x, k):
     Returns
     -------
     DGLGraph
-        The graph. The node IDs are in the same order as ``x``.
+        The graph. The node IDs are in the same order as :attr:`x`.
 
-        The graph will be created on CPU, regardless of the context of input ``x``.
+        The graph will be created on CPU, regardless of the context of input :attr:`x`.
 
     Examples
     --------
@@ -103,7 +101,7 @@ def knn_graph(x, k):
     >>> import dgl
     >>> import torch
 
-    When ``x`` is a 2D tensor, a single KNN graph is constructed.
+    When :attr:`x` is a 2D tensor, a single KNN graph is constructed.
 
     >>> x = torch.tensor([[0.0, 0.0, 1.0],
     ...                   [1.0, 0.5, 0.5],
@@ -113,7 +111,7 @@ def knn_graph(x, k):
     >>> knn_g.edges()
     >>> (tensor([0, 1, 2, 2, 2, 3, 3, 3]), tensor([0, 1, 1, 2, 3, 0, 2, 3]))
 
-    When ``x`` is a 3D tensor, multiple KNN graphs are constructed
+    When :attr:`x` is a 3D tensor, multiple KNN graphs are constructed
     and then unioned into a graph of multiple connected components.
 
     >>> x1 = torch.tensor([[0.0, 0.0, 1.0],
@@ -156,8 +154,8 @@ def segmented_knn_graph(x, k, segs):
     """Convert a tensor into multiple k-nearest-neighbor (KNN) graph(s)
     with different number of nodes.
 
-    Each chunk of ``x`` contains coordinates/features of a point set.
-    ``segs`` specifies the number of points in each point set. The
+    Each chunk of :attr:`x` contains coordinates/features of a point set.
+    :attr:`segs` specifies the number of points in each point set. The
     function constructs a KNN graph for each point set, where the predecessors
     of each point are its k-nearest neighbors. All KNN graphs will
     then be unioned into a graph with multiple connected components.
@@ -169,15 +167,15 @@ def segmented_knn_graph(x, k, segs):
     k : int
         The number of nearest neighbors per node.
     segs : list of int
-        Number of points in each point set. The numbers in ``segs``
-        must sum up to the number of rows in ``x``.
+        Number of points in each point set. The numbers in :attr:`segs`
+        must sum up to the number of rows in :attr:`x`.
 
     Returns
     -------
     DGLGraph
-        The graph. The node IDs are in the same order as ``x``.
+        The graph. The node IDs are in the same order as :attr:`x`.
 
-        The graph will be created on CPU, regardless of the context of input ``x``.
+        The graph will be created on CPU, regardless of the context of input :attr:`x`.
 
     Examples
     --------
@@ -263,7 +261,7 @@ def to_bidirected(g, readonly=None, copy_ndata=False):
 
     Notes
     -----
-    If ``copy_ndata`` is ``True``, same tensors will be used for
+    If :attr:`copy_ndata` is True, same tensors will be used for
     the features of the original graph and the returned graph to save memory cost.
     As a result, users should avoid performing in-place operations on the features of
     the returned graph, which will corrupt the features of the original graph as well.
@@ -362,7 +360,7 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
 
     Notes
     -----
-    If ``copy_ndata`` is ``True``, same tensors are used as
+    If :attr:`copy_ndata` is True, same tensors are used as
     the node features of the original graph and the new graph.
     As a result, users should avoid performing in-place operations
     on the node features of the new graph to avoid feature corruption.
@@ -382,10 +380,10 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
     **Heterographs with Multiple Edge Types**
 
     >>> g = dgl.heterograph({
-    >>>     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2, 2]), th.tensor([1, 1, 2, 1, 0])),
-    >>>     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1])),
-    >>>     ('user', 'follows', 'user'): (th.tensor([1, 2, 1), th.tensor([0, 0, 0]))
-    >>> })
+    ...     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2, 2]), th.tensor([1, 1, 2, 1, 0])),
+    ...     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1])),
+    ...     ('user', 'follows', 'user'): (th.tensor([1, 2, 1), th.tensor([0, 0, 0]))
+    ... })
     >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
     >>> g.edges['wins'].data['h'] = th.tensor([0, 1, 2, 3, 4])
 
@@ -446,19 +444,22 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
 
     # handle features
     if copy_ndata:
-        # for each ntype
-        for ntype in g.ntypes:
-            new_g.nodes[ntype].data.update(g.nodes[ntype].data)
+        node_frames = utils.extract_node_subframes(g, None)
+        utils.set_new_frames(new_g, node_frames=node_frames)
 
     if copy_edata:
-        # for each etype
+        # find indices
+        eids = []
         for c_etype in canonical_etypes:
+            eid = F.arange(0, g.number_of_edges(c_etype))
             if c_etype[0] != c_etype[2]:
-                new_g.edges[c_etype].data.update(g.edges[c_etype].data)
+                eids.append(eid)
             else:
-                for k in g.edges[c_etype].data:
-                    new_g.edges[c_etype].data[k] = \
-                        F.cat([g.edges[c_etype].data[k], g.edges[c_etype].data[k]], dim=0)
+                eids.append(F.cat([eid, eid], 0))
+
+        edge_frames = utils.extract_edge_subframes(g, eids)
+        utils.set_new_frames(new_g, edge_frames=edge_frames)
+
     return new_g
 
 def line_graph(g, backtracking=True, shared=False):
@@ -491,7 +492,7 @@ def line_graph(g, backtracking=True, shared=False):
 
     Notes
     -----
-    If ``shared`` is ``True``, same tensors will be used for
+    If :attr:`shared` is True, same tensors will be used for
     the features of the original graph and the returned graph to save memory cost.
     As a result, users should avoid performing in-place operations on the features of
     the returned graph, which will corrupt the features of the original graph as well.
@@ -524,9 +525,11 @@ def line_graph(g, backtracking=True, shared=False):
         'only homogeneous graph is supported'
     assert g.device == F.cpu(), 'the graph must be on CPU'
     lg = DGLHeteroGraph(_CAPI_DGLHeteroLineGraph(g._graph, backtracking))
+
     if shared:
-        # copy edge features
-        lg.ndata.update(g.edata)
+        new_frames = utils.extract_edge_subframes(g, None)
+        utils.set_new_frames(lg, node_frames=new_frames)
+
     return lg
 
 DGLHeteroGraph.line_graph = line_graph
@@ -575,10 +578,10 @@ def khop_adj(g, k):
     return F.tensor(adj_k.todense().astype(np.float32))
 
 def khop_graph(g, k, copy_ndata=True):
-    """Return the graph whose edges connect the ``k``-hop neighbors of the original graph.
+    """Return the graph whose edges connect the :attr:`k`-hop neighbors of the original graph.
 
     More specifically, an edge from node ``u`` and node ``v`` exists in the new graph if
-    and only if a path with length ``k`` exists from node ``u`` to node ``v`` in the
+    and only if a path with length :attr:`k` exists from node ``u`` to node ``v`` in the
     original graph.
 
     The adjacency matrix of the returned graph is :math:`A^k`
@@ -601,11 +604,11 @@ def khop_graph(g, k, copy_ndata=True):
     Returns
     -------
     DGLGraph
-        The returned ``DGLGraph``.
+        The returned graph.
 
     Notes
     -----
-    If ``copy_ndata`` is ``True``, same tensors will be used for
+    If :attr:`copy_ndata` is True, same tensors will be used for
     the features of the original graph and the returned graph to save memory cost.
     As a result, users should avoid performing in-place operations on the features of
     the returned graph, which will corrupt the features of the original graph as well.
@@ -648,7 +651,8 @@ def khop_graph(g, k, copy_ndata=True):
 
     # handle ndata
     if copy_ndata:
-        new_g.ndata.update(g.ndata)
+        node_frames = utils.extract_node_subframes(g, None)
+        utils.set_new_frames(new_g, node_frames=node_frames)
 
     return new_g
 
@@ -693,7 +697,7 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
 
     Notes
     -----
-    If ``copy_ndata`` or ``copy_edata`` is ``True``, same tensors will be used for
+    If :attr:`copy_ndata` or :attr:`copy_edata` is True, same tensors will be used for
     the features of the original graph and the reversed graph to save memory cost.
     As a result, users should avoid performing in-place operations on the features of
     the reversed graph, which will corrupt the features of the original graph as well.
@@ -719,7 +723,7 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
             [2.]])
 
     The i-th edge in the reversed graph corresponds to the i-th edge in the
-    original graph. When ``copy_edata`` is ``True``, they have the same features.
+    original graph. When :attr:`copy_edata` is True, they have the same features.
 
     >>> rg.edges()
     (tensor([1, 2, 0]), tensor([0, 1, 2]))
@@ -782,9 +786,9 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
         dgl_warning('share_edata argument has been renamed to copy_edata.')
         copy_edata = share_edata
     if g.is_block:
-        raise DGLError('Reversing a block graph is not allowed.')
-    # TODO(0.5 release, xiangsx) need to handle BLOCK
-    # currently reversing a block results in undefined behavior
+        # TODO(0.5 release, xiangsx) need to handle BLOCK
+        # currently reversing a block results in undefined behavior
+        raise DGLError('Reversing a block graph is not supported.')
     gidx = g._graph.reverse()
     new_g = DGLHeteroGraph(gidx, g.ntypes, g.etypes)
 
@@ -887,7 +891,7 @@ def laplacian_lambda_max(g):
     -------
     list[float]
         A list where the i-th item indicates the largest eigenvalue
-        of i-th graph in ``g``.
+        of i-th graph in :attr:`g`.
 
         In the case where the function takes a single graph, it will return a list
         consisting of a single element.
@@ -994,10 +998,10 @@ def add_nodes(g, num, data=None, ntype=None):
 
     Notes
     -----
-    * If the key of ``data`` does not contain some existing feature fields,
+    * If the key of :attr:`data` does not contain some existing feature fields,
     those features for the new nodes will be filled with zeros).
 
-    * If the key of ``data`` contains new feature fields, those features for
+    * If the key of :attr:`data` contains new feature fields, those features for
     the old nodes will be filled zeros).
 
     Examples
@@ -1028,7 +1032,7 @@ def add_nodes(g, num, data=None, ntype=None):
     >>> g.ndata['h']
     tensor([[1.], [1.], [1.], [1.], [1.], [0.], [1.]])
 
-    Since ``data`` contains new feature fields, the features for old nodes
+    Since :attr:`data` contains new feature fields, the features for old nodes
     will be created with zeros.
 
     >>> g.ndata['w']
@@ -1090,10 +1094,10 @@ def add_edges(g, u, v, data=None, etype=None):
     to add new nodes. The node features of the new nodes will be created
     with zeros.
 
-    * If the key of ``data`` does not contain some existing feature fields,
+    * If the key of :attr:`data` does not contain some existing feature fields,
     those features for the new edges will be created with zeros.
 
-    * If the key of ``data`` contains new feature fields, those features for
+    * If the key of :attr:`data` contains new feature fields, those features for
     the old edges will be created with zeros.
 
     Examples
@@ -1133,7 +1137,7 @@ def add_edges(g, u, v, data=None, etype=None):
     >>> g.edata['h']
     tensor([[1.], [1.], [1.], [1.], [0.], [1.], [2.]])
 
-    Since ``data`` contains new feature fields, the features for old edges
+    Since :attr:`data` contains new feature fields, the features for old edges
     will be created with zeros.
 
     >>> g.edata['w']
@@ -1446,7 +1450,7 @@ partition_graph_with_halo = hetero_partition_graph_with_halo
 metis_partition_assignment = hetero_metis_partition_assignment
 metis_partition = hetero_metis_partition
 
-def compact_graphs(graphs, always_preserve=None):
+def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=True):
     """Given a list of graphs with the same set of nodes, find and eliminate the common
     isolated nodes across all graphs.
 
@@ -1471,6 +1475,20 @@ def compact_graphs(graphs, always_preserve=None):
         node types would not be removed, regardless of whether they are isolated.
 
         If a Tensor is given, DGL assumes that all the graphs have one (same) node type.
+    copy_ndata: bool, optional
+        If True, the node features of the returned graphs are copied from the
+        original graphs.
+
+        If False, the returned graphs will not have any node features.
+
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the edge features of the reversed graph are copied from the
+        original graph.
+
+        If False, the reversed graph will not have any edge features.
+
+        (Default: True)
 
     Returns
     -------
@@ -1487,6 +1505,11 @@ def compact_graphs(graphs, always_preserve=None):
     -----
     This function currently requires that the same node type of all graphs should have
     the same node type ID, i.e. the node types are *ordered* the same.
+
+    If :attr:`copy_edata` is True, same tensors will be used for
+    the features of the original graphs and the returned graphs to save memory cost.
+    As a result, users should avoid performing in-place operations on the edge features of
+    the returned graph, which will corrupt the edge features of the original graph as well.
 
     Examples
     --------
@@ -1578,47 +1601,47 @@ def compact_graphs(graphs, always_preserve=None):
     new_graphs = [
         DGLHeteroGraph(new_graph_index, graph.ntypes, graph.etypes)
         for new_graph_index, graph in zip(new_graph_indexes, graphs)]
-    for g in new_graphs:
-        for i, ntype in enumerate(graphs[0].ntypes):
-            g.nodes[ntype].data[NID] = induced_nodes[i]
+
+    if copy_ndata:
+        for g, new_g in zip(graphs, new_graphs):
+            node_frames = utils.extract_node_subframes(g, induced_nodes)
+            utils.set_new_frames(new_g, node_frames=node_frames)
+    if copy_edata:
+        for g, new_g in zip(graphs, new_graphs):
+            edge_frames = utils.extract_edge_subframes(g, None)
+            utils.set_new_frames(new_g, edge_frames=edge_frames)
+
     if return_single:
         new_graphs = new_graphs[0]
 
     return new_graphs
 
-def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_edata=True):
+def to_block(g, dst_nodes=None, include_dst_in_src=True):
     """Convert a graph into a bipartite-structured "block" for message passing.
 
-    A block is uni-directional bipartite graph consisting of two sets of nodes
-    SRC and DST. Each set can have many node types while all the edges are from SRC
-    nodes to DST nodes.
+    A block is uni-directional bipartite graph consisting of two sets of nodes: the
+    *input* nodes and *output* nodes.
+    Each set can have many node types while all the edges are from input nodes to output
+    nodes.
 
     Specifically, for each relation graph of canonical edge type ``(utype, etype, vtype)``,
-    node type ``utype`` belongs to SRC while ``vtype`` belongs to DST.
+    node type ``utype`` belongs to the input side while ``vtype`` belongs to the output
+    side.
     Edges from node type ``utype`` to node type ``vtype`` are preserved. If
     ``utype == vtype``, the result graph will have two node types of the same name ``utype``,
-    but one belongs to SRC while the other belongs to DST. This is because although
-    they have the same name, their node ids are relabeled differently (see below). In
+    but one belongs to the input while the other belongs to the output. This is because
+    although
+    they have the same name, their node IDs are relabeled differently (see below).  In
     both cases, the canonical edge type in the new graph is still
     ``(utype, etype, vtype)``, so there is no difference when referring to it.
 
-    Moreover, the function also relabels node ids in each type to make the graph more compact.
+    Moreover, the function also relabels node IDs in each type to make the graph more compact.
     Specifically, the nodes of type ``vtype`` would contain the nodes that have at least one
-    inbound edge of any type, while ``utype`` would contain all the DST nodes of type ``vtype``,
-    as well as the nodes that have at least one outbound edge to any DST node.
+    inbound edge of any type, while ``utype`` would contain all the output nodes of type ``vtype``,
+    as well as the nodes that have at least one outbound edge to any output node.
 
-    Since DST nodes are included in SRC nodes, a common requirement is to fetch
-    the DST node features from the SRC nodes features. To avoid expensive sparse lookup,
-    the function assures that the DST nodes in both SRC and DST sets have the same ids.
-    As a result, given the node feature tensor ``X`` of type ``utype``,
-    the following code finds the corresponding DST node features of type ``vtype``:
-
-    .. code::
-
-        X[:block.number_of_dst_nodes('vtype')]
-
-    If the ``dst_nodes`` argument is given, the DST nodes would contain the given nodes.
-    Otherwise, the DST nodes would be determined by DGL via the rules above.
+    If the :attr:`dst_nodes` argument is given, the output nodes would contain the given nodes.
+    Otherwise, the output nodes would be determined by DGL via the rules above.
 
     Parameters
     ----------
@@ -1626,21 +1649,11 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
         The graph.  Must be on CPU.
     dst_nodes : Tensor or dict[str, Tensor], optional
         Optional DST nodes. If a tensor is given, the graph must have only one node type.
+
+        If given, it must be a superset of all the nodes that have at least one inbound
+        edge.  An error will be raised otherwise.
     include_dst_in_src : bool
         If False, do not include DST nodes in SRC nodes.
-
-        (Default: True)
-    copy_ndata : bool, optional
-        If True, the source and destination node features of the block are copied from the
-        original graph.
-
-        If False, the block will not have any node features.
-
-        (Default: True)
-    copy_edata: bool, optional
-        If True, the edge features of the block are copied from the origianl graph.
-
-        If False, the simple graph will not have any edge features.
 
         (Default: True)
 
@@ -1654,11 +1667,11 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
 
         The edge IDs induced for each type would be stored in feature ``dgl.EID``.
 
-    Notes
-    -----
-    This function is primarily for creating the structures for efficient
-    computation of message passing.  See User Guide Chapter 6 for a more thorough
-    description of the concept of blocks.
+    Raises
+    ------
+    DGLError
+        If :attr:`dst_nodes` is specified but it is not a superset of all the nodes that
+        have at least one inbound edge.
 
     Examples
     --------
@@ -1667,13 +1680,13 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
     >>> g = dgl.graph([(0, 1), (1, 2), (2, 3)])
     >>> block = dgl.to_block(g, torch.LongTensor([3, 2]))
 
-    The right hand side nodes would be exactly the same as the ones given: [3, 2].
+    The output nodes would be exactly the same as the ones given: [3, 2].
 
     >>> induced_dst = block.dstdata[dgl.NID]
     >>> induced_dst
     tensor([3, 2])
 
-    The first few nodes of the left hand side nodes would also be exactly the same as
+    The first few input nodes would also be exactly the same as
     the ones given.  The rest of the nodes are the ones necessary for message passing
     into nodes 3, 2.  This means that the node 1 would be included.
 
@@ -1682,7 +1695,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
     tensor([3, 2, 1])
 
     You can notice that the first two nodes are identical to the given nodes as well as
-    the right hand side nodes.
+    the output nodes.
 
     The induced edges can also be obtained by the following:
 
@@ -1698,12 +1711,12 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
     (tensor([2, 1]), tensor([3, 2]))
 
     Converting a heterogeneous graph to a block is similar, except that when specifying
-    the right hand side nodes, you have to give a dict:
+    the output nodes, you have to give a dict:
 
     >>> g = dgl.bipartite([(0, 1), (1, 2), (2, 3)], utype='A', vtype='B')
 
-    If you don't specify any node of type A on the right hand side, the node type ``A``
-    in the block would have zero nodes on the DST side.
+    If you don't specify any node of type A on the output side, the node type ``A``
+    in the block would have zero nodes on the output side.
 
     >>> block = dgl.to_block(g, {'B': torch.LongTensor([3, 2])})
     >>> block.number_of_dst_nodes('A')
@@ -1713,19 +1726,22 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
     >>> block.dstnodes['B'].data[dgl.NID]
     tensor([3, 2])
 
-    The left hand side would contain all the nodes on the right hand side:
+    The input side would contain all the nodes on the output side:
 
     >>> block.srcnodes['B'].data[dgl.NID]
     tensor([3, 2])
 
-    As well as all the nodes that have connections to the nodes on the right hand side:
+    As well as all the nodes that have connections to the nodes on the output side:
 
     >>> block.srcnodes['A'].data[dgl.NID]
     tensor([2, 1])
 
-    See also
-    --------
-    User Guide Chapter 6
+    Notes
+    -----
+    :func:`to_block` is most commonly used in customizing neighborhood sampling
+    for stochastic training on a large graph.  Please refer to User Guide Chapter 6
+    for a more thorough discussion driven by the methodology of stochastic training on a
+    large graph.
     """
     assert g.device == F.cpu(), 'the graph must be on CPU'
 
@@ -1763,133 +1779,15 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
     new_graph = DGLBlock(new_graph_index, new_ntypes, g.etypes)
     assert new_graph.is_unibipartite  # sanity check
 
-    src_node_id = {
-        ntype: F.from_dgl_nd(src)
-        for ntype, src in zip(g.ntypes, src_nodes_nd)}
-    dst_node_id = {
-        ntype: dst_nodes.get(ntype, F.tensor([], dtype=g.idtype))
-        for ntype in g.ntypes}
-    edge_id = {
-        canonical_etype: F.from_dgl_nd(edges)
-        for canonical_etype, edges in zip(g.canonical_etypes, induced_edges_nd)}
+    src_node_ids = [F.from_dgl_nd(src) for src in src_nodes_nd]
+    dst_node_ids = [F.from_dgl_nd(dst) for dst in dst_nodes_nd]
+    edge_ids = [F.from_dgl_nd(eid) for eid in induced_edges_nd]
 
-    if copy_ndata:
-        for ntype in g.ntypes:
-            src = src_node_id[ntype]
-            dst = dst_node_id[ntype]
-            for key, value in g.nodes[ntype].data.items():
-                if is_internal_column(key):
-                    continue
-                ctx = F.context(value)
-                new_graph.srcnodes[ntype].data[key] = F.gather_row(value, F.copy_to(src, ctx))
-                new_graph.dstnodes[ntype].data[key] = F.gather_row(value, F.copy_to(dst, ctx))
-    if copy_edata:
-        for canonical_etype in g.canonical_etypes:
-            eid = edge_id[canonical_etype]
-            for key, value in g.edges[canonical_etype].data.items():
-                if is_internal_column(key):
-                    continue
-                ctx = F.context(value)
-                new_graph.edges[canonical_etype].data[key] = F.gather_row(
-                    value, F.copy_to(eid, ctx))
-
-    for i, ntype in enumerate(g.ntypes):
-        new_graph.srcnodes[ntype].data[NID] = F.from_dgl_nd(src_nodes_nd[i])
-        if ntype in dst_nodes:
-            new_graph.dstnodes[ntype].data[NID] = dst_nodes[ntype]
-        else:
-            # For empty dst node sets, still create empty mapping arrays.
-            new_graph.dstnodes[ntype].data[NID] = F.tensor([], dtype=g.idtype)
-
-    for i, canonical_etype in enumerate(g.canonical_etypes):
-        induced_edges = F.from_dgl_nd(induced_edges_nd[i])
-        new_graph.edges[canonical_etype].data[EID] = induced_edges
+    node_frames = utils.extract_node_subframes_for_block(g, src_node_ids, dst_node_ids)
+    edge_frames = utils.extract_edge_subframes(g, edge_ids)
+    utils.set_new_frames(new_graph, node_frames=node_frames, edge_frames=edge_frames)
 
     return new_graph
-
-def in_subgraph(g, nodes):
-    """Extract the subgraph containing only the in edges of the given nodes.
-
-    The subgraph keeps the same type schema and the cardinality of the original one.
-    Node/edge features are not preserved. The original IDs
-    the extracted edges are stored as the `dgl.EID` feature in the returned graph.
-
-    Parameters
-    ----------
-    g : DGLHeteroGraph
-        Full graph structure.
-    nodes : tensor or dict
-        Node ids to sample neighbors from. The allowed types
-        are dictionary of node types to node id tensors, or simply node id tensor if
-        the given graph g has only one type of nodes.
-
-    Returns
-    -------
-    DGLHeteroGraph
-        The subgraph.
-    """
-    if g.is_block:
-        raise DGLError('Extracting subgraph of a block graph is not allowed.')
-    if not isinstance(nodes, dict):
-        if len(g.ntypes) > 1:
-            raise DGLError("Must specify node type when the graph is not homogeneous.")
-        nodes = {g.ntypes[0] : nodes}
-    nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
-    nodes_all_types = []
-    for ntype in g.ntypes:
-        if ntype in nodes:
-            nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
-        else:
-            nodes_all_types.append(nd.NULL[g._idtype_str])
-
-    subgidx = _CAPI_DGLInSubgraph(g._graph, nodes_all_types)
-    induced_edges = subgidx.induced_edges
-    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
-    for i, etype in enumerate(ret.canonical_etypes):
-        ret.edges[etype].data[EID] = induced_edges[i]
-    return ret
-
-def out_subgraph(g, nodes):
-    """Extract the subgraph containing all the nodes of the original graph, but only
-    the outbound edges of the given nodes.
-
-    Node/edge features are not preserved. The original IDs of
-    the extracted edges are stored as the `dgl.EID` feature in the returned graph.
-
-    Parameters
-    ----------
-    g : DGLHeteroGraph
-        Full graph structure.
-    nodes : tensor or dict
-        Node ids to sample neighbors from. The allowed types
-        are dictionary of node types to node id tensors, or simply node id tensor if
-        the given graph g has only one type of nodes.
-
-    Returns
-    -------
-    DGLHeteroGraph
-        The subgraph.
-    """
-    if g.is_block:
-        raise DGLError('Extracting subgraph of a block graph is not allowed.')
-    if not isinstance(nodes, dict):
-        if len(g.ntypes) > 1:
-            raise DGLError("Must specify node type when the graph is not homogeneous.")
-        nodes = {g.ntypes[0] : nodes}
-    nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
-    nodes_all_types = []
-    for ntype in g.ntypes:
-        if ntype in nodes:
-            nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
-        else:
-            nodes_all_types.append(nd.NULL[g._idtype_str])
-
-    subgidx = _CAPI_DGLOutSubgraph(g._graph, nodes_all_types)
-    induced_edges = subgidx.induced_edges
-    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
-    for i, etype in enumerate(ret.canonical_etypes):
-        ret.edges[etype].data[EID] = induced_edges[i]
-    return ret
 
 def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True, copy_edata=False):
     r"""Convert a graph to a simple graph, removing the parallel edges.
@@ -1907,7 +1805,7 @@ def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True
     return_counts : str, optional
         If given, the count of each edge in the original graph
         will be stored as edge features under the name
-        ``return_counts``.
+        ``return_counts``.  The old features with the same name will be replaced.
 
         (Default: "count")
     writeback_mapping: bool, optional
@@ -2052,24 +1950,22 @@ def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True
     counts = [F.from_dgl_nd(count) for count in counts]
     edge_maps = [F.from_dgl_nd(edge_map) for edge_map in edge_maps]
 
+    if copy_ndata:
+        node_frames = utils.extract_node_subframes(g, None)
+        utils.set_new_frames(simple_graph, node_frames=node_frames)
+    if copy_edata:
+        eids = []
+        for i in range(len(g.canonical_etypes)):
+            feat_idx = F.asnumpy(edge_maps[i])
+            _, indices = np.unique(feat_idx, return_index=True)
+            eids.append(F.zerocopy_from_numpy(indices))
+
+        edge_frames = utils.extract_edge_subframes(g, eids)
+        utils.set_new_frames(simple_graph, edge_frames=edge_frames)
+
     if return_counts is not None:
         for count, canonical_etype in zip(counts, g.canonical_etypes):
             simple_graph.edges[canonical_etype].data[return_counts] = count
-
-    if copy_ndata:
-        for ntype in g.ntypes:
-            for key in g.nodes[ntype].data:
-                simple_graph.nodes[ntype].data[key] = g.nodes[ntype].data[key]
-
-    if copy_edata:
-        for i, c_etype in enumerate(g.canonical_etypes):
-            for key in g.edges[c_etype].data:
-                feat_idx = F.asnumpy(edge_maps[i])
-                _, indices = np.unique(feat_idx, return_index=True)
-                simple_graph.edges[c_etype].data[key] = \
-                    F.gather_row(g.edges[c_etype].data[key],
-                                 F.copy_to(F.tensor(indices),
-                                           F.context(g.edges[c_etype].data[key])))
 
     if writeback_mapping:
         # single edge type

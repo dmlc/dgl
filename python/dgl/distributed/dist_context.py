@@ -8,6 +8,8 @@ from . import rpc
 from .constants import MAX_QUEUE_SIZE
 from .kvstore import init_kvstore, close_kvstore
 from .rpc_client import connect_to_server, shutdown_servers
+from .role import init_role
+from .. import utils
 
 SAMPLER_POOL = None
 NUM_SAMPLER_WORKERS = 0
@@ -24,11 +26,13 @@ def get_sampler_pool():
     return SAMPLER_POOL, NUM_SAMPLER_WORKERS
 
 
-def _init_rpc(ip_config, max_queue_size, net_type, role):
+def _init_rpc(ip_config, max_queue_size, net_type, role, num_threads):
     ''' This init function is called in the worker processes.
     '''
     try:
+        utils.set_num_threads(num_threads)
         connect_to_server(ip_config, max_queue_size, net_type)
+        init_role(role)
         init_kvstore(ip_config, role)
     except Exception as e:
         print(e, flush=True)
@@ -36,7 +40,8 @@ def _init_rpc(ip_config, max_queue_size, net_type, role):
         raise e
 
 
-def initialize(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
+def initialize(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type='socket',
+               num_worker_threads=1):
     """Init rpc service
     ip_config: str
         File path of ip_config file
@@ -48,6 +53,8 @@ def initialize(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type
         it will not allocate 20GB memory at once.
     net_type : str
         Networking type. Current options are: 'socket'.
+    num_worker_threads: int
+        The number of threads in a worker process.
     """
     rpc.reset()
     ctx = mp.get_context("spawn")
@@ -56,10 +63,11 @@ def initialize(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type
     if num_workers > 0:
         SAMPLER_POOL = ctx.Pool(
             num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size,
-                                                          net_type, 'sampler'))
+                                                          net_type, 'sampler', num_worker_threads))
     NUM_SAMPLER_WORKERS = num_workers
     connect_to_server(ip_config, max_queue_size, net_type)
-    init_kvstore(ip_config)
+    init_role('default')
+    init_kvstore(ip_config, 'default')
 
 
 def finalize_client():

@@ -3,7 +3,7 @@ from collections import namedtuple
 
 from .rpc import Request, Response, send_requests_to_machine, recv_responses
 from ..sampling import sample_neighbors as local_sample_neighbors
-from ..transform import in_subgraph as local_in_subgraph
+from ..subgraph import in_subgraph as local_in_subgraph
 from .rpc import register_service
 from ..convert import graph
 from ..base import NID, EID

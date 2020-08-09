@@ -4,7 +4,7 @@ import mxnet as mx
 from mxnet.gluon import nn
 
 from .... import function as fn
-from ..softmax import edge_softmax
+from ....ops import edge_softmax
 from ..utils import normalize
 from ....utils import expand_as_pair
 

@@ -26,6 +26,7 @@ from .convert import *
 from .generators import *
 from .heterograph import DGLHeteroGraph
 from .heterograph import DGLHeteroGraph as DGLGraph  # pylint: disable=reimported
+from .subgraph import *
 from .traversal import *
 from .transform import *
 from .propagate import *
