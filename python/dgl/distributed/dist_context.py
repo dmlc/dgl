@@ -1,11 +1,9 @@
 """Initialize the distributed services"""
 
-import os
 import multiprocessing as mp
 import traceback
 import atexit
 import time
-import torch as th
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
 from .kvstore import init_kvstore, close_kvstore
