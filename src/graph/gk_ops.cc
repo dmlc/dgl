@@ -9,9 +9,6 @@
 #endif  // !defined(_WIN32)
 
 #include <dgl/graph_op.h>
-#include <dgl/base_heterograph.h>
-#include <dgl/packed_func_ext.h>
-#include "../c_api_common.h"
 
 namespace dgl {
 
