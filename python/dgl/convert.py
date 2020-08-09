@@ -1187,15 +1187,15 @@ def bipartite_from_networkx(nx_graph,
     # Get the source and destination node sets
     top_nodes = set()
     bottom_nodes = set()
-    for n, nd in nx_graph.nodes(data=True):
-        assert 'bipartite' in nd, 'Expect the node {} to have attribute bipartite'.format(n)
-        if nd['bipartite'] == 0:
+    for n, ndata in nx_graph.nodes(data=True):
+        assert 'bipartite' in ndata, 'Expect the node {} to have attribute bipartite'.format(n)
+        if ndata['bipartite'] == 0:
             top_nodes.add(n)
-        elif nd['bipartite'] == 1:
+        elif ndata['bipartite'] == 1:
             bottom_nodes.add(n)
         else:
             raise ValueError('Expect the bipartite attribute of the node {} to be 0 or 1, '
-                             'got {}'.format(n, nd['bipartite']))
+                             'got {}'.format(n, ndata['bipartite']))
 
     # Separately relabel the source and destination nodes.
     top_nodes = sorted(top_nodes)
