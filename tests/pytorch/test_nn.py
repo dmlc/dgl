@@ -289,6 +289,7 @@ def test_set_trans():
     h2 = st_dec(bg, h1)
     assert h2.shape[0] == 3 and h2.shape[1] == 200 and h2.dim() == 2
 
+<<<<<<< HEAD
 def uniform_attention(g, shape):
     a = F.ones(shape)
     target_shape = (g.number_of_edges(),) + (1,) * (len(shape) - 1)
@@ -406,6 +407,8 @@ def test_partial_edge_softmax(idtype):
     assert F.allclose(y_1, y_2)
     assert F.allclose(grad_1, grad_2)
 
+=======
+>>>>>>> upstream/master
 def test_rgcn():
     ctx = F.ctx()
     etype = []
@@ -983,8 +986,6 @@ def test_hetero_conv(agg, idtype):
 
 if __name__ == '__main__':
     test_graph_conv()
-    test_edge_softmax()
-    test_partial_edge_softmax()
     test_set2set()
     test_glob_att_pool()
     test_simple_pool()

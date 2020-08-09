@@ -77,7 +77,7 @@ class SAGE(nn.Module):
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0]
 
-                block = block.to(device)
+                block = block.int().to(device)
                 h = x[input_nodes].to(device)
                 h = layer(block, h)
                 if l != len(self.layers) - 1:
@@ -155,12 +155,11 @@ def run(args, device, data):
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
+        tic_step = time.time()
         for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
-            tic_step = time.time()
-
             # Load the input features as well as output labels
             batch_inputs, batch_labels = load_subtensor(train_g, seeds, input_nodes, device)
-            blocks = [block.to(device) for block in blocks]
+            blocks = [block.int().to(device) for block in blocks]
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -175,6 +174,7 @@ def run(args, device, data):
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB'.format(
                     epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc))
+            tic_step = time.time()
 
         toc = time.time()
         print('Epoch Time(s): {:.4f}'.format(toc - tic))
@@ -202,12 +202,12 @@ if __name__ == '__main__':
     argparser.add_argument('--eval-every', type=int, default=5)
     argparser.add_argument('--lr', type=float, default=0.003)
     argparser.add_argument('--dropout', type=float, default=0.5)
-    argparser.add_argument('--num-workers', type=int, default=0,
+    argparser.add_argument('--num-workers', type=int, default=4,
         help="Number of sampling processes. Use 0 for no extra process.")
     argparser.add_argument('--inductive', action='store_true',
         help="Inductive learning setting")
     args = argparser.parse_args()
-    
+
     if args.gpu >= 0:
         device = th.device('cuda:%d' % args.gpu)
     else:
@@ -221,8 +221,6 @@ if __name__ == '__main__':
         raise Exception('unknown dataset')
 
     in_feats = g.ndata['features'].shape[1]
-
-    g = dgl.as_heterograph(g)
 
     if args.inductive:
         train_g, val_g, test_g = inductive_split(g)

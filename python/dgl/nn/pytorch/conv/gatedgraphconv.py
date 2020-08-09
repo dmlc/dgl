@@ -80,6 +80,8 @@ class GatedGraphConv(nn.Module):
         with graph.local_scope():
             assert graph.is_homogeneous(), \
                 "not a homograph; convert it with to_homo and pass in the edge type as argument"
+            assert etypes.min() >= 0 and etypes.max() < self._n_etypes, \
+                "edge type indices out of range [0, {})".format(self._n_etypes)
             zero_pad = feat.new_zeros((feat.shape[0], self._out_feats - feat.shape[1]))
             feat = th.cat([feat, zero_pad], -1)
 

@@ -29,11 +29,7 @@ def get_cases(labels=None, exclude=[]):
                 cases.add(case)
     return [fn() for fn in cases]
 
-@register_case(['dglgraph', 'path'])
-def dglgraph_path():
-    return dgl.DGLGraph(nx.path_graph(5))
-
-@register_case(['bipartite'])
+@register_case(['bipartite', 'zero-degree'])
 def bipartite1():
     return dgl.heterograph({('_U', '_E', '_V'): ([0, 0, 0, 2, 2, 3],
                                                  [0, 1, 4, 1, 4, 3])})
@@ -47,6 +43,10 @@ def bipartite_full():
 def graph0():
     return dgl.graph(([0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 6, 6, 7, 8, 9],
                       [4, 5, 1, 2, 4, 7, 9, 8 ,6, 4, 1, 0, 1, 0, 2, 3, 5]))
+
+@register_case(['homo', 'zero-degree', 'homo-zero-degree'])
+def bipartite1():
+    return dgl.graph([(0, 0), (0, 1), (0, 4), (2, 1), (2, 4), (3, 3)])
 
 @register_case(['homo', 'has_feature'])
 def graph1():
@@ -89,6 +89,11 @@ def block_graph1():
             ('store', 'sells', 'game') : ([0, 1, 1], [0, 1, 2]),
         })
     return dgl.to_block(g)
+
+@register_case(['clique'])
+def clique():
+    g = dgl.graph(([0, 0, 0, 1, 1, 1, 2, 2, 2], [0, 1, 2, 0, 1, 2, 0, 1, 2]))
+    return g
 
 def random_dglgraph(size):
     return dgl.DGLGraph(nx.erdos_renyi_graph(size, 0.3))
