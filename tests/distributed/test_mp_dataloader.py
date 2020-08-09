@@ -49,7 +49,7 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
     import dgl
     import torch as th
     os.environ['DGL_DIST_MODE'] = 'distributed'
-    dgl.distributed.initialize("mp_ip_config.txt", num_workers=4)
+    dgl.distributed.initialize("mp_ip_config.txt", num_workers=num_workers)
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_sampling.json', rank)
@@ -83,22 +83,20 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
                 dst_nodes_id = block.dstdata[dgl.NID][o_dst]
                 has_edges = groundtruth_g.has_edges_between(src_nodes_id, dst_nodes_id)
                 assert np.all(F.asnumpy(has_edges))
-                print(np.unique(np.sort(F.asnumpy(dst_nodes_id))))
                 max_nid.append(np.max(F.asnumpy(dst_nodes_id)))
                 # assert np.all(np.unique(np.sort(F.asnumpy(dst_nodes_id))) == np.arange(idx, batch_size))
             if drop_last:
                 assert np.max(max_nid) == num_nodes_to_sample - 1 - num_nodes_to_sample % batch_size
             else:
                 assert np.max(max_nid) == num_nodes_to_sample - 1
-    
-    dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @pytest.mark.parametrize("num_server", [3])
+@pytest.mark.parametrize("num_workers", [0, 4])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_dist_dataloader(tmpdir, num_server, drop_last):
+def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last):
     ip_config = open("mp_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{} 1\n'.format(get_local_usable_addr()))
@@ -112,7 +110,6 @@ def test_dist_dataloader(tmpdir, num_server, drop_last):
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
                     num_hops=num_hops, part_method='metis', reshuffle=False)
 
-    num_workers = 4
     pserver_list = []
     ctx = mp.get_context('spawn')
     for i in range(num_server):
@@ -123,9 +120,12 @@ def test_dist_dataloader(tmpdir, num_server, drop_last):
         pserver_list.append(p)
 
     time.sleep(3)
-    sampled_graph = start_client(0, tmpdir, num_server > 1, num_workers, drop_last)
+    start_client(0, tmpdir, num_server > 1, num_workers, drop_last)
+
+    dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
-        test_dist_dataloader(Path(tmpdirname), 3, True)
+        test_dist_dataloader(Path(tmpdirname), 3, 0, True)
+        test_dist_dataloader(Path(tmpdirname), 3, 4, True)
