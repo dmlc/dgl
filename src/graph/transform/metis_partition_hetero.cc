@@ -17,6 +17,8 @@ namespace dgl {
 
 namespace transform {
 
+#if !defined(_WIN32)
+
 IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr) {
   // The index type of Metis needs to be compatible with DGL index type.
   CHECK_EQ(sizeof(idx_t), sizeof(int64_t))
@@ -85,6 +87,8 @@ IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr) {
   return aten::NullArray();
 }
 
+#endif  // !defined(_WIN32)
+
 DGL_REGISTER_GLOBAL("partition._CAPI_DGLMetisPartition_Hetero")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef g = args[0];
@@ -95,7 +99,11 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLMetisPartition_Hetero")
     auto ugptr = hgptr->relation_graphs()[0];
     int k = args[1];
     NDArray vwgt = args[2];
+#if !defined(_WIN32)
     *rv = MetisPartition(ugptr, k, vwgt);
+#else
+    LOG(FATAL) << "Metis partition does not support Windows.";
+#endif  // !defined(_WIN32)
   });
 }  // namespace transform
 }  // namespace dgl
