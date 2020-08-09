@@ -47,8 +47,8 @@ Querying graph structure
 .. autosummary::
     :toctree: ../../generated/
 
-    DGLHeteroGraph.number_of_nodes
-    DGLHeteroGraph.number_of_edges
+    DGLHeteroGraph.num_nodes
+    DGLHeteroGraph.num_edges
     DGLHeteroGraph.is_multigraph
     DGLHeteroGraph.is_readonly
     DGLHeteroGraph.has_node

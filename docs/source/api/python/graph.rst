@@ -23,13 +23,11 @@ Querying graph structure
 .. autosummary::
     :toctree: ../../generated/
 
-    DGLGraph.number_of_nodes
-    DGLGraph.number_of_edges
-    DGLGraph.__len__
+    DGLGraph.num_nodes
+    DGLGraph.num_edges
     DGLGraph.is_multigraph
     DGLGraph.has_node
     DGLGraph.has_nodes
-    DGLGraph.__contains__
     DGLGraph.has_edge_between
     DGLGraph.has_edges_between
     DGLGraph.predecessors

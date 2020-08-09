@@ -196,8 +196,7 @@ def check_all_same_type(olist, otype, name, skip_none):
         return
     if len(olist) == 0:
         return
-    for idx in range(len(olist)):
-        obj = olist[idx]
+    for idx, obj in enumerate(olist):
         if not isinstance(obj, otype):
             raise DGLError('Expect all objects in {} to be an instance of {}, '
                            'got {} for the {:d}-th object'.format(name, otype, type(obj), idx))
@@ -211,5 +210,5 @@ def check_valid_idtype(idtype):
         The framework object of a data type.
     """
     if idtype is not None:
-        assert idtype == F.int32 or idtype == F.int64, \
+        assert idtype in [F.int32, F.int64], \
             'Expect idtype to be a framework object of int32/int64, got {}'.format(idtype)

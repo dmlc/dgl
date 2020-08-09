@@ -611,7 +611,7 @@ class DGLHeteroGraph(object):
             num_nodes_per_type.append(self.number_of_nodes(ntype))
         # update graph idx
         relation_graphs = []
-        for c_etype in self.relations:
+        for c_etype in self.canonical_etypes:
             # the target edge type
             if c_etype == (u_type, e_type, v_type):
                 old_u, old_v = self.edges(form='uv', order='eid', etype=c_etype)
@@ -1708,6 +1708,28 @@ class DGLHeteroGraph(object):
         return self._graph.number_of_nodes(self.get_ntype_id(ntype))
 
     def num_nodes(self, ntype=None):
+        """Return the number of nodes of the given type in the heterograph.
+
+        Parameters
+        ----------
+        ntype : str, optional
+            The node type. Can be omitted if there is only one node type
+            in the graph. (Default: None)
+
+        Returns
+        -------
+        int
+            The number of nodes
+
+        Examples
+        --------
+
+        >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1], [1, 2])})
+        >>> g.num_nodes('user')
+        3
+        >>> g.num_nodes()
+        3
+        """
         return self._graph.number_of_nodes(self.get_ntype_id(ntype))
 
     def number_of_src_nodes(self, ntype=None):
@@ -1739,6 +1761,31 @@ class DGLHeteroGraph(object):
         return self._graph.number_of_nodes(self.get_ntype_id_from_src(ntype))
 
     def num_src_nodes(self, ntype=None):
+        """Return the number of nodes of the given SRC node type in the heterograph.
+
+        The heterograph is usually a unidirectional bipartite graph.
+
+        Parameters
+        ----------
+        ntype : str, optional
+            Node type.
+            If omitted, there should be only one node type in the SRC category.
+
+        Returns
+        -------
+        int
+            The number of nodes
+
+        Examples
+        --------
+        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1], [1, 2])})
+        >>> g.num_src_nodes('user')
+        2
+        >>> g.num_src_nodes()
+        2
+        >>> g.num_nodes('user')
+        2
+        """
         return self._graph.number_of_nodes(self.get_ntype_id_from_src(ntype))
 
     def number_of_dst_nodes(self, ntype=None):
@@ -1770,6 +1817,31 @@ class DGLHeteroGraph(object):
         return self._graph.number_of_nodes(self.get_ntype_id_from_dst(ntype))
 
     def num_dst_nodes(self, ntype=None):
+        """Return the number of nodes of the given DST node type in the heterograph.
+
+        The heterograph is usually a unidirectional bipartite graph.
+
+        Parameters
+        ----------
+        ntype : str, optional
+            Node type.
+            If omitted, there should be only one node type in the DST category.
+
+        Returns
+        -------
+        int
+            The number of nodes
+
+        Examples
+        --------
+        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1], [1, 2])})
+        >>> g.num_dst_nodes('game')
+        3
+        >>> g.num_dst_nodes()
+        3
+        >>> g.num_nodes('game')
+        3
+        """
         return self._graph.number_of_nodes(self.get_ntype_id_from_dst(ntype))
 
     def number_of_edges(self, etype=None):
@@ -1800,6 +1872,30 @@ class DGLHeteroGraph(object):
         return self._graph.number_of_edges(self.get_etype_id(etype))
 
     def num_edges(self, etype=None):
+        """Return the number of edges of the given type in the heterograph.
+
+        Parameters
+        ----------
+        etype : str or tuple of str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
+
+        Returns
+        -------
+        int
+            The number of edges
+
+        Examples
+        --------
+
+        >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1], [1, 2])})
+        >>> g.num_edges(('user', 'follows', 'user'))
+        2
+        >>> g.num_edges('follows')
+        2
+        >>> g.num_edges()
+        2
+        """
         return self._graph.number_of_edges(self.get_etype_id(etype))
 
     def __len__(self):
@@ -3963,8 +4059,7 @@ class DGLHeteroGraph(object):
         """
         if idtype is None:
             return self
-        if not idtype in (F.int32, F.int64):
-            raise DGLError("ID type must be int32 or int64, but got {}.".format(idtype))
+        utils.check_valid_idtype(idtype)
         if self.idtype == idtype:
             return self
         bits = 32 if idtype == F.int32 else 64

@@ -139,7 +139,7 @@ def graph(data,
         assert src_dtype == dst_dtype, \
             'Expect the source and destination node tensors to have the same ' \
             'data type, got {} and {}'.format(src_dtype, dst_dtype)
-        assert src_dtype == F.int32 or src_dtype == F.int64, \
+        assert src_dtype in [F.int32, F.int64], \
             'Expect the node-tensors to have data type int32 or int64, got {}'.format(src_dtype)
         src_ctx = F.context(data[0])
         dst_ctx = F.context(data[1])
@@ -1022,10 +1022,7 @@ def from_networkx(nx_graph,
     g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange)
 
     # nx_graph.edges(data=True) returns src, dst, attr_dict
-    if nx_graph.number_of_edges() > 0 and edge_id_attr_name is not None:
-        has_edge_id = True
-    else:
-        has_edge_id = False
+    has_edge_id = nx_graph.number_of_edges() > 0 and edge_id_attr_name is not None
 
     # handle features
     # copy attributes
@@ -1190,15 +1187,15 @@ def bipartite_from_networkx(nx_graph,
     # Get the source and destination node sets
     top_nodes = set()
     bottom_nodes = set()
-    for n, d in nx_graph.nodes(data=True):
-        assert 'bipartite' in d, 'Expect the node {} to have attribute bipartite'.format(n)
-        if d['bipartite'] == 0:
+    for n, nd in nx_graph.nodes(data=True):
+        assert 'bipartite' in nd, 'Expect the node {} to have attribute bipartite'.format(n)
+        if nd['bipartite'] == 0:
             top_nodes.add(n)
-        elif d['bipartite'] == 1:
+        elif nd['bipartite'] == 1:
             bottom_nodes.add(n)
         else:
             raise ValueError('Expect the bipartite attribute of the node {} to be 0 or 1, '
-                             'got {}'.format(n, d['bipartite']))
+                             'got {}'.format(n, nd['bipartite']))
 
     # Separately relabel the source and destination nodes.
     top_nodes = sorted(top_nodes)
@@ -1215,10 +1212,7 @@ def bipartite_from_networkx(nx_graph,
     g = create_from_edges(u, v, '_U', '_E', '_V', urange, vrange)
 
     # nx_graph.edges(data=True) returns src, dst, attr_dict
-    if nx_graph.number_of_edges() > 0 and edge_id_attr_name is not None:
-        has_edge_id = True
-    else:
-        has_edge_id = False
+    has_edge_id = nx_graph.number_of_edges() > 0 and edge_id_attr_name is not None
 
     # handle features
     # copy attributes
