@@ -18,7 +18,8 @@ Conversion to and from heterogeneous graphs
     graph
     from_scipy
     from_networkx
-    bipartite
+    bipartite_from_scipy
+    bipartite_from_networkx
     heterograph
     to_hetero
     to_homo
