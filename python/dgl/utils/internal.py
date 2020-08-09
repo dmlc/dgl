@@ -9,6 +9,7 @@ import numpy as np
 from ..base import DGLError, dgl_warning, NID, EID
 from .. import backend as F
 from .. import ndarray as nd
+from .._ffi.function import _init_api
 
 class InconsistentDtypeException(DGLError):
     """Exception class for inconsistent dtype between graph and tensor"""
@@ -793,3 +794,15 @@ def extract_subframes(graph, nodes, edges):
             subf[EID] = ind_edges
             edge_frames.append(subf)
     return node_frames, edge_frames
+
+def set_num_threads(num_threads):
+    """Set the number of OMP threads in the process.
+
+    Parameters
+    ----------
+    num_threads : int
+        The number of OMP threads in the process.
+    """
+    _CAPI_DGLSetOMPThreads(num_threads)
+
+_init_api("dgl.utils.internal")

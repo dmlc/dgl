@@ -59,6 +59,8 @@ class RelGraphConv(layers.Layer):
         Turn it on when you encounter OOM problem during training or evaluation.
     dropout : float, optional
         Dropout rate. Default: 0.0
+    layer_norm: float, optional
+        Add layer norm. Default: False
     """
 
     def __init__(self,
@@ -71,7 +73,8 @@ class RelGraphConv(layers.Layer):
                  activation=None,
                  self_loop=False,
                  low_mem=False,
-                 dropout=0.0):
+                 dropout=0.0,
+                 layer_norm=False):
         super(RelGraphConv, self).__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
@@ -84,6 +87,8 @@ class RelGraphConv(layers.Layer):
         self.activation = activation
         self.self_loop = self_loop
         self.low_mem = low_mem
+
+        assert layer_norm is False, 'TensorFlow currently does not support layer norm.'
 
         xinit = tf.keras.initializers.glorot_uniform()
         zeroinit = tf.keras.initializers.zeros()
