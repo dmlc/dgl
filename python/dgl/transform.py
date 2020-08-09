@@ -448,7 +448,7 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
         # find indices
         eids = []
         for c_etype in canonical_etypes:
-            eid = F.arange(0, g.number_of_edges(c_etype))
+            eid = F.copy_to(F.arange(0, g.number_of_edges(c_etype)), new_g.device)
             if c_etype[0] != c_etype[2]:
                 eids.append(eid)
             else:

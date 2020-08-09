@@ -459,7 +459,7 @@ def test_khop_adj():
     feat = F.randn((N, 5))
     g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
     for k in range(3):
-        adj = F.tensor(dgl.khop_adj(g, k).T)
+        adj = F.tensor(F.swapaxes(dgl.khop_adj(g, k), 0, 1))
         # use original graph to do message passing for k times.
         g.ndata['h'] = feat
         for _ in range(k):
