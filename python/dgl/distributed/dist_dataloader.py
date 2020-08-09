@@ -82,17 +82,18 @@ class DistDataLoader:
             will be smaller. (default: ``False``)
         queue_size (int, optional): Size of multiprocessing queue
         """
-        self.pool, num_workers = get_sampler_pool()
-        assert num_workers > 0, "DistDataloader only supports num_workers>0 for now. if you \
-            want to use single process dataloader, please use PyTorch dataloader for now"
+        self.pool, self.num_workers = get_sampler_pool()
+        assert self.num_workers > 0, "DistDataloader only supports num_workers>0 for now. if you " \
+                + "want to use single process dataloader, please use PyTorch dataloader for now."
+        assert self.pool is not None, \
+                "The worker processes in DistDataloader have to be creatd in advance."
         if queue_size is None:
-            queue_size = num_workers * 4
+            queue_size = self.num_workers * 4
         self.queue_size = queue_size
         self.batch_size = batch_size
         self.queue_size = queue_size
         self.collate_fn = collate_fn
         self.current_pos = 0
-        self.num_workers = num_workers
         self.m = mp.Manager()
         self.queue = self.m.Queue(maxsize=queue_size)
         self.drop_last = drop_last
@@ -100,10 +101,6 @@ class DistDataLoader:
         self.started = False
         self.shuffle = shuffle
         self.is_closed = False
-
-        if self.pool is None:
-            ctx = mp.get_context("spawn")
-            self.pool = ctx.Pool(num_workers)
 
         self.dataset = F.tensor(dataset)
         self.expected_idxs = len(dataset) // self.batch_size

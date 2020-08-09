@@ -104,6 +104,8 @@ GLOBAL_RANK = {}
 # The role of the current process
 CUR_ROLE = None
 
+IS_STANDALONE = False
+
 def init_role(role):
     """Initialize the role of the current process.
 
@@ -121,11 +123,13 @@ def init_role(role):
 
     global PER_ROLE_RANK
     global GLOBAL_RANK
+    global IS_STANDALONE
 
     if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
-        assert role == 'default'
-        GLOBAL_RANK[0] = 0
-        PER_ROLE_RANK['default'] = {0:0}
+        if role == 'default':
+            GLOBAL_RANK[0] = 0
+            PER_ROLE_RANK['default'] = {0:0}
+        IS_STANDALONE = True
         return
 
     # Register the current role. This blocks until all clients register themselves.
@@ -181,11 +185,17 @@ def get_global_rank():
     The rank can globally identify the client process. For the client processes
     of the same role, their ranks are in a contiguous range.
     """
-    return GLOBAL_RANK[rpc.get_rank()]
+    if IS_STANDALONE:
+        return 0
+    else:
+        return GLOBAL_RANK[rpc.get_rank()]
 
 def get_rank(role):
     """Get the role-specific rank"""
-    return PER_ROLE_RANK[role][rpc.get_rank()]
+    if IS_STANDALONE:
+        return 0
+    else:
+        return PER_ROLE_RANK[role][rpc.get_rank()]
 
 def get_trainer_rank():
     """Get the rank of the current trainer process.
@@ -194,7 +204,10 @@ def get_trainer_rank():
     an error if it's called in the process of other roles.
     """
     assert CUR_ROLE == 'default'
-    return PER_ROLE_RANK['default'][rpc.get_rank()]
+    if IS_STANDALONE:
+        return 0
+    else:
+        return PER_ROLE_RANK['default'][rpc.get_rank()]
 
 def get_role():
     """Get the role of the current process"""

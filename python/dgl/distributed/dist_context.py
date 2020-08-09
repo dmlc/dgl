@@ -4,6 +4,8 @@ import multiprocessing as mp
 import traceback
 import atexit
 import time
+import os
+
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
 from .kvstore import init_kvstore, close_kvstore
@@ -29,7 +31,8 @@ def _init_rpc(ip_config, max_queue_size, net_type, role):
     ''' This init function is called in the worker processes.
     '''
     try:
-        connect_to_server(ip_config, max_queue_size, net_type)
+        if os.environ.get('DGL_DIST_MODE', 'standalone') != 'standalone':
+            connect_to_server(ip_config, max_queue_size, net_type)
         init_role(role)
         init_kvstore(ip_config, role)
     except Exception as e:
@@ -60,7 +63,8 @@ def initialize(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type
             num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size,
                                                           net_type, 'sampler'))
     NUM_SAMPLER_WORKERS = num_workers
-    connect_to_server(ip_config, max_queue_size, net_type)
+    if os.environ.get('DGL_DIST_MODE', 'standalone') != 'standalone':
+        connect_to_server(ip_config, max_queue_size, net_type)
     init_role('default')
     init_kvstore(ip_config, 'default')
 
