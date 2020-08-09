@@ -2,25 +2,22 @@
 
 from collections.abc import Iterable, Mapping
 from collections import defaultdict
-import time
 import numpy as np
 from scipy import sparse
 
 from ._ffi.function import _init_api
-from .base import EID, NID, dgl_warning, DGLError, is_internal_column
+from .base import dgl_warning, DGLError
 from . import convert
 from .heterograph import DGLHeteroGraph, DGLBlock
 from . import ndarray as nd
 from . import backend as F
 from . import utils, batch
-from .partition import reorder_nodes
 from .partition import metis_partition_assignment as hetero_metis_partition_assignment
 from .partition import partition_graph_with_halo as hetero_partition_graph_with_halo
 from .partition import metis_partition as hetero_metis_partition
 
 # TO BE DEPRECATED
 from ._deprecate.graph import DGLGraph as DGLGraphStale
-from .graph_index import _get_halo_subgraph_inner_node
 
 __all__ = [
     'line_graph',
