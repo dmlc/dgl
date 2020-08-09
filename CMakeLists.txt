@@ -151,7 +151,7 @@ if(NOT MSVC)
   include_directories(${GKLIB_PATH})
   add_subdirectory("third_party/METIS/libmetis/")
   list(APPEND DGL_LINKER_LIBS metis)
-endif(MSVC)
+endif(NOT MSVC)
 
 # support PARALLEL_ALGORITHMS
 if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
