@@ -10,9 +10,10 @@ from ..._ffi.function import _init_api
 from ..._ffi.object import register_object, ObjectBase
 from ..._ffi.ndarray import empty
 from ... import utils
-from ...nodeflow import NodeFlow
+from ..._deprecate.nodeflow import NodeFlow
 from ... import backend as F
-from ... import subgraph
+from ..._deprecate.graph import DGLGraph as DGLGraphStale
+from ...base import NID, EID, dgl_warning
 
 try:
     import Queue as queue
@@ -224,7 +225,7 @@ class NeighborSampler(NodeFlowSampler):
     layer :math:`i+1` are in layer :math:`i`. All the edges are from nodes
     in layer :math:`i` to layer :math:`i+1`.
 
-    .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/sampling/NodeFlow.png
+    .. image:: https://data.dgl.ai/tutorial/sampling/NodeFlow.png
     
     As an analogy to mini-batch training, the ``batch_size`` here is equal to the number
     of the initial seed nodes (number of nodes in the last layer).
@@ -236,18 +237,12 @@ class NeighborSampler(NodeFlowSampler):
 
     Parameters
     ----------
-    g : DGLGraph
-        The DGLGraph where we sample NodeFlows.
+    g : DGLGraphStale
+        The DGLGraphStale where we sample NodeFlows.
     batch_size : int
         The batch size (i.e, the number of nodes in the last layer)
-    expand_factor : int, float, str
+    expand_factor : int
         The number of neighbors sampled from the neighbor list of a vertex.
-        The value of this parameter can be:
-
-        * int: indicates the number of neighbors sampled from a neighbor list.
-        * float: indicates the ratio of the sampled neighbors in a neighbor list.
-        * str: indicates some common ways of calculating the number of sampled neighbors,
-          e.g., ``sqrt(deg)``.
 
         Note that no matter how large the expand_factor, the max number of sampled neighbors
         is the neighborhood size.
@@ -319,9 +314,11 @@ class NeighborSampler(NodeFlowSampler):
         super(NeighborSampler, self).__init__(
                 g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0,
                 ThreadPrefetchingWrapper)
+        dgl_warning('dgl.contrib.sampling.NeighborSampler is deprecated starting from v0.5.'
+                    ' Please read our guide<link> for how to use the new sampling APIs.')
 
         assert g.is_readonly, "NeighborSampler doesn't support mutable graphs. " + \
-                "Please turn it into an immutable graph with DGLGraph.readonly"
+                "Please turn it into an immutable graph with DGLGraphStale.readonly"
         assert isinstance(expand_factor, Integral), 'non-int expand_factor not supported'
 
         self._expand_factor = int(expand_factor)
@@ -369,8 +366,8 @@ class LayerSampler(NodeFlowSampler):
 
     Parameters
     ----------
-    g : DGLGraph
-        The DGLGraph where we sample NodeFlows.
+    g : DGLGraphStale
+        The DGLGraphStale where we sample NodeFlows.
     batch_size : int
         The batch size (i.e, the number of nodes in the last layer)
     layer_size: int
@@ -418,7 +415,7 @@ class LayerSampler(NodeFlowSampler):
                 ThreadPrefetchingWrapper)
 
         assert g.is_readonly, "LayerSampler doesn't support mutable graphs. " + \
-                "Please turn it into an immutable graph with DGLGraph.readonly"
+                "Please turn it into an immutable graph with DGLGraphStale.readonly"
         assert node_prob is None, 'non-uniform node probability not supported'
 
         self._num_workers = int(num_workers)
@@ -437,13 +434,17 @@ class LayerSampler(NodeFlowSampler):
         nflows = [NodeFlow(self.g, obj) for obj in nfobjs]
         return nflows
 
-class EdgeSubgraph(subgraph.DGLSubGraph):
+class EdgeSubgraph(DGLGraphStale):
     ''' The subgraph sampled from an edge sampler.
 
     A user can access the head nodes and tail nodes of the subgraph directly.
     '''
     def __init__(self, parent, sgi, neg):
-        super(EdgeSubgraph, self).__init__(parent, sgi)
+        super(EdgeSubgraph, self).__init__(graph_data=sgi.graph,
+                                           readonly=True,
+                                           parent=parent)
+        self.ndata[NID] = sgi.induced_nodes.tousertensor()
+        self.edata[EID] = sgi.induced_edges.tousertensor()
         self.sgi = sgi
         self.neg = neg
         self.head = None
@@ -552,8 +553,8 @@ class EdgeSampler(object):
 
     Parameters
     ----------
-    g : DGLGraph
-        The DGLGraph where we sample edges.
+    g : DGLGraphStale
+        The DGLGraphStale where we sample edges.
     batch_size : int
         The batch size (i.e, the number of edges from the graph)
     seed_edges : tensor, optional
@@ -741,7 +742,9 @@ class EdgeSampler(object):
 
         if self._negative_mode == "":
             # If no negative subgraphs.
-            return [subgraph.DGLSubGraph(self.g, subg) for subg in subgs]
+            return [self.g._create_subgraph(subg,
+                                            subg.induced_nodes,
+                                            subg.induced_edges) for subg in subgs]
         else:
             rets = []
             assert len(subgs) % 2 == 0
@@ -784,7 +787,7 @@ def create_full_nodeflow(g, num_layers, add_self_loop=False):
 
     Parameters
     ----------
-    g : DGLGraph
+    g : DGLGraphStale
         a DGL graph
     num_layers : int
         The number of layers

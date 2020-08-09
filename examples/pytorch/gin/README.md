@@ -6,7 +6,7 @@ Graph Isomorphism Network (GIN)
 
 Dependencies
 ------------
-- PyTorch 1.0.1+
+- PyTorch 1.1.0+
 - sklearn
 - tqdm
 

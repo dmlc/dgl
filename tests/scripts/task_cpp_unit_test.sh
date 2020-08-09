@@ -1,4 +1,8 @@
 #!/bin/bash
+function fail {
+    echo FAIL: $@
+    exit -1
+}
 echo $PWD
 pushd build
 ls -lh

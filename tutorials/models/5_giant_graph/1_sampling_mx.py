@@ -419,6 +419,6 @@ for nf in dgl.contrib.sampling.NeighborSampler(g, batch_size, num_neighbors,
 # advantages of this API are 1) simplicity, 2) allowing more system-level
 # optimization in the future.
 #
-# .. |image0| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/sampling/NodeFlow.png
-# .. |image1| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/sampling/sampling_result.png
+# .. |image0| image:: https://data.dgl.ai/tutorial/sampling/NodeFlow.png
+# .. |image1| image:: https://data.dgl.ai/tutorial/sampling/sampling_result.png
 #

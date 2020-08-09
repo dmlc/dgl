@@ -5,9 +5,9 @@ Backend Options
 ---------------
 * ``DGLBACKEND``:
     * Values: String (default='pytorch')
-    * The backend deep lerarning framework for DGL.
+    * The backend deep learning framework for DGL.
     * Choices:
-        * 'pytorch': use PyTorch as the backend implentation.
+        * 'pytorch': use PyTorch as the backend implementation.
         * 'mxnet': use Apache MXNet as the backend implementation.
 
 Data Repository

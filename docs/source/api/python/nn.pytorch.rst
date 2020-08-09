@@ -210,6 +210,13 @@ SetTransformerDecoder
 Utility Modules
 ----------------------------------------
 
+Sequential
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.utils.Sequential
+    :members:
+    :show-inheritance:
+
 KNNGraph
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -223,9 +230,4 @@ SegmentedKNNGraph
 .. autoclass:: dgl.nn.pytorch.factory.SegmentedKNNGraph
     :members:
     :show-inheritance:
-    
-Edge Softmax
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: dgl.nn.pytorch.softmax
-    :members: edge_softmax

@@ -6,6 +6,7 @@ from mxnet import nd
 from mxnet.gluon import nn
 
 from .... import function as fn
+from ....utils import expand_as_pair, check_eq_shape
 
 class SAGEConv(nn.Block):
     r"""GraphSAGE layer from paper `Inductive Representation Learning on
@@ -24,6 +25,14 @@ class SAGEConv(nn.Block):
     ----------
     in_feats : int
         Input feature size.
+
+        If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
+        specifies the input feature size on both the source and destination nodes.  If
+        a scalar is given, the source and destination node feature size would take the
+        same value.
+
+        If aggregator type is ``gcn``, the feature size of source and destination nodes
+        are required to be the same.
     out_feats : int
         Output feature size.
     feat_drop : float
@@ -47,7 +56,8 @@ class SAGEConv(nn.Block):
                  norm=None,
                  activation=None):
         super(SAGEConv, self).__init__()
-        self._in_feats = in_feats
+
+        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         self._aggre_type = aggregator_type
         with self.name_scope():
@@ -55,18 +65,18 @@ class SAGEConv(nn.Block):
             self.feat_drop = nn.Dropout(feat_drop)
             self.activation = activation
             if aggregator_type == 'pool':
-                self.fc_pool = nn.Dense(in_feats, use_bias=bias,
+                self.fc_pool = nn.Dense(self._in_src_feats, use_bias=bias,
                                         weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
-                                        in_units=in_feats)
+                                        in_units=self._in_src_feats)
             if aggregator_type == 'lstm':
                 raise NotImplementedError
             if aggregator_type != 'gcn':
                 self.fc_self = nn.Dense(out_feats, use_bias=bias,
                                         weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
-                                        in_units=in_feats)
+                                        in_units=self._in_dst_feats)
             self.fc_neigh = nn.Dense(out_feats, use_bias=bias,
                                      weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
-                                     in_units=in_feats)
+                                     in_units=self._in_src_feats)
 
     def forward(self, graph, feat):
         r"""Compute GraphSAGE layer.
@@ -75,9 +85,12 @@ class SAGEConv(nn.Block):
         ----------
         graph : DGLGraph
             The graph.
-        feat : mxnet.NDArray
-            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
-            is size of input feature, :math:`N` is the number of nodes.
+        feat : mxnet.NDArray or pair of mxnet.NDArray
+            If a single tensor is given, it represents the input feature of shape
+            :math:`(N, D_{in})`
+            where :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+            If a pair of tensors are given, the pair must contain two tensors of shape
+            :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
 
         Returns
         -------
@@ -85,37 +98,53 @@ class SAGEConv(nn.Block):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
-        graph = graph.local_var()
-        feat = self.feat_drop(feat)
-        h_self = feat
-        if self._aggre_type == 'mean':
-            graph.ndata['h'] = feat
-            graph.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'neigh'))
-            h_neigh = graph.ndata['neigh']
-        elif self._aggre_type == 'gcn':
-            graph.ndata['h'] = feat
-            graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'neigh'))
-            # divide in degrees
-            degs = graph.in_degrees().astype(feat.dtype)
-            degs = degs.as_in_context(feat.context)
-            h_neigh = (graph.ndata['neigh'] + graph.ndata['h']) / (degs.expand_dims(-1) + 1)
-        elif self._aggre_type == 'pool':
-            graph.ndata['h'] = nd.relu(self.fc_pool(feat))
-            graph.update_all(fn.copy_u('h', 'm'), fn.max('m', 'neigh'))
-            h_neigh = graph.ndata['neigh']
-        elif self._aggre_type == 'lstm':
-            raise NotImplementedError
-        else:
-            raise KeyError('Aggregator type {} not recognized.'.format(self._aggre_type))
+        with graph.local_scope():
+            if isinstance(feat, tuple):
+                feat_src = self.feat_drop(feat[0])
+                feat_dst = self.feat_drop(feat[1])
+            else:
+                feat_src = feat_dst = self.feat_drop(feat)
+                if graph.is_block:
+                    feat_dst = feat_src[:graph.number_of_dst_nodes()]
 
-        if self._aggre_type == 'gcn':
-            rst = self.fc_neigh(h_neigh)
-        else:
-            rst = self.fc_self(h_self) + self.fc_neigh(h_neigh)
-        # activation
-        if self.activation is not None:
-            rst = self.activation(rst)
-        # normalization
-        if self.norm is not None:
-            rst = self.norm(rst)
-        return rst
+            h_self = feat_dst
+
+            # Handle the case of graphs without edges
+            if graph.number_of_edges() == 0:
+                dst_neigh = mx.nd.zeros((graph.number_of_dst_nodes(), self._in_src_feats))
+                dst_neigh = dst_neigh.as_in_context(feat_dst.context)
+                graph.dstdata['neigh'] = dst_neigh
+
+            if self._aggre_type == 'mean':
+                graph.srcdata['h'] = feat_src
+                graph.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'neigh'))
+                h_neigh = graph.dstdata['neigh']
+            elif self._aggre_type == 'gcn':
+                check_eq_shape(feat)
+                graph.srcdata['h'] = feat_src
+                graph.dstdata['h'] = feat_dst   # same as above if homogeneous
+                graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'neigh'))
+                # divide in degrees
+                degs = graph.in_degrees().astype(feat_dst.dtype)
+                degs = degs.as_in_context(feat_dst.context)
+                h_neigh = (graph.dstdata['neigh'] + graph.dstdata['h']) / (degs.expand_dims(-1) + 1)
+            elif self._aggre_type == 'pool':
+                graph.srcdata['h'] = nd.relu(self.fc_pool(feat_src))
+                graph.update_all(fn.copy_u('h', 'm'), fn.max('m', 'neigh'))
+                h_neigh = graph.dstdata['neigh']
+            elif self._aggre_type == 'lstm':
+                raise NotImplementedError
+            else:
+                raise KeyError('Aggregator type {} not recognized.'.format(self._aggre_type))
+
+            if self._aggre_type == 'gcn':
+                rst = self.fc_neigh(h_neigh)
+            else:
+                rst = self.fc_self(h_self) + self.fc_neigh(h_neigh)
+            # activation
+            if self.activation is not None:
+                rst = self.activation(rst)
+            # normalization
+            if self.norm is not None:
+                rst = self.norm(rst)
+            return rst

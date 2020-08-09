@@ -875,6 +875,6 @@ Transformer tutorial
 #
 # .. note::
 #     The notebook itself is not executable due to many dependencies.
-#     Download `7_transformer.py <https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/7_transformer.py>`__, 
+#     Download `7_transformer.py <https://data.dgl.ai/tutorial/7_transformer.py>`__, 
 #     and copy the python script to directory ``examples/pytorch/transformer`` 
 #     then run ``python 7_transformer.py`` to see how it works.

@@ -63,7 +63,7 @@ class ChebConv(nn.Block):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : mxnet.NDArray
             The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`

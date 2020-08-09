@@ -190,8 +190,9 @@ Set2Set
 Utility Modules
 ----------------------------------------
 
-Edge Softmax
+Sequential
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: dgl.nn.mxnet.softmax
-    :members: edge_softmax
+.. autoclass:: dgl.nn.mxnet.utils.Sequential
+    :members:
+    :show-inheritance:

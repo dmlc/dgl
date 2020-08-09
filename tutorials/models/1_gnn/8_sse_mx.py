@@ -567,6 +567,6 @@ for i in range(n_epochs):
 #
 # For full examples, see `Benchmark SSE on multi-GPUs <https://github.com/dmlc/dgl/tree/master/examples/mxnet/sse>`_ on Github.
 #
-# .. |image0| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/img/floodfill-paths.gif
-# .. |image1| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/img/neighbor-sampling.gif
-# .. |image2| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/img/sse.gif
+# .. |image0| image:: https://data.dgl.ai/tutorial/img/floodfill-paths.gif
+# .. |image1| image:: https://data.dgl.ai/tutorial/img/neighbor-sampling.gif
+# .. |image2| image:: https://data.dgl.ai/tutorial/img/sse.gif

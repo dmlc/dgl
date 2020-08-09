@@ -6,18 +6,19 @@ API Reference
 
    graph
    heterograph
-   init
-   batch
+   readout
    batch_heterograph
+   nn
+   init
+   ops
    function
    traversal
    propagate
    udf
    sampler
+   sampling
    data
    transform
-   nn
-   subgraph
    graph_store
    nodeflow
    random

@@ -85,7 +85,7 @@ class DeviceAPIManager {
     auto* f = Registry::Get(factory);
     if (f == nullptr) {
       CHECK(allow_missing)
-          << "Device API " << name << " is not enabled.";
+          << "Device API " << name << " is not enabled. Please install the cuda version of dgl.";
       return nullptr;
     }
     void* ptr = (*f)();
@@ -406,3 +406,4 @@ DGL_REGISTER_GLOBAL("_GetDeviceAttr")
       DeviceAPIManager::Get(ctx)->GetAttr(ctx, kind, ret);
     }
   });
+

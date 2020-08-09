@@ -55,7 +55,7 @@ structure-free normalization, in the style of attention.
 # embedding :math:`h_i^{(l+1)}` of layer :math:`l+1` from the embeddings of
 # layer :math:`l`.
 #
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/gat.png
+# .. image:: https://data.dgl.ai/tutorial/gat/gat.png
 #   :width: 450px
 #   :align: center
 #
@@ -94,6 +94,15 @@ structure-free normalization, in the style of attention.
 # GAT in DGL
 # ----------
 #
+# DGL provides an off-the-shelf implementation of the GAT layer under the ``dgl.nn.<backend>``
+# subpackage. Simply import the ``GATConv`` as the follows.
+
+from dgl.nn.pytorch import GATConv
+
+###############################################################
+# Readers can skip the following step-by-step explanation of the implementation and
+# jump to the `Put everything together`_ for training and visualization results.
+#
 # To begin, you can get an overall impression about how a ``GATLayer`` module is
 # implemented in DGL. In this section, the four equations above are broken down 
 # one at a time.
@@ -111,6 +120,13 @@ class GATLayer(nn.Module):
         self.fc = nn.Linear(in_dim, out_dim, bias=False)
         # equation (2)
         self.attn_fc = nn.Linear(2 * out_dim, 1, bias=False)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        """Reinitialize learnable parameters."""
+        gain = nn.init.calculate_gain('relu')
+        nn.init.xavier_normal_(self.fc.weight, gain=gain)
+        nn.init.xavier_normal_(self.attn_fc.weight, gain=gain)
 
     def edge_attention(self, edges):
         # edge UDF for equation (2)
@@ -276,12 +292,8 @@ def load_cora_data():
     data = citegrh.load_cora()
     features = torch.FloatTensor(data.features)
     labels = torch.LongTensor(data.labels)
-    mask = torch.ByteTensor(data.train_mask)
-    g = data.graph
-    # add self loop
-    g.remove_edges_from(nx.selfloop_edges(g))
-    g = DGLGraph(g)
-    g.add_edges(g.nodes(), g.nodes())
+    mask = torch.BoolTensor(data.train_mask)
+    g = DGLGraph(data.graph)
     return g, features, labels, mask
 
 ##############################################################################
@@ -355,7 +367,7 @@ for epoch in range(30):
 # to their labels, whereas the edges are colored according to the magnitude of
 # the attention weights, which can be referred with the colorbar on the right.
 #
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/cora-attention.png
+# .. image:: https://data.dgl.ai/tutorial/gat/cora-attention.png
 #   :width: 600px
 #   :align: center
 #
@@ -383,7 +395,7 @@ for epoch in range(30):
 #
 # As a reference, here is the histogram if all the nodes have uniform attention weight distribution.
 #
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/cora-attention-uniform-hist.png
+# .. image:: https://data.dgl.ai/tutorial/gat/cora-attention-uniform-hist.png
 #   :width: 250px
 #   :align: center
 #
@@ -453,7 +465,7 @@ for epoch in range(30):
 # learning curves of GAT and GCN are presented below; what is evident is the
 # dramatic performance adavantage of GAT over GCN.
 #
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/ppi-curve.png
+# .. image:: https://data.dgl.ai/tutorial/gat/ppi-curve.png
 #   :width: 300px
 #   :align: center
 #
@@ -475,7 +487,7 @@ for epoch in range(30):
 #
 # Again, comparing with uniform distribution: 
 #
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/ppi-uniform-hist.png
+# .. image:: https://data.dgl.ai/tutorial/gat/ppi-uniform-hist.png
 #   :width: 250px
 #   :align: center
 #
@@ -502,7 +514,7 @@ for epoch in range(30):
 # * See the optimized `full example <https://github.com/dmlc/dgl/blob/master/examples/pytorch/gat/gat.py>`_.
 # * The next tutorial describes how to speedup GAT models by parallelizing multiple attention heads and SPMV optimization.
 #
-# .. |image2| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/cora-attention-hist.png
-# .. |image5| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/ppi-first-layer-hist.png
-# .. |image6| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/ppi-second-layer-hist.png
-# .. |image7| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/ppi-final-layer-hist.png
+# .. |image2| image:: https://data.dgl.ai/tutorial/gat/cora-attention-hist.png
+# .. |image5| image:: https://data.dgl.ai/tutorial/gat/ppi-first-layer-hist.png
+# .. |image6| image:: https://data.dgl.ai/tutorial/gat/ppi-second-layer-hist.png
+# .. |image7| image:: https://data.dgl.ai/tutorial/gat/ppi-final-layer-hist.png

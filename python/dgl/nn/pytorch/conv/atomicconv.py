@@ -1,4 +1,5 @@
 """Torch Module for Atomic Convolution Layer"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import numpy as np
 import torch as th
 import torch.nn as nn
@@ -202,7 +203,7 @@ class AtomicConv(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             Topology based on which message passing is performed.
         feat : Float32 tensor of shape (V, 1)
             Initial node features, which are atomic numbers in the paper.
@@ -216,12 +217,12 @@ class AtomicConv(nn.Module):
             Updated node representations. V for the number of nodes, K for the
             number of radial filters, and T for the number of types of atomic numbers.
         """
-        radial_pooled_values = self.radial_pooling(distances)                # (K, E, 1)
-        graph = graph.local_var()
-        if self.features_to_use is not None:
-            feat = (feat == self.features_to_use).float()                    # (V, T)
-        graph.ndata['hv'] = feat
-        graph.edata['he'] = radial_pooled_values.transpose(1, 0).squeeze(-1) # (E, K)
-        graph.update_all(msg_func, reduce_func)
+        with graph.local_scope():
+            radial_pooled_values = self.radial_pooling(distances)                # (K, E, 1)
+            if self.features_to_use is not None:
+                feat = (feat == self.features_to_use).float()                    # (V, T)
+            graph.ndata['hv'] = feat
+            graph.edata['he'] = radial_pooled_values.transpose(1, 0).squeeze(-1) # (E, K)
+            graph.update_all(msg_func, reduce_func)
 
-        return graph.ndata['hv_new'].view(graph.number_of_nodes(), -1)       # (V, K * T)
+            return graph.ndata['hv_new'].view(graph.number_of_nodes(), -1)       # (V, K * T)

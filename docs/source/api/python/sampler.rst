@@ -1,7 +1,14 @@
 .. apisampler
 
-Graph samplers
-==============
+dgl.contrib.sampling (Deprecating)
+======================
+
+.. warning::
+   This module is going to be deprecated in favor of :ref:`api-sampling`.
+
+Module for sampling algorithms on graph. Each algorithm is implemented as a
+data loader, which produces sampled subgraphs (called Nodeflow) at each
+iteration.
 
 .. autofunction:: dgl.contrib.sampling.sampler.NeighborSampler
 .. autofunction:: dgl.contrib.sampling.sampler.LayerSampler

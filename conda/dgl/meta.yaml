@@ -18,6 +18,7 @@ requirements:
     - numpy
     - scipy
     - networkx
+    - requests
 
 build:
   script_env:

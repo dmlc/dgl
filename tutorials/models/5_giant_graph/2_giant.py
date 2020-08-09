@@ -356,7 +356,7 @@ Large-Scale Training of Graph Neural Networks
 # We can see that DGL can scale to graphs with up to 500M nodes and 25B
 # edges.
 #
-# .. |image0| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/sampling/arch.png
-# .. |image1| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/sampling/NUMA_speedup.png
-# .. |image2| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/sampling/whole_speedup.png
+# .. |image0| image:: https://data.dgl.ai/tutorial/sampling/arch.png
+# .. |image1| image:: https://data.dgl.ai/tutorial/sampling/NUMA_speedup.png
+# .. |image2| image:: https://data.dgl.ai/tutorial/sampling/whole_speedup.png
 #

@@ -9,11 +9,12 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 import dgl
-from dgl.data.tree import SST, SSTBatch
+from dgl.data.tree import SSTDataset
 
 from tree_lstm import TreeLSTM
 
 SSTBatch = collections.namedtuple('SSTBatch', ['graph', 'mask', 'wordid', 'label'])
+
 def batcher(device):
     def batcher_dev(batch):
         batch_trees = dgl.batch(batch)
@@ -36,24 +37,24 @@ def main(args):
     if cuda:
         th.cuda.set_device(args.gpu)
 
-    trainset = SST()
+    trainset = SSTDataset()
     train_loader = DataLoader(dataset=trainset,
                               batch_size=args.batch_size,
                               collate_fn=batcher(device),
                               shuffle=True,
                               num_workers=0)
-    devset = SST(mode='dev')
+    devset = SSTDataset(mode='dev')
     dev_loader = DataLoader(dataset=devset,
                             batch_size=100,
                             collate_fn=batcher(device),
                             shuffle=False,
                             num_workers=0)
 
-    testset = SST(mode='test')
+    testset = SSTDataset(mode='test')
     test_loader = DataLoader(dataset=testset,
                              batch_size=100, collate_fn=batcher(device), shuffle=False, num_workers=0)
 
-    model = TreeLSTM(trainset.num_vocabs,
+    model = TreeLSTM(trainset.vocab_size,
                      args.x_size,
                      args.h_size,
                      trainset.num_classes,
@@ -61,7 +62,7 @@ def main(args):
                      cell_type='childsum' if args.child_sum else 'nary',
                      pretrained_emb = trainset.pretrained_emb).to(device)
     print(model)
-    params_ex_emb =[x for x in list(model.parameters()) if x.requires_grad and x.size(0)!=trainset.num_vocabs]
+    params_ex_emb =[x for x in list(model.parameters()) if x.requires_grad and x.size(0)!=trainset.vocab_size]
     params_emb = list(model.embedding.parameters())
 
     for p in params_ex_emb:
@@ -77,14 +78,14 @@ def main(args):
         t_epoch = time.time()
         model.train()
         for step, batch in enumerate(train_loader):
-            g = batch.graph
+            g = batch.graph.to(device)
             n = g.number_of_nodes()
             h = th.zeros((n, args.h_size)).to(device)
             c = th.zeros((n, args.h_size)).to(device)
             if step >= 3:
                 t0 = time.time() # tik
 
-            logits = model(batch, h, c)
+            logits = model(batch, g, h, c)
             logp = F.log_softmax(logits, 1)
             loss = F.nll_loss(logp, batch.label, reduction='sum')
 
@@ -98,7 +99,7 @@ def main(args):
             if step > 0 and step % args.log_every == 0:
                 pred = th.argmax(logits, 1)
                 acc = th.sum(th.eq(batch.label, pred))
-                root_ids = [i for i in range(batch.graph.number_of_nodes()) if batch.graph.out_degree(i)==0]
+                root_ids = [i for i in range(g.number_of_nodes()) if g.out_degree(i)==0]
                 root_acc = np.sum(batch.label.cpu().data.numpy()[root_ids] == pred.cpu().data.numpy()[root_ids])
 
                 print("Epoch {:05d} | Step {:05d} | Loss {:.4f} | Acc {:.4f} | Root Acc {:.4f} | Time(s) {:.4f}".format(
@@ -110,17 +111,17 @@ def main(args):
         root_accs = []
         model.eval()
         for step, batch in enumerate(dev_loader):
-            g = batch.graph
+            g = batch.graph.to(device)
             n = g.number_of_nodes()
             with th.no_grad():
                 h = th.zeros((n, args.h_size)).to(device)
                 c = th.zeros((n, args.h_size)).to(device)
-                logits = model(batch, h, c)
+                logits = model(batch, g, h, c)
 
             pred = th.argmax(logits, 1)
             acc = th.sum(th.eq(batch.label, pred)).item()
             accs.append([acc, len(batch.label)])
-            root_ids = [i for i in range(batch.graph.number_of_nodes()) if batch.graph.out_degree(i)==0]
+            root_ids = [i for i in range(g.number_of_nodes()) if g.out_degree(i)==0]
             root_acc = np.sum(batch.label.cpu().data.numpy()[root_ids] == pred.cpu().data.numpy()[root_ids])
             root_accs.append([root_acc, len(root_ids)])
 
@@ -148,17 +149,17 @@ def main(args):
     root_accs = []
     model.eval()
     for step, batch in enumerate(test_loader):
-        g = batch.graph
+        g = batch.graph.to(device)
         n = g.number_of_nodes()
         with th.no_grad():
             h = th.zeros((n, args.h_size)).to(device)
             c = th.zeros((n, args.h_size)).to(device)
-            logits = model(batch, h, c)
+            logits = model(batch, g, h, c)
 
         pred = th.argmax(logits, 1)
         acc = th.sum(th.eq(batch.label, pred)).item()
         accs.append([acc, len(batch.label)])
-        root_ids = [i for i in range(batch.graph.number_of_nodes()) if batch.graph.out_degree(i)==0]
+        root_ids = [i for i in range(g.number_of_nodes()) if g.out_degree(i)==0]
         root_acc = np.sum(batch.label.cpu().data.numpy()[root_ids] == pred.cpu().data.numpy()[root_ids])
         root_accs.append([root_acc, len(root_ids)])
 
@@ -172,7 +173,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', type=int, default=-1)
     parser.add_argument('--seed', type=int, default=41)
-    parser.add_argument('--batch-size', type=int, default=25)
+    parser.add_argument('--batch-size', type=int, default=20)
     parser.add_argument('--child-sum', action='store_true')
     parser.add_argument('--x-size', type=int, default=300)
     parser.add_argument('--h-size', type=int, default=150)

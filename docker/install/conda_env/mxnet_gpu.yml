@@ -3,14 +3,14 @@ dependencies:
   - python=3.6.9
   - pip
   - pip:
-    - mxnet-cu101
+    - mxnet-cu101==1.6.0
     - pytest
-  - nose
-  - numpy
-  - cython
-  - scipy
-  - networkx
-  - matplotlib
-  - nltk
-  - requests[security]
-  - tqdm
+    - nose
+    - numpy
+    - cython
+    - scipy
+    - networkx
+    - matplotlib
+    - nltk
+    - requests[security]
+    - tqdm

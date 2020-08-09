@@ -19,6 +19,7 @@ class Parser():
         # dataset
         self.parser.add_argument(
             '--dataset', type=str, default="MUTAG",
+            choices=['MUTAG', 'COLLAB', 'IMDBBINARY', 'IMDBMULTI'],
             help='name of dataset (default: MUTAG)')
         self.parser.add_argument(
             '--batch_size', type=int, default=32,
@@ -39,9 +40,6 @@ class Parser():
             help='which gpu device to use (default: 0)')
 
         # net
-        self.parser.add_argument(
-            '--net', type=str, default="gin",
-            help='gnn net (default: gin)')
         self.parser.add_argument(
             '--num_layers', type=int, default=5,
             help='number of layers (default: 5)')
@@ -64,9 +62,6 @@ class Parser():
         self.parser.add_argument(
             '--learn_eps', action="store_true",
             help='learn the epsilon weighting')
-        self.parser.add_argument(
-            '--degree_as_tag', action="store_true",
-            help='take the degree of nodes as input feature')
 
         # learning
         self.parser.add_argument(

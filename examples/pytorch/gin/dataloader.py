@@ -19,7 +19,7 @@ def collate(samples):
     for g in graphs:
         # deal with node feats
         for key in g.node_attr_schemes().keys():
-            g.ndata[key] = torch.from_numpy(g.ndata[key]).float()
+            g.ndata[key] = g.ndata[key].float()
         # no edge feats
     batched_graph = dgl.batch(graphs)
     labels = torch.tensor(labels)

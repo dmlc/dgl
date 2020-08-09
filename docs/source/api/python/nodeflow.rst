@@ -1,7 +1,10 @@
 .. _apinodeflow:
 
-NodeFlow -- Graph sampled from a large graph
-============================================
+dgl.nodeflow (Deprecating)
+==============
+
+.. warning::
+   This module is going to be deprecated in favor of :ref:`api-sampling`.
 
 .. currentmodule:: dgl
 .. autoclass:: NodeFlow

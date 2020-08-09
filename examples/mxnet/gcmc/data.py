@@ -246,9 +246,9 @@ class MovieLens(object):
             rrow = rating_row[ridx]
             rcol = rating_col[ridx]
             bg = dgl.bipartite((rrow, rcol), 'user', str(rating), 'movie',
-                               card=(self._num_user, self._num_movie))
+                               num_nodes=(self._num_user, self._num_movie))
             rev_bg = dgl.bipartite((rcol, rrow), 'movie', 'rev-%s' % str(rating), 'user',
-                               card=(self._num_movie, self._num_user))
+                               num_nodes=(self._num_movie, self._num_user))
             rating_graphs.append(bg)
             rating_graphs.append(rev_bg)
         graph = dgl.hetero_from_relations(rating_graphs)
@@ -261,7 +261,7 @@ class MovieLens(object):
                 x = x.asnumpy().astype('float32')
                 x[x == 0.] = np.inf
                 x = mx.nd.array(1. / np.sqrt(x))
-                return x.as_in_context(self._ctx).expand_dims(1)
+                return x.expand_dims(1)
             user_ci = []
             user_cj = []
             movie_ci = []
@@ -282,8 +282,8 @@ class MovieLens(object):
                 user_cj = _calc_norm(mx.nd.add_n(*user_cj))
                 movie_cj = _calc_norm(mx.nd.add_n(*movie_cj))
             else:
-                user_cj = mx.nd.ones((self.num_user,), ctx=self._ctx)
-                movie_cj = mx.nd.ones((self.num_movie,), ctx=self._ctx)
+                user_cj = mx.nd.ones((self.num_user,))
+                movie_cj = mx.nd.ones((self.num_movie,))
             graph.nodes['user'].data.update({'ci' : user_ci, 'cj' : user_cj})
             graph.nodes['movie'].data.update({'ci' : movie_ci, 'cj' : movie_cj})
 

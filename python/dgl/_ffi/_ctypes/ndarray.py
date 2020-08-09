@@ -73,15 +73,23 @@ class NDArrayBase(object):
     def _dgl_handle(self):
         return ctypes.cast(self.handle, ctypes.c_void_p).value
 
-    def to_dlpack(self):
+    def to_dlpack(self, alignment=0):
         """Produce an array from a DLPack Tensor without copying memory
+
+        Args
+        -------
+        alignment: int, default to be 0
+        Indicates the alignment requirement when converting to dlpack. Will copy to a
+        new tensor if the alignment requirement is not satisfied.
+        0 means no alignment requirement.
+
 
         Returns
         -------
         dlpack : DLPack tensor view of the array data
         """
         ptr = ctypes.c_void_p()
-        check_call(_LIB.DGLArrayToDLPack(self.handle, ctypes.byref(ptr)))
+        check_call(_LIB.DGLArrayToDLPack(self.handle, ctypes.byref(ptr), alignment))
         return ctypes.pythonapi.PyCapsule_New(ptr, _c_str_dltensor, _c_dlpack_deleter)
 
 

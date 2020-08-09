@@ -1,9 +1,11 @@
 .. _apirandom:
 
-DGL Random Number Generator Controls
+dgl.random
 ====================================
 
 .. automodule:: dgl.random
+
+Utilities used to control DGL's random number generator.
 
 .. autosummary::
     :toctree: ../../generated

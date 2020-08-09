@@ -5,8 +5,9 @@ import networkx as nx
 import mxnet as mx
 from mxnet import gluon
 
-from dgl import DGLGraph
-from dgl.data import register_data_args, load_data
+import dgl
+from dgl.data import register_data_args
+from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 
 from gcn import GCN
 #from gcn_mp import GCN
@@ -19,13 +20,29 @@ def evaluate(model, features, labels, mask):
 
 def main(args):
     # load and preprocess dataset
-    data = load_data(args)
-    features = mx.nd.array(data.features)
-    labels = mx.nd.array(data.labels)
-    train_mask = mx.nd.array(data.train_mask)
-    val_mask = mx.nd.array(data.val_mask)
-    test_mask = mx.nd.array(data.test_mask)
+    if args.dataset == 'cora':
+        data = CoraGraphDataset()
+    elif args.dataset == 'citeseer':
+        data = CiteseerGraphDataset()
+    elif args.dataset == 'pubmed':
+        data = PubmedGraphDataset()
+    else:
+        raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
+    g = data[0]
+    if args.gpu < 0:
+        cuda = False
+        ctx = mx.cpu(0)
+    else:
+        cuda = True
+        ctx = mx.gpu(args.gpu)
+        g = g.int().to(ctx)
+
+    features = g.ndata['feat']
+    labels = mx.nd.array(g.ndata['label'], dtype="float32", ctx=ctx)
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
+    test_mask = g.ndata['test_mask']
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
@@ -40,25 +57,10 @@ def main(args):
               val_mask.sum().asscalar(),
               test_mask.sum().asscalar()))
 
-    if args.gpu < 0:
-        cuda = False
-        ctx = mx.cpu(0)
-    else:
-        cuda = True
-        ctx = mx.gpu(args.gpu)
-
-    features = features.as_in_context(ctx)
-    labels = labels.as_in_context(ctx)
-    train_mask = train_mask.as_in_context(ctx)
-    val_mask = val_mask.as_in_context(ctx)
-    test_mask = test_mask.as_in_context(ctx)
-
-    # create GCN model
-    g = data.graph
+    # add self loop
     if args.self_loop:
-        g.remove_edges_from(nx.selfloop_edges(g))
-        g.add_edges_from(zip(g.nodes(), g.nodes()))
-    g = DGLGraph(g)
+        g = dgl.remove_self_loop(g)
+        g = dgl.add_self_loop(g)
     # normalization
     degs = g.in_degrees().astype('float32')
     norm = mx.nd.power(degs, -0.5)

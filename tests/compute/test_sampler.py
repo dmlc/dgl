@@ -10,7 +10,7 @@ np.random.seed(42)
 
 def generate_rand_graph(n):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
-    return dgl.DGLGraph(arr, readonly=True)
+    return dgl.DGLGraphStale(arr, readonly=True)
 
 def test_create_full():
     g = generate_rand_graph(100)
@@ -171,7 +171,7 @@ def test_nonuniform_neighbor_sampler():
         if edge not in edges:
             edges.append(edge)
     src, dst = zip(*edges)
-    g = dgl.DGLGraph()
+    g = dgl.DGLGraphStale()
     g.add_nodes(100)
     g.add_edges(src, dst)
     g.readonly()
@@ -228,12 +228,10 @@ def check_head_tail(g):
 
     lsrc = np.unique(F.asnumpy(lsrc))
     head_nid = np.unique(F.asnumpy(g.head_nid))
-    assert len(head_nid) == len(g.head_nid)
     np.testing.assert_equal(lsrc, head_nid)
 
     ldst = np.unique(F.asnumpy(ldst))
     tail_nid = np.unique(F.asnumpy(g.tail_nid))
-    assert len(tail_nid) == len(g.tail_nid)
     np.testing.assert_equal(tail_nid, ldst)
 
 
@@ -668,7 +666,7 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
 def check_positive_edge_sampler():
     g = generate_rand_graph(1000)
     num_edges = g.number_of_edges()
-    edge_weight = F.copy_to(F.tensor(np.full((num_edges,), 1, dtype=np.float32)), F.cpu())
+    edge_weight = F.copy_to(F.tensor(np.full((num_edges,), 0.1, dtype=np.float32)), F.cpu())
 
     edge_weight[num_edges-1] = num_edges ** 2
     EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')

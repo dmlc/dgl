@@ -2,15 +2,20 @@ from __future__ import absolute_import
 
 from distutils.version import LooseVersion
 
+import scipy # Weird bug in new pytorch when import scipy after import torch
 import torch as th
 import builtins
+import numbers
 from torch.utils import dlpack
 
 from ... import ndarray as nd
-from ... import kernel as K
+from ..._deprecate import kernel as K
 from ...function.base import TargetCode
+from ...base import dgl_warning
 
-TH_VERSION = LooseVersion(th.__version__)
+if LooseVersion(th.__version__) < LooseVersion("1.2.0"):
+    dgl_warning("Detected an old version of PyTorch. Suggest using torch>=1.2.0 "
+                "for the best experience.")
 
 def data_type_dict():
     return {'float16' : th.float16,
@@ -20,13 +25,19 @@ def data_type_dict():
             'int8'    : th.int8,
             'int16'   : th.int16,
             'int32'   : th.int32,
-            'int64'   : th.int64}
+            'int64'   : th.int64,
+            'bool'    : th.bool}
 
 def cpu():
     return th.device('cpu')
 
 def tensor(data, dtype=None):
-    return th.tensor(data, dtype=dtype)
+    if isinstance(data, numbers.Number):
+        data = [data]
+    if isinstance(data, th.Tensor):
+        return th.as_tensor(data, dtype=dtype, device=data.device)
+    else:
+        return th.as_tensor(data, dtype=dtype)
 
 def as_scalar(data):
     return data.item()
@@ -65,13 +76,23 @@ def context(input):
     return input.device
 
 def device_type(ctx):
-    return ctx.type
+    return th.device(ctx).type
 
 def device_id(ctx):
+    ctx = th.device(ctx)
     if ctx.index is None:
         return 0
     else:
         return ctx.index
+
+def to_backend_ctx(dglctx):
+    dev_type = dglctx.device_type
+    if dev_type == 1:
+        return th.device('cpu')
+    elif dev_type == 2:
+        return th.device('cuda', dglctx.device_id)
+    else:
+        raise ValueError('Unsupported DGL device context:', dglctx)
 
 def astype(input, ty):
     return input.type(ty)
@@ -82,13 +103,14 @@ def asnumpy(input):
     else:
         return input.cpu().detach().numpy()
 
-def copy_to(input, ctx):
+def copy_to(input, ctx, **kwargs):
+    ctx = th.device(ctx)
     if ctx.type == 'cpu':
         return input.cpu()
     elif ctx.type == 'cuda':
         if ctx.index is not None:
             th.cuda.set_device(ctx.index)
-        return input.cuda()
+        return input.cuda(**kwargs)
     else:
         raise RuntimeError('Invalid context', ctx)
 
@@ -130,6 +152,9 @@ def argtopk(input, k, dim, descending=True):
 def exp(input):
     return th.exp(input)
 
+def sqrt(input):
+    return th.sqrt(input)
+
 def softmax(input, dim=-1):
     return th.softmax(input, dim=dim)
 
@@ -143,13 +168,10 @@ def split(input, sizes_or_sections, dim):
     return th.split(input, sizes_or_sections, dim)
 
 def repeat(input, repeats, dim):
-    # return th.repeat_interleave(input, repeats, dim) # PyTorch 1.1
-    if dim < 0:
-        dim += input.dim()
-    return th.flatten(th.stack([input] * repeats, dim=dim+1), dim, dim+1)
+    return th.repeat_interleave(input, repeats, dim) # PyTorch 1.1
 
 def gather_row(data, row_index):
-    return th.index_select(data, 0, row_index)
+    return th.index_select(data, 0, row_index.long())
 
 def slice_axis(data, axis, begin, end):
     return th.narrow(data, axis, begin, end - begin)
@@ -161,11 +183,14 @@ def take(data, indices, dim):
 def narrow_row(x, start, stop):
     return x[start:stop]
 
+def index_add_inplace(data, row_idx, value):
+    data.index_add_(0, row_idx, value)
+
 def scatter_row(data, row_index, value):
-    return data.index_copy(0, row_index, value)
+    return data.index_copy(0, row_index.long(), value)
 
 def scatter_row_inplace(data, row_index, value):
-    data[row_index] = value
+    data[row_index.long()] = value
 
 def squeeze(input, dim):
     return th.squeeze(input, dim)
@@ -220,20 +245,9 @@ def pack_padded_tensor(input, lengths):
     index = th.tensor(index).to(device)
     return gather_row(input.view(batch_size * max_len, -1), index)
 
-def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
-    y = th.zeros(n_segs, *input.shape[1:]).to(input)
-    seg_id = seg_id.view((-1,) + (1,) * (input.dim() - 1)).expand_as(input)
-    y = y.scatter_add_(dim, seg_id, input)
-    return y
-
-def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
-    w = unsorted_1d_segment_sum(th.ones_like(seg_id), seg_id, n_segs, 0).to(input)
-    w = w.clamp(min=1)   # remove 0 entries
-    y = unsorted_1d_segment_sum(input, seg_id, n_segs, dim)
-    y = y / w.view((-1,) + (1,) * (y.dim() - 1))
-    return y
-
 def boolean_mask(input, mask):
+    if 'bool' not in str(mask.dtype):
+        mask = th.tensor(mask, dtype=th.bool)
     return input[mask]
 
 def equal(x, y):
@@ -242,7 +256,18 @@ def equal(x, y):
 def logical_not(input):
     return ~input
 
+def logical_and(input1, input2):
+    return input1 & input2
+
+def clone(input):
+    return input.clone()
+
+def clamp(data, min_val, max_val):
+    return th.clamp(data, min_val, max_val)
+
 def unique(input):
+    if input.dtype == th.bool:
+        input = input.type(th.int8)
     return th.unique(input)
 
 def full_1d(length, fill_value, dtype, ctx):
@@ -255,8 +280,8 @@ def nonzero_1d(input):
 def sort_1d(input):
     return th.sort(input)
 
-def arange(start, stop):
-    return th.arange(start, stop, dtype=th.int64)
+def arange(start, stop, dtype=th.int64):
+    return th.arange(start, stop, dtype=dtype)
 
 def rand_shuffle(arr):
     idx = th.randperm(len(arr))
@@ -275,17 +300,26 @@ def zerocopy_to_numpy(input):
 def zerocopy_from_numpy(np_array):
     return th.as_tensor(np_array)
 
-def zerocopy_to_dgl_ndarray(input):
-    return nd.from_dlpack(dlpack.to_dlpack(input.contiguous()))
+def zerocopy_to_dgl_ndarray(data):
+    return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
 
-def zerocopy_from_dgl_ndarray(input):
-    return dlpack.from_dlpack(input.to_dlpack())
+def zerocopy_to_dgl_ndarray_for_write(input):
+    return zerocopy_to_dgl_ndarray(input)
 
+def zerocopy_from_dgl_ndarray(data):
+    if data.shape == (0,):
+        # NOTE: PyTorch v1.5 does not accept DLPack object representing empty CUDA tensor.
+        #  Related issue: https://github.com/pytorch/pytorch/issues/41182
+        #  The issue will be fixed in v1.6 and later.
+        return th.tensor([], dtype=getattr(th, data.dtype),
+                         device=to_backend_ctx(data.ctx))
+    else:
+        return dlpack.from_dlpack(data.to_dlpack())
 
 
 class BinaryReduce(th.autograd.Function):
     @staticmethod
-    def forward(ctx, reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
+    def forward(ctx, reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data, out_data,
                 out_size, lhs_map, rhs_map, out_map):
         lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
         rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
@@ -293,7 +327,6 @@ class BinaryReduce(th.autograd.Function):
         out_shape = feat_shape
         if binary_op == 'dot':
             out_shape = feat_shape[:-1]
-        out_data = lhs_data.new_empty((out_size,) + out_shape)
         out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         K.binary_op_reduce(
             reducer if reducer != 'mean' else 'sum',
@@ -323,17 +356,17 @@ class BinaryReduce(th.autograd.Function):
             degs = None
         # save_for_backward can only save variables
         ctx.backward_cache = (reducer, binary_op, graph, lhs, rhs, lhs_map,
-                              rhs_map, out_map, lhs_data_nd, rhs_data_nd,
-                              feat_shape, degs)
-        ctx.save_for_backward(out_data)
+                              rhs_map, out_map, feat_shape, degs)
+        ctx.save_for_backward(lhs_data, rhs_data, out_data)
         return out_data
 
     @staticmethod
     def backward(ctx, grad_out):
         reducer, binary_op, graph, lhs, rhs, lhs_map, rhs_map, out_map, \
-            lhs_data_nd, rhs_data_nd, feat_shape, degs \
-            = ctx.backward_cache
-        out_data, = ctx.saved_tensors
+            feat_shape, degs = ctx.backward_cache
+        lhs_data, rhs_data, out_data = ctx.saved_tensors
+        lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
+        rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
         out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         grad_lhs = None
         grad_rhs = None
@@ -357,19 +390,34 @@ class BinaryReduce(th.autograd.Function):
                 lhs_map[1], rhs_map[1], out_map[1])
             grad_rhs = _reduce_grad(grad_rhs, rhs_data_nd.shape)
 
-        return None, None, None, None, None, grad_lhs, grad_rhs, None, None, \
+        return None, None, None, None, None, grad_lhs, grad_rhs, None, None, None, \
             None, None
+
+
+def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
+                  out_size, lhs_map=(None, None), rhs_map=(None, None), out_map=(None, None)):
+    lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
+    rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
+    feat_shape = K.infer_binary_feature_shape(binary_op, lhs_data_nd, rhs_data_nd)
+
+    out_shape = feat_shape
+    if binary_op == 'dot':
+        out_shape = feat_shape[:-1]
+    out_data = lhs_data.new_empty((out_size,) + out_shape)
+
+    return BinaryReduce.apply(
+            reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data, out_data,
+            out_size, lhs_map, rhs_map, out_map)
 
 
 class CopyReduce(th.autograd.Function):
     @staticmethod
-    def forward(ctx, reducer, graph, target, in_data, out_size, in_map,
+    def forward(ctx, reducer, graph, target, in_data, out_data, out_size, in_map,
                 out_map):
-        out_data = in_data.new_empty((out_size,) + in_data.shape[1:])
         in_data_nd = zerocopy_to_dgl_ndarray(in_data)
         out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         K.copy_reduce(
-            reducer if reducer != 'mean' else 'sum', 
+            reducer if reducer != 'mean' else 'sum',
             graph, target, in_data_nd, out_data_nd, in_map[0], out_map[0])
         # normalize if mean reducer
         # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
@@ -379,23 +427,22 @@ class CopyReduce(th.autograd.Function):
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
             degs_nd = zerocopy_to_dgl_ndarray(degs)
             K.copy_reduce(
-                'sum', graph, target, in_ones_nd, degs_nd, in_map[0], out_map[0]) 
+                'sum', graph, target, in_ones_nd, degs_nd, in_map[0], out_map[0])
             # reshape
             degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.dim() - 1)).clamp(min=1)
             out_data = out_data / degs
         else:
             degs = None
         # save_for_backward can only save variables
-        ctx.backward_cache = (reducer, graph, target, in_map, out_map,
-                              in_data_nd, degs)
-        ctx.save_for_backward(out_data)
+        ctx.backward_cache = (reducer, graph, target, in_map, out_map, degs)
+        ctx.save_for_backward(in_data, out_data)
         return out_data
 
     @staticmethod
     def backward(ctx, grad_out):
-        reducer, graph, target, in_map, out_map, in_data_nd, degs \
-            = ctx.backward_cache
-        out_data, = ctx.saved_tensors
+        reducer, graph, target, in_map, out_map, degs = ctx.backward_cache
+        in_data, out_data = ctx.saved_tensors
+        in_data_nd = zerocopy_to_dgl_ndarray(in_data)
         out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         grad_in = None
         if reducer == 'mean':
@@ -404,14 +451,16 @@ class CopyReduce(th.autograd.Function):
         if ctx.needs_input_grad[3]:
             grad_in = grad_out.new_empty(in_data_nd.shape)
             K.backward_copy_reduce(
-                reducer if reducer != 'mean' else 'sum', 
-                graph, target, in_data_nd, out_data_nd, grad_out_nd, 
+                reducer if reducer != 'mean' else 'sum',
+                graph, target, in_data_nd, out_data_nd, grad_out_nd,
                 zerocopy_to_dgl_ndarray(grad_in), in_map[1], out_map[1])
-        return None, None, None, grad_in, None, None, None
+        return None, None, None, grad_in, None, None, None, None
 
 
-binary_reduce = BinaryReduce.apply
-copy_reduce = CopyReduce.apply
+def copy_reduce(reducer, graph, target, in_data, out_size, in_map=(None, None),
+                out_map=(None, None)):
+    out_data = in_data.new_empty((out_size,) + in_data.shape[1:])
+    return CopyReduce.apply(reducer, graph, target, in_data, out_data, out_size, in_map, out_map)
 
 
 def _reduce_grad(grad, shape):
@@ -448,3 +497,37 @@ def _reduce_grad(grad, shape):
 def sync():
     # Pytorch performs computation synchronously, so no need for synchronization.
     pass
+
+def attach_grad(x):
+    if x.grad is not None:
+        x.grad.zero_()
+        return x
+    else:
+        return x.requires_grad_()
+
+def backward(x, head_gradient=None):
+    if head_gradient is not None and head_gradient.shape[0] == 1 and len(head_gradient.shape) == 1:
+        # Fix for torch 1.3.1
+        head_gradient = th.tensor(head_gradient.item()).to(head_gradient.device)
+    x.backward(head_gradient)
+
+def grad(x):
+    return x.grad
+
+def is_no_grad(x):
+    return x.grad is None or (x.grad == 0).all()
+
+def is_recording():
+    return th.is_grad_enabled()
+
+class record_grad(object):
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass
+
+no_grad = th.no_grad

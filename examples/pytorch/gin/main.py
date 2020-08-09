@@ -23,7 +23,8 @@ def train(args, net, trainloader, optimizer, criterion, epoch):
     for pos, (graphs, labels) in zip(bar, trainloader):
         # batch graphs will be shipped to device in forward part of model
         labels = labels.to(args.device)
-        feat = graphs.ndata['attr'].to(args.device)
+        feat = graphs.ndata.pop('attr').to(args.device)
+        graphs = graphs.to(args.device)
         outputs = net(graphs, feat)
 
         loss = criterion(outputs, labels)
@@ -52,7 +53,8 @@ def eval_net(args, net, dataloader, criterion):
 
     for data in dataloader:
         graphs, labels = data
-        feat = graphs.ndata['attr'].to(args.device)
+        feat = graphs.ndata.pop('attr').to(args.device)
+        graphs = graphs.to(args.device)
         labels = labels.to(args.device)
         total += len(labels)
         outputs = net(graphs, feat)
@@ -73,14 +75,14 @@ def eval_net(args, net, dataloader, criterion):
 def main(args):
 
     # set up seeds, args.seed supported
-    torch.manual_seed(seed=0)
-    np.random.seed(seed=0)
+    torch.manual_seed(seed=args.seed)
+    np.random.seed(seed=args.seed)
 
     is_cuda = not args.disable_cuda and torch.cuda.is_available()
 
     if is_cuda:
         args.device = torch.device("cuda:" + str(args.device))
-        torch.cuda.manual_seed_all(seed=0)
+        torch.cuda.manual_seed_all(seed=args.seed)
     else:
         args.device = torch.device("cpu")
 
@@ -109,9 +111,9 @@ def main(args):
     lrbar = tqdm(range(args.epochs), unit="epoch", position=5, ncols=0, file=sys.stdout)
 
     for epoch, _, _ in zip(tbar, vbar, lrbar):
-        scheduler.step()
 
         train(args, model, trainloader, optimizer, criterion, epoch)
+        scheduler.step()
 
         train_loss, train_acc = eval_net(
             args, model, trainloader, criterion)

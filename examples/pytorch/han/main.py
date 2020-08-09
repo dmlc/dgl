@@ -29,6 +29,11 @@ def main(args):
     g, features, labels, num_classes, train_idx, val_idx, test_idx, train_mask, \
     val_mask, test_mask = load_data(args['dataset'])
 
+    if hasattr(torch, 'BoolTensor'):
+        train_mask = train_mask.bool()
+        val_mask = val_mask.bool()
+        test_mask = test_mask.bool()
+
     features = features.to(args['device'])
     labels = labels.to(args['device'])
     train_mask = train_mask.to(args['device'])
@@ -43,6 +48,7 @@ def main(args):
                     out_size=num_classes,
                     num_heads=args['num_heads'],
                     dropout=args['dropout']).to(args['device'])
+        g = g.to(args['device'])
     else:
         from model import HAN
         model = HAN(num_meta_paths=len(g),
@@ -51,6 +57,7 @@ def main(args):
                     out_size=num_classes,
                     num_heads=args['num_heads'],
                     dropout=args['dropout']).to(args['device'])
+        g = [graph.to(args['device']) for graph in g]
 
     stopper = EarlyStopping(patience=args['patience'])
     loss_fcn = torch.nn.CrossEntropyLoss()
