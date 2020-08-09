@@ -1,7 +1,7 @@
 # pylint: disable=global-variable-undefined, invalid-name
 """Multiprocess dataloader for distributed training"""
 import multiprocessing as mp
-import queue
+from queue import Queue
 import time
 import traceback
 
@@ -95,7 +95,7 @@ class DistDataLoader:
             self.m = mp.Manager()
             self.queue = self.m.Queue(maxsize=queue_size)
         else:
-            self.queue = queue.Queue(maxsize=queue_size)
+            self.queue = Queue(maxsize=queue_size)
         self.drop_last = drop_last
         self.recv_idxs = 0
         self.shuffle = shuffle
@@ -154,8 +154,7 @@ class DistDataLoader:
         if next_data is None:
             return
         elif self.pool is not None:
-            async_result = self.pool.apply_async(
-                call_collate_fn, args=(self.name, next_data, ))
+            self.pool.apply_async(call_collate_fn, args=(self.name, next_data, ))
         else:
             result = self.collate_fn(next_data)
             self.queue.put(result)

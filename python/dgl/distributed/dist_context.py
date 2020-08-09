@@ -65,9 +65,9 @@ def initialize(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type
     global NUM_SAMPLER_WORKERS
     is_standalone = os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone'
     if num_workers > 0 and not is_standalone:
-        SAMPLER_POOL = ctx.Pool(
-            num_workers, initializer = _init_rpc, initargs=(ip_config, max_queue_size,
-                                                            net_type, 'sampler', num_worker_threads))
+        SAMPLER_POOL = ctx.Pool(num_workers, initializer=_init_rpc,
+                                initargs=(ip_config, max_queue_size,
+                                          net_type, 'sampler', num_worker_threads))
     NUM_SAMPLER_WORKERS = num_workers
     if not is_standalone:
         connect_to_server(ip_config, max_queue_size, net_type)
