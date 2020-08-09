@@ -143,8 +143,7 @@ def segmented_knn_graph(x, k, segs):
     src = F.reshape(src, (-1,))
     adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
 
-    g = convert.graph(adj)
-    return g
+    return convert.from_scipy(adj)
 
 def to_bidirected(g, readonly=None, copy_ndata=False):
     r""" Convert the graph to a bidirected one.

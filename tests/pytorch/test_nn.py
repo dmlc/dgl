@@ -778,8 +778,6 @@ def test_hetero_conv(agg, idtype):
     uf = F.randn((4, 2))
     gf = F.randn((4, 4))
     sf = F.randn((2, 3))
-    uf_dst = F.randn((4, 3))
-    gf_dst = F.randn((4, 4))
 
     h = conv(g, {'user': uf})
     assert set(h.keys()) == {'user', 'game'}

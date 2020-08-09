@@ -49,7 +49,9 @@ def _check_neighbor_sampling_dataloader(g, nids, dl):
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_neighbor_sampler_dataloader():
-    g = dgl.graph(([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0]), num_nodes=6)
+    g = dgl.heterograph({
+        ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0])},
+        {'user': 6})
     g_sampler1 = dgl.sampling.MultiLayerNeighborSampler([2, 2], return_eids=True)
     g_sampler2 = dgl.sampling.MultiLayerNeighborSampler([None, None], return_eids=True)
 

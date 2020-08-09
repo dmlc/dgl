@@ -186,12 +186,13 @@ def graph(data,
     u, v, urange, vrange = utils.graphdata2tensors(data, idtype)
     if num_nodes is not None:  # override the number of nodes
         urange, vrange = num_nodes, num_nodes
-    min_src = F.as_scalar(F.min(u, dim=0))
-    assert min_src >= 0, \
-        'Expect the source node IDs to be non-negative, got {:d}'.format(min_src)
-    min_dst = F.as_scalar(F.min(v, dim=0))
-    assert min_dst >= 0, \
-        'Expect the destination node IDs to be non-negative, got {:d}'.format(min_src)
+    if len(u) > 0:
+        min_src = F.as_scalar(F.min(u, dim=0))
+        assert min_src >= 0, \
+            'Expect the source node IDs to be non-negative, got {:d}'.format(min_src)
+        min_dst = F.as_scalar(F.min(v, dim=0))
+        assert min_dst >= 0, \
+            'Expect the destination node IDs to be non-negative, got {:d}'.format(min_src)
 
     g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange)
 
@@ -402,12 +403,13 @@ def heterograph(data_dict,
     for (srctype, etype, dsttype), data in data_dict.items():
         relation = (srctype, etype, dsttype)
         src, dst, nsrc, ndst = data
-        min_src = F.as_scalar(F.min(src, dim=0))
-        assert min_src >= 0, 'Expect the source node IDs to be ' \
-                             'non-negative for {}, got {:d}'.format(relation, min_src)
-        min_dst = F.as_scalar(F.min(dst, dim=0))
-        assert min_dst >= 0, 'Expect the destination node IDs to be ' \
-                             'non-negative for {}, got {:d}'.format(relation, min_src)
+        if len(src) > 0:
+            min_src = F.as_scalar(F.min(src, dim=0))
+            assert min_src >= 0, 'Expect the source node IDs to be ' \
+                                 'non-negative for {}, got {:d}'.format(relation, min_src)
+            min_dst = F.as_scalar(F.min(dst, dim=0))
+            assert min_dst >= 0, 'Expect the destination node IDs to be ' \
+                                 'non-negative for {}, got {:d}'.format(relation, min_src)
         num_nodes_dict_[srctype] = max(num_nodes_dict_[srctype], nsrc)
         num_nodes_dict_[dsttype] = max(num_nodes_dict_[dsttype], ndst)
 
@@ -438,8 +440,9 @@ def heterograph(data_dict,
         meta_edges_src.append(ntype_dict[srctype])
         meta_edges_dst.append(ntype_dict[dsttype])
         etypes.append(etype)
-        src, dst, nsrc, ndst = data
-        g = create_from_edges(src, dst, srctype, etype, dsttype, nsrc, ndst)
+        src, dst, _, _ = data
+        g = create_from_edges(src, dst, srctype, etype, dsttype,
+                              num_nodes_dict[srctype], num_nodes_dict[dsttype])
         rel_graphs.append(g)
 
     # metagraph is DGLGraph, currently still using int64 as index dtype

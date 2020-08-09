@@ -50,7 +50,7 @@ def segment_reduce(seglen, value, reducer='sum'):
     if len(u) != len(v):
         raise DGLError("Invalid seglen array:", seglen,
                        ". Its summation must be equal to value.shape[0].")
-    g = convert.bipartite((u, v))
+    g = convert.heterograph({('_U', '_E', '_V'): (u, v)})
     g.srcdata['h'] = value
     g.update_all(fn.copy_u('h', 'm'), getattr(fn, reducer)('m', 'h'))
     return g.dstdata['h']
