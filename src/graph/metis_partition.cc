@@ -45,8 +45,8 @@ IdArray GraphOp::MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
   METIS_SetDefaultOptions(options);
   options[METIS_OPTION_ONDISK] = 1;
   options[METIS_OPTION_NITER] = 1;
-  options[METIS_OPTION_NIPARTS]=1;
-  options[METIS_OPTION_DROPEDGES]=1;
+  options[METIS_OPTION_NIPARTS] = 1;
+  options[METIS_OPTION_DROPEDGES] = 1;
 
   int ret = METIS_PartGraphKway(&nvtxs,      // The number of vertices
                                 &ncon,       // The number of balancing constraints.
