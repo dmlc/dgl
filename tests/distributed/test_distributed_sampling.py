@@ -121,7 +121,6 @@ def test_rpc_sampling():
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_sampling(Path(tmpdirname), 2)
-        check_rpc_sampling(Path(tmpdirname), 1)
 
 def check_rpc_sampling_shuffle(tmpdir, num_server):
     ip_config = open("rpc_ip_config.txt", "w")
