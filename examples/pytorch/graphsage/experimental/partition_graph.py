@@ -3,6 +3,7 @@ import numpy as np
 import torch as th
 import argparse
 import time
+from pyinstrument import Profiler
 
 from load_graph import load_reddit, load_ogb
 
@@ -45,7 +46,11 @@ if __name__ == '__main__':
             sym_g.ndata[key] = g.ndata[key]
         g = sym_g
 
+    profiler = Profiler()
+    profiler.start()
     dgl.distributed.partition_graph(g, args.dataset, args.num_parts, 'data',
                                     part_method=args.part_method,
                                     balance_ntypes=balance_ntypes,
                                     balance_edges=args.balance_edges)
+    profiler.stop()
+    print(profiler.output_text(unicode=True, color=True))
