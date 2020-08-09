@@ -336,7 +336,9 @@ class DistGraph:
                     'The standalone mode can only work with the graph data with one partition'
             if self._gpb is None:
                 self._gpb = gpb
-            self._g = g
+            # We need to copy the graph into shared memory so that the sampler process can
+            # access to it.
+            self._g = _copy_graph_to_shared_mem(g, graph_name)
             for name in node_feats:
                 self._client.add_data(_get_data_name(name, NODE_PART_POLICY), node_feats[name])
             for name in edge_feats:
@@ -369,7 +371,7 @@ class DistGraph:
         self._client.map_shared_data(self._gpb)
 
     def __getstate__(self):
-        return self.ip_config, self.graph_name, self._gpb_input
+        return self.ip_config, self.graph_name, self._gpb
 
     def __setstate__(self, state):
         self.ip_config, self.graph_name, self._gpb_input = state
