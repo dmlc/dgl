@@ -59,6 +59,8 @@ class RelGraphConv(nn.Module):
         Turn it on when you encounter OOM problem during training or evaluation.
     dropout : float, optional
         Dropout rate. Default: 0.0
+    layer_norm: float, optional
+        Add layer norm. Default: False
     """
     def __init__(self,
                  in_feat,
