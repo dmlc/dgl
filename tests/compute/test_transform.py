@@ -26,7 +26,9 @@ def test_line_graph1():
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_line_graph2(idtype):
-    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), idtype=idtype)
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 1, 2, 2],[2, 0, 2, 0, 1])
+    }, idtype=idtype)
     lg = dgl.line_graph(g)
     assert lg.number_of_nodes() == 5
     assert lg.number_of_edges() == 8
@@ -44,7 +46,9 @@ def test_line_graph2(idtype):
                           np.array([0, 1, 2, 4]))
     assert np.array_equal(F.asnumpy(col),
                           np.array([4, 0, 3, 1]))
-    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), idtype=idtype).formats('csr')
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 1, 2, 2],[2, 0, 2, 0, 1])
+    }, idtype=idtype).formats('csr')
     lg = dgl.line_graph(g)
     assert lg.number_of_nodes() == 5
     assert lg.number_of_edges() == 8
@@ -54,7 +58,9 @@ def test_line_graph2(idtype):
     assert np.array_equal(F.asnumpy(col),
                           np.array([3, 4, 0, 3, 4, 0, 1, 2]))
 
-    g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), idtype=idtype).formats('csc')
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 1, 2, 2],[2, 0, 2, 0, 1])
+    }, idtype=idtype).formats('csc')
     lg = dgl.line_graph(g)
     assert lg.number_of_nodes() == 5
     assert lg.number_of_edges() == 8
@@ -234,9 +240,9 @@ def test_reverse_shared_frames(idtype):
 def test_to_bidirected():
     # homogeneous graph
     elist = [(0, 0), (0, 1), (1, 0),
-                (1, 1), (2, 1), (2, 2)]
+             (1, 1), (2, 1), (2, 2)]
     num_edges = 7
-    g = dgl.graph(elist)
+    g = dgl.graph(tuple(zip(*elist)))
     elist.append((1, 2))
     elist = set(elist)
     big = dgl.to_bidirected(g)
@@ -678,8 +684,10 @@ def test_compact(idtype):
         ('user', 'likes', 'user'): ([1, 8], [8, 9])},
         {'user': 20, 'game': 10}, idtype=idtype)
 
-    g3 = dgl.graph(((0, 1), (1, 2)), num_nodes=10, idtype=idtype)
-    g4 = dgl.graph(((1, 3), (3, 5)), num_nodes=10, idtype=idtype)
+    g3 = dgl.heterograph({('user', '_E', 'user'): ((0, 1), (1, 2))},
+                         {'user': 10}, idtype=idtype)
+    g4 = dgl.heterograph({('user', '_E', 'user'): ((1, 3), (3, 5))},
+                         {'user': 10}, idtype=idtype)
 
     def _check(g, new_g, induced_nodes):
         assert g.ntypes == new_g.ntypes

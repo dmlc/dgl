@@ -602,17 +602,14 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
     edge_groups = [etype_mask[i].nonzero()[0] for i in range(len(canonical_etids))]
 
     data_dict = dict()
-    num_nodes_dict = dict()
     for i, (stid, etid, dtid) in enumerate(canonical_etids):
         src_of_etype = src_local[edge_groups[i]]
         dst_of_etype = dst_local[edge_groups[i]]
         data_dict[(ntypes[stid], etypes[etid], ntypes[dtid])] = \
             (src_of_etype, dst_of_etype)
-        num_nodes_dict.update({
-            ntypes[stid]: ntype_count[stid],
-            ntypes[dtid]: ntype_count[dtid]
-        })
-    hg = heterograph(data_dict, num_nodes_dict, idtype=idtype, device=device)
+    hg = heterograph(data_dict,
+                     {ntype: count for ntype, count in zip(ntypes, ntype_count)},
+                     idtype=idtype, device=device)
 
     ntype2ngrp = {ntype : node_groups[ntid] for ntid, ntype in enumerate(ntypes)}
 

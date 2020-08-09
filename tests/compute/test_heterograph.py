@@ -1598,7 +1598,8 @@ def test_types_in_function(idtype):
         assert edges.canonical_etype == ('user', 'plays', 'game')
         return F.zeros((2,))
 
-    g = dgl.graph(((0, 1), (1, 2)), idtype=idtype, device=F.ctx())
+    g = dgl.heterograph({('user', 'follow', 'user'): ((0, 1), (1, 2))},
+                        idtype=idtype, device=F.ctx())
     g.apply_nodes(rfunc1)
     g.apply_edges(mfunc1)
     g.update_all(mfunc1, rfunc1)

@@ -236,7 +236,7 @@ def create_heterographs(idtype):
 def create_heterographs2(idtype):
     g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), idtype=idtype)
     g_y = dgl.graph(([0, 2], [2, 3]), idtype=idtype).formats('csr')
-    g = dgl.heterograph(
+    g_z = dgl.heterograph(
         {('user', 'knows', 'knowledge'): ([0, 1, 3], [2, 3, 4])}, idtype=idtype)
     g_x.ndata['h'] = F.randn((4, 3))
     g_x.edata['w'] = F.randn((3, 2))

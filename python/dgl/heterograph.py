@@ -1932,12 +1932,30 @@ class DGLHeteroGraph(object):
 
     @property
     def idtype(self):
-        """The dtype of graph index
+        """The data type for storing the structure-related graph information
+        such as node and edge IDs.
 
         Returns
         -------
-        backend dtype object
-            th.int32/th.int64 or tf.int32/tf.int64 etc.
+        Framework-specific device object
+            For example, this can be torch.int32 or torch.int64 for PyTorch.
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        >>> src_ids = torch.tensor([0, 0, 1])
+        >>> dst_ids = torch.tensor([1, 2, 2])
+        >>> g = dgl.graph((src_ids, dst_ids))
+        >>> g.idtype
+        torch.int64
+        >>> g = dgl.graph((src_ids, dst_ids), idtype=torch.int32)
+        >>> g.idtype
+        torch.int32
 
         See Also
         --------

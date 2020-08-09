@@ -814,6 +814,7 @@ def metapath_reachable_graph(g, metapath):
     srctype = g.to_canonical_etype(metapath[0])[0]
     dsttype = g.to_canonical_etype(metapath[-1])[2]
     new_g = convert.heterograph({(srctype, '_E', dsttype): adj.nonzero()},
+                                {srctype: adj.shape[0], dsttype: adj.shape[1]},
                                 idtype=g.idtype, device=g.device)
 
     # copy srcnode features

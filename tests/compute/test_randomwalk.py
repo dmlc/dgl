@@ -62,6 +62,9 @@ def test_random_walk_with_restart():
 
 @parametrize_dtype
 def test_metapath_random_walk(idtype):
+    g1 = dgl.heterograph({
+        ('a', 'ab', 'b'): ([0, 1, 2, 3], [0, 1, 2, 3])
+    }, idtype=idtype)
     G = dgl.heterograph({
         ('a', 'ab', 'b'): ([0, 1, 2, 3], [0, 1, 2, 3]),
         ('b', 'ba', 'a'): ([0, 0, 1, 1, 2, 2, 3, 3], [1, 3, 2, 0, 3, 1, 0, 2])

@@ -223,8 +223,6 @@ def test_query():
     _test(gen_from_data(elist_input(), False, False))
     _test(gen_from_data(elist_input(), True, False))
     _test(gen_from_data(elist_input(), True, True))
-    _test(gen_from_data(nx_input(), False, False))
-    _test(gen_from_data(nx_input(), True, False))
     _test(gen_from_data(scipy_coo_input(), False, False))
     _test(gen_from_data(scipy_coo_input(), True, False))
 

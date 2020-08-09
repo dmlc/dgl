@@ -148,8 +148,10 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
     if hypersparse:
         # should crash if allocated a CSR
         card = 1 << 50
+        num_nodes_dict = {'user': card, 'game': card, 'coin': card}
     else:
         card = None
+        num_nodes_dict = None
 
     if reverse:
         g = dgl.graph(([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0]), num_nodes=card)
@@ -159,7 +161,7 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
             ('game', 'play', 'user'): ([0, 1, 2, 2], [0, 0, 1, 3]),
             ('user', 'liked-by', 'game'): ([0, 1, 2, 0, 3, 0], [2, 2, 2, 1, 1, 0]),
             ('coin', 'flips', 'user'): ([0, 0, 0, 0], [0, 1, 2, 3])
-        }, {'user': card, 'game': card, 'coin': card})
+        }, num_nodes_dict)
     else:
         g = dgl.graph(([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]), num_nodes=card)
         hg = dgl.heterograph({
@@ -168,7 +170,7 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
             ('user', 'play', 'game'): ([0, 0, 1, 3], [0, 1, 2, 2]),
             ('game', 'liked-by', 'user'): ([2, 2, 2, 1, 1, 0], [0, 1, 2, 0, 3, 0]),
             ('user', 'flips', 'coin'): ([0, 1, 2, 3], [0, 0, 0, 0])
-        }, {'user': card, 'game': card, 'coin': card})
+        }, num_nodes_dict)
     hg.edges['follow'].data['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
     hg.edges['play'].data['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
     hg.edges['liked-by'].data['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
@@ -183,7 +185,10 @@ def _gen_neighbor_topk_test_graph(hypersparse, reverse):
         card = None
 
     if reverse:
-        g = dgl.graph(([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0]), num_nodes=card)
+        g = dgl.heterograph({
+            ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0])
+        }, num_nodes_dict={'user': card if card is not None else 4})
+        g.edata['weight'] = F.tensor([.5, .3, 0., -5., 22., 0., 1.], dtype=F.float32)
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2],
                                          [1, 2, 3, 0, 2, 3, 0]),
@@ -192,7 +197,10 @@ def _gen_neighbor_topk_test_graph(hypersparse, reverse):
             ('coin', 'flips', 'user'): ([0, 0, 0, 0], [0, 1, 2, 3])
         })
     else:
-        g = dgl.graph(([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]), num_nodes=card)
+        g = dgl.heterograph({
+            ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2])
+        }, num_nodes_dict={'user': card if card is not None else 4})
+        g.edata['weight'] = F.tensor([.5, .3, 0., -5., 22., 0., 1.], dtype=F.float32)
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0],
                                          [0, 0, 0, 1, 1, 1, 2]),
