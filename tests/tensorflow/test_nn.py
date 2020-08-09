@@ -403,7 +403,7 @@ def test_sage_conv_bi(idtype, g, aggre_type):
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn'])
 def test_sage_conv_bi_empty(idtype, aggre_type):
     # Test the case for graphs without edges
-    g = dgl.bipartite([], num_nodes=(5, 3)).to(F.ctx())
+    g = dgl.heterograph({('_U', '_E', '_V'): ([], [])}, {'_U': 5, '_V': 3}).to(F.ctx())
     g = g.astype(idtype).to(F.ctx())
     sage = nn.SAGEConv((3, 3), 2, 'gcn')
     feat = (F.randn((5, 3)), F.randn((3, 3)))

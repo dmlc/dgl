@@ -292,7 +292,8 @@ class MovieLens(object):
         user_movie_ratings_coo = sp.coo_matrix(
             (ones, rating_pairs),
             shape=(self.num_user, self.num_movie), dtype=np.float32)
-        return dgl.bipartite(user_movie_ratings_coo, 'user', 'rate', 'movie')
+        g = dgl.bipartite_from_scipy(user_movie_ratings_coo)
+        return dgl.heterograph({('user', 'rate', 'movie'): g.edges()})
 
     @property
     def num_links(self):

@@ -35,11 +35,13 @@ def dglgraph_path():
 
 @register_case(['bipartite'])
 def bipartite1():
-    return dgl.bipartite([(0, 0), (0, 1), (0, 4), (2, 1), (2, 4), (3, 3)])
+    return dgl.heterograph({('_U', '_E', '_V'): ([0, 0, 0, 2, 2, 3],
+                                                 [0, 1, 4, 1, 4, 3])})
 
 @register_case(['bipartite'])
 def bipartite_full():
-    return dgl.bipartite([(0, 0), (0, 1), (0, 2), (0, 3), (1, 0), (1, 1), (1, 2), (1, 3)])
+    return dgl.heterograph({('_U', '_E', '_V'): ([0, 0, 0, 0, 1, 1, 1, 1],
+                                                 [0, 1, 2, 3, 0, 1, 2, 3])})
 
 @register_case(['homo'])
 def graph0():
@@ -95,7 +97,7 @@ def random_graph(size):
     return dgl.from_networkx(nx.erdos_renyi_graph(size, 0.3))
 
 def random_bipartite(size_src, size_dst):
-    return dgl.bipartite(ssp.random(size_src, size_dst, 0.1))
+    return dgl.bipartite_from_scipy(ssp.random(size_src, size_dst, 0.1))
 
 def random_block(size):
     g = dgl.from_networkx(nx.erdos_renyi_graph(size, 0.1))

@@ -298,8 +298,8 @@ def test_empty_relation(idtype):
         edge_attrs={('user', 'follows', 'user'): ['h1']})
 
     # Test graphs without edges
-    g1 = dgl.bipartite([], 'u', 'r', 'v', num_nodes=(0, 4))
-    g2 = dgl.bipartite([], 'u', 'r', 'v', num_nodes=(1, 5))
+    g1 = dgl.heterograph({('u', 'r', 'v'): ([], [])}, {'u': 0, 'v': 4})
+    g2 = dgl.heterograph({('u', 'r', 'v'): ([], [])}, {'u': 1, 'v': 5})
     dgl.batch([g1, g2])
 
 @parametrize_dtype

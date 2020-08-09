@@ -139,8 +139,6 @@ print('#Links:', data['PvsA'].nnz)
 # Converting this SciPy matrix to a heterograph in DGL is straightforward.
 
 pa_g = dgl.heterograph({('paper', 'written-by', 'author') : data['PvsA'].nonzero()})
-# equivalent (shorter) API for creating heterograph with two node types:
-pa_g = dgl.bipartite(data['PvsA'], 'paper', 'written-by', 'author')
 
 ###############################################################################
 # You can easily print out the type names and other structural information.

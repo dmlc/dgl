@@ -10,7 +10,7 @@ from . import heterograph_index
 from .heterograph import DGLHeteroGraph, combine_frames
 from . import graph_index
 from . import utils
-from .base import NTYPE, ETYPE, NID, EID, DGLError, dgl_warning
+from .base import NTYPE, ETYPE, NID, EID, DGLError
 
 __all__ = [
     'graph',
@@ -21,7 +21,9 @@ __all__ = [
     'to_hetero',
     'to_homo',
     'from_scipy',
+    'bipartite_from_scipy',
     'from_networkx',
+    'bipartite_from_networkx',
     'to_networkx',
 ]
 
@@ -198,151 +200,13 @@ def graph(data,
 def bipartite(data,
               utype='_U', etype='_E', vtype='_V',
               num_nodes=None,
-              validate=True,
-              formats=['coo', 'csr', 'csc'],
-              idtype=None,
-              device=None,
               card=None,
-              **deprecated_kwargs):
-    """Create a bipartite graph.
-
-    The result graph is directed and edges must be from ``utype`` nodes
-    to ``vtype`` nodes. Nodes of each type have their own ID counts.
-
-    In the sparse matrix perspective, :func:`dgl.graph` creates a graph
-    whose adjacency matrix must be square while :func:`dgl.bipartite`
-    creates a graph that does not necessarily have square adjacency matrix.
-
-    Parameters
-    ----------
-    data : graph data
-        Data to initialize graph structure. Supported data formats are
-
-        (1) list of edge pairs (e.g. [(0, 2), (3, 1), ...])
-        (2) pair of vertex IDs representing end nodes (e.g. ([0, 3, ...],  [2, 1, ...]))
-        (3) scipy sparse matrix
-        (4) networkx graph
-
-    utype : str, optional
-        Source node type name. (Default: _U)
-    etype : str, optional
-        Edge type name. (Default: _E)
-    vtype : str, optional
-        Destination node type name. (Default: _V)
-    num_nodes : 2-tuple of int, optional
-        Number of nodes in the source and destination group. If None, infer from input data,
-        i.e. the largest node ID plus 1 for each type. (Default: None)
-    validate : bool, optional
-        If True, check if node ids are within cardinality, the check process may take
-        some time. (Default: True)
-        If False and card is not None, user would receive a warning.
-    formats : str or list of str
-        It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
-        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
-    idtype : int32, int64, optional
-        Integer ID type. Valid options are int32 or int64. If None, try infer from
-        the given data.
-    device : Device context, optional
-        Device on which the graph is created. Default: infer from data.
-    card : 2-tuple of int, optional
-        Deprecated (see :attr:`num_nodes`). Cardinality (number of nodes in the source and
-        destination group). If None, infer from input data, i.e. the largest node ID plus 1
-        for each type. (Default: None)
-
-    Returns
-    -------
-    DGLHeteroGraph
-
-    Examples
-    --------
-    Create from pairs of edges
-
-    >>> g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays', 'game')
-    >>> g.ntypes
-    ['user', 'game']
-    >>> g.etypes
-    ['plays']
-    >>> g.canonical_etypes
-    [('user', 'plays', 'game')]
-    >>> g.number_of_nodes('user')
-    2
-    >>> g.number_of_nodes('game')
-    4
-    >>> g.number_of_edges('plays')  # 'plays' could be omitted here
-    3
-
-    Create from source and destination vertex ID lists
-
-    >>> u = [0, 0, 1]
-    >>> v = [2, 3, 2]
-    >>> g = dgl.bipartite((u, v))
-
-    The IDs can also be stored in framework-specific tensors
-
-    >>> import torch
-    >>> u = torch.tensor([0, 0, 1])
-    >>> v = torch.tensor([2, 3, 2])
-    >>> g = dgl.bipartite((u, v))
-
-    Create from scipy sparse matrix. Since scipy sparse matrix has explicit
-    shape, the cardinality of the result graph is derived from that.
-
-    >>> from scipy.sparse import coo_matrix
-    >>> spmat = coo_matrix(([1,1,1], ([0, 0, 1], [2, 3, 2])), shape=(4, 4))
-    >>> g = dgl.bipartite(spmat, 'user', 'plays', 'game')
-    >>> g.number_of_nodes('user')
-    4
-    >>> g.number_of_nodes('game')
-    4
-
-    Create from networkx graph. The given graph must follow the bipartite
-    graph convention in networkx. Each node has a ``bipartite`` attribute
-    with values 0 or 1. The result graph has two types of nodes and only
-    edges from ``bipartite=0`` to ``bipartite=1`` will be included.
-
-    >>> import networkx as nx
-    >>> nxg = nx.complete_bipartite_graph(3, 4)
-    >>> g = dgl.bipartite(nxg, 'user', 'plays', 'game')
-    >>> g.number_of_nodes('user')
-    3
-    >>> g.number_of_nodes('game')
-    4
-    >>> g.edges()
-    (tensor([0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2]), tensor([0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]))
-
-    Check if node ids are within num_nodes specified
-
-    >>> g = dgl.bipartite(([0, 1, 2], [1, 2, 3]), num_nodes=(2, 4), validate=True)
-    ...
-    dgl._ffi.base.DGLError: Invalid node id 2 (should be less than cardinality 2).
-    >>> g = dgl.bipartite(([0, 1, 2], [1, 2, 3]), num_nodes=(3, 4), validate=True)
-    >>> g
-    Graph(num_nodes={'_U': 3, '_V': 4},
-          num_edges={('_U', '_E', '_V'): 3},
-          metagraph=[('_U', '_V')])
-    """
-    if len(deprecated_kwargs) != 0:
-        raise DGLError("Key word arguments {} have been removed from dgl.graph()."
-                       " They are moved to dgl.from_scipy() and dgl.from_networkx()."
-                       " Please refer to their API documents for more details.".format(
-                           deprecated_kwargs.keys()))
-
-    if utype == vtype:
-        raise DGLError('utype should not be equal to vtype. Use ``dgl.graph`` instead.')
-    if card is not None:
-        dgl_warning("Argument 'card' will be deprecated. "
-                    "Please use num_nodes={} instead.".format(card))
-        num_nodes = card
-
-    u, v, urange, vrange = utils.graphdata2tensors(data, idtype, bipartite=True)
-    if num_nodes is not None:  # override the number of nodes
-        urange, vrange = num_nodes
-
-    g = create_from_edges(
-        u, v, utype, etype, vtype, urange, vrange, validate,
-        formats=formats)
-
-    return g.to(device)
+              validate=True,
+              restrict_format='any',
+              **kwargs):
+    """DEPRECATED: use dgl.heterograph instead."""
+    raise DGLError('dgl.bipartite is deprecated.\n\n'
+                   'Use dgl.heterograph instead.')
 
 def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
     """DEPRECATED: use dgl.heterograph instead."""
@@ -943,7 +807,98 @@ def from_scipy(sp_mat,
         g.edata[eweight_name] = F.tensor(sp_mat.data)
     return g.to(device)
 
-def from_networkx(nx_graph, *,
+def bipartite_from_scipy(sp_mat,
+                         eweight_name=None,
+                         idtype=None,
+                         device=None):
+    """Create a unidirectional bipartite graph from a SciPy sparse matrix.
+
+    A bipartite graph has two types of nodes ``"SRC"`` and ``"DST"`` and
+    there are only edges between nodes of different types. By "unidirectional",
+    there are only edges from ``"SRC"`` nodes to ``"DST"`` nodes.
+
+    Parameters
+    ----------
+    sp_mat : scipy.sparse.spmatrix
+        The graph adjacency matrix. Each nonzero entry ``sp_mat[i, j]``
+        represents an edge from node ``i`` of type ``"SRC"`` to ``j`` of type ``"DST"``.
+        Let the matrix shape be ``(N, M)``. There will be ``N`` ``"SRC"``-type nodes
+        and ``M`` ``"DST"``-type nodes in the resulting graph.
+    eweight_name : str, optional
+        The edata name for storing the nonzero values of :attr:`sp_mat`.
+        If given, DGL will store the nonzero values of :attr:`sp_mat` in ``edata[eweight_name]``
+        of the returned graph.
+    idtype : int32 or int64, optional
+        The data type for storing the structure-related graph information such as node and
+        edge IDs. It should be a framework-specific data type object (e.g., torch.int32).
+        By default, DGL uses int64.
+    device : device context, optional
+        The device of the resulting graph. It should be a framework-specific device object
+        (e.g., torch.device). By default, DGL stores the graph on CPU.
+
+    Returns
+    -------
+    DGLGraph
+        The created graph.
+
+    Notes
+    -----
+    1. The function supports all kinds of SciPy sparse matrix classes (e.g.,
+       :class:`scipy.sparse.csr.csr_matrix`). It converts the input matrix to the COOrdinate
+       format using :func:`scipy.sparse.spmatrix.tocoo` before creates a :class:`DGLGraph`.
+       Creating from a :class:`scipy.sparse.coo.coo_matrix` is hence the most efficient way.
+    2. DGL internally maintains multiple copies of the graph structure in different sparse
+       formats and chooses the most efficient one depending on the computation invoked.
+       If memory usage becomes an issue in the case of large graphs, use
+       :func:`dgl.DGLGraph.formats` to restrict the allowed formats.
+
+    Examples
+    --------
+
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch
+    >>> from scipy.sparse import coo_matrix
+
+    Create a small three-edge graph.
+
+    >>> # Source nodes for edges (2, 1), (3, 2), (4, 3)
+    >>> src_ids = np.array([2, 3, 4])
+    >>> # Destination nodes for edges (2, 1), (3, 2), (4, 3)
+    >>> dst_ids = np.array([1, 2, 3])
+    >>> # Weight for edges (2, 1), (3, 2), (4, 3)
+    >>> eweight = np.array([0.2, 0.3, 0.5])
+    >>> sp_mat = coo_matrix((eweight, (src_ids, dst_ids)))
+    >>> g = dgl.bipartite_from_scipy(sp_mat)
+
+    Retrieve the edge weights.
+
+    >>> g = dgl.bipartite_from_scipy(sp_mat, eweight_name='w')
+    >>> g.edata['w']
+    tensor([0.2000, 0.3000, 0.5000], dtype=torch.float64)
+
+    Create a graph on the first GPU card with data type int32.
+
+    >>> g = dgl.bipartite_from_scipy(sp_mat, idtype=torch.int32, device='cuda:0')
+
+    See Also
+    --------
+    heterograph
+    bipartite_from_networkx
+    """
+    # Sanity check
+    utils.check_type(sp_mat, spmatrix, 'sp_mat', skip_none=False)
+    utils.check_valid_idtype(idtype)
+
+    u, v, urange, vrange = utils.graphdata2tensors(sp_mat, idtype, bipartite=True)
+    g = create_from_edges(u, v, '_U', '_E', '_V', urange, vrange)
+    if eweight_name is not None:
+        g.edata[eweight_name] = F.tensor(sp_mat.data)
+    return g.to(device)
+
+def from_networkx(nx_graph,
                   node_attrs=None,
                   edge_attrs=None,
                   edge_id_attr_name=None,
@@ -963,7 +918,7 @@ def from_networkx(nx_graph, *,
         not the case. If the input graph is undirected, DGL converts it to a directed graph
         by :func:`networkx.Graph.to_directed`.
     node_attrs : list[str], optional
-        The names of the node features to retrieve from the NetworkX graph. If given, DGL
+        The names of the node attributes to retrieve from the NetworkX graph. If given, DGL
         stores the retrieved node attributes in ``ndata`` of the returned graph using their
         original names. The attribute data must be convertible to Tensor type (e.g., scalar,
         numpy.ndarray, list, etc.).
@@ -1064,13 +1019,13 @@ def from_networkx(nx_graph, *,
     u, v, urange, vrange = utils.graphdata2tensors(
         nx_graph, idtype, edge_id_attr_name=edge_id_attr_name)
 
+    g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange)
+
     # nx_graph.edges(data=True) returns src, dst, attr_dict
     if nx_graph.number_of_edges() > 0 and edge_id_attr_name is not None:
         has_edge_id = True
     else:
         has_edge_id = False
-
-    g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange)
 
     # handle features
     # copy attributes
@@ -1101,6 +1056,204 @@ def from_networkx(nx_graph, *,
                     raise DGLError('Expect the pre-specified edge ids to be'
                                    ' smaller than the number of edges --'
                                    ' {}, got {}.'.format(num_edges, attrs['id']))
+                for key in edge_attrs:
+                    attr_dict[key][attrs[edge_id_attr_name]] = attrs[key]
+        else:
+            # XXX: assuming networkx iteration order is deterministic
+            #      so the order is the same as graph_index.from_networkx
+            for eid, (_, _, attrs) in enumerate(nx_graph.edges(data=True)):
+                for key in edge_attrs:
+                    attr_dict[key][eid] = attrs[key]
+        for attr in edge_attrs:
+            for val in attr_dict[attr]:
+                if val is None:
+                    raise DGLError('Not all edges have attribute {}.'.format(attr))
+            g.edata[attr] = F.copy_to(_batcher(attr_dict[attr]), g.device)
+
+    return g.to(device)
+
+def bipartite_from_networkx(nx_graph,
+                            src_attrs=None,
+                            edge_attrs=None,
+                            dst_attrs=None,
+                            edge_id_attr_name=None,
+                            idtype=None,
+                            device=None):
+    """Create a unidirectional bipartite graph from a NetworkX graph.
+
+    A bipartite graph has two types of nodes ``"SRC"`` and ``"DST"`` and
+    there are only edges between nodes of different types. By "unidirectional",
+    there are only edges from ``"SRC"`` nodes to ``"DST"`` nodes.
+
+    Creating a DGLGraph from a NetworkX graph is not fast especially for large scales.
+    It is recommended to first convert a NetworkX graph into a tuple of node-tensors
+    and then construct a DGLGraph with :func:`dgl.heterograph`.
+
+    Parameters
+    ----------
+    nx_graph : networkx.DiGraph
+        The NetworkX graph holding the graph structure and the node/edge attributes.
+        DGL will relabel the nodes using consecutive integers starting from zero if it is
+        not the case. The graph must follow `NetworkX's bipartite graph convention
+        <https://networkx.github.io/documentation/stable/reference/algorithms/bipartite.html>`_,
+        and furthermore the edges must be from nodes with attribute `bipartite=0` to nodes
+        with attribute `bipartite=1`.
+    src_attrs : list[str], optional
+        The names of the ``"SRC"`` node attributes to retrieve from the NetworkX graph. If given,
+        DGL stores the retrieved node attributes in ``srcdata`` of the returned graph using their
+        original names. The attribute data must be convertible to Tensor type (e.g., scalar,
+        numpy.array, list, etc.).
+    edge_attrs : list[str], optional
+        The names of the edge attributes to retrieve from the NetworkX graph. If given, DGL
+        stores the retrieved edge attributes in ``edata`` of the returned graph using their
+        original names. The attribute data must be convertible to Tensor type (e.g., scalar,
+        numpy.ndarray, list, etc.).
+    dst_attrs : list[str], optional
+        The names of the ``"DST"`` node attributes to retrieve from the NetworkX graph. If given,
+        DGL stores the retrieved node attributes in ``dstdata`` of the returned graph using their
+        original names. The attribute data must be convertible to Tensor type (e.g., scalar,
+        numpy.array, list, etc.).
+    edge_id_attr_name : str, optional
+        The name of the edge attribute that stores the edge IDs. If given, DGL will assign edge
+        IDs accordingly when creating the graph, so the attribute must be valid IDs, i.e.
+        consecutive integers starting from zero. By default, the edge IDs of the returned graph
+        can be arbitrary.
+    idtype : int32 or int64, optional
+        The data type for storing the structure-related graph information such as node and
+        edge IDs. It should be a framework-specific data type object (e.g., torch.int32).
+        By default, DGL uses int64.
+    device : device context, optional
+        The device of the resulting graph. It should be a framework-specific device object
+        (e.g., torch.device). By default, DGL stores the graph on CPU.
+
+    Returns
+    -------
+    DGLGraph
+        The created graph.
+
+    Examples
+    --------
+
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import networkx as nx
+    >>> import numpy as np
+    >>> import torch
+
+    Create a 2-edge unidirectional bipartite graph.
+
+    >>> nx_g = nx.DiGraph()
+    >>> # Add nodes for the source type
+    >>> nx_g.add_nodes_from([1, 3], bipartite=0, feat1=np.zeros((2, 1)), feat2=np.ones((2, 1)))
+    >>> # Add nodes for the destination type
+    >>> nx_g.add_nodes_from([2, 4, 5], bipartite=1, feat3=np.zeros((3, 1)))
+    >>> nx_g.add_edge(1, 4, weight=np.ones((1, 1)), eid=np.array([1]))
+    >>> nx_g.add_edge(3, 5, weight=np.ones((1, 1)), eid=np.array([0]))
+
+    Convert it into a DGLGraph with structure only.
+
+    >>> g = dgl.bipartite_from_networkx(nx_g)
+
+    Retrieve the node/edge features of the graph.
+
+    >>> g = dgl.bipartite_from_networkx(nx_g, src_attrs=['feat1', 'feat2'],
+    >>>                                 edge_attrs=['weight'], dst_attrs=['feat3'])
+
+    Use a pre-specified ordering of the edges.
+
+    >>> g.edges()
+    (tensor([0, 1]), tensor([1, 2]))
+    >>> g = dgl.bipartite_from_networkx(nx_g, edge_id_attr_name='eid')
+    (tensor([1, 0]), tensor([2, 1]))
+
+    Create a graph on the first GPU card with data type int32.
+
+    >>> g = dgl.bipartite_from_networkx(nx_g, idtype=torch.int32, device='cuda:0')
+
+    See Also
+    --------
+    heterograph
+    bipartite_from_scipy
+    """
+    assert nx_graph.is_directed(), 'Expect nx_graph to be a directed NetworkX graph.'
+    utils.check_all_same_type(src_attrs, str, 'src_attrs', skip_none=True)
+    utils.check_all_same_type(edge_attrs, str, 'edge_attrs', skip_none=True)
+    utils.check_all_same_type(dst_attrs, str, 'dst_attrs', skip_none=True)
+    utils.check_type(edge_id_attr_name, str, 'edge_id_attr_name', skip_none=True)
+    if edge_id_attr_name is not None:
+        assert edge_id_attr_name in next(iter(nx_graph.edges(data=True)))[-1], \
+            'Failed to find the pre-specified edge IDs in the edge features of the ' \
+            'NetworkX graph with name {}'.format(edge_id_attr_name)
+    utils.check_valid_idtype(idtype)
+
+    # Get the source and destination node sets
+    top_nodes = set()
+    bottom_nodes = set()
+    for n, d in nx_graph.nodes(data=True):
+        assert 'bipartite' in d, 'Expect the node {} to have attribute bipartite'.format(n)
+        if d['bipartite'] == 0:
+            top_nodes.add(n)
+        elif d['bipartite'] == 1:
+            bottom_nodes.add(n)
+        else:
+            raise ValueError('Expect the bipartite attribute of the node {} to be 0 or 1, '
+                             'got {}'.format(n, d['bipartite']))
+
+    # Separately relabel the source and destination nodes.
+    top_nodes = sorted(top_nodes)
+    bottom_nodes = sorted(bottom_nodes)
+    top_map = {n : i for i, n in enumerate(top_nodes)}
+    bottom_map = {n : i for i, n in enumerate(bottom_nodes)}
+
+    # Get the node tensors and the number of nodes
+    u, v, urange, vrange = utils.graphdata2tensors(
+        nx_graph, idtype, bipartite=True,
+        edge_id_attr_name=edge_id_attr_name,
+        top_map=top_map, bottom_map=bottom_map)
+
+    g = create_from_edges(u, v, '_U', '_E', '_V', urange, vrange)
+
+    # nx_graph.edges(data=True) returns src, dst, attr_dict
+    if nx_graph.number_of_edges() > 0 and edge_id_attr_name is not None:
+        has_edge_id = True
+    else:
+        has_edge_id = False
+
+    # handle features
+    # copy attributes
+    def _batcher(lst):
+        if F.is_tensor(lst[0]):
+            return F.cat([F.unsqueeze(x, 0) for x in lst], dim=0)
+        else:
+            return F.tensor(lst)
+
+    if src_attrs is not None:
+        # mapping from feature name to a list of tensors to be concatenated
+        src_attr_dict = defaultdict(list)
+        for nid in top_map.keys():
+            for attr in src_attrs:
+                src_attr_dict[attr].append(nx_graph.nodes[nid][attr])
+        for attr in src_attrs:
+            g.srcdata[attr] = F.copy_to(_batcher(src_attr_dict[attr]), g.device)
+
+    if dst_attrs is not None:
+        # mapping from feature name to a list of tensors to be concatenated
+        dst_attr_dict = defaultdict(list)
+        for nid in bottom_map.keys():
+            for attr in dst_attrs:
+                dst_attr_dict[attr].append(nx_graph.nodes[nid][attr])
+        for attr in dst_attrs:
+            g.dstdata[attr] = F.copy_to(_batcher(dst_attr_dict[attr]), g.device)
+
+    if edge_attrs is not None:
+        # mapping from feature name to a list of tensors to be concatenated
+        attr_dict = defaultdict(lambda: [None] * g.number_of_edges())
+        # each defaultdict value is initialized to be a list of None
+        # None here serves as placeholder to be replaced by feature with
+        # corresponding edge id
+        if has_edge_id:
+            for _, _, attrs in nx_graph.edges(data=True):
                 for key in edge_attrs:
                     attr_dict[key][attrs[edge_id_attr_name]] = attrs[key]
         else:

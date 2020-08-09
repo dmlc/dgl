@@ -49,7 +49,7 @@ def scipy2tensor(spmat, idtype):
     col = F.tensor(spmat.col, idtype)
     return row, col
 
-def networkx2tensor(nx_graph, idtype, edge_id_attr_name='id'):
+def networkx2tensor(nx_graph, idtype, edge_id_attr_name=None):
     """Function to convert a networkx graph to edge tensors.
 
     Parameters
@@ -60,7 +60,7 @@ def networkx2tensor(nx_graph, idtype, edge_id_attr_name='id'):
         Integer ID type. Must be int32 or int64.
     edge_id_attr_name : str, optional
         Key name for edge ids in the NetworkX graph. If not found, we
-        will consider the graph not to have pre-specified edge ids. (Default: 'id')
+        will consider the graph not to have pre-specified edge ids. (Default: None)
 
     Returns
     -------
@@ -72,12 +72,7 @@ def networkx2tensor(nx_graph, idtype, edge_id_attr_name='id'):
 
     # Relabel nodes using consecutive integers
     nx_graph = nx.convert_node_labels_to_integers(nx_graph, ordering='sorted')
-
-    # nx_graph.edges(data=True) returns src, dst, attr_dict
-    if nx_graph.number_of_edges() > 0:
-        has_edge_id = edge_id_attr_name in next(iter(nx_graph.edges(data=True)))[-1]
-    else:
-        has_edge_id = False
+    has_edge_id = edge_id_attr_name is not None
 
     if has_edge_id:
         num_edges = nx_graph.number_of_edges()
@@ -85,6 +80,9 @@ def networkx2tensor(nx_graph, idtype, edge_id_attr_name='id'):
         dst = [0] * num_edges
         for u, v, attr in nx_graph.edges(data=True):
             eid = int(attr[edge_id_attr_name])
+            assert eid >= 0 and eid < nx_graph.number_of_edges(), \
+                'Expect edge IDs to be a non-negative integer smaller than {:d}, ' \
+                'got {:d}'.format(num_edges, eid)
             src[eid] = u
             dst[eid] = v
     else:
@@ -136,8 +134,11 @@ def graphdata2tensors(data, idtype=None, bipartite=False, **kwargs):
     elif isinstance(data, nx.Graph):
         edge_id_attr_name = kwargs.get('edge_id_attr_name', None)
         if bipartite:
+            top_map = kwargs.get('top_map')
+            bottom_map = kwargs.get('bottom_map')
             src, dst = networkxbipartite2tensors(
-                data, idtype, edge_id_attr_name=edge_id_attr_name)
+                data, idtype, top_map=top_map,
+                bottom_map=bottom_map, edge_id_attr_name=edge_id_attr_name)
         else:
             src, dst = networkx2tensor(
                 data, idtype, edge_id_attr_name=edge_id_attr_name)
@@ -150,7 +151,7 @@ def graphdata2tensors(data, idtype=None, bipartite=False, **kwargs):
         num_src, num_dst = infer_from_raw
     return src, dst, num_src, num_dst
 
-def networkxbipartite2tensors(nx_graph, idtype, edge_id_attr_name='id'):
+def networkxbipartite2tensors(nx_graph, idtype, top_map, bottom_map, edge_id_attr_name=None):
     """Function to convert a networkx bipartite to edge tensors.
 
     Parameters
@@ -158,49 +159,50 @@ def networkxbipartite2tensors(nx_graph, idtype, edge_id_attr_name='id'):
     nx_graph : nx.Graph
         NetworkX graph. It must follow the bipartite graph convention of networkx.
         Each node has an attribute ``bipartite`` with values 0 and 1 indicating
-        which set it belongs to. Only edges from node set 0 to node set 1 are
-        added to the returned graph.
+        which set it belongs to.
+    top_map : dict
+        The dictionary mapping the original node labels to the node IDs for the source type.
+    bottom_map : dict
+        The dictionary mapping the original node labels to the node IDs for the destination type.
     idtype : int32, int64, optional
         Integer ID type. Must be int32 or int64.
     edge_id_attr_name : str, optional
         Key name for edge ids in the NetworkX graph. If not found, we
-        will consider the graph not to have pre-specified edge ids. (Default: 'id')
+        will consider the graph not to have pre-specified edge ids. (Default: None)
 
     Returns
     -------
     (Tensor, Tensor)
         Edge tensors.
     """
-    if not nx_graph.is_directed():
-        nx_graph = nx_graph.to_directed()
-
-    top_nodes = {n for n, d in nx_graph.nodes(data=True) if d['bipartite'] == 0}
-    bottom_nodes = set(nx_graph) - top_nodes
-    top_nodes = sorted(top_nodes)
-    bottom_nodes = sorted(bottom_nodes)
-    top_map = {n : i for i, n in enumerate(top_nodes)}
-    bottom_map = {n : i for i, n in enumerate(bottom_nodes)}
-
-    if nx_graph.number_of_edges() > 0:
-        has_edge_id = edge_id_attr_name in next(iter(nx_graph.edges(data=True)))[-1]
-    else:
-        has_edge_id = False
+    has_edge_id = edge_id_attr_name is not None
 
     if has_edge_id:
         num_edges = nx_graph.number_of_edges()
         src = [0] * num_edges
         dst = [0] * num_edges
         for u, v, attr in nx_graph.edges(data=True):
+            assert u in top_map, \
+                'Expect the node {} to have attribute bipartite=0 with edge {}'.format(u, (u, v))
+            assert v in bottom_map, \
+                'Expect the node {} to have attribute bipartite=1 with edge {}'.format(v, (u, v))
             eid = int(attr[edge_id_attr_name])
+            assert eid >= 0 and eid < nx_graph.number_of_edges(), \
+                'Expect edge IDs to be a non-negative integer smaller than {:d}, ' \
+                'got {:d}'.format(num_edges, eid)
             src[eid] = top_map[u]
             dst[eid] = bottom_map[v]
     else:
         src = []
         dst = []
         for e in nx_graph.edges:
-            if e[0] in top_map:
-                src.append(top_map[e[0]])
-                dst.append(bottom_map[e[1]])
+            u, v = e[0], e[1]
+            assert u in top_map, \
+                'Expect the node {} to have attribute bipartite=0 with edge {}'.format(u, (u, v))
+            assert v in bottom_map, \
+                'Expect the node {} to have attribute bipartite=1 with edge {}'.format(v, (u, v))
+            src.append(top_map[u])
+            dst.append(bottom_map[v])
     src = F.tensor(src, dtype=idtype)
     dst = F.tensor(dst, dtype=idtype)
     return src, dst

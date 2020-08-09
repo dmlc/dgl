@@ -72,15 +72,12 @@ def test_isolated_nodes(idtype):
     g = dgl.graph(([0, 1], [1, 2]), num_nodes=5, idtype=idtype, device=F.ctx())
     assert g.number_of_nodes() == 5
 
-    g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays',
-                      'game', num_nodes=(5, 7), idtype=idtype, device=F.ctx())
+    g = dgl.heterograph({('user', 'plays', 'game'): ([0, 0, 1], [2, 3, 2])},
+                        {'user': 5, 'game': 7}, idtype=idtype, device=F.ctx())
     assert g.idtype == idtype
     assert g.number_of_nodes('user') == 5
     assert g.number_of_nodes('game') == 7
 
-    # Test backward compatibility
-    g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays',
-                      'game', card=(5, 7), idtype=idtype, device=F.ctx())
     assert g.idtype == idtype
     assert g.number_of_nodes('user') == 5
     assert g.number_of_nodes('game') == 7

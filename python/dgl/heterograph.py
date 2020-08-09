@@ -1335,7 +1335,7 @@ class DGLHeteroGraph(object):
 
         To set features of all source nodes in a graph with only one edge type:
 
-        >>> g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game')
+        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1], [1, 2])})
         >>> g.srcdata['h'] = torch.zeros(2, 5)
 
         This is equivalent to
@@ -1423,7 +1423,7 @@ class DGLHeteroGraph(object):
 
         To set features of all source nodes in a graph with only one edge type:
 
-        >>> g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game')
+        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1], [1, 2])})
         >>> g.dstdata['h'] = torch.zeros(3, 5)
 
         This is equivalent to
@@ -1502,7 +1502,7 @@ class DGLHeteroGraph(object):
 
         To set features of all "play" relationships:
 
-        >>> g = dgl.bipartite(([0, 1, 1], [0, 0, 2]), 'user', 'plays', 'game')
+        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1], [0, 0, 2])})
         >>> g.edges['plays'].data['h'] = torch.zeros(3, 4)
 
         See Also
@@ -1707,6 +1707,9 @@ class DGLHeteroGraph(object):
         """
         return self._graph.number_of_nodes(self.get_ntype_id(ntype))
 
+    def num_nodes(self, ntype=None):
+        return self._graph.number_of_nodes(self.get_ntype_id(ntype))
+
     def number_of_src_nodes(self, ntype=None):
         """Return the number of nodes of the given SRC node type in the heterograph.
 
@@ -1725,7 +1728,7 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        >>> g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game')
+        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1], [1, 2])})
         >>> g.number_of_src_nodes('user')
         2
         >>> g.number_of_src_nodes()
@@ -1733,6 +1736,9 @@ class DGLHeteroGraph(object):
         >>> g.number_of_nodes('user')
         2
         """
+        return self._graph.number_of_nodes(self.get_ntype_id_from_src(ntype))
+
+    def num_src_nodes(self, ntype=None):
         return self._graph.number_of_nodes(self.get_ntype_id_from_src(ntype))
 
     def number_of_dst_nodes(self, ntype=None):
@@ -1753,7 +1759,7 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        >>> g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game')
+        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1], [1, 2])})
         >>> g.number_of_dst_nodes('game')
         3
         >>> g.number_of_dst_nodes()
@@ -1761,6 +1767,9 @@ class DGLHeteroGraph(object):
         >>> g.number_of_nodes('game')
         3
         """
+        return self._graph.number_of_nodes(self.get_ntype_id_from_dst(ntype))
+
+    def num_dst_nodes(self, ntype=None):
         return self._graph.number_of_nodes(self.get_ntype_id_from_dst(ntype))
 
     def number_of_edges(self, etype=None):
@@ -1788,6 +1797,9 @@ class DGLHeteroGraph(object):
         >>> g.number_of_edges()
         2
         """
+        return self._graph.number_of_edges(self.get_etype_id(etype))
+
+    def num_edges(self, etype=None):
         return self._graph.number_of_edges(self.get_etype_id(etype))
 
     def __len__(self):
@@ -2080,7 +2092,7 @@ class DGLHeteroGraph(object):
 
         Instantiate a heterograph.
 
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
+        >>> plays_g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1])})
         >>> g = dgl.heterograph({
         >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
         >>>     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])
@@ -2867,7 +2879,7 @@ class DGLHeteroGraph(object):
 
         Instantiate a heterogeneous graph.
 
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
+        >>> plays_g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1])})
         >>> g = dgl.heterograph({
         >>>     ('user', 'follows', 'user'): ([0, 1], [0, 1]),
         >>>     ('developer', 'develops', 'game'): ([0, 1], [0, 2])
@@ -3449,7 +3461,7 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        >>> g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
+        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1])})
         >>> g.edges[('user', 'plays', 'game')].data['h'] = torch.ones(4, 5)
         >>> g.apply_edges(lambda edges: {'h': edges.data['h'] * 2})
         >>> g.edges[('user', 'plays', 'game')].data['h']
@@ -4429,7 +4441,7 @@ class DGLHeteroGraph(object):
         --------
         The following example uses PyTorch backend.
 
-        >>> g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
+        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1])})
         >>> print(g.device)
         device(type='cpu')
         >>> g = g.to('cuda:0')
@@ -4462,7 +4474,7 @@ class DGLHeteroGraph(object):
         The following example uses PyTorch backend.
 
         >>> import torch
-        >>> g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
+        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1])})
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
         >>> g.edges['plays'].data['h'] = torch.tensor([[0.], [1.], [2.], [3.]])
         >>> g1 = g.to(torch.device('cuda:0'))
@@ -4585,7 +4597,7 @@ class DGLHeteroGraph(object):
         >>>     g.edata['h'] = torch.ones((g.number_of_edges(), 3))
         >>>     return g.edata['h']
         >>>
-        >>> g = dgl.bipartite(([0, 1, 1], [0, 0, 2]), 'user', 'plays', 'game')
+        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1], [0, 0, 2])})
         >>> g.edata['h'] = torch.zeros((g.number_of_edges(), 3))
         >>> newh = foo(g)        # get tensor of all ones
         >>> print(g.edata['h'])  # still get tensor of all zeros
@@ -4599,7 +4611,7 @@ class DGLHeteroGraph(object):
         >>>     g.edata['h'] = torch.ones((g.number_of_edges(), 3))
         >>>     return g.edata['h']
         >>>
-        >>> g = dgl.bipartite(([0, 1, 1], [0, 0, 2]), 'user', 'plays', 'game')
+        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1], [0, 0, 2])})
         >>> h = foo(g)
         >>> print('h' in g.edata)
         False
@@ -4635,7 +4647,7 @@ class DGLHeteroGraph(object):
         >>>         g.edata['h'] = torch.ones((g.number_of_edges(), 3))
         >>>         return g.edata['h']
         >>>
-        >>> g = dgl.bipartite(([0, 1, 1], [0, 0, 2]), 'user', 'plays', 'game')
+        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1], [0, 0, 2])})
         >>> g.edata['h'] = torch.zeros((g.number_of_edges(), 3))
         >>> newh = foo(g)        # get tensor of all ones
         >>> print(g.edata['h'])  # still get tensor of all zeros
@@ -4649,7 +4661,7 @@ class DGLHeteroGraph(object):
         >>>         g.edata['h'] = torch.ones((g.number_of_edges(), 3))
         >>>         return g.edata['h']
         >>>
-        >>> g = dgl.bipartite(([0, 1, 1], [0, 0, 2]), 'user', 'plays', 'game')
+        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1], [0, 0, 2])})
         >>> h = foo(g)
         >>> print('h' in g.edata)
         False
@@ -4857,8 +4869,8 @@ class DGLHeteroGraph(object):
         Examples
         --------
 
-        >>> g = dgl.bipartite(([0, 1, 1], [0, 0, 2]), 'user', 'plays', 'game',
-        >>>                   idtype=torch.int32)
+        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1], [0, 0, 2])},
+        >>>                     idtype=torch.int32)
         >>> g_long = g.long() # Convert g to int64 indexed, not changing the original `g`
 
         See Also
@@ -4881,8 +4893,8 @@ class DGLHeteroGraph(object):
         Examples
         --------
 
-        >>> g = dgl.bipartite(([0, 1, 1], [0, 0, 2]), 'user', 'plays', 'game',
-        >>>                   idtype=torch.int64)
+        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1], [0, 0, 2])},
+        >>>                     idtype=torch.int64)
         >>> g_int = g.int() # Convert g to int32 indexed, not changing the original `g`
 
         See Also

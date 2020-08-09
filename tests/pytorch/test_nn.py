@@ -360,11 +360,11 @@ def test_edge_softmax2(idtype, g):
         if m is None:
             m = n
         arr = (sp.sparse.random(m, n, density=0.1, format='coo') != 0).astype(np.int64)
-        return ctor(arr, readonly=True)
+        return ctor(arr)
 
     for g in [generate_rand_graph(50),
-              generate_rand_graph(50, ctor=dgl.graph),
-              generate_rand_graph(100, 50, ctor=dgl.bipartite)]:
+              generate_rand_graph(50, ctor=dgl.from_scipy),
+              generate_rand_graph(100, 50, ctor=dgl.bipartite_from_scipy)]:
         a1 = F.randn((g.number_of_edges(), 1)).requires_grad_()
         a2 = a1.clone().detach().requires_grad_()
         g.edata['s'] = a1
@@ -531,7 +531,7 @@ def test_sage_conv_bi(idtype, g, aggre_type):
 def test_sage_conv2(idtype):
     # TODO: add test for blocks
     # Test the case for graphs without edges
-    g = dgl.bipartite([], num_nodes=(5, 3))
+    g = dgl.heterograph({('_U', '_E', '_V'): ([], [])}, {'_U': 5, '_V': 3})
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
     sage = nn.SAGEConv((3, 3), 2, 'gcn')
@@ -664,7 +664,7 @@ def test_nn_conv(g, idtype):
 def test_nn_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    #g = dgl.bipartite(sp.sparse.random(50, 100, density=0.1))
+    # g = dgl.bipartite_from_scipy(sp.sparse.random(50, 100, density=0.1))
     edge_func = th.nn.Linear(4, 5 * 10)
     nnconv = nn.NNConv((5, 2), 10, edge_func, 'mean')
     feat = F.randn((g.number_of_src_nodes(), 5))
