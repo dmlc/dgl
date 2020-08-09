@@ -1,6 +1,7 @@
 # pylint: disable=global-variable-undefined, invalid-name
 """Multiprocess dataloader for distributed training"""
 import multiprocessing as mp
+import queue
 import time
 import traceback
 
@@ -83,22 +84,20 @@ class DistDataLoader:
         queue_size (int, optional): Size of multiprocessing queue
         """
         self.pool, self.num_workers = get_sampler_pool()
-        assert self.num_workers > 0, "DistDataloader only supports num_workers>0 for now. if you " \
-                + "want to use single process dataloader, please use PyTorch dataloader for now."
-        assert self.pool is not None, \
-                "The worker processes in DistDataloader have to be creatd in advance."
         if queue_size is None:
-            queue_size = self.num_workers * 4
+            queue_size = self.num_workers * 4 if self.num_workers > 0 else 4
         self.queue_size = queue_size
         self.batch_size = batch_size
-        self.queue_size = queue_size
+        self.num_pending = 0
         self.collate_fn = collate_fn
         self.current_pos = 0
-        self.m = mp.Manager()
-        self.queue = self.m.Queue(maxsize=queue_size)
+        if self.pool is not None:
+            self.m = mp.Manager()
+            self.queue = self.m.Queue(maxsize=queue_size)
+        else:
+            self.queue = queue.Queue(maxsize=queue_size)
         self.drop_last = drop_last
         self.recv_idxs = 0
-        self.started = False
         self.shuffle = shuffle
         self.is_closed = False
 
@@ -113,30 +112,33 @@ class DistDataLoader:
         self.name = "dataloader-" + str(DATALOADER_ID)
         DATALOADER_ID += 1
 
-        results = []
-        for _ in range(self.num_workers):
-            results.append(self.pool.apply_async(
-                init_fn, args=(self.name, self.collate_fn, self.queue)))
-        for res in results:
-            res.get()
+        if self.pool is not None:
+            results = []
+            for _ in range(self.num_workers):
+                results.append(self.pool.apply_async(
+                    init_fn, args=(self.name, self.collate_fn, self.queue)))
+            for res in results:
+                res.get()
 
     def __del__(self):
-        results = []
-        for _ in range(self.num_workers):
-            results.append(self.pool.apply_async(cleanup_fn, args=(self.name,)))
-        for res in results:
-            res.get()
+        if self.pool is not None:
+            results = []
+            for _ in range(self.num_workers):
+                results.append(self.pool.apply_async(cleanup_fn, args=(self.name,)))
+            for res in results:
+                res.get()
 
     def __next__(self):
-        if not self.started:
-            for _ in range(self.queue_size):
-                self._request_next_batch()
-        self._request_next_batch()
+        num_reqs = self.queue_size - self.num_pending
+        for _ in range(num_reqs):
+            self._request_next_batch()
         if self.recv_idxs < self.expected_idxs:
             result = self.queue.get(timeout=9999)
             self.recv_idxs += 1
+            self.num_pending -= 1
             return result
         else:
+            assert self.num_pending == 0
             raise StopIteration
 
     def __iter__(self):
@@ -144,16 +146,20 @@ class DistDataLoader:
             self.dataset = F.rand_shuffle(self.dataset)
         self.recv_idxs = 0
         self.current_pos = 0
+        self.num_pending = 0
         return self
 
     def _request_next_batch(self):
         next_data = self._next_data()
         if next_data is None:
-            return None
-        else:
+            return
+        elif self.pool is not None:
             async_result = self.pool.apply_async(
                 call_collate_fn, args=(self.name, next_data, ))
-            return async_result
+        else:
+            result = self.collate_fn(next_data)
+            self.queue.put(result)
+        self.num_pending += 1
 
     def _next_data(self):
         if self.current_pos == len(self.dataset):
