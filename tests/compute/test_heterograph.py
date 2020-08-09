@@ -990,10 +990,10 @@ def test_convert_bound(idtype):
         with pytest.raises(DGLError):
             dgl.graph(data, num_nodes=card, idtype=idtype, device=F.ctx())
 
-    _test_bipartite_bound(([1,2],[1,2]),(2,3))
-    _test_bipartite_bound(([0,1],[1,4]),(2,3))
-    _test_graph_bound(([1,3],[1,2]), 3)
-    _test_graph_bound(([0,1],[1,3]), 3)
+    _test_bipartite_bound(([1, 2], [1, 2]), (2, 3))
+    _test_bipartite_bound(([0, 1], [1, 4]), (2, 3))
+    _test_graph_bound(([1, 3], [1, 2]), 3)
+    _test_graph_bound(([0, 1], [1, 3]), 3)
 
 
 @parametrize_dtype

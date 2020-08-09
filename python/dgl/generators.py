@@ -38,10 +38,9 @@ def rand_graph(num_nodes, num_edges, idtype=F.int64, device=F.cpu(),
     rows = F.copy_to(F.astype(eids / num_nodes, idtype), device)
     cols = F.copy_to(F.astype(eids % num_nodes, idtype), device)
     g = convert.graph((rows, cols),
-                      num_nodes=num_nodes, validate=False,
-                      formats=formats,
+                      num_nodes=num_nodes,
                       idtype=idtype, device=device)
-    return g
+    return g.formats(formats)
 
 def rand_bipartite(num_src_nodes, num_dst_nodes, num_edges,
                    idtype=F.int64, device=F.cpu(),

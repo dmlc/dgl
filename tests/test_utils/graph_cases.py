@@ -46,7 +46,7 @@ def graph0():
 
 @register_case(['homo', 'zero-degree', 'homo-zero-degree'])
 def bipartite1():
-    return dgl.graph([(0, 0), (0, 1), (0, 4), (2, 1), (2, 4), (3, 3)])
+    return dgl.graph(([0, 0, 0, 2, 2, 3], [0, 1, 4, 1, 4, 3]))
 
 @register_case(['homo', 'has_feature'])
 def graph1():
