@@ -99,7 +99,7 @@ class RelGraphEmbedLayer(nn.Module):
         self.node_embeds = th.nn.Embedding(node_tids.shape[0], self.embed_size, sparse=self.sparse_emb)
         nn.init.uniform_(self.node_embeds.weight, -1.0, 1.0)
 
-    def forward(self, node_ids, node_tids, features):
+    def forward(self, node_ids, node_tids, type_ids, features):
         """Forward computation
         Parameters
         ----------
