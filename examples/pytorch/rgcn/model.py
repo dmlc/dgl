@@ -127,4 +127,4 @@ class RelGraphEmbedLayer(nn.Module):
                 loc = node_tids == ntype
                 embeds[loc] = self.node_embeds(tsd_ids[loc]).to(self.dev_id)
 
-        return embeds.to(self.dev_id)
+        return embeds
