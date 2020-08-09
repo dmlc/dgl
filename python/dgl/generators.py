@@ -74,8 +74,7 @@ def rand_bipartite(num_src_nodes, num_dst_nodes, num_edges,
     eids = random.choice(num_src_nodes * num_dst_nodes, num_edges, replace=False)
     rows = F.copy_to(F.astype(eids / num_dst_nodes, idtype), device)
     cols = F.copy_to(F.astype(eids % num_dst_nodes, idtype), device)
-    g = convert.bipartite((rows, cols),
-                          num_nodes=(num_src_nodes, num_dst_nodes), validate=False,
-                          idtype=idtype, device=device,
-                          formats=formats)
-    return g
+    g = convert.heterograph({('_U', '_E', '_V'): (rows, cols)},
+                            {'_U': num_src_nodes, '_V': num_dst_nodes},
+                            idtype=idtype, device=device)
+    return g.formats(formats)

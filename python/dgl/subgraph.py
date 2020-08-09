@@ -59,9 +59,10 @@ def node_subgraph(graph, nodes):
 
     Instantiate a heterograph.
 
-    >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-    >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-    >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+    >>>     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])
+    >>> })
     >>> # Set node features
     >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
@@ -173,9 +174,10 @@ def edge_subgraph(graph, edges, preserve_nodes=False):
 
     Instantiate a heterograph.
 
-    >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-    >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-    >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+    >>>     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])
+    >>> })
     >>> # Set edge features
     >>> g.edges['follows'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
@@ -351,9 +353,10 @@ def node_type_subgraph(graph, ntypes):
 
     Instantiate a heterograph.
 
-    >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-    >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-    >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+    >>>     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])
+    >>> })
     >>> # Set node features
     >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
@@ -418,9 +421,10 @@ def edge_type_subgraph(graph, etypes):
 
     Instantiate a heterograph.
 
-    >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-    >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-    >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+    >>>     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])
+    >>> })
     >>> # Set edge features
     >>> g.edges['follows'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
