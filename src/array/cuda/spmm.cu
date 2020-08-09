@@ -28,57 +28,7 @@ void _Fill(DType* ptr, size_t length, DType val) {
 
 namespace cusparse {
 
-#if CUDART_VERSION >= 11000
-template <typename DType>
-void Xcsrmm2(const DLContext &ctx,
-    cusparseHandle_t handle, cusparseOperation_t transA, cusparseOperation_t transB,
-    const DType* alpha, const DType* beta,
-    cusparseSpMatDescr_t matA, cusparseDnMatDescr_t matB, cusparseDnMatDescr_t matC) {
-  LOG(INFO) << "Not supported dtype";
-}
-
-template <>
-void Xcsrmm2<float>(const DLContext &ctx,
-    cusparseHandle_t handle, cusparseOperation_t transA, cusparseOperation_t transB,
-    const float* alpha, const float* beta,
-    cusparseSpMatDescr_t matA, cusparseDnMatDescr_t matB, cusparseDnMatDescr_t matC) {
-  auto device = runtime::DeviceAPI::Get(ctx);
-  size_t workspace_size;
-  CUSPARSE_CALL(cusparseSpMM_bufferSize(
-      handle, transA, transB,
-      alpha, matA, matB, beta, matC,
-      CUDA_R_32F, CUSPARSE_CSRMM_ALG1,
-      &workspace_size));
-  void* workspace = device->AllocWorkspace(ctx, workspace_size);
-  CUSPARSE_CALL(cusparseSpMM(
-      handle, transA, transB,
-      alpha, matA, matB, beta, matC,
-      CUDA_R_32F, CUSPARSE_CSRMM_ALG1,
-      workspace));
-  device->FreeWorkspace(ctx, workspace);
-}
-
-template <>
-void Xcsrmm2<double>(const DLContext &ctx,
-    cusparseHandle_t handle, cusparseOperation_t transA, cusparseOperation_t transB,
-    const double* alpha, const double* beta,
-    cusparseSpMatDescr_t matA, cusparseDnMatDescr_t matB, cusparseDnMatDescr_t matC) {
-  auto device = runtime::DeviceAPI::Get(ctx);
-  size_t workspace_size;
-  CUSPARSE_CALL(cusparseSpMM_bufferSize(
-      handle, transA, transB,
-      alpha, matA, matB, beta, matC,
-      CUDA_R_64F, CUSPARSE_CSRMM_ALG1,
-      &workspace_size));
-  void* workspace = device->AllocWorkspace(ctx, workspace_size);
-  CUSPARSE_CALL(cusparseSpMM(
-      handle, transA, transB,
-      alpha, matA, matB, beta, matC,
-      CUDA_R_64F, CUSPARSE_CSRMM_ALG1,
-      workspace));
-  device->FreeWorkspace(ctx, workspace);
-}
-#else
+#if CUDART_VERSION < 11000
 template <typename DType>
 cusparseStatus_t Xcsrmm2(cusparseHandle_t handle, cusparseOperation_t transA,
     cusparseOperation_t transB, int m, int n, int k, int nnz,
@@ -182,26 +132,37 @@ void CusparseCsrmm2(
 #if CUDART_VERSION >= 11000
   cusparseSpMatDescr_t matA;
   cusparseDnMatDescr_t matB, matC;
+  constexpr auto cuda_dtype = std::is_same<DType, float>::value ? CUDA_R_32F: CUDA_R_64F;
   CUSPARSE_CALL(cusparseCreateCsr(&matA,
       m, k, nnz,
       static_cast<int32_t*>(csr.indptr->data),
       static_cast<int32_t*>(csr.indices->data),
       const_cast<DType*>(valptr? valptr : A_data),
       CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I,
-      CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F));  // TODO(zihao): support R_64F
+      CUSPARSE_INDEX_BASE_ZERO, cuda_dtype));
   CUSPARSE_CALL(cusparseCreateDnMat(&matB,
       n, k, n,
-      const_cast<DType*>(B_data), CUDA_R_32F, CUSPARSE_ORDER_COL));  // ditto
+      const_cast<DType*>(B_data), cuda_dtype, CUSPARSE_ORDER_COL));
   CUSPARSE_CALL(cusparseCreateDnMat(&matC,
       m, n, m,
-      trans_out, CUDA_R_32F, CUSPARSE_ORDER_COL));  // ditto
-  Xcsrmm2<DType>(
-      csr.indptr->ctx,
-      thr_entry->cusparse_handle,
-      CUSPARSE_OPERATION_NON_TRANSPOSE,
-      CUSPARSE_OPERATION_TRANSPOSE,
-      &alpha, &beta,
-      matA, matB, matC);
+      trans_out, cuda_dtype, CUSPARSE_ORDER_COL));
+
+  auto transA = CUSPARSE_OPERATION_NON_TRANSPOSE;
+  auto transB = CUSPARSE_OPERATION_TRANSPOSE;
+  size_t workspace_size;
+  CUSPARSE_CALL(cusparseSpMM_bufferSize(
+      thr_entry->cusparse_handle, transA, transB,
+      &alpha, matA, matB, &beta, matC,
+      cuda_dtype, CUSPARSE_CSRMM_ALG1,
+      &workspace_size));
+  void* workspace = device->AllocWorkspace(ctx, workspace_size);
+  CUSPARSE_CALL(cusparseSpMM(
+      thr_entry->cusparse_handle, transA, transB,
+      &alpha, matA, matB, &beta, matC,
+      cuda_dtype, CUSPARSE_CSRMM_ALG1,
+      workspace));
+  device->FreeWorkspace(ctx, workspace);
+
   CUSPARSE_CALL(cusparseDestroySpMat(matA));
   CUSPARSE_CALL(cusparseDestroyDnMat(matB));
   CUSPARSE_CALL(cusparseDestroyDnMat(matC));
