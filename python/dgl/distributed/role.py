@@ -132,6 +132,9 @@ def init_role(role):
         IS_STANDALONE = True
         return
 
+    PER_ROLE_RANK = {}
+    GLOBAL_RANK = {}
+
     # Register the current role. This blocks until all clients register themselves.
     client_id = rpc.get_rank()
     machine_id = rpc.get_machine_id()

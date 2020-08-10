@@ -48,7 +48,6 @@ def start_server(rank, tmpdir, disable_shared_mem, num_clients):
 def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
     import dgl
     import torch as th
-    os.environ['DGL_DIST_MODE'] = 'distributed'
     dgl.distributed.initialize("mp_ip_config.txt", num_workers=num_workers)
     gpb = None
     if disable_shared_mem:
@@ -56,7 +55,8 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
     num_nodes_to_sample = 202
     batch_size = 32
     train_nid = th.arange(num_nodes_to_sample)
-    dist_graph = DistGraph("mp_ip_config.txt", "test_mp", gpb=gpb)
+    dist_graph = DistGraph("mp_ip_config.txt", "test_mp", gpb=gpb,
+                           part_config=tmpdir / 'test_sampling.json')
 
     # Create sampler
     sampler = NeighborSampler(dist_graph, [5, 10],
@@ -90,7 +90,24 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
             else:
                 assert np.max(max_nid) == num_nodes_to_sample - 1
 
-    del dataloader
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+def test_standalone(tmpdir):
+    ip_config = open("mp_ip_config.txt", "w")
+    for _ in range(1):
+        ip_config.write('{} 1\n'.format(get_local_usable_addr()))
+    ip_config.close()
+
+    g = CitationGraphDataset("cora")[0]
+    print(g.idtype)
+    num_parts = 1
+    num_hops = 1
+
+    partition_graph(g, 'test_sampling', num_parts, tmpdir,
+                    num_hops=num_hops, part_method='metis', reshuffle=False)
+
+    os.environ['DGL_DIST_MODE'] = 'standalone'
+    start_client(0, tmpdir, False, 2, True)
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 
@@ -123,10 +140,13 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last):
         pserver_list.append(p)
 
     time.sleep(3)
+    os.environ['DGL_DIST_MODE'] = 'distributed'
     start_client(0, tmpdir, num_server > 1, num_workers, drop_last)
+    dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
+        test_standalone(Path(tmpdirname))
         test_dist_dataloader(Path(tmpdirname), 3, 0, True)
         test_dist_dataloader(Path(tmpdirname), 3, 4, True)

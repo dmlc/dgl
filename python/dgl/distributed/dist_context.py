@@ -119,8 +119,8 @@ def exit_client():
     """
     # Only client with rank_0 will send shutdown request to servers.
     finalize_worker() # finalize workers should be earilier than barrier, and non-blocking
-    rpc.client_barrier()
     if  os.environ.get('DGL_DIST_MODE', 'standalone') != 'standalone':
+        rpc.client_barrier()
         shutdown_servers()
     finalize_client()
     join_finalize_worker()
