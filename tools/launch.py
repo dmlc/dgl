@@ -10,9 +10,9 @@ import time
 import json
 from threading import Thread
 
-def execute_remote(cmd, ip, thread_list):
+def execute_remote(cmd, ip, port, thread_list):
     """execute command line on remote machine via ssh"""
-    cmd = 'ssh -o StrictHostKeyChecking=no ' + ip + ' \'' + cmd + '\''
+    cmd = 'ssh -o StrictHostKeyChecking=no -p ' + str(port) + ' ' + ip + ' \'' + cmd + '\''
     # thread func to run the job
     def run(cmd):
         subprocess.check_call(cmd, shell = True)
@@ -65,7 +65,7 @@ def submit_jobs(args, udf_command):
         cmd = server_cmd + ' ' + 'DGL_SERVER_ID=' + str(i)
         cmd = cmd + ' ' + udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
-        execute_remote(cmd, ip, thread_list)
+        execute_remote(cmd, ip, args.ssh_port, thread_list)
     # launch client tasks
     client_cmd = 'DGL_DIST_MODE="distributed" DGL_ROLE=client'
     client_cmd = client_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(tot_num_clients)
@@ -94,13 +94,14 @@ def submit_jobs(args, udf_command):
             new_udf_command = udf_command.replace('python', 'python ' + new_torch_cmd)
         cmd = client_cmd + ' ' + new_udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
-        execute_remote(cmd, ip, thread_list)
+        execute_remote(cmd, ip, args.ssh_port, thread_list)
 
     for thread in thread_list:
         thread.join()
 
 def main():
     parser = argparse.ArgumentParser(description='Launch a distributed job')
+    parser.add_argument('--ssh_port', type=int, default=22, help='SSH Port.')
     parser.add_argument('--workspace', type=str,
                         help='Path of user directory of distributed tasks. \
                         This is used to specify a destination location where \
