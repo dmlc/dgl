@@ -4116,51 +4116,100 @@ class DGLHeteroGraph(object):
 
 
     def long(self):
-        """Cast this graph to use int64 IDs.
+        """Cast the graph to one of idtype int64
 
-        Features are copied (shallow copy) to the new graph.
+        If the graph already has idtype int64, the function directly returns it. Otherwise,
+        it returns a cloned graph of idtype int64 with features copied (shallow copy).
 
         Returns
         -------
-        DGLHeteroGraph
-            The graph object
+        DGLGraph
+            The graph of idtype int64.
 
         Examples
         --------
 
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1], [0, 0, 2])},
-        >>>                     idtype=torch.int32)
-        >>> g_long = g.long() # Convert g to int64 indexed, not changing the original `g`
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a graph of idtype int32.
+
+        >>> # (0, 1), (0, 2), (1, 2)
+        >>> g = dgl.graph((torch.tensor([0, 0, 1]).int(), torch.tensor([1, 2, 2]).int()))
+        >>> g.ndata['feat'] = torch.ones(3, 1)
+        >>> g.idtype
+        torch.int32
+
+        Cast the graph to one of idtype int64.
+
+        >>> # A cloned graph with an idtype of int64
+        >>> g_long = g.long()
+        >>> g_long.idtype
+        torch.int64
+        >>> # The idtype of the original graph does not change.
+        >>> g.idtype
+        torch.int32
+        >>> g_long.edges()
+        (tensor([0, 0, 1]), tensor([1, 2, 2]))
+        >>> g_long.ndata
+        {'feat': tensor([[1.],
+                         [1.],
+                         [1.]])}
 
         See Also
         --------
         int
         idtype
-        astype
         """
         return self.astype(F.int64)
 
     def int(self):
-        """Return a heterograph object use int32 as index dtype,
-        with the ndata and edata as the original object
+        """Cast the graph to one of idtype int32
+
+        If the graph already has idtype int32, the function directly returns it. Otherwise,
+        it returns a cloned graph of idtype int32 with features copied (shallow copy).
 
         Returns
         -------
-        DGLHeteroGraph
-            The graph object
+        DGLGraph
+            The graph of idtype int32.
 
         Examples
         --------
 
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1], [0, 0, 2])},
-        >>>                     idtype=torch.int64)
-        >>> g_int = g.int() # Convert g to int32 indexed, not changing the original `g`
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a graph of idtype int64.
+
+        >>> # (0, 1), (0, 2), (1, 2)
+        >>> g = dgl.graph((torch.tensor([0, 0, 1]), torch.tensor([1, 2, 2])))
+        >>> g.ndata['feat'] = torch.ones(3, 1)
+        >>> g.idtype
+        torch.int64
+
+        >>> # A cloned graph with an idtype of int32
+        >>> g_int = g.int()
+        >>> g_int.idtype
+        torch.int32
+        >>> # The idtype of the original graph does not change.
+        >>> g.idtype
+        torch.int64
+        >>> g_int.edges()
+        (tensor([0, 0, 1], dtype=torch.int32), tensor([1, 2, 2], dtype=torch.int32))
+        >>> g_int.ndata
+        {'feat': tensor([[1.],
+                         [1.],
+                         [1.]])}
 
         See Also
         --------
         long
         idtype
-        astype
         """
         return self.astype(F.int32)
 
