@@ -36,7 +36,8 @@ def main():
     hosts = []
     with open(args.ip_config) as f:
         for line in f:
-            ip, _, _ = line.strip().split(' ')
+            res = line.strip().split(' ')
+            ip = res[0]
             hosts.append(ip)
 
     
