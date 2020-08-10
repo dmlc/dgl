@@ -394,7 +394,7 @@ def test_sage_conv(idtype, g, aggre_type):
     sage = nn.SAGEConv(5, 10, aggre_type)
     feat = F.randn((g.number_of_nodes(), 5))
     sage = sage.to(F.ctx())
-    h = sage(g, feat)
+    h = sage(g, feat.to(F.ctx()))
     assert h.shape[-1] == 10
 
 @parametrize_dtype
@@ -406,7 +406,7 @@ def test_sage_conv_bi(idtype, g, aggre_type):
     sage = nn.SAGEConv((10, dst_dim), 2, aggre_type)
     feat = (F.randn((g.number_of_src_nodes(), 10)), F.randn((g.number_of_dst_nodes(), dst_dim)))
     sage = sage.to(F.ctx())
-    h = sage(g, feat)
+    h = sage(g, feat.to(F.ctx()))
     assert h.shape[-1] == 2
     assert h.shape[0] == g.number_of_dst_nodes()
 
@@ -420,7 +420,7 @@ def test_sage_conv2(idtype):
     sage = nn.SAGEConv((3, 3), 2, 'gcn')
     feat = (F.randn((5, 3)), F.randn((3, 3)))
     sage = sage.to(ctx)
-    h = sage(g, feat)
+    h = sage(g, feat.to(ctx))
     assert h.shape[-1] == 2
     assert h.shape[0] == 3
     for aggre_type in ['mean', 'pool', 'lstm']:
@@ -753,7 +753,7 @@ def test_cf_conv():
     edge_feats = F.randn((g.number_of_edges(), 3))
     h = cfconv(g, node_feats, edge_feats)
     # current we only do shape check
-    assert h.shape[-1] == 3    
+    assert h.shape[-1] == 3
 
 def myagg(alist, dsttype):
     rst = alist[0]
