@@ -21,12 +21,15 @@ if os.environ.get('DGL_ROLE', 'client') == 'server':
             'Please define DGL_SERVER_ID to run DistGraph server'
     assert os.environ.get('DGL_IP_CONFIG') is not None, \
             'Please define DGL_IP_CONFIG to run DistGraph server'
+    assert os.environ.get('DGL_SERVER_COUNT') is not None, \
+            'Please define DGL_SERVER_COUNT to run DistGraph server'
     assert os.environ.get('DGL_NUM_CLIENT') is not None, \
             'Please define DGL_NUM_CLIENT to run DistGraph server'
     assert os.environ.get('DGL_CONF_PATH') is not None, \
             'Please define DGL_CONF_PATH to run DistGraph server'
     SERV = DistGraphServer(int(os.environ.get('DGL_SERVER_ID')),
                            os.environ.get('DGL_IP_CONFIG'),
+                           int(os.environ.get('DGL_SERVER_COUNT')),
                            int(os.environ.get('DGL_NUM_CLIENT')),
                            os.environ.get('DGL_CONF_PATH'))
     SERV.start()
