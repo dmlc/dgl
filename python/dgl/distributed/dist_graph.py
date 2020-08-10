@@ -241,6 +241,8 @@ class DistGraphServer(KVServer):
         The server ID (start from 0).
     ip_config : str
         Path of IP configuration file.
+    server_count : int
+        Server count on each machine.
     num_clients : int
         Total number of client nodes.
     part_config : string
@@ -248,10 +250,13 @@ class DistGraphServer(KVServer):
     disable_shared_mem : bool
         Disable shared memory.
     '''
-    def __init__(self, server_id, ip_config, num_clients, part_config, disable_shared_mem=False):
-        super(DistGraphServer, self).__init__(server_id=server_id, ip_config=ip_config,
+    def __init__(self, server_id, ip_config, server_count, num_clients, part_config, disable_shared_mem=False):
+        super(DistGraphServer, self).__init__(server_id=server_id, 
+                                              ip_config=ip_config, 
+                                              server_count=server_count,
                                               num_clients=num_clients)
         self.ip_config = ip_config
+        self.server_count = server_count
         # Load graph partition data.
         if self.is_backup_server():
             # The backup server doesn't load the graph partition. It'll initialized afterwards.
@@ -286,7 +291,7 @@ class DistGraphServer(KVServer):
         # start server
         server_state = ServerState(kv_store=self, local_g=self.client_g, partition_book=self.gpb)
         print('start graph service on server {} for part {}'.format(self.server_id, self.part_id))
-        start_server(server_id=self.server_id, ip_config=self.ip_config,
+        start_server(server_id=self.server_id, ip_config=self.ip_config, server_count=server_count,
                      num_clients=self.num_clients, server_state=server_state)
 
 class DistGraph:
@@ -315,6 +320,8 @@ class DistGraph:
     ----------
     ip_config : str
         Path of IP configuration file.
+    server_count : int
+        Server count on each machine.
     graph_name : str
         The name of the graph. This name has to be the same as the one used in DistGraphServer.
     gpb : PartitionBook
@@ -322,8 +329,9 @@ class DistGraph:
     part_config : str
         The partition config file. It's used in the standalone mode.
     '''
-    def __init__(self, ip_config, graph_name, gpb=None, part_config=None):
+    def __init__(self, ip_config, server_count, graph_name, gpb=None, part_config=None):
         self.ip_config = ip_config
+        self.server_count = server_count
         self.graph_name = graph_name
         self._gpb_input = gpb
         if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
@@ -369,10 +377,10 @@ class DistGraph:
         self._client.map_shared_data(self._gpb)
 
     def __getstate__(self):
-        return self.ip_config, self.graph_name, self._gpb_input
+        return self.ip_config, self.server_count, self.graph_name, self._gpb_input
 
     def __setstate__(self, state):
-        self.ip_config, self.graph_name, self._gpb_input = state
+        self.ip_config, self.server_count, self.graph_name, self._gpb_input = state
         self._init()
 
         self._ndata = NodeDataView(self)
