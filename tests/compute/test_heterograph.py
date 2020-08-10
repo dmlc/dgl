@@ -1119,7 +1119,7 @@ def test_metagraph_reachable(idtype):
 
     new_g = dgl.metapath_reachable_graph(g, ['follows', 'plays'])
     assert new_g.idtype == idtype
-    assert new_g.ntypes == ['user', 'game']
+    assert new_g.ntypes == ['game', 'user']
     assert new_g.number_of_edges() == 3
     assert F.asnumpy(new_g.has_edges_between([0, 0, 1], [0, 1, 1])).all()
 

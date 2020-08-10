@@ -217,8 +217,10 @@ def test_load_old_files2():
 
 
 def create_heterographs(idtype):
-    g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), idtype=idtype)
-    g_y = dgl.graph(([0, 2], [2, 3]), idtype=idtype).formats('csr')
+    g_x = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 2], [1, 2, 3])}, idtype=idtype)
+    g_y = dgl.heterograph({
+        ('user', 'knows', 'user'): ([0, 2], [2, 3])}, idtype=idtype).formats('csr')
     g_x.ndata['h'] = F.randn((4, 3))
     g_x.edata['w'] = F.randn((3, 2))
     g_y.ndata['hh'] = F.ones((4, 5))
@@ -234,8 +236,10 @@ def create_heterographs(idtype):
     return [g, g_x, g_y]
 
 def create_heterographs2(idtype):
-    g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), idtype=idtype)
-    g_y = dgl.graph(([0, 2], [2, 3]), idtype=idtype).formats('csr')
+    g_x = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 2], [1, 2, 3])}, idtype=idtype)
+    g_y = dgl.heterograph({
+        ('user', 'knows', 'user'): ([0, 2], [2, 3])}, idtype=idtype).formats('csr')
     g_z = dgl.heterograph(
         {('user', 'knows', 'knowledge'): ([0, 1, 3], [2, 3, 4])}, idtype=idtype)
     g_x.ndata['h'] = F.randn((4, 3))

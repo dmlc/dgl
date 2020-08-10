@@ -256,8 +256,8 @@ def test_to_bidirected():
                 (1, 1), (2, 1), (2, 2)]
     elist2 = [(0, 0), (0, 1)]
     g = dgl.heterograph({
-        ('user', 'wins', 'user'): elist1,
-        ('user', 'follows', 'user'): elist2
+        ('user', 'wins', 'user'): tuple(zip(*elist1)),
+        ('user', 'follows', 'user'): tuple(zip(*elist2))
     })
     g.nodes['user'].data['h'] = F.ones((3, 1))
     elist1.append((1, 2))

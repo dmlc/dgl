@@ -154,7 +154,10 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
         num_nodes_dict = None
 
     if reverse:
-        g = dgl.graph(([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0]), num_nodes=card)
+        g = dgl.heterograph({
+            ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0])
+        }, {'user': card})
+        g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2],
                                          [1, 2, 3, 0, 2, 3, 0]),
@@ -163,7 +166,10 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
             ('coin', 'flips', 'user'): ([0, 0, 0, 0], [0, 1, 2, 3])
         }, num_nodes_dict)
     else:
-        g = dgl.graph(([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]), num_nodes=card)
+        g = dgl.heterograph({
+            ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2])
+        }, {'user': card})
+        g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0],
                                          [0, 0, 0, 1, 1, 1, 2]),
@@ -187,7 +193,7 @@ def _gen_neighbor_topk_test_graph(hypersparse, reverse):
     if reverse:
         g = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0])
-        }, num_nodes_dict={'user': card if card is not None else 4})
+        })
         g.edata['weight'] = F.tensor([.5, .3, 0., -5., 22., 0., 1.], dtype=F.float32)
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2],
@@ -199,7 +205,7 @@ def _gen_neighbor_topk_test_graph(hypersparse, reverse):
     else:
         g = dgl.heterograph({
             ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2])
-        }, num_nodes_dict={'user': card if card is not None else 4})
+        })
         g.edata['weight'] = F.tensor([.5, .3, 0., -5., 22., 0., 1.], dtype=F.float32)
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0],
