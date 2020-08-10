@@ -91,16 +91,13 @@ def finalize_worker():
 
 def join_finalize_worker():
     """join the worker close process"""
-    global SAMPLER_POOL
     if SAMPLER_POOL is not None:
         SAMPLER_POOL.join()
-    SAMPLER_POOL = None
 
 def is_initialized():
     """Is RPC initialized?
     """
     return INITIALIZED
-
 
 def exit_client():
     """Register exit callback.
