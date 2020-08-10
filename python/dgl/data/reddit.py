@@ -8,7 +8,7 @@ import os
 from .dgl_dataset import DGLBuiltinDataset
 from .utils import _get_dgl_url, generate_mask_tensor, load_graphs, save_graphs, deprecate_property
 from .. import backend as F
-from ..convert import graph as dgl_graph
+from ..convert import from_scipy
 
 
 class RedditDataset(DGLBuiltinDataset):
@@ -140,7 +140,7 @@ class RedditDataset(DGLBuiltinDataset):
         # graph
         coo_adj = sp.load_npz(os.path.join(
             self.raw_path, "reddit{}_graph.npz".format(self._self_loop_str)))
-        self._graph = dgl_graph(coo_adj)
+        self._graph = from_scipy(coo_adj)
         # features and labels
         reddit_data = np.load(os.path.join(self.raw_path, "reddit_data.npz"))
         features = reddit_data["feature"]

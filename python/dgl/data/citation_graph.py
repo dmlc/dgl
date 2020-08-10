@@ -19,7 +19,7 @@ from .. import convert
 from .. import batch
 from .. import backend as F
 from ..convert import graph as dgl_graph
-from ..convert import to_networkx
+from ..convert import from_networkx, to_networkx
 
 backend = os.environ.get('DGLBACKEND', 'pytorch')
 
@@ -119,7 +119,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
         test_mask = _sample_mask(idx_test, labels.shape[0])
 
         self._graph = graph
-        g = dgl_graph(graph)
+        g = from_networkx(graph)
 
         g.ndata['train_mask'] = generate_mask_tensor(train_mask)
         g.ndata['val_mask'] = generate_mask_tensor(val_mask)
@@ -794,13 +794,13 @@ class CoraBinary(DGLBuiltinDataset):
             for line in f.readlines():
                 if line.startswith('graph'):
                     if len(elist) != 0:
-                        self.graphs.append(dgl_graph(elist))
+                        self.graphs.append(dgl_graph(tuple(zip(*elist))))
                     elist = []
                 else:
                     u, v = line.strip().split(' ')
                     elist.append((int(u), int(v)))
             if len(elist) != 0:
-                self.graphs.append(dgl_graph(elist))
+                self.graphs.append(dgl_graph(tuple(zip(*elist))))
         with open("{}/pmpds.pkl".format(root), 'rb') as f:
             self.pmpds = _pickle_load(f)
         self.labels = []
