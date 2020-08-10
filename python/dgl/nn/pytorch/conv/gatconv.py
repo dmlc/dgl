@@ -26,16 +26,14 @@ class GATConv(nn.Module):
     node :math:`j`:
 
     .. math::
-        \alpha_{ij}^{l} = \mathrm{softmax_i} (e_{ij}^{l})
+        \alpha_{ij}^{l} &= \mathrm{softmax_i} (e_{ij}^{l})
 
-        e_{ij}^{l} = \mathrm{LeakyReLU}\left(\vec{a}^T [W h_{i} \| W h_{j}]\right)
+        e_{ij}^{l} &= \mathrm{LeakyReLU}\left(\vec{a}^T [W h_{i} \| W h_{j}]\right)
 
     Parameters
     ----------
     in_feats : int, or pair of ints
-        Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
-
-        GATConv can be applied on homogeneous graph and unidirectional `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`. If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
+        Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`. GATConv can be applied on homogeneous graph and unidirectional `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`__. If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
         a scalar is given, the source and destination node feature size would take the
         same value.
@@ -44,13 +42,13 @@ class GATConv(nn.Module):
     num_heads : int
         Number of heads in Multi-Head Attention.
     feat_drop : float, optional
-        Dropout rate on feature, defaults: ``0``.
+        Dropout rate on feature. Defaults: ``0``.
     attn_drop : float, optional
-        Dropout rate on attention weight, defaults: ``0``.
+        Dropout rate on attention weight. Defaults: ``0``.
     negative_slope : float, optional
-        LeakyReLU angle of negative slope.
+        LeakyReLU angle of negative slope. Defaults: ``0.2``.
     residual : bool, optional
-        If True, use residual connection.
+        If True, use residual connection. Defaults: ``False``.
     activation : callable activation function/layer or None, optional.
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
@@ -59,7 +57,7 @@ class GATConv(nn.Module):
         since no message will be passed to those nodes. This is harmful for some applications
         causing silent performance regression. This module will raise a DGLError if it detects
         0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
-        and let the users handle it by themselves.
+        and let the users handle it by themselves. Defaults: ``False``.
 
     Notes
     -----
@@ -92,23 +90,18 @@ class GATConv(nn.Module):
     tensor([[[ 3.4570,  1.8634],
             [ 1.3805, -0.0762],
             [ 1.0390, -1.1479]],
-
             [[ 3.4570,  1.8634],
             [ 1.3805, -0.0762],
             [ 1.0390, -1.1479]],
-
             [[ 3.4570,  1.8634],
             [ 1.3805, -0.0762],
             [ 1.0390, -1.1479]],
-
             [[ 3.4570,  1.8634],
             [ 1.3805, -0.0762],
             [ 1.0390, -1.1479]],
-
             [[ 3.4570,  1.8634],
             [ 1.3805, -0.0762],
             [ 1.0390, -1.1479]],
-
             [[ 3.4570,  1.8634],
             [ 1.3805, -0.0762],
             [ 1.0390, -1.1479]]], grad_fn=<BinaryReduceBackward>)
@@ -125,15 +118,12 @@ class GATConv(nn.Module):
     tensor([[[-0.6066,  1.0268],
             [-0.5945, -0.4801],
             [ 0.1594,  0.3825]],
-
             [[ 0.0268,  1.0783],
             [ 0.5041, -1.3025],
             [ 0.6568,  0.7048]],
-
             [[-0.2688,  1.0543],
             [-0.0315, -0.9016],
             [ 0.3943,  0.5347]],
-
             [[-0.6066,  1.0268],
             [-0.5945, -0.4801],
             [ 0.1594,  0.3825]]], grad_fn=<BinaryReduceBackward>)

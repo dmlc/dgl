@@ -5,6 +5,7 @@ from torch import nn
 from torch.nn import functional as F
 
 from .... import function as fn
+from ....base import DGLError
 from ....utils import expand_as_pair, check_eq_shape
 
 
@@ -17,20 +18,20 @@ class SAGEConv(nn.Module):
     Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__.
 
     .. math::
-        h_{\mathcal{N}(i)}^{(l+1)} = \mathrm{aggregate}
+        h_{\mathcal{N}(i)}^{(l+1)} $= \mathrm{aggregate}
         \left(\{h_{j}^{l}, \forall j \in \mathcal{N}(i) \}\right)
 
-        h_{i}^{(l+1)} = \sigma \left(W \cdot \mathrm{concat}
+        h_{i}^{(l+1)} &= \sigma \left(W \cdot \mathrm{concat}
         (h_{i}^{l}, h_{\mathcal{N}(i)}^{l+1}) \right)
 
-        h_{i}^{(l+1)} = \mathrm{norm}(h_{i}^{l})
+        h_{i}^{(l+1)} &= \mathrm{norm}(h_{i}^{l})
 
     Parameters
     ----------
     in_feats : int, or pair of ints
         Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
 
-        GATConv can be applied on homogeneous graph and unidirectional `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`. If the layer applies on a unidirectional bipartite graph, ``in_feats``
+        GATConv can be applied on homogeneous graph and unidirectional `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`__. If the layer applies on a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
         a scalar is given, the source and destination node feature size would take the
         same value.
@@ -50,9 +51,15 @@ class SAGEConv(nn.Module):
     activation : callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
+    allow_zero_in_degree : bool, optional
+        If there are 0-in-degree nodes in the graph, output for those nodes will be invalid
+        since no message will be passed to those nodes. This is harmful for some applications
+        causing silent performance regression. This module will raise a DGLError if it detects
+        0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
+        and let the users handle it by themselves. Default: ``False``.
 
-    Example
-    -------
+    Examples
+    --------
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
@@ -92,7 +99,8 @@ class SAGEConv(nn.Module):
                  feat_drop=0.,
                  bias=True,
                  norm=None,
-                 activation=None):
+                 activation=None,
+                 allow_zero_in_degree=False):
         super(SAGEConv, self).__init__()
 
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
@@ -101,6 +109,7 @@ class SAGEConv(nn.Module):
         self.norm = norm
         self.feat_drop = nn.Dropout(feat_drop)
         self.activation = activation
+        self._allow_zero_in_degree = allow_zero_in_degree
         # aggregator type: mean/pool/lstm/gcn
         if aggregator_type == 'pool':
             self.fc_pool = nn.Linear(self._in_src_feats, self._in_src_feats)
@@ -169,6 +178,13 @@ class SAGEConv(nn.Module):
             is size of output feature.
         """
         with graph.local_scope():
+            if not self._allow_zero_in_degree:
+                if (graph.in_degrees() == 0).any():
+                    raise DGLError('There are 0-in-degree nodes in the graph, output for those nodes will be invalid.'
+                                   'This is harmful for some applications, causing silent performance regression.'
+                                   'Adding self-loop on the input graph by calling `g = dgl.add_self_loop(g)` will resolve the issue.'
+                                   'Setting ``allow_zero_in_degree`` to be `True` when constructing this module will suppress the check and let the code run.')
+
             if isinstance(feat, tuple):
                 feat_src = self.feat_drop(feat[0])
                 feat_dst = self.feat_drop(feat[1])

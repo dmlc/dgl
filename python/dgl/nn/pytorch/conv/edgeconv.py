@@ -32,13 +32,13 @@ class EdgeConv(nn.Module):
     out_feat : int
         Output feature size; i.e., the number of dimensions of :math:`h_i^{(l+1)}`.
     batch_norm : bool
-        Whether to include batch normalization on messages.
+        Whether to include batch normalization on messages. Default: ``False``.
     allow_zero_in_degree : bool, optional
         If there are 0-in-degree nodes in the graph, output for those nodes will be invalid
         since no message will be passed to those nodes. This is harmful for some applications
         causing silent performance regression. This module will raise a DGLError if it detects
         0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
-        and let the users handle it by themselves.
+        and let the users handle it by themselves. Default: ``False``.
 
     Notes
     -----
@@ -111,7 +111,7 @@ class EdgeConv(nn.Module):
         phi_x = self.phi(edges.src['x'])
         return {'e': theta_x + phi_x}
 
-    def forward(self, g, h):
+    def forward(self, g, feat):
         """
 
         Description
@@ -122,7 +122,7 @@ class EdgeConv(nn.Module):
         ----------
         g : DGLGraph
             The graph.
-        h : Tensor or pair of tensors
+        feat : Tensor or pair of tensors
             :math:`(N, D)` where :math:`N` is the number of nodes and
             :math:`D` is the number of feature dimensions.
 
@@ -150,7 +150,7 @@ class EdgeConv(nn.Module):
                                    'Adding self-loop on the input graph by calling `g = dgl.add_self_loop(g)` will resolve the issue.'
                                    'Setting ``allow_zero_in_degree`` to be `True` when constructing this module will suppress the check and let the code run.')
 
-            h_src, h_dst = expand_as_pair(h, g)
+            h_src, h_dst = expand_as_pair(feat, g)
             g.srcdata['x'] = h_src
             g.dstdata['x'] = h_dst
             if not self.batch_norm:
