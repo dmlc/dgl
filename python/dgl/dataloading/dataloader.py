@@ -224,6 +224,8 @@ class BlockSampler(object):
                 assign_block_eids(block, frontier)
 
             seed_nodes = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
+            # Pre-generate CSR format so that it can be used in training directly
+            block.create_format_()
             blocks.insert(0, block)
         return blocks
 

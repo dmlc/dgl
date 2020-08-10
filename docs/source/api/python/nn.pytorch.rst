@@ -230,9 +230,4 @@ SegmentedKNNGraph
 .. autoclass:: dgl.nn.pytorch.factory.SegmentedKNNGraph
     :members:
     :show-inheritance:
-    
-Edge Softmax
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: dgl.nn.pytorch.softmax
-    :members: edge_softmax

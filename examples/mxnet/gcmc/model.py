@@ -220,7 +220,7 @@ class BiDecoder(Block):
         for i in range(self._num_basis_functions):
             graph.nodes['user'].data['h'] = F.dot(ufeat, self.Ps[i].data())
             graph.apply_edges(fn.u_dot_v('h', 'h', 'sr'))
-            basis_out.append(graph.edata['sr'].expand_dims(1))
+            basis_out.append(graph.edata['sr'])
         out = F.concat(*basis_out, dim=1)
         out = self.rate_out(out)
         return out

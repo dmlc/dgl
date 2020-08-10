@@ -137,23 +137,22 @@ def compute_acc(emb, labels, train_nids, val_nids, test_nids):
     Compute the accuracy of prediction given the labels.
     """
     emb = emb.cpu().numpy()
+    labels = labels.cpu().numpy()
     train_nids = train_nids.cpu().numpy()
-    train_labels = labels[train_nids].cpu().numpy()
+    train_labels = labels[train_nids]
     val_nids = val_nids.cpu().numpy()
-    val_labels = labels[val_nids].cpu().numpy()
+    val_labels = labels[val_nids]
     test_nids = test_nids.cpu().numpy()
-    test_labels = labels[test_nids].cpu().numpy()
+    test_labels = labels[test_nids]
 
     emb = (emb - emb.mean(0, keepdims=True)) / emb.std(0, keepdims=True)
 
     lr = lm.LogisticRegression(multi_class='multinomial', max_iter=10000)
-    lr.fit(emb[train_nids], labels[train_nids])
+    lr.fit(emb[train_nids], train_labels)
 
     pred = lr.predict(emb)
-    f1_micro_eval = skm.f1_score(labels[val_nids], pred[val_nids], average='micro')
-    f1_micro_test = skm.f1_score(labels[test_nids], pred[test_nids], average='micro')
-    f1_macro_eval = skm.f1_score(labels[val_nids], pred[val_nids], average='macro')
-    f1_macro_test = skm.f1_score(labels[test_nids], pred[test_nids], average='macro')
+    f1_micro_eval = skm.f1_score(val_labels, pred[val_nids], average='micro')
+    f1_micro_test = skm.f1_score(test_labels, pred[test_nids], average='micro')
     return f1_micro_eval, f1_micro_test
 
 def evaluate(model, g, inputs, labels, train_nids, val_nids, test_nids, batch_size, device):
@@ -191,9 +190,13 @@ def run(proc_id, n_gpus, args, devices, data):
                                           rank=proc_id)
     train_mask, val_mask, test_mask, in_feats, labels, n_classes, g = data
 
-    train_nid = th.LongTensor(np.nonzero(train_mask)[0])
-    val_nid = th.LongTensor(np.nonzero(val_mask)[0])
-    test_nid = th.LongTensor(np.nonzero(test_mask)[0])
+    train_nid = th.LongTensor(np.nonzero(train_mask)).squeeze()
+    val_nid = th.LongTensor(np.nonzero(val_mask)).squeeze()
+    test_nid = th.LongTensor(np.nonzero(test_mask)).squeeze()
+
+    #train_nid = th.LongTensor(np.nonzero(train_mask)[0])
+    #val_nid = th.LongTensor(np.nonzero(val_mask)[0])
+    #test_nid = th.LongTensor(np.nonzero(test_mask)[0])
 
     # Create PyTorch DataLoader for constructing blocks
     n_edges = g.number_of_edges()
@@ -251,7 +254,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
             pos_graph = pos_graph.to(device)
             neg_graph = neg_graph.to(device)
-            blocks = [block.to(device) for block in blocks]
+            blocks = [block.int().to(device) for block in blocks]
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, pos_graph, neg_graph)
@@ -295,13 +298,14 @@ def main(args, devices):
     val_mask = g.ndata['val_mask']
     test_mask = g.ndata['test_mask']
     g.ndata['features'] = features
+    g.create_format_()
     # Pack data
     data = train_mask, val_mask, test_mask, in_feats, labels, n_classes, g
 
     n_gpus = len(devices)
     if devices[0] == -1:
         run(0, 0, args, ['cpu'], data)
-    if n_gpus == 1:
+    elif n_gpus == 1:
         run(0, n_gpus, args, devices, data)
     else:
         procs = []
@@ -312,8 +316,6 @@ def main(args, devices):
             procs.append(p)
         for p in procs:
             p.join()
-
-    run(args, device, data)
 
 
 if __name__ == '__main__':
