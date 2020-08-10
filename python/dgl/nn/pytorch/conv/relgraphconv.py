@@ -98,7 +98,7 @@ class RelGraphConv(nn.Module):
             [-0.4323, -0.1440],
             [-0.1309, -1.0000]], grad_fn=<AddBackward0>)
 
-    # One-hot input
+    >>> # One-hot input
     >>> one_hot_feat = th.tensor(np.array([0,1,2,3,4,5]).astype(np.int64))
     >>> res = conv(g, one_hot_feat, etype)
     >>> res

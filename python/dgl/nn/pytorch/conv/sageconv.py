@@ -58,7 +58,7 @@ class SAGEConv(nn.Module):
     >>> import torch as th
     >>> from dgl.nn import SAGEConv
 
-    Case 1: Homogeneous graph
+    >>> # Case 1: Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
     >>> conv = SAGEConv(10, 2, 'gcn')
@@ -71,7 +71,7 @@ class SAGEConv(nn.Module):
             [0.1909, 1.2743],
             [0.1909, 1.2743]], grad_fn=<AddmmBackward>)
 
-    Case 2: Unidirectional bipartite graph
+    >>> # Case 2: Unidirectional bipartite graph
     >>> u = [0, 0, 1]
     >>> v = [2, 3, 2]
     >>> g = dgl.bipartite((u, v))

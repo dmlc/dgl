@@ -82,7 +82,7 @@ class GATConv(nn.Module):
     >>> import torch as th
     >>> from dgl.nn import GATConv
 
-    Case 1: Homogeneous graph
+    >>> # Case 1: Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> g = dgl.add_self_loop(g)
     >>> feat = th.ones(6, 10)
@@ -113,7 +113,7 @@ class GATConv(nn.Module):
             [ 1.3805, -0.0762],
             [ 1.0390, -1.1479]]], grad_fn=<BinaryReduceBackward>)
 
-    Case 2: Unidirectional bipartite graph
+    >>> # Case 2: Unidirectional bipartite graph
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
     >>> g = dgl.bipartite((u, v))

@@ -75,7 +75,7 @@ class NNConv(nn.Module):
     >>> import torch as th
     >>> from dgl.nn import NNConv
 
-    Case 1: Homogeneous graph
+    >>> # Case 1: Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> g = dgl.add_self_loop(g)
     >>> feat = th.ones(6, 10)
@@ -93,7 +93,7 @@ class NNConv(nn.Module):
             [-1.5243, -0.2719],
             [-1.5243, -0.2719]], grad_fn=<AddBackward0>)
 
-    Case 2: Unidirectional bipartite graph
+    >>> # Case 2: Unidirectional bipartite graph
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
     >>> g = dgl.bipartite((u, v))

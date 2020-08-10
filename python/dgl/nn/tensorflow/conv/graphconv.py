@@ -81,7 +81,7 @@ class GraphConv(layers.Layer):
     >>> import tensorflow as tf
     >>> from dgl.nn import GraphConv
 
-    Case 1: Homogeneous graph
+    >>> # Case 1: Homogeneous graph
     >>> with tf.device("CPU:0"):
     ...     g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     ...     g = dgl.add_self_loop(g)
@@ -110,7 +110,7 @@ class GraphConv(layers.Layer):
             [ 0.8251371 , -0.65073216],
             [ 0., 0.]], dtype=float32)>
 
-    Case 2: Unidirectional bipartite graph
+    >>> # Case 2: Unidirectional bipartite graph
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
     >>> with tf.device("CPU:0"):
