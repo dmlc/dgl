@@ -127,6 +127,7 @@ def start_server(server_id, num_clients, server_count):
     server_state = dgl.distributed.ServerState(kv_store=kvserver, local_g=None, partition_book=None)
     dgl.distributed.start_server(server_id=server_id,
                                  ip_config='kv_ip_config.txt',
+                                 server_count=server_count,
                                  num_clients=num_clients,
                                  server_state=server_state)
 
