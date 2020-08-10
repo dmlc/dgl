@@ -2,7 +2,6 @@
 
 from collections.abc import Iterable, Mapping
 from collections import defaultdict
-import time
 import numpy as np
 from scipy import sparse
 
@@ -43,6 +42,9 @@ __all__ = [
     'to_simple',
     'to_simple_graph',
     'as_immutable_graph',
+    'metis_partition_assignment',
+    'partition_graph_with_halo',
+    'metis_partition',
     'as_heterograph']
 
 
