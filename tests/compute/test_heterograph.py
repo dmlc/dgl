@@ -180,7 +180,7 @@ def test_create(idtype):
         )
     # bipartite graph
     def _test_validate_bipartite(card):
-        with pytest.raises(AssertionError):
+        with pytest.raises(DGLError):
             g = dgl.heterograph({
                 ('_U', '_E', '_V'): ([0, 0, 1, 1, 2], [1, 1, 2, 2, 3])
             }, {'_U': card[0], '_V': card[1]}, idtype=idtype, device=device)
@@ -990,7 +990,7 @@ def test_to_device2(g, idtype):
 @parametrize_dtype
 def test_convert_bound(idtype):
     def _test_bipartite_bound(data, card):
-        with pytest.raises(AssertionError):
+        with pytest.raises(DGLError):
             dgl.heterograph({
                 ('_U', '_E', '_V'): data
             }, {'_U': card[0], '_V': card[1]}, idtype=idtype, device=F.ctx())

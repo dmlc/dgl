@@ -209,6 +209,6 @@ def check_valid_idtype(idtype):
     idtype : data type
         The framework object of a data type.
     """
-    if idtype is not None:
-        assert idtype in [F.int32, F.int64], \
-            'Expect idtype to be a framework object of int32/int64, got {}'.format(idtype)
+    if idtype not in [None, F.int32, F.int64]:
+        raise DGLError('Expect idtype to be a framework object of int32/int64, '
+                       'got {}'.format(idtype))

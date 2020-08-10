@@ -80,9 +80,9 @@ def networkx2tensor(nx_graph, idtype, edge_id_attr_name=None):
         dst = [0] * num_edges
         for u, v, attr in nx_graph.edges(data=True):
             eid = int(attr[edge_id_attr_name])
-            assert 0 <= eid < nx_graph.number_of_edges(), \
-                'Expect edge IDs to be a non-negative integer smaller than {:d}, ' \
-                'got {:d}'.format(num_edges, eid)
+            if eid < 0 or eid >= nx_graph.number_of_edges():
+                raise DGLError('Expect edge IDs to be a non-negative integer smaller than {:d}, '
+                               'got {:d}'.format(num_edges, eid))
             src[eid] = u
             dst[eid] = v
     else:
@@ -182,14 +182,16 @@ def networkxbipartite2tensors(nx_graph, idtype, top_map, bottom_map, edge_id_att
         src = [0] * num_edges
         dst = [0] * num_edges
         for u, v, attr in nx_graph.edges(data=True):
-            assert u in top_map, \
-                'Expect the node {} to have attribute bipartite=0 with edge {}'.format(u, (u, v))
-            assert v in bottom_map, \
-                'Expect the node {} to have attribute bipartite=1 with edge {}'.format(v, (u, v))
+            if u not in top_map:
+                raise DGLError('Expect the node {} to have attribute bipartite=0 '
+                               'with edge {}'.format(u, (u, v)))
+            if v not in bottom_map:
+                raise DGLError('Expect the node {} to have attribute bipartite=1 '
+                               'with edge {}'.format(v, (u, v)))
             eid = int(attr[edge_id_attr_name])
-            assert 0 <= eid < nx_graph.number_of_edges(), \
-                'Expect edge IDs to be a non-negative integer smaller than {:d}, ' \
-                'got {:d}'.format(num_edges, eid)
+            if eid < 0 or eid >= nx_graph.number_of_edges():
+                raise DGLError('Expect edge IDs to be a non-negative integer smaller than {:d}, '
+                               'got {:d}'.format(num_edges, eid))
             src[eid] = top_map[u]
             dst[eid] = bottom_map[v]
     else:
@@ -197,10 +199,12 @@ def networkxbipartite2tensors(nx_graph, idtype, top_map, bottom_map, edge_id_att
         dst = []
         for e in nx_graph.edges:
             u, v = e[0], e[1]
-            assert u in top_map, \
-                'Expect the node {} to have attribute bipartite=0 with edge {}'.format(u, (u, v))
-            assert v in bottom_map, \
-                'Expect the node {} to have attribute bipartite=1 with edge {}'.format(v, (u, v))
+            if u not in top_map:
+                raise DGLError('Expect the node {} to have attribute bipartite=0 '
+                               'with edge {}'.format(u, (u, v)))
+            if v not in bottom_map:
+                raise DGLError('Expect the node {} to have attribute bipartite=1 '
+                               'with edge {}'.format(v, (u, v)))
             src.append(top_map[u])
             dst.append(bottom_map[v])
     src = F.tensor(src, dtype=idtype)
