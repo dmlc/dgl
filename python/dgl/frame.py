@@ -120,7 +120,7 @@ class Column(object):
         self.index = None
         self.storage = val
 
-    def to(self, device, **kwargs):
+    def to(self, device, **kwargs): # pylint: disable=invalid-name
         """ Return a new column with columns copy to the targeted device (cpu/gpu).
 
         Parameters
@@ -602,7 +602,7 @@ class Frame(MutableMapping):
         subf._default_initializer = self._default_initializer
         return subf
 
-    def to(self, device, **kwargs):
+    def to(self, device, **kwargs): # pylint: disable=invalid-name
         """ Return a new frame with columns copy to the targeted device (cpu/gpu).
 
         Parameters
