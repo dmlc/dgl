@@ -1,6 +1,7 @@
 from scipy import sparse as spsp
 import networkx as nx
 import numpy as np
+import os
 import dgl
 import dgl.function as fn
 import dgl.partition
@@ -276,15 +277,6 @@ def test_to_bidirected():
     big = dgl.to_bidirected(g, copy_ndata=True)
     assert F.array_equal(g.nodes['user'].data['h'], big.nodes['user'].data['h'])
 
-    # test multigraph
-    g = dgl.graph((F.tensor([0, 1, 3, 1]), F.tensor([1, 2, 0, 2])))
-    raise_error = False
-    try:
-        big = dgl.to_bidirected(g)
-    except:
-        raise_error = True
-    assert raise_error
-
 def test_add_reverse_edges():
     # homogeneous graph
     g = dgl.graph((F.tensor([0, 1, 3, 1]), F.tensor([1, 2, 0, 2])))
@@ -491,13 +483,13 @@ def test_laplacian_lambda_max():
         assert l_max < 2 + eps
     '''
 
-def create_large_graph_index(num_nodes):
+def create_large_graph(num_nodes):
     row = np.random.choice(num_nodes, num_nodes * 10)
     col = np.random.choice(num_nodes, num_nodes * 10)
     spm = spsp.coo_matrix((np.ones(len(row)), (row, col)))
     spm.sum_duplicates()
 
-    return spm
+    return dgl.graph(spm)
 
 def get_nodeflow(g, node_ids, num_layers):
     batch_size = len(node_ids)
@@ -509,47 +501,20 @@ def get_nodeflow(g, node_ids, num_layers):
 
 # Disabled since everything will be on heterogeneous graphs
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
-def _test_partition_with_halo():
-    g = dgl.graph(create_large_graph_index(1000))
+def test_partition_with_halo():
+    g = create_large_graph(1000)
     node_part = np.random.choice(4, g.number_of_nodes())
-    subgs = dgl.transform.partition_graph_with_halo(g, node_part, 2)
-    for part_id, subg in subgs.items():
-        node_ids = np.nonzero(node_part == part_id)[0]
-        lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
-        nf = get_nodeflow(g, node_ids, 2)
-        lnf = get_nodeflow(subg, lnode_ids, 2)
-        for i in range(nf.num_layers):
-            layer_nids1 = F.asnumpy(nf.layer_parent_nid(i))
-            layer_nids2 = lnf.layer_parent_nid(i)
-            layer_nids2 = F.asnumpy(F.gather_row(subg.ndata[dgl.NID], layer_nids2))
-            assert np.all(np.sort(layer_nids1) == np.sort(layer_nids2))
-
-        for i in range(nf.num_blocks):
-            block_eids1 = F.asnumpy(nf.block_parent_eid(i))
-            block_eids2 = lnf.block_parent_eid(i)
-            block_eids2 = F.asnumpy(F.gather_row(subg.edata[dgl.EID], block_eids2))
-            assert np.all(np.sort(block_eids1) == np.sort(block_eids2))
-
     subgs = dgl.transform.partition_graph_with_halo(g, node_part, 2, reshuffle=True)
     for part_id, subg in subgs.items():
         node_ids = np.nonzero(node_part == part_id)[0]
         lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
         assert np.all(np.sort(F.asnumpy(subg.ndata['orig_id'])[lnode_ids]) == node_ids)
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
 def test_metis_partition():
     # TODO(zhengda) Metis fails to partition a small graph.
-    g = dgl.graph(create_large_graph_index(1000))
-    check_metis_partition(g, 0)
-    check_metis_partition(g, 1)
-    check_metis_partition(g, 2)
-    check_metis_partition_with_constraint(g)
-
-@unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
-def test_hetero_metis_partition():
-    # TODO(zhengda) Metis fails to partition a small graph.
-    g = dgl.graph(create_large_graph_index(1000))
-    g = dgl.as_heterograph(g)
+    g = create_large_graph(1000)
     check_metis_partition(g, 0)
     check_metis_partition(g, 1)
     check_metis_partition(g, 2)
@@ -638,7 +603,7 @@ def check_metis_partition(g, extra_hops):
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="It doesn't support GPU")
 def test_reorder_nodes():
-    g = dgl.graph(create_large_graph_index(1000))
+    g = create_large_graph(1000)
     new_nids = np.random.permutation(g.number_of_nodes())
     # TODO(zhengda) we need to test both CSR and COO.
     new_g = dgl.partition.reorder_nodes(g, new_nids)
