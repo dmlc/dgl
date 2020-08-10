@@ -35,6 +35,7 @@ def start_find_edges_client(rank, tmpdir, disable_shared_mem, eids):
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_find_edges.json', rank)
+    dgl.distributed.initialize("rpc_ip_config.txt", 1)
     dist_graph = DistGraph("rpc_ip_config.txt", 1, "test_find_edges", gpb=gpb)
     u, v = find_edges(dist_graph, eids)
     dgl.distributed.exit_client()
