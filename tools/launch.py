@@ -38,6 +38,7 @@ def submit_jobs(args, udf_command):
                 port = int(result[1])
             elif len(result) == 1:
                 ip = result[0]
+                port = 30050
             else:
                 raise RuntimeError("Format error of ip_config.")
             server_count_per_machine = args.server_count
