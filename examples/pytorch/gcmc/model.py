@@ -338,15 +338,12 @@ class BiDecoder(nn.Module):
             ufeat = self.dropout(ufeat)
             ifeat = self.dropout(ifeat)
             graph.nodes['movie'].data['h'] = ifeat
-            graph.nodes['user'].data['h'] = ufeat
-            graph.apply_edges(self.apply_edges)
-            out = graph.edata['sr']
-            #basis_out = []
-            #for i in range(self._num_basis):
-            #    graph.nodes['user'].data['h'] = ufeat @ self.Ps[i]
-            #    graph.apply_edges(fn.u_dot_v('h', 'h', 'sr'))
-            #    basis_out.append(graph.edata['sr'])
-            #out = th.cat(basis_out, dim=1)
+            basis_out = []
+            for i in range(self._num_basis):
+                graph.nodes['user'].data['h'] = ufeat @ self.Ps[i]
+                graph.apply_edges(fn.u_dot_v('h', 'h', 'sr'))
+                basis_out.append(graph.edata['sr'])
+            out = th.cat(basis_out, dim=1)
             out = self.combine_basis(out)
         return out
 
