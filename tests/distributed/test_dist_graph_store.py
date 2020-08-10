@@ -228,6 +228,7 @@ def check_server_client(shared_mem, num_servers, num_clients):
 
     print('clients have terminated')
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_server_client():
     os.environ['DGL_DIST_MODE'] = 'distributed'
@@ -256,6 +257,7 @@ def test_standalone():
                        part_config='/tmp/dist_graph/{}.json'.format(graph_name))
     check_dist_graph(dist_g, 1, g.number_of_nodes(), g.number_of_edges())
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_split():
     #prepare_dist()
     g = create_random_graph(10000)
@@ -310,6 +312,7 @@ def test_split():
         edges5 = F.cat([edges3, edges4], 0)
         assert np.all(np.sort(edges1) == np.sort(F.asnumpy(edges5)))
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_split_even():
     #prepare_dist(1)
     g = create_random_graph(10000)

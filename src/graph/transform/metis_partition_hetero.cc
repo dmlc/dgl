@@ -17,12 +17,14 @@ namespace dgl {
 
 namespace transform {
 
+#if !defined(_WIN32)
+
 IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr) {
   // The index type of Metis needs to be compatible with DGL index type.
   CHECK_EQ(sizeof(idx_t), sizeof(int64_t))
     << "Metis only supports int64 graph for now";
   // This is a symmetric graph, so in-csr and out-csr are the same.
-  const auto mat = g->GetCSRMatrix(0);
+  const auto mat = g->GetCSCMatrix(0);
   //   const auto mat = g->GetInCSR()->ToCSRMatrix();
 
   idx_t nvtxs = g->NumVertices(0);
@@ -48,6 +50,9 @@ IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr) {
   idx_t options[METIS_NOPTIONS];
   METIS_SetDefaultOptions(options);
   options[METIS_OPTION_ONDISK] = 1;
+  options[METIS_OPTION_NITER] = 1;
+  options[METIS_OPTION_NIPARTS] = 1;
+  options[METIS_OPTION_DROPEDGES] = 1;
 
   int ret = METIS_PartGraphKway(
     &nvtxs,  // The number of vertices
@@ -82,6 +87,8 @@ IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr) {
   return aten::NullArray();
 }
 
+#endif  // !defined(_WIN32)
+
 DGL_REGISTER_GLOBAL("partition._CAPI_DGLMetisPartition_Hetero")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef g = args[0];
@@ -92,7 +99,11 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLMetisPartition_Hetero")
     auto ugptr = hgptr->relation_graphs()[0];
     int k = args[1];
     NDArray vwgt = args[2];
+#if !defined(_WIN32)
     *rv = MetisPartition(ugptr, k, vwgt);
+#else
+    LOG(FATAL) << "Metis partition does not support Windows.";
+#endif  // !defined(_WIN32)
   });
 }  // namespace transform
 }  // namespace dgl
