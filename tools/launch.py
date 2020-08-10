@@ -34,7 +34,7 @@ def submit_jobs(args, udf_command):
     ip_config = args.workspace + '/' + args.ip_config
     with open(ip_config) as f:
         for line in f:
-            result = line.strip().split(' ')
+            result = line.strip().split()
             if len(result) == 2:
                 ip = result[0]
                 port = int(result[1])

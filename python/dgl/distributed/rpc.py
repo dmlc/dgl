@@ -80,7 +80,7 @@ def read_ip_config(filename, server_count):
         machine_id = 0
         lines = [line.rstrip('\n') for line in open(filename)]
         for line in lines:
-            result = line.split(' ')
+            result = line.split()
             if len(result) == 2:
                 port = int(result[1])
             elif len(result) == 1:
