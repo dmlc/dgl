@@ -595,7 +595,7 @@ class KVServer(object):
     num_clients : int
         Total number of KVClients that will be connected to the KVServer.
     """
-    def __init__(self, server_id, ip_config, num_clients):
+    def __init__(self, server_id, ip_config, server_count, num_clients):
         assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
         assert server_count > 0, 'server_count (%d) must be a positive number.' % server_count
         assert os.path.exists(ip_config), 'Cannot open file: %s' % ip_config
