@@ -36,14 +36,14 @@ def submit_jobs(args, udf_command):
             if len(result) == 2:
                 ip = result[0]
                 port = int(result[1])
+                hosts.append((ip, port))
             elif len(result) == 1:
                 ip = result[0]
                 port = 30050
+                hosts.append((ip, port))
             else:
                 raise RuntimeError("Format error of ip_config.")
             server_count_per_machine = args.server_count
-            hosts.append((ip, port))
-
     # Get partition info of the graph data
     part_config = args.workspace + '/' + args.part_config
     with open(part_config) as conf_f:
