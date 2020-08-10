@@ -55,8 +55,8 @@ To run unsupervised training:
 ```bash
 python3 ~/dgl/tools/launch.py \
 --workspace ~/dgl/examples/pytorch/graphsage/experimental \
---num_trainers 4 \
---part_config data/ogb-product.json \
+--num_trainers 1 \
+--part_config ogb-product/ogb-product.json \
 --ip_config ip_config.txt \
 "python3 train_dist_unsupervised.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --batch-size 1000"
 ```
