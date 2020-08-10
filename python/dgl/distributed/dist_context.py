@@ -20,31 +20,30 @@ def set_initialized(value=True):
     global INITIALIZED
     INITIALIZED = value
 
-
 def get_sampler_pool():
     """Return the sampler pool and num_workers"""
     return SAMPLER_POOL, NUM_SAMPLER_WORKERS
 
-
-def _init_rpc(ip_config, max_queue_size, net_type, role, num_threads):
+def _init_rpc(ip_config, server_count, max_queue_size, net_type, role, num_threads):
     ''' This init function is called in the worker processes.
     '''
     try:
         utils.set_num_threads(num_threads)
-        connect_to_server(ip_config, max_queue_size, net_type)
+        connect_to_server(ip_config, server_count, max_queue_size, net_type)
         init_role(role)
-        init_kvstore(ip_config, role)
+        init_kvstore(ip_config, server_count, role)
     except Exception as e:
         print(e, flush=True)
         traceback.print_exc()
         raise e
 
-
-def initialize(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type='socket',
+def initialize(ip_config, server_count, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type='socket',
                num_worker_threads=1):
     """Init rpc service
     ip_config: str
         File path of ip_config file
+    server_count : int
+        Server count on each machine
     num_workers: int
         Number of worker process to be created
     max_queue_size : int
@@ -62,13 +61,12 @@ def initialize(ip_config, num_workers=0, max_queue_size=MAX_QUEUE_SIZE, net_type
     global NUM_SAMPLER_WORKERS
     if num_workers > 0:
         SAMPLER_POOL = ctx.Pool(
-            num_workers, initializer=_init_rpc, initargs=(ip_config, max_queue_size,
+            num_workers, initializer=_init_rpc, initargs=(ip_config, server_count, max_queue_size,
                                                           net_type, 'sampler', num_worker_threads))
     NUM_SAMPLER_WORKERS = num_workers
-    connect_to_server(ip_config, max_queue_size, net_type)
+    connect_to_server(ip_config, server_count, max_queue_size, net_type)
     init_role('default')
-    init_kvstore(ip_config, 'default')
-
+    init_kvstore(ip_config, server_count, 'default')
 
 def finalize_client():
     """Release resources of this client."""
@@ -77,11 +75,9 @@ def finalize_client():
     global INITIALIZED
     INITIALIZED = False
 
-
 def _exit():
     exit_client()
     time.sleep(1)
-
 
 def finalize_worker():
     """Finalize workers
