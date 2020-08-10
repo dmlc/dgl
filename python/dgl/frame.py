@@ -362,7 +362,6 @@ class Frame(MutableMapping):
         Tensor
             Column data.
         """
-        print(name)
         return self._columns[name].data
 
     def __setitem__(self, name, data):
