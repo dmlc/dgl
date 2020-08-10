@@ -173,7 +173,9 @@ def check_standalone_sampling(tmpdir):
     num_hops = 1
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
                     num_hops=num_hops, part_method='metis', reshuffle=False)
+
     os.environ['DGL_DIST_MODE'] = 'standalone'
+    dgl.distributed.initialize("rpc_ip_config.txt", 1)
     dist_graph = DistGraph(None, "test_sampling", 1, part_config=tmpdir / 'test_sampling.json')
     sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
 
@@ -183,6 +185,7 @@ def check_standalone_sampling(tmpdir):
     eids = g.edge_ids(src, dst)
     assert np.array_equal(
         F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
+    dgl.distributed.exit_client()
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')

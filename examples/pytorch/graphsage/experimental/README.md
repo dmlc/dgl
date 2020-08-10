@@ -50,7 +50,7 @@ python3 ~/dgl/tools/launch.py \
 --server_count 1 \
 --part_config ogb-product/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --server-count 1 --num-epochs 30 --batch-size 1000"
+"python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --server-count 1 --num-epochs 30 --batch-size 1000 --num-workers 4"
 ```
 
 To run unsupervised training:
@@ -61,7 +61,7 @@ python3 ~/dgl/tools/launch.py \
 --num_trainers 1 \
 --num_samplers 4 \
 --server_count 1 \
---part_config data/ogb-product.json \
+--part_config ogb-product/ogb-product.json \
 --ip_config ip_config.txt \
 "python3 train_dist_unsupervised.py --graph-name ogb-product --ip_config ip_config.txt --server-count 1 --num-epochs 3 --batch-size 1000"
 ```
