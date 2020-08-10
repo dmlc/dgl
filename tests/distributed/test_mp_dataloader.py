@@ -40,7 +40,7 @@ class NeighborSampler(object):
 def start_server(rank, tmpdir, disable_shared_mem, num_clients):
     import dgl
     print('server: #clients=' + str(num_clients))
-    g = DistGraphServer(rank, "mp_ip_config.txt", num_clients,
+    g = DistGraphServer(rank, "mp_ip_config.txt", 1, num_clients,
                         tmpdir / 'test_sampling.json', disable_shared_mem=disable_shared_mem)
     g.start()
 
@@ -49,14 +49,14 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
     import dgl
     import torch as th
     os.environ['DGL_DIST_MODE'] = 'distributed'
-    dgl.distributed.initialize("mp_ip_config.txt", num_workers=4)
+    dgl.distributed.initialize("mp_ip_config.txt", 1, num_workers=4)
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_sampling.json', rank)
     num_nodes_to_sample = 202
     batch_size = 32
     train_nid = th.arange(num_nodes_to_sample)
-    dist_graph = DistGraph("mp_ip_config.txt", "test_mp", gpb=gpb)
+    dist_graph = DistGraph("mp_ip_config.txt", 1, "test_mp", gpb=gpb)
 
     # Create sampler
     sampler = NeighborSampler(dist_graph, [5, 10],
@@ -101,7 +101,7 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
 def test_dist_dataloader(tmpdir, num_server, drop_last):
     ip_config = open("mp_ip_config.txt", "w")
     for _ in range(num_server):
-        ip_config.write('{} 1\n'.format(get_local_usable_addr()))
+        ip_config.write('{}1\n'.format(get_local_usable_addr()))
     ip_config.close()
 
     g = CitationGraphDataset("cora")[0]
