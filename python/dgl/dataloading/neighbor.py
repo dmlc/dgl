@@ -1,6 +1,6 @@
 """Data loading components for neighbor sampling"""
 from .dataloader import BlockSampler
-from .. import transform, sampling, subgraph
+from .. import sampling, subgraph
 
 class MultiLayerNeighborSampler(BlockSampler):
     """Sampler that builds computational dependency of node representations via
