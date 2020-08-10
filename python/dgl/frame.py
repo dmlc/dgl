@@ -88,6 +88,7 @@ class Column(object):
         self.storage = storage
         self.scheme = scheme if scheme else infer_scheme(storage)
         self.index = index
+        self.device = None
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -107,6 +108,10 @@ class Column(object):
         if self.index is not None:
             self.storage = F.gather_row(self.storage, self.index)
             self.index = None
+
+        if self.device is not None:
+            self.storage = F.copy_to(self.storage, self.device[0], **self.device[1])
+            self.device = None
         return self.storage
 
     @data.setter
@@ -114,6 +119,25 @@ class Column(object):
         """Update the column data."""
         self.index = None
         self.storage = val
+
+    def to(self, device, **kwargs):
+        """ Return a new column with columns copy to the targeted device (cpu/gpu).
+
+        Parameters
+        ----------
+        device : Framework-specific device context object
+            The context to move data to.
+        kwargs : Key-word arguments.
+            Key-word arguments fed to the framework copy function.
+
+        Returns
+        -------
+        Column
+            A new column
+        """
+        col = self.clone()
+        col.device = (device, kwargs)
+        return col
 
     def __getitem__(self, rowids):
         """Return the feature data given the rowids.
@@ -338,6 +362,7 @@ class Frame(MutableMapping):
         Tensor
             Column data.
         """
+        print(name)
         return self._columns[name].data
 
     def __setitem__(self, name, data):
@@ -577,6 +602,26 @@ class Frame(MutableMapping):
         subf._initializers = self._initializers
         subf._default_initializer = self._default_initializer
         return subf
+
+    def to(self, device, **kwargs):
+        """ Return a new frame with columns copy to the targeted device (cpu/gpu).
+
+        Parameters
+        ----------
+        device : Framework-specific device context object
+            The context to move data to.
+        kwargs : Key-word arguments.
+            Key-word arguments fed to the framework copy function.
+
+        Returns
+        -------
+        Frame
+            A new frame
+        """
+        newframe = self.clone()
+        new_columns = {key : col.to(device, **kwargs) for key, col in newframe._columns.items()}
+        newframe._columns = new_columns
+        return newframe
 
     def __repr__(self):
         return repr(dict(self))
