@@ -21,7 +21,7 @@ from _thread import start_new_thread
 from functools import wraps
 from data import MovieLens
 from model import GCMCLayer, DenseBiDecoder
-from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
+from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger, to_etype_name
 import dgl
 
 class Net(nn.Module):
@@ -88,7 +88,7 @@ def flatten_etypes(pair_graph, dataset, segment):
     ratings = []
 
     for rating in dataset.possible_rating_values:
-        src_etype, dst_etype = pair_graph.edges(order='eid', etype=str(rating))
+        src_etype, dst_etype = pair_graph.edges(order='eid', etype=to_etype_name(rating))
         src.append(src_etype)
         dst.append(dst_etype)
         label = np.searchsorted(dataset.possible_rating_values, rating)
@@ -212,23 +212,22 @@ def config():
 
     return args
 
-#@thread_wrapped_func
 def run(proc_id, n_gpus, args, devices, dataset):
     dev_id = devices[proc_id]
     train_labels = dataset.train_labels
     train_truths = dataset.train_truths
     num_edges = train_truths.shape[0]
 
-    reverse_types = {str(k): 'rev-' + str(k) for k in dataset.possible_rating_values}
+    reverse_types = {to_etype_name(k): 'rev-' + to_etype_name(k)
+                     for k in dataset.possible_rating_values}
     reverse_types.update({v: k for k, v in reverse_types.items()})
     sampler = dgl.dataloading.MultiLayerNeighborSampler([None])
     dataloader = dgl.dataloading.EdgeDataLoader(
         dataset.train_enc_graph,
-        {str(k): th.arange(dataset.train_enc_graph.number_of_edges(etype=str(k)))
+        {to_etype_name(k): th.arange(
+            dataset.train_enc_graph.number_of_edges(etype=to_etype_name(k)))
          for k in dataset.possible_rating_values},
         sampler,
-        exclude='reverse_types',
-        reverse_etypes=reverse_types,
         return_eids=True,
         batch_size=args.minibatch_size,
         shuffle=True,
@@ -332,6 +331,9 @@ def run(proc_id, n_gpus, args, devices, dataset):
                 print("[{}] {}".format(proc_id, logging_str))
 
             iter_idx += 1
+
+            if step == 20:
+                return
         if epoch > 1:
             epoch_time = time.time() - t0
             print("Epoch {} time {}".format(epoch, epoch_time))
@@ -417,7 +419,7 @@ if __name__ == '__main__':
         dataset.train_dec_graph.create_format_()
         procs = []
         for proc_id in range(n_gpus):
-            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, dataset))
+            p = mp.Process(target=thread_wrapped_func(run), args=(proc_id, n_gpus, args, devices, dataset))
             p.start()
             procs.append(p)
         for p in procs:

@@ -106,7 +106,7 @@ class RelGraphConvLayer(nn.Module):
             inputs_src = inputs
             inputs_dst = {k: v[:g.number_of_dst_nodes(k)] for k, v in inputs.items()}
         else:
-            inputs_src, inputs_dst = inputs
+            inputs_src = inputs_dst = inputs
 
         hs = self.conv(g, inputs, mod_kwargs=wdict)
 
