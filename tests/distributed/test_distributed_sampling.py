@@ -25,7 +25,7 @@ def start_sample_client(rank, tmpdir, disable_shared_mem):
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_sampling.json', rank)
-    dgl.distributed.initialize("rpc_ip_config.txt")
+    dgl.distributed.initialize("rpc_ip_config.txt", 1)
     dist_graph = DistGraph("rpc_ip_config.txt", 1, "test_sampling", gpb=gpb)
     sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
     dgl.distributed.exit_client()
