@@ -10,6 +10,8 @@ import time
 import json
 from threading import Thread
 
+DEFAULT_PORT = 30050
+
 def execute_remote(cmd, ip, port, thread_list):
     """execute command line on remote machine via ssh"""
     cmd = 'ssh -o StrictHostKeyChecking=no -p ' + str(port) + ' ' + ip + ' \'' + cmd + '\''
@@ -39,7 +41,7 @@ def submit_jobs(args, udf_command):
                 hosts.append((ip, port))
             elif len(result) == 1:
                 ip = result[0]
-                port = 30050
+                port = DEFAULT_PORT
                 hosts.append((ip, port))
             else:
                 raise RuntimeError("Format error of ip_config.")
