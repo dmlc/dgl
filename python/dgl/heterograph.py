@@ -1705,7 +1705,13 @@ class DGLHeteroGraph(object):
         >>> g.number_of_nodes()
         3
         """
-        return self._graph.number_of_nodes(self.get_ntype_id(ntype))
+        if ntype is None:
+            total_num_nodes = 0
+            for nty in self.ntypes:
+                total_num_nodes += self._graph.number_of_nodes(self.get_ntype_id(nty))
+            return total_num_nodes
+        else:
+            return self._graph.number_of_nodes(self.get_ntype_id(ntype))
 
     def num_nodes(self, ntype=None):
         """Return the number of nodes of the given type in the heterograph.
@@ -1730,7 +1736,13 @@ class DGLHeteroGraph(object):
         >>> g.num_nodes()
         3
         """
-        return self._graph.number_of_nodes(self.get_ntype_id(ntype))
+        if ntype is None:
+            total_num_nodes = 0
+            for nty in self.ntypes:
+                total_num_nodes += self._graph.number_of_nodes(self.get_ntype_id(nty))
+            return total_num_nodes
+        else:
+            return self._graph.number_of_nodes(self.get_ntype_id(ntype))
 
     def number_of_src_nodes(self, ntype=None):
         """Return the number of nodes of the given SRC node type in the heterograph.
@@ -4191,6 +4203,8 @@ class DGLHeteroGraph(object):
         >>> g.ndata['feat'] = torch.ones(3, 1)
         >>> g.idtype
         torch.int64
+
+        Cast the graph to one of idtype int32.
 
         >>> # A cloned graph with an idtype of int32
         >>> g_int = g.int()

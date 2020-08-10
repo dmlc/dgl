@@ -148,7 +148,17 @@ def graph(data,
         if src_ctx != dst_ctx:
             raise DGLError('Expect the source and destination node tensors to have the same ' \
                            'context, got {} and {}'.format(src_ctx, dst_ctx))
-    elif not isinstance(data[0], Iterable):
+    elif isinstance(data[0], Iterable):
+        # NaN/Inf values cannot appear in int32/int64 tensors
+        if np.isnan(data[0]).sum() > 0:
+            raise DGLError('NaN values found in the source node IDs')
+        if np.isinf(data[0]).sum() > 0:
+            raise DGLError('Inf values found in the source node IDs')
+        if np.isnan(data[1]).sum() > 0:
+            raise DGLError('NaN values found in the destination node IDs')
+        if np.isinf(data[1]).sum() > 0:
+            raise DGLError('Inf values found in the destination node IDs')
+    else:
         raise DGLError('Expect sequences (e.g., list, numpy.ndarray) or tensors for data, ' \
                        'got {}'.format(type(data[0])))
 
@@ -376,10 +386,19 @@ def heterograph(data_dict,
                 raise DGLError('Expect the source and destination node tensors for {} to have the '
                                'same context, got {} and {}'.format(key, src_ctx, dst_ctx))
             data_devices.append(src_ctx)
+        elif isinstance(data[0], Iterable):
+            # NaN/Inf values cannot appear in int32/int64 tensors
+            if np.isnan(data[0]).sum() > 0:
+                raise DGLError('NaN values found in the source node IDs for {}'.format(key))
+            if np.isinf(data[0]).sum() > 0:
+                raise DGLError('Inf values found in the source node IDs for {}'.format(key))
+            if np.isnan(data[1]).sum() > 0:
+                raise DGLError('NaN values found in the destination node IDs for {}'.format(key))
+            if np.isinf(data[1]).sum() > 0:
+                raise DGLError('Inf values found in the destination node IDs for {}'.format(key))
         else:
-            if not isinstance(data[0], Iterable):
-                raise DGLError('Expect sequences (e.g., list, numpy.ndarray) or tensors for '
-                               'data_dict[{}], got {}'.format(key, type(data[0])))
+            raise DGLError('Expect sequences (e.g., list, numpy.ndarray) or tensors for '
+                           'data_dict[{}], got {}'.format(key, type(data[0])))
 
     data_types = set(data_types)
     if len(data_types) != 1:
@@ -1190,7 +1209,7 @@ def bipartite_from_networkx(nx_graph,
     utils.check_all_same_type(dst_attrs, str, 'dst_attrs', skip_none=True)
     utils.check_type(edge_id_attr_name, str, 'edge_id_attr_name', skip_none=True)
     if edge_id_attr_name is not None and \
-            not (edge_id_attr_name in next(iter(nx_graph.edges(data=True)))[-1]):
+            not edge_id_attr_name in next(iter(nx_graph.edges(data=True)))[-1]:
         raise DGLError('Failed to find the pre-specified edge IDs in the edge features '
                        'of the NetworkX graph with name {}'.format(edge_id_attr_name))
     utils.check_valid_idtype(idtype)
