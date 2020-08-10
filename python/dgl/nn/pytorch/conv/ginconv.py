@@ -31,19 +31,20 @@ class GINConv(nn.Module):
     init_eps : float, optional
         Initial :math:`\epsilon` value, default: ``0``.
     learn_eps : bool, optional
-        If True, :math:`\epsilon` will be a learnable parameter.
+        If True, :math:`\epsilon` will be a learnable parameter. Default: ``False``.
     allow_zero_in_degree : bool, optional
         If there are 0-in-degree nodes in the graph, output for those nodes will be invalid
         since no message will be passed to those nodes. This is harmful for some applications
         causing silent performance regression. This module will raise a DGLError if it detects
         0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
-        and let the users handle it by themselves.
+        and let the users handle it by themselves. Default: ``False``.
 
     Notes
     -----
-    Zero in-degree nodes will lead to invalid output value if aggregator_type is not `sum` or `mean`.
-    A common practice to avoid this is to add a self-loop for each node in the graph if it is
-    homogeneous, which can be achieved by:
+    Zero in-degree nodes will lead to invalid output value. This is because no message
+    will be passed to those nodes, the aggregation function will be appied on empty input.
+    A common practice to avoid this is to add a self-loop for each node in the graph if
+    it is homogeneous, which can be achieved by:
 
     >>> g = ... # a DGLGraph
     >>> g = dgl.add_self_loop(g)

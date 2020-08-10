@@ -23,7 +23,7 @@ class EdgeConv(nn.Module):
        \Theta \cdot (h_j^{(l)} - h_i^{(l)}) + \Phi \cdot h_i^{(l)})
 
     where :math:`\mathcal{N}(i)` is the neighbor of :math:`i`.
-    :math:`\Theta` and :math:`\Theta` are linear layers.
+    :math:`\Theta` and :math:`\Phi` are linear layers.
 
     Parameters
     ----------

@@ -15,10 +15,12 @@ class APPNPConv(nn.Module):
     meet Personalized PageRank <https://arxiv.org/pdf/1810.05997.pdf>`__.
 
     .. math::
-        H^{0} = X
+        H^{0} &= X
 
-        H^{l+1} = (1-\alpha)\left(\tilde{D}^{-1/2}
+        H^{l+1} &= (1-\alpha)\left(\tilde{D}^{-1/2}
         \tilde{A} \tilde{D}^{-1/2} H^{l}\right) + \alpha H^{0}
+
+    where :math:`\tilde{A}` is :math:`A` + :math:`I`.
 
     Parameters
     ----------
@@ -76,7 +78,7 @@ class APPNPConv(nn.Module):
         graph : DGLGraph
             The graph.
         feat : torch.Tensor
-            The input feature of shape :math:`(N, *)` :math:`N` is the
+            The input feature of shape :math:`(N, *)`. :math:`N` is the
             number of nodes, and :math:`*` could be of any shape.
 
         Returns

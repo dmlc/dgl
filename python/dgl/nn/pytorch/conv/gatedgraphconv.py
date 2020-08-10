@@ -16,11 +16,11 @@ class GatedGraphConv(nn.Module):
     Neural Networks <https://arxiv.org/pdf/1511.05493.pdf>`__.
 
     .. math::
-        h_{i}^{0} & = [ x_i \| \mathbf{0} ]
+        h_{i}^{0} &= [ x_i \| \mathbf{0} ]
 
-        a_{i}^{t} & = \sum_{j\in\mathcal{N}(i)} W_{e_{ij}} h_{j}^{t}
+        a_{i}^{t} &= \sum_{j\in\mathcal{N}(i)} W_{e_{ij}} h_{j}^{t}
 
-        h_{i}^{t+1} & = \mathrm{GRU}(a_{i}^{t}, h_{i}^{t})
+        h_{i}^{t+1} &= \mathrm{GRU}(a_{i}^{t}, h_{i}^{t})
 
     Parameters
     ----------
