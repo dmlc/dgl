@@ -37,7 +37,7 @@ def _init_rpc(ip_config, server_count, max_queue_size, net_type, role, num_threa
         traceback.print_exc()
         raise e
 
-def initialize(ip_config, server_count, num_workers=0, 
+def initialize(ip_config, server_count, num_workers=0,
                max_queue_size=MAX_QUEUE_SIZE, net_type='socket',
                num_worker_threads=1):
     """Init rpc service
