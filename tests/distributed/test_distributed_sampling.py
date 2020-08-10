@@ -77,15 +77,6 @@ def check_rpc_sampling(tmpdir, num_server):
     assert np.array_equal(
         F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
 
-@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
-def test_rpc_find_edges():
-    import tempfile
-    os.environ['DGL_DIST_MODE'] = 'distributed'
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        check_rpc_find_edges(Path(tmpdirname), 2)
-        check_rpc_find_edges(Path(tmpdirname), 1)
-
 def check_rpc_find_edges(tmpdir, num_server):
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
