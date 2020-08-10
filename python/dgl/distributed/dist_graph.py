@@ -250,9 +250,10 @@ class DistGraphServer(KVServer):
     disable_shared_mem : bool
         Disable shared memory.
     '''
-    def __init__(self, server_id, ip_config, server_count, num_clients, part_config, disable_shared_mem=False):
-        super(DistGraphServer, self).__init__(server_id=server_id, 
-                                              ip_config=ip_config, 
+    def __init__(self, server_id, ip_config, server_count,
+                 num_clients, part_config, disable_shared_mem=False):
+        super(DistGraphServer, self).__init__(server_id=server_id,
+                                              ip_config=ip_config,
                                               server_count=server_count,
                                               num_clients=num_clients)
         self.ip_config = ip_config
@@ -291,7 +292,9 @@ class DistGraphServer(KVServer):
         # start server
         server_state = ServerState(kv_store=self, local_g=self.client_g, partition_book=self.gpb)
         print('start graph service on server {} for part {}'.format(self.server_id, self.part_id))
-        start_server(server_id=self.server_id, ip_config=self.ip_config, server_count=self.server_count,
+        start_server(server_id=self.server_id,
+                     ip_config=self.ip_config,
+                     server_count=self.server_count,
                      num_clients=self.num_clients, server_state=server_state)
 
 class DistGraph:
