@@ -291,7 +291,7 @@ class DistGraphServer(KVServer):
         # start server
         server_state = ServerState(kv_store=self, local_g=self.client_g, partition_book=self.gpb)
         print('start graph service on server {} for part {}'.format(self.server_id, self.part_id))
-        start_server(server_id=self.server_id, ip_config=self.ip_config, server_count=server_count,
+        start_server(server_id=self.server_id, ip_config=self.ip_config, server_count=self.server_count,
                      num_clients=self.num_clients, server_state=server_state)
 
 class DistGraph:
