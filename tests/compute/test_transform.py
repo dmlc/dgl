@@ -489,7 +489,7 @@ def create_large_graph(num_nodes):
     col = np.random.choice(num_nodes, num_nodes * 10)
     spm = spsp.coo_matrix((np.ones(len(row)), (row, col)))
 
-    return dgl.graph(spm)
+    return dgl.from_scipy(spm)
 
 def get_nodeflow(g, node_ids, num_layers):
     batch_size = len(node_ids)

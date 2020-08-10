@@ -156,7 +156,7 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
     if reverse:
         g = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0])
-        }, {'user': card})
+        }, {'user': card if card is not None else 4})
         g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2],
@@ -168,7 +168,7 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
     else:
         g = dgl.heterograph({
             ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2])
-        }, {'user': card})
+        }, {'user': card if card is not None else 4})
         g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0],
