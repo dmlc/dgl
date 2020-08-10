@@ -101,7 +101,7 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
 def test_dist_dataloader(tmpdir, num_server, drop_last):
     ip_config = open("mp_ip_config.txt", "w")
     for _ in range(num_server):
-        ip_config.write('{}1\n'.format(get_local_usable_addr()))
+        ip_config.write('{}\n'.format(get_local_usable_addr()))
     ip_config.close()
 
     g = CitationGraphDataset("cora")[0]
