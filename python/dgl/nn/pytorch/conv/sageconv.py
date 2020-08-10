@@ -58,6 +58,21 @@ class SAGEConv(nn.Module):
         0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
         and let the users handle it by themselves. Default: ``False``.
 
+    Notes
+    -----
+    Zero in-degree nodes will lead to invalid output value. This is because no message
+    will be passed to those nodes, the aggregation function will be appied on empty input.
+    A common practice to avoid this is to add a self-loop for each node in the graph if
+    it is homogeneous, which can be achieved by:
+
+    >>> g = ... # a DGLGraph
+    >>> g = dgl.add_self_loop(g)
+
+    Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
+    since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree`` to ``True``
+    for those cases to unblock the code and handle zere-in-degree nodes manually. A common
+    practise to handle this is to filter out the nodes with zere-in-degree when use after conv.
+
     Examples
     --------
     >>> import dgl
@@ -67,30 +82,31 @@ class SAGEConv(nn.Module):
 
     >>> # Case 1: Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> g = dgl.add_self_loop(g)
     >>> feat = th.ones(6, 10)
-    >>> conv = SAGEConv(10, 2, 'gcn')
+    >>> conv = SAGEConv(10, 2, 'pool')
     >>> res = conv(g, feat)
     >>> res
-    tensor([[0.1909, 1.2743],
-            [0.1909, 1.2743],
-            [0.1909, 1.2743],
-            [0.1909, 1.2743],
-            [0.1909, 1.2743],
-            [0.1909, 1.2743]], grad_fn=<AddmmBackward>)
+    tensor([[-1.0888, -2.1099],
+            [-1.0888, -2.1099],
+            [-1.0888, -2.1099],
+            [-1.0888, -2.1099],
+            [-1.0888, -2.1099],
+            [-1.0888, -2.1099]], grad_fn=<AddBackward0>)
 
     >>> # Case 2: Unidirectional bipartite graph
-    >>> u = [0, 0, 1]
-    >>> v = [2, 3, 2]
+    >>> u = [0, 1, 0, 0, 1]
+    >>> v = [0, 1, 2, 3, 2]
     >>> g = dgl.bipartite((u, v))
     >>> u_fea = th.rand(2, 5)
     >>> v_fea = th.rand(4, 10)
     >>> conv = SAGEConv((5, 10), 2, 'mean')
     >>> res = conv(g, (u_fea, v_fea))
     >>> res
-    tensor([[-0.3203,  0.1696],
-            [-1.4204,  0.3623],
-            [ 1.1613,  0.2149],
-            [-0.2270,  1.3949]], grad_fn=<AddBackward0>)
+    tensor([[ 0.3163,  3.1166],
+            [ 0.3866,  2.5398],
+            [ 0.5873,  1.6597],
+            [-0.2502,  2.8068]], grad_fn=<AddBackward0>)
     """
     def __init__(self,
                  in_feats,

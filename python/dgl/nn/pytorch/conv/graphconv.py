@@ -60,9 +60,10 @@ class GraphConv(nn.Module):
 
     Notes
     -----
-    Zero in-degree nodes will lead to invalid output value. A common practice
-    to avoid this is to add a self-loop for each node in the graph if it is
-    homogeneous, which can be achieved by:
+    Zero in-degree nodes will lead to invalid output value. This is because no message
+    will be passed to those nodes, the aggregation function will be appied on empty input.
+    A common practice to avoid this is to add a self-loop for each node in the graph if
+    it is homogeneous, which can be achieved by:
 
     >>> g = ... # a DGLGraph
     >>> g = dgl.add_self_loop(g)
