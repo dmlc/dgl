@@ -33,9 +33,15 @@ def submit_jobs(args, udf_command):
     with open(ip_config) as f:
         for line in f:
             result = line.strip().split(' ')
-            ip = result[0]
+            if len(result) == 2:
+                ip = result[0]
+                port = int(result[1])
+            elif len(result) == 1:
+                ip = result[0]
+            else:
+                raise RuntimeError("Format error of ip_config.")
             server_count_per_machine = args.server_count
-            hosts.append(ip)
+            hosts.append((ip, port))
 
     # Get partition info of the graph data
     part_config = args.workspace + '/' + args.part_config
@@ -55,7 +61,7 @@ def submit_jobs(args, udf_command):
     server_cmd = server_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
     server_cmd = server_cmd + ' ' + 'DGL_SERVER_COUNT=' + str(args.server_count)
     for i in range(len(hosts)*server_count_per_machine):
-        ip = hosts[int(i / server_count_per_machine)]
+        ip, _ = hosts[int(i / server_count_per_machine)]
         cmd = server_cmd + ' ' + 'DGL_SERVER_ID=' + str(i)
         cmd = cmd + ' ' + udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
@@ -78,7 +84,7 @@ def submit_jobs(args, udf_command):
     torch_cmd = torch_cmd + ' ' + '--master_addr=' + str(hosts[0][0])
     torch_cmd = torch_cmd + ' ' + '--master_port=' + str(1234)
     for node_id, host in enumerate(hosts):
-        ip = host
+        ip, _ = host
         new_torch_cmd = torch_cmd.replace('node_rank=0', 'node_rank='+str(node_id))
         if 'python3' in udf_command:
             new_udf_command = udf_command.replace('python3', 'python3 ' + new_torch_cmd)
