@@ -394,7 +394,7 @@ def test_sage_conv(idtype, g, aggre_type):
     sage = nn.SAGEConv(5, 10, aggre_type)
     feat = F.randn((g.number_of_nodes(), 5))
     sage = sage.to(F.ctx())
-    h = sage(g, F.copy_to(feat[0], F.ctx()))
+    h = sage(g, F.copy_to(feat, F.ctx()))
     assert h.shape[-1] == 10
 
 @parametrize_dtype
