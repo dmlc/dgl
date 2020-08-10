@@ -97,13 +97,15 @@ def get_local_usable_addr():
     return ip_addr + ':' + str(port)
 
 
-def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
+def connect_to_server(ip_config, server_count, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Connect this client to server.
 
     Parameters
     ----------
     ip_config : str
         Path of server IP configuration file.
+    server_count : int
+        server count on each machine.
     max_queue_size : int
         Maximal size (bytes) of client queue buffer (~20 GB on default).
         Note that the 20 GB is just an upper-bound and DGL uses zero-copy and
@@ -115,6 +117,7 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     ------
     ConnectionError : If anything wrong with the connection.
     """
+    assert server_count > 0, 'server_count (%d) must be a positive number.' % server_count
     assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % max_queue_size
     assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'.' % net_type
     # Register some basic service
@@ -131,7 +134,7 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
                          rpc.ClientBarrierRequest,
                          rpc.ClientBarrierResponse)
     rpc.register_ctrl_c()
-    server_namebook = rpc.read_ip_config(ip_config)
+    server_namebook = rpc.read_ip_config(ip_config, server_count)
     num_servers = len(server_namebook)
     rpc.set_num_server(num_servers)
     # group_count means how many servers
