@@ -45,7 +45,7 @@ class RelGraphConv(nn.Module):
 
        W_r^{(l)} = \oplus_{b=1}^B Q_{rb}^{(l)}
 
-    where :math:`B` is the number of bases, :math:`Q_{rb}^{(l)}` are block bases with shape :math:`\R^{(d^{(l+1)}/B)*(d^{l}/B)}`.
+    where :math:`B` is the number of bases, :math:`Q_{rb}^{(l)}` are block bases with shape :math:`R^{(d^{(l+1)}/B)*(d^{l}/B)}`.
 
     Parameters
     ----------
@@ -60,22 +60,23 @@ class RelGraphConv(nn.Module):
         "basis" is short for basis-diagonal-decomposition.
         "bdd" is short for block-diagonal-decomposition.
     num_bases : int, optional
-        Number of bases. If is none, use number of relations. Default: None.
+        Number of bases. If is none, use number of relations. Default: ``None``.
     bias : bool, optional
-        True if bias is added. Default: True.
+        True if bias is added. Default: ``True``.
     activation : callable, optional
-        Activation function. Default: None.
+        Activation function. Default: ``None``.
     self_loop : bool, optional
-        True to include self loop message. Default: True.
+        True to include self loop message. Default: ``True``.
     low_mem : bool, optional
         True to use low memory implementation of relation message passing function. Default: False.
         This option trades speed with memory consumption, and will slowdown the forward/backward.
-        Turn it on when you encounter OOM problem during training or evaluation.
+        Turn it on when you encounter OOM problem during training or evaluation. Default: ``False``.
     dropout : float, optional
-        Dropout rate. Default: 0.0
+        Dropout rate. Default: ``0.0``
     layer_norm: float, optional
-        Add layer norm. Default: False
+        Add layer norm. Default: ``False``
     
+
     Examples
     --------
     >>> import dgl
@@ -240,7 +241,7 @@ class RelGraphConv(nn.Module):
             msg = msg * edges.data['norm']
         return {'msg': msg}
 
-    def forward(self, g, x, etypes, norm=None):
+    def forward(self, g, feat, etypes, norm=None):
         """
 
         Description
@@ -252,11 +253,12 @@ class RelGraphConv(nn.Module):
         ----------
         g : DGLGraph
             The graph.
-        x : torch.Tensor
+        feat : torch.Tensor
             Input node features. Could be either
+
                 * :math:`(|V|, D)` dense tensor
                 * :math:`(|V|,)` int64 vector, representing the categorical values of each
-                  node. We then treat the input feature as an one-hot encoding feature.
+                  node. It then treat the input feature as an one-hot encoding feature.
         etypes : torch.Tensor
             Edge type tensor. Shape: :math:`(|E|,)`
         norm : torch.Tensor
@@ -268,12 +270,12 @@ class RelGraphConv(nn.Module):
             New node features.
         """
         with g.local_scope():
-            g.srcdata['h'] = x
+            g.srcdata['h'] = feat
             g.edata['type'] = etypes
             if norm is not None:
                 g.edata['norm'] = norm
             if self.self_loop:
-                loop_message = utils.matmul_maybe_select(x[:g.number_of_dst_nodes()],
+                loop_message = utils.matmul_maybe_select(feat[:g.number_of_dst_nodes()],
                                                          self.loop_weight)
             # message passing
             g.update_all(self.message_func, fn.sum(msg='msg', out='h'))

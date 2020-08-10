@@ -22,7 +22,7 @@ class GraphConv(gluon.Block):
 
     where :math:`\mathcal{N}(i)` is the set of neighbors of node :math:`i`,
     :math:`c_{ij}` is the product of the square root of node degrees
-    (i.e.,  :math:`c_{ij} = \sqrt{|\mathcal{N}(i)|}\sqrt{|\mathcal{N}(j)|}`,
+    (i.e.,  :math:`c_{ij} = \sqrt{|\mathcal{N}(i)|}\sqrt{|\mathcal{N}(j)|}`),
     and :math:`\sigma` is an activation function.
 
     Parameters
@@ -49,7 +49,7 @@ class GraphConv(gluon.Block):
         since no message will be passed to those nodes. This is harmful for some applications
         causing silent performance regression. This module will raise a DGLError if it detects
         0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
-        and let the users handle it by themselves.
+        and let the users handle it by themselves. Default: ``False``.
 
     Attributes
     ----------

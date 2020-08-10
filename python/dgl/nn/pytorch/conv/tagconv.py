@@ -25,9 +25,9 @@ class TAGConv(nn.Module):
     Parameters
     ----------
     in_feats : int
-        Input feature size.
+        Input feature size. i.e, the number of dimensions of :math:`X`.
     out_feats : int
-        Output feature size.
+        Output feature size.  i.e, the number of dimensions of :math:`{X}^{\prime}`.
     k: int, optional
         Number of hops :math:`k`. (default: 2)
     bias: bool, optional
