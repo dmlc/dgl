@@ -41,7 +41,7 @@ def initialize(ip_config, server_count=1, num_workers=0,
                max_queue_size=MAX_QUEUE_SIZE, net_type='socket',
                num_worker_threads=1):
     """Init rpc service
-    
+
     Parameters
     ----------
     ip_config: str
