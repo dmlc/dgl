@@ -49,6 +49,11 @@ def train(dataset, args):
 
     device = torch.device(args.device)
 
+    # Assign user and movie IDs and use them as features (to learn an individual trainable
+    # embedding for each entity)
+    g.nodes[user_ntype].data['id'] = torch.arange(g.number_of_nodes(user_ntype))
+    g.nodes[item_ntype].data['id'] = torch.arange(g.number_of_nodes(item_ntype))
+
     # Prepare torchtext dataset and vocabulary
     fields = {}
     examples = []
