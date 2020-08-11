@@ -52,7 +52,7 @@ g.edges['listened'].data['created_at'] = torch.LongTensor(events['created_at'].v
 g.edges['listened-by'].data['created_at'] = torch.LongTensor(events['created_at'].values)
 
 n_edges = g.number_of_edges('listened')
-train_indices, val_indices, test_indices = train_test_split_by_time(g, 'created_at', 'listened', 'track')
+train_indices, val_indices, test_indices = train_test_split_by_time(events, 'created_at', 'track_id')
 train_g = build_train_graph(g, train_indices, 'user', 'track', 'listened', 'listened-by')
 val_matrix, test_matrix = build_val_test_matrix(
     g, val_indices, test_indices, 'user', 'track', 'listened')

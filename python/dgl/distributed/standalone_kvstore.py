@@ -60,3 +60,6 @@ class KVClient(object):
             return self._pull_handlers[name](self._data, name, id_tensor)
         else:
             return F.gather_row(self._data[name], id_tensor)
+
+    def map_shared_data(self, partition_book):
+        '''Mapping shared-memory tensor from server to client.'''

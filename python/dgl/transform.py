@@ -12,9 +12,9 @@ from .heterograph import DGLHeteroGraph, DGLBlock
 from . import ndarray as nd
 from . import backend as F
 from . import utils, batch
-from .partition import metis_partition_assignment as hetero_metis_partition_assignment
-from .partition import partition_graph_with_halo as hetero_partition_graph_with_halo
-from .partition import metis_partition as hetero_metis_partition
+from .partition import metis_partition_assignment
+from .partition import partition_graph_with_halo
+from .partition import metis_partition
 
 # TO BE DEPRECATED
 from ._deprecate.graph import DGLGraph as DGLGraphStale
@@ -42,6 +42,9 @@ __all__ = [
     'to_simple',
     'to_simple_graph',
     'as_immutable_graph',
+    'metis_partition_assignment',
+    'partition_graph_with_halo',
+    'metis_partition',
     'as_heterograph']
 
 
@@ -414,6 +417,7 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
         num_nodes_dict[ntype] = g.number_of_nodes(ntype)
 
     canonical_etypes = g.canonical_etypes
+    num_nodes_dict = {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes}
     # fast path
     if ignore_bipartite is False:
         subgs = {}
@@ -470,7 +474,7 @@ def line_graph(g, backtracking=True, shared=False):
     Parameters
     ----------
     g : DGLGraph
-        Input graph.  Must be homogeneous and on CPU.
+        Input graph.
     backtracking : bool, optional
         If False, the line graph node corresponding to edge ``(u, v)`` will not have
         an edge connecting to the line graph node corresponding to edge ``(v, u)``.
@@ -485,14 +489,14 @@ def line_graph(g, backtracking=True, shared=False):
     G : DGLGraph
         The line graph of this graph.
 
-        The returned line graph will be on CPU.
-
     Notes
     -----
     If :attr:`shared` is True, same tensors will be used for
     the features of the original graph and the returned graph to save memory cost.
     As a result, users should avoid performing in-place operations on the features of
     the returned graph, which will corrupt the features of the original graph as well.
+
+    The implementation is done on CPU, even if the input and output graphs are on GPU.
 
     Examples
     --------
@@ -520,9 +524,10 @@ def line_graph(g, backtracking=True, shared=False):
     """
     assert g.is_homogeneous(), \
         'only homogeneous graph is supported'
-    assert g.device == F.cpu(), 'the graph must be on CPU'
-    lg = DGLHeteroGraph(_CAPI_DGLHeteroLineGraph(g._graph, backtracking))
 
+    dev = g.device
+    lg = DGLHeteroGraph(_CAPI_DGLHeteroLineGraph(g._graph.copy_to(nd.cpu()), backtracking))
+    lg = lg.to(dev)
     if shared:
         new_frames = utils.extract_edge_subframes(g, None)
         utils.set_new_frames(lg, node_frames=new_frames)
@@ -553,7 +558,6 @@ def khop_adj(g, k):
 
     Examples
     --------
-
     >>> import dgl
     >>> g = dgl.graph(([0,1,2,3,4,0,1,2,3,4], [0,1,2,3,4,1,2,3,4,0]))
     >>> dgl.khop_adj(g, 1)
@@ -1003,6 +1007,9 @@ def add_nodes(g, num, data=None, ntype=None):
 
     Examples
     --------
+
+    The following example uses PyTorch backend.
+
     >>> import dgl
     >>> import torch
 
