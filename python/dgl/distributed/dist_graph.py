@@ -9,7 +9,6 @@ from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID
 from .kvstore import KVServer, get_kvstore
-from .standalone_kvstore import KVClient as SA_KVClient
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
 from .partition import load_partition, load_partition_book
@@ -334,7 +333,7 @@ class DistGraph:
         if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
             assert part_config is not None, \
                     'When running in the standalone model, the partition config file is required'
-            self._client = SA_KVClient()
+            self._client = get_kvstore()
             # Load graph partition data.
             g, node_feats, edge_feats, self._gpb, _ = load_partition(part_config, 0)
             assert self._gpb.num_partitions() == 1, \

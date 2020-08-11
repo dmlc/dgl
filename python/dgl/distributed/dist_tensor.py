@@ -63,7 +63,7 @@ class DistTensor:
                     # If multiple partition policies match the input shape, we cannot
                     # decide which is the right one automatically. We should ask users
                     # to provide one.
-                    assert part_policy is not None, \
+                    assert part_policy is None, \
                             'Multiple partition policies match the input shape. ' \
                             + 'Please provide a partition policy explicitly.'
                     part_policy = policy
