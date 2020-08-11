@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from .mol_tree_nx import DGLMolTree
 from .chemutils import enum_assemble_nx, get_mol
 from .nnutils import GRUUpdate, cuda, tocpu
-from dgl import batch, dfs_labeled_edges_generator
+from dgl import batch, dfs_labeled_edges_generator, line_graph
 import dgl.function as DGLF
 import numpy as np
 
@@ -107,7 +107,7 @@ class DGLJTNNDecoder(nn.Module):
         ground truth tree
         '''
         mol_tree_batch = batch(mol_trees)
-        mol_tree_batch_lg = dgl.line_graph(mol_tree_batch, backtracking=False, shared=True)
+        mol_tree_batch_lg = line_graph(mol_tree_batch, backtracking=False, shared=True)
         n_trees = len(mol_trees)
 
         return self.run(mol_tree_batch, mol_tree_batch_lg, n_trees, tree_vec)
@@ -306,7 +306,7 @@ class DGLJTNNDecoder(nn.Module):
                 # keeping dst_x 0 is fine as h on new edge doesn't depend on that.
 
                 # DGL doesn't dynamically maintain a line graph.
-                mol_tree_graph_lg = dgl.line_graph(mol_tree_graph, backtracking=False, shared=True)
+                mol_tree_graph_lg = line_graph(mol_tree_graph, backtracking=False, shared=True)
 
                 mol_tree_graph_lg.pull(
                     uv,
@@ -357,7 +357,7 @@ class DGLJTNNDecoder(nn.Module):
                     mol_tree_graph.edata['dst_x'][vu] = mol_tree_graph.ndata['x'][u]
 
                     # DGL doesn't dynamically maintain a line graph.
-                    mol_tree_graph_lg = dgl.line_graph(mol_tree_graph, backtracking=False, shared=True)
+                    mol_tree_graph_lg = line_graph(mol_tree_graph, backtracking=False, shared=True)
                     mol_tree_graph_lg.apply_nodes(
                         self.dec_tree_edge_update.update_r,
                         uv

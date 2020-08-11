@@ -435,7 +435,7 @@ def line_graph(g, backtracking=True, shared=False):
         'line_heterograph only support directed homogeneous graph right now'
 
     dev = g.device
-    lg = DGLHeteroGraph(_CAPI_DGLHeteroLineGraph(g._graph.copy_to(F.cpu()), backtracking))
+    lg = DGLHeteroGraph(_CAPI_DGLHeteroLineGraph(g._graph.copy_to(nd.cpu()), backtracking))
     lg = lg.to(dev)
     if shared:
         # copy edge features
