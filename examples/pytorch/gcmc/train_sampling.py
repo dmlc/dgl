@@ -46,24 +46,14 @@ class Net(nn.Module):
         else:
             self.encoder.to(dev_id)
 
-        #self.decoder = BiDecoder(in_units=args.gcn_out_units,
-        #                         num_classes=len(args.rating_vals),
-        #                         num_basis=args.gen_r_num_basis_func)
-        self.decoder = DenseBiDecoder(in_units=args.gcn_out_units,
-                                      num_classes=len(args.rating_vals),
-                                      num_basis=args.gen_r_num_basis_func)
+        self.decoder = BiDecoder(in_units=args.gcn_out_units,
+                                 num_classes=len(args.rating_vals),
+                                 num_basis=args.gen_r_num_basis_func)
         self.decoder.to(dev_id)
 
     def forward(self, compact_g, frontier, ufeat, ifeat, possible_rating_values):
         user_out, movie_out = self.encoder(frontier, ufeat, ifeat)
-
-        #pred_ratings = self.decoder(compact_g, user_out, movie_out)
-
-        head, tail = compact_g.edges(order='eid')
-        head_emb = user_out[head]
-        tail_emb = movie_out[tail]
-
-        pred_ratings = self.decoder(head_emb, tail_emb)
+        pred_ratings = self.decoder(compact_g, user_out, movie_out)
         return pred_ratings
 
 def load_subtensor(input_nodes, pair_graph, blocks, dataset, parent_graph):
