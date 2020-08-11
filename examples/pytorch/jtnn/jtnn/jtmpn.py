@@ -98,10 +98,6 @@ def mol2dgl_single(cand_batch):
             torch.LongTensor(tree_mess_target_nodes)
 
 
-mpn_loopy_bp_msg = DGLF.copy_src(src='msg', out='msg')
-mpn_loopy_bp_reduce = DGLF.sum(msg='msg', out='accum_msg')
-
-
 class LoopyBPUpdate(nn.Module):
     def __init__(self, hidden_size):
         super(LoopyBPUpdate, self).__init__()
@@ -244,17 +240,14 @@ class DGLJTMPN(nn.Module):
 
         cand_line_graph.ndata.update(cand_graphs.edata)
         for i in range(self.depth - 1):
-            cand_line_graph.update_all(
-                mpn_loopy_bp_msg,
-                mpn_loopy_bp_reduce,
-                self.loopy_bp_updater,
-            )
+            cand_line_graph.update_all(DGLF.copy_u('msg', 'msg'), DGLF.sum('msg', 'accum_msg'))
+            cand_line_graph.apply_nodes(self.loopy_bp_updater)
 
         cand_graphs.edata.update(cand_line_graph.ndata)
-        cand_graphs.update_all(
-            mpn_gather_msg,
-            mpn_gather_reduce,
-            self.gather_updater,
-        )
+
+        cand_graphs.update_all(DGLF.copy_e('msg', 'msg'), DGLF.sum('msg', 'm'))
+        if PAPER:
+            cand_graphs.update_all(DGLF.copy_e('alpha', 'alpha'), DGLF.sum('alpha', 'accum_alpha'))
+        cand_graphs.apply_nodes(self.gather_updater)
 
         return cand_graphs

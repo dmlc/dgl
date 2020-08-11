@@ -65,10 +65,6 @@ def mol2dgl_single(smiles):
             torch.stack(bond_x) if len(bond_x) > 0 else torch.zeros(0)
 
 
-mpn_loopy_bp_msg = DGLF.copy_src(src='msg', out='msg')
-mpn_loopy_bp_reduce = DGLF.sum(msg='msg', out='accum_msg')
-
-
 class LoopyBPUpdate(nn.Module):
     def __init__(self, hidden_size):
         super(LoopyBPUpdate, self).__init__()
@@ -81,10 +77,6 @@ class LoopyBPUpdate(nn.Module):
         msg_delta = self.W_h(nodes.data['accum_msg'])
         msg = F.relu(msg_input + msg_delta)
         return {'msg': msg}
-
-
-mpn_gather_msg = DGLF.copy_edge(edge='msg', out='msg')
-mpn_gather_reduce = DGLF.sum(msg='msg', out='m')
 
 
 class GatherUpdate(nn.Module):
@@ -162,17 +154,11 @@ class DGLMPN(nn.Module):
         })
 
         for i in range(self.depth - 1):
-            mol_line_graph.update_all(
-                mpn_loopy_bp_msg,
-                mpn_loopy_bp_reduce,
-                self.loopy_bp_updater,
-            )
+            mol_line_graph.update_all(DGLF.copy_u('msg', 'msg'), DGLF.sum('msg', 'accum_msg'))
+            mol_line_graph.apply_nodes(self.loopy_bp_updater)
 
         mol_graph.edata.update(mol_line_graph.ndata)
-        mol_graph.update_all(
-            mpn_gather_msg,
-            mpn_gather_reduce,
-            self.gather_updater,
-        )
+        mol_graph.update_all(DGLF.copy_e('msg', 'msg'), DGLF.sum('msg', 'm'))
+        mol_graph.apply_nodes(self.gather_updater)
 
         return mol_graph
