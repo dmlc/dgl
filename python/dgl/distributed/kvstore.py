@@ -735,11 +735,11 @@ class KVServer(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name][:] = data_tensor[:]
-            assert self._part_policy[name].get_data_size() == data_tensor.shape[0], \
+            assert self._part_policy[name].get_part_size() == data_tensor.shape[0], \
                     'kvserver expect partition {} for {} has {} rows, but gets {} rows'.format(
                         self._part_policy[name].part_id,
                         policy_str,
-                        self._part_policy[name].get_data_size(),
+                        self._part_policy[name].get_part_size(),
                         data_tensor.shape[0])
         self._pull_handlers[name] = default_pull_handler
         self._push_handlers[name] = default_push_handler
@@ -955,7 +955,7 @@ class KVClient(object):
         # Send request to the servers to initialize data.
         # The servers may handle the duplicated initializations.
         part_shape = shape.copy()
-        part_shape[0] = part_policy.get_data_size()
+        part_shape[0] = part_policy.get_part_size()
         request = InitDataRequest(name,
                                   tuple(part_shape),
                                   F.reverse_data_type_dict[dtype],
@@ -972,7 +972,7 @@ class KVClient(object):
         self.barrier()
         # Create local shared-data
         local_shape = shape.copy()
-        local_shape[0] = part_policy.get_data_size()
+        local_shape[0] = part_policy.get_part_size()
         if name in self._part_policy:
             raise RuntimeError("Policy %s has already exists!" % name)
         if name in self._data_store:

@@ -701,7 +701,7 @@ class PartitionPolicy(object):
         else:
             raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
 
-    def get_data_size(self):
+    def get_part_size(self):
         """Get data size of current partition.
 
         Returns
