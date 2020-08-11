@@ -295,7 +295,7 @@ if __name__ == '__main__':
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
     parser.add_argument('--part_config', type=str, help='The path to the partition config file')
     parser.add_argument('--num-client', type=int, help='The number of clients')
-    parser.add_argument('--num-servers', type=int, help='The number of servers')
+    parser.add_argument('--num-servers', type=int, default=1, help='The number of servers')
     parser.add_argument('--n-classes', type=int, help='the number of classes')
     parser.add_argument('--gpu', type=int, default=0,
         help="GPU device ID. Use -1 for CPU training")
