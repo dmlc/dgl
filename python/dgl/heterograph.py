@@ -2279,8 +2279,8 @@ class DGLHeteroGraph(object):
                            'got {}'.format(type(u)))
 
         src_type, _, dst_type = self.to_canonical_etype(etype)
-        num_src_type_nodes = self.num_nodes(src_type)
-        num_dst_type_nodes = self.num_nodes(dst_type)
+        num_src_type_nodes = self.num_src_nodes(src_type)
+        num_dst_type_nodes = self.num_dst_nodes(dst_type)
 
         if isinstance(u, numbers.Integral):
             if u < 0 or u >= num_src_type_nodes:
@@ -2613,7 +2613,7 @@ class DGLHeteroGraph(object):
         See Also
         --------
         edges
-        in_edges
+        all_edges
         out_edges
         """
         if not (isinstance(v, (numbers.Integral, Iterable)) or F.is_tensor(v)):
@@ -2621,7 +2621,7 @@ class DGLHeteroGraph(object):
                            'got {}'.format(type(v)))
 
         _, _, dst_type = self.to_canonical_etype(etype)
-        num_dst_type_nodes = self.num_nodes(dst_type)
+        num_dst_type_nodes = self.num_dst_nodes(dst_type)
 
         if isinstance(v, numbers.Integral) and (v < 0 or v >= num_dst_type_nodes):
             raise DGLError('Expect the destination node ID to be from 0, ...'
@@ -2649,44 +2649,77 @@ class DGLHeteroGraph(object):
             raise DGLError('Invalid form: {}. Must be "all", "uv" or "eid".'.format(form))
 
     def out_edges(self, u, form='uv', etype=None):
-        """Return the outbound edges of the node(s) with the specified type.
+        """Return the outgoing edges of some particular node(s) with the specified type.
 
         Parameters
         ----------
-        u : int, list, tensor
-            The node id(s) of source type.
-        form : str, optional
-            The return form. Currently support:
+        u : source node ID(s)
+            The source node(s) for query. The allowed formats are:
 
-            - ``'eid'`` : one eid tensor
-            - ``'all'`` : a tuple ``(u, v, eid)``
-            - ``'uv'``  : a pair ``(u, v)``, default
+            - int: The source node for query.
+            - Tensor: A 1D tensor that contains the source node(s) for query, whose data
+              type and device should be separately the same as the idtype and device of the
+              graph.
+            - iterable[int] : Similar to the tensor, but stores node IDs in a sequence
+              (e.g. list, tuple, numpy.ndarray).
+        form : str, optional
+            The return form, which can be one of the following:
+
+            - ``'eid'``: The returned result is a 1D tensor :math:`EID`, representing
+              the IDs of all edges.
+            - ``'uv'`` (default): The returned result is a 2-tuple of 1D tensors :math:`(U, V)`,
+              representing the source and destination nodes of all edges. For each :math:`i`,
+              :math:`(U[i], V[i])` forms an edge.
+            - ``'all'``: The returned result is a 3-tuple of 1D tensors :math:`(U, V, EID)`,
+              representing the source nodes, destination nodes and IDs of all edges.
+              For each :math:`i`, :math:`(U[i], V[i])` forms an edge with ID :math:`EID[i]`.
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
-        tensor or (tensor, tensor, tensor) or (tensor, tensor)
-            All outbound edges from ``u`` are returned.
-
-            * If ``form='eid'``, return a tensor for the ids of the outbound edges
-              of the nodes with the specified type.
-            * If ``form='all'``, return a 3-tuple of tensors ``(eu, ev, eid)``.
-              ``eid[i]`` gives the ID of the edge from ``eu[i]`` to ``ev[i]``.
-            * If ``form='uv'``, return a 2-tuple of tensors ``(eu, ev)``.
-              ``ev[i]`` is the destination node of the edge from ``eu[i]``.
+        Tensor or (Tensor, Tensor) or (Tensor, Tensor, Tensor)
+            All outgoing edges of the nodes with the specified type. For a description of the
+            returned result, see the description of :attr:`form`.
 
         Examples
         --------
+        The following example uses PyTorch backend.
 
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1], [0, 1, 2])})
-        >>> g.out_edges([0, 1], form='eid')
-        tensor([0, 1, 2])
-        >>> g.out_edges([0, 1], form='all')
-        (tensor([0, 1, 1]), tensor([0, 1, 2]), tensor([0, 1, 2]))
-        >>> g.out_edges([0, 1], form='uv')
-        (tensor([0, 1, 1]), tensor([0, 1, 2]))
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 0, 2, 3])))
+
+        Query for the nodes 1 and 2.
+
+        >>> g.out_edges(torch.tensor([1, 2]))
+        (tensor([1, 1]), tensor([2, 3]))
+
+        Specify a different value for :attr:`form`.
+
+        >>> g.out_edges(torch.tensor([1, 2]), form='all')
+        (tensor([1, 1]), tensor([2, 3]), tensor([2, 3]))
+
+        For a graph of multiple edge types, it is required to specify the edge type in query.
+
+        >>> hg = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        >>> })
+        >>> hg.out_edges(torch.tensor([1, 2]), etype='follows')
+        (tensor([1]), tensor([2]))
+
+        See Also
+        --------
+        edges
+        all_edges
+        in_edges
         """
         u = utils.prepare_tensor(self, u, 'u')
         src, dst, eid = self._graph.out_edges(self.get_etype_id(etype), u)
