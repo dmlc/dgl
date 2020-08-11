@@ -139,7 +139,8 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
         policy = dgl.distributed.PartitionPolicy('node', g.get_partition_book())
         grad_sum = dgl.distributed.DistTensor(g, (g.number_of_nodes(),), F.float32,
                                               'emb1_sum', policy)
-        assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)) * num_clients)
+        if num_clients == 1:
+            assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)) * num_clients)
         assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
 
         emb = DistEmbedding(g, g.number_of_nodes(), 1, 'emb2', emb_init)
@@ -240,11 +241,6 @@ def test_server_client():
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_standalone():
     os.environ['DGL_DIST_MODE'] = 'standalone'
-    # TODO(zhengda) this is a temporary fix. We need to make initialize work
-    # for standalone mode as well.
-    dgl.distributed.role.CUR_ROLE = 'default'
-    dgl.distributed.role.GLOBAL_RANK = {-1:0}
-    dgl.distributed.role.PER_ROLE_RANK['default'] = {-1:0}
 
     g = create_random_graph(10000)
     # Partition the graph
@@ -253,9 +249,12 @@ def test_standalone():
     g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
     g.edata['features'] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
     partition_graph(g, graph_name, num_parts, '/tmp/dist_graph')
+
+    dgl.distributed.initialize("kv_ip_config.txt")
     dist_g = DistGraph("kv_ip_config.txt", graph_name,
                        part_config='/tmp/dist_graph/{}.json'.format(graph_name))
     check_dist_graph(dist_g, 1, g.number_of_nodes(), g.number_of_edges())
+    dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_split():

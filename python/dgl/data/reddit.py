@@ -171,6 +171,9 @@ class RedditDataset(DGLBuiltinDataset):
         graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
         graphs, _ = load_graphs(graph_path)
         self._graph = graphs[0]
+        self._graph.ndata['train_mask'] = generate_mask_tensor(self._graph.ndata['train_mask'].numpy())
+        self._graph.ndata['val_mask'] = generate_mask_tensor(self._graph.ndata['val_mask'].numpy())
+        self._graph.ndata['test_mask'] = generate_mask_tensor(self._graph.ndata['test_mask'].numpy())
         self._print_info()
 
     def _print_info(self):
