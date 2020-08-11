@@ -5,6 +5,7 @@ import traceback
 import atexit
 import time
 import os
+import sys
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
