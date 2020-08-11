@@ -338,6 +338,7 @@ class DistGraph:
                 self._client.add_data(_get_data_name(name, NODE_PART_POLICY), node_feats[name])
             for name in edge_feats:
                 self._client.add_data(_get_data_name(name, EDGE_PART_POLICY), edge_feats[name])
+            self._client.map_shared_data(self._gpb)
             rpc.set_num_client(1)
         else:
             self._init()

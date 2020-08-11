@@ -53,7 +53,7 @@ class DistTensor:
         self._shape = shape
         self._dtype = dtype
 
-        part_policies = self.kvstore.part_policy
+        part_policies = self.kvstore.all_possible_part_policy
         # If a user doesn't provide a partition policy, we should find one based on
         # the input shape.
         if part_policy is None:
