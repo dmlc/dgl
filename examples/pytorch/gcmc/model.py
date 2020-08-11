@@ -304,7 +304,9 @@ class BiDecoder(nn.Module):
         super(BiDecoder, self).__init__()
         self._num_basis = num_basis
         self.dropout = nn.Dropout(dropout_rate)
-        self.P = nn.Parameter(th.randn(num_basis, in_units, in_units))
+        self.Ps = nn.ParameterList()
+        for i in range(num_basis):
+            self.Ps.append(nn.Parameter(th.randn(in_units, in_units)))
         self.combine_basis = nn.Linear(self._num_basis, num_classes, bias=False)
         self.reset_parameters()
 
