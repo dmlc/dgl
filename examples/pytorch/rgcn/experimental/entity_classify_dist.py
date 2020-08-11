@@ -211,7 +211,6 @@ def evaluate(model, embed_layer, labels, eval_loader, test_loader, node_feats):
 
     test_logits = []
     test_seeds = []
-
     with th.no_grad():
         for sample_data in tqdm.tqdm(test_loader):
             seeds, blocks = sample_data
@@ -287,7 +286,7 @@ def run(args, device, data):
         shuffle=True,
         drop_last=False)
 
-    valid_sampler = NeighborSampler(g, [None] * args.n_layers, dgl.distributed.sample_neighbors)
+    valid_sampler = NeighborSampler(g, [-1] * args.n_layers, dgl.distributed.sample_neighbors)
     # Create DataLoader for constructing blocks
     valid_dataloader = DistDataLoader(
         dataset=val_nid.numpy(),
@@ -296,7 +295,7 @@ def run(args, device, data):
         shuffle=False,
         drop_last=False)
 
-    test_sampler = NeighborSampler(g, [None] * args.n_layers, dgl.distributed.sample_neighbors)
+    test_sampler = NeighborSampler(g, [-1] * args.n_layers, dgl.distributed.sample_neighbors)
     # Create DataLoader for constructing blocks
     test_dataloader = DistDataLoader(
         dataset=test_nid.numpy(),
@@ -403,15 +402,12 @@ def run(args, device, data):
                     np.sum(backward_t[-args.log_every:]), np.sum(update_t[-args.log_every:])))
             start = time.time()
 
-            if step > 1:
-                break
-
         print('[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #number_train: {}'.format(
             g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), number_train))
         epoch += 1
 
         start = time.time()
-        val_acc, test_acc = evaluate(model, embed_layer, labels, valid_sampler, test_sampler, node_feats)
+        val_acc, test_acc = evaluate(model, embed_layer, labels, valid_dataloader, test_dataloader, node_feats)
         print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc,
                                                                                   time.time() - start))
 
