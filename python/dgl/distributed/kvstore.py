@@ -835,6 +835,11 @@ class KVClient(object):
         self._role = role
 
     @property
+    def part_policy(self):
+        """Get the partition policies"""
+        return self._part_policy
+
+    @property
     def client_id(self):
         """Get client ID"""
         return self._client_id

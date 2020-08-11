@@ -2,10 +2,8 @@
 
 import os
 
-from .graph_partition_book import PartitionPolicy, NODE_PART_POLICY, EDGE_PART_POLICY
 from .dist_context import is_initialized
 from .kvstore import get_kvstore
-from ..base import DGLError
 from .. import utils
 from .. import backend as F
 
@@ -59,8 +57,8 @@ class DistTensor:
         # If a user doesn't provide a partition policy, we should find one based on
         # the input shape.
         if part_policy is None:
-            for name in part_policies:
-                policy = part_policies[name]
+            for policy_name in part_policies:
+                policy = part_policies[policy_name]
                 if policy.get_size() == shape[0]:
                     # If multiple partition policies match the input shape, we cannot
                     # decide which is the right one automatically. We should ask users
