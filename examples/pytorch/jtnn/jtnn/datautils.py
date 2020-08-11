@@ -84,9 +84,9 @@ class JTNNDataset(Dataset):
             cand_graphs = []
             atom_x_dec = torch.zeros(0, ATOM_FDIM_DEC)
             bond_x_dec = torch.zeros(0, BOND_FDIM_DEC)
-            tree_mess_src_e = torch.zeros(0, 2).int()
-            tree_mess_tgt_e = torch.zeros(0, 2).int()
-            tree_mess_tgt_n = torch.zeros(0).int()
+            tree_mess_src_e = torch.zeros(0, 2).long()
+            tree_mess_tgt_e = torch.zeros(0, 2).long()
+            tree_mess_tgt_n = torch.zeros(0).long()
 
         # prebuild the stereoisomers
         cands = mol_tree.stereo_cands
