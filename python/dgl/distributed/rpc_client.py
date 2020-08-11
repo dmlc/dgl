@@ -2,6 +2,7 @@
 
 import os
 import socket
+import atexit
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
@@ -18,10 +19,21 @@ def local_ip4_addr_list():
     for if_nidx in socket.if_nameindex():
         name = if_nidx[1]
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        ip_addr = socket.inet_ntoa(fcntl.ioctl(
-            sock.fileno(),
-            0x8915,  # SIOCGIFADDR
-            struct.pack('256s', name[:15].encode("UTF-8")))[20:24])
+        try:
+            ip_of_ni = fcntl.ioctl(sock.fileno(),
+                                   0x8915,  # SIOCGIFADDR
+                                   struct.pack('256s', name[:15].encode("UTF-8")))
+        except OSError as e:
+            if e.errno == 99: # EADDRNOTAVAIL
+                print("Warning!",
+                      "Interface: {}".format(name),
+                      "IP address not available for interface.",
+                      sep='\n')
+                continue
+            else:
+                raise e
+
+        ip_addr = socket.inet_ntoa(ip_of_ni[20:24])
         nic.add(ip_addr)
     return nic
 
@@ -84,6 +96,7 @@ def get_local_usable_addr():
 
     return ip_addr + ':' + str(port)
 
+
 def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Connect this client to server.
 
@@ -111,6 +124,13 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     rpc.register_service(rpc.SHUT_DOWN_SERVER,
                          rpc.ShutDownRequest,
                          None)
+    rpc.register_service(rpc.GET_NUM_CLIENT,
+                         rpc.GetNumberClientsRequest,
+                         rpc.GetNumberClientsResponse)
+    rpc.register_service(rpc.CLIENT_BARRIER,
+                         rpc.ClientBarrierRequest,
+                         rpc.ClientBarrierResponse)
+    rpc.register_ctrl_c()
     server_namebook = rpc.read_ip_config(ip_config)
     num_servers = len(server_namebook)
     rpc.set_num_server(num_servers)
@@ -149,11 +169,14 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     rpc.set_rank(res.client_id)
     print("Machine (%d) client (%d) connect to server successfuly!" \
         % (machine_id, rpc.get_rank()))
-
-def finalize_client():
-    """Release resources of this client."""
-    rpc.finalize_sender()
-    rpc.finalize_receiver()
+    # get total number of client
+    get_client_num_req = rpc.GetNumberClientsRequest(rpc.get_rank())
+    rpc.send_request(0, get_client_num_req)
+    res = rpc.recv_response()
+    rpc.set_num_client(res.num_client)
+    from .dist_context import exit_client, set_initialized
+    atexit.register(exit_client)
+    set_initialized()
 
 def shutdown_servers():
     """Issue commands to remote servers to shut them down.
@@ -162,7 +185,7 @@ def shutdown_servers():
     ------
     ConnectionError : If anything wrong with the connection.
     """
-    if rpc.get_rank() == 0: # Only client_0 issue this command
+    if rpc.get_rank() == 0:  # Only client_0 issue this command
         req = rpc.ShutDownRequest(rpc.get_rank())
         for server_id in range(rpc.get_num_server()):
             rpc.send_request(server_id, req)

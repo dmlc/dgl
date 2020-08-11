@@ -6,7 +6,7 @@ from mxnet.gluon import nn
 from mxnet.gluon.contrib.nn import Identity
 
 from .... import function as fn
-from ..softmax import edge_softmax
+from ....ops import edge_softmax
 from ....utils import expand_as_pair
 
 #pylint: enable=W0235
@@ -27,13 +27,8 @@ class GATConv(nn.Block):
 
     Parameters
     ----------
-    in_feats : int or pair of ints
-        Input feature size.
-
-        If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
-        specifies the input feature size on both the source and destination nodes.  If
-        a scalar is given, the source and destination node feature size would take the
-        same value.
+    in_feats : int
+        Number of input features.
     out_feats : int
         Output feature size.
     num_heads : int
@@ -65,17 +60,9 @@ class GATConv(nn.Block):
         self._in_feats = in_feats
         self._out_feats = out_feats
         with self.name_scope():
-            if isinstance(in_feats, tuple):
-                self.fc_src = nn.Dense(out_feats * num_heads, use_bias=False,
-                                       weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
-                                       in_units=self._in_src_feats)
-                self.fc_dst = nn.Dense(out_feats * num_heads, use_bias=False,
-                                       weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
-                                       in_units=self._in_dst_feats)
-            else:
-                self.fc = nn.Dense(out_feats * num_heads, use_bias=False,
-                                   weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
-                                   in_units=in_feats)
+            self.fc = nn.Dense(out_feats * num_heads, use_bias=False,
+                               weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+                               in_units=in_feats)
             self.attn_l = self.params.get('attn_l',
                                           shape=(1, num_heads, out_feats),
                                           init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
@@ -121,14 +108,16 @@ class GATConv(nn.Block):
             if isinstance(feat, tuple):
                 h_src = self.feat_drop(feat[0])
                 h_dst = self.feat_drop(feat[1])
-                feat_src = self.fc_src(h_src).reshape(
+                feat_src = self.fc(h_src).reshape(
                     -1, self._num_heads, self._out_feats)
-                feat_dst = self.fc_dst(h_dst).reshape(
+                feat_dst = self.fc(h_dst).reshape(
                     -1, self._num_heads, self._out_feats)
             else:
                 h_src = h_dst = self.feat_drop(feat)
                 feat_src = feat_dst = self.fc(h_src).reshape(
                     -1, self._num_heads, self._out_feats)
+                if graph.is_block:
+                    feat_dst = feat_src[:graph.number_of_dst_nodes()]
             # NOTE: GAT paper uses "first concatenation then linear projection"
             # to compute attention scores, while ours is "first projection then
             # addition", the two approaches are mathematically equivalent:

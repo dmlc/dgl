@@ -64,7 +64,7 @@ class NeighborSampler(object):
         neg_graph = dgl.graph((neg_heads, neg_tails), num_nodes=self.g.number_of_nodes())
         pos_graph, neg_graph = dgl.compact_graphs([pos_graph, neg_graph])
 
-        # Obtain the node IDs being used in either pos_graph or neg_graph.  Since they
+        # Obtain the node IDs being used in either pos_graph or neg_graph. Since they
         # are compacted together, pos_graph and neg_graph share the same compacted node
         # space.
         seeds = pos_graph.ndata[dgl.NID]
@@ -82,7 +82,7 @@ class NeighborSampler(object):
             block = dgl.to_block(frontier, seeds)
 
             # Pre-generate CSR format that it can be used in training directly
-            block.in_degree(0)
+            block.create_format_()
             # Obtain the seed nodes for next layer.
             seeds = block.srcdata[dgl.NID]
 
@@ -121,14 +121,7 @@ class SAGE(nn.Module):
     def forward(self, blocks, x):
         h = x
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):
-            # We need to first copy the representation of nodes on the RHS from the
-            # appropriate nodes on the LHS.
-            # Note that the shape of h is (num_nodes_LHS, D) and the shape of h_dst
-            # would be (num_nodes_RHS, D)
-            h_dst = h[:block.number_of_dst_nodes()]
-            # Then we compute the updated representation on the RHS.
-            # The shape of h now becomes (num_nodes_RHS, D)
-            h = layer(block, (h, h_dst))
+            h = layer(block, h)
             if l != len(self.layers) - 1:
                 h = self.activation(h)
                 h = self.dropout(h)
@@ -156,11 +149,11 @@ class SAGE(nn.Module):
                 end = start + batch_size
                 batch_nodes = nodes[start:end]
                 block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
+                block = block.int().to(device)
                 input_nodes = block.srcdata[dgl.NID]
 
                 h = x[input_nodes].to(device)
-                h_dst = h[:block.number_of_dst_nodes()]
-                h = layer(block, (h, h_dst))
+                h = layer(block, h)
                 if l != len(self.layers) - 1:
                     h = self.activation(h)
                     h = self.dropout(h)
@@ -191,23 +184,22 @@ def compute_acc(emb, labels, train_nids, val_nids, test_nids):
     Compute the accuracy of prediction given the labels.
     """
     emb = emb.cpu().numpy()
+    labels = labels.cpu().numpy()
     train_nids = train_nids.cpu().numpy()
-    train_labels = labels[train_nids].cpu().numpy()
+    train_labels = labels[train_nids]
     val_nids = val_nids.cpu().numpy()
-    val_labels = labels[val_nids].cpu().numpy()
+    val_labels = labels[val_nids]
     test_nids = test_nids.cpu().numpy()
-    test_labels = labels[test_nids].cpu().numpy()
+    test_labels = labels[test_nids]
 
     emb = (emb - emb.mean(0, keepdims=True)) / emb.std(0, keepdims=True)
 
     lr = lm.LogisticRegression(multi_class='multinomial', max_iter=10000)
-    lr.fit(emb[train_nids], labels[train_nids])
+    lr.fit(emb[train_nids], train_labels)
 
     pred = lr.predict(emb)
-    f1_micro_eval = skm.f1_score(labels[val_nids], pred[val_nids], average='micro')
-    f1_micro_test = skm.f1_score(labels[test_nids], pred[test_nids], average='micro')
-    f1_macro_eval = skm.f1_score(labels[val_nids], pred[val_nids], average='macro')
-    f1_macro_test = skm.f1_score(labels[test_nids], pred[test_nids], average='macro')
+    f1_micro_eval = skm.f1_score(val_labels, pred[val_nids], average='micro')
+    f1_micro_test = skm.f1_score(test_labels, pred[test_nids], average='micro')
     return f1_micro_eval, f1_micro_test
 
 def evaluate(model, g, inputs, labels, train_nids, val_nids, test_nids, batch_size, device):
@@ -245,9 +237,13 @@ def run(proc_id, n_gpus, args, devices, data):
                                           rank=proc_id)
     train_mask, val_mask, test_mask, in_feats, labels, n_classes, g = data
 
-    train_nid = th.LongTensor(np.nonzero(train_mask)[0])
-    val_nid = th.LongTensor(np.nonzero(val_mask)[0])
-    test_nid = th.LongTensor(np.nonzero(test_mask)[0])
+    train_nid = th.LongTensor(np.nonzero(train_mask)).squeeze()
+    val_nid = th.LongTensor(np.nonzero(val_mask)).squeeze()
+    test_nid = th.LongTensor(np.nonzero(test_mask)).squeeze()
+
+    #train_nid = th.LongTensor(np.nonzero(train_mask)[0])
+    #val_nid = th.LongTensor(np.nonzero(val_mask)[0])
+    #test_nid = th.LongTensor(np.nonzero(test_mask)[0])
 
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], args.num_negs, args.neg_share)
@@ -301,6 +297,9 @@ def run(proc_id, n_gpus, args, devices, data):
             batch_inputs = load_subtensor(g, input_nodes, device)
             d_step = time.time()
 
+            pos_graph = pos_graph.to(device)
+            neg_graph = neg_graph.to(device)
+            blocks = [block.int().to(device) for block in blocks]
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, pos_graph, neg_graph)
@@ -335,23 +334,23 @@ def run(proc_id, n_gpus, args, devices, data):
 def main(args, devices):
     # load reddit data
     data = RedditDataset(self_loop=True)
-    train_mask = data.train_mask
-    val_mask = data.val_mask
-    test_mask = data.test_mask
-    features = th.Tensor(data.features)
+    n_classes = data.num_classes
+    g = data[0]
+    features = g.ndata['feat']
     in_feats = features.shape[1]
-    labels = th.LongTensor(data.labels)
-    n_classes = data.num_labels
-    # Construct graph
-    g = dgl.graph(data.graph.all_edges())
+    labels = g.ndata['label']
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
+    test_mask = g.ndata['test_mask']
     g.ndata['features'] = features
+    g.create_format_()
     # Pack data
     data = train_mask, val_mask, test_mask, in_feats, labels, n_classes, g
 
     n_gpus = len(devices)
     if devices[0] == -1:
         run(0, 0, args, ['cpu'], data)
-    if n_gpus == 1:
+    elif n_gpus == 1:
         run(0, n_gpus, args, devices, data)
     else:
         procs = []
@@ -362,8 +361,6 @@ def main(args, devices):
             procs.append(p)
         for p in procs:
             p.join()
-
-    run(args, device, data)
 
 
 if __name__ == '__main__':
@@ -385,7 +382,7 @@ if __name__ == '__main__':
     argparser.add_argument('--num-workers', type=int, default=0,
         help="Number of sampling processes. Use 0 for no extra process.")
     args = argparser.parse_args()
-    
+
     devices = list(map(int, args.gpu.split(',')))
 
     main(args, devices)

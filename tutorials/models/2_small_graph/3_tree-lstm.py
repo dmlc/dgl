@@ -48,15 +48,19 @@ Tutorial: Tree-LSTM in DGL
 # at the first one.
 #
 
+from collections import namedtuple
+
 import dgl
-from dgl.data.tree import SST
-from dgl.data import SSTBatch
+from dgl.data.tree import SSTDataset
+
+
+SSTBatch = namedtuple('SSTBatch', ['graph', 'mask', 'wordid', 'label'])
 
 # Each sample in the dataset is a constituency tree. The leaf nodes
 # represent words. The word is an int value stored in the "x" field.
 # The non-leaf nodes have a special word PAD_WORD. The sentiment
 # label is stored in the "y" feature field.
-trainset = SST(mode='tiny')  # the "tiny" set has only five trees
+trainset = SSTDataset(mode='tiny')  # the "tiny" set has only five trees
 tiny_sst = trainset.trees
 num_vocabs = trainset.num_vocabs
 num_classes = trainset.num_classes
@@ -212,11 +216,15 @@ class TreeLSTMCell(nn.Module):
 # followings:
 #
 
+# to heterogenous graph
+trv_a_tree = dgl.graph(a_tree.edges())
 print('Traversing one tree:')
-print(dgl.topological_nodes_generator(a_tree))
+print(dgl.topological_nodes_generator(trv_a_tree))
 
+# to heterogenous graph
+trv_graph = dgl.graph(graph.edges())
 print('Traversing many trees at the same time:')
-print(dgl.topological_nodes_generator(graph))
+print(dgl.topological_nodes_generator(trv_graph))
 
 ##############################################################################
 # Call :meth:`~dgl.DGLGraph.prop_nodes` to trigger the message passing:
@@ -224,12 +232,11 @@ print(dgl.topological_nodes_generator(graph))
 import dgl.function as fn
 import torch as th
 
-graph.ndata['a'] = th.ones(graph.number_of_nodes(), 1)
-graph.register_message_func(fn.copy_src('a', 'a'))
-graph.register_reduce_func(fn.sum('a', 'a'))
-
-traversal_order = dgl.topological_nodes_generator(graph)
-graph.prop_nodes(traversal_order)
+trv_graph.ndata['a'] = th.ones(graph.number_of_nodes(), 1)
+traversal_order = dgl.topological_nodes_generator(trv_graph)
+trv_graph.prop_nodes(traversal_order,
+                     message_func=fn.copy_src('a', 'a'),
+                     reduce_func=fn.sum('a', 'a'))
 
 # the following is a syntax sugar that does the same
 # dgl.prop_nodes_topo(graph)
@@ -285,16 +292,18 @@ class TreeLSTM(nn.Module):
             The prediction of each node.
         """
         g = batch.graph
-        g.register_message_func(self.cell.message_func)
-        g.register_reduce_func(self.cell.reduce_func)
-        g.register_apply_node_func(self.cell.apply_node_func)
+        # to heterogenous graph
+        g = dgl.graph(g.edges())
         # feed embedding
         embeds = self.embedding(batch.wordid * batch.mask)
         g.ndata['iou'] = self.cell.W_iou(self.dropout(embeds)) * batch.mask.float().unsqueeze(-1)
         g.ndata['h'] = h
         g.ndata['c'] = c
         # propagate
-        dgl.prop_nodes_topo(g)
+        dgl.prop_nodes_topo(g,
+                            message_func=self.cell.message_func,
+                            reduce_func=self.cell.reduce_func,
+                            apply_node_func=self.cell.apply_node_func)
         # compute logits
         h = self.dropout(g.ndata.pop('h'))
         logits = self.linear(h)

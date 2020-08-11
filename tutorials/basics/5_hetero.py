@@ -96,14 +96,15 @@ using the heterograph class and its associated API.
 #
 # For instance, the following code creates the user-item interactions heterograph shown earlier.
 
-# Each value of the dictionary is a list of edge tuples.
+# Each value of the dictionary is a pair of source and destination arrays.
 # Nodes are integer IDs starting from zero. Nodes IDs of different types have
 # separate countings.
 import dgl
+import numpy as np
 
 ratings = dgl.heterograph(
-    {('user', '+1', 'movie') : [(0, 0), (0, 1), (1, 0)],
-     ('user', '-1', 'movie') : [(2, 1)]})
+    {('user', '+1', 'movie') : (np.array([0, 0, 1]), np.array([0, 1, 0])),
+     ('user', '-1', 'movie') : (np.array([2]), np.array([1]))})
 
 ###############################################################################
 # DGL supports creating a graph from a variety of data sources. The following
@@ -129,11 +130,6 @@ plus1.add_edges_from([('u0', 'm0'), ('u0', 'm1'), ('u1', 'm0')])
 ratings = dgl.heterograph(
     {('user', '+1', 'movie') : plus1,
      ('user', '-1', 'movie') : minus1})
-
-# Creating from edge indices
-ratings = dgl.heterograph(
-    {('user', '+1', 'movie') : ([0, 0, 1], [0, 1, 0]),
-     ('user', '-1', 'movie') : ([2], [1])})
 
 ###############################################################################
 # Manipulating heterograph
@@ -238,7 +234,7 @@ def plot_graph(nxg):
     ag.layout('dot')
     ag.draw('graph.png')
 
-plot_graph(G.metagraph)
+plot_graph(G.metagraph())
 
 ###############################################################################
 # Learning tasks associated with heterographs

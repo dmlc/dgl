@@ -6,7 +6,7 @@
 [![Benchmark by ASV](http://img.shields.io/badge/benchmarked%20by-asv-green.svg?style=flat)](https://asv.dgl.ai/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
-Documentation ([Latest](https://docs.dgl.ai/en/latest/) | [Stable](https://docs.dgl.ai)) | [DGL at a glance](https://docs.dgl.ai/tutorials/basics/1_first.html#sphx-glr-tutorials-basics-1-first-py) | [Model Tutorials](https://docs.dgl.ai/tutorials/models/index.html) | [Discussion Forum](https://discuss.dgl.ai)
+Documentation ([Latest](https://docs.dgl.ai/en/latest/) | [Stable](https://docs.dgl.ai)) | [DGL at a glance](https://docs.dgl.ai/tutorials/basics/1_first.html#sphx-glr-tutorials-basics-1-first-py) | [Model Tutorials](https://docs.dgl.ai/tutorials/models/index.html) | [Discussion Forum](https://discuss.dgl.ai) | [Slack Channel](https://join.slack.com/t/deep-graph-library/shared_invite/zt-eb4ict1g-xcg3PhZAFAB8p6dtKuP6xQ)
 
 
 DGL is an easy-to-use, high performance and scalable Python package for deep learning on graphs. DGL is framework agnostic, meaning if a deep graph model is a component of an end-to-end application, the rest of the logics can be implemented in any major frameworks, such as PyTorch, Apache MXNet or TensorFlow.
@@ -215,7 +215,7 @@ Refer to the guide [here](https://docs.dgl.ai/install/index.html#install-from-so
 
 ## New to Deep Learning and Graph Deep Learning?
 
-Check out the open source book [*Dive into Deep Learning*](http://gluon.ai/).
+Check out the open source book [*Dive into Deep Learning*](https://d2l.ai/).
 
 For those who are new to graph neural network, please see the [basic of DGL](https://docs.dgl.ai/tutorials/basics/index.html).
 

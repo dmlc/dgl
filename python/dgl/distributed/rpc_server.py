@@ -35,6 +35,8 @@ def start_server(server_id, ip_config, num_clients, server_state, \
     assert num_clients >= 0, 'num_client (%d) cannot be a negative number.' % num_client
     assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % queue_size
     assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'' % net_type
+    # HandleCtrlC Register for handling Ctrl+C event
+    rpc.register_ctrl_c()
     # Register some basic services
     rpc.register_service(rpc.CLIENT_REGISTER,
                          rpc.ClientRegisterRequest,
@@ -42,6 +44,12 @@ def start_server(server_id, ip_config, num_clients, server_state, \
     rpc.register_service(rpc.SHUT_DOWN_SERVER,
                          rpc.ShutDownRequest,
                          None)
+    rpc.register_service(rpc.GET_NUM_CLIENT,
+                         rpc.GetNumberClientsRequest,
+                         rpc.GetNumberClientsResponse)
+    rpc.register_service(rpc.CLIENT_BARRIER,
+                         rpc.ClientBarrierRequest,
+                         rpc.ClientBarrierResponse)
     rpc.set_rank(server_id)
     server_namebook = rpc.read_ip_config(ip_config)
     machine_id = server_namebook[server_id][0]
@@ -56,6 +64,7 @@ def start_server(server_id, ip_config, num_clients, server_state, \
     print("Wait connections ...")
     rpc.receiver_wait(ip_addr, port, num_clients)
     print("%d clients connected!" % num_clients)
+    rpc.set_num_client(num_clients)
     # Recv all the client's IP and assign ID to clients
     addr_list = []
     client_namebook = {}

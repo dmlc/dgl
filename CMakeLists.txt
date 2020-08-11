@@ -26,6 +26,7 @@ dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
+
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
 if (NOT MSVC)
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g3 -ggdb")
@@ -44,6 +45,8 @@ include_directories("third_party/METIS/include/")
 include_directories("third_party/dmlc-core/include")
 include_directories("third_party/minigun/minigun")
 include_directories("third_party/minigun/third_party/moderngpu/src")
+include_directories("third_party/cub/")
+include_directories("third_party/phmap/")
 
 # initial variables
 set(DGL_LINKER_LIBS "")
@@ -88,8 +91,13 @@ if(USE_OPENMP)
 endif(USE_OPENMP)
 
 # To compile METIS correct for DGL.
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DIDXTYPEWIDTH=64 -DREALTYPEWIDTH=32")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIDXTYPEWIDTH=64 -DREALTYPEWIDTH=32")
+if(MSVC)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /DIDXTYPEWIDTH=64 /DREALTYPEWIDTH=32")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DIDXTYPEWIDTH=64 /DREALTYPEWIDTH=32")
+else(MSVC)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DIDXTYPEWIDTH=64 -DREALTYPEWIDTH=32")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIDXTYPEWIDTH=64 -DREALTYPEWIDTH=32")
+endif(MSVC)
 
 # configure minigun
 add_definitions(-DENABLE_PARTIAL_FRONTIER=0)  # disable minigun partial frontier compile
@@ -103,6 +111,8 @@ file(GLOB DGL_SRC
   src/kernel/*.cc
   src/kernel/cpu/*.cc
   src/runtime/*.cc
+  src/geometry/*.cc
+  src/geometry/cpu/*.cc
 )
 
 file(GLOB_RECURSE DGL_SRC_1
@@ -128,22 +138,25 @@ endif(USE_CUDA)
 
 # For serialization
 add_subdirectory("third_party/dmlc-core")
+# dmlc-core options for support S3/HDFS
+add_definitions(-DUSE_S3=OFF)
+add_definitions(-DUSE_HDFS=OFF)
 list(APPEND DGL_LINKER_LIBS dmlc)
 set(GOOGLE_TEST 0) # Turn off dmlc-core test
 
-if(NOT MSVC)
 # Compile METIS
-set(GKLIB_PATH "third_party/METIS/GKlib")
-include(${GKLIB_PATH}/GKlibSystem.cmake)
-include_directories(${GKLIB_PATH})
-add_subdirectory("third_party/METIS/libmetis/")
-list(APPEND DGL_LINKER_LIBS metis)
-
-  # support PARALLEL_ALGORITHMS
-  if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
-    add_definitions(-DPARALLEL_ALGORITHMS)
-  endif(LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
+if(NOT MSVC)
+  set(GKLIB_PATH "${CMAKE_SOURCE_DIR}/third_party/METIS/GKlib")
+  include(${GKLIB_PATH}/GKlibSystem.cmake)
+  include_directories(${GKLIB_PATH})
+  add_subdirectory("third_party/METIS/libmetis/")
+  list(APPEND DGL_LINKER_LIBS metis)
 endif(NOT MSVC)
+
+# support PARALLEL_ALGORITHMS
+if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
+  add_definitions(-DPARALLEL_ALGORITHMS)
+endif(LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 

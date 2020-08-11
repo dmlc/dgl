@@ -4,7 +4,7 @@ import mxnet as mx
 from mxnet.gluon import nn
 
 from .... import function as fn
-from ..softmax import edge_softmax
+from ....ops import edge_softmax
 from ..utils import normalize
 from ....utils import expand_as_pair
 
@@ -60,10 +60,10 @@ class AGNNConv(nn.Block):
             should be the same as input shape.
         """
         with graph.local_scope():
-            feat_src, feat_dst = expand_as_pair(feat)
+            feat_src, feat_dst = expand_as_pair(feat, graph)
             graph.srcdata['h'] = feat_src
             graph.srcdata['norm_h'] = normalize(feat_src, p=2, axis=-1)
-            if isinstance(feat, tuple):
+            if isinstance(feat, tuple) or graph.is_block:
                 graph.dstdata['norm_h'] = normalize(feat_dst, p=2, axis=-1)
             # compute cosine distance
             graph.apply_edges(fn.u_dot_v('norm_h', 'norm_h', 'cos'))

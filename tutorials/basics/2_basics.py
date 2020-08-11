@@ -60,18 +60,9 @@ u = th.tensor([0, 0, 0, 0, 0])
 v = th.tensor([1, 2, 3, 4, 5])
 star1 = dgl.DGLGraph((u, v))
 
-# Create the same graph in one go! Essentially, if one of the arrays is a scalar,
-# the value is automatically broadcasted to match the length of the other array
-# -- a feature called *edge broadcasting*.
-start2 = dgl.DGLGraph((0, v))
-
 # Create the same graph from a scipy sparse matrix (using ``scipy.sparse.csr_matrix`` works too).
 adj = spp.coo_matrix((np.ones(len(u)), (u.numpy(), v.numpy())))
 star3 = dgl.DGLGraph(adj)
-
-# Create the same graph from a list of integer pairs.
-elist = [(0, 1), (0, 2), (0, 3), (0, 4), (0, 5)]
-star4 = dgl.DGLGraph(elist)
 
 ###############################################################################
 # You can also create a graph by progressively adding more nodes and edges.
@@ -91,7 +82,8 @@ src = th.tensor([8, 9]); dst = th.tensor([0, 0])
 g.add_edges(src, dst)
 
 # Edge broadcasting will do star graph in one go!
-g.clear(); g.add_nodes(10)
+g = dgl.DGLGraph()
+g.add_nodes(10)
 src = th.tensor(list(range(1, 10)));
 g.add_edges(src, 0)
 
@@ -184,7 +176,7 @@ print(g_multi.edges())
 # An edge in multigraph cannot be uniquely identified by using its incident nodes
 # :math:`u` and :math:`v`; query their edge IDs use ``edge_id`` interface.
 
-eid_10 = g_multi.edge_id(1, 0, return_array=True)
+_, _, eid_10 = g_multi.edge_id(1, 0, return_uv=True)
 g_multi.edges[eid_10].data['w'] = th.ones(len(eid_10), 2)
 print(g_multi.edata['w'])
 

@@ -3,13 +3,12 @@
 from torch import nn
 
 from .... import function as fn
-from ..softmax import edge_softmax
+from ....ops import edge_softmax
 from ....utils import expand_as_pair
 
 
 class DotGatConv(nn.Module):
-    r"""Apply dot product version of self attention in GCN as in
-    `Attention Is All You Need <https://arxiv.org/abs/1706.03762>`.
+    r"""Apply dot product version of self attention in GCN.
 
         .. math::
             h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{i, j} h_j^{(l)}
@@ -24,18 +23,6 @@ class DotGatConv(nn.Module):
         where :math:`W_i` and :math:`W_j` transform node :math:`i`'s and node :math:`j`'s
         features into the same dimension, so that when compute note features' similarity,
         we can use dot-product.
-
-        Parameters
-    ----------
-    in_feats : int, or pair of ints
-        Input feature size.
-
-        If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
-        specifies the input feature size on both the source and destination nodes.  If
-        a scalar is given, the source and destination node feature size would take the
-        same value.
-    out_feats : int
-        Output feature size.
     """
 
     def __init__(self,
@@ -83,6 +70,8 @@ class DotGatConv(nn.Module):
         else:
             h_src = feat
             feat_src = feat_dst = self.fc(h_src)
+            if graph.is_block:
+                feat_dst = feat_src[:graph.number_of_dst_nodes()]
 
         # Assign features to nodes
         graph.srcdata.update({'ft': feat_src})
@@ -95,7 +84,8 @@ class DotGatConv(nn.Module):
         graph.edata['sa'] = edge_softmax(graph, graph.edata['a'])
 
         # Step 3. Broadcast softmax value to each edge, and then attention is done
-        graph.apply_edges(fn.u_mul_e('ft', 'sa', 'attn'))
+        graph.apply_edges(lambda edges: {'attn': edges.src['ft'] * \
+                                                 edges.data['sa'].unsqueeze(dim=0).T})
 
         # Step 4. Aggregate attention to dst,user nodes, so formula 7 is done
         graph.update_all(fn.copy_e('attn', 'm'), fn.sum('m', 'agg_u'))

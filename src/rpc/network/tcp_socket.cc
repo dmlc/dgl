@@ -15,6 +15,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #endif  // !_WIN32
+#include <string.h>
+#include <errno.h>
 
 namespace dgl {
 namespace network {
@@ -26,7 +28,7 @@ TCPSocket::TCPSocket() {
   // init socket
   socket_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (socket_ < 0) {
-    LOG(FATAL) << "Can't create new socket.";
+    LOG(FATAL) << "Can't create new socket. Errno=" << errno;
   }
 }
 
@@ -39,13 +41,15 @@ bool TCPSocket::Connect(const char * ip, int port) {
   sa_server.sin_family      = AF_INET;
   sa_server.sin_port        = htons(port);
 
-  if (0 < inet_pton(AF_INET, ip, &sa_server.sin_addr) &&
-      0 <= connect(socket_, reinterpret_cast<SA*>(&sa_server),
-                   sizeof(sa_server))) {
-    return true;
-  }
+  int retval = 0;
+  do {  // retry if EINTR failure appears
+    if (0 < inet_pton(AF_INET, ip, &sa_server.sin_addr) &&
+        0 <= (retval = connect(socket_, reinterpret_cast<SA*>(&sa_server),
+                    sizeof(sa_server)))) {
+      return true;
+    }
+  } while (retval == -1 && errno == EINTR);
 
-  LOG(ERROR) << "Failed connect to " << ip << ":" << port;
   return false;
 }
 
@@ -53,23 +57,28 @@ bool TCPSocket::Bind(const char * ip, int port) {
   SAI sa_server;
   sa_server.sin_family      = AF_INET;
   sa_server.sin_port        = htons(port);
+  int retval = 0;
+  do {  // retry if EINTR failure appears
+    if (0 < inet_pton(AF_INET, ip, &sa_server.sin_addr) &&
+        0 <= (retval = bind(socket_, reinterpret_cast<SA*>(&sa_server),
+                  sizeof(sa_server)))) {
+      return true;
+    }
+  } while (retval == -1 && errno == EINTR);
 
-  if (0 < inet_pton(AF_INET, ip, &sa_server.sin_addr) &&
-      0 <= bind(socket_, reinterpret_cast<SA*>(&sa_server),
-                sizeof(sa_server))) {
-    return true;
-  }
-
-  LOG(ERROR) << "Failed bind on " << ip << ":" << port;
+  LOG(ERROR) << "Failed bind on " << ip << ":" << port << " ,errno=" << errno;
   return false;
 }
 
 bool TCPSocket::Listen(int max_connection) {
-  if (0 <= listen(socket_, max_connection)) {
-    return true;
-  }
+  int retval;
+  do {  // retry if EINTR failure appears
+    if (0 <= (retval = listen(socket_, max_connection))) {
+      return true;
+    }
+  } while (retval == -1 && errno == EINTR);
 
-  LOG(ERROR) << "Failed listen on socket fd: " << socket_;
+  LOG(ERROR) << "Failed listen on socket fd: " << socket_ << " ,errno=" << errno;
   return false;
 }
 
@@ -78,9 +87,13 @@ bool TCPSocket::Accept(TCPSocket * socket, std::string * ip, int * port) {
   SAI sa_client;
   socklen_t len = sizeof(sa_client);
 
-  sock_client = accept(socket_, reinterpret_cast<SA*>(&sa_client), &len);
+  do {  // retry if EINTR failure appears
+    sock_client = accept(socket_, reinterpret_cast<SA*>(&sa_client), &len);
+  } while (sock_client == -1 && errno == EINTR);
+
   if (sock_client < 0) {
-    LOG(ERROR) << "Failed accept connection on " << *ip << ":" << *port;
+    LOG(ERROR) << "Failed accept connection on " << *ip << ":" << *port
+               << " ,errno=" << errno << (errno == EAGAIN ? " SO_RCVTIMEO timeout reached" : "");
     return false;
   }
 
@@ -137,8 +150,17 @@ bool TCPSocket::SetBlocking(bool flag) {
 #endif  // _WIN32
 
 void TCPSocket::SetTimeout(int timeout) {
-  setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO,
-    reinterpret_cast<char*>(&timeout), sizeof(timeout));
+  #ifdef _WIN32
+    timeout = timeout * 1000;  // WIN API accepts millsec
+    setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO,
+               reinterpret_cast<char*>(&timeout), sizeof(timeout));
+  #else  // !_WIN32
+    struct timeval tv;
+    tv.tv_sec = timeout;
+    tv.tv_usec = 0;
+    setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO,
+               &tv, sizeof(tv));
+  #endif  // _WIN32
 }
 
 bool TCPSocket::ShutDown(int ways) {
@@ -157,11 +179,29 @@ void TCPSocket::Close() {
 }
 
 int64_t TCPSocket::Send(const char * data, int64_t len_data) {
-  return send(socket_, data, len_data, 0);
+  int64_t number_send;
+
+  do {  // retry if EINTR failure appears
+    number_send = send(socket_, data, len_data, 0);
+  } while (number_send == -1 && errno == EINTR);
+  if (number_send == -1) {
+    LOG(ERROR) << "send error: " << strerror(errno);
+  }
+
+  return number_send;
 }
 
 int64_t TCPSocket::Receive(char * buffer, int64_t size_buffer) {
-  return recv(socket_, buffer, size_buffer, 0);
+  int64_t number_recv;
+
+  do {  // retry if EINTR failure appears
+    number_recv = recv(socket_, buffer, size_buffer, 0);
+  } while (number_recv == -1 && errno == EINTR);
+  if (number_recv == -1) {
+    LOG(ERROR) << "recv error: " << strerror(errno);
+  }
+
+  return number_recv;
 }
 
 int TCPSocket::Socket() const {

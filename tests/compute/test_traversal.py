@@ -1,6 +1,7 @@
 import random
 import sys
 import time
+import unittest
 
 import dgl
 import networkx as nx
@@ -9,6 +10,7 @@ import scipy.sparse as sp
 import backend as F
 
 import itertools
+from utils import parametrize_dtype
 
 np.random.seed(42)
 
@@ -16,7 +18,9 @@ def toset(x):
     # F.zerocopy_to_numpy may return a int
     return set(F.zerocopy_to_numpy(x).tolist())
 
-def test_bfs(n=100):
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+@parametrize_dtype
+def test_bfs(idtype, n=100):
     def _bfs_nx(g_nx, src):
         edges = nx.bfs_edges(g_nx, src)
         layers_nx = [set([src])]
@@ -26,21 +30,21 @@ def test_bfs(n=100):
         for u, v in edges:
             if u in layers_nx[-1]:
                 frontier.add(v)
-                edge_frontier.add(g.edge_id(u, v))
+                edge_frontier.add(g.edge_ids(u, v))
             else:
                 layers_nx.append(frontier)
                 edges_nx.append(edge_frontier)
                 frontier = set([v])
-                edge_frontier = set([g.edge_id(u, v)])
+                edge_frontier = set([g.edge_ids(u, v)])
         # avoids empty successors
         if len(frontier) > 0 and len(edge_frontier) > 0:
             layers_nx.append(frontier)
             edges_nx.append(edge_frontier)
         return layers_nx, edges_nx
 
-    g = dgl.DGLGraph()
     a = sp.random(n, n, 3 / n, data_rvs=lambda n: np.ones(n))
-    g.from_scipy_sparse_matrix(a)
+    g = dgl.graph(a).astype(idtype)
+
     g_nx = g.to_networkx()
     src = random.choice(range(n))
     layers_nx, _ = _bfs_nx(g_nx, src)
@@ -49,19 +53,19 @@ def test_bfs(n=100):
     assert all(toset(x) == y for x, y in zip(layers_dgl, layers_nx))
 
     g_nx = nx.random_tree(n, seed=42)
-    g = dgl.DGLGraph()
-    g.from_networkx(g_nx)
+    g = dgl.graph(g_nx).astype(idtype)
     src = 0
     _, edges_nx = _bfs_nx(g_nx, src)
     edges_dgl = dgl.bfs_edges_generator(g, src)
     assert len(edges_dgl) == len(edges_nx)
     assert all(toset(x) == y for x, y in zip(edges_dgl, edges_nx))
 
-def test_topological_nodes(n=100):
-    g = dgl.DGLGraph()
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+@parametrize_dtype
+def test_topological_nodes(idtype, n=100):
     a = sp.random(n, n, 3 / n, data_rvs=lambda n: np.ones(n))
     b = sp.tril(a, -1).tocoo()
-    g.from_scipy_sparse_matrix(b)
+    g = dgl.graph(b).astype(idtype)
 
     layers_dgl = dgl.topological_nodes_generator(g)
 
@@ -84,15 +88,16 @@ def test_topological_nodes(n=100):
     assert all(toset(x) == toset(y) for x, y in zip(layers_dgl, layers_spmv))
 
 DFS_LABEL_NAMES = ['forward', 'reverse', 'nontree']
-def test_dfs_labeled_edges(example=False):
-    dgl_g = dgl.DGLGraph()
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+@parametrize_dtype
+def test_dfs_labeled_edges(idtype, example=False):
+    dgl_g = dgl.DGLGraph().astype(idtype)
     dgl_g.add_nodes(6)
     dgl_g.add_edges([0, 1, 0, 3, 3], [1, 2, 2, 4, 5])
     dgl_edges, dgl_labels = dgl.dfs_labeled_edges_generator(
             dgl_g, [0, 3], has_reverse_edge=True, has_nontree_edge=True)
     dgl_edges = [toset(t) for t in dgl_edges]
     dgl_labels = [toset(t) for t in dgl_labels]
-
     g1_solutions = [
             # edges           labels
             [[0, 1, 1, 0, 2], [0, 0, 1, 1, 2]],
@@ -119,8 +124,7 @@ def test_dfs_labeled_edges(example=False):
     else:
         assert False
 
-
 if __name__ == '__main__':
-    test_bfs()
-    test_topological_nodes()
-    test_dfs_labeled_edges()
+    test_bfs(idtype='int32')
+    test_topological_nodes(idtype='int32')
+    test_dfs_labeled_edges(idtype='int32')

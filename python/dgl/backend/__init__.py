@@ -18,7 +18,6 @@ def _gen_missing_api(api, mod_name):
                           ' the DGLBACKEND environment.' % (api, mod_name))
     return _missing_api
 
-
 def load_backend(mod_name):
     print('Using backend: %s' % mod_name, file=sys.stderr)
     mod = importlib.import_module('.%s' % mod_name, __name__)
@@ -88,3 +87,9 @@ def is_enabled(api):
         True if the API is enabled by the current backend.
     """
     return api in _enabled_apis
+
+def to_dgl_nd(data):
+    return zerocopy_to_dgl_ndarray(data)
+
+def from_dgl_nd(data):
+    return zerocopy_from_dgl_ndarray(data)

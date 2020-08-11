@@ -13,82 +13,56 @@ from torch.utils.data import DataLoader
 from functools import partial
 
 import dgl
-from dgl.data.rdf import AIFB, MUTAG, BGS, AM
+from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from model import EntityClassify, RelGraphEmbed
 
-class HeteroNeighborSampler:
-    """Neighbor sampler on heterogeneous graphs
-
-    Parameters
-    ----------
-    g : DGLHeteroGraph
-        Full graph
-    category : str
-        Category name of the seed nodes.
-    fanouts : list of int
-        Fanout of each hop starting from the seed nodes. If a fanout is None,
-        sample full neighbors.
-    """
-    def __init__(self, g, category, fanouts):
-        self.g = g
-        self.category = category
-        self.fanouts = fanouts
-
-    def sample_blocks(self, seeds):
-        blocks = []
-        seeds = {self.category : th.tensor(seeds).long()}
-        cur = seeds
-        for fanout in self.fanouts:
-            if fanout is None:
-                frontier = dgl.in_subgraph(self.g, cur)
-            else:
-                frontier = dgl.sampling.sample_neighbors(self.g, cur, fanout)
-            block = dgl.to_block(frontier, cur)
-            cur = {}
-            for ntype in block.srctypes:
-                cur[ntype] = block.srcnodes[ntype].data[dgl.NID]
-            blocks.insert(0, block)
-        return seeds, blocks
-
-def extract_embed(node_embed, block):
+def extract_embed(node_embed, input_nodes):
     emb = {}
-    for ntype in block.srctypes:
-        nid = block.srcnodes[ntype].data[dgl.NID]
+    for ntype, nid in input_nodes.items():
+        nid = input_nodes[ntype]
         emb[ntype] = node_embed[ntype][nid]
     return emb
 
-
-def evaluate(model, seeds, blocks, node_embed, labels, category, use_cuda):
+def evaluate(model, loader, node_embed, labels, category, device):
     model.eval()
-    emb = extract_embed(node_embed, blocks[0])
-    lbl = labels[seeds]
-    if use_cuda:
-        emb = {k : e.cuda() for k, e in emb.items()}
-        lbl = lbl.cuda()
-    logits = model(emb, blocks)[category]
-    loss = F.cross_entropy(logits, lbl)
-    acc = th.sum(logits.argmax(dim=1) == lbl).item() / len(seeds)
-    return loss, acc
+    total_loss = 0
+    total_acc = 0
+    count = 0
+    for input_nodes, seeds, blocks in loader:
+        blocks = [blk.to(device) for blk in blocks]
+        seeds = seeds[category]
+        emb = extract_embed(node_embed, input_nodes)
+        emb = {k : e.to(device) for k, e in emb.items()}
+        lbl = labels[seeds].to(device)
+        logits = model(emb, blocks)[category]
+        loss = F.cross_entropy(logits, lbl)
+        acc = th.sum(logits.argmax(dim=1) == lbl).item()
+        total_loss += loss.item() * len(seeds)
+        total_acc += acc
+        count += len(seeds)
+    return total_loss / count, total_acc / count
 
 def main(args):
     # load graph data
     if args.dataset == 'aifb':
-        dataset = AIFB()
+        dataset = AIFBDataset()
     elif args.dataset == 'mutag':
-        dataset = MUTAG()
+        dataset = MUTAGDataset()
     elif args.dataset == 'bgs':
-        dataset = BGS()
+        dataset = BGSDataset()
     elif args.dataset == 'am':
-        dataset = AM()
+        dataset = AMDataset()
     else:
         raise ValueError()
 
-    g = dataset.graph
+    g = dataset[0]
     category = dataset.predict_category
     num_classes = dataset.num_classes
-    train_idx = dataset.train_idx
-    test_idx = dataset.test_idx
-    labels = dataset.labels
+    train_mask = g.nodes[category].data.pop('train_mask')
+    test_mask = g.nodes[category].data.pop('test_mask')
+    train_idx = th.nonzero(train_mask).squeeze()
+    test_idx = th.nonzero(test_mask).squeeze()
+    labels = g.nodes[category].data.pop('labels')
 
     # split dataset into train, validate, test
     if args.validation:
@@ -98,9 +72,11 @@ def main(args):
         val_idx = train_idx
 
     # check cuda
+    device = 'cpu'
     use_cuda = args.gpu >= 0 and th.cuda.is_available()
     if use_cuda:
         th.cuda.set_device(args.gpu)
+        device = 'cuda:%d' % args.gpu
 
     train_label = labels[train_idx]
     val_label = labels[val_idx]
@@ -122,20 +98,17 @@ def main(args):
         model.cuda()
 
     # train sampler
-    sampler = HeteroNeighborSampler(g, category, [args.fanout] * args.n_layers)
-    loader = DataLoader(dataset=train_idx.numpy(),
-                        batch_size=args.batch_size,
-                        collate_fn=sampler.sample_blocks,
-                        shuffle=True,
-                        num_workers=0)
+    sampler = dgl.sampling.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
+    loader = dgl.sampling.NodeDataLoader(
+        g, {category: train_idx}, sampler,
+        batch_size=args.batch_size, shuffle=True, num_workers=0)
 
     # validation sampler
-    val_sampler = HeteroNeighborSampler(g, category, [None] * args.n_layers)
-    _, val_blocks = val_sampler.sample_blocks(val_idx)
-
-    # test sampler
-    test_sampler = HeteroNeighborSampler(g, category, [None] * args.n_layers)
-    _, test_blocks = test_sampler.sample_blocks(test_idx)
+    # we do not use full neighbor to save computation resources
+    val_sampler = dgl.sampling.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
+    val_loader = dgl.sampling.NodeDataLoader(
+        g, {category: val_idx}, val_sampler,
+        batch_size=args.batch_size, shuffle=True, num_workers=0)
 
     # optimizer
     all_params = itertools.chain(model.parameters(), embed_layer.parameters())
@@ -150,10 +123,12 @@ def main(args):
         if epoch > 3:
             t0 = time.time()
 
-        for i, (seeds, blocks) in enumerate(loader):
+        for i, (input_nodes, seeds, blocks) in enumerate(loader):
+            blocks = [blk.to(device) for blk in blocks]
+            seeds = seeds[category]     # we only predict the nodes with type "category"
             batch_tic = time.time()
-            emb = extract_embed(node_embed, blocks[0])
-            lbl = labels[seeds[category]]
+            emb = extract_embed(node_embed, input_nodes)
+            lbl = labels[seeds]
             if use_cuda:
                 emb = {k : e.cuda() for k, e in emb.items()}
                 lbl = lbl.cuda()
@@ -162,22 +137,26 @@ def main(args):
             loss.backward()
             optimizer.step()
 
-            train_acc = th.sum(logits.argmax(dim=1) == lbl).item() / len(seeds[category])
+            train_acc = th.sum(logits.argmax(dim=1) == lbl).item() / len(seeds)
             print("Epoch {:05d} | Batch {:03d} | Train Acc: {:.4f} | Train Loss: {:.4f} | Time: {:.4f}".
                   format(epoch, i, train_acc, loss.item(), time.time() - batch_tic))
 
         if epoch > 3:
             dur.append(time.time() - t0)
 
-        val_loss, val_acc = evaluate(model, val_idx, val_blocks, node_embed, labels, category, use_cuda)
+        val_loss, val_acc = evaluate(model, val_loader, node_embed, labels, category, device)
         print("Epoch {:05d} | Valid Acc: {:.4f} | Valid loss: {:.4f} | Time: {:.4f}".
-              format(epoch, val_acc, val_loss.item(), np.average(dur)))
+              format(epoch, val_acc, val_loss, np.average(dur)))
     print()
     if args.model_path is not None:
         th.save(model.state_dict(), args.model_path)
 
-    test_loss, test_acc = evaluate(model, test_idx, test_blocks, node_embed, labels, category, use_cuda)
-    print("Test Acc: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
+    output = model.inference(
+        g, args.batch_size, 'cuda' if use_cuda else 'cpu', 0, node_embed)
+    test_pred = output[category][test_idx]
+    test_labels = labels[test_idx]
+    test_acc = (test_pred.argmax(1) == test_labels).float().mean()
+    print("Test Acc: {:.4f}".format(test_acc))
     print()
 
 if __name__ == '__main__':

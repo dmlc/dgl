@@ -53,8 +53,14 @@ class RelGraphConv(nn.Module):
         Activation function. Default: None
     self_loop : bool, optional
         True to include self loop message. Default: False
+    low_mem : bool, optional
+        True to use low memory implementation of relation message passing function. Default: False
+        This option trade speed with memory consumption, and will slowdown the forward/backward.
+        Turn it on when you encounter OOM problem during training or evaluation.
     dropout : float, optional
         Dropout rate. Default: 0.0
+    layer_norm: float, optional
+        Add layer norm. Default: False
     """
     def __init__(self,
                  in_feat,
@@ -65,7 +71,9 @@ class RelGraphConv(nn.Module):
                  bias=True,
                  activation=None,
                  self_loop=False,
-                 dropout=0.0):
+                 low_mem=False,
+                 dropout=0.0,
+                 layer_norm=False):
         super(RelGraphConv, self).__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
@@ -77,6 +85,8 @@ class RelGraphConv(nn.Module):
         self.bias = bias
         self.activation = activation
         self.self_loop = self_loop
+        self.low_mem = low_mem
+        self.layer_norm = layer_norm
 
         if regularizer == "basis":
             # add basis weights
@@ -114,6 +124,10 @@ class RelGraphConv(nn.Module):
             self.h_bias = nn.Parameter(th.Tensor(out_feat))
             nn.init.zeros_(self.h_bias)
 
+        # layer norm
+        if self.layer_norm:
+            self.layer_norm_weight = nn.LayerNorm(n_hidden, elementwise_affine=True)
+
         # weight for self loop
         if self.self_loop:
             self.loop_weight = nn.Parameter(th.Tensor(in_feat, out_feat))
@@ -133,7 +147,22 @@ class RelGraphConv(nn.Module):
         else:
             weight = self.weight
 
-        msg = utils.bmm_maybe_select(edges.src['h'], weight, edges.data['type'])
+        # calculate msg @ W_r before put msg into edge
+        # if src is th.int64 we expect it is an index select
+        if edges.src['h'].dtype != th.int64 and self.low_mem:
+            etypes = th.unique(edges.data['type'])
+            msg = th.empty((edges.src['h'].shape[0], self.out_feat),
+                           device=edges.src['h'].device)
+            for etype in etypes:
+                loc = edges.data['type'] == etype
+                w = weight[etype]
+                src = edges.src['h'][loc]
+                sub_msg = th.matmul(src, w)
+                msg[loc] = sub_msg
+        else:
+            # put W_r into edges then do msg @ W_r
+            msg = utils.bmm_maybe_select(edges.src['h'], weight, edges.data['type'])
+
         if 'norm' in edges.data:
             msg = msg * edges.data['norm']
         return {'msg': msg}
@@ -142,10 +171,24 @@ class RelGraphConv(nn.Module):
         """Message function for block-diagonal-decomposition regularizer"""
         if edges.src['h'].dtype == th.int64 and len(edges.src['h'].shape) == 1:
             raise TypeError('Block decomposition does not allow integer ID feature.')
-        weight = self.weight.index_select(0, edges.data['type']).view(
-            -1, self.submat_in, self.submat_out)
-        node = edges.src['h'].view(-1, 1, self.submat_in)
-        msg = th.bmm(node, weight).view(-1, self.out_feat)
+
+        # calculate msg @ W_r before put msg into edge
+        if self.low_mem:
+            etypes = th.unique(edges.data['type'])
+            msg = th.empty((edges.src['h'].shape[0], self.out_feat),
+                           device=edges.src['h'].device)
+            for etype in etypes:
+                loc = edges.data['type'] == etype
+                w = self.weight[etype].view(self.num_bases, self.submat_in, self.submat_out)
+                src = edges.src['h'][loc].view(-1, self.num_bases, self.submat_in)
+                sub_msg = th.einsum('abc,bcd->abd', src, w)
+                sub_msg = sub_msg.reshape(-1, self.out_feat)
+                msg[loc] = sub_msg
+        else:
+            weight = self.weight.index_select(0, edges.data['type']).view(
+                -1, self.submat_in, self.submat_out)
+            node = edges.src['h'].view(-1, 1, self.submat_in)
+            msg = th.bmm(node, weight).view(-1, self.out_feat)
         if 'norm' in edges.data:
             msg = msg * edges.data['norm']
         return {'msg': msg}
@@ -172,19 +215,20 @@ class RelGraphConv(nn.Module):
         torch.Tensor
             New node features.
         """
-        assert g.is_homograph(), \
-            "not a homograph; convert it with to_homo and pass in the edge type as argument"
         with g.local_scope():
-            g.ndata['h'] = x
+            g.srcdata['h'] = x
             g.edata['type'] = etypes
             if norm is not None:
                 g.edata['norm'] = norm
             if self.self_loop:
-                loop_message = utils.matmul_maybe_select(x, self.loop_weight)
+                loop_message = utils.matmul_maybe_select(x[:g.number_of_dst_nodes()],
+                                                         self.loop_weight)
             # message passing
             g.update_all(self.message_func, fn.sum(msg='msg', out='h'))
             # apply bias and activation
-            node_repr = g.ndata['h']
+            node_repr = g.dstdata['h']
+            if self.layer_norm:
+                node_repr = self.layer_norm_weight(node_repr)
             if self.bias:
                 node_repr = node_repr + self.h_bias
             if self.self_loop:

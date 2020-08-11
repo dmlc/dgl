@@ -5,7 +5,7 @@ from tensorflow.keras import layers
 import numpy as np
 
 from .... import function as fn
-from ..softmax import edge_softmax
+from ....ops import edge_softmax
 from ..utils import Identity
 
 # pylint: enable=W0235
@@ -67,14 +67,8 @@ class GATConv(layers.Layer):
         self._out_feats = out_feats
         xinit = tf.keras.initializers.VarianceScaling(scale=np.sqrt(
             2), mode="fan_avg", distribution="untruncated_normal")
-        if isinstance(in_feats, tuple):
-            self.fc_src = layers.Dense(
-                out_feats * num_heads, use_bias=False, kernel_initializer=xinit)
-            self.fc_dst = layers.Dense(
-                out_feats * num_heads, use_bias=False, kernel_initializer=xinit)
-        else:
-            self.fc = layers.Dense(
-                out_feats * num_heads, use_bias=False, kernel_initializer=xinit)
+        self.fc = layers.Dense(
+            out_feats * num_heads, use_bias=False, kernel_initializer=xinit)
         self.attn_l = tf.Variable(initial_value=xinit(
             shape=(1, num_heads, out_feats), dtype='float32'), trainable=True)
         self.attn_r = tf.Variable(initial_value=xinit(
@@ -116,12 +110,14 @@ class GATConv(layers.Layer):
             if isinstance(feat, tuple):
                 h_src = self.feat_drop(feat[0])
                 h_dst = self.feat_drop(feat[1])
-                feat_src = tf.reshape(self.fc_src(h_src), (-1, self._num_heads, self._out_feats))
-                feat_dst = tf.reshape(self.fc_dst(h_dst), (-1, self._num_heads, self._out_feats))
+                feat_src = tf.reshape(self.fc(h_src), (-1, self._num_heads, self._out_feats))
+                feat_dst = tf.reshape(self.fc(h_dst), (-1, self._num_heads, self._out_feats))
             else:
                 h_src = h_dst = self.feat_drop(feat)
                 feat_src = feat_dst = tf.reshape(
                     self.fc(h_src), (-1, self._num_heads, self._out_feats))
+                if graph.is_block:
+                    feat_dst = feat_src[:graph.number_of_dst_nodes()]
             # NOTE: GAT paper uses "first concatenation then linear projection"
             # to compute attention scores, while ours is "first projection then
             # addition", the two approaches are mathematically equivalent:

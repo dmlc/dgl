@@ -90,7 +90,7 @@ class GraphSAGE(nn.Module):
                                         dropout=dropout, use_pp=False, use_lynorm=False))
 
     def forward(self, g):
-        h = g.ndata['features']
+        h = g.ndata['feat']
         for layer in self.layers:
             h = layer(g, h)
         return h

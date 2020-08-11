@@ -1,12 +1,12 @@
 # Recurrent Relational Network (RRN)
 
 * Paper link: https://arxiv.org/abs/1711.08028
-* Author's code repo: https://github.com/rasmusbergpalm/recurrent-relational-networks.git
+* Author's code repo: https://github.com/rasmusbergpalm/recurrent-relational-networks
 
 ## Dependencies
 
 * PyTorch 1.0+
-* DGL 0.3+
+* DGL 0.5+
 
 ## Codes
 
@@ -15,7 +15,7 @@ application on sudoku solving.
 
 ## Usage
 
-- To train the RNN for sudoku, run the following
+- To train the RRN for sudoku, run the following
 ```
 python3 train_sudoku.py --output_dir out/ --do_train --do_eval
 ```

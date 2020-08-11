@@ -10,6 +10,7 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <memory>
 
 #include "communicator.h"
 #include "msg_queue.h"
@@ -19,9 +20,9 @@
 namespace dgl {
 namespace network {
 
-static int kMaxTryCount = 1024;    // maximal connection: 1024
-static int kTimeOut = 10;          // 10 minutes for socket timeout
-static int kMaxConnection = 1024;  // maximal connection: 1024
+static constexpr int kMaxTryCount = 1024;    // maximal connection: 1024
+static constexpr int kTimeOut = 10 * 60;     // 10 minutes (in seconds) for socket timeout
+static constexpr int kMaxConnection = 1024;  // maximal connection: 1024
 
 /*!
  * \breif Networking address

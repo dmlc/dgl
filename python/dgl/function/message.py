@@ -5,11 +5,12 @@ import sys
 from itertools import product
 
 from .base import BuiltinFunction, TargetCode
-from ..runtime import ir
-from ..runtime.ir import var
+from .._deprecate.runtime import ir
+from .._deprecate.runtime.ir import var
 
 
-__all__ = ["src_mul_edge", "copy_src", "copy_edge", "copy_u", "copy_e"]
+__all__ = ["src_mul_edge", "copy_src", "copy_edge", "copy_u", "copy_e",
+           "BinaryMessageFunction", "CopyMessageFunction"]
 
 
 class MessageFunction(BuiltinFunction):

@@ -49,16 +49,10 @@ def randn(shape):
     return copy_to(_randn(shape), _default_context)
 
 def tensor(data, dtype=None):
-    if dtype is None:
-        if is_tensor(data):
-            data = zerocopy_to_numpy(data)
-        else:
-            data = np.array(data)
-        dtype = int64 if np.issubdtype(data.dtype, np.integer) else float32
     return copy_to(_tensor(data, dtype), _default_context)
 
-def arange(start, stop):
-    return copy_to(_arange(start, stop), _default_context)
+def arange(start, stop, dtype=int64):
+    return copy_to(_arange(start, stop, dtype), _default_context)
 
 def full(shape, fill_value, dtype, ctx=_default_context):
     return _full(shape, fill_value, dtype, ctx)
