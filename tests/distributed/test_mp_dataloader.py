@@ -55,7 +55,7 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
     num_nodes_to_sample = 202
     batch_size = 32
     train_nid = th.arange(num_nodes_to_sample)
-    dist_graph = DistGraph("mp_ip_config.txt", 1, "test_mp", gpb=gpb,
+    dist_graph = DistGraph("mp_ip_config.txt", "test_mp", gpb=gpb,
                            part_config=tmpdir / 'test_sampling.json')
 
     # Create sampler
@@ -95,7 +95,7 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
 def test_standalone(tmpdir):
     ip_config = open("mp_ip_config.txt", "w")
     for _ in range(1):
-        ip_config.write('{} 1\n'.format(get_local_usable_addr()))
+        ip_config.write('{}\n'.format(get_local_usable_addr()))
     ip_config.close()
 
     g = CitationGraphDataset("cora")[0]
