@@ -1,12 +1,11 @@
 """For Graph Serialization"""
 from __future__ import absolute_import
 import os
-from .._deprecate.graph import DGLGraph
 from ..heterograph import DGLHeteroGraph
 from .._ffi.object import ObjectBase, register_object
 from .._ffi.function import _init_api
 from .. import backend as F
-from .heterograph_serialize import HeteroGraphData, save_heterographs
+from .heterograph_serialize import save_heterographs
 
 _init_api("dgl.data.graph_serialize")
 
@@ -30,7 +29,7 @@ class GraphData(ObjectBase):
     """GraphData Object"""
 
     @staticmethod
-    def create(g: DGLGraph):
+    def create(g):
         """Create GraphData"""
         # TODO(zihao): support serialize batched graph in the future.
         assert g.batch_size == 1, "Batched DGLGraph is not supported for serialization"
@@ -52,9 +51,10 @@ class GraphData(ObjectBase):
         return _CAPI_MakeGraphData(ghandle, node_tensors, edge_tensors)
 
     def get_graph(self):
-        """Get DGLGraph from GraphData"""
+        """Get DGLHeteroGraph from GraphData"""
         ghandle = _CAPI_GDataGraphHandle(self)
-        g = DGLGraph(graph_data=ghandle, readonly=True)
+        hgi =_CAPI_DGLAsHeteroGraph(ghandle)
+        g = DGLHeteroGraph(hgi, ['_U'], ['_E'])
         node_tensors_items = _CAPI_GDataNodeTensors(self).items()
         edge_tensors_items = _CAPI_GDataEdgeTensors(self).items()
         for k, v in node_tensors_items:
@@ -190,7 +190,6 @@ def load_graph_v1(filename, idx_list=None):
         label_dict[k] = F.zerocopy_from_dgl_ndarray(v)
 
     return [gdata.get_graph() for gdata in metadata.graph_data], label_dict
-
 
 def load_labels(filename):
     """
