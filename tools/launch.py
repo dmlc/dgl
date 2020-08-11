@@ -45,7 +45,7 @@ def submit_jobs(args, udf_command):
                 hosts.append((ip, port))
             else:
                 raise RuntimeError("Format error of ip_config.")
-            server_count_per_machine = args.server_count
+            server_count_per_machine = args.num_servers
     # Get partition info of the graph data
     part_config = args.workspace + '/' + args.part_config
     with open(part_config) as conf_f:
@@ -62,7 +62,7 @@ def submit_jobs(args, udf_command):
     server_cmd = server_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(tot_num_clients)
     server_cmd = server_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.part_config)
     server_cmd = server_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
-    server_cmd = server_cmd + ' ' + 'DGL_SERVER_COUNT=' + str(args.server_count)
+    server_cmd = server_cmd + ' ' + 'DGL_NUM_SERVER=' + str(args.num_servers)
     for i in range(len(hosts)*server_count_per_machine):
         ip, _ = hosts[int(i / server_count_per_machine)]
         cmd = server_cmd + ' ' + 'DGL_SERVER_ID=' + str(i)
@@ -74,7 +74,7 @@ def submit_jobs(args, udf_command):
     client_cmd = client_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(tot_num_clients)
     client_cmd = client_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.part_config)
     client_cmd = client_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
-    client_cmd = client_cmd + ' ' + 'DGL_SERVER_COUNT=' + str(args.server_count)
+    client_cmd = client_cmd + ' ' + 'DGL_NUM_SERVER=' + str(args.num_servers)
     if os.environ.get('OMP_NUM_THREADS') is not None:
         client_cmd = client_cmd + ' ' + 'OMP_NUM_THREADS=' + os.environ.get('OMP_NUM_THREADS')
     if os.environ.get('PYTHONPATH') is not None:
@@ -117,7 +117,7 @@ def main():
                         help='The file (in workspace) of the partition config')
     parser.add_argument('--ip_config', type=str,
                         help='The file (in workspace) of IP configuration for server processes')
-    parser.add_argument('--server_count', type=int,
+    parser.add_argument('--num_servers', type=int,
                         help='Server count on each machine.')
     parser.add_argument('--num_server_threads', type=int, default=1,
                         help='The number of OMP threads in the server process. \
