@@ -146,7 +146,7 @@ def run(proc_id, n_gpus, args, devices, data):
     test_nid = test_mask.nonzero().squeeze()
 
     # Split train_nid
-    train_nid = th.split(train_nid, math.ceil(len(train_nid) // n_gpus))[proc_id]
+    train_nid = th.split(train_nid, math.ceil(len(train_nid) / n_gpus))[proc_id]
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.sampling.MultiLayerNeighborSampler(
