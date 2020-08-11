@@ -194,9 +194,9 @@ def partition_graph(g, num_parts, part_method="metis", **kwargs):
     if num_parts == 1:
         raise ValueError
     elif part_method == 'metis':
-        parts = metis_partition_assignment(g, num_parts, **kwargs)
+        group = metis_partition_assignment(g, num_parts, **kwargs)
     elif part_method == 'random':
-        parts = random_choice(num_parts, g.number_of_nodes())
+        group = random_choice(num_parts, g.number_of_nodes())
     else:
         raise Exception('Unknown partitioning method: ' + part_method)
-    return parts
+    return group
