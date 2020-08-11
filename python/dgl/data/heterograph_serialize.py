@@ -24,6 +24,7 @@ def save_heterographs(filename, g_list, labels):
         labels = {}
     if isinstance(g_list, DGLHeteroGraph):
         g_list = [g_list]
+    assert all([type(g) == DGLHeteroGraph for g in g_list]), "Invalid DGLHeteroGraph in g_list argument"
     gdata_list = [HeteroGraphData.create(g) for g in g_list]
     _CAPI_SaveHeteroGraphData(filename, gdata_list, tensor_dict_to_ndarray_dict(labels))
 

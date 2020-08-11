@@ -104,7 +104,7 @@ def save_graphs(filename, g_list, labels=None):
             os.makedirs(f_path)
 
     g_sample = g_list[0] if isinstance(g_list, list) else g_list
-    if isinstance(g_sample, DGLHeteroGraph):
+    if type(g_sample) == DGLHeteroGraph: # Doesn't support DGLHeteroGraph's derived class
         save_heterographs(filename, g_list, labels)
     else:
         raise Exception(
