@@ -78,7 +78,7 @@ def train():
     for epoch in range(MAX_EPOCH):
         word_acc,topo_acc,assm_acc,steo_acc = 0,0,0,0
 
-        for it, batch in tqdm.tqdm(enumerate(dataloader), total=2000):
+        for it, batch in enumerate(tqdm.tqdm(dataloader)):
             model.zero_grad()
             try:
                 loss, kl_div, wacc, tacc, sacc, dacc = model(batch, beta)
