@@ -17,12 +17,13 @@ D = 5
 
 def test_line_graph1():
     N = 5
-    G = dgl.DGLGraph(nx.star_graph(N))
+    G = dgl.DGLGraph(nx.star_graph(N)).to(F.ctx())
     G.edata['h'] = F.randn((2 * N, D))
     n_edges = G.number_of_edges()
     L = G.line_graph(shared=True)
     assert L.number_of_nodes() == 2 * N
     assert F.allclose(L.ndata['h'], G.edata['h'])
+    assert G.device == F.ctx()
 
 @parametrize_dtype
 def test_line_graph2(idtype):
