@@ -66,7 +66,7 @@ class GraphData(ObjectBase):
 
 def save_graphs(filename, g_list, labels=None):
     r"""
-    Save DGLGraphs/DGLHeteroGraph and graph labels to file
+    Save DGLGraphs and graph labels to file
 
     Parameters
     ----------
@@ -104,27 +104,12 @@ def save_graphs(filename, g_list, labels=None):
             os.makedirs(f_path)
 
     g_sample = g_list[0] if isinstance(g_list, list) else g_list
-    if isinstance(g_sample, DGLGraph):
-        save_dglgraphs(filename, g_list, labels)
-    elif isinstance(g_sample, DGLHeteroGraph):
+    if isinstance(g_sample, DGLHeteroGraph):
         save_heterographs(filename, g_list, labels)
     else:
         raise Exception(
             "Invalid argument g_list. Must be a DGLGraph or a list of DGLGraphs/DGLHeteroGraphs")
 
-
-def save_dglgraphs(filename, g_list, labels=None):
-    """Internal function to save DGLGraphs"""
-    if isinstance(g_list, DGLGraph):
-        g_list = [g_list]
-    if (labels is not None) and (len(labels) != 0):
-        label_dict = dict()
-        for key, value in labels.items():
-            label_dict[key] = F.zerocopy_to_dgl_ndarray(value)
-    else:
-        label_dict = None
-    gdata_list = [GraphData.create(g) for g in g_list]
-    _CAPI_SaveDGLGraphs_V0(filename, gdata_list, label_dict)
 
 
 def load_graphs(filename, idx_list=None):
