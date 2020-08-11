@@ -31,6 +31,7 @@ from .subgraph import *
 from .traversal import *
 from .transform import *
 from .propagate import *
+from .random import *
 
 from ._deprecate.graph import DGLGraph as DGLGraphStale
 from ._deprecate.nodeflow import *

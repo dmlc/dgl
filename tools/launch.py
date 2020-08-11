@@ -100,7 +100,7 @@ def main():
                         the contents of current directory will be rsyncd')
     parser.add_argument('--num_trainers', type=int,
                         help='The number of trainer processes per machine')
-    parser.add_argument('--num_samplers', type=int,
+    parser.add_argument('--num_samplers', type=int, default=0,
                         help='The number of sampler processes per trainer process')
     parser.add_argument('--part_config', type=str,
                         help='The file (in workspace) of the partition config')

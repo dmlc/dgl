@@ -43,10 +43,11 @@ specify relative paths to the path of the workspace.
 ```bash
 python3 ~/dgl/tools/launch.py \
 --workspace ~/graphsage/ \
---num_client 4 \
+--num_trainers 1 \
+--num_samplers 4 \
 --part_config ogb-product/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 30 --batch-size 1000"
+"python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 30 --batch-size 1000 --num-workers 4"
 ```
 
 To run unsupervised training:
@@ -54,10 +55,10 @@ To run unsupervised training:
 ```bash
 python3 ~/dgl/tools/launch.py \
 --workspace ~/dgl/examples/pytorch/graphsage/experimental \
---num_client 4 \
---part_config data/ogb-product.json \
+--num_trainers 1 \
+--part_config ogb-product/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 train_dist_unsupervised.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --batch-size 1000 --num-client 4"
+"python3 train_dist_unsupervised.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --batch-size 1000"
 ```
 
 ## Distributed code runs in the standalone mode
