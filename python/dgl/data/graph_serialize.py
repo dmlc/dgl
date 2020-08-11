@@ -1,6 +1,7 @@
 """For Graph Serialization"""
 from __future__ import absolute_import
 import os
+from ..base import dgl_warning
 from ..heterograph import DGLHeteroGraph
 from .._ffi.object import ObjectBase, register_object
 from .._ffi.function import _init_api
@@ -147,6 +148,9 @@ def load_graphs(filename, idx_list=None):
 
     version = _CAPI_GetFileVersion(filename)
     if version == 1:
+        dgl_warning(
+            "You are loading a graph file saved by old version of dgl.  \
+            Please consider saving it again with the current format.")
         return load_graph_v1(filename, idx_list)
     elif version == 2:
         return load_graph_v2(filename, idx_list)
