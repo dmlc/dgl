@@ -2920,11 +2920,11 @@ class DGLHeteroGraph(object):
             raise DGLError('Expect the destination node ID to be from 0, ...'
                            ', {:d}, got {:d}'.format(num_dst_type_nodes - 1, v))
 
-        if not F.is_tensor(v) and isinstance(v, Iterable):
+        if not F.is_tensor(v) and not is_all(v) and isinstance(v, Iterable):
             utils.detect_nan_in_iterable(v, 'the destination node IDs')
             utils.detect_inf_in_iterable(v, 'the destination node IDs')
 
-        if F.is_tensor(v) or isinstance(v, Iterable):
+        if (F.is_tensor(v) or isinstance(v, Iterable)) and not is_all(v):
             utils.assert_nonnegative_iterable(v, 'the destination node IDs')
             utils.assert_iterable_bounded_by_value(
                 v, 'the destination node IDs', num_dst_type_nodes,
@@ -2948,49 +2948,96 @@ class DGLHeteroGraph(object):
         return self.out_degrees(u, etype)
 
     def out_degrees(self, u=ALL, etype=None):
-        """Return the out-degrees of nodes u with edges of type ``etype``.
+        """Return the out-degree(s) of some particular node(s) with the specified edge type.
 
         Parameters
         ----------
-        u : list, tensor
-            The node ID array of source type. Default is to return the degrees
-            of all the nodes.
+        u : source node ID(s), optional
+
+            - int: The source node for query.
+            - Tensor: A 1D tensor that contains the source node(s) for query, whose data
+              type and device should be separately the same as the idtype and device of the
+              graph.
+            - iterable[int] : Similar to the tensor, but stores node IDs in a sequence
+              (e.g. list, tuple, numpy.ndarray).
+
+            By default, it considers all nodes.
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
-        d : tensor
-            The out-degree array. ``d[i]`` gives the out-degree of node ``u[i]``
-            with edges of type ``etype``.
+        tensor or int
+            The out-degree(s) of the node(s).
+
+            - If :attr:`u` is an ``int`` object, the return result will be an ``int``
+              object as well.
+            - If :attr:`u` is a ``Tensor`` or ``iterable[int]`` object, the return result
+              will be a 1D ``Tensor``. The data type of the result will be the same as the
+              idtype of the graph. The i-th element of the tensor is the out-degree of the
+              node ``v[i]``.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        Instantiate a heterograph.
+        >>> import dgl
+        >>> import torch
 
-        >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
-        >>>     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 1, 2, 3])))
+
+        Query for all nodes.
+
+        >>> g.out_degrees()
+        tensor([2, 2, 0, 0])
+
+        Query for nodes 1 and 2.
+
+        >>> g.out_degrees(torch.tensor([1, 2]))
+        tensor([2, 0])
+
+        For a graph of multiple edge types, it is required to specify the edge type in query.
+
+        >>> hg = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
         >>> })
-
-        Query for node degree.
-
-        >>> g.out_degrees(0, 'plays')
-        1
-        >>> g.out_degrees(etype='follows')
-        tensor([1, 2, 0])
+        >>> hg.out_degrees(torch.tensor([1, 0]), etype='follows')
+        tensor([1, 1])
 
         See Also
         --------
-        out_degree
+        in_degrees
         """
-        srctype = self.to_canonical_etype(etype)[0]
+        if not (is_all(u) or isinstance(u, (numbers.Integral, Iterable)) or F.is_tensor(u)):
+            raise DGLError('Expect u to have type int, tensor or sequence, '
+                           'got {}'.format(type(u)))
+
+        src_type, _, _ = self.to_canonical_etype(etype)
+        num_src_type_nodes = self.num_dst_nodes(src_type)
+
+        if isinstance(u, numbers.Integral) and (u < 0 or u >= num_src_type_nodes):
+            raise DGLError('Expect the source node ID to be from 0, ...'
+                           ', {:d}, got {:d}'.format(num_src_type_nodes - 1, u))
+
+        if not F.is_tensor(u) and not is_all(u) and isinstance(u, Iterable):
+            utils.detect_nan_in_iterable(u, 'the source node IDs')
+            utils.detect_inf_in_iterable(u, 'the source node IDs')
+
+        if (F.is_tensor(u) or isinstance(u, Iterable)) and not is_all(u):
+            utils.assert_nonnegative_iterable(u, 'the source node IDs')
+            utils.assert_iterable_bounded_by_value(
+                u, 'the source node IDs', num_src_type_nodes,
+                'the number of {} nodes'.format(src_type))
+
         etid = self.get_etype_id(etype)
         if is_all(u):
-            u = self.srcnodes(srctype)
+            u = self.srcnodes(src_type)
         deg = self._graph.out_degrees(etid, utils.prepare_tensor(self, u, 'u'))
         if isinstance(u, numbers.Integral):
             return F.as_scalar(deg)
