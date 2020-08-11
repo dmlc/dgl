@@ -120,7 +120,7 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
 
     # Test sparse emb
     try:
-        emb = DistEmbedding(g, g.number_of_nodes(), 1, 'emb1', emb_init)
+        emb = DistEmbedding(g.number_of_nodes(), 1, 'emb1', emb_init)
         lr = 0.001
         optimizer = SparseAdagrad([emb], lr=lr)
         with F.record_grad():
@@ -143,7 +143,7 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
             assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)) * num_clients)
         assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
 
-        emb = DistEmbedding(g, g.number_of_nodes(), 1, 'emb2', emb_init)
+        emb = DistEmbedding(g.number_of_nodes(), 1, 'emb2', emb_init)
         with F.no_grad():
             feats1 = emb(nids)
         assert np.all(F.asnumpy(feats1) == 0)
