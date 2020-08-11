@@ -266,7 +266,7 @@ def run(proc_id, n_gpus, args, devices, data):
     val_nid = val_mask.nonzero().squeeze()
 
     # Split train_nid
-    train_nid = th.split(train_nid, math.ceil(len(train_nid) // n_gpus))[proc_id]
+    train_nid = th.split(train_nid, math.ceil(len(train_nid) / n_gpus))[proc_id]
 
     # Create sampler
     sampler = NeighborSampler(g, [int(_) for _ in args.fan_out.split(',')])
