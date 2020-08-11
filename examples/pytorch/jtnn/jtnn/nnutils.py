@@ -48,10 +48,3 @@ def tocpu(g):
     src = src.cpu()
     dst = dst.cpu()
     return dgl.graph((src, dst), num_nodes=g.number_of_nodes())
-
-def line_graph(g, backtracking=True, shared=False):
-    #g2 = tocpu(g)
-    g2 = dgl.line_graph(g, backtracking, shared)
-    #g2 = g2.to(g.device)
-    g2.ndata.update(g.edata)
-    return g2

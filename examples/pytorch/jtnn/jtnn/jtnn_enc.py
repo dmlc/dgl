@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from .nnutils import GRUUpdate, cuda, line_graph, tocpu
-from dgl import batch, bfs_edges_generator
+from .nnutils import GRUUpdate, cuda, tocpu
+from dgl import batch, bfs_edges_generator, line_graph
 import dgl.function as DGLF
 import numpy as np
 
@@ -17,11 +17,6 @@ def level_order(forest, roots):
     edges_back = bfs_edges_generator(forest, roots, reverse=True)
     yield from reversed(edges_back)
     yield from edges
-
-enc_tree_msg = [DGLF.copy_src(src='m', out='m'), DGLF.copy_src(src='rm', out='rm')]
-enc_tree_reduce = [DGLF.sum(msg='m', out='s'), DGLF.sum(msg='rm', out='accum_rm')]
-enc_tree_gather_msg = DGLF.copy_edge(edge='m', out='m')
-enc_tree_gather_reduce = DGLF.sum(msg='m', out='m')
 
 class EncoderGatherUpdate(nn.Module):
     def __init__(self, hidden_size):
@@ -102,21 +97,15 @@ class DGLJTNNEncoder(nn.Module):
         # if m_ij is actually computed or not.
         mol_tree_batch_lg.ndata.update(mol_tree_batch.edata)
         for eid in level_order(mol_tree_batch, root_ids):
-            #eid = mol_tree_batch.edge_ids(u, v)
-            mol_tree_batch_lg.pull(
-                eid.to(mol_tree_batch_lg.device),
-                enc_tree_msg,
-                enc_tree_reduce,
-                self.enc_tree_update,
-            )
+            eid = eid.to(mol_tree_batch_lg.device)
+            mol_tree_batch_lg.pull(eid, DGLF.copy_u('m', 'm'), DGLF.sum('m', 's'))
+            mol_tree_batch_lg.pull(eid, DGLF.copy_u('rm', 'rm'), DGLF.sum('rm', 'rm'))
+            mol_tree_batch_lg.apply_nodes(self.enc_tree_update)
 
         # Readout
         mol_tree_batch.edata.update(mol_tree_batch_lg.ndata)
-        mol_tree_batch.update_all(
-            enc_tree_gather_msg,
-            enc_tree_gather_reduce,
-            self.enc_tree_gather_update,
-        )
+        mol_tree_batch.update_all(DGLF.copy_e('m', 'm'), DGLF.sum('m', 'm'))
+        mol_tree_batch.apply_nodes(self.enc_tree_gather_update)
 
         root_vecs = mol_tree_batch.nodes[root_ids].data['h']
 
