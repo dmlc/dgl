@@ -1,6 +1,6 @@
 """Classes for heterogeneous graphs."""
 #pylint: disable= too-many-lines
-from collections import defaultdict
+from collections import defaultdict, Iterable
 from collections.abc import Mapping
 from contextlib import contextmanager
 import copy
@@ -2069,31 +2069,70 @@ class DGLHeteroGraph(object):
         return self.has_nodes(vid)
 
     def has_nodes(self, vid, ntype=None):
-        """Whether the graph has a node with a particular id and type.
+        """Whether the graph has some particular node(s) of a given type.
 
         Parameters
         ----------
-        vid : int, iterable, tensor
-            Node ID(s).
+        vid : node ID(s)
+            The node ID(s) for query. The allowed formats are:
+
+            - int: The ID of a single node.
+            - Tensor: A 1D tensor that contains the IDs of multiple nodes, whose data type and
+              device should be separately the same as the idtype and device of the graph.
+            - iterable[int]: A sequence (e.g. list, tuple, numpy.ndarray)
+              of integers that contains the IDs of multiple nodes.
         ntype : str, optional
-            The node type. Can be omitted if there is only one node type
-            in the graph. (Default: None)
+            The node type for query. It is required if the graph has
+            multiple node types.
 
         Returns
         -------
         bool or bool Tensor
-            Each element is a bool flag, which is True if the node exists,
-            and is False otherwise.
+
+            - If :attr:`vid` is an ``int``, the result will be a ``bool`` indicating
+              whether the graph has the particular node.
+            - If :attr:`vid` is a 1D ``Tensor`` or ``iterable[int]`` of node IDs,
+              the result will be a bool Tensor whose i-th element indicates whether
+              the graph has node :attr:`vid[i]` of the given type.
 
         Examples
         --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a graph with two node types -- 'user' and 'game'.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([0, 1]))
+        >>> })
+
+        Query for the nodes.
+
         >>> g.has_nodes(0, 'user')
         True
-        >>> g.has_nodes(4, 'user')
+        >>> g.has_nodes(3, 'game')
         False
-        >>> g.has_nodes([0, 1, 2, 3, 4], 'user')
-        tensor([True, True, True, False, False])
+        >>> g.has_nodes(torch.tensor([3, 0, 1]), 'game')
+        tensor([False,  True,  True])
         """
+        if not (isinstance(vid, numbers.Integral) or isinstance(vid, Iterable)):
+            raise DGLError('Expect an int, a tensor or a sequence for vid, got {}'.format(type(vid)))
+
+        if isinstance(vid, numbers.Integral) and vid < 0:
+            raise DGLError('Expect a non-negative value for vid, got {:d}'.format(vid))
+
+        if isinstance(vid, Iterable) and not F.is_tensor(vid):
+            # NaN/Inf values cannot appear in int32/int64 tensors
+            utils.detect_nan_in_iterable(vid, 'vid')
+            utils.detect_inf_in_iterable(vid, 'vid')
+
+        if isinstance(vid, Iterable):
+            utils.assert_nonnegative_iterable(vid, 'vid')
+
         ret = self._graph.has_nodes(
             self.get_ntype_id(ntype),
             utils.prepare_tensor(self, vid, "vid"))
@@ -2103,7 +2142,7 @@ class DGLHeteroGraph(object):
             return F.astype(ret, F.bool)
 
     def has_node(self, vid, ntype=None):
-        """Whether the graph has a node with ids and a particular type.
+        """Whether the graph has a particular node of a given type.
 
         DEPRECATED: see :func:`~DGLGraph.has_nodes`
         """
@@ -2111,34 +2150,118 @@ class DGLHeteroGraph(object):
         return self.has_nodes(vid, ntype)
 
     def has_edges_between(self, u, v, etype=None):
-        """Whether the graph has an edge (u, v) of type ``etype``.
+        """Whether the graph has some particular edge(s) of a given type.
 
         Parameters
         ----------
-        u : int, iterable of int, Tensor
-            Source node ID(s).
-        v : int, iterable of int, Tensor
-            Destination node ID(s).
+        u : source node ID(s)
+            The source node(s) of the edges for query. The allowed formats are:
+
+            - int: The source node of an edge for query.
+            - Tensor: A 1D tensor that contains the source node(s) of edge(s) for query, whose
+              data type an device should be separately the same as the idtype and device of
+              the graph. Its i-th element is the source node of the i-th edge for query.
+            - iterable[int] : Similar to the tensor, but stores node IDs in a sequence
+              (e.g. list, tuple, numpy.ndarray).
+        v : destination node ID(s)
+            The destination node(s) of the edges for query. It's a counterpart of :attr:`u`
+            for destination nodes and should have the same format as :attr:`u`. If :attr:`u`
+            and :attr:`v` are not int, they should have the same length.
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type.
 
         Returns
         -------
-        a : Tensor
-            Binary tensor indicating the existence of edges. ``a[i]=1`` if the graph
-            contains edge ``(u[i], v[i])`` of type ``etype``, 0 otherwise.
+        bool or bool Tensor
+
+            - If :attr:`u` and :attr:`v` are ``int`` objects, the result will be a ``bool``
+              indicating whether there is an edge from ``u`` to ``v`` of the given edge type.
+            - If :attr:`u` and :attr:`v` are ``Tensor`` or ``iterable[int]`` objects, the
+              result will be a bool Tensor whose i-th element indicates whether there is an
+              edge from ``u[i]`` to ``v[i]`` of the given edge type.
+
+        Notes
+        -----
+        The value(s) of :attr:`u` and :attr:`v` need to be separately smaller than the
+        number of nodes of the source and destination type.
 
         Examples
         --------
 
-        >>> g.has_edge_between(0, 1, ('user', 'plays', 'game'))
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a graph with three canonical edge types.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
+        >>> })
+
+        Query for edges.
+
+        >>> g.has_edges_between(1, 2, 'plays')
         True
-        >>> g.has_edge_between(0, 2, ('user', 'plays', 'game'))
-        False
-        >>> g.has_edge_between([0, 0], [1, 2], ('user', 'plays', 'game'))
-        tensor([1, 0])
+        >>> g.has_edges_between(torch.tensor([1, 2]), torch.tensor([2, 3]), 'plays')
+        tensor([ True, False])
+
+        Use a canonical edge type instead when there is ambiguity for an edge type.
+
+        >>> g.has_edges_between(torch.tensor([1, 2]), torch.tensor([2, 3]),
+        >>>                     ('user', 'follows', 'user'))
+        tensor([ True, False])
+        >>> g.has_edges_between(torch.tensor([1, 2]), torch.tensor([2, 3]),
+        >>>                     ('user', 'follows', 'game'))
+        tensor([True, True])
         """
+        u_type = type(u)
+        v_type = type(v)
+        if u_type != v_type:
+            raise DGLError('Expect the source and destination node IDs to have the same type, ' \
+                           'got {} and {}'.format(u_type, v_type))
+
+        if not (isinstance(u, int) or isinstance(u, Iterable)):
+            raise DGLError('Expect the node IDs to have type int, tensor or sequence, '
+                           'got {}'.format(type(u)))
+
+        src_type, edge_type, dst_type = self.to_canonical_etype(etype)
+        num_src_type_nodes = self.num_nodes(src_type)
+        num_dst_type_nodes = self.num_nodes(dst_type)
+
+        if isinstance(u, int):
+            if u < 0 or u >= num_src_type_nodes:
+                raise DGLError('Expect the source node ID to be a valid one, i.e. one from 0, ...'
+                               ', {:d}, got {:d}'.format(num_src_type_nodes - 1, u))
+            if v < 0 or v >= num_dst_type_nodes:
+                raise DGLError('Expect the destination node ID to be a valid one, i.e. one '
+                               'from 0, ..., {:d}, got {:d}'.format(num_dst_type_nodes - 1, v))
+        else:
+            if len(u) != len(v):
+                raise DGLError('Expect the source and destination node IDs to have the same '
+                               'length, got {:d} and {:d}'.format(len(u), len(v)))
+
+        if not F.is_tensor(u) and isinstance(u, Iterable):
+            utils.detect_nan_in_iterable(u, 'the source node IDs')
+            utils.detect_nan_in_iterable(v, 'the destination node IDs')
+
+            utils.detect_inf_in_iterable(u, 'the source node IDs')
+            utils.detect_inf_in_iterable(v, 'the destination node IDs')
+
+            utils.assert_nonnegative_iterable(u, 'the source node IDs')
+            utils.assert_nonnegative_iterable(v, 'the destination node IDs')
+
+            utils.assert_iterable_bounded_by_value(
+                u, 'the source node IDs', num_src_type_nodes,
+                'the number of {} nodes'.format(src_type))
+            utils.assert_iterable_bounded_by_value(
+                v, 'the destination node IDs', num_dst_type_nodes,
+                'the number of {} nodes'.format(dst_type))
+
         ret = self._graph.has_edges_between(
             self.get_etype_id(etype),
             utils.prepare_tensor(self, u, 'u'),

@@ -153,8 +153,8 @@ def test_create(idtype):
     # create from scipy
     spmat = ssp.coo_matrix(([1,1,1], ([0, 0, 1], [2, 3, 2])), shape=(4, 4))
     g = dgl.from_scipy(spmat, idtype=idtype, device=device)
-    assert g.number_of_nodes() == 4
-    assert g.number_of_edges() == 3
+    assert g.num_nodes() == 4
+    assert g.num_edges() == 3
     assert g.idtype == idtype
     assert g.device == device
 
@@ -164,9 +164,9 @@ def test_create(idtype):
         ('l0', 'e1', 'l2'): ([2], [2]),
         ('l2', 'e2', 'l2'): ([1, 3], [1, 3])
         }, idtype=idtype, device=device)
-    assert g.number_of_nodes('l0') == 3
-    assert g.number_of_nodes('l1') == 3
-    assert g.number_of_nodes('l2') == 4
+    assert g.num_nodes('l0') == 3
+    assert g.num_nodes('l1') == 3
+    assert g.num_nodes('l2') == 4
     assert g.idtype == idtype
     assert g.device == device
 
@@ -229,10 +229,10 @@ def test_query(idtype):
 
     def _test(g):
         # number of nodes
-        assert [g.number_of_nodes(ntype) for ntype in ntypes] == [3, 2, 2]
+        assert [g.num_nodes(ntype) for ntype in ntypes] == [3, 2, 2]
 
         # number of edges
-        assert [g.number_of_edges(etype) for etype in etypes] == [2, 4, 2, 2]
+        assert [g.num_edges(etype) for etype in etypes] == [2, 4, 2, 2]
 
         # has_node & has_nodes
         for ntype in ntypes:

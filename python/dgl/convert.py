@@ -134,6 +134,10 @@ def graph(data,
         raise DGLError('Expect the source and destination node IDs to have the same type, ' \
                        'got {} and {}'.format(src_type, dst_type))
 
+    if len(data[0]) != len(data[1]):
+        raise DGLError('Expect the source and destination node IDs to have the same length, ' \
+                       'got {:d} and {:d}'.format(len(data[0]), len(data[1])))
+
     if F.is_tensor(data[0]):
         src_dtype = F.dtype(data[0])
         dst_dtype = F.dtype(data[1])
@@ -150,14 +154,10 @@ def graph(data,
                            'context, got {} and {}'.format(src_ctx, dst_ctx))
     elif isinstance(data[0], Iterable):
         # NaN/Inf values cannot appear in int32/int64 tensors
-        if np.isnan(data[0]).sum() > 0:
-            raise DGLError('NaN values found in the source node IDs')
-        if np.isinf(data[0]).sum() > 0:
-            raise DGLError('Inf values found in the source node IDs')
-        if np.isnan(data[1]).sum() > 0:
-            raise DGLError('NaN values found in the destination node IDs')
-        if np.isinf(data[1]).sum() > 0:
-            raise DGLError('Inf values found in the destination node IDs')
+        utils.detect_nan_in_iterable(data[0], 'the source node IDs')
+        utils.detect_inf_in_iterable(data[0], 'the source node IDs')
+        utils.detect_nan_in_iterable(data[1], 'the destination node IDs')
+        utils.detect_inf_in_iterable(data[1], 'the destination node IDs')
     else:
         raise DGLError('Expect sequences (e.g., list, numpy.ndarray) or tensors for data, ' \
                        'got {}'.format(type(data[0])))
@@ -199,14 +199,8 @@ def graph(data,
     if num_nodes is not None:  # override the number of nodes
         urange, vrange = num_nodes, num_nodes
     if len(u) > 0:
-        min_src = F.as_scalar(F.min(u, dim=0))
-        if min_src < 0:
-            raise DGLError('Expect the source node IDs to be non-negative, '
-                           'got {:d}'.format(min_src))
-        min_dst = F.as_scalar(F.min(v, dim=0))
-        if min_dst < 0:
-            raise DGLError('Expect the destination node IDs to be non-negative, '
-                           'got {:d}'.format(min_src))
+        utils.assert_nonnegative_iterable(u, 'the source node IDs')
+        utils.assert_nonnegative_iterable(v, 'the destination node IDs')
 
     g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange)
 
@@ -388,14 +382,10 @@ def heterograph(data_dict,
             data_devices.append(src_ctx)
         elif isinstance(data[0], Iterable):
             # NaN/Inf values cannot appear in int32/int64 tensors
-            if np.isnan(data[0]).sum() > 0:
-                raise DGLError('NaN values found in the source node IDs for {}'.format(key))
-            if np.isinf(data[0]).sum() > 0:
-                raise DGLError('Inf values found in the source node IDs for {}'.format(key))
-            if np.isnan(data[1]).sum() > 0:
-                raise DGLError('NaN values found in the destination node IDs for {}'.format(key))
-            if np.isinf(data[1]).sum() > 0:
-                raise DGLError('Inf values found in the destination node IDs for {}'.format(key))
+            utils.detect_nan_in_iterable(data[0], 'the source node IDs for {}'.format(key))
+            utils.detect_inf_in_iterable(data[0], 'the source node IDs for {}'.format(key))
+            utils.detect_nan_in_iterable(data[1], 'the destination node IDs for {}'.format(key))
+            utils.detect_inf_in_iterable(data[1], 'the destination node IDs for {}'.format(key))
         else:
             raise DGLError('Expect sequences (e.g., list, numpy.ndarray) or tensors for '
                            'data_dict[{}], got {}'.format(key, type(data[0])))
@@ -431,14 +421,10 @@ def heterograph(data_dict,
         relation = (srctype, etype, dsttype)
         src, dst, nsrc, ndst = data
         if len(src) > 0:
-            min_src = F.as_scalar(F.min(src, dim=0))
-            if min_src < 0:
-                raise DGLError('Expect the source node IDs to be '
-                               'non-negative for {}, got {:d}'.format(relation, min_src))
-            min_dst = F.as_scalar(F.min(dst, dim=0))
-            if min_dst < 0:
-                raise DGLError('Expect the destination node IDs to be '
-                               'non-negative for {}, got {:d}'.format(relation, min_src))
+            utils.assert_nonnegative_iterable(
+                src, 'the source node IDs of canonical edge type {}'.format(relation))
+            utils.assert_nonnegative_iterable(
+                dst, 'the destination node IDs of canonical edge type {}'.format(relation))
         num_nodes_dict_[srctype] = max(num_nodes_dict_[srctype], nsrc)
         num_nodes_dict_[dsttype] = max(num_nodes_dict_[dsttype], ndst)
 
