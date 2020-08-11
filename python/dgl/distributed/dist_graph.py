@@ -369,7 +369,7 @@ class DistGraph:
         self._client.map_shared_data(self._gpb)
 
     def __getstate__(self):
-        return self.ip_config, self.graph_name, self._gpb_input
+        return self.ip_config, self.graph_name, self._gpb
 
     def __setstate__(self, state):
         self.ip_config, self.graph_name, self._gpb_input = state
