@@ -1,5 +1,5 @@
 
-3 Graph data input pipeline in DGL
+Graph data input pipeline in DGL
 ==================================
 
 DGL implements many commonly used graph datasets in
@@ -13,7 +13,7 @@ This chapter introduces how to create a DGL-Dataset for our own graph
 data. The following contents explain how the pipeline works, and
 show how to implement each component of it.
 
-3.1 DGLDataset class
+DGLDataset class
 --------------------
 
 ``DGLDataset`` is the base class for processing, loading and saving
@@ -99,7 +99,7 @@ template of ``MyDataset`` is as follows.
 ``__getitem__(idx)`` and ``__len__()`` that must be implemented in the
 subclass. But we recommend to implement saving and loading as well,
 since they can save significant time for processing large datasets, and
-there are several APIs making it easy (see `Section 3.4 
+there are several APIs making it easy (see `Save and load data 
 <file:///Users/xiangkhu/Documents/GitHub/dgl/docs/build/html/guide/data.html#save-and-load-data>`__).
 
 Note that the purpose of ``DGLDataset`` is to provide a standard and
@@ -112,7 +112,7 @@ subclass.
 The rest of this chapter shows the best practices to implement the
 functions in the pipeline.
 
-3.2 Download raw data (optional)
+Download raw data (optional)
 --------------------------------
 
 If our dataset is already in local disk, make sure it’s in directory
@@ -169,7 +169,7 @@ Optionally, we can check SHA-1 string of the downloaded file as the
 example above does, in case the author changed the file in the remote
 server some day.
 
-3.3 Process data
+Process data
 ----------------
 
 We implement the data processing code in function ``process()``, and it
@@ -181,10 +181,10 @@ how to process datasets related to these tasks.
 Here we focus on the standard way to process graphs, features and masks.
 We will use builtin datasets as examples and skip the implementations
 for building graphs from files, but add links to the detailed
-implementations. Please refer to `Section 2.3 <https://>`__ to see a
+implementations. Please refer to `Creating graphs from external sources <https://>`__ to see a
 complete guide on how to build graphs from external sources.
 
-3.3.1 Processing Graph Classification datasets
+Processing Graph Classification datasets
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Graph classification datasets are almost the same as most datasets in
@@ -283,7 +283,7 @@ follows:
             pass
 
 A complete guide for training graph classification models can be found
-in `Section 5.4 <https://>`__.
+in `Training Graph Classification models <https://>`__.
 
 For more examples of graph classification datasets, please refer to our builtin graph classification
 datasets: 
@@ -296,7 +296,7 @@ datasets:
 
 * `TUDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#tu-dataset>`__
 
-3.3.2 Processing Node Classification datasets
+Processing Node Classification datasets
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Different from graph classification, node classification is typically on
@@ -388,7 +388,7 @@ to show the usage of it:
     labels = graph.ndata['label']
 
 A complete guide for training node classification models can be found in
-`Section 5.1 <https://>`__.
+`Training Node Classification/Regression models <https://>`__.
 
 For more examples of node classification datasets, please refer to our
 builtin datasets:
@@ -413,7 +413,7 @@ builtin datasets:
 
 * `RDF datasets <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#rdf-datasets>`__
 
-3.3.3 Processing dataset for Link Prediction datasets
+Processing dataset for Link Prediction datasets
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The processing of link prediction datasets is similar to that for node
@@ -483,7 +483,7 @@ to show the usage of it:
 
 
 A complete guide for training link prediction models can be found in
-`Section 5.3 <https://>`__.
+`Training Link Prediction models <https://>`__.
 
 For more examples of link prediction datasets, please refer to our
 builtin datasets: 
@@ -492,7 +492,7 @@ builtin datasets:
 
 * `BitcoinOTCDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#bitcoinotc-dataset>`__
 
-3.4 Save and load data
+Save and load data
 ----------------------
 
 We recommend to implement saving and loading functions to cache the
@@ -546,7 +546,7 @@ example, in the builtin dataset
 the processed data is quite large, so it’s more effective to process
 each data example in ``__getitem__(idx)``.
 
-3.5 Loading OGB datasets using ``ogb`` package
+Loading OGB datasets using ``ogb`` package
 ----------------------------------------------
 
 `Open Graph Benchmark (OGB) <https://ogb.stanford.edu/docs/home/>`__ is
