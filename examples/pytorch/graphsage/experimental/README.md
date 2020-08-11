@@ -47,7 +47,7 @@ python3 ~/dgl/tools/launch.py \
 --workspace ~/graphsage/ \
 --num_trainers 1 \
 --num_samplers 4 \
---server_count 1 \
+--num_servers 1 \
 --part_config ogb-product/ogb-product.json \
 --ip_config ip_config.txt \
 "python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 30 --batch-size 1000 --num-workers 4"
