@@ -53,8 +53,8 @@ def create_random_graph(n):
     arr = (spsp.random(n, n, density=0.001, format='coo', random_state=100) != 0).astype(np.int64)
     return dgl.graph(arr)
 
-def run_server(graph_name, server_id, num_clients, shared_mem):
-    g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients,
+def run_server(graph_name, server_id, server_count, num_clients, shared_mem):
+    g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients, server_count,
                         '/tmp/dist_graph/{}.json'.format(graph_name),
                         disable_shared_mem=not shared_mem)
     print('start server', server_id)
@@ -66,9 +66,9 @@ def emb_init(shape, dtype):
 def rand_init(shape, dtype):
     return F.tensor(np.random.normal(size=shape), F.float32)
 
-def run_client(graph_name, part_id, num_clients, num_nodes, num_edges):
+def run_client(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
     time.sleep(5)
-    dgl.distributed.initialize("kv_ip_config.txt")
+    dgl.distributed.initialize("kv_ip_config.txt", server_count)
     gpb, graph_name = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                                           part_id, None)
     g = DistGraph(graph_name, gpb=gpb)
@@ -193,7 +193,7 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
     print('end')
 
 def check_server_client(shared_mem, num_servers, num_clients):
-    prepare_dist(num_servers)
+    prepare_dist()
     g = create_random_graph(10000)
 
     # Partition the graph
@@ -208,7 +208,7 @@ def check_server_client(shared_mem, num_servers, num_clients):
     serv_ps = []
     ctx = mp.get_context('spawn')
     for serv_id in range(num_servers):
-        p = ctx.Process(target=run_server, args=(graph_name, serv_id,
+        p = ctx.Process(target=run_server, args=(graph_name, serv_id, num_servers,
                                                  num_clients, shared_mem))
         serv_ps.append(p)
         p.start()
@@ -216,7 +216,7 @@ def check_server_client(shared_mem, num_servers, num_clients):
     cli_ps = []
     for cli_id in range(num_clients):
         print('start client', cli_id)
-        p = ctx.Process(target=run_client, args=(graph_name, 0, num_clients, g.number_of_nodes(),
+        p = ctx.Process(target=run_client, args=(graph_name, 0, num_servers, num_clients, g.number_of_nodes(),
                                                  g.number_of_edges()))
         p.start()
         cli_ps.append(p)
@@ -379,10 +379,10 @@ def test_split_even():
     assert np.all(all_nodes == F.asnumpy(all_nodes2))
     assert np.all(all_edges == F.asnumpy(all_edges2))
 
-def prepare_dist(num_servers):
+def prepare_dist():
     ip_config = open("kv_ip_config.txt", "w")
     ip_addr = get_local_usable_addr()
-    ip_config.write('{} {}\n'.format(ip_addr, num_servers))
+    ip_config.write('{}\n'.format(ip_addr))
     ip_config.close()
 
 if __name__ == '__main__':

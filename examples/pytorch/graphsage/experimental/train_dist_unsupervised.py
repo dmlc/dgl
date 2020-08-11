@@ -22,7 +22,78 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 #from pyinstrument import Profiler
-from train_sampling import SAGE
+
+class SAGE(nn.Module):
+    def __init__(self,
+                 in_feats,
+                 n_hidden,
+                 n_classes,
+                 n_layers,
+                 activation,
+                 dropout):
+        super().__init__()
+        self.n_layers = n_layers
+        self.n_hidden = n_hidden
+        self.n_classes = n_classes
+        self.layers = nn.ModuleList()
+        self.layers.append(dglnn.SAGEConv(in_feats, n_hidden, 'mean'))
+        for i in range(1, n_layers - 1):
+            self.layers.append(dglnn.SAGEConv(n_hidden, n_hidden, 'mean'))
+        self.layers.append(dglnn.SAGEConv(n_hidden, n_classes, 'mean'))
+        self.dropout = nn.Dropout(dropout)
+        self.activation = activation
+
+    def forward(self, blocks, x):
+        h = x
+        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
+            h = layer(block, h)
+            if l != len(self.layers) - 1:
+                h = self.activation(h)
+                h = self.dropout(h)
+        return h
+
+    def inference(self, g, x, batch_size, device):
+        """
+        Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
+        g : the entire graph.
+        x : the input of entire node set.
+
+        The inference code is written in a fashion that it could handle any number of nodes and
+        layers.
+        """
+        # During inference with sampling, multi-layer blocks are very inefficient because
+        # lots of computations in the first few layers are repeated.
+        # Therefore, we compute the representation of all nodes layer by layer.  The nodes
+        # on each layer are of course splitted in batches.
+        # TODO: can we standardize this?
+        for l, layer in enumerate(self.layers):
+            y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
+
+            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
+            dataloader = dgl.sampling.NodeDataLoader(
+                g,
+                th.arange(g.number_of_nodes()),
+                sampler,
+                batch_size=args.batch_size,
+                shuffle=True,
+                drop_last=False,
+                num_workers=args.num_workers)
+
+            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
+                block = blocks[0]
+
+                block = block.int().to(device)
+                h = x[input_nodes].to(device)
+                h = layer(block, h)
+                if l != len(self.layers) - 1:
+                    h = self.activation(h)
+                    h = self.dropout(h)
+
+                y[output_nodes] = h.cpu()
+
+            x = y
+        return y
+
 
 class NegativeSampler(object):
     def __init__(self, g, neg_nseeds):
@@ -349,7 +420,7 @@ def run(args, device, data):
 def main(args):
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
-    dgl.distributed.initialize(args.ip_config, num_workers=args.num_workers)
+    dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
     g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
     print('rank:', g.rank())
     print('number of edges', g.number_of_edges())
@@ -381,6 +452,7 @@ if __name__ == '__main__':
     parser.add_argument('--id', type=int, help='the partition id')
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
     parser.add_argument('--part_config', type=str, help='The path to the partition config file')
+    parser.add_argument('--num-servers', type=int, help='Server count on each machine.')
     parser.add_argument('--n-classes', type=int, help='the number of classes')
     parser.add_argument('--gpu', type=int, default=0,
         help="GPU device ID. Use -1 for CPU training")
