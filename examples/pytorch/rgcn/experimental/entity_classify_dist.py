@@ -504,6 +504,7 @@ if __name__ == '__main__':
             help='User global norm instead of per node type norm')
     parser.add_argument('--layer-norm', default=False, action='store_true',
             help='Use layer norm')
+    parser.add_argument('--local_rank', type=int, help='get rank of the process')
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
     args = parser.parse_args()
 
