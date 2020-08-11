@@ -142,7 +142,7 @@ class NodeDataView(MutableMapping):
             name1 = _get_data_name(name, policy.policy_str)
             dtype, shape, _ = g._client.get_data_meta(name1)
             # We create a wrapper on the existing tensor in the kvstore.
-            self._data[name] = DistTensor(g, shape, dtype, name, part_policy=policy)
+            self._data[name] = DistTensor(shape, dtype, name, part_policy=policy)
 
     def _get_names(self):
         return list(self._data.keys())
@@ -188,7 +188,7 @@ class EdgeDataView(MutableMapping):
             name1 = _get_data_name(name, policy.policy_str)
             dtype, shape, _ = g._client.get_data_meta(name1)
             # We create a wrapper on the existing tensor in the kvstore.
-            self._data[name] = DistTensor(g, shape, dtype, name, part_policy=policy)
+            self._data[name] = DistTensor(shape, dtype, name, part_policy=policy)
 
     def _get_names(self):
         return list(self._data.keys())

@@ -41,7 +41,7 @@ class DistEmbedding:
         if part_policy is None:
             part_policy = PartitionPolicy(NODE_PART_POLICY, g.get_partition_book())
 
-        self._tensor = DistTensor(g, (num_embeddings, embedding_dim), F.float32, name,
+        self._tensor = DistTensor((num_embeddings, embedding_dim), F.float32, name,
                                   init_func, part_policy)
         self._trace = []
 

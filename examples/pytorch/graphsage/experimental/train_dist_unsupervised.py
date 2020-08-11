@@ -124,11 +124,11 @@ class DistSAGE(SAGE):
         # TODO: can we standardize this?
         nodes = dgl.distributed.node_split(np.arange(g.number_of_nodes()),
                                            g.get_partition_book(), force_even=True)
-        y = dgl.distributed.DistTensor(g, (g.number_of_nodes(), self.n_hidden), th.float32, 'h',
+        y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_hidden), th.float32, 'h',
                                        persistent=True)
         for l, layer in enumerate(self.layers):
             if l == len(self.layers) - 1:
-                y = dgl.distributed.DistTensor(g, (g.number_of_nodes(), self.n_classes),
+                y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_classes),
                                                th.float32, 'h_last', persistent=True)
 
             sampler = PosNeighborSampler(g, [-1], dgl.distributed.sample_neighbors)
