@@ -153,6 +153,7 @@ def start_client(ip_config):
         assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
 
 def test_serialize():
+    os.environ['DGL_DIST_MODE'] = 'distributed'
     from dgl.distributed.rpc import serialize_to_payload, deserialize_from_payload
     SERVICE_ID = 12345
     dgl.distributed.register_service(SERVICE_ID, MyRequest, MyResponse)
@@ -170,6 +171,7 @@ def test_serialize():
     assert res.x == res1.x
 
 def test_rpc_msg():
+    os.environ['DGL_DIST_MODE'] = 'distributed'
     from dgl.distributed.rpc import serialize_to_payload, deserialize_from_payload, RPCMessage
     SERVICE_ID = 32452
     dgl.distributed.register_service(SERVICE_ID, MyRequest, MyResponse)
@@ -186,6 +188,7 @@ def test_rpc_msg():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_rpc():
+    os.environ['DGL_DIST_MODE'] = 'distributed'
     ip_config = open("rpc_ip_config.txt", "w")
     ip_addr = get_local_usable_addr()
     ip_config.write('%s 1\n' % ip_addr)
@@ -201,6 +204,7 @@ def test_rpc():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_multi_client():
+    os.environ['DGL_DIST_MODE'] = 'distributed'
     ip_config = open("rpc_ip_config_mul_client.txt", "w")
     ip_addr = get_local_usable_addr()
     ip_config.write('%s 1\n' % ip_addr)
