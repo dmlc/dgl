@@ -2544,7 +2544,7 @@ class DGLHeteroGraph(object):
         return src, dst
 
     def in_edges(self, v, form='uv', etype=None):
-        """Return the incoming edges of some particular node(s) with the specified type.
+        """Return the incoming edges of some particular node(s) with the specified edge type.
 
         Parameters
         ----------
@@ -2649,7 +2649,7 @@ class DGLHeteroGraph(object):
             raise DGLError('Invalid form: {}. Must be "all", "uv" or "eid".'.format(form))
 
     def out_edges(self, u, form='uv', etype=None):
-        """Return the outgoing edges of some particular node(s) with the specified type.
+        """Return the outgoing edges of some particular node(s) with the specified edge type.
 
         Parameters
         ----------
@@ -2754,7 +2754,7 @@ class DGLHeteroGraph(object):
             raise DGLError('Invalid form: {}. Must be "all", "uv" or "eid".'.format(form))
 
     def all_edges(self, form='uv', order='eid', etype=None):
-        """Return all edges with the specified type.
+        """Return all edges with the specified edge type.
 
         Parameters
         ----------
@@ -2842,46 +2842,97 @@ class DGLHeteroGraph(object):
         return self.in_degrees(v, etype)
 
     def in_degrees(self, v=ALL, etype=None):
-        """Return the in-degrees of nodes v with edges of type ``etype``.
+        """Return the in-degree(s) of some particular node(s) with the specified edge type.
 
         Parameters
         ----------
-        v : int, iterable of int or tensor, optional.
-            The node ID array of the destination type. Default is to return the
-            degrees of all nodes.
-        etype : str or tuple of str or None, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+        v : destination node ID(s), optional
+            The destination node(s) for query. The allowed formats are:
+
+            - int: The destination node for query.
+            - Tensor: A 1D tensor that contains the destination node(s) for query, whose data
+              type and device should be separately the same as the idtype and device of the
+              graph.
+            - iterable[int] : Similar to the tensor, but stores node IDs in a sequence
+              (e.g. list, tuple, numpy.ndarray).
+
+            By default, it considers all nodes.
+        etype : str or tuple of str, optional
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
-        d : tensor or int
-            The in-degree array. ``d[i]`` gives the in-degree of node ``v[i]``
-            with edges of type ``etype``. If the argument is an integer, so will
-            be the return.
+        tensor or int
+            The in-degree(s) of the node(s).
+
+            - If :attr:`v` is an ``int`` object, the return result will be an ``int``
+              object as well.
+            - If :attr:`v` is a ``Tensor`` or ``iterable[int]`` object, the return result
+              will be a 1D ``Tensor``. The data type of the result will be the same as the
+              idtype of the graph. The i-th element of the tensor is the in-degree of the
+              node ``v[i]``.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        Instantiate a heterograph.
+        >>> import dgl
+        >>> import torch
 
-        >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
-        >>>     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 1, 2, 3])))
+
+        Query for all nodes.
+
+        >>> g.in_degrees()
+        tensor([0, 2, 1, 1])
+
+        Query for nodes 1 and 2.
+
+        >>> g.in_degrees(torch.tensor([1, 2]))
+        tensor([2, 1])
+
+        For a graph of multiple edge types, it is required to specify the edge type in query.
+
+        >>> hg = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
         >>> })
+        >>> hg.in_degrees(torch.tensor([1, 0]), etype='follows')
+        tensor([1, 0])
 
-        Query for node degree.
-
-        >>> g.in_degrees(0, 'plays')
-        2
-        >>> g.in_degrees(etype='follows')
-        tensor([0, 1, 2])
+        See Also
+        --------
+        out_degrees
         """
-        dsttype = self.to_canonical_etype(etype)[2]
+        if not (is_all(v) or isinstance(v, (numbers.Integral, Iterable)) or F.is_tensor(v)):
+            raise DGLError('Expect v to have type int, tensor or sequence, '
+                           'got {}'.format(type(v)))
+
+        _, _, dst_type = self.to_canonical_etype(etype)
+        num_dst_type_nodes = self.num_dst_nodes(dst_type)
+
+        if isinstance(v, numbers.Integral) and (v < 0 or v >= num_dst_type_nodes):
+            raise DGLError('Expect the destination node ID to be from 0, ...'
+                           ', {:d}, got {:d}'.format(num_dst_type_nodes - 1, v))
+
+        if not F.is_tensor(v) and isinstance(v, Iterable):
+            utils.detect_nan_in_iterable(v, 'the destination node IDs')
+            utils.detect_inf_in_iterable(v, 'the destination node IDs')
+
+        if F.is_tensor(v) or isinstance(v, Iterable):
+            utils.assert_nonnegative_iterable(v, 'the destination node IDs')
+            utils.assert_iterable_bounded_by_value(
+                v, 'the destination node IDs', num_dst_type_nodes,
+                'the number of {} nodes'.format(dst_type))
+
         etid = self.get_etype_id(etype)
         if is_all(v):
-            v = self.dstnodes(dsttype)
+            v = self.dstnodes(dst_type)
         deg = self._graph.in_degrees(etid, utils.prepare_tensor(self, v, 'v'))
         if isinstance(v, numbers.Integral):
             return F.as_scalar(deg)

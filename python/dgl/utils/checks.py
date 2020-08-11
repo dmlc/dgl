@@ -275,6 +275,9 @@ def assert_iterable_bounded_by_value(values, values_name, target_max_val, target
     target_max_val_name : str
         Name of target_max_val for error message.
     """
+    if len(values) == 0:
+        return
+
     if F.is_tensor(values):
         max_val = F.as_scalar(F.max(values, dim=0))
     else:
