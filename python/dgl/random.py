@@ -5,6 +5,8 @@ from ._ffi.function import _init_api
 from . import backend as F
 from . import ndarray as nd
 
+__all__ = ['seed']
+
 def seed(val):
     """Set the seed of randomized methods in DGL.
 

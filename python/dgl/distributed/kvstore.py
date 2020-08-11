@@ -5,6 +5,7 @@ import numpy as np
 
 from . import rpc
 from .graph_partition_book import PartitionPolicy
+from .standalone_kvstore import KVClient as SA_KVClient
 
 from .. import backend as F
 from .. import utils
@@ -776,8 +777,8 @@ class KVClient(object):
         We can set different role for kvstore.
     """
     def __init__(self, ip_config, role='default'):
-        assert rpc.get_rank() != -1, 'Please invoke rpc.connect_to_server() \
-        before creating KVClient.'
+        assert rpc.get_rank() != -1, \
+                'Please invoke rpc.connect_to_server() before creating KVClient.'
         assert os.path.exists(ip_config), 'Cannot open file: %s' % ip_config
         # Register services on client
         rpc.register_service(KVSTORE_PULL,
@@ -1233,7 +1234,10 @@ def init_kvstore(ip_config, role):
     """initialize KVStore"""
     global KVCLIENT
     if KVCLIENT is None:
-        KVCLIENT = KVClient(ip_config, role)
+        if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
+            KVCLIENT = SA_KVClient()
+        else:
+            KVCLIENT = KVClient(ip_config, role)
 
 def close_kvstore():
     """Close the current KVClient"""
