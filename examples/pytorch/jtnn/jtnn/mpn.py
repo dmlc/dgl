@@ -6,7 +6,6 @@ from .chemutils import get_mol
 import dgl
 from dgl import mean_nodes
 import dgl.function as DGLF
-from .nnutils import line_graph
 
 ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca',
              'Fe', 'Al', 'I', 'B', 'K', 'Se', 'Zn', 'H', 'Cu', 'Mn', 'unknown']
@@ -122,7 +121,7 @@ class DGLMPN(nn.Module):
     def forward(self, mol_graph):
         n_samples = mol_graph.batch_size
 
-        mol_line_graph = line_graph(mol_graph, backtracking=False, shared=True)
+        mol_line_graph = dgl.line_graph(mol_graph, backtracking=False, shared=True)
 
         n_nodes = mol_graph.number_of_nodes()
         n_edges = mol_graph.number_of_edges()

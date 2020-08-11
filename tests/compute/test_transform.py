@@ -15,7 +15,6 @@ D = 5
 
 # line graph related
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_line_graph1():
     N = 5
     G = dgl.DGLGraph(nx.star_graph(N))
@@ -25,7 +24,6 @@ def test_line_graph1():
     assert L.number_of_nodes() == 2 * N
     assert F.allclose(L.ndata['h'], G.edata['h'])
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_line_graph2(idtype):
     g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
@@ -73,7 +71,6 @@ def test_line_graph2(idtype):
     assert np.array_equal(col[order],
                           np.array([3, 4, 0, 3, 4, 0, 1, 2]))
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_no_backtracking():
     N = 5
     G = dgl.DGLGraph(nx.star_graph(N))

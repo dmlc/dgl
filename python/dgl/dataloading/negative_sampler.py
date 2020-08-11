@@ -35,15 +35,15 @@ class Uniform(_BaseNegativeSampler):
     """Negative sampler that randomly chooses negative destination nodes
     for each source node according to a uniform distribution.
 
-    For each edge with type `(utype, etype, vtype)`, ``k`` pairs of nodes
-    with node type ``utype`` and ``vtype`` will be returned.  The source nodes
-    will always be the source node of the edge, while the destination nodes
-    are chosen uniformly.
+    For each edge ``(u, v)`` of type ``(srctype, etype, dsttype)``, DGL generates
+    :attr:`k` pairs of negative edges ``(u, v')``, where ``v'`` is chosen
+    uniformly from all the nodes of type ``dsttype``.  The resulting edges will
+    also have type ``(srctype, etype, dsttype)``.
 
     Parameters
     ----------
     k : int
-        The number of negative examples.
+        The number of negative examples per edge.
 
     Examples
     --------

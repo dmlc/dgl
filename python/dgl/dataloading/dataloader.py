@@ -115,42 +115,47 @@ class BlockSampler(object):
     have their outputs computed.
 
     The default implementation of :py:meth:`~dgl.dataloading.BlockSampler.sample_blocks` is
-    to repeat ``num_hops`` times the following:
+    to repeat ``num_layers`` times the following procedure from the last layer to the first
+    layer:
 
-    * Obtain a frontier with the same nodes as the original graph but only the edges
-      involved in message passing on the last layer.
+    * Obtain a frontier.  The frontier is defined as a graph with the same nodes as the
+      original graph but only the edges involved in message passing on the current layer.
       Customizable via :py:meth:`~dgl.dataloading.BlockSampler.sample_frontier`.
 
     * Optionally, if the task is link prediction or edge classfication, remove edges
       connecting training node pairs.  If the graph is undirected, also remove the
-      reverse edges.  This is controlled by the argument ``exclude_eids`` in
+      reverse edges.  This is controlled by the argument :attr:`exclude_eids` in
       :py:meth:``~dgl.dataloading.BlockSampler.sample_blocks`` method.
 
     * Convert the frontier into a block.
 
-    * Optionally assign the edge IDs to the block, controlled by the argument
-      ``return_eids`` in :py:meth:``~dgl.dataloading.BlockSampler.sample_blocks`` method.
+    * Optionally assign the IDs of the edges in the original graph selected in the first step
+      to the block, controlled by the argument ``return_eids`` in
+      :py:meth:``~dgl.dataloading.BlockSampler.sample_blocks`` method.
 
     * Prepend the block to the block list to be returned.
 
-    All subclasses should either
+    All subclasses should override :py:meth:`~dgl.dataloading.BlockSampler.sample_frontier`
+    method while specifying the number of layers to sample in :attr:`num_layers` argument.
 
-    * Override :py:meth:`~dgl.dataloading.BlockSampler.sample_blocks` method, or
+    Parameters
+    ----------
+    num_layers : int
+        The number of layers to sample.
+    return_eids : bool, default False
+        Whether to return the edge IDs involved in message passing in the block.
+        If True, the edge IDs will be stored as an edge feature named ``dgl.EID``.
 
-    * Override
-      :py:meth:`~dgl.dataloading.BlockSampler.sample_frontier` method while specifying
-      the number of layers to sample in ``num_hops`` argument.
-
-    See also
-    --------
+    Notes
+    -----
     For the concept of frontiers and blocks, please refer to User Guide Section 6.
     """
-    def __init__(self, num_hops):
-        self.num_hops = num_hops
+    def __init__(self, num_layers, return_eids):
+        self.num_layers = num_layers
+        self.return_eids = return_eids
 
     def sample_frontier(self, block_id, g, seed_nodes):
-        """
-        Generate the frontier given the output nodes.
+        """Generate the frontier given the output nodes.
 
         Parameters
         ----------
@@ -175,9 +180,8 @@ class BlockSampler(object):
         """
         raise NotImplementedError
 
-    def sample_blocks(self, g, seed_nodes, exclude_eids=None, return_eids=False):
-        """
-        Generate the a list of blocks given the output nodes.
+    def sample_blocks(self, g, seed_nodes, exclude_eids=None):
+        """Generate the a list of blocks given the output nodes.
 
         Parameters
         ----------
@@ -190,9 +194,6 @@ class BlockSampler(object):
             of node IDs.
         exclude_eids : Tensor or dict[etype, Tensor]
             The edges to exclude from computation dependency.
-        return_eids : bool, default False
-            Whether to return the edge IDs involved in message passing in the block.
-            If True, the edge IDs will be stored as an edge feature named ``dgl.EID``.
 
         Returns
         -------
@@ -206,8 +207,9 @@ class BlockSampler(object):
         blocks = []
         exclude_eids = (
             _tensor_or_dict_to_numpy(exclude_eids) if exclude_eids is not None else None)
-        for block_id in reversed(range(self.num_hops)):
+        for block_id in reversed(range(self.num_layers)):
             frontier = self.sample_frontier(block_id, g, seed_nodes)
+
             # Removing edges from the frontier for link prediction training falls
             # into the category of frontier postprocessing
             if exclude_eids is not None:
@@ -233,7 +235,8 @@ class BlockSampler(object):
                     frontier.edata[EID] = new_eids
 
             block = transform.to_block(frontier, seed_nodes)
-            if return_eids:
+
+            if self.return_eids:
                 assign_block_eids(block, frontier)
 
             seed_nodes = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
@@ -243,8 +246,7 @@ class BlockSampler(object):
         return blocks
 
 class Collator(ABC):
-    """
-    Abstract DGL collator for training GNNs on downstream tasks stochastically.
+    """Abstract DGL collator for training GNNs on downstream tasks stochastically.
 
     Provides a ``dataset`` object containing the collection of all nodes or edges,
     as well as a ``collate`` method that combines a set of items from ``dataset`` and
@@ -275,8 +277,7 @@ class Collator(ABC):
         raise NotImplementedError
 
 class NodeCollator(Collator):
-    """
-    DGL collator to combine nodes and their computation dependencies within a minibatch for
+    """DGL collator to combine nodes and their computation dependencies within a minibatch for
     training node classification or regression on a single graph with neighborhood sampling.
 
     Parameters
@@ -285,11 +286,8 @@ class NodeCollator(Collator):
         The graph.
     nids : Tensor or dict[ntype, Tensor]
         The node set to compute outputs.
-    block_sampler : :py:class:`~dgl.dataloading.BlockSampler`
+    block_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
-    return_eids : bool, default False
-        Whether to return the edge IDs involved in message passing in the block.
-        If True, the edge IDs will be stored as an edge feature named ``dgl.EID``.
 
     Examples
     --------
@@ -305,14 +303,13 @@ class NodeCollator(Collator):
     >>> for input_nodes, output_nodes, blocks in dataloader:
     ...     train_on(input_nodes, output_nodes, blocks)
     """
-    def __init__(self, g, nids, block_sampler, return_eids=False):
+    def __init__(self, g, nids, block_sampler):
         self.g = g
         if not isinstance(nids, Mapping):
             assert len(g.ntypes) == 1, \
                 "nids should be a dict of node type and ids for graph with multiple node types"
         self.nids = nids
         self.block_sampler = block_sampler
-        self.return_eids = return_eids
 
         if isinstance(nids, Mapping):
             self._dataset = utils.FlattenedDict(nids)
@@ -345,15 +342,14 @@ class NodeCollator(Collator):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-        blocks = self.block_sampler.sample_blocks(self.g, items, return_eids=self.return_eids)
+        blocks = self.block_sampler.sample_blocks(self.g, items)
         output_nodes = blocks[-1].dstdata[NID]
         input_nodes = blocks[0].srcdata[NID]
 
         return input_nodes, output_nodes, blocks
 
 class EdgeCollator(Collator):
-    """
-    DGL collator to combine edges and their computation dependencies within a minibatch for
+    """DGL collator to combine edges and their computation dependencies within a minibatch for
     training edge classification, edge regression, or link prediction on a single graph
     with neighborhood sampling.
 
@@ -362,7 +358,7 @@ class EdgeCollator(Collator):
     * A tensor of input nodes necessary for computing the representation on edges, or
       a dictionary of node type names and such tensors.
 
-    * A graph that contains only the edges in the minibatch and their incident nodes.
+    * A subgraph that contains only the edges in the minibatch and their incident nodes.
       Note that the graph has an identical metagraph with the original graph.
 
     * If a negative sampler is given, another graph that contains the "negative edges",
@@ -374,15 +370,18 @@ class EdgeCollator(Collator):
     Parameters
     ----------
     g : DGLHeteroGraph
-        The graph.
+        The graph from which the edges are iterated in minibatches and the subgraphs
+        are generated.
     eids : Tensor or dict[etype, Tensor]
-        The edge set to compute outputs.
-    block_sampler : :py:class:`~dgl.dataloading.BlockSampler`
+        The edge set in graph :attr:`g` to compute outputs.
+    block_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
     g_sampling : DGLHeteroGraph, optional
-        The graph where neighborhood sampling is performed.
+        The graph where neighborhood sampling and message passing is performed.
 
-        If None, assume to be the same as ``g``.
+        Note that this is not necessarily the same as :attr:`g`.
+
+        If None, assume to be the same as :attr:`g`.
     exclude : str, optional
         Whether and how to exclude dependencies related to the sampled edges in the
         minibatch.  Possible values are
@@ -427,9 +426,6 @@ class EdgeCollator(Collator):
 
         A set of builtin negative samplers are provided in
         :py:mod:`dgl.dataloading.negative_sampler`.
-    return_eids : bool, default False
-        Whether to return the edge IDs involved in message passing in the block.
-        If True, the edge IDs will be stored as an edge feature named ``dgl.EID``.
 
     Examples
     --------
@@ -518,8 +514,7 @@ class EdgeCollator(Collator):
     ...     train_on(input_nodse, pair_graph, neg_pair_graph, blocks)
     """
     def __init__(self, g, eids, block_sampler, g_sampling=None, exclude=None,
-                 reverse_eids=None, reverse_etypes=None, negative_sampler=None,
-                 return_eids=False):
+                 reverse_eids=None, reverse_etypes=None, negative_sampler=None):
         self.g = g
         if not isinstance(eids, Mapping):
             assert len(g.etypes) == 1, \
@@ -542,7 +537,6 @@ class EdgeCollator(Collator):
         self.reverse_eids = reverse_eids
         self.reverse_etypes = reverse_etypes
         self.negative_sampler = negative_sampler
-        self.return_eids = return_eids
 
         if isinstance(eids, Mapping):
             self._dataset = utils.FlattenedDict(eids)
@@ -571,8 +565,7 @@ class EdgeCollator(Collator):
             reverse_etype_map=self.reverse_etypes)
 
         blocks = self.block_sampler.sample_blocks(
-            self.g_sampling, seed_nodes, exclude_eids=exclude_eids,
-            return_eids=self.return_eids)
+            self.g_sampling, seed_nodes, exclude_eids=exclude_eids)
         input_nodes = blocks[0].srcdata[NID]
 
         return input_nodes, pair_graph, blocks
@@ -611,8 +604,7 @@ class EdgeCollator(Collator):
             reverse_etype_map=self.reverse_etypes)
 
         blocks = self.block_sampler.sample_blocks(
-            self.g_sampling, seed_nodes, exclude_eids=exclude_eids,
-            return_eids=self.return_eids)
+            self.g_sampling, seed_nodes, exclude_eids=exclude_eids)
         input_nodes = blocks[0].srcdata[NID]
 
         return input_nodes, pair_graph, neg_pair_graph, blocks

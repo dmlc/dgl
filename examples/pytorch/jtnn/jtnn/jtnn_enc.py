@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from .nnutils import GRUUpdate, cuda, line_graph, tocpu
+from .nnutils import GRUUpdate, cuda, tocpu
 from dgl import batch, bfs_edges_generator
 import dgl.function as DGLF
 import numpy as np
@@ -57,7 +57,7 @@ class DGLJTNNEncoder(nn.Module):
         mol_tree_batch = batch(mol_trees)
         
         # Build line graph to prepare for belief propagation
-        mol_tree_batch_lg = line_graph(mol_tree_batch, backtracking=False, shared=True)
+        mol_tree_batch_lg = dgl.line_graph(mol_tree_batch, backtracking=False, shared=True)
 
         return self.run(mol_tree_batch, mol_tree_batch_lg)
 

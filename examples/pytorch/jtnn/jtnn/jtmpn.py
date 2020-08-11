@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from .nnutils import cuda, line_graph
+from .nnutils import cuda
 import rdkit.Chem as Chem
 import dgl
 from dgl import mean_nodes
@@ -174,7 +174,7 @@ class DGLJTMPN(nn.Module):
 
         n_samples = len(cand_graphs)
 
-        cand_line_graph = line_graph(cand_graphs, backtracking=False, shared=True)
+        cand_line_graph = dgl.line_graph(cand_graphs, backtracking=False, shared=True)
 
         n_nodes = cand_graphs.number_of_nodes()
         n_edges = cand_graphs.number_of_edges()

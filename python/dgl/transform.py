@@ -403,6 +403,10 @@ def line_graph(g, backtracking=True, shared=False):
     G : DGLHeteroGraph
         The line graph of this graph.
 
+    Notes
+    -----
+    The implementation is done on CPU, even if the input and output graphs are on GPU.
+
     Examples
     --------
     >>> A = [[0, 0, 1],
@@ -428,7 +432,10 @@ def line_graph(g, backtracking=True, shared=False):
     """
     assert g.is_homogeneous(), \
         'line_heterograph only support directed homogeneous graph right now'
-    lg = DGLHeteroGraph(_CAPI_DGLHeteroLineGraph(g._graph, backtracking))
+
+    dev = g.device
+    lg = DGLHeteroGraph(_CAPI_DGLHeteroLineGraph(g._graph.copy_to(F.cpu()), backtracking))
+    lg = lg.to(dev)
     if shared:
         # copy edge features
         lg.ndata.update(g.edata)

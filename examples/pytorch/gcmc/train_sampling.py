@@ -221,14 +221,13 @@ def run(proc_id, n_gpus, args, devices, dataset):
     reverse_types = {to_etype_name(k): 'rev-' + to_etype_name(k)
                      for k in dataset.possible_rating_values}
     reverse_types.update({v: k for k, v in reverse_types.items()})
-    sampler = dgl.dataloading.MultiLayerNeighborSampler([None])
+    sampler = dgl.dataloading.MultiLayerNeighborSampler([None], return_eids=True)
     dataloader = dgl.dataloading.EdgeDataLoader(
         dataset.train_enc_graph,
         {to_etype_name(k): th.arange(
             dataset.train_enc_graph.number_of_edges(etype=to_etype_name(k)))
          for k in dataset.possible_rating_values},
         sampler,
-        return_eids=True,
         batch_size=args.minibatch_size,
         shuffle=True,
         drop_last=False)
@@ -239,7 +238,6 @@ def run(proc_id, n_gpus, args, devices, dataset):
             th.arange(dataset.valid_dec_graph.number_of_edges()),
             sampler,
             g_sampling=dataset.valid_enc_graph,
-            return_eids=True,
             batch_size=args.minibatch_size,
             shuffle=False,
             drop_last=False)
@@ -248,7 +246,6 @@ def run(proc_id, n_gpus, args, devices, dataset):
             th.arange(dataset.test_dec_graph.number_of_edges()),
             sampler,
             g_sampling=dataset.test_enc_graph,
-            return_eids=True,
             batch_size=args.minibatch_size,
             shuffle=False,
             drop_last=False)

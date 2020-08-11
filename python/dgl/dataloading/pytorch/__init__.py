@@ -15,8 +15,6 @@ class NodeDataLoader(DataLoader):
         The node set to compute outputs.
     block_sampler : :py:class:`~dgl.dataloading.BlockSampler`
         The neighborhood sampler.
-    return_eids : bool, default False
-        Whether to return the edge IDs of the original graph in the sampled block.
     kwargs : dict
         Arguments being passed to ``torch.utils.data.DataLoader``.
 
@@ -86,8 +84,6 @@ class EdgeDataLoader(DataLoader):
         The negative sampler.
 
         See the docstring in :py:class:`~dgl.dataloading.EdgeCollator`.
-    return_eids : bool, default False
-        Whether to return the edge IDs of the original graph in the sampled block.
     kwargs : dict
         Arguments being passed to `torch.utils.data.DataLoader`.
 

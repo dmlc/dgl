@@ -313,10 +313,6 @@ class BiDecoder(nn.Module):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def apply_edges(self, edges):
-        sr = th.einsum('ai,bij,aj->ab', edges.src['h'], self.P, edges.dst['h'])
-        return {'sr': sr}
-
     def forward(self, graph, ufeat, ifeat):
         """Forward function.
 
