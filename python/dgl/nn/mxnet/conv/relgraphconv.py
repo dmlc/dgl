@@ -61,6 +61,8 @@ class RelGraphConv(gluon.Block):
         Default: False.
     dropout : float, optional
         Dropout rate. Default: 0.0
+    layer_norm: float, optional
+        Add layer norm. Default: False
     """
     def __init__(self,
                  in_feat,
@@ -72,7 +74,8 @@ class RelGraphConv(gluon.Block):
                  activation=None,
                  self_loop=False,
                  low_mem=False,
-                 dropout=0.0):
+                 dropout=0.0,
+                 layer_norm=False):
         super(RelGraphConv, self).__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
@@ -86,6 +89,7 @@ class RelGraphConv(gluon.Block):
         self.self_loop = self_loop
 
         assert low_mem is False, 'MXNet currently does not support low-memory implementation.'
+        assert layer_norm is False, 'MXNet currently does not support layer norm.'
 
         if regularizer == "basis":
             # add basis weights
@@ -181,7 +185,7 @@ class RelGraphConv(gluon.Block):
         mx.ndarray.NDArray
             New node features.
         """
-        assert g.is_homograph(), \
+        assert g.is_homogeneous(), \
             "not a homograph; convert it with to_homo and pass in the edge type as argument"
         with g.local_scope():
             g.ndata['h'] = x

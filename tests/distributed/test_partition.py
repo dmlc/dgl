@@ -4,7 +4,7 @@ import os
 import numpy as np
 from scipy import sparse as spsp
 from numpy.testing import assert_array_equal
-from dgl.graph_index import create_graph_index
+from dgl.heterograph_index import create_unitgraph_from_coo
 from dgl.distributed import partition_graph, load_partition
 from dgl import function as fn
 import backend as F
@@ -14,13 +14,12 @@ import random
 
 def create_random_graph(n):
     arr = (spsp.random(n, n, density=0.001, format='coo', random_state=100) != 0).astype(np.int64)
-    ig = create_graph_index(arr, readonly=True)
-    return dgl.DGLGraph(ig)
+    return dgl.graph(arr)
 
 def check_partition(g, part_method, reshuffle):
     g.ndata['labels'] = F.arange(0, g.number_of_nodes())
-    g.ndata['feats'] = F.tensor(np.random.randn(g.number_of_nodes(), 10))
-    g.edata['feats'] = F.tensor(np.random.randn(g.number_of_edges(), 10))
+    g.ndata['feats'] = F.tensor(np.random.randn(g.number_of_nodes(), 10), F.float32)
+    g.edata['feats'] = F.tensor(np.random.randn(g.number_of_edges(), 10), F.float32)
     g.update_all(fn.copy_src('feats', 'msg'), fn.sum('msg', 'h'))
     g.update_all(fn.copy_edge('feats', 'msg'), fn.sum('msg', 'eh'))
     num_parts = 4
@@ -103,6 +102,7 @@ def check_partition(g, part_method, reshuffle):
         assert F.dtype(eid2pid) in (F.int32, F.int64)
         assert np.all(F.asnumpy(eid2pid) == edge_map)
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_partition():
     g = create_random_graph(10000)
     check_partition(g, 'metis', True)
@@ -110,9 +110,9 @@ def test_partition():
     check_partition(g, 'random', True)
     check_partition(g, 'random', False)
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_hetero_partition():
     g = create_random_graph(10000)
-    g = dgl.as_heterograph(g)
     check_partition(g, 'metis', True)
     check_partition(g, 'metis', False)
     check_partition(g, 'random', True)

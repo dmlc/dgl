@@ -5,10 +5,11 @@ from distutils.version import LooseVersion
 import scipy # Weird bug in new pytorch when import scipy after import torch
 import torch as th
 import builtins
+import numbers
 from torch.utils import dlpack
 
 from ... import ndarray as nd
-from ... import kernel as K
+from ..._deprecate import kernel as K
 from ...function.base import TargetCode
 from ...base import dgl_warning
 
@@ -31,7 +32,12 @@ def cpu():
     return th.device('cpu')
 
 def tensor(data, dtype=None):
-    return th.as_tensor(data, dtype=dtype)
+    if isinstance(data, numbers.Number):
+        data = [data]
+    if isinstance(data, th.Tensor):
+        return th.as_tensor(data, dtype=dtype, device=data.device)
+    else:
+        return th.as_tensor(data, dtype=dtype)
 
 def as_scalar(data):
     return data.item()
@@ -98,6 +104,7 @@ def asnumpy(input):
         return input.cpu().detach().numpy()
 
 def copy_to(input, ctx, **kwargs):
+    ctx = th.device(ctx)
     if ctx.type == 'cpu':
         return input.cpu()
     elif ctx.type == 'cuda':
@@ -161,10 +168,7 @@ def split(input, sizes_or_sections, dim):
     return th.split(input, sizes_or_sections, dim)
 
 def repeat(input, repeats, dim):
-    # return th.repeat_interleave(input, repeats, dim) # PyTorch 1.1
-    if dim < 0:
-        dim += input.dim()
-    return th.flatten(th.stack([input] * repeats, dim=dim+1), dim, dim+1)
+    return th.repeat_interleave(input, repeats, dim) # PyTorch 1.1
 
 def gather_row(data, row_index):
     return th.index_select(data, 0, row_index.long())
@@ -186,7 +190,7 @@ def scatter_row(data, row_index, value):
     return data.index_copy(0, row_index.long(), value)
 
 def scatter_row_inplace(data, row_index, value):
-    data[row_index] = value
+    data[row_index.long()] = value
 
 def squeeze(input, dim):
     return th.squeeze(input, dim)
@@ -211,6 +215,9 @@ def ones(shape, dtype, ctx):
 
 def uniform(shape, dtype, ctx, low, high):
     return th.empty(shape, dtype=dtype, device=ctx).uniform_(low, high)
+
+def randint(shape, dtype, ctx, low, high):
+    return th.randint(low, high, shape, dtype=dtype, device=ctx)
 
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
@@ -241,19 +248,6 @@ def pack_padded_tensor(input, lengths):
     index = th.tensor(index).to(device)
     return gather_row(input.view(batch_size * max_len, -1), index)
 
-def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
-    y = th.zeros(n_segs, *input.shape[1:]).to(input)
-    seg_id = seg_id.view((-1,) + (1,) * (input.dim() - 1)).expand_as(input)
-    y = y.scatter_add_(dim, seg_id, input)
-    return y
-
-def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
-    w = unsorted_1d_segment_sum(th.ones_like(seg_id), seg_id, n_segs, 0).to(input)
-    w = w.clamp(min=1)   # remove 0 entries
-    y = unsorted_1d_segment_sum(input, seg_id, n_segs, dim)
-    y = y / w.view((-1,) + (1,) * (y.dim() - 1))
-    return y
-
 def boolean_mask(input, mask):
     if 'bool' not in str(mask.dtype):
         mask = th.tensor(mask, dtype=th.bool)
@@ -271,6 +265,9 @@ def logical_and(input1, input2):
 def clone(input):
     return input.clone()
 
+def clamp(data, min_val, max_val):
+    return th.clamp(data, min_val, max_val)
+
 def unique(input):
     if input.dtype == th.bool:
         input = input.type(th.int8)
@@ -286,8 +283,8 @@ def nonzero_1d(input):
 def sort_1d(input):
     return th.sort(input)
 
-def arange(start, stop, dtype="int64"):
-    return th.arange(start, stop, dtype=data_type_dict()[dtype])
+def arange(start, stop, dtype=th.int64):
+    return th.arange(start, stop, dtype=dtype)
 
 def rand_shuffle(arr):
     idx = th.randperm(len(arr))
@@ -306,15 +303,21 @@ def zerocopy_to_numpy(input):
 def zerocopy_from_numpy(np_array):
     return th.as_tensor(np_array)
 
-def zerocopy_to_dgl_ndarray(input):
-    return nd.from_dlpack(dlpack.to_dlpack(input.contiguous()))
+def zerocopy_to_dgl_ndarray(data):
+    return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
 
 def zerocopy_to_dgl_ndarray_for_write(input):
     return zerocopy_to_dgl_ndarray(input)
 
-def zerocopy_from_dgl_ndarray(input):
-    return dlpack.from_dlpack(input.to_dlpack())
-
+def zerocopy_from_dgl_ndarray(data):
+    if data.shape == (0,):
+        # NOTE: PyTorch v1.5 does not accept DLPack object representing empty CUDA tensor.
+        #  Related issue: https://github.com/pytorch/pytorch/issues/41182
+        #  The issue will be fixed in v1.6 and later.
+        return th.tensor([], dtype=getattr(th, data.dtype),
+                         device=to_backend_ctx(data.ctx))
+    else:
+        return dlpack.from_dlpack(data.to_dlpack())
 
 
 class BinaryReduce(th.autograd.Function):

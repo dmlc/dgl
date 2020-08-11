@@ -145,11 +145,13 @@ list(APPEND DGL_LINKER_LIBS dmlc)
 set(GOOGLE_TEST 0) # Turn off dmlc-core test
 
 # Compile METIS
-set(GKLIB_PATH "${CMAKE_SOURCE_DIR}/third_party/METIS/GKlib")
-include(${GKLIB_PATH}/GKlibSystem.cmake)
-include_directories(${GKLIB_PATH})
-add_subdirectory("third_party/METIS/libmetis/")
-list(APPEND DGL_LINKER_LIBS metis)
+if(NOT MSVC)
+  set(GKLIB_PATH "${CMAKE_SOURCE_DIR}/third_party/METIS/GKlib")
+  include(${GKLIB_PATH}/GKlibSystem.cmake)
+  include_directories(${GKLIB_PATH})
+  add_subdirectory("third_party/METIS/libmetis/")
+  list(APPEND DGL_LINKER_LIBS metis)
+endif(NOT MSVC)
 
 # support PARALLEL_ALGORITHMS
 if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)

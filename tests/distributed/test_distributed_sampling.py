@@ -2,7 +2,7 @@ import dgl
 import unittest
 import os
 from dgl.data import CitationGraphDataset
-from dgl.distributed import sample_neighbors
+from dgl.distributed import sample_neighbors, find_edges
 from dgl.distributed import partition_graph, load_partition, load_partition_book
 import sys
 import multiprocessing as mp
@@ -11,12 +11,12 @@ import backend as F
 import time
 from utils import get_local_usable_addr
 from pathlib import Path
-
+import pytest
 from dgl.distributed import DistGraphServer, DistGraph
 
 
 def start_server(rank, tmpdir, disable_shared_mem, graph_name):
-    g = DistGraphServer(rank, "rpc_ip_config.txt", 1,
+    g = DistGraphServer(rank, "rpc_ip_config.txt", 1, 1,
                         tmpdir / (graph_name + '.json'), disable_shared_mem=disable_shared_mem)
     g.start()
 
@@ -25,16 +25,26 @@ def start_sample_client(rank, tmpdir, disable_shared_mem):
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_sampling.json', rank)
+    dgl.distributed.initialize("rpc_ip_config.txt", 1)
     dist_graph = DistGraph("rpc_ip_config.txt", "test_sampling", gpb=gpb)
     sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
     dgl.distributed.exit_client()
     return sampled_graph
 
+def start_find_edges_client(rank, tmpdir, disable_shared_mem, eids):
+    gpb = None
+    if disable_shared_mem:
+        _, _, _, gpb, _ = load_partition(tmpdir / 'test_find_edges.json', rank)
+    dgl.distributed.initialize("rpc_ip_config.txt", 1)
+    dist_graph = DistGraph("rpc_ip_config.txt", "test_find_edges", gpb=gpb)
+    u, v = find_edges(dist_graph, eids)
+    dgl.distributed.exit_client()
+    return u, v
 
 def check_rpc_sampling(tmpdir, num_server):
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
-        ip_config.write('{} 1\n'.format(get_local_usable_addr()))
+        ip_config.write('{}\n'.format(get_local_usable_addr()))
     ip_config.close()
 
     g = CitationGraphDataset("cora")[0]
@@ -67,6 +77,34 @@ def check_rpc_sampling(tmpdir, num_server):
     assert np.array_equal(
         F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
 
+def check_rpc_find_edges(tmpdir, num_server):
+    ip_config = open("rpc_ip_config.txt", "w")
+    for _ in range(num_server):
+        ip_config.write('{}\n'.format(get_local_usable_addr()))
+    ip_config.close()
+
+    g = CitationGraphDataset("cora")[0]
+    g.readonly()
+    num_parts = num_server
+
+    partition_graph(g, 'test_find_edges', num_parts, tmpdir,
+                    num_hops=1, part_method='metis', reshuffle=False)
+
+    pserver_list = []
+    ctx = mp.get_context('spawn')
+    for i in range(num_server):
+        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_find_edges'))
+        p.start()
+        time.sleep(1)
+        pserver_list.append(p)
+
+    time.sleep(3)
+    eids = F.tensor(np.random.randint(g.number_of_edges(), size=100))
+    u, v = g.find_edges(eids)
+    du, dv = start_find_edges_client(0, tmpdir, num_server > 1, eids)
+    assert F.array_equal(u, du)
+    assert F.array_equal(v, dv)
+
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 def test_rpc_sampling():
@@ -78,9 +116,9 @@ def test_rpc_sampling():
 def check_rpc_sampling_shuffle(tmpdir, num_server):
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
-        ip_config.write('{} 1\n'.format(get_local_usable_addr()))
+        ip_config.write('{}\n'.format(get_local_usable_addr()))
     ip_config.close()
-    
+
     g = CitationGraphDataset("cora")[0]
     g.readonly()
     num_parts = num_server
@@ -122,22 +160,23 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
 # Wait non shared memory graph store
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
-def test_rpc_sampling_shuffle():
+@pytest.mark.parametrize("num_server", [1, 2])
+def test_rpc_sampling_shuffle(num_server):
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
-        check_rpc_sampling_shuffle(Path(tmpdirname), 2)
-        check_rpc_sampling_shuffle(Path(tmpdirname), 1)
+        check_rpc_sampling_shuffle(Path(tmpdirname), num_server)
 
 def check_standalone_sampling(tmpdir):
     g = CitationGraphDataset("cora")[0]
-    g.readonly()
     num_parts = 1
     num_hops = 1
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
                     num_hops=num_hops, part_method='metis', reshuffle=False)
 
-    dist_graph = DistGraph(None, "test_sampling", conf_file=tmpdir / 'test_sampling.json')
+    os.environ['DGL_DIST_MODE'] = 'standalone'
+    dgl.distributed.initialize("rpc_ip_config.txt", 1)
+    dist_graph = DistGraph(None, "test_sampling", part_config=tmpdir / 'test_sampling.json')
     sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
 
     src, dst = sampled_graph.edges()
@@ -146,6 +185,7 @@ def check_standalone_sampling(tmpdir):
     eids = g.edge_ids(src, dst)
     assert np.array_equal(
         F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
+    dgl.distributed.exit_client()
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
@@ -157,6 +197,7 @@ def test_standalone_sampling():
 
 def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
     gpb = None
+    dgl.distributed.initialize("rpc_ip_config.txt", 1)
     if disable_shared_mem:
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_in_subgraph.json', rank)
     dist_graph = DistGraph("rpc_ip_config.txt", "test_in_subgraph", gpb=gpb)
@@ -168,7 +209,7 @@ def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
 def check_rpc_in_subgraph(tmpdir, num_server):
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
-        ip_config.write('{} 1\n'.format(get_local_usable_addr()))
+        ip_config.write('{}\n'.format(get_local_usable_addr()))
     ip_config.close()
 
     g = CitationGraphDataset("cora")[0]
@@ -193,7 +234,6 @@ def check_rpc_in_subgraph(tmpdir, num_server):
         p.join()
 
     src, dst = sampled_graph.edges()
-    g = dgl.as_heterograph(g)
     assert sampled_graph.number_of_nodes() == g.number_of_nodes()
     subg1 = dgl.in_subgraph(g, nodes)
     src1, dst1 = subg1.edges()
@@ -222,3 +262,5 @@ if __name__ == "__main__":
         check_rpc_sampling_shuffle(Path(tmpdirname), 2)
         check_rpc_sampling(Path(tmpdirname), 2)
         check_rpc_sampling(Path(tmpdirname), 1)
+        check_rpc_find_edges(Path(tmpdirname), 2)
+        check_rpc_find_edges(Path(tmpdirname), 1)

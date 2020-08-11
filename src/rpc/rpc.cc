@@ -77,6 +77,10 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
 }
 
 //////////////////////////// C APIs ////////////////////////////
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCReset")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  RPCContext::Reset();
+});
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
@@ -205,6 +209,17 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetMsgSeq")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   const int64_t msg_seq = args[0];
   RPCContext::ThreadLocal()->msg_seq = msg_seq;
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetBarrierCount")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  *rv = RPCContext::ThreadLocal()->barrier_count;
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetBarrierCount")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  const int32_t count = args[0];
+  RPCContext::ThreadLocal()->barrier_count = count;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetMachineID")

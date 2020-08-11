@@ -14,8 +14,6 @@ namespace dgl {
 
 #if !defined(_WIN32)
 
-namespace {
-
 /*!
  * Convert DGL CSR to GKLib CSR.
  * GKLib CSR actually stores a CSR object and a CSC object of a graph.
@@ -96,8 +94,6 @@ aten::CSRMatrix Convert2DGLCsr(gk_csr_t *gk_csr, bool is_row) {
 
   return aten::CSRMatrix(gk_csr->nrows, gk_csr->ncols, indptr_arr, indices_arr, eids_arr);
 }
-
-}  // namespace
 
 #endif  // !defined(_WIN32)
 

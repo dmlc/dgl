@@ -138,6 +138,9 @@ def load_partition(conf_file, part_id):
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
 
     gpb, graph_name = load_partition_book(conf_file, part_id, graph)
+    nids = F.boolean_mask(graph.ndata[NID], graph.ndata['inner_node'])
+    partids = gpb.nid2partid(nids)
+    assert np.all(F.asnumpy(partids == part_id)), 'load a wrong partition'
     return graph, node_feats, edge_feats, gpb, graph_name
 
 def load_partition_book(conf_file, part_id, graph=None):
@@ -162,6 +165,8 @@ def load_partition_book(conf_file, part_id, graph=None):
     with open(conf_file) as conf_f:
         part_metadata = json.load(conf_f)
     assert 'num_parts' in part_metadata, 'num_parts does not exist.'
+    assert part_metadata['num_parts'] > part_id, \
+            'part {} is out of range (#parts: {})'.format(part_id, part_metadata['num_parts'])
     num_parts = part_metadata['num_parts']
     assert 'num_nodes' in part_metadata, "cannot get the number of nodes of the global graph."
     assert 'num_edges' in part_metadata, "cannot get the number of edges of the global graph."
@@ -197,7 +202,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     The partitioned data is stored into multiple files.
 
     First, the metadata of the original graph and the partitioning is stored in a JSON file
-    named after `graph_name`. This JSON file contains the information of the originla graph
+    named after `graph_name`. This JSON file contains the information of the original graph
     as well as the file names that store each partition.
 
     The node assignment is stored in a separate file if we don't reshuffle node Ids to ensure

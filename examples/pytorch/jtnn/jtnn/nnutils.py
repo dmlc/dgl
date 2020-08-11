@@ -1,11 +1,12 @@
 import torch
 import torch.nn as nn
 import os
+import dgl
 
 
-def cuda(tensor):
+def cuda(x):
     if torch.cuda.is_available() and not os.getenv('NOCUDA', None):
-        return tensor.cuda()
+        return x.to(torch.device('cuda'))   # works for both DGLGraph and tensor
     else:
         return tensor
 
@@ -42,7 +43,8 @@ class GRUUpdate(nn.Module):
         dic.update(self.update_r(node, zm=dic))
         return dic
 
-
-def move_dgl_to_cuda(g):
-    g.ndata.update({k: cuda(g.ndata[k]) for k in g.ndata})
-    g.edata.update({k: cuda(g.edata[k]) for k in g.edata})
+def tocpu(g):
+    src, dst = g.edges()
+    src = src.cpu()
+    dst = dst.cpu()
+    return dgl.graph((src, dst), num_nodes=g.number_of_nodes())

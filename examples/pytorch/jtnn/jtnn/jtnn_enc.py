@@ -1,23 +1,22 @@
 import torch
 import torch.nn as nn
-from .nnutils import GRUUpdate, cuda
-from dgl import batch, bfs_edges_generator
+from .nnutils import GRUUpdate, cuda, tocpu
+from dgl import batch, bfs_edges_generator, line_graph
 import dgl.function as DGLF
 import numpy as np
 
 MAX_NB = 8
 
 def level_order(forest, roots):
+    forest = tocpu(forest)
     edges = bfs_edges_generator(forest, roots)
+    if len(edges) == 0:
+        # no edges in the tree; do not perform loopy BP
+        return
     _, leaves = forest.find_edges(edges[-1])
     edges_back = bfs_edges_generator(forest, roots, reverse=True)
     yield from reversed(edges_back)
     yield from edges
-
-enc_tree_msg = [DGLF.copy_src(src='m', out='m'), DGLF.copy_src(src='rm', out='rm')]
-enc_tree_reduce = [DGLF.sum(msg='m', out='s'), DGLF.sum(msg='rm', out='accum_rm')]
-enc_tree_gather_msg = DGLF.copy_edge(edge='m', out='m')
-enc_tree_gather_reduce = DGLF.sum(msg='m', out='m')
 
 class EncoderGatherUpdate(nn.Module):
     def __init__(self, hidden_size):
@@ -53,14 +52,14 @@ class DGLJTNNEncoder(nn.Module):
         mol_tree_batch = batch(mol_trees)
         
         # Build line graph to prepare for belief propagation
-        mol_tree_batch_lg = mol_tree_batch.line_graph(backtracking=False, shared=True)
+        mol_tree_batch_lg = line_graph(mol_tree_batch, backtracking=False, shared=True)
 
         return self.run(mol_tree_batch, mol_tree_batch_lg)
 
     def run(self, mol_tree_batch, mol_tree_batch_lg):
         # Since tree roots are designated to 0.  In the batched graph we can
         # simply find the corresponding node ID by looking at node_offset
-        node_offset = np.cumsum([0] + mol_tree_batch.batch_num_nodes)
+        node_offset = np.cumsum(np.insert(mol_tree_batch.batch_num_nodes().cpu().numpy(), 0, 0))
         root_ids = node_offset[:-1]
         n_nodes = mol_tree_batch.number_of_nodes()
         n_edges = mol_tree_batch.number_of_edges()
@@ -68,6 +67,7 @@ class DGLJTNNEncoder(nn.Module):
         # Assign structure embeddings to tree nodes
         mol_tree_batch.ndata.update({
             'x': self.embedding(mol_tree_batch.ndata['wid']),
+            'm': cuda(torch.zeros(n_nodes, self.hidden_size)),
             'h': cuda(torch.zeros(n_nodes, self.hidden_size)),
         })
 
@@ -95,21 +95,17 @@ class DGLJTNNEncoder(nn.Module):
         # messages, and the uncomputed messages are zero vectors.  Essentially,
         # we can always compute s_ij as the sum of incoming m_ij, no matter
         # if m_ij is actually computed or not.
+        mol_tree_batch_lg.ndata.update(mol_tree_batch.edata)
         for eid in level_order(mol_tree_batch, root_ids):
-            #eid = mol_tree_batch.edge_ids(u, v)
-            mol_tree_batch_lg.pull(
-                eid,
-                enc_tree_msg,
-                enc_tree_reduce,
-                self.enc_tree_update,
-            )
+            eid = eid.to(mol_tree_batch_lg.device)
+            mol_tree_batch_lg.pull(eid, DGLF.copy_u('m', 'm'), DGLF.sum('m', 's'))
+            mol_tree_batch_lg.pull(eid, DGLF.copy_u('rm', 'rm'), DGLF.sum('rm', 'rm'))
+            mol_tree_batch_lg.apply_nodes(self.enc_tree_update)
 
         # Readout
-        mol_tree_batch.update_all(
-            enc_tree_gather_msg,
-            enc_tree_gather_reduce,
-            self.enc_tree_gather_update,
-        )
+        mol_tree_batch.edata.update(mol_tree_batch_lg.ndata)
+        mol_tree_batch.update_all(DGLF.copy_e('m', 'm'), DGLF.sum('m', 'm'))
+        mol_tree_batch.apply_nodes(self.enc_tree_gather_update)
 
         root_vecs = mol_tree_batch.nodes[root_ids].data['h']
 

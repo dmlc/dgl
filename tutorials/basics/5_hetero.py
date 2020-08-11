@@ -234,7 +234,7 @@ def plot_graph(nxg):
     ag.layout('dot')
     ag.draw('graph.png')
 
-plot_graph(G.metagraph)
+plot_graph(G.metagraph())
 
 ###############################################################################
 # Learning tasks associated with heterographs

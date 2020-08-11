@@ -1,11 +1,12 @@
-from dgl.backend import gspmm, gsddmm
+from dgl.ops import gspmm, gsddmm, edge_softmax
+from test_utils.graph_cases import get_cases
 from utils import parametrize_dtype
 import dgl
 import random
 import pytest
 import networkx as nx
 import backend as F
-import numpy as np
+import numpy as np 
 
 random.seed(42)
 np.random.seed(42)
@@ -69,15 +70,12 @@ udf_reduce = {
 
 graphs = [
 #    dgl.rand_graph(30, 0),
-    dgl.rand_graph(100, 30),
-    dgl.rand_graph(100, 3000),
-    dgl.rand_bipartite(80, 160, 3000)
+    dgl.rand_graph(30, 100),
+    dgl.rand_bipartite(30, 40, 300)
 ]
 
 spmm_shapes = [
     ((1, 2, 1, 3, 1), (4, 1, 3, 1, 1)),
-    ((5, 3, 1, 7), (1, 3, 7, 1)),
-    ((1, 3, 1), (4, 1, 3)),
     ((3, 3), (1, 3)),
     ((1,), (3,)),
     ((3,), (1,)),
@@ -88,9 +86,12 @@ sddmm_shapes = [
     ((1, 2, 1, 3, 1), (4, 1, 3, 1, 1)),
     ((5, 3, 1, 7), (1, 3, 7, 7)),
     ((1, 3, 3), (4, 1, 3)),
-    ((3, 3), (1, 3)),
     ((3,), (3,)),
     ((1,), (1,))
+]
+
+edge_softmax_shapes = [
+    (1,), (1, 3), (3, 4, 5)
 ]
 
 @pytest.mark.parametrize('g', graphs)
@@ -98,13 +99,8 @@ sddmm_shapes = [
 @pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'copy_lhs', 'copy_rhs'])
 @pytest.mark.parametrize('reducer', ['sum', 'min', 'max'])
 @parametrize_dtype
-def test_spmm(g, shp, msg, reducer, index_dtype):
-    if dgl.backend.backend_name == 'tensorflow' and (reducer in ['min', 'max'] or index_dtype == 'int32'):
-        pytest.skip()  # tensorflow dlpack has problem writing into int32 arrays on GPU.
-    if index_dtype == 'int32':
-        g = g.int()
-    else:
-        g = g.long()
+def test_spmm(idtype, g, shp, msg, reducer):
+    g = g.astype(idtype).to(F.ctx())
     print(g)
     print(g.idtype)
 
@@ -164,15 +160,12 @@ def test_spmm(g, shp, msg, reducer, index_dtype):
 @pytest.mark.parametrize('rhs_target', ['u', 'v', 'e'])
 @pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'dot', 'copy_lhs', 'copy_rhs'])
 @parametrize_dtype
-def test_sddmm(g, shp, lhs_target, rhs_target, msg, index_dtype):
+def test_sddmm(g, shp, lhs_target, rhs_target, msg, idtype):
+    if lhs_target == rhs_target:
+        return
+    g = g.astype(idtype).to(F.ctx())
     if dgl.backend.backend_name == 'mxnet' and g.number_of_edges() == 0:
         pytest.skip()   # mxnet do not support zero shape tensor
-    if dgl.backend.backend_name == 'tensorflow' and index_dtype == 'int32':
-        pytest.skip()   # tensorflow dlpack has problem with int32 ndarray.
-    if index_dtype == 'int32':
-        g = g.int()
-    else:
-        g = g.long()
     print(g)
     print(g.idtype)
 
@@ -233,5 +226,36 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg, index_dtype):
     rhs_frame.pop('y')
     if 'm' in g.edata: g.edata.pop('m')
 
+@pytest.mark.parametrize('g', get_cases(['clique']))
+@pytest.mark.parametrize('norm_by', ['src', 'dst'])
+@pytest.mark.parametrize('shp', edge_softmax_shapes)
+@parametrize_dtype
+def test_edge_softmax(g, norm_by, shp, idtype):
+    g = g.astype(idtype).to(F.ctx())
+    edata = F.tensor(np.random.rand(g.number_of_edges(), *shp))
+    e1 = F.attach_grad(F.clone(edata))
+
+    with F.record_grad():
+        score1 = edge_softmax(g, e1, norm_by=norm_by)
+        F.backward(F.reduce_sum(score1))
+        grad_edata = F.grad(e1)
+
+    with F.record_grad():
+        e2 = F.attach_grad(F.clone(edata))
+        e2_2d = F.reshape(
+            e2, (g.number_of_src_nodes(), g.number_of_dst_nodes(), *e2.shape[1:]))
+        if norm_by == 'src':
+            score2 = F.softmax(e2_2d, 1)
+            score2 = F.reshape(score2, (-1, *e2.shape[1:]))
+        if norm_by == 'dst':
+            score2 = F.softmax(e2_2d, 0)
+            score2 = F.reshape(score2, (-1, *e2.shape[1:]))
+        assert F.allclose(score1, score2)
+        print('forward passed')
+
+        F.backward(F.reduce_sum(score2))
+        assert F.allclose(F.grad(e2), grad_edata)
+        print('backward passed')
+
 if __name__ == '__main__':
-    test_spmm(graphs[0], spmm_shapes[5], 'copy_lhs', 'sum')
+    test_spmm(F.int32, graphs[0], spmm_shapes[5], 'copy_lhs', 'sum')

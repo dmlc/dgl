@@ -8,6 +8,7 @@ import math, random, sys
 from optparse import OptionParser
 from collections import deque
 import rdkit
+import tqdm
 
 from jtnn import *
 
@@ -69,7 +70,7 @@ def train():
             dataset,
             batch_size=batch_size,
             shuffle=True,
-            num_workers=4,
+            num_workers=0,
             collate_fn=JTNNCollator(vocab, True),
             drop_last=True,
             worker_init_fn=worker_init_fn)
@@ -77,7 +78,7 @@ def train():
     for epoch in range(MAX_EPOCH):
         word_acc,topo_acc,assm_acc,steo_acc = 0,0,0,0
 
-        for it, batch in enumerate(dataloader):
+        for it, batch in enumerate(tqdm.tqdm(dataloader)):
             model.zero_grad()
             try:
                 loss, kl_div, wacc, tacc, sacc, dacc = model(batch, beta)

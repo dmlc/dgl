@@ -112,8 +112,8 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     # This creaets a subgraph from subgraphs returned from the CAPI above.
     def create_subgraph(subg, induced_nodes, induced_edges):
         subg1 = DGLHeteroGraph(gidx=subg.graph, ntypes=['_N'], etypes=['_E'])
-        subg1.ndata[NID] = induced_nodes[0].tousertensor()
-        subg1.edata[EID] = induced_edges[0].tousertensor()
+        subg1.ndata[NID] = induced_nodes[0]
+        subg1.edata[EID] = induced_edges[0]
         return subg1
 
     for i, subg in enumerate(subgs):
@@ -175,9 +175,9 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
     '''
     # METIS works only on symmetric graphs.
     # The METIS runs on the symmetric graph to generate the node assignment to partitions.
-    from .transform import to_bidirected # avoid cyclic import
     start = time.time()
-    sym_g = to_bidirected(g, copy_ndata=False)
+    sym_gidx = _CAPI_DGLMakeSymmetric_Hetero(g._graph)
+    sym_g = DGLHeteroGraph(gidx=sym_gidx)
     print('Convert a graph into a bidirected graph: {:.3f} seconds'.format(
         time.time() - start))
     vwgt = []
