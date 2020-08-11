@@ -1449,11 +1449,6 @@ def remove_self_loop(g, etype=None):
 
 DGLHeteroGraph.remove_self_loop = remove_self_loop
 
-# For compatibility with old code using dgl.transform.partition_graph_with_halo etc.
-partition_graph_with_halo = hetero_partition_graph_with_halo
-metis_partition_assignment = hetero_metis_partition_assignment
-metis_partition = hetero_metis_partition
-
 def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=True):
     """Given a list of graphs with the same set of nodes, find and eliminate the common
     isolated nodes across all graphs.
