@@ -22,12 +22,14 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 import dgl
 from dgl import DGLGraph
+from dgl.distributed import DistDataLoader
 from functools import partial
 
 from dgl.nn import RelGraphConv
 import tqdm
 
 from ogb.nodeproppred import DglNodePropPredDataset
+from pyinstrument import Profiler
 
 class EntityClassify(nn.Module):
     """ Entity classification class for RGCN
@@ -67,7 +69,7 @@ class EntityClassify(nn.Module):
                  low_mem=False,
                  layer_norm=False):
         super(EntityClassify, self).__init__()
-        self.device = th.device(device if device >= 0 else 'cpu')
+        self.device = device
         self.h_dim = h_dim
         self.out_dim = out_dim
         self.num_rels = num_rels
@@ -134,8 +136,9 @@ class DistEmbedLayer(nn.Module):
                  embed_size,
                  sparse_emb=False,
                  embed_name='embed'):
-        super(DistRelGraphEmbedLayer, self).__init__()
+        super(DistEmbedLayer, self).__init__()
         self.dev_id = dev_id
+        self.num_of_ntype = num_of_ntype
         self.embed_size = embed_size
         self.embed_name = embed_name
         self.sparse_emb = sparse_emb
@@ -147,7 +150,7 @@ class DistEmbedLayer(nn.Module):
 
         if sparse_emb:
             self.node_embeds = dgl.distributed.DistEmbedding(g,
-                                                             (g.number_of_nodes(),),
+                                                             g.number_of_nodes(),
                                                              self.embed_size,
                                                              'node_emb',
                                                              init_emb)
@@ -223,12 +226,59 @@ def evaluate(model, embed_layer, labels, eval_loader, test_loader, node_feats):
 
     return compute_acc(eval_logits, labels[eval_seeds]), compute_acc(test_logits, labels[test_seeds])
 
+class NeighborSampler:
+    """Neighbor sampler
+    Parameters
+    ----------
+    g : DGLHeterograph
+        Full graph
+    target_idx : tensor
+        The target training node IDs in g
+    fanouts : list of int
+        Fanout of each hop starting from the seed nodes. If a fanout is None,
+        sample full neighbors.
+    """
+    def __init__(self, g, fanouts, sample_neighbors):
+        self.g = g
+        self.fanouts = fanouts
+        self.sample_neighbors = sample_neighbors
+
+    def sample_blocks(self, seeds):
+        """Do neighbor sample
+        Parameters
+        ----------
+        seeds :
+            Seed nodes
+        Returns
+        -------
+        tensor
+            Seed nodes, also known as target nodes
+        blocks
+            Sampled subgraphs
+        """
+        blocks = []
+        etypes = []
+        norms = []
+        ntypes = []
+        seeds = th.LongTensor(np.asarray(seeds))
+        cur = seeds
+        for fanout in self.fanouts:
+            frontier = self.sample_neighbors(self.g, cur, fanout, replace=True)
+            etypes = self.g.edata[dgl.ETYPE][frontier.edata[dgl.EID]]
+            norm = self.g.edata['norm'][frontier.edata[dgl.EID]]
+            block = dgl.to_block(frontier, cur)
+            block.srcdata[dgl.NTYPE] = self.g.ndata[dgl.NTYPE][block.srcdata[dgl.NID]]
+            block.edata['etype'] = etypes
+            block.edata['norm'] = norm
+            cur = block.srcdata[dgl.NID]
+            blocks.insert(0, block)
+        return seeds, blocks
+
 def run(args, device, data):
     g, node_feats, num_of_ntype, num_classes, num_rels, train_nid, val_nid, test_nid, labels = data
 
     fanouts = [int(fanout) for fanout in args.fanout.split(',')]
-    sampler = NeighborSampler(g, fanouts, dgl.distributed.sample_neighbors, device)
-
+    sampler = NeighborSampler(g, fanouts, dgl.distributed.sample_neighbors)
     # Create DataLoader for constructing blocks
     dataloader = DistDataLoader(
         dataset=train_nid.numpy(),
@@ -237,7 +287,7 @@ def run(args, device, data):
         shuffle=True,
         drop_last=False)
 
-    valid_sampler = NeighborSampler(g, [None] * args.n_layers, dgl.distributed.sample_neighbors, device)
+    valid_sampler = NeighborSampler(g, [None] * args.n_layers, dgl.distributed.sample_neighbors)
     # Create DataLoader for constructing blocks
     valid_dataloader = DistDataLoader(
         dataset=val_nid.numpy(),
@@ -246,7 +296,7 @@ def run(args, device, data):
         shuffle=False,
         drop_last=False)
 
-    test_sampler = NeighborSampler(g, [None] * args.n_layers, dgl.distributed.sample_neighbors, device)
+    test_sampler = NeighborSampler(g, [None] * args.n_layers, dgl.distributed.sample_neighbors)
     # Create DataLoader for constructing blocks
     test_dataloader = DistDataLoader(
         dataset=test_nid.numpy(),
@@ -268,7 +318,7 @@ def run(args, device, data):
                            num_bases=args.n_bases,
                            num_hidden_layers=args.n_layers-2,
                            dropout=args.dropout,
-                           user_self_loop=args.use_self_loop,
+                           use_self_loop=args.use_self_loop,
                            low_mem=args.low_mem,
                            layer_norm=args.layer_norm)
     model = model.to(device)
@@ -282,9 +332,12 @@ def run(args, device, data):
         all_params = list(model.parameters()) + list(embed_layer.parameters())
         optimizer = th.optim.Adam(all_params, lr=args.lr, weight_decay=args.l2norm)
 
+    #profiler = Profiler()
+    #profiler.start()
+
     # training loop
     print("start training...")
-    for epoch in range(args.num_epochs):
+    for epoch in range(args.n_epochs):
         tic = time.time()
 
         sample_time = 0
@@ -307,7 +360,7 @@ def run(args, device, data):
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
         step_time = []
-        for step, blocks in enumerate(dataloader):
+        for step, sample_data in enumerate(dataloader):
             seeds, blocks = sample_data
             number_train += seeds.shape[0]
             tic_step = time.time()
@@ -317,24 +370,21 @@ def run(args, device, data):
             feats = embed_layer(blocks[0].srcdata[dgl.NID],
                                 blocks[0].srcdata[dgl.NTYPE],
                                 node_feats)
-            labels = labels[seeds]
+            label = labels[seeds]
             copy_time = time.time()
             feat_copy_t.append(copy_time - tic_step)
 
             # forward
             logits = model(blocks, feats)
-            loss = F.cross_entropy(logits, labels)
+            loss = F.cross_entropy(logits, label)
             forward_end = time.time()
 
             # backward
             optimizer.zero_grad()
-            if args.sparse_embedding:
-                emb_optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             if args.sparse_embedding:
                 emb_optimizer.step()
-            loss.backward()
             compute_end = time.time()
             forward_t.append(forward_end - copy_time)
             backward_t.append(compute_end - forward_end)
@@ -353,28 +403,31 @@ def run(args, device, data):
                     np.sum(backward_t[-args.log_every:]), np.sum(update_t[-args.log_every:])))
             start = time.time()
 
+            if step > 1:
+                break
+
         print('[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #number_train: {}'.format(
             g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), number_train))
         epoch += 1
 
-        if epoch % args.eval_every == 0 and epoch != 0:
-            start = time.time()
-            val_acc, test_acc = evaluate(model, embed_layer, labels, valid_sampler, test_sampler, node_feats)
-            print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc,
+        start = time.time()
+        val_acc, test_acc = evaluate(model, embed_layer, labels, valid_sampler, test_sampler, node_feats)
+        print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc,
                                                                                   time.time() - start))
+
+    #profiler.stop()
+    #print(profiler.output_text())
 
 def main(args):
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
 
-    print(args.num_workers)
     dgl.distributed.initialize(args.ip_config, num_workers=args.num_workers)
-    print('finish init')
     g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, part_config=args.conf_path)
     print('rank:', g.rank())
     print('number of edges', g.number_of_edges())
 
-    train_nids = dgl.distributed.node_split(th.ones((g.number_of_nodes(),), dtype=th.bool), g.get_partition_book())
+    pb = g.get_partition_book()
     train_nid = dgl.distributed.node_split(g.ndata['train_mask'], pb, force_even=True)
     val_nid = dgl.distributed.node_split(g.ndata['val_mask'], pb, force_even=True)
     test_nid = dgl.distributed.node_split(g.ndata['test_mask'], pb, force_even=True)
@@ -386,14 +439,15 @@ def main(args):
     device = th.device('cpu')
     labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
     n_classes = len(th.unique(labels[labels >= 0]))
+    print(labels.shape)
     print('#classes:', n_classes)
-
-    # no initial node features
-    node_feats = [None] * number_of_nodes
 
     # these two infor should have a better place to store and retrive
     num_of_ntype = len(th.unique(g.ndata[dgl.NTYPE][np.arange(g.number_of_nodes())]))
     num_rels = len(th.unique(g.edata[dgl.ETYPE][np.arange(g.number_of_edges())]))
+
+    # no initial node features
+    node_feats = [None] * num_of_ntype
 
     run(args, device, (g, node_feats, num_of_ntype, n_classes, num_rels,
                        train_nid, val_nid, test_nid, labels))
@@ -439,6 +493,7 @@ if __name__ == '__main__':
             help="Mini-batch size. ")
     parser.add_argument("--eval-batch-size", type=int, default=128,
             help="Mini-batch size. ")
+    parser.add_argument('--log-every', type=int, default=20)
     parser.add_argument("--num-workers", type=int, default=1,
             help="Number of workers for distributed dataloader.")
     parser.add_argument("--low-mem", default=False, action='store_true',
