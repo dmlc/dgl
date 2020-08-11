@@ -27,7 +27,7 @@ python3 train_sudoku.py --output_dir out/ --do_eval --steps 64
 
   Test accuracy (puzzle-level): 
 
-|       | 32 stpes | 64 steps |
+|       | 32 steps | 64 steps |
 | ----- | :------: | :------: |
 | Paper | 94.1     | 96.6     |
 | DGL   | 95.3     | 98.9     |
