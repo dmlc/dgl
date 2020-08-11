@@ -152,8 +152,7 @@ class DistEmbedLayer(nn.Module):
             self.node_embeds = dgl.distributed.DistEmbedding(g,
                                                              g.number_of_nodes(),
                                                              self.embed_size,
-                                                             'node_emb',
-                                                             init_emb)
+                                                             'node_emb')
         else:
             self.node_embeds = th.nn.Embedding(g.number_of_nodes(), self.embed_size)
             nn.init.uniform_(self.node_embeds.weight, -1.0, 1.0)
