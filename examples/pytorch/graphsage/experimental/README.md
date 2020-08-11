@@ -50,7 +50,7 @@ python3 ~/dgl/tools/launch.py \
 --num_servers 1 \
 --part_config ogb-product/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 ~/dgl/examples/pytorch/graphsage/experimental/train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 30 --batch-size 1000 --num-workers 4"
+"python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 30 --batch-size 1000 --num-workers 4"
 ```
 
 To run unsupervised training:
