@@ -224,6 +224,9 @@ def assert_nonnegative_iterable(values, name):
     name : str
         Name of the iterable for error message.
     """
+    if len(values) == 0:
+        return
+
     if F.is_tensor(values):
         min_val = F.as_scalar(F.min(values, dim=0))
     else:

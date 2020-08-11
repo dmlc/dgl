@@ -2721,6 +2721,27 @@ class DGLHeteroGraph(object):
         all_edges
         in_edges
         """
+        if not (isinstance(u, (numbers.Integral, Iterable)) or F.is_tensor(u)):
+            raise DGLError('Expect u to have type int, tensor or sequence, '
+                           'got {}'.format(type(u)))
+
+        src_type, _, _ = self.to_canonical_etype(etype)
+        num_src_type_nodes = self.num_src_nodes(src_type)
+
+        if isinstance(u, numbers.Integral) and (u < 0 or u >= num_src_type_nodes):
+            raise DGLError('Expect the source node ID to be from 0, ...'
+                           ', {:d}, got {:d}'.format(num_src_type_nodes - 1, u))
+
+        if not F.is_tensor(u) and isinstance(u, Iterable):
+            utils.detect_nan_in_iterable(u, 'the source node IDs')
+            utils.detect_inf_in_iterable(u, 'the source node IDs')
+
+        if F.is_tensor(u) or isinstance(u, Iterable):
+            utils.assert_nonnegative_iterable(u, 'the source node IDs')
+            utils.assert_iterable_bounded_by_value(
+                u, 'the source node IDs', num_src_type_nodes,
+                'the number of {} nodes'.format(src_type))
+
         u = utils.prepare_tensor(self, u, 'u')
         src, dst, eid = self._graph.out_edges(self.get_etype_id(etype), u)
         if form == 'all':
