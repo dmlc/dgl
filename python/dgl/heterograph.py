@@ -1683,62 +1683,86 @@ class DGLHeteroGraph(object):
     #################################################################
 
     def number_of_nodes(self, ntype=None):
-        """Return the number of nodes of the given type in the heterograph.
+        """Return the number of nodes.
 
         Parameters
         ----------
         ntype : str, optional
-            The node type. Can be omitted if there is only one node type
-            in the graph. (Default: None)
+            The node type for query. If given, it returns the number of nodes for a particular
+            type. If not given (default), it returns the total number of nodes of all types.
 
         Returns
         -------
         int
-            The number of nodes
+            The number of nodes.
 
         Examples
         --------
 
-        >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1], [1, 2])})
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a graph with two node types -- 'user' and 'game'.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        >>> })
+
+        Query for the number of nodes.
+
         >>> g.number_of_nodes('user')
-        3
+        5
+        >>> g.number_of_nodes('game')
+        7
         >>> g.number_of_nodes()
-        3
+        12
         """
-        if ntype is None:
-            total_num_nodes = 0
-            for nty in self.ntypes:
-                total_num_nodes += self._graph.number_of_nodes(self.get_ntype_id(nty))
-            return total_num_nodes
-        else:
-            return self._graph.number_of_nodes(self.get_ntype_id(ntype))
+        return self.num_nodes(ntype)
 
     def num_nodes(self, ntype=None):
-        """Return the number of nodes of the given type in the heterograph.
+        """Return the number of nodes.
 
         Parameters
         ----------
         ntype : str, optional
-            The node type. Can be omitted if there is only one node type
-            in the graph. (Default: None)
+            The node type for query. If given, it returns the number of nodes for a particular
+            type. If not given (default), it returns the total number of nodes of all types.
 
         Returns
         -------
         int
-            The number of nodes
+            The number of nodes.
 
         Examples
         --------
 
-        >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1], [1, 2])})
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a graph with two node types -- 'user' and 'game'.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        >>> })
+
+        Query for the number of nodes.
+
         >>> g.num_nodes('user')
-        3
+        5
+        >>> g.num_nodes('game')
+        7
         >>> g.num_nodes()
-        3
+        12
         """
         if ntype is None:
             total_num_nodes = 0
-            for nty in self.ntypes:
+            for nty in self._ntypes:
                 total_num_nodes += self._graph.number_of_nodes(self.get_ntype_id(nty))
             return total_num_nodes
         else:
@@ -1857,13 +1881,16 @@ class DGLHeteroGraph(object):
         return self._graph.number_of_nodes(self.get_ntype_id_from_dst(ntype))
 
     def number_of_edges(self, etype=None):
-        """Return the number of edges of the given type in the heterograph.
+        """Return the number of edges.
 
         Parameters
         ----------
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If given, it returns the number of edges for a
+            particular edge type. If not given (default), it returns the total number of edges
+            of all types.
 
         Returns
         -------
@@ -1873,24 +1900,46 @@ class DGLHeteroGraph(object):
         Examples
         --------
 
-        >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1], [1, 2])})
-        >>> g.number_of_edges(('user', 'follows', 'user'))
-        2
-        >>> g.number_of_edges('follows')
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a graph with three canonical edge types.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
+        >>> })
+
+        Query for the number of edges.
+
+        >>> g.number_of_edges('plays')
         2
         >>> g.number_of_edges()
+        7
+
+        Use a canonical edge type instead when there is ambiguity for an edge type.
+
+        >>> g.number_of_edges(('user', 'follows', 'user'))
         2
+        >>> g.number_of_edges(('user', 'follows', 'game'))
+        3
         """
-        return self._graph.number_of_edges(self.get_etype_id(etype))
+        return self.num_edges(etype)
 
     def num_edges(self, etype=None):
-        """Return the number of edges of the given type in the heterograph.
+        """Return the number of edges.
 
         Parameters
         ----------
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If given, it returns the number of edges for a
+            particular edge type. If not given (default), it returns the total number of edges
+            of all types.
 
         Returns
         -------
@@ -1900,15 +1949,40 @@ class DGLHeteroGraph(object):
         Examples
         --------
 
-        >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1], [1, 2])})
-        >>> g.num_edges(('user', 'follows', 'user'))
-        2
-        >>> g.num_edges('follows')
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a graph with three canonical edge types.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
+        >>> })
+
+        Query for the number of edges.
+
+        >>> g.num_edges('plays')
         2
         >>> g.num_edges()
+        7
+
+        Use a canonical edge type instead when there is ambiguity for an edge type.
+
+        >>> g.num_edges(('user', 'follows', 'user'))
         2
+        >>> g.num_edges(('user', 'follows', 'game'))
+        3
         """
-        return self._graph.number_of_edges(self.get_etype_id(etype))
+        if etype is None:
+            total_num_edges = 0
+            for ety in self._canonical_etypes:
+                total_num_edges += self._graph.number_of_edges(self.get_etype_id(ety))
+            return total_num_edges
+        else:
+            return self._graph.number_of_edges(self.get_etype_id(etype))
 
     def __len__(self):
         """Deprecated: please directly call :func:`number_of_nodes`
