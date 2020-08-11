@@ -97,6 +97,8 @@ def initialize(ip_config, num_servers=1, num_workers=0,
             SAMPLER_POOL = None
         NUM_SAMPLER_WORKERS = num_workers
         if not is_standalone:
+            assert num_servers is not None and num_servers > 0, \
+                    'The number of servers per machine must be specified with a positive number.'
             connect_to_server(ip_config, num_servers, max_queue_size, net_type)
         init_role('default')
         init_kvstore(ip_config, num_servers, 'default')
