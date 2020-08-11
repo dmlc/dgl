@@ -13,6 +13,7 @@ from . import container
 from . import distributed
 from . import random
 from . import sampling
+from . import dataloading
 from . import ops
 
 from ._ffi.runtime_ctypes import TypeCode
