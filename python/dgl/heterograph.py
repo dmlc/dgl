@@ -2502,44 +2502,85 @@ class DGLHeteroGraph(object):
             return F.as_scalar(eid) if is_int else eid
 
     def find_edges(self, eid, etype=None):
-        """Given an edge ID array with the specified type, return the source
-        and destination node ID array ``s`` and ``d``.  ``s[i]`` and ``d[i]``
-        are source and destination node ID for edge ``eid[i]``.
+        """Return the source and destination node(s) of some particular edge(s)
+        with the specified edge type.
 
         Parameters
         ----------
-        eid : list, tensor
-            The edge ID array.
+        eid : edge ID(s)
+            The IDs of the edges for query. The function expects that :attr:`eid` contains
+            valid edge IDs only, i.e. consecutive integers 0, 1, ... E - 1, where E is the
+            number of edges with the specified edge type.
+
+            - int: An edge ID for query.
+            - Tensor: A 1D tensor that contains the edge IDs for query, whose data
+              type and device should be separately the same as the idtype and device of the
+              graph.
+            - iterable[int] : Similar to the tensor, but stores edge IDs in a sequence
+              (e.g. list, tuple, numpy.ndarray).
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type.
 
         Returns
         -------
-        tensor
-            The source node ID array.
-        tensor
-            The destination node ID array.
+        Tensor
+            The source node IDs of the edges, whose i-th element is the source node of the edge
+            with ID ``eid[i]``.
+        Tensor
+            The destination node IDs of the edges, whose i-th element is the destination node of
+            the edge with ID ``eid[i]``.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1], [0, 0, 2])})
-        >>> g.find_edges([0, 2], ('user', 'plays', 'game'))
-        (tensor([0, 1]), tensor([0, 2]))
-        >>> g.find_edges([0, 2])
-        (tensor([0, 1]), tensor([0, 2]))
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 0, 2, 3])))
+
+        Find edges of IDs 0 and 2.
+
+        >>> g.find_edges(torch.tensor([0, 2]))
+        (tensor([0, 1]), tensor([1, 2]))
+
+        For a graph of multiple edge types, it is required to specify the edge type in query.
+
+        >>> hg = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        >>> })
+        >>> hg.find_edges(torch.tensor([1, 0]), 'plays')
+        (tensor([4, 3]), tensor([6, 5]))
         """
+        if not (isinstance(eid, (numbers.Integral, Iterable)) or F.is_tensor(eid)):
+            raise DGLError('Expect eid to have type int, tensor or sequence, '
+                           'got {}'.format(type(eid)))
+
+        num_edges = self.num_edges(etype)
+
+        if isinstance(eid, numbers.Integral) and (eid < 0 or eid >= num_edges):
+            raise DGLError('Expect the edge ID to be from 0, ...'
+                           ', {:d}, got {:d}'.format(num_edges - 1, eid))
+
+        if not F.is_tensor(eid) and isinstance(eid, Iterable):
+            utils.detect_nan_in_iterable(eid, 'the edge IDs')
+            utils.detect_inf_in_iterable(eid, 'the edge IDs')
+
+        if F.is_tensor(eid) or isinstance(eid, Iterable):
+            utils.assert_nonnegative_iterable(eid, 'the edge IDs')
+            utils.assert_iterable_bounded_by_value(
+                eid, 'the edge IDs', num_edges,
+                'the number of {} edges'.format(etype))
+
         eid = utils.prepare_tensor(self, eid, 'eid')
         if len(eid) == 0:
             empty = F.copy_to(F.tensor([], self.idtype), self.device)
             return empty, empty
-        # sanity check
-        max_eid = F.as_scalar(F.max(eid, dim=0))
-        if max_eid >= self.number_of_edges(etype):
-            raise DGLError('Expect edge IDs to be smaller than number of edges ({}). '
-                           ' But got {}.'.format(self.number_of_edges(etype), max_eid))
         src, dst, _ = self._graph.find_edges(self.get_etype_id(etype), eid)
         return src, dst
 
@@ -3019,7 +3060,7 @@ class DGLHeteroGraph(object):
                            'got {}'.format(type(u)))
 
         src_type, _, _ = self.to_canonical_etype(etype)
-        num_src_type_nodes = self.num_dst_nodes(src_type)
+        num_src_type_nodes = self.num_src_nodes(src_type)
 
         if isinstance(u, numbers.Integral) and (u < 0 or u >= num_src_type_nodes):
             raise DGLError('Expect the source node ID to be from 0, ...'
