@@ -84,11 +84,11 @@ class Column(object):
     index : Tensor
         Index tensor
     """
-    def __init__(self, storage, scheme=None, index=None):
+    def __init__(self, storage, scheme=None, index=None, device=None):
         self.storage = storage
         self.scheme = scheme if scheme else infer_scheme(storage)
         self.index = index
-        self.device = None
+        self.device = device
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -210,7 +210,7 @@ class Column(object):
 
     def clone(self):
         """Return a shallow copy of this column."""
-        return Column(self.storage, self.scheme, self.index)
+        return Column(self.storage, self.scheme, self.index, self.device)
 
     def deepclone(self):
         """Return a deepcopy of this column.
@@ -238,9 +238,9 @@ class Column(object):
             Sub-column
         """
         if self.index is None:
-            return Column(self.storage, self.scheme, rowids)
+            return Column(self.storage, self.scheme, rowids, self.device)
         else:
-            return Column(self.storage, self.scheme, F.gather_row(self.index, rowids))
+            return Column(self.storage, self.scheme, F.gather_row(self.index, rowids), self.device)
 
     @staticmethod
     def create(data):
