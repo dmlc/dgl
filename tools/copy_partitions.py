@@ -36,9 +36,9 @@ def main():
     hosts = []
     with open(args.ip_config) as f:
         for line in f:
-            ip, _, _ = line.strip().split(' ')
+            res = line.strip().split(' ')
+            ip = res[0]
             hosts.append(ip)
-
     
     # We need to update the partition config file so that the paths are relative to
     # the workspace in the remote machines.
