@@ -68,7 +68,7 @@ class DGLHeteroGraph(object):
             raise DGLError('The input is already a DGLGraph. No need to create it again.')
         if not isinstance(gidx, heterograph_index.HeteroGraphIndex):
             dgl_warning('Recommend creating graphs by `dgl.graph(data)`'
-                        ' instead of `dgl.DGLGraph(data)`.')
+                        ' instead of `dgl.DGLHeteroGraph(data)`.')
             u, v, num_src, num_dst = utils.graphdata2tensors(gidx)
             gidx = heterograph_index.create_unitgraph_from_coo(
                 1, num_src, num_dst, u, v, ['coo', 'csr', 'csc'])
