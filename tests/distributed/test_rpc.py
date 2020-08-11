@@ -114,13 +114,13 @@ def start_server(num_clients, ip_config):
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.start_server(server_id=0, 
                                  ip_config=ip_config, 
-                                 server_count=1,
+                                 num_servers=1,
                                  num_clients=num_clients, 
                                  server_state=server_state)
 
 def start_client(ip_config):
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
-    dgl.distributed.connect_to_server(ip_config=ip_config, server_count=1)
+    dgl.distributed.connect_to_server(ip_config=ip_config, num_servers=1)
     req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
     # test send and recv
     dgl.distributed.send_request(0, req)

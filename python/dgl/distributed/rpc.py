@@ -24,7 +24,7 @@ SERVICE_ID_TO_PROPERTY = {}
 
 DEFUALT_PORT = 30050
 
-def read_ip_config(filename, server_count):
+def read_ip_config(filename, num_servers):
     """Read network configuration information of server from file.
 
     For exampple, the following TXT shows a 4-machine configuration:
@@ -42,8 +42,8 @@ def read_ip_config(filename, server_count):
         172.31.30.180 20090
 
     Note that, DGL supports multiple backup servers that shares data with each others
-    on the same machine via shared-memory tensor. The server_count should be >= 1. For example,
-    if we set server_count to 5, it means that we have 1 main server and 4 backup servers on
+    on the same machine via shared-memory tensor. The num_servers should be >= 1. For example,
+    if we set num_servers to 5, it means that we have 1 main server and 4 backup servers on
     current machine.
 
     Parameters
@@ -51,7 +51,7 @@ def read_ip_config(filename, server_count):
     filename : str
         Path of IP configuration file.
 
-    server_count : int
+    num_servers : int
         Server count on each machine.
 
     Returns
@@ -59,7 +59,7 @@ def read_ip_config(filename, server_count):
     dict
         server namebook.
         The key is server_id (int)
-        The value is [machine_id, ip, port, server_count] ([int, str, int, int])
+        The value is [machine_id, ip, port, num_servers] ([int, str, int, int])
 
         e.g.,
 
@@ -73,7 +73,7 @@ def read_ip_config(filename, server_count):
            7:[3, '172.31.30.180', 30051, 2]}
     """
     assert len(filename) > 0, 'filename cannot be empty.'
-    assert server_count > 0, 'server_count (%d) must be a positive number.' % server_count
+    assert num_servers > 0, 'num_servers (%d) must be a positive number.' % num_servers
     server_namebook = {}
     try:
         server_id = 0
@@ -88,8 +88,8 @@ def read_ip_config(filename, server_count):
             else:
                 raise RuntimeError('length of result can only be 1 or 2.')
             ip_addr = result[0]
-            for s_count in range(server_count):
-                server_namebook[server_id] = [machine_id, ip_addr, port+s_count, server_count]
+            for s_count in range(num_servers):
+                server_namebook[server_id] = [machine_id, ip_addr, port+s_count, num_servers]
                 server_id += 1
             machine_id += 1
     except RuntimeError:

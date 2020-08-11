@@ -103,13 +103,13 @@ def test_partition_policy():
     assert node_policy.get_data_size() == len(node_map)
     assert edge_policy.get_data_size() == len(edge_map)
 
-def start_server(server_id, num_clients, server_count):
+def start_server(server_id, num_clients, num_servers):
     # Init kvserver
     print("Sleep 5 seconds to test client re-connect.")
     time.sleep(5)
     kvserver = dgl.distributed.KVServer(server_id=server_id,
                                         ip_config='kv_ip_config.txt',
-                                        server_count=server_count,
+                                        num_servers=num_servers,
                                         num_clients=num_clients)
     kvserver.add_part_policy(node_policy)
     kvserver.add_part_policy(edge_policy)
@@ -127,15 +127,15 @@ def start_server(server_id, num_clients, server_count):
     server_state = dgl.distributed.ServerState(kv_store=kvserver, local_g=None, partition_book=None)
     dgl.distributed.start_server(server_id=server_id,
                                  ip_config='kv_ip_config.txt',
-                                 server_count=server_count,
+                                 num_servers=num_servers,
                                  num_clients=num_clients,
                                  server_state=server_state)
 
-def start_server_mul_role(server_id, num_clients, server_count):
+def start_server_mul_role(server_id, num_clients, num_servers):
     # Init kvserver
     kvserver = dgl.distributed.KVServer(server_id=server_id,
                                         ip_config='kv_ip_mul_config.txt',
-                                        server_count=server_count,
+                                        num_servers=num_servers,
                                         num_clients=num_clients)
     kvserver.add_part_policy(node_policy)
     if kvserver.is_backup_server():
@@ -146,16 +146,16 @@ def start_server_mul_role(server_id, num_clients, server_count):
     server_state = dgl.distributed.ServerState(kv_store=kvserver, local_g=None, partition_book=None)
     dgl.distributed.start_server(server_id=server_id,
                                  ip_config='kv_ip_mul_config.txt',
-                                 server_count=server_count,
+                                 num_servers=num_servers,
                                  num_clients=num_clients,
                                  server_state=server_state)
 
-def start_client(num_clients, server_count):
+def start_client(num_clients, num_servers):
     os.environ['DGL_DIST_MODE'] = 'distributed'
     # Note: connect to server first !
-    dgl.distributed.initialize(ip_config='kv_ip_config.txt', server_count=server_count)
+    dgl.distributed.initialize(ip_config='kv_ip_config.txt', num_servers=num_servers)
     # Init kvclient
-    kvclient = dgl.distributed.KVClient(ip_config='kv_ip_config.txt', server_count=server_count)
+    kvclient = dgl.distributed.KVClient(ip_config='kv_ip_config.txt', num_servers=num_servers)
     kvclient.map_shared_data(partition_book=gpb)
     assert dgl.distributed.get_num_client() == num_clients
     kvclient.init_data(name='data_1', 
@@ -280,10 +280,10 @@ def start_client(num_clients, server_count):
     data_tensor = data_tensor * num_clients
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
 
-def start_client_mul_role(i, num_workers, server_count):
+def start_client_mul_role(i, num_workers, num_servers):
     os.environ['DGL_DIST_MODE'] = 'distributed'
     # Initialize creates kvstore !
-    dgl.distributed.initialize(ip_config='kv_ip_mul_config.txt', server_count=server_count, num_workers=num_workers)
+    dgl.distributed.initialize(ip_config='kv_ip_mul_config.txt', num_servers=num_servers, num_workers=num_workers)
     if i == 0: # block one trainer
         time.sleep(5)
     kvclient = dgl.distributed.kvstore.get_kvstore()

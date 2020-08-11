@@ -241,7 +241,7 @@ class DistGraphServer(KVServer):
         The server ID (start from 0).
     ip_config : str
         Path of IP configuration file.
-    server_count : int
+    num_servers : int
         Server count on each machine.
     num_clients : int
         Total number of client nodes.
@@ -250,14 +250,14 @@ class DistGraphServer(KVServer):
     disable_shared_mem : bool
         Disable shared memory.
     '''
-    def __init__(self, server_id, ip_config, server_count,
+    def __init__(self, server_id, ip_config, num_servers,
                  num_clients, part_config, disable_shared_mem=False):
         super(DistGraphServer, self).__init__(server_id=server_id,
                                               ip_config=ip_config,
-                                              server_count=server_count,
+                                              num_servers=num_servers,
                                               num_clients=num_clients)
         self.ip_config = ip_config
-        self.server_count = server_count
+        self.num_servers = num_servers
         # Load graph partition data.
         if self.is_backup_server():
             # The backup server doesn't load the graph partition. It'll initialized afterwards.
@@ -294,7 +294,7 @@ class DistGraphServer(KVServer):
         print('start graph service on server {} for part {}'.format(self.server_id, self.part_id))
         start_server(server_id=self.server_id,
                      ip_config=self.ip_config,
-                     server_count=self.server_count,
+                     num_servers=self.num_servers,
                      num_clients=self.num_clients, server_state=server_state)
 
 class DistGraph:
