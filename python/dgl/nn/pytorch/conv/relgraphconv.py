@@ -34,7 +34,8 @@ class RelGraphConv(nn.Module):
 
        W_r^{(l)} = \sum_{b=1}^B a_{rb}^{(l)}V_b^{(l)}
 
-    where :math:`B` is the number of bases, :math:`V_b^{(l)}` are linearly combined with coefficients :math:`a_{rb}^{(l)}`.
+    where :math:`B` is the number of bases, :math:`V_b^{(l)}` are linearly combined
+    with coefficients :math:`a_{rb}^{(l)}`.
 
     The block-diagonal-decomposition regularization decomposes :math:`W_r` into :math:`B`
     number of block diagonal matrices. We refer :math:`B` as the number of bases.
@@ -45,7 +46,8 @@ class RelGraphConv(nn.Module):
 
        W_r^{(l)} = \oplus_{b=1}^B Q_{rb}^{(l)}
 
-    where :math:`B` is the number of bases, :math:`Q_{rb}^{(l)}` are block bases with shape :math:`R^{(d^{(l+1)}/B)*(d^{l}/B)}`.
+    where :math:`B` is the number of bases, :math:`Q_{rb}^{(l)}` are block
+    bases with shape :math:`R^{(d^{(l+1)}/B)*(d^{l}/B)}`.
 
     Parameters
     ----------
@@ -75,7 +77,6 @@ class RelGraphConv(nn.Module):
         Dropout rate. Default: ``0.0``
     layer_norm: float, optional
         Add layer norm. Default: ``False``
-    
 
     Examples
     --------

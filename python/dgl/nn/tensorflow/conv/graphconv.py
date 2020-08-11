@@ -62,17 +62,19 @@ class GraphConv(layers.Layer):
 
     Notes
     -----
-    Zero in-degree nodes will lead to invalid output value. A common practice
-    to avoid this is to add a self-loop for each node in the graph if it is
-    homogeneous, which can be achieved by:
+    Zero in-degree nodes will lead to invalid output value. This is because no message
+    will be passed to those nodes, the aggregation function will be appied on empty input.
+    A common practice to avoid this is to add a self-loop for each node in the graph if
+    it is homogeneous, which can be achieved by:
 
     >>> g = ... # a DGLGraph
     >>> g = dgl.add_self_loop(g)
 
     Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
-    since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree`` to ``True``
-    for those cases to unblock the code and handle zere-in-degree nodes manually. A common
-    practise to handle this is to filter out the nodes with zere-in-degree when use after conv.
+    since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree``
+    to ``True`` for those cases to unblock the code and handle zere-in-degree nodes manually.
+    A common practise to handle this is to filter out the nodes with zere-in-degree when use
+    after conv.
 
     Examples
     --------
@@ -202,10 +204,14 @@ class GraphConv(layers.Layer):
         with graph.local_scope():
             if not self._allow_zero_in_degree:
                 if  tf.math.count_nonzero(graph.in_degrees() == 0) > 0:
-                    raise DGLError('There are 0-in-degree nodes in the graph, output for those nodes will be invalid.'
-                                   'This is harmful for some applications, causing silent performance regression.'
-                                   'Adding self-loop on the input graph by calling `g = dgl.add_self_loop(g)` will resolve the issue.'
-                                   'Setting ``allow_zero_in_degree`` to be `True` when constructing this module will suppress the check and let the code run.')
+                    raise DGLError('There are 0-in-degree nodes in the graph,
+                                    'output for those nodes will be invalid.'
+                                    'This is harmful for some applications, '
+                                    'causing silent performance regression.'
+                                    'Adding self-loop on the input graph by '
+                                    'calling `g = dgl.add_self_loop(g)` will resolve the issue.'
+                                    'Setting ``allow_zero_in_degree`` to be `True` when constructing
+                                    'this module will suppress the check and let the code run.')
 
             feat_src, feat_dst = expand_as_pair(feat, graph)
 

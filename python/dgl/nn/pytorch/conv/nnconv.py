@@ -4,7 +4,6 @@ import torch as th
 from torch import nn
 from torch.nn import init
 
-from .... import transform
 from ....base import DGLError
 from .... import function as fn
 from ..utils import Identity
@@ -23,13 +22,16 @@ class NNConv(nn.Module):
         h_{i}^{l+1} = h_{i}^{l} + \mathrm{aggregate}\left(\left\{
         f_\Theta (e_{ij}) \cdot h_j^{l}, j\in \mathcal{N}(i) \right\}\right)
 
-    where :math:`e_{ij}` is the edge feature, :math:`f_\Theta` is a function with learnable parameters.
+    where :math:`e_{ij}` is the edge feature, :math:`f_\Theta` is a function
+    with learnable parameters.
 
     Parameters
     ----------
     in_feats : int
         Input feature size; i.e, the number of dimensions of :math:`h_j^{(l)}`.
-        NN can be applied on homogeneous graph and unidirectional `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`__. If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
+        NN can be applied on homogeneous graph and unidirectional
+        `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`__.
+        If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
         a scalar is given, the source and destination node feature size would take the
         same value.
@@ -64,9 +66,10 @@ class NNConv(nn.Module):
     >>> g = dgl.add_self_loop(g)
 
     Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
-    since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree`` to ``True``
-    for those cases to unblock the code and handle zere-in-degree nodes manually. A common
-    practise to handle this is to filter out the nodes with zere-in-degree when use after conv.
+    since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree``
+    to ``True`` for those cases to unblock the code and handle zere-in-degree nodes manually.
+    A common practise to handle this is to filter out the nodes with zere-in-degree when use
+    after conv.
 
     Examples
     --------
@@ -185,10 +188,14 @@ class NNConv(nn.Module):
         with graph.local_scope():
             if not self._allow_zero_in_degree:
                 if (graph.in_degrees() == 0).any():
-                    raise DGLError('There are 0-in-degree nodes in the graph, output for those nodes will be invalid.'
-                                   'This is harmful for some applications, causing silent performance regression.'
-                                   'Adding self-loop on the input graph by calling `g = dgl.add_self_loop(g)` will resolve the issue.'
-                                   'Setting ``allow_zero_in_degree`` to be `True` when constructing this module will suppress the check and let the code run.')
+                    raise DGLError('There are 0-in-degree nodes in the graph,
+                                    'output for those nodes will be invalid.'
+                                    'This is harmful for some applications, '
+                                    'causing silent performance regression.'
+                                    'Adding self-loop on the input graph by '
+                                    'calling `g = dgl.add_self_loop(g)` will resolve the issue.'
+                                    'Setting ``allow_zero_in_degree`` to be `True` when constructing
+                                    'this module will suppress the check and let the code run.')
 
             feat_src, feat_dst = expand_as_pair(feat, graph)
 

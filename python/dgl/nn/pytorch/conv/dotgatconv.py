@@ -33,7 +33,9 @@ class DotGatConv(nn.Module):
     ----------
     in_feats : int, or pair of ints
         Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
-        DotGatConv can be applied on homogeneous graph and unidirectional `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`__. If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
+        DotGatConv can be applied on homogeneous graph and unidirectional
+        `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`__.
+        If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
         a scalar is given, the source and destination node feature size would take the
         same value.
@@ -57,9 +59,10 @@ class DotGatConv(nn.Module):
     >>> g = dgl.add_self_loop(g)
 
     Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
-    since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree`` to ``True``
-    for those cases to unblock the code and handle zere-in-degree nodes manually. A common
-    practise to handle this is to filter out the nodes with zere-in-degree when use after conv.
+    since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree``
+    to ``True`` for those cases to unblock the code and handle zere-in-degree nodes manually.
+    A common practise to handle this is to filter out the nodes with zere-in-degree when use
+    after conv.
 
     Examples
     --------
@@ -146,10 +149,14 @@ class DotGatConv(nn.Module):
 
         if not self._allow_zero_in_degree:
             if (graph.in_degrees() == 0).any():
-                raise DGLError('There are 0-in-degree nodes in the graph, output for those nodes will be invalid.'
-                                'This is harmful for some applications, causing silent performance regression.'
-                                'Adding self-loop on the input graph by calling `g = dgl.add_self_loop(g)` will resolve the issue.'
-                                'Setting ``allow_zero_in_degree`` to be `True` when constructing this module will suppress the check and let the code run.')
+                raise DGLError('There are 0-in-degree nodes in the graph,
+                                'output for those nodes will be invalid.'
+                                'This is harmful for some applications, '
+                                'causing silent performance regression.'
+                                'Adding self-loop on the input graph by '
+                                'calling `g = dgl.add_self_loop(g)` will resolve the issue.'
+                                'Setting ``allow_zero_in_degree`` to be `True` when constructing
+                                'this module will suppress the check and let the code run.')
 
         # check if feat is a tuple
         if isinstance(feat, tuple):

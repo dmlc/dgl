@@ -18,7 +18,8 @@ class SGConv(nn.Module):
     .. math::
         H^{K} = (\tilde{D}^{-1/2} \tilde{A} \tilde{D}^{-1/2})^K X \Theta
 
-    where :math:`\tilde{A}` is :math:`A` + :math:`I`. Thus the graph input is expected to have self-loop edges added.
+    where :math:`\tilde{A}` is :math:`A` + :math:`I`.
+    Thus the graph input is expected to have self-loop edges added.
 
     Parameters
     ----------
@@ -58,9 +59,10 @@ class SGConv(nn.Module):
     >>> g = dgl.add_self_loop(g)
 
     Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
-    since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree`` to ``True``
-    for those cases to unblock the code and handle zere-in-degree nodes manually. A common
-    practise to handle this is to filter out the nodes with zere-in-degree when use after conv.
+    since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree``
+    to ``True`` for those cases to unblock the code and handle zere-in-degree nodes manually.
+    A common practise to handle this is to filter out the nodes with zere-in-degree when use
+    after conv.
 
     Example
     -------
@@ -151,10 +153,14 @@ class SGConv(nn.Module):
         with graph.local_scope():
             if not self._allow_zero_in_degree:
                 if (graph.in_degrees() == 0).any():
-                    raise DGLError('There are 0-in-degree nodes in the graph, output for those nodes will be invalid.'
-                                   'This is harmful for some applications, causing silent performance regression.'
-                                   'Adding self-loop on the input graph by calling `g = dgl.add_self_loop(g)` will resolve the issue.'
-                                   'Setting ``allow_zero_in_degree`` to be `True` when constructing this module will suppress the check and let the code run.')
+                    raise DGLError('There are 0-in-degree nodes in the graph,
+                                    'output for those nodes will be invalid.'
+                                    'This is harmful for some applications, '
+                                    'causing silent performance regression.'
+                                    'Adding self-loop on the input graph by '
+                                    'calling `g = dgl.add_self_loop(g)` will resolve the issue.'
+                                    'Setting ``allow_zero_in_degree`` to be `True` when constructing
+                                    'this module will suppress the check and let the code run.')
 
             if self._cached_h is not None:
                 feat = self._cached_h

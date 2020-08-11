@@ -129,9 +129,7 @@ class TAGConv(nn.Module):
                 rst = graph.ndata['h']
                 rst = rst * norm
                 fstack.append(rst)
-                print (rst)
 
-            print (th.cat(fstack, dim=-1))
             rst = self.lin(th.cat(fstack, dim=-1))
 
             if self._activation is not None:
