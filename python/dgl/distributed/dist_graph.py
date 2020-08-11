@@ -323,8 +323,6 @@ class DistGraph:
     ----------
     ip_config : str
         Path of IP configuration file.
-    server_count : int
-        Server count on each machine.
     graph_name : str
         The name of the graph. This name has to be the same as the one used in DistGraphServer.
     gpb : PartitionBook
@@ -332,9 +330,8 @@ class DistGraph:
     part_config : str
         The partition config file. It's used in the standalone mode.
     '''
-    def __init__(self, ip_config, server_count, graph_name, gpb=None, part_config=None):
+    def __init__(self, ip_config, graph_name, gpb=None, part_config=None):
         self.ip_config = ip_config
-        self.server_count = server_count
         self.graph_name = graph_name
         self._gpb_input = gpb
         if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
@@ -380,10 +377,10 @@ class DistGraph:
         self._client.map_shared_data(self._gpb)
 
     def __getstate__(self):
-        return self.ip_config, self.server_count, self.graph_name, self._gpb
+        return self.ip_config, self.graph_name, self._gpb
 
     def __setstate__(self, state):
-        self.ip_config, self.server_count, self.graph_name, self._gpb_input = state
+        self.ip_config, self.graph_name, self._gpb_input = state
         self._init()
 
         self._ndata = NodeDataView(self)
