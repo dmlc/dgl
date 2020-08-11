@@ -62,7 +62,7 @@ class CFConv(nn.Module):
     .. math::
         h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} h_j^{l} \circ W^{(l)}e_ij
 
-    where :math:`\circ` represents element-wise multiplication and for :math:\text{SPP} :
+    where :math:`\circ` represents element-wise multiplication and for :math:`\text{SPP}` :
 
     .. math::
         \text{SSP}(x) = \frac{1}{\beta} * \log(1 + \exp(\beta * x)) - \log(\text{shift})

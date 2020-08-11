@@ -64,7 +64,7 @@ class DenseGraphConv(nn.Module):
 
     See also
     --------
-    `GraphConv<https://docs.dgl.ai/api/python/nn.pytorch.html#graphconv>`
+    `GraphConv <https://docs.dgl.ai/api/python/nn.pytorch.html#graphconv>`__
     """
     def __init__(self,
                  in_feats,

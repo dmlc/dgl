@@ -252,17 +252,17 @@ class AtomicConv(nn.Module):
         ----------
         graph : DGLGraph
             Topology based on which message passing is performed.
-        feat : Float32 tensor of shape (V, 1)
+        feat : Float32 tensor of shape :math:`(V, 1)`
             Initial node features, which are atomic numbers in the paper.
-            V for the number of nodes.
-        distances : Float32 tensor of shape (E, 1)
+            :math:`V` for the number of nodes.
+        distances : Float32 tensor of shape :math:`(E, 1)`
             Distance between end nodes of edges. E for the number of edges.
 
         Returns
         -------
-        Float32 tensor of shape (V, K * T)
-            Updated node representations. V for the number of nodes, K for the
-            number of radial filters, and T for the number of types of atomic numbers.
+        Float32 tensor of shape :math:`(V, K * T)`
+            Updated node representations. :math:`V` for the number of nodes, :math:`K` for the
+            number of radial filters, and :math:`T` for the number of types of atomic numbers.
         """
         with graph.local_scope():
             radial_pooled_values = self.radial_pooling(distances)                # (K, E, 1)

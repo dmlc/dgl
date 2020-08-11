@@ -55,7 +55,7 @@ class DenseChebConv(nn.Module):
 
     See also
     --------
-    `ChebConv<https://docs.dgl.ai/api/python/nn.pytorch.html#chebconv>`
+    `ChebConv <https://docs.dgl.ai/api/python/nn.pytorch.html#chebconv>`__
     """
     def __init__(self,
                  in_feats,

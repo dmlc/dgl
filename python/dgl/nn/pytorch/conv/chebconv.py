@@ -18,26 +18,29 @@ class ChebConv(nn.Module):
     <https://arxiv.org/pdf/1606.09375.pdf>`__.
 
     .. math::
-        h_i^{l+1} = \sum_{k=0}^{K-1} W^{k, l}z_i^{k, l}
+        h_i^{l+1} &= \sum_{k=0}^{K-1} W^{k, l}z_i^{k, l}
 
-        Z^{0, l} = H^{l}
+        Z^{0, l} &= H^{l}
 
-        Z^{1, l} = \tilde{L} \cdot H^{l}
+        Z^{1, l} &= \tilde{L} \cdot H^{l}
 
-        Z^{k, l} = 2 \cdot \tilde{L} \cdot Z^{k-1, l} - Z^{k-2, l}
+        Z^{k, l} &= 2 \cdot \tilde{L} \cdot Z^{k-1, l} - Z^{k-2, l}
 
-        \tilde{L} = 2\left(I - \tilde{D}^{-1/2} \tilde{A} \tilde{D}^{-1/2}\right)/\lambda_{max} - I
+        \tilde{L} &= 2\left(I - \tilde{D}^{-1/2} \tilde{A} \tilde{D}^{-1/2}\right)/\lambda_{max} - I
+
+    where :math:`\tilde{A}` is :math:`A` + :math:`I`, :math:`W` is learnable weight.
+
 
     Parameters
     ----------
     in_feats: int
-        Dimension of input features :math:`h_i^{(l)}`.
+        Dimension of input features; i.e, the number of dimensions of :math:`h_i^{(l)}`.
     out_feats: int
         Dimension of output features :math:`h_i^{(l+1)}`.
     k : int
-        Chebyshev filter size.
+        Chebyshev filter size :math:`K`.
     activation : function, optional
-        Activation function, default is ReLu.
+        Activation function. Default ``ReLu``.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
 

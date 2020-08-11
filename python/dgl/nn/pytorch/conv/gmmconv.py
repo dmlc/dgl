@@ -21,25 +21,27 @@ class GMMConv(nn.Module):
     <http://openaccess.thecvf.com/content_cvpr_2017/papers/Monti_Geometric_Deep_Learning_CVPR_2017_paper.pdf>`__.
 
     .. math::
-        h_i^{l+1} = \mathrm{aggregate}\left(\left\{\frac{1}{K}
+        u_{ij} &= f(x_i, x_j), x_j \in \mathcal{N}(i)
+
+        w_k(u) &= \exp\left(-\frac{1}{2}(u-\mu_k)^T \Sigma_k^{-1} (u - \mu_k)\right)
+
+        h_i^{l+1} &= \mathrm{aggregate}\left(\left\{\frac{1}{K}
          \sum_{k}^{K} w_k(u_{ij}), \forall j\in \mathcal{N}(i)\right\}\right)
 
-        w_k(u) = \exp\left(-\frac{1}{2}(u-\mu_k)^T \Sigma_k^{-1} (u - \mu_k)\right)
-
-    where :math:`\mu` denotes the pseudo-coordinates between a vertex and one of its neighbor, :math:`\Sigma_k^{-1}` and :math:`\mu_k` are learnable parameters representing the covariance matrix and mean vector of a Gaussian kernel.
+    where :math:`u` denotes the pseudo-coordinates between a vertex and one of its neighbor, computed using function :math:`f`, :math:`\Sigma_k^{-1}` and :math:`\mu_k` are learnable parameters representing the covariance matrix and mean vector of a Gaussian kernel.
 
     Parameters
     ----------
     in_feats : int
-        Number of input features.
+        Number of input features; i.e., the number of dimensions of :math:`x_i`.
     out_feats : int
-        Number of output features.
+        Number of output features; i.e., the number of dimensions of :math:`h_i^{(l+1)}`.
     dim : int
-        Dimensionality of pseudo-coordinte.
+        Dimensionality of pseudo-coordinte; i.e, the number of dimensions of :math:`u_{ij}`.
     n_kernels : int
         Number of kernels :math:`K`.
     aggregator_type : str
-        Aggregator type (``sum``, ``mean``, ``max``).
+        Aggregator type (``sum``, ``mean``, ``max``). Default: ``sum``.
     residual : bool
         If True, use residual connection inside this layer. Default: ``False``.
     bias : bool
@@ -49,13 +51,14 @@ class GMMConv(nn.Module):
         since no message will be passed to those nodes. This is harmful for some applications
         causing silent performance regression. This module will raise a DGLError if it detects
         0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
-        and let the users handle it by themselves.
+        and let the users handle it by themselves. Default: ``False``.
 
     Notes
     -----
-    Zero in-degree nodes will lead to invalid output value. A common practice
-    to avoid this is to add a self-loop for each node in the graph if it is
-    homogeneous, which can be achieved by:
+    Zero in-degree nodes will lead to invalid output value. This is because no message
+    will be passed to those nodes, the aggregation function will be appied on empty input.
+    A common practice to avoid this is to add a self-loop for each node in the graph if
+    it is homogeneous, which can be achieved by:
 
     >>> g = ... # a DGLGraph
     >>> g = dgl.add_self_loop(g)
@@ -72,7 +75,7 @@ class GMMConv(nn.Module):
     >>> import torch as th
     >>> from dgl.nn import GMMConv
 
-    Case 1: Homogeneous graph
+    >>> # Case 1: Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> g = dgl.add_self_loop(g)
     >>> feat = th.ones(6, 10)
@@ -87,7 +90,7 @@ class GMMConv(nn.Module):
             [-0.3462, -0.2654],
             [-0.3462, -0.2654]], grad_fn=<AddBackward0>)
 
-    Case 2: Unidirectional bipartite graph
+    >>> # Case 2: Unidirectional bipartite graph
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
     >>> g = dgl.bipartite((u, v))

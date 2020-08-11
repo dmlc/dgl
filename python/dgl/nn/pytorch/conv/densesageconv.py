@@ -20,7 +20,7 @@ class DenseSAGEConv(nn.Module):
     in_feats : int
         Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
     out_feats : int
-        Output feature size; i.e, the number of dimensions of :math:`h_i^{(l+1)}.
+        Output feature size; i.e, the number of dimensions of :math:`h_i^{(l+1)}`.
     feat_drop : float, optional
         Dropout rate on features. Default: 0.
     bias : bool
@@ -57,7 +57,7 @@ class DenseSAGEConv(nn.Module):
 
     See also
     --------
-    `SAGEConv<https://docs.dgl.ai/api/python/nn.pytorch.html#sageconv>`
+    `SAGEConv <https://docs.dgl.ai/api/python/nn.pytorch.html#sageconv>`__
     """
     def __init__(self,
                  in_feats,

@@ -21,20 +21,19 @@ class DotGatConv(nn.Module):
         where :math:`\alpha_{ij}` is the attention score bewteen node :math:`i` and node :math:`j`:
 
         .. math::
-            \alpha_{i, j} = \mathrm{softmax_i}(e_{ij}^{l})
+            \alpha_{i, j} &= \mathrm{softmax_i}(e_{ij}^{l})
 
-            e_{ij}^{l} = ({W_i^{(l)} h_i^{(l)}})^T \cdot {W_j^{(l)} h_j^{(l)}}
+            e_{ij}^{l} &= ({W_i^{(l)} h_i^{(l)}})^T \cdot {W_j^{(l)} h_j^{(l)}}
 
         where :math:`W_i` and :math:`W_j` transform node :math:`i`'s and node :math:`j`'s
         features into the same dimension, so that when compute note features' similarity,
-        we can use dot-product.
+        it can use dot-product.
 
     Parameters
     ----------
     in_feats : int, or pair of ints
         Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
-
-        GATConv can be applied on homogeneous graph and unidirectional `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`. If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
+        DotGatConv can be applied on homogeneous graph and unidirectional `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`__. If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
         a scalar is given, the source and destination node feature size would take the
         same value.
@@ -45,13 +44,14 @@ class DotGatConv(nn.Module):
         since no message will be passed to those nodes. This is harmful for some applications
         causing silent performance regression. This module will raise a DGLError if it detects
         0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
-        and let the users handle it by themselves.
+        and let the users handle it by themselves. Default: ``False``.
 
     Notes
     -----
-    Zero in-degree nodes will lead to invalid output value. A common practice
-    to avoid this is to add a self-loop for each node in the graph if it is
-    homogeneous, which can be achieved by:
+    Zero in-degree nodes will lead to invalid output value. This is because no message
+    will be passed to those nodes, the aggregation function will be appied on empty input.
+    A common practice to avoid this is to add a self-loop for each node in the graph if
+    it is homogeneous, which can be achieved by:
 
     >>> g = ... # a DGLGraph
     >>> g = dgl.add_self_loop(g)
