@@ -161,6 +161,7 @@ def copy_v(g, x):
     return gsddmm(g, 'copy_rhs', None, x)
 
 
+# pylint: disable=unused-argument
 def copy_e(g, x):
     r"""Generalized SDDMM function that copies destination node features to edges."""
     return x
