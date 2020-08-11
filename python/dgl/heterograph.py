@@ -2274,7 +2274,7 @@ class DGLHeteroGraph(object):
             raise DGLError('Expect the source and destination node IDs to have the same type, ' \
                            'got {} and {}'.format(u_type, v_type))
 
-        if not isinstance(u, (int, Iterable)):
+        if not (isinstance(u, (numbers.Integral, Iterable)) or F.is_tensor(u)):
             raise DGLError('Expect the node IDs to have type int, tensor or sequence, '
                            'got {}'.format(type(u)))
 
@@ -2282,7 +2282,7 @@ class DGLHeteroGraph(object):
         num_src_type_nodes = self.num_nodes(src_type)
         num_dst_type_nodes = self.num_nodes(dst_type)
 
-        if isinstance(u, int):
+        if isinstance(u, numbers.Integral):
             if u < 0 or u >= num_src_type_nodes:
                 raise DGLError('Expect the source node ID to be a valid one, i.e. one from 0, ...'
                                ', {:d}, got {:d}'.format(num_src_type_nodes - 1, u))
@@ -2294,13 +2294,14 @@ class DGLHeteroGraph(object):
                 raise DGLError('Expect the source and destination node IDs to have the same '
                                'length, got {:d} and {:d}'.format(len(u), len(v)))
 
-        if not F.is_tensor(u) and isinstance(u, Iterable):
+        if not (F.is_tensor(u) or isinstance(u, numbers.Integral)):
             utils.detect_nan_in_iterable(u, 'the source node IDs')
             utils.detect_nan_in_iterable(v, 'the destination node IDs')
 
             utils.detect_inf_in_iterable(u, 'the source node IDs')
             utils.detect_inf_in_iterable(v, 'the destination node IDs')
 
+        if isinstance(u, Iterable) or F.is_tensor(u):
             utils.assert_nonnegative_iterable(u, 'the source node IDs')
             utils.assert_nonnegative_iterable(v, 'the destination node IDs')
 
@@ -2615,6 +2616,27 @@ class DGLHeteroGraph(object):
         in_edges
         out_edges
         """
+        if not (isinstance(v, (numbers.Integral, Iterable)) or F.is_tensor(v)):
+            raise DGLError('Expect v to have type int, tensor or sequence, '
+                           'got {}'.format(type(v)))
+
+        _, _, dst_type = self.to_canonical_etype(etype)
+        num_dst_type_nodes = self.num_nodes(dst_type)
+
+        if isinstance(v, numbers.Integral) and (v < 0 or v >= num_dst_type_nodes):
+            raise DGLError('Expect the destination node ID to be from 0, ...'
+                           ', {:d}, got {:d}'.format(num_dst_type_nodes - 1, v))
+
+        if not F.is_tensor(v) and isinstance(v, Iterable):
+            utils.detect_nan_in_iterable(v, 'the destination node IDs')
+            utils.detect_inf_in_iterable(v, 'the destination node IDs')
+
+        if F.is_tensor(v) or isinstance(v, Iterable):
+            utils.assert_nonnegative_iterable(v, 'the destination node IDs')
+            utils.assert_iterable_bounded_by_value(
+                v, 'the destination node IDs', num_dst_type_nodes,
+                'the number of {} nodes'.format(dst_type))
+
         v = utils.prepare_tensor(self, v, 'v')
         src, dst, eid = self._graph.in_edges(self.get_etype_id(etype), v)
         if form == 'all':
