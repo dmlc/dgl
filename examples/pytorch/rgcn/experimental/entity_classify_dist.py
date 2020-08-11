@@ -110,9 +110,9 @@ class EntityClassify(nn.Module):
         return h
 
 def init_emb(shape, dtype):
-            arr = th.zeros(shape, dtype=dtype)
-            arr.uniform_(-1, 1)
-            return arr
+    arr = th.zeros(shape, dtype=dtype)
+    arr.uniform_(-1, 1)
+    return arr
 
 class DistEmbedLayer(nn.Module):
     r"""Embedding layer for featureless heterograph.
