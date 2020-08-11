@@ -313,8 +313,6 @@ class DistGraph:
 
     Parameters
     ----------
-    ip_config : str
-        Path of IP configuration file.
     graph_name : str
         The name of the graph. This name has to be the same as the one used in DistGraphServer.
     gpb : PartitionBook
@@ -322,8 +320,7 @@ class DistGraph:
     part_config : str
         The partition config file. It's used in the standalone mode.
     '''
-    def __init__(self, ip_config, graph_name, gpb=None, part_config=None):
-        self.ip_config = ip_config
+    def __init__(self, graph_name, gpb=None, part_config=None):
         self.graph_name = graph_name
         self._gpb_input = gpb
         if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
@@ -369,10 +366,10 @@ class DistGraph:
         self._client.map_shared_data(self._gpb)
 
     def __getstate__(self):
-        return self.ip_config, self.graph_name, self._gpb
+        return self.graph_name, self._gpb
 
     def __setstate__(self, state):
-        self.ip_config, self.graph_name, self._gpb_input = state
+        self.graph_name, self._gpb_input = state
         self._init()
 
         self._ndata = NodeDataView(self)
@@ -431,7 +428,7 @@ class DistGraph:
         Examples
         --------
 
-        >>> g = DistGraph("ip_config.txt", "test")
+        >>> g = DistGraph("test")
         >>> g.ntypes
         ['_U']
         """
@@ -449,7 +446,7 @@ class DistGraph:
         Examples
         --------
 
-        >>> g = DistGraph("ip_config.txt", "test")
+        >>> g = DistGraph("test")
         >>> g.etypes
         ['_E']
         """

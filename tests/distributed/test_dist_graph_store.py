@@ -71,7 +71,7 @@ def run_client(graph_name, part_id, num_clients, num_nodes, num_edges):
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                                           part_id, None)
-    g = DistGraph("kv_ip_config.txt", graph_name, gpb=gpb)
+    g = DistGraph(graph_name, gpb=gpb)
     check_dist_graph(g, num_clients, num_nodes, num_edges)
 
 def check_dist_graph(g, num_clients, num_nodes, num_edges):
@@ -251,8 +251,7 @@ def test_standalone():
     partition_graph(g, graph_name, num_parts, '/tmp/dist_graph')
 
     dgl.distributed.initialize("kv_ip_config.txt")
-    dist_g = DistGraph("kv_ip_config.txt", graph_name,
-                       part_config='/tmp/dist_graph/{}.json'.format(graph_name))
+    dist_g = DistGraph(graph_name, part_config='/tmp/dist_graph/{}.json'.format(graph_name))
     check_dist_graph(dist_g, 1, g.number_of_nodes(), g.number_of_edges())
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
 

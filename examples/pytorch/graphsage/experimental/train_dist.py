@@ -264,7 +264,7 @@ def main(args):
         th.distributed.init_process_group(backend='gloo')
 
     dgl.distributed.initialize(args.ip_config, num_workers=args.num_workers)
-    g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, part_config=args.part_config)
+    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
     print('rank:', g.rank())
 
     pb = g.get_partition_book()

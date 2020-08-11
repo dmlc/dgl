@@ -350,7 +350,7 @@ def main(args):
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
     dgl.distributed.initialize(args.ip_config, num_workers=args.num_workers)
-    g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, part_config=args.part_config)
+    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
     print('rank:', g.rank())
     print('number of edges', g.number_of_edges())
 
