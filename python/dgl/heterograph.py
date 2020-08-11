@@ -2331,43 +2331,56 @@ class DGLHeteroGraph(object):
         return self.has_edges_between(u, v, etype)
 
     def predecessors(self, v, etype=None):
-        """Return the predecessors of node `v` in the graph with the specified
-        edge type.
+        """Return the predecessor(s) of some particular node(s) with the specified edge type.
 
-        Node `u` is a predecessor of `v` if an edge `(u, v)` with type `etype`
-        exists in the graph.
+        Node ``u`` is a predecessor of node ``v`` if there is an edge ``(u, v)`` with type
+        ``etype`` in the graph.
 
         Parameters
         ----------
         v : int
-            The destination node.
+            The destination node for query.
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
-        tensor
-            Array of predecessor node IDs with the specified edge type.
+        Tensor
+            The predecessors of :attr:`v` with the specified edge type.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
         >>> import dgl
-        >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        >>>     ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+        >>> import torch
+
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 1, 2, 3])))
+
+        Query for node 1.
+
+        >>> g.predecessors(1)
+        tensor([0, 0])
+
+        For a graph of multiple edge types, it is required to specify the edge type in query.
+
+        >>> hg = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
         >>> })
-        >>> g.predecessors(0, 'plays')
-        tensor([0, 1])
-        >>> g.predecessors(0, 'develops')
+        >>> hg.predecessors(1, etype='follows')
         tensor([0])
 
         See Also
         --------
         successors
         """
+        utils.check_type(v, numbers.Integral, 'v', skip_none=False)
         return self._graph.predecessors(self.get_etype_id(etype), v)
 
     def successors(self, v, etype=None):

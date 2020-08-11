@@ -587,7 +587,7 @@ class EdgeCollator(Collator):
                 'please return a dict in negative sampler.'
             neg_srcdst = {self.g.canonical_etypes[0]: neg_srcdst}
         neg_edges = {
-            etype: neg_srcdst.get(etype, []) for etype in self.g.canonical_etypes}
+            etype: neg_srcdst.get(etype, ([], [])) for etype in self.g.canonical_etypes}
         neg_pair_graph = heterograph(
             neg_edges, {ntype: self.g.number_of_nodes(ntype) for ntype in self.g.ntypes})
 
