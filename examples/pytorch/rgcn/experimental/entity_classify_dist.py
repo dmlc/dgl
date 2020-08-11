@@ -109,6 +109,11 @@ class EntityClassify(nn.Module):
             h = layer(block, h, block.edata['etype'], block.edata['norm'])
         return h
 
+def init_emb(shape, dtype):
+            arr = th.zeros(shape, dtype=dtype)
+            arr.uniform_(-1, 1)
+            return arr
+
 class DistEmbedLayer(nn.Module):
     r"""Embedding layer for featureless heterograph.
     Parameters
@@ -142,11 +147,6 @@ class DistEmbedLayer(nn.Module):
         self.embed_size = embed_size
         self.embed_name = embed_name
         self.sparse_emb = sparse_emb
-
-        def init_emb(shape, dtype):
-            arr = th.zeros(shape, dtype=dtype)
-            arr.uniform_(-1, 1)
-            return arr
 
         if sparse_emb:
             self.node_embeds = dgl.distributed.DistEmbedding(g,

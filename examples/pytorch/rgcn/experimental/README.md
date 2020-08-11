@@ -17,13 +17,13 @@ python3 partition_graph.py --dataset ogbn-mag --num_parts 4 --balance_train --ba
 
 ### Step 2: copy the partitioned data to the cluster
 DGL provides a script for copying partitioned data to the cluster. The command below copies partition data
-to the machines in the cluster. The configuration of the cluster is defined by `ip_config.txt`,
-The data is copied to `~/rgcn/ogbn-mag` on each of the remote machines. `--part_config`
+to the machines in the cluster. The configuration of the cluster is defined by `ip_config.txt`.
+The data is copied to `~/rgcn/ogbn-mag` on each of the remote machines. `--rel_data_path` specifies the location of the partitioned data (generated in Step 1). `--part_config`
 specifies the location of the partitioned data in the local machine (a user only needs to specify
 the location of the partition configuration file).
 ```bash
 python3 ~/dgl/tools/copy_partitions.py --ip_config ip_config.txt \
-			--workspace ~/rgcn --rel_data_path ogbn-mag \
+			--workspace ~/rgcn --rel_data_path data \
 			--part_config data/ogbn-mag.json
 ```
 
@@ -39,10 +39,11 @@ specify relative paths to the path of the workspace.
 ```bash
 python3 ~/dgl/tools/launch.py \
 --workspace ~/rgcn/ \
---num_client 4 \
---part_config ogbn-mag/ogbn-mag.json \
+--num_trainers 1 \
+--num_samplers 4 \
+--part_config data/ogbn-mag.json \
 --ip_config ip_config.txt \
-"python3 entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 256 --n-hidden 64 --lr 0.01 --eval-batch-size 8 --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm"
+"python3 entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 256 --n-hidden 64 --lr 0.01 --eval-batch-size 8 --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --sparse-embedding --num-workers=4"
 ```
 
 ## Distributed code runs in the standalone mode
