@@ -59,7 +59,6 @@ To run unsupervised training:
 python3 ~/dgl/tools/launch.py \
 --workspace ~/graphsage/ \
 --num_trainers 1 \
---num_samplers 4 \
 --num_servers 1 \
 --part_config ogb-product/ogb-product.json \
 --ip_config ip_config.txt \
