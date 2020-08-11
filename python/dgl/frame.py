@@ -106,9 +106,12 @@ class Column(object):
     def data(self):
         """Return the feature data. Perform index selecting if needed."""
         if self.index is not None:
+            """copy index is usually cheaper than copy data"""
+            self.index = F.copy_to(self.index, F.context(self.storage))
             self.storage = F.gather_row(self.storage, self.index)
             self.index = None
 
+        """move data to the right device"""
         if self.device is not None:
             self.storage = F.copy_to(self.storage, self.device[0], **self.device[1])
             self.device = None
