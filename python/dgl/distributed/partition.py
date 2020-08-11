@@ -202,7 +202,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     The partitioned data is stored into multiple files.
 
     First, the metadata of the original graph and the partitioning is stored in a JSON file
-    named after `graph_name`. This JSON file contains the information of the originla graph
+    named after `graph_name`. This JSON file contains the information of the original graph
     as well as the file names that store each partition.
 
     The node assignment is stored in a separate file if we don't reshuffle node Ids to ensure
