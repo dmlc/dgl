@@ -306,6 +306,7 @@ def test_rgcn():
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
     rgc_basis_low.weight = rgc_basis.weight
     rgc_basis_low.w_comp = rgc_basis.w_comp
+    rgc_basis_low.loop_weight = rgc_basis.loop_weight
     h = th.randn((100, I)).to(ctx)
     r = th.tensor(etype).to(ctx)
     h_new = rgc_basis(g, h, r)
@@ -317,6 +318,7 @@ def test_rgcn():
     rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B).to(ctx)
     rgc_bdd_low = nn.RelGraphConv(I, O, R, "bdd", B, low_mem=True).to(ctx)
     rgc_bdd_low.weight = rgc_bdd.weight
+    rgc_bdd_low.loop_weight = rgc_bdd.loop_weight
     h = th.randn((100, I)).to(ctx)
     r = th.tensor(etype).to(ctx)
     h_new = rgc_bdd(g, h, r)
@@ -332,6 +334,7 @@ def test_rgcn():
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
     rgc_basis_low.weight = rgc_basis.weight
     rgc_basis_low.w_comp = rgc_basis.w_comp
+    rgc_basis_low.loop_weight = rgc_basis.loop_weight
     h = th.randn((100, I)).to(ctx)
     r = th.tensor(etype).to(ctx)
     h_new = rgc_basis(g, h, r, norm)
@@ -343,6 +346,7 @@ def test_rgcn():
     rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B).to(ctx)
     rgc_bdd_low = nn.RelGraphConv(I, O, R, "bdd", B, low_mem=True).to(ctx)
     rgc_bdd_low.weight = rgc_bdd.weight
+    rgc_bdd_low.loop_weight = rgc_bdd.loop_weight
     h = th.randn((100, I)).to(ctx)
     r = th.tensor(etype).to(ctx)
     h_new = rgc_bdd(g, h, r, norm)
@@ -356,6 +360,7 @@ def test_rgcn():
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
     rgc_basis_low.weight = rgc_basis.weight
     rgc_basis_low.w_comp = rgc_basis.w_comp
+    rgc_basis_low.loop_weight = rgc_basis.loop_weight
     h = th.randint(0, I, (100,)).to(ctx)
     r = th.tensor(etype).to(ctx)
     h_new = rgc_basis(g, h, r)

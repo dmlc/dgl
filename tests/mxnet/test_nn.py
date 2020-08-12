@@ -314,7 +314,7 @@ def test_dense_cheb_conv():
 
 @parametrize_dtype
 @pytest.mark.parametrize('norm_type', ['both', 'right', 'none'])
-@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 def test_dense_graph_conv(idtype, g, norm_type):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -692,9 +692,9 @@ def test_hetero_conv(agg, idtype):
         ('store', 'sells', 'game'): [(0, 0), (0, 3), (1, 1), (1, 2)]},
         idtype=idtype, device=F.ctx())
     conv = nn.HeteroGraphConv({
-        'follows': nn.GraphConv(2, 3),
-        'plays': nn.GraphConv(2, 4),
-        'sells': nn.GraphConv(3, 4)},
+        'follows': nn.GraphConv(2, 3, allow_zero_in_degree=True),
+        'plays': nn.GraphConv(2, 4, allow_zero_in_degree=True),
+        'sells': nn.GraphConv(3, 4, allow_zero_in_degree=True)},
         agg)
     conv.initialize(ctx=F.ctx())
     print(conv)
@@ -731,9 +731,9 @@ def test_hetero_conv(agg, idtype):
 
     # test with pair input
     conv = nn.HeteroGraphConv({
-        'follows': nn.SAGEConv(2, 3, 'mean'),
-        'plays': nn.SAGEConv((2, 4), 4, 'mean'),
-        'sells': nn.SAGEConv(3, 4, 'mean')},
+        'follows': nn.SAGEConv(2, 3, 'mean', allow_zero_in_degree=True),
+        'plays': nn.SAGEConv((2, 4), 4, 'mean', allow_zero_in_degree=True),
+        'sells': nn.SAGEConv(3, 4, 'mean', allow_zero_in_degree=True)},
         agg)
     conv.initialize(ctx=F.ctx())
 
