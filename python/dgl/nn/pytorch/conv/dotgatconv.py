@@ -3,7 +3,7 @@
 from torch import nn
 
 from .... import function as fn
-from ..softmax import edge_softmax
+from ....ops import edge_softmax
 from ....utils import expand_as_pair
 
 
@@ -83,6 +83,8 @@ class DotGatConv(nn.Module):
         else:
             h_src = feat
             feat_src = feat_dst = self.fc(h_src)
+            if graph.is_block:
+                feat_dst = feat_src[:graph.number_of_dst_nodes()]
 
         # Assign features to nodes
         graph.srcdata.update({'ft': feat_src})
@@ -94,11 +96,8 @@ class DotGatConv(nn.Module):
         # Step 2. edge softmax to compute attention scores
         graph.edata['sa'] = edge_softmax(graph, graph.edata['a'])
 
-        # Step 3. Broadcast softmax value to each edge, and then attention is done
-        graph.apply_edges(fn.u_mul_e('ft', 'sa', 'attn'))
-
-        # Step 4. Aggregate attention to dst,user nodes, so formula 7 is done
-        graph.update_all(fn.copy_e('attn', 'm'), fn.sum('m', 'agg_u'))
+        # Step 3. Broadcast softmax value to each edge, and aggregate dst node
+        graph.update_all(fn.u_mul_e('ft', 'sa', 'attn'), fn.sum('attn', 'agg_u'))
 
         # output results to the destination nodes
         rst = graph.dstdata['agg_u']
