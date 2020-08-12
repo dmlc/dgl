@@ -2445,6 +2445,7 @@ def test_frame(idtype):
     assert F.array_equal(sg._node_frames[0]._columns['h'].storage, g.ndata['h'])
     assert F.array_equal(sg._edge_frames[0]._columns['h'].storage, g.edata['h'])
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TensorFlow always create a new tensor")
 @unittest.skipIf(F._default_context_str == 'cpu', reason="cpu do not have context change problem")
 @parametrize_dtype
 def test_frame_device(idtype):
