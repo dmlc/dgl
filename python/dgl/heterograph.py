@@ -2074,10 +2074,44 @@ class DGLHeteroGraph(object):
     def is_multigraph(self):
         """Whether the graph is a multigraph
 
+        In a multigraph, there can be multiple edges from a node ``u`` to a node ``v``.
+
         Returns
         -------
         bool
-            True if the graph is a multigraph, False otherwise.
+            Whether the graph is a multigraph.
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Check for homogeneous graphs.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 3])))
+        >>> g.is_multigraph
+        False
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([1, 3, 3])))
+        >>> g.is_multigraph
+        True
+
+        Check for heterogeneous graphs.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3]))
+        >>> })
+        >>> g.is_multigraph
+        False
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1, 1]), torch.tensor([1, 2, 2])),
+        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3]))
+        >>> })
+        >>> g.is_multigraph
+        True
         """
         return self._graph.is_multigraph()
 

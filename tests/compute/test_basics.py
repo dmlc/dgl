@@ -157,7 +157,7 @@ def test_batch_setter_getter(idtype):
     assert _pfc(g.edata['l']) == truth
     u = F.tensor([0, 6, 0], g.idtype)
     v = F.tensor([6, 9, 7], g.idtype)
-    assert _pfc(g.edges[u, v].data['l']) == [0., 0., 0.]
+    assert _pfc(g.edges[u, v].data['l']) == [1.0, 1.0, 0.0]
 
 @parametrize_dtype
 def test_batch_setter_autograd(idtype):
