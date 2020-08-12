@@ -219,7 +219,7 @@ class RelGraphConv(layers.Layer):
         tf.Tensor
             New node features.
         """
-        assert g.is_homogeneous(), \
+        assert g.is_homogeneous, \
             "not a homogeneous graph; convert it with to_homogeneous " \
             "and pass in the edge type as argument"
         with g.local_scope():

@@ -78,7 +78,7 @@ class GatedGraphConv(nn.Module):
             is the output feature size.
         """
         with graph.local_scope():
-            assert graph.is_homogeneous(), \
+            assert graph.is_homogeneous, \
                 "not a homogeneous graph; convert it with to_homogeneous " \
                 "and pass in the edge type as argument"
             assert etypes.min() >= 0 and etypes.max() < self._n_etypes, \

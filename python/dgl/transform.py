@@ -430,7 +430,7 @@ def line_graph(g, backtracking=True, shared=False):
     ... (tensor([0, 1, 2, 4]), tensor([4, 0, 3, 1]))
 
     """
-    assert g.is_homogeneous(), \
+    assert g.is_homogeneous, \
         'line_heterograph only support directed homogeneous graph right now'
 
     dev = g.device

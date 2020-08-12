@@ -2116,6 +2116,42 @@ class DGLHeteroGraph(object):
         return self._graph.is_multigraph()
 
     @property
+    def is_homogeneous(self):
+        """Whether the graph is a homogeneous graph.
+
+        A homogeneous graph only has one node type and one edge type.
+
+        Returns
+        -------
+        bool
+            Whether the graph is a homogeneous graph.
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph for check.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 0, 2, 3])))
+        >>> g.is_homogeneous
+        True
+
+        Create a heterogeneous graph for check.
+
+        If the graph has multiple edge types, one need to specify the edge type.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3]))})
+        >>> g.is_homogeneous
+        False
+        """
+        return len(self.ntypes) == 1 and len(self.etypes) == 1
+
+    @property
     def is_readonly(self):
         """Deprecated: DGLGraph will always be mutable.
 
@@ -2609,15 +2645,25 @@ class DGLHeteroGraph(object):
         >>>            etype=('user', 'follows', 'game'))
         tensor([1, 2])
         """
-        u_type = type(u)
-        v_type = type(v)
-        if u_type != v_type:
-            raise DGLError('Expect the source and destination node IDs to have the same type, ' \
-                           'got {} and {}'.format(u_type, v_type))
-
+        # u and v can be of different types in the case of broadcasting
         if not (isinstance(u, (numbers.Integral, Iterable)) or F.is_tensor(u)):
-            raise DGLError('Expect the node IDs to have type int, tensor or sequence, '
+            raise DGLError('Expect the source node ID(s) to have type int, tensor or sequence, '
                            'got {}'.format(type(u)))
+        if not (isinstance(v, (numbers.Integral, Iterable)) or F.is_tensor(v)):
+            raise DGLError('Expect the destination node ID(s) to have type int, tensor or sequence, '
+                           'got {}'.format(type(v)))
+
+        if not isinstance(u, numbers.Integral) and not isinstance(v, numbers.Integral):
+            u_type = type(u)
+            v_type = type(v)
+            if u_type != v_type:
+                raise DGLError('Expect the source and destination node ID(s) to have the same '
+                               'type, got {} and {}'.format(u_type, v_type))
+            u_len = len(u)
+            v_len = len(v)
+            if u_len != v_len:
+                raise DGLError('Expect the source and destination node ID(s) to have the same '
+                               'length, got {:d} and {:d}'.format(u_len, v_len))
 
         src_type, _, dst_type = self.to_canonical_etype(etype)
         num_src_type_nodes = self.num_src_nodes(src_type)
@@ -2627,28 +2673,28 @@ class DGLHeteroGraph(object):
             if u < 0 or u >= num_src_type_nodes:
                 raise DGLError('Expect the source node ID to be a valid one, i.e. one from 0, ...'
                                ', {:d}, got {:d}'.format(num_src_type_nodes - 1, u))
+
+        if isinstance(v, numbers.Integral):
             if v < 0 or v >= num_dst_type_nodes:
                 raise DGLError('Expect the destination node ID to be a valid one, i.e. one '
                                'from 0, ..., {:d}, got {:d}'.format(num_dst_type_nodes - 1, v))
-        else:
-            if len(u) != len(v):
-                raise DGLError('Expect the source and destination node IDs to have the same '
-                               'length, got {:d} and {:d}'.format(len(u), len(v)))
 
         if not (F.is_tensor(u) or isinstance(u, numbers.Integral)):
             utils.detect_nan_in_iterable(u, 'the source node IDs')
-            utils.detect_nan_in_iterable(v, 'the destination node IDs')
-
             utils.detect_inf_in_iterable(u, 'the source node IDs')
+
+        if not (F.is_tensor(v) or isinstance(v, numbers.Integral)):
+            utils.detect_nan_in_iterable(v, 'the destination node IDs')
             utils.detect_inf_in_iterable(v, 'the destination node IDs')
 
         if isinstance(u, Iterable) or F.is_tensor(u):
             utils.assert_nonnegative_iterable(u, 'the source node IDs')
-            utils.assert_nonnegative_iterable(v, 'the destination node IDs')
-
             utils.assert_iterable_bounded_by_value(
                 u, 'the source node IDs', num_src_type_nodes,
                 'the number of {} nodes'.format(src_type))
+
+        if isinstance(v, Iterable) or F.is_tensor(v):
+            utils.assert_nonnegative_iterable(v, 'the destination node IDs')
             utils.assert_iterable_bounded_by_value(
                 v, 'the destination node IDs', num_dst_type_nodes,
                 'the number of {} nodes'.format(dst_type))
@@ -4638,10 +4684,6 @@ class DGLHeteroGraph(object):
         yield
         self._node_frames = old_nframes
         self._edge_frames = old_eframes
-
-    def is_homogeneous(self):
-        """Return if the graph is homogeneous."""
-        return len(self.ntypes) == 1 and len(self.etypes) == 1
 
     def formats(self, formats=None):
         r"""Get a cloned graph with the specified sparse format(s) or query

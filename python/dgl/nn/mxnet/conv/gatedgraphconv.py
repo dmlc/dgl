@@ -76,7 +76,7 @@ class GatedGraphConv(nn.Block):
             is the output feature size.
         """
         with graph.local_scope():
-            assert graph.is_homogeneous(), \
+            assert graph.is_homogeneous, \
                 "not a homogeneous graph; convert it with to_homogeneous " \
                 "and pass in the edge type as argument"
             zero_pad = nd.zeros((feat.shape[0], self._out_feats - feat.shape[1]),
