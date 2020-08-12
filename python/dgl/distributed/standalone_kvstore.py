@@ -4,6 +4,7 @@ This kvstore is used when running in the standalone mode
 """
 
 from .. import backend as F
+from .graph_partition_book import PartitionPolicy, NODE_PART_POLICY, EDGE_PART_POLICY
 
 class KVClient(object):
     ''' The fake KVStore client.
@@ -13,8 +14,14 @@ class KVClient(object):
     '''
     def __init__(self):
         self._data = {}
+        self._all_possible_part_policy = {}
         self._push_handlers = {}
         self._pull_handlers = {}
+
+    @property
+    def all_possible_part_policy(self):
+        """Get all possible partition policies"""
+        return self._all_possible_part_policy
 
     def barrier(self):
         '''barrier'''
@@ -31,9 +38,11 @@ class KVClient(object):
         '''add data to the client'''
         self._data[name] = tensor
 
-    def init_data(self, name, shape, dtype, _, init_func):
+    def init_data(self, name, shape, dtype, part_policy, init_func):
         '''add new data to the client'''
         self._data[name] = init_func(shape, dtype)
+        if part_policy.policy_str not in self._all_possible_part_policy:
+            self._all_possible_part_policy[part_policy.policy_str] = part_policy
 
     def delete_data(self, name):
         '''delete the data'''
@@ -63,3 +72,7 @@ class KVClient(object):
 
     def map_shared_data(self, partition_book):
         '''Mapping shared-memory tensor from server to client.'''
+        self._all_possible_part_policy[NODE_PART_POLICY] = PartitionPolicy(NODE_PART_POLICY,
+                                                                           partition_book)
+        self._all_possible_part_policy[EDGE_PART_POLICY] = PartitionPolicy(EDGE_PART_POLICY,
+                                                                           partition_book)

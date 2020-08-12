@@ -334,6 +334,7 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
         num_nodes_dict[ntype] = g.number_of_nodes(ntype)
 
     canonical_etypes = g.canonical_etypes
+    num_nodes_dict = {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes}
     # fast path
     if ignore_bipartite is False:
         subgs = {}
@@ -403,10 +404,15 @@ def line_graph(g, backtracking=True, shared=False):
     G : DGLHeteroGraph
         The line graph of this graph.
 
-    Examples:
-    A = [[0, 0, 1],
-            [1, 0, 1],
-            [1, 1, 0]]
+    Notes
+    -----
+    The implementation is done on CPU, even if the input and output graphs are on GPU.
+
+    Examples
+    --------
+    >>> A = [[0, 0, 1],
+    ...      [1, 0, 1],
+    ...      [1, 1, 0]]
     >>> g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]), 'user', 'follows')
     >>> lg = g.line_graph()
     >>> lg
@@ -427,7 +433,10 @@ def line_graph(g, backtracking=True, shared=False):
     """
     assert g.is_homogeneous(), \
         'line_heterograph only support directed homogeneous graph right now'
-    lg = DGLHeteroGraph(_CAPI_DGLHeteroLineGraph(g._graph, backtracking))
+
+    dev = g.device
+    lg = DGLHeteroGraph(_CAPI_DGLHeteroLineGraph(g._graph.copy_to(nd.cpu()), backtracking))
+    lg = lg.to(dev)
     if shared:
         # copy edge features
         lg.ndata.update(g.edata)
@@ -453,7 +462,6 @@ def khop_adj(g, k):
 
     Examples
     --------
-
     >>> import dgl
     >>> g = dgl.DGLGraph()
     >>> g.add_nodes(5)
@@ -863,6 +871,7 @@ def add_nodes(g, num, data=None, ntype=None):
     --------
 
     The following example uses PyTorch backend.
+
     >>> import dgl
     >>> import torch
 
@@ -965,6 +974,7 @@ def add_edges(g, u, v, data=None, etype=None):
     --------
 
     The following example uses PyTorch backend.
+
     >>> import dgl
     >>> import torch
     **Homogeneous Graphs or Heterogeneous Graphs with A Single Edge Type**
@@ -1538,10 +1548,12 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
     Examples
     --------
     Converting a homogeneous graph to a block as described above:
+
     >>> g = dgl.graph([(0, 1), (1, 2), (2, 3)])
     >>> block = dgl.to_block(g, torch.LongTensor([3, 2]))
 
     The right hand side nodes would be exactly the same as the ones given: [3, 2].
+
     >>> induced_dst = block.dstdata[dgl.NID]
     >>> induced_dst
     tensor([3, 2])
@@ -1549,6 +1561,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
     The first few nodes of the left hand side nodes would also be exactly the same as
     the ones given.  The rest of the nodes are the ones necessary for message passing
     into nodes 3, 2.  This means that the node 1 would be included.
+
     >>> induced_src = block.srcdata[dgl.NID]
     >>> induced_src
     tensor([3, 2, 1])
@@ -1557,22 +1570,26 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
     the right hand side nodes.
 
     The induced edges can also be obtained by the following:
+
     >>> block.edata[dgl.EID]
     tensor([2, 1])
 
     This indicates that edge (2, 3) and (1, 2) are included in the result graph.  We can
     verify that the first edge in the block indeed maps to the edge (2, 3), and the
     second edge in the block indeed maps to the edge (1, 2):
+
     >>> src, dst = block.edges(order='eid')
     >>> induced_src[src], induced_dst[dst]
     (tensor([2, 1]), tensor([3, 2]))
 
     Converting a heterogeneous graph to a block is similar, except that when specifying
     the right hand side nodes, you have to give a dict:
+
     >>> g = dgl.bipartite([(0, 1), (1, 2), (2, 3)], utype='A', vtype='B')
 
     If you don't specify any node of type A on the right hand side, the node type ``A``
     in the block would have zero nodes on the DST side.
+
     >>> block = dgl.to_block(g, {'B': torch.LongTensor([3, 2])})
     >>> block.number_of_dst_nodes('A')
     0
@@ -1582,10 +1599,12 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, copy_ndata=True, copy_e
     tensor([3, 2])
 
     The left hand side would contain all the nodes on the right hand side:
+
     >>> block.srcnodes['B'].data[dgl.NID]
     tensor([3, 2])
 
     As well as all the nodes that have connections to the nodes on the right hand side:
+
     >>> block.srcnodes['A'].data[dgl.NID]
     tensor([2, 1])
     """

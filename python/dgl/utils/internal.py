@@ -667,6 +667,11 @@ class FlattenedDict(object):
         group_sizes = {k: len(v) for k, v in groups.items()}
         self._group_keys, self._group_sizes = zip(*group_sizes.items())
         self._group_offsets = np.insert(np.cumsum(self._group_sizes), 0, 0)
+        # TODO: this is faster (37s -> 21s per epoch compared to searchsorted in GCMC) but takes
+        # O(E) memory.
+        self._idx_to_group = np.zeros(self._group_offsets[-1], dtype='int32')
+        for i in range(len(self._groups)):
+            self._idx_to_group[self._group_offsets[i]:self._group_offsets[i + 1]] = i
 
     def __len__(self):
         """Return the total number of items."""
@@ -680,10 +685,11 @@ class FlattenedDict(object):
 
     def __getitem__(self, idx):
         """Return the item at the given position with the key of its original group."""
-        i = np.searchsorted(self._group_offsets, idx, 'right') - 1
+        i = self._idx_to_group[idx]
         k = self._group_keys[i]
         j = idx - self._group_offsets[i]
-        return k, self._groups[k][j]
+        g = self._groups[k]
+        return k, g[j]
 
 def compensate(ids, origin_ids):
     """computing the compensate set of ids from origin_ids
