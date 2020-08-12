@@ -2219,7 +2219,8 @@ class DGLHeteroGraph(object):
         etype : str or tuple of str, optional
             The edge type for query, which can be an edge type (str) or a canonical edge type
             (3-tuple of str). When an edge type appears in multiple canonical edge types, one
-            must use a canonical edge type.
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
@@ -2244,18 +2245,24 @@ class DGLHeteroGraph(object):
         >>> import dgl
         >>> import torch
 
-        Create a graph with three canonical edge types.
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 0, 2, 3])))
+
+        Query for the edges.
+
+        >>> g.has_edges_between(1, 2)
+        True
+        >>> g.has_edges_between(torch.tensor([1, 2]), torch.tensor([2, 3]))
+        tensor([ True, False])
+
+        If the graph has multiple edge types, one need to specify the edge type.
 
         >>> g = dgl.heterograph({
         >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
         >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
         >>>     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
         >>> })
-
-        Query for edges.
-
-        >>> g.has_edges_between(1, 2, 'plays')
-        True
         >>> g.has_edges_between(torch.tensor([1, 2]), torch.tensor([2, 3]), 'plays')
         tensor([ True, False])
 
@@ -2445,66 +2452,142 @@ class DGLHeteroGraph(object):
                              return_uv=return_uv, etype=etype)
 
     def edge_ids(self, u, v, force_multi=None, return_uv=False, etype=None):
-        """Return all edge IDs between source node array `u` and destination
-        node array `v` with the specified edge type.
+        """Return the IDs of some particular edge(s) with the specified edge type.
 
         Parameters
         ----------
-        u : int, list, tensor
-            The node ID array of source type.
-        v : int, list, tensor
-            The node ID array of destination type.
+        u : source node ID(s)
+            The source node(s) of the edges for query. The allowed formats are:
+
+            - int: The source node of an edge for query.
+            - Tensor: A 1D tensor that contains the source node(s) of edge(s) for query, whose
+              data type an device should be separately the same as the idtype and device of
+              the graph. Its i-th element is the source node of the i-th edge for query.
+            - iterable[int] : Similar to the tensor, but stores node IDs in a sequence
+              (e.g. list, tuple, numpy.ndarray).
+        v : destination node ID(s)
+            The destination node(s) of the edges for query. It's a counterpart of :attr:`u`
+            for destination nodes and should have the same format as :attr:`u`. If :attr:`u`
+            and :attr:`v` are not int, they should have the same length.
         force_multi : bool, optional
-            Deprecated (Will be deleted in the future).
-            Whether to always treat the graph as a multigraph. See the
-            "Returns" for their effects. (Default: False)
-        return_uv : bool
-            See the "Returns" for their effects. (Default: False)
+            Deprecated, use :attr:`return_uv` instead. Whether to allow the graph to be a
+            multigraph, i.e. there can be multiple edges from one node to another.
+        return_uv : bool, optional
+            Whether to return the source and destination node IDs along with the edges. If
+            False (default), it assumes that the graph is a simple graph and there is at most
+            one edge from one node to another. If True, there can be multiple edges found
+            from one node to another.
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
         tensor, or (tensor, tensor, tensor)
 
-            * If ``return_uv=False``, return a single edge ID array ``e``.
-            ``e[i]`` is the edge ID between ``u[i]`` and ``v[i]``.
-
-            * Otherwise, return three arrays ``(eu, ev, e)``.  ``e[i]`` is the ID
-            of an edge between ``eu[i]`` and ``ev[i]``.  All edges between ``u[i]``
-            and ``v[i]`` are returned.
+            * If ``return_uv=False``, it returns a 1D tensor that contains the IDs of the edges.
+              If :attr:`u` and :attr:`v` are int, the tensor has length 1. Otherwise, the i-th
+              element of the tensor is the ID of the edge ``(u[i], v[i])``.
+            * If ``return_uv=True``, it returns a tuple of three 1D tensors ``(eu, ev, e)``.
+              ``e[i]`` is the ID of an edge from ``eu[i]`` to ``ev[i]``. It returns all edges
+              from ``eu[i]`` to ``ev[i]`` in this case.
 
         Notes
         -----
-        If the graph is a simple graph, ``return_uv=False``, and no edge
-        exists between some pairs of ``u[i]`` and ``v[i]``, the result is undefined
-        and an empty tensor is returned.
+        If the graph is a simple graph, ``return_uv=False``, and there are no edges
+        between some pairs of node(s), the result is undefined and it returns an empty tensor.
 
-        If the graph is a multi graph, ``return_uv=False``, and multi edges
-        exist between some pairs of `u[i]` and `v[i]`, the result is undefined.
+        If the graph is a multigraph, ``return_uv=False``, and there are multiple edges
+        between some pairs of node(s), the result is undefined.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        Instantiate a heterograph.
+        >>> import dgl
+        >>> import torch
 
-        >>> plays_g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1])})
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1, 1]), torch.tensor([1, 0, 2, 3, 2])))
+
+        Query for the edges.
+
+        >>> g.edge_ids(0, 0)
+        1
+        >>> g.edge_ids(torch.tensor([1, 0]), torch.tensor([3, 1]))
+        tensor([3, 0])
+
+        Get all edges for pairs of nodes.
+
+        >>> g.edge_ids(torch.tensor([1, 0]), torch.tensor([3, 1]), return_uv=True)
+        (tensor([1, 0]), tensor([3, 1]), tensor([3, 0]))
+
+        If the graph has multiple edge types, one need to specify the edge type.
+
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
-        >>>     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
         >>> })
+        >>> g.edge_ids(torch.tensor([1]), torch.tensor([2]), etype='plays')
+        tensor([0])
 
-        Query for edge ids.
+        Use a canonical edge type instead when there is ambiguity for an edge type.
 
-        >>> plays_g.edge_ids([0], [2], etype=('user', 'plays', 'game'))
-        tensor([], dtype=torch.int64)
-        >>> plays_g.edge_ids([1], [2], etype=('user', 'plays', 'game'))
-        tensor([2])
-        >>> g.edge_ids([1], [2], return_uv=True, etype=('user', 'follows', 'user'))
-        (tensor([1, 1]), tensor([2, 2]), tensor([1, 2]))
+        >>> g.edge_ids(torch.tensor([0, 1]), torch.tensor([1, 2]),
+        >>>            etype=('user', 'follows', 'user'))
+        tensor([0, 1])
+        >>> g.edge_ids(torch.tensor([1, 2]), torch.tensor([2, 3]),
+        >>>            etype=('user', 'follows', 'game'))
+        tensor([1, 2])
         """
+        u_type = type(u)
+        v_type = type(v)
+        if u_type != v_type:
+            raise DGLError('Expect the source and destination node IDs to have the same type, ' \
+                           'got {} and {}'.format(u_type, v_type))
+
+        if not (isinstance(u, (numbers.Integral, Iterable)) or F.is_tensor(u)):
+            raise DGLError('Expect the node IDs to have type int, tensor or sequence, '
+                           'got {}'.format(type(u)))
+
+        src_type, _, dst_type = self.to_canonical_etype(etype)
+        num_src_type_nodes = self.num_src_nodes(src_type)
+        num_dst_type_nodes = self.num_dst_nodes(dst_type)
+
+        if isinstance(u, numbers.Integral):
+            if u < 0 or u >= num_src_type_nodes:
+                raise DGLError('Expect the source node ID to be a valid one, i.e. one from 0, ...'
+                               ', {:d}, got {:d}'.format(num_src_type_nodes - 1, u))
+            if v < 0 or v >= num_dst_type_nodes:
+                raise DGLError('Expect the destination node ID to be a valid one, i.e. one '
+                               'from 0, ..., {:d}, got {:d}'.format(num_dst_type_nodes - 1, v))
+        else:
+            if len(u) != len(v):
+                raise DGLError('Expect the source and destination node IDs to have the same '
+                               'length, got {:d} and {:d}'.format(len(u), len(v)))
+
+        if not (F.is_tensor(u) or isinstance(u, numbers.Integral)):
+            utils.detect_nan_in_iterable(u, 'the source node IDs')
+            utils.detect_nan_in_iterable(v, 'the destination node IDs')
+
+            utils.detect_inf_in_iterable(u, 'the source node IDs')
+            utils.detect_inf_in_iterable(v, 'the destination node IDs')
+
+        if isinstance(u, Iterable) or F.is_tensor(u):
+            utils.assert_nonnegative_iterable(u, 'the source node IDs')
+            utils.assert_nonnegative_iterable(v, 'the destination node IDs')
+
+            utils.assert_iterable_bounded_by_value(
+                u, 'the source node IDs', num_src_type_nodes,
+                'the number of {} nodes'.format(src_type))
+            utils.assert_iterable_bounded_by_value(
+                v, 'the destination node IDs', num_dst_type_nodes,
+                'the number of {} nodes'.format(dst_type))
+
         is_int = isinstance(u, numbers.Integral) and isinstance(v, numbers.Integral)
         u = utils.prepare_tensor(self, u, 'u')
         v = utils.prepare_tensor(self, v, 'v')
