@@ -108,6 +108,7 @@ Getting Started
    api/python/dgl.ops
    api/python/dgl.function
    api/python/sampling
+   api/python/dgl.dataloading
 
 .. toctree::
    :maxdepth: 3

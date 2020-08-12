@@ -3,10 +3,10 @@ computation dependency of necessary nodes with neighborhood sampling methods.
 
 This includes
 
-* :py:class:`~dgl.dataloading.pytorch.NodeDataLoader`` for iterating over the nodes in
+* :py:class:`~dgl.dataloading.pytorch.NodeDataLoader` for iterating over the nodes in
   a graph in minibatches.
 
-* :py:class:`~dgl.dataloading.pytorch.EdgeDataLoader`` for iterating over the edges in
+* :py:class:`~dgl.dataloading.pytorch.EdgeDataLoader` for iterating over the edges in
   a graph in minibatches.
 
 * Various sampler classes that perform neighborhood sampling for multi-layer GNNs.
