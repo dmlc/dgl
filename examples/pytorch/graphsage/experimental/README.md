@@ -35,7 +35,7 @@ python3 partition_graph.py --dataset ogb-product --num_parts 4 --balance_train -
 DGL provides a script for copying partitioned data and files to the cluster. Before that, copy the training script to a local folder:
 
 ```bash
-mkdir dgl_code
+mkdir ~/dgl_code
 cp ~/dgl/examples/pytorch/graphsage/experimental/train_dist.py ~/dgl_code
 cp ~/dgl/examples/pytorch/graphsage/experimental/train_dist_unsupervised.py ~/dgl_code
 ```
