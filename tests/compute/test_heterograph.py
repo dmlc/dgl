@@ -64,9 +64,10 @@ def create_test_heterograph3(idtype):
         ('developer', 'develops', 'game'): (F.tensor([0, 1], dtype=idtype),
                                             F.tensor([0, 1], dtype=idtype))},
         idtype=idtype, device=F.ctx())
-    g.ndata['h'] = {'user' : F.copy_to(F.tensor([1, 1, 1], dtype=idtype), ctx=F.ctx()),
-                    'game' : F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx()),
-                    'developer' : F.copy_to(F.tensor([3, 3], dtype=idtype), ctx=F.ctx())}
+
+    g.nodes['user'].data['h'] = F.copy_to(F.tensor([1, 1, 1], dtype=idtype), ctx=F.ctx())
+    g.nodes['game'].data['h'] = F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())
+    g.nodes['developer'].data['h'] = F.copy_to(F.tensor([3, 3], dtype=idtype), ctx=F.ctx())
     g.edges['plays'].data['h'] = F.copy_to(F.tensor([1, 1, 1, 1], dtype=idtype), ctx=F.ctx())
     return g
 
@@ -77,8 +78,8 @@ def create_test_heterograph4(idtype):
         ('user', 'plays', 'game'): (F.tensor([0, 1], dtype=idtype),
                                     F.tensor([0, 1], dtype=idtype))},
         idtype=idtype, device=F.ctx())
-    g.ndata['h'] = {'user' : F.copy_to(F.tensor([1, 1, 1], dtype=idtype), ctx=F.ctx()),
-                    'game' : F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())}
+    g.nodes['user'].data['h'] = F.copy_to(F.tensor([1, 1, 1], dtype=idtype), ctx=F.ctx())
+    g.nodes['game'].data['h'] = F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())
     g.edges['follows'].data['h'] = F.copy_to(F.tensor([1, 2, 3, 4, 5, 6], dtype=idtype), ctx=F.ctx())
     g.edges['plays'].data['h'] = F.copy_to(F.tensor([1, 2], dtype=idtype), ctx=F.ctx())
     return g
@@ -587,20 +588,6 @@ def test_view(idtype):
     except Exception:
         fail = True
     assert fail
-    g.ndata['h'] = {'user' : f1,
-                    'game' : f2}
-    f3 = g.nodes['user'].data['h']
-    f4 = g.nodes['game'].data['h']
-    assert F.array_equal(f1, f3)
-    assert F.array_equal(f2, f4)
-    data = g.ndata['h']
-    assert F.array_equal(f1, data['user'])
-    assert F.array_equal(f2, data['game'])
-    # test repr
-    print(g.ndata)
-    g.ndata.pop('h')
-    # test repr
-    print(g.ndata)
 
     f3 = F.randn((2, 4))
     g.edges['user', 'follows', 'user'].data['h'] = f3
@@ -618,18 +605,6 @@ def test_view(idtype):
     except Exception:
         fail = True
     assert fail
-    g.edata['h'] = {('user', 'follows', 'user') : f3}
-    f4 = g.edges['user', 'follows', 'user'].data['h']
-    f5 = g.edges['follows'].data['h']
-    assert F.array_equal(f3, f4)
-    assert F.array_equal(f3, f5)
-    data = g.edata['h']
-    assert F.array_equal(f3, data[('user', 'follows', 'user')])
-    # test repr
-    print(g.edata)
-    g.edata.pop('h')
-    # test repr
-    print(g.edata)
 
     # test srcdata
     f1 = F.randn((3, 6))
@@ -639,28 +614,6 @@ def test_view(idtype):
     assert F.array_equal(g.srcnodes('user'), F.arange(0, 3, idtype))
     g.srcnodes['user'].data.pop('h')
 
-    # multi type ndata
-    f1 = F.randn((3, 6))
-    f2 = F.randn((2, 6))
-    fail = False
-    try:
-        g.srcdata['h'] = f1
-    except Exception:
-        fail = True
-    assert fail
-    g.srcdata['h'] = {'user' : f1,
-                      'developer' : f2}
-    f3 = g.srcnodes['user'].data['h']
-    f4 = g.srcnodes['developer'].data['h']
-    assert F.array_equal(f1, f3)
-    assert F.array_equal(f2, f4)
-    data = g.srcdata['h']
-    assert F.array_equal(f1, data['user'])
-    assert F.array_equal(f2, data['developer'])
-    # test repr
-    print(g.srcdata)
-    g.srcdata.pop('h')
-
     # test dstdata
     f1 = F.randn((3, 6))
     g.dstnodes['user'].data['h'] = f1       # ok
@@ -668,28 +621,6 @@ def test_view(idtype):
     assert F.array_equal(f1, f2)
     assert F.array_equal(g.dstnodes('user'), F.arange(0, 3, idtype))
     g.dstnodes['user'].data.pop('h')
-
-    # multi type ndata
-    f1 = F.randn((3, 6))
-    f2 = F.randn((2, 6))
-    fail = False
-    try:
-        g.dstdata['h'] = f1
-    except Exception:
-        fail = True
-    assert fail
-    g.dstdata['h'] = {'user' : f1,
-                      'game' : f2}
-    f3 = g.dstnodes['user'].data['h']
-    f4 = g.dstnodes['game'].data['h']
-    assert F.array_equal(f1, f3)
-    assert F.array_equal(f2, f4)
-    data = g.dstdata['h']
-    assert F.array_equal(f1, data['user'])
-    assert F.array_equal(f2, data['game'])
-    # test repr
-    print(g.dstdata)
-    g.dstdata.pop('h')
 
 @parametrize_dtype
 def test_view1(idtype):
@@ -819,15 +750,6 @@ def test_view1(idtype):
     f4 = HG.edges['follows'].data['h']
     assert F.array_equal(f3, f4)
     assert F.array_equal(g.edges(form='eid'), F.arange(0, 2, g.idtype))
-
-    # multiple types
-    ndata = HG.ndata['h']
-    assert isinstance(ndata, dict)
-    assert F.array_equal(ndata['user'], f2)
-
-    edata = HG.edata['h']
-    assert isinstance(edata, dict)
-    assert F.array_equal(edata[('user', 'follows', 'user')], f4)
 
 @parametrize_dtype
 def test_flatten(idtype):
@@ -2116,8 +2038,8 @@ def test_add_edges(idtype):
     g = dgl.heterograph({
         ('user', 'plays', 'game'): ([0, 1], [1, 2])
     }, idtype=idtype, device=F.ctx())
-    g.ndata['h'] = {'user' : F.copy_to(F.tensor([1, 1], dtype=idtype), ctx=F.ctx()),
-                    'game' : F.copy_to(F.tensor([2, 2, 2], dtype=idtype), ctx=F.ctx())}
+    g.nodes['user'].data['h'] = F.copy_to(F.tensor([1, 1], dtype=idtype), ctx=F.ctx())
+    g.nodes['game'].data['h'] = F.copy_to(F.tensor([2, 2, 2], dtype=idtype), ctx=F.ctx())
     g.edata['h'] = F.copy_to(F.tensor([1, 1], dtype=idtype), ctx=F.ctx())
     u = F.tensor([0, 2], dtype=idtype)
     v = F.tensor([2, 3], dtype=idtype)
@@ -2275,8 +2197,8 @@ def test_remove_edges(idtype):
     # has data
     g = dgl.heterograph(
         {('user', 'plays', 'game'): ([0, 1], [1, 2])}, idtype=idtype, device=F.ctx())
-    g.ndata['h'] = {'user' : F.copy_to(F.tensor([1, 1], dtype=idtype), ctx=F.ctx()),
-                    'game' : F.copy_to(F.tensor([2, 2, 2], dtype=idtype), ctx=F.ctx())}
+    g.nodes['user'].data['h'] = F.copy_to(F.tensor([1, 1], dtype=idtype), ctx=F.ctx())
+    g.nodes['game'].data['h'] = F.copy_to(F.tensor([2, 2, 2], dtype=idtype), ctx=F.ctx())
     g.edata['h'] = F.copy_to(F.tensor([1, 2], dtype=idtype), ctx=F.ctx())
     g.remove_edges(1)
     assert g.number_of_edges() == 1
