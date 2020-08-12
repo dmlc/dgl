@@ -426,6 +426,43 @@ class DistGraph:
         return self._edata
 
     @property
+    def idtype(self):
+        """The dtype of graph index
+
+        Returns
+        -------
+        backend dtype object
+            th.int32/th.int64 or tf.int32/tf.int64 etc.
+
+        See Also
+        --------
+        long
+        int
+        """
+        return self._g.idtype
+
+    @property
+    def device(self):
+        """Get the device context of this graph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
+        >>> print(g.device)
+        device(type='cpu')
+        >>> g = g.to('cuda:0')
+        >>> print(g.device)
+        device(type='cuda', index=0)
+
+        Returns
+        -------
+        Device context object
+        """
+        return self._g.device
+
+    @property
     def ntypes(self):
         """Return the list of node types of this graph.
 
