@@ -92,7 +92,8 @@ class DistDataLoader:
         self.collate_fn = collate_fn
         self.current_pos = 0
         if self.pool is not None:
-            self.queue = mp.Queue(maxsize=4)
+            self.m = mp.Manager()
+            self.queue = self.m.Queue(maxsize=4)
         else:
             self.queue = Queue(maxsize=queue_size)
         self.drop_last = drop_last
@@ -133,7 +134,7 @@ class DistDataLoader:
         for _ in range(num_reqs):
             self._request_next_batch()
         if self.recv_idxs < self.expected_idxs:
-            result = self.queue.get(timeout=9999)
+            result = self.queue.get(timeout=60)
             self.recv_idxs += 1
             self.num_pending -= 1
             return result
