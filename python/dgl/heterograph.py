@@ -4767,7 +4767,8 @@ class DGLHeteroGraph(object):
             utils.assert_iterable_bounded_by_value(
                 u, 'the source node IDs', num_src_type_nodes, 'the number of source nodes')
             utils.assert_iterable_bounded_by_value(
-                v, 'the destination node IDs', num_dst_type_nodes, 'the number of destination nodes')
+                v, 'the destination node IDs',
+                num_dst_type_nodes, 'the number of destination nodes')
         elif F.is_tensor(edges):
             utils.assert_nonnegative_iterable(edges, 'the edge IDs')
             utils.assert_iterable_bounded_by_value(
@@ -4794,22 +4795,28 @@ class DGLHeteroGraph(object):
 
     @property
     def device(self):
-        """Get the device context of this graph.
+        """Get the device of the graph.
+
+        Returns
+        -------
+        device context
+            The device of the graph, which should be a framework-specific device object
+            (e.g., torch.device).
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1])})
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph for demonstration.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
         >>> print(g.device)
         device(type='cpu')
-        >>> g = g.to('cuda:0')
-        >>> print(g.device)
-        device(type='cuda', index=0)
 
-        Returns
-        -------
-        Device context object
+        The case of heterogeneous graphs is the same.
         """
         return F.to_backend_ctx(self._graph.ctx)
 
