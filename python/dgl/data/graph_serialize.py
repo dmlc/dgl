@@ -1,12 +1,12 @@
 """For Graph Serialization"""
 from __future__ import absolute_import
 import os
-from .._deprecate.graph import DGLGraph
+from ..base import dgl_warning
 from ..heterograph import DGLHeteroGraph
 from .._ffi.object import ObjectBase, register_object
 from .._ffi.function import _init_api
 from .. import backend as F
-from .heterograph_serialize import HeteroGraphData, save_heterographs
+from .heterograph_serialize import save_heterographs
 
 _init_api("dgl.data.graph_serialize")
 
@@ -30,7 +30,7 @@ class GraphData(ObjectBase):
     """GraphData Object"""
 
     @staticmethod
-    def create(g: DGLGraph):
+    def create(g):
         """Create GraphData"""
         # TODO(zihao): support serialize batched graph in the future.
         assert g.batch_size == 1, "Batched DGLGraph is not supported for serialization"
@@ -52,9 +52,10 @@ class GraphData(ObjectBase):
         return _CAPI_MakeGraphData(ghandle, node_tensors, edge_tensors)
 
     def get_graph(self):
-        """Get DGLGraph from GraphData"""
+        """Get DGLHeteroGraph from GraphData"""
         ghandle = _CAPI_GDataGraphHandle(self)
-        g = DGLGraph(graph_data=ghandle, readonly=True)
+        hgi =_CAPI_DGLAsHeteroGraph(ghandle)
+        g = DGLHeteroGraph(hgi, ['_U'], ['_E'])
         node_tensors_items = _CAPI_GDataNodeTensors(self).items()
         edge_tensors_items = _CAPI_GDataEdgeTensors(self).items()
         for k, v in node_tensors_items:
@@ -66,7 +67,7 @@ class GraphData(ObjectBase):
 
 def save_graphs(filename, g_list, labels=None):
     r"""
-    Save DGLGraphs/DGLHeteroGraph and graph labels to file
+    Save DGLGraphs and graph labels to file
 
     Parameters
     ----------
@@ -104,27 +105,12 @@ def save_graphs(filename, g_list, labels=None):
             os.makedirs(f_path)
 
     g_sample = g_list[0] if isinstance(g_list, list) else g_list
-    if isinstance(g_sample, DGLGraph):
-        save_dglgraphs(filename, g_list, labels)
-    elif isinstance(g_sample, DGLHeteroGraph):
+    if type(g_sample) == DGLHeteroGraph: # Doesn't support DGLHeteroGraph's derived class
         save_heterographs(filename, g_list, labels)
     else:
         raise Exception(
             "Invalid argument g_list. Must be a DGLGraph or a list of DGLGraphs/DGLHeteroGraphs")
 
-
-def save_dglgraphs(filename, g_list, labels=None):
-    """Internal function to save DGLGraphs"""
-    if isinstance(g_list, DGLGraph):
-        g_list = [g_list]
-    if (labels is not None) and (len(labels) != 0):
-        label_dict = dict()
-        for key, value in labels.items():
-            label_dict[key] = F.zerocopy_to_dgl_ndarray(value)
-    else:
-        label_dict = None
-    gdata_list = [GraphData.create(g) for g in g_list]
-    _CAPI_SaveDGLGraphs_V0(filename, gdata_list, label_dict)
 
 
 def load_graphs(filename, idx_list=None):
@@ -162,6 +148,9 @@ def load_graphs(filename, idx_list=None):
 
     version = _CAPI_GetFileVersion(filename)
     if version == 1:
+        dgl_warning(
+            "You are loading a graph file saved by old version of dgl.  \
+            Please consider saving it again with the current format.")
         return load_graph_v1(filename, idx_list)
     elif version == 2:
         return load_graph_v2(filename, idx_list)
@@ -190,7 +179,6 @@ def load_graph_v1(filename, idx_list=None):
         label_dict[k] = F.zerocopy_from_dgl_ndarray(v)
 
     return [gdata.get_graph() for gdata in metadata.graph_data], label_dict
-
 
 def load_labels(filename):
     """
