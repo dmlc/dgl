@@ -142,7 +142,7 @@ class GINConv(nn.Module):
         """
         with graph.local_scope():
             if not self._allow_zero_in_degree:
-                if (graph.in_degrees() == 0).any() and
+                if (graph.in_degrees() == 0).any() and \
                 (self._aggregator_type not in ['sum', 'mean']):
                     raise DGLError('There are 0-in-degree nodes in the graph, '
                                    'output for those nodes will be invalid. '
