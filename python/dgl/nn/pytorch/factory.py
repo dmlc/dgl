@@ -141,7 +141,7 @@ class SegmentedKNNGraph(nn.Module):
 
     #pylint: disable=invalid-name
     def forward(self, x, segs):
-        """Forward computation.
+        r"""Forward computation.
 
         Parameters
         ----------

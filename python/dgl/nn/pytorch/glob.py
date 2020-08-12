@@ -25,7 +25,9 @@ class SumPooling(nn.Module):
 
     Notes
     -----
-        * Input: Could be one graph, or a batch of graphs. If using a batch of graphs, make sure nodes in all graphs have the same feature size, and concatenate nodes' feature together as the input.
+        Input: Could be one graph, or a batch of graphs. If using a batch of graphs,
+        make sure nodes in all graphs have the same feature size, and concatenate
+        nodes' feature together as the input.
 
     Examples
     --------
@@ -101,7 +103,9 @@ class AvgPooling(nn.Module):
 
     Notes
     -----
-        * Input: Could be one graph, or a batch of graphs. If using a batch of graphs, make sure nodes in all graphs have the same feature size, and concatenate nodes' feature together as the input.
+        Input: Could be one graph, or a batch of graphs. If using a batch of graphs,
+        make sure nodes in all graphs have the same feature size, and concatenate
+        nodes' feature together as the input.
 
     Examples
     --------
@@ -177,7 +181,9 @@ class MaxPooling(nn.Module):
 
     Notes
     -----
-        * Input: Could be one graph, or a batch of graphs. If using a batch of graphs, make sure nodes in all graphs have the same feature size, and concatenate nodes' feature together as the input.
+        Input: Could be one graph, or a batch of graphs. If using a batch of graphs,
+        make sure nodes in all graphs have the same feature size, and concatenate
+        nodes' feature together as the input.
 
     Examples
     --------
@@ -254,7 +260,9 @@ class SortPooling(nn.Module):
 
     Notes
     -----
-        * Input: Could be one graph, or a batch of graphs. If using a batch of graphs, make sure nodes in all graphs have the same feature size, and concatenate nodes' feature together as the input.
+        Input: Could be one graph, or a batch of graphs. If using a batch of graphs,
+        make sure nodes in all graphs have the same feature size, and concatenate
+        nodes' feature together as the input.
 
     Examples
     --------
