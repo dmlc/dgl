@@ -30,7 +30,8 @@ python3 ~/dgl/tools/copy_partitions.py \
 --ip_config ip_config.txt \
 --workspace ~/graphsage \
 --rel_data_path ogb-product \
---part_config data/ogb-product.json 
+--part_config data/ogb-product.json \
+--script_folder ~/dgl/examples/pytorch/graphsage
 ```
 
 **Note**: users need to make sure that the master node has right permission to ssh to all the other nodes.
