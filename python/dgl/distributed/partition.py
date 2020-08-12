@@ -81,6 +81,7 @@ import json
 import os
 import time
 import numpy as np
+import torch
 
 from .. import backend as F
 from ..base import NID, EID
