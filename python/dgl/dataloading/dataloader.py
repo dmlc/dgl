@@ -343,8 +343,8 @@ class NodeCollator(Collator):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
         blocks = self.block_sampler.sample_blocks(self.g, items)
-        output_nodes = blocks[-1].dstdata[NID]
-        input_nodes = blocks[0].srcdata[NID]
+        output_nodes = {nty: blocks[-1].nodes[nty].data[NID] for nty in blocks[-1].dsttypes}
+        input_nodes = {nty: blocks[0].nodes[nty].data[NID] for nty in blocks[0].srctypes}
 
         return input_nodes, output_nodes, blocks
 

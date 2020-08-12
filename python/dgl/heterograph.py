@@ -3707,29 +3707,44 @@ class DGLHeteroGraph(object):
     def node_attr_schemes(self, ntype=None):
         """Return the node feature schemes for the specified type.
 
-        Each feature scheme is a named tuple that stores the shape and data type
-        of the node feature.
+        The scheme of a feature describes the shape and data type of it.
 
         Parameters
         ----------
         ntype : str, optional
-            The node type. Can be omitted if there is only one node
-            type in the graph. Error will be raised otherwise.
-            (Default: None)
+            The node type for query. If the graph has multiple node types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
-        dict of str to schemes
-            The schemes of node feature columns.
+        dict[str, Scheme]
+            A dictionary mapping a feature name to its associated feature scheme.
 
         Examples
         --------
-        The following uses PyTorch backend.
+        The following example uses PyTorch backend.
 
-        >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1], [0, 2])})
-        >>> g.nodes['user'].data['h'] = torch.randn(3, 4)
+        >>> import dgl
+        >>> import torch
+
+        Query for a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> g.ndata['h1'] = torch.randn(3, 1)
+        >>> g.ndata['h2'] = torch.randn(3, 2)
+        >>> g.node_attr_schemes()
+        {'h1': Scheme(shape=(1,), dtype=torch.float32),
+         'h2': Scheme(shape=(2,), dtype=torch.float32)}
+
+        Query for a heterogeneous graph of multiple node types.
+
+        >>> g = dgl.heterograph({('user', 'plays', 'game'):
+        >>>                      (torch.tensor([1, 2]), torch.tensor([3, 4]))})
+        >>> g.nodes['user'].data['h1'] = torch.randn(3, 1)
+        >>> g.nodes['user'].data['h2'] = torch.randn(3, 2)
         >>> g.node_attr_schemes('user')
-        {'h': Scheme(shape=(4,), dtype=torch.float32)}
+        {'h1': Scheme(shape=(1,), dtype=torch.float32),
+         'h2': Scheme(shape=(2,), dtype=torch.float32)}
 
         See Also
         --------
@@ -3740,28 +3755,48 @@ class DGLHeteroGraph(object):
     def edge_attr_schemes(self, etype=None):
         """Return the edge feature schemes for the specified type.
 
-        Each feature scheme is a named tuple that stores the shape and data type
-        of the edge feature.
+        The scheme of a feature describes the shape and data type of it.
 
         Parameters
         ----------
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
-        dict of str to schemes
-            The schemes of edge feature columns.
+        dict[str, Scheme]
+            A dictionary mapping a feature name to its associated feature scheme.
 
         Examples
         --------
-        The following uses PyTorch backend.
+        The following example uses PyTorch backend.
 
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1])})
-        >>> g.edges['user', 'plays', 'game'].data['h'] = torch.randn(4, 4)
-        >>> g.edge_attr_schemes(('user', 'plays', 'game'))
-        {'h': Scheme(shape=(4,), dtype=torch.float32)}
+        >>> import dgl
+        >>> import torch
+
+        Query for a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> g.edata['h1'] = torch.randn(2, 1)
+        >>> g.edata['h2'] = torch.randn(2, 2)
+        >>> g.edge_attr_schemes()
+        {'h1': Scheme(shape=(1,), dtype=torch.float32),
+         'h2': Scheme(shape=(2,), dtype=torch.float32)}
+
+        Query for a heterogeneous graph of multiple edge types.
+
+        >>> g = dgl.heterograph({('user', 'plays', 'game'):
+        >>>                      (torch.tensor([1, 2]), torch.tensor([3, 4])),
+        >>>                      ('user', 'follows', 'user'):
+        >>>                      (torch.tensor([3, 4]), torch.tensor([5, 6]))})
+        >>> g.edges['plays'].data['h1'] = torch.randn(2, 1)
+        >>> g.edges['plays'].data['h2'] = torch.randn(2, 2)
+        >>> g.edge_attr_schemes('plays')
+        {'h1': Scheme(shape=(1,), dtype=torch.float32),
+         'h2': Scheme(shape=(2,), dtype=torch.float32)}
 
         See Also
         --------
