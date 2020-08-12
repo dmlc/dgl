@@ -14,6 +14,7 @@ __all__ = ["DistDataLoader"]
 def call_collate_fn(name, next_data):
     """Call collate function"""
     try:
+        print("call")
         result = DGL_GLOBAL_COLLATE_FNS[name](next_data)
         DGL_GLOBAL_MP_QUEUES[name].put(result)
     except Exception as e:
@@ -129,7 +130,8 @@ class DistDataLoader:
                 res.get()
 
     def __next__(self):
-        num_reqs = self.queue_size - self.num_pending
+        # num_reqs = self.queue_size - self.num_pending
+        num_reqs = 1
         for _ in range(num_reqs):
             self._request_next_batch()
         if self.recv_idxs < self.expected_idxs:
