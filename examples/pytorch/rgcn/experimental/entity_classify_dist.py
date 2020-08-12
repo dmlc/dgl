@@ -152,7 +152,8 @@ class DistEmbedLayer(nn.Module):
             self.node_embeds = dgl.distributed.DistEmbedding(g,
                                                              g.number_of_nodes(),
                                                              self.embed_size,
-                                                             'node_emb')
+                                                             'node_emb',
+                                                             init_emb)
         else:
             self.node_embeds = th.nn.Embedding(g.number_of_nodes(), self.embed_size)
             nn.init.uniform_(self.node_embeds.weight, -1.0, 1.0)
@@ -414,10 +415,10 @@ def run(args, device, data):
     #print(profiler.output_text())
 
 def main(args):
+    dgl.distributed.initialize(args.ip_config, num_workers=args.num_workers)
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
 
-    dgl.distributed.initialize(args.ip_config, num_workers=args.num_workers)
     g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, part_config=args.conf_path)
     print('rank:', g.rank())
     print('number of edges', g.number_of_edges())
