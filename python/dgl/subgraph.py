@@ -43,7 +43,7 @@ def node_subgraph(graph, nodes):
 
     Returns
     -------
-    G : DGLHeteroGraph
+    G : DGLGraph
         The subgraph.
 
         The nodes and edges in the subgraph are relabeled using consecutive
@@ -59,16 +59,18 @@ def node_subgraph(graph, nodes):
 
     Instantiate a heterograph.
 
-    >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-    >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-    >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+    >>> g = dgl.heterograph({
+    ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+    ...     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])})
     >>> # Set node features
     >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
     Get subgraphs.
 
     >>> g.subgraph({'user': [4, 5]})
-    An error occurs as these nodes do not exist.
+    Traceback (most recent call last):
+        ...
+    dgl._ffi.base.DGLError: ...
     >>> sub_g = g.subgraph({'user': [1, 2]})
     >>> print(sub_g)
     Graph(num_nodes={'user': 2, 'game': 0},
@@ -158,7 +160,7 @@ def edge_subgraph(graph, edges, preserve_nodes=False):
 
     Returns
     -------
-    G : DGLHeteroGraph
+    G : DGLGraph
         The subgraph.
 
         The nodes and edges are relabeled using consecutive integers from 0.
@@ -173,16 +175,18 @@ def edge_subgraph(graph, edges, preserve_nodes=False):
 
     Instantiate a heterograph.
 
-    >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-    >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-    >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+    >>> g = dgl.heterograph({
+    ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+    ...     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])})
     >>> # Set edge features
     >>> g.edges['follows'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
     Get subgraphs.
 
     >>> g.edge_subgraph({('user', 'follows', 'user'): [5, 6]})
-    An error occurs as these edges do not exist.
+    Traceback (most recent call last):
+        ...
+    dgl._ffi.base.DGLError: ...
     >>> sub_g = g.edge_subgraph({('user', 'follows', 'user'): [1, 2],
     >>>                          ('user', 'plays', 'game'): [2]})
     >>> print(sub_g)
@@ -255,7 +259,7 @@ def in_subgraph(g, nodes):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    g : DGLGraph
         Full graph structure.
     nodes : tensor or dict
         Node ids to sample neighbors from. The allowed types
@@ -264,12 +268,53 @@ def in_subgraph(g, nodes):
 
     Returns
     -------
-    DGLHeteroGraph
+    DGLGraph
         The subgraph.
 
-        One can retrieve the mapping from subgraph node/edge ID to parent
-        node/edge ID via ``dgl.NID`` and ``dgl.EID`` node/edge features of the
-        subgraph.
+        One can retrieve the mapping from subgraph edge ID to parent
+        edge ID via ``dgl.EID`` edge features of the subgraph.
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    Instantiate a heterograph.
+
+    >>> g = dgl.heterograph({
+    ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+    ...     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])})
+    >>> # Set edge features
+    >>> g.edges['follows'].data['h'] = torch.tensor([[0.], [1.], [2.]])
+
+    Get subgraphs.
+
+    >>> sub_g = g.in_subgraph({'user': [2], 'game': [2]})
+    >>> print(sub_g)
+    Graph(num_nodes={'game': 3, 'user': 3},
+          num_edges={('user', 'plays', 'game'): 1, ('user', 'follows', 'user'): 2},
+          metagraph=[('user', 'game', 'plays'), ('user', 'user', 'follows')])
+
+    Get the original node/edge indices.
+
+    >>> sub_g.edges['plays'].data[dgl.EID]
+    tensor([2])
+    >>> sub_g.edges['follows'].data[dgl.EID]
+    tensor([1, 2])
+
+    Get the copied edge features.
+
+    >>> sub_g.edges['follows'].data['h']
+    tensor([[1.],
+            [2.]])
+    >>> sub_g.edges['follows'].data['h'] += 1
+    >>> g.edges['follows'].data['h']          # Features are not shared.
+    tensor([[0.],
+            [1.],
+            [2.]])
+
+    See also
+    --------
+    out_subgraph
     """
     if g.is_block:
         raise DGLError('Extracting subgraph of a block graph is not allowed.')
@@ -303,7 +348,7 @@ def out_subgraph(g, nodes):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    g : DGLGraph
         Full graph structure.
     nodes : tensor or dict
         Node ids to sample neighbors from. The allowed types
@@ -312,12 +357,53 @@ def out_subgraph(g, nodes):
 
     Returns
     -------
-    DGLHeteroGraph
+    DGLGraph
         The subgraph.
 
-        One can retrieve the mapping from subgraph node/edge ID to parent
-        node/edge ID via ``dgl.NID`` and ``dgl.EID`` node/edge features of the
-        subgraph.
+        One can retrieve the mapping from subgraph edge ID to parent
+        edge ID via ``dgl.EID`` edge features of the subgraph.
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    Instantiate a heterograph.
+
+    >>> g = dgl.heterograph({
+    ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+    ...     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])})
+    >>> # Set edge features
+    >>> g.edges['follows'].data['h'] = torch.tensor([[0.], [1.], [2.]])
+
+    Get subgraphs.
+
+    >>> sub_g = g.out_subgraph({'user': [1]})
+    >>> print(sub_g)
+    Graph(num_nodes={'game': 3, 'user': 3},
+          num_edges={('user', 'plays', 'game'): 2, ('user', 'follows', 'user'): 2},
+          metagraph=[('user', 'game', 'plays'), ('user', 'user', 'follows')])
+
+    Get the original node/edge indices.
+
+    >>> sub_g.edges['plays'].data[dgl.EID]
+    tensor([1, 2])
+    >>> sub_g.edges['follows'].data[dgl.EID]
+    tensor([1, 2])
+
+    Get the copied edge features.
+
+    >>> sub_g.edges['follows'].data['h']
+    tensor([[1.],
+            [2.]])
+    >>> sub_g.edges['follows'].data['h'] += 1
+    >>> g.edges['follows'].data['h']          # Features are not shared.
+    tensor([[0.],
+            [1.],
+            [2.]])
+
+    See also
+    --------
+    in_subgraph
     """
     if g.is_block:
         raise DGLError('Extracting subgraph of a block graph is not allowed.')
@@ -356,7 +442,7 @@ def node_type_subgraph(graph, ntypes):
 
     Returns
     -------
-    G : DGLHeteroGraph
+    G : DGLGraph
         The subgraph.
 
     Examples
@@ -365,9 +451,9 @@ def node_type_subgraph(graph, ntypes):
 
     Instantiate a heterograph.
 
-    >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-    >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-    >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+    >>> g = dgl.heterograph({
+    ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+    ...     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])})
     >>> # Set node features
     >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
@@ -423,7 +509,7 @@ def edge_type_subgraph(graph, etypes):
 
     Returns
     -------
-    G : DGLHeteroGraph
+    G : DGLGraph
         The subgraph.
 
     Examples
@@ -432,9 +518,9 @@ def edge_type_subgraph(graph, etypes):
 
     Instantiate a heterograph.
 
-    >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-    >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-    >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+    >>> g = dgl.heterograph({
+    ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+    ...     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])})
     >>> # Set edge features
     >>> g.edges['follows'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 

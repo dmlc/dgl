@@ -8,6 +8,7 @@ from .. import transform
 from .randomwalks import random_walk
 from .neighbor import select_topk
 from ..base import EID
+from .. import utils
 
 
 class RandomWalkNeighborSampler(object):
@@ -59,6 +60,7 @@ class RandomWalkNeighborSampler(object):
     """
     def __init__(self, G, num_traversals, termination_prob,
                  num_random_walks, num_neighbors, metapath=None, weight_column='weights'):
+        assert G.device == F.cpu(), "Graph must be on CPU."
         self.G = G
         self.weight_column = weight_column
         self.num_random_walks = num_random_walks
@@ -99,6 +101,8 @@ class RandomWalkNeighborSampler(object):
             A homogeneous graph constructed by selecting neighbors for each given node according
             to the algorithm above.  The returned graph is on CPU.
         """
+        seed_nodes = utils.prepare_tensor(self.G, seed_nodes, 'seed_nodes')
+
         seed_nodes = F.repeat(seed_nodes, self.num_random_walks, 0)
         paths, _ = random_walk(
             self.G, seed_nodes, metapath=self.full_metapath, restart_prob=self.restart_prob)

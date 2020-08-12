@@ -75,15 +75,23 @@ class EdgeDataLoader(DataLoader):
         * ``reverse_id``,
         * ``reverse_types``
 
-        See the docstring in :class:`~dgl.dataloading.EdgeCollator`.
+        See the description of the argument with the same name in the docstring of
+        :class:`~dgl.dataloading.EdgeCollator` for more details.
     reverse_edge_ids : Tensor or dict[etype, Tensor], optional
-        See the docstring in :class:`~dgl.dataloading.EdgeCollator`.
+        The mapping from the original edge IDs to the ID of their reverse edges.
+
+        See the description of the argument with the same name in the docstring of
+        :class:`~dgl.dataloading.EdgeCollator` for more details.
     reverse_etypes : dict[etype, etype], optional
-        See the docstring in :class:`~dgl.dataloading.EdgeCollator`.
+        The mapping from the original edge types to their reverse edge types.
+
+        See the description of the argument with the same name in the docstring of
+        :class:`~dgl.dataloading.EdgeCollator` for more details.
     negative_sampler : callable, optional
         The negative sampler.
 
-        See the docstring in :class:`~dgl.dataloading.EdgeCollator`.
+        See the description of the argument with the same name in the docstring of
+        :class:`~dgl.dataloading.EdgeCollator` for more details.
     kwargs : dict
         Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
 

@@ -150,7 +150,7 @@ class BlockSampler(object):
 
     Notes
     -----
-    For the concept of frontiers and blocks, please refer to User Guide Section 6.
+    For the concept of frontiers and blocks, please refer to User Guide Section 6 [TODO].
     """
     def __init__(self, num_layers, return_eids):
         self.num_layers = num_layers
@@ -180,7 +180,7 @@ class BlockSampler(object):
 
         Notes
         -----
-        For the concept of frontiers and blocks, please refer to User Guide Section 6.
+        For the concept of frontiers and blocks, please refer to User Guide Section 6 [TODO].
         """
         raise NotImplementedError
 
@@ -206,7 +206,7 @@ class BlockSampler(object):
 
         Notes
         -----
-        For the concept of frontiers and blocks, please refer to User Guide Section 6.
+        For the concept of frontiers and blocks, please refer to User Guide Section 6 [TODO].
         """
         blocks = []
         exclude_eids = (
@@ -258,7 +258,7 @@ class Collator(ABC):
 
     Notes
     -----
-    For the concept of blocks, please refer to User Guide Section 6.
+    For the concept of blocks, please refer to User Guide Section 6 [TODO].
     """
     @abstractproperty
     def dataset(self):
@@ -276,7 +276,7 @@ class Collator(ABC):
 
         Notes
         -----
-        For the concept of blocks, please refer to User Guide Section 6.
+        For the concept of blocks, please refer to User Guide Section 6 [TODO].
         """
         raise NotImplementedError
 

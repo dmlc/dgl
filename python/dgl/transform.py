@@ -59,7 +59,8 @@ def pairwise_squared_distance(x):
 
 #pylint: disable=invalid-name
 def knn_graph(x, k):
-    """Convert a tensor into k-nearest-neighbor (KNN) graph(s).
+    """Convert a tensor into k-nearest-neighbor (KNN) graph(s) according
+    to Euclidean distance.
 
     The function transforms the coordinates/features of a point set
     into a directed homogeneous graph.  The coordinates of the point
@@ -71,7 +72,7 @@ def knn_graph(x, k):
     destination node.
 
     If you give a 3D tensor, then each submatrix will be transformed
-    into a separate graph. The graphs will be unioned into a large
+    into a separate graph.  DGL then composes the graphs into a large
     graph of multiple connected components.
 
     Parameters
@@ -91,7 +92,7 @@ def knn_graph(x, k):
     DGLGraph
         The graph. The node IDs are in the same order as :attr:`x`.
 
-        The graph will be created on CPU, regardless of the context of input :attr:`x`.
+        The returned graph is on CPU, regardless of the context of input :attr:`x`.
 
     Examples
     --------
@@ -111,8 +112,8 @@ def knn_graph(x, k):
     >>> knn_g.edges()
     >>> (tensor([0, 1, 2, 2, 2, 3, 3, 3]), tensor([0, 1, 1, 2, 3, 0, 2, 3]))
 
-    When :attr:`x` is a 3D tensor, multiple KNN graphs are constructed
-    and then unioned into a graph of multiple connected components.
+    When :attr:`x` is a 3D tensor, DGL constructs multiple KNN graphs and
+    and then composes them into a graph of multiple connected components.
 
     >>> x1 = torch.tensor([[0.0, 0.0, 1.0],
     ...                    [1.0, 0.5, 0.5],
@@ -157,8 +158,8 @@ def segmented_knn_graph(x, k, segs):
     Each chunk of :attr:`x` contains coordinates/features of a point set.
     :attr:`segs` specifies the number of points in each point set. The
     function constructs a KNN graph for each point set, where the predecessors
-    of each point are its k-nearest neighbors. All KNN graphs will
-    then be unioned into a graph with multiple connected components.
+    of each point are its k-nearest neighbors. DGL then composes all KNN graphs
+    into a graph with multiple connected components.
 
     Parameters
     ----------
@@ -175,7 +176,7 @@ def segmented_knn_graph(x, k, segs):
     DGLGraph
         The graph. The node IDs are in the same order as :attr:`x`.
 
-        The graph will be created on CPU, regardless of the context of input :attr:`x`.
+        The returned graph is on CPU, regardless of the context of input :attr:`x`.
 
     Examples
     --------
@@ -227,15 +228,15 @@ def to_bidirected(g, readonly=None, copy_ndata=False):
     removing parallel edges.
 
     The function generates a new graph with no edge features.  In the new graph,
-    a single edge ``(u, v)`` exists if and only if either an edge connecting ``u``
-    to ``v`` or an edge connecting ``v`` to ``u`` exists in the original graph.
+    a single edge ``(u, v)`` exists if and only if there exists an edge connecting ``u``
+    to ``v`` or an edge connecting ``v`` to ``u`` in the original graph.
 
     For a heterogeneous graph with multiple edge types, DGL treats edges corresponding
     to each type as a separate graph and convert the graph to a bidirected one
     for each of them.
 
     Since :func:`to_bidirected` **is not well defined for unidirectional
-    bipartite graphs**, an error will be raised if an edge type whose source node type is
+    bipartite graphs**, DGL will raise an error if an edge type whose source node type is
     different from the destination node type exists.
 
     Parameters
@@ -472,7 +473,7 @@ def line_graph(g, backtracking=True, shared=False):
     Parameters
     ----------
     g : DGLGraph
-        Input graph.
+        Input graph.  Must be homogeneous.
     backtracking : bool, optional
         If False, the line graph node corresponding to edge ``(u, v)`` will not have
         an edge connecting to the line graph node corresponding to edge ``(v, u)``.
