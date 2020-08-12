@@ -1637,76 +1637,27 @@ class DGLHeteroGraph(object):
     def srcdata(self):
         """Return a node data view for setting/getting source node features.
 
-        Return the data view of all nodes in the SRC category.
-
-        If the source nodes have only one node type, ``g.srcdata['feat']``
-        gives the node feature data under name ``'feat'``.
-        If the source nodes have multiple node types, then
-        ``g.srcdata['feat']`` returns a dictionary where the key is
-        the source node type and the value is the node feature
-        tensor. If the source node type does not have feature
-        `'feat'`, it is not included in the dictionary.
+        Notes
+        -----
+        - This is only for setting/getting source node features for a graph of a single source
+          node type. To work with graphs of multiple source ndoe types, see
+          :func:`dgl.DGLGraph.srcnodes`.
+        - For setting features, the device of the features must be the same as the device
+          of the graph.
+        - This is identical to :func:`dgl.DGLGraph.ndata` if the graph is homogeneous.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        To set features of all source nodes in a graph with only one edge type:
-
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1], [1, 2])})
-        >>> g.srcdata['h'] = torch.zeros(2, 5)
-
-        This is equivalent to
-
-        >>> g.nodes['user'].data['h'] = torch.zeros(2, 5)
-
-        Also work on more complex uni-bipartite graph
-
-        >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game') : ([0, 1], [1, 2]),
-        ...     ('user', 'reads', 'book') : ([0, 1], [1, 0]),
-        ...     })
-        >>> print(g.is_unibipartite)
-        True
-        >>> g.srcdata['h'] = torch.zeros(2, 5)
-
-        To set features of all source nodes in a uni-bipartite graph
-        with multiple source node types:
-
-        >>> g = dgl.heterograph({
-        ...     ('game', 'liked-by', 'user') : ([1, 2], [0, 1]),
-        ...     ('book', 'liked-by', 'user') : ([0, 1], [1, 0]),
-        ...     })
-        >>> print(g.is_unibipartite)
-        True
-        >>> g.srcdata['h'] = {'game' : torch.zeros(3, 5),
-        ...                   'book' : torch.zeros(2, 5)}
+        >>> import dgl
+        >>> import torch
+        >>> g = dgl.heterograph({('user', 'plays', 'game'):
+        >>>                     (torch.tensor([0, 1]), torch.tensor([1, 2]))})
+        >>> g.srcdata['h'] = torch.ones(2, 1)
         >>> g.srcdata['h']
-        ... {'game': tensor([[0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.]]),
-        ...  'book': tensor([[0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.]])}
-
-        To set features of part of source nodes in a uni-bipartite graph
-        with multiple source node types:
-        >>> g = dgl.heterograph({
-        ...     ('game', 'liked-by', 'user') : ([1, 2], [0, 1]),
-        ...     ('book', 'liked-by', 'user') : ([0, 1], [1, 0]),
-        ...     })
-        >>> g.srcdata['h'] = {'game' : torch.zeros(3, 5)}
-        >>> g.srcdata['h']
-        >>> {'game': tensor([[0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.]])}
-        >>> # clean the feature 'h' and no source node type contains 'h'
-        >>> g.srcdata.pop('h')
-        >>> g.srcdata['h']
-        ... {}
-
-        Notes
-        -----
-        This is identical to :func:`dgl.DGLGraph.ndata` if the graph is homogeneous.
+        tensor([[1.],
+                [1.]])
 
         See Also
         --------
@@ -1724,90 +1675,44 @@ class DGLHeteroGraph(object):
 
     @property
     def dstdata(self):
-        """Return the data view of all destination nodes.
+        """Return a node data view for setting/getting destination node features.
 
-        If the destination nodes have only one node type,
-        ``g.dstdata['feat']`` gives the node feature data under name
-        ``'feat'``.
-        If the destination nodes have multiple node types, then
-        ``g.dstdata['feat']`` returns a dictionary where the key is
-        the destination node type and the value is the node feature
-        tensor. If the destination node type does not have feature
-        `'feat'`, it is not included in the dictionary.
+        Notes
+        -----
+        - This is only for setting/getting source node features for a graph of a single
+          destination node type. To work with graphs of multiple destination ndoe types, see
+          :func:`dgl.DGLGraph.dstnodes`.
+        - For setting features, the device of the features must be the same as the device
+          of the graph.
+        - This is identical to :func:`dgl.DGLGraph.ndata` if the graph is homogeneous.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        To set features of all source nodes in a graph with only one edge type:
-
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1], [1, 2])})
-        >>> g.dstdata['h'] = torch.zeros(3, 5)
-
-        This is equivalent to
-
-        >>> g.nodes['game'].data['h'] = torch.zeros(3, 5)
-
-        Also work on more complex uni-bipartite graph
-
-        >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game') : ([0, 1], [1, 2]),
-        ...     ('store', 'sells', 'game') : ([0, 1], [1, 0]),
-        ...     })
-        >>> print(g.is_unibipartite)
-        True
-        >>> g.dstdata['h'] = torch.zeros(3, 5)
-
-        To set features of all destination nodes in a uni-bipartite graph
-        with multiple destination node types::
-
-        >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game') : ([0, 1], [1, 2]),
-        ...     ('user', 'reads', 'book') : ([0, 1], [1, 0]),
-        ...     })
-        >>> print(g.is_unibipartite)
-        True
-        >>> g.dstdata['h'] = {'game' : torch.zeros(3, 5),
-        ...                   'book' : torch.zeros(2, 5)}
+        >>> import dgl
+        >>> import torch
+        >>> g = dgl.heterograph({('user', 'plays', 'game'):
+        >>>                     (torch.tensor([0, 1]), torch.tensor([1, 2]))})
+        >>> g.dstdata['h'] = torch.ones(3, 1)
         >>> g.dstdata['h']
-        ... {'game': tensor([[0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.]]),
-        ...  'book': tensor([[0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.]])}
-
-        To set features of part of destination nodes in a uni-bipartite graph
-        with multiple destination node types:
-        >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game') : ([0, 1], [1, 2]),
-        ...     ('user', 'reads', 'book') : ([0, 1], [1, 0]),
-        ...     })
-        >>> g.dstdata['h'] = {'game' : torch.zeros(3, 5)}
-        >>> g.dstdata['h']
-        ... {'game': tensor([[0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.]])}
-        >>> # clean the feature 'h' and no destination node type contains 'h'
-        >>> g.dstdata.pop('h')
-        >>> g.dstdata['h']
-        ... {}
-
-        Notes
-        -----
-        This is identical to :any:`DGLHeteroGraph.ndata` if the graph is homogeneous.
+        tensor([[1.],
+                [1.],
+                [1.]])
 
         See Also
         --------
         nodes
+        ndata
+        dstnodes
         """
         if len(self.dsttypes) == 1:
             ntype = self.dsttypes[0]
             ntid = self.get_ntype_id_from_dst(ntype)
             return HeteroNodeDataView(self, ntype, ntid, ALL)
         else:
-            ntypes = self.dsttypes
-            ntids = [self.get_ntype_id_from_dst(ntype) for ntype in ntypes]
-            return HeteroNodeDataView(self, ntypes, ntids, ALL)
+            raise DGLError('To set features for destination nodes in a graph with multiple '
+                           'destination node types, use dgl.DGLGraph.dstnodes')
 
     @property
     def edges(self):

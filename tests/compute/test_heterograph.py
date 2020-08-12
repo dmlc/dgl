@@ -91,8 +91,8 @@ def create_test_heterograph5(idtype):
         ('user', 'plays', 'game'): (F.tensor([0, 1], dtype=idtype),
                                     F.tensor([0, 1], dtype=idtype))},
         idtype=idtype, device=F.ctx())
-    g.ndata['h'] = {'user' : F.copy_to(F.tensor([1, 1, 1], dtype=idtype), ctx=F.ctx()),
-                    'game' : F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())}
+    g.nodes['user'].data['h'] = F.copy_to(F.tensor([1, 1, 1], dtype=idtype), ctx=F.ctx())
+    g.nodes['game'].data['h'] = F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())
     g.edges['follows'].data['h'] = F.copy_to(F.tensor([1, 2], dtype=idtype), ctx=F.ctx())
     g.edges['plays'].data['h'] = F.copy_to(F.tensor([1, 2], dtype=idtype), ctx=F.ctx())
     return g
