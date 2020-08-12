@@ -17,6 +17,9 @@ def _get_data_name(name, part_policy):
 def _default_init_data(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
 
+# These Ids can identify the anonymous distributed tensors.
+DIST_TENSOR_ID = 0
+
 class DistTensor:
     ''' Distributed tensor.
 
@@ -79,7 +82,9 @@ class DistTensor:
         # We need to generate the name in a deterministic way.
         if name is None:
             assert not persistent, 'We cannot generate anonymous persistent distributed tensors'
-            name = 'anonymous-' + str(len(exist_names) + 1)
+            global DIST_TENSOR_ID
+            name = 'anonymous-' + str(DIST_TENSOR_ID)
+            DIST_TENSOR_ID += 1
         self._name = _get_data_name(name, part_policy.policy_str)
         self._persistent = persistent
         if self._name not in exist_names:
