@@ -14,6 +14,8 @@ could like this:
 172.31.16.98
 ```
 
+Users need to make sure that the master node (node-0) has right permission to ssh to all the other nodes.
+
 ### Step 1: partition the graph.
 
 The example provides a script to partition some builtin graphs such as Reddit and OGB product graph.
@@ -24,7 +26,7 @@ We need to load some function from the parent directory.
 export PYTHONPATH=$PYTHONPATH:..
 ```
 
-In this example, we partition the OGB product graph into 4 parts with Metis. The partitions are balanced with respect to
+In this example, we partition the OGB product graph into 4 parts with Metis on node-0. The partitions are balanced with respect to
 the number of nodes, the number of edges and the number of labelled nodes.
 ```bash
 python3 partition_graph.py --dataset ogb-product --num_parts 4 --balance_train --balance_edges
@@ -52,7 +54,7 @@ python3 ~/dgl/tools/copy_partitions.py \
 --script_folder ~/dgl_code
 ```
 
-**Note**: users need to make sure that the master node has right permission to ssh to all the other nodes.
+After runing this command, user can find a folder called ``graphsage`` on each machine. The folder contains ``ip_config.txt``, ``dgl_code``, and ``ogb-product`` inside.
 
 ### Step 3: Launch distributed jobs
 
@@ -67,7 +69,7 @@ python3 ~/dgl/tools/launch.py \
 --num_servers 1 \
 --part_config ogb-product/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 train_dist.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 30 --batch_size 1000 --num_workers 4"
+"python3 dgl_code/train_dist.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 30 --batch_size 1000 --num_workers 4"
 ```
 
 To run unsupervised training:
@@ -79,7 +81,7 @@ python3 ~/dgl/tools/launch.py \
 --num_servers 1 \
 --part_config ogb-product/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 train_dist_unsupervised.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 3 --batch_size 1000"
+"python3 dgl_code/train_dist_unsupervised.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 3 --batch_size 1000"
 ```
 
 ## Distributed code runs in the standalone mode
