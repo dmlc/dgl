@@ -62,7 +62,7 @@ python3 ~/dgl/tools/launch.py \
 --num_servers 1 \
 --part_config ogb-product/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 ~/dgl/examples/pytorch/graphsage/experimental/train_dist_unsupervised.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 3 --batch_size 1000"
+"python3 train_dist_unsupervised.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 3 --batch_size 1000"
 ```
 
 ## Distributed code runs in the standalone mode
