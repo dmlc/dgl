@@ -145,18 +145,19 @@ def test_batch_setter_getter(idtype):
     truth = [0.] * 17
     truth[0] = truth[4] = truth[3] = truth[9] = truth[16] = 1.
     assert _pfc(g.edata['l']) == truth
-    # get partial edges (many-many)
+    u = F.tensor([3, 4, 6], g.idtype)
+    v = F.tensor([9, 9, 9], g.idtype)
+    g.edges[u, v].data['l'] = F.ones((3, D))
+    truth[5] = truth[7] = truth[11] = 1.
+    assert _pfc(g.edata['l']) == truth
+    u = F.tensor([0, 0, 0], g.idtype)
+    v = F.tensor([4, 5, 6], g.idtype)
+    g.edges[u, v].data['l'] = F.ones((3, D))
+    truth[6] = truth[8] = truth[10] = 1.
+    assert _pfc(g.edata['l']) == truth
     u = F.tensor([0, 6, 0], g.idtype)
     v = F.tensor([6, 9, 7], g.idtype)
-    assert _pfc(g.edges[u, v].data['l']) == [1., 1., 0.]
-    # get partial edges (many-one)
-    u = F.tensor([5, 6, 7], g.idtype)
-    v = F.tensor([9], g.idtype)
-    assert _pfc(g.edges[u, v].data['l']) == [1., 1., 0.]
-    # get partial edges (one-many)
-    u = F.tensor([0], g.idtype)
-    v = F.tensor([3, 4, 5], g.idtype)
-    assert _pfc(g.edges[u, v].data['l']) == [1., 1., 1.]
+    assert _pfc(g.edges[u, v].data['l']) == [0., 0., 0.]
 
 @parametrize_dtype
 def test_batch_setter_autograd(idtype):

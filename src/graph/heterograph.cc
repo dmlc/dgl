@@ -420,7 +420,7 @@ FlattenedHeteroGraphPtr HeteroGraph::FlattenImpl(const std::vector<dgl_type_t>& 
       dsttype_set.push_back(dsttype);
     }
   }
-  // Sort the node types so that we can compare the sets and decide whether a homograph
+  // Sort the node types so that we can compare the sets and decide whether a homogeneous graph
   // should be returned.
   std::sort(srctype_set.begin(), srctype_set.end());
   std::sort(dsttype_set.begin(), dsttype_set.end());

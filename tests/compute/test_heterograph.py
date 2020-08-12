@@ -43,7 +43,8 @@ def create_test_heterograph1(idtype):
     g0 = dgl.graph(edges, idtype=idtype, device=F.ctx())
     g0.ndata[dgl.NTYPE] = ntypes
     g0.edata[dgl.ETYPE] = etypes
-    return dgl.to_hetero(g0, ['user', 'game', 'developer'], ['follows', 'plays', 'wishes', 'develops'])
+    return dgl.to_heterogeneous(g0, ['user', 'game', 'developer'],
+                                ['follows', 'plays', 'wishes', 'develops'])
 
 def create_test_heterograph2(idtype):
     g = dgl.heterograph({
@@ -1021,7 +1022,7 @@ def test_convert(idtype):
         ws.append(w)
     hg.edges['plays'].data['x'] = F.randn((4, 3))
 
-    g = dgl.to_homo(hg)
+    g = dgl.to_homogeneous(hg)
     assert g.idtype == idtype
     assert g.device == hg.device
     assert F.array_equal(F.cat(hs, dim=0), g.ndata['h'])
@@ -1049,7 +1050,7 @@ def test_convert(idtype):
         ('developer', 'game', 'develops')])
 
     for _mg in [None, mg]:
-        hg2 = dgl.to_hetero(
+        hg2 = dgl.to_heterogeneous(
                 g, hg.ntypes, hg.etypes,
                 ntype_field=dgl.NTYPE, etype_field=dgl.ETYPE, metagraph=_mg)
         assert hg2.idtype == hg.idtype
@@ -1070,7 +1071,7 @@ def test_convert(idtype):
     g = dgl.graph(([0, 1, 2, 0], [2, 2, 3, 3]), idtype=idtype, device=F.ctx())
     g.ndata[dgl.NTYPE] = F.tensor([0, 0, 1, 2])
     g.edata[dgl.ETYPE] = F.tensor([0, 0, 1, 2])
-    hg = dgl.to_hetero(g, ['l0', 'l1', 'l2'], ['e0', 'e1', 'e2'])
+    hg = dgl.to_heterogeneous(g, ['l0', 'l1', 'l2'], ['e0', 'e1', 'e2'])
     assert hg.idtype == idtype
     assert hg.device == g.device
     assert set(hg.canonical_etypes) == set(
@@ -1090,7 +1091,7 @@ def test_convert(idtype):
     g.ndata[dgl.NTYPE] = F.tensor([0, 1, 2])
     g.edata[dgl.ETYPE] = F.tensor([0, 0])
     for _mg in [None, mg]:
-        hg = dgl.to_hetero(g, ['user', 'TV', 'movie'], ['watches'], metagraph=_mg)
+        hg = dgl.to_heterogeneous(g, ['user', 'TV', 'movie'], ['watches'], metagraph=_mg)
         assert hg.idtype == g.idtype
         assert hg.device == g.device
         assert set(hg.canonical_etypes) == set(
@@ -1106,7 +1107,7 @@ def test_convert(idtype):
     hg = dgl.heterograph({
         ('_U', '_E', '_V'): ([0, 1], [0, 1])
     }, {'_U': 2, '_V': 3}, idtype=idtype, device=F.ctx())
-    g = dgl.to_homo(hg)
+    g = dgl.to_homogeneous(hg)
     assert hg.idtype == g.idtype
     assert hg.device == g.device
     assert g.number_of_nodes() == 5
@@ -1667,7 +1668,7 @@ def test_isolated_ntype(idtype):
     G = dgl.graph(([0, 1, 2], [4, 5, 6]), num_nodes=11, idtype=idtype, device=F.ctx())
     G.ndata[dgl.NTYPE] = F.tensor([0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2], dtype=F.int64)
     G.edata[dgl.ETYPE] = F.tensor([0, 0, 0], dtype=F.int64)
-    g = dgl.to_hetero(G, ['A', 'B', 'C'], ['AB'])
+    g = dgl.to_heterogeneous(G, ['A', 'B', 'C'], ['AB'])
     assert g.number_of_nodes('A') == 3
     assert g.number_of_nodes('B') == 4
     assert g.number_of_nodes('C') == 4

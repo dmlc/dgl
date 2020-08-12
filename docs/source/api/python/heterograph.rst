@@ -21,8 +21,8 @@ Conversion to and from heterogeneous graphs
     bipartite_from_scipy
     bipartite_from_networkx
     heterograph
-    to_hetero
-    to_homo
+    to_heterogeneous
+    to_homogeneous
     to_networkx
     DGLHeteroGraph.adjacency_matrix
     DGLHeteroGraph.incidence_matrix

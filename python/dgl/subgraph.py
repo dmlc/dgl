@@ -453,7 +453,7 @@ def edge_type_subgraph(graph, etypes):
     node_type_subgraph
     """
     etype_ids = [graph.get_etype_id(etype) for etype in etypes]
-    # meta graph is homograph, still using int64
+    # meta graph is homogeneous graph, still using int64
     meta_src, meta_dst, _ = graph._graph.metagraph.find_edges(utils.toindex(etype_ids, "int64"))
     rel_graphs = [graph._graph.get_relation_graph(i) for i in etype_ids]
     meta_src = meta_src.tonumpy()

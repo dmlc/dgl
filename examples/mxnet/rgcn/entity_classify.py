@@ -85,7 +85,7 @@ def main(args):
         if ntype == category:
             category_id = i
 
-    g = dgl.to_homo(hg)
+    g = dgl.to_homogeneous(hg)
     num_nodes = g.number_of_nodes()
     node_ids = mx.nd.arange(num_nodes)
     edge_norm = g.edata['norm']

@@ -220,7 +220,8 @@ class RelGraphConv(layers.Layer):
             New node features.
         """
         assert g.is_homogeneous(), \
-            "not a homograph; convert it with to_homo and pass in the edge type as argument"
+            "not a homogeneous graph; convert it with to_homogeneous " \
+            "and pass in the edge type as argument"
         with g.local_scope():
             g.ndata['h'] = x
             g.edata['type'] = tf.cast(etypes, tf.int64)

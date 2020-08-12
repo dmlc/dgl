@@ -954,34 +954,35 @@ class DGLHeteroGraph(object):
             return self.ntypes
 
     def metagraph(self):
-        """Return the metagraph as networkx.MultiDiGraph.
+        """Return the metagraph of the heterograph.
 
-        The nodes are labeled with node type names.
-        The edges have their keys holding the edge type names.
+        A metagraph is a summary of the node and edge types in a heterograph.
+        Each node in the metagraph corresponds to a node type in the heterograph.
+        There is an edge from node A to node B in the metagraph if there are edges
+        from nodes of type A to nodes of type B in the heterograph.
 
         Returns
         -------
         networkx.MultiDiGraph
+            The metagraph.
 
         Examples
         --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
-        >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1])
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
         >>> })
         >>> meta_g = g.metagraph()
-
-        The metagraph then has two nodes and two edges.
-
         >>> meta_g.nodes()
         NodeView(('user', 'game'))
-        >>> meta_g.number_of_nodes()
-        2
         >>> meta_g.edges()
-        OutMultiEdgeDataView([('user', 'user'), ('user', 'game')])
-        >>> meta_g.number_of_edges()
-        2
+        OutMultiEdgeDataView([('user', 'user'), ('user', 'game'), ('user', 'game')])
         """
         nx_graph = self._graph.metagraph.to_networkx()
         nx_metagraph = nx.MultiDiGraph()

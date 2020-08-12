@@ -10,7 +10,7 @@ from . import heterograph_index
 from .heterograph import DGLHeteroGraph, combine_frames
 from . import graph_index
 from . import utils
-from .base import NTYPE, ETYPE, NID, EID, DGLError
+from .base import NTYPE, ETYPE, NID, EID, DGLError, dgl_warning
 
 __all__ = [
     'graph',
@@ -18,7 +18,9 @@ __all__ = [
     'hetero_from_relations',
     'hetero_from_shared_memory',
     'heterograph',
+    'to_heterogeneous',
     'to_hetero',
+    'to_homogeneous',
     'to_homo',
     'from_scipy',
     'bipartite_from_scipy',
@@ -470,8 +472,8 @@ def heterograph(data_dict,
 
     return retg.to(device)
 
-def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
-              metagraph=None):
+def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
+                     etype_field=ETYPE, metagraph=None):
     """Convert the given homogeneous graph to a heterogeneous graph.
 
     The input graph should have only one type of nodes and edges. Each node and edge
@@ -488,8 +490,8 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
 
     Parameters
     ----------
-    G : DGLHeteroGraph
-        Input homogeneous graph.
+    G : DGLGraph
+        The homogeneous graph.
     ntypes : list of str
         The node type names.
     etypes : list of str
@@ -506,8 +508,8 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
 
     Returns
     -------
-    DGLHeteroGraph
-        A heterograph. The parent node and edge ID are stored in the column
+    DGLGraph
+        A heterogeneous graph. The parent node and edge ID are stored in the column
         ``dgl.NID`` and ``dgl.EID`` respectively for all node/edge types.
 
     Notes
@@ -524,42 +526,42 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
     --------
 
     >>> import dgl
-    >>> hetero_g = dgl.heterograph({
+    >>> hg = dgl.heterograph({
     >>>     ('user', 'develops', 'activity'): ([0, 1], [1, 2]),
     >>>     ('developer', 'develops', 'game'): ([0, 1], [0, 1])
     >>> })
-    >>> print(hetero_g)
+    >>> print(hg)
     Graph(num_nodes={'user': 2, 'activity': 3, 'developer': 2, 'game': 2},
           num_edges={('user', 'develops', 'activity'): 2, ('developer', 'develops', 'game'): 2},
           metagraph=[('user', 'activity'), ('developer', 'game')])
 
     We first convert the heterogeneous graph to a homogeneous graph.
 
-    >>> homo_g = dgl.to_homo(hetero_g)
-    >>> print(homo_g)
+    >>> g = dgl.to_homogeneous(hg)
+    >>> print(g)
     Graph(num_nodes=9, num_edges=4,
           ndata_schemes={'_TYPE': Scheme(shape=(), dtype=torch.int64),
                          '_ID': Scheme(shape=(), dtype=torch.int64)}
           edata_schemes={'_TYPE': Scheme(shape=(), dtype=torch.int64),
                          '_ID': Scheme(shape=(), dtype=torch.int64)})
-    >>> homo_g.ndata
+    >>> g.ndata
     {'_TYPE': tensor([0, 0, 1, 1, 1, 2, 2, 3, 3]), '_ID': tensor([0, 1, 0, 1, 2, 0, 1, 0, 1])}
     Nodes 0, 1 for 'user', 2, 3, 4 for 'activity', 5, 6 for 'developer', 7, 8 for 'game'
-    >>> homo_g.edata
+    >>> g.edata
     {'_TYPE': tensor([0, 0, 1, 1]), '_ID': tensor([0, 1, 0, 1])}
     Edges 0, 1 for ('user', 'develops', 'activity'), 2, 3 for ('developer', 'develops', 'game')
 
     Now convert the homogeneous graph back to a heterogeneous graph.
 
-    >>> hetero_g_2 = dgl.to_hetero(homo_g, hetero_g.ntypes, hetero_g.etypes)
-    >>> print(hetero_g_2)
+    >>> hg_2 = dgl.to_heterogeneous(g, hg.ntypes, hg.etypes)
+    >>> print(hg_2)
     Graph(num_nodes={'user': 2, 'activity': 3, 'developer': 2, 'game': 2},
           num_edges={('user', 'develops', 'activity'): 2, ('developer', 'develops', 'game'): 2},
           metagraph=[('user', 'activity'), ('developer', 'game')])
 
     See Also
     --------
-    dgl.to_homo
+    to_homogeneous
     """
     # TODO(minjie): use hasattr to support DGLGraph input; should be fixed once
     #  DGLGraph is merged with DGLHeteroGraph
@@ -647,7 +649,17 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
 
     return hg
 
-def to_homo(G):
+def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
+              metagraph=None):
+    """Convert the given homogeneous graph to a heterogeneous graph.
+
+    DEPRECATED: Please use to_heterogeneous
+    """
+    dgl_warning("dgl.to_hetero is deprecated. Please use dgl.to_heterogeneous")
+    return to_heterogeneous(G, ntypes, etypes, ntype_field=ntype_field,
+                            etype_field=etype_field, metagraph=metagraph)
+
+def to_homogeneous(G):
     """Convert the given heterogeneous graph to a homogeneous graph.
 
     The returned graph has only one type of nodes and edges.
@@ -658,33 +670,33 @@ def to_homo(G):
 
     Parameters
     ----------
-    G : DGLHeteroGraph
-        Input heterogeneous graph.
+    G : DGLGraph
+        The heterogeneous graph.
 
     Returns
     -------
-    DGLHeteroGraph
+    DGLGraph
         A homogeneous graph. The parent node and edge type/ID are stored in
         columns ``dgl.NTYPE/dgl.NID`` and ``dgl.ETYPE/dgl.EID`` respectively.
 
     Examples
     --------
 
-    >>> hetero_g = dgl.heterograph({
+    >>> hg = dgl.heterograph({
     >>>     ('user', 'follows', 'user'): [[0, 1], [1, 2]],
     >>>     ('developer', 'develops', 'game'): [[0, 1], [0, 1]]
     >>> })
-    >>> homo_g = dgl.to_homo(hetero_g)
-    >>> homo_g.ndata
+    >>> g = dgl.to_homogeneous(hg)
+    >>> g.ndata
     {'_TYPE': tensor([0, 0, 0, 1, 1, 2, 2]), '_ID': tensor([0, 1, 2, 0, 1, 0, 1])}
     First three nodes for 'user', next two for 'developer' and the last two for 'game'
-    >>> homo_g.edata
+    >>> g.edata
     {'_TYPE': tensor([0, 0, 1, 1]), '_ID': tensor([0, 1, 0, 1])}
     First two edges for 'follows', next two for 'develops'
 
     See Also
     --------
-    dgl.to_hetero
+    to_heterogeneous
     """
     num_nodes_per_ntype = [G.number_of_nodes(ntype) for ntype in G.ntypes]
     offset_per_ntype = np.insert(np.cumsum(num_nodes_per_ntype), 0, 0)
@@ -731,6 +743,14 @@ def to_homo(G):
     retg.edata[EID] = F.copy_to(F.cat(eids, 0), G.device)
 
     return retg
+
+def to_homo(G):
+    """Convert the given heterogeneous graph to a homogeneous graph.
+
+    DEPRECATED: Please use to_homogeneous
+    """
+    dgl_warning("dgl.to_homo is deprecated. Please use dgl.to_homogeneous")
+    return to_homogeneous(G)
 
 def from_scipy(sp_mat,
                eweight_name=None,
