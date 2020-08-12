@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
-from .nnutils import cuda, line_graph
+from .nnutils import cuda
 import rdkit.Chem as Chem
 import dgl
-from dgl import mean_nodes
+from dgl import mean_nodes, line_graph
 import dgl.function as DGLF
 import os
 
@@ -93,13 +93,9 @@ def mol2dgl_single(cand_batch):
 
     return cand_graphs, torch.stack(atom_x), \
             torch.stack(bond_x) if len(bond_x) > 0 else torch.zeros(0), \
-            torch.IntTensor(tree_mess_source_edges), \
-            torch.IntTensor(tree_mess_target_edges), \
-            torch.IntTensor(tree_mess_target_nodes)
-
-
-mpn_loopy_bp_msg = DGLF.copy_src(src='msg', out='msg')
-mpn_loopy_bp_reduce = DGLF.sum(msg='msg', out='accum_msg')
+            torch.LongTensor(tree_mess_source_edges), \
+            torch.LongTensor(tree_mess_target_edges), \
+            torch.LongTensor(tree_mess_target_nodes)
 
 
 class LoopyBPUpdate(nn.Module):
@@ -224,19 +220,19 @@ class DGLJTMPN(nn.Module):
                 tgt_u, tgt_v = tree_mess_tgt_edges.unbind(1)
                 src_u = src_u.to(mol_tree_batch.device)
                 src_v = src_v.to(mol_tree_batch.device)
-                eid = mol_tree_batch.edge_ids(src_u.int(), src_v.int()).long()
+                eid = mol_tree_batch.edge_ids(src_u, src_v)
                 alpha = mol_tree_batch.edata['m'][eid]
                 cand_graphs.edges[tgt_u, tgt_v].data['alpha'] = alpha
             else:
                 src_u, src_v = tree_mess_src_edges.unbind(1)
                 src_u = src_u.to(mol_tree_batch.device)
                 src_v = src_v.to(mol_tree_batch.device)
-                eid = mol_tree_batch.edge_ids(src_u.int(), src_v.int()).long()
+                eid = mol_tree_batch.edge_ids(src_u, src_v)
                 alpha = mol_tree_batch.edata['m'][eid]
                 node_idx = (tree_mess_tgt_nodes
                             .to(device=zero_node_state.device)[:, None]
                             .expand_as(alpha))
-                node_alpha = zero_node_state.clone().scatter_add(0, node_idx.long(), alpha)
+                node_alpha = zero_node_state.clone().scatter_add(0, node_idx, alpha)
                 cand_graphs.ndata['alpha'] = node_alpha
                 cand_graphs.apply_edges(
                     func=lambda edges: {'alpha': edges.src['alpha']},
@@ -244,17 +240,14 @@ class DGLJTMPN(nn.Module):
 
         cand_line_graph.ndata.update(cand_graphs.edata)
         for i in range(self.depth - 1):
-            cand_line_graph.update_all(
-                mpn_loopy_bp_msg,
-                mpn_loopy_bp_reduce,
-                self.loopy_bp_updater,
-            )
+            cand_line_graph.update_all(DGLF.copy_u('msg', 'msg'), DGLF.sum('msg', 'accum_msg'))
+            cand_line_graph.apply_nodes(self.loopy_bp_updater)
 
         cand_graphs.edata.update(cand_line_graph.ndata)
-        cand_graphs.update_all(
-            mpn_gather_msg,
-            mpn_gather_reduce,
-            self.gather_updater,
-        )
+
+        cand_graphs.update_all(DGLF.copy_e('msg', 'msg'), DGLF.sum('msg', 'm'))
+        if PAPER:
+            cand_graphs.update_all(DGLF.copy_e('alpha', 'alpha'), DGLF.sum('alpha', 'accum_alpha'))
+        cand_graphs.apply_nodes(self.gather_updater)
 
         return cand_graphs
