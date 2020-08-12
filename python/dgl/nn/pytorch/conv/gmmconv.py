@@ -115,13 +115,13 @@ class GMMConv(nn.Module):
                  aggregator_type='sum',
                  residual=False,
                  bias=True,
-                 add_self_loop=False):
+                 allow_zero_in_degree=False):
         super(GMMConv, self).__init__()
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         self._dim = dim
         self._n_kernels = n_kernels
-        self._add_self_loop = add_self_loop
+        self._allow_zero_in_degree = allow_zero_in_degree
         if aggregator_type == 'sum':
             self._reducer = fn.sum
         elif aggregator_type == 'mean':
