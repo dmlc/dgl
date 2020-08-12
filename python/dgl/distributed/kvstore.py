@@ -738,11 +738,11 @@ class KVServer(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name][:] = data_tensor[:]
-            assert self._part_policy[name].get_data_size() == data_tensor.shape[0], \
+            assert self._part_policy[name].get_part_size() == data_tensor.shape[0], \
                     'kvserver expect partition {} for {} has {} rows, but gets {} rows'.format(
                         self._part_policy[name].part_id,
                         policy_str,
-                        self._part_policy[name].get_data_size(),
+                        self._part_policy[name].get_part_size(),
                         data_tensor.shape[0])
         self._pull_handlers[name] = default_pull_handler
         self._push_handlers[name] = default_push_handler
@@ -821,6 +821,8 @@ class KVClient(object):
         self._data_store = {}
         # Store the partition information with specified data name
         self._part_policy = {}
+        # This stores all unique partition policies in the kvstore. The key is the policy name.
+        self._all_possible_part_policy = {}
         # Store the full data shape across kvserver
         self._full_data_shape = {}
         # Store all the data name
@@ -839,6 +841,11 @@ class KVClient(object):
         self._push_handlers = {}
         # register role on server-0
         self._role = role
+
+    @property
+    def all_possible_part_policy(self):
+        """Get all possible partition policies"""
+        return self._all_possible_part_policy
 
     @property
     def client_id(self):
@@ -961,7 +968,7 @@ class KVClient(object):
         # Send request to the servers to initialize data.
         # The servers may handle the duplicated initializations.
         part_shape = shape.copy()
-        part_shape[0] = part_policy.get_data_size()
+        part_shape[0] = part_policy.get_part_size()
         request = InitDataRequest(name,
                                   tuple(part_shape),
                                   F.reverse_data_type_dict[dtype],
@@ -978,7 +985,7 @@ class KVClient(object):
         self.barrier()
         # Create local shared-data
         local_shape = shape.copy()
-        local_shape[0] = part_policy.get_data_size()
+        local_shape[0] = part_policy.get_part_size()
         if name in self._part_policy:
             raise RuntimeError("Policy %s has already exists!" % name)
         if name in self._data_store:
@@ -986,6 +993,7 @@ class KVClient(object):
         if name in self._full_data_shape:
             raise RuntimeError("Data shape %s has already exists!" % name)
         self._part_policy[name] = part_policy
+        self._all_possible_part_policy[part_policy.policy_str] = part_policy
         shared_data = empty_shared_mem(name+'-kvdata-', False, \
             local_shape, F.reverse_data_type_dict[dtype])
         dlpack = shared_data.to_dlpack()
@@ -1062,6 +1070,7 @@ class KVClient(object):
                 dlpack = shared_data.to_dlpack()
                 self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
                 self._part_policy[name] = PartitionPolicy(policy_str, partition_book)
+                self._all_possible_part_policy[policy_str] = self._part_policy[name]
                 self._pull_handlers[name] = default_pull_handler
                 self._push_handlers[name] = default_push_handler
         # Get full data shape across servers
