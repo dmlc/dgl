@@ -935,8 +935,40 @@ class DGLHeteroGraph(object):
 
     @property
     def srctypes(self):
-        """Return the node types in the SRC category. Return :attr:``ntypes`` if
-        the graph is not a uni-bipartite graph.
+        """Return the source node types.
+
+        Returns
+        -------
+        list of str
+
+            * If the graph is a uni-bipartite graph, it returns the source node types.
+              For a definition of uni-bipartite, see :func:`is_unibipartite`.
+            * Otherwise, it returns all node types in the graph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Query for a uni-bipartite graph.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0]), torch.tensor([1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        >>> })
+        >>> g.srctypes
+        ['developer', 'user']
+
+        Query for a graph that is not uni-bipartite.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0]), torch.tensor([1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        >>> })
+        >>> g.srctypes
+        ['developer', 'game', 'user']
         """
         if self.is_unibipartite:
             return sorted(list(self._srctypes_invmap.keys()))
@@ -945,8 +977,41 @@ class DGLHeteroGraph(object):
 
     @property
     def dsttypes(self):
-        """Return the node types in the DST category. Return :attr:``ntypes`` if
-        the graph is not a uni-bipartite graph.
+        """Return the destination node types.
+
+        Returns
+        -------
+        list of str
+            Each str is a node type.
+
+            * If the graph is a uni-bipartite graph, it returns the destination node types.
+              For a definition of uni-bipartite, see :func:`is_unibipartite`.
+            * Otherwise, it returns all node types in the graph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Query for a uni-bipartite graph.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0]), torch.tensor([1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        >>> })
+        >>> g.dsttypes
+        ['game']
+
+        Query for a graph that is not uni-bipartite.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0]), torch.tensor([1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        >>> })
+        >>> g.dsttypes
+        ['developer', 'game', 'user']
         """
         if self.is_unibipartite:
             return sorted(list(self._dsttypes_invmap.keys()))
@@ -1401,17 +1466,64 @@ class DGLHeteroGraph(object):
 
     @property
     def srcnodes(self):
-        """Return a SRC node view that can be used to set/get feature
-        data of a single node type.
+        """Return a node view for source nodes
+
+        If the graph is a uni-bipartite graph (see :func:`is_unibipartite` for reference),
+        this is :func:`nodes` restricted to source node types. Otherwise, it is an alias
+        for :func:`nodes`.
+
+        It allows two utilities:
+
+        1. Getting the node IDs for a single node type.
+        2. Setting/getting features for all nodes of a single node type.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        To set features of all users
+        >>> import dgl
+        >>> import torch
 
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1], [1, 2])})
-        >>> g.srcnodes['user'].data['h'] = torch.zeros(2, 5)
+        Create a uni-bipartite graph.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0]), torch.tensor([1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        >>> })
+
+        Get the node IDs for source node types.
+
+        >>> g.srcnodes('user')
+        tensor([0])
+        >>> g.srcnodes('developer')
+        tensor([0, 1])
+
+        Set/get features for source node types.
+
+        >>> g.srcnodes['user'].data['h'] = torch.ones(1, 1)
+        >>> g.srcnodes['user'].data['h']
+        tensor([[1.]])
+
+        Create a graph that is not uni-bipartite.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0]), torch.tensor([1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        >>> })
+
+        :func:`dgl.DGLGraph.srcnodes` falls back to :func:`dgl.DGLGraph.nodes` and one can
+        get the node IDs for both source and destination node types.
+
+        >>> g.srcnodes('game')
+        tensor([0, 1, 2])
+
+        One can also set/get features for destination node types in this case.
+
+        >>> g.srcnodes['game'].data['h'] = torch.ones(3, 1)
+        >>> g.srcnodes['game'].data['h']
+        tensor([[1.],
+                [1.],
+                [1.]])
 
         See Also
         --------
@@ -1421,17 +1533,63 @@ class DGLHeteroGraph(object):
 
     @property
     def dstnodes(self):
-        """Return a DST node view that can be used to set/get feature
-        data of a single node type.
+        """Return a node view for destination nodes
+
+        If the graph is a uni-bipartite graph (see :func:`is_unibipartite` for reference),
+        this is :func:`nodes` restricted to destination node types. Otherwise, it is an alias
+        for :func:`nodes`.
+
+        It allows two utilities:
+
+        1. Getting the node IDs for a single node type.
+        2. Setting/getting features for all nodes of a single node type.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        To set features of all games
+        >>> import dgl
+        >>> import torch
 
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1], [1, 2])})
-        >>> g.dstnodes['game'].data['h'] = torch.zeros(3, 5)
+        Create a uni-bipartite graph.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0]), torch.tensor([1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        >>> })
+
+        Get the node IDs for destination node types.
+
+        >>> g.dstnodes('game')
+        tensor([0, 1, 2])
+
+        Set/get features for destination node types.
+
+        >>> g.dstnodes['game'].data['h'] = torch.ones(3, 1)
+        >>> g.dstnodes['game'].data['h']
+        tensor([[1.],
+                [1.],
+                [1.]])
+
+        Create a graph that is not uni-bipartite.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0]), torch.tensor([1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        >>> })
+
+        :func:`dgl.DGLGraph.dstnodes` falls back to :func:`dgl.DGLGraph.nodes` and one can
+        get the node IDs for both source and destination node types.
+
+        >>> g.dstnodes('developer')
+        tensor([0, 1])
+
+        One can also set/get features for source node types in this case.
+
+        >>> g.dstnodes['developer'].data['h'] = torch.ones(2, 1)
+        >>> g.dstnodes['developer'].data['h']
+        tensor([[1.],
+                [1.]])
 
         See Also
         --------
@@ -1441,50 +1599,27 @@ class DGLHeteroGraph(object):
 
     @property
     def ndata(self):
-        """Return the data view of all the nodes.
+        """Return a node data view for setting/getting node features
 
-        If the graph has only one node type, ``g.ndata['feat']`` gives
-        the node feature data under name ``'feat'``.
-        If the graph has multiple node types, then ``g.ndata['feat']``
-        returns a dictionary where the key is the node type and the
-        value is the node feature tensor. If the node type does not
-        have feature `'feat'`, it is not included in the dictionary.
+        Notes
+        -----
+        - This is only for setting/getting node features for a graph of a single node type.
+          To work with graphs of multiple node types, see :func:`dgl.DGLGraph.nodes`.
+        - For setting features, the device of the features must be the same as the device
+          of the graph.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        To set features of all nodes in a heterogeneous graph
-        with only one node type:
-
-        >>> g = dgl.graph(([0, 1], [1, 2]))
-        >>> g.ndata['h'] = torch.zeros(3, 5)
-
-        To set features of all nodes in a heterogeneous graph
-        with multiple node types:
-
-        >>> g = dgl.heterograph({('user', 'like', 'movie') : ([0, 1, 1], [1, 2, 0])})
-        >>> g.ndata['h'] = {'user': torch.zeros(2, 5),
-        ...                 'movie': torch.zeros(3, 5)}
+        >>> import dgl
+        >>> import torch
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> g.ndata['h'] = torch.ones(3, 1)
         >>> g.ndata['h']
-        ... {'user': tensor([[0., 0., 0., 0., 0.],
-        ...                 [0., 0., 0., 0., 0.]]),
-        ...  'movie': tensor([[0., 0., 0., 0., 0.],
-        ...                   [0., 0., 0., 0., 0.],
-        ...                   [0., 0., 0., 0., 0.]])}
-
-        To set features of part of nodes in a heterogeneous graph
-        with multiple node types:
-
-        >>> g = dgl.heterograph({('user', 'like', 'movie') : ([0, 1, 1], [1, 2, 0])})
-        >>> g.ndata['h'] = {'user': torch.zeros(2, 5)}
-        >>> g.ndata['h']
-        ... {'user': tensor([[0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.]])}
-        >>> # clean the feature 'h' and no node type contains 'h'
-        >>> g.ndata.pop('h')
-        >>> g.ndata['h']
-        ... {}
+        tensor([[1.],
+                [1.],
+                [1.]])
 
         See Also
         --------
@@ -1495,14 +1630,14 @@ class DGLHeteroGraph(object):
             ntype = self.ntypes[0]
             return HeteroNodeDataView(self, ntype, ntid, ALL)
         else:
-            ntids = [self.get_ntype_id(ntype) for ntype in self.ntypes]
-            ntypes = self.ntypes
-            return HeteroNodeDataView(self, ntypes, ntids, ALL)
-
+            raise DGLError('To set/get node features for graphs of multiple node types, '
+                           'use DGLGraph.nodes.')
 
     @property
     def srcdata(self):
-        """Return the data view of all nodes in the SRC category.
+        """Return a node data view for setting/getting source node features.
+
+        Return the data view of all nodes in the SRC category.
 
         If the source nodes have only one node type, ``g.srcdata['feat']``
         gives the node feature data under name ``'feat'``.
@@ -1569,23 +1704,23 @@ class DGLHeteroGraph(object):
         >>> g.srcdata['h']
         ... {}
 
-
         Notes
         -----
-        This is identical to :any:`DGLHeteroGraph.ndata` if the graph is homogeneous.
+        This is identical to :func:`dgl.DGLGraph.ndata` if the graph is homogeneous.
 
         See Also
         --------
         nodes
+        ndata
+        srcnodes
         """
         if len(self.srctypes) == 1:
             ntype = self.srctypes[0]
             ntid = self.get_ntype_id_from_src(ntype)
             return HeteroNodeDataView(self, ntype, ntid, ALL)
         else:
-            ntypes = self.srctypes
-            ntids = [self.get_ntype_id_from_src(ntype) for ntype in ntypes]
-            return HeteroNodeDataView(self, ntypes, ntids, ALL)
+            raise DGLError('To set features for source nodes in a graph with multiple source '
+                           'node types, use dgl.DGLGraph.srcnodes')
 
     @property
     def dstdata(self):
@@ -4823,6 +4958,9 @@ class DGLHeteroGraph(object):
     def to(self, device, **kwargs):  # pylint: disable=invalid-name
         """Move ndata, edata and graph structure to the targeted device (cpu/gpu).
 
+        If the graph is already on the specified device, the function directly returns it.
+        Otherwise, it returns a cloned graph on the specified device.
+
         Parameters
         ----------
         device : Framework-specific device context object
@@ -4832,22 +4970,37 @@ class DGLHeteroGraph(object):
 
         Returns
         -------
-        g : DGLHeteroGraph
-          Moved DGLHeteroGraph of the targeted mode.
+        g : DGLGraph
+            The graph on the specified device.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
+        >>> import dgl
         >>> import torch
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1])})
-        >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
-        >>> g.edges['plays'].data['h'] = torch.tensor([[0.], [1.], [2.], [3.]])
+
+        >>> g = dgl.graph((torch.tensor([1, 0]), torch.tensor([1, 2])))
+        >>> g.ndata['h'] = torch.ones(3, 1)
+        >>> g.edata['h'] = torch.zeros(2, 2)
         >>> g1 = g.to(torch.device('cuda:0'))
         >>> print(g1.device)
         device(type='cuda', index=0)
+        >>> print(g1.ndata['h'].device)
+        device(type='cuda', index=0)
+        >>> print(g1.nodes().device)
+        device(type='cuda', index=0)
+
+        The original graph is still on CPU.
+
         >>> print(g.device)
         device(type='cpu')
+        >>> print(g.ndata['h'].device)
+        device(type='cpu')
+        >>> print(g.nodes().device)
+        device(type='cpu')
+
+        The case of heterogeneous graphs is the same.
         """
         if device is None or self.device == device:
             return self
@@ -4927,62 +5080,72 @@ class DGLHeteroGraph(object):
         return ret
 
     def local_var(self):
-        """Return a heterograph object that can be used in a local function scope.
+        """Return a graph object for usage in a local function scope.
 
         The returned graph object shares the feature data and graph structure of this graph.
         However, any out-place mutation to the feature data will not reflect to this graph,
-        thus making it easier to use in a function scope.
+        thus making it easier to use in a function scope (e.g. forward computation of a model).
 
         If set, the local graph object will use same initializers for node features and
         edge features.
 
         Returns
         -------
-        DGLHeteroGraph
-            The graph object that can be used as a local variable.
+        DGLGraph
+            The graph object for a local variable.
 
         Notes
         -----
-        Internally, the returned graph shares the same feature tensors, but construct a new
-        dictionary structure (aka. Frame) so adding/removing feature tensors from the returned
-        graph will not reflect to the original graph. However, inplace operations do change
-        the shared tensor values, so will be reflected to the original graph. This function
-        also has little overhead when the number of feature tensors in this graph is small.
+        Inplace operations do reflect to the original graph. This function also has little
+        overhead when the number of feature tensors in this graph is small.
 
         Examples
         --------
+
         The following example uses PyTorch backend.
 
-        Avoid accidentally overriding existing feature data. This is quite common when
-        implementing a NN module:
+        >>> import dgl
+        >>> import torch
+
+        Create a function for computation on graphs.
 
         >>> def foo(g):
         >>>     g = g.local_var()
-        >>>     g.edata['h'] = torch.ones((g.number_of_edges(), 3))
+        >>>     g.edata['h'] = torch.ones((g.num_edges(), 3))
+        >>>     g.edata['h2'] = torch.ones((g.num_edges(), 3))
         >>>     return g.edata['h']
-        >>>
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1], [0, 0, 2])})
-        >>> g.edata['h'] = torch.zeros((g.number_of_edges(), 3))
-        >>> newh = foo(g)        # get tensor of all ones
+
+        ``local_var`` avoids changing the graph features when exiting the function.
+
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([0, 0, 2])))
+        >>> g.edata['h'] = torch.zeros((g.num_edges(), 3))
+        >>> newh = foo(g)
         >>> print(g.edata['h'])  # still get tensor of all zeros
+        tensor([[0., 0., 0.],
+                [0., 0., 0.],
+                [0., 0., 0.]])
+        >>> 'h2' in g.edata      # new feature set in the function scope is not found
+        False
 
-        Automatically garbage collect locally-defined tensors without the need to manually
-        ``pop`` the tensors.
+        In-place operations will still reflect to the original graph.
 
         >>> def foo(g):
         >>>     g = g.local_var()
-        >>>     # This 'h' feature will stay local and be GCed when the function exits
-        >>>     g.edata['h'] = torch.ones((g.number_of_edges(), 3))
+        >>>     # in-place operation
+        >>>     g.edata['h'] += 1
         >>>     return g.edata['h']
         >>>
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1], [0, 0, 2])})
-        >>> h = foo(g)
-        >>> print('h' in g.edata)
-        False
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([0, 0, 2])))
+        >>> g.edata['h'] = torch.zeros((g.num_edges(), 1))
+        >>> newh = foo(g)
+        >>> print(g.edata['h'])  # the result changes
+        tensor([[1.],
+                [1.],
+                [1.]])
 
         See Also
         --------
-        local_var
+        local_scope
         """
         ret = copy.copy(self)
         ret._node_frames = [fr.clone() for fr in self._node_frames]
@@ -4991,44 +5154,63 @@ class DGLHeteroGraph(object):
 
     @contextmanager
     def local_scope(self):
-        """Enter a local scope context for this graph.
+        """Enter a local scope context for the graph.
 
         By entering a local scope, any out-place mutation to the feature data will
-        not reflect to the original graph, thus making it easier to use in a function scope.
+        not reflect to the original graph, thus making it easier to use in a function scope
+        (e.g. forward computation of a model).
 
         If set, the local scope will use same initializers for node features and
         edge features.
 
+        Notes
+        -----
+        Inplace operations do reflect to the original graph. This function also has little
+        overhead when the number of feature tensors in this graph is small.
+
         Examples
         --------
+
         The following example uses PyTorch backend.
 
-        Avoid accidentally overriding existing feature data. This is quite common when
-        implementing a NN module:
+        >>> import dgl
+        >>> import torch
+
+        Create a function for computation on graphs.
 
         >>> def foo(g):
         >>>     with g.local_scope():
-        >>>         g.edata['h'] = torch.ones((g.number_of_edges(), 3))
+        >>>         g.edata['h'] = torch.ones((g.num_edges(), 3))
+        >>>         g.edata['h2'] = torch.ones((g.num_edges(), 3))
         >>>         return g.edata['h']
-        >>>
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1], [0, 0, 2])})
-        >>> g.edata['h'] = torch.zeros((g.number_of_edges(), 3))
-        >>> newh = foo(g)        # get tensor of all ones
+
+        ``local_scope`` avoids changing the graph features when exiting the function.
+
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([0, 0, 2])))
+        >>> g.edata['h'] = torch.zeros((g.num_edges(), 3))
+        >>> newh = foo(g)
         >>> print(g.edata['h'])  # still get tensor of all zeros
+        tensor([[0., 0., 0.],
+                [0., 0., 0.],
+                [0., 0., 0.]])
+        >>> 'h2' in g.edata      # new feature set in the function scope is not found
+        False
 
-        Automatically garbage collect locally-defined tensors without the need to manually
-        ``pop`` the tensors.
+        In-place operations will still reflect to the original graph.
 
         >>> def foo(g):
         >>>     with g.local_scope():
-        >>>         # This 'h' feature will stay local and be GCed when the function exits
-        >>>         g.edata['h'] = torch.ones((g.number_of_edges(), 3))
+        >>>         # in-place operation
+        >>>         g.edata['h'] += 1
         >>>         return g.edata['h']
         >>>
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1], [0, 0, 2])})
-        >>> h = foo(g)
-        >>> print('h' in g.edata)
-        False
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([0, 0, 2])))
+        >>> g.edata['h'] = torch.zeros((g.num_edges(), 1))
+        >>> newh = foo(g)
+        >>> print(g.edata['h'])  # the result changes
+        tensor([[1.],
+                [1.],
+                [1.]])
 
         See Also
         --------
