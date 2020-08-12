@@ -3,17 +3,12 @@
 from .. import backend as F
 from .. import utils
 from .dist_tensor import DistTensor
-from .graph_partition_book import PartitionPolicy, NODE_PART_POLICY
 
 class DistEmbedding:
     '''Embeddings in the distributed training.
 
-    By default, the embeddings are created for nodes in the graph.
-
     Parameters
     ----------
-    g : DistGraph
-        The distributed graph object.
     num_embeddings : int
         The number of embeddings
     embedding_dim : int
@@ -28,7 +23,7 @@ class DistEmbedding:
     Examples
     --------
     >>> emb_init = lambda shape, dtype: F.zeros(shape, dtype, F.cpu())
-    >>> emb = dgl.distributed.DistEmbedding(g, g.number_of_nodes(), 10)
+    >>> emb = dgl.distributed.DistEmbedding(g.number_of_nodes(), 10)
     >>> optimizer = dgl.distributed.SparseAdagrad([emb], lr=0.001)
     >>> for blocks in dataloader:
     >>>     feats = emb(nids)
@@ -36,12 +31,9 @@ class DistEmbedding:
     >>>     loss.backward()
     >>>     optimizer.step()
     '''
-    def __init__(self, g, num_embeddings, embedding_dim, name=None,
+    def __init__(self, num_embeddings, embedding_dim, name=None,
                  init_func=None, part_policy=None):
-        if part_policy is None:
-            part_policy = PartitionPolicy(NODE_PART_POLICY, g.get_partition_book())
-
-        self._tensor = DistTensor(g, (num_embeddings, embedding_dim), F.float32, name,
+        self._tensor = DistTensor((num_embeddings, embedding_dim), F.float32, name,
                                   init_func, part_policy)
         self._trace = []
 

@@ -195,11 +195,11 @@ class DistSAGE(SAGE):
         # TODO: can we standardize this?
         nodes = dgl.distributed.node_split(np.arange(g.number_of_nodes()),
                                            g.get_partition_book(), force_even=True)
-        y = dgl.distributed.DistTensor(g, (g.number_of_nodes(), self.n_hidden), th.float32, 'h',
+        y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_hidden), th.float32, 'h',
                                        persistent=True)
         for l, layer in enumerate(self.layers):
             if l == len(self.layers) - 1:
-                y = dgl.distributed.DistTensor(g, (g.number_of_nodes(), self.n_classes),
+                y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_classes),
                                                th.float32, 'h_last', persistent=True)
 
             sampler = PosNeighborSampler(g, [-1], dgl.distributed.sample_neighbors)
@@ -418,10 +418,10 @@ def run(args, device, data):
         th.save(pred, 'emb.pt')
 
 def main(args):
+    dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
-    dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
-    g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, part_config=args.part_config)
+    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
     print('rank:', g.rank())
     print('number of edges', g.number_of_edges())
 
@@ -452,7 +452,7 @@ if __name__ == '__main__':
     parser.add_argument('--id', type=int, help='the partition id')
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
     parser.add_argument('--part_config', type=str, help='The path to the partition config file')
-    parser.add_argument('--num-servers', type=int, help='Server count on each machine.')
+    parser.add_argument('--num-servers', type=int, default=1, help='Server count on each machine.')
     parser.add_argument('--n-classes', type=int, help='the number of classes')
     parser.add_argument('--gpu', type=int, default=0,
         help="GPU device ID. Use -1 for CPU training")
