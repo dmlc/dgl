@@ -3,7 +3,6 @@
 import torch as th
 from torch import nn
 
-from .... import transform
 from .... import function as fn
 from ....base import DGLError
 

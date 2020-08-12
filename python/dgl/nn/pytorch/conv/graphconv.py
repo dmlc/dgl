@@ -187,7 +187,8 @@ class GraphConv(nn.Module):
             :math:`(N, D_{in})`
             where :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
             If a pair of torch.Tensor is given, which is the case for bipartite graph, the pair
-            must contain two tensors of shape :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
+            must contain two tensors of shape :math:`(N_{in}, D_{in_{src}})` and
+            :math:`(N_{out}, D_{in_{dst}})`.
         weight : torch.Tensor, optional
             Optional external weight tensor.
 
@@ -205,7 +206,8 @@ class GraphConv(nn.Module):
             The error can be ignored by setting ``allow_zero_in_degree`` parameter to ``True``.
 
             Case 2:
-            External weight is provided while at the same time the module has defined its own weight parameter.
+            External weight is provided while at the same time the module
+            has defined its own weight parameter.
 
         Notes
         -----
