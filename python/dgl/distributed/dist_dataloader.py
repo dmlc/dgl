@@ -92,8 +92,7 @@ class DistDataLoader:
         self.collate_fn = collate_fn
         self.current_pos = 0
         if self.pool is not None:
-            self.m = mp.Manager()
-            self.queue = self.m.Queue(maxsize=queue_size)
+            self.queue = mp.JoinableQueue(maxsize=queue_size)
         else:
             self.queue = Queue(maxsize=queue_size)
         self.drop_last = drop_last
