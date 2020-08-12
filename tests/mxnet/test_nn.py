@@ -731,9 +731,9 @@ def test_hetero_conv(agg, idtype):
 
     # test with pair input
     conv = nn.HeteroGraphConv({
-        'follows': nn.SAGEConv(2, 3, 'mean', allow_zero_in_degree=True),
-        'plays': nn.SAGEConv((2, 4), 4, 'mean', allow_zero_in_degree=True),
-        'sells': nn.SAGEConv(3, 4, 'mean', allow_zero_in_degree=True)},
+        'follows': nn.SAGEConv(2, 3, 'mean'),
+        'plays': nn.SAGEConv((2, 4), 4, 'mean'),
+        'sells': nn.SAGEConv(3, 4, 'mean')},
         agg)
     conv.initialize(ctx=F.ctx())
 
