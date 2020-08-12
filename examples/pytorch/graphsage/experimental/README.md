@@ -2,7 +2,7 @@
 
 This is an example of training GraphSage in a distributed fashion. To train GraphSage, it has five steps:
 
-### Step 0: Set IP configuration file.
+### Step 0: set IP configuration file.
 
 User need to set their own IP configuration file before training. For example, if we have four machines in cuurent cluster, the IP configuration
 could like this:
@@ -14,7 +14,7 @@ could like this:
 172.31.16.98
 ```
 
-### Step 1: Partition the graph.
+### Step 1: partition the graph.
 
 The example provides a script to partition some builtin graphs such as Reddit and OGB product graph.
 If we want to train GraphSage on 4 machines, we need to partition the graph into 4 parts.
@@ -29,8 +29,6 @@ the number of nodes, the number of edges and the number of labelled nodes.
 ```bash
 python3 partition_graph.py --dataset ogb-product --num_parts 4 --balance_train --balance_edges
 ```
-
-Users can find the partitioned data in `~/dgl_data` folder.
 
 ### Step 2: copy the partitioned data and files to the cluster
 
