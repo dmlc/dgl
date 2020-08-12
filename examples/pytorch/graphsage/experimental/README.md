@@ -50,7 +50,7 @@ python3 ~/dgl/tools/launch.py \
 --num_servers 1 \
 --part_config ogb-product/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-servers 1 --num-epochs 30 --batch-size 1000 --num-workers 4"
+"python3 train_dist.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 30 --batch_size 1000 --num_workers 4"
 ```
 
 To run unsupervised training:
@@ -62,7 +62,7 @@ python3 ~/dgl/tools/launch.py \
 --num_servers 1 \
 --part_config ogb-product/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 ~/dgl/examples/pytorch/graphsage/experimental/train_dist_unsupervised.py --graph-name ogb-product --ip_config ip_config.txt --num-servers 1 --num-epochs 3 --batch-size 1000"
+"python3 train_dist_unsupervised.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 3 --batch_size 1000"
 ```
 
 ## Distributed code runs in the standalone mode
@@ -81,13 +81,13 @@ python3 partition_graph.py --dataset ogb-product --num_parts 1
 To run supervised training:
 
 ```bash
-python3 train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --batch-size 1000 --part_config data/ogb-product.json --standalone
+python3 train_dist.py --graph_name ogb-product --ip_config ip_config.txt --num_epochs 3 --batch_size 1000 --part_config data/ogb-product.json --standalone
 ```
 
 To run unsupervised training:
 
 ```bash
-python3 train_dist_unsupervised.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 3 --batch-size 1000 --part_config data/ogb-product.json --standalone
+python3 train_dist_unsupervised.py --graph_name ogb-product --ip_config ip_config.txt --num_epochs 3 --batch_size 1000 --part_config data/ogb-product.json --standalone
 ```
 
 Note: please ensure that all environment variables shown above are unset if they were set for testing distributed training.
