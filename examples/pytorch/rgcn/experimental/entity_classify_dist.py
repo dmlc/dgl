@@ -191,11 +191,13 @@ def compute_acc(logits, labels):
     labels = labels.long()
     return (logits.argmax(dim=1) == labels).float().sum() / len(logits)
 
-def evaluate(model, embed_layer, labels, eval_loader, test_loader, node_feats):
+def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, node_feats, global_val_mask, global_test_mask):
     model.eval()
     embed_layer.eval()
     eval_logits = []
     eval_seeds = []
+
+    global_logits = dgl.distributed.DistTensor(g, labels.shape, th.float32, 'logits', persistent=True)
 
     with th.no_grad():
         for sample_data in tqdm.tqdm(eval_loader):
@@ -208,6 +210,7 @@ def evaluate(model, embed_layer, labels, eval_loader, test_loader, node_feats):
             eval_seeds.append(seeds.cpu().detach())
     eval_logits = th.cat(eval_logits)
     eval_seeds = th.cat(eval_seeds)
+    global_logits[eval_seeds] = eval_logits
 
     test_logits = []
     test_seeds = []
@@ -222,8 +225,14 @@ def evaluate(model, embed_layer, labels, eval_loader, test_loader, node_feats):
             test_seeds.append(seeds.cpu().detach())
     test_logits = th.cat(test_logits)
     test_seeds = th.cat(test_seeds)
+    global_logits[test_seeds] = test_logits
 
-    return compute_acc(eval_logits, labels[eval_seeds]), compute_acc(test_logits, labels[test_seeds])
+    g.barrier()
+    if g.rank() == 0:
+        return compute_acc(global_logits[global_val_nid], labels[global_val_mask]), \
+            compute_acc(global_logits[global_test_nid], labels[global_test_mask])
+    else:
+        return -1, -1
 
 class NeighborSampler:
     """Neighbor sampler
@@ -274,7 +283,8 @@ class NeighborSampler:
         return seeds, blocks
 
 def run(args, device, data):
-    g, node_feats, num_of_ntype, num_classes, num_rels, train_nid, val_nid, test_nid, labels = data
+    g, node_feats, num_of_ntype, num_classes, num_rels, \
+        train_nid, val_nid, test_nid, labels, global_val_mask, global_test_mask = data
 
     fanouts = [int(fanout) for fanout in args.fanout.split(',')]
     sampler = NeighborSampler(g, fanouts, dgl.distributed.sample_neighbors)
@@ -407,9 +417,11 @@ def run(args, device, data):
         epoch += 1
 
         start = time.time()
-        val_acc, test_acc = evaluate(model, embed_layer, labels, valid_dataloader, test_dataloader, node_feats)
-        print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc,
-                                                                                  time.time() - start))
+        val_acc, test_acc = evaluate(g, model, embed_layer, labels,
+            valid_dataloader, test_dataloader, node_feats, global_val_mask, global_test_mask)
+        if val_acc >= 0:
+            print('Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(val_acc, test_acc,
+                                                                         time.time() - start))
 
     #profiler.stop()
     #print(profiler.output_text())
@@ -434,6 +446,8 @@ def main(args):
           len(test_nid), len(np.intersect1d(test_nid.numpy(), local_nid))))
     device = th.device('cpu')
     labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
+    global_val_mask = g.ndata['val_mask'][np.arange(g.number_of_nodes())]
+    global_test_mask = g.ndata['test_mask'][np.arange(g.number_of_nodes())]
     n_classes = len(th.unique(labels[labels >= 0]))
     print(labels.shape)
     print('#classes:', n_classes)
@@ -446,7 +460,7 @@ def main(args):
     node_feats = [None] * num_of_ntype
 
     run(args, device, (g, node_feats, num_of_ntype, n_classes, num_rels,
-                       train_nid, val_nid, test_nid, labels))
+                       train_nid, val_nid, test_nid, labels, global_val_mask, global_test_mask))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN')
