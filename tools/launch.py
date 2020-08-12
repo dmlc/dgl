@@ -113,20 +113,30 @@ def main():
                         help='The number of trainer processes per machine')
     parser.add_argument('--num_samplers', type=int, default=0,
                         help='The number of sampler processes per trainer process')
+    parser.add_argument('--num_servers', type=int,
+                        help='The number of server processes per machine')
     parser.add_argument('--part_config', type=str,
                         help='The file (in workspace) of the partition config')
     parser.add_argument('--ip_config', type=str,
                         help='The file (in workspace) of IP configuration for server processes')
-    parser.add_argument('--num_servers', type=int,
-                        help='Server count on each machine.')
     parser.add_argument('--num_server_threads', type=int, default=1,
                         help='The number of OMP threads in the server process. \
                         It should be small if server processes and trainer processes run on \
                         the same machine. By default, it is 1.')
     args, udf_command = parser.parse_known_args()
     assert len(udf_command) == 1, 'Please provide user command line.'
-    assert args.num_trainers > 0, '--num_trainers must be a positive number.'
-    assert args.num_samplers >= 0
+    assert args.num_trainers is not None and args.num_trainers > 0, \
+            '--num_trainers must be a positive number.'
+    assert args.num_samplers is not None and args.num_samplers >= 0, \
+            '--num_samplers must be a non-negative number.'
+    assert args.num_servers is not None and args.num_servers > 0, \
+            '--num_servers must be a positive number.'
+    assert args.num_server_threads > 0, '--num_server_threads must be a positive number.'
+    assert args.workspace is not None, 'A user has to specify a workspace with --workspace.'
+    assert args.part_config is not None, \
+            'A user has to specify a partition configuration file with --part_config.'
+    assert args.ip_config is not None, \
+            'A user has to specify an IP configuration file with --ip_config.'
     udf_command = str(udf_command[0])
     if 'python' not in udf_command:
         raise RuntimeError("DGL launching script can only support Python executable file.")

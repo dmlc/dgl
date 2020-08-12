@@ -2756,7 +2756,7 @@ class DGLHeteroGraph(object):
             Representation dict from feature name to feature tensor.
         """
         if is_all(u):
-            return dict(self._node_frames[ntid])
+            return self._node_frames[ntid]
         else:
             u = utils.prepare_tensor(self, u, 'u')
             return self._node_frames[ntid].subframe(u)
@@ -3614,14 +3614,12 @@ class DGLHeteroGraph(object):
         # TODO(minjie): handle initializer
         new_nframes = []
         for nframe in self._node_frames:
-            new_feats = {k : F.copy_to(feat, device, **kwargs) for k, feat in nframe.items()}
-            new_nframes.append(Frame(new_feats, num_rows=nframe.num_rows))
+            new_nframes.append(nframe.to(device, **kwargs))
         ret._node_frames = new_nframes
 
         new_eframes = []
         for eframe in self._edge_frames:
-            new_feats = {k : F.copy_to(feat, device, **kwargs) for k, feat in eframe.items()}
-            new_eframes.append(Frame(new_feats, num_rows=eframe.num_rows))
+            new_eframes.append(eframe.to(device, **kwargs))
         ret._edge_frames = new_eframes
 
         # 2. Copy misc info

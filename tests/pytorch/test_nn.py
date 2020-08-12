@@ -306,6 +306,7 @@ def test_rgcn():
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
     rgc_basis_low.weight = rgc_basis.weight
     rgc_basis_low.w_comp = rgc_basis.w_comp
+    rgc_basis_low.loop_weight = rgc_basis.loop_weight
     h = th.randn((100, I)).to(ctx)
     r = th.tensor(etype).to(ctx)
     h_new = rgc_basis(g, h, r)
@@ -317,6 +318,7 @@ def test_rgcn():
     rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B).to(ctx)
     rgc_bdd_low = nn.RelGraphConv(I, O, R, "bdd", B, low_mem=True).to(ctx)
     rgc_bdd_low.weight = rgc_bdd.weight
+    rgc_bdd_low.loop_weight = rgc_bdd.loop_weight
     h = th.randn((100, I)).to(ctx)
     r = th.tensor(etype).to(ctx)
     h_new = rgc_bdd(g, h, r)
@@ -332,6 +334,7 @@ def test_rgcn():
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
     rgc_basis_low.weight = rgc_basis.weight
     rgc_basis_low.w_comp = rgc_basis.w_comp
+    rgc_basis_low.loop_weight = rgc_basis.loop_weight
     h = th.randn((100, I)).to(ctx)
     r = th.tensor(etype).to(ctx)
     h_new = rgc_basis(g, h, r, norm)
@@ -343,6 +346,7 @@ def test_rgcn():
     rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B).to(ctx)
     rgc_bdd_low = nn.RelGraphConv(I, O, R, "bdd", B, low_mem=True).to(ctx)
     rgc_bdd_low.weight = rgc_bdd.weight
+    rgc_bdd_low.loop_weight = rgc_bdd.loop_weight
     h = th.randn((100, I)).to(ctx)
     r = th.tensor(etype).to(ctx)
     h_new = rgc_bdd(g, h, r, norm)
@@ -356,6 +360,7 @@ def test_rgcn():
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
     rgc_basis_low.weight = rgc_basis.weight
     rgc_basis_low.w_comp = rgc_basis.w_comp
+    rgc_basis_low.loop_weight = rgc_basis.loop_weight
     h = th.randint(0, I, (100,)).to(ctx)
     r = th.tensor(etype).to(ctx)
     h_new = rgc_basis(g, h, r)
@@ -365,7 +370,7 @@ def test_rgcn():
     assert F.allclose(h_new, h_new_low)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 def test_gat_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -376,7 +381,7 @@ def test_gat_conv(g, idtype):
     assert h.shape == (g.number_of_nodes(), 4, 2)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
 def test_gat_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -387,7 +392,7 @@ def test_gat_conv_bi(g, idtype):
     assert h.shape == (g.number_of_dst_nodes(), 4, 2)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn', 'lstm'])
 def test_sage_conv(idtype, g, aggre_type):
     g = g.astype(idtype).to(F.ctx())
@@ -398,7 +403,7 @@ def test_sage_conv(idtype, g, aggre_type):
     assert h.shape[-1] == 10
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn', 'lstm'])
 def test_sage_conv_bi(idtype, g, aggre_type):
     g = g.astype(idtype).to(F.ctx())
@@ -417,14 +422,14 @@ def test_sage_conv2(idtype):
     g = dgl.bipartite([], num_nodes=(5, 3))
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    sage = nn.SAGEConv((3, 3), 2, 'gcn')
+    sage = nn.SAGEConv((3, 3), 2, 'gcn', allow_zero_in_degree=True)
     feat = (F.randn((5, 3)), F.randn((3, 3)))
     sage = sage.to(ctx)
-    h = sage(g, feat)
+    h = sage(g, (F.copy_to(feat[0], F.ctx()), F.copy_to(feat[1], F.ctx())))
     assert h.shape[-1] == 2
     assert h.shape[0] == 3
     for aggre_type in ['mean', 'pool', 'lstm']:
-        sage = nn.SAGEConv((3, 1), 2, aggre_type)
+        sage = nn.SAGEConv((3, 1), 2, aggre_type, allow_zero_in_degree=True)
         feat = (F.randn((5, 3)), F.randn((3, 1)))
         sage = sage.to(ctx)
         h = sage(g, feat)
@@ -463,7 +468,7 @@ def test_appnp_conv():
     assert h.shape[-1] == 5
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 @pytest.mark.parametrize('aggregator_type', ['mean', 'max', 'sum'])
 def test_gin_conv(g, idtype, aggregator_type):
     g = g.astype(idtype).to(F.ctx())
@@ -478,7 +483,7 @@ def test_gin_conv(g, idtype, aggregator_type):
     assert h.shape == (g.number_of_nodes(), 12)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
 @pytest.mark.parametrize('aggregator_type', ['mean', 'max', 'sum'])
 def test_gin_conv_bi(g, idtype, aggregator_type):
     g = g.astype(idtype).to(F.ctx())
@@ -493,7 +498,7 @@ def test_gin_conv_bi(g, idtype, aggregator_type):
     assert h.shape == (g.number_of_dst_nodes(), 12)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 def test_agnn_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -504,7 +509,7 @@ def test_agnn_conv(g, idtype):
     assert h.shape == (g.number_of_nodes(), 5)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
 def test_agnn_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -529,7 +534,7 @@ def test_gated_graph_conv():
     assert h.shape[-1] == 10
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 def test_nn_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -543,7 +548,7 @@ def test_nn_conv(g, idtype):
     assert h.shape[-1] == 10
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
 def test_nn_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -559,7 +564,7 @@ def test_nn_conv_bi(g, idtype):
     assert h.shape[-1] == 10
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo']))
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
 def test_gmm_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -572,7 +577,7 @@ def test_gmm_conv(g, idtype):
     assert h.shape[-1] == 10
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite', 'block-bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite', 'block-bipartite'], exclude=['zero-degree']))
 def test_gmm_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -587,7 +592,7 @@ def test_gmm_conv_bi(g, idtype):
 
 @parametrize_dtype
 @pytest.mark.parametrize('norm_type', ['both', 'right', 'none'])
-@pytest.mark.parametrize('g', get_cases(['homo', 'bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'bipartite'], exclude=['zero-degree']))
 def test_dense_graph_conv(norm_type, g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -605,7 +610,7 @@ def test_dense_graph_conv(norm_type, g, idtype):
     assert F.allclose(out_conv, out_dense_conv)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'bipartite'], exclude=['zero-degree']))
 def test_dense_sage_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -628,7 +633,7 @@ def test_dense_sage_conv(g, idtype):
     assert F.allclose(out_sage, out_dense_sage), g
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 def test_edge_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -639,7 +644,7 @@ def test_edge_conv(g, idtype):
     assert h1.shape == (g.number_of_nodes(), 2)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
 def test_edge_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -753,7 +758,7 @@ def test_cf_conv():
     edge_feats = F.randn((g.number_of_edges(), 3))
     h = cfconv(g, node_feats, edge_feats)
     # current we only do shape check
-    assert h.shape[-1] == 3    
+    assert h.shape[-1] == 3
 
 def myagg(alist, dsttype):
     rst = alist[0]
@@ -770,9 +775,9 @@ def test_hetero_conv(agg, idtype):
         ('store', 'sells', 'game'): [(0, 0), (0, 3), (1, 1), (1, 2)]},
         idtype=idtype, device=F.ctx())
     conv = nn.HeteroGraphConv({
-        'follows': nn.GraphConv(2, 3),
-        'plays': nn.GraphConv(2, 4),
-        'sells': nn.GraphConv(3, 4)},
+        'follows': nn.GraphConv(2, 3, allow_zero_in_degree=True),
+        'plays': nn.GraphConv(2, 4, allow_zero_in_degree=True),
+        'sells': nn.GraphConv(3, 4, allow_zero_in_degree=True)},
         agg)
     conv = conv.to(F.ctx())
     uf = F.randn((4, 2))
@@ -808,9 +813,9 @@ def test_hetero_conv(agg, idtype):
 
     # test with pair input
     conv = nn.HeteroGraphConv({
-        'follows': nn.SAGEConv(2, 3, 'mean'),
-        'plays': nn.SAGEConv((2, 4), 4, 'mean'),
-        'sells': nn.SAGEConv(3, 4, 'mean')},
+        'follows': nn.SAGEConv(2, 3, 'mean', allow_zero_in_degree=True),
+        'plays': nn.SAGEConv((2, 4), 4, 'mean', allow_zero_in_degree=True),
+        'sells': nn.SAGEConv(3, 4, 'mean', allow_zero_in_degree=True)},
         agg)
     conv = conv.to(F.ctx())
 
