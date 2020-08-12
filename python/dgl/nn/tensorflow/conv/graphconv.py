@@ -205,13 +205,14 @@ class GraphConv(layers.Layer):
             if not self._allow_zero_in_degree:
                 if  tf.math.count_nonzero(graph.in_degrees() == 0) > 0:
                     raise DGLError('There are 0-in-degree nodes in the graph, '
-                                    'output for those nodes will be invalid. '
-                                    'This is harmful for some applications, '
-                                    'causing silent performance regression. '
-                                    'Adding self-loop on the input graph by '
-                                    'calling `g = dgl.add_self_loop(g)` will resolve the issue. '
-                                    'Setting ``allow_zero_in_degree`` to be `True` when constructing '
-                                    'this module will suppress the check and let the code run.')
+                                   'output for those nodes will be invalid. '
+                                   'This is harmful for some applications, '
+                                   'causing silent performance regression. '
+                                   'Adding self-loop on the input graph by '
+                                   'calling `g = dgl.add_self_loop(g)` will resolve '
+                                   'the issue. Setting ``allow_zero_in_degree`` '
+                                   'to be `True` when constructing this module will '
+                                   'suppress the check and let the code run.')
 
             feat_src, feat_dst = expand_as_pair(feat, graph)
 
