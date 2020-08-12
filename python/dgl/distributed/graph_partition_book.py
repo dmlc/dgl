@@ -306,41 +306,6 @@ class GraphPartitionBook:
                 getting remote tensor of eid2localeid.')
         return F.gather_row(self._eidg2l[partid], eids)
 
-    def get_partition(self, partid):
-        """Get the graph of one partition.
-
-        Parameters
-        ----------
-        partid : int
-            Partition ID.
-
-        Returns
-        -------
-        DGLGraph
-            The graph of the partition.
-        """
-        #TODO(zhengda) add implementation later.
-
-    def get_node_size(self):
-        """Get the number of nodes in the current partition.
-
-        Return
-        ------
-        int
-            The number of nodes in current partition
-        """
-        return self._node_size
-
-    def get_edge_size(self):
-        """Get the number of edges in the current partition.
-
-        Return
-        ------
-        int
-            The number of edges in current partition
-        """
-        return self._edge_size
-
     @property
     def partid(self):
         """Get the current partition id
@@ -573,45 +538,6 @@ class RangePartitionBook:
         return eids - int(start)
 
 
-    def get_partition(self, partid):
-        """Get the graph of one partition.
-
-        Parameters
-        ----------
-        partid : int
-            Partition ID.
-
-        Returns
-        -------
-        DGLGraph
-            The graph of the partition.
-        """
-        #TODO(zhengda) add implementation later.
-
-    def get_node_size(self):
-        """Get the number of nodes in the current partition.
-
-        Return
-        ------
-        int
-            The number of nodes in current partition
-        """
-        range_start = self._node_map[self._partid - 1] if self._partid > 0 else 0
-        range_end = self._node_map[self._partid]
-        return range_end - range_start
-
-    def get_edge_size(self):
-        """Get the number of edges in the current partition.
-
-        Return
-        ------
-        int
-            The number of edges in current partition
-        """
-        range_start = self._edge_map[self._partid - 1] if self._partid > 0 else 0
-        range_end = self._edge_map[self._partid]
-        return range_end - range_start
-
     @property
     def partid(self):
         """Get the current partition id
@@ -701,7 +627,7 @@ class PartitionPolicy(object):
         else:
             raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
 
-    def get_data_size(self):
+    def get_part_size(self):
         """Get data size of current partition.
 
         Returns
@@ -713,5 +639,20 @@ class PartitionPolicy(object):
             return len(self._partition_book.partid2eids(self._part_id))
         elif self._policy_str == NODE_PART_POLICY:
             return len(self._partition_book.partid2nids(self._part_id))
+        else:
+            raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
+
+    def get_size(self):
+        """Get the full size of the data.
+
+        Returns
+        -------
+        int
+            data size
+        """
+        if self._policy_str == EDGE_PART_POLICY:
+            return self._partition_book._num_edges()
+        elif self._policy_str == NODE_PART_POLICY:
+            return self._partition_book._num_nodes()
         else:
             raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
