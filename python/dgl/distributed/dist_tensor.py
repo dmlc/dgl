@@ -84,6 +84,8 @@ class DistTensor:
             assert not persistent, 'We cannot generate anonymous persistent distributed tensors'
             global DIST_TENSOR_ID
             name = 'anonymous-' + str(DIST_TENSOR_ID)
+            # all trainer processes should do the same thing. All of them should have
+            # the same Ids.
             DIST_TENSOR_ID += 1
         self._name = _get_data_name(name, part_policy.policy_str)
         self._persistent = persistent
