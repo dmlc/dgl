@@ -3772,34 +3772,52 @@ class DGLHeteroGraph(object):
         return self._edge_frames[self.get_etype_id(etype)].schemes
 
     def set_n_initializer(self, initializer, field=None, ntype=None):
-        """Set the initializer for empty node features.
+        """Set the initializer for node features.
 
-        Initializer is a callable that returns a tensor given the shape, data type
-        and device context.
-
-        When a subset of the nodes are assigned a new feature, initializer is
-        used to create feature for the rest of the nodes.
+        When only part of the nodes have a feature (e.g. new nodes are added,
+        features are set for a subset of nodes), the initializer initializes
+        features for the rest nodes.
 
         Parameters
         ----------
         initializer : callable
-            The initializer, mapping (shape, data type, context) to tensor.
+            A function that takes four arguments ``shape``, ``data type``, ``device``
+            and ``id_range`` as input and returns a ``tensor`` for the node features.
         field : str, optional
-            The feature field name. Default is to set an initializer for all the
-            feature fields.
+            The name of the feature that the initializer applies. If not given, the
+            initializer applies to all features.
         ntype : str, optional
-            The node type. Can be omitted if there is only one node
-            type in the graph. Error will be raised otherwise.
-            (Default: None)
+            The type of the nodes that the initializer applies. If the graph has
+            multiple node types, one must specify the argument. Otherwise, it can
+            be omitted.
 
-        Note
+        Notes
         -----
-        User defined initializer must follow the signature of
-        :func:`dgl.init.base_initializer() <dgl.init.base_initializer>`
+        Without setting a node feature initializer, zero tensors are generated
+        for nodes without a feature.
 
-        See Also
+        Examples
         --------
-        set_e_initializer
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Define a function for initializer.
+
+        >>> def init_feats(shape, dtype, device, id_range):
+        >>>     return torch.ones(shape, dtype=dtype, device=device)
+
+        An example for a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0]), torch.tensor([1])))
+        >>> g.ndata['h1'] = torch.zeros(2, 2)
+        >>> g.ndata['h2'] = torch.ones(2, 1)
+        >>> # Apply the initializer to feature 'h2' only.
+        >>> g.set_n_initializer(init_feats, field='h2')
+        >>> g.add_nodes(1)
+        >>> print(g.ndata['h1'])
         """
         ntid = self.get_ntype_id(ntype)
         self._node_frames[ntid].set_initializer(initializer, field)
