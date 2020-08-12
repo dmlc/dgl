@@ -1173,7 +1173,43 @@ class DGLHeteroGraph(object):
     #################################################################
     @property
     def batch_size(self):
-        """TBD"""
+        """Return the number of graphs in the batched graph.
+
+        Returns
+        -------
+        int
+            The Number of graphs in the batch.
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Query for homogeneous graphs.
+
+        >>> g1 = dgl.graph((torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])))
+        >>> g1.batch_size
+        1
+        >>> g2 = dgl.graph((torch.tensor([0, 0, 0, 1]), torch.tensor([0, 1, 2, 0])))
+        >>> bg = dgl.batch([g1, g2])
+        >>> bg.batch_size
+        2
+
+        Query for heterogeneous graphs.
+
+        >>> hg1 = dgl.heterograph({
+        >>>       ('user', 'plays', 'game') : (torch.tensor([0, 1]), torch.tensor([0, 0]))})
+        >>> hg1.batch_size
+        1
+        >>> hg2 = dgl.heterograph({
+        >>>       ('user', 'plays', 'game') : (torch.tensor([0, 0]), torch.tensor([1, 0]))})
+        >>> bg = dgl.batch([hg1, hg2])
+        >>> bg.batch_size
+        2
+        """
         return len(self.batch_num_nodes(self.ntypes[0]))
 
     def batch_num_nodes(self, ntype=None):
@@ -2650,8 +2686,8 @@ class DGLHeteroGraph(object):
             raise DGLError('Expect the source node ID(s) to have type int, tensor or sequence, '
                            'got {}'.format(type(u)))
         if not (isinstance(v, (numbers.Integral, Iterable)) or F.is_tensor(v)):
-            raise DGLError('Expect the destination node ID(s) to have type int, tensor or sequence, '
-                           'got {}'.format(type(v)))
+            raise DGLError('Expect the destination node ID(s) to have type int, tensor or '
+                           'sequence, got {}'.format(type(v)))
 
         if not isinstance(u, numbers.Integral) and not isinstance(v, numbers.Integral):
             u_type = type(u)
