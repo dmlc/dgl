@@ -145,18 +145,6 @@ def test_batch_setter_getter(idtype):
     truth = [0.] * 17
     truth[0] = truth[4] = truth[3] = truth[9] = truth[16] = 1.
     assert _pfc(g.edata['l']) == truth
-    # set partial edges (many-one)
-    u = F.tensor([3, 4, 6], g.idtype)
-    v = F.tensor([9], g.idtype)
-    g.edges[u, v].data['l'] = F.ones((3, D))
-    truth[5] = truth[7] = truth[11] = 1.
-    assert _pfc(g.edata['l']) == truth
-    # set partial edges (one-many)
-    u = F.tensor([0], g.idtype)
-    v = F.tensor([4, 5, 6], g.idtype)
-    g.edges[u, v].data['l'] = F.ones((3, D))
-    truth[6] = truth[8] = truth[10] = 1.
-    assert _pfc(g.edata['l']) == truth
     # get partial edges (many-many)
     u = F.tensor([0, 6, 0], g.idtype)
     v = F.tensor([6, 9, 7], g.idtype)

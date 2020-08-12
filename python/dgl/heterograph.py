@@ -851,41 +851,53 @@ class DGLHeteroGraph(object):
 
     @property
     def ntypes(self):
-        """Return the list of node types of this graph.
+        """Return the node types of the graph.
 
         Returns
         -------
         list of str
+            Each ``str`` is a node type.
 
         Examples
         --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
-        >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1])
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
         >>> })
         >>> g.ntypes
-        ['user', 'game']
+        ['game', 'user']
         """
         return self._ntypes
 
     @property
     def etypes(self):
-        """Return the list of edge types of this graph.
+        """Return the edge types of the graph.
 
         Returns
         -------
         list of str
+            Each ``str`` is an edge type.
 
         Examples
         --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
-        >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1])
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
         >>> })
         >>> g.etypes
-        ['follows', 'plays']
+        ['follows', 'follows', 'plays']
         """
         return self._etypes
 
@@ -893,18 +905,31 @@ class DGLHeteroGraph(object):
     def canonical_etypes(self):
         """Return the canonical edge types of the graph.
 
-        A canonical edge type is a 3-tuple of strings ``src_type, edge_type, dst_type``, where
-        ``src_type``, ``edge_type``, ``dst_type`` are separately the type of source
+        A canonical edge type is a 3-tuple of str ``src_type, edge_type, dst_type``, where
+        ``src_type``, ``edge_type``, ``dst_type`` are separately the type of the source
         nodes, edges and destination nodes.
+
+        Returns
+        -------
+        list of 3-tuple of str
+            Each 3-tuple of str is a canonical edge type.
 
         Examples
         --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
-        >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1])
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
         >>> })
         >>> g.canonical_etypes
-        [('user', 'follows', 'user'), ('user', 'plays', 'game')]
+        [('user', 'follows', 'user'),
+         ('user', 'follows', 'game'),
+         ('user', 'plays', 'game')]
         """
         return self._canonical_etypes
 
@@ -986,13 +1011,18 @@ class DGLHeteroGraph(object):
 
         Notes
         -----
-        If :attr:`etype` is an edge type, the API expects it to occur only once in the graph. For
+        If :attr:`etype` is an edge type, the API expects it to appear only once in the graph. For
         example, in a graph with canonical edge types ``('A', 'follows', 'B')``,
         ``('A', 'follows', 'C')`` and ``('B', 'watches', 'D')``, ``'follows'`` is an invalid value
         for :attr:`etype` while ``'watches'`` is a valid one.
 
         Examples
         --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
         Create a heterograph.
 
         >>> g = dgl.heterograph({

@@ -30,7 +30,7 @@ def test_bfs(idtype, n=100):
         for u, v in edges:
             if u in layers_nx[-1]:
                 frontier.add(v)
-                edge_frontier.add(g.edge_ids(u, v))
+                edge_frontier.add(g.edge_ids(int(u), int(v)))
             else:
                 layers_nx.append(frontier)
                 edges_nx.append(edge_frontier)
