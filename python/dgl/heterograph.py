@@ -1670,8 +1670,9 @@ class DGLHeteroGraph(object):
             ntid = self.get_ntype_id_from_src(ntype)
             return HeteroNodeDataView(self, ntype, ntid, ALL)
         else:
-            raise DGLError('To set features for source nodes in a graph with multiple source '
-                           'node types, use dgl.DGLGraph.srcnodes')
+            ntypes = self.srctypes
+            ntids = [self.get_ntype_id_from_src(ntype) for ntype in ntypes]
+            return HeteroNodeDataView(self, ntypes, ntids, ALL)
 
     @property
     def dstdata(self):
@@ -1711,8 +1712,9 @@ class DGLHeteroGraph(object):
             ntid = self.get_ntype_id_from_dst(ntype)
             return HeteroNodeDataView(self, ntype, ntid, ALL)
         else:
-            raise DGLError('To set features for destination nodes in a graph with multiple '
-                           'destination node types, use dgl.DGLGraph.dstnodes')
+            ntypes = self.dsttypes
+            ntids = [self.get_ntype_id_from_dst(ntype) for ntype in ntypes]
+            return HeteroNodeDataView(self, ntypes, ntids, ALL)
 
     @property
     def edges(self):
@@ -3781,8 +3783,18 @@ class DGLHeteroGraph(object):
         Parameters
         ----------
         initializer : callable
-            A function that takes four arguments ``shape``, ``data type``, ``device``
-            and ``id_range`` as input and returns a ``tensor`` for the node features.
+            A function of signature ``func(shape, dtype, ctx, id_range) -> Tensor``.
+            The tensor will be the initialized features. The arguments are:
+
+            * shape: tuple of int
+                The shape of the tensor to return. The first dimension is the number
+                of nodes for feature initialization.
+            * dtype: framework-specific data type object
+                The data type of the tensor to return.
+            * ctx: framework-specific device object
+                The device of the tensor to return.
+            * id_range: slice
+                The start and end ID of the nodes for feature initialization.
         field : str, optional
             The name of the feature that the initializer applies. If not given, the
             initializer applies to all features.
@@ -3818,39 +3830,126 @@ class DGLHeteroGraph(object):
         >>> g.set_n_initializer(init_feats, field='h2')
         >>> g.add_nodes(1)
         >>> print(g.ndata['h1'])
+        tensor([[0., 0.],
+                [0., 0.],
+                [0., 0.]])
+        >>> print(g.ndata['h2'])
+        tensor([[1.], [1.], [1.]])
+
+        An example for a heterogeneous graph of multiple node types.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        >>>                                 torch.tensor([0, 0, 1, 1])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        >>>                                         torch.tensor([0, 1]))
+        >>>     })
+        >>> g.nodes['user'].data['h'] = torch.zeros(3, 2)
+        >>> g.nodes['game'].data['w'] = torch.ones(2, 2)
+        >>> g.set_n_initializer(init_feats, ntype='game')
+        >>> g.add_nodes(1, ntype='user')
+        >>> # Initializer not set for 'user', use zero tensors by default
+        >>> g.nodes['user'].data['h']
+        tensor([[0., 0.],
+                [0., 0.],
+                [0., 0.],
+                [0., 0.]])
+        >>> # Initializer set for 'game'
+        >>> g.add_nodes(1, ntype='game')
+        >>> g.nodes['game'].data['w']
+        tensor([[1., 1.],
+                [1., 1.],
+                [1., 1.]])
         """
         ntid = self.get_ntype_id(ntype)
         self._node_frames[ntid].set_initializer(initializer, field)
 
     def set_e_initializer(self, initializer, field=None, etype=None):
-        """Set the initializer for empty edge features.
+        """Set the initializer for edge features.
 
-        Initializer is a callable that returns a tensor given the shape, data
-        type and device context.
-
-        When a subset of the edges are assigned a new feature, initializer is
-        used to create feature for rest of the edges.
+        When only part of the edges have a feature (e.g. new edges are added,
+        features are set for a subset of edges), the initializer initializes
+        features for the rest edges.
 
         Parameters
         ----------
         initializer : callable
-            The initializer, mapping (shape, data type, context) to tensor.
+            A function of signature ``func(shape, dtype, ctx, id_range) -> Tensor``.
+            The tensor will be the initialized features. The arguments are:
+
+            * shape: tuple of int
+                The shape of the tensor to return. The first dimension is the number
+                of edges for feature initialization.
+            * dtype: framework-specific data type object
+                The data type of the tensor to return.
+            * ctx: framework-specific device object
+                The device of the tensor to return.
+            * id_range: slice
+                The start and end ID of the edges for feature initialization.
         field : str, optional
-            The feature field name. Default is set an initializer for all the
-            feature fields.
+            The name of the feature that the initializer applies. If not given, the
+            initializer applies to all features.
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. Error will be raised otherwise.
-            (Default: None)
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
-        Note
+        Notes
         -----
-        User defined initializer must follow the signature of
-        :func:`dgl.init.base_initializer() <dgl.init.base_initializer>`
+        Without setting an edge feature initializer, zero tensors are generated
+        for edges without a feature.
 
-        See Also
+        Examples
         --------
-        set_n_initializer
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Define a function for initializer.
+
+        >>> def init_feats(shape, dtype, device, id_range):
+        >>>     return torch.ones(shape, dtype=dtype, device=device)
+
+        An example for a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0]), torch.tensor([1])))
+        >>> g.edata['h1'] = torch.zeros(1, 2)
+        >>> g.edata['h2'] = torch.ones(1, 1)
+        >>> # Apply the initializer to feature 'h2' only.
+        >>> g.set_e_initializer(init_feats, field='h2')
+        >>> g.add_edges(torch.tensor([1]), torch.tensor([1]))
+        >>> print(g.edata['h1'])
+        tensor([[0., 0.],
+                [0., 0.]])
+        >>> print(g.edata['h2'])
+        tensor([[1.], [1.]])
+
+        An example for a heterogeneous graph of multiple edge types.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1]),
+        >>>                                 torch.tensor([0, 0])),
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        >>>                                         torch.tensor([0, 1]))
+        >>>     })
+        >>> g.edges['plays'].data['h'] = torch.zeros(2, 2)
+        >>> g.edges['develops'].data['w'] = torch.ones(2, 2)
+        >>> g.set_e_initializer(init_feats, etype='plays')
+        >>> # Initializer not set for 'develops', use zero tensors by default
+        >>> g.add_edges(torch.tensor([1]), torch.tensor([1]), etype='develops')
+        >>> g.edges['develops'].data['w']
+        tensor([[1., 1.],
+                [1., 1.],
+                [0., 0.]])
+        >>> # Initializer set for 'plays'
+        >>> g.add_edges(torch.tensor([1]), torch.tensor([1]), etype='plays')
+        >>> g.edges['plays'].data['h']
+        tensor([[0., 0.],
+                [0., 0.],
+                [1., 1.]])
         """
         etid = self.get_etype_id(etype)
         self._edge_frames[etid].set_initializer(initializer, field)
