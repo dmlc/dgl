@@ -371,6 +371,7 @@ class DistGraph:
         self._gpb = get_shared_mem_partition_book(self.graph_name, self._g)
         if self._gpb is None:
             self._gpb = self._gpb_input
+        assert not self._gdb is None
         self._client.map_shared_data(self._gpb)
 
     def __getstate__(self):
