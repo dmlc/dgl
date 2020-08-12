@@ -100,8 +100,8 @@ def test_partition_policy():
     eid_partid = edge_policy.to_partid(F.tensor([0,1,2,3,4,5,6], F.int64))
     assert_array_equal(F.asnumpy(nid_partid), F.asnumpy(F.tensor([0,0,0,0,0,0], F.int64)))
     assert_array_equal(F.asnumpy(eid_partid), F.asnumpy(F.tensor([0,0,0,0,0,0,0], F.int64)))
-    assert node_policy.get_data_size() == len(node_map)
-    assert edge_policy.get_data_size() == len(edge_map)
+    assert node_policy.get_part_size() == len(node_map)
+    assert edge_policy.get_part_size() == len(edge_map)
 
 def start_server(server_id, num_clients, num_servers):
     # Init kvserver
