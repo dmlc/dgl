@@ -229,8 +229,8 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, node_feats
 
     g.barrier()
     if g.rank() == 0:
-        return compute_acc(global_results[global_val_nid], labels[global_val_mask]), \
-            compute_acc(global_results[global_test_nid], labels[global_test_mask])
+        return compute_acc(global_results[global_val_mask], labels[global_val_mask]), \
+            compute_acc(global_results[global_test_mask], labels[global_test_mask])
     else:
         return -1, -1
 
