@@ -59,6 +59,8 @@ class RelGraphConv(nn.Module):
         Turn it on when you encounter OOM problem during training or evaluation.
     dropout : float, optional
         Dropout rate. Default: 0.0
+    layer_norm: float, optional
+        Add layer norm. Default: False
     """
     def __init__(self,
                  in_feat,
@@ -70,7 +72,8 @@ class RelGraphConv(nn.Module):
                  activation=None,
                  self_loop=False,
                  low_mem=False,
-                 dropout=0.0):
+                 dropout=0.0,
+                 layer_norm=False):
         super(RelGraphConv, self).__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
@@ -83,6 +86,7 @@ class RelGraphConv(nn.Module):
         self.activation = activation
         self.self_loop = self_loop
         self.low_mem = low_mem
+        self.layer_norm = layer_norm
 
         if regularizer == "basis":
             # add basis weights
@@ -119,6 +123,10 @@ class RelGraphConv(nn.Module):
         if self.bias:
             self.h_bias = nn.Parameter(th.Tensor(out_feat))
             nn.init.zeros_(self.h_bias)
+
+        # layer norm
+        if self.layer_norm:
+            self.layer_norm_weight = nn.LayerNorm(n_hidden, elementwise_affine=True)
 
         # weight for self loop
         if self.self_loop:
@@ -219,6 +227,8 @@ class RelGraphConv(nn.Module):
             g.update_all(self.message_func, fn.sum(msg='msg', out='h'))
             # apply bias and activation
             node_repr = g.dstdata['h']
+            if self.layer_norm:
+                node_repr = self.layer_norm_weight(node_repr)
             if self.bias:
                 node_repr = node_repr + self.h_bias
             if self.self_loop:

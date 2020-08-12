@@ -35,10 +35,9 @@ class LinkPredict(nn.Module):
                  num_bases=-1,
                  num_hidden_layers=1,
                  dropout=0,
-                 use_self_loop=False,
+                 use_self_loop=True,
                  low_mem=False,
-                 relation_regularizer = "basis",
-                 regularization_coef=0):
+                 relation_regularizer = "bdd"):
         super(LinkPredict, self).__init__()
         self.device = th.device(device if device >= 0 else 'cpu')
         self.h_dim = h_dim
@@ -49,33 +48,19 @@ class LinkPredict(nn.Module):
         self.dropout = dropout
         self.use_self_loop = use_self_loop
         self.relation_regularizer = relation_regularizer
-        self.regularization_coef = regularization_coef
 
         self.w_relation = nn.Parameter(th.Tensor(num_rels, h_dim).to(self.device))
         nn.init.xavier_uniform_(self.w_relation,
                                 gain=nn.init.calculate_gain('relu'))
 
         self.layers = nn.ModuleList()
-        # i2h
-        self.layers.append(RelGraphConv(
-            self.h_dim, self.h_dim, self.edge_rels, self.relation_regularizer,
-            self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-            low_mem=low_mem, dropout=self.dropout))
         # h2h
         for idx in range(self.num_hidden_layers):
+            act = F.relu if idx < self.num_hidden_layers - 1 else None
             self.layers.append(RelGraphConv(
                 self.h_dim, self.h_dim, self.edge_rels, self.relation_regularizer,
-                self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
+                self.num_bases, activation=act, self_loop=self.use_self_loop,
                 low_mem=low_mem, dropout=self.dropout))
-
-    def forward_full(self, blocks, feats):
-        h = feats
-        for layer, block in zip(self.layers, blocks):
-            block = block.int()
-            block = block.to(self.device)
-            h = layer(block, h, block.edata['etype'], block.edata['norm'])
-
-        return h
 
     def forward(self, p_blocks, p_feats, n_blocks=None, n_feats=None, p_g=None, n_g=None, sample='neighbor'):
         p_h = p_feats
@@ -111,6 +96,37 @@ class LinkPredict(nn.Module):
         n_head_emb = n_h[head]
         n_tail_emb = n_h[tail]
         return (p_head_emb, p_tail_emb, r_emb, n_head_emb, n_tail_emb, p_h, n_h)
+
+    def inference(self, g, in_feats, batch_size, device):
+        """
+        Inference with the RGCN model on full neighbor
+        g : the entire graph.
+        x : the input of entire node set.
+
+        The inference code is written in a fashion that it could handle any number of nodes and
+        layers.
+        """
+        x = in_feats
+        for l, layer in enumerate(self.layers):
+            y = th.zeros(g.number_of_nodes(), self.h_dim)
+
+            sampler = NodeSampler(g, [None])
+            dataloader = DataLoader(dataset=th.arange(g.number_of_nodes()),
+                                    batch_size=batch_size,
+                                    collate_fn=sampler.sample_nodes,
+                                    shuffle=False,
+                                    pin_memory=True,
+                                    drop_last=False,
+                                    num_workers=0)
+            for seeds, blocks in tqdm.tqdm(dataloader):
+                block = blocks[0]
+                block = block.int().to(device)
+                idx = block.srcdata[dgl.NID]
+                h = layer(block, x[idx].to(device), block.edata['etype'], block.edata['norm'])
+                y[seeds] = h.cpu()
+
+            x = y
+        return y
 
 def regularization_loss(n_emb, r_emb):
     return th.mean(n_emb.pow(2)) + \
@@ -178,8 +194,9 @@ class NodeSampler:
 
     def sample_nodes(self, seeds):
         seeds = th.tensor(seeds).long()
-        curr = seeds
+        seeds = seeds.squeeze()
 
+        curr = seeds
         blocks = []
         for fanout in self.fanouts:
             if fanout is None or fanout == -1:
@@ -190,12 +207,13 @@ class NodeSampler:
             norm = self.g.edata['norm'][frontier.edata[dgl.EID]]
             block = dgl.to_block(frontier, curr)
             block.srcdata['ntype'] = self.g.ndata['ntype'][block.srcdata[dgl.NID]]
-            block.edata['etype'] = etypes
-            block.edata['norm'] = norm
+            block.srcdata['type_id'] = self.g.ndata['type_id'][block.srcdata[dgl.NID]]
+            block.edata['etype'] = etypes[block.edata[dgl.EID]]
+            block.edata['norm'] = norm[block.edata[dgl.EID]]
             curr = block.srcdata[dgl.NID]
             blocks.insert(0, block.int())
 
-        return blocks
+        return seeds, blocks
 
 class LinkPathSampler:
     def __init__(self, g, num_rel):
@@ -212,17 +230,17 @@ class LinkPathSampler:
         p_u, p_v = subg.edges()
         p_rel = subg.edata['etype']
         org_nid = subg.ndata[dgl.NID]
+        subg.ndata['type_id'] = g.ndata['type_id'][subg.ndata[dgl.NID]]
 
         # only half of the edges will be used as graph structure
-        pos_idx = np.random.choice(bsize,
-                                   size=bsize//2, replace=False)
+        pos_idx = np.random.choice(bsize, size=bsize//2, replace=False)
         pos_idx = th.tensor(pos_idx).long()
         subg = dgl.remove_edges(subg, pos_idx)
         rels = subg.edata['etype']
 
         subg = dgl.add_reverse_edges(subg, copy_ndata=True)
         # dgl.NID and dgl.EID are not copy automatically
-        subg.ndata[dgl.NID] = org_nid
+        subg.ndata['old_nid'] = org_nid
         subg.edata['etype'] = th.cat([rels, rels + self.num_rel])
 
         # calculate norm for compact_subg
@@ -291,6 +309,8 @@ class LinkNeighborSampler:
             n_block = dgl.to_block(n_frontier, n_curr)
             p_block.srcdata['ntype'] = g.ndata['ntype'][p_block.srcdata[dgl.NID]]
             n_block.srcdata['ntype'] = g.ndata['ntype'][n_block.srcdata[dgl.NID]]
+            p_block.srcdata['type_id'] = g.ndata['type_id'][p_block.srcdata[dgl.NID]]
+            n_block.srcdata['type_id'] = g.ndata['type_id'][n_block.srcdata[dgl.NID]]
             p_block.edata['etype'] = p_etypes
             n_block.edata['etype'] = n_etypes
             p_block.edata['norm'] = p_norm
@@ -302,21 +322,31 @@ class LinkNeighborSampler:
 
         return (bsize, p_g, n_g, p_blocks, n_blocks)
 
-def fullgraph_eval(g, embed_layer, model, device, node_feats,
-    dim_size, minibatch_blocks, pos_eids, neg_eids, neg_cnt, queue, filterred_test):
+def fullgraph_emb(g, embed_layer, model, node_feats, dim_size, device):
+    in_feats = th.zeros(g.number_of_nodes(), dim_size)
+
+    for i in range((g.number_of_nodes() + 1023) // 1024):
+        idx = th.arange(start=i * 1024,
+                        end=(i+1) * 1024 \
+                            if (i+1) * 1024 < g.number_of_nodes() \
+                            else g.number_of_nodes())
+        in_feats[idx] = embed_layer(idx,
+                                    g.ndata['ntype'][idx],
+                                    g.ndata['type_id'][idx],
+                                    node_feats).cpu()
+
+    emb = model.inference(g, in_feats, 1024, device)
+    return emb
+
+def fullgraph_eval(train_g, g, embed_layer, model, device, node_feats,
+    dim_size, pos_eids, neg_eids, neg_cnt, queue, filterred_test):
     model.eval()
     embed_layer.eval()
     t0 = time.time()
     logs = []
-    embs = th.empty(g.number_of_nodes(), dim_size)
-    with th.no_grad():
-        for block in tqdm.tqdm(minibatch_blocks):
-            in_feats = embed_layer(block[0].srcdata[dgl.NID].to(device),
-                                   block[0].srcdata['ntype'].to(device),
-                                   node_feats)
-            mb_feats = model(block, in_feats)
-            embs[block[-1].dstdata[dgl.NID]] = mb_feats.cpu()
 
+    with th.no_grad():
+        embs = fullgraph_emb(train_g, embed_layer, model, node_feats, dim_size, device)
         mrr = 0
         mr = 0
         hit1 = 0
@@ -330,6 +360,7 @@ def fullgraph_eval(g, embed_layer, model, device, node_feats,
         # randomly select neg_cnt edges and corrupt them int neg heads and neg tails
         if neg_cnt > 0:
             total_neg_seeds = th.randint(neg_eids.shape[0], (neg_cnt * ((pos_cnt // pos_batch_size) + 1),))
+            print(total_neg_seeds)
         # treat all nodes in head or tail as neg nodes
         else:
             n_u, n_v = g.find_edges(neg_eids)
@@ -401,8 +432,6 @@ def fullgraph_eval(g, embed_layer, model, device, node_feats,
                                                        ntail_emb.shape[0]).reshape(-1, ntail_emb.shape[0]))
             t_neg_score = th.cat(t_neg_score, dim=1)
             h_neg_score = th.cat(h_neg_score, dim=1)
-            #t_neg_score = F.logsigmoid(t_neg_score)
-            #h_neg_score = F.logsigmoid(h_neg_score)
 
             if filterred_test:
                 # exclude false neg edges
@@ -476,13 +505,13 @@ def fullgraph_eval(g, embed_layer, model, device, node_feats,
                     'HITS@10': 1.0 if ranking <= 10 else 0.0
                 })
 
-    metrics = {}
-    if len(logs) > 0:
-        for metric in logs[0].keys():
-            metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
     if queue is not None:
         queue.put(logs)
     else:
+        metrics = {}
+        if len(logs) > 0:
+            for metric in logs[0].keys():
+                metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
         for k, v in metrics.items():
             print('Average {}: {}'.format(k, v))
     t1 = time.time()
@@ -497,12 +526,9 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
 
     batch_size = args.batch_size
     chunk_size = args.chunk_size
-    valid_batch_size = args.valid_batch_size
     fanouts = [args.fanout if args.fanout > 0 else None] * args.n_layers
 
     num_train_edges = train_neg_seeds.shape[0]
-    num_valid_edges = valid_neg_seeds.shape[0]
-    num_test_edges = test_neg_seeds.shape[0]
     node_tids = test_g.ndata['ntype']
     num_of_ntype = int(th.max(node_tids).numpy()) + 1
 
@@ -532,27 +558,6 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
                             drop_last=True,
                             num_workers=args.num_workers)
 
-    valid_sampler = NodeSampler(valid_g, fanouts=[None] * args.n_layers)
-    valid_dataloader = DataLoader(dataset=th.arange(test_g.number_of_nodes()),
-                                  batch_size=4 * 1024,
-                                  collate_fn=valid_sampler.sample_nodes,
-                                  shuffle=False,
-                                  pin_memory=True,
-                                  drop_last=False,
-                                  num_workers=args.num_workers)
-
-    # for the test, we first calculate embeddings for all nodes
-    # and then calculate mrr, mr, etc.
-    test_sampler = NodeSampler(test_g, fanouts=[None] * args.n_layers)
-    test_dataloader = DataLoader(dataset=th.arange(test_g.number_of_nodes()),
-                                 batch_size=4 * 1024,
-                                 collate_fn=test_sampler.sample_nodes,
-                                 shuffle=False,
-                                 pin_memory=True,
-                                 drop_last=False,
-                                 num_workers=args.num_workers)
-
-
     if n_gpus > 1:
         dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
             master_ip='127.0.0.1', master_port='12345')
@@ -578,8 +583,7 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
                         dropout=args.dropout,
                         use_self_loop=args.use_self_loop,
                         low_mem=args.low_mem,
-                        relation_regularizer=args.relation_regularizer,
-                        regularization_coef=args.regularization_coef)
+                        relation_regularizer=args.relation_regularizer)
     if dev_id >= 0:
         model.cuda(dev_id)
         if args.mix_cpu_gpu is False:
@@ -605,19 +609,22 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
         for i, sample_data in enumerate(dataloader):
             if args.sampler == 'neighbor':
                 bsize, p_g, n_g, p_blocks, n_blocks = sample_data
-                p_feats = embed_layer(p_blocks[0].srcdata[dgl.NID].to(dev_id),
-                                    p_blocks[0].srcdata['ntype'].to(dev_id),
-                                    node_feats)
-                n_feats = embed_layer(n_blocks[0].srcdata[dgl.NID].to(dev_id),
-                                    n_blocks[0].srcdata['ntype'].to(dev_id),
-                                    node_feats)
+                p_feats = embed_layer(p_blocks[0].srcdata[dgl.NID],
+                                      p_blocks[0].srcdata['ntype'],
+                                      p_blocks[0].srcdata['type_id'],
+                                      node_feats)
+                n_feats = embed_layer(n_blocks[0].srcdata[dgl.NID],
+                                      n_blocks[0].srcdata['ntype'],
+                                      n_blocks[0].srcdata['type_id'],
+                                      node_feats)
 
                 p_head_emb, p_tail_emb, r_emb, n_head_emb, n_tail_emb, p_emb, n_emb = \
                     model(p_blocks, p_feats, n_blocks, n_feats, p_g, n_g)
             else:
                 bsize, g, p_u, p_v, rids = sample_data
-                in_feats = embed_layer(g.ndata[dgl.NID].to(dev_id),
-                                       g.ndata['ntype'].to(dev_id),
+                in_feats = embed_layer(g.ndata['old_nid'],
+                                       g.ndata['ntype'],
+                                       g.ndata['type_id'],
                                        node_feats)
                 mb_feats = model(g, in_feats, sample=args.sampler)
                 p_head_emb = mb_feats[p_u]
@@ -630,10 +637,6 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
                     r_emb = model.w_relation[rids]
                 else:
                     r_emb = model.module.w_relation[rids]
-
-            #n_shuffle_seed = th.randperm(n_head_emb.shape[0])
-            #n_head_emb = n_head_emb[n_shuffle_seed]
-            #n_tail_emb = n_tail_emb[n_shuffle_seed]
 
             pred_loss = get_loss(p_head_emb,
                                 p_tail_emb,
@@ -671,15 +674,15 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
             dur = t1 - t0
             print("Epoch {} takes {} seconds".format(epoch, dur))
 
-        if epoch > 1 and epoch % 10 == 0:
+        if epoch > 1 and epoch % args.evaluate_every == 0:
             # We use multi-gpu evaluation to speed things up
-            fullgraph_eval(valid_g,
+            fullgraph_eval(train_g,
+                        valid_g,
                         embed_layer,
                         model,
                         dev_id,
                         node_feats,
                         args.n_hidden,
-                        valid_dataloader,
                         valid_seeds,
                         valid_neg_seeds,
                         args.valid_neg_cnt,
@@ -707,13 +710,13 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
         th.save(model.state_dict(), args.model_path)
 
     # We use multi-gpu testing to speed things up
-    fullgraph_eval(test_g,
+    fullgraph_eval(train_g,
+                   test_g,
                    embed_layer,
                    model,
                    dev_id,
                    node_feats,
                    args.n_hidden,
-                   test_dataloader,
                    test_seeds,
                    test_neg_seeds,
                    args.test_neg_cnt,
@@ -736,30 +739,44 @@ def main(args, devices):
     # load graph data
     dataset = load_data(args.dataset)
     g = dataset[0]
+    # wn18, fb15k has only one node type.
+    g.ndata['type_id'] = th.arange(g.number_of_nodes())
     num_nodes = dataset.num_nodes
-    train_edge_mask = g.edata.pop('train_mask')
-    valid_edge_mask = g.edata.pop('val_mask')
-    test_edge_mask = g.edata.pop('test_mask')
-    train_edge_id = th.nonzero(train_edge_mask).squeeze()
-    valid_edge_id = th.nonzero(valid_edge_mask).squeeze()
-    valid_edge_id = th.cat([train_edge_id, valid_edge_id])
+    train_mask = g.edata.pop('train_mask')
+    valid_mask = g.edata.pop('val_mask')
+    test_mask = g.edata.pop('test_mask')
 
-    train_g = g.edge_subgraph(train_edge_id, preserve_nodes=True)
-    valid_g = g.edge_subgraph(valid_edge_id, preserve_nodes=True)
+    train_g = g.edge_subgraph(train_mask, preserve_nodes=True)
+    valid_g = g.edge_subgraph((train_mask | valid_mask), preserve_nodes=True)
     test_g  = g
 
+    # train_g
     train_seed_mask = train_g.edata.pop('train_edge_mask')
     train_seeds = th.nonzero(train_seed_mask).squeeze()
+    train_g.edata.pop('valid_edge_mask')
+    train_g.edata.pop('test_edge_mask')
+
+    # valid_g
+    t_seed_mask = valid_g.edata.pop('train_edge_mask')
     val_seed_mask = valid_g.edata.pop('valid_edge_mask')
     valid_seeds = th.nonzero(val_seed_mask).squeeze()
+    valid_neg_seeds = th.nonzero(t_seed_mask | val_seed_mask).squeeze()
+    valid_g.edata.pop('test_edge_mask')
+
+    # test_g
+    t_seed_mask = test_g.edata.pop('train_edge_mask')
+    v_seed_mask = test_g.edata.pop('valid_edge_mask')
     test_seed_mask = test_g.edata.pop('test_edge_mask')
     test_seeds = th.nonzero(test_seed_mask).squeeze()
+    test_neg_seeds = th.nonzero(t_seed_mask | v_seed_mask | test_seed_mask).squeeze()
     num_rels = dataset.num_rels
     edge_rels = num_rels * 2 # we add reverse edges
 
     print("Train pos edges #{}".format(train_seeds.shape[0]))
     print("Valid pos edges #{}".format(valid_seeds.shape[0]))
     print("Test pos edges #{}".format(test_seeds.shape[0]))
+    print("Valid neg edges #{}".format(valid_neg_seeds.shape[0]))
+    print("Test neg edges #{}".format(test_neg_seeds.shape[0]))
 
     train_shuffle = th.randperm(train_seeds.shape[0])
     train_seeds = train_seeds[train_shuffle]
@@ -786,12 +803,9 @@ def main(args, devices):
     train_g.edata['norm'].share_memory_()
     train_g.edata['etype'].share_memory_()
     train_g.ndata['ntype'].share_memory_()
-    train_g.edata.pop('valid_edge_mask')
-    train_g.edata.pop('test_edge_mask')
 
     # get valid set
     u, v, eid = valid_g.all_edges(form='all')
-    valid_neg_seeds = th.nonzero(~val_seed_mask).squeeze()
     # calculate norm for each edge type and store in edge
     if args.global_norm:
         _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
@@ -813,12 +827,9 @@ def main(args, devices):
     valid_g.edata['norm'].share_memory_()
     valid_g.edata['etype'].share_memory_()
     valid_g.ndata['ntype'].share_memory_()
-    valid_g.edata.pop('train_edge_mask')
-    valid_g.edata.pop('test_edge_mask')
 
     # get test set
     u, v, eid = test_g.all_edges(form='all')
-    test_neg_seeds = th.nonzero(~test_seed_mask).squeeze()
     # calculate norm for each edge type and store in edge
     if args.global_norm:
         _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
@@ -840,8 +851,6 @@ def main(args, devices):
     test_g.edata['norm'].share_memory_()
     test_g.edata['etype'].share_memory_()
     test_g.ndata['ntype'].share_memory_()
-    test_g.edata.pop('train_edge_mask')
-    test_g.edata.pop('valid_edge_mask')
 
     train_g.create_format_()
     valid_g.create_format_()
@@ -902,8 +911,6 @@ def config():
             help="number of hidden units")
     parser.add_argument("--gpu", type=str, default='0',
             help="gpu")
-    parser.add_argument("--keep_pos_edges", default=False, action='store_true',
-            help="Whether delete positive edges during training in case of linkage leakage")
     parser.add_argument("--lr", type=float, default=1e-2,
             help="learning rate")
     parser.add_argument("--n-bases", type=int, default=10,
@@ -922,8 +929,6 @@ def config():
             help="Mini-batch size.")
     parser.add_argument("--chunk-size", type=int, default=32,
             help="Negative sample chunk size. In each chunk, positive pairs will share negative edges")
-    parser.add_argument("--valid-batch-size", type=int, default=8,
-            help="Mini-batch size for validation and test.")
     parser.add_argument("--fanout", type=int, default=10,
             help="Fan-out of neighbor sampling.")
     parser.add_argument("--global-norm", default=False, action='store_true',
@@ -948,6 +953,8 @@ def config():
             help="Relation weight regularizer")
     parser.add_argument("--sampler", type=str, default='neighbor',
             help="subgraph sampler")
+    parser.add_argument("--evaluate-every", type=int, default=10,
+            help="perform evaluation every n epochs")
 
     args = parser.parse_args()
 
@@ -958,5 +965,4 @@ if __name__ == '__main__':
     devices = list(map(int, args.gpu.split(',')))
     print(args)
     assert args.batch_size > 0
-    assert args.valid_batch_size > 0
     main(args, devices)
