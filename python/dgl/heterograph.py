@@ -1757,60 +1757,26 @@ class DGLHeteroGraph(object):
 
     @property
     def edata(self):
-        """Return the data view of all the edges.
+        """Return an edge data view for setting/getting edge features
 
-        If the graph has only one edge type, ``g.edata['feat']`` gives the
-        edge feature data under name ``'feat'``.
-        If the graph has multiple edge types, then ``g.edata['feat']``
-        returns a dictionary where the key is the edge type and the value
-        is the edge feature tensor. If the edge type does not have feature
-        ``'feat'``, it is not included in the dictionary.
-
-        Note: When the graph has multiple edge type, The key used in
-        ``g.edata['feat']`` should be the canonical edge types, i.e.
-        (h_ntype, r_type, t_ntype).
+        Notes
+        -----
+        - This is only for setting/getting edge features for a graph of a single edge type.
+          To work with graphs of multiple edge types, see :func:`dgl.DGLGraph.edges`.
+        - For setting features, the device of the features must be the same as the device
+          of the graph.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        To set features of all edges in a heterogeneous graph
-        with only one edge type:
-
-        >>> g = dgl.graph(([0, 1], [1, 2]))
-        >>> g.edata['h'] = torch.zeros(2, 5)
-
-        To set features of all edges in a heterogeneous graph
-        with multiple edge types:
-
-        >>> g = dgl.heterograph({
-        >>>    ('user', 'watches', 'movie'): ([0, 1, 1], [1, 0, 1]),
-        >>>    ('user', 'watches', 'TV'): ([0, 1], [0, 1])
-        >>> })
-        >>> g.edata['h'] = {('user', 'watches', 'movie') : torch.zeros(3, 5),
-        >>>                 ('user', 'watches', 'TV') : torch.zeros(2, 5)}
+        >>> import dgl
+        >>> import torch
+        >>> g = dgl.graph((torch.tensor([1, 2]), torch.tensor([2, 3])))
+        >>> g.edata['h'] = torch.ones(2, 1)
         >>> g.edata['h']
-        ... {('user', 'watches', 'movie'): tensor([[0., 0., 0., 0., 0.],
-        ...                                        [0., 0., 0., 0., 0.],
-        ...                                        [0., 0., 0., 0., 0.]]),
-        ...  ('user', 'watches', 'TV'): tensor([[0., 0., 0., 0., 0.],
-        ...                                     [0., 0., 0., 0., 0.]])}
-
-        To set features of part of edges in a heterogeneous graph
-        with multiple edge types:
-        >>> g = dgl.heterograph({
-        >>>    ('user', 'watches', 'movie'): ([0, 1, 1], [1, 0, 1]),
-        >>>    ('user', 'watches', 'TV'): ([0, 1], [0, 1])
-        >>> })
-        >>> g.edata['h'] = {('user', 'watches', 'movie') : torch.zeros(3, 5)}
-        >>> g.edata['h']
-        ... {('user', 'watches', 'movie'): tensor([[0., 0., 0., 0., 0.],
-        ...                                        [0., 0., 0., 0., 0.],
-        ...                                        [0., 0., 0., 0., 0.]])}
-        >>> # clean the feature 'h' and no edge type contains 'h'
-        >>> g.edata.pop('h')
-        >>> g.edata['h']
-        ... {}
+        tensor([[1.],
+                [1.]])
 
         See Also
         --------
@@ -1819,7 +1785,8 @@ class DGLHeteroGraph(object):
         if len(self.canonical_etypes) == 1:
             return HeteroEdgeDataView(self, None, ALL)
         else:
-            return HeteroEdgeDataView(self, self.canonical_etypes, ALL)
+            raise DGLError('To set/get edge features for graphs of multiple edge types, '
+                           'use DGLGraph.edges.')
 
     def _find_etypes(self, key):
         etypes = [
