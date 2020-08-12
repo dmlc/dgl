@@ -247,7 +247,7 @@ class LinkPathSampler:
         in_deg = subg.in_degrees(range(subg.number_of_nodes())).float()
         norm = 1.0 / in_deg
         norm[th.isinf(norm)] = 0
-        subg.ndata['norm'] = norm.long()
+        subg.ndata['norm'] = norm
         subg.apply_edges(lambda edges : {'norm' : edges.dst['norm']})
         subg.edata['norm'] = subg.edata['norm'].unsqueeze(1)
         return (bsize, subg, p_u, p_v, p_rel)
@@ -672,7 +672,7 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
 
         if epoch > 1 and epoch % args.evaluate_every == 0:
             # We use multi-gpu evaluation to speed things up
-            fullgraph_eval(train_g,
+            fullgraph_eval(valid_g,
                         valid_g,
                         embed_layer,
                         model,
@@ -706,7 +706,7 @@ def run(proc_id, n_gpus, args, devices, dataset, pos_seeds, neg_seeds, queue=Non
         th.save(model.state_dict(), args.model_path)
 
     # We use multi-gpu testing to speed things up
-    fullgraph_eval(train_g,
+    fullgraph_eval(valid_g,
                    test_g,
                    embed_layer,
                    model,
@@ -784,7 +784,7 @@ def main(args, devices):
         degrees = count[inverse_index]
         norm = th.ones(v.shape[0]) / degrees
         norm = norm.unsqueeze(1)
-        train_g.edata['norm'] = norm.long()
+        train_g.edata['norm'] = norm
     else:
         train_g.edata['norm'] = th.full((eid.shape[0],1), 1)
         for rel_id in range(edge_rels):
@@ -795,7 +795,7 @@ def main(args, devices):
             degrees = count[inverse_index]
             norm = th.ones(v_r.shape[0]) / degrees
             norm = norm.unsqueeze(1)
-            train_g.edata['norm'][idx] = norm.long()
+            train_g.edata['norm'][idx] = norm
     train_g.edata['norm'].share_memory_()
     train_g.edata['etype'].share_memory_()
     train_g.ndata['ntype'].share_memory_()
@@ -808,9 +808,9 @@ def main(args, devices):
         degrees = count[inverse_index]
         norm = th.ones(v.shape[0]) / degrees
         norm = norm.unsqueeze(1)
-        valid_g.edata['norm'] = norm.long()
+        valid_g.edata['norm'] = norm
     else:
-        valid_g.edata['norm'] = th.full((eid.shape[0],1), 1).long()
+        valid_g.edata['norm'] = th.full((eid.shape[0],1), 1)
         for rel_id in range(edge_rels):
             idx = (valid_g.edata['etype'] == rel_id)
             u_r = u[idx]
@@ -819,7 +819,7 @@ def main(args, devices):
             degrees = count[inverse_index]
             norm = th.ones(v_r.shape[0]) / degrees
             norm = norm.unsqueeze(1)
-            valid_g.edata['norm'][idx] = norm.long()
+            valid_g.edata['norm'][idx] = norm
     valid_g.edata['norm'].share_memory_()
     valid_g.edata['etype'].share_memory_()
     valid_g.ndata['ntype'].share_memory_()
@@ -832,9 +832,9 @@ def main(args, devices):
         degrees = count[inverse_index]
         norm = th.ones(v.shape[0]) / degrees
         norm = norm.unsqueeze(1)
-        test_g.edata['norm'] = norm.long()
+        test_g.edata['norm'] = norm
     else:
-        test_g.edata['norm'] = th.full((eid.shape[0],1), 1).long()
+        test_g.edata['norm'] = th.full((eid.shape[0],1), 1)
         for rel_id in range(edge_rels):
             idx = (test_g.edata['etype'] == rel_id)
             u_r = u[idx]
@@ -843,7 +843,7 @@ def main(args, devices):
             degrees = count[inverse_index]
             norm = th.ones(v_r.shape[0]) / degrees
             norm = norm.unsqueeze(1)
-            test_g.edata['norm'][idx] = norm.long()
+            test_g.edata['norm'][idx] = norm
     test_g.edata['norm'].share_memory_()
     test_g.edata['etype'].share_memory_()
     test_g.ndata['ntype'].share_memory_()
