@@ -415,7 +415,7 @@ def run(args, device, data):
     #print(profiler.output_text())
 
 def main(args):
-    dgl.distributed.initialize(args.ip_config, num_workers=args.num_workers)
+    dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
 
@@ -456,6 +456,7 @@ if __name__ == '__main__':
     parser.add_argument('--ip-config', type=str, help='The file for IP configuration')
     parser.add_argument('--conf-path', type=str, help='The path to the partition config file')
     parser.add_argument('--num-client', type=int, help='The number of clients')
+    parser.add_argument('--num-servers', type=int, default=1, help='Server count on each machine.')
 
     # rgcn related
     parser.add_argument("--gpu", type=str, default='0',
