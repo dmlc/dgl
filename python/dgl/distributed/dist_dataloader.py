@@ -55,6 +55,7 @@ def enable_mp_debug():
     logger = multiprocessing.log_to_stderr()
     logger.setLevel(logging.DEBUG)
 
+enable_mp_debug()
 DATALOADER_ID = 0
 
 class DistDataLoader:
