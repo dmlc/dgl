@@ -15,9 +15,7 @@ export PYTHONPATH=$PYTHONPATH:..
 In this example, we partition the OGB product graph into 4 parts with Metis. The partitions are balanced with respect to
 the number of nodes, the number of edges and the number of labelled nodes.
 ```bash
-mkdir dgl_data
-cd dgl_data
-python3 ~/dgl/examples/pytorch/graphsage/experimental/partition_graph.py --dataset ogb-product --num_parts 4 --balance_train --balance_edges
+python3 partition_graph.py --dataset ogb-product --num_parts 4 --balance_train --balance_edges --output ~/dgl_data
 ```
 
 ### Step 2: copy the partitioned data to the cluster
