@@ -184,12 +184,12 @@ class DistEmbedLayer(nn.Module):
 
         return embeds
 
-def compute_acc(logits, labels):
+def compute_acc(results, labels):
     """
     Compute the accuracy of prediction given the labels.
     """
     labels = labels.long()
-    return (logits.argmax(dim=1) == labels).float().sum() / len(logits)
+    return (results == labels).float().sum() / len(results)
 
 def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, node_feats, global_val_mask, global_test_mask):
     model.eval()
@@ -197,7 +197,7 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, node_feats
     eval_logits = []
     eval_seeds = []
 
-    global_logits = dgl.distributed.DistTensor(g, labels.shape, th.float32, 'logits', persistent=True)
+    global_results = dgl.distributed.DistTensor(g, labels.shape, th.long, 'results', persistent=True)
 
     with th.no_grad():
         for sample_data in tqdm.tqdm(eval_loader):
@@ -210,7 +210,7 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, node_feats
             eval_seeds.append(seeds.cpu().detach())
     eval_logits = th.cat(eval_logits)
     eval_seeds = th.cat(eval_seeds)
-    global_logits[eval_seeds] = eval_logits
+    global_results[eval_seeds] = eval_logits.argmax(dim=1)
 
     test_logits = []
     test_seeds = []
@@ -225,12 +225,12 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, node_feats
             test_seeds.append(seeds.cpu().detach())
     test_logits = th.cat(test_logits)
     test_seeds = th.cat(test_seeds)
-    global_logits[test_seeds] = test_logits
+    global_results[test_seeds] = test_logits.argmax(dim=1)
 
     g.barrier()
     if g.rank() == 0:
-        return compute_acc(global_logits[global_val_nid], labels[global_val_mask]), \
-            compute_acc(global_logits[global_test_nid], labels[global_test_mask])
+        return compute_acc(global_results[global_val_nid], labels[global_val_mask]), \
+            compute_acc(global_results[global_test_nid], labels[global_test_mask])
     else:
         return -1, -1
 
