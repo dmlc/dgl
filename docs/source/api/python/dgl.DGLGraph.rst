@@ -14,6 +14,8 @@ Querying metagraph structure
 
     DGLHeteroGraph.ntypes
     DGLHeteroGraph.etypes
+    DGLHeteroGraph.srctypes
+    DGLHeteroGraph.dsttypes
     DGLHeteroGraph.canonical_etypes
     DGLHeteroGraph.metagraph
     DGLHeteroGraph.to_canonical_etype
@@ -26,9 +28,12 @@ Querying graph structure
 .. autosummary::
     :toctree: ../../generated/
 
-    DGLHeteroGraph.number_of_nodes
-    DGLHeteroGraph.number_of_edges
+    DGLHeteroGraph.num_nodes
+    DGLHeteroGraph.num_edges
+    DGLHeteroGraph.num_src_nodes
+    DGLHeteroGraph.num_dst_nodes
     DGLHeteroGraph.is_multigraph
+    DGLHeteroGraph.is_homogeneous
     DGLHeteroGraph.has_nodes
     DGLHeteroGraph.has_edges_between
     DGLHeteroGraph.predecessors
@@ -75,6 +80,10 @@ Using Node/edge features
     DGLHeteroGraph.edge_attr_schemes
     DGLHeteroGraph.set_n_initializer
     DGLHeteroGraph.set_e_initializer
+    DGLHeteroGraph.srcnodes
+    DGLHeteroGraph.dstnodes
+    DGLHeteroGraph.srcdata
+    DGLHeteroGraph.dstdata
     DGLHeteroGraph.local_var
     DGLHeteroGraph.local_scope
 
@@ -107,3 +116,14 @@ Computing with DGLHeteroGraph
     DGLHeteroGraph.filter_nodes
     DGLHeteroGraph.filter_edges
     DGLHeteroGraph.to
+    DGLHeteroGraph.device
+
+Querying batch summary
+----------------------
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    DGLHeteroGraph.batch_size
+    DGLHeteroGraph.batch_num_nodes
+    DGLHeteroGraph.batch_num_edges
