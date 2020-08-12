@@ -193,7 +193,7 @@ def load_partition_book(conf_file, part_id, graph=None):
 
 def partition_graph(g, num_parts, part_method="metis", **kwargs):
     if num_parts == 1:
-        return torch.zeros(g.number_of_nodes())
+        return torch.zeros(g.number_of_nodes()).long()
     elif part_method == 'metis':
         group = metis_partition_assignment(g, num_parts, **kwargs)
     elif part_method == 'random':
