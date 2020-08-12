@@ -1213,7 +1213,51 @@ class DGLHeteroGraph(object):
         return len(self.batch_num_nodes(self.ntypes[0]))
 
     def batch_num_nodes(self, ntype=None):
-        """TBD"""
+        """Return the number of nodes for each graph in the batch with the specified node type.
+
+        Parameters
+        ----------
+        ntype : str, optional
+            The node type for query. If the graph has multiple node types, one must
+            specify the argument. Otherwise, it can be omitted.
+
+        Returns
+        -------
+        Tensor
+            The number of nodes with the specified type for each graph in the batch. The i-th
+            element of it is the number of nodes with the specified type for the i-th graph.
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Query for homogeneous graphs.
+
+        >>> g1 = dgl.graph((torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])))
+        >>> g1.batch_num_nodes()
+        tensor([4])
+        >>> g2 = dgl.graph((torch.tensor([0, 0, 0, 1]), torch.tensor([0, 1, 2, 0])))
+        >>> bg = dgl.batch([g1, g2])
+        >>> bg.batch_num_nodes()
+        tensor([4, 3])
+
+        Query for heterogeneous graphs.
+
+        >>> hg1 = dgl.heterograph({
+        >>>       ('user', 'plays', 'game') : (torch.tensor([0, 1]), torch.tensor([0, 0]))})
+        >>> hg2 = dgl.heterograph({
+        >>>       ('user', 'plays', 'game') : (torch.tensor([0, 0]), torch.tensor([1, 0]))})
+        >>> bg = dgl.batch([hg1, hg2])
+        >>> bg.batch_num_nodes('user')
+        tensor([2, 1])
+        """
+        if ntype is not None and ntype not in self.ntypes:
+            raise DGLError('Expect ntype in {}, got {}'.format(self.ntypes, ntype))
+
         if self._batch_num_nodes is None:
             self._batch_num_nodes = {}
             for ty in self.ntypes:
@@ -1235,7 +1279,50 @@ class DGLHeteroGraph(object):
         self._batch_num_nodes = val
 
     def batch_num_edges(self, etype=None):
-        """TBD"""
+        """Return the number of edges for each graph in the batch with the specified edge type.
+
+        Parameters
+        ----------
+        etype : str or tuple of str, optional
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
+
+        Returns
+        -------
+        Tensor
+            The number of edges with the specified type for each graph in the batch. The i-th
+            element of it is the number of edges with the specified type for the i-th graph.
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Query for homogeneous graphs.
+
+        >>> g1 = dgl.graph((torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])))
+        >>> g1.batch_num_edges()
+        tensor([3])
+        >>> g2 = dgl.graph((torch.tensor([0, 0, 0, 1]), torch.tensor([0, 1, 2, 0])))
+        >>> bg = dgl.batch([g1, g2])
+        >>> bg.batch_num_edges()
+        tensor([3, 4])
+
+        Query for heterogeneous graphs.
+
+        >>> hg1 = dgl.heterograph({
+        >>>       ('user', 'plays', 'game') : (torch.tensor([0, 1]), torch.tensor([0, 0]))})
+        >>> hg2 = dgl.heterograph({
+        >>>       ('user', 'plays', 'game') : (torch.tensor([0, 0]), torch.tensor([1, 0]))})
+        >>> bg = dgl.batch([hg1, hg2])
+        >>> bg.batch_num_edges('plays')
+        tensor([2, 2])
+        """
         if self._batch_num_edges is None:
             self._batch_num_edges = {}
             for ty in self.canonical_etypes:
@@ -1246,6 +1333,8 @@ class DGLHeteroGraph(object):
                 raise DGLError('Edge type name must be specified if there are more than one '
                                'edge types.')
             etype = self.canonical_etypes[0]
+        else:
+            etype = self.to_canonical_etype(etype)
         return self._batch_num_edges[etype]
 
     def set_batch_num_edges(self, val):
@@ -1884,15 +1973,14 @@ class DGLHeteroGraph(object):
             return self._graph.number_of_nodes(self.get_ntype_id(ntype))
 
     def number_of_src_nodes(self, ntype=None):
-        """Return the number of nodes of the given SRC node type in the heterograph.
-
-        The heterograph is usually a unidirectional bipartite graph.
+        """Return the number of nodes of the given source node type.
 
         Parameters
         ----------
         ntype : str, optional
-            Node type.
-            If omitted, there should be only one node type in the SRC category.
+            The source node type for query. If given, it returns the number of nodes for a
+            particular source node type. If not given (default), it returns the number of
+            nodes summed over all source node types.
 
         Returns
         -------
@@ -1901,26 +1989,44 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1], [1, 2])})
-        >>> g.number_of_src_nodes('user')
-        2
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph for query.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
         >>> g.number_of_src_nodes()
+        7
+
+        Create a heterogeneous graph with two source node types -- 'developer' and 'user'.
+
+        >>> g = dgl.heterograph({
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        >>> })
+
+        Query for the number of nodes.
+
+        >>> g.number_of_src_nodes('developer')
         2
-        >>> g.number_of_nodes('user')
-        2
+        >>> g.number_of_src_nodes('user')
+        5
+        >>> g.number_of_src_nodes()
+        7
         """
-        return self._graph.number_of_nodes(self.get_ntype_id_from_src(ntype))
+        return self.num_src_nodes(ntype)
 
     def num_src_nodes(self, ntype=None):
-        """Return the number of nodes of the given SRC node type in the heterograph.
-
-        The heterograph is usually a unidirectional bipartite graph.
+        """Return the number of nodes of the given source node type.
 
         Parameters
         ----------
         ntype : str, optional
-            Node type.
-            If omitted, there should be only one node type in the SRC category.
+            The source node type for query. If given, it returns the number of nodes for a
+            particular source node type. If not given (default), it returns the number of
+            nodes summed over all source node types.
 
         Returns
         -------
@@ -1929,26 +2035,50 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1], [1, 2])})
-        >>> g.num_src_nodes('user')
-        2
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph for query.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
         >>> g.num_src_nodes()
+        3
+
+        Create a heterogeneous graph with two source node types -- 'developer' and 'user'.
+
+        >>> g = dgl.heterograph({
+        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        >>> })
+
+        Query for the number of nodes.
+
+        >>> g.num_src_nodes('developer')
         2
-        >>> g.num_nodes('user')
-        2
+        >>> g.num_src_nodes('user')
+        5
+        >>> g.num_src_nodes()
+        7
         """
-        return self._graph.number_of_nodes(self.get_ntype_id_from_src(ntype))
+        if ntype is None:
+            total_num_nodes = 0
+            for nty in self.srctypes:
+                total_num_nodes += self._graph.number_of_nodes(self.get_ntype_id_from_src(nty))
+            return total_num_nodes
+        else:
+            return self._graph.number_of_nodes(self.get_ntype_id_from_src(ntype))
 
     def number_of_dst_nodes(self, ntype=None):
-        """Return the number of nodes of the given DST node type in the heterograph.
-
-        The heterograph is usually a unidirectional bipartite graph.
+        """Return the number of nodes of the given destination node type.
 
         Parameters
         ----------
         ntype : str, optional
-            Node type.
-            If omitted, there should be only one node type in the DST category.
+            The destination node type for query. If given, it returns the number of nodes for a
+            particular destination node type. If not given (default), it returns the number of
+            nodes summed over all destination node types.
 
         Returns
         -------
@@ -1957,26 +2087,44 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1], [1, 2])})
-        >>> g.number_of_dst_nodes('game')
-        3
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph for query.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
         >>> g.number_of_dst_nodes()
         3
-        >>> g.number_of_nodes('game')
-        3
+
+        Create a heterogeneous graph with two destination node types -- 'user' and 'game'.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        >>> })
+
+        Query for the number of nodes.
+
+        >>> g.number_of_dst_nodes('user')
+        5
+        >>> g.number_of_dst_nodes('game')
+        7
+        >>> g.number_of_dst_nodes()
+        12
         """
-        return self._graph.number_of_nodes(self.get_ntype_id_from_dst(ntype))
+        return self.num_dst_nodes(ntype)
 
     def num_dst_nodes(self, ntype=None):
-        """Return the number of nodes of the given DST node type in the heterograph.
-
-        The heterograph is usually a unidirectional bipartite graph.
+        """Return the number of nodes of the given destination node type.
 
         Parameters
         ----------
         ntype : str, optional
-            Node type.
-            If omitted, there should be only one node type in the DST category.
+            The destination node type for query. If given, it returns the number of nodes for a
+            particular destination node type. If not given (default), it returns the number of
+            nodes summed over all destination node types.
 
         Returns
         -------
@@ -1985,15 +2133,40 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1], [1, 2])})
-        >>> g.num_dst_nodes('game')
-        3
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph for query.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
         >>> g.num_dst_nodes()
         3
-        >>> g.num_nodes('game')
-        3
+
+        Create a heterogeneous graph with two destination node types -- 'user' and 'game'.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        >>> })
+
+        Query for the number of nodes.
+
+        >>> g.num_dst_nodes('user')
+        5
+        >>> g.num_dst_nodes('game')
+        7
+        >>> g.num_dst_nodes()
+        12
         """
-        return self._graph.number_of_nodes(self.get_ntype_id_from_dst(ntype))
+        if ntype is None:
+            total_num_nodes = 0
+            for nty in self.dsttypes:
+                total_num_nodes += self._graph.number_of_nodes(self.get_ntype_id_from_dst(nty))
+            return total_num_nodes
+        else:
+            return self._graph.number_of_nodes(self.get_ntype_id_from_dst(ntype))
 
     def number_of_edges(self, etype=None):
         """Return the number of edges.
@@ -4389,38 +4562,93 @@ class DGLHeteroGraph(object):
     #################################################################
 
     def filter_nodes(self, predicate, nodes=ALL, ntype=None):
-        """Return a tensor of node IDs with the given node type that satisfy
+        """Return the IDs of the nodes with the given node type that satisfy
         the given predicate.
 
         Parameters
         ----------
         predicate : callable
-            A function of signature ``func(nodes) -> tensor``.
-            ``nodes`` are :class:`NodeBatch` objects as in :mod:`~dgl.udf`.
-            The ``tensor`` returned should be a 1-D boolean tensor with
+            A function of signature ``func(nodes) -> Tensor``.
+            ``nodes`` are :class:`dgl.NodeBatch` objects.
+            Its output tensor should be a 1D boolean tensor with
             each element indicating whether the corresponding node in
             the batch satisfies the predicate.
-        nodes : int, iterable or tensor of ints
-            The nodes to filter on. Default value is all the nodes.
+        nodes : node ID(s), optional
+            The node(s) for query. The allowed formats are:
+
+            - Tensor: A 1D tensor that contains the node(s) for query, whose data type
+              and device should be separately the same as the idtype and device of the graph.
+            - iterable[int] : Similar to the tensor, but stores node IDs in a sequence
+              (e.g. list, tuple, numpy.ndarray).
+
+            By default, it considers all nodes.
         ntype : str, optional
-            The node type. Can be omitted if there is only one node type
-            in the graph. (Default: None)
+            The node type for query. If the graph has multiple node types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
         tensor
-            Node ids indicating the nodes that satisfy the predicate.
+            A 1D tensor that contains the ID(s) of the node(s) that satisfy the predicate.
 
         Examples
         --------
-        >>> import torch
+
+        The following example uses PyTorch backend.
+
         >>> import dgl
-        >>> import dgl.function as fn
-        >>> g = dgl.graph(([], []), 'user', 'follows', num_nodes=4)
-        >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [1.], [0.]])
-        >>> g.filter_nodes(lambda nodes: (nodes.data['h'] == 1.).squeeze(1), ntype='user')
+        >>> import torch
+
+        Define a predicate function.
+
+        >>> def nodes_with_feature_one(nodes):
+        >>>     # Whether a node has feature 1
+        >>>     return (nodes.data['h'] == 1.).squeeze(1)
+
+        Filter nodes for a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])))
+        >>> g.ndata['h'] = torch.tensor([[0.], [1.], [1.], [0.]])
+        >>> print(g.filter_nodes(nodes_with_feature_one))
+        tensor([1, 2])
+
+        Filter on nodes with IDs 0 and 1
+
+        >>> print(g.filter_nodes(nodes_with_feature_one, nodes=torch.tensor([0, 1])))
+        tensor([1])
+
+        Filter nodes for a heterogeneous graph.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        >>>                                 torch.tensor([0, 0, 1, 1]))})
+        >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [1.]])
+        >>> g.nodes['game'].data['h'] = torch.tensor([[0.], [1.]])
+        >>> # Filter for 'user' nodes
+        >>> print(g.filter_nodes(nodes_with_feature_one, ntype='user'))
         tensor([1, 2])
         """
+        if not (is_all(nodes) or isinstance(nodes, (numbers.Integral, Iterable))
+                or F.is_tensor(nodes)):
+            raise DGLError('Expect nodes to have type int, tensor or sequence, '
+                           'got {}'.format(type(nodes)))
+
+        num_nodes = self.num_nodes(ntype)
+
+        if isinstance(nodes, numbers.Integral) and (nodes < 0 or nodes >= num_nodes):
+            raise DGLError('Expect the node ID to be from 0, ...'
+                           ', {:d}, got {:d}'.format(num_nodes - 1, nodes))
+
+        if not F.is_tensor(nodes) and not is_all(nodes) and isinstance(nodes, Iterable):
+            utils.detect_nan_in_iterable(nodes, 'the node IDs')
+            utils.detect_inf_in_iterable(nodes, 'the node IDs')
+
+        if (F.is_tensor(nodes) or isinstance(nodes, Iterable)) and not is_all(nodes):
+            utils.assert_nonnegative_iterable(nodes, 'the node IDs')
+            utils.assert_iterable_bounded_by_value(
+                nodes, 'the destination node IDs', num_nodes,
+                'the number of nodes with the specified type')
+
         with self.local_scope():
             self.apply_nodes(lambda nbatch: {'_mask' : predicate(nbatch)}, nodes, ntype)
             ntype = self.ntypes[0] if ntype is None else ntype
@@ -4432,39 +4660,125 @@ class DGLHeteroGraph(object):
                 return F.boolean_mask(v, F.gather_row(mask, v))
 
     def filter_edges(self, predicate, edges=ALL, etype=None):
-        """Return a tensor of edge IDs with the given edge type that satisfy
+        """Return the IDs of the edges with the given edge type that satisfy
         the given predicate.
 
         Parameters
         ----------
         predicate : callable
-            A function of signature ``func(edges) -> tensor``.
-            ``edges`` are :class:`EdgeBatch` objects as in :mod:`~dgl.udf`.
-            The ``tensor`` returned should be a 1-D boolean tensor with
+            A function of signature ``func(edges) -> Tensor``.
+            ``edges`` are :class:`dgl.EdgeBatch` objects.
+            Its output tensor should be a 1D boolean tensor with
             each element indicating whether the corresponding edge in
             the batch satisfies the predicate.
-        edges : valid edges type
-            Edges on which to apply ``func``. See :func:`send` for valid
-            edges type. Default value is all the edges.
-        etype : str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+        edges : edge ID(s) or edge end nodes, optional
+            The edge(s) for query. The allowed formats are:
+
+            - Tensor: A 1D tensor that contains the IDs of the edge(s) for query, whose data
+              type and device should be separately the same as the idtype and device of the
+              graph.
+            - iterable[int]: Similar to the tensor, but stores edge IDs in a sequence
+              (e.g. list, tuple, numpy.ndarray).
+            - (Tensor, Tensor): A 2-tuple of the source and destination nodes of multiple
+              edges for query. Each tensor is a 1D tensor containing node IDs. DGL calls this
+              format "tuple of node-tensors". The data type and device of the tensors should
+              be separately the same as the idtype and device of the graph.
+            - (iterable[int], iterable[int]): Similar to the tuple of node-tensors format,
+              but stores node IDs in two sequences (e.g. list, tuple, numpy.ndarray).
+
+            By default, it considers all edges.
+        etype : str or tuple of str, optional
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
         tensor
-            Edge ids indicating the edges that satisfy the predicate.
+            A 1D tensor that contains the ID(s) of the edge(s) that satisfy the predicate.
 
         Examples
         --------
-        >>> import torch
+
+        The following example uses PyTorch backend.
+
         >>> import dgl
-        >>> import dgl.function as fn
-        >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 0, 1, 2], [0, 1, 2, 3])})
-        >>> g.edges['follows'].data['h'] = torch.tensor([[0.], [1.], [1.], [0.]])
-        >>> g.filter_edges(lambda edges: (edges.data['h'] == 1.).squeeze(1), etype='follows')
+        >>> import torch
+
+        Define a predicate function.
+
+        >>> def edges_with_feature_one(edges):
+        >>>     # Whether an edge has feature 1
+        >>>     return (edges.data['h'] == 1.).squeeze(1)
+
+        Filter edges for a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])))
+        >>> g.edata['h'] = torch.tensor([[0.], [1.], [1.]])
+        >>> print(g.filter_edges(edges_with_feature_one))
+        tensor([1, 2])
+
+        Filter on edges with IDs 0 and 1
+
+        >>> print(g.filter_edges(edges_with_feature_one, edges=torch.tensor([0, 1])))
+        tensor([1])
+
+        Filter edges for a heterogeneous graph.
+
+        >>> g = dgl.heterograph({
+        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        >>>                                 torch.tensor([0, 0, 1, 1])),
+        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2]))})
+        >>> g.edges['plays'].data['h'] = torch.tensor([[0.], [1.], [1.], [0.]])
+        >>> # Filter for 'plays' nodes
+        >>> print(g.filter_edges(edges_with_feature_one, etype='plays'))
         tensor([1, 2])
         """
+        if not (is_all(edges) or isinstance(edges, Iterable) or F.is_tensor(edges)):
+            raise DGLError('Expect edges to have type tensor, or sequence '
+                           '(e.g. list, tuple, numpy.ndarray), got {}'.format(type(edges)))
+
+        num_edges = self.num_edges(etype)
+        src_type, _, dst_type = self.to_canonical_etype(etype)
+        num_src_type_nodes = self.num_src_nodes(src_type)
+        num_dst_type_nodes = self.num_dst_nodes(dst_type)
+
+        if isinstance(edges, tuple):
+            if len(edges) != 2:
+                raise DGLError('Expect edges to have length 2 when it is a tuple, '
+                               'got {:d}'.format(len(edges)))
+            u, v = edges
+            u_type = type(u)
+            v_type = type(v)
+            if u_type != v_type:
+                raise DGLError('Expect the source node ID(s) and the destination node ID(s), '
+                               'to have the same type, got {} and {}'.format(u_type, v_type))
+            if not (isinstance(u, Iterable) or F.is_tensor(u)):
+                raise DGLError('Expect the node ID(s) to have type tensor, or sequence '
+                               '(e.g. list, tuple, numpy.ndarray), got {}'.format(type(u)))
+            if isinstance(u, Iterable) and not F.is_tensor(u):
+                utils.detect_nan_in_iterable(u, 'edges[0]')
+                utils.detect_nan_in_iterable(v, 'edges[1]')
+                utils.detect_inf_in_iterable(u, 'edges[0]')
+                utils.detect_inf_in_iterable(v, 'edges[1]')
+            utils.assert_nonnegative_iterable(u, 'edges[0]')
+            utils.assert_nonnegative_iterable(v, 'edges[1]')
+            utils.assert_iterable_bounded_by_value(
+                u, 'the source node IDs', num_src_type_nodes, 'the number of source nodes')
+            utils.assert_iterable_bounded_by_value(
+                v, 'the destination node IDs', num_dst_type_nodes, 'the number of destination nodes')
+        elif F.is_tensor(edges):
+            utils.assert_nonnegative_iterable(edges, 'the edge IDs')
+            utils.assert_iterable_bounded_by_value(
+                edges, 'the edge IDs', num_edges, 'the number of edges')
+        elif isinstance(edges, Iterable) and not is_all(edges):
+            utils.detect_nan_in_iterable(edges, 'the edge IDs')
+            utils.detect_inf_in_iterable(edges, 'the edge IDs')
+            utils.assert_nonnegative_iterable(edges, 'the edge IDs')
+            utils.assert_iterable_bounded_by_value(
+                edges, 'the edge IDs', num_edges, 'the number of edges')
+
         with self.local_scope():
             self.apply_edges(lambda ebatch: {'_mask' : predicate(ebatch)}, edges, etype)
             etype = self.canonical_etypes[0] if etype is None else etype

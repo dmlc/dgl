@@ -1302,24 +1302,44 @@ def bipartite_from_networkx(nx_graph,
     return g.to(device)
 
 def to_networkx(g, node_attrs=None, edge_attrs=None):
-    """Convert to networkx graph.
+    """Convert a homogeneous graph to a NetworkX graph.
 
-    The edge id will be saved as the 'id' edge attribute.
+    It will save the edge IDs as the ``'id'`` edge attribute in the returned NetworkX graph.
 
     Parameters
     ----------
-    g : DGLGraph or DGLHeteroGraph
-        For DGLHeteroGraphs, we currently only support the
-        case of one node type and one edge type.
+    g : DGLGraph
+        A homogeneous graph on CPU.
     node_attrs : iterable of str, optional
-        The node attributes to be copied. (Default: None)
+        The node attributes to copy from ``g.ndata``. (Default: None)
     edge_attrs : iterable of str, optional
-        The edge attributes to be copied. (Default: None)
+        The edge attributes to copy from ``g.edata``. (Default: None)
 
     Returns
     -------
     networkx.DiGraph
-        The nx graph
+        The converted NetworkX graph.
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch
+
+    >>> g = dgl.graph((torch.tensor([1, 2]), torch.tensor([1, 3])))
+    >>> g.ndata['h'] = torch.zeros(4, 1)
+    >>> g.edata['h1'] = torch.ones(2, 1)
+    >>> g.edata['h2'] = torch.zeros(2, 2)
+    >>> nx_g = dgl.to_networkx(g, node_attrs=['h'], edge_attrs=['h1', 'h2'])
+    >>> nx_g.nodes(data=True)
+    NodeDataView({0: {'h': tensor([0.])},
+                  1: {'h': tensor([0.])},
+                  2: {'h': tensor([0.])},
+                  3: {'h': tensor([0.])}})
+    >>> nx_g.edges(data=True)
+    OutMultiEdgeDataView([(1, 1, {'id': 0, 'h1': tensor([1.]), 'h2': tensor([0., 0.])}),
+                          (2, 3, {'id': 1, 'h1': tensor([1.]), 'h2': tensor([0., 0.])})])
     """
     if g.device != F.cpu():
         raise DGLError('Cannot convert a CUDA graph to networkx. Call g.cpu() first.')
