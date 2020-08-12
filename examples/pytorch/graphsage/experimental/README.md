@@ -32,18 +32,24 @@ python3 partition_graph.py --dataset ogb-product --num_parts 4 --balance_train -
 
 ### Step 2: copy the partitioned data and files to the cluster
 
-DGL provides a script for copying partitioned data and files to the cluster. The command below copies partition data
-to the machines in the cluster. The configuration of the cluster is defined by `ip_config.txt`,
-The data is copied to `~/graphsage/ogb-product` on each of the remote machines. `--part_config`
-specifies the location of the partitioned data in the local machine (a user only needs to specify
+DGL provides a script for copying partitioned data and files to the cluster. Before that, copy the training script to a local folder:
+
+```bash
+mkdir dgl_code
+cp ~/dgl/examples/pytorch/graphsage/experimental/train_dist.py ~/dgl_code
+cp ~/dgl/examples/pytorch/graphsage/experimental/train_dist_unsupervised.py ~/dgl_code
+```
+
+The command below copies partition data, ip config file, as well as training scripts to the machines in the cluster. The configuration of the cluster is defined by `ip_config.txt`, The data is copied to `~/graphsage/ogb-product` on each of the remote machines. The training script is copied to `~/graphsage/dgl_code` on each of the remote machines. `--part_config` specifies the location of the partitioned data in the local machine (a user only needs to specify
 the location of the partition configuration file).
+
 ```bash
 python3 ~/dgl/tools/copy_partitions.py \
 --ip_config ip_config.txt \
 --workspace ~/graphsage \
 --rel_data_path ogb-product \
 --part_config data/ogb-product.json \
---script_folder ~/dgl/examples/pytorch/graphsage/experimental
+--script_folder ~/dgl_code
 ```
 
 **Note**: users need to make sure that the master node has right permission to ssh to all the other nodes.
