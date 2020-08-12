@@ -29,7 +29,7 @@ class RandomWalkNeighborSampler(object):
     Parameters
     ----------
     G : DGLGraph
-        The graph.
+        The graph.  It must be on CPU.
     num_traversals : int
         The maximum number of metapath-based traversals for a single random walk.
 
@@ -90,6 +90,8 @@ class RandomWalkNeighborSampler(object):
         seed_nodes : Tensor
             A tensor of given node IDs of node type ``ntype`` to generate neighbors from.  The
             node type ``ntype`` is the beginning and ending node type of the given metapath.
+
+            It must be on CPU.
 
         Returns
         -------
