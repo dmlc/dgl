@@ -106,8 +106,11 @@ class Column(object):
     def data(self):
         """Return the feature data. Perform index selecting if needed."""
         if self.index is not None:
-            # copy index is usually cheaper than copy data
-            self.index = F.copy_to(self.index, F.context(self.storage))
+            # If index and storage is not in the same context,
+            # copy index to the same context of storage.
+            # Copy index is usually cheaper than copy data
+            if F.context(self.storage) != F.context(self.index):
+                self.index = F.copy_to(self.index, F.context(self.storage))
             self.storage = F.gather_row(self.storage, self.index)
             self.index = None
 
