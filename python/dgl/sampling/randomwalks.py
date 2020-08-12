@@ -29,22 +29,25 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     Parameters
     ----------
     g : DGLGraph
-        The graph.
+        The graph.  Must be on CPU.
     nodes : Tensor
         Node ID tensor from which the random walk traces starts.
+
+        The tensor must be on CPU, and must have the same dtype as the ID type
+        of the graph.
     metapath : list[str or tuple of str], optional
         Metapath, specified as a list of edge types.
 
-        Mutually exclusive with ``length``.
+        Mutually exclusive with :attr:`length`.
 
         If omitted, DGL assumes that ``g`` only has one node & edge type.  In this
         case, the argument ``length`` specifies the length of random walk traces.
     length : int, optional
         Length of random walks.
 
-        Mutually exclusive with ``metapath``.
+        Mutually exclusive with :attr:`metapath`.
 
-        Only used when ``metapath`` is None.
+        Only used when :attr:`metapath` is None.
     prob : str, optional
         The name of the edge feature tensor on the graph storing the (unnormalized)
         probabilities associated with each edge for choosing the next node.
@@ -57,20 +60,21 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     restart_prob : float or Tensor, optional
         Probability to terminate the current trace before each transition.
 
-        If a tensor is given, ``restart_prob`` should have the same length as ``metapath``.
+        If a tensor is given, :attr:`restart_prob` should have the same length as
+        :attr:`metapath` or :attr:`length`.
 
     Returns
     -------
     traces : Tensor
-        A 2-dimensional node ID tensor with shape ``(num_seeds, len(metapath) + 1)``.
+        A 2-dimensional node ID tensor with shape ``(num_seeds, len(metapath) + 1)`` or
+        ``(num_seeds, length + 1)`` if :attr:`metapath` is None.
     types : Tensor
-        A 1-dimensional node type ID tensor with shape ``(len(metapath) + 1)``.
+        A 1-dimensional node type ID tensor with shape ``(len(metapath) + 1)`` or
+        ``(length + 1)``.
         The type IDs match the ones in the original graph ``g``.
 
     Notes
     -----
-    The input graph must be on CPU; graphs on GPU is not supported.
-
     The returned tensors are on CPU.
 
     Examples
@@ -187,9 +191,9 @@ def pack_traces(traces, types):
     Parameters
     ----------
     traces : Tensor
-        A 2-dimensional node ID tensor.
+        A 2-dimensional node ID tensor.  Must be on CPU and either ``int32`` or ``int64``.
     types : Tensor
-        A 1-dimensional node type ID tensor.
+        A 1-dimensional node type ID tensor.  Must be on CPU and either ``int32`` or ``int64``.
 
     Returns
     -------
@@ -205,8 +209,6 @@ def pack_traces(traces, types):
 
     Notes
     -----
-    The input tensors must be on CPU; tensors on GPU is not supported.
-
     The returned tensors are on CPU.
 
     Examples

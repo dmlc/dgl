@@ -91,13 +91,13 @@ class RandomWalkNeighborSampler(object):
             A tensor of given node IDs of node type ``ntype`` to generate neighbors from.  The
             node type ``ntype`` is the beginning and ending node type of the given metapath.
 
-            It must be on CPU.
+            It must be on CPU and have the same dtype as the ID type of the graph.
 
         Returns
         -------
         g : DGLGraph
             A homogeneous graph constructed by selecting neighbors for each given node according
-            to the algorithm above.
+            to the algorithm above.  The returned graph is on CPU.
         """
         seed_nodes = F.repeat(seed_nodes, self.num_random_walks, 0)
         paths, _ = random_walk(
