@@ -1630,8 +1630,9 @@ class DGLHeteroGraph(object):
             ntype = self.ntypes[0]
             return HeteroNodeDataView(self, ntype, ntid, ALL)
         else:
-            raise DGLError('To set/get node features for graphs of multiple node types, '
-                           'use DGLGraph.nodes.')
+            ntids = [self.get_ntype_id(ntype) for ntype in self.ntypes]
+            ntypes = self.ntypes
+            return HeteroNodeDataView(self, ntypes, ntids, ALL)
 
     @property
     def srcdata(self):
