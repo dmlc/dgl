@@ -150,8 +150,8 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
         metapath = [g.get_etype_id(etype) for etype in metapath]
 
     gidx = g._graph
-    nodes = F.to_dgl_nd(utils.prepare_tensor(g, nodes))
-    metapath = F.to_dgl_nd(utils.prepare_tensor(g, metapath))
+    nodes = F.to_dgl_nd(utils.prepare_tensor(g, nodes, 'nodes'))
+    metapath = F.to_dgl_nd(utils.prepare_tensor(g, metapath, 'metapath'))
 
     # Load the probability tensor from the edge frames
     if prob is None:
