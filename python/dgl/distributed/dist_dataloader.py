@@ -52,6 +52,7 @@ def enable_mp_debug():
     """Print multiprocessing debug information. This is only
     for debug usage"""
     import logging
+    import multiprocessing
     logger = multiprocessing.log_to_stderr()
     logger.setLevel(logging.DEBUG)
 
