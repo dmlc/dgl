@@ -191,7 +191,7 @@ def compute_acc(results, labels):
     labels = labels.long()
     return (results == labels).float().sum() / len(results)
 
-def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, node_feats, global_val_mask, global_test_mask):
+def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, node_feats, global_val_nid, global_test_nid):
     model.eval()
     embed_layer.eval()
     eval_logits = []
@@ -229,8 +229,8 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, node_feats
 
     g.barrier()
     if g.rank() == 0:
-        return compute_acc(global_results[global_val_mask], labels[global_val_mask]), \
-            compute_acc(global_results[global_test_mask], labels[global_test_mask])
+        return compute_acc(global_results[global_val_nid], labels[global_val_nid]), \
+            compute_acc(global_results[global_test_nid], labels[global_test_nid])
     else:
         return -1, -1
 
@@ -284,7 +284,7 @@ class NeighborSampler:
 
 def run(args, device, data):
     g, node_feats, num_of_ntype, num_classes, num_rels, \
-        train_nid, val_nid, test_nid, labels, global_val_mask, global_test_mask = data
+        train_nid, val_nid, test_nid, labels, global_val_nid, global_test_nid = data
 
     fanouts = [int(fanout) for fanout in args.fanout.split(',')]
     sampler = NeighborSampler(g, fanouts, dgl.distributed.sample_neighbors)
@@ -418,7 +418,7 @@ def run(args, device, data):
 
         start = time.time()
         val_acc, test_acc = evaluate(g, model, embed_layer, labels,
-            valid_dataloader, test_dataloader, node_feats, global_val_mask, global_test_mask)
+            valid_dataloader, test_dataloader, node_feats, global_val_nid, global_test_nid)
         if val_acc >= 0:
             print('Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(val_acc, test_acc,
                                                                          time.time() - start))
@@ -446,8 +446,8 @@ def main(args):
           len(test_nid), len(np.intersect1d(test_nid.numpy(), local_nid))))
     device = th.device('cpu')
     labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
-    global_val_mask = g.ndata['val_mask'][np.arange(g.number_of_nodes())].bool()
-    global_test_mask = g.ndata['test_mask'][np.arange(g.number_of_nodes())].bool()
+    global_val_nid = th.LongTensor(np.nonzero(g.ndata['val_mask'][np.arange(g.number_of_nodes())])))
+    global_test_nid = th.LongTensor(np.nonzero(g.ndata['test_mask'][np.arange(g.number_of_nodes())]))
     n_classes = len(th.unique(labels[labels >= 0]))
     print(labels.shape)
     print('#classes:', n_classes)
@@ -460,7 +460,7 @@ def main(args):
     node_feats = [None] * num_of_ntype
 
     run(args, device, (g, node_feats, num_of_ntype, n_classes, num_rels,
-                       train_nid, val_nid, test_nid, labels, global_val_mask, global_test_mask))
+                       train_nid, val_nid, test_nid, labels, global_val_nid, global_test_nid))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN')
