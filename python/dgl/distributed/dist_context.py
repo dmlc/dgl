@@ -5,6 +5,7 @@ import traceback
 import atexit
 import time
 import os
+import sys
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
@@ -63,22 +64,44 @@ def initialize(ip_config, num_servers=1, num_workers=0,
     num_worker_threads: int
         The number of threads in a worker process.
     """
-    rpc.reset()
-    ctx = mp.get_context("spawn")
-    global SAMPLER_POOL
-    global NUM_SAMPLER_WORKERS
-    is_standalone = os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone'
-    if num_workers > 0 and not is_standalone:
-        SAMPLER_POOL = ctx.Pool(num_workers, initializer=_init_rpc,
-                                initargs=(ip_config, num_servers, max_queue_size,
-                                          net_type, 'sampler', num_worker_threads))
+    if os.environ.get('DGL_ROLE', 'client') == 'server':
+        from .dist_graph import DistGraphServer
+        assert os.environ.get('DGL_SERVER_ID') is not None, \
+                'Please define DGL_SERVER_ID to run DistGraph server'
+        assert os.environ.get('DGL_IP_CONFIG') is not None, \
+                'Please define DGL_IP_CONFIG to run DistGraph server'
+        assert os.environ.get('DGL_NUM_SERVER') is not None, \
+                'Please define DGL_NUM_SERVER to run DistGraph server'
+        assert os.environ.get('DGL_NUM_CLIENT') is not None, \
+                'Please define DGL_NUM_CLIENT to run DistGraph server'
+        assert os.environ.get('DGL_CONF_PATH') is not None, \
+                'Please define DGL_CONF_PATH to run DistGraph server'
+        serv = DistGraphServer(int(os.environ.get('DGL_SERVER_ID')),
+                               os.environ.get('DGL_IP_CONFIG'),
+                               int(os.environ.get('DGL_NUM_SERVER')),
+                               int(os.environ.get('DGL_NUM_CLIENT')),
+                               os.environ.get('DGL_CONF_PATH'))
+        serv.start()
+        sys.exit()
     else:
-        SAMPLER_POOL = None
-    NUM_SAMPLER_WORKERS = num_workers
-    if not is_standalone:
-        connect_to_server(ip_config, num_servers, max_queue_size, net_type)
-    init_role('default')
-    init_kvstore(ip_config, num_servers, 'default')
+        rpc.reset()
+        ctx = mp.get_context("spawn")
+        global SAMPLER_POOL
+        global NUM_SAMPLER_WORKERS
+        is_standalone = os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone'
+        if num_workers > 0 and not is_standalone:
+            SAMPLER_POOL = ctx.Pool(num_workers, initializer=_init_rpc,
+                                    initargs=(ip_config, num_servers, max_queue_size,
+                                              net_type, 'sampler', num_worker_threads))
+        else:
+            SAMPLER_POOL = None
+        NUM_SAMPLER_WORKERS = num_workers
+        if not is_standalone:
+            assert num_servers is not None and num_servers > 0, \
+                    'The number of servers per machine must be specified with a positive number.'
+            connect_to_server(ip_config, num_servers, max_queue_size, net_type)
+        init_role('default')
+        init_kvstore(ip_config, num_servers, 'default')
 
 def finalize_client():
     """Release resources of this client."""
