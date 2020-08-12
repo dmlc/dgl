@@ -20,16 +20,15 @@ class KNNGraph(nn.Module):
     point sets with the same number of points into a union of those graphs.
 
     The KNNGraph is implemented in the following steps:
+
     1. Compute an NxN matrix of pairwise distance for all points.
-    2. Pick the k points with the smallest distance for each point as their
-       k-nearest neighbors.
-    3. Construct a graph with edges to each point as a node from its
-       k-nearest neighbors.
+    2. Pick the k points with the smallest distance for each point as their k-nearest neighbors.
+    3. Construct a graph with edges to each point as a node from its k-nearest neighbors.
 
     The overall computational complexity is :math:`O(N^2(logN + D)`.
 
-    If a batch of point sets is provided, then the point :math:`j` in point
-    set :math:`i` is mapped to graph node ID :math:`i \times M + j`, where
+    If a batch of point sets is provided, the point :math:`j` in point
+    set :math:`i` is mapped to graph node ID: :math:`i \times M + j`, where
     :math:`M` is the number of nodes in each point set.
 
     The predecessors of each node are the k-nearest neighbors of the
@@ -69,7 +68,9 @@ class KNNGraph(nn.Module):
 
     #pylint: disable=invalid-name
     def forward(self, x):
-        """Forward computation.
+        """
+
+        Forward computation.
 
         Parameters
         ----------
@@ -95,7 +96,7 @@ class SegmentedKNNGraph(nn.Module):
     point sets with different number of points into a union of those graphs.
 
     If a batch of point sets is provided, then the point :math:`j` in the point
-    set :math:`i` is mapped to graph node ID
+    set :math:`i` is mapped to graph node ID:
     :math:`\sum_{p<i} |V_p| + j`, where :math:`|V_p|` means the number of
     points in the point set :math:`p`.
 
@@ -150,7 +151,7 @@ class SegmentedKNNGraph(nn.Module):
         segs : iterable of int
             :math:`(N)` integers where :math:`N` means the number of point
             sets.  The number of elements must sum up to :math:`M`. And any
-            :math:'N' should :math:'\ge k'
+            :math:`N` should :math:`\ge k`
 
         Returns
         -------

@@ -18,16 +18,14 @@ class SumPooling(nn.Module):
 
     Description
     -----------
-    Apply sum pooling over the nodes in a graph.
+    Apply sum pooling over the nodes in a graph .
 
     .. math::
         r^{(i)} = \sum_{k=1}^{N_i} x^{(i)}_k
 
     Notes
     -----
-        * Input: Could be one graph, or a batch of graphs. If using a batch
-        of graphs, make sure the nodes in all graphs have the same feature
-        size, and concatenate nodes feature together as the input.
+        * Input: Could be one graph, or a batch of graphs. If using a batch of graphs, make sure nodes in all graphs have the same feature size, and concatenate nodes' feature together as the input.
 
     Examples
     --------
@@ -44,17 +42,18 @@ class SumPooling(nn.Module):
     >>> g2 = dgl.DGLGraph()
     >>> g2.add_nodes(3)
     >>> g2_node_feats = th.ones(3,5)
-
-    >>> sumpool = SumPooling()
     >>>
+    >>> sumpool = SumPooling()
 
-    Case 1: Input single graph
+    Case 1: Input a single graph
+
     >>> sumpool(g1, g1_node_feats)
         tensor([[2., 2., 2., 2., 2.]])
 
     Case 2: Input a batch of graphs
 
     Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
     >>> batch_g = dgl.batch([g1, g2])
     >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
     >>>
@@ -73,8 +72,9 @@ class SumPooling(nn.Module):
         Parameters
         ----------
         graph : a DGLGraph or a batch of DGLGraphs
+            a DGLGraph or a batch of DGLGraphs
         feat : torch.Tensor
-            The input feature with shape :math:`(N, D)` where :math:`N` is the number
+            The input feature with shape :math:`(N, D)`, where :math:`N` is the number
             of nodes in the graph, and :math:`D` means the size of features.
 
         Returns
@@ -101,9 +101,7 @@ class AvgPooling(nn.Module):
 
     Notes
     -----
-        * Input: Could be one graph, or a batch of graphs. If using a batch of graphs,
-        make sure nodes in all graphs have the same feature size, and concatenate nodes
-        feature together as the input.
+        * Input: Could be one graph, or a batch of graphs. If using a batch of graphs, make sure nodes in all graphs have the same feature size, and concatenate nodes' feature together as the input.
 
     Examples
     --------
@@ -120,17 +118,18 @@ class AvgPooling(nn.Module):
     >>> g2 = dgl.DGLGraph()
     >>> g2.add_nodes(3)
     >>> g2_node_feats = th.ones(3,5)
-
-    >>> avgpool = AvgPooling()
     >>>
+    >>> avgpool = AvgPooling()
 
     Case 1: Input single graph
+
     >>> avgpool(g1, g1_node_feats)
         tensor([[1., 1., 1., 1., 1.]])
 
     Case 2: Input a batch of graphs
 
     Build a batch of DGL graphs and concatenate all graphs' note features into one tensor.
+
     >>> batch_g = dgl.batch([g1, g2])
     >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
     >>>
@@ -148,11 +147,11 @@ class AvgPooling(nn.Module):
 
         Parameters
         ----------
-        graph : a DGLGraph or a batch of DGLGraphs
+        graph : DGLGraph or a batch of DGLGraphs
+            A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, D)` where
-            :math:`N` is the number of nodes in the graph, and :math:`D` means the size
-             of features.
+            The input feature with shape :math:`(N, D)`, where :math:`N` is the number
+            of nodes in the graph, and :math:`D` means the size of features.
 
         Returns
         -------
@@ -175,14 +174,10 @@ class MaxPooling(nn.Module):
 
     .. math::
         r^{(i)} = \max_{k=1}^{N_i}\left( x^{(i)}_k \right)
-    .. math::
-        r^{(i)} = \max_{k=1}^{N_i}\left( x^{(i)}_k \right)
 
     Notes
     -----
-        * Input: Could be one graph, or a batch of graphs. If  using a batch of graphs,
-        make sure nodes in all graphs have the same feature size, and concatenate nodes'
-        feature together as the input.
+        * Input: Could be one graph, or a batch of graphs. If using a batch of graphs, make sure nodes in all graphs have the same feature size, and concatenate nodes' feature together as the input.
 
     Examples
     --------
@@ -199,17 +194,18 @@ class MaxPooling(nn.Module):
     >>> g2 = dgl.DGLGraph()
     >>> g2.add_nodes(3)
     >>> g2_node_feats = th.ones(3,5)
-
-    >>> maxpool = MaxPooling()
     >>>
+    >>> maxpool = MaxPooling()
 
     Case 1: Input a single graph
+
     >>> maxpool(g1, g1_node_feats)
         tensor([[1., 1., 1., 1., 1.]])
 
     Case 2: Input a batch of graphs
 
     Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
     >>> batch_g = dgl.batch([g1, g2])
     >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
     >>>
@@ -225,10 +221,10 @@ class MaxPooling(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph
-            The graph.
+        graph : DGLGraph or a batch of DGLGraphs
+            A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, *)` where
+            The input feature with shape :math:`(N, *)`, where
             :math:`N` is the number of nodes in the graph.
 
         Returns
@@ -258,9 +254,7 @@ class SortPooling(nn.Module):
 
     Notes
     -----
-        * Input: Could be one graph, or a batch of graphs. If using a batch of graphs,
-        make sure nodes in all graphs have the same feature size, and concatenate nodes'
-        feature together as the input.
+        * Input: Could be one graph, or a batch of graphs. If using a batch of graphs, make sure nodes in all graphs have the same feature size, and concatenate nodes' feature together as the input.
 
     Examples
     --------
@@ -276,17 +270,18 @@ class SortPooling(nn.Module):
     >>> g2 = dgl.DGLGraph()
     >>> g2.add_nodes(3)
     >>> g2_node_feats = th.ones(3,5)
-
-    >>> sortpool = SortPooling(k=2)
     >>>
+    >>> sortpool = SortPooling(k=2)
 
     Case 1: Input a single graph
+
     >>> sortpool(g1, g1_node_feats)
         tensor([[1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]])
 
     Case 2: Input a batch of graphs
 
     Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
     >>> batch_g = dgl.batch([g1, g2])
     >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
     >>>
@@ -308,7 +303,7 @@ class SortPooling(nn.Module):
         graph : DGLGraph or a batch of DGLGraphs
             A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, D)` where :math:`N` is the
+            The input feature with shape :math:`(N, D)`, where :math:`N` is the
             number of nodes in the graph, and :math:`D` means the size of features.
 
         Returns
@@ -359,8 +354,8 @@ class GlobalAttentionPooling(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph
-            The graph.
+        graph : DGLGraph or a batch of DGLGraphs
+            A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where :math:`N` is the
             number of nodes in the graph, and :math:`D` means the size of features.
@@ -408,7 +403,7 @@ class Set2Set(nn.Module):
     Parameters
     ----------
     input_dim : int
-        The size of each input sample
+        The size of each input sample.
     n_iters : int
         The number of iterations.
     n_layers : int
@@ -432,9 +427,9 @@ class Set2Set(nn.Module):
         Compute set2set pooling.
 
         Parameters
-         ----------
+        ----------
         graph : DGLGraph
-            The graph.
+            The input graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where  :math:`N` is the
             number of nodes in the graph, and :math:`D` means the size of features.
@@ -743,9 +738,9 @@ class SetTransformerEncoder(nn.Module):
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            The input graph.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, D)` where :math:`N` is the
+            The input feature with shape :math:`(N, D)`, where :math:`N` is the
             number of nodes in the graph.
 
         Returns
@@ -808,9 +803,9 @@ class SetTransformerDecoder(nn.Module):
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            The input graph.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, D)` where :math:`N` is the
+            The input feature with shape :math:`(N, D)`, where :math:`N` is the
             number of nodes in the graph, and :math:`D` means the size of features.
 
         Returns

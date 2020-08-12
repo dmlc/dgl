@@ -6,11 +6,11 @@ __all__ = ['edge_softmax']
 
 
 def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
-    r"""Compute edge softmax.
+    r"""
 
     Description
     -----------
-    For a node :math:`i`, edge softmax is an operation of computing
+    Compute edge softmax. For a node :math:`i`, edge softmax is an operation that computes
 
     .. math::
       a_{ij} = \frac{\exp(z_{ij})}{\sum_{j\in\mathcal{N}(i)}\exp(z_{ij})}
@@ -44,7 +44,7 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
     -----
         * Input shape: :math:`(E, *, 1)` where * means any number of
           additional dimensions, :math:`E` equals the length of eids.
-          If the 'eids' is ALL, :math:`E` equals the number of edges in
+          If the `eids` is ALL, :math:`E` equals the number of edges in
           the graph.
         * Return shape: :math:`(E, *, 1)`
 
@@ -56,7 +56,7 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
     >>> import dgl
     >>> import torch as th
 
-    Create a :code:`DGLGraph` object and initialize its edge features.
+    Create a :code:`DGLGraph` object g and initialize its edge features.
 
     >>> g = dgl.DGLGraph()
     >>> g.add_nodes(3)

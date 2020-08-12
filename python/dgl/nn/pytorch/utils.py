@@ -122,6 +122,7 @@ class Sequential(nn.Sequential):
 
     Examples
     --------
+    The following example uses PyTorch backend.
 
     Mode 1: sequentially apply GNN modules on the same graph
 
