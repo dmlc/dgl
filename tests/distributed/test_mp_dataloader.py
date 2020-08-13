@@ -148,6 +148,8 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last):
     except Exception as e:
         print(e)
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
+    for p in pserver_list:
+        p.join()
 
 def start_node_dataloader(rank, tmpdir, disable_shared_mem, num_workers):
     import dgl
@@ -238,6 +240,8 @@ def test_dataloader(tmpdir, num_server, num_workers, dataloader_type):
         print(e)
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
     print('test10')
+    for p in pserver_list:
+        p.join()
 
 if __name__ == "__main__":
     import tempfile
