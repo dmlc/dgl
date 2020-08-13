@@ -17,9 +17,10 @@ def call_collate_fn(name, next_data):
         # with open("~/debug.log", "a") as f:
             # f.writelines(["Issue request"])
         result = DGL_GLOBAL_COLLATE_FNS[name](next_data)
-        DGL_GLOBAL_MP_QUEUES[name].put(result)
+        return result
+        # DGL_GLOBAL_MP_QUEUES[name].put(result)
     except Exception as e:
-        traceback.print_exc(file=open("~/error.log", "a"))
+        traceback.print_exc(file=open("~/error.log", "w"))
         print(e)
         raise e
     return 1
@@ -135,10 +136,11 @@ class DistDataLoader:
     def __next__(self):
         # num_reqs = self.queue_size - self.num_pending
         num_reqs = 1
-        for _ in range(num_reqs):
-            self._request_next_batch()
+        # for _ in range(num_reqs):
+
+        
         if self.recv_idxs < self.expected_idxs:
-            result = self.queue.get(timeout=60)
+            result = self._request_next_batch()
             self.recv_idxs += 1
             self.num_pending -= 1
             return result
@@ -160,7 +162,7 @@ class DistDataLoader:
             return
         elif self.pool is not None:
             rr = self.pool.apply_async(call_collate_fn, args=(self.name, next_data, ))
-            rr.get()
+            return rr.get()
         else:
             result = self.collate_fn(next_data)
             self.queue.put(result)
