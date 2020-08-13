@@ -13,7 +13,6 @@ from pathlib import Path
 from dgl.distributed import DistGraphServer, DistGraph, DistDataLoader
 import pytest
 import backend as F
-import torch as th
 
 class NeighborSampler(object):
     def __init__(self, g, fanouts, sample_neighbors):
@@ -22,6 +21,7 @@ class NeighborSampler(object):
         self.sample_neighbors = sample_neighbors
 
     def sample_blocks(self, seeds):
+        import torch as th
         seeds = th.LongTensor(np.asarray(seeds))
         blocks = []
         for fanout in self.fanouts:
