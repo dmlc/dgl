@@ -5,6 +5,14 @@ from ..dataloader import NodeCollator, EdgeCollator
 from ...distributed import DistGraph
 from ...distributed import DistDataLoader
 
+def _remove_kwargs_dist(kwargs):
+    if 'num_workers' in kwargs:
+        del kwargs['num_workers']
+    if 'pin_memory' in kwargs:
+        del kwargs['pin_memory']
+        print('Distributed DataLoader does not support pin_memory')
+    return kwargs
+
 class NodeDataLoader:
     """PyTorch dataloader for batch-iterating over a set of nodes, generating the list
     of blocks as computation dependency of the said minibatch.
@@ -45,6 +53,7 @@ class NodeDataLoader:
                 dataloader_kwargs[k] = v
         self.collator = NodeCollator(g, nids, block_sampler, **collator_kwargs)
         if isinstance(g, DistGraph):
+            _remove_kwargs_dist(dataloader_kwargs)
             self.dataloader = DistDataLoader(self.collator.dataset,
                                              collate_fn=self.collator.collate,
                                              **dataloader_kwargs)
@@ -204,14 +213,12 @@ class EdgeDataLoader:
                 dataloader_kwargs[k] = v
         self.collator = EdgeCollator(g, eids, block_sampler, **collator_kwargs)
 
-        if isinstance(g, DistGraph):
-            self.dataloader = DistDataLoader(self.collator.dataset,
-                                             collate_fn=self.collator.collate,
-                                             **dataloader_kwargs)
-        else:
-            self.dataloader = DataLoader(self.collator.dataset,
-                                         collate_fn=self.collator.collate,
-                                         **dataloader_kwargs)
+        assert not isinstance(g, DistGraph), \
+                'EdgeDataLoader does not support DistGraph for now. ' \
+                + 'Please use DistDataLoader directly.'
+        self.dataloader = DataLoader(self.collator.dataset,
+                                     collate_fn=self.collator.collate,
+                                     **dataloader_kwargs)
 
 
     def __next__(self):
