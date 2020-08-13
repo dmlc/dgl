@@ -4,6 +4,7 @@ import numpy as np
 import os
 import dgl
 import dgl.function as fn
+import dgl.partition
 import backend as F
 from dgl.graph_index import from_scipy_sparse_matrix
 import unittest
@@ -331,8 +332,8 @@ def test_add_reverse_edges():
     ub, vb = bg.all_edges(order='eid', etype=('user', 'plays', 'game'))
     assert F.array_equal(u, ub)
     assert F.array_equal(v, vb)
-    assert len(bg.edges['plays'].data) == 0
-    assert len(bg.edges['follows'].data) == 0
+    assert set(bg.edges['plays'].data.keys()) == {dgl.EID}
+    assert set(bg.edges['follows'].data.keys()) == {dgl.EID}
 
     # donot share ndata and edata
     bg = dgl.add_reverse_edges(g, copy_ndata=False, copy_edata=False, ignore_bipartite=True)
@@ -450,7 +451,7 @@ def test_khop_adj():
     feat = F.randn((N, 5))
     g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
     for k in range(3):
-        adj = F.tensor(dgl.khop_adj(g, k))
+        adj = F.tensor(F.swapaxes(dgl.khop_adj(g, k), 0, 1))
         # use original graph to do message passing for k times.
         g.ndata['h'] = feat
         for _ in range(k):
@@ -486,6 +487,7 @@ def create_large_graph(num_nodes):
     row = np.random.choice(num_nodes, num_nodes * 10)
     col = np.random.choice(num_nodes, num_nodes * 10)
     spm = spsp.coo_matrix((np.ones(len(row)), (row, col)))
+    spm.sum_duplicates()
 
     return dgl.from_scipy(spm)
 
@@ -497,6 +499,7 @@ def get_nodeflow(g, node_ids, num_layers):
             seed_nodes=node_ids)
     return next(iter(sampler))
 
+# Disabled since everything will be on heterogeneous graphs
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_partition_with_halo():
     g = create_large_graph(1000)

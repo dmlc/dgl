@@ -61,17 +61,18 @@ def _find_exclude_eids_with_reverse_types(g, eids, reverse_etype_map):
     return exclude_eids
 
 def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
-    """Find all edge IDs to exclude according to ``exclude_mode``.
+    """Find all edge IDs to exclude according to :attr:`exclude_mode`.
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    g : DGLGraph
         The graph.
     exclude_mode : str, optional
         Can be either of the following,
 
         None (default)
             Does not exclude any edge.
+
         'reverse_id'
             Exclude all edges specified in ``eids``, as well as their reverse edges
             of the same edge type.
@@ -81,6 +82,7 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
 
             This mode assumes that the reverse of an edge with ID ``e`` and type
             ``etype`` will have ID ``reverse_eid_map[e]`` and type ``etype``.
+
         'reverse_types'
             Exclude all edges specified in ``eids``, as well as their reverse
             edges of the corresponding edge types.
@@ -110,32 +112,32 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
 class BlockSampler(object):
     """Abstract class specifying the neighborhood sampling strategy for DGL data loaders.
 
-    The main method for BlockSampler is :func:`~dgl.dataloading.BlockSampler.sample_blocks`,
+    The main method for BlockSampler is :meth:`sample_blocks`,
     which generates a list of blocks for a multi-layer GNN given a set of seed nodes to
     have their outputs computed.
 
-    The default implementation of :py:meth:`~dgl.dataloading.BlockSampler.sample_blocks` is
-    to repeat ``num_layers`` times the following procedure from the last layer to the first
+    The default implementation of :meth:`sample_blocks` is
+    to repeat :attr:`num_layers` times the following procedure from the last layer to the first
     layer:
 
     * Obtain a frontier.  The frontier is defined as a graph with the same nodes as the
       original graph but only the edges involved in message passing on the current layer.
-      Customizable via :py:meth:`~dgl.dataloading.BlockSampler.sample_frontier`.
+      Customizable via :meth:`sample_frontier`.
 
     * Optionally, if the task is link prediction or edge classfication, remove edges
       connecting training node pairs.  If the graph is undirected, also remove the
       reverse edges.  This is controlled by the argument :attr:`exclude_eids` in
-      :py:meth:``~dgl.dataloading.BlockSampler.sample_blocks`` method.
+      :meth:`sample_blocks` method.
 
     * Convert the frontier into a block.
 
     * Optionally assign the IDs of the edges in the original graph selected in the first step
       to the block, controlled by the argument ``return_eids`` in
-      :py:meth:``~dgl.dataloading.BlockSampler.sample_blocks`` method.
+      :meth:`sample_blocks` method.
 
     * Prepend the block to the block list to be returned.
 
-    All subclasses should override :py:meth:`~dgl.dataloading.BlockSampler.sample_frontier`
+    All subclasses should override :meth:`sample_frontier`
     method while specifying the number of layers to sample in :attr:`num_layers` argument.
 
     Parameters
@@ -148,7 +150,7 @@ class BlockSampler(object):
 
     Notes
     -----
-    For the concept of frontiers and blocks, please refer to User Guide Section 6.
+    For the concept of frontiers and blocks, please refer to User Guide Section 6 [TODO].
     """
     def __init__(self, num_layers, return_eids):
         self.num_layers = num_layers
@@ -157,11 +159,13 @@ class BlockSampler(object):
     def sample_frontier(self, block_id, g, seed_nodes):
         """Generate the frontier given the output nodes.
 
+        The subclasses should override this function.
+
         Parameters
         ----------
         block_id : int
             Represents which GNN layer the frontier is generated for.
-        g : DGLHeteroGraph
+        g : DGLGraph
             The original graph.
         seed_nodes : Tensor or dict[ntype, Tensor]
             The output nodes by node type.
@@ -171,12 +175,12 @@ class BlockSampler(object):
 
         Returns
         -------
-        DGLHeteroGraph
+        DGLGraph
             The frontier generated for the current layer.
 
-        See also
-        --------
-        For the concept of frontiers and blocks, please refer to User Guide Section 6.
+        Notes
+        -----
+        For the concept of frontiers and blocks, please refer to User Guide Section 6 [TODO].
         """
         raise NotImplementedError
 
@@ -185,7 +189,7 @@ class BlockSampler(object):
 
         Parameters
         ----------
-        g : DGLHeteroGraph
+        g : DGLGraph
             The original graph.
         seed_nodes : Tensor or dict[ntype, Tensor]
             The output nodes by node type.
@@ -197,12 +201,12 @@ class BlockSampler(object):
 
         Returns
         -------
-        list[DGLHeteroGraph]
+        list[DGLGraph]
             The blocks generated for computing the multi-layer GNN output.
 
-        See also
-        --------
-        For the concept of frontiers and blocks, please refer to User Guide Section 6.
+        Notes
+        -----
+        For the concept of frontiers and blocks, please refer to User Guide Section 6 [TODO].
         """
         blocks = []
         exclude_eids = (
@@ -248,13 +252,13 @@ class BlockSampler(object):
 class Collator(ABC):
     """Abstract DGL collator for training GNNs on downstream tasks stochastically.
 
-    Provides a ``dataset`` object containing the collection of all nodes or edges,
-    as well as a ``collate`` method that combines a set of items from ``dataset`` and
-    obtains the blocks.
+    Provides a :attr:`dataset` object containing the collection of all nodes or edges,
+    as well as a :attr:`collate` method that combines a set of items from
+    :attr:`dataset` and obtains the blocks.
 
-    See also
-    --------
-    For the concept of blocks, please refer to User Guide Section 6.
+    Notes
+    -----
+    For the concept of blocks, please refer to User Guide Section 6 [TODO].
     """
     @abstractproperty
     def dataset(self):
@@ -268,11 +272,11 @@ class Collator(ABC):
         Parameters
         ----------
         items : list[str, int]
-            The list of node or edge type-ID pairs.
+            The list of node or edge IDs or type-ID pairs.
 
-        See also
-        --------
-        For the concept of blocks, please refer to User Guide Section 6.
+        Notes
+        -----
+        For the concept of blocks, please refer to User Guide Section 6 [TODO].
         """
         raise NotImplementedError
 
@@ -282,7 +286,7 @@ class NodeCollator(Collator):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    g : DGLGraph
         The graph.
     nids : Tensor or dict[ntype, Tensor]
         The node set to compute outputs.
@@ -324,6 +328,12 @@ class NodeCollator(Collator):
         """Find the list of blocks necessary for computing the representation of given
         nodes for a node classification/regression task.
 
+        Parameters
+        ----------
+        items : list[int] or list[tuple[str, int]]
+            Either a list of node IDs (for homogeneous graphs), or a list of node type-ID
+            pairs (for heterogeneous graphs).
+
         Returns
         -------
         input_nodes : Tensor or dict[ntype, Tensor]
@@ -336,7 +346,7 @@ class NodeCollator(Collator):
 
             If the original graph has multiple node types, return a dictionary of
             node type names and node ID tensors.  Otherwise, return a single tensor.
-        blocks : list[DGLHeteroGraph]
+        blocks : list[DGLGraph]
             The list of blocks necessary for computing the representation.
         """
         if isinstance(items[0], tuple):
@@ -369,14 +379,14 @@ class EdgeCollator(Collator):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    g : DGLGraph
         The graph from which the edges are iterated in minibatches and the subgraphs
         are generated.
     eids : Tensor or dict[etype, Tensor]
         The edge set in graph :attr:`g` to compute outputs.
     block_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
-    g_sampling : DGLHeteroGraph, optional
+    g_sampling : DGLGraph, optional
         The graph where neighborhood sampling and message passing is performed.
 
         Note that this is not necessarily the same as :attr:`g`.
@@ -425,7 +435,7 @@ class EdgeCollator(Collator):
           or a dictionary of edge types and such pairs if the graph is heterogenenous.
 
         A set of builtin negative samplers are provided in
-        :py:mod:`dgl.dataloading.negative_sampler`.
+        :ref:`the negative sampling module <negative-sampling>`.
 
     Examples
     --------
@@ -616,6 +626,12 @@ class EdgeCollator(Collator):
         """Combines the sampled edges into a minibatch for edge classification, edge
         regression, and link prediction tasks.
 
+        Parameters
+        ----------
+        items : list[int] or list[tuple[str, int]]
+            Either a list of edge IDs (for homogeneous graphs), or a list of edge type-ID
+            pairs (for heterogeneous graphs).
+
         Returns
         -------
         Either ``(input_nodes, pair_graph, blocks)``, or
@@ -627,19 +643,19 @@ class EdgeCollator(Collator):
 
             If the original graph has multiple node types, return a dictionary of
             node type names and node ID tensors.  Otherwise, return a single tensor.
-        pair_graph : DGLHeteroGraph
+        pair_graph : DGLGraph
             The graph that contains only the edges in the minibatch as well as their incident
             nodes.
 
             Note that the metagraph of this graph will be identical to that of the original
             graph.
-        negative_pair_graph : DGLHeteroGraph
+        negative_pair_graph : DGLGraph
             The graph that contains only the edges connecting the source and destination nodes
             yielded from the given negative sampler, if negative sampling is enabled.
 
             Note that the metagraph of this graph will be identical to that of the original
             graph.
-        blocks : list[DGLHeteroGraph]
+        blocks : list[DGLGraph]
             The list of blocks necessary for computing the representation of the edges.
         """
         if self.negative_sampler is None:

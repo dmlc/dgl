@@ -8,6 +8,7 @@ from .. import transform
 from .randomwalks import random_walk
 from .neighbor import select_topk
 from ..base import EID
+from .. import utils
 
 
 class RandomWalkNeighborSampler(object):
@@ -29,7 +30,7 @@ class RandomWalkNeighborSampler(object):
     Parameters
     ----------
     G : DGLGraph
-        The graph.
+        The graph.  It must be on CPU.
     num_traversals : int
         The maximum number of metapath-based traversals for a single random walk.
 
@@ -53,24 +54,13 @@ class RandomWalkNeighborSampler(object):
         The name of the edge feature to be stored on the returned graph with the number of
         visits.
 
-    Inputs
-    ------
-    seed_nodes : Tensor
-        A tensor of given node IDs of node type ``ntype`` to generate neighbors from.  The
-        node type ``ntype`` is the beginning and ending node type of the given metapath.
-
-    Outputs
-    -------
-    g : DGLGraph
-        A homogeneous graph constructed by selecting neighbors for each given node according
-        to the algorithm above.
-
     Examples
     --------
     See examples in :any:`PinSAGESampler`.
     """
     def __init__(self, G, num_traversals, termination_prob,
                  num_random_walks, num_neighbors, metapath=None, weight_column='weights'):
+        assert G.device == F.cpu(), "Graph must be on CPU."
         self.G = G
         self.weight_column = weight_column
         self.num_random_walks = num_random_walks
@@ -96,6 +86,23 @@ class RandomWalkNeighborSampler(object):
 
     # pylint: disable=no-member
     def __call__(self, seed_nodes):
+        """
+        Parameters
+        ----------
+        seed_nodes : Tensor
+            A tensor of given node IDs of node type ``ntype`` to generate neighbors from.  The
+            node type ``ntype`` is the beginning and ending node type of the given metapath.
+
+            It must be on CPU and have the same dtype as the ID type of the graph.
+
+        Returns
+        -------
+        g : DGLGraph
+            A homogeneous graph constructed by selecting neighbors for each given node according
+            to the algorithm above.  The returned graph is on CPU.
+        """
+        seed_nodes = utils.prepare_tensor(self.G, seed_nodes, 'seed_nodes')
+
         seed_nodes = F.repeat(seed_nodes, self.num_random_walks, 0)
         paths, _ = random_walk(
             self.G, seed_nodes, metapath=self.full_metapath, restart_prob=self.restart_prob)
@@ -164,17 +171,6 @@ class PinSAGESampler(RandomWalkNeighborSampler):
     weight_column : str, default "weights"
         The name of the edge feature to be stored on the returned graph with the number of
         visits.
-
-    Inputs
-    ------
-    seed_nodes : Tensor
-        A tensor of given node IDs of node type ``ntype`` to generate neighbors from.
-
-    Outputs
-    -------
-    g : DGLHeteroGraph
-        A homogeneous graph constructed by selecting neighbors for each given node according
-        to PinSage algorithm.
 
     Examples
     --------
