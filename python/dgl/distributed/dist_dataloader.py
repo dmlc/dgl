@@ -97,7 +97,7 @@ class DistDataLoader:
         self.current_pos = 0
         if self.pool is not None:
             self.m = mp.Manager()
-            self.queue = mp.JoinableQueue(maxsize=4)
+            self.queue = self.m.Queue(maxsize=4)
         else:
             self.queue = Queue(maxsize=queue_size)
         self.drop_last = drop_last
@@ -139,7 +139,6 @@ class DistDataLoader:
             self._request_next_batch()
         if self.recv_idxs < self.expected_idxs:
             result = self.queue.get(timeout=60)
-            self.queue.task_done()
             self.recv_idxs += 1
             self.num_pending -= 1
             return result
@@ -160,7 +159,8 @@ class DistDataLoader:
         if next_data is None:
             return
         elif self.pool is not None:
-            self.pool.apply_async(call_collate_fn, args=(self.name, next_data, ))
+            rr = self.pool.apply_async(call_collate_fn, args=(self.name, next_data, ))
+            rr.get()
         else:
             result = self.collate_fn(next_data)
             self.queue.put(result)
