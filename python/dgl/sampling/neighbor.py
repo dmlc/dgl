@@ -6,13 +6,10 @@ from ..base import DGLError, EID
 from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from .. import utils
-from .. import subgraph as subg
-from .dataloader import BlockSampler, assign_block_eids
 
 __all__ = [
     'sample_neighbors',
-    'select_topk',
-    'MultiLayerNeighborSampler']
+    'select_topk']
 
 def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
@@ -27,7 +24,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     Parameters
     ----------
     g : DGLGraph
-        The graph
+        The graph.  Must be on CPU.
     nodes : tensor or dict
         Node IDs to sample neighbors from.
 
@@ -60,7 +57,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     Returns
     -------
     DGLGraph
-        A sampled subgraph containing only the sampled neighboring edges.
+        A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
 
     Examples
     --------
@@ -98,6 +95,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")
         nodes = {g.ntypes[0] : nodes}
+    assert g.device == F.cpu(), "Graph must be on CPU."
+
     nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
     nodes_all_types = []
     for ntype in g.ntypes:
@@ -150,7 +149,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
     Parameters
     ----------
     g : DGLGraph
-        The graph
+        The graph.  Must be on CPU.
     k : int or dict[etype, int]
         The number of edges to be selected for each node on each edge type.
 
@@ -181,7 +180,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
     Returns
     -------
     DGLGraph
-        A sampled subgraph containing only the sampled neighboring edges.
+        A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
 
     Examples
     --------
@@ -198,6 +197,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")
         nodes = {g.ntypes[0] : nodes}
+    assert g.device == F.cpu(), "Graph must be on CPU."
 
     # Parse nodes into a list of NDArrays.
     nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
@@ -234,75 +234,5 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
     for i, etype in enumerate(ret.canonical_etypes):
         ret.edges[etype].data[EID] = induced_edges[i]
     return ret
-
-
-class MultiLayerNeighborSampler(BlockSampler):
-    """Sampler that builds computational dependency of node representations via
-    neighbor sampling for multilayer GNN.
-
-    This sampler will make every node gather messages from a fixed number of neighbors
-    per edge type.  The neighbors are picked uniformly.
-
-    Parameters
-    ----------
-    fanouts : list[int] or list[dict[etype, int] or None]
-        List of neighbors to sample per edge type for each GNN layer, starting from the
-        first layer.
-
-        If the graph is homogeneous, only an integer is needed for each layer.
-
-        If None is provided for one layer, all neighbors will be included regardless of
-        edge types.
-
-        If -1 is provided for one edge type on one layer, then all inbound edges
-        of that edge type will be included.
-    replace : bool, default True
-        Whether to sample with replacement
-    return_eids : bool, default False
-        Whether to return edge IDs of the original graph in the sampled blocks.
-
-        If True, the edge IDs will be stored as ``dgl.EID`` feature for each edge type.
-
-    Examples
-    --------
-    To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
-    a homogeneous graph where each node takes messages from all neighbors (assume
-    the backend is PyTorch):
-    >>> sampler = dgl.sampling.NeighborSampler([None, None, None])
-    >>> collator = dgl.sampling.NodeCollator(g, train_nid, sampler)
-    >>> dataloader = torch.utils.data.DataLoader(
-    ...     collator.dataset, collate_fn=collator.collate,
-    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
-    >>> for blocks in dataloader:
-    ...     train_on(blocks)
-
-    If we wish to gather from 5 neighbors on the first layer, 10 neighbors on the second,
-    and 15 layers on the third:
-    >>> sampler = dgl.sampling.NeighborSampler([5, 10, 15])
-
-    If training on a heterogeneous graph and you want different number of neighbors for each
-    edge type, one should instead provide a list of dicts.  Each dict would specify the
-    number of neighbors to pick per edge type.
-    >>> sampler = dgl.sampling.NeighborSampler([
-    ...     {('user', 'follows', 'user'): 5,
-    ...      ('user', 'plays', 'game'): 4,
-    ...      ('game', 'played-by', 'user'): 3}] * 3)
-    """
-    def __init__(self, fanouts, replace=False, return_eids=False):
-        super().__init__(len(fanouts))
-
-        self.fanouts = fanouts
-        self.replace = replace
-        self.return_eids = return_eids
-        if return_eids:
-            self.set_block_postprocessor(assign_block_eids)
-
-    def sample_frontier(self, block_id, g, seed_nodes, *args, **kwargs):
-        fanout = self.fanouts[block_id]
-        if fanout is None:
-            frontier = subg.in_subgraph(g, seed_nodes)
-        else:
-            frontier = sample_neighbors(g, seed_nodes, fanout, replace=self.replace)
-        return frontier
 
 _init_api('dgl.sampling.neighbor', __name__)

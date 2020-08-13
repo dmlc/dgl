@@ -216,6 +216,9 @@ def ones(shape, dtype, ctx):
 def uniform(shape, dtype, ctx, low, high):
     return th.empty(shape, dtype=dtype, device=ctx).uniform_(low, high)
 
+def randint(shape, dtype, ctx, low, high):
+    return th.randint(low, high, shape, dtype=dtype, device=ctx)
+
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, th.Tensor):
@@ -274,7 +277,7 @@ def full_1d(length, fill_value, dtype, ctx):
     return th.full((length,), fill_value, dtype=dtype, device=ctx)
 
 def nonzero_1d(input):
-    x = th.nonzero(input).squeeze()
+    x = th.nonzero(input, as_tuple=False).squeeze()
     return x if x.dim() == 1 else x.view(-1)
 
 def sort_1d(input):

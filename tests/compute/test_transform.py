@@ -1,8 +1,10 @@
 from scipy import sparse as spsp
 import networkx as nx
 import numpy as np
+import os
 import dgl
 import dgl.function as fn
+import dgl.partition
 import backend as F
 from dgl.graph_index import from_scipy_sparse_matrix
 import unittest
@@ -14,17 +16,16 @@ D = 5
 
 # line graph related
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_line_graph1():
     N = 5
-    G = dgl.DGLGraph(nx.star_graph(N))
+    G = dgl.DGLGraph(nx.star_graph(N)).to(F.ctx())
     G.edata['h'] = F.randn((2 * N, D))
     n_edges = G.number_of_edges()
     L = G.line_graph(shared=True)
     assert L.number_of_nodes() == 2 * N
     assert F.allclose(L.ndata['h'], G.edata['h'])
+    assert G.device == F.ctx()
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_line_graph2(idtype):
     g = dgl.graph(([0, 1, 1, 2, 2],[2, 0, 2, 0, 1]),
@@ -72,7 +73,6 @@ def test_line_graph2(idtype):
     assert np.array_equal(col[order],
                           np.array([3, 4, 0, 3, 4, 0, 1, 2]))
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_no_backtracking():
     N = 5
     G = dgl.DGLGraph(nx.star_graph(N))
@@ -275,15 +275,6 @@ def test_to_bidirected():
     big = dgl.to_bidirected(g, copy_ndata=True)
     assert F.array_equal(g.nodes['user'].data['h'], big.nodes['user'].data['h'])
 
-    # test multigraph
-    g = dgl.graph((F.tensor([0, 1, 3, 1]), F.tensor([1, 2, 0, 2])))
-    raise_error = False
-    try:
-        big = dgl.to_bidirected(g)
-    except:
-        raise_error = True
-    assert raise_error
-
 def test_add_reverse_edges():
     # homogeneous graph
     g = dgl.graph((F.tensor([0, 1, 3, 1]), F.tensor([1, 2, 0, 2])))
@@ -339,8 +330,8 @@ def test_add_reverse_edges():
     ub, vb = bg.all_edges(order='eid', etype=('user', 'plays', 'game'))
     assert F.array_equal(u, ub)
     assert F.array_equal(v, vb)
-    assert len(bg.edges['plays'].data) == 0
-    assert len(bg.edges['follows'].data) == 0
+    assert set(bg.edges['plays'].data.keys()) == {dgl.EID}
+    assert set(bg.edges['follows'].data.keys()) == {dgl.EID}
 
     # donot share ndata and edata
     bg = dgl.add_reverse_edges(g, copy_ndata=False, copy_edata=False, ignore_bipartite=True)
@@ -458,7 +449,7 @@ def test_khop_adj():
     feat = F.randn((N, 5))
     g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
     for k in range(3):
-        adj = F.tensor(dgl.khop_adj(g, k))
+        adj = F.tensor(F.swapaxes(dgl.khop_adj(g, k), 0, 1))
         # use original graph to do message passing for k times.
         g.ndata['h'] = feat
         for _ in range(k):
@@ -490,12 +481,13 @@ def test_laplacian_lambda_max():
         assert l_max < 2 + eps
     '''
 
-def create_large_graph_index(num_nodes):
+def create_large_graph(num_nodes):
     row = np.random.choice(num_nodes, num_nodes * 10)
     col = np.random.choice(num_nodes, num_nodes * 10)
     spm = spsp.coo_matrix((np.ones(len(row)), (row, col)))
+    spm.sum_duplicates()
 
-    return from_scipy_sparse_matrix(spm, True)
+    return dgl.graph(spm)
 
 def get_nodeflow(g, node_ids, num_layers):
     batch_size = len(node_ids)
@@ -505,48 +497,22 @@ def get_nodeflow(g, node_ids, num_layers):
             seed_nodes=node_ids)
     return next(iter(sampler))
 
+# Disabled since everything will be on heterogeneous graphs
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_partition_with_halo():
-    g = dgl.DGLGraphStale(create_large_graph_index(1000), readonly=True)
+    g = create_large_graph(1000)
     node_part = np.random.choice(4, g.number_of_nodes())
-    subgs = dgl.transform.partition_graph_with_halo(g, node_part, 2)
-    for part_id, subg in subgs.items():
-        node_ids = np.nonzero(node_part == part_id)[0]
-        lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
-        nf = get_nodeflow(g, node_ids, 2)
-        lnf = get_nodeflow(subg, lnode_ids, 2)
-        for i in range(nf.num_layers):
-            layer_nids1 = F.asnumpy(nf.layer_parent_nid(i))
-            layer_nids2 = lnf.layer_parent_nid(i)
-            layer_nids2 = F.asnumpy(F.gather_row(subg.ndata[dgl.NID], layer_nids2))
-            assert np.all(np.sort(layer_nids1) == np.sort(layer_nids2))
-
-        for i in range(nf.num_blocks):
-            block_eids1 = F.asnumpy(nf.block_parent_eid(i))
-            block_eids2 = lnf.block_parent_eid(i)
-            block_eids2 = F.asnumpy(F.gather_row(subg.edata[dgl.EID], block_eids2))
-            assert np.all(np.sort(block_eids1) == np.sort(block_eids2))
-
     subgs = dgl.transform.partition_graph_with_halo(g, node_part, 2, reshuffle=True)
     for part_id, subg in subgs.items():
         node_ids = np.nonzero(node_part == part_id)[0]
         lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
         assert np.all(np.sort(F.asnumpy(subg.ndata['orig_id'])[lnode_ids]) == node_ids)
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
 def test_metis_partition():
     # TODO(zhengda) Metis fails to partition a small graph.
-    g = dgl.DGLGraphStale(create_large_graph_index(1000), readonly=True)
-    check_metis_partition(g, 0)
-    check_metis_partition(g, 1)
-    check_metis_partition(g, 2)
-    check_metis_partition_with_constraint(g)
-
-@unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
-def test_hetero_metis_partition():
-    # TODO(zhengda) Metis fails to partition a small graph.
-    g = dgl.DGLGraphStale(create_large_graph_index(1000), readonly=True)
-    g = dgl.as_heterograph(g)
+    g = create_large_graph(1000)
     check_metis_partition(g, 0)
     check_metis_partition(g, 1)
     check_metis_partition(g, 2)
@@ -635,10 +601,10 @@ def check_metis_partition(g, extra_hops):
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="It doesn't support GPU")
 def test_reorder_nodes():
-    g = dgl.DGLGraphStale(create_large_graph_index(1000), readonly=True)
+    g = create_large_graph(1000)
     new_nids = np.random.permutation(g.number_of_nodes())
     # TODO(zhengda) we need to test both CSR and COO.
-    new_g = dgl.transform.reorder_nodes(g, new_nids)
+    new_g = dgl.partition.reorder_nodes(g, new_nids)
     new_in_deg = new_g.in_degrees()
     new_out_deg = new_g.out_degrees()
     in_deg = g.in_degrees()

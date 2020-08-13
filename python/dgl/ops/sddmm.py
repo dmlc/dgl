@@ -5,7 +5,7 @@ import sys
 from ..backend import gsddmm as gsddmm_internal
 from .. import backend as F
 
-__all__ = ['gsddmm', 'copy_u', 'copy_v']
+__all__ = ['gsddmm', 'copy_u', 'copy_v', 'copy_e']
 
 
 def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
@@ -159,6 +159,12 @@ def copy_v(g, x):
     This function supports autograd (computing input gradients given the output gradient).
     """
     return gsddmm(g, 'copy_rhs', None, x)
+
+
+# pylint: disable=unused-argument
+def copy_e(g, x):
+    r"""Generalized SDDMM function that copies destination node features to edges."""
+    return x
 
 
 _register_sddmm_func()

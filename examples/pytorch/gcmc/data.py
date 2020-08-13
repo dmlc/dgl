@@ -8,6 +8,7 @@ import torch as th
 
 import dgl
 from dgl.data.utils import download, extract_archive, get_download_dir
+from utils import to_etype_name
 
 _urls = {
     'ml-100k' : 'http://files.grouplens.org/datasets/movielens/ml-100k.zip',
@@ -210,7 +211,7 @@ class MovieLens(object):
         def _npairs(graph):
             rst = 0
             for r in self.possible_rating_values:
-                r = str(r).replace('.', '_')
+                r = to_etype_name(r)
                 rst += graph.number_of_edges(str(r))
             return rst
 
@@ -252,7 +253,7 @@ class MovieLens(object):
             ridx = np.where(rating_values == rating)
             rrow = rating_row[ridx]
             rcol = rating_col[ridx]
-            rating = str(rating).replace('.', '_')
+            rating = to_etype_name(rating)
             bg = dgl.bipartite((rrow, rcol), 'user', rating, 'movie',
                                num_nodes=(self._num_user, self._num_movie))
             rev_bg = dgl.bipartite((rcol, rrow), 'movie', 'rev-%s' % rating, 'user',
@@ -275,7 +276,7 @@ class MovieLens(object):
             movie_ci = []
             movie_cj = []
             for r in self.possible_rating_values:
-                r = str(r).replace('.', '_')
+                r = to_etype_name(r)
                 user_ci.append(graph['rev-%s' % r].in_degrees())
                 movie_ci.append(graph[r].in_degrees())
                 if self._symm:
