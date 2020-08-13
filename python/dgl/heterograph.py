@@ -1788,8 +1788,7 @@ class DGLHeteroGraph(object):
         if len(self.canonical_etypes) == 1:
             return HeteroEdgeDataView(self, None, ALL)
         else:
-            raise DGLError('To set/get edge features for graphs of multiple edge types, '
-                           'use DGLGraph.edges.')
+            return HeteroEdgeDataView(self, self.canonical_etypes, ALL)
 
     def _find_etypes(self, key):
         etypes = [
