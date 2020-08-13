@@ -111,7 +111,7 @@ class EntityClassify(nn.Module):
 
 def init_emb(shape, dtype):
     arr = th.zeros(shape, dtype=dtype)
-    arr.uniform_(-1, 1)
+    nn.init.uniform_(arr, -1.0, 1.0)
     return arr
 
 class DistEmbedLayer(nn.Module):
@@ -335,7 +335,7 @@ def run(args, device, data):
         model = th.nn.parallel.DistributedDataParallel(model)
 
     if args.sparse_embedding:
-        emb_optimizer = dgl.distributed.SparseAdagrad([embed_layer.node_embeds], lr=args.lr)
+        emb_optimizer = dgl.distributed.SparseAdagrad([embed_layer.node_embeds], lr=args.sparse_lr)
         optimizer = th.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)
     else:
         all_params = list(model.parameters()) + list(embed_layer.parameters())
@@ -417,6 +417,7 @@ def run(args, device, data):
         epoch += 1
 
         start = time.time()
+        g.barrier()
         val_acc, test_acc = evaluate(g, model, embed_layer, labels,
             valid_dataloader, test_dataloader, node_feats, global_val_nid, global_test_nid)
         if val_acc >= 0:
@@ -481,6 +482,8 @@ if __name__ == '__main__':
             help="number of hidden units")
     parser.add_argument("--lr", type=float, default=1e-2,
             help="learning rate")
+    parser.add_argument("--sparse-lr", type=float, default=1e-2,
+            help="sparse lr rate")
     parser.add_argument("--n-bases", type=int, default=-1,
             help="number of filter weight matrices, default: -1 [use all]")
     parser.add_argument("--n-layers", type=int, default=2,

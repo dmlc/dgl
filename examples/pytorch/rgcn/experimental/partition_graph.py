@@ -76,6 +76,7 @@ def load_ogb(dataset, global_norm):
         g.ndata['train_mask'] = train_mask
         g.ndata['val_mask'] = val_mask
         g.ndata['test_mask'] = test_mask
+
         labels = th.full((g.number_of_nodes(),), -1, dtype=paper_labels.dtype)
         labels[target_idx] = paper_labels
         g.ndata['labels'] = labels
