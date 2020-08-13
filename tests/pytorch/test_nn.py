@@ -392,7 +392,7 @@ def test_gat_conv_bi(g, idtype):
     assert h.shape == (g.number_of_dst_nodes(), 4, 2)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn', 'lstm'])
 def test_sage_conv(idtype, g, aggre_type):
     g = g.astype(idtype).to(F.ctx())
@@ -403,7 +403,7 @@ def test_sage_conv(idtype, g, aggre_type):
     assert h.shape[-1] == 10
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
+@pytest.mark.parametrize('g', get_cases(['bipartite']))
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn', 'lstm'])
 def test_sage_conv_bi(idtype, g, aggre_type):
     g = g.astype(idtype).to(F.ctx())
@@ -422,14 +422,14 @@ def test_sage_conv2(idtype):
     g = dgl.bipartite([], num_nodes=(5, 3))
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    sage = nn.SAGEConv((3, 3), 2, 'gcn', allow_zero_in_degree=True)
+    sage = nn.SAGEConv((3, 3), 2, 'gcn')
     feat = (F.randn((5, 3)), F.randn((3, 3)))
     sage = sage.to(ctx)
     h = sage(g, (F.copy_to(feat[0], F.ctx()), F.copy_to(feat[1], F.ctx())))
     assert h.shape[-1] == 2
     assert h.shape[0] == 3
     for aggre_type in ['mean', 'pool', 'lstm']:
-        sage = nn.SAGEConv((3, 1), 2, aggre_type, allow_zero_in_degree=True)
+        sage = nn.SAGEConv((3, 1), 2, aggre_type)
         feat = (F.randn((5, 3)), F.randn((3, 1)))
         sage = sage.to(ctx)
         h = sage(g, feat)
@@ -610,7 +610,7 @@ def test_dense_graph_conv(norm_type, g, idtype):
     assert F.allclose(out_conv, out_dense_conv)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'bipartite'], exclude=['zero-degree']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'bipartite']))
 def test_dense_sage_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -813,9 +813,9 @@ def test_hetero_conv(agg, idtype):
 
     # test with pair input
     conv = nn.HeteroGraphConv({
-        'follows': nn.SAGEConv(2, 3, 'mean', allow_zero_in_degree=True),
-        'plays': nn.SAGEConv((2, 4), 4, 'mean', allow_zero_in_degree=True),
-        'sells': nn.SAGEConv(3, 4, 'mean', allow_zero_in_degree=True)},
+        'follows': nn.SAGEConv(2, 3, 'mean'),
+        'plays': nn.SAGEConv((2, 4), 4, 'mean'),
+        'sells': nn.SAGEConv(3, 4, 'mean')},
         agg)
     conv = conv.to(F.ctx())
 
