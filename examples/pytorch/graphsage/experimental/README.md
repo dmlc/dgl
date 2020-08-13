@@ -4,7 +4,7 @@ This is an example of training GraphSage in a distributed fashion. To train Grap
 
 ### Step 0: set IP configuration file.
 
-User need to set their own IP configuration file before training. For example, if we have four machines in cuurent cluster, the IP configuration
+User need to set their own IP configuration file before training. For example, if we have four machines in current cluster, the IP configuration
 could like this:
 
 ```bash
