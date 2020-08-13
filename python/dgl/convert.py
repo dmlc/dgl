@@ -91,10 +91,11 @@ def graph(data,
     2. The most efficient construction approach is to provide a tuple of node tensors without
        specifying :attr:`idtype` and :attr:`device`. This is because the returned graph shares
        the storage with the input node-tensors in this case.
-    3. DGL internally maintains multiple copies of the graph structure in different sparse
-       formats and chooses the most efficient one depending on the computation invoked.
-       If memory usage becomes an issue in the case of large graphs, use
-       :func:`dgl.DGLGraph.formats` to restrict the allowed formats.
+    3. DGL internally maintains multiple copies of the graph structure in different
+       `sparse formats <https://en.wikipedia.org/wiki/Sparse_matrix>`_ and chooses the most
+       efficient one depending on the computation invoked. If memory usage becomes an issue
+       in the case of large graphs, use :func:`dgl.DGLGraph.formats` to restrict the allowed
+       formats.
 
     Examples
     --------
@@ -264,10 +265,12 @@ def heterograph(data_dict,
         - ``(iterable[int], iterable[int])``: Similar to the tuple of node-tensors
           format, but stores node IDs in two sequences (e.g. list, tuple, numpy.ndarray).
     num_nodes_dict : dict[str, int], optional
-        The number of nodes for each node type. If not given (default), for each node type
-        :math:`T`, DGL finds the largest ID appeared in *every* graph data whose source or
-        destination node type is :math:`T`, and sets the number of nodes to be that ID plus one.
-        If given and the value is no greater than the largest ID, DGL will raise an error.
+        The number of nodes for some node types, which is a dictionary mapping a node type
+        :math:`T` to the number of :math:`T`-typed nodes. If not given for a node type
+        :math:`T`, DGL finds the largest ID appeared in *every* graph data whose source
+        or destination node type is :math:`T`, and sets the number of nodes to be that ID
+        plus one. If given and the value is no greater than the largest ID for some node type,
+        DGL will raise an error. By default, DGL infers the number of nodes for all node types.
     idtype : int32 or int64, optional
         The data type for storing the structure-related graph information such as node and
         edge IDs. It should be a framework-specific data type object (e.g., ``torch.int32``).
@@ -436,7 +439,7 @@ def heterograph(data_dict,
         utils.check_type(num_nodes_dict, dict, 'num_nodes_dict', skip_none=False)
         for nty in num_nodes_dict_:
             if nty not in num_nodes_dict:
-                raise DGLError('Missing node type {} for num_nodes_dict'.format(nty))
+                num_nodes_dict[nty] = num_nodes_dict_[nty]
             if num_nodes_dict[nty] < num_nodes_dict_[nty]:
                 raise DGLError('Expect the number of nodes to be at least {:d} for type {}, '
                                'got {:d}'.format(num_nodes_dict_[nty], nty, num_nodes_dict[nty]))
@@ -936,7 +939,7 @@ def bipartite_from_scipy(sp_mat,
     utils.check_valid_idtype(idtype)
 
     u, v, urange, vrange = utils.graphdata2tensors(sp_mat, idtype, bipartite=True)
-    g = create_from_edges(u, v, '_U', '_E', '_V', urange, vrange)
+    g = create_from_edges(u, v, utype, etype, vtype, urange, vrange)
     if eweight_name is not None:
         g.edata[eweight_name] = F.tensor(sp_mat.data)
     return g.to(device)
@@ -1258,7 +1261,7 @@ def bipartite_from_networkx(nx_graph,
         edge_id_attr_name=edge_id_attr_name,
         top_map=top_map, bottom_map=bottom_map)
 
-    g = create_from_edges(u, v, '_U', '_E', '_V', urange, vrange)
+    g = create_from_edges(u, v, utype, etype, vtype, urange, vrange)
 
     # nx_graph.edges(data=True) returns src, dst, attr_dict
     has_edge_id = nx_graph.number_of_edges() > 0 and edge_id_attr_name is not None
