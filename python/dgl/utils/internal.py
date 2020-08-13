@@ -754,8 +754,8 @@ def relabel(x):
                                F.copy_to(F.arange(0, len(unique_x), dtype), ctx))
     return unique_x, old_to_new
 
-def extract_subframes(graph, nodes, edges):
-    """Extract node/edge features of the given nodes and edges from :attr:`graph`
+def extract_node_subframes(graph, nodes):
+    """Extract node features of the given nodes from :attr:`graph`
     and return them in frames.
 
     Note that this function does not perform actual tensor memory copy but using `Frame.subframe`
@@ -771,17 +771,11 @@ def extract_subframes(graph, nodes, edges):
         Node IDs. If not None, the list length must be equal to the number of node types
         in the graph. The returned frames store the node IDs in the ``dgl.NID`` field
         unless it is None, which means the whole frame is shallow-copied.
-    edges : list[Tensor] or None
-        Edge IDs. If not None, the list length must be equal to the number of edge types
-        in the graph. The returned frames store the edge IDs in the ``dgl.NID`` field
-        unless it is None, which means the whole frame is shallow-copied.
 
     Returns
     -------
     list[Frame]
         Extracted node frames.
-    list[Frame]
-        Extracted edge frames.
     """
     if nodes is None:
         node_frames = [nf.clone() for nf in graph._node_frames]
@@ -791,6 +785,67 @@ def extract_subframes(graph, nodes, edges):
             subf = graph._node_frames[i].subframe(ind_nodes)
             subf[NID] = ind_nodes
             node_frames.append(subf)
+    return node_frames
+
+def extract_node_subframes_for_block(graph, srcnodes, dstnodes):
+    """Extract the input node features and output node features of the given nodes from
+    :attr:`graph` and return them in frames ready for a block.
+
+    Note that this function does not perform actual tensor memory copy but using `Frame.subframe`
+    to get the features. If :attr:`srcnodes` or :attr:`dstnodes` is None, it performs a
+    shallow copy of the original node frames that only copies the dictionary structure
+    but not the tensor contents.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph to extract features from.
+    srcnodes : list[Tensor]
+        Input node IDs. The list length must be equal to the number of node types
+        in the graph. The returned frames store the node IDs in the ``dgl.NID`` field.
+    dstnodes : list[Tensor]
+        Output node IDs. The list length must be equal to the number of node types
+        in the graph. The returned frames store the node IDs in the ``dgl.NID`` field.
+
+    Returns
+    -------
+    list[Frame]
+        Extracted node frames.
+    """
+    node_frames = []
+    for i, ind_nodes in enumerate(srcnodes):
+        subf = graph._node_frames[i].subframe(ind_nodes)
+        subf[NID] = ind_nodes
+        node_frames.append(subf)
+    for i, ind_nodes in enumerate(dstnodes):
+        subf = graph._node_frames[i].subframe(ind_nodes)
+        subf[NID] = ind_nodes
+        node_frames.append(subf)
+    return node_frames
+
+def extract_edge_subframes(graph, edges):
+    """Extract edge features of the given edges from :attr:`graph`
+    and return them in frames.
+
+    Note that this function does not perform actual tensor memory copy but using `Frame.subframe`
+    to get the features. If :attr:`edges` is None, it performs a shallow copy of the
+    original edge frames that only copies the dictionary structure but not the tensor
+    contents.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph to extract features from.
+    edges : list[Tensor] or None
+        Edge IDs. If not None, the list length must be equal to the number of edge types
+        in the graph. The returned frames store the edge IDs in the ``dgl.NID`` field
+        unless it is None, which means the whole frame is shallow-copied.
+
+    Returns
+    -------
+    list[Frame]
+        Extracted edge frames.
+    """
     if edges is None:
         edge_frames = [nf.clone() for nf in graph._edge_frames]
     else:
@@ -799,7 +854,32 @@ def extract_subframes(graph, nodes, edges):
             subf = graph._edge_frames[i].subframe(ind_edges)
             subf[EID] = ind_edges
             edge_frames.append(subf)
-    return node_frames, edge_frames
+    return edge_frames
+
+def set_new_frames(graph, *, node_frames=None, edge_frames=None):
+    """Set the node and edge frames of a given graph to new ones.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph whose node and edge frames are to be updated.
+    node_frames : list[Frame], optional
+        New node frames.
+
+        Default is None, where the node frames are not updated.
+    edge_frames : list[Frame], optional
+        New edge frames
+
+        Default is None, where the edge frames are not updated.
+    """
+    if node_frames is not None:
+        assert len(node_frames) == len(graph.ntypes), \
+            "[BUG] number of node frames different from number of node types"
+        graph._node_frames = node_frames
+    if edge_frames is not None:
+        assert len(edge_frames) == len(graph.etypes), \
+            "[BUG] number of edge frames different from number of edge types"
+        graph._edge_frames = edge_frames
 
 def set_num_threads(num_threads):
     """Set the number of OMP threads in the process.
