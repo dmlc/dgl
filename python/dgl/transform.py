@@ -520,7 +520,7 @@ def line_graph(g, backtracking=True, shared=False):
     >>> lg.edges()
     (tensor([0, 1, 2, 4]), tensor([4, 0, 3, 1]))
     """
-    assert g.is_homogeneous(), \
+    assert g.is_homogeneous, \
         'only homogeneous graph is supported'
 
     dev = g.device
@@ -571,7 +571,7 @@ def khop_adj(g, k):
             [1., 3., 3., 1., 0.],
             [0., 1., 3., 3., 1.]])
     """
-    assert g.is_homogeneous(), \
+    assert g.is_homogeneous, \
         'only homogeneous graph is supported'
     adj_k = g.adj(scipy_fmt=g.formats()['created'][0]) ** k
     return F.tensor(adj_k.todense().astype(np.float32))
@@ -636,7 +636,7 @@ def khop_graph(g, k, copy_ndata=True):
              ndata_schemes={}
              edata_schemes={})
     """
-    assert g.is_homogeneous(), \
+    assert g.is_homogeneous, \
         'only homogeneous graph is supported'
     n = g.number_of_nodes()
     adj_k = g.adj(transpose=True, scipy_fmt=g.formats()['created'][0]) ** k

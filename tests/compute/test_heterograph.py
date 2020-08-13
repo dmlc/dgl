@@ -114,7 +114,8 @@ def test_create(idtype):
     dst_ids = np.array([1, 2, 3])
     eweight = np.array([0.2, 0.3, 0.5])
     sp_mat = ssp.coo_matrix((eweight, (src_ids, dst_ids)))
-    g = dgl.bipartite_from_scipy(sp_mat, idtype=idtype, device=device)
+    g = dgl.bipartite_from_scipy(sp_mat, utype='user', etype='plays',
+                                 vtype='game', idtype=idtype, device=device)
     assert g.idtype == idtype
     assert g.device == device
     assert g.num_src_nodes() == 5
@@ -132,7 +133,8 @@ def test_create(idtype):
     nx_g.add_nodes_from([2, 4, 5], bipartite=1, feat3=np.zeros((3)))
     nx_g.add_edge(1, 4, weight=np.ones((1)), eid=np.array([1]))
     nx_g.add_edge(3, 5, weight=np.ones((1)), eid=np.array([0]))
-    g = dgl.bipartite_from_networkx(nx_g, idtype=idtype, device=device)
+    g = dgl.bipartite_from_networkx(nx_g, utype='user', etype='plays',
+                                    vtype='game', idtype=idtype, device=device)
     assert g.idtype == idtype
     assert g.device == device
     assert g.num_src_nodes() == 2

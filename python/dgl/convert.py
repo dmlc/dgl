@@ -844,6 +844,7 @@ def from_scipy(sp_mat,
     return g.to(device)
 
 def bipartite_from_scipy(sp_mat,
+                         utype='_U', etype='_E', vtype='_V',
                          eweight_name=None,
                          idtype=None,
                          device=None):
@@ -860,6 +861,12 @@ def bipartite_from_scipy(sp_mat,
         represents an edge from node ``i`` of type ``"SRC"`` to ``j`` of type ``"DST"``.
         Let the matrix shape be ``(N, M)``. There will be ``N`` ``"SRC"``-type nodes
         and ``M`` ``"DST"``-type nodes in the resulting graph.
+    utype : str, optional
+        The name of the source node type.
+    etype : str, optional
+        The name of the edge type.
+    vtype : str, optional
+        The name of the destination node type.
     eweight_name : str, optional
         The edata name for storing the nonzero values of :attr:`sp_mat`.
         If given, DGL will store the nonzero values of :attr:`sp_mat` in ``edata[eweight_name]``
@@ -1105,9 +1112,8 @@ def from_networkx(nx_graph,
     return g.to(device)
 
 def bipartite_from_networkx(nx_graph,
-                            src_attrs=None,
-                            edge_attrs=None,
-                            dst_attrs=None,
+                            utype='_U', etype='_E', vtype='_V',
+                            src_attrs=None, edge_attrs=None, dst_attrs=None,
                             edge_id_attr_name=None,
                             idtype=None,
                             device=None):
@@ -1130,6 +1136,12 @@ def bipartite_from_networkx(nx_graph,
         <https://networkx.github.io/documentation/stable/reference/algorithms/bipartite.html>`_,
         and furthermore the edges must be from nodes with attribute `bipartite=0` to nodes
         with attribute `bipartite=1`.
+    utype : str, optional
+        The name of the source node type.
+    etype : str, optional
+        The name of the edge type.
+    vtype : str, optional
+        The name of the destination node type.
     src_attrs : list[str], optional
         The names of the ``"SRC"`` node attributes to retrieve from the NetworkX graph. If given,
         DGL stores the retrieved node attributes in ``srcdata`` of the returned graph using their
