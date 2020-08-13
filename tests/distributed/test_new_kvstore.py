@@ -284,6 +284,7 @@ def start_client(num_clients, num_servers):
     data_store = {}
 
     for i in range(99999):
+        print(i)
         data_type = F.reverse_data_type_dict[F.dtype(data_2)]
         shared_data = empty_shared_mem('-test-kvdata-', True, data_2.shape, data_type)
         dlpack = shared_data.to_dlpack()
