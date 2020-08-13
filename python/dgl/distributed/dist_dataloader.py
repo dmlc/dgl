@@ -14,10 +14,10 @@ __all__ = ["DistDataLoader"]
 def call_collate_fn(name, next_data):
     """Call collate function"""
     try:
-        with open("~/debug.log", "a") as f:
-            f.writelines(["Issue request"])
-            result = DGL_GLOBAL_COLLATE_FNS[name](next_data)
-            DGL_GLOBAL_MP_QUEUES[name].put(result)
+        # with open("~/debug.log", "a") as f:
+            # f.writelines(["Issue request"])
+        result = DGL_GLOBAL_COLLATE_FNS[name](next_data)
+        DGL_GLOBAL_MP_QUEUES[name].put(result)
     except Exception as e:
         traceback.print_exc(file=open("~/error.log", "a"))
         print(e)
