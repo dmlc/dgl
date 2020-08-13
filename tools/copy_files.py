@@ -28,6 +28,8 @@ def main():
                         help='Relative path in workspace to store the partition data.')
     parser.add_argument('--part_config', type=str, required=True,
                         help='The partition config file. The path is on the local machine.')
+    parser.add_argument('--script_folder', type=str, required=True,
+                        help='The folder contains all the user code scripts.')
     parser.add_argument('--ip_config', type=str, required=True,
                         help='The file of IP configuration for servers. \
                         The path is on the local machine.')
@@ -89,6 +91,8 @@ def main():
         copy_file(part_files['node_feats'], ip, remote_path)
         copy_file(part_files['edge_feats'], ip, remote_path)
         copy_file(part_files['part_graph'], ip, remote_path)
+        # copy script folder
+        copy_file(args.script_folder, ip, args.workspace)
 
 
 def signal_handler(signal, frame):
