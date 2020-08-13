@@ -287,9 +287,9 @@ def start_client(num_clients, num_servers):
         print(i)
         data_type = F.reverse_data_type_dict[F.dtype(data_2)]
         shared_data = dgl.empty_shared_mem('-test-kvdata-', True, data_2.shape, data_type)
-        dlpack = shared_data.to_dlpack()
-        data_store['-test-kvdata-'] = F.zerocopy_from_dlpack(dlpack)
-        del data_store['-test-kvdata-']
+        #dlpack = shared_data.to_dlpack()
+        #data_store['-test-kvdata-'] = F.zerocopy_from_dlpack(dlpack)
+        #del data_store['-test-kvdata-']
 
 def start_client_mul_role(i, num_workers, num_servers):
     os.environ['DGL_DIST_MODE'] = 'distributed'
