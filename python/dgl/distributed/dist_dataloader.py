@@ -14,8 +14,10 @@ __all__ = ["DistDataLoader"]
 def call_collate_fn(name, next_data):
     """Call collate function"""
     try:
-        result = DGL_GLOBAL_COLLATE_FNS[name](next_data)
-        DGL_GLOBAL_MP_QUEUES[name].put(result)
+        with open("~/debug.log", "a") as f:
+            f.writelines(["Issue request"])
+            result = DGL_GLOBAL_COLLATE_FNS[name](next_data)
+            DGL_GLOBAL_MP_QUEUES[name].put(result)
     except Exception as e:
         traceback.print_exc(file=open("~/error.log", "a"))
         print(e)
@@ -95,7 +97,7 @@ class DistDataLoader:
         self.current_pos = 0
         if self.pool is not None:
             self.m = mp.Manager()
-            self.queue = self.m.Queue(maxsize=4)
+            self.queue = mp.JoinableQueue(maxsize=4)
         else:
             self.queue = Queue(maxsize=queue_size)
         self.drop_last = drop_last
@@ -137,6 +139,7 @@ class DistDataLoader:
             self._request_next_batch()
         if self.recv_idxs < self.expected_idxs:
             result = self.queue.get(timeout=60)
+            self.queue.task_done()
             self.recv_idxs += 1
             self.num_pending -= 1
             return result
