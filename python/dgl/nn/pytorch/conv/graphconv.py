@@ -171,7 +171,7 @@ class GraphConv(nn.Module):
         if self.bias is not None:
             init.zeros_(self.bias)
 
-    def forward(self, graph, feat, weight=None):
+    def forward(self, graph, feat, weight=None, p0=None):
         r"""
 
         Description
@@ -234,6 +234,10 @@ class GraphConv(nn.Module):
             feat_src, feat_dst = expand_as_pair(feat, graph)
             if self._norm == 'both':
                 degs = graph.out_degrees().float().clamp(min=1)
+                if p0 is not None:
+                    for t in graph.out_edges(p0):
+                        print(degs[t[1]])
+                        print(feat[t[1]])
                 norm = th.pow(degs, -0.5)
                 shp = norm.shape + (1,) * (feat_src.dim() - 1)
                 norm = th.reshape(norm, shp)
