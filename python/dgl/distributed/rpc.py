@@ -16,7 +16,7 @@ __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
 'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call', \
 'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', \
-'get_num_client', 'set_num_client', 'client_barrier']
+'get_num_client', 'set_num_client', 'client_barrier', 'copy_data_to_shared_memory']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
@@ -990,6 +990,12 @@ def register_ctrl_c():
     """HandleCtrlC Register for handling Ctrl+C event.
     """
     _CAPI_DGLRPCHandleCtrlC()
+
+def copy_data_to_shared_memory(source, dst):
+    """Copy tensor data to shared-memory tensor
+    """
+    _CAPI_DGLCopyDataToSharedMemory(F.zerocopy_to_dgl_ndarray(source), 
+                                    F.zerocopy_to_dgl_ndarray(dst))
 
 ############### Some basic services will be defined here #############
 
