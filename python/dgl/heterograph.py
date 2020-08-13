@@ -837,7 +837,7 @@ class DGLHeteroGraph(object):
 
         A uni-bipartite heterograph can further divide its node types into two sets:
         SRC and DST. All edges are from nodes in SRC to nodes in DST. The following APIs
-        can be used to get the nodes and types that belong to SRC and DST sets:
+        can be used to get the type, data, and nodes that belong to SRC and DST sets:
 
         * :func:`srctype` and :func:`dsttype`
         * :func:`srcdata` and :func:`dstdata`
@@ -2241,7 +2241,7 @@ class DGLHeteroGraph(object):
         Returns
         -------
         int
-            The number of edges
+            The number of edges.
 
         Examples
         --------
@@ -2391,7 +2391,7 @@ class DGLHeteroGraph(object):
         Returns
         -------
         Framework-specific device object
-            For example, this can be torch.int32 or torch.int64 for PyTorch.
+            For example, this can be ``torch.int32`` or ``torch.int64`` for PyTorch.
 
         Examples
         --------
@@ -2443,10 +2443,10 @@ class DGLHeteroGraph(object):
         vid : node ID(s)
             The node ID(s) for query. The allowed formats are:
 
-            - int: The ID of a single node.
-            - Tensor: A 1D tensor that contains the IDs of multiple nodes, whose data type and
+            - ``int``: The ID of a single node.
+            - ``Tensor``: A 1D tensor that contains the IDs of multiple nodes, whose data type and
               device should be separately the same as the idtype and device of the graph.
-            - iterable[int]: A sequence (e.g. list, tuple, numpy.ndarray)
+            - ``iterable[int]``: A sequence (e.g. list, tuple, numpy.ndarray)
               of integers that contains the IDs of multiple nodes.
         ntype : str, optional
             The node type for query. It is required if the graph has
@@ -2525,11 +2525,11 @@ class DGLHeteroGraph(object):
         u : source node ID(s)
             The source node(s) of the edges for query. The allowed formats are:
 
-            - int: The source node of an edge for query.
-            - Tensor: A 1D tensor that contains the source node(s) of edge(s) for query, whose
+            - ``int``: The source node of an edge for query.
+            - ``Tensor``: A 1D tensor that contains the source node(s) of edge(s) for query, whose
               data type an device should be separately the same as the idtype and device of
               the graph. Its i-th element is the source node of the i-th edge for query.
-            - iterable[int] : Similar to the tensor, but stores node IDs in a sequence
+            - ``iterable[int]`` : Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
         v : destination node ID(s)
             The destination node(s) of the edges for query. It's a counterpart of :attr:`u`
@@ -2778,11 +2778,11 @@ class DGLHeteroGraph(object):
         u : source node ID(s)
             The source node(s) of the edges for query. The allowed formats are:
 
-            - int: The source node of an edge for query.
-            - Tensor: A 1D tensor that contains the source node(s) of edge(s) for query, whose
+            - ``int``: The source node of an edge for query.
+            - ``Tensor``: A 1D tensor that contains the source node(s) of edge(s) for query, whose
               data type an device should be separately the same as the idtype and device of
               the graph. Its i-th element is the source node of the i-th edge for query.
-            - iterable[int] : Similar to the tensor, but stores node IDs in a sequence
+            - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
         v : destination node ID(s)
             The destination node(s) of the edges for query. It's a counterpart of :attr:`u`
@@ -2946,14 +2946,14 @@ class DGLHeteroGraph(object):
         ----------
         eid : edge ID(s)
             The IDs of the edges for query. The function expects that :attr:`eid` contains
-            valid edge IDs only, i.e. consecutive integers 0, 1, ... E - 1, where E is the
-            number of edges with the specified edge type.
+            valid edge IDs only, i.e. consecutive integers :math:`0, 1, ... E - 1`, where
+            :math:`E` is the number of edges with the specified edge type.
 
-            - int: An edge ID for query.
-            - Tensor: A 1D tensor that contains the edge IDs for query, whose data
+            - ``int``: An edge ID for query.
+            - ``Tensor``: A 1D tensor that contains the edge IDs for query, whose data
               type and device should be separately the same as the idtype and device of the
               graph.
-            - iterable[int] : Similar to the tensor, but stores edge IDs in a sequence
+            - ``iterable[int]``: Similar to the tensor, but stores edge IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
         etype : str or tuple of str, optional
             The edge type for query, which can be an edge type (str) or a canonical edge type
@@ -3029,11 +3029,11 @@ class DGLHeteroGraph(object):
         v : destination node ID(s)
             The destination node(s) for query. The allowed formats are:
 
-            - int: The destination node for query.
-            - Tensor: A 1D tensor that contains the destination node(s) for query, whose data
+            - ``int``: The destination node for query.
+            - ``Tensor``: A 1D tensor that contains the destination node(s) for query, whose data
               type and device should be separately the same as the idtype and device of the
               graph.
-            - iterable[int] : Similar to the tensor, but stores node IDs in a sequence
+            - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
         form : str, optional
             The return form, which can be one of the following:
@@ -3134,11 +3134,11 @@ class DGLHeteroGraph(object):
         u : source node ID(s)
             The source node(s) for query. The allowed formats are:
 
-            - int: The source node for query.
-            - Tensor: A 1D tensor that contains the source node(s) for query, whose data
+            - ``int``: The source node for query.
+            - ``Tensor``: A 1D tensor that contains the source node(s) for query, whose data
               type and device should be separately the same as the idtype and device of the
               graph.
-            - iterable[int] : Similar to the tensor, but stores node IDs in a sequence
+            - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
         form : str, optional
             The return form, which can be one of the following:
@@ -3327,11 +3327,11 @@ class DGLHeteroGraph(object):
         v : destination node ID(s), optional
             The destination node(s) for query. The allowed formats are:
 
-            - int: The destination node for query.
-            - Tensor: A 1D tensor that contains the destination node(s) for query, whose data
+            - ``int``: The destination node for query.
+            - ``Tensor``: A 1D tensor that contains the destination node(s) for query, whose data
               type and device should be separately the same as the idtype and device of the
               graph.
-            - iterable[int] : Similar to the tensor, but stores node IDs in a sequence
+            - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
 
             By default, it considers all nodes.
@@ -3432,11 +3432,11 @@ class DGLHeteroGraph(object):
         ----------
         u : source node ID(s), optional
 
-            - int: The source node for query.
-            - Tensor: A 1D tensor that contains the source node(s) for query, whose data
+            - ``int``: The source node for query.
+            - ``Tensor``: A 1D tensor that contains the source node(s) for query, whose data
               type and device should be separately the same as the idtype and device of the
               graph.
-            - iterable[int] : Similar to the tensor, but stores node IDs in a sequence
+            - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
 
             By default, it considers all nodes.
@@ -3786,15 +3786,14 @@ class DGLHeteroGraph(object):
             A function of signature ``func(shape, dtype, ctx, id_range) -> Tensor``.
             The tensor will be the initialized features. The arguments are:
 
-            * shape: tuple of int
-                The shape of the tensor to return. The first dimension is the number
-                of nodes for feature initialization.
-            * dtype: framework-specific data type object
-                The data type of the tensor to return.
-            * ctx: framework-specific device object
-                The device of the tensor to return.
-            * id_range: slice
-                The start and end ID of the nodes for feature initialization.
+            - ``shape``: The shape of the tensor to return, which is a tuple of int.
+              The first dimension is the number of nodes for feature initialization.
+            - ``dtype``: The data type of the tensor to return, which is a
+              framework-specific data type object.
+            - ``ctx``: The device of the tensor to return, which is a framework-specific
+              device object.
+            - ``id_range``: The start and end ID of the nodes for feature initialization,
+              which is a slice.
         field : str, optional
             The name of the feature that the initializer applies. If not given, the
             initializer applies to all features.
@@ -3877,15 +3876,14 @@ class DGLHeteroGraph(object):
             A function of signature ``func(shape, dtype, ctx, id_range) -> Tensor``.
             The tensor will be the initialized features. The arguments are:
 
-            * shape: tuple of int
-                The shape of the tensor to return. The first dimension is the number
-                of edges for feature initialization.
-            * dtype: framework-specific data type object
-                The data type of the tensor to return.
-            * ctx: framework-specific device object
-                The device of the tensor to return.
-            * id_range: slice
-                The start and end ID of the edges for feature initialization.
+            - ``shape``: The shape of the tensor to return, which is a tuple of int.
+              The first dimension is the number of edges for feature initialization.
+            - ``dtype``: The data type of the tensor to return, which is a
+              framework-specific data type object.
+            - ``ctx``: The device of the tensor to return, which is a framework-specific
+              device object.
+            - ``id_range``: The start and end ID of the edges for feature initialization,
+              which is a slice.
         field : str, optional
             The name of the feature that the initializer applies. If not given, the
             initializer applies to all features.
@@ -4960,7 +4958,7 @@ class DGLHeteroGraph(object):
         -------
         device context
             The device of the graph, which should be a framework-specific device object
-            (e.g., torch.device).
+            (e.g., ``torch.device``).
 
         Examples
         --------
@@ -4988,7 +4986,7 @@ class DGLHeteroGraph(object):
         Parameters
         ----------
         device : Framework-specific device context object
-            The context to move data to.
+            The context to move data to (e.g., ``torch.device``).
         kwargs : Key-word arguments.
             Key-word arguments fed to the framework copy function.
 

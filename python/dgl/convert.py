@@ -44,28 +44,28 @@ def graph(data,
         :math:`(U[i], V[i])` forms an edge and is given edge ID :math:`i` in the graph.
         The allowed data formats are:
 
-        - (Tensor, Tensor): Each tensor must be a 1D tensor containing node IDs.
+        - ``(Tensor, Tensor)``: Each tensor must be a 1D tensor containing node IDs.
           DGL calls this format "tuple of node-tensors". The tensors should have the same
           data type of int32/int64 and device context (see below the descriptions of
           :attr:`idtype` and :attr:`device`).
-        - (iterable[int], iterable[int]): Similar to the tuple of node-tensors
+        - ``(iterable[int], iterable[int])``: Similar to the tuple of node-tensors
           format, but stores node IDs in two sequences (e.g. list, tuple, numpy.ndarray).
     ntype : str, optional
-        Deprecated. To construct a graph with named node types, see :func:`dgl.heterograph`.
+        Deprecated. To construct a graph with named node types, use :func:`dgl.heterograph`.
     etype : str, optional
-        Deprecated. To construct a graph with named edge types, see :func:`dgl.heterograph`.
+        Deprecated. To construct a graph with named edge types, use :func:`dgl.heterograph`.
     num_nodes : int, optional
         The number of nodes in the graph. If not given, this will be the largest node ID
         plus 1 from the :attr:`data` argument. If given and the value is no greater than
         the largest node ID from the :attr:`data` argument, DGL will raise an error.
     idtype : int32 or int64, optional
         The data type for storing the structure-related graph information such as node and
-        edge IDs. It should be a framework-specific data type object (e.g., torch.int32).
-        If not given (default), DGL infers the ID type from the :attr:`data` argument.
+        edge IDs. It should be a framework-specific data type object (e.g., ``torch.int32``).
+        If ``None`` (default), DGL infers the ID type from the :attr:`data` argument.
         See "Notes" for more details.
     device : device context, optional
         The device of the returned graph, which should be a framework-specific device object
-        (e.g., torch.device). If ``None`` (default), DGL uses the device of the tensors of
+        (e.g., ``torch.device``). If ``None`` (default), DGL uses the device of the tensors of
         the :attr:`data` argument. If :attr:`data` is not a tuple of node-tensors, the
         returned graph is on CPU.  If the specified :attr:`device` differs from that of the
         provided tensors, it casts the given tensors to the specified device first.
@@ -252,16 +252,16 @@ def heterograph(data_dict,
     ----------
     data_dict : graph data
         The dictionary data for constructing a heterogeneous graph. The keys are in the form of
-        string triplet :math:`(src_type, edge_type, dst_type)`, specifying the source node,
+        string triplet (src_type, edge_type, dst_type), specifying the source node,
         edge, and destination node types. The values are graph data in the form of
         :math:`(U, V)`, where :math:`(U[i], V[i])` forms an edge and is given edge ID :math:`i`.
         The allowed graph data formats are:
 
-        - (Tensor, Tensor): Each tensor must be a 1D tensor containing node IDs. DGL calls this
-          format "tuple of node-tensors". The tensors should have the same data type of
+        - ``(Tensor, Tensor)``: Each tensor must be a 1D tensor containing node IDs. DGL calls
+          this format "tuple of node-tensors". The tensors should have the same data type of
           int32/int64 and device context (see below the descriptions of :attr:`idtype` and
           :attr:`device`).
-        - (iterable[int], iterable[int]): Similar to the tuple of node-tensors
+        - ``(iterable[int], iterable[int])``: Similar to the tuple of node-tensors
           format, but stores node IDs in two sequences (e.g. list, tuple, numpy.ndarray).
     num_nodes_dict : dict[str, int], optional
         The number of nodes for each node type. If not given (default), for each node type
@@ -270,11 +270,11 @@ def heterograph(data_dict,
         If given and the value is no greater than the largest ID, DGL will raise an error.
     idtype : int32 or int64, optional
         The data type for storing the structure-related graph information such as node and
-        edge IDs. It should be a framework-specific data type object (e.g., torch.int32).
-        If not given (default), DGL infers the ID type from the :attr:`data_dict` argument.
+        edge IDs. It should be a framework-specific data type object (e.g., ``torch.int32``).
+        If ``None`` (default), DGL infers the ID type from the :attr:`data_dict` argument.
     device : device context, optional
         The device of the returned graph, which should be a framework-specific device object
-        (e.g., torch.device). If ``None`` (default), DGL uses the device of the tensors of
+        (e.g., ``torch.device``). If ``None`` (default), DGL uses the device of the tensors of
         the :attr:`data` argument. If :attr:`data` is not a tuple of node-tensors, the
         returned graph is on CPU.  If the specified :attr:`device` differs from that of the
         provided tensors, it casts the given tensors to the specified device first.
@@ -770,11 +770,11 @@ def from_scipy(sp_mat,
         graph.
     idtype : int32 or int64, optional
         The data type for storing the structure-related graph information such as node and
-        edge IDs. It should be a framework-specific data type object (e.g., torch.int32).
+        edge IDs. It should be a framework-specific data type object (e.g., ``torch.int32``).
         By default, DGL uses int64.
     device : device context, optional
         The device of the resulting graph. It should be a framework-specific device object
-        (e.g., torch.device). By default, DGL stores the graph on CPU.
+        (e.g., ``torch.device``). By default, DGL stores the graph on CPU.
 
     Returns
     -------
@@ -970,11 +970,11 @@ def from_networkx(nx_graph,
         can be arbitrary. It must be None if :attr:`nx_graph` is undirected.
     idtype : int32 or int64, optional
         The data type for storing the structure-related graph information such as node and
-        edge IDs. It should be a framework-specific data type object (e.g., torch.int32).
+        edge IDs. It should be a framework-specific data type object (e.g., ``torch.int32``).
         By default, DGL uses int64.
     device : device context, optional
         The device of the resulting graph. It should be a framework-specific device object
-        (e.g., torch.device). By default, DGL stores the graph on CPU.
+        (e.g., ``torch.device``). By default, DGL stores the graph on CPU.
 
     Returns
     -------
@@ -998,7 +998,7 @@ def from_networkx(nx_graph,
     >>> import numpy as np
     >>> import torch
 
-    Create a 2-edge NetworkX graph
+    Create a 2-edge NetworkX graph.
 
     >>> nx_g = nx.DiGraph()
     >>> # Add 3 nodes and two features for them
