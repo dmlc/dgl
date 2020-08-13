@@ -69,7 +69,7 @@ class NodeDataLoader:
     def __iter__(self):
         return self.dataloader.__iter__()
 
-class EdgeDataLoader:
+class EdgeDataLoader(DataLoader):
     """PyTorch dataloader for batch-iterating over a set of edges, generating the list
     of blocks as computation dependency of the said minibatch for edge classification,
     edge regression, and link prediction.
@@ -216,13 +216,5 @@ class EdgeDataLoader:
         assert not isinstance(g, DistGraph), \
                 'EdgeDataLoader does not support DistGraph for now. ' \
                 + 'Please use DistDataLoader directly.'
-        self.dataloader = DataLoader(self.collator.dataset,
-                                     collate_fn=self.collator.collate,
-                                     **dataloader_kwargs)
-
-
-    def __next__(self):
-        return self.dataloader.__next()
-
-    def __iter__(self):
-        return self.dataloader.__iter__()
+        super().__init__(
+            self.collator.dataset, collate_fn=self.collator.collate, **dataloader_kwargs)
