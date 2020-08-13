@@ -994,7 +994,7 @@ def register_ctrl_c():
 def copy_data_to_shared_memory(source, dst):
     """Copy tensor data to shared-memory tensor
     """
-    _CAPI_DGLCopyDataToSharedMemory(F.zerocopy_to_dgl_ndarray(source), 
+    _CAPI_DGLCopyDataToSharedMemory(F.zerocopy_to_dgl_ndarray(source),
                                     F.zerocopy_to_dgl_ndarray(dst))
 
 ############### Some basic services will be defined here #############
