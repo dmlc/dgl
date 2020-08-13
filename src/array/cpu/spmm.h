@@ -104,8 +104,10 @@ void SpMMSumCoo(
       const DType* lhs_off = Op::use_lhs? X + rid * lhs_dim + lhs_add : nullptr;
       const DType* rhs_off = Op::use_rhs? W + eid * rhs_dim + rhs_add : nullptr;
       const DType val = Op::Call(lhs_off, rhs_off);
+      if (val != 0) {
 #pragma omp atomic
-      out_off[k] += val;
+        out_off[k] += val;
+      }
     }
   }
 }
@@ -169,7 +171,7 @@ void SpMMCmpCsr(
             aw = eid;
         }
       }
-      out_off[k] = accum;
+      out_off[k] = (row_start != row_end) ? accum : 0;
       if (Op::use_lhs)
         argx_off[k] = ax;
       if (Op::use_rhs)
@@ -240,6 +242,18 @@ void SpMMCmpCoo(
           argw_off[k] = eid;
       }
     }
+  }
+
+  // Set the result of the nodes never compared to anybody else (i.e. 0-in-degree nodes) to 0.
+  // A node has never compared to anybody else iff the first element of the result array equals
+  // Cmp::zero.
+#pragma omp parallel for
+  for (IdType i = 0; i < nnz; ++i) {
+    const IdType cid = col[i];
+    DType* out_off = O + cid * dim;
+
+    if (out_off[0] == Cmp::zero)
+      std::fill(out_off, out_off + dim, 0);
   }
 }
 
