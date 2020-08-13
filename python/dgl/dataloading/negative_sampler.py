@@ -11,7 +11,7 @@ class _BaseNegativeSampler(object):
 
         Parameters
         ----------
-        g : DGLHeteroGraph
+        g : DGLGraph
             The graph.
         eids : Tensor or dict[etype, Tensor]
             The sampled edges in the minibatch.
