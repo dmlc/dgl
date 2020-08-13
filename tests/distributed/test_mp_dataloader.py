@@ -152,14 +152,16 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last):
 def start_node_dataloader(rank, tmpdir, disable_shared_mem, num_workers):
     import dgl
     import torch as th
-    dgl.distributed.initialize("mp_ip_config.txt", 1, num_workers=num_workers)
+    print('test7')
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_sampling.json', rank)
+    print('test8')
     num_nodes_to_sample = 202
     batch_size = 32
     train_nid = th.arange(num_nodes_to_sample)
     dist_graph = DistGraph("test_mp", gpb=gpb, part_config=tmpdir / 'test_sampling.json')
+    print('test9')
 
     # Create sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler([5, 10])
@@ -197,6 +199,7 @@ def start_node_dataloader(rank, tmpdir, disable_shared_mem, num_workers):
 @pytest.mark.parametrize("num_workers", [0, 4])
 @pytest.mark.parametrize("dataloader_type", ["node"])
 def test_dataloader(tmpdir, num_server, num_workers, dataloader_type):
+    print('test1')
     ip_config = open("mp_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -207,8 +210,10 @@ def test_dataloader(tmpdir, num_server, num_workers, dataloader_type):
     num_parts = num_server
     num_hops = 1
 
+    print('test2')
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
                     num_hops=num_hops, part_method='metis', reshuffle=False)
+    print('test3')
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -218,15 +223,21 @@ def test_dataloader(tmpdir, num_server, num_workers, dataloader_type):
         p.start()
         time.sleep(1)
         pserver_list.append(p)
+    print('test4')
 
     time.sleep(3)
     os.environ['DGL_DIST_MODE'] = 'distributed'
     try:
         if dataloader_type == 'node':
+            print('test5')
+            dgl.distributed.initialize("mp_ip_config.txt", 1, num_workers=num_workers)
+            print('test6')
             start_node_dataloader(0, tmpdir, num_server > 1, num_workers)
     except Exception as e:
+        print('start node dataloader fails:', num_server, num_workers, dataloader_type)
         print(e)
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
+    print('test10')
 
 if __name__ == "__main__":
     import tempfile
