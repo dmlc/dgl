@@ -106,7 +106,10 @@ def test_standalone(tmpdir):
                     num_hops=num_hops, part_method='metis', reshuffle=False)
 
     os.environ['DGL_DIST_MODE'] = 'standalone'
-    start_dist_dataloader(0, tmpdir, False, 2, True)
+    try:
+        start_dist_dataloader(0, tmpdir, False, 2, True)
+    except Exception as e:
+        print(e)
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 
@@ -140,7 +143,10 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last):
 
     time.sleep(3)
     os.environ['DGL_DIST_MODE'] = 'distributed'
-    start_dist_dataloader(0, tmpdir, num_server > 1, num_workers, drop_last)
+    try:
+        start_dist_dataloader(0, tmpdir, num_server > 1, num_workers, drop_last)
+    except Exception as e:
+        print(e)
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 def start_node_dataloader(rank, tmpdir, disable_shared_mem, num_workers):
@@ -215,8 +221,11 @@ def test_dataloader(tmpdir, num_server, num_workers, dataloader_type):
 
     time.sleep(3)
     os.environ['DGL_DIST_MODE'] = 'distributed'
-    if dataloader_type == 'node':
-        start_node_dataloader(0, tmpdir, num_server > 1, num_workers)
+    try:
+        if dataloader_type == 'node':
+            start_node_dataloader(0, tmpdir, num_server > 1, num_workers)
+    except Exception as e:
+        print(e)
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 if __name__ == "__main__":
