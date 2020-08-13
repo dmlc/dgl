@@ -55,8 +55,7 @@ def start_client(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
     num_nodes_to_sample = 202
     batch_size = 32
     train_nid = th.arange(num_nodes_to_sample)
-    dist_graph = DistGraph("mp_ip_config.txt", "test_mp", gpb=gpb,
-                           part_config=tmpdir / 'test_sampling.json')
+    dist_graph = DistGraph("test_mp", gpb=gpb, part_config=tmpdir / 'test_sampling.json')
 
     # Create sampler
     sampler = NeighborSampler(dist_graph, [5, 10],

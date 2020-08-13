@@ -69,9 +69,9 @@ def heterograph0():
 
 @register_case(['batched', 'homo'])
 def batched_graph0():
-    g1 = dgl.graph(([0, 1, 2], [1, 2, 3]))
-    g2 = dgl.graph(([1, 1], [2, 0]))
-    g3 = dgl.graph(([0], [1]))
+    g1 = dgl.add_self_loop(dgl.graph(([0, 1, 2], [1, 2, 3])))
+    g2 = dgl.add_self_loop(dgl.graph(([1, 1], [2, 0])))
+    g3 = dgl.add_self_loop(dgl.graph(([0], [1])))
     return dgl.batch([g1, g2, g3])
 
 @register_case(['block', 'bipartite', 'block-biparitite'])
