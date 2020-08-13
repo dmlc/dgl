@@ -155,6 +155,7 @@ def start_node_dataloader(rank, tmpdir, disable_shared_mem, num_workers):
     import dgl
     import torch as th
     print('test7')
+    dgl.distributed.initialize("mp_ip_config.txt", 1, num_workers=num_workers)
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_sampling.json', rank)
@@ -193,6 +194,8 @@ def start_node_dataloader(rank, tmpdir, disable_shared_mem, num_workers):
                 assert np.all(F.asnumpy(has_edges))
                 max_nid.append(np.max(F.asnumpy(dst_nodes_id)))
                 # assert np.all(np.unique(np.sort(F.asnumpy(dst_nodes_id))) == np.arange(idx, batch_size))
+    del dataloader
+    dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
@@ -229,18 +232,18 @@ def test_dataloader(tmpdir, num_server, num_workers, dataloader_type):
 
     time.sleep(3)
     os.environ['DGL_DIST_MODE'] = 'distributed'
-    try:
-        if dataloader_type == 'node':
-            print('test5')
-            dgl.distributed.initialize("mp_ip_config.txt", 1, num_workers=num_workers)
-            print('test6')
-            start_node_dataloader(0, tmpdir, num_server > 1, num_workers)
-    except Exception as e:
-        print('start node dataloader fails:', num_server, num_workers, dataloader_type)
-        print(e)
-    dgl.distributed.exit_client() # this is needed since there's two test here in one process
+    ptrainer_list = []
+    if dataloader_type == 'node':
+        print('test5')
+        p = ctx.Process(target=start_node_dataloader, args=(
+            0, tmpdir, num_server > 1, num_workers))
+        p.start()
+        time.sleep(1)
+        ptrainer_list.append(p)
     print('test10')
     for p in pserver_list:
+        p.join()
+    for p in ptrainer_list:
         p.join()
 
 if __name__ == "__main__":
