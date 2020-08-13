@@ -236,8 +236,8 @@ class GraphConv(nn.Module):
                 degs = graph.out_degrees().float().clamp(min=1)
                 if p0 is not None:
                     for t in graph.out_edges(p0)[1]:
-                        print(degs[t])
-                        print(feat[t])
+                        print(degs[t].tolist())
+                        print(feat[t].tolist())
                 norm = th.pow(degs, -0.5)
                 shp = norm.shape + (1,) * (feat_src.dim() - 1)
                 norm = th.reshape(norm, shp)
