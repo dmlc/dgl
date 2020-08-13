@@ -46,7 +46,7 @@ The command below copies partition data, ip config file, as well as training scr
 the location of the partition configuration file).
 
 ```bash
-python3 ~/dgl/tools/copy_partitions.py \
+python3 ~/dgl/tools/copy_files.py \
 --ip_config ip_config.txt \
 --workspace ~/graphsage \
 --rel_data_path ogb-product \
