@@ -22,7 +22,7 @@ def call_collate_fn(name, next_data):
         # DGL_GLOBAL_MP_QUEUES[name].put(result)
     except Exception as e:
         import logging
-        logging.basicConfig(filename='/home/ubuntu/du1.log',level=logging.DEBUG)
+        logging.basicConfig(filename='/home/ubuntu/du2.log',level=logging.DEBUG)
         # traceback.print_exc(file=open("/home/ubuntu/error2.log", "w"))
         # with open("/home/ubuntu/error22.log", "w") as f:
         #     f.write(str(e))
