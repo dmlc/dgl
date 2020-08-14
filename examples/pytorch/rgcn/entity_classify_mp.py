@@ -26,7 +26,7 @@ from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from model import RelGraphEmbedLayer
 from dgl.nn import RelGraphConv
 from utils import thread_wrapped_func
-import tqdm 
+import tqdm
 
 from ogb.nodeproppred import DglNodePropPredDataset
 
@@ -167,7 +167,7 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
     embed_layer.eval()
     eval_logits = []
     eval_seeds = []
- 
+
     with th.no_grad():
         for sample_data in tqdm.tqdm(eval_loader):
             th.cuda.empty_cache()
@@ -181,7 +181,7 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
             eval_seeds.append(seeds.cpu().detach())
     eval_logits = th.cat(eval_logits)
     eval_seeds = th.cat(eval_seeds)
- 
+
     return eval_logits, eval_seeds
 
 
@@ -237,7 +237,7 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
 
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
-    # 
+    #
     embed_layer = RelGraphEmbedLayer(dev_id,
                                      g.number_of_nodes(),
                                      node_tids,
