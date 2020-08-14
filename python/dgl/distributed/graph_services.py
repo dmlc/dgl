@@ -247,10 +247,9 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
 def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     """Sample from the neighbors of the given nodes from a distributed graph.
 
-    When sampling with replacement, the sampled subgraph could have parallel edges.
-
-    For sampling without replace, if fanout > the number of neighbors, all the
-    neighbors are sampled.
+    For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
+    will be randomly chosen.  The graph returned will then contain all the nodes in the
+    original graph, but only the sampled edges.
 
     Node/edge features are not preserved. The original IDs of
     the sampled edges are stored as the `dgl.EID` feature in the returned graph.
@@ -260,27 +259,38 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     Parameters
     ----------
     g : DistGraph
-        The distributed graph.
+        The distributed graph..
     nodes : tensor or dict
-        Node ids to sample neighbors from. If it's a dict, it should contain only
+        Node IDs to sample neighbors from. If it's a dict, it should contain only
         one key-value pair to make this API consistent with dgl.sampling.sample_neighbors.
     fanout : int
-        The number of sampled neighbors for each node.
+        The number of edges to be sampled for each node.
+
+        If -1 is given, all of the neighbors will be selected.
     edge_dir : str, optional
-        Edge direction ('in' or 'out'). If is 'in', sample from in edges. Otherwise,
-        sample from out edges.
+        Determines whether to sample inbound or outbound edges.
+
+        Can take either ``in`` for inbound edges or ``out`` for outbound edges.
     prob : str, optional
-        Feature name used as the probabilities associated with each neighbor of a node.
-        Its shape should be compatible with a scalar edge feature tensor.
+        Feature name used as the (unnormalized) probabilities associated with each
+        neighboring edge of a node.  The feature must have only one element for each
+        edge.
+
+        The features must be non-negative floats, and the sum of the features of
+        inbound/outbound edges for every node must be positive (though they don't have
+        to sum up to one).  Otherwise, the result will be undefined.
     replace : bool, optional
         If True, sample with replacement.
 
+        When sampling with replacement, the sampled subgraph could have parallel edges.
+
+        For sampling without replacement, if fanout > the number of neighbors, all the
+        neighbors are sampled. If fanout == -1, all neighbors are collected.
+
     Returns
     -------
-    DGLHeteroGraph
-        A sampled subgraph containing only the sampled neighbor edges from
-        ``nodes``. The sampled subgraph has the same metagraph as the original
-        one.
+    DGLGraph
+        A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
     """
     if isinstance(nodes, dict):
         assert len(nodes) == 1, 'The distributed sampler only supports one node type for now.'
@@ -288,7 +298,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     def issue_remote_req(node_ids):
         return SamplingRequest(node_ids, fanout, edge_dir=edge_dir,
                                prob=prob, replace=replace)
-    def local_access(local_g, partition_book, local_nids):
+    d ef local_access(local_g, partition_book, local_nids):
         return _sample_neighbors(local_g, partition_book, local_nids,
                                  fanout, edge_dir, prob, replace)
     return _distributed_access(g, nodes, issue_remote_req, local_access)
@@ -386,25 +396,31 @@ def find_edges(g, edge_ids):
     return _distributed_edge_access(g, edge_ids, issue_remove_req, local_access)
 
 def in_subgraph(g, nodes):
-    """Extract the subgraph containing only the in edges of the given nodes.
+    """Return the subgraph induced on the inbound edges of the given nodes.
 
-    The subgraph keeps the same type schema and the cardinality of the original one.
-    Node/edge features are not preserved. The original IDs
+    The subgraph keeps the same type schema and all the nodes are preserved regardless
+    of whether they have an edge or not.
+
+    Node/edge features are not preserved. The original IDs of
     the extracted edges are stored as the `dgl.EID` feature in the returned graph.
 
     For now, we only support the input graph with one node type and one edge type.
+
 
     Parameters
     ----------
     g : DistGraph
         The distributed graph structure.
-    nodes : tensor
+    nodes : tensor or dict
         Node ids to sample neighbors from.
 
     Returns
     -------
-    DGLHeteroGraph
+    DGLGraph
         The subgraph.
+
+        One can retrieve the mapping from subgraph edge ID to parent
+        edge ID via ``dgl.EID`` edge features of the subgraph.
     """
     if isinstance(nodes, dict):
         assert len(nodes) == 1, 'The distributed in_subgraph only supports one node type for now.'
