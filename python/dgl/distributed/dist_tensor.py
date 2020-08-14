@@ -24,17 +24,36 @@ DIST_TENSOR_ID = 0
 class DistTensor:
     ''' Distributed tensor.
 
-    DistTensor references to a tensor stored in the distributed KVStore.
-    When a DistTensor is created, it may reference to a tensor in the KVStore, or
-    create a new one. The tensor is identified by the name passed to the constructor
-    of DistTensor. If the name exists, DistTensor will reference the existing one.
-    In this case, the shape and the data type should match the existing tensor.
+    DistTensor references to a distributed tensor sharded and stored in a cluster of machines.
+    Distributed tensors are designed to store node data and edge data of a distributed graph.
+    Therefore, their first dimensions have to be the number of nodes or edges in the graph.
+    The tensors are sharded in the first dimension based on the partition policy of nodes
+    or edges. When a distributed tensor is created, the partition policy is automatically
+    determined based on the first dimension: if it matches the number of nodes, it will use
+    the node partition policy; if it matches the number of edges, it wll use the edge partition
+    policy. Users can overwrite the rule by providing a partition policy directly.
+
+    A distributed tensor can have a unique name to identify it or be anonymous.
+    When the distributed tensor has a name, the tensor can be persistent if persistent=True.
+    A persistent tensor lives in the system even if the DistTenor object is
+    destroyed in the trainer process. However, DGL does not allow an anonymous tensor
+    to be persistent.
+
+    When a DistTensor is created, it may reference to an existing distributed tensor or
+    create a new one. A distributed tensor is identified by the name passed to the constructor.
+    If the name exists, DistTensor will reference the existing one.
+    In this case, the shape and the data type must match the existing tensor.
     If the name doesn't exist, a new tensor will be created in the kvstore.
 
-    If persistent=True when creating DistTesnor, the tensor in the KVStore will
-    be persistent. Even if DistTensor is destroyed in the local trainer process,
-    the tensor will still exist in KVStore. However, we do not allow an anonymous
-    tensor to be persistent.
+    When a distributed tensor is created, its values are initialized to zero. Users
+    can define an initialization function to control how the values are initialized.
+    The init function has two input arguments: shape and data type and returns a tensor.
+    Below shows an example of an init function:
+
+    ```
+    def init_func(shape, dtype):
+        return torch.ones(shape=shape, dtype=dtype)
+    ```
 
     Parameters
     ----------
@@ -122,20 +141,44 @@ class DistTensor:
 
     @property
     def part_policy(self):
-        ''' Return the partition policy '''
+        '''Return the partition policy
+
+        Returns
+        -------
+        PartitionPolicy
+            The partition policy of the distributed tensor.
+        '''
         return self._part_policy
 
     @property
     def shape(self):
-        ''' Return the shape of the distributed tensor. '''
+        '''Return the shape of the distributed tensor.
+
+        Returns
+        -------
+        tuple
+            The shape of the distributed tensor.
+        '''
         return self._shape
 
     @property
     def dtype(self):
-        ''' Return the data type of the distributed tensor. '''
+        '''Return the data type of the distributed tensor.
+
+        Returns
+        ------
+        dtype
+            The data type of the tensor.
+        '''
         return self._dtype
 
     @property
     def name(self):
-        ''' Return the name of the distributed tensor '''
+        '''Return the name of the distributed tensor
+
+        Returns
+        -------
+        str
+            The name of the tensor.
+        '''
         return self._name
