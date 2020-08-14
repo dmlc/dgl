@@ -61,7 +61,9 @@ class MultiLayerNeighborSampler(BlockSampler):
         fanout = self.fanouts[block_id]
         if isinstance(g, distributed.DistGraph):
             if fanout is None:
-                frontier = distributed.in_subgraph(g, seed_nodes)
+                # TODO(zhengda) There is a bug in the distributed version of in_subgraph.
+                # let's use sample_neighbors to replace in_subgraph for now.
+                frontier = distributed.sample_neighbors(g, seed_nodes, -1, replace=False)
             else:
                 frontier = distributed.sample_neighbors(g, seed_nodes, fanout, replace=self.replace)
         else:
