@@ -84,7 +84,7 @@ python3 link_predict.py -d FB15k-237 --gpu 0 --eval-protocol filtered
 ```
 
 ### Link Prediction with Minibatch and Neighbor Sampling
-wn18:
+#### WM18
 ```
 Average MRR: 0.7898
 Average MR: 50.28
@@ -96,3 +96,27 @@ Average HITS@10: 0.9485
 python3 link_predict_mp.py --low-mem --lr 0.00165 --n-bases 2 --n-layers 1 --n-epochs 20 --fanout -1 --batch-size 256 --regularization-coef 1e-4 --valid-neg-cnt 1000 --test-neg-cnt -1 --use-self-loop --num-worker 4 --n-hidden 200 --dropout 0.2 --dataset wn18
 ```
 
+#### FB15k-237
+filtered MRR 0.264 (DGL), 0.249 (paper)
+```
+Average MRR: 0.26377048539984593
+Average MR: 161.4138326981335
+Average HITS@1: 0.1804211863578618
+Average HITS@3: 0.28664614482556433
+Average HITS@10: 0.4319603244405355
+```
+```
+python3 link_predict_mp.py --lr 0.002 --n-bases 100 --n-layers 2 --n-epochs 2000 --batch-size 30000 --regularization-coef 0.01 --valid-neg-cnt 1000 --test-neg-cnt -1 --use-self-loop --num-worker 4 --n-hidden 500 --dropout 0.4 --dataset FB15k-237 --sampler=path --chunk-size 20 --global-norm --relation-regularizer bdd --gamma 200.0
+```
+
+Raw MRR 0.149 (DGL), 0.156 (paper)
+```
+Average MRR: 0.14897002375811436
+Average MR: 321.6044903742793
+Average HITS@1: 0.06591419915958174
+Average HITS@3: 0.16400371347600898
+Average HITS@10: 0.3168425681618294
+```
+```
+python3 link_predict_mp.py --lr 0.002 --n-bases 100 --n-layers 2 --n-epochs 2000 --batch-size 30000 --regularization-coef 0.01 --valid-neg-cnt 1000 --test-neg-cnt -1 --use-self-loop --num-worker 4 --n-hidden 500 --dropout 0.4 --dataset FB15k-237 --sampler=path --chunk-size 20 --global-norm --relation-regularizer bdd --gamma 200.0 --no-test-filter
+```
