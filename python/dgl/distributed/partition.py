@@ -5,21 +5,21 @@ organized as follows:
 
 ```
 data_root_dir/
-  |-- part_conf.json      # partition configuration file in JSON
-  |-- node_map            # partition id of each node stored in a numpy array
-  |-- edge_map            # partition id of each edge stored in a numpy array
+  |-- graph_name.json     # partition configuration file in JSON
+  |-- node_map.npy        # partition id of each node stored in a numpy array (optional)
+  |-- edge_map.npy        # partition id of each edge stored in a numpy array (optional)
   |-- part0/              # data for partition 0
-      |-- node_feats      # node features stored in binary format
-      |-- edge_feats      # edge features stored in binary format
-      |-- graph           # graph structure of this partition stored in binary format
+      |-- node_feats.dgl  # node features stored in binary format
+      |-- edge_feats.dgl  # edge features stored in binary format
+      |-- graph.dgl       # graph structure of this partition stored in binary format
   |-- part1/              # data for partition 1
-      |-- node_feats
-      |-- edge_feats
-      |-- graph
+      |-- node_feats.dgl
+      |-- edge_feats.dgl
+      |-- graph.dgl
 ```
 
-The partition configuration file stores the file locations. For the above example,
-the configuration file will look like the following:
+The JSON file stores the partition information. For the example above,
+the JSON file will look like the following:
 
 ```
 {
@@ -89,8 +89,8 @@ from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 from ..transform import metis_partition_assignment, partition_graph_with_halo
 from .graph_partition_book import GraphPartitionBook, RangePartitionBook
 
-def load_partition(conf_file, part_id):
-    ''' Load data of a partition from the data path in the DistGraph server.
+def load_partition(part_config, part_id):
+    ''' Load data of a partition from the data path.
 
     A partition data includes a graph structure of the partition, a dict of node tensors,
     a dict of edge tensors and some metadata. The partition may contain the HALO nodes,
@@ -100,12 +100,11 @@ def load_partition(conf_file, part_id):
     the information of the global graph (not the local partition), which includes the number
     of nodes, the number of edges as well as the node assignment of the global graph.
 
-    The function currently loads data through the normal filesystem interface. In the future,
-    we need to support loading data from other storage such as S3 and HDFS.
+    The function currently loads data through the local filesystem interface.
 
     Parameters
     ----------
-    conf_file : str
+    part_config : str
         The path of the partition config file.
     part_id : int
         The partition Id.
@@ -115,15 +114,15 @@ def load_partition(conf_file, part_id):
     DGLGraph
         The graph partition structure.
     dict of tensors
-        All node features.
+        Node features.
     dict of tensors
-        All edge features.
+        Edge features.
     GraphPartitionBook
-        The global partition information.
+        The graph partition information.
     str
         The graph name
     '''
-    with open(conf_file) as conf_f:
+    with open(part_config) as conf_f:
         part_metadata = json.load(conf_f)
     assert 'part-{}'.format(part_id) in part_metadata, "part-{} does not exist".format(part_id)
     part_files = part_metadata['part-{}'.format(part_id)]
@@ -137,18 +136,18 @@ def load_partition(conf_file, part_id):
     assert NID in graph.ndata, "the partition graph should contain node mapping to global node Id"
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
 
-    gpb, graph_name = load_partition_book(conf_file, part_id, graph)
+    gpb, graph_name = load_partition_book(part_config, part_id, graph)
     nids = F.boolean_mask(graph.ndata[NID], graph.ndata['inner_node'])
     partids = gpb.nid2partid(nids)
     assert np.all(F.asnumpy(partids == part_id)), 'load a wrong partition'
     return graph, node_feats, edge_feats, gpb, graph_name
 
-def load_partition_book(conf_file, part_id, graph=None):
+def load_partition_book(part_config, part_id, graph=None):
     ''' Load a graph partition book from the partition config file.
 
     Parameters
     ----------
-    conf_file : str
+    part_config : str
         The path of the partition config file.
     part_id : int
         The partition Id.
@@ -162,7 +161,7 @@ def load_partition_book(conf_file, part_id, graph=None):
     str
         The graph name
     '''
-    with open(conf_file) as conf_f:
+    with open(part_config) as conf_f:
         part_metadata = json.load(conf_f)
     assert 'num_parts' in part_metadata, 'num_parts does not exist.'
     assert part_metadata['num_parts'] > part_id, \
