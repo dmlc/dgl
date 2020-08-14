@@ -146,7 +146,7 @@ template <typename Idx,
           typename DType,
           bool atomic=false>
 struct Max {
-  static constexpr DType zero = std::numeric_limits<DType>::lowest();
+  static constexpr DType zero = -std::numeric_limits<DType>::infinity();
   static constexpr bool require_arg = true;
   static __device__ __forceinline__ void Call(
     DType *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
@@ -183,7 +183,7 @@ template <typename Idx,
           typename DType,
           bool atomic=false>
 struct Min {
-  static constexpr DType zero = std::numeric_limits<DType>::max();
+  static constexpr DType zero = std::numeric_limits<DType>::infinity();
   static constexpr bool require_arg = true;
   static __device__ __forceinline__ void Call(
     DType *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,

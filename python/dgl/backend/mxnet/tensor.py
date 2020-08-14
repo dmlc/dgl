@@ -325,6 +325,9 @@ def clone(input):
 def clamp(data, min_val, max_val):
     return nd.clip(data, min_val, max_val)
 
+def replace_inf_with_zero(x):
+    return nd.where(nd.abs(x) == np.inf, nd.zeros_like(x), x)
+
 def unique(input):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
