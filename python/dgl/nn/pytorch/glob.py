@@ -73,7 +73,7 @@ class SumPooling(nn.Module):
 
         Parameters
         ----------
-        graph : a DGLGraph or a batch of DGLGraphs
+        graph : DGLGraph
             a DGLGraph or a batch of DGLGraphs
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)`, where :math:`N` is the number
@@ -151,7 +151,7 @@ class AvgPooling(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph or a batch of DGLGraphs
+        graph : DGLGraph
             A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)`, where :math:`N` is the number
@@ -227,7 +227,7 @@ class MaxPooling(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph or a batch of DGLGraphs
+        graph : DGLGraph
             A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
             The input feature with shape :math:`(N, *)`, where
@@ -308,7 +308,7 @@ class SortPooling(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph or a batch of DGLGraphs
+        graph : DGLGraph
             A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)`, where :math:`N` is the
@@ -362,7 +362,7 @@ class GlobalAttentionPooling(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph or a batch of DGLGraphs
+        graph : DGLGraph
             A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where :math:`N` is the
