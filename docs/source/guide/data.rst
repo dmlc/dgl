@@ -4,8 +4,8 @@ Graph data input pipeline in DGL
 
 DGL implements many commonly used graph datasets in
 `dgl.data <https://docs.dgl.ai/en/latest/api/python/dgl.data.html>`__. They
-follow a standard pipeline defined in class `DGLDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#dgl-dataset>`__. We highly
-recommend processing graph data into a ``DGLDataset`` subclass, as the
+follow a standard pipeline defined in class :class:`dgl.data.DGLDataset`. We highly
+recommend processing graph data into a :class:`dgl.data.DGLDataset` subclass, as the
 pipeline provides simple and clean solution for loading, processing and
 saving graph data.
 
@@ -16,18 +16,20 @@ show how to implement each component of it.
 DGLDataset class
 --------------------
 
-``DGLDataset`` is the base class for processing, loading and saving
+:class:`dgl.data.DGLDataset` is the base class for processing, loading and saving
 graph datasets defined in ``dgl.data``. It implements the basic pipeline
 for processing graph data. The following flow chart shows how the
 pipeline works.
 
-|image0|
-
 To process a graph dataset located in a remote server or local disk, we
-define a class, say ``MyDataset``, inherits from ``DGLDataset``. The
+define a class, say ``MyDataset``, inherits from :class:`dgl.data.DGLDataset`. The
 template of ``MyDataset`` is as follows.
 
-.. |image0| image:: https://i.imgur.com/fU6fzj8l.png
+.. figure:: assets/data_flow_chart.png
+	:align: center
+	:scale: 50 %
+
+	Flow chart for graph data input pipeline defined in class DGLDataset.
 
 .. code:: 
 
@@ -95,18 +97,18 @@ template of ``MyDataset`` is as follows.
             pass
 
 
-``DGLDataset`` class has abstract functions ``process()``,
+:class:`dgl.data.DGLDataset` class has abstract functions ``process()``,
 ``__getitem__(idx)`` and ``__len__()`` that must be implemented in the
 subclass. But we recommend to implement saving and loading as well,
 since they can save significant time for processing large datasets, and
 there are several APIs making it easy (see `Save and load data 
 <file:///Users/xiangkhu/Documents/GitHub/dgl/docs/build/html/guide/data.html#save-and-load-data>`__).
 
-Note that the purpose of ``DGLDataset`` is to provide a standard and
+Note that the purpose of :class:`dgl.data.DGLDataset` is to provide a standard and
 convenient way to load graph data. We can store graphs, features,
 labels, masks and basic information about the dataset, such as number of
 classes, number of labels, etc. Operations such as sampling, partition
-or feature normalization are done outside of the ``DGLDataset``
+or feature normalization are done outside of the :class:`dgl.data.DGLDataset`
 subclass.
 
 The rest of this chapter shows the best practices to implement the
@@ -121,9 +123,9 @@ download and move data to the right directory, we can do it
 automatically by implementing function ``download()``.
 
 If the dataset is a zip file, make ``MyDataset`` inherit from
-``DGLBuiltinDataset`` class, which handles the zip file extraction for us. Otherwise,
+:class:`dgl.data.DGLBuiltinDataset` class, which handles the zip file extraction for us. Otherwise,
 implement ``download()`` like in
-`QM7bDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#qm7b-dataset>`__:
+:class:`dgl.data.QM7bDataset`:
 
 .. code:: 
 
@@ -137,10 +139,9 @@ implement ``download()`` like in
         download(self.url, path=file_path)
 
 The above code downloads a .mat file to directory ``self.raw_dir``. If
-the file is a .gz, .tar, .tar.gz or .tgz file, use ``extract_archive``
+the file is a .gz, .tar, .tar.gz or .tgz file, use :func:`dgl.data.utils.extract_archive`
 function to extract. The following code shows how to download a .gz file
-in
-`BitcoinOTCDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#bitcoinotc-dataset>`__:
+in :class:`dgl.data.BitcoinOTCDataset`:
 
 .. code:: 
 
@@ -161,7 +162,7 @@ in
         self._extract_gz(gz_file_path, self.raw_path)
 
 The above code will extract the file into directory ``self.name`` under
-``self.raw_dir``. If the class inherits from ``DGLBuiltinDataset``
+``self.raw_dir``. If the class inherits from :class:`dgl.data.DGLBuiltinDataset`
 to handle zip file, it will extract the file into directory ``self.name`` 
 as well.
 
@@ -189,14 +190,12 @@ Processing Graph Classification datasets
 
 Graph classification datasets are almost the same as most datasets in
 typical machine learning tasks, where mini-batch training is used. So we
-process the raw data to a list of ``DGLGraph`` objects and a list of
+process the raw data to a list of :class:`dgl.DGLGraph` objects and a list of
 label tensors. In addition, if the raw data has been splitted into
 several files, we can add a parameter ``split`` to load specific part of
 the data.
 
-Take
-`QM7bDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#qm7b-dataset>`__
-as example:
+Take :class:`dgl.data.QM7bDataset` as example:
 
 .. code:: 
 
@@ -244,7 +243,7 @@ code <https://docs.dgl.ai/en/latest/_modules/dgl/data/qm7b.html#QM7bDataset>`__
 for details of ``self._load_graph()`` and ``__getitem__``.
 
 We can also add properties to the class to indicate some useful
-information of the dataset. In ``QM7bDataset``, we can add a property
+information of the dataset. In :class:`dgl.data.QM7bDataset`, we can add a property
 ``num_labels`` to indicate the total number of prediction tasks in this
 multi-task dataset:
 
@@ -255,7 +254,7 @@ multi-task dataset:
         """Number of labels for each graph, i.e. number of prediction tasks."""
         return 14
 
-After all these coding, we can finally use the ``QM7bDataset`` as
+After all these coding, we can finally use the :class:`dgl.data.QM7bDataset` as
 follows:
 
 .. code:: 
@@ -302,9 +301,7 @@ Processing Node Classification datasets
 Different from graph classification, node classification is typically on
 a single graph. As such, splits of the dataset are on the nodes of the
 graph. We recommend using node masks to specify the splits. We use
-builtin dataset
-`CitationGraphDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#citation-network-dataset>`__
-as an example:
+builtin dataset `CitationGraphDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#citation-network-dataset>`__ as an example:
 
 .. code:: 
 
@@ -366,8 +363,7 @@ Notice that the implementations of ``__getitem__(idx)`` and
 for node classification tasks. The masks are ``bool tensors`` in PyTorch
 and TensorFlow, and ``float tensors`` in MXNet.
 
-We use a subclass of ``CitationGraphDataset``
-`CiteseerGraphDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#dgl.data.CiteseerGraphDataset>`__
+We use a subclass of ``CitationGraphDataset``, :class:`dgl.data.CiteseerGraphDataset`,
 to show the usage of it:
 
 .. code:: 
@@ -462,8 +458,7 @@ highlight the key part for processing link prediction datasets:
 As shown in the code, we add splitting masks into ``edata`` field of the
 graph. Check `KnowledgeGraphDataset source
 code <https://docs.dgl.ai/en/latest/_modules/dgl/data/knowledge_graph.html#KnowledgeGraphDataset>`__
-to see the complete code. We use a subclass of ``KnowledgeGraphDataset``
-`FB15k237Dataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#dgl.data.FB15k237Dataset>`__
+to see the complete code. We use a subclass of ``KnowledgeGraphDataset``, :class:`dgl.data.FB15k237Dataset`,
 to show the usage of it:
 
 .. code:: 
@@ -499,15 +494,8 @@ We recommend to implement saving and loading functions to cache the
 processed data in local disk. This saves a lot of data processing time
 in most cases. We provide four functions to make things simple:
 
--  `save_graphs <https://docs.dgl.ai/en/latest/generated/dgl.data.utils.save_graphs.html>`__
-   and
-   `load_graphs <https://docs.dgl.ai/en/latest/generated/dgl.data.utils.load_graphs.html>`__:
-   save/load DGLGraph objects and labels to/from local disk.
--  `save_info <https://docs.dgl.ai/en/latest/generated/dgl.data.utils.save_info.html>`__
-   and
-   `load_info <https://docs.dgl.ai/en/latest/generated/dgl.data.utils.load_info.html>`__:
-   save/load useful information of the dataset (python ``dict`` object)
-   to/from local disk.
+-  :func:`dgl.data.utils.save_graphs` and :func:`dgl.data.utils.load_graphs`: save/load DGLGraph objects and labels to/from local disk.
+-  :func:`dgl.data.utils.save_info` and :func:`dgl.data.utils.load_info`: save/load useful information of the dataset (python ``dict`` object) to/from local disk.
 
 The following example shows how to save and load a list of graphs and
 dataset information.
@@ -541,8 +529,7 @@ dataset information.
         return os.path.exists(graph_path) and os.path.exists(info_path)
 
 Note that there are cases not suitable to save processed data. For
-example, in the builtin dataset
-`GDELTDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#gdelt-dataset>`__,
+example, in the builtin dataset :class:`dgl.data.GDELTDataset`,
 the processed data is quite large, so it’s more effective to process
 each data example in ``__getitem__(idx)``.
 
@@ -552,7 +539,7 @@ Loading OGB datasets using ``ogb`` package
 `Open Graph Benchmark (OGB) <https://ogb.stanford.edu/docs/home/>`__ is
 a collection of benchmark datasets. The official OGB package
 `ogb <https://github.com/snap-stanford/ogb>`__ provides APIs for
-downloading and processing OGB datasets into ``DGLGraph`` objects. We
+downloading and processing OGB datasets into :class:`dgl.data.DGLGraph` objects. We
 introduce their basic usage here.
 
 First install ogb package using pip:

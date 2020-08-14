@@ -2406,6 +2406,100 @@ def test_remove_nodes(idtype):
     assert F.array_equal(u, F.tensor([1], dtype=idtype))
     assert F.array_equal(v, F.tensor([0], dtype=idtype))
 
+@parametrize_dtype
+def test_frame(idtype):
+    g = dgl.graph(([0, 1, 2], [1, 2, 3]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.copy_to(F.tensor([0, 1, 2, 3], dtype=idtype), ctx=F.ctx())
+    g.edata['h'] = F.copy_to(F.tensor([0, 1, 2], dtype=idtype), ctx=F.ctx())
+
+    # remove nodes
+    sg = dgl.remove_nodes(g, [3])
+    # check for lazy update
+    assert F.array_equal(sg._node_frames[0]._columns['h'].storage, g.ndata['h'])
+    assert F.array_equal(sg._edge_frames[0]._columns['h'].storage, g.edata['h'])
+    assert sg.ndata['h'].shape[0] == 3
+    assert sg.edata['h'].shape[0] == 2
+    # update after read
+    assert F.array_equal(sg._node_frames[0]._columns['h'].storage, F.tensor([0, 1, 2], dtype=idtype))
+    assert F.array_equal(sg._edge_frames[0]._columns['h'].storage, F.tensor([0, 1], dtype=idtype))
+
+    ng = dgl.add_nodes(sg, 1)
+    assert ng.ndata['h'].shape[0] == 4
+    assert F.array_equal(ng._node_frames[0]._columns['h'].storage, F.tensor([0, 1, 2, 0], dtype=idtype))
+    ng = dgl.add_edges(ng, [3], [1])
+    assert ng.edata['h'].shape[0] == 3
+    assert F.array_equal(ng._edge_frames[0]._columns['h'].storage, F.tensor([0, 1, 0], dtype=idtype))
+
+    # multi level lazy update
+    sg = dgl.remove_nodes(g, [3])
+    assert F.array_equal(sg._node_frames[0]._columns['h'].storage, g.ndata['h'])
+    assert F.array_equal(sg._edge_frames[0]._columns['h'].storage, g.edata['h'])
+    ssg = dgl.remove_nodes(sg, [1])
+    assert F.array_equal(ssg._node_frames[0]._columns['h'].storage, g.ndata['h'])
+    assert F.array_equal(ssg._edge_frames[0]._columns['h'].storage, g.edata['h'])
+    # ssg is changed
+    assert ssg.ndata['h'].shape[0] == 2
+    assert ssg.edata['h'].shape[0] == 0
+    assert F.array_equal(ssg._node_frames[0]._columns['h'].storage, F.tensor([0, 2], dtype=idtype))
+    # sg still in lazy model
+    assert F.array_equal(sg._node_frames[0]._columns['h'].storage, g.ndata['h'])
+    assert F.array_equal(sg._edge_frames[0]._columns['h'].storage, g.edata['h'])
+
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TensorFlow always create a new tensor")
+@unittest.skipIf(F._default_context_str == 'cpu', reason="cpu do not have context change problem")
+@parametrize_dtype
+def test_frame_device(idtype):
+    g = dgl.graph(([0,1,2], [2,3,1]))
+    g.ndata['h'] = F.copy_to(F.tensor([1,1,1,2], dtype=idtype), ctx=F.cpu())
+    g.ndata['hh'] = F.copy_to(F.ones((4,3), dtype=idtype), ctx=F.cpu())
+    g.edata['h'] = F.copy_to(F.tensor([1,2,3], dtype=idtype), ctx=F.cpu())
+
+    g = g.to(F.ctx())
+    # lazy device copy
+    assert F.context(g._node_frames[0]._columns['h'].storage) == F.cpu()
+    assert F.context(g._node_frames[0]._columns['hh'].storage) == F.cpu()
+    print(g.ndata['h'])
+    assert F.context(g._node_frames[0]._columns['h'].storage) == F.ctx()
+    assert F.context(g._node_frames[0]._columns['hh'].storage) == F.cpu()
+    assert F.context(g._edge_frames[0]._columns['h'].storage) == F.cpu()
+
+    # lazy device copy in subgraph
+    sg = dgl.node_subgraph(g, [0,1,2])
+    assert F.context(sg._node_frames[0]._columns['h'].storage) == F.ctx()
+    assert F.context(sg._node_frames[0]._columns['hh'].storage) == F.cpu()
+    assert F.context(sg._edge_frames[0]._columns['h'].storage) == F.cpu()
+    print(sg.ndata['hh'])
+    assert F.context(sg._node_frames[0]._columns['hh'].storage) == F.ctx()
+    assert F.context(sg._edge_frames[0]._columns['h'].storage) == F.cpu()
+
+    # back to cpu
+    sg = sg.to(F.cpu())
+    assert F.context(sg._node_frames[0]._columns['h'].storage) == F.ctx()
+    assert F.context(sg._node_frames[0]._columns['hh'].storage) == F.ctx()
+    assert F.context(sg._edge_frames[0]._columns['h'].storage) == F.cpu()
+    print(sg.ndata['h'])
+    print(sg.ndata['hh'])
+    print(sg.edata['h'])
+    assert F.context(sg._node_frames[0]._columns['h'].storage) == F.cpu()
+    assert F.context(sg._node_frames[0]._columns['hh'].storage) == F.cpu()
+    assert F.context(sg._edge_frames[0]._columns['h'].storage) == F.cpu()
+
+    # set some field
+    sg = sg.to(F.ctx())
+    assert F.context(sg._node_frames[0]._columns['h'].storage) == F.cpu()
+    sg.ndata['h'][0] = 5
+    assert F.context(sg._node_frames[0]._columns['h'].storage) == F.ctx()
+    assert F.context(sg._node_frames[0]._columns['hh'].storage) == F.cpu()
+    assert F.context(sg._edge_frames[0]._columns['h'].storage) == F.cpu()
+
+    # add nodes
+    ng = dgl.add_nodes(sg, 3)
+    assert F.context(ng._node_frames[0]._columns['h'].storage) == F.ctx()
+    assert F.context(ng._node_frames[0]._columns['hh'].storage) == F.ctx()
+    assert F.context(ng._edge_frames[0]._columns['h'].storage) == F.cpu()
+
+
+
 if __name__ == '__main__':
     # test_create()
     # test_query()
@@ -2434,9 +2528,11 @@ if __name__ == '__main__':
     # test_dtype_cast()
     # test_reverse("int32")
     # test_format()
-    test_add_edges(F.int32)
-    test_add_nodes(F.int32)
-    test_remove_edges(F.int32)
-    test_remove_nodes(F.int32)
-    test_clone(F.int32)
+    #test_add_edges(F.int32)
+    #test_add_nodes(F.int32)
+    #test_remove_edges(F.int32)
+    #test_remove_nodes(F.int32)
+    #test_clone(F.int32)
+    test_frame(F.int32)
+    test_frame_device(F.int32)
     pass
