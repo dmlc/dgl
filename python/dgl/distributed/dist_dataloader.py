@@ -14,19 +14,10 @@ __all__ = ["DistDataLoader"]
 def call_collate_fn(name, next_data):
     """Call collate function"""
     try:
-        import logging
-        logging.basicConfig(filename='/home/ubuntu/du1.log',level=logging.DEBUG)
         result = DGL_GLOBAL_COLLATE_FNS[name](next_data)
-        logging.info("debug1111")
-        return result
-        # DGL_GLOBAL_MP_QUEUES[name].put(result)
+        DGL_GLOBAL_MP_QUEUES[name].put(result)
     except Exception as e:
-        import logging
-        logging.basicConfig(filename='/home/ubuntu/du2.log',level=logging.DEBUG)
-        # traceback.print_exc(file=open("/home/ubuntu/error2.log", "w"))
-        # with open("/home/ubuntu/error22.log", "w") as f:
-        #     f.write(str(e))
-        logging.exception(e)
+        traceback.print_exc()
         print(e)
         raise e
     return 1
@@ -61,11 +52,9 @@ def enable_mp_debug():
     """Print multiprocessing debug information. This is only
     for debug usage"""
     import logging
-    import multiprocessing
     logger = multiprocessing.log_to_stderr()
     logger.setLevel(logging.DEBUG)
 
-enable_mp_debug()
 DATALOADER_ID = 0
 
 class DistDataLoader:
@@ -104,7 +93,7 @@ class DistDataLoader:
         self.current_pos = 0
         if self.pool is not None:
             self.m = mp.Manager()
-            self.queue = self.m.Queue(maxsize=4)
+            self.queue = self.m.Queue(maxsize=queue_size)
         else:
             self.queue = Queue(maxsize=queue_size)
         self.drop_last = drop_last
@@ -140,13 +129,11 @@ class DistDataLoader:
                 res.get()
 
     def __next__(self):
-        # num_reqs = self.queue_size - self.num_pending
-        num_reqs = 1
-        # for _ in range(num_reqs):
-
-        
+        num_reqs = self.queue_size - self.num_pending
+        for _ in range(num_reqs):
+            self._request_next_batch()
         if self.recv_idxs < self.expected_idxs:
-            result = self._request_next_batch()
+            result = self.queue.get(timeout=9999)
             self.recv_idxs += 1
             self.num_pending -= 1
             return result
@@ -167,8 +154,7 @@ class DistDataLoader:
         if next_data is None:
             return
         elif self.pool is not None:
-            rr = self.pool.apply_async(call_collate_fn, args=(self.name, next_data, ))
-            return rr.get()
+            self.pool.apply_async(call_collate_fn, args=(self.name, next_data, ))
         else:
             result = self.collate_fn(next_data)
             self.queue.put(result)
