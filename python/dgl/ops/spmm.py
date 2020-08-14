@@ -1,8 +1,7 @@
 """dgl spmm operator module."""
 import sys
 
-from ..base import dgl_warning
-from ..backend import gspmm as gspmm_internal, backend_name
+from ..backend import gspmm as gspmm_internal
 from .. import backend as F
 
 __all__ = ['gspmm']
