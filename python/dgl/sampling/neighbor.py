@@ -24,7 +24,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     Parameters
     ----------
     g : DGLGraph
-        The graph
+        The graph.  Must be on CPU.
     nodes : tensor or dict
         Node IDs to sample neighbors from.
 
@@ -57,7 +57,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     Returns
     -------
     DGLGraph
-        A sampled subgraph containing only the sampled neighboring edges.
+        A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
 
     Examples
     --------
@@ -95,6 +95,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")
         nodes = {g.ntypes[0] : nodes}
+    assert g.device == F.cpu(), "Graph must be on CPU."
+
     nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
     nodes_all_types = []
     for ntype in g.ntypes:
@@ -147,7 +149,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
     Parameters
     ----------
     g : DGLGraph
-        The graph
+        The graph.  Must be on CPU.
     k : int or dict[etype, int]
         The number of edges to be selected for each node on each edge type.
 
@@ -178,7 +180,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
     Returns
     -------
     DGLGraph
-        A sampled subgraph containing only the sampled neighboring edges.
+        A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
 
     Examples
     --------
@@ -195,6 +197,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")
         nodes = {g.ntypes[0] : nodes}
+    assert g.device == F.cpu(), "Graph must be on CPU."
 
     # Parse nodes into a list of NDArrays.
     nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')

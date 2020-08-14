@@ -84,10 +84,11 @@ class Column(object):
     index : Tensor
         Index tensor
     """
-    def __init__(self, storage, scheme=None, index=None):
+    def __init__(self, storage, scheme=None, index=None, device=None):
         self.storage = storage
         self.scheme = scheme if scheme else infer_scheme(storage)
         self.index = index
+        self.device = device
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -105,8 +106,18 @@ class Column(object):
     def data(self):
         """Return the feature data. Perform index selecting if needed."""
         if self.index is not None:
+            # If index and storage is not in the same context,
+            # copy index to the same context of storage.
+            # Copy index is usually cheaper than copy data
+            if F.context(self.storage) != F.context(self.index):
+                self.index = F.copy_to(self.index, F.context(self.storage))
             self.storage = F.gather_row(self.storage, self.index)
             self.index = None
+
+        # move data to the right device
+        if self.device is not None:
+            self.storage = F.copy_to(self.storage, self.device[0], **self.device[1])
+            self.device = None
         return self.storage
 
     @data.setter
@@ -114,6 +125,25 @@ class Column(object):
         """Update the column data."""
         self.index = None
         self.storage = val
+
+    def to(self, device, **kwargs): # pylint: disable=invalid-name
+        """ Return a new column with columns copy to the targeted device (cpu/gpu).
+
+        Parameters
+        ----------
+        device : Framework-specific device context object
+            The context to move data to.
+        kwargs : Key-word arguments.
+            Key-word arguments fed to the framework copy function.
+
+        Returns
+        -------
+        Column
+            A new column
+        """
+        col = self.clone()
+        col.device = (device, kwargs)
+        return col
 
     def __getitem__(self, rowids):
         """Return the feature data given the rowids.
@@ -186,7 +216,7 @@ class Column(object):
 
     def clone(self):
         """Return a shallow copy of this column."""
-        return Column(self.storage, self.scheme, self.index)
+        return Column(self.storage, self.scheme, self.index, self.device)
 
     def deepclone(self):
         """Return a deepcopy of this column.
@@ -214,9 +244,9 @@ class Column(object):
             Sub-column
         """
         if self.index is None:
-            return Column(self.storage, self.scheme, rowids)
+            return Column(self.storage, self.scheme, rowids, self.device)
         else:
-            return Column(self.storage, self.scheme, F.gather_row(self.index, rowids))
+            return Column(self.storage, self.scheme, F.gather_row(self.index, rowids), self.device)
 
     @staticmethod
     def create(data):
@@ -577,6 +607,26 @@ class Frame(MutableMapping):
         subf._initializers = self._initializers
         subf._default_initializer = self._default_initializer
         return subf
+
+    def to(self, device, **kwargs): # pylint: disable=invalid-name
+        """ Return a new frame with columns copy to the targeted device (cpu/gpu).
+
+        Parameters
+        ----------
+        device : Framework-specific device context object
+            The context to move data to.
+        kwargs : Key-word arguments.
+            Key-word arguments fed to the framework copy function.
+
+        Returns
+        -------
+        Frame
+            A new frame
+        """
+        newframe = self.clone()
+        new_columns = {key : col.to(device, **kwargs) for key, col in newframe._columns.items()}
+        newframe._columns = new_columns
+        return newframe
 
     def __repr__(self):
         return repr(dict(self))

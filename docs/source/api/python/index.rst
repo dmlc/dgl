@@ -11,4 +11,4 @@ API Reference
    dgl.ops
    dgl.function
    sampling
-   dataloading
+   dgl.dataloading
