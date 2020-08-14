@@ -125,8 +125,9 @@ void SpMMSumCoo(
  * \param arge Arg-Min/Max on edges. which refers the source node indices 
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \note it uses node parallel strategy, different threads are responsible
+ * \note It uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes.
+ * \note The result will contain infinity for zero-degree nodes.
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
 void SpMMCmpCsr(
@@ -171,7 +172,7 @@ void SpMMCmpCsr(
             aw = eid;
         }
       }
-      out_off[k] = (row_start != row_end) ? accum : 0;
+      out_off[k] = accum;
       if (Op::use_lhs)
         argx_off[k] = ax;
       if (Op::use_rhs)
@@ -196,6 +197,7 @@ void SpMMCmpCsr(
  * \note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes. To avoid possible data hazard,
  *       we use atomic operators in the reduction phase.
+ * \note The result will contain infinity for zero-degree nodes.
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
 void SpMMCmpCoo(
@@ -241,17 +243,6 @@ void SpMMCmpCoo(
         if (Op::use_rhs)
           argw_off[k] = eid;
       }
-    }
-  }
-
-  // Set the result of the nodes never compared to anybody else (i.e. 0-in-degree nodes) to 0.
-  // Here we simply replace all Cmp::zero entries to 0.
-#pragma omp parallel for
-  for (IdType cid = 0; cid < coo.num_cols; ++cid) {
-    DType* out_off = O + cid * dim;
-    for (int64_t k = 0; k < dim; ++k) {
-      if (out_off[k] == Cmp::zero)
-        out_off[k] = 0;
     }
   }
 }
