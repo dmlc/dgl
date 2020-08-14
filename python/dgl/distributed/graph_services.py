@@ -298,7 +298,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     def issue_remote_req(node_ids):
         return SamplingRequest(node_ids, fanout, edge_dir=edge_dir,
                                prob=prob, replace=replace)
-    d ef local_access(local_g, partition_book, local_nids):
+    def local_access(local_g, partition_book, local_nids):
         return _sample_neighbors(local_g, partition_book, local_nids,
                                  fanout, edge_dir, prob, replace)
     return _distributed_access(g, nodes, issue_remote_req, local_access)
