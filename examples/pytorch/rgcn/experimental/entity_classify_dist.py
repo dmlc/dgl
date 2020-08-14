@@ -340,6 +340,8 @@ def run(args, device, data):
     model = model.to(device)
     if not args.standalone:
         model = th.nn.parallel.DistributedDataParallel(model)
+        if args.sparse_embedding and not args.dgl_sparse
+            embed_layer = DistributedDataParallel(embed_layer, device_ids=None, output_device=None)
 
     if args.sparse_embedding:
         if args.dgl_sparse:
