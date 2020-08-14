@@ -117,3 +117,5 @@ Utilities
     :toctree: ../../generated/
 
     seed
+    save_graphs
+    load_graphs
