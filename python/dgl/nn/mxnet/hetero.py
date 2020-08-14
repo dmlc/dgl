@@ -107,6 +107,11 @@ class HeteroGraphConv(nn.Block):
             for name, mod in mods.items():
                 self.register_child(mod, name)
             self.mods = mods
+            # Do not break if graph has 0-in-degree nodes.
+            # Because there is no general rule to add self-loop for heterograph.
+            for _, v in self.mods.items():
+                if hasattr(v, '_allow_zero_in_degree'):
+                    v._allow_zero_in_degree = True
             if isinstance(aggregate, str):
                 self.agg_fn = get_aggregate_fn(aggregate)
             else:
