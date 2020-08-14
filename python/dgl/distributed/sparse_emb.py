@@ -5,7 +5,20 @@ from .. import utils
 from .dist_tensor import DistTensor
 
 class DistEmbedding:
-    '''Embeddings in the distributed training.
+    '''Distributed embeddings.
+
+    Like distributed tensors, distributed embeddings are sharded in a cluster of machines.
+    They are sharded in the same way as distributed tensor. Please see DistTensor for more
+    details on the partition policy.
+
+    Distributed embeddings are part of a model. They are updated by mini-batches.
+    However, the distributed embeddings have to be updated by DGL's optimizers instead of
+    the optimizers provided by the deep learning frameworks (e.g., Pytorch and MXNet).
+
+    To support efficient training on a graph with many nodes, the embeddings support sparse
+    updates. That is, only the embeddings involved in a mini-batch are updated.
+    Currently, DGL provides only one optimizer: SparseAdagrad. DGL will provide more
+    optimizers in the future.
 
     Parameters
     ----------
@@ -88,10 +101,12 @@ def _init_state(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
 
 class SparseAdagrad:
-    ''' The Adagrad optimizer for sparse embeddings.
+    ''' The sparse Adagrad optimizer.
 
-    This optimizer collects gradients for the sparse embeddings and update
-    the embeddings in the distributed KVStore.
+    This optimizer implements a sparse version of the Adagrad algorithm.
+    It works with DistEmbedding and only update the embeddings
+    involved in a mini-batch to support efficient training on a graph with many
+    nodes and edges.
 
     Parameters
     ----------
@@ -117,8 +132,7 @@ class SparseAdagrad:
         ''' The step function.
 
         The step function is invoked at the end of every batch to push the gradients
-        of the sparse embeddings to the distributed kvstore and update the embeddings
-        in the kvstore.
+        of the embeddings involved in a mini-batch to DGL's servers and update the embeddings.
         '''
         with F.no_grad():
             for emb in self._params:
