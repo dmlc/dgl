@@ -245,15 +245,14 @@ void SpMMCmpCoo(
   }
 
   // Set the result of the nodes never compared to anybody else (i.e. 0-in-degree nodes) to 0.
-  // A node has never compared to anybody else iff the first element of the result array equals
-  // Cmp::zero.
+  // Here we simply replace all Cmp::zero entries to 0.
 #pragma omp parallel for
-  for (IdType i = 0; i < nnz; ++i) {
-    const IdType cid = col[i];
+  for (IdType cid = 0; cid < coo.num_cols; ++cid) {
     DType* out_off = O + cid * dim;
-
-    if (out_off[0] == Cmp::zero)
-      std::fill(out_off, out_off + dim, 0);
+    for (int64_t k = 0; k < dim; ++k) {
+      if (out_off[k] == Cmp::zero)
+        out_off[k] = 0;
+    }
   }
 }
 
@@ -329,7 +328,10 @@ template <typename DType> constexpr bool CopyRhs<DType>::use_rhs;
 //////////////////////////////// Reduce operators on CPU ////////////////////////////////
 template <typename DType>
 struct Max {
-  static constexpr DType zero = std::numeric_limits<DType>::lowest();
+  static constexpr DType zero = (
+      std::numeric_limits<DType>::has_infinity ?
+      -std::numeric_limits<DType>::infinity() :
+      std::numeric_limits<DType>::lowest());
   // return true if accum should be replaced
   inline static DType Call(DType accum, DType val) {
     return accum < val;
@@ -339,7 +341,10 @@ template <typename DType> constexpr DType Max<DType>::zero;
 
 template <typename DType>
 struct Min {
-  static constexpr DType zero = std::numeric_limits<DType>::max();
+  static constexpr DType zero = (
+      std::numeric_limits<DType>::has_infinity ?
+      std::numeric_limits<DType>::infinity() :
+      std::numeric_limits<DType>::max());
   // return true if accum should be replaced
   inline static DType Call(DType accum, DType val) {
     return accum > val;

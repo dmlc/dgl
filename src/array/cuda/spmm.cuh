@@ -132,6 +132,24 @@ __global__ void ArgSpMMCooKernel(
 }
 
 /*!
+ * \brief CUDA kernel that sets the reduction results to 0 for nodes with
+ *        no messages.
+ * \note This is done by checking if the first element of the feature
+ *       equals the zero element in the reduction operation.  If so,
+ *       we replace the entire feature of that node to 0.
+ */
+template <typename DType, typename ReduceOp>
+__global__ void CleanupSpMMCooKernel(DType* out, int64_t M_by_out_len) {
+  int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
+  const int64_t stride_x = blockDim.x * gridDim.x;
+  while (tx < M_by_out_len) {
+    if (out[tx] == ReduceOp::zero)
+      out[tx] = 0;
+    tx += stride_x;
+  }
+}
+
+/*!
  * \brief CUDA kernel of g-SpMM on Coo format.
  * \note it uses node parallel strategy, different threadblocks (on y-axis)
  *       is responsible for the computation on different destination nodes. 
@@ -173,7 +191,7 @@ __global__ void SpMMCsrKernel(
         DType out = BinaryOp::Call(uoff + lhs_add, eoff + rhs_add);
         ReduceOp::Call(&local_accum, &local_argu, &local_arge, out, cid, eid);
       }
-      out[ty * out_len + tx] = local_accum;
+      out[ty * out_len + tx] = indptr[ty] == indptr[ty + 1] ? 0 : local_accum;
       if (ReduceOp::require_arg && BinaryOp::use_lhs)
         arg_u[ty * out_len + tx] = local_argu;
       if (ReduceOp::require_arg && BinaryOp::use_rhs)
@@ -253,6 +271,14 @@ void SpMMCoo(
           ubcast_off, ebcast_off,
           lhs_len, rhs_len, len
         );
+
+      // The reducers that require setting the result to 0 is coincidentally
+      // the same as the the reducers that require computing args.
+      const int64_t M_by_len = M * len;
+      const int new_ntx = FindNumThreads(M_by_len);
+      const int new_nbx = (M_by_len + new_ntx - 1) / new_ntx;
+      CleanupSpMMCooKernel<DType, ReduceOp>
+        <<<new_nbx, new_ntx, 0, thr_entry->stream>>>(out_data, M_by_len);
     }
   });
 }
