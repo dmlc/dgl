@@ -116,9 +116,6 @@ def test_spmm(idtype, g, shp, msg, reducer):
     e = F.attach_grad(F.clone(he))
     with F.record_grad():
         v = gspmm(g, msg, reducer, u, e)
-        non_degree_indices = F.tensor(
-            np.nonzero(F.asnumpy(g.in_degrees()) != 0)[0])
-        v = F.gather_row(v, non_degree_indices)
         if g.number_of_edges() > 0:
             F.backward(F.reduce_sum(v))
             if msg != 'copy_rhs':
@@ -129,7 +126,7 @@ def test_spmm(idtype, g, shp, msg, reducer):
     with F.record_grad():
         g.update_all(udf_msg[msg], udf_reduce[reducer])
         if g.number_of_edges() > 0:
-            v1 = F.gather_row(g.dstdata['v'], non_degree_indices)
+            v1 = g.dstdata['v']
             assert F.allclose(v, v1)
             print('forward passed')
 
