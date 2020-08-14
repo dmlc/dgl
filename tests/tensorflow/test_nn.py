@@ -380,9 +380,9 @@ def test_hetero_conv(agg, idtype):
         ('store', 'sells', 'game'): [(0, 0), (0, 3), (1, 1), (1, 2)]},
         idtype=idtype, device=F.ctx())
     conv = nn.HeteroGraphConv({
-        'follows': nn.GraphConv(2, 3),
-        'plays': nn.GraphConv(2, 4),
-        'sells': nn.GraphConv(3, 4)},
+        'follows': nn.GraphConv(2, 3, allow_zero_in_degree=True),
+        'plays': nn.GraphConv(2, 4, allow_zero_in_degree=True),
+        'sells': nn.GraphConv(3, 4, allow_zero_in_degree=True)},
         agg)
     uf = F.randn((4, 2))
     gf = F.randn((4, 4))

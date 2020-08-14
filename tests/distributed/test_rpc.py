@@ -114,12 +114,13 @@ def start_server(num_clients, ip_config):
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.start_server(server_id=0, 
                                  ip_config=ip_config, 
+                                 num_servers=1,
                                  num_clients=num_clients, 
                                  server_state=server_state)
 
 def start_client(ip_config):
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
-    dgl.distributed.connect_to_server(ip_config=ip_config)
+    dgl.distributed.connect_to_server(ip_config=ip_config, num_servers=1)
     req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
     # test send and recv
     dgl.distributed.send_request(0, req)
@@ -191,7 +192,7 @@ def test_rpc():
     os.environ['DGL_DIST_MODE'] = 'distributed'
     ip_config = open("rpc_ip_config.txt", "w")
     ip_addr = get_local_usable_addr()
-    ip_config.write('%s 1\n' % ip_addr)
+    ip_config.write('%s\n' % ip_addr)
     ip_config.close()
     ctx = mp.get_context('spawn')
     pserver = ctx.Process(target=start_server, args=(1, "rpc_ip_config.txt"))
@@ -207,7 +208,7 @@ def test_multi_client():
     os.environ['DGL_DIST_MODE'] = 'distributed'
     ip_config = open("rpc_ip_config_mul_client.txt", "w")
     ip_addr = get_local_usable_addr()
-    ip_config.write('%s 1\n' % ip_addr)
+    ip_config.write('%s\n' % ip_addr)
     ip_config.close()
     ctx = mp.get_context('spawn')
     pserver = ctx.Process(target=start_server, args=(10, "rpc_ip_config_mul_client.txt"))

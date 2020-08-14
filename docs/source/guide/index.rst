@@ -7,6 +7,7 @@ User Guide
   preface
   graph
   message
+  nn
   data
   training
   minibatch

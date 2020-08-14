@@ -40,7 +40,7 @@ Getting Started
 * :doc:`End-to-end model tutorials<tutorials/models/index>` for learning DGL by popular models on graphs.
 
 ..
-  Follow the :doc:`instructions<install/index>` to install DGL.  
+  Follow the :doc:`instructions<install/index>` to install DGL.
   :doc:`DGL at a glance<tutorials/basics/1_first>` is the most common place to get started with.
   It offers a broad experience of using DGL for deep learning on graph data.
 
@@ -89,6 +89,7 @@ Getting Started
    guide/preface
    guide/graph
    guide/message
+   guide/nn
    guide/data
    guide/training
    guide/minibatch
@@ -107,6 +108,7 @@ Getting Started
    api/python/dgl.ops
    api/python/dgl.function
    api/python/sampling
+   api/python/dgl.dataloading
 
 .. toctree::
    :maxdepth: 3
