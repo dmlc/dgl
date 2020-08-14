@@ -161,6 +161,20 @@ class GraphConv(layers.Layer):
 
         self._activation = activation
 
+    def set_allow_zero_in_degree(self, set_value):
+        r"""
+
+        Description
+        -----------
+        Set allow_zero_in_degree flag.
+
+        Parameters
+        ----------
+        set_value : bool
+            The value to be set to the flag.
+        """
+        self._allow_zero_in_degree = set_value
+
     def call(self, graph, feat, weight=None):
         r"""
 
