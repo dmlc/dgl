@@ -77,13 +77,13 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
 
 def _attach_zerodeg_note(docstring, reducer):
     note1 = """
-    The {} function will return zero for nodes with no incoming messages."""
+    The {} function will return zero for nodes with no incoming messages.""".format(reducer)
     note2 = """
     This is implemented by replacing all {} values to zero.
     """.format("infinity" if reducer == "min" else "negative infinity")
 
     docstring = docstring + note1
-    if reducer == "min" or reducer == "max":
+    if reducer in ('min', 'max'):
         docstring = docstring + note2
     return docstring
 
@@ -119,7 +119,7 @@ def _gen_spmm_func(binary_op, reduce_op):
     Broadcasting follows NumPy semantics. Please see
     https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html
     for more details about the NumPy broadcasting semantics.
-    """.format(binary_op, reduce_op, reduce_op)
+    """.format(binary_op, reduce_op)
     docstring = _attach_zerodeg_note(docstring, reduce_op)
 
     def func(g, x, y):
@@ -161,8 +161,7 @@ def _gen_copy_reduce_func(binary_op, reduce_op):
     """.format(
         binary_str[binary_op],
         reduce_op,
-        x_str[binary_op],
-        reduce_op), reduce_op)
+        x_str[binary_op]), reduce_op)
 
     def func(g, x):
         if binary_op == 'copy_u':
