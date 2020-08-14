@@ -12,7 +12,6 @@ from .. import backend as F
 
 __all__ = ['sample_neighbors', 'in_subgraph', 'find_edges']
 
-RPC_TIMEOUT = 600000 # in milliseconds
 SAMPLING_SERVICE_ID = 6657
 INSUBGRAPH_SERVICE_ID = 6658
 EDGES_SERVICE_ID = 6659
@@ -239,7 +238,7 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
 
     # receive responses from remote machines.
     if msgseq2pos is not None:
-        results = recv_responses(msgseq2pos, RPC_TIMEOUT)
+        results = recv_responses(msgseq2pos)
         res_list.extend(results)
 
     sampled_graph = merge_graphs(res_list, g.number_of_nodes())
@@ -352,7 +351,7 @@ def _distributed_edge_access(g, edges, issue_remote_req, local_access):
 
     # receive responses from remote machines.
     if msgseq2pos is not None:
-        results = recv_responses(msgseq2pos, RPC_TIMEOUT)
+        results = recv_responses(msgseq2pos)
         for result in results:
             src = result.global_src
             dst = result.global_dst
