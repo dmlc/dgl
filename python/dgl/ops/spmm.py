@@ -2,7 +2,7 @@
 import sys
 
 from ..base import dgl_warning
-from ..backend import gspmm as gspmm_internal
+from ..backend import gspmm as gspmm_internal, backend_name
 from .. import backend as F
 
 __all__ = ['gspmm']
@@ -59,17 +59,33 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
             new_rhs_shape = (rhs_shape[0],) + (1,) * rhs_pad_ndims + rhs_shape[1:]
             lhs_data = F.reshape(lhs_data, new_lhs_shape)
             rhs_data = F.reshape(rhs_data, new_rhs_shape)
+    ret = gspmm_internal(g._graph, op,
+                         'sum' if reduce_op == 'mean' else reduce_op,
+                         lhs_data, rhs_data)
+
+    # assign zero features for zero degree nodes.
+    deg = g.in_degrees()
+    min_deg = F.as_scalar(F.min(deg, dim=0))
+    if min_deg == 0:
+        non_zero_nids = F.nonzero_1d(deg == 0)
+        if backend_name == 'pytorch':
+            ret[non_zero_nids] = 0.
+        else:
+            dtype = F.dtype(ret)
+            ctx = F.context(ret)
+            ret = F.scatter_row(ret, non_zero_nids,
+                                F.zeros((len(non_zero_nids),) + F.shape(ret)[1:], dtype, ctx))
+
+    # divide in degrees for mean reducer.
     if reduce_op == 'mean':
-        ret = gspmm_internal(g._graph, op, 'sum', lhs_data, rhs_data)
         ret_shape = F.shape(ret)
-        deg = g.in_degrees()
-        if F.as_scalar(F.min(deg, dim=0)) == 0:
+        if min_deg == 0:
             dgl_warning('Zero-degree nodes encountered in mean reducer. Setting the mean to 0.')
         deg = F.astype(F.clamp(deg, 1, g.number_of_edges()), F.dtype(ret))
         deg_shape = (ret_shape[0],) + (1,) * (len(ret_shape) - 1)
         return ret / F.reshape(deg, deg_shape)
     else:
-        return gspmm_internal(g._graph, op, reduce_op, lhs_data, rhs_data)
+        return ret
 
 
 def _gen_spmm_func(binary_op, reduce_op):

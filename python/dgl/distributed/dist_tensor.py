@@ -68,7 +68,8 @@ class DistTensor:
                             + 'Please provide a partition policy explicitly.'
                     part_policy = policy
             assert part_policy is not None, \
-                    'Cannot determine the partition policy. Please provide it.'
+                    'Cannot find a right partition policy. Currently, DistTensor only ' \
+                    + 'supports partition policy associated with nodes or edges.'
 
         self._part_policy = part_policy
 
