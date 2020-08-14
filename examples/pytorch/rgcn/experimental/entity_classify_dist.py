@@ -340,7 +340,7 @@ def run(args, device, data):
     model = model.to(device)
     if not args.standalone:
         model = th.nn.parallel.DistributedDataParallel(model)
-        if args.sparse_embedding and not args.dgl_sparse
+        if args.sparse_embedding and not args.dgl_sparse:
             embed_layer = DistributedDataParallel(embed_layer, device_ids=None, output_device=None)
 
     if args.sparse_embedding:
@@ -402,6 +402,8 @@ def run(args, device, data):
 
             # backward
             optimizer.zero_grad()
+            if args.sparse_embedding and not args.dgl_sparse:
+                emb_optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             if args.sparse_embedding:
