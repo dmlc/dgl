@@ -53,6 +53,7 @@ class SumPooling(nn.Module):
         tensor([[2., 2., 2., 2., 2.]])
 
     Case 2: Input a batch of graphs
+
     Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
 
     >>> batch_g = dgl.batch([g1, g2])
@@ -130,6 +131,7 @@ class AvgPooling(nn.Module):
         tensor([[1., 1., 1., 1., 1.]])
 
     Case 2: Input a batch of graphs
+
     Build a batch of DGL graphs and concatenate all graphs' note features into one tensor.
 
     >>> batch_g = dgl.batch([g1, g2])
@@ -207,6 +209,7 @@ class MaxPooling(nn.Module):
         tensor([[1., 1., 1., 1., 1.]])
 
     Case 2: Input a batch of graphs
+
     Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
 
     >>> batch_g = dgl.batch([g1, g2])
@@ -284,6 +287,7 @@ class SortPooling(nn.Module):
         tensor([[1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]])
 
     Case 2: Input a batch of graphs
+
     Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
 
     >>> batch_g = dgl.batch([g1, g2])
