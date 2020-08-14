@@ -108,6 +108,14 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
     test3 = dgl.distributed.DistTensor((g.number_of_nodes(), 3), F.float32, 'test3')
     del test3
 
+    # add tests for anonymous distributed tensor.
+    test3 = dgl.distributed.DistTensor(new_shape, F.float32, init_func=rand_init)
+    data = test3[0:10]
+    test4 = dgl.distributed.DistTensor(new_shape, F.float32, init_func=rand_init)
+    del test3
+    test5 = dgl.distributed.DistTensor(new_shape, F.float32, init_func=rand_init)
+    assert np.sum(F.asnumpy(test5[0:10] != data)) > 0
+
     # test a persistent tesnor
     test4 = dgl.distributed.DistTensor(new_shape, F.float32, 'test4', init_func=rand_init,
                                        persistent=True)
