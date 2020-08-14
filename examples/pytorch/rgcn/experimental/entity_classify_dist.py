@@ -120,17 +120,18 @@ class DistEmbedLayer(nn.Module):
     ----------
     dev_id : int
         Device to run the layer.
-    num_nodes : int
-        Number of nodes.
-    node_tides : tensor
-        Storing the node type id for each node starting from 0
+    g : DistGraph
+        training graph
     num_of_ntype : int
         Number of node types
-    input_size : list of int
-        A list of input feature size for each node type. If None, we then
-        treat certain input feature as an one-hot encoding feature.
     embed_size : int
         Output embed size
+    sparse_emb: bool
+        Whether to use sparse embedding
+        Default: False
+    dgl_sparse_emb: bool
+        Whether to use DGL sparse embedding
+        Default: False
     embed_name : str, optional
         Embed name
     """
@@ -140,7 +141,8 @@ class DistEmbedLayer(nn.Module):
                  num_of_ntype,
                  embed_size,
                  sparse_emb=False,
-                 embed_name='embed'):
+                 dgl_sparse_emb=False,
+                 embed_name='node_emb'):
         super(DistEmbedLayer, self).__init__()
         self.dev_id = dev_id
         self.num_of_ntype = num_of_ntype
@@ -149,11 +151,15 @@ class DistEmbedLayer(nn.Module):
         self.sparse_emb = sparse_emb
 
         if sparse_emb:
-            self.node_embeds = dgl.distributed.DistEmbedding(g,
-                                                             g.number_of_nodes(),
-                                                             self.embed_size,
-                                                             'node_emb',
-                                                             init_emb)
+            if dgl_sparse_emb:
+                self.node_embeds = dgl.distributed.DistEmbedding(g,
+                                                                 g.number_of_nodes(),
+                                                                 self.embed_size,
+                                                                 embed_name,
+                                                                 init_emb)
+            else:
+                self.node_embeds = th.nn.Embedding(g.number_of_nodes(), self.embed_size, sparse=self.sparse_emb)
+                nn.init.uniform_(self.node_embeds.weight, -1.0, 1.0)
         else:
             self.node_embeds = th.nn.Embedding(g.number_of_nodes(), self.embed_size)
             nn.init.uniform_(self.node_embeds.weight, -1.0, 1.0)
@@ -318,7 +324,8 @@ def run(args, device, data):
                                  g,
                                  num_of_ntype,
                                  args.n_hidden,
-                                 sparse_emb=args.sparse_embedding)
+                                 sparse_emb=args.sparse_embedding,
+                                 dgl_sparse_emb=args.dgl_sparse)
 
     model = EntityClassify(device,
                            args.n_hidden,
@@ -335,7 +342,10 @@ def run(args, device, data):
         model = th.nn.parallel.DistributedDataParallel(model)
 
     if args.sparse_embedding:
-        emb_optimizer = dgl.distributed.SparseAdagrad([embed_layer.node_embeds], lr=args.sparse_lr)
+        if args.dgl_sparse:
+            emb_optimizer = dgl.distributed.SparseAdagrad([embed_layer.node_embeds], lr=args.sparse_lr)
+        else:
+            emb_optimizer = th.optim.SparseAdam(embed_layer.module.node_embeds.parameters(), lr=args.sparse_lr)
         optimizer = th.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)
     else:
         all_params = list(model.parameters()) + list(embed_layer.parameters())
@@ -500,9 +510,6 @@ if __name__ == '__main__':
             help="Fan-out of neighbor sampling.")
     parser.add_argument("--use-self-loop", default=False, action='store_true',
             help="include self feature as a special relation")
-    fp = parser.add_mutually_exclusive_group(required=False)
-    fp.add_argument('--validation', dest='validation', action='store_true')
-    fp.add_argument('--testing', dest='validation', action='store_false')
     parser.add_argument("--batch-size", type=int, default=100,
             help="Mini-batch size. ")
     parser.add_argument("--eval-batch-size", type=int, default=128,
@@ -516,6 +523,8 @@ if __name__ == '__main__':
             help="Whether store node embeddins in cpu")
     parser.add_argument("--sparse-embedding", action='store_true',
             help='Use sparse embedding for node embeddings.')
+    parser.add_argument("--dgl-sparse", action='store_true',
+            help='Whether to use DGL sparse embedding')
     parser.add_argument('--node-feats', default=False, action='store_true',
             help='Whether use node features')
     parser.add_argument('--global-norm', default=False, action='store_true',
