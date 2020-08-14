@@ -113,12 +113,12 @@ def main():
                         help='The number of trainer processes per machine')
     parser.add_argument('--num_samplers', type=int, default=0,
                         help='The number of sampler processes per trainer process')
+    parser.add_argument('--num_servers', type=int,
+                        help='The number of server processes per machine')
     parser.add_argument('--part_config', type=str,
                         help='The file (in workspace) of the partition config')
     parser.add_argument('--ip_config', type=str,
                         help='The file (in workspace) of IP configuration for server processes')
-    parser.add_argument('--num_servers', type=int,
-                        help='Server count on each machine.')
     parser.add_argument('--num_server_threads', type=int, default=1,
                         help='The number of OMP threads in the server process. \
                         It should be small if server processes and trainer processes run on \

@@ -4,30 +4,39 @@ import torch as th
 from torch import nn
 from torch.nn import init
 
+from ....base import DGLError
 from .... import function as fn
 from ..utils import Identity
 from ....utils import expand_as_pair
 
 
 class NNConv(nn.Module):
-    r"""Graph Convolution layer introduced in `Neural Message Passing
+    r"""
+
+    Description
+    -----------
+    Graph Convolution layer introduced in `Neural Message Passing
     for Quantum Chemistry <https://arxiv.org/pdf/1704.01212.pdf>`__.
 
     .. math::
         h_{i}^{l+1} = h_{i}^{l} + \mathrm{aggregate}\left(\left\{
         f_\Theta (e_{ij}) \cdot h_j^{l}, j\in \mathcal{N}(i) \right\}\right)
 
+    where :math:`e_{ij}` is the edge feature, :math:`f_\Theta` is a function
+    with learnable parameters.
+
     Parameters
     ----------
     in_feats : int
-        Input feature size.
-
+        Input feature size; i.e, the number of dimensions of :math:`h_j^{(l)}`.
+        NN can be applied on homogeneous graph and unidirectional
+        `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`__.
         If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
         a scalar is given, the source and destination node feature size would take the
         same value.
     out_feats : int
-        Output feature size.
+        Output feature size; i.e., the number of dimensions of :math:`h_i^{(l+1)}`.
     edge_func : callable activation function/layer
         Maps each edge feature to a vector of shape
         ``(in_feats * out_feats)`` as weight to compute
@@ -39,18 +48,81 @@ class NNConv(nn.Module):
         If True, use residual connection. Default: ``False``.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
+    allow_zero_in_degree : bool, optional
+        If there are 0-in-degree nodes in the graph, output for those nodes will be invalid
+        since no message will be passed to those nodes. This is harmful for some applications
+        causing silent performance regression. This module will raise a DGLError if it detects
+        0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
+        and let the users handle it by themselves.
+
+    Notes
+    -----
+    Zero in-degree nodes will lead to invalid output value. This is because no message
+    will be passed to those nodes, the aggregation function will be appied on empty input.
+    A common practice to avoid this is to add a self-loop for each node in the graph if
+    it is homogeneous, which can be achieved by:
+
+    >>> g = ... # a DGLGraph
+    >>> g = dgl.add_self_loop(g)
+
+    Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
+    since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree``
+    to ``True`` for those cases to unblock the code and handle zere-in-degree nodes manually.
+    A common practise to handle this is to filter out the nodes with zere-in-degree when use
+    after conv.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> from dgl.nn import NNConv
+
+    >>> # Case 1: Homogeneous graph
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> g = dgl.add_self_loop(g)
+    >>> feat = th.ones(6, 10)
+    >>> lin = th.nn.Linear(5, 20)
+    >>> def edge_func(efeat):
+    ...     return lin(efeat)
+    >>> efeat = th.ones(6+6, 5)
+    >>> conv = NNConv(10, 2, edge_func, 'mean')
+    >>> res = conv(g, feat, efeat)
+    >>> res
+    tensor([[-1.5243, -0.2719],
+            [-1.5243, -0.2719],
+            [-1.5243, -0.2719],
+            [-1.5243, -0.2719],
+            [-1.5243, -0.2719],
+            [-1.5243, -0.2719]], grad_fn=<AddBackward0>)
+
+    >>> # Case 2: Unidirectional bipartite graph
+    >>> u = [0, 1, 0, 0, 1]
+    >>> v = [0, 1, 2, 3, 2]
+    >>> g = dgl.bipartite((u, v))
+    >>> u_feat = th.tensor(np.random.rand(2, 10).astype(np.float32))
+    >>> v_feat = th.tensor(np.random.rand(4, 10).astype(np.float32))
+    >>> conv = NNConv(10, 2, edge_func, 'mean')
+    >>> efeat = th.ones(5, 5)
+    >>> res = conv(g, (u_feat, v_feat), efeat)
+    >>> res
+    tensor([[-0.6568,  0.5042],
+            [ 0.9089, -0.5352],
+            [ 0.1261, -0.0155],
+            [-0.6568,  0.5042]], grad_fn=<AddBackward0>)
     """
     def __init__(self,
                  in_feats,
                  out_feats,
                  edge_func,
-                 aggregator_type,
+                 aggregator_type='mean',
                  residual=False,
-                 bias=True):
+                 bias=True,
+                 allow_zero_in_degree=False):
         super(NNConv, self).__init__()
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
-        self.edge_nn = edge_func
+        self.edge_func = edge_func
         if aggregator_type == 'sum':
             self.reducer = fn.sum
         elif aggregator_type == 'mean':
@@ -71,10 +143,21 @@ class NNConv(nn.Module):
             self.bias = nn.Parameter(th.Tensor(out_feats))
         else:
             self.register_buffer('bias', None)
+        self._allow_zero_in_degree = allow_zero_in_degree
         self.reset_parameters()
 
     def reset_parameters(self):
-        """Reinitialize learnable parameters."""
+        r"""
+
+        Description
+        -----------
+        Reinitialize learnable parameters.
+
+        Notes
+        -----
+        The model parameters are initialized using Glorot uniform initialization
+        and the bias is initialized to be zero.
+        """
         gain = init.calculate_gain('relu')
         if self.bias is not None:
             nn.init.zeros_(self.bias)
@@ -94,7 +177,7 @@ class NNConv(nn.Module):
             input feature size.
         efeat : torch.Tensor
             The edge feature of shape :math:`(N, *)`, should fit the input
-            shape requirement of ``edge_nn``.
+            shape requirement of ``edge_func``.
 
         Returns
         -------
@@ -103,12 +186,24 @@ class NNConv(nn.Module):
             is the output feature size.
         """
         with graph.local_scope():
+            if not self._allow_zero_in_degree:
+                if (graph.in_degrees() == 0).any():
+                    raise DGLError('There are 0-in-degree nodes in the graph, '
+                                   'output for those nodes will be invalid. '
+                                   'This is harmful for some applications, '
+                                   'causing silent performance regression. '
+                                   'Adding self-loop on the input graph by '
+                                   'calling `g = dgl.add_self_loop(g)` will resolve '
+                                   'the issue. Setting ``allow_zero_in_degree`` '
+                                   'to be `True` when constructing this module will '
+                                   'suppress the check and let the code run.')
+
             feat_src, feat_dst = expand_as_pair(feat, graph)
 
             # (n, d_in, 1)
             graph.srcdata['h'] = feat_src.unsqueeze(-1)
             # (n, d_in, d_out)
-            graph.edata['w'] = self.edge_nn(efeat).view(-1, self._in_src_feats, self._out_feats)
+            graph.edata['w'] = self.edge_func(efeat).view(-1, self._in_src_feats, self._out_feats)
             # (n, d_in, d_out)
             graph.update_all(fn.u_mul_e('h', 'w', 'm'), self.reducer('m', 'neigh'))
             rst = graph.dstdata['neigh'].sum(dim=1) # (n, d_out)
