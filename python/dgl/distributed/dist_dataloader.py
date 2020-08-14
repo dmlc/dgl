@@ -58,31 +58,40 @@ def enable_mp_debug():
 DATALOADER_ID = 0
 
 class DistDataLoader:
-    """DGL customized multiprocessing dataloader, which is designed for using with DistGraph."""
+    """DGL customized multiprocessing dataloader.
+
+    Like Pytorch DataLoader, it generates mini-batches with multiprocessing. The difference is
+    that this class utilizes the worker processes created by `dgl.distributed.initialize`.
+
+    For DGL's distributed sampling with multiprocessing, users have to use this class instead
+    of using Pytorch DataLoader because DGL's RPC servers have to connect with all clients
+    in advance.
+
+    Note that the iteration order is not guaranteed with this class. For example,
+    if dataset = [1, 2, 3, 4], batch_size = 2 and shuffle = False, the order of [1, 2]
+    and [3, 4] is not guaranteed.
+
+    Parameters
+    ----------
+    dataset: a tensor
+        A tensor of node IDs or edge IDs.
+    batch_size: int
+        The number of samples per batch to load.
+    shuffle: bool, optional
+        Set to ``True`` to have the data reshuffled at every epoch (default: ``False``).
+    collate_fn: callable, optional
+        The function is typically used to sample neighbors of the nodes in a batch
+        or the endpoint nodes of the edges in a batch.
+    drop_last: bool, optional
+        Set to ``True`` to drop the last incomplete batch, if the dataset size is not
+        divisible by the batch size. If ``False`` and the size of dataset is not divisible
+        by the batch size, then the last batch will be smaller. (default: ``False``)
+    queue_size: int, optional
+        Size of multiprocessing queue
+    """
 
     def __init__(self, dataset, batch_size, shuffle=False, collate_fn=None, drop_last=False,
                  queue_size=None):
-        """
-        This class will utilize the worker process created by dgl.distributed.initialize function
-
-        Note that the iteration order is not guaranteed with this class. For example,
-         if dataset = [1, 2, 3, 4], batch_size = 2 and shuffle = False, the order of [1, 2]
-         and [3, 4] is not guaranteed.
-
-        dataset (Dataset): dataset from which to load the data.
-        batch_size (int, optional): how many samples per batch to load
-            (default: ``1``).
-        shuffle (bool, optional): set to ``True`` to have the data reshuffled
-            at every epoch (default: ``False``).
-        collate_fn (callable, optional): merges a list of samples to form a
-            mini-batch of Tensor(s).  Used when using batched loading from a
-            map-style dataset.
-        drop_last (bool, optional): set to ``True`` to drop the last incomplete batch,
-            if the dataset size is not divisible by the batch size. If ``False`` and
-            the size of dataset is not divisible by the batch size, then the last batch
-            will be smaller. (default: ``False``)
-        queue_size (int, optional): Size of multiprocessing queue
-        """
         self.pool, self.num_workers = get_sampler_pool()
         if queue_size is None:
             queue_size = self.num_workers * 4 if self.num_workers > 0 else 4
