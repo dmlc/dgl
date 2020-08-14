@@ -9,14 +9,14 @@ class NodeDataLoader(DataLoader):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    g : DGLGraph
         The graph.
     nids : Tensor or dict[ntype, Tensor]
         The node set to compute outputs.
-    block_sampler : :py:class:`~dgl.dataloading.BlockSampler`
+    block_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
     kwargs : dict
-        Arguments being passed to ``torch.utils.data.DataLoader``.
+        Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
 
     Examples
     --------
@@ -52,13 +52,13 @@ class EdgeDataLoader(DataLoader):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    g : DGLGraph
         The graph.
     nids : Tensor or dict[ntype, Tensor]
         The node set to compute outputs.
-    block_sampler : :py:class:`~dgl.dataloading.BlockSampler`
+    block_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
-    g_sampling : DGLHeteroGraph, optional
+    g_sampling : DGLGraph, optional
         The graph where neighborhood sampling is performed.
 
         One may wish to iterate over the edges in one graph while perform sampling in
@@ -72,20 +72,28 @@ class EdgeDataLoader(DataLoader):
         minibatch.  Possible values are
 
         * None,
-        * ``reverse``,
+        * ``reverse_id``,
         * ``reverse_types``
 
-        See the docstring in :py:class:`~dgl.dataloading.EdgeCollator`.
+        See the description of the argument with the same name in the docstring of
+        :class:`~dgl.dataloading.EdgeCollator` for more details.
     reverse_edge_ids : Tensor or dict[etype, Tensor], optional
-        See the docstring in :py:class:`~dgl.dataloading.EdgeCollator`.
+        The mapping from the original edge IDs to the ID of their reverse edges.
+
+        See the description of the argument with the same name in the docstring of
+        :class:`~dgl.dataloading.EdgeCollator` for more details.
     reverse_etypes : dict[etype, etype], optional
-        See the docstring in :py:class:`~dgl.dataloading.EdgeCollator`.
+        The mapping from the original edge types to their reverse edge types.
+
+        See the description of the argument with the same name in the docstring of
+        :class:`~dgl.dataloading.EdgeCollator` for more details.
     negative_sampler : callable, optional
         The negative sampler.
 
-        See the docstring in :py:class:`~dgl.dataloading.EdgeCollator`.
+        See the description of the argument with the same name in the docstring of
+        :class:`~dgl.dataloading.EdgeCollator` for more details.
     kwargs : dict
-        Arguments being passed to `torch.utils.data.DataLoader`.
+        Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
 
     Examples
     --------
@@ -167,7 +175,7 @@ class EdgeDataLoader(DataLoader):
 
     See also
     --------
-    :py:class:`~dgl.dataloading.EdgeCollator`
+    :class:`~dgl.dataloading.EdgeCollator`
 
     For end-to-end usages, please refer to the following tutorial/examples:
 
