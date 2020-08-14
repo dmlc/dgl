@@ -88,6 +88,8 @@ def start_dist_dataloader(rank, tmpdir, disable_shared_mem, num_workers, drop_la
                 assert np.max(max_nid) == num_nodes_to_sample - 1 - num_nodes_to_sample % batch_size
             else:
                 assert np.max(max_nid) == num_nodes_to_sample - 1
+    del dataloader
+    dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
@@ -143,28 +145,26 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last):
 
     time.sleep(3)
     os.environ['DGL_DIST_MODE'] = 'distributed'
-    try:
-        start_dist_dataloader(0, tmpdir, num_server > 1, num_workers, drop_last)
-    except Exception as e:
-        print(e)
-    dgl.distributed.exit_client() # this is needed since there's two test here in one process
+    ptrainer = ctx.Process(target=start_dist_dataloader, args=(
+        0, tmpdir, num_server > 1, num_workers, drop_last))
+    ptrainer.start()
+    time.sleep(1)
+
     for p in pserver_list:
         p.join()
+    ptrainer.join()
 
 def start_node_dataloader(rank, tmpdir, disable_shared_mem, num_workers):
     import dgl
     import torch as th
-    print('test7')
     dgl.distributed.initialize("mp_ip_config.txt", 1, num_workers=num_workers)
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_sampling.json', rank)
-    print('test8')
     num_nodes_to_sample = 202
     batch_size = 32
     train_nid = th.arange(num_nodes_to_sample)
     dist_graph = DistGraph("test_mp", gpb=gpb, part_config=tmpdir / 'test_sampling.json')
-    print('test9')
 
     # Create sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler([5, 10])
@@ -204,7 +204,6 @@ def start_node_dataloader(rank, tmpdir, disable_shared_mem, num_workers):
 @pytest.mark.parametrize("num_workers", [0, 4])
 @pytest.mark.parametrize("dataloader_type", ["node"])
 def test_dataloader(tmpdir, num_server, num_workers, dataloader_type):
-    print('test1')
     ip_config = open("mp_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -215,10 +214,8 @@ def test_dataloader(tmpdir, num_server, num_workers, dataloader_type):
     num_parts = num_server
     num_hops = 1
 
-    print('test2')
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
                     num_hops=num_hops, part_method='metis', reshuffle=False)
-    print('test3')
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -228,19 +225,16 @@ def test_dataloader(tmpdir, num_server, num_workers, dataloader_type):
         p.start()
         time.sleep(1)
         pserver_list.append(p)
-    print('test4')
 
     time.sleep(3)
     os.environ['DGL_DIST_MODE'] = 'distributed'
     ptrainer_list = []
     if dataloader_type == 'node':
-        print('test5')
         p = ctx.Process(target=start_node_dataloader, args=(
             0, tmpdir, num_server > 1, num_workers))
         p.start()
         time.sleep(1)
         ptrainer_list.append(p)
-    print('test10')
     for p in pserver_list:
         p.join()
     for p in ptrainer_list:
