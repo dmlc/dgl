@@ -2,8 +2,7 @@
 Graph data input pipeline in DGL
 ==================================
 
-DGL implements many commonly used graph datasets in
-`dgl.data <https://docs.dgl.ai/en/latest/api/python/dgl.data.html>`__. They
+DGL implements many commonly used graph datasets in :ref:`apidata`. They
 follow a standard pipeline defined in class :class:`dgl.data.DGLDataset`. We highly
 recommend processing graph data into a :class:`dgl.data.DGLDataset` subclass, as the
 pipeline provides simple and clean solution for loading, processing and
@@ -17,7 +16,7 @@ DGLDataset class
 --------------------
 
 :class:`dgl.data.DGLDataset` is the base class for processing, loading and saving
-graph datasets defined in ``dgl.data``. It implements the basic pipeline
+graph datasets defined in :ref:`apidata`. It implements the basic pipeline
 for processing graph data. The following flow chart shows how the
 pipeline works.
 
@@ -101,8 +100,7 @@ template of ``MyDataset`` is as follows.
 ``__getitem__(idx)`` and ``__len__()`` that must be implemented in the
 subclass. But we recommend to implement saving and loading as well,
 since they can save significant time for processing large datasets, and
-there are several APIs making it easy (see `Save and load data 
-<file:///Users/xiangkhu/Documents/GitHub/dgl/docs/build/html/guide/data.html#save-and-load-data>`__).
+there are several APIs making it easy (see :ref:`ref-save-load-data`).
 
 Note that the purpose of :class:`dgl.data.DGLDataset` is to provide a standard and
 convenient way to load graph data. We can store graphs, features,
@@ -287,13 +285,13 @@ in `Training Graph Classification models <https://>`__.
 For more examples of graph classification datasets, please refer to our builtin graph classification
 datasets: 
 
-* `GINDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#graph-isomorphism-network-dataset>`__
+* :ref:`gindataset`
 
-* `MiniGCDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#mini-graph-classification-dataset>`__
+* :ref:`minigcdataset`
 
-* `QM7bDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#qm7b-dataset>`__
+* :ref:`qm7bdata`
 
-* `TUDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#tu-dataset>`__
+* :ref:`tudata`
 
 Processing Node Classification datasets
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -389,25 +387,25 @@ A complete guide for training node classification models can be found in
 For more examples of node classification datasets, please refer to our
 builtin datasets:
 
-* `CitationGraphDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#citation-network-dataset>`__
+* :ref:`citationdata`
 
-* `CoraFullDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#corafull-dataset>`__
+* :ref:`corafulldata`
 
-* `Amazon Co-Purchase dataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#amazon-co-purchase-dataset>`__
+* :ref:`amazoncobuydata`
 
-* `Coauthor dataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#coauthor-dataset>`__
+* :ref:`coauthordata`
 
-* `KarateClubDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#karate-club-dataset>`__
+* :ref:`karateclubdata`
 
-* `PPIDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#protein-protein-interaction-dataset>`__
+* :ref:`ppidata`
 
-* `RedditDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#reddit-dataset>`__
+* :ref:`redditdata`
 
-* `SBMMixtureDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#symmetric-stochastic-block-model-mixture-dataset>`__
+* :ref:`sbmdata`
 
-* `SSTDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#stanford-sentiment-treebank-dataset>`__
+* :ref:`sstdata`
 
-* `RDF datasets <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#rdf-datasets>`__
+* :ref:`rdfdata`
 
 Processing dataset for Link Prediction datasets
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -483,9 +481,11 @@ A complete guide for training link prediction models can be found in
 For more examples of link prediction datasets, please refer to our
 builtin datasets: 
 
-* `Knowlege graph dataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#knowlege-graph-dataset>`__
+* :ref:`kgdata`
 
-* `BitcoinOTCDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#bitcoinotc-dataset>`__
+* :ref:`bitcoinotcdata`
+
+.. _ref-save-load-data:
 
 Save and load data
 ----------------------
