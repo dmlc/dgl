@@ -173,7 +173,7 @@ __global__ void SpMMCsrKernel(
         DType out = BinaryOp::Call(uoff + lhs_add, eoff + rhs_add);
         ReduceOp::Call(&local_accum, &local_argu, &local_arge, out, cid, eid);
       }
-      out[ty * out_len + tx] = indptr[ty] == indptr[ty + 1] ? 0 : local_accum;
+      out[ty * out_len + tx] = local_accum;
       if (ReduceOp::require_arg && BinaryOp::use_lhs)
         arg_u[ty * out_len + tx] = local_argu;
       if (ReduceOp::require_arg && BinaryOp::use_rhs)
