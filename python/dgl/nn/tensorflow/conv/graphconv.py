@@ -117,8 +117,8 @@ class GraphConv(layers.Layer):
     >>> v = [0, 1, 2, 3, 2]
     >>> with tf.device("CPU:0"):
     ...     g = dgl.bipartite((u, v))
-    ...     u_fea = th.rand(2, 5)
-    ...     v_fea = th.rand(4, 5)
+    ...     u_fea = tf.convert_to_tensor(np.random.rand(2, 5))
+    ...     v_fea = tf.convert_to_tensor(np.random.rand(4, 5))
     ...     conv = GraphConv(5, 2, norm='both', weight=True, bias=True)
     ...     res = conv(g, (u_fea, v_fea))
     >>> res

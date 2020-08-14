@@ -218,7 +218,7 @@ class GraphConv(gluon.Block):
         """
         with graph.local_scope():
             if not self._allow_zero_in_degree:
-                if (graph.in_degrees() == 0).asnumpy().any():
+                if graph.in_degrees().min() == 0:
                     raise DGLError('There are 0-in-degree nodes in the graph, '
                                    'output for those nodes will be invalid. '
                                    'This is harmful for some applications, '
