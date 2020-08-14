@@ -4,6 +4,7 @@ import os
 
 from .dist_context import is_initialized
 from .kvstore import get_kvstore
+from .role import get_role
 from .. import utils
 from .. import backend as F
 
@@ -84,9 +85,9 @@ class DistTensor:
         if name is None:
             assert not persistent, 'We cannot generate anonymous persistent distributed tensors'
             global DIST_TENSOR_ID
-            name = 'anonymous-' + str(DIST_TENSOR_ID)
-            # all trainer processes should do the same thing. All of them should have
-            # the same Ids.
+            # All processes of the same role should create DistTensor synchronously.
+            # Thus, all of them should have the same Ids.
+            name = 'anonymous-' + get_role() + '-' + str(DIST_TENSOR_ID)
             DIST_TENSOR_ID += 1
         self._name = _get_data_name(name, part_policy.policy_str)
         self._persistent = persistent
