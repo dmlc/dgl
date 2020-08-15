@@ -11,7 +11,6 @@ from .heterograph import DGLHeteroGraph, combine_frames
 from . import graph_index
 from . import utils
 from .base import NTYPE, ETYPE, NID, EID, DGLError, dgl_warning
-from .frame import Frame
 
 __all__ = [
     'graph',
@@ -1148,7 +1147,7 @@ def from_networkx(nx_graph,
 
 def bipartite_from_networkx(nx_graph,
                             utype='_U', etype='_E', vtype='_V',
-                            src_attrs=None, edge_attrs=None, dst_attrs=None,
+                            u_attrs=None, e_attrs=None, v_attrs=None,
                             edge_id_attr_name=None,
                             idtype=None,
                             device=None):
@@ -1176,21 +1175,21 @@ def bipartite_from_networkx(nx_graph,
         The name of the edge type.
     vtype : str, optional
         The name of the destination node type.
-    src_attrs : list[str], optional
-        The names of the node attributes to retrieve from the NetworkX graph. If given,
-        DGL stores the retrieved node attributes in ``srcdata`` of the returned graph using their
-        original names. The attribute data must be convertible to Tensor type (e.g., scalar,
-        numpy.array, list, etc.).
-    edge_attrs : list[str], optional
+    u_attrs : list[str], optional
+        The names of the node attributes for node type :attr:`utype` to retrieve from the
+        NetworkX graph. If given, DGL stores the retrieved node attributes in
+        ``nodes[utype].data`` of the returned graph using their original names. The attribute
+        data must be convertible to Tensor type (e.g., scalar, numpy.array, list, etc.).
+    e_attrs : list[str], optional
         The names of the edge attributes to retrieve from the NetworkX graph. If given, DGL
         stores the retrieved edge attributes in ``edata`` of the returned graph using their
         original names. The attribute data must be convertible to Tensor type (e.g., scalar,
         numpy.ndarray, list, etc.).
-    dst_attrs : list[str], optional
-        The names of the ``"DST"`` node attributes to retrieve from the NetworkX graph. If given,
-        DGL stores the retrieved node attributes in ``dstdata`` of the returned graph using their
-        original names. The attribute data must be convertible to Tensor type (e.g., scalar,
-        numpy.array, list, etc.).
+    v_attrs : list[str], optional
+        The names of the node attributes for node type :attr:`vtype` to retrieve from the
+        NetworkX graph.  If given, DGL stores the retrieved node attributes in
+        ``nodes[vtype].data`` of the returned graph using their original names. The attribute
+        data must be convertible to Tensor type (e.g., scalar, numpy.array, list, etc.).
     edge_id_attr_name : str, optional
         The name of the edge attribute that stores the edge IDs. If given, DGL will assign edge
         IDs accordingly when creating the graph, so the attribute must be valid IDs, i.e.
