@@ -322,6 +322,12 @@ class DistGraph:
     `disable_shared_mem=False` when creating `DistGraphServer`. When shared-memory is disabled,
     a user has to pass a partition book. This is currently used for the testing purpose.
 
+    DistGraph does not provide many APIs to access the structure of the distributed graph.
+    DistGraph is mainly used in distributed mini-batch training. Users invoke the distributed
+    sampling APIs on a DistGraph object to generate mini-batches and perform forward and
+    backward computation on the mini-batches. As such, DistGraph only provides a small set
+    of APIs required for mini-batch training.
+
     Currently, DistGraph only supports graphs with only one node type and one edge type.
 
     Parameters
@@ -329,11 +335,29 @@ class DistGraph:
     graph_name : str
         The name of the graph. This name has to be the same as the one used for
         partitioning a graph.
-    gpb : PartitionBook
+    gpb : GraphPartitionBook, optional
         The partition book object. Normally, users do not need to provide the partition book.
         This is mainly used for the testing purpose.
-    part_config : str
-        The partition config file. It's used in the standalone mode.
+    part_config : str, optional
+        The path of partition config file. It's used in the standalone mode.
+
+    Examples
+    --------
+    >>> g = dgl.distributed.DistGraph('graph-name')
+    >>> def sample(seeds):
+            seeds = th.LongTensor(np.asarray(seeds))
+            frontier = dgl.distributed.sample_neighbors(g, seeds, 10)
+            return dgl.to_block(frontier, seeds)
+    >>> dataloader = dgl.distributed.DistDataLoader(dataset=nodes, batch_size=1000,
+                                                    collate_fn=sample, shuffle=True)
+    >>> for block in dataloader:
+            feat = g.ndata['features'][block.srcdata[dgl.NID]]
+            labels = g.ndata['labels'][block.dstdata[dgl.NID]]
+            pred = model(block, feat)
+            loss = loss_fcn(pred, labels)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
     '''
     def __init__(self, graph_name, gpb=None, part_config=None):
         self.graph_name = graph_name
@@ -518,6 +542,12 @@ class DistGraph:
         -------
         int
             The number of nodes
+
+        Examples
+        --------
+        >>> g = dgl.distributed.DistGraph('ogb-product')
+        >>> print(g.number_of_nodes())
+        2449029
         """
         return self._num_nodes
 
@@ -528,6 +558,12 @@ class DistGraph:
         -------
         int
             The number of edges
+
+        Examples
+        --------
+        >>> g = dgl.distributed.DistGraph('ogb-product')
+        >>> print(g.number_of_nodes())
+        123718280
         """
         return self._num_edges
 
