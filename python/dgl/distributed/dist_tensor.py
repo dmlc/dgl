@@ -4,6 +4,7 @@ import os
 
 from .dist_context import is_initialized
 from .kvstore import get_kvstore
+from .role import get_role
 from .. import utils
 from .. import backend as F
 
@@ -16,6 +17,9 @@ def _get_data_name(name, part_policy):
 
 def _default_init_data(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
+
+# These Ids can identify the anonymous distributed tensors.
+DIST_TENSOR_ID = 0
 
 class DistTensor:
     ''' Distributed tensor.
@@ -68,7 +72,8 @@ class DistTensor:
                             + 'Please provide a partition policy explicitly.'
                     part_policy = policy
             assert part_policy is not None, \
-                    'Cannot determine the partition policy. Please provide it.'
+                    'Cannot find a right partition policy. Currently, DistTensor only ' \
+                    + 'supports partition policy associated with nodes or edges.'
 
         self._part_policy = part_policy
 
@@ -79,7 +84,11 @@ class DistTensor:
         # We need to generate the name in a deterministic way.
         if name is None:
             assert not persistent, 'We cannot generate anonymous persistent distributed tensors'
-            name = 'anonymous-' + str(len(exist_names) + 1)
+            global DIST_TENSOR_ID
+            # All processes of the same role should create DistTensor synchronously.
+            # Thus, all of them should have the same Ids.
+            name = 'anonymous-' + get_role() + '-' + str(DIST_TENSOR_ID)
+            DIST_TENSOR_ID += 1
         self._name = _get_data_name(name, part_policy.policy_str)
         self._persistent = persistent
         if self._name not in exist_names:

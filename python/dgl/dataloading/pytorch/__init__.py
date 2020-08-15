@@ -2,8 +2,18 @@
 import inspect
 from torch.utils.data import DataLoader
 from ..dataloader import NodeCollator, EdgeCollator
+from ...distributed import DistGraph
+from ...distributed import DistDataLoader
 
-class NodeDataLoader(DataLoader):
+def _remove_kwargs_dist(kwargs):
+    if 'num_workers' in kwargs:
+        del kwargs['num_workers']
+    if 'pin_memory' in kwargs:
+        del kwargs['pin_memory']
+        print('Distributed DataLoader does not support pin_memory')
+    return kwargs
+
+class NodeDataLoader:
     """PyTorch dataloader for batch-iterating over a set of nodes, generating the list
     of blocks as computation dependency of the said minibatch.
 
@@ -42,8 +52,22 @@ class NodeDataLoader(DataLoader):
             else:
                 dataloader_kwargs[k] = v
         self.collator = NodeCollator(g, nids, block_sampler, **collator_kwargs)
-        super().__init__(
-            self.collator.dataset, collate_fn=self.collator.collate, **dataloader_kwargs)
+        if isinstance(g, DistGraph):
+            _remove_kwargs_dist(dataloader_kwargs)
+            self.dataloader = DistDataLoader(self.collator.dataset,
+                                             collate_fn=self.collator.collate,
+                                             **dataloader_kwargs)
+        else:
+            self.dataloader = DataLoader(self.collator.dataset,
+                                         collate_fn=self.collator.collate,
+                                         **dataloader_kwargs)
+
+
+    def __next__(self):
+        return self.dataloader.__next()
+
+    def __iter__(self):
+        return self.dataloader.__iter__()
 
 class EdgeDataLoader(DataLoader):
     """PyTorch dataloader for batch-iterating over a set of edges, generating the list
@@ -196,5 +220,9 @@ class EdgeDataLoader(DataLoader):
             else:
                 dataloader_kwargs[k] = v
         self.collator = EdgeCollator(g, eids, block_sampler, **collator_kwargs)
+
+        assert not isinstance(g, DistGraph), \
+                'EdgeDataLoader does not support DistGraph for now. ' \
+                + 'Please use DistDataLoader directly.'
         super().__init__(
             self.collator.dataset, collate_fn=self.collator.collate, **dataloader_kwargs)
