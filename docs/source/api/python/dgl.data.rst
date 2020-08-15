@@ -208,8 +208,6 @@ Utils
     utils.check_sha1
     utils.extract_archive
     utils.split_dataset
-    utils.save_graphs
-    utils.load_graphs
     utils.load_labels
     utils.save_info
     utils.load_info
