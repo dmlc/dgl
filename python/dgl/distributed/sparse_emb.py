@@ -7,36 +7,50 @@ from .dist_tensor import DistTensor
 class DistEmbedding:
     '''Distributed embeddings.
 
-    Like distributed tensors, distributed embeddings are sharded in a cluster of machines.
-    They are sharded in the same way as distributed tensor. Please see DistTensor for more
-    details on the partition policy.
-
-    Distributed embeddings are part of a model. They are updated by mini-batches.
-    However, the distributed embeddings have to be updated by DGL's optimizers instead of
+    DGL provides a distributed embedding to support models that require learnable embeddings.
+    DGL's distributed embeddings are mainly used for learning node embeddings of graph models.
+    Because distributed embeddings are part of a model, they are updated by mini-batches.
+    The distributed embeddings have to be updated by DGL's optimizers instead of
     the optimizers provided by the deep learning frameworks (e.g., Pytorch and MXNet).
 
     To support efficient training on a graph with many nodes, the embeddings support sparse
-    updates. That is, only the embeddings involved in a mini-batch are updated.
-    Currently, DGL provides only one optimizer: SparseAdagrad. DGL will provide more
+    updates. That is, only the embeddings involved in a mini-batch computation are updated.
+    Currently, DGL provides only one optimizer: `SparseAdagrad`. DGL will provide more
     optimizers in the future.
+
+    Like distributed tensors, distributed embeddings are sharded and stored in a cluster
+    of machines. Many aspects of distributed embeddings are the same as distributed tensors.
+    Distributed embeddings are sharded in the same way as distributed tensors; they can be
+    identified by unique names in the system; their values are initialized by an init function.
+    Please see `DistTensor` for more details. Because distributed embeddings are sharded
+    in the same way as nodes and edges of a distributed graph, it is usually much more
+    efficient than the sparse embeddings provided by the deep learning frameworks.
 
     Parameters
     ----------
     num_embeddings : int
-        The number of embeddings
+        The number of embeddings. Currently, the number of embeddings has to be the same as
+        the number of nodes or the number of edges.
     embedding_dim : int
         The dimension size of embeddings.
-    name : str
-        The name of the embeddings
-    init_func : callable
-        The function to create the initial data.
-    part_policy : PartitionPolicy
-        The partition policy.
+    name : str, optional
+        The name of the embeddings. The name can uniquely identify embeddings in a system
+        so that another DistEmbedding object can referent to the embeddings.
+    init_func : callable, optional
+        The function to create the initial data. If the init function is not provided,
+        the values of the embeddings are initialized to zero.
+    part_policy : PartitionPolicy, optional
+        The partition policy that assigns embeddings to different machines in the cluster.
+        Currently, it only supports node partition policy or edge partition policy.
+        The system determines the right partition policy automatically.
 
     Examples
     --------
-    >>> emb_init = lambda shape, dtype: F.zeros(shape, dtype, F.cpu())
-    >>> emb = dgl.distributed.DistEmbedding(g.number_of_nodes(), 10)
+    >>> def initializer(shape, dtype):
+            arr = th.zeros(shape, dtype=dtype)
+            arr.uniform_(-1, 1)
+            return arr
+    >>> emb = dgl.distributed.DistEmbedding(g.number_of_nodes(), 10, init_func=initializer)
     >>> optimizer = dgl.distributed.SparseAdagrad([emb], lr=0.001)
     >>> for blocks in dataloader:
     >>>     feats = emb(nids)
@@ -111,7 +125,7 @@ class SparseAdagrad:
     Parameters
     ----------
     params : list of DistEmbeddings
-        The list of sparse embeddings.
+        The list of distributed embeddings.
     lr : float
         The learning rate.
     '''
@@ -120,6 +134,7 @@ class SparseAdagrad:
         self._lr = lr
         # We need to register a state sum for each embedding in the kvstore.
         for emb in params:
+            assert isinstance(emb, DistEmbedding), 'SparseAdagrad only supports DistEmbeding'
             name = emb._tensor.name
             kvstore = emb._tensor.kvstore
             policy = emb._tensor.part_policy

@@ -25,19 +25,27 @@ class DistTensor:
     ''' Distributed tensor.
 
     DistTensor references to a distributed tensor sharded and stored in a cluster of machines.
-    Distributed tensors are designed to store node data and edge data of a distributed graph.
-    Therefore, their first dimensions have to be the number of nodes or edges in the graph.
+    It has the same interface as Pytorch Tensor to access its metadata (e.g., shape and data type).
+    To access data in a distributed tensor, it supports slicing rows and writing data to rows.
+    It does not support any operators of a deep learning framework, such as addition and
+    multiplication.
+
+    Currently, distributed tensors are designed to store node data and edge data of a distributed
+    graph. Therefore, their first dimensions have to be the number of nodes or edges in the graph.
     The tensors are sharded in the first dimension based on the partition policy of nodes
     or edges. When a distributed tensor is created, the partition policy is automatically
-    determined based on the first dimension: if it matches the number of nodes, it will use
-    the node partition policy; if it matches the number of edges, it wll use the edge partition
-    policy. Users can overwrite the rule by providing a partition policy directly.
+    determined based on the first dimension if the partition policy is not provided: if
+    the first dimension matches the number of nodes, DistTensor will use the node partition policy;
+    if the first dimension matches the number of edges, DistTensor wll use the edge partition
+    policy. To determine the partition policy automatically, a DistGraph object has to be created.
+    Users can overwrite the rule by providing a partition policy directly.
 
-    A distributed tensor can have a unique name to identify it or be anonymous.
-    When the distributed tensor has a name, the tensor can be persistent if persistent=True.
-    A persistent tensor lives in the system even if the DistTenor object is
-    destroyed in the trainer process. However, DGL does not allow an anonymous tensor
-    to be persistent.
+    A distributed tensor can be identified by a unique name or is anonymous.
+    When a distributed tensor has a name, the tensor can be persistent if persistent=True.
+    Normally, when a DistTensor object is destroyed, the distributed tensor in the system
+    is destroyed at the same time. However, a persistent tensor lives in the system even if
+    the DistTenor object is destroyed in the trainer process. DGL does not allow an anonymous
+    tensor to be persistent.
 
     When a DistTensor is created, it may reference to an existing distributed tensor or
     create a new one. A distributed tensor is identified by the name passed to the constructor.
@@ -50,29 +58,55 @@ class DistTensor:
     The init function has two input arguments: shape and data type and returns a tensor.
     Below shows an example of an init function:
 
-    ```
-    def init_func(shape, dtype):
-        return torch.ones(shape=shape, dtype=dtype)
-    ```
+    .. highlight:: python
+    .. code-block:: python
+
+        def init_func(shape, dtype):
+            return torch.ones(shape=shape, dtype=dtype)
+
+    Note: creating `DistTensor` is a synchronized operation. When a trainer process tries to
+    create a DistTensor object, the creation succeeds only when all trainer processes
+    do the same.
 
     Parameters
     ----------
     shape : tuple
-        The shape of the tensor
+        The shape of the tensor. The first dimension has to be the number of nodes or
+        the number of edges of a distributed graph.
     dtype : dtype
-        The dtype of the tensor
-    name : string
-        The name of the tensor.
-    init_func : callable
-        The function to initialize data in the tensor.
-    part_policy : PartitionPolicy
-        The partition policy of the tensor
+        The dtype of the tensor. The data type has to be the one in the deep learning framework.
+    name : string, optional
+        The name of the embeddings. The name can uniquely identify embeddings in a system
+        so that another DistTensor object can referent to the distributed tensor.
+    init_func : callable, optional
+        The function to initialize data in the tensor. If the init function is not provided,
+        the values of the embeddings are initialized to zero.
+    part_policy : PartitionPolicy, optional
+        The partition policy of the rows of the tensor to different machines in the cluster.
+        Currently, it only supports node partition policy or edge partition policy.
+        The system determines the right partition policy automatically.
     persistent : bool
-        Whether the created tensor is persistent.
+        Whether the created tensor lives after the DistTensor object is destroyed.
+
+    Examples
+    --------
+    >>> init = lambda shape, dtype: th.ones(shape, dtype=dtype)
+    >>> arr = dgl.distributed.DistTensor((g.number_of_nodes(), 2), th.int32, init_func=init)
+    >>> print(arr[0:3])
+    tensor([[1, 1],
+            [1, 1],
+            [1, 1]], dtype=torch.int32)
+    >>> arr[0:3] = th.ones((3, 2), dtype=th.int32) * 2
+    >>> print(arr[0:3])
+    tensor([[2, 2],
+            [2, 2],
+            [2, 2]], dtype=torch.int32)
     '''
     def __init__(self, shape, dtype, name=None, init_func=None, part_policy=None,
                  persistent=False):
         self.kvstore = get_kvstore()
+        assert self.kvstore is not None, \
+                'Distributed module is not initialized. Please call dgl.distributed.initialize.'
         self._shape = shape
         self._dtype = dtype
 
@@ -91,10 +125,13 @@ class DistTensor:
                             + 'Please provide a partition policy explicitly.'
                     part_policy = policy
             assert part_policy is not None, \
-                    'Cannot find a right partition policy. Currently, DistTensor only ' \
-                    + 'supports partition policy associated with nodes or edges.'
+                    'Cannot find a right partition policy. It is either because ' \
+                    + 'its first dimension does not match the number of nodes or edges ' \
+                    + 'of a distributed graph or there does not exist a distributed graph.'
 
         self._part_policy = part_policy
+        assert part_policy.get_size() == shape[0], \
+                'The partition policy does not match the input shape.'
 
         if init_func is None:
             init_func = _default_init_data
