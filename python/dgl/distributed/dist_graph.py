@@ -342,6 +342,8 @@ class DistGraph:
             assert part_config is not None, \
                     'When running in the standalone model, the partition config file is required'
             self._client = get_kvstore()
+            assert self._client is not None, \
+                    'Distributed module is not initialized. Please call dgl.distributed.initialize.'
             # Load graph partition data.
             g, node_feats, edge_feats, self._gpb, _ = load_partition(part_config, 0)
             assert self._gpb.num_partitions() == 1, \
@@ -375,6 +377,8 @@ class DistGraph:
 
     def _init(self):
         self._client = get_kvstore()
+        assert self._client is not None, \
+                'Distributed module is not initialized. Please call dgl.distributed.initialize.'
         self._g = _get_graph_from_shared_mem(self.graph_name)
         self._gpb = get_shared_mem_partition_book(self.graph_name, self._g)
         if self._gpb is None:
