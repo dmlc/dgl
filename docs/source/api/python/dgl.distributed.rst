@@ -73,8 +73,10 @@ Graph partition book
 .. currentmodule:: dgl.distributed.graph_partition_book
 
 .. autoclass:: GraphPartitionBook
+    :members: shared_memory, num_partitions, metadata, nid2partid, eid2partid, partid2nids, partid2eids, nid2localnid, eid2localeid, partid
 
 .. autoclass:: PartitionPolicy
+    :members: policy_str, part_id, partition_book, to_local, to_partid, get_part_size, get_size
 
 Split and Load Graphs
 `````````````````````
