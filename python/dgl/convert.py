@@ -1234,8 +1234,8 @@ def bipartite_from_networkx(nx_graph,
 
     Retrieve the node/edge features of the graph.
 
-    >>> g = dgl.bipartite_from_networkx(nx_g, src_attrs=['feat1', 'feat2'],
-    >>>                                 edge_attrs=['weight'], dst_attrs=['feat3'])
+    >>> g = dgl.bipartite_from_networkx(nx_g, u_attrs=['feat1', 'feat2'],
+    ...                                 e_attrs=['weight'], v_attrs=['feat3'])
 
     Use a pre-specified ordering of the edges.
 
@@ -1255,9 +1255,9 @@ def bipartite_from_networkx(nx_graph,
     """
     if not nx_graph.is_directed():
         raise DGLError('Expect nx_graph to be a directed NetworkX graph.')
-    utils.check_all_same_type(src_attrs, str, 'src_attrs', skip_none=True)
-    utils.check_all_same_type(edge_attrs, str, 'edge_attrs', skip_none=True)
-    utils.check_all_same_type(dst_attrs, str, 'dst_attrs', skip_none=True)
+    utils.check_all_same_type(u_attrs, str, 'u_attrs', skip_none=True)
+    utils.check_all_same_type(e_attrs, str, 'e_attrs', skip_none=True)
+    utils.check_all_same_type(v_attrs, str, 'v_attrs', skip_none=True)
     utils.check_type(edge_id_attr_name, str, 'edge_id_attr_name', skip_none=True)
     if edge_id_attr_name is not None and \
             not edge_id_attr_name in next(iter(nx_graph.edges(data=True)))[-1]:
@@ -1304,25 +1304,25 @@ def bipartite_from_networkx(nx_graph,
         else:
             return F.tensor(lst)
 
-    if src_attrs is not None:
+    if u_attrs is not None:
         # mapping from feature name to a list of tensors to be concatenated
         src_attr_dict = defaultdict(list)
         for nid in top_map.keys():
-            for attr in src_attrs:
+            for attr in u_attrs:
                 src_attr_dict[attr].append(nx_graph.nodes[nid][attr])
-        for attr in src_attrs:
+        for attr in u_attrs:
             g.srcdata[attr] = F.copy_to(_batcher(src_attr_dict[attr]), g.device)
 
-    if dst_attrs is not None:
+    if v_attrs is not None:
         # mapping from feature name to a list of tensors to be concatenated
         dst_attr_dict = defaultdict(list)
         for nid in bottom_map.keys():
-            for attr in dst_attrs:
+            for attr in v_attrs:
                 dst_attr_dict[attr].append(nx_graph.nodes[nid][attr])
-        for attr in dst_attrs:
+        for attr in v_attrs:
             g.dstdata[attr] = F.copy_to(_batcher(dst_attr_dict[attr]), g.device)
 
-    if edge_attrs is not None:
+    if e_attrs is not None:
         # mapping from feature name to a list of tensors to be concatenated
         attr_dict = defaultdict(lambda: [None] * g.number_of_edges())
         # each defaultdict value is initialized to be a list of None
@@ -1330,15 +1330,15 @@ def bipartite_from_networkx(nx_graph,
         # corresponding edge id
         if has_edge_id:
             for _, _, attrs in nx_graph.edges(data=True):
-                for key in edge_attrs:
+                for key in e_attrs:
                     attr_dict[key][attrs[edge_id_attr_name]] = attrs[key]
         else:
             # XXX: assuming networkx iteration order is deterministic
             #      so the order is the same as graph_index.from_networkx
             for eid, (_, _, attrs) in enumerate(nx_graph.edges(data=True)):
-                for key in edge_attrs:
+                for key in e_attrs:
                     attr_dict[key][eid] = attrs[key]
-        for attr in edge_attrs:
+        for attr in e_attrs:
             for val in attr_dict[attr]:
                 if val is None:
                     raise DGLError('Not all edges have attribute {}.'.format(attr))
