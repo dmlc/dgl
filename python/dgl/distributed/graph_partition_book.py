@@ -80,7 +80,7 @@ def get_shared_mem_partition_book(graph_name, graph_part):
         return BasicPartitionBook(part_id, num_parts, node_map, edge_map, graph_part)
 
 class GraphPartitionBook:
-    """ The partition information of a graph.
+    """ The base class of the graph partition book.
 
     For distributed training, a graph is partitioned into multiple parts and is loaded
     in multiple machines. The partition book contains all necessary information to locate
@@ -92,6 +92,21 @@ class GraphPartitionBook:
     * the partition ID that a node or edge belongs to,
     * the node IDs and the edge IDs that a partition has.
     * the local IDs of nodes and edges in a partition.
+
+    Currently, there are two classes that implement `GraphPartitionBook`:
+    `BasicGraphPartitionBook` and `RangePartitionBook`. `BasicGraphPartitionBook`
+    stores the mappings between every individual node/edge ID and partition ID on
+    every machine, which usually consumes a lot of memory, while `RangePartitionBook`
+    calculates the mapping between node/edge IDs and partition IDs based on some small
+    metadata because nodes/edges have been relabeled to have IDs in the same partition
+    fall in a contiguous ID range. `RangePartitionBook` is usually a preferred way to
+    provide mappings between node/edge IDs and partition IDs.
+
+    A graph partition book is constructed automatically when a graph is partitioned.
+    When a graph partition is loaded, a graph partition book is loaded as well.
+    Please see :py:meth:`~dgl.distributed.partition.partition_graph`,
+    :py:meth:`~dgl.distributed.partition.load_partition` and
+    :py:meth:`~dgl.distributed.partition.load_partition_book` for more details.
     """
 
     def shared_memory(self, graph_name):
@@ -523,15 +538,14 @@ NODE_PART_POLICY = 'node'
 EDGE_PART_POLICY = 'edge'
 
 class PartitionPolicy(object):
-    """This defines a partition policy for a distributed tensor.
+    """This defines a partition policy for a distributed tensor or distributed embedding.
 
     When DGL shards tensors and stores them in a cluster of machines, it requires
     partition policies that map rows of the tensors to machines in the cluster.
 
     Although an arbitrary partition policy can be defined, DGL currently supports
-    two partition policies that are aligned with how nodes and edges of a distributed
-    graph are mapped to machines. To define a partition policy from a graph partition
-    book, users need to specify the policy name ('node' or 'edge').
+    two partition policies for mapping nodes and edges to machines. To define a partition
+    policy from a graph partition book, users need to specify the policy name ('node' or 'edge').
 
     Parameters
     ----------
