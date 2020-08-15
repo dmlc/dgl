@@ -123,47 +123,47 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
 
     The partitioned data is stored into multiple files organized as follows:
 
-    ```
-    data_root_dir/
-      |-- graph_name.json     # partition configuration file in JSON
-      |-- node_map.npy        # partition id of each node stored in a numpy array (optional)
-      |-- edge_map.npy        # partition id of each edge stored in a numpy array (optional)
-      |-- part0/              # data for partition 0
-          |-- node_feats.dgl  # node features stored in binary format
-          |-- edge_feats.dgl  # edge features stored in binary format
-          |-- graph.dgl       # graph structure of this partition stored in binary format
-      |-- part1/              # data for partition 1
-          |-- node_feats.dgl
-          |-- edge_feats.dgl
-          |-- graph.dgl
-    ```
+    .. code-block:: none
+
+        data_root_dir/
+          |-- graph_name.json     # partition configuration file in JSON
+          |-- node_map.npy        # partition id of each node stored in a numpy array (optional)
+          |-- edge_map.npy        # partition id of each edge stored in a numpy array (optional)
+          |-- part0/              # data for partition 0
+              |-- node_feats.dgl  # node features stored in binary format
+              |-- edge_feats.dgl  # edge features stored in binary format
+              |-- graph.dgl       # graph structure of this partition stored in binary format
+          |-- part1/              # data for partition 1
+              |-- node_feats.dgl
+              |-- edge_feats.dgl
+              |-- graph.dgl
 
     First, the metadata of the original graph and the partitioning is stored in a JSON file
     named after `graph_name`. This JSON file contains the information of the original graph
     as well as the path of the files that store each partition. Below show an example.
 
-    ```
-    {
-       "graph_name" : "test",
-       "part_method" : "metis",
-       "num_parts" : 2,
-       "halo_hops" : 1,
-       "node_map" : "data_root_dir/node_map.npy",
-       "edge_map" : "data_root_dir/edge_map.npy"
-       "num_nodes" : 1000000,
-       "num_edges" : 52000000,
-       "part-0" : {
-         "node_feats" : "data_root_dir/part0/node_feats.dgl",
-         "edge_feats" : "data_root_dir/part0/edge_feats.dgl",
-         "part_graph" : "data_root_dir/part0/graph.dgl",
-       },
-       "part-1" : {
-         "node_feats" : "data_root_dir/part1/node_feats.dgl",
-         "edge_feats" : "data_root_dir/part1/edge_feats.dgl",
-         "part_graph" : "data_root_dir/part1/graph.dgl",
-       },
-    }
-    ```
+    .. code-block:: none
+
+        {
+           "graph_name" : "test",
+           "part_method" : "metis",
+           "num_parts" : 2,
+           "halo_hops" : 1,
+           "node_map" : "data_root_dir/node_map.npy",
+           "edge_map" : "data_root_dir/edge_map.npy"
+           "num_nodes" : 1000000,
+           "num_edges" : 52000000,
+           "part-0" : {
+             "node_feats" : "data_root_dir/part0/node_feats.dgl",
+             "edge_feats" : "data_root_dir/part0/edge_feats.dgl",
+             "part_graph" : "data_root_dir/part0/graph.dgl",
+           },
+           "part-1" : {
+             "node_feats" : "data_root_dir/part1/node_feats.dgl",
+             "edge_feats" : "data_root_dir/part1/edge_feats.dgl",
+             "part_graph" : "data_root_dir/part1/graph.dgl",
+           },
+        }
 
     Here are the definition of the fields in the partition configuration file:
 
