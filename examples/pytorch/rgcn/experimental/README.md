@@ -44,7 +44,12 @@ python3 ~/dgl/tools/launch.py \
 --num_samplers 4 \
 --part_config data/ogbn-mag.json \
 --ip_config ip_config.txt \
-"python3 entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 256 --n-hidden 64 --lr 0.01 --eval-batch-size 8 --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --sparse-embedding --ip-config ip_config.txt --num-workers 4 --num-servers 1"
+"python3 entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 512  --n-hidden 64 --lr 0.01 --eval-batch-size 16  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt  --num-workers 4 --num-servers 1 --sparse-embedding  --sparse-lr 0.06"
+```
+
+We can get the performance score at the second epoch:
+```
+Val Acc 0.4323, Test Acc 0.4255, time: 128.0379
 ```
 
 ## Distributed code runs in the standalone mode
