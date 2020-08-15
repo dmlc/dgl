@@ -299,19 +299,19 @@ class DistGraphServer(KVServer):
 class DistGraph:
     '''The class for accessing a distributed graph.
 
-    This provides the graph interface to access the partitioned graph data for distributed GNN
-    training.
+    This class provides the graph interface to access the partitioned graph data for
+    distributed GNN training.
 
     DistGraph can run in two modes: the standalone mode and the distributed mode.
 
     * When a user runs the training script normally, DistGraph will be in the standalone mode.
-    In this mode, the input graph has to be constructed with only one partition. This mode is
-    used for testing and debugging purpose. In this mode, users have to provide `part_config` so
-    that `DistGraph` can load the input graph.
+      In this mode, the input graph has to be constructed with only one partition. This mode is
+      used for testing and debugging purpose. In this mode, users have to provide `part_config` so
+      that `DistGraph` can load the input graph.
     * When a user runs the training script with the distributed launch script, DistGraph will
-    be set into the distributed mode. This is used for actual distributed training. All data of
-    partitions are loaded by the DistGraph servers. DistGraph connects with the servers to
-    access the partitioned graph data.
+      be set into the distributed mode. This is used for actual distributed training. All data of
+      partitions are loaded by the DistGraph servers. DistGraph connects with the servers to
+      access the partitioned graph data.
 
     Currently, the DistGraph servers and clients run on the same set of machines
     in the distributed mode. `DistGraph` uses shared-memory to access the partition data

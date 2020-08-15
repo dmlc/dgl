@@ -5,28 +5,60 @@ dgl.distributed
 
 .. automodule:: dgl.distributed
 
-DGL Distributed
+Initialization
 ---------------
-
-Initialization and Exit
-```````````````````````
 
 .. autosummary::
     :toctree: ../../generated/
 
     initialize
-    exit_client
 
 Distributed Graph
 -----------------
 
 .. autoclass:: DistGraph
+    :members: ndata, edata, idtype, device, ntypes, etypes, number_of_nodes, number_of_edges, node_attr_schemes, edge_attr_schemes, rank, find_edges, get_partition_book, barrier, local_partition
+
+Distributed Tensor
+------------------
+
+.. autoclass:: DistTensor
+
+Distributed Embedding
+---------------------
+
+.. autoclass:: DistEmbedding
+
+Distributed workload split
+--------------------------
 
 .. autosummary::
     :toctree: ../../generated/
 
     node_split
     edge_split
+
+Distributed Sampling
+--------------------
+
+Distributed DataLoader
+``````````````````````
+
+.. currentmodule:: dgl.distributed.dist_dataloader
+
+.. autoclass:: DistDataLoader
+
+Distributed Neighbor Sampling
+`````````````````````````````
+
+.. currentmodule:: dgl.distributed.graph_services
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    sample_neighbors
+    find_edges
+    in_subgraph
 
 Partition
 ---------
@@ -51,26 +83,4 @@ Split and Load Graphs
     load_partition
     load_partition_book
     partition_graph
-
-Distributed Sampling
---------------------
-
-Distributed DataLoader
-``````````````````````
-
-.. currentmodule:: dgl.distributed.dist_dataloader
-
-.. autoclass:: DistDataLoader
-
-Distributed Neighbor Sampling
-`````````````````````````````
-
-.. currentmodule:: dgl.distributed.graph_services
-
-.. autosummary::
-    :toctree: ../../generated/
-
-    sample_neighbors
-    find_edges
-    in_subgraph
 
