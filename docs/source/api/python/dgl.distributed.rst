@@ -23,11 +23,15 @@ Distributed Tensor
 ------------------
 
 .. autoclass:: DistTensor
+    :members: part_policy, shape, dtype, name
 
 Distributed Embedding
 ---------------------
 
 .. autoclass:: DistEmbedding
+
+.. autoclass:: SparseAdagrad
+    :members: step
 
 Distributed workload split
 --------------------------
