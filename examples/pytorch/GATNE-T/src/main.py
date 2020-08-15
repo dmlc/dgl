@@ -33,8 +33,9 @@ def get_graph(network_data, vocab):
     '''
     graphs = []
 
+    node_type = '_N' # '_N' can be replaced by an arbitrary name
     data_dict = dict()
-    num_nodes_dict = {'_N': len(vocab)}
+    num_nodes_dict = {node_type: len(vocab)}
 
     for edge_type in network_data:
         tmp_data = network_data[edge_type]
@@ -42,7 +43,7 @@ def get_graph(network_data, vocab):
         for edge in tmp_data:
             edges.append((vocab[edge[0]], vocab[edge[1]]))
             edges.append((vocab[edge[1]], vocab[edge[0]]))
-        data_dict[edge_type] = zip(*edges)
+        data_dict[(node_type, edge_type, node_type)] = zip(*edges)
     graph = dgl.heterograph(data_dict, num_nodes_dict)
     
     return graph

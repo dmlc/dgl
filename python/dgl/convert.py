@@ -11,6 +11,7 @@ from .heterograph import DGLHeteroGraph, combine_frames
 from . import graph_index
 from . import utils
 from .base import NTYPE, ETYPE, NID, EID, DGLError, dgl_warning
+from .frame import Frame
 
 __all__ = [
     'graph',
@@ -41,7 +42,7 @@ def graph(data,
     ----------
     data : graph data
         The data for constructing a graph, which takes the form of :math:`(U, V)`.
-        :math:`(U[i], V[i])` forms an edge and is given edge ID :math:`i` in the graph.
+        :math:`(U[i], V[i])` forms the edge with ID :math:`i` in the graph.
         The allowed data formats are:
 
         - ``(Tensor, Tensor)``: Each tensor must be a 1D tensor containing node IDs.
@@ -79,8 +80,8 @@ def graph(data,
     -----
     1. If the :attr:`idtype` argument is not given then:
 
-       - in the case of the tuple of node-tensor format, DGL uses
-         the data type of the tensors for storing node/edge IDs.
+       - in the case of the tuple of node-tensor format, DGL uses the
+         data type of the given ID tensors.
        - in the case of the tuple of sequence format, DGL uses int64.
 
        Once the graph has been created, you can change the data type by using
@@ -117,7 +118,7 @@ def graph(data,
 
     >>> g = dgl.graph((src_ids, dst_ids), num_nodes=100)
 
-    Create a graph on the first GPU card with data type int32.
+    Create a graph on the first GPU with data type int32.
 
     >>> g = dgl.graph((src_ids, dst_ids), idtype=torch.int32, device='cuda:0')
 
@@ -253,21 +254,21 @@ def heterograph(data_dict,
     ----------
     data_dict : graph data
         The dictionary data for constructing a heterogeneous graph. The keys are in the form of
-        string triplet (src_type, edge_type, dst_type), specifying the source node,
+        string triplets (src_type, edge_type, dst_type), specifying the source node,
         edge, and destination node types. The values are graph data in the form of
-        :math:`(U, V)`, where :math:`(U[i], V[i])` forms an edge and is given edge ID :math:`i`.
+        :math:`(U, V)`, where :math:`(U[i], V[i])` forms the edge with ID :math:`i`.
         The allowed graph data formats are:
 
         - ``(Tensor, Tensor)``: Each tensor must be a 1D tensor containing node IDs. DGL calls
-          this format "tuple of node-tensors". The tensors should have the same data type of
-          int32/int64 and device context (see below the descriptions of :attr:`idtype` and
-          :attr:`device`).
+          this format "tuple of node-tensors". The tensors should have the same data type,
+          which must be either int32 or int64. They should also have the same device context
+          (see below the descriptions of :attr:`idtype` and :attr:`device`).
         - ``(iterable[int], iterable[int])``: Similar to the tuple of node-tensors
           format, but stores node IDs in two sequences (e.g. list, tuple, numpy.ndarray).
     num_nodes_dict : dict[str, int], optional
         The number of nodes for some node types, which is a dictionary mapping a node type
         :math:`T` to the number of :math:`T`-typed nodes. If not given for a node type
-        :math:`T`, DGL finds the largest ID appeared in *every* graph data whose source
+        :math:`T`, DGL finds the largest ID appearing in *every* graph data whose source
         or destination node type is :math:`T`, and sets the number of nodes to be that ID
         plus one. If given and the value is no greater than the largest ID for some node type,
         DGL will raise an error. By default, DGL infers the number of nodes for all node types.
@@ -292,7 +293,7 @@ def heterograph(data_dict,
     1. If the :attr:`idtype` argument is not given then:
 
        - in the case of the tuple of node-tensor format, DGL uses
-         the data type of the tensors for storing node/edge IDs.
+         the data type of the given ID tensors.
        - in the case of the tuple of sequence format, DGL uses int64.
 
        Once the graph has been created, you can change the data type by using
@@ -319,10 +320,10 @@ def heterograph(data_dict,
     Create a heterograph with three canonical edge types.
 
     >>> data_dict = {
-    >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-    >>>     ('user', 'follows', 'topic'): (torch.tensor([1, 1]), torch.tensor([1, 2])),
-    >>>     ('user', 'plays', 'game'): (torch.tensor([0, 3]), torch.tensor([3, 4]))
-    >>> }
+    ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+    ...     ('user', 'follows', 'topic'): (torch.tensor([1, 1]), torch.tensor([1, 2])),
+    ...     ('user', 'plays', 'game'): (torch.tensor([0, 3]), torch.tensor([3, 4]))
+    ... }
     >>> g = dgl.heterograph(data_dict)
     >>> g
     Graph(num_nodes={'game': 5, 'topic': 3, 'user': 4},
@@ -336,7 +337,7 @@ def heterograph(data_dict,
     >>> num_nodes_dict = {'user': 4, 'topic': 4, 'game': 6}
     >>> g = dgl.heterograph(data_dict, num_nodes_dict=num_nodes_dict)
 
-    Create a graph on the first GPU card with data type int32.
+    Create a graph on the first GPU with data type int32.
 
     >>> g = dgl.heterograph(data_dict, idtype=torch.int32, device='cuda:0')
     """
@@ -491,6 +492,9 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
     (0, ty_A, 1) and (2, ty_B, 3). In another word, these two edges share the same edge
     type name, but can be distinguished by a canonical edge type tuple.
 
+    This function will copy any node/edge features from :attr:`G` to the returned heterogeneous
+    graph, except for node/edge types and IDs used to recover the heterogeneous graph.
+
     Parameters
     ----------
     G : DGLGraph
@@ -530,9 +534,9 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
 
     >>> import dgl
     >>> hg = dgl.heterograph({
-    >>>     ('user', 'develops', 'activity'): ([0, 1], [1, 2]),
-    >>>     ('developer', 'develops', 'game'): ([0, 1], [0, 1])
-    >>> })
+    ...     ('user', 'develops', 'activity'): ([0, 1], [1, 2]),
+    ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+    ... })
     >>> print(hg)
     Graph(num_nodes={'user': 2, 'activity': 3, 'developer': 2, 'game': 2},
           num_edges={('user', 'develops', 'activity'): 2, ('developer', 'develops', 'game'): 2},
@@ -636,19 +640,17 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
 
     # features
     for key, data in G.ndata.items():
+        if key in [ntype_field, NID]:
+            continue
         for ntid, ntype in enumerate(hg.ntypes):
             rows = F.copy_to(F.tensor(ntype2ngrp[ntype]), F.context(data))
             hg._node_frames[ntid][key] = F.gather_row(data, rows)
     for key, data in G.edata.items():
+        if key in [etype_field, EID]:
+            continue
         for etid in range(len(hg.canonical_etypes)):
             rows = F.copy_to(F.tensor(edge_groups[etid]), F.context(data))
             hg._edge_frames[etid][key] = F.gather_row(data, rows)
-
-    for ntid, ntype in enumerate(hg.ntypes):
-        hg._node_frames[ntid][NID] = F.tensor(ntype2ngrp[ntype])
-
-    for etid in range(len(hg.canonical_etypes)):
-        hg._edge_frames[etid][EID] = F.tensor(edge_groups[etid])
 
     return hg
 
@@ -662,7 +664,7 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
     return to_heterogeneous(G, ntypes, etypes, ntype_field=ntype_field,
                             etype_field=etype_field, metagraph=metagraph)
 
-def to_homogeneous(G):
+def to_homogeneous(G, ndata=None, edata=None):
     """Convert the given heterogeneous graph to a homogeneous graph.
 
     The returned graph has only one type of nodes and edges.
@@ -671,10 +673,22 @@ def to_homogeneous(G):
     is an integer representing the type id, which can be used to retrieve the type
     names stored in ``G.ntypes`` and ``G.etypes`` arguments.
 
+    If all
+
     Parameters
     ----------
     G : DGLGraph
         The heterogeneous graph.
+    ndata : list[str], optional
+        The node features to combine across all node types. For each feature ``feat`` in
+        :attr:`ndata`, it concatenates ``G.nodes[T].data[feat]`` across all node types ``T``.
+        As a result, the feature ``feat`` of all node types should have the same shape and
+        data type. By default, the returned graph will not have any node features.
+    edata : list[str], optional
+        The edge features to combine across all edge types. For each feature ``feat`` in
+        :attr:`edata`, it concatenates ``G.edges[T].data[feat]`` across all edge types ``T``.
+        As a result, the feature ``feat`` of all edge types should have the same shape and
+        data type. By default, the returned graph will not have any edge features.
 
     Returns
     -------
@@ -685,17 +699,32 @@ def to_homogeneous(G):
     Examples
     --------
 
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch
+
     >>> hg = dgl.heterograph({
-    >>>     ('user', 'follows', 'user'): [[0, 1], [1, 2]],
-    >>>     ('developer', 'develops', 'game'): [[0, 1], [0, 1]]
-    >>> })
+    ...     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+    ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+    ...     })
+    >>> hg.nodes['user'].data['h'] = torch.ones(3, 1)
+    >>> hg.nodes['developer'].data['h'] = torch.zeros(2, 1)
+    >>> hg.nodes['game'].data['h'] = torch.ones(2, 1)
     >>> g = dgl.to_homogeneous(hg)
+    >>> # The first three nodes are for 'user', the next two are for 'developer',
+    >>> # and the last two are for 'game'
     >>> g.ndata
     {'_TYPE': tensor([0, 0, 0, 1, 1, 2, 2]), '_ID': tensor([0, 1, 2, 0, 1, 0, 1])}
-    First three nodes for 'user', next two for 'developer' and the last two for 'game'
+    >>> # The first two edges are for 'follows', and the next two are for 'develops' edges.
     >>> g.edata
     {'_TYPE': tensor([0, 0, 1, 1]), '_ID': tensor([0, 1, 0, 1])}
-    First two edges for 'follows', next two for 'develops'
+
+    Combine feature 'h' across all node types in the conversion.
+
+    >>> g = dgl.to_homogeneous(hg, ndata=['h'])
+    >>> g.ndata['h']
+    tensor([[1.], [1.], [1.], [0.], [0.], [1.], [1.]])
 
     See Also
     --------
@@ -732,8 +761,12 @@ def to_homogeneous(G):
                  idtype=G.idtype, device=G.device)
 
     # copy features
-    comb_nf = combine_frames(G._node_frames, range(len(G.ntypes)))
-    comb_ef = combine_frames(G._edge_frames, range(len(G.etypes)))
+    if ndata is None:
+        ndata = []
+    if edata is None:
+        edata = []
+    comb_nf = combine_frames(G._node_frames, range(len(G.ntypes)), col_names=ndata)
+    comb_ef = combine_frames(G._edge_frames, range(len(G.etypes)), col_names=edata)
     if comb_nf is not None:
         retg.ndata.update(comb_nf)
     if comb_ef is not None:
@@ -822,7 +855,7 @@ def from_scipy(sp_mat,
     >>> g.edata['w']
     tensor([0.2000, 0.3000, 0.5000], dtype=torch.float64)
 
-    Create a graph on the first GPU card with data type int32.
+    Create a graph on the first GPU with data type int32.
 
     >>> g = dgl.from_scipy(sp_mat, idtype=torch.int32, device='cuda:0')
 
@@ -853,17 +886,16 @@ def bipartite_from_scipy(sp_mat,
                          device=None):
     """Create a unidirectional bipartite graph from a SciPy sparse matrix.
 
-    A bipartite graph has two types of nodes ``"SRC"`` and ``"DST"`` and
-    there are only edges between nodes of different types. By "unidirectional",
-    there are only edges from ``"SRC"`` nodes to ``"DST"`` nodes.
+    The created graph will have two types of nodes ``utype`` and ``vtype`` as well as one
+    edge type ``etype`` whose edges are from ``utype`` to ``vtype``.
 
     Parameters
     ----------
     sp_mat : scipy.sparse.spmatrix
         The graph adjacency matrix. Each nonzero entry ``sp_mat[i, j]``
-        represents an edge from node ``i`` of type ``"SRC"`` to ``j`` of type ``"DST"``.
-        Let the matrix shape be ``(N, M)``. There will be ``N`` ``"SRC"``-type nodes
-        and ``M`` ``"DST"``-type nodes in the resulting graph.
+        represents an edge from node ``i`` of type :attr:`utype` to ``j`` of type :attr:`vtype`.
+        Let the matrix shape be ``(N, M)``. There will be ``N`` nodes of type :attr:`utype`
+        and ``M`` nodes of type ``vtype`` in the resulting graph.
     utype : str, optional
         The name of the source node type.
     etype : str, optional
@@ -876,11 +908,11 @@ def bipartite_from_scipy(sp_mat,
         of the returned graph.
     idtype : int32 or int64, optional
         The data type for storing the structure-related graph information such as node and
-        edge IDs. It should be a framework-specific data type object (e.g., torch.int32).
+        edge IDs. It should be a framework-specific data type object (e.g., ``torch.int32``).
         By default, DGL uses int64.
     device : device context, optional
         The device of the resulting graph. It should be a framework-specific device object
-        (e.g., torch.device). By default, DGL stores the graph on CPU.
+        (e.g., ``torch.device``). By default, DGL stores the graph on CPU.
 
     Returns
     -------
@@ -925,7 +957,7 @@ def bipartite_from_scipy(sp_mat,
     >>> g.edata['w']
     tensor([0.2000, 0.3000, 0.5000], dtype=torch.float64)
 
-    Create a graph on the first GPU card with data type int32.
+    Create a graph on the first GPU with data type int32.
 
     >>> g = dgl.bipartite_from_scipy(sp_mat, idtype=torch.int32, device='cuda:0')
 
@@ -1032,7 +1064,7 @@ def from_networkx(nx_graph,
     >>> g = dgl.from_networkx(nx_g, edge_id_attr_name='eid')
     (tensor([2, 1]), tensor([1, 2]))
 
-    Create a graph on the first GPU card with data type int32.
+    Create a graph on the first GPU with data type int32.
 
     >>> g = dgl.from_networkx(nx_g, idtype=torch.int32, device='cuda:0')
 
@@ -1122,9 +1154,8 @@ def bipartite_from_networkx(nx_graph,
                             device=None):
     """Create a unidirectional bipartite graph from a NetworkX graph.
 
-    A bipartite graph has two types of nodes ``"SRC"`` and ``"DST"`` and
-    there are only edges between nodes of different types. By "unidirectional",
-    there are only edges from ``"SRC"`` nodes to ``"DST"`` nodes.
+    The created graph will have two types of nodes ``utype`` and ``vtype`` as well as one
+    edge type ``etype`` whose edges are from ``utype`` to ``vtype``.
 
     Creating a DGLGraph from a NetworkX graph is not fast especially for large scales.
     It is recommended to first convert a NetworkX graph into a tuple of node-tensors
@@ -1137,8 +1168,8 @@ def bipartite_from_networkx(nx_graph,
         DGL will relabel the nodes using consecutive integers starting from zero if it is
         not the case. The graph must follow `NetworkX's bipartite graph convention
         <https://networkx.github.io/documentation/stable/reference/algorithms/bipartite.html>`_,
-        and furthermore the edges must be from nodes with attribute `bipartite=0` to nodes
-        with attribute `bipartite=1`.
+        and furthermore the edges must be from nodes with attribute ``bipartite=0`` to nodes
+        with attribute ``bipartite=1``.
     utype : str, optional
         The name of the source node type.
     etype : str, optional
@@ -1146,7 +1177,7 @@ def bipartite_from_networkx(nx_graph,
     vtype : str, optional
         The name of the destination node type.
     src_attrs : list[str], optional
-        The names of the ``"SRC"`` node attributes to retrieve from the NetworkX graph. If given,
+        The names of the node attributes to retrieve from the NetworkX graph. If given,
         DGL stores the retrieved node attributes in ``srcdata`` of the returned graph using their
         original names. The attribute data must be convertible to Tensor type (e.g., scalar,
         numpy.array, list, etc.).
@@ -1214,7 +1245,7 @@ def bipartite_from_networkx(nx_graph,
     >>> g = dgl.bipartite_from_networkx(nx_g, edge_id_attr_name='eid')
     (tensor([1, 0]), tensor([2, 1]))
 
-    Create a graph on the first GPU card with data type int32.
+    Create a graph on the first GPU with data type int32.
 
     >>> g = dgl.bipartite_from_networkx(nx_g, idtype=torch.int32, device='cuda:0')
 

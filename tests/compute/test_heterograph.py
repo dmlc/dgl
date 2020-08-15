@@ -946,7 +946,7 @@ def test_convert(idtype):
         ws.append(w)
     hg.edges['plays'].data['x'] = F.randn((4, 3))
 
-    g = dgl.to_homogeneous(hg)
+    g = dgl.to_homogeneous(hg, ndata=['h'], edata=['w'])
     assert g.idtype == idtype
     assert g.device == hg.device
     assert F.array_equal(F.cat(hs, dim=0), g.ndata['h'])

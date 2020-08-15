@@ -97,7 +97,7 @@ def main(args):
                 category_id = i
 
         # edge type and normalization factor
-        g = dgl.to_homogeneous(hg)
+        g = dgl.to_homogeneous(hg, edata=['norm'])
 
     # check cuda
     if args.gpu < 0:

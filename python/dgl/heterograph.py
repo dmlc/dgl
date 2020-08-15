@@ -873,7 +873,7 @@ class DGLHeteroGraph(object):
         >>> g.ntypes
         ['game', 'user']
         """
-        return self._ntypes
+        return sorted(self._ntypes)
 
     @property
     def etypes(self):
@@ -883,6 +883,13 @@ class DGLHeteroGraph(object):
         -------
         list of str
             Each ``str`` is an edge type.
+
+        Notes
+        -----
+        An edge type can appear in multiple canonical edge types. For example, ``'interacts'``
+        can appear in two canonical edge types ``('drug', 'interacts', 'drug')`` and
+        ``('protein', 'interacts', 'protein')``. It is recommended to use
+        :func:`~dgl.DGLGraph.canonical_etypes` in this case.
 
         Examples
         --------
@@ -899,7 +906,7 @@ class DGLHeteroGraph(object):
         >>> g.etypes
         ['follows', 'follows', 'plays']
         """
-        return self._etypes
+        return sorted(self._etypes)
 
     @property
     def canonical_etypes(self):
@@ -931,7 +938,7 @@ class DGLHeteroGraph(object):
          ('user', 'follows', 'game'),
          ('user', 'plays', 'game')]
         """
-        return self._canonical_etypes
+        return sorted(self._canonical_etypes)
 
     @property
     def srctypes(self):
@@ -1681,7 +1688,7 @@ class DGLHeteroGraph(object):
 
         Notes
         -----
-        - This is only for setting/getting source node features for a graph of a single
+        - This is only for setting/getting destination node features for a graph of a single
           destination node type. To work with graphs of multiple destination ndoe types, see
           :func:`dgl.DGLGraph.dstnodes`.
         - For setting features, the device of the features must be the same as the device
@@ -2293,6 +2300,10 @@ class DGLHeteroGraph(object):
         """Whether the graph is a multigraph
 
         In a multigraph, there can be multiple edges from a node ``u`` to a node ``v``.
+
+        For a heterogeneous graph of multiple canonical edge types, we consider it as a
+        multigraph if there are multiple edges from a node ``u`` to a node ``v`` for any
+        canonical edge type.
 
         Returns
         -------
@@ -5777,7 +5788,7 @@ def reduce_dict_data(frames, reducer, order=None):
         ret[k] = merger(flist)
     return ret
 
-def combine_frames(frames, ids):
+def combine_frames(frames, ids, col_names=None):
     """Merge the frames into one frame, taking the common columns.
 
     Return None if there is no common columns.
@@ -5788,6 +5799,8 @@ def combine_frames(frames, ids):
         List of frames
     ids : List[int]
         List of frame IDs
+    col_names : List[str], optional
+        Column names to consider. If not given, it considers all columns.
 
     Returns
     -------
@@ -5795,7 +5808,10 @@ def combine_frames(frames, ids):
         The resulting frame
     """
     # find common columns and check if their schemes match
-    schemes = {key: scheme for key, scheme in frames[ids[0]].schemes.items()}
+    if col_names is None:
+        schemes = {key: scheme for key, scheme in frames[ids[0]].schemes.items()}
+    else:
+        schemes = {key: frames[ids[0]].schemes[key] for key in col_names}
     for frame_id in ids:
         frame = frames[frame_id]
         for key, scheme in list(schemes.items()):
