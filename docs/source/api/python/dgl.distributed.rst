@@ -11,21 +11,22 @@ DGL Distributed
 Initialization and Exit
 ```````````````````````
 
-.. currentmodule:: dgl.distributed.dist_context
+.. autosummary::
+    :toctree: ../../generated/
 
-.. autoclass:: initialize
-.. autoclass:: exit_client
+    initialize
+    exit_client
 
 Distributed Graph
 -----------------
 
-.. currentmodule:: dgl.distributed.dist_graph
-
 .. autoclass:: DistGraph
 
-.. autoclass:: node_split
+.. autosummary::
+    :toctree: ../../generated/
 
-.. autoclass:: edge_split
+    node_split
+    edge_split
 
 Partition
 ---------
@@ -44,11 +45,12 @@ Split and Load Graphs
 
 .. currentmodule:: dgl.distributed.partition
 
-.. autoclass:: load_partition
+.. autosummary::
+    :toctree: ../../generated/
 
-.. autoclass:: load_partition_book
-
-.. autoclass:: partition_graph
+    load_partition
+    load_partition_book
+    partition_graph
 
 Distributed Sampling
 --------------------
@@ -65,9 +67,10 @@ Distributed Neighbor Sampling
 
 .. currentmodule:: dgl.distributed.graph_services
 
-.. autoclass:: sample_neighbors
+.. autosummary::
+    :toctree: ../../generated/
 
-.. autoclass:: find_edges
-
-.. autoclass:: in_subgraph
+    sample_neighbors
+    find_edges
+    in_subgraph
 
