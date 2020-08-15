@@ -268,6 +268,9 @@ def clone(input):
 def clamp(data, min_val, max_val):
     return th.clamp(data, min_val, max_val)
 
+def replace_inf_with_zero(x):
+    return th.masked_fill(x, th.isinf(x), 0)
+
 def unique(input):
     if input.dtype == th.bool:
         input = input.type(th.int8)

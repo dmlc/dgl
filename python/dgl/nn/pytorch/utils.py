@@ -104,20 +104,25 @@ class Identity(nn.Module):
         return x
 
 class Sequential(nn.Sequential):
-    r"""A squential container for stacking graph neural network modules.
+    r"""
 
-    We support two modes: sequentially apply GNN modules on the same graph or
-    a list of given graphs. In the second case, the number of graphs equals the
+    Description
+    -----------
+    A squential container for stacking graph neural network modules.
+
+    DGL supports two modes: sequentially apply GNN modules on 1) the same graph or
+    2) a list of given graphs. In the second case, the number of graphs equals the
     number of modules inside this container.
 
     Parameters
     ----------
     *args :
-        Sub-modules of type torch.nn.Module, will be added to the container in
-        the order they are passed in the constructor.
+        Sub-modules of torch.nn.Module that will be added to the container in
+        the order by which they are passed in the constructor.
 
     Examples
     --------
+    The following example uses PyTorch backend.
 
     Mode 1: sequentially apply GNN modules on the same graph
 
@@ -146,16 +151,17 @@ class Sequential(nn.Sequential):
     >>> e_feat = torch.rand(9, 4)
     >>> net(g, n_feat, e_feat)
     (tensor([[39.8597, 45.4542, 25.1877, 30.8086],
-        [40.7095, 45.3985, 25.4590, 30.0134],
-        [40.7894, 45.2556, 25.5221, 30.4220]]), tensor([[80.3772, 89.7752, 50.7762, 60.5520],
-        [80.5671, 89.3736, 50.6558, 60.6418],
-        [80.4620, 89.5142, 50.3643, 60.3126],
-        [80.4817, 89.8549, 50.9430, 59.9108],
-        [80.2284, 89.6954, 50.0448, 60.1139],
-        [79.7846, 89.6882, 50.5097, 60.6213],
-        [80.2654, 90.2330, 50.2787, 60.6937],
-        [80.3468, 90.0341, 50.2062, 60.2659],
-        [80.0556, 90.2789, 50.2882, 60.5845]]))
+             [40.7095, 45.3985, 25.4590, 30.0134],
+             [40.7894, 45.2556, 25.5221, 30.4220]]),
+     tensor([[80.3772, 89.7752, 50.7762, 60.5520],
+             [80.5671, 89.3736, 50.6558, 60.6418],
+             [80.4620, 89.5142, 50.3643, 60.3126],
+             [80.4817, 89.8549, 50.9430, 59.9108],
+             [80.2284, 89.6954, 50.0448, 60.1139],
+             [79.7846, 89.6882, 50.5097, 60.6213],
+             [80.2654, 90.2330, 50.2787, 60.6937],
+             [80.3468, 90.0341, 50.2062, 60.2659],
+             [80.0556, 90.2789, 50.2882, 60.5845]]))
 
     Mode 2: sequentially apply GNN modules on different graphs
 
@@ -186,11 +192,14 @@ class Sequential(nn.Sequential):
             [220.4007, 239.7365, 213.8648, 234.9637],
             [196.4630, 207.6319, 184.2927, 208.7465]])
     """
+
     def __init__(self, *args):
         super(Sequential, self).__init__(*args)
 
     def forward(self, graph, *feats):
-        r"""Sequentially apply modules to the input.
+        r"""
+
+        Sequentially apply modules to the input.
 
         Parameters
         ----------
@@ -199,8 +208,8 @@ class Sequential(nn.Sequential):
 
         *feats :
             Input features.
-            The output of :math:`i`-th block should match that of the input
-            of :math:`(i+1)`-th block.
+            The output of the :math:`i`-th module should match the input
+            of the :math:`(i+1)`-th module in the sequential.
         """
         if isinstance(graph, list):
             for graph_i, module in zip(graph, self):
