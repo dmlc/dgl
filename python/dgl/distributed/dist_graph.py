@@ -354,10 +354,6 @@ class DistGraph:
             feat = g.ndata['features'][block.srcdata[dgl.NID]]
             labels = g.ndata['labels'][block.dstdata[dgl.NID]]
             pred = model(block, feat)
-            loss = loss_fcn(pred, labels)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
     '''
     def __init__(self, graph_name, gpb=None, part_config=None):
         self.graph_name = graph_name

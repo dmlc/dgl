@@ -60,12 +60,14 @@ DATALOADER_ID = 0
 class DistDataLoader:
     """DGL customized multiprocessing dataloader.
 
-    Like Pytorch DataLoader, it generates mini-batches with multiprocessing. The difference is
-    that this class utilizes the worker processes created by `dgl.distributed.initialize`.
+    DistDataLoader provides a similar interface to Pytorch's DataLoader to generate mini-batches
+    with multiprocessing. It utilizes the worker processes created by `dgl.distributed.initialize`
+    to parallelize sampling.
 
     For DGL's distributed sampling with multiprocessing, users have to use this class instead
     of using Pytorch DataLoader because DGL's RPC servers have to connect with all clients
-    in advance.
+    at the beginning of the training script. Therefore, the sampling processes have to be
+    created when the distributed module is initialized.
 
     Note that the iteration order is not guaranteed with this class. For example,
     if dataset = [1, 2, 3, 4], batch_size = 2 and shuffle = False, the order of [1, 2]
@@ -88,6 +90,20 @@ class DistDataLoader:
         by the batch size, then the last batch will be smaller. (default: ``False``)
     queue_size: int, optional
         Size of multiprocessing queue
+
+    Examples
+    --------
+    >>> g = dgl.distributed.DistGraph('graph-name')
+    >>> def sample(seeds):
+            seeds = th.LongTensor(np.asarray(seeds))
+            frontier = dgl.distributed.sample_neighbors(g, seeds, 10)
+            return dgl.to_block(frontier, seeds)
+    >>> dataloader = dgl.distributed.DistDataLoader(dataset=nodes, batch_size=1000,
+                                                    collate_fn=sample, shuffle=True)
+    >>> for block in dataloader:
+            feat = g.ndata['features'][block.srcdata[dgl.NID]]
+            labels = g.ndata['labels'][block.dstdata[dgl.NID]]
+            pred = model(block, feat)
     """
 
     def __init__(self, dataset, batch_size, shuffle=False, collate_fn=None, drop_last=False,
