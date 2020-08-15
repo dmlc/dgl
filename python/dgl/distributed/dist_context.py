@@ -44,18 +44,23 @@ def _init_rpc(ip_config, num_servers, max_queue_size, net_type, role, num_thread
 def initialize(ip_config, num_servers=1, num_workers=0,
                max_queue_size=MAX_QUEUE_SIZE, net_type='socket',
                num_worker_threads=1):
-    """Init distributed module
+    """Initialize DGL's distributed module
 
-    This function initializes DGL's distributed module. It has to be invoked at
-    the very beginning of the training script. For example, when used with Pytorch,
-    this function has to be invoked before Pytorch's Pytorch.distributed.init_process_group.
+    This function has to be invoked at the very beginning of the training script.
+    For example, when used with Pytorch, this function has to be invoked before
+    Pytorch's `pytorch.distributed.init_process_group`.
 
-    DGL uses multiprocessing to parallelize distributed sampling. The ampling processes
+    The initialization function acts differently in different modes. When the training
+    scripts runs as a trainer process, this API builds connections with DGL servers and
+    creates sampler processes; when the training script runs as a server process,
+    this API runs the server code and never returns.
+
+    DGL uses multiprocessing to parallelize distributed sampling. The sampling processes
     have to be created in advance. `num_workers` specifies the number of sampling worker
     processes per trainer process.
 
     Users also have to provide the number of server processes on each machine in order
-    to connect to all the server processes in the cluster of machines.
+    to connect to all the server processes in the cluster of machines correctly.
 
     Parameters
     ----------
@@ -71,7 +76,7 @@ def initialize(ip_config, num_servers=1, num_workers=0,
         Note that the 20 GB is just an upper-bound and DGL uses zero-copy and
         it will not allocate 20GB memory at once.
     net_type : str
-        Networking type. Current options are: 'socket'.
+        Networking type. Currently the only valid option is 'socket'.
     num_worker_threads: int
         The number of threads in a worker process.
     """
