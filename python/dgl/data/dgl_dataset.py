@@ -63,7 +63,7 @@ class DGLDataset(object):
     save_dir : str
         Directory to save the processed dataset
     save_path : str
-        Filr path to save the processed dataset
+        File path to save the processed dataset
     verbose : bool
         Whether to print information
     hash : str

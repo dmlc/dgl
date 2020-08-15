@@ -108,6 +108,14 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
     test3 = dgl.distributed.DistTensor((g.number_of_nodes(), 3), F.float32, 'test3')
     del test3
 
+    # add tests for anonymous distributed tensor.
+    test3 = dgl.distributed.DistTensor(new_shape, F.float32, init_func=rand_init)
+    data = test3[0:10]
+    test4 = dgl.distributed.DistTensor(new_shape, F.float32, init_func=rand_init)
+    del test3
+    test5 = dgl.distributed.DistTensor(new_shape, F.float32, init_func=rand_init)
+    assert np.sum(F.asnumpy(test5[0:10] != data)) > 0
+
     # test a persistent tesnor
     test4 = dgl.distributed.DistTensor(new_shape, F.float32, 'test4', init_func=rand_init,
                                        persistent=True)
@@ -252,7 +260,10 @@ def test_standalone():
 
     dgl.distributed.initialize("kv_ip_config.txt")
     dist_g = DistGraph(graph_name, part_config='/tmp/dist_graph/{}.json'.format(graph_name))
-    check_dist_graph(dist_g, 1, g.number_of_nodes(), g.number_of_edges())
+    try:
+        check_dist_graph(dist_g, 1, g.number_of_nodes(), g.number_of_edges())
+    except Exception as e:
+        print(e)
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
