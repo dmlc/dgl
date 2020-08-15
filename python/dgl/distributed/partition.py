@@ -87,7 +87,7 @@ from ..base import NID, EID
 from ..random import choice as random_choice
 from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 from ..transform import metis_partition_assignment, partition_graph_with_halo
-from .graph_partition_book import GraphPartitionBook, RangePartitionBook
+from .graph_partition_book import BasicPartitionBook, RangePartitionBook
 
 def load_partition(part_config, part_id):
     ''' Load data of a partition from the data path.
@@ -186,7 +186,7 @@ def load_partition_book(part_config, part_id, graph=None):
         return RangePartitionBook(part_id, num_parts, np.array(node_map),
                                   np.array(edge_map)), part_metadata['graph_name']
     else:
-        return GraphPartitionBook(part_id, num_parts, node_map, edge_map,
+        return BasicPartitionBook(part_id, num_parts, node_map, edge_map,
                                   graph), part_metadata['graph_name']
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
