@@ -240,22 +240,36 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     g : DGLGraph
         The input graph to partition
     graph_name : str
-        The name of the graph.
+        The name of the graph. The name will be used to construct
+        :py:meth:`~dgl.distributed.DistGraph`.
     num_parts : int
         The number of partitions
-    num_hops : int
-        The number of hops of HALO nodes we construct on a partition graph structure.
-    part_method : str
-        The partition method. It supports "random" and "metis".
     out_path : str
         The path to store the files for all partitioned data.
-    reshuffle : bool
+    num_hops : int, optional
+        The number of hops of HALO nodes we construct on a partition graph structure.
+        The default value is 1.
+    part_method : str, optional
+        The partition method. It supports "random" and "metis". The default value is "metis".
+    reshuffle : bool, optional
         Reshuffle nodes and edges so that nodes and edges in a partition are in
-        contiguous Id range.
-    balance_ntypes : tensor
-        Node type of each node
+        contiguous Id range. The default value is True
+    balance_ntypes : tensor, optional
+        Node type of each node. This is a 1D-array of integers. Its values indicates the node
+        type of each node. This argument is used by Metis partition. When the argument is
+        specified, the Metis algorithm will try to partition the input graph into partitions where
+        each partition has roughly the same number of nodes for each node type. The default value
+        is None, which means Metis partitions the graph to only balance the number of nodes.
     balance_edges : bool
-        Indicate whether to balance the edges.
+        Indicate whether to balance the edges in each partition. This argument is used by
+        the Metis algorithm.
+
+    Examples
+    --------
+    >>> dgl.distributed.partition_graph(g, 'test', 4, num_hops=1, part_method='metis',
+                                        out_path='output/', reshuffle=True,
+                                        balance_ntypes=g.ndata['train_mask'],
+                                        balance_edges=True)
     '''
     if num_parts == 1:
         parts = {0: g}
