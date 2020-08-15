@@ -1,81 +1,4 @@
-"""Functions for partitions.
-
-For distributed training, a graph is partitioned and partitions are stored in files
-organized as follows:
-
-```
-data_root_dir/
-  |-- graph_name.json     # partition configuration file in JSON
-  |-- node_map.npy        # partition id of each node stored in a numpy array (optional)
-  |-- edge_map.npy        # partition id of each edge stored in a numpy array (optional)
-  |-- part0/              # data for partition 0
-      |-- node_feats.dgl  # node features stored in binary format
-      |-- edge_feats.dgl  # edge features stored in binary format
-      |-- graph.dgl       # graph structure of this partition stored in binary format
-  |-- part1/              # data for partition 1
-      |-- node_feats.dgl
-      |-- edge_feats.dgl
-      |-- graph.dgl
-```
-
-The JSON file stores the partition information. For the example above,
-the JSON file will look like the following:
-
-```
-{
-  "graph_name" : "test",
-  "part_method" : "metis",
-  "num_parts" : 2,
-  "halo_hops" : 1,
-  "node_map" : "data_root_dir/node_map.npy",
-  "edge_map" : "data_root_dir/edge_map.npy"
-  "num_nodes" : 1000000,
-  "num_edges" : 52000000,
-  "part-0" : {
-    "node_feats" : "data_root_dir/part0/node_feats.dgl",
-    "edge_feats" : "data_root_dir/part0/edge_feats.dgl",
-    "part_graph" : "data_root_dir/part0/graph.dgl",
-  },
-  "part-1" : {
-    "node_feats" : "data_root_dir/part1/node_feats.dgl",
-    "edge_feats" : "data_root_dir/part1/edge_feats.dgl",
-    "part_graph" : "data_root_dir/part1/graph.dgl",
-  },
-}
-```
-
-Here are the definition of the fields in the partition configuration file:
-    * `graph_name` is the name of the graph given by a user.
-    * `part_method` is the method used to assign nodes to partitions.
-      Currently, it supports "random" and "metis".
-    * `num_parts` is the number of partitions.
-    * `halo_hops` is the number of HALO nodes we want to include in a partition.
-    * `node_map` is the node assignment map, which tells the partition Id a node is assigned to.
-    * `edge_map` is the edge assignment map, which tells the partition Id an edge is assigned to.
-    * `num_nodes` is the number of nodes in the global graph.
-    * `num_edges` is the number of edges in the global graph.
-    * `part-*` stores the data of a partition.
-
-Nodes in each partition is *relabeled* to always start with zero. We call the node
-ID in the original graph, *global ID*, while the relabeled ID in each partition,
-*local ID*. Each partition graph has an integer node data tensor stored under name
-`dgl.NID` and each value is the node's global ID. Similarly, edges are relabeled too
-and the mapping from local ID to global ID is stored as an integer edge data tensor
-under name `dgl.EID`.
-
-Note that each partition can contain *HALO* nodes and edges, those belonging to
-other partitions but are included in this partition for integrity or efficiency concerns.
-We call nodes and edges that truly belong to one partition *local nodes/edges*, while
-the rest "HALO nodes/edges".
-
-Node and edge features are splitted and stored together with each graph partition.
-We do not store features of HALO nodes and edges.
-
-Two useful functions in this module:
-    * :func:`~dgl.distributed.load_partition` loads one partition and the meta data into memory.
-    * :func:`~dgl.distributed.partition` partitions a graph into files organized as above.
-
-"""
+"""Functions for partitions. """
 
 import json
 import os
@@ -198,32 +121,93 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     the node assignment; 3) split the node features and edge features based on
     the partition result.
 
-    The partitioned data is stored into multiple files.
+    The partitioned data is stored into multiple files organized as follows:
+
+    ```
+    data_root_dir/
+      |-- graph_name.json     # partition configuration file in JSON
+      |-- node_map.npy        # partition id of each node stored in a numpy array (optional)
+      |-- edge_map.npy        # partition id of each edge stored in a numpy array (optional)
+      |-- part0/              # data for partition 0
+          |-- node_feats.dgl  # node features stored in binary format
+          |-- edge_feats.dgl  # edge features stored in binary format
+          |-- graph.dgl       # graph structure of this partition stored in binary format
+      |-- part1/              # data for partition 1
+          |-- node_feats.dgl
+          |-- edge_feats.dgl
+          |-- graph.dgl
+    ```
 
     First, the metadata of the original graph and the partitioning is stored in a JSON file
     named after `graph_name`. This JSON file contains the information of the original graph
-    as well as the file names that store each partition.
+    as well as the path of the files that store each partition. Below show an example.
 
-    The node assignment is stored in a separate file if we don't reshuffle node Ids to ensure
-    that all nodes in a partition fall into a contiguous Id range. The node assignment is stored
-    in a numpy file.
+    ```
+    {
+       "graph_name" : "test",
+       "part_method" : "metis",
+       "num_parts" : 2,
+       "halo_hops" : 1,
+       "node_map" : "data_root_dir/node_map.npy",
+       "edge_map" : "data_root_dir/edge_map.npy"
+       "num_nodes" : 1000000,
+       "num_edges" : 52000000,
+       "part-0" : {
+         "node_feats" : "data_root_dir/part0/node_feats.dgl",
+         "edge_feats" : "data_root_dir/part0/edge_feats.dgl",
+         "part_graph" : "data_root_dir/part0/graph.dgl",
+       },
+       "part-1" : {
+         "node_feats" : "data_root_dir/part1/node_feats.dgl",
+         "edge_feats" : "data_root_dir/part1/edge_feats.dgl",
+         "part_graph" : "data_root_dir/part1/graph.dgl",
+       },
+    }
+    ```
 
-    All node features in a partition are stored in a file with DGL format. The node features are
-    stored in a dictionary, in which the key is the node data name and the value is a tensor.
+    Here are the definition of the fields in the partition configuration file:
 
-    All edge features in a partition are stored in a file with DGL format. The edge features are
-    stored in a dictionary, in which the key is the edge data name and the value is a tensor.
+    * `graph_name` is the name of the graph given by a user.
+    * `part_method` is the method used to assign nodes to partitions.
+      Currently, it supports "random" and "metis".
+    * `num_parts` is the number of partitions.
+    * `halo_hops` is the number of HALO nodes we want to include in a partition.
+    * `node_map` is the node assignment map, which tells the partition Id a node is assigned to.
+    * `edge_map` is the edge assignment map, which tells the partition Id an edge is assigned to.
+    * `num_nodes` is the number of nodes in the global graph.
+    * `num_edges` is the number of edges in the global graph.
+    * `part-*` stores the data of a partition.
 
-    The graph structure of a partition is stored in a file with the DGLGraph format. The DGLGraph
-    contains the mapping of node/edge Ids to the Ids in the global graph. The mappings can be
-    accessed with `part.ndata[dgl.NID]` and `part.edata[dgl.NID]`, where `part` is the partition
-    graph structure. In addition to the mapping, the partition graph contains node data
-    ("inner_node" and "orig_id") and edge data ("inner_edge").
+    If node IDs and edge IDs are not shuffled to ensure that all nodes/edges in a partition
+    fall into a contiguous ID range, DGL needs to store node/edge mappings (from
+    node/edge IDs to partition IDs) in separate files (node_map.npy and edge_map.npy).
+    The node/edge mappings are stored in numpy files.
+
+    The graph structure of a partition is stored in a file with the DGLGraph format.
+    Nodes in each partition is *relabeled* to always start with zero. We call the node
+    ID in the original graph, *global ID*, while the relabeled ID in each partition,
+    *local ID*. Each partition graph has an integer node data tensor stored under name
+    `dgl.NID` and each value is the node's global ID. Similarly, edges are relabeled too
+    and the mapping from local ID to global ID is stored as an integer edge data tensor
+    under name `dgl.EID`.
+
+    The partition graph contains additional node data ("inner_node" and "orig_id") and
+    edge data ("inner_edge"):
 
     * "inner_node" indicates whether a node belongs to a partition.
     * "inner_edge" indicates whether an edge belongs to a partition.
     * "orig_id" exists when reshuffle=True. It indicates the original node Ids in the original
     graph before reshuffling.
+
+    Note that each partition can contain *HALO* nodes and edges, those belonging to
+    other partitions but are included in this partition for integrity or efficiency concerns.
+    We call nodes and edges that truly belong to one partition *local nodes/edges*, while
+    the rest "HALO nodes/edges".
+
+    Node and edge features are splitted and stored together with each graph partition.
+    All node/edge features in a partition are stored in a file with DGL format. The node/edge
+    features are stored in dictionaries, in which the key is the node/edge data name and
+    the value is a tensor. We do not store features of HALO nodes and edges.
 
     When performing Metis partitioning, we can put some constraint on the partitioning.
     Current, it supports two constrants to balance the partitioning. By default, Metis
@@ -270,6 +254,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                                         out_path='output/', reshuffle=True,
                                         balance_ntypes=g.ndata['train_mask'],
                                         balance_edges=True)
+    >>> g, node_feats, edge_feats, gpb, graph_name = dgl.distributed.load_partition(
+                                        'output/test.json', 0)
     '''
     if num_parts == 1:
         parts = {0: g}
