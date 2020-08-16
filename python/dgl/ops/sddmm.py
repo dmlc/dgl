@@ -3,8 +3,9 @@ from itertools import product
 import sys
 
 from ..backend import gsddmm as gsddmm_internal
+from .. import backend as F
 
-__all__ = ['gsddmm', 'copy_u', 'copy_v']
+__all__ = ['gsddmm', 'copy_u', 'copy_v', 'copy_e']
 
 
 def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
@@ -41,6 +42,21 @@ def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     tensor
         The result tensor.
     """
+    if op not in ['copy_lhs', 'copy_rhs']:
+        # Expand dims so that there will be no broadcasting issues with different
+        # number of dimensions. For example, given two shapes (N, 3, 1), (E, 5, 3, 4)
+        # that are valid broadcastable shapes, change them to (N, 1, 3, 1) and
+        # (E, 5, 3, 4)
+        lhs_shape = F.shape(lhs_data)
+        rhs_shape = F.shape(rhs_data)
+        if len(lhs_shape) != len(rhs_shape):
+            max_ndims = max(len(lhs_shape), len(rhs_shape))
+            lhs_pad_ndims = max_ndims - len(lhs_shape)
+            rhs_pad_ndims = max_ndims - len(rhs_shape)
+            new_lhs_shape = (lhs_shape[0],) + (1,) * lhs_pad_ndims + lhs_shape[1:]
+            new_rhs_shape = (rhs_shape[0],) + (1,) * rhs_pad_ndims + rhs_shape[1:]
+            lhs_data = F.reshape(lhs_data, new_lhs_shape)
+            rhs_data = F.reshape(rhs_data, new_rhs_shape)
     return gsddmm_internal(
         g._graph, op, lhs_data, rhs_data, lhs_target, rhs_target)
 
@@ -143,6 +159,12 @@ def copy_v(g, x):
     This function supports autograd (computing input gradients given the output gradient).
     """
     return gsddmm(g, 'copy_rhs', None, x)
+
+
+# pylint: disable=unused-argument
+def copy_e(g, x):
+    r"""Generalized SDDMM function that copies destination node features to edges."""
+    return x
 
 
 _register_sddmm_func()

@@ -63,6 +63,36 @@ def prepare_tensor_dict(g, data, name):
     return {key : prepare_tensor(g, val, '{}["{}"]'.format(name, key))
             for key, val in data.items()}
 
+def parse_edges_arg_to_eid(g, edges, etid, argname='edges'):
+    """Parse the :attr:`edges` argument and return an edge ID tensor.
+
+    The resulting edge ID tensor has the same ID type and device of :attr:`g`.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        Graph
+    edges : pair of Tensor, Tensor, iterable[int]
+        Argument for specifying edges.
+    etid : int
+        Edge type ID.
+    argname : str, optional
+        Argument name.
+
+    Returns
+    -------
+    Tensor
+        Edge ID tensor
+    """
+    if isinstance(edges, tuple):
+        u, v = edges
+        u = prepare_tensor(g, u, '{}[0]'.format(argname))
+        v = prepare_tensor(g, v, '{}[1]'.format(argname))
+        eid = g.edge_ids(u, v, etype=g.canonical_etypes[etid])
+    else:
+        eid = prepare_tensor(g, edges, argname)
+    return eid
+
 def check_all_same_idtype(glist, name):
     """Check all the graphs have the same idtype."""
     if len(glist) == 0:

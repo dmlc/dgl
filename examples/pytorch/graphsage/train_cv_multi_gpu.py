@@ -11,6 +11,7 @@ import time
 import argparse
 import tqdm
 import traceback
+import math
 from _thread import start_new_thread
 from functools import wraps
 from dgl.data import RedditDataset
@@ -175,18 +176,6 @@ def thread_wrapped_func(func):
             raise exception.__class__(trace)
     return decorated_function
 
-def prepare_mp(g):
-    """
-    Explicitly materialize the CSR, CSC and COO representation of the given graph
-    so that they could be shared via copy-on-write to sampler workers and GPU
-    trainers.
-
-    This is a workaround before full shared memory support on heterogeneous graphs.
-    """
-    g.in_degree(0)
-    g.out_degree(0)
-    g.find_edges([0])
-
 def compute_acc(pred, labels):
     """
     Compute the accuracy of prediction given the labels.
@@ -273,13 +262,11 @@ def run(proc_id, n_gpus, args, devices, data):
 
     # Unpack data
     train_mask, val_mask, in_feats, labels, n_classes, g = data
-    train_nid = th.LongTensor(np.nonzero(train_mask)[0])
-    val_nid = th.LongTensor(np.nonzero(val_mask)[0])
-    train_mask = th.BoolTensor(train_mask)
-    val_mask = th.BoolTensor(val_mask)
+    train_nid = train_mask.nonzero().squeeze()
+    val_nid = val_mask.nonzero().squeeze()
 
     # Split train_nid
-    train_nid = th.split(train_nid, len(train_nid) // n_gpus)[proc_id]
+    train_nid = th.split(train_nid, math.ceil(len(train_nid) / n_gpus))[proc_id]
 
     # Create sampler
     sampler = NeighborSampler(g, [int(_) for _ in args.fan_out.split(',')])
@@ -387,18 +374,17 @@ if __name__ == '__main__':
 
     # load reddit data
     data = RedditDataset(self_loop=True)
-    train_mask = data.train_mask
-    val_mask = data.val_mask
-    features = th.Tensor(data.features)
+    n_classes = data.num_classes
+    g = data[0]
+    features = g.ndata['feat']
     in_feats = features.shape[1]
-    labels = th.LongTensor(data.labels)
-    n_classes = data.num_labels
-    # Construct graph
-    g = dgl.graph(data.graph.all_edges())
+    labels = g.ndata['label']
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
     g.ndata['features'] = features.share_memory_()
     create_history_storage(g, args, n_classes)
 
-    prepare_mp(g)
+    g.create_format_()
     # Pack data
     data = train_mask, val_mask, in_feats, labels, n_classes, g
 

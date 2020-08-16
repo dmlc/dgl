@@ -8,15 +8,15 @@ import numbers
 import networkx as nx
 import numpy as np
 
+from ._ffi.function import _init_api
+from .base import ALL, SLICE_FULL, NTYPE, NID, ETYPE, EID, is_all, DGLError, dgl_warning
+from . import core
 from . import graph_index
 from . import heterograph_index
 from . import utils
 from . import backend as F
-from ._deprecate.runtime import ir, scheduler, Runtime, GraphAdapter
-from .frame import Frame, FrameRef, frame_like
+from .frame import Frame
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
-from .base import ALL, SLICE_FULL, NTYPE, NID, ETYPE, EID, is_all, DGLError, dgl_warning
-from ._ffi.function import _init_api
 
 __all__ = ['DGLHeteroGraph', 'combine_names']
 
@@ -181,11 +181,11 @@ class DGLHeteroGraph(object):
         and its SRC node types and DST node types are given as in the pair.
     etypes : list of str
         Edge type list. ``etypes[i]`` stores the name of edge type i.
-    node_frames : list of FrameRef, optional
+    node_frames : list[Frame], optional
         Node feature storage. If None, empty frame is created.
         Otherwise, ``node_frames[i]`` stores the node features
         of node type i. (default: None)
-    edge_frames : list of FrameRef, optional
+    edge_frames : list[Frame], optional
         Edge feature storage. If None, empty frame is created.
         Otherwise, ``edge_frames[i]`` stores the edge features
         of edge type i. (default: None)
@@ -271,14 +271,14 @@ class DGLHeteroGraph(object):
         # node and edge frame
         if node_frames is None:
             node_frames = [None] * len(self._ntypes)
-        node_frames = [FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
+        node_frames = [Frame(num_rows=self._graph.number_of_nodes(i))
                        if frame is None else frame
                        for i, frame in enumerate(node_frames)]
         self._node_frames = node_frames
 
         if edge_frames is None:
             edge_frames = [None] * len(self._etypes)
-        edge_frames = [FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
+        edge_frames = [Frame(num_rows=self._graph.number_of_edges(i))
                        if frame is None else frame
                        for i, frame in enumerate(edge_frames)]
         self._edge_frames = edge_frames
@@ -2419,408 +2419,6 @@ class DGLHeteroGraph(object):
         else:
             return deg
 
-    def _create_hetero_subgraph(self, sgi, induced_nodes, induced_edges):
-        """Internal function to create a subgraph."""
-        node_frames = []
-        for i, ind_nodes in enumerate(induced_nodes):
-            subframe = self._node_frames[i][utils.toindex(ind_nodes, self._idtype_str)]
-            node_frames.append(FrameRef(Frame(subframe, num_rows=len(ind_nodes))))
-        edge_frames = []
-        for i, ind_edges in enumerate(induced_edges):
-            subframe = self._edge_frames[i][utils.toindex(ind_edges, self._idtype_str)]
-            edge_frames.append(FrameRef(Frame(subframe, num_rows=len(ind_edges))))
-
-        hsg = DGLHeteroGraph(sgi.graph, self._ntypes, self._etypes, node_frames, edge_frames)
-        for ntype, induced_nid in zip(self.ntypes, induced_nodes):
-            ndata = hsg.nodes[ntype].data
-            orig_ndata = self.nodes[ntype].data
-            ndata[NID] = induced_nid
-            for key in orig_ndata:
-                ndata[key] = F.gather_row(orig_ndata[key], induced_nid)
-        for etype, induced_eid in zip(self.canonical_etypes, induced_edges):
-            edata = hsg.edges[etype].data
-            orig_edata = self.edges[etype].data
-            edata[EID] = induced_eid
-            for key in orig_edata:
-                edata[key] = F.gather_row(orig_edata[key], induced_eid)
-        return hsg
-
-    def subgraph(self, nodes):
-        """Return the subgraph induced on given nodes.
-
-        The metagraph of the returned subgraph is the same as the parent graph.
-        Features are copied from the original graph.
-
-        Parameters
-        ----------
-        nodes : list or dict[str->list or iterable]
-            A dictionary mapping node types to node ID array for constructing
-            subgraph. All nodes must exist in the graph.
-
-            If the graph only has one node type, one can just specify a list,
-            tensor, or any iterable of node IDs intead.
-
-            The node ID array can be either an interger tensor or a bool tensor.
-            When a bool tensor is used, it is automatically converted to
-            an interger tensor using the semantic of np.where(nodes_idx == True).
-
-            Note: When using bool tensor, only backend (torch, tensorflow, mxnet)
-            tensors are supported.
-
-        Returns
-        -------
-        G : DGLHeteroGraph
-            The subgraph.
-
-            The nodes and edges in the subgraph are relabeled using consecutive
-            integers from 0.
-
-            One can retrieve the mapping from subgraph node/edge ID to parent
-            node/edge ID via ``dgl.NID`` and ``dgl.EID`` node/edge features of the
-            subgraph.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        Instantiate a heterograph.
-
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-        >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
-        >>> # Set node features
-        >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
-
-        Get subgraphs.
-
-        >>> g.subgraph({'user': [4, 5]})
-        An error occurs as these nodes do not exist.
-        >>> sub_g = g.subgraph({'user': [1, 2]})
-        >>> print(sub_g)
-        Graph(num_nodes={'user': 2, 'game': 0},
-              num_edges={('user', 'plays', 'game'): 0, ('user', 'follows', 'user'): 2},
-              metagraph=[('user', 'game'), ('user', 'user')])
-
-        Get subgraphs using boolean mask tensor.
-
-        >>> sub_g = g.subgraph({'user': th.tensor([False, True, True])})
-        >>> print(sub_g)
-        Graph(num_nodes={'user': 2, 'game': 0},
-              num_edges={('user', 'plays', 'game'): 0, ('user', 'follows', 'user'): 2},
-              metagraph=[('user', 'game'), ('user', 'user')])
-
-        Get the original node/edge indices.
-
-        >>> sub_g['follows'].ndata[dgl.NID] # Get the node indices in the raw graph
-        tensor([1, 2])
-        >>> sub_g['follows'].edata[dgl.EID] # Get the edge indices in the raw graph
-        tensor([1, 2])
-
-        Get the copied node features.
-
-        >>> sub_g.nodes['user'].data['h']
-        tensor([[1.],
-                [2.]])
-        >>> sub_g.nodes['user'].data['h'] += 1
-        >>> g.nodes['user'].data['h']          # Features are not shared.
-        tensor([[0.],
-                [1.],
-                [2.]])
-
-        See Also
-        --------
-        edge_subgraph
-        """
-        if self.is_block:
-            raise DGLError('Extracting subgraph from a block graph is not allowed.')
-        if not isinstance(nodes, Mapping):
-            assert len(self.ntypes) == 1, \
-                'need a dict of node type and IDs for graph with multiple node types'
-            nodes = {self.ntypes[0]: nodes}
-
-        def _process_nodes(ntype, v):
-            if F.is_tensor(v) and F.dtype(v) == F.bool:
-                return F.astype(F.nonzero_1d(F.copy_to(v, self.device)), self.idtype)
-            else:
-                return utils.prepare_tensor(self, v, 'nodes["{}"]'.format(ntype))
-        induced_nodes = [_process_nodes(ntype, nodes.get(ntype, [])) for ntype in self.ntypes]
-        sgi = self._graph.node_subgraph(induced_nodes)
-        induced_edges = sgi.induced_edges
-        return self._create_hetero_subgraph(sgi, induced_nodes, induced_edges)
-
-    def edge_subgraph(self, edges, preserve_nodes=False):
-        """Return the subgraph induced on given edges.
-
-        The metagraph of the returned subgraph is the same as the parent graph.
-
-        Features are copied from the original graph.
-
-        Parameters
-        ----------
-        edges : dict[str->list or iterable]
-            A dictionary mapping edge types to edge ID array for constructing
-            subgraph. All edges must exist in the subgraph.
-
-            The edge types are characterized by triplets of
-            ``(src type, etype, dst type)``.
-
-            If the graph only has one edge type, one can just specify a list,
-            tensor, or any iterable of edge IDs intead.
-
-            The edge ID array can be either an interger tensor or a bool tensor.
-            When a bool tensor is used, it is automatically converted to
-            an interger tensor using the semantic of np.where(edges_idx == True).
-
-            Note: When using bool tensor, only backend (torch, tensorflow, mxnet)
-            tensors are supported.
-
-        preserve_nodes : bool
-            Whether to preserve all nodes or not. If false, all nodes
-            without edges will be removed. (Default: False)
-
-        Returns
-        -------
-        G : DGLHeteroGraph
-            The subgraph.
-
-            The nodes and edges are relabeled using consecutive integers from 0.
-
-            One can retrieve the mapping from subgraph node/edge ID to parent
-            node/edge ID via ``dgl.NID`` and ``dgl.EID`` node/edge features of the
-            subgraph.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        Instantiate a heterograph.
-
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-        >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
-        >>> # Set edge features
-        >>> g.edges['follows'].data['h'] = torch.tensor([[0.], [1.], [2.]])
-
-        Get subgraphs.
-
-        >>> g.edge_subgraph({('user', 'follows', 'user'): [5, 6]})
-        An error occurs as these edges do not exist.
-        >>> sub_g = g.edge_subgraph({('user', 'follows', 'user'): [1, 2],
-        >>>                          ('user', 'plays', 'game'): [2]})
-        >>> print(sub_g)
-        Graph(num_nodes={'user': 2, 'game': 1},
-              num_edges={('user', 'plays', 'game'): 1, ('user', 'follows', 'user'): 2},
-              metagraph=[('user', 'game'), ('user', 'user')])
-
-        Get subgraphs using boolean mask tensor.
-        >>> sub_g = g.edge_subgraph({('user', 'follows', 'user'): th.tensor([False, True, True]),
-        >>>                   ('user', 'plays', 'game'): th.tensor([False, False, True, False])})
-        >>> sub_g
-        Graph(num_nodes={'user': 2, 'game': 1},
-            num_edges={('user', 'plays', 'game'): 1, ('user', 'follows', 'user'): 2},
-            metagraph=[('user', 'game'), ('user', 'user')])
-
-        Get the original node/edge indices.
-
-        >>> sub_g['follows'].ndata[dgl.NID] # Get the node indices in the raw graph
-        tensor([1, 2])
-        >>> sub_g['plays'].edata[dgl.EID]   # Get the edge indices in the raw graph
-        tensor([2])
-
-        Get the copied node features.
-
-        >>> sub_g.edges['follows'].data['h']
-        tensor([[1.],
-                [2.]])
-        >>> sub_g.edges['follows'].data['h'] += 1
-        >>> g.edges['follows'].data['h']          # Features are not shared.
-        tensor([[0.],
-                [1.],
-                [2.]])
-
-        See Also
-        --------
-        subgraph
-        """
-        if self.is_block:
-            raise DGLError('Extracting subgraph from a block graph is not allowed.')
-        if not isinstance(edges, Mapping):
-            assert len(self.canonical_etypes) == 1, \
-                'need a dict of edge type and IDs for graph with multiple edge types'
-            edges = {self.canonical_etypes[0]: edges}
-
-        def _process_edges(etype, e):
-            if F.is_tensor(e) and F.dtype(e) == F.bool:
-                return F.astype(F.nonzero_1d(F.copy_to(e, self.device)), self.idtype)
-            else:
-                return utils.prepare_tensor(self, e, 'edges["{}"]'.format(etype))
-
-        edges = {self.to_canonical_etype(etype): e for etype, e in edges.items()}
-        induced_edges = [
-            _process_edges(cetype, edges.get(cetype, []))
-            for cetype in self.canonical_etypes]
-        sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes)
-        induced_nodes = sgi.induced_nodes
-
-        return self._create_hetero_subgraph(sgi, induced_nodes, induced_edges)
-
-    def node_type_subgraph(self, ntypes):
-        """Return the subgraph induced on given node types.
-
-        The metagraph of the returned subgraph is the subgraph of the original
-        metagraph induced from the node types.
-
-        Features are shared with the original graph.
-
-        Parameters
-        ----------
-        ntypes : list[str]
-            The node types
-
-        Returns
-        -------
-        G : DGLHeteroGraph
-            The subgraph.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        Instantiate a heterograph.
-
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-        >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
-        >>> # Set node features
-        >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
-
-        Get subgraphs.
-
-        >>> sub_g = g.node_type_subgraph(['user'])
-        >>> print(sub_g)
-        Graph(num_nodes=3, num_edges=3,
-              ndata_schemes={'h': Scheme(shape=(1,), dtype=torch.float32)}
-              edata_schemes={})
-
-        Get the shared node features.
-
-        >>> sub_g.nodes['user'].data['h']
-        tensor([[0.],
-                [1.],
-                [2.]])
-        >>> sub_g.nodes['user'].data['h'] += 1
-        >>> g.nodes['user'].data['h']          # Features are shared.
-        tensor([[1.],
-                [2.],
-                [3.]])
-
-        See Also
-        --------
-        edge_type_subgraph
-        """
-        rel_graphs = []
-        meta_edges = []
-        induced_etypes = []
-        node_frames = [self._node_frames[self.get_ntype_id(ntype)] for ntype in ntypes]
-        edge_frames = []
-
-        num_nodes_per_type = [self.number_of_nodes(ntype) for ntype in ntypes]
-        ntypes_invmap = {ntype: i for i, ntype in enumerate(ntypes)}
-        srctype_id, dsttype_id, _ = self._graph.metagraph.edges('eid')
-        for i in range(len(self._etypes)):
-            srctype = self._ntypes[srctype_id[i]]
-            dsttype = self._ntypes[dsttype_id[i]]
-
-            if srctype in ntypes and dsttype in ntypes:
-                meta_edges.append((ntypes_invmap[srctype], ntypes_invmap[dsttype]))
-                rel_graphs.append(self._graph.get_relation_graph(i))
-                induced_etypes.append(self.etypes[i])
-                edge_frames.append(self._edge_frames[i])
-
-        metagraph = graph_index.from_edge_list(meta_edges, True)
-        # num_nodes_per_type doesn't need to be int32
-        hgidx = heterograph_index.create_heterograph_from_relations(
-            metagraph, rel_graphs, utils.toindex(num_nodes_per_type, "int64"))
-        hg = DGLHeteroGraph(hgidx, ntypes, induced_etypes,
-                            node_frames, edge_frames)
-        return hg
-
-    def edge_type_subgraph(self, etypes):
-        """Return the subgraph induced on given edge types.
-
-        The metagraph of the returned subgraph is the subgraph of the original metagraph
-        induced from the edge types.
-
-        Features are shared with the original graph.
-
-        Parameters
-        ----------
-        etypes : list[str or tuple]
-            The edge types
-
-        Returns
-        -------
-        G : DGLHeteroGraph
-            The subgraph.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        Instantiate a heterograph.
-
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-        >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
-        >>> # Set edge features
-        >>> g.edges['follows'].data['h'] = torch.tensor([[0.], [1.], [2.]])
-
-        Get subgraphs.
-
-        >>> sub_g = g.edge_type_subgraph(['follows'])
-        >>> print(sub_g)
-        Graph(num_nodes=3, num_edges=3,
-              ndata_schemes={}
-              edata_schemes={'h': Scheme(shape=(1,), dtype=torch.float32)})
-
-        Get the shared edge features.
-
-        >>> sub_g.edges['follows'].data['h']
-        tensor([[0.],
-                [1.],
-                [2.]])
-        >>> sub_g.edges['follows'].data['h'] += 1
-        >>> g.edges['follows'].data['h']          # Features are shared.
-        tensor([[1.],
-                [2.],
-                [3.]])
-
-        See Also
-        --------
-        node_type_subgraph
-        """
-        etype_ids = [self.get_etype_id(etype) for etype in etypes]
-        # meta graph is homograph, still using int64
-        meta_src, meta_dst, _ = self._graph.metagraph.find_edges(utils.toindex(etype_ids, "int64"))
-        rel_graphs = [self._graph.get_relation_graph(i) for i in etype_ids]
-        meta_src = meta_src.tonumpy()
-        meta_dst = meta_dst.tonumpy()
-        ntypes_invmap = {n: i for i, n in enumerate(set(meta_src) | set(meta_dst))}
-        mapped_meta_src = [ntypes_invmap[v] for v in meta_src]
-        mapped_meta_dst = [ntypes_invmap[v] for v in meta_dst]
-        node_frames = [self._node_frames[i] for i in ntypes_invmap]
-        edge_frames = [self._edge_frames[i] for i in etype_ids]
-        induced_ntypes = [self._ntypes[i] for i in ntypes_invmap]
-        induced_etypes = [self._etypes[i] for i in etype_ids]   # get the "name" of edge type
-        num_nodes_per_induced_type = [self.number_of_nodes(ntype) for ntype in induced_ntypes]
-
-        metagraph = graph_index.from_edge_list((mapped_meta_src, mapped_meta_dst), True)
-        # num_nodes_per_type should be int64
-        hgidx = heterograph_index.create_heterograph_from_relations(
-            metagraph, rel_graphs, utils.toindex(num_nodes_per_induced_type, "int64"))
-        hg = DGLHeteroGraph(hgidx, induced_ntypes, induced_etypes, node_frames, edge_frames)
-        return hg
-
     def adjacency_matrix(self, transpose=None, ctx=F.cpu(), scipy_fmt=None, etype=None):
         """Return the adjacency matrix of edges of the given edge type.
 
@@ -3101,7 +2699,7 @@ class DGLHeteroGraph(object):
         etid = self.get_etype_id(etype)
         self._edge_frames[etid].set_initializer(initializer, field)
 
-    def _set_n_repr(self, ntid, u, data, inplace=False):
+    def _set_n_repr(self, ntid, u, data):
         """Internal API to set node features.
 
         `data` is a dictionary from the feature name to feature tensor. Each tensor
@@ -3109,8 +2707,7 @@ class DGLHeteroGraph(object):
         and (D1, D2, ...) be the shape of the node representation tensor. The
         length of the given node ids must match B (i.e, len(u) == B).
 
-        All update will be done out of place to work with autograd unless the
-        inplace flag is true.
+        All updates will be done out of place to work with autograd.
 
         Parameters
         ----------
@@ -3120,9 +2717,6 @@ class DGLHeteroGraph(object):
             The node(s).
         data : dict of tensor
             Node representation.
-        inplace : bool, optional
-            If True, update will be done in place, but autograd will break.
-            (Default: False)
         """
         if is_all(u):
             num_nodes = self._graph.number_of_nodes(ntid)
@@ -3140,11 +2734,9 @@ class DGLHeteroGraph(object):
                                ' same device.'.format(key, F.context(val), self.device))
 
         if is_all(u):
-            for key, val in data.items():
-                self._node_frames[ntid][key] = val
+            self._node_frames[ntid].update(data)
         else:
-            u = utils.toindex(u, self._idtype_str)
-            self._node_frames[ntid].update_rows(u, data, inplace=inplace)
+            self._node_frames[ntid].update_row(u, data)
 
     def _get_n_repr(self, ntid, u):
         """Get node(s) representation of a single node type.
@@ -3164,11 +2756,10 @@ class DGLHeteroGraph(object):
             Representation dict from feature name to feature tensor.
         """
         if is_all(u):
-            return dict(self._node_frames[ntid])
+            return self._node_frames[ntid]
         else:
             u = utils.prepare_tensor(self, u, 'u')
-            u = utils.toindex(u, self._idtype_str)
-            return self._node_frames[ntid].select_rows(u)
+            return self._node_frames[ntid].subframe(u)
 
     def _pop_n_repr(self, ntid, key):
         """Internal API to get and remove the specified node feature.
@@ -3187,15 +2778,14 @@ class DGLHeteroGraph(object):
         """
         return self._node_frames[ntid].pop(key)
 
-    def _set_e_repr(self, etid, edges, data, inplace=False):
+    def _set_e_repr(self, etid, edges, data):
         """Internal API to set edge(s) features.
 
         `data` is a dictionary from the feature name to feature tensor. Each tensor
         is of shape (B, D1, D2, ...), where B is the number of edges to be updated,
         and (D1, D2, ...) be the shape of the edge representation tensor.
 
-        All update will be done out of place to work with autograd unless the
-        inplace flag is true.
+        All update will be done out of place to work with autograd.
 
         Parameters
         ----------
@@ -3211,27 +2801,17 @@ class DGLHeteroGraph(object):
             The default value is all the edges.
         data : tensor or dict of tensor
             Edge representation.
-        inplace : bool, optional
-            If True, update will be done in place, but autograd will break.
-            (Default: False)
         """
         # parse argument
-        if is_all(edges):
-            eid = ALL
-        elif isinstance(edges, tuple):
-            u, v = edges
-            u = utils.prepare_tensor(self, u, 'edges[0]')
-            v = utils.prepare_tensor(self, v, 'edges[1]')
-            eid = self.edge_ids(u, v, etype=self.canonical_etypes[etid])
-        else:
-            eid = utils.prepare_tensor(self, edges, 'edges')
+        if not is_all(edges):
+            eid = utils.parse_edges_arg_to_eid(self, edges, etid, 'edges')
 
         # sanity check
         if not utils.is_dict_like(data):
             raise DGLError('Expect dictionary type for feature data.'
                            ' Got "%s" instead.' % type(data))
 
-        if is_all(eid):
+        if is_all(edges):
             num_edges = self._graph.number_of_edges(etid)
         else:
             num_edges = len(eid)
@@ -3246,14 +2826,10 @@ class DGLHeteroGraph(object):
                                ' same device.'.format(key, F.context(val), self.device))
 
         # set
-        if is_all(eid):
-            # update column
-            for key, val in data.items():
-                self._edge_frames[etid][key] = val
+        if is_all(edges):
+            self._edge_frames[etid].update(data)
         else:
-            # update row
-            eid = utils.toindex(eid, self._idtype_str)
-            self._edge_frames[etid].update_rows(eid, data, inplace=inplace)
+            self._edge_frames[etid].update_row(eid, data)
 
     def _get_e_repr(self, etid, edges):
         """Internal API to get edge features.
@@ -3273,20 +2849,10 @@ class DGLHeteroGraph(object):
         """
         # parse argument
         if is_all(edges):
-            eid = ALL
-        elif isinstance(edges, tuple):
-            u, v = edges
-            u = utils.prepare_tensor(self, u, 'edges[0]')
-            v = utils.prepare_tensor(self, v, 'edges[1]')
-            eid = self.edge_ids(u, v, etype=self.canonical_etypes[etid])
-        else:
-            eid = utils.prepare_tensor(self, edges, 'edges')
-
-        if is_all(eid):
             return dict(self._edge_frames[etid])
         else:
-            eid = utils.toindex(eid, self._idtype_str)
-            return self._edge_frames[etid].select_rows(eid)
+            eid = utils.parse_edges_arg_to_eid(self, edges, etid, 'edges')
+            return self._edge_frames[etid].subframe(eid)
 
     def _pop_e_repr(self, etid, key):
         """Get and remove the specified edge repr of a single edge type.
@@ -3306,63 +2872,8 @@ class DGLHeteroGraph(object):
         self._edge_frames[etid].pop(key)
 
     #################################################################
-    # DEPRECATED: from the old DGLGraph
-    #################################################################
-
-    def from_networkx(self, nx_graph, node_attrs=None, edge_attrs=None):
-        """DEPRECATED: please use
-
-            ``dgl.from_networkx(nx_graph, node_attrs, edge_attrs)``
-
-        which will return a new graph created from the networkx graph.
-        """
-        raise DGLError('DGLGraph.from_networkx is deprecated. Please call the following\n\n'
-                       '\t dgl.from_networkx(nx_graph, node_attrs, edge_attrs)\n\n'
-                       ', which creates a new DGLGraph from the networkx graph.')
-
-    def from_scipy_sparse_matrix(self, spmat, multigraph=None):
-        """DEPRECATED: please use
-
-            ``dgl.from_scipy(spmat)``
-
-        which will return a new graph created from the scipy matrix.
-        """
-        raise DGLError('DGLGraph.from_scipy_sparse_matrix is deprecated. '
-                       'Please call the following\n\n'
-                       '\t dgl.from_scipy(spmat)\n\n'
-                       ', which creates a new DGLGraph from the scipy matrix.')
-
-    #################################################################
     # Message passing
     #################################################################
-
-    def register_apply_node_func(self, func):
-        """Deprecated: please directly call :func:`apply_nodes` with ``func``
-        as argument.
-        """
-        raise DGLError('DGLGraph.register_apply_node_func is deprecated.'
-                       ' Please directly call apply_nodes with func as the argument.')
-
-    def register_apply_edge_func(self, func):
-        """Deprecated: please directly call :func:`apply_edges` with ``func``
-        as argument.
-        """
-        raise DGLError('DGLGraph.register_apply_edge_func is deprecated.'
-                       ' Please directly call apply_edges with func as the argument.')
-
-    def register_message_func(self, func):
-        """Deprecated: please directly call :func:`update_all` with ``func``
-        as argument.
-        """
-        raise DGLError('DGLGraph.register_message_func is deprecated.'
-                       ' Please directly call update_all with func as the argument.')
-
-    def register_reduce_func(self, func):
-        """Deprecated: please directly call :func:`update_all` with ``func``
-        as argument.
-        """
-        raise DGLError('DGLGraph.register_reduce_func is deprecated.'
-                       ' Please directly call update_all with func as the argument.')
 
     def apply_nodes(self, func, v=ALL, ntype=None, inplace=False):
         """Apply the function on the nodes with the same type to update their
@@ -3381,7 +2892,7 @@ class DGLHeteroGraph(object):
             The node type. Can be omitted if there is only one node type
             in the graph. (Default: None)
         inplace : bool, optional
-            If True, update will be done in place, but autograd will break.
+            **DEPRECATED**. If True, update will be done in place, but autograd will break.
             (Default: False)
 
         Examples
@@ -3398,16 +2909,16 @@ class DGLHeteroGraph(object):
         --------
         apply_edges
         """
+        if inplace:
+            raise DGLError('The `inplace` option is removed in v0.5.')
         ntid = self.get_ntype_id(ntype)
+        ntype = self.ntypes[ntid]
         if is_all(v):
-            v = F.arange(0, self.number_of_nodes(ntype), self.idtype)
+            v = self.nodes(ntype)
         else:
             v = utils.prepare_tensor(self, v, 'v')
-        with ir.prog() as prog:
-            v_ntype = utils.toindex(v, self._idtype_str)
-            scheduler.schedule_apply_nodes(v_ntype, func, self._node_frames[ntid],
-                                           inplace=inplace, ntype=self._ntypes[ntid])
-            Runtime.run(prog)
+        ndata = core.invoke_node_udf(self, v, ntype, func, orig_nid=v)
+        self._set_n_repr(ntid, v, ndata)
 
     def apply_edges(self, func, edges=ALL, etype=None, inplace=False):
         """Apply the function on the edges with the same type to update their
@@ -3417,7 +2928,7 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        func : callable or None
+        func : callable
             Apply function on the edge. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
         edges : optional
@@ -3427,8 +2938,7 @@ class DGLHeteroGraph(object):
             The edge type. Can be omitted if there is only one edge type
             in the graph. (Default: None)
         inplace: bool, optional
-            If True, update will be done in place, but autograd will break.
-            (Default: False)
+            **DEPRECATED**. Must be False.
 
         Examples
         --------
@@ -3444,133 +2954,23 @@ class DGLHeteroGraph(object):
         See Also
         --------
         apply_nodes
-        group_apply_edges
         """
+        if inplace:
+            raise DGLError('The `inplace` option is removed in v0.5.')
         etid = self.get_etype_id(etype)
-        stid, dtid = self._graph.metagraph.find_edge(etid)
+        etype = self.canonical_etypes[etid]
+        g = self if etype is None else self[etype]
         if is_all(edges):
-            u, v, _ = self.edges(etype=etype, form='all')
-            # TODO(minjie): temporary hack
-            eid = utils.toindex(slice(0, self.number_of_edges(etype)), self._idtype_str)
-        elif isinstance(edges, tuple):
-            u, v = edges
-            u = utils.prepare_tensor(self, u, 'edges[0]')
-            v = utils.prepare_tensor(self, v, 'edges[1]')
-            eid = self.edge_ids(u, v, etype=etype)
+            eid = ALL
         else:
-            eid = utils.prepare_tensor(self, edges, 'edges')
-            u, v = self.find_edges(eid, etype=etype)
-
-        with ir.prog() as prog:
-            u = utils.toindex(u, self._idtype_str)
-            v = utils.toindex(v, self._idtype_str)
-            eid = utils.toindex(eid, self._idtype_str)
-            scheduler.schedule_apply_edges(
-                AdaptedHeteroGraph(self, stid, dtid, etid),
-                u, v, eid, func, inplace=inplace)
-            Runtime.run(prog)
-
-    def group_apply_edges(self, group_by, func, edges=ALL, etype=None, inplace=False):
-        """Group the edges by nodes and apply the function of the grouped
-        edges to update their features.  The edges are of the same edge type
-        (hence having the same source and destination node type).
-
-        Parameters
-        ----------
-        group_by : str
-            Specify how to group edges. Expected to be either ``'src'`` or ``'dst'``
-        func : callable
-            Apply function on the edge. The function should be an
-            :mod:`Edge UDF <dgl.udf>`. The input of `Edge UDF` should be
-            (bucket_size, degrees, *feature_shape), and return the dict
-            with values of the same shapes.
-        edges : optional
-            Edges on which to group and apply ``func``. See :func:`send` for valid
-            edge specification. Default is all the edges.
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
-        inplace: bool, optional
-            If True, update will be done in place, but autograd will break.
-            (Default: False)
-
-        Examples
-        --------
-        >>> g = dgl.graph(([0, 0, 1], [1, 2, 2]), 'user', 'follows')
-        >>> g.edata['feat'] = torch.randn((g.number_of_edges(), 1))
-        >>> def softmax_feat(edges):
-        >>>     return {'norm_feat': th.softmax(edges.data['feat'], dim=1)}
-        >>> g.group_apply_edges(group_by='src', func=softmax_feat)
-        >>> g.edata['norm_feat']
-        tensor([[0.3796],
-                [0.6204],
-                [1.0000]])
-
-        See Also
-        --------
-        apply_edges
-        """
-        if group_by not in ('src', 'dst'):
-            raise DGLError("Group_by should be either src or dst")
-        etid = self.get_etype_id(etype)
-        stid, dtid = self._graph.metagraph.find_edge(etid)
-        if is_all(edges):
-            u, v, eid = self.edges(etype=etype, form='all')
-        elif isinstance(edges, tuple):
-            u, v = edges
-            u = utils.prepare_tensor(self, u, 'edges[0]')
-            v = utils.prepare_tensor(self, v, 'edges[1]')
-            eid = self.edge_ids(u, v, etype=etype)
+            eid = utils.parse_edges_arg_to_eid(self, edges, etid, 'edges')
+        if core.is_builtin(func):
+            if not is_all(eid):
+                g = g.edge_subgraph(eid, preserve_nodes=True)
+            edata = core.invoke_gsddmm(g, func)
         else:
-            eid = utils.prepare_tensor(self, edges, 'edges')
-            u, v = self.find_edges(eid, etype=etype)
-
-
-        with ir.prog() as prog:
-            u = utils.toindex(u, self._idtype_str)
-            v = utils.toindex(v, self._idtype_str)
-            eid = utils.toindex(eid, self._idtype_str)
-            scheduler.schedule_group_apply_edge(
-                AdaptedHeteroGraph(self, stid, dtid, etid),
-                u, v, eid,
-                func, group_by,
-                inplace=inplace)
-            Runtime.run(prog)
-
-    def send(self, edges, message_func, etype=None):
-        """Send messages along the given edges with the same edge type.
-
-        DEPRECATE: please use send_and_recv, update_all.
-        """
-        raise DGLError('DGLGraph.send is deprecated. As a replacement, use DGLGraph.apply_edges\n'
-                       ' API to compute messages as edge data. Then use DGLGraph.send_and_recv\n'
-                       ' and set the message function as dgl.function.copy_e to conduct message\n'
-                       ' aggregation.')
-
-    def recv(self,
-             v,
-             reduce_func,
-             apply_node_func=None,
-             etype=None,
-             inplace=False):
-        r"""Receive and reduce incoming messages and update the features of node(s) :math:`v`.
-
-        DEPRECATE: please use send_and_recv, update_all.
-        """
-        raise DGLError('DGLGraph.recv is deprecated. As a replacement, use DGLGraph.apply_edges\n'
-                       ' API to compute messages as edge data. Then use DGLGraph.send_and_recv\n'
-                       ' and set the message function as dgl.function.copy_e to conduct message\n'
-                       ' aggregation.')
-
-    def multi_recv(self, v, reducer_dict, cross_reducer, apply_node_func=None, inplace=False):
-        r"""Receive messages from multiple edge types and perform aggregation.
-
-        DEPRECATE: please use multi_send_and_recv, multi_update_all.
-        """
-        raise DGLError('DGLGraph.multi_recv is deprecated. As a replacement,\n'
-                       ' use DGLGraph.apply_edges API to compute messages as edge data.\n'
-                       ' Then use DGLGraph.multi_send_and_recv and set the message function\n'
-                       ' as dgl.function.copy_e to conduct message aggregation.')
+            edata = core.invoke_edge_udf(g, eid, etype, func)
+        self._set_e_repr(etid, eid, edata)
 
     def send_and_recv(self,
                       edges,
@@ -3612,8 +3012,7 @@ class DGLHeteroGraph(object):
             The edge type. Can be omitted if there is only one edge type
             in the graph. (Default: None)
         inplace: bool, optional
-            If True, update will be done in place, but autograd will break.
-            (Default: False)
+            **DEPRECATED**. Must be False.
 
         Examples
         --------
@@ -3633,152 +3032,23 @@ class DGLHeteroGraph(object):
                 [0.],
                 [1.]])
         """
+        if inplace:
+            raise DGLError('The `inplace` option is removed in v0.5.')
+        # edge type
         etid = self.get_etype_id(etype)
-        stid, dtid = self._graph.metagraph.find_edge(etid)
-
-        if isinstance(edges, tuple):
-            u, v = edges
-            u = utils.prepare_tensor(self, u, 'edges[0]')
-            v = utils.prepare_tensor(self, v, 'edges[1]')
-            eid = self.edge_ids(u, v, etype=etype)
-        else:
-            eid = utils.prepare_tensor(self, edges, 'edges')
-            u, v = self.find_edges(eid, etype=etype)
-
-        if len(u) == 0:
-            # no edges to be triggered
+        _, dtid = self._graph.metagraph.find_edge(etid)
+        etype = self.canonical_etypes[etid]
+        # edge IDs
+        eid = utils.parse_edges_arg_to_eid(self, edges, etid, 'edges')
+        if len(eid) == 0:
+            # no computation
             return
-
-        with ir.prog() as prog:
-            u = utils.toindex(u, self._idtype_str)
-            v = utils.toindex(v, self._idtype_str)
-            eid = utils.toindex(eid, self._idtype_str)
-            scheduler.schedule_snr(AdaptedHeteroGraph(self, stid, dtid, etid),
-                                   (u, v, eid),
-                                   message_func, reduce_func, apply_node_func,
-                                   inplace=inplace)
-            Runtime.run(prog)
-
-    def multi_send_and_recv(self, etype_dict, cross_reducer, apply_node_func=None, inplace=False):
-        r"""Send and receive messages along multiple edge types and perform aggregation.
-
-        Optionally, apply a function to update the node features after "receive".
-
-        This is a convenient combination for performing multiple
-        :mod:`send <dgl.DGLHeteroGraph.send>` along edges of different types and
-        :mod:`multi_recv <dgl.DGLHeteroGraph.multi_recv>` for the destinations of all edges.
-
-        Parameters
-        ----------
-        etype_dict : dict
-            Mapping an edge type (str or tuple of str) to the type specific
-            configuration (4-tuples). Each 4-tuple represents
-            (edges, msg_func, reduce_func, apply_node_func):
-
-            * edges: See send() for valid edge specification.
-                  Edges on which to pass messages.
-            * msg_func: callable
-                  Message function on the edges. The function should be
-                  an :mod:`Edge UDF <dgl.udf>`.
-            * reduce_func: callable
-                  Reduce function on the node. The function should be
-                  a :mod:`Node UDF <dgl.udf>`.
-            * apply_node_func : callable, optional
-                  Apply function on the nodes. The function should be
-                  a :mod:`Node UDF <dgl.udf>`. (Default: None)
-        cross_reducer : str
-            Cross type reducer. One of ``"sum"``, ``"min"``, ``"max"``, ``"mean"``, ``"stack"``.
-        apply_node_func : callable
-            Apply function on the nodes. The function should be
-            a :mod:`Node UDF <dgl.udf>`. (Default: None)
-        inplace: bool, optional
-            If True, update will be done in place, but autograd will break.
-            (Default: False)
-
-        Examples
-        --------
-
-        >>> import dgl
-        >>> import dgl.function as fn
-        >>> import torch
-
-        Instantiate a heterograph.
-
-        >>> g1 = dgl.graph(([0], [1]), 'user', 'follows')
-        >>> g2 = dgl.bipartite(([0], [1]), 'game', 'attracts', 'user')
-        >>> g = dgl.hetero_from_relations([g1, g2])
-
-        Trigger send and recv separately.
-
-        >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.]])
-        >>> g.nodes['game'].data['h'] = torch.tensor([[1.]])
-        >>> g.send(g['follows'].edges(), fn.copy_src('h', 'm'), etype='follows')
-        >>> g.send(g['attracts'].edges(), fn.copy_src('h', 'm'), etype='attracts')
-        >>> g.multi_recv(g.nodes('user'),
-        >>>              {'follows': fn.sum('m', 'h'), 'attracts': fn.sum('m', 'h')}, "sum")
-        >>> g.nodes['user'].data['h']
-        tensor([[0.],
-                [2.]])
-
-        Trigger “send” and “receive” in one call.
-
-        >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.]])
-        >>> g.nodes['game'].data['h'] = torch.tensor([[1.]])
-        >>> g.multi_send_and_recv(
-        >>>     {'follows': (g['follows'].edges(), fn.copy_src('h', 'm'), fn.sum('m', 'h')),
-        >>>      'attracts': (g['attracts'].edges(), fn.copy_src('h', 'm'), fn.sum('m', 'h'))},
-        >>> "sum")
-        >>> g.nodes['user'].data['h']
-        tensor([[0.],
-                [2.]])
-        """
-        # infer receive node type
-        ntype = infer_ntype_from_dict(self, etype_dict)
-        dtid = self.get_ntype_id_from_dst(ntype)
-
-        # TODO(minjie): currently loop over each edge type and reuse the old schedule.
-        #   Should replace it with fused kernel.
-        all_out = []
-        all_vs = []
-        merge_order = []
-        with ir.prog() as prog:
-            for etype, args in etype_dict.items():
-                etid = self.get_etype_id(etype)
-                stid, _ = self._graph.metagraph.find_edge(etid)
-                outframe = FrameRef(frame_like(self._node_frames[dtid]._frame))
-                args = pad_tuple(args, 4)
-                if args is None:
-                    raise DGLError('Invalid per-type arguments. Should be '
-                                   '(edges, msg_func, reduce_func, [apply_node_func])')
-                edges, mfunc, rfunc, afunc = args
-                if isinstance(edges, tuple):
-                    u, v = edges
-                    u = utils.prepare_tensor(self, u, 'edges[0]')
-                    v = utils.prepare_tensor(self, v, 'edges[1]')
-                    eid = self.edge_ids(u, v, etype=etype)
-                else:
-                    eid = utils.prepare_tensor(self, edges, 'edges')
-                    u, v = self.find_edges(eid, etype=etype)
-                all_vs.append(v)
-                if len(u) == 0:
-                    # no edges to be triggered
-                    continue
-                u = utils.toindex(u, self._idtype_str)
-                v = utils.toindex(v, self._idtype_str)
-                eid = utils.toindex(eid, self._idtype_str)
-                scheduler.schedule_snr(AdaptedHeteroGraph(self, stid, dtid, etid),
-                                       (u, v, eid),
-                                       mfunc, rfunc, afunc,
-                                       inplace=inplace, outframe=outframe)
-                all_out.append(outframe)
-                merge_order.append(etid)  # use edge type id as merge order hint
-            Runtime.run(prog)
-        # merge by cross_reducer
-        self._node_frames[dtid].update(merge_frames(all_out, cross_reducer, merge_order))
-        # apply
-        if apply_node_func is not None:
-            dstnodes = F.unique(F.cat(all_vs, 0))
-            self.apply_nodes(apply_node_func, dstnodes, ntype, inplace)
+        u, v = self.find_edges(eid, etype=etype)
+        # call message passing onsubgraph
+        ndata = core.message_passing(_create_compute_graph(self, u, v, eid),
+                                     message_func, reduce_func, apply_node_func)
+        dstnodes = F.unique(v)
+        self._set_n_repr(dtid, dstnodes, ndata)
 
     def pull(self,
              v,
@@ -3825,8 +3095,7 @@ class DGLHeteroGraph(object):
             The edge type. Can be omitted if there is only one edge type
             in the graph. (Default: None)
         inplace: bool, optional
-            If True, update will be done in place, but autograd will break.
-            (Default: False)
+            **DEPRECATED**. Must be False.
 
         Examples
         --------
@@ -3850,113 +3119,21 @@ class DGLHeteroGraph(object):
                 [1.],
                 [1.]])
         """
-        # only one type of edges
+        if inplace:
+            raise DGLError('The `inplace` option is removed in v0.5.')
+        v = utils.prepare_tensor(self, v, 'v')
+        if len(v) == 0:
+            # no computation
+            return
         etid = self.get_etype_id(etype)
-        stid, dtid = self._graph.metagraph.find_edge(etid)
-
-        v = utils.prepare_tensor(self, v, 'v')
-        if len(v) == 0:
-            return
-        with ir.prog() as prog:
-            v = utils.toindex(v, self._idtype_str)
-            scheduler.schedule_pull(AdaptedHeteroGraph(self, stid, dtid, etid),
-                                    v,
-                                    message_func, reduce_func, apply_node_func,
-                                    inplace=inplace)
-            Runtime.run(prog)
-
-    def multi_pull(self, v, etype_dict, cross_reducer, apply_node_func=None, inplace=False):
-        r"""Pull and receive messages of the given nodes along multiple edge types
-        and perform aggregation.
-
-        This is equivalent to :mod:`multi_send_and_recv <dgl.DGLHeteroGraph.multi_send_and_recv>`
-        on the incoming edges of ``v`` with the specified types.
-
-        Parameters
-        ----------
-        v : int, container or tensor
-            The node(s) to be updated.
-        etype_dict : dict
-            Mapping an edge type (str or tuple of str) to the type specific
-            configuration (3-tuples). Each 3-tuple represents
-            (msg_func, reduce_func, apply_node_func):
-
-            * msg_func: callable
-                  Message function on the edges. The function should be
-                  an :mod:`Edge UDF <dgl.udf>`.
-            * reduce_func: callable
-                  Reduce function on the nodes. The function should be
-                  a :mod:`Node UDF <dgl.udf>`.
-            * apply_node_func : callable, optional
-                  Apply function on the nodes. The function should be
-                  a :mod:`Node UDF <dgl.udf>`. (Default: None)
-        cross_reducer : str
-            Cross type reducer. One of ``"sum"``, ``"min"``, ``"max"``, ``"mean"``, ``"stack"``.
-        apply_node_func : callable
-            Apply function on the nodes. The function should be
-            a :mod:`Node UDF <dgl.udf>`. (Default: None)
-        inplace: bool, optional
-            If True, update will be done in place, but autograd will break.
-            (Default: False)
-
-        Examples
-        --------
-
-        >>> import dgl
-        >>> import dgl.function as fn
-        >>> import torch
-
-        Instantiate a heterograph.
-
-        >>> g1 = dgl.graph(([1, 1], [1, 0]), 'user', 'follows')
-        >>> g2 = dgl.bipartite(([0], [1]), 'game', 'attracts', 'user')
-        >>> g = dgl.hetero_from_relations([g1, g2])
-
-        Pull.
-
-        >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.]])
-        >>> g.nodes['game'].data['h'] = torch.tensor([[1.]])
-        >>> g.multi_pull(1,
-        >>>              {'follows': (fn.copy_src('h', 'm'), fn.sum('m', 'h')),
-        >>>               'attracts': (fn.copy_src('h', 'm'), fn.sum('m', 'h'))},
-        >>> "sum")
-        >>> g.nodes['user'].data['h']
-        tensor([[0.],
-                [3.]])
-        """
-        v = utils.prepare_tensor(self, v, 'v')
-        if len(v) == 0:
-            return
-        # infer receive node type
-        ntype = infer_ntype_from_dict(self, etype_dict)
-        dtid = self.get_ntype_id_from_dst(ntype)
-        # TODO(minjie): currently loop over each edge type and reuse the old schedule.
-        #   Should replace it with fused kernel.
-        all_out = []
-        merge_order = []
-        with ir.prog() as prog:
-            for etype, args in etype_dict.items():
-                etid = self.get_etype_id(etype)
-                stid, _ = self._graph.metagraph.find_edge(etid)
-                outframe = FrameRef(frame_like(self._node_frames[dtid]._frame))
-                args = pad_tuple(args, 3)
-                if args is None:
-                    raise DGLError('Invalid per-type arguments. Should be '
-                                   '(msg_func, reduce_func, [apply_node_func])')
-                mfunc, rfunc, afunc = args
-                v = utils.toindex(v, self._idtype_str)
-                scheduler.schedule_pull(AdaptedHeteroGraph(self, stid, dtid, etid),
-                                        v,
-                                        mfunc, rfunc, afunc,
-                                        inplace=inplace, outframe=outframe)
-                all_out.append(outframe)
-                merge_order.append(etid)  # use edge type id as merge order hint
-            Runtime.run(prog)
-        # merge by cross_reducer
-        self._node_frames[dtid].update(merge_frames(all_out, cross_reducer, merge_order))
-        # apply
-        if apply_node_func is not None:
-            self.apply_nodes(apply_node_func, v, ntype, inplace)
+        _, dtid = self._graph.metagraph.find_edge(etid)
+        etype = self.canonical_etypes[etid]
+        g = self if etype is None else self[etype]
+        # call message passing on subgraph
+        src, dst, eid = g.in_edges(v, form='all')
+        ndata = core.message_passing(_create_compute_graph(self, src, dst, eid, v),
+                                     message_func, reduce_func, apply_node_func)
+        self._set_n_repr(dtid, v, ndata)
 
     def push(self,
              u,
@@ -3994,8 +3171,7 @@ class DGLHeteroGraph(object):
             The edge type. Can be omitted if there is only one edge type
             in the graph. (Default: None)
         inplace: bool, optional
-            If True, update will be done in place, but autograd will break.
-            (Default: False)
+            **DEPRECATED**. Must be False.
 
         Examples
         --------
@@ -4017,20 +3193,10 @@ class DGLHeteroGraph(object):
                 [0.],
                 [0.]])
         """
-        # only one type of edges
-        etid = self.get_etype_id(etype)
-        stid, dtid = self._graph.metagraph.find_edge(etid)
-
-        u = utils.prepare_tensor(self, u, 'u')
-        if len(u) == 0:
-            return
-        with ir.prog() as prog:
-            u = utils.toindex(u, self._idtype_str)
-            scheduler.schedule_push(AdaptedHeteroGraph(self, stid, dtid, etid),
-                                    u,
-                                    message_func, reduce_func, apply_node_func,
-                                    inplace=inplace)
-            Runtime.run(prog)
+        if inplace:
+            raise DGLError('The `inplace` option is removed in v0.5.')
+        edges = self.out_edges(u, form='eid', etype=etype)
+        self.send_and_recv(edges, message_func, reduce_func, apply_node_func, etype=etype)
 
     def update_all(self,
                    message_func,
@@ -4085,15 +3251,16 @@ class DGLHeteroGraph(object):
                 [0.],
                 [3.]])
         """
-        # only one type of edges
         etid = self.get_etype_id(etype)
-        stid, dtid = self._graph.metagraph.find_edge(etid)
+        etype = self.canonical_etypes[etid]
+        _, dtid = self._graph.metagraph.find_edge(etid)
+        g = self if etype is None else self[etype]
+        ndata = core.message_passing(g, message_func, reduce_func, apply_node_func)
+        self._set_n_repr(dtid, ALL, ndata)
 
-        with ir.prog() as prog:
-            scheduler.schedule_update_all(AdaptedHeteroGraph(self, stid, dtid, etid),
-                                          message_func, reduce_func,
-                                          apply_node_func)
-            Runtime.run(prog)
+    #################################################################
+    # Message passing on heterograph
+    #################################################################
 
     def multi_update_all(self, etype_dict, cross_reducer, apply_node_func=None):
         r"""Send and receive messages along all edges.
@@ -4124,11 +3291,7 @@ class DGLHeteroGraph(object):
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`. (Default: None)
         inplace: bool, optional
-            If True, update will be done in place, but autograd will break.
-            (Default: False)
-
-        etype_dict : dict of callable
-            ``update_all`` arguments per edge type.
+            **DEPRECATED**. Must be False.
 
         Examples
         --------
@@ -4154,33 +3317,29 @@ class DGLHeteroGraph(object):
         tensor([[0.],
                 [4.]])
         """
-        # TODO(minjie): currently loop over each edge type and reuse the old schedule.
-        #   Should replace it with fused kernel.
         all_out = defaultdict(list)
         merge_order = defaultdict(list)
-        with ir.prog() as prog:
-            for etype, args in etype_dict.items():
-                etid = self.get_etype_id(etype)
-                stid, dtid = self._graph.metagraph.find_edge(etid)
-                outframe = FrameRef(frame_like(self._node_frames[dtid]._frame))
-                args = pad_tuple(args, 3)
-                if args is None:
-                    raise DGLError('Invalid per-type arguments. Should be '
-                                   '(msg_func, reduce_func, [apply_node_func])')
-                mfunc, rfunc, afunc = args
-                scheduler.schedule_update_all(AdaptedHeteroGraph(self, stid, dtid, etid),
-                                              mfunc, rfunc, afunc,
-                                              outframe=outframe)
-                all_out[dtid].append(outframe)
-                merge_order[dtid].append(etid)  # use edge type id as merge order hint
-            Runtime.run(prog)
+        for etype, args in etype_dict.items():
+            etid = self.get_etype_id(etype)
+            _, dtid = self._graph.metagraph.find_edge(etid)
+            args = pad_tuple(args, 3)
+            if args is None:
+                raise DGLError('Invalid arguments for edge type "{}". Should be '
+                               '(msg_func, reduce_func, [apply_node_func])'.format(etype))
+            mfunc, rfunc, afunc = args
+            all_out[dtid].append(core.message_passing(self[etype], mfunc, rfunc, afunc))
+            merge_order[dtid].append(etid)  # use edge type id as merge order hint
         for dtid, frames in all_out.items():
             # merge by cross_reducer
             self._node_frames[dtid].update(
-                merge_frames(frames, cross_reducer, merge_order[dtid]))
+                reduce_dict_data(frames, cross_reducer, merge_order[dtid]))
             # apply
             if apply_node_func is not None:
-                self.apply_nodes(apply_node_func, ALL, self.ntypes[dtid], inplace=False)
+                self.apply_nodes(apply_node_func, ALL, self.ntypes[dtid])
+
+    #################################################################
+    # Message propagation
+    #################################################################
 
     def prop_nodes(self,
                    nodes_generator,
@@ -4393,12 +3552,6 @@ class DGLHeteroGraph(object):
                     e = utils.prepare_tensor(self, edges, 'edges')
                 return F.boolean_mask(e, F.gather_row(mask, e))
 
-    def readonly(self, readonly_state=True):
-        """Deprecated: DGLGraph will always be mutable."""
-        dgl_warning('DGLGraph.is_readonly is deprecated in v0.5.\n'
-                    'DGLGraph now always supports mutable operations like add_nodes'
-                    ' and add_edges.')
-
     @property
     def device(self):
         """Get the device context of this graph.
@@ -4461,14 +3614,12 @@ class DGLHeteroGraph(object):
         # TODO(minjie): handle initializer
         new_nframes = []
         for nframe in self._node_frames:
-            new_feats = {k : F.copy_to(feat, device, **kwargs) for k, feat in nframe.items()}
-            new_nframes.append(FrameRef(Frame(new_feats, num_rows=nframe.num_rows)))
+            new_nframes.append(nframe.to(device, **kwargs))
         ret._node_frames = new_nframes
 
         new_eframes = []
         for eframe in self._edge_frames:
-            new_feats = {k : F.copy_to(feat, device, **kwargs) for k, feat in eframe.items()}
-            new_eframes.append(FrameRef(Frame(new_feats, num_rows=eframe.num_rows)))
+            new_eframes.append(eframe.to(device, **kwargs))
         ret._edge_frames = new_eframes
 
         # 2. Copy misc info
@@ -4871,6 +4022,112 @@ class DGLHeteroGraph(object):
         """
         return self.astype(F.int32)
 
+    #################################################################
+    # DEPRECATED: from the old DGLGraph
+    #################################################################
+
+    def from_networkx(self, nx_graph, node_attrs=None, edge_attrs=None):
+        """DEPRECATED: please use
+
+            ``dgl.from_networkx(nx_graph, node_attrs, edge_attrs)``
+
+        which will return a new graph created from the networkx graph.
+        """
+        raise DGLError('DGLGraph.from_networkx is deprecated. Please call the following\n\n'
+                       '\t dgl.from_networkx(nx_graph, node_attrs, edge_attrs)\n\n'
+                       ', which creates a new DGLGraph from the networkx graph.')
+
+    def from_scipy_sparse_matrix(self, spmat, multigraph=None):
+        """DEPRECATED: please use
+
+            ``dgl.from_scipy(spmat)``
+
+        which will return a new graph created from the scipy matrix.
+        """
+        raise DGLError('DGLGraph.from_scipy_sparse_matrix is deprecated. '
+                       'Please call the following\n\n'
+                       '\t dgl.from_scipy(spmat)\n\n'
+                       ', which creates a new DGLGraph from the scipy matrix.')
+
+    def register_apply_node_func(self, func):
+        """Deprecated: please directly call :func:`apply_nodes` with ``func``
+        as argument.
+        """
+        raise DGLError('DGLGraph.register_apply_node_func is deprecated.'
+                       ' Please directly call apply_nodes with func as the argument.')
+
+    def register_apply_edge_func(self, func):
+        """Deprecated: please directly call :func:`apply_edges` with ``func``
+        as argument.
+        """
+        raise DGLError('DGLGraph.register_apply_edge_func is deprecated.'
+                       ' Please directly call apply_edges with func as the argument.')
+
+    def register_message_func(self, func):
+        """Deprecated: please directly call :func:`update_all` with ``func``
+        as argument.
+        """
+        raise DGLError('DGLGraph.register_message_func is deprecated.'
+                       ' Please directly call update_all with func as the argument.')
+
+    def register_reduce_func(self, func):
+        """Deprecated: please directly call :func:`update_all` with ``func``
+        as argument.
+        """
+        raise DGLError('DGLGraph.register_reduce_func is deprecated.'
+                       ' Please directly call update_all with func as the argument.')
+
+    def group_apply_edges(self, group_by, func, edges=ALL, etype=None, inplace=False):
+        """**DEPRECATED**: The API is removed in 0.5."""
+        raise DGLError('DGLGraph.group_apply_edges is removed in 0.5.')
+
+    def send(self, edges, message_func, etype=None):
+        """Send messages along the given edges with the same edge type.
+
+        DEPRECATE: please use send_and_recv, update_all.
+        """
+        raise DGLError('DGLGraph.send is deprecated. As a replacement, use DGLGraph.apply_edges\n'
+                       ' API to compute messages as edge data. Then use DGLGraph.send_and_recv\n'
+                       ' and set the message function as dgl.function.copy_e to conduct message\n'
+                       ' aggregation.')
+
+    def recv(self, v, reduce_func, apply_node_func=None, etype=None, inplace=False):
+        r"""Receive and reduce incoming messages and update the features of node(s) :math:`v`.
+
+        DEPRECATE: please use send_and_recv, update_all.
+        """
+        raise DGLError('DGLGraph.recv is deprecated. As a replacement, use DGLGraph.apply_edges\n'
+                       ' API to compute messages as edge data. Then use DGLGraph.send_and_recv\n'
+                       ' and set the message function as dgl.function.copy_e to conduct message\n'
+                       ' aggregation.')
+
+    def multi_recv(self, v, reducer_dict, cross_reducer, apply_node_func=None, inplace=False):
+        r"""Receive messages from multiple edge types and perform aggregation.
+
+        DEPRECATE: please use multi_send_and_recv, multi_update_all.
+        """
+        raise DGLError('DGLGraph.multi_recv is deprecated. As a replacement,\n'
+                       ' use DGLGraph.apply_edges API to compute messages as edge data.\n'
+                       ' Then use DGLGraph.multi_send_and_recv and set the message function\n'
+                       ' as dgl.function.copy_e to conduct message aggregation.')
+
+    def multi_send_and_recv(self, etype_dict, cross_reducer, apply_node_func=None, inplace=False):
+        r"""**DEPRECATED**: The API is removed in v0.5."""
+        raise DGLError('DGLGraph.multi_pull is removed in v0.5. As a replacement,\n'
+                       ' use DGLGraph.edge_subgraph to extract the subgraph first \n'
+                       ' and then call DGLGraph.multi_update_all.')
+
+    def multi_pull(self, v, etype_dict, cross_reducer, apply_node_func=None, inplace=False):
+        r"""**DEPRECATED**: The API is removed in v0.5."""
+        raise DGLError('DGLGraph.multi_pull is removed in v0.5. As a replacement,\n'
+                       ' use DGLGraph.edge_subgraph to extract the subgraph first \n'
+                       ' and then call DGLGraph.multi_update_all.')
+
+    def readonly(self, readonly_state=True):
+        """Deprecated: DGLGraph will always be mutable."""
+        dgl_warning('DGLGraph.readonly is deprecated in v0.5.\n'
+                    'DGLGraph now always supports mutable operations like add_nodes'
+                    ' and add_edges.')
 
 ############################################################
 # Internal APIs
@@ -4956,35 +4213,6 @@ def find_src_dst_ntypes(ntypes, metagraph):
         dsttypes = {ntypes[tid] : tid for tid in dst}
         return srctypes, dsttypes
 
-def infer_ntype_from_dict(graph, etype_dict):
-    """Infer node type from dictionary of edge type to values.
-
-    All the edge types in the dict must share the same destination node type
-    and the node type will be returned. Otherwise, throw error.
-
-    Parameters
-    ----------
-    graph : DGLHeteroGraph
-        Graph
-    etype_dict : dict
-        Dictionary whose key is edge type
-
-    Returns
-    -------
-    str
-        Node type
-    """
-    ntype = None
-    for ety in etype_dict:
-        _, _, dty = graph.to_canonical_etype(ety)
-        if ntype is None:
-            ntype = dty
-        if ntype != dty:
-            raise DGLError("Cannot infer destination node type from the dictionary. "
-                           "A valid specification must make sure that all the edge "
-                           "type keys share the same destination node type.")
-    return ntype
-
 def pad_tuple(tup, length, pad_val=None):
     """Pad the given tuple to the given length.
 
@@ -5000,13 +4228,13 @@ def pad_tuple(tup, length, pad_val=None):
     else:
         return tup + (pad_val,) * (length - len(tup))
 
-def merge_frames(frames, reducer, order=None):
-    """Merge input frames into one. Resolve conflict fields using reducer.
+def reduce_dict_data(frames, reducer, order=None):
+    """Merge tensor dictionaries into one. Resolve conflict fields using reducer.
 
     Parameters
     ----------
-    frames : list[FrameRef]
-        Input frames
+    frames : list[dict[str, Tensor]]
+        Input tensor dictionaries
     reducer : str
         One of "sum", "max", "min", "mean", "stack"
     order : list[Int], optional
@@ -5018,7 +4246,7 @@ def merge_frames(frames, reducer, order=None):
 
     Returns
     -------
-    FrameRef
+    dict[str, Tensor]
         Merged frame
     """
     if len(frames) == 1 and reducer != 'stack':
@@ -5040,10 +4268,10 @@ def merge_frames(frames, reducer, order=None):
                            '"sum", "max", "min", "mean" or "stack".')
         def merger(flist):
             return redfn(F.stack(flist, 0), 0) if len(flist) > 1 else flist[0]
-    ret = FrameRef(frame_like(frames[0]._frame))
     keys = set()
     for frm in frames:
         keys.update(frm.keys())
+    ret = {}
     for k in keys:
         flist = []
         for frm in frames:
@@ -5059,14 +4287,14 @@ def combine_frames(frames, ids):
 
     Parameters
     ----------
-    frames : List[FrameRef]
+    frames : List[Frame]
         List of frames
     ids : List[int]
         List of frame IDs
 
     Returns
     -------
-    FrameRef
+    Frame
         The resulting frame
     """
     # find common columns and check if their schemes match
@@ -5087,7 +4315,7 @@ def combine_frames(frames, ids):
     # concatenate the columns
     to_cat = lambda key: [frames[i][key] for i in ids if frames[i].num_rows > 0]
     cols = {key: F.cat(to_cat(key), dim=0) for key in schemes}
-    return FrameRef(Frame(cols))
+    return Frame(cols)
 
 def combine_names(names, ids=None):
     """Combine the selected names into one new name.
@@ -5108,118 +4336,6 @@ def combine_names(names, ids=None):
     else:
         selected = sorted([names[i] for i in ids])
         return '+'.join(selected)
-
-class AdaptedHeteroGraph(GraphAdapter):
-    """Adapt DGLGraph to interface required by scheduler.
-
-    Parameters
-    ----------
-    graph : DGLHeteroGraph
-        Graph
-    stid : int
-        Source node type id
-    dtid : int
-        Destination node type id
-    etid : int
-        Edge type id
-    """
-    def __init__(self, graph, stid, dtid, etid):
-        self.graph = graph
-        self.stid = stid
-        self.dtid = dtid
-        self.etid = etid
-
-    @property
-    def gidx(self):
-        return self.graph._graph
-
-    def num_src(self):
-        """Number of source nodes."""
-        return self.graph._graph.number_of_nodes(self.stid)
-
-    def num_dst(self):
-        """Number of destination nodes."""
-        return self.graph._graph.number_of_nodes(self.dtid)
-
-    def num_edges(self):
-        """Number of edges."""
-        return self.graph._graph.number_of_edges(self.etid)
-
-    @property
-    def srcframe(self):
-        """Frame to store source node features."""
-        return self.graph._node_frames[self.stid]
-
-    @property
-    def dstframe(self):
-        """Frame to store source node features."""
-        return self.graph._node_frames[self.dtid]
-
-    @property
-    def edgeframe(self):
-        """Frame to store edge features."""
-        return self.graph._edge_frames[self.etid]
-
-    @property
-    def msgframe(self):
-        """Frame to store messages."""
-        return self.graph._msg_frames[self.etid]
-
-    @property
-    def msgindicator(self):
-        """Message indicator tensor."""
-        return self.graph._get_msg_index(self.etid)
-
-    @msgindicator.setter
-    def msgindicator(self, val):
-        """Set new message indicator tensor."""
-        self.graph._set_msg_index(self.etid, val)
-
-    def in_edges(self, nodes):
-        nodes = nodes.tousertensor(self.graph.device)
-        src, dst, eid = self.graph._graph.in_edges(self.etid, nodes)
-        return (utils.toindex(src, self.graph._graph.dtype),
-                utils.toindex(dst, self.graph._graph.dtype),
-                utils.toindex(eid, self.graph._graph.dtype))
-
-    def out_edges(self, nodes):
-        nodes = nodes.tousertensor(self.graph.device)
-        src, dst, eid = self.graph._graph.out_edges(self.etid, nodes)
-        return (utils.toindex(src, self.graph._graph.dtype),
-                utils.toindex(dst, self.graph._graph.dtype),
-                utils.toindex(eid, self.graph._graph.dtype))
-
-    def edges(self, form):
-        src, dst, eid = self.graph._graph.edges(self.etid, form)
-        return (utils.toindex(src, self.graph._graph.dtype),
-                utils.toindex(dst, self.graph._graph.dtype),
-                utils.toindex(eid, self.graph._graph.dtype))
-
-    def get_immutable_gidx(self, ctx):
-        return self.graph._graph.get_unitgraph(self.etid, ctx)
-
-    def bits_needed(self):
-        return self.graph._graph.bits_needed(self.etid)
-
-    @property
-    def canonical_etype(self):
-        """Canonical edge type."""
-        return self.graph.canonical_etypes[self.etid]
-
-
-def check_same_dtype(graph_dtype, tensor):
-    """check whether tensor's dtype is consistent with graph's dtype"""
-    if F.is_tensor(tensor):
-        if graph_dtype != F.reverse_data_type_dict[F.dtype(tensor)]:
-            raise utils.InconsistentDtypeException(
-                "Expect the input tensor to be the same as the graph index dtype({}), but got {}"
-                .format(graph_dtype, F.reverse_data_type_dict[F.dtype(tensor)]))
-
-
-def check_idtype_dict(graph_dtype, tensor_dict):
-    """check whether the dtypes of tensors in dict are consistent with graph's dtype"""
-    for _, v in tensor_dict.items():
-        check_same_dtype(graph_dtype, v)
 
 class DGLBlock(DGLHeteroGraph):
     """Subclass that signifies the graph is a block created from
@@ -5250,5 +4366,70 @@ class DGLBlock(DGLHeteroGraph):
             meta = str(self.metagraph().edges(keys=True))
             return ret.format(
                 srcnode=nsrcnode_dict, dstnode=ndstnode_dict, edge=nedge_dict, meta=meta)
+
+
+def _create_compute_graph(graph, u, v, eid, recv_nodes=None):
+    """Create a computation graph from the given edges.
+
+    The compute graph is a uni-directional bipartite graph with only
+    one edge type. Similar to subgraph extraction, it stores the original node IDs
+    in the srcdata[NID] and dstdata[NID] and extracts features accordingly.
+    Edges are not relabeled.
+
+    This function is typically used during message passing to generate
+    a graph that contains only the active set of edges.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The input graph.
+    u : Tensor
+        Src nodes.
+    v : Tensor
+        Dst nodes.
+    eid : Tensor
+        Edge IDs.
+    recv_nodes : Tensor
+        Nodes that receive messages. If None, it is equal to unique(v).
+        Otherwise, it must be a superset of v and can contain nodes
+        that have no incoming edges.
+
+    Returns
+    -------
+    DGLGraph
+        A computation graph.
+    """
+    if len(u) == 0:
+        # The computation graph has no edge and will not trigger message
+        # passing. However, because of the apply node phase, we still construct
+        # an empty graph to continue.
+        unique_src = new_u = new_v = u
+        assert recv_nodes is not None
+        unique_dst, _ = utils.relabel(recv_nodes)
+    else:
+        # relabel u and v to starting from 0
+        unique_src, src_map = utils.relabel(u)
+        if recv_nodes is None:
+            unique_dst, dst_map = utils.relabel(v)
+        else:
+            unique_dst, dst_map = utils.relabel(recv_nodes)
+        new_u = F.gather_row(src_map, u)
+        new_v = F.gather_row(dst_map, v)
+
+    srctype, etype, dsttype = graph.canonical_etypes[0]
+    # create graph
+    hgidx = heterograph_index.create_unitgraph_from_coo(
+        2, len(unique_src), len(unique_dst), new_u, new_v, ['coo', 'csr', 'csc'])
+    # create frame
+    srcframe = graph._node_frames[graph.get_ntype_id(srctype)].subframe(unique_src)
+    srcframe[NID] = unique_src
+    dstframe = graph._node_frames[graph.get_ntype_id(dsttype)].subframe(unique_dst)
+    dstframe[NID] = unique_dst
+    eframe = graph._edge_frames[0].subframe(eid)
+    eframe[EID] = eid
+
+    return DGLHeteroGraph(hgidx, ([srctype], [dsttype]), [etype],
+                          node_frames=[srcframe, dstframe],
+                          edge_frames=[eframe])
 
 _init_api("dgl.heterograph")

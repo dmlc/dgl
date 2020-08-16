@@ -7,4 +7,4 @@ We use builtin metris to do the graph partition.
 
 Run `main.py` and you should directly see the result.
 
-Accuracy over 10 runs: 0.7565994 ± 0.00654619
+Accuracy over 10 runs: 0.7830701 ± 0.0035093208

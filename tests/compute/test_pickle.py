@@ -2,7 +2,6 @@ import networkx as nx
 import scipy.sparse as ssp
 import dgl
 import dgl.contrib as contrib
-from dgl.frame import Frame, FrameRef, Column
 from dgl.graph_index import create_graph_index
 from dgl.utils import toindex
 import backend as F
@@ -126,24 +125,6 @@ def test_pickling_graph_index():
     src_idx2, dst_idx2, _ = gi2.edges()
     assert F.array_equal(src_idx.tousertensor(), src_idx2.tousertensor())
     assert F.array_equal(dst_idx.tousertensor(), dst_idx2.tousertensor())
-
-
-def test_pickling_frame():
-    x = F.randn((3, 7))
-    y = F.randn((3, 5))
-
-    c = Column(x)
-
-    c2 = _reconstruct_pickle(c)
-    assert F.allclose(c.data, c2.data)
-
-    fr = Frame({'x': x, 'y': y})
-
-    fr2 = _reconstruct_pickle(fr)
-    assert F.allclose(fr2['x'].data, x)
-    assert F.allclose(fr2['y'].data, y)
-
-    fr = Frame()
 
 
 def _global_message_func(nodes):

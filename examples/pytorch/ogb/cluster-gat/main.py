@@ -85,8 +85,8 @@ class GAT(nn.Module):
                 y = th.zeros(g.number_of_nodes(), self.n_hidden * num_heads if l != len(self.layers) - 1 else self.n_classes)
             else:
                 y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
-            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
-            dataloader = dgl.sampling.NodeDataLoader(
+            sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
+            dataloader = dgl.dataloading.NodeDataLoader(
                     g,
                     th.arange(g.number_of_nodes()),
                     sampler,
@@ -96,7 +96,7 @@ class GAT(nn.Module):
                     num_workers=args.num_workers)
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
-                block = blocks[0].to(device)
+                block = blocks[0].int().to(device)
                 h = x[input_nodes].to(device)
                 h_dst = h[:block.number_of_dst_nodes()].to(device)
                 if l < self.n_layers - 1:
@@ -164,7 +164,7 @@ def run(args, device, data):
         # blocks.
         tic_start = time.time()
         for step, cluster in enumerate(cluster_iterator):
-            cluster = cluster.to(device)
+            cluster = cluster.int().to(device)
             mask = cluster.ndata['train_mask']
             if mask.sum() == 0:
                 continue
@@ -265,7 +265,7 @@ if __name__ == '__main__':
 
     cluster_iter_data = ClusterIter(
             'ogbn-products', graph, args.num_partitions, args.batch_size)
-    cluster_iterator = DataLoader(cluster_iter_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=0, collate_fn=partial(subgraph_collate_fn, graph))
+    cluster_iterator = DataLoader(cluster_iter_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4, collate_fn=partial(subgraph_collate_fn, graph))
 
     in_feats = graph.ndata['feat'].shape[1]
     n_classes = (labels.max() + 1).item()

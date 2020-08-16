@@ -216,6 +216,9 @@ def ones(shape, dtype, ctx):
 def uniform(shape, dtype, ctx, low, high):
     return th.empty(shape, dtype=dtype, device=ctx).uniform_(low, high)
 
+def randint(shape, dtype, ctx, low, high):
+    return th.randint(low, high, shape, dtype=dtype, device=ctx)
+
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, th.Tensor):
@@ -245,19 +248,6 @@ def pack_padded_tensor(input, lengths):
     index = th.tensor(index).to(device)
     return gather_row(input.view(batch_size * max_len, -1), index)
 
-def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
-    y = th.zeros(n_segs, *input.shape[1:]).to(input)
-    seg_id = seg_id.view((-1,) + (1,) * (input.dim() - 1)).expand_as(input)
-    y = y.scatter_add_(dim, seg_id, input)
-    return y
-
-def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
-    w = unsorted_1d_segment_sum(th.ones_like(seg_id), seg_id, n_segs, 0).to(input)
-    w = w.clamp(min=1)   # remove 0 entries
-    y = unsorted_1d_segment_sum(input, seg_id, n_segs, dim)
-    y = y / w.view((-1,) + (1,) * (y.dim() - 1))
-    return y
-
 def boolean_mask(input, mask):
     if 'bool' not in str(mask.dtype):
         mask = th.tensor(mask, dtype=th.bool)
@@ -275,6 +265,12 @@ def logical_and(input1, input2):
 def clone(input):
     return input.clone()
 
+def clamp(data, min_val, max_val):
+    return th.clamp(data, min_val, max_val)
+
+def replace_inf_with_zero(x):
+    return th.masked_fill(x, th.isinf(x), 0)
+
 def unique(input):
     if input.dtype == th.bool:
         input = input.type(th.int8)
@@ -284,7 +280,7 @@ def full_1d(length, fill_value, dtype, ctx):
     return th.full((length,), fill_value, dtype=dtype, device=ctx)
 
 def nonzero_1d(input):
-    x = th.nonzero(input).squeeze()
+    x = th.nonzero(input, as_tuple=False).squeeze()
     return x if x.dim() == 1 else x.view(-1)
 
 def sort_1d(input):

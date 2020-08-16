@@ -161,110 +161,6 @@ def test_simple_pool():
     h1 = sort_pool(bg, h0)
     assert h1.shape[0] == 5 and h1.shape[1] == 10 * 5 and h1.ndim == 2
 
-def uniform_attention(g, shape):
-    a = F.ones(shape)
-    target_shape = (g.number_of_edges(),) + (1,) * (len(shape) - 1)
-    return a / tf.cast(tf.reshape(g.in_degrees(g.edges()[1]), target_shape), tf.float32)
-
-def test_edge_softmax():
-    # Basic
-    g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
-    edata = F.ones((g.number_of_edges(), 1))
-    a = nn.edge_softmax(g, edata)
-    assert len(g.ndata) == 0
-    assert len(g.edata) == 0
-    assert F.allclose(a, uniform_attention(g, a.shape))
-
-    # Test higher dimension case
-    edata = F.ones((g.number_of_edges(), 3, 1))
-    a = nn.edge_softmax(g, edata)
-    assert len(g.ndata) == 0
-    assert len(g.edata) == 0
-    assert F.allclose(a, uniform_attention(g, a.shape))
-
-    # Test both forward and backward with Tensorflow built-in softmax.
-    g = dgl.DGLGraph().to(F.ctx())
-    g.add_nodes(30)
-    # build a complete graph
-    for i in range(30):
-        for j in range(30):
-            g.add_edge(i, j)
-    
-    score = F.randn((900, 1))
-    with tf.GradientTape() as tape:
-        tape.watch(score)
-        grad = F.randn((900, 1))
-        y = tf.reshape(F.softmax(tf.reshape(score,(30, 30)), dim=0), (-1, 1))
-        grads = tape.gradient(y, [score])
-        grad_score = grads[0]
-
-    with tf.GradientTape() as tape:
-        tape.watch(score)
-        y_dgl = nn.edge_softmax(g, score)
-        assert len(g.ndata) == 0
-        assert len(g.edata) == 0
-        # check forward
-        assert F.allclose(y_dgl, y)
-        grads = tape.gradient(y_dgl, [score])
-    # checkout gradient
-    assert F.allclose(grads[0], grad_score)
-    print(grads[0][:10], grad_score[:10])
-    
-    # Test 2
-    def generate_rand_graph(n):
-      arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
-      return dgl.DGLGraph(arr, readonly=True)
-    
-    g = generate_rand_graph(50).to(F.ctx())
-    a1 = F.randn((g.number_of_edges(), 1))
-    a2 = tf.identity(a1)
-    with tf.GradientTape() as tape:
-        tape.watch(a1)
-        g.edata['s'] = a1
-        g.group_apply_edges('dst', lambda edges: {'ss':F.softmax(edges.data['s'], 1)})
-        loss = tf.reduce_sum(g.edata['ss'])
-        a1_grad = tape.gradient(loss, [a1])[0]
-    
-    with tf.GradientTape() as tape:
-        tape.watch(a2)
-        builtin_sm = nn.edge_softmax(g, a2)
-        loss = tf.reduce_sum(builtin_sm)
-        a2_grad = tape.gradient(loss, [a2])[0]
-    print(a1_grad - a2_grad)
-    assert len(g.ndata) == 0
-    assert len(g.edata) == 2
-    assert F.allclose(a1_grad, a2_grad, rtol=1e-4, atol=1e-4) # Follow tolerance in unittest backend
-
-def test_partial_edge_softmax():
-    g = dgl.DGLGraph().to(F.ctx())
-    g.add_nodes(30)
-    # build a complete graph
-    for i in range(30):
-        for j in range(30):
-            g.add_edge(i, j)
-
-    score = F.randn((300, 1))
-    grad = F.randn((300, 1))
-    import numpy as np
-    eids = np.random.choice(900, 300, replace=False).astype('int64')
-    eids = F.tensor(eids)
-    # compute partial edge softmax
-    with tf.GradientTape() as tape:
-        tape.watch(score)
-        y_1 = nn.edge_softmax(g, score, eids)
-        grads = tape.gradient(y_1, [score])
-    grad_1 = grads[0]
-    # compute edge softmax on edge subgraph
-    subg = g.edge_subgraph(eids, preserve_nodes=True)
-    with tf.GradientTape() as tape:
-        tape.watch(score)
-        y_2 = nn.edge_softmax(subg, score)
-        grads = tape.gradient(y_2, [score])
-    grad_2 = grads[0]
-
-    assert F.allclose(y_1, y_2)
-    assert F.allclose(grad_1, grad_2)
-
 def test_glob_att_pool():
     g = dgl.DGLGraph(nx.path_graph(10)).to(F.ctx())
 
@@ -371,8 +267,8 @@ def test_gat_conv(g, idtype):
 def test_gat_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    gat = nn.GATConv((5, 10), 2, 4)
-    feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 10)))
+    gat = nn.GATConv(5, 2, 4)
+    feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
     h = gat(g, feat)
     assert h.shape == (g.number_of_dst_nodes(), 4, 2)
 
@@ -484,9 +380,9 @@ def test_hetero_conv(agg, idtype):
         ('store', 'sells', 'game'): [(0, 0), (0, 3), (1, 1), (1, 2)]},
         idtype=idtype, device=F.ctx())
     conv = nn.HeteroGraphConv({
-        'follows': nn.GraphConv(2, 3),
-        'plays': nn.GraphConv(2, 4),
-        'sells': nn.GraphConv(3, 4)},
+        'follows': nn.GraphConv(2, 3, allow_zero_in_degree=True),
+        'plays': nn.GraphConv(2, 4, allow_zero_in_degree=True),
+        'sells': nn.GraphConv(3, 4, allow_zero_in_degree=True)},
         agg)
     uf = F.randn((4, 2))
     gf = F.randn((4, 4))
@@ -577,8 +473,6 @@ def test_hetero_conv(agg, idtype):
 
 if __name__ == '__main__':
     test_graph_conv()
-    test_edge_softmax()
-    test_partial_edge_softmax()
     # test_set2set()
     test_glob_att_pool()
     test_simple_pool()

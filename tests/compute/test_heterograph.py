@@ -82,13 +82,13 @@ def create_test_heterograph3(idtype):
     wishes_nx.add_edge('u2', 'g0', id=1)
 
     follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows',
-            idtype=idtype, device=device).formats('coo')
+            idtype=idtype, device=device, formats='coo')
     plays_g = dgl.bipartite([(0, 0), (1, 0), (2, 1), (1, 1)], 'user', 'plays', 'game',
-            idtype=idtype, device=device).formats('coo')
+            idtype=idtype, device=device, formats='coo')
     wishes_g = dgl.bipartite([(0, 1), (2, 0)], 'user', 'wishes', 'game',
-            idtype=idtype, device=device).formats('coo')
+            idtype=idtype, device=device, formats='coo')
     develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game',
-            idtype=idtype, device=device).formats('coo')
+            idtype=idtype, device=device, formats='coo')
     g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
     assert g.idtype == idtype
     assert g.device == device
@@ -1332,7 +1332,7 @@ def test_subgraph(idtype):
     if F._default_context_str != 'gpu':
         # TODO(minjie): enable this later
         for fmt in ['csr', 'csc', 'coo']:
-            g = dgl.graph([(0, 1), (1, 2)]).formats(fmt)
+            g = dgl.graph([(0, 1), (1, 2)], formats=fmt)
             sg = g.subgraph({g.ntypes[0]: [1, 0]})
             nids = F.asnumpy(sg.ndata[dgl.NID])
             assert np.array_equal(nids, np.array([1, 0]))
@@ -1410,44 +1410,6 @@ def test_level2(idtype):
     with pytest.raises(DGLError):
         g.send_and_recv([2, 3], mfunc, rfunc)
 
-    # test multi
-    g.multi_send_and_recv(
-        {'plays' : (g.edges(etype='plays'), mfunc, rfunc),
-         ('user', 'wishes', 'game'): (g.edges(etype='wishes'), mfunc, rfunc2)},
-        'sum')
-    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[3., 3.], [3., 3.]]))
-
-    # test multi
-    g.multi_send_and_recv(
-        {'plays' : (g.edges(etype='plays'), mfunc, rfunc, afunc),
-         ('user', 'wishes', 'game'): (g.edges(etype='wishes'), mfunc, rfunc2)},
-        'sum', afunc)
-    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[5., 5.], [5., 5.]]))
-
-    # test cross reducer
-    g.nodes['user'].data['h'] = F.randn((3, 2))
-    for cred in ['sum', 'max', 'min', 'mean']:
-        g.multi_send_and_recv(
-            {'plays' : (g.edges(etype='plays'), mfunc, rfunc, afunc),
-             'wishes': (g.edges(etype='wishes'), mfunc, rfunc2)},
-            cred, afunc)
-        y = g.nodes['game'].data['y']
-        g['plays'].send_and_recv(g.edges(etype='plays'), mfunc, rfunc, afunc)
-        y1 = g.nodes['game'].data['y']
-        g['wishes'].send_and_recv(g.edges(etype='wishes'), mfunc, rfunc2)
-        y2 = g.nodes['game'].data['y']
-        yy = get_redfn(cred)(F.stack([y1, y2], 0), 0)
-        yy = yy + 1  # final afunc
-        assert F.array_equal(y, yy)
-
-    # test fail case
-    # fail because cannot infer ntype
-    with pytest.raises(DGLError):
-        g.multi_send_and_recv(
-            {'plays' : (g.edges(etype='plays'), mfunc, rfunc),
-             'follows': (g.edges(etype='follows'), mfunc, rfunc2)},
-            'sum')
-
     g.nodes['game'].data.clear()
 
     #############################################################
@@ -1467,49 +1429,6 @@ def test_level2(idtype):
     # test fail case
     with pytest.raises(DGLError):
         g.pull(1, mfunc, rfunc)
-
-    # test multi
-    g.multi_pull(
-        1,
-        {'plays' : (mfunc, rfunc),
-         ('user', 'wishes', 'game'): (mfunc, rfunc2)},
-        'sum')
-    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[0., 0.], [3., 3.]]))
-
-    # test multi
-    g.multi_pull(
-        1,
-        {'plays' : (mfunc, rfunc, afunc),
-         ('user', 'wishes', 'game'): (mfunc, rfunc2)},
-        'sum', afunc)
-    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[0., 0.], [5., 5.]]))
-
-    # test cross reducer
-    g.nodes['user'].data['h'] = F.randn((3, 2))
-    for cred in ['sum', 'max', 'min', 'mean']:
-        g.multi_pull(
-            1,
-            {'plays' : (mfunc, rfunc, afunc),
-             'wishes': (mfunc, rfunc2)},
-            cred, afunc)
-        y = g.nodes['game'].data['y']
-        g['plays'].pull(1, mfunc, rfunc, afunc)
-        y1 = g.nodes['game'].data['y']
-        g['wishes'].pull(1, mfunc, rfunc2)
-        y2 = g.nodes['game'].data['y']
-        g.nodes['game'].data['y'] = get_redfn(cred)(F.stack([y1, y2], 0), 0)
-        g.apply_nodes(afunc, 1, ntype='game')
-        yy = g.nodes['game'].data['y']
-        assert F.array_equal(y, yy)
-
-    # test fail case
-    # fail because cannot infer ntype
-    with pytest.raises(DGLError):
-        g.multi_pull(
-            1,
-            {'plays' : (mfunc, rfunc),
-             'follows': (mfunc, rfunc2)},
-            'sum')
 
     g.nodes['game'].data.clear()
 
@@ -1672,8 +1591,8 @@ def test_empty_heterograph(idtype):
     assert g.number_of_edges('develops') == 2
     assert g.number_of_nodes('developer') == 2
 
-
-def test_types_in_function():
+@parametrize_dtype
+def test_types_in_function(idtype):
     def mfunc1(edges):
         assert edges.canonical_etype == ('user', 'follow', 'user')
         return {}
@@ -1706,7 +1625,7 @@ def test_types_in_function():
         assert edges.canonical_etype == ('user', 'plays', 'game')
         return F.zeros((2,))
 
-    g = dgl.graph([(0, 1), (1, 2)], 'user', 'follow')
+    g = dgl.graph([(0, 1), (1, 2)], 'user', 'follow', idtype=idtype, device=F.ctx())
     g.apply_nodes(rfunc1)
     g.apply_edges(mfunc1)
     g.update_all(mfunc1, rfunc1)
@@ -1716,7 +1635,7 @@ def test_types_in_function():
     g.filter_nodes(filter_nodes1)
     g.filter_edges(filter_edges1)
 
-    g = dgl.bipartite([(0, 1), (1, 2)], 'user', 'plays', 'game')
+    g = dgl.bipartite([(0, 1), (1, 2)], 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
     g.apply_nodes(rfunc2, ntype='game')
     g.apply_edges(mfunc2)
     g.update_all(mfunc2, rfunc2)
@@ -1866,7 +1785,7 @@ def test_dtype_cast(idtype):
 @parametrize_dtype
 def test_format(idtype):
     # single relation
-    g = dgl.graph([(0, 0), (1, 1), (0, 1), (2, 0)], idtype=idtype, device=F.ctx()).formats('coo')
+    g = dgl.graph([(0, 0), (1, 1), (0, 1), (2, 0)], idtype=idtype, device=F.ctx(), formats='coo')
     assert g.formats()['created'] == ['coo']
     assert len(g.formats()['not created']) == 0
     try:
@@ -1886,7 +1805,7 @@ def test_format(idtype):
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): [(0, 0), (1, 0), (1, 1), (2, 1)],
         ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
-        }, idtype=idtype, device=F.ctx()).formats('csr')
+        }, idtype=idtype, device=F.ctx(), formats='csr')
     user_feat = F.randn((g['follows'].number_of_src_nodes(), 5))
     g['follows'].srcdata['h'] = user_feat
     assert g.formats()['created'] == ['csr']
@@ -2487,6 +2406,100 @@ def test_remove_nodes(idtype):
     assert F.array_equal(u, F.tensor([1], dtype=idtype))
     assert F.array_equal(v, F.tensor([0], dtype=idtype))
 
+@parametrize_dtype
+def test_frame(idtype):
+    g = dgl.graph(([0, 1, 2], [1, 2, 3]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.copy_to(F.tensor([0, 1, 2, 3], dtype=idtype), ctx=F.ctx())
+    g.edata['h'] = F.copy_to(F.tensor([0, 1, 2], dtype=idtype), ctx=F.ctx())
+
+    # remove nodes
+    sg = dgl.remove_nodes(g, [3])
+    # check for lazy update
+    assert F.array_equal(sg._node_frames[0]._columns['h'].storage, g.ndata['h'])
+    assert F.array_equal(sg._edge_frames[0]._columns['h'].storage, g.edata['h'])
+    assert sg.ndata['h'].shape[0] == 3
+    assert sg.edata['h'].shape[0] == 2
+    # update after read
+    assert F.array_equal(sg._node_frames[0]._columns['h'].storage, F.tensor([0, 1, 2], dtype=idtype))
+    assert F.array_equal(sg._edge_frames[0]._columns['h'].storage, F.tensor([0, 1], dtype=idtype))
+
+    ng = dgl.add_nodes(sg, 1)
+    assert ng.ndata['h'].shape[0] == 4
+    assert F.array_equal(ng._node_frames[0]._columns['h'].storage, F.tensor([0, 1, 2, 0], dtype=idtype))
+    ng = dgl.add_edges(ng, [3], [1])
+    assert ng.edata['h'].shape[0] == 3
+    assert F.array_equal(ng._edge_frames[0]._columns['h'].storage, F.tensor([0, 1, 0], dtype=idtype))
+
+    # multi level lazy update
+    sg = dgl.remove_nodes(g, [3])
+    assert F.array_equal(sg._node_frames[0]._columns['h'].storage, g.ndata['h'])
+    assert F.array_equal(sg._edge_frames[0]._columns['h'].storage, g.edata['h'])
+    ssg = dgl.remove_nodes(sg, [1])
+    assert F.array_equal(ssg._node_frames[0]._columns['h'].storage, g.ndata['h'])
+    assert F.array_equal(ssg._edge_frames[0]._columns['h'].storage, g.edata['h'])
+    # ssg is changed
+    assert ssg.ndata['h'].shape[0] == 2
+    assert ssg.edata['h'].shape[0] == 0
+    assert F.array_equal(ssg._node_frames[0]._columns['h'].storage, F.tensor([0, 2], dtype=idtype))
+    # sg still in lazy model
+    assert F.array_equal(sg._node_frames[0]._columns['h'].storage, g.ndata['h'])
+    assert F.array_equal(sg._edge_frames[0]._columns['h'].storage, g.edata['h'])
+
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TensorFlow always create a new tensor")
+@unittest.skipIf(F._default_context_str == 'cpu', reason="cpu do not have context change problem")
+@parametrize_dtype
+def test_frame_device(idtype):
+    g = dgl.graph(([0,1,2], [2,3,1]))
+    g.ndata['h'] = F.copy_to(F.tensor([1,1,1,2], dtype=idtype), ctx=F.cpu())
+    g.ndata['hh'] = F.copy_to(F.ones((4,3), dtype=idtype), ctx=F.cpu())
+    g.edata['h'] = F.copy_to(F.tensor([1,2,3], dtype=idtype), ctx=F.cpu())
+
+    g = g.to(F.ctx())
+    # lazy device copy
+    assert F.context(g._node_frames[0]._columns['h'].storage) == F.cpu()
+    assert F.context(g._node_frames[0]._columns['hh'].storage) == F.cpu()
+    print(g.ndata['h'])
+    assert F.context(g._node_frames[0]._columns['h'].storage) == F.ctx()
+    assert F.context(g._node_frames[0]._columns['hh'].storage) == F.cpu()
+    assert F.context(g._edge_frames[0]._columns['h'].storage) == F.cpu()
+
+    # lazy device copy in subgraph
+    sg = dgl.node_subgraph(g, [0,1,2])
+    assert F.context(sg._node_frames[0]._columns['h'].storage) == F.ctx()
+    assert F.context(sg._node_frames[0]._columns['hh'].storage) == F.cpu()
+    assert F.context(sg._edge_frames[0]._columns['h'].storage) == F.cpu()
+    print(sg.ndata['hh'])
+    assert F.context(sg._node_frames[0]._columns['hh'].storage) == F.ctx()
+    assert F.context(sg._edge_frames[0]._columns['h'].storage) == F.cpu()
+
+    # back to cpu
+    sg = sg.to(F.cpu())
+    assert F.context(sg._node_frames[0]._columns['h'].storage) == F.ctx()
+    assert F.context(sg._node_frames[0]._columns['hh'].storage) == F.ctx()
+    assert F.context(sg._edge_frames[0]._columns['h'].storage) == F.cpu()
+    print(sg.ndata['h'])
+    print(sg.ndata['hh'])
+    print(sg.edata['h'])
+    assert F.context(sg._node_frames[0]._columns['h'].storage) == F.cpu()
+    assert F.context(sg._node_frames[0]._columns['hh'].storage) == F.cpu()
+    assert F.context(sg._edge_frames[0]._columns['h'].storage) == F.cpu()
+
+    # set some field
+    sg = sg.to(F.ctx())
+    assert F.context(sg._node_frames[0]._columns['h'].storage) == F.cpu()
+    sg.ndata['h'][0] = 5
+    assert F.context(sg._node_frames[0]._columns['h'].storage) == F.ctx()
+    assert F.context(sg._node_frames[0]._columns['hh'].storage) == F.cpu()
+    assert F.context(sg._edge_frames[0]._columns['h'].storage) == F.cpu()
+
+    # add nodes
+    ng = dgl.add_nodes(sg, 3)
+    assert F.context(ng._node_frames[0]._columns['h'].storage) == F.ctx()
+    assert F.context(ng._node_frames[0]._columns['hh'].storage) == F.ctx()
+    assert F.context(ng._edge_frames[0]._columns['h'].storage) == F.cpu()
+
+
+
 if __name__ == '__main__':
     # test_create()
     # test_query()
@@ -2515,9 +2528,11 @@ if __name__ == '__main__':
     # test_dtype_cast()
     # test_reverse("int32")
     # test_format()
-    test_add_edges(F.int32)
-    test_add_nodes(F.int32)
-    test_remove_edges(F.int32)
-    test_remove_nodes(F.int32)
-    test_clone(F.int32)
+    #test_add_edges(F.int32)
+    #test_add_nodes(F.int32)
+    #test_remove_edges(F.int32)
+    #test_remove_nodes(F.int32)
+    #test_clone(F.int32)
+    test_frame(F.int32)
+    test_frame_device(F.int32)
     pass

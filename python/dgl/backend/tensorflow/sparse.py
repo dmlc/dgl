@@ -1,7 +1,10 @@
 import tensorflow as tf
 import numpy as np
 from .tensor import tensor, copy_to, context
+from ...base import is_all, ALL
 from ...sparse import _gspmm, _gsddmm
+
+__all__ = ['gspmm', 'gsddmm', 'edge_softmax']
 
 
 def _scatter_nd(index, src, n_rows):
@@ -39,7 +42,6 @@ def _gather_nd(index, src):
     new_idx = index * stride + copy_to(sum(offsets), ctx)
     src = tf.reshape(src, (-1,))
     new_idx = tf.reshape(new_idx, (-1))
-    print(src, new_idx)
     rst = tf.reshape(tf.gather(src, new_idx), shp)
     return rst
 
@@ -92,6 +94,10 @@ def _addsub(op, x):
     return -x if op == 'sub' else x
 
 
+def _expand(x, shape):
+    return tf.broadcast_to(x, (x.shape[0], *shape))
+
+
 def gspmm_real(gidx, op, reduce_op, X, Y):
     out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
 
@@ -110,7 +116,7 @@ def gspmm_real(gidx, op, reduce_op, X, Y):
                 if op in ['mul', 'div']:
                     dX = _scatter_nd(
                         argX,
-                        _muldiv(op, _gather_nd(argY, tf.broadcast_to(Y, (Y.shape[0], *dZ.shape[1:])))) * dZ,
+                        _muldiv(op, _gather_nd(argY, _expand(Y, dZ.shape[1:]))) * dZ,
                         X.shape[0])
                 elif op in ['add', 'sub', 'copy_lhs']:
                     dX = _scatter_nd(argX, dZ, X.shape[0])
@@ -131,7 +137,7 @@ def gspmm_real(gidx, op, reduce_op, X, Y):
                 if op in ['mul',  'div']:
                     dY = _scatter_nd(
                         argY,
-                        _gather_nd(argX, tf.broadcast_to(X, (X.shape[0], *dZ.shape[1:]))) * dZ,
+                        _gather_nd(argX, _expand(X, dZ.shape[1:])) * dZ,
                         Y.shape[0])
                     if op == 'div': dY = -dY / (Y ** 2)
                 elif op in ['add', 'sub', 'copy_rhs']:
@@ -215,3 +221,30 @@ def gsddmm(gidx, op, X, Y, lhs_target='u', rhs_target='v'):
     if Y is None:
         Y = tf.zeros(())
     return _lambda(X, Y)
+
+
+def edge_softmax_real(gidx, score, eids=ALL, norm_by='dst'):
+    if not is_all(eids):
+        gidx = gidx.edge_subgraph(tf.cast(eids, gidx.dtype), True)
+    if norm_by == 'src':
+        gidx = gidx.reverse()
+    score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
+    score = tf.math.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
+    score_sum = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
+    out = _gsddmm(gidx, 'div', score, score_sum, 'e', 'v')
+
+    def edge_softmax_backward(grad_out):
+        sds = out * grad_out
+        accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
+        grad_score = sds - gsddmm(gidx, 'mul', out, accum, 'e', 'v')
+        return grad_score
+
+    return out, edge_softmax_backward
+
+
+def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
+    @tf.custom_gradient
+    def _lambda(logits):
+        return edge_softmax_real(gidx, logits, eids, norm_by)
+    return _lambda(logits)
+

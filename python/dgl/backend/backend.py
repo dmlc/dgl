@@ -908,8 +908,28 @@ def ones(shape, dtype, ctx):
     pass
 
 def uniform(shape, dtype, ctx, low, high):
-    """Crear a tensor with random value in an uniform 
+    """Create a tensor with random value in a uniform
     distribution between low (inclusive) and high (exclusive).
+
+    Parameters
+    ----------
+    shape : tuple of int
+        The tensor shape.
+    dtype : data type
+        It should be one of the values in the data type dict.
+    ctx : context
+        The device of the result tensor.
+
+    Returns
+    -------
+    Tensor
+        The random tensor.
+    """
+    pass
+
+def randint(shape, dtype, ctx, low, high):
+    """Create a tensor with random value in a uniform integer
+    distribution between low (inclusive) and high (exclusive)
 
     Parameters
     ----------
@@ -968,58 +988,6 @@ def pack_padded_tensor(input, lengths):
     Tensor
         The obtained tensor with shape :math:`(N, *)` where
         :math:`N = \sum_{i=1}^{B}L_i`
-    """
-    pass
-
-def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
-    """Computes the sum along segments of a tensor.
-
-    Equivalent to tf.unsorted_segment_sum, but seg_id is required to be a
-    1D tensor.
-
-    Parameters
-    ----------
-    input : Tensor
-        The input tensor
-    seg_id : 1D Tensor
-        The segment IDs whose values are between 0 and n_segs - 1.  Should
-        have the same length as input.
-    n_segs : int
-        Number of distinct segments
-    dim : int
-        Dimension to sum on
-
-    Returns
-    -------
-    Tensor
-        The result
-    """
-    pass
-
-def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
-    """Computes the mean along segments of a tensor.
-
-    Equivalent to tf.unsorted_segment_mean, but seg_id is required to be a
-    1D tensor.
-
-    Note that segments never appeared in seg_id will have results of 0.
-
-    Parameters
-    ----------
-    input : Tensor
-        The input tensor
-    seg_id : 1D Tensor
-        The segment IDs whose values are between 0 and n_segs - 1.  Should
-        have the same length as input.
-    n_segs : int
-        Number of distinct segments
-    dim : int
-        Dimension to average on
-
-    Returns
-    -------
-    Tensor
-        The result
     """
     pass
 
@@ -1086,6 +1054,41 @@ def clone(input):
     -------
     Tensor
         A clone tensor.
+    """
+    pass
+
+def clamp(data, min_val, max_val):
+    """Clamp all elements in :attr:`input` into the range [min_val, max_val]
+    and return a resulting tensor.
+
+    Parameters
+    ----------
+    data : Tensor
+        Input tensor
+    min_val : Scalar
+        Min value.
+    max_val : Scalar
+        Max value.
+
+    Returns
+    -------
+    Tensor
+        The result.
+    """
+    pass
+
+def replace_inf_with_zero(x):
+    """Returns a new tensor replacing infinity and negative infinity with zeros.
+
+    Parameters
+    ----------
+    x : Tensor
+        The input
+
+    Returns
+    -------
+    Tensor
+        The result
     """
     pass
 
@@ -1448,6 +1451,42 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
         The result tensor.
     """
     pass
+
+def edge_softmax(gidx, logits, eids, norm_by):
+    r"""Compute edge softmax.
+
+    For a node :math:`i`, edge softmax is an operation of computing
+
+    .. math::
+      a_{ij} = \frac{\exp(z_{ij})}{\sum_{j\in\mathcal{N}(i)}\exp(z_{ij})}
+
+    where :math:`z_{ij}` is a signal of edge :math:`j\rightarrow i`, also
+    called logits in the context of softmax. :math:`\mathcal{N}(i)` is
+    the set of nodes that have an edge to :math:`i`.
+
+    By default edge softmax is normalized by destination nodes(i.e. :math:`ij`
+    are incoming edges of `i` in the formula above). We also support edge
+    softmax normalized by source nodes(i.e. :math:`ij` are outgoing edges of
+    `i` in the formula). The previous case correspond to softmax in GAT and
+    Transformer, and the later case correspond to softmax in Capsule network.
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The graph to perfor edge softmax on.
+    logits : torch.Tensor
+        The input edge feature
+    eids : torch.Tensor or ALL, optional
+        Edges on which to apply edge softmax. If ALL, apply edge
+        softmax on all edges in the graph. Default: ALL.
+    norm_by : str, could be `src` or `dst`
+        Normalized by source nodes or destination nodes. Default: `dst`.
+
+    Returns
+    -------
+    Tensor
+        Softmax value
+    """
 
 
 ###############################################################################

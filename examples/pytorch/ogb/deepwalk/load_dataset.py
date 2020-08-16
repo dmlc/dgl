@@ -31,7 +31,7 @@ if __name__ == "__main__":
             if weighted:
                 f.write(str(g.edges()[0][i].item()) + " "\
                     +str(g.edges()[1][i].item()) + " "\
-                    +str(g.edata['edge_weight'][i]) + "\n")
+                    +str(g.edata['edge_weight'][i].item()) + "\n")
             else:
                 f.write(str(g.edges()[0][i].item()) + " "\
                     +str(g.edges()[1][i].item()) + " "\

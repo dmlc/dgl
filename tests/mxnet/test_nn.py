@@ -173,9 +173,9 @@ def test_gat_conv(g, idtype):
 def test_gat_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    gat = nn.GATConv((5, 10), 2, 4)
+    gat = nn.GATConv(5, 2, 4)
     gat.initialize(ctx=ctx)
-    feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 10)))
+    feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
     h = gat(g, feat)
     assert h.shape == (g.number_of_dst_nodes(), 4, 2)
 
@@ -314,7 +314,7 @@ def test_dense_cheb_conv():
 
 @parametrize_dtype
 @pytest.mark.parametrize('norm_type', ['both', 'right', 'none'])
-@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 def test_dense_graph_conv(idtype, g, norm_type):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -572,58 +572,6 @@ def test_simple_pool():
     h1 = sort_pool(bg, h0)
     assert h1.shape[0] == 5 and h1.shape[1] == 10 * 5 and h1.ndim == 2
 
-def uniform_attention(g, shape):
-    a = mx.nd.ones(shape).as_in_context(g.device)
-    target_shape = (g.number_of_edges(),) + (1,) * (len(shape) - 1)
-    return a / g.in_degrees(g.edges()[1]).reshape(target_shape).astype('float32')
-
-def test_edge_softmax():
-    # Basic
-    g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
-    edata = F.ones((g.number_of_edges(), 1))
-    a = nn.edge_softmax(g, edata)
-    assert len(g.ndata) == 0
-    assert len(g.edata) == 0
-    assert np.allclose(a.asnumpy(), uniform_attention(g, a.shape).asnumpy(),
-            1e-4, 1e-4)
-
-    # Test higher dimension case
-    edata = F.ones((g.number_of_edges(), 3, 1))
-    a = nn.edge_softmax(g, edata)
-    assert len(g.ndata) == 0
-    assert len(g.edata) == 0
-    assert np.allclose(a.asnumpy(), uniform_attention(g, a.shape).asnumpy(),
-            1e-4, 1e-4)
-
-def test_partial_edge_softmax():
-    g = dgl.DGLGraph().to(F.ctx())
-    g.add_nodes(30)
-    # build a complete graph
-    for i in range(30):
-        for j in range(30):
-            g.add_edge(i, j)
-
-    score = F.randn((300, 1))
-    score.attach_grad()
-    grad = F.randn((300, 1))
-    import numpy as np
-    eids = F.tensor(np.random.choice(900, 300, replace=False), g.idtype)
-    # compute partial edge softmax
-    with mx.autograd.record():
-        y_1 = nn.edge_softmax(g, score, eids)
-        y_1.backward(grad)
-        grad_1 = score.grad
-
-    # compute edge softmax on edge subgraph
-    subg = g.edge_subgraph(eids, preserve_nodes=True)
-    with mx.autograd.record():
-        y_2 = nn.edge_softmax(subg, score)
-        y_2.backward(grad)
-        grad_2 = score.grad
-
-    assert F.allclose(y_1, y_2)
-    assert F.allclose(grad_1, grad_2)
-
 def test_rgcn():
     ctx = F.ctx()
     etype = []
@@ -744,9 +692,9 @@ def test_hetero_conv(agg, idtype):
         ('store', 'sells', 'game'): [(0, 0), (0, 3), (1, 1), (1, 2)]},
         idtype=idtype, device=F.ctx())
     conv = nn.HeteroGraphConv({
-        'follows': nn.GraphConv(2, 3),
-        'plays': nn.GraphConv(2, 4),
-        'sells': nn.GraphConv(3, 4)},
+        'follows': nn.GraphConv(2, 3, allow_zero_in_degree=True),
+        'plays': nn.GraphConv(2, 4, allow_zero_in_degree=True),
+        'sells': nn.GraphConv(3, 4, allow_zero_in_degree=True)},
         agg)
     conv.initialize(ctx=F.ctx())
     print(conv)
@@ -848,8 +796,6 @@ if __name__ == '__main__':
     test_gmm_conv()
     test_nn_conv()
     test_sg_conv()
-    test_edge_softmax()
-    test_partial_edge_softmax()
     test_set2set()
     test_glob_att_pool()
     test_simple_pool()

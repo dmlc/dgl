@@ -82,7 +82,7 @@ void RandomEngine::UniformChoice(IdxType num, IdxType population, IdxType* out, 
       for (IdxType i = 0; i < num; ++i)
         out[i] = i;
       for (IdxType i = num; i < population; ++i) {
-        const IdxType j = RandInt(i);
+        const IdxType j = RandInt(i + 1);
         if (j < num)
           out[j] = i;
       }

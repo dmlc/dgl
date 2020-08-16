@@ -183,7 +183,7 @@ class DGLJTNNVAE(nn.Module):
                 node['is_leaf'] = False
                 set_atommap(node['mol'], node['nid'])
 
-        mol_tree_sg = mol_tree.graph.subgraph(effective_nodes.int().to(tree_vec.device))
+        mol_tree_sg = mol_tree.graph.subgraph(effective_nodes.to(tree_vec.device))
         mol_tree_msg, _ = self.jtnn([mol_tree_sg])
         mol_tree_msg = unbatch(mol_tree_msg)[0]
         mol_tree_msg.nodes_dict = nodes_dict

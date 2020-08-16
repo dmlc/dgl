@@ -6,6 +6,7 @@ import networkx as nx
 from dgl import DGLGraph
 from collections import defaultdict as ddict
 import unittest
+from test_utils import parametrize_dtype
 
 D = 5
 reduce_msg_shapes = set()
@@ -25,7 +26,7 @@ def reduce_func(nodes):
 def apply_node_func(nodes):
     return {'h' : nodes.data['h'] + nodes.data['accum']}
 
-def generate_graph(grad=False):
+def generate_graph_old(grad=False):
     g = DGLGraph()
     g.add_nodes(10) # 10 nodes
     # create a graph where 0 is the source and 9 is the sink
@@ -48,10 +49,51 @@ def generate_graph(grad=False):
     g.set_e_initializer(dgl.init.zero_initializer)
     return g
 
-def test_batch_setter_getter():
+def generate_graph(idtype, grad=False):
+    '''
+    s, d, eid
+    0, 1, 0
+    1, 9, 1
+    0, 2, 2
+    2, 9, 3
+    0, 3, 4
+    3, 9, 5
+    0, 4, 6
+    4, 9, 7
+    0, 5, 8
+    5, 9, 9
+    0, 6, 10
+    6, 9, 11
+    0, 7, 12
+    7, 9, 13
+    0, 8, 14
+    8, 9, 15
+    9, 0, 16
+    '''
+    u = F.tensor([0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 9])
+    v = F.tensor([1, 9, 2, 9, 3, 9, 4, 9, 5, 9, 6, 9, 7, 9, 8, 9, 0])
+    g = dgl.graph((u, v), idtype=idtype)
+    assert g.device == F.ctx()
+    ncol = F.randn((10, D))
+    ecol = F.randn((17, D))
+    if grad:
+        ncol = F.attach_grad(ncol)
+        ecol = F.attach_grad(ecol)
+
+    g.ndata['h'] = ncol
+    g.edata['w'] = ecol
+    g.set_n_initializer(dgl.init.zero_initializer)
+    g.set_e_initializer(dgl.init.zero_initializer)
+    return g
+
+def test_compatible():
+    g = generate_graph_old()
+
+@parametrize_dtype
+def test_batch_setter_getter(idtype):
     def _pfc(x):
         return list(F.zerocopy_to_numpy(x)[:,0])
-    g = generate_graph()
+    g = generate_graph(idtype)
     # set all nodes
     g.ndata['h'] = F.zeros((10, D))
     assert F.allclose(g.ndata['h'], F.zeros((10, D)))
@@ -128,9 +170,9 @@ def test_batch_setter_getter():
     v = F.tensor([3, 4, 5], g.idtype)
     assert _pfc(g.edges[u, v].data['l']) == [1., 1., 1.]
 
-
-def test_batch_setter_autograd():
-    g = generate_graph(grad=True)
+@parametrize_dtype
+def test_batch_setter_autograd(idtype):
+    g = generate_graph(idtype, grad=True)
     h1 = g.ndata['h']
     # partial set
     v = F.tensor([1, 2, 8], g.idtype)
@@ -261,10 +303,11 @@ def _test_nx_conversion():
     assert F.allclose(g.edata['h'], F.tensor([[1., 2.], [1., 2.],
                                               [2., 3.], [2., 3.]]))
 
-def test_apply_nodes():
+@parametrize_dtype
+def test_apply_nodes(idtype):
     def _upd(nodes):
         return {'h' : nodes.data['h'] * 2}
-    g = generate_graph()
+    g = generate_graph(idtype)
     old = g.ndata['h']
     g.apply_nodes(_upd)
     assert F.allclose(old * 2, g.ndata['h'])
@@ -272,10 +315,11 @@ def test_apply_nodes():
     g.apply_nodes(lambda nodes : {'h' : nodes.data['h'] * 0.}, u)
     assert F.allclose(F.gather_row(g.ndata['h'], u), F.zeros((4, D)))
 
-def test_apply_edges():
+@parametrize_dtype
+def test_apply_edges(idtype):
     def _upd(edges):
         return {'w' : edges.data['w'] * 2}
-    g = generate_graph()
+    g = generate_graph(idtype)
     old = g.edata['w']
     g.apply_edges(_upd)
     assert F.allclose(old * 2, g.edata['w'])
@@ -285,8 +329,9 @@ def test_apply_edges():
     eid = F.tensor(g.edge_ids(u, v))
     assert F.allclose(F.gather_row(g.edata['w'], eid), F.zeros((6, D)))
 
-def test_update_routines():
-    g = generate_graph()
+@parametrize_dtype
+def test_update_routines(idtype):
+    g = generate_graph(idtype)
 
     # send_and_recv
     reduce_msg_shapes.clear()
@@ -321,28 +366,23 @@ def test_update_routines():
     assert(reduce_msg_shapes == {(1, 8, D), (9, 1, D)})
     reduce_msg_shapes.clear()
 
-def test_update_all_0deg():
+@parametrize_dtype
+def test_update_all_0deg(idtype):
     # test#1
-    g = DGLGraph()
-    g = g.to(F.ctx())
-    g.add_nodes(5)
-    g.add_edge(1, 0)
-    g.add_edge(2, 0)
-    g.add_edge(3, 0)
-    g.add_edge(4, 0)
+    g = dgl.graph([(1,0), (2,0), (3,0), (4,0)], idtype=idtype, device=F.ctx())
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
-        return {'h' : nodes.data['h'] + F.sum(nodes.mailbox['m'], 1)}
+        return {'x' : nodes.data['h'] + F.sum(nodes.mailbox['m'], 1)}
     def _apply(nodes):
-        return {'h' : nodes.data['h'] * 2}
+        return {'x' : nodes.data['x'] * 2}
     def _init2(shape, dtype, ctx, ids):
         return 2 + F.zeros(shape, dtype, ctx)
-    g.set_n_initializer(_init2, 'h')
+    g.set_n_initializer(_init2, 'x')
     old_repr = F.randn((5, 5))
     g.ndata['h'] = old_repr
     g.update_all(_message, _reduce, _apply)
-    new_repr = g.ndata['h']
+    new_repr = g.ndata['x']
     # the first row of the new_repr should be the sum of all the node
     # features; while the 0-deg nodes should be initialized by the
     # initializer and applied with UDF.
@@ -350,35 +390,30 @@ def test_update_all_0deg():
     assert F.allclose(new_repr[0], 2 * F.sum(old_repr, 0))
 
     # test#2: graph with no edge
-    g = DGLGraph()
-    g = g.to(F.ctx())
-    g.add_nodes(5)
-    g.set_n_initializer(_init2, 'h')
+    g = dgl.graph([], num_nodes=5, idtype=idtype, device=F.ctx())
     g.ndata['h'] = old_repr
-    g.update_all(_message, _reduce, _apply)
+    g.update_all(_message, _reduce, lambda nodes : {'h' : nodes.data['h'] * 2})
     new_repr = g.ndata['h']
     # should fallback to apply
     assert F.allclose(new_repr, 2*old_repr)
 
-def test_pull_0deg():
-    g = DGLGraph()
-    g = g.to(F.ctx())
-    g.add_nodes(2)
-    g.add_edge(0, 1)
+@parametrize_dtype
+def test_pull_0deg(idtype):
+    g = dgl.graph([(0,1)], idtype=idtype, device=F.ctx())
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
-        return {'h' : nodes.data['h'] + F.sum(nodes.mailbox['m'], 1)}
+        return {'x' : nodes.data['h'] + F.sum(nodes.mailbox['m'], 1)}
     def _apply(nodes):
-        return {'h' : nodes.data['h'] * 2}
+        return {'x' : nodes.data['x'] * 2}
     def _init2(shape, dtype, ctx, ids):
         return 2 + F.zeros(shape, dtype, ctx)
-    g.set_n_initializer(_init2, 'h')
+    g.set_n_initializer(_init2, 'x')
     # test#1: pull both 0deg and non-0deg nodes
     old = F.randn((2, 5))
     g.ndata['h'] = old
     g.pull([0, 1], _message, _reduce, _apply)
-    new = g.ndata.pop('h')
+    new = g.ndata['x']
     # 0deg check: initialized with the func and got applied
     assert F.allclose(new[0], F.full_1d(5, 4, dtype=F.float32))
     # non-0deg check
@@ -387,8 +422,8 @@ def test_pull_0deg():
     # test#2: pull only 0deg node
     old = F.randn((2, 5))
     g.ndata['h'] = old
-    g.pull(0, _message, _reduce, _apply)
-    new = g.ndata.pop('h')
+    g.pull(0, _message, _reduce, lambda nodes : {'h' : nodes.data['h'] * 2})
+    new = g.ndata['h']
     # 0deg check: fallback to apply
     assert F.allclose(new[0], 2*old[0])
     # non-0deg check: not touched
@@ -428,81 +463,19 @@ def test_dynamic_addition():
     assert len(g.edata['h1']) == len(g.edata['h2'])
 
 
-def test_repr():
-    g = dgl.DGLGraph()
-    g = g.to(F.ctx())
-    g.add_nodes(10)
-    g.add_edge(0, 1)
+@parametrize_dtype
+def test_repr(idtype):
+    g = dgl.graph([(0,1), (0,2), (1,2)], num_nodes=10, idtype=idtype, device=F.ctx())
     repr_string = g.__repr__()
     print(repr_string)
     g.ndata['x'] = F.zeros((10, 5))
-    g.add_edges([0, 1], 2)
     g.edata['y'] = F.zeros((3, 4))
     repr_string = g.__repr__()
     print(repr_string)
 
-
-def test_group_apply_edges():
-    def edge_udf(edges):
-        h = F.sum(edges.data['feat'] * (edges.src['h'] + edges.dst['h']), dim=2)
-        normalized_feat = F.softmax(h, dim=1)
-        return {"norm_feat": normalized_feat}
-
-    g = DGLGraph()
-    g = g.to(F.ctx())
-    g.add_nodes(10)
-    g.add_edges(0, [1, 2, 3, 4, 5, 6, 7, 8])
-    g.add_edges(1, [2, 3, 4, 6, 7, 8])
-    g.add_edges(2, [2, 3, 4, 5, 6, 7, 8])
-
-    g.ndata['h'] = F.randn((g.number_of_nodes(), D))
-    g.edata['feat'] = F.randn((g.number_of_edges(), D))
-
-    def _test(group_by):
-        g.group_apply_edges(group_by=group_by, func=edge_udf)
-        if group_by == 'src':
-            u, v, eid = g.out_edges(1, form='all')
-        else:
-            u, v, eid = g.in_edges(5, form='all')
-        out_feat = g.edges[eid].data['norm_feat']
-        result = (g.nodes[u].data['h'] + g.nodes[v].data['h']) * g.edges[eid].data['feat']
-        result = F.softmax(F.sum(result, dim=1), dim=0)
-        assert F.allclose(out_feat, result)
-
-    # test group by source nodes
-    _test('src')
-
-    # test group by destination nodes
-    _test('dst')
-
-
-# GitHub issue #1036
-@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
-def test_group_apply_edges2():
-    m = ssp.random(10, 10, 0.2)
-    g = DGLGraph(m, readonly=True)
-    g = g.to(F.ctx())
-    g.ndata['deg'] = g.in_degrees()
-    g.ndata['id'] = F.arange(0, g.number_of_nodes(), g.idtype)
-    g.edata['id'] = F.arange(0, g.number_of_edges(), g.idtype)
-
-    def apply(edges):
-        w = edges.data['id']
-        n_nodes, deg = w.shape
-
-        dst = edges.dst['id'][:, 0]
-        # TODO: tmp hack
-        eid1 = F.asnumpy(g.in_edges(dst, 'eid')).reshape(n_nodes, deg).sort(1)
-        eid2 = F.asnumpy(edges.data['id']).sort(1)
-        assert np.array_equal(eid1, eid2)
-        return {'id2': w}
-
-    g.group_apply_edges('dst', apply, inplace=True)
-
-
-def test_local_var():
-    g = DGLGraph(nx.path_graph(5))
-    g = g.to(F.ctx())
+@parametrize_dtype
+def test_local_var(idtype):
+    g = dgl.graph([(0,1), (1,2), (2,3), (3,4)], idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
     # test override
@@ -539,10 +512,7 @@ def test_local_var():
     assert 'ww' not in g.edata
 
     # test initializer1
-    g = DGLGraph()
-    g = g.to(F.ctx())
-    g.add_nodes(2)
-    g.add_edges([0, 1], [1, 1])
+    g = dgl.graph([(0,1), (1,1)], idtype=idtype, device=F.ctx())
     g.set_n_initializer(dgl.init.zero_initializer)
     def foo(g):
         g = g.local_var()
@@ -561,9 +531,9 @@ def test_local_var():
         assert F.allclose(g.edata['w'], F.tensor([[1.], [0.]]))
     foo(g)
 
-def test_local_scope():
-    g = DGLGraph(nx.path_graph(5))
-    g = g.to(F.ctx())
+@parametrize_dtype
+def test_local_scope(idtype):
+    g = dgl.graph([(0,1), (1,2), (2,3), (3,4)], idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
     # test override
@@ -614,10 +584,7 @@ def test_local_scope():
     assert 'ww' not in g.edata
 
     # test initializer1
-    g = DGLGraph()
-    g = g.to(F.ctx())
-    g.add_nodes(2)
-    g.add_edges([0, 1], [1, 1])
+    g = dgl.graph([(0,1), (1,1)], idtype=idtype, device=F.ctx())
     g.set_n_initializer(dgl.init.zero_initializer)
     def foo(g):
         with g.local_scope():
@@ -636,23 +603,59 @@ def test_local_scope():
             assert F.allclose(g.edata['w'], F.tensor([[1.], [0.]]))
     foo(g)
 
-if __name__ == '__main__':
-    #test_nx_conversion()
-    test_batch_setter_getter()
-    test_batch_setter_autograd()
-    test_batch_send()
-    test_batch_recv()
-    test_apply_nodes()
-    test_apply_edges()
-    test_update_routines()
-    test_recv_0deg()
-    test_recv_0deg_newfld()
-    test_update_all_0deg()
-    test_pull_0deg()
-    test_send_multigraph()
-    test_dynamic_addition()
-    test_repr()
-    test_group_apply_edges()
-    test_group_apply_edges2()
-    test_local_var()
-    test_local_scope()
+@parametrize_dtype
+def test_isolated_nodes(idtype):
+    g = dgl.graph([(0, 1), (1, 2)], num_nodes=5, idtype=idtype, device=F.ctx())
+    assert g.number_of_nodes() == 5
+
+    # Test backward compatibility
+    g = dgl.graph([(0, 1), (1, 2)], card=5, idtype=idtype, device=F.ctx())
+    assert g.number_of_nodes() == 5
+
+    g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays',
+                      'game', num_nodes=(5, 7), idtype=idtype, device=F.ctx())
+    assert g.idtype == idtype
+    assert g.number_of_nodes('user') == 5
+    assert g.number_of_nodes('game') == 7
+
+    # Test backward compatibility
+    g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays',
+                      'game', card=(5, 7), idtype=idtype, device=F.ctx())
+    assert g.idtype == idtype
+    assert g.number_of_nodes('user') == 5
+    assert g.number_of_nodes('game') == 7
+
+@parametrize_dtype
+def test_send_multigraph(idtype):
+    g = dgl.graph([(0,1), (0,1), (0,1), (2,1)], idtype=idtype, device=F.ctx())
+
+    def _message_a(edges):
+        return {'a': edges.data['a']}
+    def _message_b(edges):
+        return {'a': edges.data['a'] * 3}
+    def _reduce(nodes):
+        return {'a': F.max(nodes.mailbox['a'], 1)}
+
+    def answer(*args):
+        return F.max(F.stack(args, 0), 0)
+
+    assert g.is_multigraph
+
+    # send by eid
+    old_repr = F.randn((4, 5))
+    # send_and_recv_on
+    g.ndata['a'] = F.zeros((3, 5))
+    g.edata['a'] = old_repr
+    g.send_and_recv([0, 2, 3], message_func=_message_a, reduce_func=_reduce)
+    new_repr = g.ndata['a']
+    assert F.allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
+    assert F.allclose(new_repr[[0, 2]], F.zeros((2, 5)))
+
+@parametrize_dtype
+def test_issue_1088(idtype):
+    # This test ensures that message passing on a heterograph with one edge type
+    # would not crash (GitHub issue #1088).
+    import dgl.function as fn
+    g = dgl.heterograph({('U', 'E', 'V'): ([0, 1, 2], [1, 2, 3])}, idtype=idtype, device=F.ctx())
+    g.nodes['U'].data['x'] = F.randn((3, 3))
+    g.update_all(fn.copy_u('x', 'm'), fn.sum('m', 'y'))

@@ -109,7 +109,7 @@ class SAGE(nn.Module):
                 end = start + batch_size
                 batch_nodes = nodes[start:end]
                 block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
-                block = block.to(device)
+                block = block.int().to(device)
                 induced_nodes = block.srcdata[dgl.NID]
 
                 h = x[induced_nodes].to(device)
@@ -147,18 +147,6 @@ class NeighborSampler(object):
             hist_blocks.insert(0, hist_block)
         return blocks, hist_blocks
 
-def prepare_mp(g):
-    """
-    Explicitly materialize the CSR, CSC and COO representation of the given graph
-    so that they could be shared via copy-on-write to sampler workers and GPU
-    trainers.
-
-    This is a workaround before full shared memory support on heterogeneous graphs.
-    """
-    g.in_degree(0)
-    g.out_degree(0)
-    g.find_edges([0])
-
 def compute_acc(pred, labels):
     """
     Compute the accuracy of prediction given the labels.
@@ -188,7 +176,7 @@ def load_subtensor(g, labels, blocks, hist_blocks, dev_id, aggregation_on_device
     """
     blocks[0].srcdata['features'] = g.ndata['features'][blocks[0].srcdata[dgl.NID]]
     blocks[-1].dstdata['label'] = labels[blocks[-1].dstdata[dgl.NID]]
-    ret_blocks = [] 
+    ret_blocks = []
     ret_hist_blocks = []
     for i, (block, hist_block) in enumerate(zip(blocks, hist_blocks)):
         hist_col = 'features' if i == 0 else 'hist_%d' % i
@@ -200,7 +188,7 @@ def load_subtensor(g, labels, blocks, hist_blocks, dev_id, aggregation_on_device
             hist_block = hist_block.to(dev_id)
         hist_block.update_all(fn.copy_u('hist', 'm'), fn.mean('m', 'agg_hist'))
 
-        block = block.to(dev_id)
+        block = block.int().to(dev_id)
         if not aggregation_on_device:
             hist_block = hist_block.to(dev_id)
         block.dstdata['agg_hist'] = hist_block.dstdata['agg_hist']
@@ -232,10 +220,8 @@ def run(args, dev_id, data):
 
     # Unpack data
     train_mask, val_mask, in_feats, labels, n_classes, g = data
-    train_nid = th.LongTensor(np.nonzero(train_mask)[0])
-    val_nid = th.LongTensor(np.nonzero(val_mask)[0])
-    train_mask = th.BoolTensor(train_mask)
-    val_mask = th.BoolTensor(val_mask)
+    train_nid = train_mask.nonzero().squeeze()
+    val_nid = val_mask.nonzero().squeeze()
 
     # Create sampler
     sampler = NeighborSampler(g, [int(_) for _ in args.fan_out.split(',')])
@@ -269,9 +255,8 @@ def run(args, dev_id, data):
     for epoch in range(args.num_epochs):
         tic = time.time()
         model.train()
+        tic_step = time.time()
         for step, (blocks, hist_blocks) in enumerate(dataloader):
-            tic_step = time.time()
-
             # The nodes for input lies at the LHS side of the first block.
             # The nodes for output lies at the RHS side of the last block.
             input_nodes = blocks[0].srcdata[dgl.NID]
@@ -295,7 +280,7 @@ def run(args, dev_id, data):
                 acc = compute_acc(batch_pred, batch_labels)
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f}'.format(
                     epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:])))
-
+            tic_step = time.time()
         toc = time.time()
         print('Epoch Time(s): {:.4f}'.format(toc - tic))
         if epoch >= 5:
@@ -324,16 +309,15 @@ if __name__ == '__main__':
 
     # load reddit data
     data = RedditDataset(self_loop=True)
-    train_mask = data.train_mask
-    val_mask = data.val_mask
-    features = th.Tensor(data.features)
+    n_classes = data.num_classes
+    g = data[0]
+    features = g.ndata['feat']
     in_feats = features.shape[1]
-    labels = th.LongTensor(data.labels)
-    n_classes = data.num_labels
-    # Construct graph
-    g = dgl.graph(data.graph.all_edges())
+    labels = g.ndata['label']
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
     g.ndata['features'] = features
-    prepare_mp(g)
+    g.create_format_()
     # Pack data
     data = train_mask, val_mask, in_feats, labels, n_classes, g
 

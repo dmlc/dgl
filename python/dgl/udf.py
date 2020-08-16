@@ -6,28 +6,26 @@ class EdgeBatch(object):
 
     Parameters
     ----------
-    edges : tuple of utils.Index
-        The edge tuple (u, v, eid). eid can be ALL
-    src_data : dict
-        The src node features, in the form of ``dict``
-        with ``str`` keys and ``tensor`` values
-    edge_data : dict
-        The edge features, in the form of ``dict`` with
-        ``str`` keys and ``tensor`` values
-    dst_data : dict of tensors
-        The dst node features, in the form of ``dict``
-        with ``str`` keys and ``tensor`` values
-    canonical_etype : tuple of (str, str, str), optional
-        Canonical edge type of the edge batch, if UDF is
-        running on a heterograph.
+    graph : DGLGraph
+        Graph object.
+    eid : Tensor
+        Edge IDs.
+    etype : (str, str, str)
+        Edge type.
+    src_data : dict[str, Tensor]
+        Src node features.
+    edge_data : dict[str, Tensor]
+        Edge features.
+    dst_data : dict[str, Tensor]
+        Dst node features.
     """
-    def __init__(self, edges, src_data, edge_data, dst_data,
-                 canonical_etype=(None, None, None)):
-        self._edges = edges
+    def __init__(self, graph, eid, etype, src_data, edge_data, dst_data):
+        self._graph = graph
+        self._eid = eid
+        self._etype = etype
         self._src_data = src_data
         self._edge_data = edge_data
         self._dst_data = dst_data
-        self._canonical_etype = canonical_etype
 
     @property
     def src(self):
@@ -67,14 +65,15 @@ class EdgeBatch(object):
 
         Returns
         -------
-        tuple of three tensors
-            The edge tuple :math:`(src, dst, eid)`. :math:`src[i],
-            dst[i], eid[i]` separately specifies the source node,
-            destination node and the edge id for the ith edge
-            in the batch.
+        Tensor
+            Source node IDs.
+        Tensor
+            Destination node IDs.
+        Tensor
+            Edge IDs.
         """
-        u, v, eid = self._edges
-        return (u.tousertensor(), v.tousertensor(), eid.tousertensor())
+        u, v = self._graph.find_edges(self._eid, etype=self.canonical_etype)
+        return u, v, self._eid
 
     def batch_size(self):
         """Return the number of edges in this edge batch.
@@ -83,7 +82,7 @@ class EdgeBatch(object):
         -------
         int
         """
-        return len(self._edges[0])
+        return len(self._eid)
 
     def __len__(self):
         """Return the number of edges in this edge batch.
@@ -97,31 +96,31 @@ class EdgeBatch(object):
     @property
     def canonical_etype(self):
         """Return the canonical edge type (i.e. triplet of source, edge, and
-        destination node type) for this edge batch, if available."""
-        return self._canonical_etype
+        destination node type) for this edge batch."""
+        return self._etype
 
 class NodeBatch(object):
-    """The class that can represent a batch of nodes.
+    """The class to represent a batch of nodes.
 
     Parameters
     ----------
-    nodes : utils.Index
-        The node ids.
-    data : dict
-        The node features, in the form of ``dict``
-        with ``str`` keys and ``tensor`` values
-    msgs : dict, optional
-        The messages, , in the form of ``dict``
-        with ``str`` keys and ``tensor`` values
+    graph : DGLGraph
+        Graph object.
+    nodes : Tensor
+        Node ids.
     ntype : str, optional
-        The node type of this node batch, if running
-        on a heterograph.
+        The node type of this node batch,
+    data : dict[str, Tensor]
+        Node feature data.
+    msgs : dict[str, Tensor], optional
+        Messages data.
     """
-    def __init__(self, nodes, data, msgs=None, ntype=None):
+    def __init__(self, graph, nodes, ntype, data, msgs=None):
+        self._graph = graph
         self._nodes = nodes
+        self._ntype = ntype
         self._data = data
         self._msgs = msgs
-        self._ntype = ntype
 
     @property
     def data(self):
@@ -156,7 +155,7 @@ class NodeBatch(object):
         tensor
             The nodes.
         """
-        return self._nodes.tousertensor()
+        return self._nodes
 
     def batch_size(self):
         """Return the number of nodes in this batch.

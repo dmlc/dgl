@@ -101,7 +101,13 @@ class RelGraphConvLayer(nn.Module):
                      for i, w in enumerate(th.split(weight, 1, dim=0))}
         else:
             wdict = {}
-        inputs_src, inputs_dst = dglnn.expand_as_pair(inputs, g)
+
+        if g.is_block:
+            inputs_src = inputs
+            inputs_dst = {k: v[:g.number_of_dst_nodes(k)] for k, v in inputs.items()}
+        else:
+            inputs_src = inputs_dst = inputs
+
         hs = self.conv(g, inputs, mod_kwargs=wdict)
 
         def _apply(ntype, h):
@@ -226,8 +232,8 @@ class EntityClassify(nn.Module):
                     self.h_dim if l != len(self.layers) - 1 else self.out_dim)
                 for k in g.ntypes}
 
-            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
-            dataloader = dgl.sampling.NodeDataLoader(
+            sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
+            dataloader = dgl.dataloading.NodeDataLoader(
                 g,
                 {k: th.arange(g.number_of_nodes(k)) for k in g.ntypes},
                 sampler,

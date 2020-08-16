@@ -196,9 +196,3 @@ Sequential
 .. autoclass:: dgl.nn.mxnet.utils.Sequential
     :members:
     :show-inheritance:
-
-Edge Softmax
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: dgl.nn.mxnet.softmax
-    :members: edge_softmax

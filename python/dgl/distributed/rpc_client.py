@@ -96,15 +96,16 @@ def get_local_usable_addr():
 
     return ip_addr + ':' + str(port)
 
-INITIALIZED = False
 
-def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
+def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Connect this client to server.
 
     Parameters
     ----------
     ip_config : str
         Path of server IP configuration file.
+    num_servers : int
+        server count on each machine.
     max_queue_size : int
         Maximal size (bytes) of client queue buffer (~20 GB on default).
         Note that the 20 GB is just an upper-bound and DGL uses zero-copy and
@@ -116,6 +117,7 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     ------
     ConnectionError : If anything wrong with the connection.
     """
+    assert num_servers > 0, 'num_servers (%d) must be a positive number.' % num_servers
     assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % max_queue_size
     assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'.' % net_type
     # Register some basic service
@@ -132,7 +134,7 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
                          rpc.ClientBarrierRequest,
                          rpc.ClientBarrierResponse)
     rpc.register_ctrl_c()
-    server_namebook = rpc.read_ip_config(ip_config)
+    server_namebook = rpc.read_ip_config(ip_config, num_servers)
     num_servers = len(server_namebook)
     rpc.set_num_server(num_servers)
     # group_count means how many servers
@@ -175,16 +177,9 @@ def connect_to_server(ip_config, max_queue_size=MAX_QUEUE_SIZE, net_type='socket
     rpc.send_request(0, get_client_num_req)
     res = rpc.recv_response()
     rpc.set_num_client(res.num_client)
+    from .dist_context import exit_client, set_initialized
     atexit.register(exit_client)
-    global INITIALIZED
-    INITIALIZED = True
-
-def finalize_client():
-    """Release resources of this client."""
-    rpc.finalize_sender()
-    rpc.finalize_receiver()
-    global INITIALIZED
-    INITIALIZED = False
+    set_initialized()
 
 def shutdown_servers():
     """Issue commands to remote servers to shut them down.
@@ -193,21 +188,7 @@ def shutdown_servers():
     ------
     ConnectionError : If anything wrong with the connection.
     """
-    if rpc.get_rank() == 0: # Only client_0 issue this command
+    if rpc.get_rank() == 0:  # Only client_0 issue this command
         req = rpc.ShutDownRequest(rpc.get_rank())
         for server_id in range(rpc.get_num_server()):
             rpc.send_request(server_id, req)
-
-def exit_client():
-    """Register exit callback.
-    """
-    # Only client with rank_0 will send shutdown request to servers.
-    rpc.client_barrier()
-    shutdown_servers()
-    finalize_client()
-    atexit.unregister(exit_client)
-
-def is_initialized():
-    """Is RPC initialized?
-    """
-    return INITIALIZED
