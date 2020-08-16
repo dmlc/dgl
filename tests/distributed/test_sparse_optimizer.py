@@ -4,6 +4,7 @@ from scipy import sparse as spsp
 import dgl
 import backend as F
 import unittest
+from utils import get_local_usable_addr
 
 def create_random_graph(n):
     arr = (spsp.random(n, n, density=0.001, format='coo', random_state=100) != 0).astype(np.int64)
@@ -27,8 +28,13 @@ def test_adagrad():
     graph_name = 'sparse_adagrad_graph'
     dgl.distributed.partition_graph(g, graph_name, num_parts, '/tmp/dist_graph')
 
-    dgl.distributed.initialize('172.0.0.1', 1)
-    g = dgl.distributed.DistGraph('172.0.0.1', graph_name,
+    # Prepare ip config
+    ip_config = open("rpc_ip_config.txt", "w")
+    ip_config.write('{}\n'.format(get_local_usable_addr()))
+    ip_config.close()
+
+    dgl.distributed.initialize("rpc_ip_config.txt")
+    g = dgl.distributed.DistGraph(graph_name,
                                   part_config='/tmp/dist_graph/sparse_adagrad_graph.json')
     embed_size=10
 
