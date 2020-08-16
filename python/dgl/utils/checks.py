@@ -164,48 +164,6 @@ def check_all_same_schema(feat_dict_list, keys, name):
                                    name, k, F.dtype(t1), F.shape(t1)[1:],
                                    F.dtype(t2), F.shape(t2)[1:]))
 
-def check_type(obj, otype, name, skip_none):
-    """Check whether the object is an instance of an expected type.
-
-    Parameters
-    ----------
-    obj : object
-        An arbitrary object.
-    otype : type
-        The expected type of the object.
-    name : str
-        Name of the object.
-    skip_none : bool
-        Whether to skip the check when obj is None.
-    """
-    if skip_none and obj is None:
-        return
-    if not isinstance(obj, otype):
-        raise DGLError('Expect {} to be an instance of {}, got {}'.format(name, otype, type(obj)))
-
-def check_all_same_type(olist, otype, name, skip_none):
-    """Check whether all objects in a list are instances of an expected type.
-
-    Parameters
-    ----------
-    olist : list
-        A list of objects.
-    otype : type
-        The expected type of the objects.
-    name : str
-        Name of this list for error message.
-    skip_none : bool
-        Whether to skip the check when olist is None.
-    """
-    if skip_none and olist is None:
-        return
-    if len(olist) == 0:
-        return
-    for idx, obj in enumerate(olist):
-        if not isinstance(obj, otype):
-            raise DGLError('Expect all objects in {} to be an instance of {}, '
-                           'got {} for the {:d}-th object'.format(name, otype, type(obj), idx))
-
 def check_valid_idtype(idtype):
     """Check whether the value of the idtype argument is valid (int32/int64)
 
@@ -217,49 +175,3 @@ def check_valid_idtype(idtype):
     if idtype not in [None, F.int32, F.int64]:
         raise DGLError('Expect idtype to be a framework object of int32/int64, '
                        'got {}'.format(idtype))
-
-def check_id_range(ids, maxid, name):
-    """Check whether the given IDs are within range [0, maxid).
-
-    Parameters
-    ----------
-    ids : Tensor
-        ID tensor.
-    maxid : int
-        Max
-    """
-    if len(values) == 0:
-        return
-
-    if F.is_tensor(values):
-        min_val = F.as_scalar(F.min(values, dim=0))
-    else:
-        min_val = np.min(values)
-    if min_val < 0:
-        raise DGLError('Expect {} to contain non-negative values only, '
-                       'got a negative element {}'.format(name, min_val))
-
-def assert_iterable_bounded_by_value(values, values_name, target_max_val, target_max_val_name):
-    """Check whether an iterable of scalars only contains values smaller than max_val
-
-    Parameters
-    ----------
-    values : iterable
-        An iterable of scalars for check.
-    values_name : str
-        Name of values for error message.
-    target_max_val : scalar
-        A value that should be strictly larger than all elements of values
-    target_max_val_name : str
-        Name of target_max_val for error message.
-    """
-    if len(values) == 0:
-        return
-
-    if F.is_tensor(values):
-        max_val = F.as_scalar(F.max(values, dim=0))
-    else:
-        max_val = np.max(values)
-    if max_val >= target_max_val:
-        raise DGLError('Expect the values in {} to be strictly smaller than {} {}, got '
-                       '{}'.format(values_name, target_max_val_name, target_max_val, max_val))
