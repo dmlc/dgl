@@ -152,8 +152,7 @@ class DistEmbedLayer(nn.Module):
 
         if sparse_emb:
             if dgl_sparse_emb:
-                self.node_embeds = dgl.distributed.DistEmbedding(g,
-                                                                 g.number_of_nodes(),
+                self.node_embeds = dgl.distributed.DistEmbedding(g.number_of_nodes(),
                                                                  self.embed_size,
                                                                  embed_name,
                                                                  init_emb)
@@ -203,7 +202,7 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, node_feats
     eval_logits = []
     eval_seeds = []
 
-    global_results = dgl.distributed.DistTensor(g, labels.shape, th.long, 'results', persistent=True)
+    global_results = dgl.distributed.DistTensor(labels.shape, th.long, 'results', persistent=True)
 
     with th.no_grad():
         for sample_data in tqdm.tqdm(eval_loader):
@@ -353,9 +352,6 @@ def run(args, device, data):
         all_params = list(model.parameters()) + list(embed_layer.parameters())
         optimizer = th.optim.Adam(all_params, lr=args.lr, weight_decay=args.l2norm)
 
-    #profiler = Profiler()
-    #profiler.start()
-
     # training loop
     print("start training...")
     for epoch in range(args.n_epochs):
@@ -438,15 +434,12 @@ def run(args, device, data):
             print('Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(val_acc, test_acc,
                                                                          time.time() - start))
 
-    #profiler.stop()
-    #print(profiler.output_text())
-
 def main(args):
     dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
 
-    g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, part_config=args.conf_path)
+    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.conf_path)
     print('rank:', g.rank())
     print('number of edges', g.number_of_edges())
 

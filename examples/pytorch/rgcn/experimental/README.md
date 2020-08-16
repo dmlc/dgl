@@ -20,11 +20,12 @@ DGL provides a script for copying partitioned data to the cluster. The command b
 to the machines in the cluster. The configuration of the cluster is defined by `ip_config.txt`.
 The data is copied to `~/rgcn/ogbn-mag` on each of the remote machines. `--rel_data_path` specifies the location of the partitioned data (generated in Step 1). `--part_config`
 specifies the location of the partitioned data in the local machine (a user only needs to specify
-the location of the partition configuration file).
+the location of the partition configuration file). `--script_folder` specifies the location of the training scripts.
 ```bash
-python3 ~/dgl/tools/copy_partitions.py --ip_config ip_config.txt \
-			--workspace ~/rgcn --rel_data_path data \
-			--part_config data/ogbn-mag.json
+python ~/dgl/tools/copy_files.py --ip_config ip_config.txt \
+                                 --workspace ~/rgcn --rel_data_path data \
+				 --part_config data/ogbn-mag.json \
+			         --script_folder ./
 ```
 
 **Note**: users need to make sure that the master node has right permission to ssh to all the other nodes.
