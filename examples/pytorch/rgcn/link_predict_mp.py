@@ -421,11 +421,7 @@ def fullgraph_emb(g, embed_layer, model, node_feats, dim_size, device):
                                     g.ndata['type_id'][idx],
                                     node_feats).cpu()
 
-<<<<<<< HEAD
     emb = model.inference(g, in_feats, device)
-=======
-    emb = model.inference(g, in_feats, 128, device)
->>>>>>> 1791cd1bc8f8eeaf7b9879ddd5712608b75b305a
     return emb
 
 def fullgraph_eval(train_g, g, embed_layer, model, device, node_feats,
