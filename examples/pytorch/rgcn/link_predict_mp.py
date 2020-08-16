@@ -422,7 +422,7 @@ def fullgraph_emb(g, embed_layer, model, node_feats, dim_size, device):
                                     g.ndata['type_id'][idx],
                                     node_feats).cpu()
 
-    emb = model.inference(g, in_feats, 1024, device)
+    emb = model.inference(g, in_feats, 128, device)
     return emb
 
 def fullgraph_eval(train_g, g, embed_layer, model, device, node_feats,
@@ -474,7 +474,10 @@ def fullgraph_eval(train_g, g, embed_layer, model, device, node_feats,
     logs = []
 
     with th.no_grad():
-        embs = fullgraph_emb(g, embed_layer, model, node_feats, dim_size, device)
+        if queue is not None:
+            embs = fullgraph_emb(g, embed_layer, model.module, node_feats, dim_size, device)
+        else:
+            embs = fullgraph_emb(g, embed_layer, model, node_feats, dim_size, device)
         pos_batch_size = 1024
         pos_cnt = pos_eids.shape[0]
         total_cnt = 0
@@ -746,13 +749,16 @@ def run(proc_id, n_gpus, args, devices, node_feats, dataset, pos_seeds, neg_seed
                                       n_blocks[0].srcdata['type_id'],
                                       node_feats)
 
-                p_h, n_h = modle(p_blocks, p_feats, n_blocks, n_feats, sample=args.sampler)
+                p_h, n_h = model(p_blocks, p_feats, n_blocks, n_feats, sample=args.sampler)
 
                 head, tail, eid = p_g.all_edges(form='all')
                 p_head_emb = p_h[head]
                 p_tail_emb = p_h[tail]
                 rids = p_g.edata['etype']
-                r_emb = self.w_relation[rids]
+                if queue is None:
+                    r_emb = model.w_relation[rids]
+                else:
+                    r_emb = model.module.w_relation[rids]
                 head, tail = n_g.all_edges(form='uv')
                 n_head_emb = n_h[head]
                 n_tail_emb = n_h[tail]
