@@ -1,5 +1,7 @@
 """Define sparse embedding and optimizer."""
 
+import torch as th
+
 from .. import backend as F
 from .. import utils
 from .dist_tensor import DistTensor
@@ -78,10 +80,12 @@ class SparseAdagradUDF:
         embs = data_store[name]
         state_sum = data_store[name + "_sum"]
         with F.no_grad():
-            grad_sum = F.mean(grad_values * grad_values, 1)
-            F.index_add_inplace(state_sum, grad_indices, grad_sum)
+            grad_sum = grad_values * grad_values
+            # This is faster than F.index_add_inplace. As long as the indices are unique,
+            # += has the same behavior as F.index_add_inplace. += is much faster.
+            state_sum[grad_indices] += grad_sum
             std = state_sum[grad_indices]  # _sparse_mask
-            std_values = F.unsqueeze((F.sqrt(std) + 1e-10), 1)
+            std_values = F.sqrt(std) + 1e-10
             F.index_add_inplace(embs, grad_indices, grad_values / std_values * (-self._lr))
 
 def _init_state(shape, dtype):
@@ -109,7 +113,7 @@ class SparseAdagrad:
             kvstore = emb._tensor.kvstore
             policy = emb._tensor.part_policy
             kvstore.init_data(name + "_sum",
-                              (emb._tensor.shape[0],), emb._tensor.dtype,
+                              emb._tensor.shape, emb._tensor.dtype,
                               policy, _init_state)
             kvstore.register_push_handler(name, SparseAdagradUDF(self._lr))
 
@@ -126,7 +130,8 @@ class SparseAdagrad:
                 kvstore = emb._tensor.kvstore
                 trace = emb._trace
                 if len(trace) == 1:
-                    kvstore.push(name, trace[0][0], F.grad(trace[0][1]))
+                    idxs = trace[0][0]
+                    grads = F.grad(trace[0][1])
                 else:
                     # TODO(zhengda) we need to merge the gradients of the same embeddings first.
                     idxs = [t[0] for t in trace]
@@ -136,6 +141,15 @@ class SparseAdagrad:
                     # We'll need to scale them with the state sum on the kvstore server
                     # after we push them.
                     grads = F.cat(grads, 0)
-                    kvstore.push(name, idxs, grads)
+
+                uniq_idxs, inverse_idxs = th.unique(idxs, return_inverse=True)
+                if len(uniq_idxs) != len(idxs):
+                    shape = list(grads.shape)
+                    shape[0] = len(uniq_idxs)
+                    coalesced_grads = F.zeros(shape, F.dtype(grads), F.cpu())
+                    F.index_add_inplace(coalesced_grads, inverse_idxs, grads)
+                    idxs = uniq_idxs
+                    grads = coalesced_grads
+                kvstore.push(name, idxs, grads)
                 # Clean up the old traces.
                 emb._trace = []
