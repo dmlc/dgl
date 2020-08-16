@@ -2497,21 +2497,6 @@ class DGLHeteroGraph(object):
         >>> g.has_nodes(torch.tensor([3, 0, 1]), 'game')
         tensor([False,  True,  True])
         """
-        if not isinstance(vid, (numbers.Integral, Iterable)):
-            raise DGLError('Expect an int, a tensor or a sequence for vid, '
-                           'got {}'.format(type(vid)))
-
-        if isinstance(vid, numbers.Integral) and vid < 0:
-            raise DGLError('Expect a non-negative value for vid, got {:d}'.format(vid))
-
-        if isinstance(vid, Iterable) and not F.is_tensor(vid):
-            # NaN/Inf values cannot appear in int32/int64 tensors
-            utils.detect_nan_in_iterable(vid, 'vid')
-            utils.detect_inf_in_iterable(vid, 'vid')
-
-        if isinstance(vid, Iterable):
-            utils.assert_nonnegative_iterable(vid, 'vid')
-
         ret = self._graph.has_nodes(
             self.get_ntype_id(ntype),
             utils.prepare_tensor(self, vid, "vid"))
@@ -2605,50 +2590,6 @@ class DGLHeteroGraph(object):
         >>>                     ('user', 'follows', 'game'))
         tensor([True, True])
         """
-        u_type = type(u)
-        v_type = type(v)
-        if u_type != v_type:
-            raise DGLError('Expect the source and destination node IDs to have the same type, ' \
-                           'got {} and {}'.format(u_type, v_type))
-
-        if not (isinstance(u, (numbers.Integral, Iterable)) or F.is_tensor(u)):
-            raise DGLError('Expect the node IDs to have type int, tensor or sequence, '
-                           'got {}'.format(type(u)))
-
-        src_type, _, dst_type = self.to_canonical_etype(etype)
-        num_src_type_nodes = self.num_src_nodes(src_type)
-        num_dst_type_nodes = self.num_dst_nodes(dst_type)
-
-        if isinstance(u, numbers.Integral):
-            if u < 0 or u >= num_src_type_nodes:
-                raise DGLError('Expect the source node ID to be a valid one, i.e. one from 0, ...'
-                               ', {:d}, got {:d}'.format(num_src_type_nodes - 1, u))
-            if v < 0 or v >= num_dst_type_nodes:
-                raise DGLError('Expect the destination node ID to be a valid one, i.e. one '
-                               'from 0, ..., {:d}, got {:d}'.format(num_dst_type_nodes - 1, v))
-        else:
-            if len(u) != len(v):
-                raise DGLError('Expect the source and destination node IDs to have the same '
-                               'length, got {:d} and {:d}'.format(len(u), len(v)))
-
-        if not (F.is_tensor(u) or isinstance(u, numbers.Integral)):
-            utils.detect_nan_in_iterable(u, 'the source node IDs')
-            utils.detect_nan_in_iterable(v, 'the destination node IDs')
-
-            utils.detect_inf_in_iterable(u, 'the source node IDs')
-            utils.detect_inf_in_iterable(v, 'the destination node IDs')
-
-        if isinstance(u, Iterable) or F.is_tensor(u):
-            utils.assert_nonnegative_iterable(u, 'the source node IDs')
-            utils.assert_nonnegative_iterable(v, 'the destination node IDs')
-
-            utils.assert_iterable_bounded_by_value(
-                u, 'the source node IDs', num_src_type_nodes,
-                'the number of {} nodes'.format(src_type))
-            utils.assert_iterable_bounded_by_value(
-                v, 'the destination node IDs', num_dst_type_nodes,
-                'the number of {} nodes'.format(dst_type))
-
         ret = self._graph.has_edges_between(
             self.get_etype_id(etype),
             utils.prepare_tensor(self, u, 'u'),
@@ -2874,60 +2815,6 @@ class DGLHeteroGraph(object):
         >>>            etype=('user', 'follows', 'game'))
         tensor([1, 2])
         """
-        # u and v can be of different types in the case of broadcasting
-        if not (isinstance(u, (numbers.Integral, Iterable)) or F.is_tensor(u)):
-            raise DGLError('Expect the source node ID(s) to have type int, tensor or sequence, '
-                           'got {}'.format(type(u)))
-        if not (isinstance(v, (numbers.Integral, Iterable)) or F.is_tensor(v)):
-            raise DGLError('Expect the destination node ID(s) to have type int, tensor or '
-                           'sequence, got {}'.format(type(v)))
-
-        if not isinstance(u, numbers.Integral) and not isinstance(v, numbers.Integral):
-            u_type = type(u)
-            v_type = type(v)
-            if u_type != v_type:
-                raise DGLError('Expect the source and destination node ID(s) to have the same '
-                               'type, got {} and {}'.format(u_type, v_type))
-            u_len = len(u)
-            v_len = len(v)
-            if u_len != v_len:
-                raise DGLError('Expect the source and destination node ID(s) to have the same '
-                               'length, got {:d} and {:d}'.format(u_len, v_len))
-
-        src_type, _, dst_type = self.to_canonical_etype(etype)
-        num_src_type_nodes = self.num_src_nodes(src_type)
-        num_dst_type_nodes = self.num_dst_nodes(dst_type)
-
-        if isinstance(u, numbers.Integral):
-            if u < 0 or u >= num_src_type_nodes:
-                raise DGLError('Expect the source node ID to be a valid one, i.e. one from 0, ...'
-                               ', {:d}, got {:d}'.format(num_src_type_nodes - 1, u))
-
-        if isinstance(v, numbers.Integral):
-            if v < 0 or v >= num_dst_type_nodes:
-                raise DGLError('Expect the destination node ID to be a valid one, i.e. one '
-                               'from 0, ..., {:d}, got {:d}'.format(num_dst_type_nodes - 1, v))
-
-        if not (F.is_tensor(u) or isinstance(u, numbers.Integral)):
-            utils.detect_nan_in_iterable(u, 'the source node IDs')
-            utils.detect_inf_in_iterable(u, 'the source node IDs')
-
-        if not (F.is_tensor(v) or isinstance(v, numbers.Integral)):
-            utils.detect_nan_in_iterable(v, 'the destination node IDs')
-            utils.detect_inf_in_iterable(v, 'the destination node IDs')
-
-        if isinstance(u, Iterable) or F.is_tensor(u):
-            utils.assert_nonnegative_iterable(u, 'the source node IDs')
-            utils.assert_iterable_bounded_by_value(
-                u, 'the source node IDs', num_src_type_nodes,
-                'the number of {} nodes'.format(src_type))
-
-        if isinstance(v, Iterable) or F.is_tensor(v):
-            utils.assert_nonnegative_iterable(v, 'the destination node IDs')
-            utils.assert_iterable_bounded_by_value(
-                v, 'the destination node IDs', num_dst_type_nodes,
-                'the number of {} nodes'.format(dst_type))
-
         is_int = isinstance(u, numbers.Integral) and isinstance(v, numbers.Integral)
         u = utils.prepare_tensor(self, u, 'u')
         v = utils.prepare_tensor(self, v, 'v')
@@ -3005,26 +2892,6 @@ class DGLHeteroGraph(object):
         >>> hg.find_edges(torch.tensor([1, 0]), 'plays')
         (tensor([4, 3]), tensor([6, 5]))
         """
-        if not (isinstance(eid, (numbers.Integral, Iterable)) or F.is_tensor(eid)):
-            raise DGLError('Expect eid to have type int, tensor or sequence, '
-                           'got {}'.format(type(eid)))
-
-        num_edges = self.num_edges(etype)
-
-        if isinstance(eid, numbers.Integral) and (eid < 0 or eid >= num_edges):
-            raise DGLError('Expect the edge ID to be from 0, ...'
-                           ', {:d}, got {:d}'.format(num_edges - 1, eid))
-
-        if not F.is_tensor(eid) and isinstance(eid, Iterable):
-            utils.detect_nan_in_iterable(eid, 'the edge IDs')
-            utils.detect_inf_in_iterable(eid, 'the edge IDs')
-
-        if F.is_tensor(eid) or isinstance(eid, Iterable):
-            utils.assert_nonnegative_iterable(eid, 'the edge IDs')
-            utils.assert_iterable_bounded_by_value(
-                eid, 'the edge IDs', num_edges,
-                'the number of {} edges'.format(etype))
-
         eid = utils.prepare_tensor(self, eid, 'eid')
         if len(eid) == 0:
             empty = F.copy_to(F.tensor([], self.idtype), self.device)
@@ -3105,27 +2972,6 @@ class DGLHeteroGraph(object):
         all_edges
         out_edges
         """
-        if not (isinstance(v, (numbers.Integral, Iterable)) or F.is_tensor(v)):
-            raise DGLError('Expect v to have type int, tensor or sequence, '
-                           'got {}'.format(type(v)))
-
-        _, _, dst_type = self.to_canonical_etype(etype)
-        num_dst_type_nodes = self.num_dst_nodes(dst_type)
-
-        if isinstance(v, numbers.Integral) and (v < 0 or v >= num_dst_type_nodes):
-            raise DGLError('Expect the destination node ID to be from 0, ...'
-                           ', {:d}, got {:d}'.format(num_dst_type_nodes - 1, v))
-
-        if not F.is_tensor(v) and isinstance(v, Iterable):
-            utils.detect_nan_in_iterable(v, 'the destination node IDs')
-            utils.detect_inf_in_iterable(v, 'the destination node IDs')
-
-        if F.is_tensor(v) or isinstance(v, Iterable):
-            utils.assert_nonnegative_iterable(v, 'the destination node IDs')
-            utils.assert_iterable_bounded_by_value(
-                v, 'the destination node IDs', num_dst_type_nodes,
-                'the number of {} nodes'.format(dst_type))
-
         v = utils.prepare_tensor(self, v, 'v')
         src, dst, eid = self._graph.in_edges(self.get_etype_id(etype), v)
         if form == 'all':
@@ -3210,27 +3056,6 @@ class DGLHeteroGraph(object):
         all_edges
         in_edges
         """
-        if not (isinstance(u, (numbers.Integral, Iterable)) or F.is_tensor(u)):
-            raise DGLError('Expect u to have type int, tensor or sequence, '
-                           'got {}'.format(type(u)))
-
-        src_type, _, _ = self.to_canonical_etype(etype)
-        num_src_type_nodes = self.num_src_nodes(src_type)
-
-        if isinstance(u, numbers.Integral) and (u < 0 or u >= num_src_type_nodes):
-            raise DGLError('Expect the source node ID to be from 0, ...'
-                           ', {:d}, got {:d}'.format(num_src_type_nodes - 1, u))
-
-        if not F.is_tensor(u) and isinstance(u, Iterable):
-            utils.detect_nan_in_iterable(u, 'the source node IDs')
-            utils.detect_inf_in_iterable(u, 'the source node IDs')
-
-        if F.is_tensor(u) or isinstance(u, Iterable):
-            utils.assert_nonnegative_iterable(u, 'the source node IDs')
-            utils.assert_iterable_bounded_by_value(
-                u, 'the source node IDs', num_src_type_nodes,
-                'the number of {} nodes'.format(src_type))
-
         u = utils.prepare_tensor(self, u, 'u')
         src, dst, eid = self._graph.out_edges(self.get_etype_id(etype), u)
         if form == 'all':
@@ -3398,30 +3223,10 @@ class DGLHeteroGraph(object):
         --------
         out_degrees
         """
-        if not (is_all(v) or isinstance(v, (numbers.Integral, Iterable)) or F.is_tensor(v)):
-            raise DGLError('Expect v to have type int, tensor or sequence, '
-                           'got {}'.format(type(v)))
-
-        _, _, dst_type = self.to_canonical_etype(etype)
-        num_dst_type_nodes = self.num_dst_nodes(dst_type)
-
-        if isinstance(v, numbers.Integral) and (v < 0 or v >= num_dst_type_nodes):
-            raise DGLError('Expect the destination node ID to be from 0, ...'
-                           ', {:d}, got {:d}'.format(num_dst_type_nodes - 1, v))
-
-        if not F.is_tensor(v) and not is_all(v) and isinstance(v, Iterable):
-            utils.detect_nan_in_iterable(v, 'the destination node IDs')
-            utils.detect_inf_in_iterable(v, 'the destination node IDs')
-
-        if (F.is_tensor(v) or isinstance(v, Iterable)) and not is_all(v):
-            utils.assert_nonnegative_iterable(v, 'the destination node IDs')
-            utils.assert_iterable_bounded_by_value(
-                v, 'the destination node IDs', num_dst_type_nodes,
-                'the number of {} nodes'.format(dst_type))
-
+        dsttype = self.to_canonical_etype(etype)[2]
         etid = self.get_etype_id(etype)
         if is_all(v):
-            v = self.dstnodes(dst_type)
+            v = self.dstnodes(dsttype)
         deg = self._graph.in_degrees(etid, utils.prepare_tensor(self, v, 'v'))
         if isinstance(v, numbers.Integral):
             return F.as_scalar(deg)
@@ -3503,30 +3308,10 @@ class DGLHeteroGraph(object):
         --------
         in_degrees
         """
-        if not (is_all(u) or isinstance(u, (numbers.Integral, Iterable)) or F.is_tensor(u)):
-            raise DGLError('Expect u to have type int, tensor or sequence, '
-                           'got {}'.format(type(u)))
-
-        src_type, _, _ = self.to_canonical_etype(etype)
-        num_src_type_nodes = self.num_src_nodes(src_type)
-
-        if isinstance(u, numbers.Integral) and (u < 0 or u >= num_src_type_nodes):
-            raise DGLError('Expect the source node ID to be from 0, ...'
-                           ', {:d}, got {:d}'.format(num_src_type_nodes - 1, u))
-
-        if not F.is_tensor(u) and not is_all(u) and isinstance(u, Iterable):
-            utils.detect_nan_in_iterable(u, 'the source node IDs')
-            utils.detect_inf_in_iterable(u, 'the source node IDs')
-
-        if (F.is_tensor(u) or isinstance(u, Iterable)) and not is_all(u):
-            utils.assert_nonnegative_iterable(u, 'the source node IDs')
-            utils.assert_iterable_bounded_by_value(
-                u, 'the source node IDs', num_src_type_nodes,
-                'the number of {} nodes'.format(src_type))
-
+        srctype = self.to_canonical_etype(etype)[0]
         etid = self.get_etype_id(etype)
         if is_all(u):
-            u = self.srcnodes(src_type)
+            u = self.srcnodes(srctype)
         deg = self._graph.out_degrees(etid, utils.prepare_tensor(self, u, 'u'))
         if isinstance(u, numbers.Integral):
             return F.as_scalar(deg)
@@ -4796,27 +4581,6 @@ class DGLHeteroGraph(object):
         >>> print(g.filter_nodes(nodes_with_feature_one, ntype='user'))
         tensor([1, 2])
         """
-        if not (is_all(nodes) or isinstance(nodes, (numbers.Integral, Iterable))
-                or F.is_tensor(nodes)):
-            raise DGLError('Expect nodes to have type int, tensor or sequence, '
-                           'got {}'.format(type(nodes)))
-
-        num_nodes = self.num_nodes(ntype)
-
-        if isinstance(nodes, numbers.Integral) and (nodes < 0 or nodes >= num_nodes):
-            raise DGLError('Expect the node ID to be from 0, ...'
-                           ', {:d}, got {:d}'.format(num_nodes - 1, nodes))
-
-        if not F.is_tensor(nodes) and not is_all(nodes) and isinstance(nodes, Iterable):
-            utils.detect_nan_in_iterable(nodes, 'the node IDs')
-            utils.detect_inf_in_iterable(nodes, 'the node IDs')
-
-        if (F.is_tensor(nodes) or isinstance(nodes, Iterable)) and not is_all(nodes):
-            utils.assert_nonnegative_iterable(nodes, 'the node IDs')
-            utils.assert_iterable_bounded_by_value(
-                nodes, 'the destination node IDs', num_nodes,
-                'the number of nodes with the specified type')
-
         with self.local_scope():
             self.apply_nodes(lambda nbatch: {'_mask' : predicate(nbatch)}, nodes, ntype)
             ntype = self.ntypes[0] if ntype is None else ntype
@@ -4903,51 +4667,6 @@ class DGLHeteroGraph(object):
         >>> print(g.filter_edges(edges_with_feature_one, etype='plays'))
         tensor([1, 2])
         """
-        if not (is_all(edges) or isinstance(edges, Iterable) or F.is_tensor(edges)):
-            raise DGLError('Expect edges to have type tensor, or sequence '
-                           '(e.g. list, tuple, numpy.ndarray), got {}'.format(type(edges)))
-
-        num_edges = self.num_edges(etype)
-        src_type, _, dst_type = self.to_canonical_etype(etype)
-        num_src_type_nodes = self.num_src_nodes(src_type)
-        num_dst_type_nodes = self.num_dst_nodes(dst_type)
-
-        if isinstance(edges, tuple):
-            if len(edges) != 2:
-                raise DGLError('Expect edges to have length 2 when it is a tuple, '
-                               'got {:d}'.format(len(edges)))
-            u, v = edges
-            u_type = type(u)
-            v_type = type(v)
-            if u_type != v_type:
-                raise DGLError('Expect the source node ID(s) and the destination node ID(s), '
-                               'to have the same type, got {} and {}'.format(u_type, v_type))
-            if not (isinstance(u, Iterable) or F.is_tensor(u)):
-                raise DGLError('Expect the node ID(s) to have type tensor, or sequence '
-                               '(e.g. list, tuple, numpy.ndarray), got {}'.format(type(u)))
-            if isinstance(u, Iterable) and not F.is_tensor(u):
-                utils.detect_nan_in_iterable(u, 'edges[0]')
-                utils.detect_nan_in_iterable(v, 'edges[1]')
-                utils.detect_inf_in_iterable(u, 'edges[0]')
-                utils.detect_inf_in_iterable(v, 'edges[1]')
-            utils.assert_nonnegative_iterable(u, 'edges[0]')
-            utils.assert_nonnegative_iterable(v, 'edges[1]')
-            utils.assert_iterable_bounded_by_value(
-                u, 'the source node IDs', num_src_type_nodes, 'the number of source nodes')
-            utils.assert_iterable_bounded_by_value(
-                v, 'the destination node IDs',
-                num_dst_type_nodes, 'the number of destination nodes')
-        elif F.is_tensor(edges):
-            utils.assert_nonnegative_iterable(edges, 'the edge IDs')
-            utils.assert_iterable_bounded_by_value(
-                edges, 'the edge IDs', num_edges, 'the number of edges')
-        elif isinstance(edges, Iterable) and not is_all(edges):
-            utils.detect_nan_in_iterable(edges, 'the edge IDs')
-            utils.detect_inf_in_iterable(edges, 'the edge IDs')
-            utils.assert_nonnegative_iterable(edges, 'the edge IDs')
-            utils.assert_iterable_bounded_by_value(
-                edges, 'the edge IDs', num_edges, 'the number of edges')
-
         with self.local_scope():
             self.apply_edges(lambda ebatch: {'_mask' : predicate(ebatch)}, edges, etype)
             etype = self.canonical_etypes[0] if etype is None else etype

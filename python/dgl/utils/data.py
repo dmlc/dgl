@@ -5,6 +5,7 @@ import networkx as nx
 
 from ..base import DGLError
 from .. import backend as F
+from . import checks
 
 def elist2tensor(elist, idtype):
     """Function to convert an edge list to edge tensors.
@@ -125,8 +126,37 @@ def graphdata2tensors(data, idtype=None, bipartite=False, **kwargs):
         # preferred default idtype is int64
         # if data is tensor and idtype is None, infer the idtype from tensor
         idtype = F.int64
+    checks.check_valid_idtype(idtype)
+
+    if isinstance(data, tuple) and (not F.is_tensor(data[0]) or not F.is_tensor(data[1])):
+        # (Iterable, Iterable) type data, convert it to (Tensor, Tensor)
+        if len(data[0]) == 0:
+            # force idtype for empty list
+            data = F.tensor(data[0], idtype), F.tensor(data[1], idtype)
+        else:
+            # convert the iterable to tensor and keep its native data type so we can check
+            # its validity later
+            data = F.tensor(data[0]), F.tensor(data[1])
+
     if isinstance(data, tuple):
-        src, dst = F.tensor(data[0], idtype), F.tensor(data[1], idtype)
+        # (Tensor, Tensor) type data
+        src, dst = data
+        # sanity checks
+        # TODO(minjie): move these checks to C for faster graph construction.
+        if F.dtype(src) != F.dtype(dst):
+            raise DGLError('Expect the source and destination node IDs to have the same type,'
+                           ' but got {} and {}.'.format(F.dtype(src), F.dtype(dst)))
+        if F.context(src) != F.context(dst):
+            raise DGLError('Expect the source and destination node IDs to be on the same device,'
+                           ' but got {} and {}.'.format(F.context(src), F.context(dst)))
+        if F.dtype(src) not in (F.int32, F.int64):
+            raise DGLError('Expect the source ID tensor to have data type int32 or int64,'
+                           ' but got {}.'.format(F.dtype(src)))
+        if F.dtype(dst) not in (F.int32, F.int64):
+            raise DGLError('Expect the destination ID tensor to have data type int32 or int64,'
+                           ' but got {}.'.format(F.dtype(dst)))
+        if idtype != None:
+            src, dst = F.astype(src, idtype), F.astype(dst, idtype)
     elif isinstance(data, list):
         src, dst = elist2tensor(data, idtype)
     elif isinstance(data, sp.sparse.spmatrix):
@@ -144,6 +174,14 @@ def graphdata2tensors(data, idtype=None, bipartite=False, **kwargs):
                 data, idtype, edge_id_attr_name=edge_id_attr_name)
     else:
         raise DGLError('Unsupported graph data type:', type(data))
+    
+    if len(src) != len(dst):
+        raise DGLError('Expect the source and destination ID tensors to have the same length,'
+                       ' but got {} and {}.'.format(len(src), len(dst)))
+    if len(src) > 0 and (F.as_scalar(F.min(src, 0)) < 0 or F.as_scalar(F.min(dst, 0)) < 0):
+        raise DGLError('All IDs must be non-negative integers.')
+
+    # infer number of nodes
     infer_from_raw = infer_num_nodes(data, bipartite=bipartite)
     if infer_from_raw is None:
         num_src, num_dst = infer_num_nodes((src, dst), bipartite=bipartite)

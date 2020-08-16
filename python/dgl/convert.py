@@ -126,45 +126,7 @@ def graph(data,
     from_scipy
     from_networkx
     """
-    # Sanity check
-    utils.check_type(data, tuple, 'data', skip_none=False)
-    if len(data) != 2:
-        raise DGLError('Expect data to have length 2, got {:d}'.format(len(data)))
-
-    src_type = type(data[0])
-    dst_type = type(data[1])
-    if src_type != dst_type:
-        raise DGLError('Expect the source and destination node IDs to have the same type, ' \
-                       'got {} and {}'.format(src_type, dst_type))
-
-    if len(data[0]) != len(data[1]):
-        raise DGLError('Expect the source and destination node IDs to have the same length, ' \
-                       'got {:d} and {:d}'.format(len(data[0]), len(data[1])))
-
-    if F.is_tensor(data[0]):
-        src_dtype = F.dtype(data[0])
-        dst_dtype = F.dtype(data[1])
-        if src_dtype != dst_dtype:
-            raise DGLError('Expect the source and destination node tensors to have the same ' \
-                           'data type, got {} and {}'.format(src_dtype, dst_dtype))
-        if src_dtype not in [F.int32, F.int64]:
-            raise DGLError('Expect the node-tensors to have data type int32 or int64, '
-                           'got {}'.format(src_dtype))
-        src_ctx = F.context(data[0])
-        dst_ctx = F.context(data[1])
-        if src_ctx != dst_ctx:
-            raise DGLError('Expect the source and destination node tensors to have the same ' \
-                           'context, got {} and {}'.format(src_ctx, dst_ctx))
-    elif isinstance(data[0], Iterable):
-        # NaN/Inf values cannot appear in int32/int64 tensors
-        utils.detect_nan_in_iterable(data[0], 'the source node IDs')
-        utils.detect_inf_in_iterable(data[0], 'the source node IDs')
-        utils.detect_nan_in_iterable(data[1], 'the destination node IDs')
-        utils.detect_inf_in_iterable(data[1], 'the destination node IDs')
-    else:
-        raise DGLError('Expect sequences (e.g., list, numpy.ndarray) or tensors for data, ' \
-                       'got {}'.format(type(data[0])))
-
+    # Deprecated arguments
     if ntype is not None:
         raise DGLError('The ntype argument is deprecated for dgl.graph. To construct ' \
                        'a graph with named node types, use dgl.heterograph.')
@@ -172,38 +134,26 @@ def graph(data,
         raise DGLError('The etype argument is deprecated for dgl.graph. To construct ' \
                        'a graph with named edge types, use dgl.heterograph.')
 
-    if num_nodes is not None and not (isinstance(num_nodes, int) and num_nodes >= 0):
-        raise DGLError('Expect num_nodes to be a positive integer, got {}'.format(num_nodes))
-
-    utils.check_valid_idtype(idtype)
-
-    # Deprecation handling
-    deprecated_kwargs = set(deprecated_kwargs.keys())
-    nx_deprecated_kwargs = deprecated_kwargs & {
-        'edge_id_attr_name', 'node_attrs', 'edge_attrs'}
-    other_deprecated_kwargs = deprecated_kwargs & {
-        'card', 'validate', 'restrict_format'}
-
-    # Handle the deprecated arguments related to SciPy
     if isinstance(data, spmatrix):
         raise DGLError("dgl.graph no longer supports graph construction from a SciPy "
                        "sparse matrix, use dgl.from_scipy instead.")
 
-    # Handle the deprecated arguments related to NetworkX
-    if isinstance(data, nx.Graph) or len(nx_deprecated_kwargs) > 0:
+    if isinstance(data, nx.Graph):
         raise DGLError("dgl.graph no longer supports graph construction from a NetworkX "
                        "graph, use dgl.from_networkx instead.")
 
-    # Handle the deprecation of other input arguments
-    if len(other_deprecated_kwargs) > 0:
-        raise DGLError("Arguments {} have been deprecated.".format(other_deprecated_kwargs))
+    if len(deprecated_kwargs) != 0:
+        raise DGLError("Key word arguments {} have been removed from dgl.graph()."
+                       " They are moved to dgl.from_scipy() and dgl.from_networkx()."
+                       " Please refer to their API documents for more details.".format(
+                           deprecated_kwargs.keys()))
 
     u, v, urange, vrange = utils.graphdata2tensors(data, idtype)
     if num_nodes is not None:  # override the number of nodes
+        if num_nodes < max(urange, vrange):
+            raise DGLError('The num_nodes argument must be larger than the max ID in the data,'
+                           ' but got {} and {}.'.format(num_nodes, max(urange, vrange) - 1))
         urange, vrange = num_nodes, num_nodes
-    if len(u) > 0:
-        utils.assert_nonnegative_iterable(u, 'the source node IDs')
-        utils.assert_nonnegative_iterable(v, 'the destination node IDs')
 
     g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange)
 
@@ -340,116 +290,41 @@ def heterograph(data_dict,
 
     >>> g = dgl.heterograph(data_dict, idtype=torch.int32, device='cuda:0')
     """
-    # Sanity check
-    utils.check_type(data_dict, dict, 'data_dict', skip_none=False)
-    # Record the type of all graph data for consistency check
-    data_types = []
-    # Record the data type/device of node-tensors for consistency check
-    data_dtypes = []
-    data_devices = []
-
-    # Check type, length, dtype of the arguments
-    for key, data in data_dict.items():
-        # Check for key
-        utils.check_type(key, tuple, 'a key of data_dict', skip_none=False)
-        if len(key) != 3:
-            raise DGLError('Expect a key of data_dict to have length 3, '
-                           'got {:d}'.format(len(key)))
-        for typ in key:
-            if not isinstance(typ, str):
-                raise DGLError('Expect a key of data_dict to contain str only, '
-                               'got {}'.format(type(typ)))
-
-        # Check for value
-        utils.check_type(data, tuple, 'data_dict[{}]'.format(key), skip_none=False)
-        if len(data) != 2:
-            raise DGLError('Expect data_dict[{}] to have length 2, '
-                           'got {:d}'.format(key, len(data)))
-        src_type = type(data[0])
-        dst_type = type(data[1])
-        if src_type != dst_type:
-            raise DGLError('Expect the source and destination node IDs for {} to have '
-                           'the same type, got {} and {}'.format(key, src_type, dst_type))
-        data_types.append(src_type)
-
-        if F.is_tensor(data[0]):
-            src_dtype = F.dtype(data[0])
-            dst_dtype = F.dtype(data[1])
-            if src_dtype != dst_dtype:
-                raise DGLError('Expect the source and destination node tensors for {} to have the '
-                               'same data type, got {} and {}'.format(key, src_dtype, dst_dtype))
-            data_dtypes.append(src_dtype)
-            src_ctx = F.context(data[0])
-            dst_ctx = F.context(data[1])
-            if src_ctx != dst_ctx:
-                raise DGLError('Expect the source and destination node tensors for {} to have the '
-                               'same context, got {} and {}'.format(key, src_ctx, dst_ctx))
-            data_devices.append(src_ctx)
-        elif isinstance(data[0], Iterable):
-            # NaN/Inf values cannot appear in int32/int64 tensors
-            utils.detect_nan_in_iterable(data[0], 'the source node IDs for {}'.format(key))
-            utils.detect_inf_in_iterable(data[0], 'the source node IDs for {}'.format(key))
-            utils.detect_nan_in_iterable(data[1], 'the destination node IDs for {}'.format(key))
-            utils.detect_inf_in_iterable(data[1], 'the destination node IDs for {}'.format(key))
-        else:
-            raise DGLError('Expect sequences (e.g., list, numpy.ndarray) or tensors for '
-                           'data_dict[{}], got {}'.format(key, type(data[0])))
-
-    data_types = set(data_types)
-    if len(data_types) != 1:
-        raise DGLError('Expect the node IDs to have a same type, got {}'.format(data_types))
-    # Skip the check for sequences
-    if len(data_dtypes) > 0:
-        data_dtypes = set(data_dtypes)
-        if len(data_dtypes) != 1:
-            raise DGLError('Expect the node tensors to have a same data type, '
-                           'got {}'.format(data_dtypes))
-        data_devices = set(data_devices)
-        if len(data_devices) != 1:
-            raise DGLError('Expect the node tensors to be on a same device, '
-                           'got {}'.format(data_devices))
-
-    utils.check_valid_idtype(idtype)
-    if idtype is None:
-        if len(data_dtypes) > 0:
-            idtype = list(data_dtypes)[0]
-        else:
-            idtype = F.int64
-
     # Convert all data to node tensors first
-    data_dict = {(sty, ety, dty) : utils.graphdata2tensors(data, idtype, bipartite=(sty != dty))
-                 for (sty, ety, dty), data in data_dict.items()}
-
-    # Sanity check for the node IDs and the number of nodes
-    num_nodes_dict_ = defaultdict(int)
-    for (srctype, etype, dsttype), data in data_dict.items():
-        relation = (srctype, etype, dsttype)
-        src, dst, nsrc, ndst = data
-        if len(src) > 0:
-            utils.assert_nonnegative_iterable(
-                src, 'the source node IDs of canonical edge type {}'.format(relation))
-            utils.assert_nonnegative_iterable(
-                dst, 'the destination node IDs of canonical edge type {}'.format(relation))
-        num_nodes_dict_[srctype] = max(num_nodes_dict_[srctype], nsrc)
-        num_nodes_dict_[dsttype] = max(num_nodes_dict_[dsttype], ndst)
-
+    node_tensor_dict = {}
+    need_infer = num_nodes_dict is None
     if num_nodes_dict is None:
-        num_nodes_dict = num_nodes_dict_
-    else:
-        utils.check_type(num_nodes_dict, dict, 'num_nodes_dict', skip_none=False)
-        for nty in num_nodes_dict_:
-            if nty not in num_nodes_dict:
-                num_nodes_dict[nty] = num_nodes_dict_[nty]
-            if num_nodes_dict[nty] < num_nodes_dict_[nty]:
-                raise DGLError('Expect the number of nodes to be at least {:d} for type {}, '
-                               'got {:d}'.format(num_nodes_dict_[nty], nty, num_nodes_dict[nty]))
+        num_nodes_dict = defaultdict(int)
+    for (sty, ety, dty), data in data_dict.items():
+        if isinstance(data, spmatrix):
+            raise DGLError("dgl.heterograph no longer supports graph construction from a SciPy "
+                           "sparse matrix, use dgl.from_scipy instead.")
 
-    # Graph creation
-    # TODO(BarclayII): I'm keeping the node type names sorted because even if
-    # the metagraph is the same, the same node type name in different graphs may
-    # map to different node type IDs.
-    # In the future, we need to lower the type names into C++.
+        if isinstance(data, nx.Graph):
+            raise DGLError("dgl.heterograph no longer supports graph construction from a NetworkX "
+                           "graph, use dgl.from_networkx instead.")
+        is_bipartite = (sty != dty)
+        u, v, urange, vrange = utils.graphdata2tensors(data, idtype, bipartite=is_bipartite)
+        node_tensor_dict[(sty, ety, dty)] = (u, v)
+        if need_infer:
+            num_nodes_dict[sty] = max(num_nodes_dict[sty], urange)
+            num_nodes_dict[dty] = max(num_nodes_dict[dty], vrange)
+        else:  # sanity check
+            if num_nodes_dict[sty] < urange:
+                raise DGLError('The given number of nodes of node type {} must be larger than'
+                               ' the max ID in the data, but got {} and {}.'.format(
+                                   sty, num_nodes_dict[sty], urange - 1))
+            if num_nodes_dict[dty] < vrange:
+                raise DGLError('The given number of nodes of node type {} must be larger than'
+                               ' the max ID in the data, but got {} and {}.'.format(
+                                   sty, num_nodes_dict[dty], vrange - 1))
+    # Create the graph
+
+    # Sort the ntypes and relation tuples to have a deterministic order for the same set
+    # of type names.
     ntypes = list(sorted(num_nodes_dict.keys()))
+    relations = list(sorted(node_tensor_dict.keys()))
+
     num_nodes_per_type = utils.toindex([num_nodes_dict[ntype] for ntype in ntypes], "int64")
     ntype_dict = {ntype: i for i, ntype in enumerate(ntypes)}
 
@@ -457,11 +332,11 @@ def heterograph(data_dict,
     meta_edges_dst = []
     etypes = []
     rel_graphs = []
-    for (srctype, etype, dsttype), data in data_dict.items():
+    for srctype, etype, dsttype in relations:
         meta_edges_src.append(ntype_dict[srctype])
         meta_edges_dst.append(ntype_dict[dsttype])
         etypes.append(etype)
-        src, dst, _, _ = data
+        src, dst = node_tensor_dict[(srctype, etype, dsttype)]
         g = create_from_edges(src, dst, srctype, etype, dsttype,
                               num_nodes_dict[srctype], num_nodes_dict[dsttype])
         rel_graphs.append(g)
@@ -864,13 +739,11 @@ def from_scipy(sp_mat,
     from_networkx
     """
     # Sanity check
-    utils.check_type(sp_mat, spmatrix, 'sp_mat', skip_none=False)
     num_rows = sp_mat.shape[0]
     num_cols = sp_mat.shape[1]
     if num_rows != num_cols:
         raise DGLError('Expect the number of rows to be the same as the number of columns for '
                        'sp_mat, got {:d} and {:d}.'.format(num_rows, num_cols))
-    utils.check_valid_idtype(idtype)
 
     u, v, urange, vrange = utils.graphdata2tensors(sp_mat, idtype)
     g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange)
@@ -966,9 +839,6 @@ def bipartite_from_scipy(sp_mat,
     bipartite_from_networkx
     """
     # Sanity check
-    utils.check_type(sp_mat, spmatrix, 'sp_mat', skip_none=False)
-    utils.check_valid_idtype(idtype)
-
     u, v, urange, vrange = utils.graphdata2tensors(sp_mat, idtype, bipartite=True)
     g = create_from_edges(u, v, utype, etype, vtype, urange, vrange)
     if eweight_name is not None:
@@ -1073,15 +943,10 @@ def from_networkx(nx_graph,
     from_scipy
     """
     # Sanity check
-    utils.check_type(nx_graph, nx.Graph, 'nx_graph', skip_none=False)
-    utils.check_all_same_type(node_attrs, str, 'node_attrs', skip_none=True)
-    utils.check_all_same_type(edge_attrs, str, 'edge_attrs', skip_none=True)
-    utils.check_type(edge_id_attr_name, str, 'edge_id_attr_name', skip_none=True)
     if edge_id_attr_name is not None and \
             edge_id_attr_name not in next(iter(nx_graph.edges(data=True)))[-1]:
         raise DGLError('Failed to find the pre-specified edge IDs in the edge features of '
                        'the NetworkX graph with name {}'.format(edge_id_attr_name))
-    utils.check_valid_idtype(idtype)
 
     if not nx_graph.is_directed() and not (edge_id_attr_name is None and edge_attrs is None):
         raise DGLError('Expect edge_id_attr_name and edge_attrs to be None when nx_graph is '
@@ -1255,15 +1120,10 @@ def bipartite_from_networkx(nx_graph,
     """
     if not nx_graph.is_directed():
         raise DGLError('Expect nx_graph to be a directed NetworkX graph.')
-    utils.check_all_same_type(u_attrs, str, 'u_attrs', skip_none=True)
-    utils.check_all_same_type(e_attrs, str, 'e_attrs', skip_none=True)
-    utils.check_all_same_type(v_attrs, str, 'v_attrs', skip_none=True)
-    utils.check_type(edge_id_attr_name, str, 'edge_id_attr_name', skip_none=True)
     if edge_id_attr_name is not None and \
             not edge_id_attr_name in next(iter(nx_graph.edges(data=True)))[-1]:
         raise DGLError('Failed to find the pre-specified edge IDs in the edge features '
                        'of the NetworkX graph with name {}'.format(edge_id_attr_name))
-    utils.check_valid_idtype(idtype)
 
     # Get the source and destination node sets
     top_nodes = set()

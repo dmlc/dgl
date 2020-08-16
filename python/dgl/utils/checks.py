@@ -36,7 +36,11 @@ def prepare_tensor(g, data, name):
                                name, g.idtype, g.device, F.dtype(data), F.context(data)))
         ret = data
     else:
-        ret = F.copy_to(F.tensor(data, g.idtype), g.device)
+        data = F.tensor(data)
+        if F.dtype(data) not in (F.int32, F.int64):
+            raise DGLError('Expect argument "{}" to have data type int32 or int64,'
+                           ' but got {}.'.format(F.dtype(src)))
+        ret = F.copy_to(F.astype(data, g.idtype), g.device)
 
     if F.ndim(ret) != 1:
         raise DGLError('Expect a 1-D tensor for argument "{}". But got {}.'.format(
@@ -214,15 +218,15 @@ def check_valid_idtype(idtype):
         raise DGLError('Expect idtype to be a framework object of int32/int64, '
                        'got {}'.format(idtype))
 
-def assert_nonnegative_iterable(values, name):
-    """Check whether an iterable of scalars contains non-negative values only.
+def check_id_range(ids, maxid, name):
+    """Check whether the given IDs are within range [0, maxid).
 
     Parameters
     ----------
-    values : iterable
-        An iterable of scalars for check.
-    name : str
-        Name of the iterable for error message.
+    ids : Tensor
+        ID tensor.
+    maxid : int
+        Max
     """
     if len(values) == 0:
         return
@@ -234,32 +238,6 @@ def assert_nonnegative_iterable(values, name):
     if min_val < 0:
         raise DGLError('Expect {} to contain non-negative values only, '
                        'got a negative element {}'.format(name, min_val))
-
-def detect_nan_in_iterable(values, name):
-    """Check whether an iterable contains NaN values.
-
-    Parameters
-    ----------
-    values : iterable
-        An iterable of values for check.
-    name : str
-        Name of the iterable for error message.
-    """
-    if np.isnan(values).sum() > 0:
-        raise DGLError('NaN values found in {}'.format(name))
-
-def detect_inf_in_iterable(values, name):
-    """Check whether an iterable contains Inf values.
-
-    Parameters
-    ----------
-    values : iterable
-        An iterable of values for check.
-    name : str
-        Name of the iterable for error message.
-    """
-    if np.isinf(values).sum() > 0:
-        raise DGLError('Inf values found in {}'.format(name))
 
 def assert_iterable_bounded_by_value(values, values_name, target_max_val, target_max_val_name):
     """Check whether an iterable of scalars only contains values smaller than max_val
