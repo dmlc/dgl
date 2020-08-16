@@ -37,5 +37,5 @@ python3 -m pytest -v --junitxml=pytest_backend.xml tests/$DGLBACKEND || fail "ba
 
 export OMP_NUM_THREADS=1
 if [ $2 != "gpu" ]; then
-    python3 -m pytest -v --junitxml=pytest_distributed.xml tests/distributed || fail "distributed"
+    python3 -m pytest -s -v --junitxml=pytest_distributed.xml tests/distributed || fail "distributed"
 fi
