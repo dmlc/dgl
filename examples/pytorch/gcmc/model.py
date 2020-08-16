@@ -304,7 +304,9 @@ class BiDecoder(nn.Module):
         super(BiDecoder, self).__init__()
         self._num_basis = num_basis
         self.dropout = nn.Dropout(dropout_rate)
-        self.P = nn.Parameter(th.randn(num_basis, in_units, in_units))
+        self.Ps = nn.ParameterList(
+            nn.Parameter(th.randn(in_units, in_units))
+            for _ in range(num_basis))
         self.combine_basis = nn.Linear(self._num_basis, num_classes, bias=False)
         self.reset_parameters()
 
@@ -343,7 +345,7 @@ class BiDecoder(nn.Module):
             out = self.combine_basis(out)
         return out
 
-class DenseBiDecoder(BiDecoder):
+class DenseBiDecoder(nn.Module):
     r"""Dense bi-linear decoder.
 
     Dense implementation of the bi-linear decoder used in GCMC. Suitable when
@@ -366,10 +368,17 @@ class DenseBiDecoder(BiDecoder):
                  num_classes,
                  num_basis=2,
                  dropout_rate=0.0):
-        super(DenseBiDecoder, self).__init__(in_units,
-                                             num_classes,
-                                             num_basis,
-                                             dropout_rate)
+        super().__init__()
+        self._num_basis = num_basis
+        self.dropout = nn.Dropout(dropout_rate)
+        self.P = nn.Parameter(th.randn(num_basis, in_units, in_units))
+        self.combine_basis = nn.Linear(self._num_basis, num_classes, bias=False)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
 
     def forward(self, ufeat, ifeat):
         """Forward function.

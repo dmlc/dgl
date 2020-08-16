@@ -104,8 +104,10 @@ void SpMMSumCoo(
       const DType* lhs_off = Op::use_lhs? X + rid * lhs_dim + lhs_add : nullptr;
       const DType* rhs_off = Op::use_rhs? W + eid * rhs_dim + rhs_add : nullptr;
       const DType val = Op::Call(lhs_off, rhs_off);
+      if (val != 0) {
 #pragma omp atomic
-      out_off[k] += val;
+        out_off[k] += val;
+      }
     }
   }
 }
@@ -123,8 +125,9 @@ void SpMMSumCoo(
  * \param arge Arg-Min/Max on edges. which refers the source node indices 
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \note it uses node parallel strategy, different threads are responsible
+ * \note It uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes.
+ * \note The result will contain infinity for zero-degree nodes.
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
 void SpMMCmpCsr(
@@ -194,6 +197,7 @@ void SpMMCmpCsr(
  * \note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes. To avoid possible data hazard,
  *       we use atomic operators in the reduction phase.
+ * \note The result will contain infinity for zero-degree nodes.
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
 void SpMMCmpCoo(
@@ -315,7 +319,7 @@ template <typename DType> constexpr bool CopyRhs<DType>::use_rhs;
 //////////////////////////////// Reduce operators on CPU ////////////////////////////////
 template <typename DType>
 struct Max {
-  static constexpr DType zero = std::numeric_limits<DType>::lowest();
+  static constexpr DType zero = -std::numeric_limits<DType>::infinity();
   // return true if accum should be replaced
   inline static DType Call(DType accum, DType val) {
     return accum < val;
@@ -325,7 +329,7 @@ template <typename DType> constexpr DType Max<DType>::zero;
 
 template <typename DType>
 struct Min {
-  static constexpr DType zero = std::numeric_limits<DType>::max();
+  static constexpr DType zero = std::numeric_limits<DType>::infinity();
   // return true if accum should be replaced
   inline static DType Call(DType accum, DType val) {
     return accum > val;

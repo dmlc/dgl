@@ -20,6 +20,8 @@ DGL builtin dataset
 .. autoclass:: DGLBuiltinDataset
     :members: download
 
+.. _sstdata:
+
 Stanford sentiment treebank dataset
 ```````````````````````````````````
 
@@ -28,6 +30,7 @@ For more information about the dataset, see `Sentiment Analysis <https://nlp.sta
 .. autoclass:: SSTDataset
     :members: __getitem__, __len__
 
+.. _karateclubdata:
 
 Karate club dataset
 ```````````````````````````````````
@@ -35,6 +38,7 @@ Karate club dataset
 .. autoclass:: KarateClubDataset
     :members: __getitem__, __len__
 
+.. _citationdata:
 
 Citation network dataset
 ```````````````````````````````````
@@ -48,6 +52,7 @@ Citation network dataset
 .. autoclass:: PubmedGraphDataset
     :members: __getitem__, __len__
 
+.. _kgdata:
 
 Knowlege graph dataset
 ```````````````````````````````````
@@ -61,6 +66,7 @@ Knowlege graph dataset
 .. autoclass:: WN18Dataset
     :members: __getitem__, __len__
 
+.. _rdfdata:
 
 RDF datasets
 ```````````````````````````````````
@@ -77,7 +83,7 @@ RDF datasets
 .. autoclass:: AMDataset
     :members: __getitem__, __len__
 
-
+.. _corafulldata:
 
 CoraFull dataset
 ```````````````````````````````````
@@ -85,6 +91,7 @@ CoraFull dataset
 .. autoclass:: CoraFullDataset
     :members: __getitem__, __len__
 
+.. _amazoncobuydata:
 
 Amazon Co-Purchase dataset
 ```````````````````````````````````
@@ -95,6 +102,7 @@ Amazon Co-Purchase dataset
 .. autoclass:: AmazonCoBuyPhotoDataset
     :members: __getitem__, __len__
 
+.. _coauthordata:
 
 Coauthor dataset
 ```````````````````````````````````
@@ -105,6 +113,7 @@ Coauthor dataset
 .. autoclass:: CoauthorPhysicsDataset
     :members: __getitem__, __len__
 
+.. _bitcoinotcdata:
 
 BitcoinOTC dataset
 ```````````````````````````````````
@@ -119,6 +128,7 @@ ICEWS18 dataset
 .. autoclass:: ICEWS18Dataset
     :members: __getitem__, __len__
 
+.. _qm7bdata:
 
 QM7b dataset
 ```````````````````````````````````
@@ -134,12 +144,15 @@ GDELT dataset
 .. autoclass:: GDELTDataset
     :members: __getitem__, __len__
 
+.. _minigcdataset:
 
 Mini graph classification dataset
 `````````````````````````````````
 
 .. autoclass:: MiniGCDataset
     :members: __getitem__, __len__
+
+.. _tudata:
 
 TU dataset
 ``````````
@@ -150,6 +163,8 @@ TU dataset
 .. autoclass:: LegacyTUDataset
     :members: __getitem__, __len__
 
+.. _gindataset:
+
 Graph isomorphism network dataset
 ```````````````````````````````````
 
@@ -158,6 +173,7 @@ A compact subset of graph kernel dataset
 .. autoclass:: GINDataset
     :members: __getitem__, __len__
 
+.. _ppidata:
 
 Protein-Protein Interaction dataset
 ```````````````````````````````````
@@ -165,6 +181,7 @@ Protein-Protein Interaction dataset
 .. autoclass:: PPIDataset
     :members: __getitem__, __len__
 
+.. _redditdata:
 
 Reddit dataset
 ``````````````
@@ -172,6 +189,7 @@ Reddit dataset
 .. autoclass:: RedditDataset
     :members: __getitem__, __len__
 
+.. _sbmdata:
 
 Symmetric Stochastic Block Model Mixture dataset
 ````````````````````````````````````````````````
@@ -190,8 +208,6 @@ Utils
     utils.check_sha1
     utils.extract_archive
     utils.split_dataset
-    utils.save_graphs
-    utils.load_graphs
     utils.load_labels
     utils.save_info
     utils.load_info

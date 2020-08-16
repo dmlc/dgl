@@ -9,7 +9,6 @@ from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID
 from .kvstore import KVServer, get_kvstore
-from .standalone_kvstore import KVClient as SA_KVClient
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
 from .partition import load_partition, load_partition_book
@@ -142,7 +141,7 @@ class NodeDataView(MutableMapping):
             name1 = _get_data_name(name, policy.policy_str)
             dtype, shape, _ = g._client.get_data_meta(name1)
             # We create a wrapper on the existing tensor in the kvstore.
-            self._data[name] = DistTensor(g, shape, dtype, name, part_policy=policy)
+            self._data[name] = DistTensor(shape, dtype, name, part_policy=policy)
 
     def _get_names(self):
         return list(self._data.keys())
@@ -188,7 +187,7 @@ class EdgeDataView(MutableMapping):
             name1 = _get_data_name(name, policy.policy_str)
             dtype, shape, _ = g._client.get_data_meta(name1)
             # We create a wrapper on the existing tensor in the kvstore.
-            self._data[name] = DistTensor(g, shape, dtype, name, part_policy=policy)
+            self._data[name] = DistTensor(shape, dtype, name, part_policy=policy)
 
     def _get_names(self):
         return list(self._data.keys())
@@ -321,8 +320,6 @@ class DistGraph:
 
     Parameters
     ----------
-    ip_config : str
-        Path of IP configuration file.
     graph_name : str
         The name of the graph. This name has to be the same as the one used in DistGraphServer.
     gpb : PartitionBook
@@ -330,14 +327,13 @@ class DistGraph:
     part_config : str
         The partition config file. It's used in the standalone mode.
     '''
-    def __init__(self, ip_config, graph_name, gpb=None, part_config=None):
-        self.ip_config = ip_config
+    def __init__(self, graph_name, gpb=None, part_config=None):
         self.graph_name = graph_name
         self._gpb_input = gpb
         if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
             assert part_config is not None, \
                     'When running in the standalone model, the partition config file is required'
-            self._client = SA_KVClient()
+            self._client = get_kvstore()
             # Load graph partition data.
             g, node_feats, edge_feats, self._gpb, _ = load_partition(part_config, 0)
             assert self._gpb.num_partitions() == 1, \
@@ -349,6 +345,7 @@ class DistGraph:
                 self._client.add_data(_get_data_name(name, NODE_PART_POLICY), node_feats[name])
             for name in edge_feats:
                 self._client.add_data(_get_data_name(name, EDGE_PART_POLICY), edge_feats[name])
+            self._client.map_shared_data(self._gpb)
             rpc.set_num_client(1)
         else:
             self._init()
@@ -377,10 +374,10 @@ class DistGraph:
         self._client.map_shared_data(self._gpb)
 
     def __getstate__(self):
-        return self.ip_config, self.graph_name, self._gpb
+        return self.graph_name, self._gpb
 
     def __setstate__(self, state):
-        self.ip_config, self.graph_name, self._gpb_input = state
+        self.graph_name, self._gpb_input = state
         self._init()
 
         self._ndata = NodeDataView(self)
@@ -429,6 +426,43 @@ class DistGraph:
         return self._edata
 
     @property
+    def idtype(self):
+        """The dtype of graph index
+
+        Returns
+        -------
+        backend dtype object
+            th.int32/th.int64 or tf.int32/tf.int64 etc.
+
+        See Also
+        --------
+        long
+        int
+        """
+        return self._g.idtype
+
+    @property
+    def device(self):
+        """Get the device context of this graph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
+        >>> print(g.device)
+        device(type='cpu')
+        >>> g = g.to('cuda:0')
+        >>> print(g.device)
+        device(type='cuda', index=0)
+
+        Returns
+        -------
+        Device context object
+        """
+        return self._g.device
+
+    @property
     def ntypes(self):
         """Return the list of node types of this graph.
 
@@ -439,7 +473,7 @@ class DistGraph:
         Examples
         --------
 
-        >>> g = DistGraph("ip_config.txt", "test")
+        >>> g = DistGraph("test")
         >>> g.ntypes
         ['_U']
         """
@@ -457,7 +491,7 @@ class DistGraph:
         Examples
         --------
 
-        >>> g = DistGraph("ip_config.txt", "test")
+        >>> g = DistGraph("test")
         >>> g.etypes
         ['_E']
         """

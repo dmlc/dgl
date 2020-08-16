@@ -2,9 +2,9 @@
 
 import os
 
-from .graph_partition_book import PartitionPolicy, NODE_PART_POLICY, EDGE_PART_POLICY
 from .dist_context import is_initialized
-from ..base import DGLError
+from .kvstore import get_kvstore
+from .role import get_role
 from .. import utils
 from .. import backend as F
 
@@ -17,6 +17,9 @@ def _get_data_name(name, part_policy):
 
 def _default_init_data(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
+
+# These Ids can identify the anonymous distributed tensors.
+DIST_TENSOR_ID = 0
 
 class DistTensor:
     ''' Distributed tensor.
@@ -35,8 +38,6 @@ class DistTensor:
 
     Parameters
     ----------
-    g : DistGraph
-        The distributed graph object.
     shape : tuple
         The shape of the tensor
     dtype : dtype
@@ -50,40 +51,52 @@ class DistTensor:
     persistent : bool
         Whether the created tensor is persistent.
     '''
-    def __init__(self, g, shape, dtype, name=None, init_func=None, part_policy=None,
+    def __init__(self, shape, dtype, name=None, init_func=None, part_policy=None,
                  persistent=False):
-        self.kvstore = g._client
+        self.kvstore = get_kvstore()
         self._shape = shape
         self._dtype = dtype
 
+        part_policies = self.kvstore.all_possible_part_policy
+        # If a user doesn't provide a partition policy, we should find one based on
+        # the input shape.
         if part_policy is None:
-            assert shape[0] != g.number_of_nodes() or shape[0] != g.number_of_edges(), \
-                    'Cannot determine the partition policy. Please provide it.'
-            if shape[0] == g.number_of_nodes():
-                part_policy = PartitionPolicy(NODE_PART_POLICY, g.get_partition_book())
-            elif shape[0] == g.number_of_edges():
-                part_policy = PartitionPolicy(EDGE_PART_POLICY, g.get_partition_book())
-            else:
-                raise DGLError('Cannot determine the partition policy. Please provide it.')
+            for policy_name in part_policies:
+                policy = part_policies[policy_name]
+                if policy.get_size() == shape[0]:
+                    # If multiple partition policies match the input shape, we cannot
+                    # decide which is the right one automatically. We should ask users
+                    # to provide one.
+                    assert part_policy is None, \
+                            'Multiple partition policies match the input shape. ' \
+                            + 'Please provide a partition policy explicitly.'
+                    part_policy = policy
+            assert part_policy is not None, \
+                    'Cannot find a right partition policy. Currently, DistTensor only ' \
+                    + 'supports partition policy associated with nodes or edges.'
 
         self._part_policy = part_policy
 
         if init_func is None:
             init_func = _default_init_data
-        exist_names = g._client.data_name_list()
+        exist_names = self.kvstore.data_name_list()
         # If a user doesn't provide a name, we generate a name ourselves.
         # We need to generate the name in a deterministic way.
         if name is None:
             assert not persistent, 'We cannot generate anonymous persistent distributed tensors'
-            name = 'anonymous-' + str(len(exist_names) + 1)
+            global DIST_TENSOR_ID
+            # All processes of the same role should create DistTensor synchronously.
+            # Thus, all of them should have the same Ids.
+            name = 'anonymous-' + get_role() + '-' + str(DIST_TENSOR_ID)
+            DIST_TENSOR_ID += 1
         self._name = _get_data_name(name, part_policy.policy_str)
         self._persistent = persistent
         if self._name not in exist_names:
-            g._client.init_data(self._name, shape, dtype, part_policy, init_func)
+            self.kvstore.init_data(self._name, shape, dtype, part_policy, init_func)
             self._owner = True
         else:
             self._owner = False
-            dtype1, shape1, _ = g._client.get_data_meta(self._name)
+            dtype1, shape1, _ = self.kvstore.get_data_meta(self._name)
             assert dtype == dtype1, 'The dtype does not match with the existing tensor'
             assert shape == shape1, 'The shape does not match with the existing tensor'
 

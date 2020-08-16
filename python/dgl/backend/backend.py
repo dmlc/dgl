@@ -1077,6 +1077,21 @@ def clamp(data, min_val, max_val):
     """
     pass
 
+def replace_inf_with_zero(x):
+    """Returns a new tensor replacing infinity and negative infinity with zeros.
+
+    Parameters
+    ----------
+    x : Tensor
+        The input
+
+    Returns
+    -------
+    Tensor
+        The result
+    """
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------
