@@ -1618,7 +1618,7 @@ class DGLHeteroGraph(object):
         If ``g`` is a graph of multiple node types, ``g.ndata[feat]`` returns a
         dict[str, Tensor] mapping node types to the node features associated with the name
         ``feat`` for the corresponding type. One can also set a node feature associated
-        with the name  ``feat`` for some node type(s) by setting ``g.ndata[feat]`` to a
+        with the name ``feat`` for some node type(s) by setting ``g.ndata[feat]`` to a
         dictionary as described.
 
         Notes
@@ -1642,7 +1642,7 @@ class DGLHeteroGraph(object):
                 [1.],
                 [1.]])
 
-        Set and get feature 'h' or a graph of multiple node types.
+        Set and get feature 'h' for a graph of multiple node types.
 
         >>> g = dgl.heterograph({
         ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
@@ -1674,14 +1674,21 @@ class DGLHeteroGraph(object):
     def srcdata(self):
         """Return a node data view for setting/getting source node features.
 
+        Let ``g`` be a DGLGraph. If ``g`` is a graph of a single source node type,
+        ``g.srcdata[feat]`` returns the source node feature associated with the name ``feat``.
+        One can also set a source node feature associated with the name ``feat`` by
+        setting ``g.srcdata[feat]`` to a tensor.
+
+        If ``g`` is a graph of multiple source node types, ``g.srcdata[feat]`` returns a
+        dict[str, Tensor] mapping source node types to the node features associated with
+        the name ``feat`` for the corresponding type. One can also set a node feature
+        associated with the name ``feat`` for some source node type(s) by setting
+        ``g.srcdata[feat]`` to a dictionary as described.
+
         Notes
         -----
-        - This is only for setting/getting source node features for a graph of a single source
-          node type. To work with graphs of multiple source ndoe types, see
-          :func:`dgl.DGLGraph.srcnodes`.
-        - For setting features, the device of the features must be the same as the device
-          of the graph.
-        - This is identical to :func:`dgl.DGLGraph.ndata` if the graph is homogeneous.
+        For setting features, the device of the features must be the same as the device
+        of the graph.
 
         Examples
         --------
@@ -1689,12 +1696,30 @@ class DGLHeteroGraph(object):
 
         >>> import dgl
         >>> import torch
-        >>> g = dgl.heterograph({('user', 'plays', 'game'):
-        ...                     (torch.tensor([0, 1]), torch.tensor([1, 2]))})
+
+        Set and get feature 'h' for a graph of a single source node type.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1]), torch.tensor([1, 2]))})
         >>> g.srcdata['h'] = torch.ones(2, 1)
         >>> g.srcdata['h']
         tensor([[1.],
                 [1.]])
+
+        Set and get feature 'h' for a graph of multiple source node types.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
+        ...     ('player', 'plays', 'game'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
+        ... })
+        >>> g.srcdata['h'] = {'user': torch.zeros(3, 1), 'player': torch.ones(3, 1)}
+        >>> g.srcdata['h']
+        {'player': tensor([[1.], [1.], [1.]]),
+         'user': tensor([[0.], [0.], [0.]])}
+        >>> g.srcdata['h'] = {'user': torch.ones(3, 1)}
+        >>> g.srcdata['h']
+        {'player': tensor([[1.], [1.], [1.]]),
+         'user': tensor([[1.], [1.], [1.]])}
 
         See Also
         --------
@@ -1715,14 +1740,21 @@ class DGLHeteroGraph(object):
     def dstdata(self):
         """Return a node data view for setting/getting destination node features.
 
+        Let ``g`` be a DGLGraph. If ``g`` is a graph of a single destination node type,
+        ``g.dstdata[feat]`` returns the destination node feature associated with the name
+        ``feat``. One can also set a destination node feature associated with the name
+        ``feat`` by setting ``g.dstdata[feat]`` to a tensor.
+
+        If ``g`` is a graph of multiple destination node types, ``g.dstdata[feat]`` returns a
+        dict[str, Tensor] mapping destination node types to the node features associated with
+        the name ``feat`` for the corresponding type. One can also set a node feature
+        associated with the name ``feat`` for some destination node type(s) by setting
+        ``g.dstdata[feat]`` to a dictionary as described.
+
         Notes
         -----
-        - This is only for setting/getting destination node features for a graph of a single
-          destination node type. To work with graphs of multiple destination ndoe types, see
-          :func:`dgl.DGLGraph.dstnodes`.
-        - For setting features, the device of the features must be the same as the device
-          of the graph.
-        - This is identical to :func:`dgl.DGLGraph.ndata` if the graph is homogeneous.
+        For setting features, the device of the features must be the same as the device
+        of the graph.
 
         Examples
         --------
@@ -1730,13 +1762,31 @@ class DGLHeteroGraph(object):
 
         >>> import dgl
         >>> import torch
-        >>> g = dgl.heterograph({('user', 'plays', 'game'):
-        ...                     (torch.tensor([0, 1]), torch.tensor([1, 2]))})
+
+        Set and get feature 'h' for a graph of a single destination node type.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1]), torch.tensor([1, 2]))})
         >>> g.dstdata['h'] = torch.ones(3, 1)
         >>> g.dstdata['h']
         tensor([[1.],
                 [1.],
                 [1.]])
+
+        Set and get feature 'h' for a graph of multiple destination node types.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 2]), torch.tensor([1, 2])),
+        ...     ('user', 'watches', 'movie'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
+        ... })
+        >>> g.dstdata['h'] = {'game': torch.zeros(3, 1), 'movie': torch.ones(2, 1)}
+        >>> g.dstdata['h']
+        {'game': tensor([[0.], [0.], [0.]]),
+         'movie': tensor([[1.], [1.]])}
+        >>> g.dstdata['h'] = {'game': torch.ones(3, 1)}
+        >>> g.dstdata['h']
+        {'game': tensor([[1.], [1.], [1.]]),
+         'movie': tensor([[1.], [1.]])}
 
         See Also
         --------
@@ -1796,14 +1846,22 @@ class DGLHeteroGraph(object):
 
     @property
     def edata(self):
-        """Return an edge data view for setting/getting edge features
+        """Return an edge data view for setting/getting edge features.
+
+        Let ``g`` be a DGLGraph. If ``g`` is a graph of a single edge type, ``g.edata[feat]``
+        returns the edge feature associated with the name ``feat``. One can also set an
+        edge feature associated with the name ``feat`` by setting ``g.edata[feat]`` to a tensor.
+
+        If ``g`` is a graph of multiple edge types, ``g.edata[feat]`` returns a
+        dict[str, Tensor] mapping canonical edge types to the edge features associated with
+        the name ``feat`` for the corresponding type. One can also set an edge feature
+        associated with the name ``feat`` for some edge type(s) by setting
+        ``g.edata[feat]`` to a dictionary as described.
 
         Notes
         -----
-        - This is only for setting/getting edge features for a graph of a single edge type.
-          To work with graphs of multiple edge types, see :func:`dgl.DGLGraph.edges`.
-        - For setting features, the device of the features must be the same as the device
-          of the graph.
+        For setting features, the device of the features must be the same as the device
+        of the graph.
 
         Examples
         --------
@@ -1811,11 +1869,31 @@ class DGLHeteroGraph(object):
 
         >>> import dgl
         >>> import torch
-        >>> g = dgl.graph((torch.tensor([1, 2]), torch.tensor([2, 3])))
+
+        Set and get feature 'h' for a graph of a single edge type.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
         >>> g.edata['h'] = torch.ones(2, 1)
         >>> g.edata['h']
         tensor([[1.],
                 [1.]])
+
+        Set and get feature 'h' for a graph of multiple edge types.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
+        ...     ('user', 'plays', 'user'): (torch.tensor([2, 2]), torch.tensor([1, 1])),
+        ...     ('player', 'plays', 'game'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
+        ... })
+        >>> g.edata['h'] = {('user', 'follows', 'user'): torch.zeros(2, 1),
+        ...                 ('user', 'plays', 'user'): torch.ones(2, 1)}
+        >>> g.edata['h']
+        {('user', 'follows', 'user'): tensor([[0.], [0.]]),
+         ('user', 'plays', 'user'): tensor([[1.], [1.]])}
+        >>> g.edata['h'] = {('user', 'follows', 'user'): torch.ones(2, 1)}
+        >>> g.edata['h']
+        {('user', 'follows', 'user'): tensor([[1.], [1.]]),
+         ('user', 'plays', 'user'): tensor([[1.], [1.]])}
 
         See Also
         --------
@@ -2324,7 +2402,7 @@ class DGLHeteroGraph(object):
 
             - ``int``: The ID of a single node.
             - ``Tensor``: A 1D tensor that contains the IDs of multiple nodes, whose data type and
-              device should be separately the same as the idtype and device of the graph.
+              device should be the same as the idtype and device of the graph.
             - ``iterable[int]``: A sequence (e.g. list, tuple, numpy.ndarray)
               of integers that contains the IDs of multiple nodes.
         ntype : str, optional
@@ -2390,9 +2468,10 @@ class DGLHeteroGraph(object):
             The source node(s) of the edges for query. The allowed formats are:
 
             - ``int``: The source node of an edge for query.
-            - ``Tensor``: A 1D tensor that contains the source node(s) of edge(s) for query, whose
-              data type an device should be separately the same as the idtype and device of
-              the graph. Its i-th element is the source node of the i-th edge for query.
+            - ``Tensor``: A 1D tensor that contains the source node(s) of edge(s) for query.
+              The data type and device of the tensor must be the same as the idtype and
+              device of the graph. Its i-th element represents the source node ID of the
+              i-th edge for query.
             - ``iterable[int]`` : Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
         v : destination node ID(s)
@@ -2591,7 +2670,8 @@ class DGLHeteroGraph(object):
                              return_uv=return_uv, etype=etype)
 
     def edge_ids(self, u, v, force_multi=None, return_uv=False, etype=None):
-        """Return the IDs of some particular edge(s) with the specified edge type.
+        """Return the ID(s) of edge(s) from the given source node(s) to the given destination
+        node(s) with the specified edge type.
 
         Parameters
         ----------
@@ -2600,7 +2680,7 @@ class DGLHeteroGraph(object):
 
             - ``int``: The source node of an edge for query.
             - ``Tensor``: A 1D tensor that contains the source node(s) of edge(s) for query, whose
-              data type an device should be separately the same as the idtype and device of
+              data type an device should be the same as the idtype and device of
               the graph. Its i-th element is the source node of the i-th edge for query.
             - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
@@ -2613,7 +2693,7 @@ class DGLHeteroGraph(object):
             multigraph, i.e. there can be multiple edges from one node to another.
         return_uv : bool, optional
             Whether to return the source and destination node IDs along with the edges. If
-            False (default), it assumes that the graph is a simple graph and there is at most
+            False (default), it assumes that the graph is a simple graph and there is only
             one edge from one node to another. If True, there can be multiple edges found
             from one node to another.
         etype : str or tuple of str, optional
@@ -2636,10 +2716,10 @@ class DGLHeteroGraph(object):
         Notes
         -----
         If the graph is a simple graph, ``return_uv=False``, and there are no edges
-        between some pairs of node(s), the result is undefined and it returns an empty tensor.
+        between some pairs of node(s), it will raise an error.
 
         If the graph is a multigraph, ``return_uv=False``, and there are multiple edges
-        between some pairs of node(s), the result is undefined.
+        between some pairs of node(s), it returns an arbitrary one from them.
 
         Examples
         --------
@@ -2712,13 +2792,12 @@ class DGLHeteroGraph(object):
         ----------
         eid : edge ID(s)
             The IDs of the edges for query. The function expects that :attr:`eid` contains
-            valid edge IDs only, i.e. consecutive integers :math:`0, 1, ... E - 1`, where
+            valid edge IDs only, i.e. among consecutive integers :math:`0, 1, ... E - 1`, where
             :math:`E` is the number of edges with the specified edge type.
 
             - ``int``: An edge ID for query.
             - ``Tensor``: A 1D tensor that contains the edge IDs for query, whose data
-              type and device should be separately the same as the idtype and device of the
-              graph.
+              type and device should be the same as the idtype and device of the graph.
             - ``iterable[int]``: Similar to the tensor, but stores edge IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
         etype : str or tuple of str, optional
@@ -2777,8 +2856,7 @@ class DGLHeteroGraph(object):
 
             - ``int``: The destination node for query.
             - ``Tensor``: A 1D tensor that contains the destination node(s) for query, whose data
-              type and device should be separately the same as the idtype and device of the
-              graph.
+              type and device should be the same as the idtype and device of the graph.
             - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
         form : str, optional
@@ -2861,8 +2939,7 @@ class DGLHeteroGraph(object):
 
             - ``int``: The source node for query.
             - ``Tensor``: A 1D tensor that contains the source node(s) for query, whose data
-              type and device should be separately the same as the idtype and device of the
-              graph.
+              type and device should be the same as the idtype and device of the graph.
             - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
         form : str, optional
@@ -3033,8 +3110,7 @@ class DGLHeteroGraph(object):
 
             - ``int``: The destination node for query.
             - ``Tensor``: A 1D tensor that contains the destination node(s) for query, whose data
-              type and device should be separately the same as the idtype and device of the
-              graph.
+              type and device should be the same as the idtype and device of the graph.
             - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
 
@@ -3118,8 +3194,7 @@ class DGLHeteroGraph(object):
 
             - ``int``: The source node for query.
             - ``Tensor``: A 1D tensor that contains the source node(s) for query, whose data
-              type and device should be separately the same as the idtype and device of the
-              graph.
+              type and device should be the same as the idtype and device of the graph.
             - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
 
@@ -4398,7 +4473,7 @@ class DGLHeteroGraph(object):
             The node(s) for query. The allowed formats are:
 
             - Tensor: A 1D tensor that contains the node(s) for query, whose data type
-              and device should be separately the same as the idtype and device of the graph.
+              and device should be the same as the idtype and device of the graph.
             - iterable[int] : Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
 
@@ -4475,14 +4550,13 @@ class DGLHeteroGraph(object):
             The edge(s) for query. The allowed formats are:
 
             - Tensor: A 1D tensor that contains the IDs of the edge(s) for query, whose data
-              type and device should be separately the same as the idtype and device of the
-              graph.
+              type and device should be the same as the idtype and device of the graph.
             - iterable[int]: Similar to the tensor, but stores edge IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
             - (Tensor, Tensor): A 2-tuple of the source and destination nodes of multiple
               edges for query. Each tensor is a 1D tensor containing node IDs. DGL calls this
               format "tuple of node-tensors". The data type and device of the tensors should
-              be separately the same as the idtype and device of the graph.
+              be the same as the idtype and device of the graph.
             - (iterable[int], iterable[int]): Similar to the tuple of node-tensors format,
               but stores node IDs in two sequences (e.g. list, tuple, numpy.ndarray).
 
@@ -4590,7 +4664,7 @@ class DGLHeteroGraph(object):
 
         Returns
         -------
-        g : DGLGraph
+        DGLGraph
             The graph on the specified device.
 
         Examples
@@ -5018,7 +5092,7 @@ class DGLHeteroGraph(object):
 
 
     def long(self):
-        """Cast the graph to one of idtype int64
+        """Cast the graph to one with idtype int64
 
         If the graph already has idtype int64, the function directly returns it. Otherwise,
         it returns a cloned graph of idtype int64 with features copied (shallow copy).
@@ -5068,7 +5142,7 @@ class DGLHeteroGraph(object):
         return self.astype(F.int64)
 
     def int(self):
-        """Cast the graph to one of idtype int32
+        """Cast the graph to one with idtype int32
 
         If the graph already has idtype int32, the function directly returns it. Otherwise,
         it returns a cloned graph of idtype int32 with features copied (shallow copy).

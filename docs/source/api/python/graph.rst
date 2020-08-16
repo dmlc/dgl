@@ -23,11 +23,13 @@ Querying graph structure
 .. autosummary::
     :toctree: ../../generated/
 
-    DGLGraph.num_nodes
-    DGLGraph.num_edges
+    DGLGraph.number_of_nodes
+    DGLGraph.number_of_edges
+    DGLGraph.__len__
     DGLGraph.is_multigraph
     DGLGraph.has_node
     DGLGraph.has_nodes
+    DGLGraph.__contains__
     DGLGraph.has_edge_between
     DGLGraph.has_edges_between
     DGLGraph.predecessors
@@ -93,7 +95,7 @@ Converting from/to other format
 
     DGLGraph.to_networkx
     DGLGraph.from_networkx
-    DGLGraph.from_scipy
+    DGLGraph.from_scipy_sparse_matrix
     DGLGraph.adjacency_matrix
     DGLGraph.adjacency_matrix_scipy
     DGLGraph.incidence_matrix

@@ -16,13 +16,11 @@ Conversion to and from heterogeneous graphs
     :toctree: ../../generated/
 
     graph
-    from_scipy
-    from_networkx
-    bipartite_from_scipy
-    bipartite_from_networkx
+    bipartite
+    hetero_from_relations
     heterograph
-    to_heterogeneous
-    to_homogeneous
+    to_hetero
+    to_homo
     to_networkx
     DGLHeteroGraph.adjacency_matrix
     DGLHeteroGraph.incidence_matrix
@@ -47,8 +45,8 @@ Querying graph structure
 .. autosummary::
     :toctree: ../../generated/
 
-    DGLHeteroGraph.num_nodes
-    DGLHeteroGraph.num_edges
+    DGLHeteroGraph.number_of_nodes
+    DGLHeteroGraph.number_of_edges
     DGLHeteroGraph.is_multigraph
     DGLHeteroGraph.is_readonly
     DGLHeteroGraph.has_node

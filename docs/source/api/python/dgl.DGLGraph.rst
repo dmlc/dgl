@@ -115,8 +115,6 @@ Computing with DGLGraph
     DGLGraph.prop_edges
     DGLGraph.filter_nodes
     DGLGraph.filter_edges
-    DGLGraph.to
-    DGLGraph.device
 
 Querying batch summary
 ----------------------
@@ -127,3 +125,12 @@ Querying batch summary
     DGLGraph.batch_size
     DGLGraph.batch_num_nodes
     DGLGraph.batch_num_edges
+
+Device Control
+--------------
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    DGLGraph.to
+    DGLGraph.device

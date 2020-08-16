@@ -110,6 +110,14 @@ def graphdata2tensors(data, idtype=None, bipartite=False, **kwargs):
     bipartite : bool, optional
         Whether infer number of nodes of a bipartite graph --
         num_src and num_dst can be different.
+    kwargs
+
+        - edge_id_attr_name : The name (str) of the edge attribute that stores the edge
+          IDs in the NetworkX graph.
+        - top_map : The dictionary mapping the original IDs of the source nodes to the
+          new ones.
+        - bottom_map : The dictionary mapping the original IDs of the destination nodes
+          to the new ones.
 
     Returns
     -------
