@@ -152,7 +152,7 @@ class LinkPredict(nn.Module):
 
             return p_h, n_h
 
-    def inference(self, g, in_feats, batch_size, device):
+    def inference(self, g, in_feats, device, batch_size=16):
         """
         Inference with the RGCN model on full neighbor
 
@@ -177,7 +177,6 @@ class LinkPredict(nn.Module):
         x = in_feats
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.h_dim)
-
             sampler = NodeSampler(g)
             dataloader = DataLoader(dataset=th.arange(g.number_of_nodes()),
                                     batch_size=batch_size,
@@ -422,7 +421,7 @@ def fullgraph_emb(g, embed_layer, model, node_feats, dim_size, device):
                                     g.ndata['type_id'][idx],
                                     node_feats).cpu()
 
-    emb = model.inference(g, in_feats, 1024, device)
+    emb = model.inference(g, in_feats, device)
     return emb
 
 def fullgraph_eval(train_g, g, embed_layer, model, device, node_feats,
