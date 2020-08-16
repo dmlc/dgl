@@ -61,7 +61,7 @@ Querying and manipulating index data type
     DGLHeteroGraph.long
     DGLHeteroGraph.int
 
-Using node/edge features
+Using Node/edge features
 ------------------------
 
 .. autosummary::
