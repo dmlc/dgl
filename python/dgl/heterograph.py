@@ -109,9 +109,9 @@ class DGLHeteroGraph(object):
     and "user-watches-TV" as follows:
 
     >>> GG = dgl.heterograph({
-    >>>     ('user', 'watches', 'movie'): ([0, 1, 1], [1, 0, 1]),
-    >>>     ('user', 'watches', 'TV'): ([0, 1], [0, 1])
-    >>> })
+    ...     ('user', 'watches', 'movie'): ([0, 1, 1], [1, 0, 1]),
+    ...     ('user', 'watches', 'TV'): ([0, 1], [0, 1])
+    ... })
 
     To distinguish between the two "watches" edge type, one must specify a full triplet:
 
@@ -384,11 +384,11 @@ class DGLHeteroGraph(object):
         **Heterogeneous Graphs with Multiple Node Types**
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
-        >>>                                 torch.tensor([0, 0, 1, 1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
-        >>>                                         torch.tensor([0, 1]))
-        >>>     })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        ...                                         torch.tensor([0, 1]))
+        ...     })
         >>> g.add_nodes(2)
         DGLError: Node type name must be specified
         if there are more than one node types.
@@ -531,7 +531,7 @@ class DGLHeteroGraph(object):
         We can also assign features for the new edges in adding new edges.
 
         >>> g.add_edges(torch.tensor([0, 0]), torch.tensor([2, 2]),
-        >>>             {'h': torch.tensor([[1.], [2.]]), 'w': torch.ones(2, 1)})
+        ...             {'h': torch.tensor([[1.], [2.]]), 'w': torch.ones(2, 1)})
         >>> g.edata['h']
         tensor([[1.], [1.], [1.], [1.], [0.], [1.], [2.]])
 
@@ -544,17 +544,17 @@ class DGLHeteroGraph(object):
         **Heterogeneous Graphs with Multiple Edge Types**
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
-        >>>                                 torch.tensor([0, 0, 1, 1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
-        >>>                                         torch.tensor([0, 1]))
-        >>>     })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        ...                                         torch.tensor([0, 1]))
+        ...     })
         >>> g.add_edges(torch.tensor([3]), torch.tensor([3]))
         DGLError: Edge type name must be specified
         if there are more than one edge types.
         >>> g.number_of_edges('plays')
         4
-        >>>  g.add_edges(torch.tensor([3]), torch.tensor([3]), etype='plays')
+        >>> g.add_edges(torch.tensor([3]), torch.tensor([3]), etype='plays')
         >>> g.number_of_edges('plays')
         5
 
@@ -680,11 +680,11 @@ class DGLHeteroGraph(object):
         **Heterogeneous Graphs with Multiple Edge Types**
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
-        >>>                                 torch.tensor([0, 0, 1, 1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
-        >>>                                         torch.tensor([0, 1]))
-        >>>     })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        ...                                         torch.tensor([0, 1]))
+        ...     })
         >>> g.remove_edges(torch.tensor([0, 1]))
         DGLError: Edge type name must be specified
         if there are more than one edge types.
@@ -768,11 +768,11 @@ class DGLHeteroGraph(object):
         **Heterogeneous Graphs with Multiple Node Types**
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
-        >>>                                 torch.tensor([0, 0, 1, 1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
-        >>>                                         torch.tensor([0, 1]))
-        >>>     })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        ...                                         torch.tensor([0, 1]))
+        ...     })
         >>> g.remove_nodes(torch.tensor([0, 1]))
         DGLError: Node type name must be specified
         if there are more than one node types.
@@ -866,14 +866,14 @@ class DGLHeteroGraph(object):
         >>> import torch
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
+        ... })
         >>> g.ntypes
         ['game', 'user']
         """
-        return sorted(self._ntypes)
+        return self._ntypes
 
     @property
     def etypes(self):
@@ -899,22 +899,22 @@ class DGLHeteroGraph(object):
         >>> import torch
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
+        ... })
         >>> g.etypes
         ['follows', 'follows', 'plays']
         """
-        return sorted(self._etypes)
+        return self._etypes
 
     @property
     def canonical_etypes(self):
         """Return the canonical edge types of the graph.
 
         A canonical edge type is a 3-tuple of str ``src_type, edge_type, dst_type``, where
-        ``src_type``, ``edge_type``, ``dst_type`` are separately the type of the source
-        nodes, edges and destination nodes.
+        ``src_type``, ``edge_type``, ``dst_type`` are the type of the source nodes, edges
+        and destination nodes respectively.
 
         Returns
         -------
@@ -929,16 +929,16 @@ class DGLHeteroGraph(object):
         >>> import torch
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
+        ... })
         >>> g.canonical_etypes
         [('user', 'follows', 'user'),
          ('user', 'follows', 'game'),
          ('user', 'plays', 'game')]
         """
-        return sorted(self._canonical_etypes)
+        return self._canonical_etypes
 
     @property
     def srctypes(self):
@@ -962,18 +962,18 @@ class DGLHeteroGraph(object):
         Query for a uni-bipartite graph.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0]), torch.tensor([1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
-        >>> })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0]), torch.tensor([1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        ... })
         >>> g.srctypes
         ['developer', 'user']
 
         Query for a graph that is not uni-bipartite.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0]), torch.tensor([1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0]), torch.tensor([1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        ... })
         >>> g.srctypes
         ['developer', 'game', 'user']
         """
@@ -1005,18 +1005,18 @@ class DGLHeteroGraph(object):
         Query for a uni-bipartite graph.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0]), torch.tensor([1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
-        >>> })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0]), torch.tensor([1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        ... })
         >>> g.dsttypes
         ['game']
 
         Query for a graph that is not uni-bipartite.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0]), torch.tensor([1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0]), torch.tensor([1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        ... })
         >>> g.dsttypes
         ['developer', 'game', 'user']
         """
@@ -1028,10 +1028,9 @@ class DGLHeteroGraph(object):
     def metagraph(self):
         """Return the metagraph of the heterograph.
 
-        A metagraph is a summary of the node and edge types in a heterograph.
-        Each node in the metagraph corresponds to a node type in the heterograph.
-        There is an edge from node A to node B in the metagraph if there are edges
-        from nodes of type A to nodes of type B in the heterograph.
+        The metagraph (or network schema) of a heterogeneous network specifies type constraints
+        on the sets of nodes and edges between the nodes. For a formal definition, refer to
+        `Yizhou et al. <https://www.kdd.org/exploration_files/V14-02-03-Sun.pdf>`_.
 
         Returns
         -------
@@ -1046,10 +1045,10 @@ class DGLHeteroGraph(object):
         >>> import torch
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
+        ... })
         >>> meta_g = g.metagraph()
         >>> meta_g.nodes()
         NodeView(('user', 'game'))
@@ -1099,10 +1098,10 @@ class DGLHeteroGraph(object):
         Create a heterograph.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
-        >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        >>>     ('developer', 'follows', 'game'): ([0, 1], [0, 1])
-        >>> })
+        ...     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
+        ...     ('developer', 'follows', 'game'): ([0, 1], [0, 1])
+        ... })
 
         Map an edge type to its corresponding canonical edge type.
 
@@ -1250,7 +1249,8 @@ class DGLHeteroGraph(object):
         Returns
         -------
         int
-            The Number of graphs in the batch.
+            The Number of graphs in the batch. If the graph is not a batched one,
+            it will return 1.
 
         Examples
         --------
@@ -1273,11 +1273,11 @@ class DGLHeteroGraph(object):
         Query for heterogeneous graphs.
 
         >>> hg1 = dgl.heterograph({
-        >>>       ('user', 'plays', 'game') : (torch.tensor([0, 1]), torch.tensor([0, 0]))})
+        ...       ('user', 'plays', 'game') : (torch.tensor([0, 1]), torch.tensor([0, 0]))})
         >>> hg1.batch_size
         1
         >>> hg2 = dgl.heterograph({
-        >>>       ('user', 'plays', 'game') : (torch.tensor([0, 0]), torch.tensor([1, 0]))})
+        ...       ('user', 'plays', 'game') : (torch.tensor([0, 0]), torch.tensor([1, 0]))})
         >>> bg = dgl.batch([hg1, hg2])
         >>> bg.batch_size
         2
@@ -1291,7 +1291,8 @@ class DGLHeteroGraph(object):
         ----------
         ntype : str, optional
             The node type for query. If the graph has multiple node types, one must
-            specify the argument. Otherwise, it can be omitted.
+            specify the argument. Otherwise, it can be omitted. If the graph is not a batched
+            one, it will return a list of length 1 that holds the number of nodes in the graph.
 
         Returns
         -------
@@ -1320,9 +1321,9 @@ class DGLHeteroGraph(object):
         Query for heterogeneous graphs.
 
         >>> hg1 = dgl.heterograph({
-        >>>       ('user', 'plays', 'game') : (torch.tensor([0, 1]), torch.tensor([0, 0]))})
+        ...       ('user', 'plays', 'game') : (torch.tensor([0, 1]), torch.tensor([0, 0]))})
         >>> hg2 = dgl.heterograph({
-        >>>       ('user', 'plays', 'game') : (torch.tensor([0, 0]), torch.tensor([1, 0]))})
+        ...       ('user', 'plays', 'game') : (torch.tensor([0, 0]), torch.tensor([1, 0]))})
         >>> bg = dgl.batch([hg1, hg2])
         >>> bg.batch_num_nodes('user')
         tensor([2, 1])
@@ -1366,6 +1367,8 @@ class DGLHeteroGraph(object):
         Tensor
             The number of edges with the specified type for each graph in the batch. The i-th
             element of it is the number of edges with the specified type for the i-th graph.
+            If the graph is not a batched one, it will return a list of length 1 that holds
+            the number of edges in the graph.
 
         Examples
         --------
@@ -1388,9 +1391,9 @@ class DGLHeteroGraph(object):
         Query for heterogeneous graphs.
 
         >>> hg1 = dgl.heterograph({
-        >>>       ('user', 'plays', 'game') : (torch.tensor([0, 1]), torch.tensor([0, 0]))})
+        ...       ('user', 'plays', 'game') : (torch.tensor([0, 1]), torch.tensor([0, 0]))})
         >>> hg2 = dgl.heterograph({
-        >>>       ('user', 'plays', 'game') : (torch.tensor([0, 0]), torch.tensor([1, 0]))})
+        ...       ('user', 'plays', 'game') : (torch.tensor([0, 0]), torch.tensor([1, 0]))})
         >>> bg = dgl.batch([hg1, hg2])
         >>> bg.batch_num_edges('plays')
         tensor([2, 2])
@@ -1425,7 +1428,7 @@ class DGLHeteroGraph(object):
     def nodes(self):
         """Return a node view
 
-        The node view allows two utilities:
+        One can use it for:
 
         1. Getting the node IDs for a single node type.
         2. Setting/getting features for all nodes of a single node type.
@@ -1441,9 +1444,9 @@ class DGLHeteroGraph(object):
 
         >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
         >>> hg = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
 
         Get the node IDs of the homogeneous graph.
 
@@ -1479,7 +1482,7 @@ class DGLHeteroGraph(object):
         this is :func:`nodes` restricted to source node types. Otherwise, it is an alias
         for :func:`nodes`.
 
-        It allows two utilities:
+        One can use it for:
 
         1. Getting the node IDs for a single node type.
         2. Setting/getting features for all nodes of a single node type.
@@ -1494,9 +1497,9 @@ class DGLHeteroGraph(object):
         Create a uni-bipartite graph.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0]), torch.tensor([1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
-        >>> })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0]), torch.tensor([1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        ... })
 
         Get the node IDs for source node types.
 
@@ -1514,9 +1517,9 @@ class DGLHeteroGraph(object):
         Create a graph that is not uni-bipartite.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0]), torch.tensor([1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0]), torch.tensor([1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        ... })
 
         :func:`dgl.DGLGraph.srcnodes` falls back to :func:`dgl.DGLGraph.nodes` and one can
         get the node IDs for both source and destination node types.
@@ -1546,7 +1549,7 @@ class DGLHeteroGraph(object):
         this is :func:`nodes` restricted to destination node types. Otherwise, it is an alias
         for :func:`nodes`.
 
-        It allows two utilities:
+        One can use it for:
 
         1. Getting the node IDs for a single node type.
         2. Setting/getting features for all nodes of a single node type.
@@ -1561,9 +1564,9 @@ class DGLHeteroGraph(object):
         Create a uni-bipartite graph.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0]), torch.tensor([1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
-        >>> })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0]), torch.tensor([1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        ... })
 
         Get the node IDs for destination node types.
 
@@ -1581,9 +1584,9 @@ class DGLHeteroGraph(object):
         Create a graph that is not uni-bipartite.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0]), torch.tensor([1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0]), torch.tensor([1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        ... })
 
         :func:`dgl.DGLGraph.dstnodes` falls back to :func:`dgl.DGLGraph.nodes` and one can
         get the node IDs for both source and destination node types.
@@ -1608,12 +1611,20 @@ class DGLHeteroGraph(object):
     def ndata(self):
         """Return a node data view for setting/getting node features
 
+        Let ``g`` be a DGLGraph. If ``g`` is a graph of a single node type, ``g.ndata[feat]``
+        returns the node feature associated with the name ``feat``. One can also set a node
+        feature associated with the name ``feat`` by setting ``g.ndata[feat]`` to a tensor.
+
+        If ``g`` is a graph of multiple node types, ``g.ndata[feat]`` returns a
+        dict[str, Tensor] mapping node types to the node features associated with the name
+        ``feat`` for the corresponding type. One can also set a node feature associated
+        with the name  ``feat`` for some node type(s) by setting ``g.ndata[feat]`` to a
+        dictionary as described.
+
         Notes
         -----
-        - This is only for setting/getting node features for a graph of a single node type.
-          To work with graphs of multiple node types, see :func:`dgl.DGLGraph.nodes`.
-        - For setting features, the device of the features must be the same as the device
-          of the graph.
+        For setting features, the device of the features must be the same as the device
+        of the graph.
 
         Examples
         --------
@@ -1621,12 +1632,30 @@ class DGLHeteroGraph(object):
 
         >>> import dgl
         >>> import torch
+
+        Set and get feature 'h' for a graph of a single node type.
+
         >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
         >>> g.ndata['h'] = torch.ones(3, 1)
         >>> g.ndata['h']
         tensor([[1.],
                 [1.],
                 [1.]])
+
+        Set and get feature 'h' or a graph of multiple node types.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
+        ...     ('player', 'plays', 'game'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
+        ... })
+        >>> g.ndata['h'] = {'game': torch.zeros(2, 1), 'player': torch.ones(3, 1)}
+        >>> g.ndata['h']
+        {'game': tensor([[0.], [0.]]),
+         'player': tensor([[1.], [1.], [1.]])}
+        >>> g.ndata['h'] = {'game': torch.ones(2, 1)}
+        >>> g.ndata['h']
+        {'game': tensor([[1.], [1.]]),
+         'player': tensor([[1.], [1.], [1.]])}
 
         See Also
         --------
@@ -1661,7 +1690,7 @@ class DGLHeteroGraph(object):
         >>> import dgl
         >>> import torch
         >>> g = dgl.heterograph({('user', 'plays', 'game'):
-        >>>                     (torch.tensor([0, 1]), torch.tensor([1, 2]))})
+        ...                     (torch.tensor([0, 1]), torch.tensor([1, 2]))})
         >>> g.srcdata['h'] = torch.ones(2, 1)
         >>> g.srcdata['h']
         tensor([[1.],
@@ -1702,7 +1731,7 @@ class DGLHeteroGraph(object):
         >>> import dgl
         >>> import torch
         >>> g = dgl.heterograph({('user', 'plays', 'game'):
-        >>>                     (torch.tensor([0, 1]), torch.tensor([1, 2]))})
+        ...                     (torch.tensor([0, 1]), torch.tensor([1, 2]))})
         >>> g.dstdata['h'] = torch.ones(3, 1)
         >>> g.dstdata['h']
         tensor([[1.],
@@ -1728,7 +1757,7 @@ class DGLHeteroGraph(object):
     def edges(self):
         """Return an edge view
 
-        The edge view allows two utilities:
+        One can use it for:
 
         1. Getting the edges for a single edge type. In this case, this is
            an alias for :func:`dgl.DGLGraph.all_edges`. For a description
@@ -1745,9 +1774,9 @@ class DGLHeteroGraph(object):
         Create a heterogeneous graph of two edge types.
 
         >>> hg = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
 
         Set and get a feature 'h' for all edges of a single type in the heterogeneous graph.
 
@@ -1903,43 +1932,7 @@ class DGLHeteroGraph(object):
     #################################################################
 
     def number_of_nodes(self, ntype=None):
-        """Return the number of nodes.
-
-        Parameters
-        ----------
-        ntype : str, optional
-            The node type for query. If given, it returns the number of nodes for a particular
-            type. If not given (default), it returns the total number of nodes of all types.
-
-        Returns
-        -------
-        int
-            The number of nodes.
-
-        Examples
-        --------
-
-        The following example uses PyTorch backend.
-
-        >>> import dgl
-        >>> import torch
-
-        Create a graph with two node types -- 'user' and 'game'.
-
-        >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        >>> })
-
-        Query for the number of nodes.
-
-        >>> g.number_of_nodes('user')
-        5
-        >>> g.number_of_nodes('game')
-        7
-        >>> g.number_of_nodes()
-        12
-        """
+        """Alias of num_nodes"""
         return self.num_nodes(ntype)
 
     def num_nodes(self, ntype=None):
@@ -1967,9 +1960,9 @@ class DGLHeteroGraph(object):
         Create a graph with two node types -- 'user' and 'game'.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
 
         Query for the number of nodes.
 
@@ -1989,49 +1982,7 @@ class DGLHeteroGraph(object):
             return self._graph.number_of_nodes(self.get_ntype_id(ntype))
 
     def number_of_src_nodes(self, ntype=None):
-        """Return the number of nodes of the given source node type.
-
-        Parameters
-        ----------
-        ntype : str, optional
-            The source node type for query. If given, it returns the number of nodes for a
-            particular source node type. If not given (default), it returns the number of
-            nodes summed over all source node types.
-
-        Returns
-        -------
-        int
-            The number of nodes
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        >>> import dgl
-        >>> import torch
-
-        Create a homogeneous graph for query.
-
-        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
-        >>> g.number_of_src_nodes()
-        7
-
-        Create a heterogeneous graph with two source node types -- 'developer' and 'user'.
-
-        >>> g = dgl.heterograph({
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        >>> })
-
-        Query for the number of nodes.
-
-        >>> g.number_of_src_nodes('developer')
-        2
-        >>> g.number_of_src_nodes('user')
-        5
-        >>> g.number_of_src_nodes()
-        7
-        """
+        """Alias of num_src_nodes"""
         return self.num_src_nodes(ntype)
 
     def num_src_nodes(self, ntype=None):
@@ -2065,9 +2016,9 @@ class DGLHeteroGraph(object):
         Create a heterogeneous graph with two source node types -- 'developer' and 'user'.
 
         >>> g = dgl.heterograph({
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        >>> })
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
 
         Query for the number of nodes.
 
@@ -2087,49 +2038,7 @@ class DGLHeteroGraph(object):
             return self._graph.number_of_nodes(self.get_ntype_id_from_src(ntype))
 
     def number_of_dst_nodes(self, ntype=None):
-        """Return the number of nodes of the given destination node type.
-
-        Parameters
-        ----------
-        ntype : str, optional
-            The destination node type for query. If given, it returns the number of nodes for a
-            particular destination node type. If not given (default), it returns the number of
-            nodes summed over all destination node types.
-
-        Returns
-        -------
-        int
-            The number of nodes
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        >>> import dgl
-        >>> import torch
-
-        Create a homogeneous graph for query.
-
-        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
-        >>> g.number_of_dst_nodes()
-        3
-
-        Create a heterogeneous graph with two destination node types -- 'user' and 'game'.
-
-        >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        >>> })
-
-        Query for the number of nodes.
-
-        >>> g.number_of_dst_nodes('user')
-        5
-        >>> g.number_of_dst_nodes('game')
-        7
-        >>> g.number_of_dst_nodes()
-        12
-        """
+        """Alias of num_dst_nodes"""
         return self.num_dst_nodes(ntype)
 
     def num_dst_nodes(self, ntype=None):
@@ -2163,9 +2072,9 @@ class DGLHeteroGraph(object):
         Create a heterogeneous graph with two destination node types -- 'user' and 'game'.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
 
         Query for the number of nodes.
 
@@ -2185,52 +2094,7 @@ class DGLHeteroGraph(object):
             return self._graph.number_of_nodes(self.get_ntype_id_from_dst(ntype))
 
     def number_of_edges(self, etype=None):
-        """Return the number of edges.
-
-        Parameters
-        ----------
-        etype : str or tuple of str, optional
-            The edge type for query, which can be an edge type (str) or a canonical edge type
-            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
-            must use a canonical edge type. If given, it returns the number of edges for a
-            particular edge type. If not given (default), it returns the total number of edges
-            of all types.
-
-        Returns
-        -------
-        int
-            The number of edges
-
-        Examples
-        --------
-
-        The following example uses PyTorch backend.
-
-        >>> import dgl
-        >>> import torch
-
-        Create a graph with three canonical edge types.
-
-        >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
-        >>> })
-
-        Query for the number of edges.
-
-        >>> g.number_of_edges('plays')
-        2
-        >>> g.number_of_edges()
-        7
-
-        Use a canonical edge type instead when there is ambiguity for an edge type.
-
-        >>> g.number_of_edges(('user', 'follows', 'user'))
-        2
-        >>> g.number_of_edges(('user', 'follows', 'game'))
-        3
-        """
+        """Alias of num_edges"""
         return self.num_edges(etype)
 
     def num_edges(self, etype=None):
@@ -2261,10 +2125,10 @@ class DGLHeteroGraph(object):
         Create a graph with three canonical edge types.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
+        ... })
 
         Query for the number of edges.
 
@@ -2310,6 +2174,10 @@ class DGLHeteroGraph(object):
         bool
             Whether the graph is a multigraph.
 
+        Notes
+        -----
+        Checking whether the graph is a multigraph can be expensive for a large one.
+
         Examples
         --------
 
@@ -2330,15 +2198,15 @@ class DGLHeteroGraph(object):
         Check for heterogeneous graphs.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3]))
+        ... })
         >>> g.is_multigraph
         False
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1, 1]), torch.tensor([1, 2, 2])),
-        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1, 1]), torch.tensor([1, 2, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3]))
+        ... })
         >>> g.is_multigraph
         True
         """
@@ -2374,7 +2242,7 @@ class DGLHeteroGraph(object):
         If the graph has multiple edge types, one need to specify the edge type.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3]))})
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3]))})
         >>> g.is_homogeneous
         False
         """
@@ -2484,9 +2352,9 @@ class DGLHeteroGraph(object):
         Create a graph with two node types -- 'user' and 'game'.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([0, 1]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([0, 1]))
+        ... })
 
         Query for the nodes.
 
@@ -2574,20 +2442,20 @@ class DGLHeteroGraph(object):
         If the graph has multiple edge types, one need to specify the edge type.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
+        ... })
         >>> g.has_edges_between(torch.tensor([1, 2]), torch.tensor([2, 3]), 'plays')
         tensor([ True, False])
 
         Use a canonical edge type instead when there is ambiguity for an edge type.
 
         >>> g.has_edges_between(torch.tensor([1, 2]), torch.tensor([2, 3]),
-        >>>                     ('user', 'follows', 'user'))
+        ...                     ('user', 'follows', 'user'))
         tensor([ True, False])
         >>> g.has_edges_between(torch.tensor([1, 2]), torch.tensor([2, 3]),
-        >>>                     ('user', 'follows', 'game'))
+        ...                     ('user', 'follows', 'game'))
         tensor([True, True])
         """
         ret = self._graph.has_edges_between(
@@ -2609,7 +2477,7 @@ class DGLHeteroGraph(object):
         return self.has_edges_between(u, v, etype)
 
     def predecessors(self, v, etype=None):
-        """Return the predecessor(s) of some particular node(s) with the specified edge type.
+        """Return the predecessor(s) of a particular node with the specified edge type.
 
         Node ``u`` is a predecessor of node ``v`` if there is an edge ``(u, v)`` with type
         ``etype`` in the graph.
@@ -2648,9 +2516,9 @@ class DGLHeteroGraph(object):
         For a graph of multiple edge types, it is required to specify the edge type in query.
 
         >>> hg = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
         >>> hg.predecessors(1, etype='follows')
         tensor([0])
 
@@ -2661,7 +2529,7 @@ class DGLHeteroGraph(object):
         return self._graph.predecessors(self.get_etype_id(etype), v)
 
     def successors(self, v, etype=None):
-        """Return the successor(s) of some particular node(s) with the specified edge type.
+        """Return the successor(s) of a particular node with the specified edge type.
 
         Node ``u`` is a successor of node ``v`` if there is an edge ``(v, u)`` with type
         ``etype`` in the graph.
@@ -2700,9 +2568,9 @@ class DGLHeteroGraph(object):
         For a graph of multiple edge types, it is required to specify the edge type in query.
 
         >>> hg = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
         >>> hg.successors(1, etype='follows')
         tensor([2])
 
@@ -2799,20 +2667,20 @@ class DGLHeteroGraph(object):
         If the graph has multiple edge types, one need to specify the edge type.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
+        ... })
         >>> g.edge_ids(torch.tensor([1]), torch.tensor([2]), etype='plays')
         tensor([0])
 
         Use a canonical edge type instead when there is ambiguity for an edge type.
 
         >>> g.edge_ids(torch.tensor([0, 1]), torch.tensor([1, 2]),
-        >>>            etype=('user', 'follows', 'user'))
+        ...            etype=('user', 'follows', 'user'))
         tensor([0, 1])
         >>> g.edge_ids(torch.tensor([1, 2]), torch.tensor([2, 3]),
-        >>>            etype=('user', 'follows', 'game'))
+        ...            etype=('user', 'follows', 'game'))
         tensor([1, 2])
         """
         is_int = isinstance(u, numbers.Integral) and isinstance(v, numbers.Integral)
@@ -2886,9 +2754,9 @@ class DGLHeteroGraph(object):
         For a graph of multiple edge types, it is required to specify the edge type in query.
 
         >>> hg = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
         >>> hg.find_edges(torch.tensor([1, 0]), 'plays')
         (tensor([4, 3]), tensor([6, 5]))
         """
@@ -2960,9 +2828,9 @@ class DGLHeteroGraph(object):
         For a graph of multiple edge types, it is required to specify the edge type in query.
 
         >>> hg = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
         >>> hg.in_edges(torch.tensor([1, 0]), etype='follows')
         (tensor([0]), tensor([1]))
 
@@ -3044,9 +2912,9 @@ class DGLHeteroGraph(object):
         For a graph of multiple edge types, it is required to specify the edge type in query.
 
         >>> hg = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
         >>> hg.out_edges(torch.tensor([1, 2]), etype='follows')
         (tensor([1]), tensor([2]))
 
@@ -3125,9 +2993,9 @@ class DGLHeteroGraph(object):
         For a graph of multiple edge types, it is required to specify the edge type in query.
 
         >>> hg = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
         >>> hg.all_edges(etype='plays')
         (tensor([3, 4]), tensor([5, 6]))
 
@@ -3213,9 +3081,9 @@ class DGLHeteroGraph(object):
         For a graph of multiple edge types, it is required to specify the edge type in query.
 
         >>> hg = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
         >>> hg.in_degrees(torch.tensor([1, 0]), etype='follows')
         tensor([1, 0])
 
@@ -3298,9 +3166,9 @@ class DGLHeteroGraph(object):
         For a graph of multiple edge types, it is required to specify the edge type in query.
 
         >>> hg = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        >>>     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        >>> })
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
         >>> hg.out_degrees(torch.tensor([1, 0]), etype='follows')
         tensor([1, 1])
 
@@ -3352,9 +3220,9 @@ class DGLHeteroGraph(object):
 
         >>> plays_g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1])})
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): ([0, 1], [0, 1]),
-        >>>     ('developer', 'develops', 'game'): ([0, 1], [0, 2])
-        >>> })
+        ...     ('user', 'follows', 'user'): ([0, 1], [0, 1]),
+        ...     ('developer', 'develops', 'game'): ([0, 1], [0, 2])
+        ... })
 
         Get a backend dependent sparse tensor. Here we use PyTorch for example.
 
@@ -3504,7 +3372,7 @@ class DGLHeteroGraph(object):
         Query for a heterogeneous graph of multiple node types.
 
         >>> g = dgl.heterograph({('user', 'plays', 'game'):
-        >>>                      (torch.tensor([1, 2]), torch.tensor([3, 4]))})
+        ...                      (torch.tensor([1, 2]), torch.tensor([3, 4]))})
         >>> g.nodes['user'].data['h1'] = torch.randn(3, 1)
         >>> g.nodes['user'].data['h2'] = torch.randn(3, 2)
         >>> g.node_attr_schemes('user')
@@ -3554,9 +3422,9 @@ class DGLHeteroGraph(object):
         Query for a heterogeneous graph of multiple edge types.
 
         >>> g = dgl.heterograph({('user', 'plays', 'game'):
-        >>>                      (torch.tensor([1, 2]), torch.tensor([3, 4])),
-        >>>                      ('user', 'follows', 'user'):
-        >>>                      (torch.tensor([3, 4]), torch.tensor([5, 6]))})
+        ...                      (torch.tensor([1, 2]), torch.tensor([3, 4])),
+        ...                      ('user', 'follows', 'user'):
+        ...                      (torch.tensor([3, 4]), torch.tensor([5, 6]))})
         >>> g.edges['plays'].data['h1'] = torch.randn(2, 1)
         >>> g.edges['plays'].data['h2'] = torch.randn(2, 2)
         >>> g.edge_attr_schemes('plays')
@@ -3614,7 +3482,7 @@ class DGLHeteroGraph(object):
         Define a function for initializer.
 
         >>> def init_feats(shape, dtype, device, id_range):
-        >>>     return torch.ones(shape, dtype=dtype, device=device)
+        ...     return torch.ones(shape, dtype=dtype, device=device)
 
         An example for a homogeneous graph.
 
@@ -3634,11 +3502,11 @@ class DGLHeteroGraph(object):
         An example for a heterogeneous graph of multiple node types.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
-        >>>                                 torch.tensor([0, 0, 1, 1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
-        >>>                                         torch.tensor([0, 1]))
-        >>>     })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        ...                                         torch.tensor([0, 1]))
+        ...     })
         >>> g.nodes['user'].data['h'] = torch.zeros(3, 2)
         >>> g.nodes['game'].data['w'] = torch.ones(2, 2)
         >>> g.set_n_initializer(init_feats, ntype='game')
@@ -3705,7 +3573,7 @@ class DGLHeteroGraph(object):
         Define a function for initializer.
 
         >>> def init_feats(shape, dtype, device, id_range):
-        >>>     return torch.ones(shape, dtype=dtype, device=device)
+        ...     return torch.ones(shape, dtype=dtype, device=device)
 
         An example for a homogeneous graph.
 
@@ -3724,11 +3592,11 @@ class DGLHeteroGraph(object):
         An example for a heterogeneous graph of multiple edge types.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1]),
-        >>>                                 torch.tensor([0, 0])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
-        >>>                                         torch.tensor([0, 1]))
-        >>>     })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1]),
+        ...                                 torch.tensor([0, 0])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        ...                                         torch.tensor([0, 1]))
+        ...     })
         >>> g.edges['plays'].data['h'] = torch.zeros(2, 2)
         >>> g.edges['develops'].data['w'] = torch.ones(2, 2)
         >>> g.set_e_initializer(init_feats, etype='plays')
@@ -4071,12 +3939,12 @@ class DGLHeteroGraph(object):
         >>> import torch
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
-        >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1])
-        >>> })
+        ...     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1])
+        ... })
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
         >>> g.send_and_recv(g['follows'].edges(), fn.copy_src('h', 'm'),
-        >>>                 fn.sum('m', 'h'), etype='follows')
+        ...                 fn.sum('m', 'h'), etype='follows')
         >>> g.nodes['user'].data['h']
         tensor([[0.],
                 [0.],
@@ -4157,9 +4025,9 @@ class DGLHeteroGraph(object):
         Instantiate a heterograph.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
-        >>>     ('user', 'plays', 'game'): ([0, 2], [0, 1])
-        >>> })
+        ...     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ...     ('user', 'plays', 'game'): ([0, 2], [0, 1])
+        ... })
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
         Pull.
@@ -4353,18 +4221,18 @@ class DGLHeteroGraph(object):
         Instantiate a heterograph.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'follows', 'user'): ([0, 1], [1, 1]),
-        >>>     ('game', 'attracts', 'user'): ([0], [1])
-        >>> })
+        ...     ('user', 'follows', 'user'): ([0, 1], [1, 1]),
+        ...     ('game', 'attracts', 'user'): ([0], [1])
+        ... })
         >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.]])
         >>> g.nodes['game'].data['h'] = torch.tensor([[1.]])
 
         Update all.
 
         >>> g.multi_update_all(
-        >>>     {'follows': (fn.copy_src('h', 'm'), fn.sum('m', 'h')),
-        >>>      'attracts': (fn.copy_src('h', 'm'), fn.sum('m', 'h'))},
-        >>> "sum")
+        ...     {'follows': (fn.copy_src('h', 'm'), fn.sum('m', 'h')),
+        ...      'attracts': (fn.copy_src('h', 'm'), fn.sum('m', 'h'))},
+        ... "sum")
         >>> g.nodes['user'].data['h']
         tensor([[0.],
                 [4.]])
@@ -4436,7 +4304,7 @@ class DGLHeteroGraph(object):
         >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1, 2, 3], [2, 3, 4, 4])})
         >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.], [3.], [4.], [5.]])
         >>> g['follows'].prop_nodes([[2, 3], [4]], fn.copy_src('h', 'm'),
-        >>>                         fn.sum('m', 'h'), etype='follows')
+        ...                         fn.sum('m', 'h'), etype='follows')
         tensor([[1.],
                 [2.],
                 [1.],
@@ -4494,7 +4362,7 @@ class DGLHeteroGraph(object):
         >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1, 2, 3], [2, 3, 4, 4])})
         >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.], [3.], [4.], [5.]])
         >>> g['follows'].prop_edges([[0, 1], [2, 3]], fn.copy_src('h', 'm'),
-        >>>                         fn.sum('m', 'h'), etype='follows')
+        ...                         fn.sum('m', 'h'), etype='follows')
         >>> g.nodes['user'].data['h']
         tensor([[1.],
                 [2.],
@@ -4555,8 +4423,8 @@ class DGLHeteroGraph(object):
         Define a predicate function.
 
         >>> def nodes_with_feature_one(nodes):
-        >>>     # Whether a node has feature 1
-        >>>     return (nodes.data['h'] == 1.).squeeze(1)
+        ...     # Whether a node has feature 1
+        ...     return (nodes.data['h'] == 1.).squeeze(1)
 
         Filter nodes for a homogeneous graph.
 
@@ -4573,8 +4441,8 @@ class DGLHeteroGraph(object):
         Filter nodes for a heterogeneous graph.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
-        >>>                                 torch.tensor([0, 0, 1, 1]))})
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1]))})
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [1.]])
         >>> g.nodes['game'].data['h'] = torch.tensor([[0.], [1.]])
         >>> # Filter for 'user' nodes
@@ -4641,8 +4509,8 @@ class DGLHeteroGraph(object):
         Define a predicate function.
 
         >>> def edges_with_feature_one(edges):
-        >>>     # Whether an edge has feature 1
-        >>>     return (edges.data['h'] == 1.).squeeze(1)
+        ...     # Whether an edge has feature 1
+        ...     return (edges.data['h'] == 1.).squeeze(1)
 
         Filter edges for a homogeneous graph.
 
@@ -4659,9 +4527,9 @@ class DGLHeteroGraph(object):
         Filter edges for a heterogeneous graph.
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
-        >>>                                 torch.tensor([0, 0, 1, 1])),
-        >>>     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2]))})
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1])),
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2]))})
         >>> g.edges['plays'].data['h'] = torch.tensor([[0.], [1.], [1.], [0.]])
         >>> # Filter for 'plays' nodes
         >>> print(g.filter_edges(edges_with_feature_one, etype='plays'))
@@ -4862,10 +4730,10 @@ class DGLHeteroGraph(object):
         Create a function for computation on graphs.
 
         >>> def foo(g):
-        >>>     g = g.local_var()
-        >>>     g.edata['h'] = torch.ones((g.num_edges(), 3))
-        >>>     g.edata['h2'] = torch.ones((g.num_edges(), 3))
-        >>>     return g.edata['h']
+        ...     g = g.local_var()
+        ...     g.edata['h'] = torch.ones((g.num_edges(), 3))
+        ...     g.edata['h2'] = torch.ones((g.num_edges(), 3))
+        ...     return g.edata['h']
 
         ``local_var`` avoids changing the graph features when exiting the function.
 
@@ -4882,11 +4750,11 @@ class DGLHeteroGraph(object):
         In-place operations will still reflect to the original graph.
 
         >>> def foo(g):
-        >>>     g = g.local_var()
-        >>>     # in-place operation
-        >>>     g.edata['h'] += 1
-        >>>     return g.edata['h']
-        >>>
+        ...     g = g.local_var()
+        ...     # in-place operation
+        ...     g.edata['h'] += 1
+        ...     return g.edata['h']
+
         >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([0, 0, 2])))
         >>> g.edata['h'] = torch.zeros((g.num_edges(), 1))
         >>> newh = foo(g)
@@ -4931,10 +4799,10 @@ class DGLHeteroGraph(object):
         Create a function for computation on graphs.
 
         >>> def foo(g):
-        >>>     with g.local_scope():
-        >>>         g.edata['h'] = torch.ones((g.num_edges(), 3))
-        >>>         g.edata['h2'] = torch.ones((g.num_edges(), 3))
-        >>>         return g.edata['h']
+        ...     with g.local_scope():
+        ...         g.edata['h'] = torch.ones((g.num_edges(), 3))
+        ...         g.edata['h2'] = torch.ones((g.num_edges(), 3))
+        ...         return g.edata['h']
 
         ``local_scope`` avoids changing the graph features when exiting the function.
 
@@ -4951,11 +4819,11 @@ class DGLHeteroGraph(object):
         In-place operations will still reflect to the original graph.
 
         >>> def foo(g):
-        >>>     with g.local_scope():
-        >>>         # in-place operation
-        >>>         g.edata['h'] += 1
-        >>>         return g.edata['h']
-        >>>
+        ...     with g.local_scope():
+        ...         # in-place operation
+        ...         g.edata['h'] += 1
+        ...         return g.edata['h']
+
         >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([0, 0, 2])))
         >>> g.edata['h'] = torch.zeros((g.num_edges(), 1))
         >>> newh = foo(g)
@@ -5032,11 +4900,11 @@ class DGLHeteroGraph(object):
         **Heterographs with Multiple Edge Types**
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
-        >>>                                 torch.tensor([0, 0, 1, 1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
-        >>>                                         torch.tensor([0, 1]))
-        >>>     })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        ...                                         torch.tensor([0, 1]))
+        ...     })
         >>> g.formats()
         {'created': ['coo'], 'not created': ['csr', 'csc']}
         >>> # Get a clone of the graph with 'csr' format
@@ -5081,11 +4949,11 @@ class DGLHeteroGraph(object):
         **Heterographs with Multiple Edge Types**
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
-        >>>                                 torch.tensor([0, 0, 1, 1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
-        >>>                                         torch.tensor([0, 1]))
-        >>>     })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        ...                                         torch.tensor([0, 1]))
+        ...     })
         >>> g.format()
         {'created': ['coo'], 'not created': ['csr', 'csc']}
         >>> g.create_format_()
