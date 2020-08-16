@@ -421,7 +421,11 @@ def fullgraph_emb(g, embed_layer, model, node_feats, dim_size, device):
                                     g.ndata['type_id'][idx],
                                     node_feats).cpu()
 
+<<<<<<< HEAD
     emb = model.inference(g, in_feats, device)
+=======
+    emb = model.inference(g, in_feats, 128, device)
+>>>>>>> 1791cd1bc8f8eeaf7b9879ddd5712608b75b305a
     return emb
 
 def fullgraph_eval(train_g, g, embed_layer, model, device, node_feats,
@@ -473,7 +477,10 @@ def fullgraph_eval(train_g, g, embed_layer, model, device, node_feats,
     logs = []
 
     with th.no_grad():
-        embs = fullgraph_emb(g, embed_layer, model, node_feats, dim_size, device)
+        if queue is not None:
+            embs = fullgraph_emb(g, embed_layer, model.module, node_feats, dim_size, device)
+        else:
+            embs = fullgraph_emb(g, embed_layer, model, node_feats, dim_size, device)
         pos_batch_size = 1024
         pos_cnt = pos_eids.shape[0]
         total_cnt = 0
@@ -720,7 +727,8 @@ def run(proc_id, n_gpus, args, devices, node_feats, dataset, pos_seeds, neg_seed
 
     if n_gpus > 1:
         embed_layer = DistributedDataParallel(embed_layer, device_ids=[dev_id], output_device=dev_id)
-        model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id, find_unused_parameters=True)
+        #model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id, find_unused_parameters=True)
+        model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
 
     # optimizer
     all_params = itertools.chain(model.parameters(), embed_layer.parameters())
@@ -744,13 +752,16 @@ def run(proc_id, n_gpus, args, devices, node_feats, dataset, pos_seeds, neg_seed
                                       n_blocks[0].srcdata['type_id'],
                                       node_feats)
 
-                p_h, n_h = modle(p_blocks, p_feats, n_blocks, n_feats, sample=args.sampler)
+                p_h, n_h = model(p_blocks, p_feats, n_blocks, n_feats, sample=args.sampler)
 
                 head, tail, eid = p_g.all_edges(form='all')
                 p_head_emb = p_h[head]
                 p_tail_emb = p_h[tail]
                 rids = p_g.edata['etype']
-                r_emb = self.w_relation[rids]
+                if queue is None:
+                    r_emb = model.w_relation[rids]
+                else:
+                    r_emb = model.module.w_relation[rids]
                 head, tail = n_g.all_edges(form='uv')
                 n_head_emb = n_h[head]
                 n_tail_emb = n_h[tail]
@@ -763,12 +774,14 @@ def run(proc_id, n_gpus, args, devices, node_feats, dataset, pos_seeds, neg_seed
                 mb_feats = model(g, in_feats, sample=args.sampler)
                 p_head_emb = mb_feats[p_u]
                 p_tail_emb = mb_feats[p_v]
-
                 nh_idx = th.randint(low=0, high=mb_feats.shape[0], size=(p_head_emb.shape[0],))
                 nt_idx = th.randint(low=0, high=mb_feats.shape[0], size=(p_tail_emb.shape[0],))
                 n_head_emb = mb_feats[nh_idx]
                 n_tail_emb = mb_feats[nt_idx]
-                r_emb = model.w_relation[rids]
+                if queue is None:
+                    r_emb = model.w_relation[rids]
+                else:
+                    r_emb = model.module.w_relation[rids]
 
             pred_loss = get_loss(p_head_emb,
                                  p_tail_emb,
