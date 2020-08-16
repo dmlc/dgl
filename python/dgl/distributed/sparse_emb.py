@@ -1,7 +1,5 @@
 """Define sparse embedding and optimizer."""
 
-import torch as th
-
 from .. import backend as F
 from .. import utils
 from .dist_tensor import DistTensor
@@ -142,7 +140,7 @@ class SparseAdagrad:
                     # after we push them.
                     grads = F.cat(grads, 0)
 
-                uniq_idxs, inverse_idxs = th.unique(idxs, return_inverse=True)
+                uniq_idxs, inverse_idxs = F.unique(idxs, return_inverse=True)
                 if len(uniq_idxs) != len(idxs):
                     shape = list(grads.shape)
                     shape[0] = len(uniq_idxs)

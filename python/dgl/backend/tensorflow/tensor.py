@@ -400,7 +400,8 @@ def clamp(data, min_val, max_val):
 def replace_inf_with_zero(x):
     return tf.where(tf.abs(x) == np.inf, 0, x)
 
-def unique(input):
+def unique(input, return_inverse=False):
+    assert not return_inverse, 'TensorFlow does not support unique with return_inverse=True'
     return tf.unique(input).y
 
 

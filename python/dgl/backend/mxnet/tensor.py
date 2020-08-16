@@ -328,10 +328,11 @@ def clamp(data, min_val, max_val):
 def replace_inf_with_zero(x):
     return nd.where(nd.abs(x) == np.inf, nd.zeros_like(x), x)
 
-def unique(input):
+def unique(input, return_inverse=False):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
     tmp = np.unique(tmp)
+    assert not return_inverse, 'MXNet does not support unique with return_inverse=True'
     return nd.array(tmp, ctx=input.context, dtype=input.dtype)
 
 def full_1d(length, fill_value, dtype, ctx):
