@@ -483,7 +483,7 @@ You can similarly write a ``HeteroMLPPredictor``.
             # h contains the node representations computed from the GNN above.
             with graph.local_scope():
                 graph.ndata['h'] = h   # assigns 'h' of all node types in one shot
-                graph.apply_edges(self.apply_edges)
+                graph.apply_edges(self.apply_edges, etype=etype)
                 return graph.edges[etype].data['score']
 
 The end-to-end model that predicts a score for each edge on a single
