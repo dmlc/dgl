@@ -445,7 +445,7 @@ def test_edge_ids():
     g2 = dgl.heterograph({
         ('user', 'follows', 'user'): (F.tensor([0, 0], F.int64), F.tensor([1, 1], F.int64)),
         ('user', 'plays', 'game'): (F.tensor([0], F.int64), F.tensor([N2], F.int64))},
-        {'user': N1, 'game': N1})
+        {'user': N1, 'game': N1}, device=F.cpu())
 
     eid = g2.edge_ids(0, 1, etype='follows')
     assert eid == 0

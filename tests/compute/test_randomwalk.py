@@ -60,8 +60,7 @@ def test_random_walk_with_restart():
             trace_diff = np.diff(F.zerocopy_to_numpy(t), axis=-1)
             assert (trace_diff % 2 == 0).all()
 
-@parametrize_dtype
-def test_metapath_random_walk(idtype):
+def test_metapath_random_walk(idtype="int32"):
     g1 = dgl.heterograph({
         ('a', 'ab', 'b'): ([0, 1, 2, 3], [0, 1, 2, 3])
     }, idtype=idtype)
