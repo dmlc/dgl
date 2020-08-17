@@ -40,7 +40,9 @@ def prepare_tensor(g, data, name):
                            ' but got {}.'.format(name, F.dtype(data)))
         ret = F.copy_to(F.astype(data, g.idtype), g.device)
 
-    if F.ndim(ret) != 1:
+    if F.ndim(ret) == 0:
+        ret = F.unsqueeze(ret, 0)
+    if F.ndim(ret) > 1:
         raise DGLError('Expect a 1-D tensor for argument "{}". But got {}.'.format(
             name, ret))
     return ret

@@ -2981,9 +2981,6 @@ class DGLHeteroGraph(object):
         out_edges
         """
         v = utils.prepare_tensor(self, v, 'v')
-        _, _, dsttype = self.to_canonical_etype(etype)
-        if F.as_scalar(F.sum(self.has_nodes(v, ntype=dsttype), dim=0)) != len(v):
-            raise DGLError('v contains invalid node IDs')
         src, dst, eid = self._graph.in_edges(self.get_etype_id(etype), v)
         if form == 'all':
             return src, dst, eid
