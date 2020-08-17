@@ -446,8 +446,6 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
     --------
     to_homogeneous
     """
-    # TODO(minjie): use hasattr to support DGLGraph input; should be fixed once
-    #  DGLGraph is merged with DGLHeteroGraph
     if (hasattr(G, 'ntypes') and len(G.ntypes) > 1
             or hasattr(G, 'etypes') and len(G.etypes) > 1):
         raise DGLError('The input graph should be homogeneous and have only one '
@@ -503,10 +501,12 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
     edge_groups = [etype_mask[i].nonzero()[0] for i in range(len(canonical_etids))]
 
     data_dict = dict()
+    canonical_etypes = []
     for i, (stid, etid, dtid) in enumerate(canonical_etids):
         src_of_etype = src_local[edge_groups[i]]
         dst_of_etype = dst_local[edge_groups[i]]
-        data_dict[(ntypes[stid], etypes[etid], ntypes[dtid])] = \
+        canonical_etypes.append((ntypes[stid], etypes[etid], ntypes[dtid]))
+        data_dict[canonical_etypes[-1]] = \
             (src_of_etype, dst_of_etype)
     hg = heterograph(data_dict,
                      {ntype: count for ntype, count in zip(ntypes, ntype_count)},
@@ -521,12 +521,14 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
         for ntid, ntype in enumerate(hg.ntypes):
             rows = F.copy_to(F.tensor(ntype2ngrp[ntype]), F.context(data))
             hg._node_frames[ntid][key] = F.gather_row(data, rows)
+
     for key, data in G.edata.items():
         if key in [etype_field, EID]:
             continue
         for etid in range(len(hg.canonical_etypes)):
             rows = F.copy_to(F.tensor(edge_groups[etid]), F.context(data))
-            hg._edge_frames[etid][key] = F.gather_row(data, rows)
+            hg._edge_frames[hg.get_etype_id(canonical_etypes[etid])][key] = \
+                F.gather_row(data, rows)
 
     return hg
 

@@ -51,7 +51,7 @@ def bipartite1():
 @register_case(['homo', 'has_feature'])
 def graph1():
     g = dgl.graph(([0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 6, 6, 7, 8, 9],
-                   [4, 5, 1, 2, 4, 7, 9, 8 ,6, 4, 1, 0, 1, 0, 2, 3, 5]))
+                   [4, 5, 1, 2, 4, 7, 9, 8 ,6, 4, 1, 0, 1, 0, 2, 3, 5]), device=F.cpu())
     g.ndata['h'] = F.copy_to(F.randn((g.number_of_nodes(), 2)), F.cpu())
     g.edata['w'] = F.copy_to(F.randn((g.number_of_edges(), 3)), F.cpu())
     return g
@@ -79,6 +79,7 @@ def batched_graph0():
 @register_case(['block', 'bipartite', 'block-biparitite'])
 def block_graph0():
     g = dgl.graph(([2, 3, 4], [5, 6, 7]), num_nodes=100)
+    g = g.to(F.cpu())
     return dgl.to_block(g)
 
 @register_case(['block'])

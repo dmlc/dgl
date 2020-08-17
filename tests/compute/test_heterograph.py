@@ -145,8 +145,8 @@ def test_create(idtype):
     assert F.allclose(src, F.tensor([0, 1], dtype=idtype))
     assert F.allclose(dst, F.tensor([1, 2], dtype=idtype))
     g = dgl.bipartite_from_networkx(nx_g, utype='_U', etype='_E', vtype='V',
-                                    src_attrs=['feat1', 'feat2'],
-                                    edge_attrs = ['weight'], dst_attrs = ['feat3'])
+                                    u_attrs=['feat1', 'feat2'],
+                                    e_attrs = ['weight'], v_attrs = ['feat3'])
     assert F.allclose(g.srcdata['feat1'], F.tensor(np.zeros((2, 2))))
     assert F.allclose(g.srcdata['feat2'], F.tensor(np.ones((2, 2))))
     assert F.allclose(g.dstdata['feat3'], F.tensor(np.zeros((3, 3))))
@@ -974,7 +974,7 @@ def test_convert(idtype):
         ('user', 'user', 'follows'),
         ('user', 'game', 'plays'),
         ('user', 'game', 'wishes'),
-        ('developer', 'game', 'develops')])
+        ('developer', 'game',  'develops')])
 
     for _mg in [None, mg]:
         hg2 = dgl.to_heterogeneous(
