@@ -1,7 +1,7 @@
 .. _guide-data-pipeline:
 
-Graph data input pipeline in DGL
-==================================
+Chapter 4: Graph Data Pipeline
+====================================================
 
 DGL implements many commonly used graph datasets in :ref:`apidata`. They
 follow a standard pipeline defined in class :class:`dgl.data.DGLDataset`. We highly
