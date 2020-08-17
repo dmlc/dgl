@@ -4,6 +4,7 @@ from scipy import sparse as spsp
 import dgl
 import backend as F
 import unittest
+from pathlib import Path
 from utils import get_local_usable_addr
 
 def create_random_graph(n):
@@ -16,17 +17,17 @@ def init_emb(shape, dtype):
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Test with Pytorch Adagrad')
-def test_adagrad():
+def test_adagrad(tmpdir):
     import torch as th
     import torch.nn as nn
     import torch.nn.functional as F
 
-    g = create_random_graph(10000)
+    g = create_random_graph(100)
 
     # Partition the graph
     num_parts = 1
     graph_name = 'sparse_adagrad_graph'
-    dgl.distributed.partition_graph(g, graph_name, num_parts, '/tmp/dist_graph')
+    dgl.distributed.partition_graph(g, graph_name, num_parts, tmpdir)
 
     # Prepare ip config
     ip_config = open("rpc_ip_config.txt", "w")
@@ -35,7 +36,7 @@ def test_adagrad():
 
     dgl.distributed.initialize("rpc_ip_config.txt")
     g = dgl.distributed.DistGraph(graph_name,
-                                  part_config='/tmp/dist_graph/sparse_adagrad_graph.json')
+                                  part_config=tmpdir / 'sparse_adagrad_graph.json')
     embed_size=10
 
     w1 = nn.Parameter(th.Tensor(10, 10))
@@ -55,6 +56,7 @@ def test_adagrad():
     th_emb_optimizer = th.optim.Adagrad(torch_embeds.parameters(), lr=0.01)
 
     for _ in range(10):
+        # We only test on the first 50 nodes.
         idx = th.tensor(np.random.choice(50, 10))
         truth = th.ones((len(idx),)).long()
 
@@ -79,4 +81,6 @@ def test_adagrad():
                                            torch_embeds(idx).numpy())
 
 if __name__ == '__main__':
-    test_adagrad()
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        test_adagrad(Path(tmpdirname))
