@@ -2896,12 +2896,13 @@ class DGLHeteroGraph(object):
         (tensor([4, 3]), tensor([6, 5]))
         """
         eid = utils.prepare_tensor(self, eid, 'eid')
-        min_eid = F.as_scalar(F.min(eid, 0))
-        if len(eid) > 0 > min_eid:
-            raise DGLError('Invalid edge ID {:d}'.format(min_eid))
-        max_eid = F.as_scalar(F.max(eid, 0))
-        if len(eid) > 0 and max_eid >= self.num_edges(etype):
-            raise DGLError('Invalid edge ID {:d}'.format(max_eid))
+        if len(eid) > 0:
+            min_eid = F.as_scalar(F.min(eid, 0))
+            if min_eid < 0:
+                raise DGLError('Invalid edge ID {:d}'.format(min_eid))
+            max_eid = F.as_scalar(F.max(eid, 0))
+            if max_eid >= self.num_edges(etype):
+                raise DGLError('Invalid edge ID {:d}'.format(max_eid))
 
         if len(eid) == 0:
             empty = F.copy_to(F.tensor([], self.idtype), self.device)
