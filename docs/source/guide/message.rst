@@ -1,3 +1,5 @@
+.. _guide-message-passing:
+
 Message Passing
 ===============
 

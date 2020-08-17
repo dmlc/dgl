@@ -186,6 +186,15 @@ Set2Set
     :members:
     :show-inheritance:
 
+Heterogeneous Graph Convolution Module
+----------------------------------------
+
+HeteroGraphConv
+~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.HeteroGraphConv
+   :members:
+   :show-inheritance:
 
 Utility Modules
 ----------------------------------------

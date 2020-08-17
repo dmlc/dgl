@@ -199,7 +199,7 @@ class EdgeDataLoader(DataLoader):
 
     See also
     --------
-    :class:`~dgl.dataloading.EdgeCollator`
+    :class:`~dgl.dataloading.dataloader.EdgeCollator`
 
     For end-to-end usages, please refer to the following tutorial/examples:
 
