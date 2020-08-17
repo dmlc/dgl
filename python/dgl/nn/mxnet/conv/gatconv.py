@@ -247,6 +247,8 @@ class GATConv(nn.Block):
             if isinstance(feat, tuple):
                 h_src = self.feat_drop(feat[0])
                 h_dst = self.feat_drop(feat[1])
+                if not hasattr(self, 'fc_src'):
+                    self.fc_src, self.fc_dst = self.fc, self.fc
                 feat_src = self.fc_src(h_src).reshape(
                     -1, self._num_heads, self._out_feats)
                 feat_dst = self.fc_dst(h_dst).reshape(
