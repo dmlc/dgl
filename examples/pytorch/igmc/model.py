@@ -29,9 +29,11 @@ class IGMC(nn.Module):
         self.multiply_by = multiply_by
 
         self.convs = th.nn.ModuleList()
-        self.convs.append(gconv(in_feats, latent_dim[0], num_relations, num_bases=num_bases, self_loop=True))
+        self.convs.append(gconv(in_feats, latent_dim[0], num_relations, 
+                                num_bases=num_bases, self_loop=True, low_mem=True))
         for i in range(0, len(latent_dim)-1):
-            self.convs.append(gconv(latent_dim[i], latent_dim[i+1], num_relations, num_bases=num_bases, self_loop=True))
+            self.convs.append(gconv(latent_dim[i], latent_dim[i+1], num_relations, 
+                                    num_bases=num_bases, self_loop=True, low_mem=True))
         
         self.lin1 = nn.Linear(2 * sum(latent_dim), 128)
         if side_features:

@@ -205,9 +205,6 @@ def subgraph_extraction_labeling(ind, graph, mode="bipartite",
     # subgraph.ndata['x'] = th.cat([subgraph.ndata['nlabel'], subgraph.ndata['refex']], dim=1)
     subgraph.ndata['x'] = subgraph.ndata['nlabel']
 
-    # refex_feature = extract_refex_feature(subgraph).to(th.float)
-    # subgraph.ndata['x'] = th.cat([subgraph.ndata['x'], refex_feature], dim=1)
-
     # set edge mask to zero as to remove links between target nodes in training process
     subgraph.edata['edge_mask'] = th.ones(subgraph.number_of_edges())
     su = subgraph.nodes()[subgraph.ndata[dgl.NID]==ind[0]]

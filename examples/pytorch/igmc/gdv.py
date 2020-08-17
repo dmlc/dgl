@@ -1,5 +1,3 @@
-"""Motif Counter definition."""
-
 import pandas as pd
 from tqdm import tqdm
 import networkx as nx
@@ -69,22 +67,30 @@ def cal_graph_degree_vector(nx_graph, graphlets, categories, num_roles, node_sub
     return graph_degree_vector
 
 if __name__ == "__main__":
-    from data import MovieLens
-    movielens = MovieLens("ml-100k", testing=True)
-    nx_graph = movielens.train_graph.to_networkx().to_undirected()
-
     # from dgl.data import CoraGraphDataset
     # data = CoraGraphDataset()
-    # nx_graph = data.graph.to_undirected()
+    # nx_graph = data[0].to_networkx().to_undirected()
 
-    graphlets, categories, num_roles = enumerate_graphlets(graphlet_size=4)
-    node_subsets = create_node_subsets(nx_graph, graphlet_size=4)    
-    graph_degree_vector = cal_graph_degree_vector(nx_graph, graphlets, categories, num_roles, node_subsets)
+    # graphlets, categories, num_roles = enumerate_graphlets(graphlet_size=4)
+    # node_subsets = create_node_subsets(nx_graph, graphlet_size=4)    
+    # graph_degree_vector = cal_graph_degree_vector(nx_graph, graphlets, categories, num_roles, node_subsets)
 
-    motifs = [[nid]+[graph_degree_vector[nid][role_idx] for role_idx in range(num_roles)] for nid in nx_graph.nodes()]
-    motifs = pd.DataFrame(motifs)
-    motifs.columns = ["nid"] + ["role_"+str(role_idx) for role_idx in range(num_roles)]
+    # motifs = [[nid]+[graph_degree_vector[nid][role_idx] for role_idx in range(num_roles)] for nid in nx_graph.nodes()]
+    # motifs = pd.DataFrame(motifs)
+    # motifs.columns = ["nid"] + ["role_"+str(role_idx) for role_idx in range(num_roles)]
 
-    motifs.to_csv("./ml100k_motifs.csv", index=None)
+    # motifs.to_csv("./cora.gdv", index=None, sep=" ")
     # motifs = pd.read_csv("./cora_motifs.csv")
-    pass
+
+    # extract graphlet vector degree using orca (https://file.biolab.si/biolab/supp/orca/)
+    import os 
+    from data import MovieLens
+
+    data_name = "ml-100k"
+    movielens = MovieLens(data_name, testing=True)
+    nx_graph = movielens.train_graph.to_networkx().to_undirected()
+    
+    nx.write_edgelist(nx_graph, "{}.edgelist".format(data_name), data=False)
+    os.system("sed -i '1i\{} {}' {}.edgelist".format(
+        nx_graph.number_of_nodes(), nx_graph.number_of_edges(), data_name))
+    os.system("./orca/orca.exe 4 {}.edgelist {}.gdv".format(data_name, data_name))

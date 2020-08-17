@@ -12,6 +12,7 @@ import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.optim as optim
+import dgl
 
 import traceback
 from functools import wraps
@@ -137,6 +138,7 @@ def train(proc_id, n_gpus, args, devices, movielens):
     th.manual_seed(args.seed)
     if th.cuda.is_available():
         th.cuda.manual_seed_all(args.seed)
+    dgl.random.seed(args.seed)
 
     # Split train_dataset and set dataloader
     train_rating_pairs = th.split(th.stack(movielens.train_rating_pairs), 

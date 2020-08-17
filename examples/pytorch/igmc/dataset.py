@@ -33,7 +33,7 @@ class MovieLensDataset(th.utils.data.Dataset):
 
 def collate_movielens(data):
     g_list, label_list = map(list, zip(*data))
-    g = dgl.batch_hetero(g_list)
+    g = dgl.batch(g_list)
     g_label = th.stack(label_list)
     return g, g_label
 

@@ -13,6 +13,7 @@ import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.optim as optim
+import dgl
 
 from model import IGMC
 from data import MovieLens
@@ -103,7 +104,7 @@ def train(args):
     test_loader = th.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, 
                             num_workers=args.num_workers, collate_fn=collate_movielens)
 
-    in_feats = (args.hop+1)*2 #+ movielens.train_graph.ndata['refex'].shape[1]
+    in_feats = (args.hop+1)*2 # + movielens.train_graph.ndata['refex'].shape[1]
     model = IGMC(in_feats=in_feats, 
                  latent_dim=[32, 32, 32, 32],
                  num_relations=5, # movielens.num_rating, 
@@ -233,4 +234,5 @@ if __name__ == '__main__':
     th.manual_seed(args.seed)
     if th.cuda.is_available():
         th.cuda.manual_seed_all(args.seed)
+    dgl.random.seed(args.seed)
     train(args)
