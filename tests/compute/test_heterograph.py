@@ -436,8 +436,8 @@ def test_edge_ids():
     N2 = 1 << 48
 
     g = dgl.heterograph({
-        ('user', 'follows', 'user'): ([0], [1]),
-        ('user', 'plays', 'game'): ([0], [N2])},
+        ('user', 'follows', 'user'): (F.tensor([0], F.int64), F.tensor([1], F.int64)),
+        ('user', 'plays', 'game'): (F.tensor([0], F.int64), F.tensor([N2], F.int64))},
         {'user': N1, 'game': N1})
     with pytest.raises(DGLError):
         eid = g.edge_ids(0, 0, etype='follows')
