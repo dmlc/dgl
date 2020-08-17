@@ -101,9 +101,9 @@ class DistDataLoader:
     >>> dataloader = dgl.distributed.DistDataLoader(dataset=nodes, batch_size=1000,
                                                     collate_fn=sample, shuffle=True)
     >>> for block in dataloader:
-            feat = g.ndata['features'][block.srcdata[dgl.NID]]
-            labels = g.ndata['labels'][block.dstdata[dgl.NID]]
-            pred = model(block, feat)
+    ...     feat = g.ndata['features'][block.srcdata[dgl.NID]]
+    ...     labels = g.ndata['labels'][block.dstdata[dgl.NID]]
+    ...     pred = model(block, feat)
     """
 
     def __init__(self, dataset, batch_size, shuffle=False, collate_fn=None, drop_last=False,
