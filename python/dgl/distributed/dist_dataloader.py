@@ -64,15 +64,6 @@ class DistDataLoader:
     with multiprocessing. It utilizes the worker processes created by :func:`dgl.distributed.initialize`
     to parallelize sampling.
 
-    For DGL's distributed sampling with multiprocessing, users have to use this class instead
-    of using Pytorch DataLoader because DGL's RPC servers have to connect with all clients
-    at the beginning of the training script. Therefore, the sampling processes have to be
-    created when the distributed module is initialized.
-
-    Note that the iteration order is not guaranteed with this class. For example,
-    if dataset = [1, 2, 3, 4], batch_size = 2 and shuffle = False, the order of [1, 2]
-    and [3, 4] is not guaranteed.
-
     Parameters
     ----------
     dataset: a tensor
@@ -104,6 +95,19 @@ class DistDataLoader:
     ...     feat = g.ndata['features'][block.srcdata[dgl.NID]]
     ...     labels = g.ndata['labels'][block.dstdata[dgl.NID]]
     ...     pred = model(block, feat)
+
+    Note
+    ----
+    When performing DGL's distributed sampling with multiprocessing, users have to use this class
+    instead of Pytorch's DataLoader because DGL's RPC requires that all processes establish
+    connections with servers before invoking any DGL's distributed API. Therefore, this dataloader
+    uses the worker processes created in :func:`dgl.distributed.initialize`.
+
+    Note
+    ----
+    This dataloader does not guarantee the iteration order. For example,
+    if dataset = [1, 2, 3, 4], batch_size = 2 and shuffle = False, the order of [1, 2]
+    and [3, 4] is not guaranteed.
     """
 
     def __init__(self, dataset, batch_size, shuffle=False, collate_fn=None, drop_last=False,
