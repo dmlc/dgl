@@ -46,19 +46,11 @@ def initialize(ip_config, num_servers=1, num_workers=0,
                num_worker_threads=1):
     """Initialize DGL's distributed module
 
-    This function has to be invoked at the very beginning of the training script.
-    For example, when used with Pytorch, this function has to be invoked before
-    Pytorch's `pytorch.distributed.init_process_group`.
-
-    The initialization function acts differently in different modes. When the training
-    scripts runs as a trainer process, this API builds connections with DGL servers and
-    creates sampler processes; when the training script runs as a server process,
-    this API runs the server code and never returns.
-
-    DGL uses multiprocessing to parallelize distributed sampling. The sampling processes
-    have to be created in advance. `num_workers` specifies the number of sampling worker
-    processes per trainer process.
-
+    This function initializes DGL's distributed module. It acts differently in server
+    or client modes. In the server mode, it runs the server code and never returns.
+    In the client mode, it builds connections with servers for communication and
+    creates worker processes for distributed sampling. `num_workers` specifies
+    the number of sampling worker processes per trainer process.
     Users also have to provide the number of server processes on each machine in order
     to connect to all the server processes in the cluster of machines correctly.
 
@@ -73,12 +65,19 @@ def initialize(ip_config, num_servers=1, num_workers=0,
         for distributed sampling.
     max_queue_size : int
         Maximal size (bytes) of client queue buffer (~20 GB on default).
+
         Note that the 20 GB is just an upper-bound and DGL uses zero-copy and
         it will not allocate 20GB memory at once.
     net_type : str
         Networking type. Currently the only valid option is 'socket'.
     num_worker_threads: int
         The number of threads in a worker process.
+
+    Note
+    ----
+    Users have to invoke this API before any DGL's distributed API and framework-specific
+    distributed API. For example, when used with Pytorch, users have to invoke this function
+    before Pytorch's `pytorch.distributed.init_process_group`.
     """
     if os.environ.get('DGL_ROLE', 'client') == 'server':
         from .dist_graph import DistGraphServer
