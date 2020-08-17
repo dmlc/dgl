@@ -1,5 +1,7 @@
-Message Passing
-===============
+.. _guide-message-passing:
+
+Chapter 2: Message Passing
+================================
 
 Message Passing Paradigm
 ------------------------
@@ -120,11 +122,8 @@ cleaned. The math formula for the above function is:
 message reduction and node update in a single call, which leaves room
 for optimizations, as explained below.
 
-Notes
------
-
-Performance Optimization Notes
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Writing Efficient Message Passing Codes
+----------------------------------------------
 
 DGL optimized memory consumption and computing speed for message
 passing. The optimization includes:
@@ -208,7 +207,7 @@ be optimized with DGL’s built-in function ``u_add_v``, which further
 speeds up computation and saves memory footprint.
 
 Apply Message Passing On Part Of The Graph
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------------------------------
 
 If we only want to update part of the nodes in the graph, the practice
 is to create a subgraph by providing the ids for the nodes we want to
@@ -226,7 +225,7 @@ training <https://docs.dgl.ai/generated/guide/minibatch.html>`__ user guide for 
 usages.
 
 Apply Edge Weight In Message Passing
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+----------------------------------------
 
 A commonly seen practice in GNN modeling is to apply edge weight on the
 message before message aggregation, for examples, in

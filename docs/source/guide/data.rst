@@ -1,6 +1,7 @@
+.. _guide-data-pipeline:
 
-Graph data input pipeline in DGL
-==================================
+Chapter 4: Graph Data Pipeline
+====================================================
 
 DGL implements many commonly used graph datasets in :ref:`apidata`. They
 follow a standard pipeline defined in class :class:`dgl.data.DGLDataset`. We highly
@@ -24,11 +25,10 @@ To process a graph dataset located in a remote server or local disk, we
 define a class, say ``MyDataset``, inherits from :class:`dgl.data.DGLDataset`. The
 template of ``MyDataset`` is as follows.
 
-.. figure:: assets/data_flow_chart.png
-	:align: center
-	:scale: 50 %
+.. figure:: https://data.dgl.ai/asset/image/userguide_data_flow.png
+    :align: center
 
-	Flow chart for graph data input pipeline defined in class DGLDataset.
+    Flow chart for graph data input pipeline defined in class DGLDataset.
 
 .. code:: 
 
@@ -494,7 +494,7 @@ We recommend to implement saving and loading functions to cache the
 processed data in local disk. This saves a lot of data processing time
 in most cases. We provide four functions to make things simple:
 
--  :func:`dgl.data.utils.save_graphs` and :func:`dgl.data.utils.load_graphs`: save/load DGLGraph objects and labels to/from local disk.
+-  :func:`dgl.save_graphs` and :func:`dgl.load_graphs`: save/load DGLGraph objects and labels to/from local disk.
 -  :func:`dgl.data.utils.save_info` and :func:`dgl.data.utils.load_info`: save/load useful information of the dataset (python ``dict`` object) to/from local disk.
 
 The following example shows how to save and load a list of graphs and
@@ -503,8 +503,8 @@ dataset information.
 .. code:: 
 
     import os
-    from dgl.data.utils import makedirs, \
-        save_graphs, load_graphs, save_info, load_info
+    from dgl import save_graphs, load_graphs
+    from dgl.data.utils import makedirs, save_info, load_info
     
     def save(self):
         # save graphs and labels
