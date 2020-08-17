@@ -4,7 +4,6 @@ import torch as th
 from torch import nn
 from torch.nn import init
 
-from ....base import DGLError
 from .... import function as fn
 from ..utils import Identity
 from ....utils import expand_as_pair
@@ -48,28 +47,6 @@ class NNConv(nn.Module):
         If True, use residual connection. Default: ``False``.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
-    allow_zero_in_degree : bool, optional
-        If there are 0-in-degree nodes in the graph, output for those nodes will be invalid
-        since no message will be passed to those nodes. This is harmful for some applications
-        causing silent performance regression. This module will raise a DGLError if it detects
-        0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
-        and let the users handle it by themselves.
-
-    Notes
-    -----
-    Zero in-degree nodes will lead to invalid output value. This is because no message
-    will be passed to those nodes, the aggregation function will be appied on empty input.
-    A common practice to avoid this is to add a self-loop for each node in the graph if
-    it is homogeneous, which can be achieved by:
-
-    >>> g = ... # a DGLGraph
-    >>> g = dgl.add_self_loop(g)
-
-    Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
-    since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree``
-    to ``True`` for those cases to unblock the code and handle zere-in-degree nodes manually.
-    A common practise to handle this is to filter out the nodes with zere-in-degree when use
-    after conv.
 
     Examples
     --------
@@ -117,8 +94,7 @@ class NNConv(nn.Module):
                  edge_func,
                  aggregator_type='mean',
                  residual=False,
-                 bias=True,
-                 allow_zero_in_degree=False):
+                 bias=True):
         super(NNConv, self).__init__()
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
@@ -143,7 +119,6 @@ class NNConv(nn.Module):
             self.bias = nn.Parameter(th.Tensor(out_feats))
         else:
             self.register_buffer('bias', None)
-        self._allow_zero_in_degree = allow_zero_in_degree
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -186,18 +161,6 @@ class NNConv(nn.Module):
             is the output feature size.
         """
         with graph.local_scope():
-            if not self._allow_zero_in_degree:
-                if (graph.in_degrees() == 0).any():
-                    raise DGLError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
-
             feat_src, feat_dst = expand_as_pair(feat, graph)
 
             # (n, d_in, 1)

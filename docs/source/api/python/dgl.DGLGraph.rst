@@ -78,6 +78,21 @@ Using Node/edge features
     DGLHeteroGraph.local_var
     DGLHeteroGraph.local_scope
 
+Using Node/edge features for blocks
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Please refer to :ref:`guide-minibatch` for the definition of blocks.
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    DGLHeteroGraph.number_of_src_nodes
+    DGLHeteroGraph.number_of_dst_nodes
+    DGLHeteroGraph.srcnodes
+    DGLHeteroGraph.srcdata
+    DGLHeteroGraph.dstnodes
+    DGLHeteroGraph.dstdata
+
 Transforming graph
 ------------------
 
@@ -88,6 +103,7 @@ Transforming graph
     DGLHeteroGraph.edge_subgraph
     DGLHeteroGraph.node_type_subgraph
     DGLHeteroGraph.edge_type_subgraph
+    DGLHeteroGraph.__getitem__
 
 Computing with DGLHeteroGraph
 -----------------------------
