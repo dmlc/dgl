@@ -242,7 +242,7 @@ def edge_subgraph(graph, edges, preserve_nodes=False):
 
     edges = {graph.to_canonical_etype(etype): e for etype, e in edges.items()}
     induced_edges = [
-        _process_edges(cetype, edges.get(cetype, []))
+        _process_edges(cetype, edges.get(cetype, F.tensor([], graph.idtype)))
         for cetype in graph.canonical_etypes]
     sgi = graph._graph.edge_subgraph(induced_edges, preserve_nodes)
     induced_nodes = sgi.induced_nodes
