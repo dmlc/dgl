@@ -2482,7 +2482,7 @@ class DGLHeteroGraph(object):
         tensor([False,  True,  True])
         """
         vid_tensor = utils.prepare_tensor(self, vid, "vid")
-        if len(vid_tensor) > 0 and F.as_scalar(F.min(vid_tensor, 0)) < 0:
+        if F.as_scalar(F.min(vid_tensor, 0)) < 0 < len(vid_tensor):
             raise DGLError('All IDs must be non-negative integers.')
         ret = self._graph.has_nodes(
             self.get_ntype_id(ntype), vid_tensor)
