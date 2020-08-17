@@ -2482,8 +2482,7 @@ class DGLHeteroGraph(object):
         tensor([False,  True,  True])
         """
         vid_tensor = utils.prepare_tensor(self, vid, "vid")
-        if len(vid_tensor) > 0 and (F.as_scalar(F.min(vid_tensor, 0)) < 0 or
-                                    F.as_scalar(F.min(vid_tensor, 0)) < 0):
+        if len(vid_tensor) > 0 and F.as_scalar(F.min(vid_tensor, 0)) < 0:
             raise DGLError('All IDs must be non-negative integers.')
         ret = self._graph.has_nodes(
             self.get_ntype_id(ntype), vid_tensor)
@@ -2652,7 +2651,7 @@ class DGLHeteroGraph(object):
         --------
         successors
         """
-        if not self.has_nodes(v):
+        if not self.has_nodes(v, self.to_canonical_etype(etype)[-1]):
             raise DGLError('Non-existing node ID {}'.format(v))
         return self._graph.predecessors(self.get_etype_id(etype), v)
 
@@ -2706,7 +2705,7 @@ class DGLHeteroGraph(object):
         --------
         predecessors
         """
-        if not self.has_nodes(v):
+        if not self.has_nodes(v, self.to_canonical_etype(etype)[0]):
             raise DGLError('Non-existing node ID {}'.format(v))
         return self._graph.successors(self.get_etype_id(etype), v)
 
@@ -3240,8 +3239,6 @@ class DGLHeteroGraph(object):
         if is_all(v):
             v = self.dstnodes(dsttype)
         v_tensor = utils.prepare_tensor(self, v, 'v')
-        if F.as_scalar(F.sum(self.has_nodes(v_tensor, ntype=dsttype), dim=0)) != len(v_tensor):
-            raise DGLError('v contains invalid node IDs')
         deg = self._graph.in_degrees(etid, v_tensor)
         if isinstance(v, numbers.Integral):
             return F.as_scalar(deg)
