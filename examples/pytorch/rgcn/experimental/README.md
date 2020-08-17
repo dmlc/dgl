@@ -18,8 +18,9 @@ python3 partition_graph.py --dataset ogbn-mag --num_parts 4 --balance_train --ba
 ### Step 2: copy the partitioned data to the cluster
 DGL provides a script for copying partitioned data to the cluster. The command below copies partition data
 to the machines in the cluster. The configuration of the cluster is defined by `ip_config.txt`.
-The data is copied to `~/rgcn/ogbn-mag` on each of the remote machines. `--rel_data_path` specifies the location of the partitioned data (generated in Step 1). `--part_config`
-specifies the location of the partitioned data in the local machine (a user only needs to specify
+The data is copied to `~/rgcn/ogbn-mag` on each of the remote machines.
+`--rel_data_path` specifies the relative path in the workspace where the partitioned data will be stored.
+`--part_config` specifies the location of the partitioned data in the local machine (a user only needs to specify
 the location of the partition configuration file). `--script_folder` specifies the location of the training scripts.
 ```bash
 python ~/dgl/tools/copy_files.py --ip_config ip_config.txt \
