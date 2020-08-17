@@ -37,6 +37,7 @@ def test_adagrad(tmpdir):
     ip_config.close()
     print('test3')
 
+    os.environ['DGL_DIST_MODE'] = 'standalone'
     dgl.distributed.initialize("rpc_ip_config.txt")
     print('test4')
     g = dgl.distributed.DistGraph(graph_name,
