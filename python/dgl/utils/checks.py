@@ -1,7 +1,6 @@
 """Checking and logging utilities."""
 # pylint: disable=invalid-name
 from __future__ import absolute_import, division
-import numpy as np
 
 from ..base import DGLError
 from .. import backend as F
@@ -39,7 +38,7 @@ def prepare_tensor(g, data, name):
         data = F.tensor(data)
         if F.dtype(data) not in (F.int32, F.int64):
             raise DGLError('Expect argument "{}" to have data type int32 or int64,'
-                           ' but got {}.'.format(F.dtype(src)))
+                           ' but got {}.'.format(name, F.dtype(data)))
         ret = F.copy_to(F.astype(data, g.idtype), g.device)
 
     if F.ndim(ret) != 1:

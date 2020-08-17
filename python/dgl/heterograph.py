@@ -1,6 +1,6 @@
 """Classes for heterogeneous graphs."""
 #pylint: disable= too-many-lines
-from collections import defaultdict, Iterable
+from collections import defaultdict
 from collections.abc import Mapping
 from contextlib import contextmanager
 import copy

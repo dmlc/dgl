@@ -163,7 +163,7 @@ def graphdata2tensors(data, idtype=None, bipartite=False, **kwargs):
         if F.dtype(dst) not in (F.int32, F.int64):
             raise DGLError('Expect the destination ID tensor to have data type int32 or int64,'
                            ' but got {}.'.format(F.dtype(dst)))
-        if idtype != None:
+        if idtype is not None:
             src, dst = F.astype(src, idtype), F.astype(dst, idtype)
     elif isinstance(data, list):
         src, dst = elist2tensor(data, idtype)
@@ -182,7 +182,7 @@ def graphdata2tensors(data, idtype=None, bipartite=False, **kwargs):
                 data, idtype, edge_id_attr_name=edge_id_attr_name)
     else:
         raise DGLError('Unsupported graph data type:', type(data))
-    
+
     if len(src) != len(dst):
         raise DGLError('Expect the source and destination ID tensors to have the same length,'
                        ' but got {} and {}.'.format(len(src), len(dst)))
