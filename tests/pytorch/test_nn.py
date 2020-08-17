@@ -436,13 +436,14 @@ def test_sage_conv2(idtype):
         assert h.shape[-1] == 2
         assert h.shape[0] == 3
 
-def test_sgc_conv():
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_sgc_conv(g, idtype):
     ctx = F.ctx()
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
-    g = g.to(F.ctx())
+    g = g.astype(idtype).to(ctx)
     # not cached
     sgc = nn.SGConv(5, 10, 3)
-    feat = F.randn((100, 5))
+    feat = F.randn((g.number_of_nodes(), 5))
     sgc = sgc.to(ctx)
 
     h = sgc(g, feat)
@@ -456,12 +457,13 @@ def test_sgc_conv():
     assert F.allclose(h_0, h_1)
     assert h_0.shape[-1] == 10
 
-def test_appnp_conv():
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_appnp_conv(g, idtype):
     ctx = F.ctx()
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
-    g = g.to(F.ctx())
+    g = g.astype(idtype).to(ctx)
     appnp = nn.APPNPConv(10, 0.1)
-    feat = F.randn((100, 5))
+    feat = F.randn((g.number_of_nodes(), 5))
     appnp = appnp.to(ctx)
 
     h = appnp(g, feat)
@@ -519,13 +521,14 @@ def test_agnn_conv_bi(g, idtype):
     h = agnn(g, feat)
     assert h.shape == (g.number_of_dst_nodes(), 5)
 
-def test_gated_graph_conv():
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_gated_graph_conv(g, idtype):
     ctx = F.ctx()
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
-    g = g.to(F.ctx())
+    g = g.astype(idtype).to(ctx)
     ggconv = nn.GatedGraphConv(5, 10, 5, 3)
     etypes = th.arange(g.number_of_edges()) % 3
-    feat = F.randn((100, 5))
+    feat = F.randn((g.number_of_nodes(), 5))
     ggconv = ggconv.to(ctx)
     etypes = etypes.to(ctx)
 
@@ -552,7 +555,6 @@ def test_nn_conv(g, idtype):
 def test_nn_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    #g = dgl.bipartite(sp.sparse.random(50, 100, density=0.1))
     edge_func = th.nn.Linear(4, 5 * 10)
     nnconv = nn.NNConv((5, 2), 10, edge_func, 'mean')
     feat = F.randn((g.number_of_src_nodes(), 5))
@@ -725,8 +727,10 @@ def test_sequential():
     n_feat = net([g1, g2, g3], n_feat)
     assert n_feat.shape == (4, 4)
 
-def test_atomic_conv():
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True).to(F.ctx())
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_atomic_conv(g, idtype):
+    g = g.astype(idtype).to(F.ctx())
     aconv = nn.AtomicConv(interaction_cutoffs=F.tensor([12.0, 12.0]),
                           rbf_kernel_means=F.tensor([0.0, 2.0]),
                           rbf_kernel_scaling=F.tensor([4.0, 4.0]),
@@ -736,15 +740,17 @@ def test_atomic_conv():
     if F.gpu_ctx():
         aconv = aconv.to(ctx)
 
-    feat = F.randn((100, 1))
+    feat = F.randn((g.number_of_nodes(), 1))
     dist = F.randn((g.number_of_edges(), 1))
 
     h = aconv(g, feat, dist)
     # current we only do shape check
     assert h.shape[-1] == 4
 
-def test_cf_conv():
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True).to(F.ctx())
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_cf_conv(g, idtype):
+    g = g.astype(idtype).to(F.ctx())
     cfconv = nn.CFConv(node_in_feats=2,
                        edge_in_feats=3,
                        hidden_feats=2,
@@ -754,7 +760,7 @@ def test_cf_conv():
     if F.gpu_ctx():
         cfconv = cfconv.to(ctx)
 
-    node_feats = F.randn((100, 2))
+    node_feats = F.randn((g.number_of_nodes(), 2))
     edge_feats = F.randn((g.number_of_edges(), 3))
     h = cfconv(g, node_feats, edge_feats)
     # current we only do shape check

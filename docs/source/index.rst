@@ -84,6 +84,7 @@ Getting Started
    :maxdepth: 2
    :caption: User Guide
    :hidden:
+   :titlesonly:
    :glob:
 
    guide/preface
