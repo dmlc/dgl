@@ -100,6 +100,7 @@ Transforming graph
     DGLGraph.edge_subgraph
     DGLGraph.node_type_subgraph
     DGLGraph.edge_type_subgraph
+    DGLGraph.__getitem__
 
 Converting to other formats
 ---------------------------

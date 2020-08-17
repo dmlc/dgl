@@ -194,6 +194,7 @@ def test_rgcn():
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True)
     rgc_basis_low.weight = rgc_basis.weight
     rgc_basis_low.w_comp = rgc_basis.w_comp
+    rgc_basis_low.loop_weight = rgc_basis.loop_weight
     h = tf.random.normal((100, I))
     r = tf.constant(etype)
     h_new = rgc_basis(g, h, r)
@@ -205,6 +206,7 @@ def test_rgcn():
     rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B)
     rgc_bdd_low = nn.RelGraphConv(I, O, R, "bdd", B, low_mem=True)
     rgc_bdd_low.weight = rgc_bdd.weight
+    rgc_bdd_low.loop_weight = rgc_bdd.loop_weight
     h = tf.random.normal((100, I))
     r = tf.constant(etype)
     h_new = rgc_bdd(g, h, r)
@@ -220,6 +222,7 @@ def test_rgcn():
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True)
     rgc_basis_low.weight = rgc_basis.weight
     rgc_basis_low.w_comp = rgc_basis.w_comp
+    rgc_basis_low.loop_weight = rgc_basis.loop_weight
     h = tf.random.normal((100, I))
     r = tf.constant(etype)
     h_new = rgc_basis(g, h, r, norm)
@@ -231,6 +234,7 @@ def test_rgcn():
     rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B)
     rgc_bdd_low = nn.RelGraphConv(I, O, R, "bdd", B, low_mem=True)
     rgc_bdd_low.weight = rgc_bdd.weight
+    rgc_bdd_low.loop_weight = rgc_bdd.loop_weight
     h = tf.random.normal((100, I))
     r = tf.constant(etype)
     h_new = rgc_bdd(g, h, r, norm)
@@ -244,6 +248,7 @@ def test_rgcn():
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True)
     rgc_basis_low.weight = rgc_basis.weight
     rgc_basis_low.w_comp = rgc_basis.w_comp
+    rgc_basis_low.loop_weight = rgc_basis.loop_weight
     h = tf.constant(np.random.randint(0, I, (100,))) * 1
     r = tf.constant(etype) * 1
     h_new = rgc_basis(g, h, r)
@@ -253,7 +258,7 @@ def test_rgcn():
     assert F.allclose(h_new, h_new_low)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 def test_gat_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -263,7 +268,7 @@ def test_gat_conv(g, idtype):
     assert h.shape == (g.number_of_nodes(), 4, 2)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
 def test_gat_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -313,12 +318,14 @@ def test_sage_conv_bi_empty(idtype, aggre_type):
         assert h.shape[-1] == 2
         assert h.shape[0] == 3
 
-def test_sgc_conv():
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_sgc_conv(g, idtype):
     ctx = F.ctx()
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True).to(F.ctx())
+    g = g.astype(idtype).to(ctx)
     # not cached
     sgc = nn.SGConv(5, 10, 3)
-    feat = F.randn((100, 5))
+    feat = F.randn((g.number_of_nodes(), 5))
 
     h = sgc(g, feat)
     assert h.shape[-1] == 10
@@ -330,10 +337,13 @@ def test_sgc_conv():
     assert F.allclose(h_0, h_1)
     assert h_0.shape[-1] == 10
 
-def test_appnp_conv():
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True).to(F.ctx())
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_appnp_conv(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
     appnp = nn.APPNPConv(10, 0.1)
-    feat = F.randn((100, 5))
+    feat = F.randn((g.number_of_nodes(), 5))
 
     h = appnp(g, feat)
     assert h.shape[-1] == 5

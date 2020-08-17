@@ -22,6 +22,8 @@ Graph Create Ops
     knn_graph
     segmented_knn_graph
 
+.. _api-subgraph-extraction:
+
 Subgraph Extraction Routines
 -------------------------------------
 
