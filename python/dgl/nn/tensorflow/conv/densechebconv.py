@@ -1,4 +1,4 @@
-"""Torch Module for DenseChebConv"""
+"""Tensorflow Module for DenseChebConv"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import tensorflow as tf
 from tensorflow.keras import layers

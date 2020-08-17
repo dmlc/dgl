@@ -1,4 +1,4 @@
-"""Torch Module for Chebyshev Spectral Graph Convolution layer"""
+"""Tensorflow Module for Chebyshev Spectral Graph Convolution layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import tensorflow as tf
 from tensorflow.keras import layers
