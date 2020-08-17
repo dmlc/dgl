@@ -25,11 +25,10 @@ To process a graph dataset located in a remote server or local disk, we
 define a class, say ``MyDataset``, inherits from :class:`dgl.data.DGLDataset`. The
 template of ``MyDataset`` is as follows.
 
-.. figure:: assets/data_flow_chart.png
-	:align: center
-	:scale: 50 %
+.. figure:: https://data.dgl.ai/asset/image/userguide_data_flow.png
+    :align: center
 
-	Flow chart for graph data input pipeline defined in class DGLDataset.
+    Flow chart for graph data input pipeline defined in class DGLDataset.
 
 .. code:: 
 
