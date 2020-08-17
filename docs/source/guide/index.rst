@@ -3,6 +3,7 @@ User Guide
 
 .. toctree::
   :maxdepth: 2
+  :titlesonly:
 
   preface
   graph
