@@ -95,9 +95,9 @@ class DistDataLoader:
     --------
     >>> g = dgl.distributed.DistGraph('graph-name')
     >>> def sample(seeds):
-            seeds = th.LongTensor(np.asarray(seeds))
-            frontier = dgl.distributed.sample_neighbors(g, seeds, 10)
-            return dgl.to_block(frontier, seeds)
+    ...     seeds = th.LongTensor(np.asarray(seeds))
+    ...     frontier = dgl.distributed.sample_neighbors(g, seeds, 10)
+    ...     return dgl.to_block(frontier, seeds)
     >>> dataloader = dgl.distributed.DistDataLoader(dataset=nodes, batch_size=1000,
                                                     collate_fn=sample, shuffle=True)
     >>> for block in dataloader:
