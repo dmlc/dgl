@@ -60,7 +60,7 @@ def graph1():
 def heterograph0():
     g = dgl.heterograph({
         ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        ('developer', 'develops', 'game'): ([0, 1], [0, 1])})
+        ('developer', 'develops', 'game'): ([0, 1], [0, 1])}, device=F.cpu())
     g.nodes['user'].data['h'] = F.copy_to(F.randn((g.number_of_nodes('user'), 3)), F.cpu())
     g.nodes['game'].data['h'] = F.copy_to(F.randn((g.number_of_nodes('game'), 2)), F.cpu())
     g.nodes['developer'].data['h'] = F.copy_to(F.randn((g.number_of_nodes('developer'), 3)), F.cpu())
