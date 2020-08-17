@@ -90,6 +90,20 @@ class AGNNConv(nn.Module):
         else:
             self.register_buffer('beta', th.Tensor([init_beta]))
 
+    def set_allow_zero_in_degree(self, set_value):
+        r"""
+
+        Description
+        -----------
+        Set allow_zero_in_degree flag.
+
+        Parameters
+        ----------
+        set_value : bool
+            The value to be set to the flag.
+        """
+        self._allow_zero_in_degree = set_value
+
     def forward(self, graph, feat):
         r"""
 

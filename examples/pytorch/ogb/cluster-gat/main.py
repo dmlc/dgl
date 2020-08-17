@@ -100,9 +100,9 @@ class GAT(nn.Module):
                 h = x[input_nodes].to(device)
                 h_dst = h[:block.number_of_dst_nodes()].to(device)
                 if l < self.n_layers - 1:
-                   h = layer(block, (h, h_dst)).flatten(1)
+                   h = layer(block, h).flatten(1)
                 else:
-                    h = layer(block, (h, h_dst))
+                    h = layer(block, h)
                     h = h.mean(1)
                     h = h.log_softmax(dim=-1)
 
