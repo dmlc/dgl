@@ -75,7 +75,7 @@ def initialize(ip_config, num_servers=1, num_workers=0,
         Maximal size (bytes) of client queue buffer (~20 GB on default).
         Note that the 20 GB is just an upper-bound and DGL uses zero-copy and
         it will not allocate 20GB memory at once.
-    net_type : str
+    net_type : str, optional
         Networking type. Currently the only valid option is 'socket'.
     num_worker_threads: int
         The number of threads in a worker process.
