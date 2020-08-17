@@ -161,6 +161,8 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     if not (is_all(edata) or isinstance(edata, list)):
         raise DGLError('Invalid argument edata: must be a string list but got {}.'.format(
             type(edata)))
+    if any(g.is_block for g in graphs):
+        raise DGLError("Batching a block is not supported.")
 
     utils.check_all_same_device(graphs, 'graphs')
     utils.check_all_same_idtype(graphs, 'graphs')
