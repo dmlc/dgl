@@ -222,6 +222,16 @@ SetTransformerDecoder
     :members:
     :show-inheritance:
 
+Heterogeneous Graph Convolution Module
+----------------------------------------
+
+HeteroGraphConv
+~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.HeteroGraphConv
+   :members:
+   :show-inheritance:
+
 Utility Modules
 ----------------------------------------
 

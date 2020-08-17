@@ -435,7 +435,7 @@ class EdgeCollator(Collator):
           or a dictionary of edge types and such pairs if the graph is heterogenenous.
 
         A set of builtin negative samplers are provided in
-        :ref:`the negative sampling module <negative-sampling>`.
+        :ref:`the negative sampling module <api-dataloading-negative-sampling>`.
 
     Examples
     --------
