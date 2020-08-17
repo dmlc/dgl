@@ -30,6 +30,8 @@ General collating functions
 .. autoclass:: EdgeCollator
     :members: dataset, collate
 
+.. _api-dataloading-neighbor-sampling:
+
 Neighborhood Sampling Classes
 -----------------------------
 
@@ -45,7 +47,7 @@ Uniform Node-wise Neighbor Sampling (GraphSAGE style)
 .. autoclass:: MultiLayerNeighborSampler
     :members: sample_frontier
 
-.. _negative-sampling:
+.. _api-dataloading-negative-sampling:
 
 Negative Samplers for Link Prediction
 -------------------------------------
