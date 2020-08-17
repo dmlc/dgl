@@ -44,14 +44,14 @@ def check_equivalence_between_heterographs(g1, g2, node_attrs=None, edge_attrs=N
 def test_topology(idtype):
     """Test batching two DGLHeteroGraphs where some nodes are isolated in some relations"""
     g1 = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
-        ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
-        ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1), (3, 1)]
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'follows', 'developer'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2, 3], [0, 0, 1, 1])
     }, idtype=idtype, device=F.ctx())
     g2 = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
-        ('user', 'follows', 'developer'): [(0, 1), (1, 2)],
-        ('user', 'plays', 'game'): [(0, 0), (1, 0), (2, 1)]
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'follows', 'developer'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2], [0, 0, 1])
     }, idtype=idtype, device=F.ctx())
     bg = dgl.batch([g1, g2])
 
@@ -113,17 +113,17 @@ def test_topology(idtype):
 def test_batching_batched(idtype):
     """Test batching a DGLHeteroGraph and a BatchedDGLHeteroGraph."""
     g1 = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
-        ('user', 'plays', 'game'): [(0, 0), (1, 0)]
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1], [0, 0])
     }, idtype=idtype, device=F.ctx())
     g2 = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
-        ('user', 'plays', 'game'): [(0, 0), (1, 0)]
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1], [0, 0])
     }, idtype=idtype, device=F.ctx())
     bg1 = dgl.batch([g1, g2])
     g3 = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1)],
-        ('user', 'plays', 'game'): [(1, 0)]
+        ('user', 'follows', 'user'): ([0], [1]),
+        ('user', 'plays', 'game'): ([1], [0])
     }, idtype=idtype, device=F.ctx())
     bg2 = dgl.batch([bg1, g3])
     assert bg2.idtype == idtype
@@ -169,8 +169,8 @@ def test_batching_batched(idtype):
 def test_features(idtype):
     """Test the features of batched DGLHeteroGraphs"""
     g1 = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
-        ('user', 'plays', 'game'): [(0, 0), (1, 0)]
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1], [0, 0])
     }, idtype=idtype, device=F.ctx())
     g1.nodes['user'].data['h1'] = F.tensor([[0.], [1.], [2.]])
     g1.nodes['user'].data['h2'] = F.tensor([[3.], [4.], [5.]])
@@ -181,8 +181,8 @@ def test_features(idtype):
     g1.edges['plays'].data['h1'] = F.tensor([[0.], [1.]])
 
     g2 = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
-        ('user', 'plays', 'game'): [(0, 0), (1, 0)]
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1], [0, 0])
     }, idtype=idtype, device=F.ctx())
     g2.nodes['user'].data['h1'] = F.tensor([[0.], [1.], [2.]])
     g2.nodes['user'].data['h2'] = F.tensor([[3.], [4.], [5.]])
@@ -243,8 +243,8 @@ def test_features(idtype):
 def test_empty_relation(idtype):
     """Test the features of batched DGLHeteroGraphs"""
     g1 = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
-        ('user', 'plays', 'game'): []
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([], [])
     }, idtype=idtype, device=F.ctx())
     g1.nodes['user'].data['h1'] = F.tensor([[0.], [1.], [2.]])
     g1.nodes['user'].data['h2'] = F.tensor([[3.], [4.], [5.]])
@@ -252,8 +252,8 @@ def test_empty_relation(idtype):
     g1.edges['follows'].data['h2'] = F.tensor([[2.], [3.]])
 
     g2 = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
-        ('user', 'plays', 'game'): [(0, 0), (1, 0)]
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1], [0, 0])
     }, idtype=idtype, device=F.ctx())
     g2.nodes['user'].data['h1'] = F.tensor([[0.], [1.], [2.]])
     g2.nodes['user'].data['h2'] = F.tensor([[3.], [4.], [5.]])
@@ -298,8 +298,8 @@ def test_empty_relation(idtype):
         edge_attrs={('user', 'follows', 'user'): ['h1']})
 
     # Test graphs without edges
-    g1 = dgl.bipartite([], 'u', 'r', 'v', num_nodes=(0, 4))
-    g2 = dgl.bipartite([], 'u', 'r', 'v', num_nodes=(1, 5))
+    g1 = dgl.heterograph({('u', 'r', 'v'): ([], [])}, {'u': 0, 'v': 4})
+    g2 = dgl.heterograph({('u', 'r', 'v'): ([], [])}, {'u': 1, 'v': 5})
     dgl.batch([g1, g2])
 
 @parametrize_dtype

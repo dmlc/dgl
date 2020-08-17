@@ -86,8 +86,8 @@ def save_graphs(filename, g_list, labels=None):
     Create :code:`DGLGraph`/:code:`DGLHeteroGraph` objects and initialize node
     and edge features.
 
-    >>> g1 = dgl.graph(([0, 1, 2], [1, 2, 3])
-    >>> g2 = dgl.graph(([0, 2], [2, 3])
+    >>> g1 = dgl.graph(([0, 1, 2], [1, 2, 3]))
+    >>> g2 = dgl.graph(([0, 2], [2, 3]))
     >>> g2.edata["e"] = th.ones(2, 4)
 
     Save Graphs into file

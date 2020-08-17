@@ -304,7 +304,7 @@ def test_sage_conv_bi(idtype, g, aggre_type):
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn'])
 def test_sage_conv_bi_empty(idtype, aggre_type):
     # Test the case for graphs without edges
-    g = dgl.bipartite([], num_nodes=(5, 3)).to(F.ctx())
+    g = dgl.heterograph({('_U', '_E', '_V'): ([], [])}, {'_U': 5, '_V': 3}).to(F.ctx())
     g = g.astype(idtype).to(F.ctx())
     sage = nn.SAGEConv((3, 3), 2, 'gcn')
     feat = (F.randn((5, 3)), F.randn((3, 3)))
@@ -385,9 +385,9 @@ def myagg(alist, dsttype):
 @pytest.mark.parametrize('agg', ['sum', 'max', 'min', 'mean', 'stack', myagg])
 def test_hetero_conv(agg, idtype):
     g = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (0, 2), (2, 1), (1, 3)],
-        ('user', 'plays', 'game'): [(0, 0), (0, 2), (0, 3), (1, 0), (2, 2)],
-        ('store', 'sells', 'game'): [(0, 0), (0, 3), (1, 1), (1, 2)]},
+        ('user', 'follows', 'user'): ([0, 0, 2, 1], [1, 2, 1, 3]),
+        ('user', 'plays', 'game'): ([0, 0, 0, 1, 2], [0, 2, 3, 0, 2]),
+        ('store', 'sells', 'game'): ([0, 0, 1, 1], [0, 3, 1, 2])},
         idtype=idtype, device=F.ctx())
     conv = nn.HeteroGraphConv({
         'follows': nn.GraphConv(2, 3, allow_zero_in_degree=True),

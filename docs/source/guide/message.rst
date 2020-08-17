@@ -267,7 +267,7 @@ The message passing on heterographs can be split into two parts:
    relationships.
 
 DGL’s interface to call message passing on heterographs is
-`multi_update_all() <https://docs.dgl.ai/generated/dgl.DGLHeteroGraph.multi_update_all.html>`__.
+:meth:`~dgl.DGLGraph.multi_update_all`.
 ``multi_update_all`` takes a dictionary containing the parameters for
 ``update_all`` within each relation using relation as the key, and a
 string represents the cross type reducer. The reducer can be one of

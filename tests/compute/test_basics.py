@@ -145,30 +145,19 @@ def test_batch_setter_getter(idtype):
     truth = [0.] * 17
     truth[0] = truth[4] = truth[3] = truth[9] = truth[16] = 1.
     assert _pfc(g.edata['l']) == truth
-    # set partial edges (many-one)
     u = F.tensor([3, 4, 6], g.idtype)
-    v = F.tensor([9], g.idtype)
+    v = F.tensor([9, 9, 9], g.idtype)
     g.edges[u, v].data['l'] = F.ones((3, D))
     truth[5] = truth[7] = truth[11] = 1.
     assert _pfc(g.edata['l']) == truth
-    # set partial edges (one-many)
-    u = F.tensor([0], g.idtype)
+    u = F.tensor([0, 0, 0], g.idtype)
     v = F.tensor([4, 5, 6], g.idtype)
     g.edges[u, v].data['l'] = F.ones((3, D))
     truth[6] = truth[8] = truth[10] = 1.
     assert _pfc(g.edata['l']) == truth
-    # get partial edges (many-many)
     u = F.tensor([0, 6, 0], g.idtype)
     v = F.tensor([6, 9, 7], g.idtype)
-    assert _pfc(g.edges[u, v].data['l']) == [1., 1., 0.]
-    # get partial edges (many-one)
-    u = F.tensor([5, 6, 7], g.idtype)
-    v = F.tensor([9], g.idtype)
-    assert _pfc(g.edges[u, v].data['l']) == [1., 1., 0.]
-    # get partial edges (one-many)
-    u = F.tensor([0], g.idtype)
-    v = F.tensor([3, 4, 5], g.idtype)
-    assert _pfc(g.edges[u, v].data['l']) == [1., 1., 1.]
+    assert _pfc(g.edges[u, v].data['l']) == [1.0, 1.0, 0.0]
 
 @parametrize_dtype
 def test_batch_setter_autograd(idtype):
@@ -221,9 +210,7 @@ def _test_nx_conversion():
     n3 = F.randn((5, 4))
     e1 = F.randn((4, 5))
     e2 = F.randn((4, 7))
-    g = DGLGraph()
-    g.add_nodes(5)
-    g.add_edges([0,1,3,4], [2,4,0,3])
+    g = dgl.graph(([0, 1, 3, 4], [2, 4, 0, 3]))
     g.ndata.update({'n1': n1, 'n2': n2, 'n3': n3})
     g.edata.update({'e1': e1, 'e2': e2})
 
@@ -369,7 +356,7 @@ def test_update_routines(idtype):
 @parametrize_dtype
 def test_update_all_0deg(idtype):
     # test#1
-    g = dgl.graph([(1,0), (2,0), (3,0), (4,0)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([1, 2, 3, 4], [0, 0, 0, 0]), idtype=idtype, device=F.ctx())
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
@@ -390,7 +377,7 @@ def test_update_all_0deg(idtype):
     assert F.allclose(new_repr[0], 2 * F.sum(old_repr, 0))
 
     # test#2: graph with no edge
-    g = dgl.graph([], num_nodes=5, idtype=idtype, device=F.ctx())
+    g = dgl.graph(([], []), num_nodes=5, idtype=idtype, device=F.ctx())
     g.ndata['h'] = old_repr
     g.update_all(_message, _reduce, lambda nodes : {'h' : nodes.data['h'] * 2})
     new_repr = g.ndata['h']
@@ -399,7 +386,7 @@ def test_update_all_0deg(idtype):
 
 @parametrize_dtype
 def test_pull_0deg(idtype):
-    g = dgl.graph([(0,1)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0], [1]), idtype=idtype, device=F.ctx())
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
@@ -465,7 +452,7 @@ def test_dynamic_addition():
 
 @parametrize_dtype
 def test_repr(idtype):
-    g = dgl.graph([(0,1), (0,2), (1,2)], num_nodes=10, idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 0, 1], [1, 2, 2]), num_nodes=10, idtype=idtype, device=F.ctx())
     repr_string = g.__repr__()
     print(repr_string)
     g.ndata['x'] = F.zeros((10, 5))
@@ -475,7 +462,7 @@ def test_repr(idtype):
 
 @parametrize_dtype
 def test_local_var(idtype):
-    g = dgl.graph([(0,1), (1,2), (2,3), (3,4)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]), idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
     # test override
@@ -512,7 +499,7 @@ def test_local_var(idtype):
     assert 'ww' not in g.edata
 
     # test initializer1
-    g = dgl.graph([(0,1), (1,1)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 1], [1, 1]), idtype=idtype, device=F.ctx())
     g.set_n_initializer(dgl.init.zero_initializer)
     def foo(g):
         g = g.local_var()
@@ -533,7 +520,7 @@ def test_local_var(idtype):
 
 @parametrize_dtype
 def test_local_scope(idtype):
-    g = dgl.graph([(0,1), (1,2), (2,3), (3,4)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]), idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
     g.edata['w'] = F.zeros((g.number_of_edges(), 4))
     # test override
@@ -584,7 +571,7 @@ def test_local_scope(idtype):
     assert 'ww' not in g.edata
 
     # test initializer1
-    g = dgl.graph([(0,1), (1,1)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 1], [1, 1]), idtype=idtype, device=F.ctx())
     g.set_n_initializer(dgl.init.zero_initializer)
     def foo(g):
         with g.local_scope():
@@ -605,29 +592,27 @@ def test_local_scope(idtype):
 
 @parametrize_dtype
 def test_isolated_nodes(idtype):
-    g = dgl.graph([(0, 1), (1, 2)], num_nodes=5, idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 1], [1, 2]), num_nodes=5, idtype=idtype, device=F.ctx())
     assert g.number_of_nodes() == 5
 
-    # Test backward compatibility
-    g = dgl.graph([(0, 1), (1, 2)], card=5, idtype=idtype, device=F.ctx())
-    assert g.number_of_nodes() == 5
-
-    g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays',
-                      'game', num_nodes=(5, 7), idtype=idtype, device=F.ctx())
+    g = dgl.heterograph({
+        ('user', 'plays', 'game'): ([0, 0, 1], [2, 3, 2])
+    }, {'user': 5, 'game': 7}, idtype=idtype, device=F.ctx())
     assert g.idtype == idtype
     assert g.number_of_nodes('user') == 5
     assert g.number_of_nodes('game') == 7
 
     # Test backward compatibility
-    g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays',
-                      'game', card=(5, 7), idtype=idtype, device=F.ctx())
+    g = dgl.heterograph({
+        ('user', 'plays', 'game'): ([0, 0, 1], [2, 3, 2])
+    }, {'user': 5, 'game': 7}, idtype=idtype, device=F.ctx())
     assert g.idtype == idtype
     assert g.number_of_nodes('user') == 5
     assert g.number_of_nodes('game') == 7
 
 @parametrize_dtype
 def test_send_multigraph(idtype):
-    g = dgl.graph([(0,1), (0,1), (0,1), (2,1)], idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 0, 0, 2], [1, 1, 1, 1]), idtype=idtype, device=F.ctx())
 
     def _message_a(edges):
         return {'a': edges.data['a']}

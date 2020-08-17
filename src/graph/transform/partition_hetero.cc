@@ -52,7 +52,7 @@ HaloHeteroSubgraph GetSubgraphWithHalo(std::shared_ptr<HeteroGraph> hg,
                                        IdArray nodes, int num_hops) {
   CHECK_EQ(hg->NumBits(), 64) << "halo subgraph only supports 64bits graph";
   CHECK_EQ(hg->relation_graphs().size(), 1)
-    << "halo subgraph only supports homograph";
+    << "halo subgraph only supports homogeneous graph";
   CHECK_EQ(nodes->dtype.bits, 64)
     << "halo subgraph only supports 64bits nodes tensor";
   const dgl_id_t *nid = static_cast<dgl_id_t *>(nodes->data);
