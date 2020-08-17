@@ -76,7 +76,9 @@ def initialize(ip_config, num_servers=1, num_workers=0,
         Note that the 20 GB is just an upper-bound and DGL uses zero-copy and
         it will not allocate 20GB memory at once.
     net_type : str, optional
-        Networking type. Currently the only valid option is 'socket'.
+        Networking type. Currently the only valid option is ``'socket'``.
+        
+        Default: ``'socket'``
     num_worker_threads: int
         The number of threads in a worker process.
     """
