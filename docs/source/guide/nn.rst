@@ -1,11 +1,11 @@
 .. _guide-nn:
 
-Building DGL NN Module
-======================
+Chapter 3: Building GNN Modules
+=====================================
 
 DGL NN module is the building block for your GNN model. It inherents
 from `Pytorch’s NN Module <https://pytorch.org/docs/1.2.0/_modules/torch/nn/modules/module.html>`__, `MXNet Gluon’s NN Block  <http://mxnet.incubator.apache.org/versions/1.6/api/python/docs/api/gluon/nn/index.html>`__ and `TensorFlow’s Keras
-Layer <https://www.tensorflow.org/api_docs/python/tf/keras/layers>`__, depending on the DNN framework backend we are using. In DGL NN
+Layer <https://www.tensorflow.org/api_docs/python/tf/keras/layers>`__, depending on the DNN framework backend in use. In DGL NN
 module, the parameter registration in construction function and tensor
 operation in forward function are the same with the backend framework.
 In this way, DGL code can be seamlessly integrated into the backend
