@@ -221,9 +221,9 @@ class EdgeDataView(MutableMapping):
 class DistGraphServer(KVServer):
     ''' The DistGraph server.
 
-    This DistGraph server loads the graph data and sets up a service so that trainers can read data
-    of a graph partition (graph structure, node data and edge data) from remote machines.
-    A server is responsible for one graph partition.
+    This DistGraph server loads the graph data and sets up a service so that trainers and
+    samplers can read data of a graph partition (graph structure, node data and edge data)
+    from remote machines. A server is responsible for one graph partition.
 
     Currently, each machine runs only one main server with a set of backup servers to handle
     clients' requests. The main server and the backup servers all handle the requests for the same
@@ -304,8 +304,6 @@ class DistGraph:
     distributed sampling APIs to generate mini-batches and perform forward and
     backward computation on the mini-batches.
 
-    **Note**: DistGraph currently only supports graphs with only one node type and one edge type.
-
     DistGraph can run in two modes: the standalone mode and the distributed mode.
 
     * When a user runs the training script normally, DistGraph will be in the standalone mode.
@@ -363,6 +361,12 @@ class DistGraph:
             feat = g.ndata['features'][block.srcdata[dgl.NID]]
             labels = g.ndata['labels'][block.dstdata[dgl.NID]]
             pred = model(block, feat)
+
+    Note
+    ----
+    ``DistGraph`` currently only supports graphs with only one node type and one edge type.
+    For heterogeneous graphs, users need to convert them into DGL graphs with one node type and
+    one edge type and store the actual node types and edge types as node data and edge data.
     '''
     def __init__(self, graph_name, gpb=None, part_config=None):
         self.graph_name = graph_name
