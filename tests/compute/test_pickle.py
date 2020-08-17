@@ -132,7 +132,7 @@ def _global_message_func(nodes):
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(exclude=['dglgraph']))
+@pytest.mark.parametrize('g', get_cases(exclude=['dglgraph', 'two_hetero_batch']))
 def test_pickling_graph(g, idtype):
     g = g.astype(idtype)
     new_g = _reconstruct_pickle(g)
