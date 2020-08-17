@@ -81,8 +81,6 @@ Using Node/edge features
     DGLGraph.edata
     DGLGraph.node_attr_schemes
     DGLGraph.edge_attr_schemes
-    DGLGraph.set_n_initializer
-    DGLGraph.set_e_initializer
     DGLGraph.srcnodes
     DGLGraph.dstnodes
     DGLGraph.srcdata

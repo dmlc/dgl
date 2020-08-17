@@ -2440,7 +2440,7 @@ class DGLHeteroGraph(object):
 
             - ``int``: The ID of a single node.
             - ``Tensor``: A 1D tensor that contains the IDs of multiple nodes, whose data type and
-              device should be the same as the idtype and device of the graph.
+              device should be the same as the :py:attr:`idtype` and device of the graph.
             - ``iterable[int]``: A sequence (e.g. list, tuple, numpy.ndarray)
               of integers that contains the IDs of multiple nodes.
         ntype : str, optional
@@ -2507,7 +2507,7 @@ class DGLHeteroGraph(object):
 
             - ``int``: The source node of an edge for query.
             - ``Tensor``: A 1D tensor that contains the source node(s) of edge(s) for query.
-              The data type and device of the tensor must be the same as the idtype and
+              The data type and device of the tensor must be the same as the :py:attr:`idtype` and
               device of the graph. Its i-th element represents the source node ID of the
               i-th edge for query.
             - ``iterable[int]`` : Similar to the tensor, but stores node IDs in a sequence
@@ -2718,7 +2718,7 @@ class DGLHeteroGraph(object):
 
             - ``int``: The source node of an edge for query.
             - ``Tensor``: A 1D tensor that contains the source node(s) of edge(s) for query, whose
-              data type an device should be the same as the idtype and device of
+              data type an device should be the same as the :py:attr:`idtype` and device of
               the graph. Its i-th element is the source node of the i-th edge for query.
             - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
@@ -2835,7 +2835,7 @@ class DGLHeteroGraph(object):
 
             - ``int``: An edge ID for query.
             - ``Tensor``: A 1D tensor that contains the edge IDs for query, whose data
-              type and device should be the same as the idtype and device of the graph.
+              type and device should be the same as the :py:attr:`idtype` and device of the graph.
             - ``iterable[int]``: Similar to the tensor, but stores edge IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
         etype : str or tuple of str, optional
@@ -2894,7 +2894,7 @@ class DGLHeteroGraph(object):
 
             - ``int``: The destination node for query.
             - ``Tensor``: A 1D tensor that contains the destination node(s) for query, whose data
-              type and device should be the same as the idtype and device of the graph.
+              type and device should be the same as the :py:attr:`idtype` and device of the graph.
             - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
         form : str, optional
@@ -2976,7 +2976,7 @@ class DGLHeteroGraph(object):
 
             - ``int``: The source node for query.
             - ``Tensor``: A 1D tensor that contains the source node(s) for query, whose data
-              type and device should be the same as the idtype and device of the graph.
+              type and device should be the same as the :py:attr:`idtype` and device of the graph.
             - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
         form : str, optional
@@ -3146,7 +3146,7 @@ class DGLHeteroGraph(object):
 
             - ``int``: The destination node for query.
             - ``Tensor``: A 1D tensor that contains the destination node(s) for query, whose data
-              type and device should be the same as the idtype and device of the graph.
+              type and device should be the same as the :py:attr:`idtype` and device of the graph.
             - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
 
@@ -3230,7 +3230,7 @@ class DGLHeteroGraph(object):
 
             - ``int``: The source node for query.
             - ``Tensor``: A 1D tensor that contains the source node(s) for query, whose data
-              type and device should be the same as the idtype and device of the graph.
+              type and device should be the same as the :py:attr:`idtype` and device of the graph.
             - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
 
@@ -4525,7 +4525,7 @@ class DGLHeteroGraph(object):
             The node(s) for query. The allowed formats are:
 
             - Tensor: A 1D tensor that contains the node(s) for query, whose data type
-              and device should be the same as the idtype and device of the graph.
+              and device should be the same as the :py:attr:`idtype` and device of the graph.
             - iterable[int] : Similar to the tensor, but stores node IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
 
@@ -4602,13 +4602,13 @@ class DGLHeteroGraph(object):
             The edge(s) for query. The allowed formats are:
 
             - Tensor: A 1D tensor that contains the IDs of the edge(s) for query, whose data
-              type and device should be the same as the idtype and device of the graph.
+              type and device should be the same as the :py:attr:`idtype` and device of the graph.
             - iterable[int]: Similar to the tensor, but stores edge IDs in a sequence
               (e.g. list, tuple, numpy.ndarray).
             - (Tensor, Tensor): A 2-tuple of the source and destination nodes of multiple
               edges for query. Each tensor is a 1D tensor containing node IDs. DGL calls this
               format "tuple of node-tensors". The data type and device of the tensors should
-              be the same as the idtype and device of the graph.
+              be the same as the :py:attr:`idtype` and device of the graph.
             - (iterable[int], iterable[int]): Similar to the tuple of node-tensors format,
               but stores node IDs in two sequences (e.g. list, tuple, numpy.ndarray).
 
