@@ -120,8 +120,9 @@ def node_subgraph(graph, nodes):
             return F.astype(F.nonzero_1d(F.copy_to(v, graph.device)), graph.idtype)
         else:
             return utils.prepare_tensor(graph, v, 'nodes["{}"]'.format(ntype))
-    induced_nodes = [_process_nodes(ntype, nodes.get(ntype, F.tensor([], graph.idtype)))
-                     for ntype in graph.ntypes]
+    induced_nodes = [_process_nodes(
+        ntype, nodes.get(ntype, F.copy_to(F.tensor([], graph.idtype), graph.device)))
+        for ntype in graph.ntypes]
     sgi = graph._graph.node_subgraph(induced_nodes)
     induced_edges = sgi.induced_edges
     return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges)
@@ -241,8 +242,8 @@ def edge_subgraph(graph, edges, preserve_nodes=False):
             return utils.prepare_tensor(graph, e, 'edges["{}"]'.format(etype))
 
     edges = {graph.to_canonical_etype(etype): e for etype, e in edges.items()}
-    induced_edges = [
-        _process_edges(cetype, edges.get(cetype, F.tensor([], graph.idtype)))
+    induced_edges = [_process_edges(
+        cetype, edges.get(cetype, F.copy_to(F.tensor([], graph.idtype), graph.device)))
         for cetype in graph.canonical_etypes]
     sgi = graph._graph.edge_subgraph(induced_edges, preserve_nodes)
     induced_nodes = sgi.induced_nodes

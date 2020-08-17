@@ -371,10 +371,10 @@ def test_hypersparse():
     N2 = 1 << 48
 
     g = dgl.heterograph({
-        ('user', 'follows', 'user'): ([0], [1]),
-        ('user', 'plays', 'game'): ([0], [N2])},
+        ('user', 'follows', 'user'): (F.tensor([0], F.int64), F.tensor([1], F.int64)),
+        ('user', 'plays', 'game'): (F.tensor([0], F.int64), F.tensor([N2], F.int64))},
         {'user': N1, 'game': N1},
-        idtype=F.int64, device=F.ctx())
+        device=F.ctx())
     assert g.number_of_nodes('user') == N1
     assert g.number_of_nodes('game') == N1
     assert g.number_of_edges('follows') == 1

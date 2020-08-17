@@ -88,7 +88,7 @@ def block_graph1():
             ('user', 'plays', 'game') : ([0, 1, 2], [1, 1, 0]),
             ('user', 'likes', 'game') : ([1, 2, 3], [0, 0, 2]),
             ('store', 'sells', 'game') : ([0, 1, 1], [0, 1, 2]),
-        })
+        }, device=F.cpu())
     return dgl.to_block(g)
 
 @register_case(['clique'])

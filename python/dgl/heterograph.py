@@ -2833,7 +2833,7 @@ class DGLHeteroGraph(object):
             is_neg_one = F.equal(eid, -1)
             if F.as_scalar(F.sum(is_neg_one, 0)):
                 # Raise error since some (u, v) pair is not a valid edge.
-                idx = F.nonzero_1d(is_neg_one)[0]
+                idx = F.nonzero_1d(is_neg_one)
                 raise DGLError("Error: (%d, %d) does not form a valid edge." % (
                     F.as_scalar(F.gather_row(u, idx)),
                     F.as_scalar(F.gather_row(v, idx))))
