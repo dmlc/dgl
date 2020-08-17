@@ -132,7 +132,6 @@ class DenseChebConv(layers.Layer):
         Zh = (Zs @ tf.expand_dims(feat, axis=0) @ self.W)
         Zh = tf.reduce_sum(Zh, 0)
 
-
         if self.bias is not None:
             Zh = Zh + self.bias
         return Zh

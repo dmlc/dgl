@@ -116,9 +116,9 @@ class ChebConv(layers.Layer):
 
         with graph.local_scope():
             in_degrees = tf.clip_by_value(tf.cast(graph.in_degrees(), tf.float32),
-                                        clip_value_min=1,
-                                        clip_value_max=np.inf)
-            D_invsqrt = tf.expand_dims(tf.pow(in_degrees, -0.5), axis = -1)
+                                          clip_value_min=1,
+                                          clip_value_max=np.inf)
+            D_invsqrt = tf.expand_dims(tf.pow(in_degrees, -0.5), axis=-1)
             if lambda_max is None:
                 try:
                     lambda_max = laplacian_lambda_max(graph)
@@ -132,7 +132,8 @@ class ChebConv(layers.Layer):
             if isinstance(lambda_max, list):
                 lambda_max = tf.constant(lambda_max, dtype=tf.float32)
             if lambda_max.ndim == 1:
-                lambda_max = tf.expand_dims(lambda_max, axis=-1)  # (B,) to (B, 1)
+                lambda_max = tf.expand_dims(
+                    lambda_max, axis=-1)  # (B,) to (B, 1)
 
             # broadcast from (B, 1) to (N, 1)
             lambda_max = broadcast_nodes(graph, lambda_max)
