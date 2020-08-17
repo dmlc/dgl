@@ -157,15 +157,15 @@ class GATConv(nn.Block):
         with self.name_scope():
             if isinstance(in_feats, tuple):
                 self.fc_src = nn.Dense(out_feats * num_heads, use_bias=False,
-                                weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
-                                in_units=self._in_src_feats)
+                                       weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+                                       in_units=self._in_src_feats)
                 self.fc_dst = nn.Dense(out_feats * num_heads, use_bias=False,
-                                weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
-                                in_units=self._in_dst_feats)
+                                       weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+                                       in_units=self._in_dst_feats)
             else:
                 self.fc = nn.Dense(out_feats * num_heads, use_bias=False,
-                                weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
-                                in_units=in_feats)
+                                   weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+                                   in_units=in_feats)
             self.attn_l = self.params.get('attn_l',
                                           shape=(1, num_heads, out_feats),
                                           init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
