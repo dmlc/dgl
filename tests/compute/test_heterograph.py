@@ -802,7 +802,7 @@ def test_flatten(idtype):
 
     etypes = F.asnumpy(fg.edata[dgl.ETYPE]).tolist()
     eids = F.asnumpy(fg.edata[dgl.EID]).tolist()
-    assert set(zip(etypes, eids)) == set([(1, 0), (1, 1), (1, 2), (1, 3), (2, 0), (2, 1)])
+    assert set(zip(etypes, eids)) == set([(3, 0), (3, 1), (2, 1), (2, 0), (2, 3), (2, 2)])
 
     check_mapping(g, fg)
 
@@ -974,7 +974,7 @@ def test_convert(idtype):
         ('user', 'user', 'follows'),
         ('user', 'game', 'plays'),
         ('user', 'game', 'wishes'),
-        ('developer', 'game',  'develops')])
+        ('developer', 'game', 'develops')])
 
     for _mg in [None, mg]:
         hg2 = dgl.to_heterogeneous(
