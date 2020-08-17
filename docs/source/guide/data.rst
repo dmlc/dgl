@@ -1,3 +1,4 @@
+.. _guide-data-pipeline:
 
 Graph data input pipeline in DGL
 ==================================
