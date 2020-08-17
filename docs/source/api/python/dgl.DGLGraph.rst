@@ -4,7 +4,7 @@ dgl.DGLGraph
 =====================================================
 
 .. currentmodule:: dgl
-.. autoclass:: DGLGraph
+.. class:: DGLGraph
 
 Querying metagraph structure
 ----------------------------
@@ -29,9 +29,13 @@ Querying graph structure
     :toctree: ../../generated/
 
     DGLGraph.num_nodes
+    DGLGraph.number_of_nodes
     DGLGraph.num_edges
+    DGLGraph.number_of_edges
     DGLGraph.num_src_nodes
+    DGLGraph.number_of_src_nodes
     DGLGraph.num_dst_nodes
+    DGLGraph.number_of_dst_nodes
     DGLGraph.is_unibipartite
     DGLGraph.is_multigraph
     DGLGraph.is_homogeneous
@@ -43,7 +47,6 @@ Querying graph structure
     DGLGraph.find_edges
     DGLGraph.in_edges
     DGLGraph.out_edges
-    DGLGraph.all_edges
     DGLGraph.in_degrees
     DGLGraph.out_degrees
 
@@ -98,6 +101,17 @@ Transforming graph
     DGLGraph.node_type_subgraph
     DGLGraph.edge_type_subgraph
 
+Converting to other formats
+---------------------------
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    DGLGraph.adj
+    DGLGraph.adjacency_matrix
+    DGLGraph.inc
+    DGLGraph.incidence_matrix
+
 Computing with DGLGraph
 -----------------------------
 
@@ -125,6 +139,17 @@ Querying batch summary
     DGLGraph.batch_size
     DGLGraph.batch_num_nodes
     DGLGraph.batch_num_edges
+
+Mutating topology
+-----------------
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    DGLGraph.add_nodes
+    DGLGraph.add_edges
+    DGLGraph.remove_nodes
+    DGLGraph.remove_edges
 
 Device Control
 --------------

@@ -102,7 +102,8 @@ def random_graph(size):
     return dgl.from_networkx(nx.erdos_renyi_graph(size, 0.3))
 
 def random_bipartite(size_src, size_dst):
-    return dgl.bipartite_from_scipy(ssp.random(size_src, size_dst, 0.1))
+    return dgl.bipartite_from_scipy(ssp.random(size_src, size_dst, 0.1),
+                                    utype='_U', etype='_E', vtype='V', )
 
 def random_block(size):
     g = dgl.from_networkx(nx.erdos_renyi_graph(size, 0.1))

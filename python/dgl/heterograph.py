@@ -1809,10 +1809,34 @@ class DGLHeteroGraph(object):
 
         One can use it for:
 
-        1. Getting the edges for a single edge type. In this case, this is
-           an alias for :func:`dgl.DGLGraph.all_edges`. For a description
-           of usage in this case, refer to the doc of :func:`dgl.DGLGraph.all_edges`.
-        2. Setting/getting features for all edges of a single edge type.
+        1. Getting the edges for a single edge type. In this case, it can take the
+           following optional arguments:
+
+            - form : str, optional
+                  The return form, which can be one of the following:
+
+                  - ``'uv'`` (default): The returned result is a 2-tuple of 1D tensors
+                    :math:`(U, V)`, representing the source and destination nodes of all edges.
+                    For each :math:`i`, :math:`(U[i], V[i])` forms an edge.
+                  - ``'eid'``: The returned result is a 1D tensor :math:`EID`, representing
+                    the IDs of all edges.
+                  - ``'all'``: The returned result is a 3-tuple of 1D tensors :math:`(U, V, EID)`,
+                    representing the source nodes, destination nodes and IDs of all edges.
+                    For each :math:`i`, :math:`(U[i], V[i])` forms an edge with ID :math:`EID[i]`.
+            - order : str, optional
+                  The order of the returned edges, which can be one of the following:
+
+                  - ``'eid'`` (default): The edges are sorted by their IDs.
+                  - ``'srcdst'``: The edges are sorted first by their source node IDs and then
+                    by their destination node IDs to break ties.
+            - etype : str or tuple of str, optional
+                  The edge type for query, which can be an edge type (str) or a canonical edge
+                  type (3-tuple of str). When an edge type appears in multiple canonical edge
+                  types, one must use a canonical edge type. If the graph has multiple edge
+                  types, one must specify the argument. Otherwise, it can be omitted.
+        2. Setting/getting features for all edges of a single edge type. To set/get a feature
+           ``feat`` for edges of type ``etype`` in a graph ``g``, one can use
+           ``g.edges[etype].data[feat]``.
 
         Examples
         --------
@@ -1820,6 +1844,30 @@ class DGLHeteroGraph(object):
 
         >>> import dgl
         >>> import torch
+
+        **Get the Edges for a Single Edge Type**
+
+        Create a graph with a single edge type.
+
+        >>> g = dgl.graph((torch.tensor([1, 0, 0]), torch.tensor([1, 1, 0])))
+        >>> g.edges()
+        (tensor([1, 0, 0]), tensor([1, 1, 0]))
+
+        Specify a different value for :attr:`form` and :attr:`order`.
+
+        >>> g.edges(form='all', order='srcdst')
+        (tensor([0, 0, 1]), tensor([0, 1, 1]), tensor([2, 1, 0]))
+
+        For a graph of multiple edge types, it is required to specify the edge type in query.
+
+        >>> hg = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
+        >>> hg.edges(etype='plays')
+        (tensor([3, 4]), tensor([5, 6]))
+
+        **Set/get Features for All Edges of a Single Edge Type**
 
         Create a heterogeneous graph of two edge types.
 
@@ -1839,9 +1887,8 @@ class DGLHeteroGraph(object):
         See Also
         --------
         edata
-        all_edges
         """
-        # Todo (Mufei) Replace the syntax g.edges[...].edata[...] with g.edges[...][...]
+        # TODO(Mufei): Replace the syntax g.edges[...].edata[...] with g.edges[...][...]
         return HeteroEdgeView(self)
 
     @property
@@ -2010,7 +2057,7 @@ class DGLHeteroGraph(object):
     #################################################################
 
     def number_of_nodes(self, ntype=None):
-        """Alias of num_nodes"""
+        """Alias of :func:`num_nodes`"""
         return self.num_nodes(ntype)
 
     def num_nodes(self, ntype=None):
@@ -2052,15 +2099,12 @@ class DGLHeteroGraph(object):
         12
         """
         if ntype is None:
-            total_num_nodes = 0
-            for nty in self._ntypes:
-                total_num_nodes += self._graph.number_of_nodes(self.get_ntype_id(nty))
-            return total_num_nodes
+            return sum([self._graph.number_of_nodes(ntid) for ntid in range(len(self.ntypes))])
         else:
             return self._graph.number_of_nodes(self.get_ntype_id(ntype))
 
     def number_of_src_nodes(self, ntype=None):
-        """Alias of num_src_nodes"""
+        """Alias of :func:`num_src_nodes`"""
         return self.num_src_nodes(ntype)
 
     def num_src_nodes(self, ntype=None):
@@ -2108,15 +2152,13 @@ class DGLHeteroGraph(object):
         7
         """
         if ntype is None:
-            total_num_nodes = 0
-            for nty in self.srctypes:
-                total_num_nodes += self._graph.number_of_nodes(self.get_ntype_id_from_src(nty))
-            return total_num_nodes
+            return sum([self._graph.number_of_nodes(self.get_ntype_id_from_src(nty))
+                        for nty in self.srctypes])
         else:
             return self._graph.number_of_nodes(self.get_ntype_id_from_src(ntype))
 
     def number_of_dst_nodes(self, ntype=None):
-        """Alias of num_dst_nodes"""
+        """Alias of :func:`num_dst_nodes`"""
         return self.num_dst_nodes(ntype)
 
     def num_dst_nodes(self, ntype=None):
@@ -2164,15 +2206,13 @@ class DGLHeteroGraph(object):
         12
         """
         if ntype is None:
-            total_num_nodes = 0
-            for nty in self.dsttypes:
-                total_num_nodes += self._graph.number_of_nodes(self.get_ntype_id_from_dst(nty))
-            return total_num_nodes
+            return sum([self._graph.number_of_nodes(self.get_ntype_id_from_dst(nty))
+                        for nty in self.dsttypes])
         else:
             return self._graph.number_of_nodes(self.get_ntype_id_from_dst(ntype))
 
     def number_of_edges(self, etype=None):
-        """Alias of num_edges"""
+        """Alias of :func:`num_edges`"""
         return self.num_edges(etype)
 
     def num_edges(self, etype=None):
@@ -2223,10 +2263,8 @@ class DGLHeteroGraph(object):
         3
         """
         if etype is None:
-            total_num_edges = 0
-            for ety in self._canonical_etypes:
-                total_num_edges += self._graph.number_of_edges(self.get_etype_id(ety))
-            return total_num_edges
+            return sum([self._graph.number_of_edges(etid)
+                        for etid in range(len(self.canonical_etypes))])
         else:
             return self._graph.number_of_edges(self.get_etype_id(etype))
 
@@ -2915,7 +2953,6 @@ class DGLHeteroGraph(object):
         See Also
         --------
         edges
-        all_edges
         out_edges
         """
         v = utils.prepare_tensor(self, v, 'v')
@@ -2998,7 +3035,6 @@ class DGLHeteroGraph(object):
         See Also
         --------
         edges
-        all_edges
         in_edges
         """
         u = utils.prepare_tensor(self, u, 'u')
@@ -3262,6 +3298,10 @@ class DGLHeteroGraph(object):
             return deg
 
     def adjacency_matrix(self, transpose=None, ctx=F.cpu(), scipy_fmt=None, etype=None):
+        """Alias of :func:`adj`"""
+        return self.adj(transpose, ctx, scipy_fmt, etype)
+
+    def adj(self, transpose=None, ctx=F.cpu(), scipy_fmt=None, etype=None):
         """Return the adjacency matrix of edges of the given edge type.
 
         By default, a row of returned adjacency matrix represents the
@@ -3279,9 +3319,12 @@ class DGLHeteroGraph(object):
         scipy_fmt : str, optional
             If specified, return a scipy sparse matrix in the given format.
             Otherwise, return a backend dependent sparse tensor. (Default: None)
-        etype : str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+        etype : str or tuple of str, optional
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If given, it returns the number of edges for a
+            particular edge type. If not given (default), it returns the total number of edges
+            of all types.
 
         Returns
         -------
@@ -3291,9 +3334,13 @@ class DGLHeteroGraph(object):
         Examples
         --------
 
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
         Instantiate a heterogeneous graph.
 
-        >>> plays_g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1])})
         >>> g = dgl.heterograph({
         ...     ('user', 'follows', 'user'): ([0, 1], [0, 1]),
         ...     ('developer', 'develops', 'game'): ([0, 1], [0, 2])
@@ -3301,7 +3348,7 @@ class DGLHeteroGraph(object):
 
         Get a backend dependent sparse tensor. Here we use PyTorch for example.
 
-        >>> g.adjacency_matrix(etype='develops')
+        >>> g.adj(etype='develops')
         tensor(indices=tensor([[0, 2],
                                [0, 1]]),
                values=tensor([1., 1.]),
@@ -3309,7 +3356,7 @@ class DGLHeteroGraph(object):
 
         Get a scipy coo sparse matrix.
 
-        >>> g.adjacency_matrix(scipy_fmt='coo', etype='develops')
+        >>> g.adj(scipy_fmt='coo', etype='develops')
         <3x2 sparse matrix of type '<class 'numpy.int64'>'
         with 2 stored elements in COOrdinate format>
         """
@@ -3326,9 +3373,6 @@ class DGLHeteroGraph(object):
         else:
             return self._graph.adjacency_matrix_scipy(etid, transpose, scipy_fmt, False)
 
-    # Alias of ``adjacency_matrix``
-    adj = adjacency_matrix
-
     def adjacency_matrix_scipy(self, transpose=None, fmt='csr', return_edge_ids=None):
         """DEPRECATED: please use ``dgl.adjacency_matrix(transpose, scipy_fmt=fmt)``.
         """
@@ -3339,6 +3383,10 @@ class DGLHeteroGraph(object):
         return self.adjacency_matrix(transpose=transpose, scipy_fmt=fmt)
 
     def incidence_matrix(self, typestr, ctx=F.cpu(), etype=None):
+        """Alias of :func:`inc`"""
+        return self.inc(typestr, ctx, etype)
+
+    def inc(self, typestr, ctx=F.cpu(), etype=None):
         """Return the incidence matrix representation of edges with the given
         edge type.
 
@@ -3373,9 +3421,12 @@ class DGLHeteroGraph(object):
             Can be either ``in``, ``out`` or ``both``
         ctx : context, optional
             The context of returned incidence matrix. (Default: cpu)
-        etype : str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
+        etype : str or tuple of str, optional
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If given, it returns the number of edges for a
+            particular edge type. If not given (default), it returns the total number of edges
+            of all types.
 
         Returns
         -------
@@ -3385,18 +3436,22 @@ class DGLHeteroGraph(object):
         Examples
         --------
 
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+
         >>> g = dgl.graph(([0, 1], [0, 2]))
-        >>> g.incidence_matrix('in')
+        >>> g.inc('in')
         tensor(indices=tensor([[0, 2],
                                [0, 1]]),
                values=tensor([1., 1.]),
                size=(3, 2), nnz=2, layout=torch.sparse_coo)
-        >>> g.incidence_matrix('out')
+        >>> g.inc('out')
         tensor(indices=tensor([[0, 1],
                                [0, 1]]),
                values=tensor([1., 1.]),
                size=(3, 2), nnz=2, layout=torch.sparse_coo)
-        >>> g.incidence_matrix('both')
+        >>> g.inc('both')
         tensor(indices=tensor([[1, 2],
                                [1, 1]]),
                values=tensor([-1.,  1.]),
@@ -3404,9 +3459,6 @@ class DGLHeteroGraph(object):
         """
         etid = self.get_etype_id(etype)
         return self._graph.incidence_matrix(etid, typestr, ctx)[0]
-
-    # Alias of ``incidence_matrix``
-    inc = incidence_matrix
 
     #################################################################
     # Features

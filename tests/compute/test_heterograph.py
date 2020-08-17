@@ -124,7 +124,8 @@ def test_create(idtype):
     src, dst = g.edges()
     assert F.allclose(src, F.tensor([2, 3, 4], dtype=idtype))
     assert F.allclose(dst, F.tensor([1, 2, 3], dtype=idtype))
-    g = dgl.bipartite_from_scipy(sp_mat, eweight_name='w', idtype=idtype, device=device)
+    g = dgl.bipartite_from_scipy(sp_mat, utype='_U', etype='_E', vtype='_V',
+                                 eweight_name='w', idtype=idtype, device=device)
     assert F.allclose(g.edata['w'], F.tensor(eweight))
 
     # Create a bipartite graph from a NetworkX graph
@@ -143,13 +144,15 @@ def test_create(idtype):
     src, dst = g.edges()
     assert F.allclose(src, F.tensor([0, 1], dtype=idtype))
     assert F.allclose(dst, F.tensor([1, 2], dtype=idtype))
-    g = dgl.bipartite_from_networkx(nx_g, src_attrs=['feat1', 'feat2'],
+    g = dgl.bipartite_from_networkx(nx_g, utype='_U', etype='_E', vtype='V',
+                                    src_attrs=['feat1', 'feat2'],
                                     edge_attrs = ['weight'], dst_attrs = ['feat3'])
     assert F.allclose(g.srcdata['feat1'], F.tensor(np.zeros((2, 2))))
     assert F.allclose(g.srcdata['feat2'], F.tensor(np.ones((2, 2))))
     assert F.allclose(g.dstdata['feat3'], F.tensor(np.zeros((3, 3))))
     assert F.allclose(g.edata['weight'], F.tensor(np.ones((2, 1))))
-    g = dgl.bipartite_from_networkx(nx_g, edge_id_attr_name='eid', idtype=idtype, device=device)
+    g = dgl.bipartite_from_networkx(nx_g, utype='_U', etype='_E', vtype='V',
+                                    edge_id_attr_name='eid', idtype=idtype, device=device)
     src, dst = g.edges()
     assert F.allclose(src, F.tensor([1, 0], dtype=idtype))
     assert F.allclose(dst, F.tensor([2, 1], dtype=idtype))

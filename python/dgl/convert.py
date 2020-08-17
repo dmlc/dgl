@@ -1,6 +1,5 @@
 """Module for converting graph from/to other object."""
-# pylint: disable=dangerous-default-value
-from collections import defaultdict, Iterable
+from collections import defaultdict
 from scipy.sparse import spmatrix
 import numpy as np
 import networkx as nx
@@ -31,6 +30,7 @@ __all__ = [
 
 def graph(data,
           ntype=None, etype=None,
+          *,
           num_nodes=None,
           idtype=None,
           device=None,
@@ -167,8 +167,10 @@ def bipartite(data,
               restrict_format='any',
               **kwargs):
     """DEPRECATED: use dgl.heterograph instead."""
-    raise DGLError('dgl.bipartite is deprecated.\n\n'
-                   'Use dgl.heterograph instead.')
+    raise DGLError(
+        'dgl.bipartite is deprecated. Use dgl.heterograph({' +
+        "('{}', '{}', '{}')".format(utype, etype, vtype) +
+        ' : data} to create a bipartite graph instead.')
 
 def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
     """DEPRECATED: use dgl.heterograph instead."""
@@ -752,7 +754,7 @@ def from_scipy(sp_mat,
     return g.to(device)
 
 def bipartite_from_scipy(sp_mat,
-                         utype='_U', etype='_E', vtype='_V',
+                         utype, etype, vtype,
                          eweight_name=None,
                          idtype=None,
                          device=None):
@@ -821,17 +823,18 @@ def bipartite_from_scipy(sp_mat,
     >>> # Weight for edges (2, 1), (3, 2), (4, 3)
     >>> eweight = np.array([0.2, 0.3, 0.5])
     >>> sp_mat = coo_matrix((eweight, (src_ids, dst_ids)))
-    >>> g = dgl.bipartite_from_scipy(sp_mat)
+    >>> g = dgl.bipartite_from_scipy(sp_mat, utype='_U', etype='_E', vtype='_V')
 
     Retrieve the edge weights.
 
-    >>> g = dgl.bipartite_from_scipy(sp_mat, eweight_name='w')
+    >>> g = dgl.bipartite_from_scipy(sp_mat, utype='_U', etype='_E', vtype='_V', eweight_name='w')
     >>> g.edata['w']
     tensor([0.2000, 0.3000, 0.5000], dtype=torch.float64)
 
     Create a graph on the first GPU with data type int32.
 
-    >>> g = dgl.bipartite_from_scipy(sp_mat, idtype=torch.int32, device='cuda:0')
+    >>> g = dgl.bipartite_from_scipy(sp_mat, utype='_U', etype='_E', vtype='_V',
+    ...                              idtype=torch.int32, device='cuda:0')
 
     See Also
     --------
@@ -1011,7 +1014,7 @@ def from_networkx(nx_graph,
     return g.to(device)
 
 def bipartite_from_networkx(nx_graph,
-                            utype='_U', etype='_E', vtype='_V',
+                            utype, etype, vtype,
                             u_attrs=None, e_attrs=None, v_attrs=None,
                             edge_id_attr_name=None,
                             idtype=None,
@@ -1095,23 +1098,28 @@ def bipartite_from_networkx(nx_graph,
 
     Convert it into a DGLGraph with structure only.
 
-    >>> g = dgl.bipartite_from_networkx(nx_g)
+    >>> g = dgl.bipartite_from_networkx(nx_g, utype='_U', etype='_E', vtype='_V')
 
     Retrieve the node/edge features of the graph.
 
-    >>> g = dgl.bipartite_from_networkx(nx_g, u_attrs=['feat1', 'feat2'],
-    ...                                 e_attrs=['weight'], v_attrs=['feat3'])
+    >>> g = dgl.bipartite_from_networkx(nx_g, utype='_U', etype='_E', vtype='_V',
+    ...                                 u_attrs=['feat1', 'feat2'],
+    ...                                 e_attrs=['weight'],
+    ...                                 v_attrs=['feat3'])
 
     Use a pre-specified ordering of the edges.
 
     >>> g.edges()
     (tensor([0, 1]), tensor([1, 2]))
-    >>> g = dgl.bipartite_from_networkx(nx_g, edge_id_attr_name='eid')
+    >>> g = dgl.bipartite_from_networkx(nx_g,
+    ...                                 utype='_U', etype='_E', vtype='_V',
+    ...                                 edge_id_attr_name='eid')
     (tensor([1, 0]), tensor([2, 1]))
 
     Create a graph on the first GPU with data type int32.
 
-    >>> g = dgl.bipartite_from_networkx(nx_g, idtype=torch.int32, device='cuda:0')
+    >>> g = dgl.bipartite_from_networkx(nx_g, utype='_U', etype='_E', vtype='_V',
+    ...                                 idtype=torch.int32, device='cuda:0')
 
     See Also
     --------

@@ -42,7 +42,8 @@ def rand_graph(num_nodes, num_edges, idtype=F.int64, device=F.cpu(),
                       idtype=idtype, device=device)
     return g.formats(formats)
 
-def rand_bipartite(num_src_nodes, num_dst_nodes, num_edges,
+def rand_bipartite(utype, etype, vtype,
+                   num_src_nodes, num_dst_nodes, num_edges,
                    idtype=F.int64, device=F.cpu(),
                    formats=['csr', 'coo', 'csc']):
     """Generate a random bipartite graph of the given number of src/dst nodes and
@@ -52,6 +53,12 @@ def rand_bipartite(num_src_nodes, num_dst_nodes, num_edges,
 
     Parameters
     ----------
+    utype : str, optional
+        The name of the source node type.
+    etype : str, optional
+        The name of the edge type.
+    vtype : str, optional
+        The name of the destination node type.
     num_src_nodes : int
         The number of source nodes, the :math:`|U|` in :math:`G=(U,V,E)`.
     num_dst_nodes : int
@@ -74,7 +81,7 @@ def rand_bipartite(num_src_nodes, num_dst_nodes, num_edges,
     eids = random.choice(num_src_nodes * num_dst_nodes, num_edges, replace=False)
     rows = F.copy_to(F.astype(eids / num_dst_nodes, idtype), device)
     cols = F.copy_to(F.astype(eids % num_dst_nodes, idtype), device)
-    g = convert.heterograph({('_U', '_E', '_V'): (rows, cols)},
-                            {'_U': num_src_nodes, '_V': num_dst_nodes},
+    g = convert.heterograph({(utype, etype, vtype): (rows, cols)},
+                            {utype: num_src_nodes, vtype: num_dst_nodes},
                             idtype=idtype, device=device)
     return g.formats(formats)
