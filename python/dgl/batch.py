@@ -1,5 +1,6 @@
 """Utilities for batching/unbatching graphs."""
 from collections.abc import Mapping
+from collections import defaultdict
 
 from . import backend as F
 from .base import ALL, is_all, DGLError, dgl_warning
@@ -165,24 +166,25 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     utils.check_all_same_device(graphs, 'graphs')
     utils.check_all_same_idtype(graphs, 'graphs')
     relations = graphs[0].canonical_etypes
+    ntypes = graphs[0].ntypes
     idtype = graphs[0].idtype
     device = graphs[0].device
 
     # Batch graph structure for each relation graph
-    edge_dict = {}
-    num_nodes_dict = {}
-    for rel in relations:
-        srctype, etype, dsttype = rel
-        srcnid_off = dstnid_off = 0
-        src, dst = [], []
-        for g in graphs:
+    edge_dict = defaultdict(list)
+    num_nodes_dict = defaultdict(int)
+    for g in graphs:
+        for rel in relations:
+            srctype, etype, dsttype = rel
             u, v = g.edges(order='eid', etype=rel)
-            src.append(u + srcnid_off)
-            dst.append(v + dstnid_off)
-            srcnid_off += g.number_of_nodes(srctype)
-            dstnid_off += g.number_of_nodes(dsttype)
+            src = u + num_nodes_dict[srctype]
+            dst = v + num_nodes_dict[dsttype]
+            edge_dict[rel].append((src, dst))
+        for ntype in ntypes:
+            num_nodes_dict[ntype] += g.number_of_nodes(ntype)
+    for rel in relations:
+        src, dst = zip(*edge_dict[rel])
         edge_dict[rel] = (F.cat(src, 0), F.cat(dst, 0))
-        num_nodes_dict.update({srctype : srcnid_off, dsttype : dstnid_off})
     retg = convert.heterograph(edge_dict, num_nodes_dict, idtype=idtype, device=device)
 
     # Compute batch num nodes
