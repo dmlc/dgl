@@ -165,22 +165,6 @@ def test_pickling_batched_heterograph():
     new_bg = _reconstruct_pickle(bg)
     test_utils.check_graph_equal(bg, new_bg)
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
-@unittest.skipIf(dgl.backend.backend_name != "pytorch", reason="Only test for pytorch format file")
-def test_pickling_heterograph_index_compatibility():
-    g = dgl.heterograph({
-        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
-        ('user', 'plays', 'game'): ([0, 1, 2, 1], [0, 0, 1, 1]),
-        ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
-        ('developer', 'develops', 'game'): ([0, 1], [0, 1])
-    })
-
-    with open("tests/compute/hetero_pickle_old.pkl", "rb") as f:
-        gi = pickle.load(f)
-        f.close()
-    new_g = dgl.DGLHeteroGraph(gi, g.ntypes, g.etypes)
-    _assert_is_identical_hetero(g, new_g)
-
 if __name__ == '__main__':
     test_pickling_index()
     test_pickling_graph_index()

@@ -1,6 +1,6 @@
 """Classes for heterogeneous graphs."""
 #pylint: disable= too-many-lines
-from collections import defaultdict
+from collections import defaultdict, Iterable
 from collections.abc import Mapping
 from contextlib import contextmanager
 import copy
@@ -2481,9 +2481,11 @@ class DGLHeteroGraph(object):
         >>> g.has_nodes(torch.tensor([3, 0, 1]), 'game')
         tensor([False,  True,  True])
         """
+        vid_tensor = utils.prepare_tensor(self, vid, "vid")
+        if len(vid_tensor) > 0 and (F.as_scalar(F.min(vid_tensor, 0)) < 0 or F.as_scalar(F.min(vid_tensor, 0)) < 0):
+            raise DGLError('All IDs must be non-negative integers.')
         ret = self._graph.has_nodes(
-            self.get_ntype_id(ntype),
-            utils.prepare_tensor(self, vid, "vid"))
+            self.get_ntype_id(ntype), vid_tensor)
         if isinstance(vid, numbers.Integral):
             return bool(F.as_scalar(ret))
         else:
@@ -2575,10 +2577,16 @@ class DGLHeteroGraph(object):
         ...                     ('user', 'follows', 'game'))
         tensor([True, True])
         """
+        srctype, _, dsttype = self.to_canonical_etype(etype)
+        u_tensor = utils.prepare_tensor(self, u, 'u')
+        if F.as_scalar(F.sum(self.has_nodes(u_tensor, ntype=srctype), dim=0)) != len(u_tensor):
+            raise DGLError('u contains invalid node IDs')
+        v_tensor = utils.prepare_tensor(self, v, 'v')
+        if F.as_scalar(F.sum(self.has_nodes(v_tensor, ntype=dsttype), dim=0)) != len(v_tensor):
+            raise DGLError('v contains invalid node IDs')
         ret = self._graph.has_edges_between(
             self.get_etype_id(etype),
-            utils.prepare_tensor(self, u, 'u'),
-            utils.prepare_tensor(self, v, 'v'))
+            u_tensor, v_tensor)
         if isinstance(u, numbers.Integral) and isinstance(v, numbers.Integral):
             return bool(F.as_scalar(ret))
         else:
@@ -2643,6 +2651,8 @@ class DGLHeteroGraph(object):
         --------
         successors
         """
+        if not self.has_nodes(v):
+            raise DGLError('Non-existing node ID {}'.format(v))
         return self._graph.predecessors(self.get_etype_id(etype), v)
 
     def successors(self, v, etype=None):
@@ -2695,6 +2705,8 @@ class DGLHeteroGraph(object):
         --------
         predecessors
         """
+        if not self.has_nodes(v):
+            raise DGLError('Non-existing node ID {}'.format(v))
         return self._graph.successors(self.get_etype_id(etype), v)
 
     def edge_id(self, u, v, force_multi=None, return_uv=False, etype=None):
@@ -2802,8 +2814,13 @@ class DGLHeteroGraph(object):
         tensor([1, 2])
         """
         is_int = isinstance(u, numbers.Integral) and isinstance(v, numbers.Integral)
+        srctype, _, dsttype = self.to_canonical_etype(etype)
         u = utils.prepare_tensor(self, u, 'u')
+        if F.as_scalar(F.sum(self.has_nodes(u, ntype=srctype), dim=0)) != len(u):
+            raise DGLError('u contains invalid node IDs')
         v = utils.prepare_tensor(self, v, 'v')
+        if F.as_scalar(F.sum(self.has_nodes(v, ntype=dsttype), dim=0)) != len(v):
+            raise DGLError('v contains invalid node IDs')
         if force_multi is not None:
             dgl_warning("force_multi will be deprecated, " \
                         "Please use return_uv instead")
@@ -2816,7 +2833,7 @@ class DGLHeteroGraph(object):
             is_neg_one = F.equal(eid, -1)
             if F.as_scalar(F.sum(is_neg_one, 0)):
                 # Raise error since some (u, v) pair is not a valid edge.
-                idx = F.nonzero_1d(is_neg_one)
+                idx = F.nonzero_1d(is_neg_one)[0]
                 raise DGLError("Error: (%d, %d) does not form a valid edge." % (
                     F.as_scalar(F.gather_row(u, idx)),
                     F.as_scalar(F.gather_row(v, idx))))
@@ -2878,6 +2895,13 @@ class DGLHeteroGraph(object):
         (tensor([4, 3]), tensor([6, 5]))
         """
         eid = utils.prepare_tensor(self, eid, 'eid')
+        min_eid = F.as_scalar(F.min(eid, 0))
+        if len(eid) > 0 and min_eid < 0:
+            raise DGLError('Invalid edge ID {:d}'.format(min_eid))
+        max_eid = F.as_scalar(F.max(eid, 0))
+        if len(eid) > 0 and max_eid >= self.num_edges(etype):
+            raise DGLError('Invalid edge ID {:d}'.format(max_eid))
+
         if len(eid) == 0:
             empty = F.copy_to(F.tensor([], self.idtype), self.device)
             return empty, empty
@@ -2956,6 +2980,9 @@ class DGLHeteroGraph(object):
         out_edges
         """
         v = utils.prepare_tensor(self, v, 'v')
+        _, _, dsttype = self.to_canonical_etype(etype)
+        if F.as_scalar(F.sum(self.has_nodes(v, ntype=dsttype), dim=0)) != len(v):
+            raise DGLError('v contains invalid node IDs')
         src, dst, eid = self._graph.in_edges(self.get_etype_id(etype), v)
         if form == 'all':
             return src, dst, eid
@@ -3038,6 +3065,9 @@ class DGLHeteroGraph(object):
         in_edges
         """
         u = utils.prepare_tensor(self, u, 'u')
+        srctype, _, _ = self.to_canonical_etype(etype)
+        if F.as_scalar(F.sum(self.has_nodes(u, ntype=srctype), dim=0)) != len(u):
+            raise DGLError('u contains invalid node IDs')
         src, dst, eid = self._graph.out_edges(self.get_etype_id(etype), u)
         if form == 'all':
             return src, dst, eid
@@ -3207,7 +3237,10 @@ class DGLHeteroGraph(object):
         etid = self.get_etype_id(etype)
         if is_all(v):
             v = self.dstnodes(dsttype)
-        deg = self._graph.in_degrees(etid, utils.prepare_tensor(self, v, 'v'))
+        v_tensor = utils.prepare_tensor(self, v, 'v')
+        if F.as_scalar(F.sum(self.has_nodes(v_tensor, ntype=dsttype), dim=0)) != len(v_tensor):
+            raise DGLError('v contains invalid node IDs')
+        deg = self._graph.in_degrees(etid, v_tensor)
         if isinstance(v, numbers.Integral):
             return F.as_scalar(deg)
         else:
@@ -3291,6 +3324,9 @@ class DGLHeteroGraph(object):
         etid = self.get_etype_id(etype)
         if is_all(u):
             u = self.srcnodes(srctype)
+        u_tensor = utils.prepare_tensor(self, u, 'u')
+        if F.as_scalar(F.sum(self.has_nodes(u_tensor, ntype=srctype), dim=0)) != len(u_tensor):
+            raise DGLError('u contains invalid node IDs')
         deg = self._graph.out_degrees(etid, utils.prepare_tensor(self, u, 'u'))
         if isinstance(u, numbers.Integral):
             return F.as_scalar(deg)
@@ -4090,7 +4126,7 @@ class DGLHeteroGraph(object):
             return
         u, v = self.find_edges(eid, etype=etype)
         # call message passing onsubgraph
-        ndata = core.message_passing(_create_compute_graph(self, u, v, eid),
+        ndata = core.message_passing(_create_compute_graph(self[etype], u, v, eid),
                                      message_func, reduce_func, apply_node_func)
         dstnodes = F.unique(v)
         self._set_n_repr(dtid, dstnodes, ndata)
@@ -4177,7 +4213,7 @@ class DGLHeteroGraph(object):
         g = self if etype is None else self[etype]
         # call message passing on subgraph
         src, dst, eid = g.in_edges(v, form='all')
-        ndata = core.message_passing(_create_compute_graph(self, src, dst, eid, v),
+        ndata = core.message_passing(_create_compute_graph(self[etype], src, dst, eid, v),
                                      message_func, reduce_func, apply_node_func)
         self._set_n_repr(dtid, v, ndata)
 
@@ -4301,7 +4337,7 @@ class DGLHeteroGraph(object):
         etype = self.canonical_etypes[etid]
         _, dtid = self._graph.metagraph.find_edge(etid)
         g = self if etype is None else self[etype]
-        ndata = core.message_passing(g, message_func, reduce_func, apply_node_func)
+        ndata = core.message_passing(self[etype], message_func, reduce_func, apply_node_func)
         self._set_n_repr(dtid, ALL, ndata)
 
     #################################################################
@@ -4576,6 +4612,12 @@ class DGLHeteroGraph(object):
         >>> print(g.filter_nodes(nodes_with_feature_one, ntype='user'))
         tensor([1, 2])
         """
+        if is_all(nodes):
+            nodes = self.nodes(ntype)
+        v = utils.prepare_tensor(self, nodes, 'nodes')
+        if F.as_scalar(F.sum(self.has_nodes(v, ntype=ntype), dim=0)) != len(v):
+            raise DGLError('v contains invalid node IDs')
+
         with self.local_scope():
             self.apply_nodes(lambda nbatch: {'_mask' : predicate(nbatch)}, nodes, ntype)
             ntype = self.ntypes[0] if ntype is None else ntype
@@ -4583,7 +4625,6 @@ class DGLHeteroGraph(object):
             if is_all(nodes):
                 return F.nonzero_1d(mask)
             else:
-                v = utils.prepare_tensor(self, nodes, 'nodes')
                 return F.boolean_mask(v, F.gather_row(mask, v))
 
     def filter_edges(self, predicate, edges=ALL, etype=None):
@@ -4661,6 +4702,28 @@ class DGLHeteroGraph(object):
         >>> print(g.filter_edges(edges_with_feature_one, etype='plays'))
         tensor([1, 2])
         """
+        if is_all(edges):
+            pass
+        elif isinstance(edges, tuple):
+            u, v = edges
+            srctype, _, dsttype = self.to_canonical_etype(etype)
+            u = utils.prepare_tensor(self, u, 'u')
+            if F.as_scalar(F.sum(self.has_nodes(u, ntype=srctype), dim=0)) != len(u):
+                raise DGLError('edges[0] contains invalid node IDs')
+            v = utils.prepare_tensor(self, v, 'v')
+            if F.as_scalar(F.sum(self.has_nodes(v, ntype=dsttype), dim=0)) != len(v):
+                raise DGLError('edges[1] contains invalid node IDs')
+        elif isinstance(edges, Iterable) or F.is_tensor(edges):
+            edges = utils.prepare_tensor(self, edges, 'edges')
+            min_eid = F.as_scalar(F.min(edges, 0))
+            if len(edges) > 0 and min_eid < 0:
+                raise DGLError('Invalid edge ID {:d}'.format(min_eid))
+            max_eid = F.as_scalar(F.max(edges, 0))
+            if len(edges) > 0 and max_eid >= self.num_edges(etype):
+                raise DGLError('Invalid edge ID {:d}'.format(max_eid))
+        else:
+            raise ValueError('Unsupported type of edges:', type(edges))
+
         with self.local_scope():
             self.apply_edges(lambda ebatch: {'_mask' : predicate(ebatch)}, edges, etype)
             etype = self.canonical_etypes[0] if etype is None else etype
