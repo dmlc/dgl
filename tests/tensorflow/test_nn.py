@@ -481,6 +481,30 @@ def test_hetero_conv(agg, idtype):
     assert mod3.carg1 == 0
     assert mod3.carg2 == 1
 
+
+def test_dense_cheb_conv():
+    for k in range(3, 4):
+        ctx = F.ctx()
+        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1, random_state=42))
+        g = g.to(ctx)
+
+        adj = tf.sparse.to_dense(tf.sparse.reorder(g.adjacency_matrix(ctx=ctx)))
+        cheb = nn.ChebConv(5, 2, k, None, bias=True)
+        dense_cheb = nn.DenseChebConv(5, 2, k, bias=True)
+
+        # init cheb modules
+        feat = F.ones((100, 5))
+        out_cheb = cheb(g, feat, [2.0])
+
+        dense_cheb.W = tf.reshape(cheb.linear.weights[0], (k, 5, 2))
+        if cheb.linear.bias is not None:
+            dense_cheb.bias = cheb.linear.bias
+
+        out_dense_cheb = dense_cheb(adj, feat, 2.0)
+        print(out_cheb - out_dense_cheb)
+        assert F.allclose(out_cheb, out_dense_cheb)
+
+
 if __name__ == '__main__':
     test_graph_conv()
     # test_set2set()
@@ -500,5 +524,5 @@ if __name__ == '__main__':
     # test_gmm_conv()
     # test_dense_graph_conv()
     # test_dense_sage_conv()
-    # test_dense_cheb_conv()
+    test_dense_cheb_conv()
     # test_sequential()
