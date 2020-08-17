@@ -1,8 +1,10 @@
-Build DGL NN Module
-===================
+.. _guide-nn:
+
+Building DGL NN Module
+======================
 
 DGL NN module is the building block for your GNN model. It inherents
-from `Pytorch’s NN Module <https://pytorch.org/docs/1.2.0/_modules/torch/nn/modules/module.html>`__, `MXNet Gluon’s NN Blcok  <http://mxnet.incubator.apache.org/versions/1.6/api/python/docs/api/gluon/nn/index.html>`__ and `TensorFlow’s Keras
+from `Pytorch’s NN Module <https://pytorch.org/docs/1.2.0/_modules/torch/nn/modules/module.html>`__, `MXNet Gluon’s NN Block  <http://mxnet.incubator.apache.org/versions/1.6/api/python/docs/api/gluon/nn/index.html>`__ and `TensorFlow’s Keras
 Layer <https://www.tensorflow.org/api_docs/python/tf/keras/layers>`__, depending on the DNN framework backend we are using. In DGL NN
 module, the parameter registration in construction function and tensor
 operation in forward function are the same with the backend framework.
@@ -264,8 +266,7 @@ The code actually does message passing and reducing computing. This part
 of code varies module by module. Note that all the message passings in
 the above code are implemented using ``update_all()`` API and
 ``built-in`` message/reduce functions to fully utilize DGL’s performance
-optimization as described in the `Message Passing User Guide
-Section <https://docs.dgl.ai/guide/message.html>`__.
+optimization as described in :ref:`guide-message-passing`.
 
 Update feature after reducing for output
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
