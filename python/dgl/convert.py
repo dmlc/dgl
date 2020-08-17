@@ -1287,8 +1287,7 @@ DGLHeteroGraph.to_networkx = to_networkx
 def create_from_edges(u, v,
                       utype, etype, vtype,
                       urange, vrange,
-                      validate=True,
-                      formats=['coo', 'csr', 'csc']):
+                      validate=True):
     """Internal function to create a graph from incident nodes with types.
 
     utype could be equal to vtype
@@ -1313,9 +1312,6 @@ def create_from_edges(u, v,
         maximum of the destination node IDs in the edge list plus 1. (Default: None)
     validate : bool, optional
         If True, checks if node IDs are within range.
-    formats : str or list of str
-        It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
-        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
 
     Returns
     -------
@@ -1336,12 +1332,8 @@ def create_from_edges(u, v,
     else:
         num_ntypes = 2
 
-    if 'coo' in formats:
-        hgidx = heterograph_index.create_unitgraph_from_coo(
-            num_ntypes, urange, vrange, u, v, formats)
-    else:
-        hgidx = heterograph_index.create_unitgraph_from_coo(
-            num_ntypes, urange, vrange, u, v, ['coo']).formats(formats)
+    hgidx = heterograph_index.create_unitgraph_from_coo(
+        num_ntypes, urange, vrange, u, v, ['coo', 'csr', 'csc'])
     if utype == vtype:
         return DGLHeteroGraph(hgidx, [utype], [etype])
     else:
