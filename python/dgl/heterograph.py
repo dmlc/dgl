@@ -2482,7 +2482,8 @@ class DGLHeteroGraph(object):
         tensor([False,  True,  True])
         """
         vid_tensor = utils.prepare_tensor(self, vid, "vid")
-        if len(vid_tensor) > 0 and (F.as_scalar(F.min(vid_tensor, 0)) < 0 or F.as_scalar(F.min(vid_tensor, 0)) < 0):
+        if len(vid_tensor) > 0 and (F.as_scalar(F.min(vid_tensor, 0)) < 0 or
+                                    F.as_scalar(F.min(vid_tensor, 0)) < 0):
             raise DGLError('All IDs must be non-negative integers.')
         ret = self._graph.has_nodes(
             self.get_ntype_id(ntype), vid_tensor)
@@ -2839,7 +2840,7 @@ class DGLHeteroGraph(object):
                     F.as_scalar(F.gather_row(v, idx))))
             return F.as_scalar(eid) if is_int else eid
 
-    def find_edges(self, eid, etype=None):
+    def find_edges(self, eid, etype=None):  # pylint: disable=chained-comparison
         """Return the source and destination node(s) of some particular edge(s)
         with the specified edge type.
 
@@ -4126,7 +4127,8 @@ class DGLHeteroGraph(object):
             return
         u, v = self.find_edges(eid, etype=etype)
         # call message passing onsubgraph
-        ndata = core.message_passing(_create_compute_graph(self[etype], u, v, eid),
+        g = self if etype is None else self[etype]
+        ndata = core.message_passing(_create_compute_graph(g, u, v, eid),
                                      message_func, reduce_func, apply_node_func)
         dstnodes = F.unique(v)
         self._set_n_repr(dtid, dstnodes, ndata)
@@ -4213,7 +4215,7 @@ class DGLHeteroGraph(object):
         g = self if etype is None else self[etype]
         # call message passing on subgraph
         src, dst, eid = g.in_edges(v, form='all')
-        ndata = core.message_passing(_create_compute_graph(self[etype], src, dst, eid, v),
+        ndata = core.message_passing(_create_compute_graph(g, src, dst, eid, v),
                                      message_func, reduce_func, apply_node_func)
         self._set_n_repr(dtid, v, ndata)
 
@@ -4337,7 +4339,7 @@ class DGLHeteroGraph(object):
         etype = self.canonical_etypes[etid]
         _, dtid = self._graph.metagraph.find_edge(etid)
         g = self if etype is None else self[etype]
-        ndata = core.message_passing(self[etype], message_func, reduce_func, apply_node_func)
+        ndata = core.message_passing(g, message_func, reduce_func, apply_node_func)
         self._set_n_repr(dtid, ALL, ndata)
 
     #################################################################
@@ -4410,7 +4412,8 @@ class DGLHeteroGraph(object):
                 raise DGLError('Invalid arguments for edge type "{}". Should be '
                                '(msg_func, reduce_func, [apply_node_func])'.format(etype))
             mfunc, rfunc, afunc = args
-            all_out[dtid].append(core.message_passing(self[etype], mfunc, rfunc, afunc))
+            g = self if etype is None else self[etype]
+            all_out[dtid].append(core.message_passing(g, mfunc, rfunc, afunc))
             merge_order[dtid].append(etid)  # use edge type id as merge order hint
         for dtid, frames in all_out.items():
             # merge by cross_reducer
@@ -4627,7 +4630,7 @@ class DGLHeteroGraph(object):
             else:
                 return F.boolean_mask(v, F.gather_row(mask, v))
 
-    def filter_edges(self, predicate, edges=ALL, etype=None):
+    def filter_edges(self, predicate, edges=ALL, etype=None): # pylint: disable=chained-comparison
         """Return the IDs of the edges with the given edge type that satisfy
         the given predicate.
 
