@@ -2840,7 +2840,7 @@ class DGLHeteroGraph(object):
                     F.as_scalar(F.gather_row(v, idx))))
             return F.as_scalar(eid) if is_int else eid
 
-    def find_edges(self, eid, etype=None):  # pylint: disable=chained-comparison
+    def find_edges(self, eid, etype=None):
         """Return the source and destination node(s) of some particular edge(s)
         with the specified edge type.
 
@@ -2897,7 +2897,7 @@ class DGLHeteroGraph(object):
         """
         eid = utils.prepare_tensor(self, eid, 'eid')
         min_eid = F.as_scalar(F.min(eid, 0))
-        if len(eid) > 0 and min_eid < 0:
+        if len(eid) > 0 > min_eid:
             raise DGLError('Invalid edge ID {:d}'.format(min_eid))
         max_eid = F.as_scalar(F.max(eid, 0))
         if len(eid) > 0 and max_eid >= self.num_edges(etype):
@@ -4630,7 +4630,7 @@ class DGLHeteroGraph(object):
             else:
                 return F.boolean_mask(v, F.gather_row(mask, v))
 
-    def filter_edges(self, predicate, edges=ALL, etype=None): # pylint: disable=chained-comparison
+    def filter_edges(self, predicate, edges=ALL, etype=None):
         """Return the IDs of the edges with the given edge type that satisfy
         the given predicate.
 
@@ -4719,7 +4719,7 @@ class DGLHeteroGraph(object):
         elif isinstance(edges, Iterable) or F.is_tensor(edges):
             edges = utils.prepare_tensor(self, edges, 'edges')
             min_eid = F.as_scalar(F.min(edges, 0))
-            if len(edges) > 0 and min_eid < 0:
+            if len(edges) > 0 > min_eid:
                 raise DGLError('Invalid edge ID {:d}'.format(min_eid))
             max_eid = F.as_scalar(F.max(edges, 0))
             if len(edges) > 0 and max_eid >= self.num_edges(etype):
