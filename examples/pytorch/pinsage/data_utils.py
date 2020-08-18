@@ -2,26 +2,28 @@ import torch
 import dgl
 import numpy as np
 import scipy.sparse as ssp
+import tqdm
+import dask.dataframe as dd
 
 # This is the train-test split method most of the recommender system papers running on MovieLens
 # takes.  It essentially follows the intuition of "training on the past and predict the future".
 # One can also change the threshold to make validation and test set take larger proportions.
 def train_test_split_by_time(df, timestamp, item):
-    df = df.copy()
     df['train_mask'] = np.ones((len(df),), dtype=np.bool)
     df['val_mask'] = np.zeros((len(df),), dtype=np.bool)
     df['test_mask'] = np.zeros((len(df),), dtype=np.bool)
-    df = df.sort_values([item, timestamp])
-    for track_id in df[item].unique():
-        idx = (df[item] == track_id).to_numpy().nonzero()[0]
-        idx = df.index[idx]
-        if len(idx) > 1:
-            df.loc[idx[-1], 'train_mask'] = False
-            df.loc[idx[-1], 'test_mask'] = True
-        if len(idx) > 2:
-            df.loc[idx[-2], 'train_mask'] = False
-            df.loc[idx[-2], 'val_mask'] = True
-    df = df.sort_index()
+    df = dd.from_pandas(df, npartitions=10)
+    def train_test_split(df):
+        df = df.sort_values([timestamp])
+        if df.shape[0] > 1:
+            df.iloc[-1, -3] = False
+            df.iloc[-1, -1] = True
+        if df.shape[0] > 2:
+            df.iloc[-2, -3] = False
+            df.iloc[-2, -2] = True
+        return df
+    df = df.groupby(item).apply(train_test_split).compute(scheduler='processes').sort_index()
+    print(df[df[item] == df[item].unique()[0]].sort_values(timestamp))
     return df['train_mask'].to_numpy().nonzero()[0], \
            df['val_mask'].to_numpy().nonzero()[0], \
            df['test_mask'].to_numpy().nonzero()[0]
