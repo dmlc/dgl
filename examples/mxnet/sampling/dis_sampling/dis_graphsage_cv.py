@@ -65,7 +65,7 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
     # initialize graph
     dur = []
 
-    adj = g.adjacency_matrix().as_in_context(g_ctx)
+    adj = g.adjacency_matrix(transpose=False).as_in_context(g_ctx)
     for epoch in range(args.n_epochs):
         start = time.time()
         if distributed:
