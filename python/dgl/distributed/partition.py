@@ -121,6 +121,12 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     the node assignment; 3) split the node features and edge features based on
     the partition result.
 
+    When a graph is partitioned, each partition can contain *HALO* nodes and edges, which are
+    the ones that belong to
+    other partitions but are included in this partition for integrity or efficiency concerns.
+    In this document, *local nodes/edges* refers to the nodes and edges that truly belong to
+    a partition. The rest are "HALO nodes/edges".
+
     The partitioned data is stored into multiple files organized as follows:
 
     .. code-block:: none
@@ -198,11 +204,6 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     * "inner_edge" indicates whether an edge belongs to a partition.
     * "orig_id" exists when reshuffle=True. It indicates the original node Ids in the original
     graph before reshuffling.
-
-    Note that each partition can contain *HALO* nodes and edges, those belonging to
-    other partitions but are included in this partition for integrity or efficiency concerns.
-    We call nodes and edges that truly belong to one partition *local nodes/edges*, while
-    the rest "HALO nodes/edges".
 
     Node and edge features are splitted and stored together with each graph partition.
     All node/edge features in a partition are stored in a file with DGL format. The node/edge
