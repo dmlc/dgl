@@ -154,11 +154,11 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
     # handle features
     if copy_ndata:
         node_frames = utils.extract_node_subframes(g, None)
-        utils.set_new_frames(new_g, node_frames=node_frames)
+        utils.set_new_frames(ret, node_frames=node_frames)
 
     if copy_edata:
         edge_frames = utils.extract_edge_subframes(g, induced_edges)
-        utils.set_new_frames(new_g, edge_frames=edge_frames)
+        utils.set_new_frames(ret, edge_frames=edge_frames)
 
     return ret
 
@@ -283,11 +283,11 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
     # handle features
     if copy_ndata:
         node_frames = utils.extract_node_subframes(g, None)
-        utils.set_new_frames(new_g, node_frames=node_frames)
+        utils.set_new_frames(ret, node_frames=node_frames)
 
     if copy_edata:
         edge_frames = utils.extract_edge_subframes(g, induced_edges)
-        utils.set_new_frames(new_g, edge_frames=edge_frames)
+        utils.set_new_frames(ret, edge_frames=edge_frames)
     return ret
 
 _init_api('dgl.sampling.neighbor', __name__)
