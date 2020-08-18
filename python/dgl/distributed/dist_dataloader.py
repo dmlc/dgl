@@ -61,8 +61,8 @@ class DistDataLoader:
     """DGL customized multiprocessing dataloader.
 
     DistDataLoader provides a similar interface to Pytorch's DataLoader to generate mini-batches
-    with multiprocessing. It utilizes the worker processes created by :func:`dgl.distributed.initialize`
-    to parallelize sampling.
+    with multiprocessing. It utilizes the worker processes created by
+    :func:`dgl.distributed.initialize` to parallelize sampling.
 
     Parameters
     ----------
