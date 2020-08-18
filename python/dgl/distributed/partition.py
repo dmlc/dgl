@@ -252,11 +252,11 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     Examples
     --------
     >>> dgl.distributed.partition_graph(g, 'test', 4, num_hops=1, part_method='metis',
-                                        out_path='output/', reshuffle=True,
-                                        balance_ntypes=g.ndata['train_mask'],
-                                        balance_edges=True)
+    ...                                 out_path='output/', reshuffle=True,
+    ...                                 balance_ntypes=g.ndata['train_mask'],
+    ...                                 balance_edges=True)
     >>> g, node_feats, edge_feats, gpb, graph_name = dgl.distributed.load_partition(
-                                        'output/test.json', 0)
+    ...                                 'output/test.json', 0)
     '''
     if num_parts == 1:
         parts = {0: g}
