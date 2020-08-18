@@ -1055,7 +1055,7 @@ class KVClient(object):
 
         Parameters
         ----------
-        partition_book : GraphPartitionBook or RangePartitionBook
+        partition_book : GraphPartitionBook
             Store the partition information
         """
         # Get shared data from server side
