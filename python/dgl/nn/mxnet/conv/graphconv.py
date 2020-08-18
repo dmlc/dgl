@@ -58,8 +58,8 @@ class GraphConv(gluon.Block):
     bias : torch.Tensor
         The learnable bias tensor.
 
-    Notes
-    -----
+    Note
+    ----
     Zero in-degree nodes will lead to invalid output value. This is because no message
     will be passed to those nodes, the aggregation function will be appied on empty input.
     A common practice to avoid this is to add a self-loop for each node in the graph if
@@ -208,8 +208,8 @@ class GraphConv(gluon.Block):
             since no message will be passed to those nodes. This will cause invalid output.
             The error can be ignored by setting ``allow_zero_in_degree`` parameter to ``True``.
 
-        Notes
-        -----
+        Note
+        ----
         * Input shape: :math:`(N, *, \text{in_feats})` where * means any number of additional
           dimensions, :math:`N` is the number of nodes.
         * Output shape: :math:`(N, *, \text{out_feats})` where all but the last dimension are

@@ -82,8 +82,8 @@ class TAGConv(nn.Module):
         -----------
         Reinitialize learnable parameters.
 
-        Notes
-        -----
+        Note
+        ----
         The model parameters are initialized using Glorot uniform initialization.
         """
         gain = nn.init.calculate_gain('relu')
