@@ -18,91 +18,101 @@ __all__ = ['node_subgraph', 'edge_subgraph', 'node_type_subgraph', 'edge_type_su
            'in_subgraph', 'out_subgraph']
 
 def node_subgraph(graph, nodes):
-    """Return the subgraph induced on given nodes.
+    """Return a subgraph induced on the given nodes.
 
-    The metagraph of the returned subgraph is the same as the parent graph.
-    Features are copied from the original graph.
+    A node-induced subgraph is a subset of the nodes of a graph together with
+    any edges whose endpoints are both in this subset. In addition to extracting
+    the subgraph, DGL conducts the following:
+
+    * Relabel the extracted nodes to IDs starting from zero.
+
+    * Copy the features of the extracted nodes and edges to the resulting graph.
+      The copy is *lazy* and incurs data movement only when needed.
+
+    * Store the IDs of the extracted nodes and edges in the ``ndata`` and ``edata``
+      of the resulting graph under name ``dgl.NID`` and ``dgl.EID``, respectively.
+
+    If the graph is heterogeneous, DGL extracts a subgraph per relation and composes
+    them as the resulting graph. Thus, the resulting graph has the same set of relations
+    as the input one.
 
     Parameters
     ----------
     graph : DGLGraph
         The graph to extract subgraphs from.
-    nodes : list or dict[str->list or iterable]
-        A dictionary mapping node types to node ID array for constructing
-        subgraph. All nodes must exist in the graph.
+    nodes : nodes or dict[str, nodes]
+        The nodes to form the subgraph. The allowed nodes formats are:
 
-        If the graph only has one node type, one can just specify a list,
-        tensor, or any iterable of node IDs intead.
-
-        The node ID array can be either an interger tensor or a bool tensor.
-        When a bool tensor is used, it is automatically converted to
-        an interger tensor using the semantic of np.where(nodes_idx == True).
-
-        Note: When using bool tensor, only backend (torch, tensorflow, mxnet)
-        tensors are supported.
-
+        * Int Tensor: Each element is a node ID. The tensor must have the same device type
+          and ID data type as the graph's.
+        * iterable[int]: Each element is a node ID.
+        * Bool Tensor: Each :math:`i^{th}` element is a bool flag indicating whether
+          node :math:`i` is used to extract the subgraph.
+        
+        If the graph is homogeneous, one can directly pass the above formats.
+        Otherwise, the argument must be a dictionary with keys being node types
+        and values being the nodes.
+    
     Returns
     -------
     G : DGLGraph
         The subgraph.
 
-        The nodes and edges in the subgraph are relabeled using consecutive
-        integers from 0.
-
-        One can retrieve the mapping from subgraph node/edge ID to parent
-        node/edge ID via ``dgl.NID`` and ``dgl.EID`` node/edge features of the
-        subgraph.
-
     Examples
     --------
     The following example uses PyTorch backend.
 
-    Instantiate a heterograph.
+    >>> import dgl
+    >>> import torch
+
+    Extract a subgraph from a homogeneous graph.
+
+    >>> g = dgl.graph(([0, 1, 2, 3, 4], [1, 2, 3, 4, 0]))  # 5-node cycle
+    >>> sg = dgl.node_subgraph(g, [0, 1, 4])
+    >>> sg
+    Graph(num_nodes=3, num_edges=2,
+          ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}
+          edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
+    >>> sg.edges()
+    (tensor([0, 2]), tensor([1, 0]))
+    >>> sg.ndata[dgl.NID]  # original node IDs
+    tensor([0, 1, 4])
+    >>> sg.edata[dgl.EID]  # original edge IDs
+    tensor([0, 4])
+
+    Specify nodes using a boolean mask.
+    
+    >>> nodes = torch.tensor([True, True, False, False, True])  # choose nodes [0, 1, 4]
+    >>> dgl.node_subgraph(g, nodes)
+    Graph(num_nodes=3, num_edges=2,
+          ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}
+          edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
+
+    The resulting subgraph also copies features from the parent graph.
+
+    >>> g.ndata['x'] = torch.arange(10).view(5, 2)
+    >>> sg = dgl.node_subgraph(g, [0, 1, 4])
+    >>> sg
+    Graph(num_nodes=3, num_edges=2,
+          ndata_schemes={'x': Scheme(shape=(2,), dtype=torch.int64),
+                         '_ID': Scheme(shape=(), dtype=torch.int64)}
+          edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
+    >>> sg.ndata['x']
+    tensor([[0, 1],
+            [2, 3],
+            [8, 9]])
+
+    Extract a subgraph from a hetergeneous graph.
 
     >>> g = dgl.heterograph({
     >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
     >>>     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])
     >>> })
-    >>> # Set node features
-    >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
-
-    Get subgraphs.
-
-    >>> g.subgraph({'user': [4, 5]})
-    Traceback (most recent call last):
-        ...
-    dgl._ffi.base.DGLError: ...
-    >>> sub_g = g.subgraph({'user': [1, 2]})
-    >>> print(sub_g)
+    >>> sub_g = dgl.node_subgraph(g, {'user': [1, 2]})
+    >>> sub_g
     Graph(num_nodes={'user': 2, 'game': 0},
           num_edges={('user', 'plays', 'game'): 0, ('user', 'follows', 'user'): 2},
           metagraph=[('user', 'game'), ('user', 'user')])
-
-    Get subgraphs using boolean mask tensor.
-
-    >>> sub_g = g.subgraph({'user': th.tensor([False, True, True])})
-    >>> print(sub_g)
-    Graph(num_nodes={'user': 2, 'game': 0},
-          num_edges={('user', 'plays', 'game'): 0, ('user', 'follows', 'user'): 2},
-          metagraph=[('user', 'game'), ('user', 'user')])
-
-    Get the original node/edge indices.
-
-    >>> sub_g['follows'].ndata[dgl.NID] # Get the node indices in the raw graph
-    tensor([1, 2])
-    >>> sub_g['follows'].edata[dgl.EID] # Get the edge indices in the raw graph
-    tensor([1, 2])
-
-    Get the copied node features.
-
-    >>> sub_g.nodes['user'].data['h']
-    tensor([[1.],
-            [2.]])
-    >>> sub_g.nodes['user'].data['h'] += 1
-    >>> g.nodes['user'].data['h']          # Features are not shared.
-    tensor([[0.],
-            [1.],
-            [2.]])
 
     See Also
     --------
@@ -132,103 +142,121 @@ def node_subgraph(graph, nodes):
 DGLHeteroGraph.subgraph = utils.alias_func(node_subgraph)
 
 def edge_subgraph(graph, edges, preserve_nodes=False):
-    """Return the subgraph induced on given edges.
+    """Return a subgraph induced on the given edges.
 
-    The metagraph of the returned subgraph is the same as the parent graph.
+    An edge-induced subgraph is equivalent to creating a new graph
+    with the same number of nodes using the given edges.  In addition to extracting
+    the subgraph, DGL conducts the following:
 
-    Features are copied from the original graph.
+    * Relabel the incident nodes to IDs starting from zero. Isolated nodes are removed.
+
+    * Copy the features of the extracted nodes and edges to the resulting graph.
+      The copy is *lazy* and incurs data movement only when needed.
+
+    * Store the IDs of the extracted nodes and edges in the ``ndata`` and ``edata``
+      of the resulting graph under name ``dgl.NID`` and ``dgl.EID``, respectively.
+
+    If the graph is heterogeneous, DGL extracts a subgraph per relation and composes
+    them as the resulting graph. Thus, the resulting graph has the same set of relations
+    as the input one.
 
     Parameters
     ----------
     graph : DGLGraph
-        The graph to extract subgraphs from.
-    edges : dict[(str, str, str), Tensor]
-        A dictionary mapping edge types to edge ID array for constructing
-        subgraph. All edges must exist in the subgraph.
+        The graph to extract the subgraph from.
+    edges : dict[(str, str, str), edges]
+        The edges to form the subgraph. The allowed edges formats are:
 
-        The edge types are characterized by triplets of
-        ``(src type, etype, dst type)``.
-
-        If the graph only has one edge type, one can just specify a list,
-        tensor, or any iterable of edge IDs intead.
-
-        The edge ID array can be either an interger tensor or a bool tensor.
-        When a bool tensor is used, it is automatically converted to
-        an interger tensor using the semantic of np.where(edges_idx == True).
-
-        Note: When using bool tensor, only backend (torch, tensorflow, mxnet)
-        tensors are supported.
-
-    preserve_nodes : bool
-        Whether to preserve all nodes or not. If false, all nodes
-        without edges will be removed. (Default: False)
+        * Int Tensor: Each element is an edge ID. The tensor must have the same device type
+          and ID data type as the graph's.
+        * iterable[int]: Each element is an edge ID.
+        * Bool Tensor: Each :math:`i^{th}` element is a bool flag indicating whether
+          edge :math:`i` is used to extract the subgraph.
+        
+        If the graph is homogeneous, one can directly pass the above formats.
+        Otherwise, the argument must be a dictionary with keys being edge types
+        and values being the nodes.
+    preserve_nodes : bool, optional
+        If true, do not relabel the incident nodes and remove the isolated nodes
+        in the extracted subgraph. (Default: False)
 
     Returns
     -------
     G : DGLGraph
         The subgraph.
 
-        The nodes and edges are relabeled using consecutive integers from 0.
-
-        One can retrieve the mapping from subgraph node/edge ID to parent
-        node/edge ID via ``dgl.NID`` and ``dgl.EID`` node/edge features of the
-        subgraph.
-
     Examples
     --------
     The following example uses PyTorch backend.
 
-    Instantiate a heterograph.
+    >>> import dgl
+    >>> import torch
+
+    Extract a subgraph from a homogeneous graph.
+
+    >>> g = dgl.graph(([0, 1, 2, 3, 4], [1, 2, 3, 4, 0]))  # 5-node cycle
+    >>> sg = dgl.edge_subgraph(g, [0, 4])
+    >>> sg
+    Graph(num_nodes=3, num_edges=2,
+          ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}
+          edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
+    >>> sg.edges()
+    (tensor([0, 1]), tensor([2, 0]))
+    >>> sg.ndata[dgl.NID]  # original node IDs
+    tensor([0, 4, 1])
+    >>> sg.edata[dgl.EID]  # original edge IDs
+    tensor([0, 4])
+
+    Extract a subgraph without node relabeling.
+
+    >>> sg = dgl.edge_subgraph(g, [0, 4], preserve_nodes=True)
+    >>> sg
+    Graph(num_nodes=5, num_edges=2,
+          ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}
+          edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
+    >>> sg.edges()
+    (tensor([0, 4]), tensor([1, 0]))
+
+    Specify edges using a boolean mask.
+    
+    >>> nodes = torch.tensor([True, False, False, False, True])  # choose edges [0, 4]
+    >>> dgl.edge_subgraph(g, nodes)
+    Graph(num_nodes=3, num_edges=2,
+          ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}
+          edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
+
+    The resulting subgraph also copies features from the parent graph.
+
+    >>> g.ndata['x'] = torch.arange(10).view(5, 2)
+    >>> sg = dgl.edge_subgraph(g, [0, 4])
+    >>> sg
+    Graph(num_nodes=3, num_edges=2,
+          ndata_schemes={'x': Scheme(shape=(2,), dtype=torch.int64),
+                         '_ID': Scheme(shape=(), dtype=torch.int64)}
+          edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
+    >>> sg.ndata[dgl.NID]
+    tensor([0, 4, 1])
+    >>> sg.ndata['x']
+    tensor([[0, 1],
+            [8, 9],
+            [2, 3]])
+
+    Extract a subgraph from a hetergeneous graph.
 
     >>> g = dgl.heterograph({
     >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
     >>>     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])
     >>> })
-    >>> # Set edge features
-    >>> g.edges['follows'].data['h'] = torch.tensor([[0.], [1.], [2.]])
-
-    Get subgraphs.
-
-    >>> g.edge_subgraph({('user', 'follows', 'user'): [5, 6]})
-    Traceback (most recent call last):
-        ...
-    dgl._ffi.base.DGLError: ...
-    >>> sub_g = g.edge_subgraph({('user', 'follows', 'user'): [1, 2],
-    >>>                          ('user', 'plays', 'game'): [2]})
+    >>> sub_g = dgl.edge_subgraph(g, {('user', 'follows', 'user'): [1, 2],
+    ...                               ('user', 'plays', 'game'): [2]})
     >>> print(sub_g)
     Graph(num_nodes={'user': 2, 'game': 1},
           num_edges={('user', 'plays', 'game'): 1, ('user', 'follows', 'user'): 2},
           metagraph=[('user', 'game'), ('user', 'user')])
 
-    Get subgraphs using boolean mask tensor.
-    >>> sub_g = g.edge_subgraph({('user', 'follows', 'user'): th.tensor([False, True, True]),
-    >>>                   ('user', 'plays', 'game'): th.tensor([False, False, True, False])})
-    >>> sub_g
-    Graph(num_nodes={'user': 2, 'game': 1},
-        num_edges={('user', 'plays', 'game'): 1, ('user', 'follows', 'user'): 2},
-        metagraph=[('user', 'game'), ('user', 'user')])
-
-    Get the original node/edge indices.
-
-    >>> sub_g['follows'].ndata[dgl.NID] # Get the node indices in the raw graph
-    tensor([1, 2])
-    >>> sub_g['plays'].edata[dgl.EID]   # Get the edge indices in the raw graph
-    tensor([2])
-
-    Get the copied node features.
-
-    >>> sub_g.edges['follows'].data['h']
-    tensor([[1.],
-            [2.]])
-    >>> sub_g.edges['follows'].data['h'] += 1
-    >>> g.edges['follows'].data['h']          # Features are not shared.
-    tensor([[0.],
-            [1.],
-            [2.]])
-
     See Also
     --------
-    subgraph
+    node_subgraph
     """
     if graph.is_block:
         raise DGLError('Extracting subgraph from a block graph is not allowed.')
