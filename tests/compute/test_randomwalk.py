@@ -59,6 +59,3 @@ def test_random_walk_with_restart():
         for t in traces_per_seed:
             trace_diff = np.diff(F.zerocopy_to_numpy(t), axis=-1)
             assert (trace_diff % 2 == 0).all()
-
-if __name__ == '__main__':
-    # test_random_walk()
