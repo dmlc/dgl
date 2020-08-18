@@ -59,29 +59,3 @@ def test_random_walk_with_restart():
         for t in traces_per_seed:
             trace_diff = np.diff(F.zerocopy_to_numpy(t), axis=-1)
             assert (trace_diff % 2 == 0).all()
-
-def test_metapath_random_walk(idtype=F.int32):
-    g1 = dgl.heterograph({
-        ('a', 'ab', 'b'): ([0, 1, 2, 3], [0, 1, 2, 3])
-    }, idtype=idtype)
-    g2 = dgl.heterograph({
-        ('b', 'ba', 'a'): ([0, 0, 1, 1, 2, 2, 3, 3], [1, 3, 2, 0, 3, 1, 0, 2])
-    }, idtype=idtype)
-    G = dgl.heterograph({
-        ('a', 'ab', 'b'): ([0, 1, 2, 3], [0, 1, 2, 3]),
-        ('b', 'ba', 'a'): ([0, 0, 1, 1, 2, 2, 3, 3], [1, 3, 2, 0, 3, 1, 0, 2])
-    }, idtype=idtype)
-    seeds = [0, 1]
-    traces = dgl.contrib.sampling.metapath_random_walk(G, ['ab', 'ba'] * 4, seeds, 3)
-    for seed, traces_per_seed in zip(seeds, traces):
-        assert len(traces_per_seed) == 3
-        for trace in traces_per_seed:
-            assert len(trace) == 8
-            trace = np.insert(F.asnumpy(trace), 0, seed)
-            for i in range(4):
-                assert g1.has_edge_between(trace[2 * i], trace[2 * i + 1])
-                assert g2.has_edge_between(trace[2 * i + 1], trace[2 * i + 2])
-
-if __name__ == '__main__':
-    # test_random_walk()
-    test_metapath_random_walk("int32")
