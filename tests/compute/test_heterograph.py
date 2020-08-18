@@ -453,7 +453,7 @@ def test_edge_ids():
 @parametrize_dtype
 def test_adj(idtype):
     g = create_test_heterograph(idtype)
-    adj = F.sparse_to_numpy(g.adj(etype='follows'))
+    adj = F.sparse_to_numpy(g.adj(transpose=False, etype='follows'))
     assert np.allclose(
             adj,
             np.array([[0., 0., 0.],
@@ -465,7 +465,7 @@ def test_adj(idtype):
             np.array([[0., 1., 0.],
                       [0., 0., 1.],
                       [0., 0., 0.]]))
-    adj = F.sparse_to_numpy(g.adj(etype='plays'))
+    adj = F.sparse_to_numpy(g.adj(transpose=False, etype='plays'))
     assert np.allclose(
             adj,
             np.array([[1., 1., 0.],
@@ -477,29 +477,29 @@ def test_adj(idtype):
                       [1., 1.],
                       [0., 1.]]))
 
-    adj = g.adj(scipy_fmt='csr', etype='follows')
+    adj = g.adj(transpose=False, scipy_fmt='csr', etype='follows')
     assert np.allclose(
             adj.todense(),
             np.array([[0., 0., 0.],
                       [1., 0., 0.],
                       [0., 1., 0.]]))
-    adj = g.adj(scipy_fmt='coo', etype='follows')
+    adj = g.adj(transpose=False, scipy_fmt='coo', etype='follows')
     assert np.allclose(
             adj.todense(),
             np.array([[0., 0., 0.],
                       [1., 0., 0.],
                       [0., 1., 0.]]))
-    adj = g.adj(scipy_fmt='csr', etype='plays')
+    adj = g.adj(transpose=False, scipy_fmt='csr', etype='plays')
     assert np.allclose(
             adj.todense(),
             np.array([[1., 1., 0.],
                       [0., 1., 1.]]))
-    adj = g.adj(scipy_fmt='coo', etype='plays')
+    adj = g.adj(transpose=False, scipy_fmt='coo', etype='plays')
     assert np.allclose(
             adj.todense(),
             np.array([[1., 1., 0.],
                       [0., 1., 1.]]))
-    adj = F.sparse_to_numpy(g['follows'].adj())
+    adj = F.sparse_to_numpy(g['follows'].adj(transpose=False))
     assert np.allclose(
             adj,
             np.array([[0., 0., 0.],
