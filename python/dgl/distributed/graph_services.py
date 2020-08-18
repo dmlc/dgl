@@ -56,10 +56,11 @@ def _sample_neighbors(local_g, partition_book, seed_nodes, fan_out, edge_dir, pr
     local_ids = F.astype(local_ids, local_g.idtype)
     # local_ids = self.seed_nodes
     sampled_graph = local_sample_neighbors(
-        local_g, local_ids, fan_out, edge_dir, prob, replace)
+        local_g, local_ids, fan_out, edge_dir, prob, replace, _dist_training=True)
     global_nid_mapping = local_g.ndata[NID]
     src, dst = sampled_graph.edges()
     global_src, global_dst = global_nid_mapping[src], global_nid_mapping[dst]
+    print(sampled_graph, type(sampled_graph))
     global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
     return global_src, global_dst, global_eids
 
@@ -86,6 +87,7 @@ def _in_subgraph(local_g, partition_book, seed_nodes):
     local_ids = partition_book.nid2localnid(seed_nodes, partition_book.partid)
     local_ids = F.astype(local_ids, local_g.idtype)
     # local_ids = self.seed_nodes
+    # (BarclayII)
     sampled_graph = local_in_subgraph(local_g, local_ids)
     global_nid_mapping = local_g.ndata[NID]
     src, dst = sampled_graph.edges()
