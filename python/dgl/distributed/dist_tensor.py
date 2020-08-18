@@ -24,7 +24,7 @@ DIST_TENSOR_ID = 0
 class DistTensor:
     ''' Distributed tensor.
 
-    DistTensor references to a distributed tensor sharded and stored in a cluster of machines.
+    ``DistTensor`` references to a distributed tensor sharded and stored in a cluster of machines.
     It has the same interface as Pytorch Tensor to access its metadata (e.g., shape and data type).
     To access data in a distributed tensor, it supports slicing rows and writing data to rows.
     It does not support any operators of a deep learning framework, such as addition and
@@ -34,22 +34,22 @@ class DistTensor:
     graph. Therefore, their first dimensions have to be the number of nodes or edges in the graph.
     The tensors are sharded in the first dimension based on the partition policy of nodes
     or edges. When a distributed tensor is created, the partition policy is automatically
-    determined based on the first dimension if the partition policy is not provided: if
-    the first dimension matches the number of nodes, DistTensor will use the node partition policy;
-    if the first dimension matches the number of edges, DistTensor wll use the edge partition
+    determined based on the first dimension if the partition policy is not provided: if the first
+    dimension matches the number of nodes, ``DistTensor`` will use the node partition policy;
+    if the first dimension matches the number of edges, ``DistTensor`` wll use the edge partition
     policy. To determine the partition policy automatically, a DistGraph object has to be created.
     Users can overwrite the rule by providing a partition policy directly.
 
-    A distributed tensor can be identified by a unique name or is anonymous.
-    When a distributed tensor has a name, the tensor can be persistent if persistent=True.
-    Normally, when a DistTensor object is destroyed, the distributed tensor in the system
-    is destroyed at the same time. However, a persistent tensor lives in the system even if
-    the DistTenor object is destroyed in the trainer process. DGL does not allow an anonymous
-    tensor to be persistent.
+    A distributed tensor can be ether named or anonymous.
+    When a distributed tensor has a name, the tensor can be persistent if ``persistent=True``.
+    Normally, DGL destroys the distributed tensor in the system when the ``DistTensor`` object
+    goes away. However, a persistent tensor lives in the system even if
+    the ``DistTenor`` object disappears in the trainer process. The persistent tensor has
+    the same life span as the DGL servers. DGL does not allow an anonymous tensor to be persistent.
 
-    When a DistTensor is created, it may reference to an existing distributed tensor or
+    When a ``DistTensor`` object is created, it may reference to an existing distributed tensor or
     create a new one. A distributed tensor is identified by the name passed to the constructor.
-    If the name exists, DistTensor will reference the existing one.
+    If the name exists, ``DistTensor`` will reference the existing one.
     In this case, the shape and the data type must match the existing tensor.
     If the name doesn't exist, a new tensor will be created in the kvstore.
 
@@ -64,10 +64,6 @@ class DistTensor:
         def init_func(shape, dtype):
             return torch.ones(shape=shape, dtype=dtype)
 
-    Note: creating `DistTensor` is a synchronized operation. When a trainer process tries to
-    create a DistTensor object, the creation succeeds only when all trainer processes
-    do the same.
-
     Parameters
     ----------
     shape : tuple
@@ -77,7 +73,7 @@ class DistTensor:
         The dtype of the tensor. The data type has to be the one in the deep learning framework.
     name : string, optional
         The name of the embeddings. The name can uniquely identify embeddings in a system
-        so that another DistTensor object can referent to the distributed tensor.
+        so that another ``DistTensor`` object can referent to the distributed tensor.
     init_func : callable, optional
         The function to initialize data in the tensor. If the init function is not provided,
         the values of the embeddings are initialized to zero.
@@ -86,7 +82,7 @@ class DistTensor:
         Currently, it only supports node partition policy or edge partition policy.
         The system determines the right partition policy automatically.
     persistent : bool
-        Whether the created tensor lives after the DistTensor object is destroyed.
+        Whether the created tensor lives after the ``DistTensor`` object is destroyed.
 
     Examples
     --------
@@ -101,6 +97,12 @@ class DistTensor:
     tensor([[2, 2],
             [2, 2],
             [2, 2]], dtype=torch.int32)
+
+    Note
+    ----
+    The creation of ``DistTensor`` is a synchronized operation. When a trainer process tries to
+    create a ``DistTensor`` object, the creation succeeds only when all trainer processes
+    do the same.
     '''
     def __init__(self, shape, dtype, name=None, init_func=None, part_policy=None,
                  persistent=False):
