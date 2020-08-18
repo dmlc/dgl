@@ -61,6 +61,8 @@ def main(args):
     # add self loop
     g = dgl.remove_self_loop(g)
     g = dgl.add_self_loop(g)
+    if cuda:
+        g = g.to('cuda:0')
 
     # create APPNP model
     model = APPNP(g,
