@@ -1,5 +1,11 @@
 # PinSAGE example
 
+## Requirements
+
+- dask
+- pandas
+- torchtext
+
 ## Prepare datasets
 
 ### MovieLens 1M
