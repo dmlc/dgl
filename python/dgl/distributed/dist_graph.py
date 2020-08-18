@@ -304,25 +304,25 @@ class DistGraph:
     distributed sampling APIs to generate mini-batches and perform forward and
     backward computation on the mini-batches.
 
-    DistGraph can run in two modes: the standalone mode and the distributed mode.
+    The class can run in two modes: the standalone mode and the distributed mode.
 
-    * When a user runs the training script normally, DistGraph will be in the standalone mode.
-      In this mode, the input data is constructed by
+    * When a user runs the training script normally, ``DistGraph`` will be in the standalone mode.
+      In this mode, the input data must be constructed by
       :py:meth:`~dgl.distributed.partition.partition_graph` with only one partition. This mode is
-      used for testing and debugging purpose. In this mode, users have to provide `part_config` so
-      that `DistGraph` can load the input graph.
-    * When a user runs the training script with the distributed launch script, DistGraph will
+      used for testing and debugging purpose. In this mode, users have to provide ``part_config``
+      so that ``DistGraph`` can load the input graph.
+    * When a user runs the training script with the distributed launch script, ``DistGraph`` will
       be set into the distributed mode. This is used for actual distributed training. All data of
-      partitions are loaded by the DistGraph servers, which are created by DGL's launch script.
-      DistGraph connects with the servers to access the partitioned graph data.
+      partitions are loaded by the ``DistGraph`` servers, which are created by DGL's launch script.
+      ``DistGraph`` connects with the servers to access the partitioned graph data.
 
-    Currently, the DistGraph servers and clients run on the same set of machines
-    in the distributed mode. `DistGraph` uses shared-memory to access the partition data
+    Currently, the ``DistGraph`` servers and clients run on the same set of machines
+    in the distributed mode. ``DistGraph`` uses shared-memory to access the partition data
     in the local machine. This gives the best performance for distributed training
 
-    Users may want to run DistGraph servers and clients on separate sets of machines.
+    Users may want to run ``DistGraph`` servers and clients on separate sets of machines.
     In this case, a user may want to disable shared memory by passing
-    `disable_shared_mem=False` when creating `DistGraphServer`. When shared-memory is disabled,
+    `disable_shared_mem=False` when creating ``DistGraphServer``. When shared memory is disabled,
     a user has to pass a partition book. This is currently used for the testing purpose.
 
     Parameters
@@ -339,17 +339,17 @@ class DistGraph:
 
     Examples
     --------
-    The example shows the creation of DistGraph in the standalone mode.
+    The example shows the creation of ``DistGraph`` in the standalone mode.
 
     >>> dgl.distributed.partition_graph(g, 'graph_name', 1, num_hops=1, part_method='metis',
                                         out_path='output/', reshuffle=True)
     >>> g = dgl.distributed.DistGraph('graph_name', part_config='output/graph_name.json')
 
-    The example shows the creation of DistGraph in the distributed mode.
+    The example shows the creation of ``DistGraph`` in the distributed mode.
 
     >>> g = dgl.distributed.DistGraph('graph-name')
 
-    The code below shows the mini-batch training using DistGraph.
+    The code below shows the mini-batch training using ``DistGraph``.
 
     >>> def sample(seeds):
             seeds = th.LongTensor(np.asarray(seeds))
