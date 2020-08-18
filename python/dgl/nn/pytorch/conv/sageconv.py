@@ -121,8 +121,8 @@ class SAGEConv(nn.Module):
         -----------
         Reinitialize learnable parameters.
 
-        Notes
-        -----
+        Note
+        ----
         The linear weights :math:`W^{(l)}` are initialized using Glorot uniform initialization.
         The LSTM module is using xavier initialization method for its weights.
         """
