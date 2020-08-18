@@ -72,18 +72,19 @@ def _check_neighbor_sampling_dataloader(g, nids, dl, mode):
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_neighbor_sampler_dataloader():
-    g = dgl.graph([(0,1),(0,2),(0,3),(1,3),(1,4)],
-            'user', 'follow', num_nodes=6).long()
+    g = dgl.heterograph({('user', 'follow', 'user'): ([0, 0, 0, 1, 1], [1, 2, 3, 3, 4])}, 
+                        {'user': 6}).long()
     g = dgl.to_bidirected(g)
     reverse_eids = F.tensor([5, 6, 7, 8, 9, 0, 1, 2, 3, 4], dtype=F.int64)
     g_sampler1 = dgl.dataloading.MultiLayerNeighborSampler([2, 2], return_eids=True)
     g_sampler2 = dgl.dataloading.MultiLayerFullNeighborSampler(2, return_eids=True)
 
     hg = dgl.heterograph({
-        ('user', 'follow', 'user'): [(0, 1), (0, 2), (0, 3), (1, 0), (1, 2), (1, 3), (2, 0)],
-        ('user', 'followed-by', 'user'): [(1, 0), (2, 0), (3, 0), (0, 1), (2, 1), (3, 1), (0, 2)],
-        ('user', 'play', 'game'): [(0, 0), (1, 1), (1, 2), (3, 0), (5, 2)],
-        ('game', 'played-by', 'user'): [(0, 0), (1, 1), (2, 1), (0, 3), (2, 5)]}).long()
+         ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0]),
+         ('user', 'followed-by', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]),
+         ('user', 'play', 'game'): ([0, 1, 1, 3, 5], [0, 1, 2, 0, 2]),
+         ('game', 'played-by', 'user'): ([0, 1, 2, 0, 2], [0, 1, 1, 3, 5])
+    }).long()
     hg_sampler1 = dgl.dataloading.MultiLayerNeighborSampler(
         [{'play': 1, 'played-by': 1, 'follow': 2, 'followed-by': 1}] * 2, return_eids=True)
     hg_sampler2 = dgl.dataloading.MultiLayerFullNeighborSampler(2, return_eids=True)

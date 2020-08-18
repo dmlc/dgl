@@ -13,15 +13,12 @@ framework code. The major difference lies in the message passing
 operations that are unique in DGL.
 
 DGL has integrated many commonly used
-`Sparse_GraphConvs <https://docs.dgl.ai/api/python/nn.pytorch.html#module-dgl.nn.pytorch.conv>`__,
-`Dense_GraphConvs <https://docs.dgl.ai/api/python/nn.pytorch.html#dense-conv-layers>`__,
-`Graph_Poolings <https://docs.dgl.ai/api/python/nn.pytorch.html#module-dgl.nn.pytorch.glob>`__,
+:ref:`apinn-pytorch-conv`, :ref:`apinn-pytorch-dense-conv`, :ref:`apinn-pytorch-pooling`,
 and
-`Utility <https://docs.dgl.ai/api/python/nn.pytorch.html#utility-modules>`__
-NN modules. We welcome your contribution!
+:ref:`apinn-pytorch-util`. We welcome your contribution!
 
 In this section, we will use
-`dgl.nn.conv.SAGEConv <https://github.com/sneakerkg/dgl/blob/nn_doc_refactor/python/dgl/nn/pytorch/conv/sageconv.py>`__
+:class:`~dgl.nn.pytorch.conv.SAGEConv`
 with Pytorch backend as an example to introduce how to build your own
 DGL NN Module.
 
@@ -289,7 +286,7 @@ object construction phase.
 Heterogeneous GraphConv Module
 ------------------------------
 
-`HeteroGraphConv <https://github.com/dmlc/dgl/blob/master/python/dgl/nn/pytorch/hetero.py>`__
+:class:`dgl.nn.pytorch.HeteroGraphConv`
 is a module-level encapsulation to run DGL NN module on heterogeneous
 graph. The implementation logic is the same as message passing level API
 ``multi_update_all()``:

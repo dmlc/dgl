@@ -399,7 +399,7 @@ def unbatch(g, node_split=None, edge_split=None):
                           for i in range(num_split)]
 
     # Create graphs
-    gs = [convert.heterograph(edge_dict, num_nodes_dict, validate=True, idtype=g.idtype)
+    gs = [convert.heterograph(edge_dict, num_nodes_dict, idtype=g.idtype)
           for edge_dict, num_nodes_dict in zip(edge_dict_per, num_nodes_dict_per)]
 
     # Unbatch node features
