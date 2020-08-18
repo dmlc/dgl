@@ -177,7 +177,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
     return ret
 
 def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
-                copy_ndata=True, copy_edata=True, _dist_training=True):
+                copy_ndata=True, copy_edata=True):
     """Select the neighboring edges with k-largest (or k-smallest) weights of the given
     nodes and return the induced subgraph.
 
@@ -231,10 +231,6 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
         edge features.
 
         (Default: True)
-    _dist_training : bool, optional
-        Internal argument.  Do not use.
-
-        (Default: False)
 
     Returns
     -------
@@ -299,23 +295,15 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
 
     # handle features
-    # (TODO) (BarclayII) DGL distributed fails with bus error, freezes, or other
-    # incomprehensible errors with lazy feature copy.
-    # So in distributed training context, we fall back to old behavior where we
-    # only set the edge IDs.
-    if not _dist_training:
-        if copy_ndata:
-            print(g, type(g))
-            node_frames = utils.extract_node_subframes(g, None)
-            utils.set_new_frames(ret, node_frames=node_frames)
+    if copy_ndata:
+        print(g, type(g))
+        node_frames = utils.extract_node_subframes(g, None)
+        utils.set_new_frames(ret, node_frames=node_frames)
 
-        if copy_edata:
-            print(g, type(g))
-            edge_frames = utils.extract_edge_subframes(g, induced_edges)
-            utils.set_new_frames(ret, edge_frames=edge_frames)
-    else:
-        for i, etype in enumerate(ret.canonical_etypes):
-            ret.edges[etype].data[EID] = induced_edges[i]
+    if copy_edata:
+        print(g, type(g))
+        edge_frames = utils.extract_edge_subframes(g, induced_edges)
+        utils.set_new_frames(ret, edge_frames=edge_frames)
     return ret
 
 _init_api('dgl.sampling.neighbor', __name__)
