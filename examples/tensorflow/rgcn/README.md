@@ -5,7 +5,7 @@
 * Author's code for link prediction: [https://github.com/MichSchli/RelationPrediction](https://github.com/MichSchli/RelationPrediction)
 
 ### Dependencies
-* Tensorflow 2.1+
+* Tensorflow 2.2+
 * requests
 * rdflib
 * pandas

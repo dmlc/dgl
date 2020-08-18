@@ -148,7 +148,7 @@ def knn_graph(x, k):
         (F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))),
         shape=(n_samples * n_points, n_samples * n_points))
 
-    return convert.graph(adj)
+    return convert.from_scipy(adj)
 
 #pylint: disable=invalid-name
 def segmented_knn_graph(x, k, segs):
@@ -220,8 +220,7 @@ def segmented_knn_graph(x, k, segs):
     src = F.reshape(src, (-1,))
     adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
 
-    g = convert.graph(adj)
-    return g
+    return convert.from_scipy(adj)
 
 def to_bidirected(g, readonly=None, copy_ndata=False):
     r"""Convert the graph to a bidirectional simple graph, adding reverse edges and
@@ -373,7 +372,7 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
     --------
     **Homogeneous graphs**
 
-    >>> g = dgl.graph(th.tensor([0, 0]), th.tensor([0, 1]))
+    >>> g = dgl.graph((th.tensor([0, 0]), th.tensor([0, 1])))
     >>> bg1 = dgl.add_reverse_edges(g)
     >>> bg1.edges()
     (tensor([0, 0, 0, 1]), tensor([0, 1, 0, 0]))
@@ -381,10 +380,10 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
     **Heterogeneous graphs with Multiple Edge Types**
 
     >>> g = dgl.heterograph({
-    ...     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2, 2]), th.tensor([1, 1, 2, 1, 0])),
-    ...     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1])),
-    ...     ('user', 'follows', 'user'): (th.tensor([1, 2, 1), th.tensor([0, 0, 0]))
-    ... })
+    >>>     ('user', 'wins', 'user'): (th.tensor([0, 2, 0, 2, 2]), th.tensor([1, 1, 2, 1, 0])),
+    >>>     ('user', 'plays', 'game'): (th.tensor([1, 2, 1]), th.tensor([2, 1, 1])),
+    >>>     ('user', 'follows', 'user'): (th.tensor([1, 2, 1), th.tensor([0, 0, 0]))
+    >>> })
     >>> g.nodes['game'].data['hv'] = th.ones(3, 1)
     >>> g.edges['wins'].data['h'] = th.tensor([0, 1, 2, 3, 4])
 
@@ -521,7 +520,7 @@ def line_graph(g, backtracking=True, shared=False):
     >>> lg.edges()
     (tensor([0, 1, 2, 4]), tensor([4, 0, 3, 1]))
     """
-    assert g.is_homogeneous(), \
+    assert g.is_homogeneous, \
         'only homogeneous graph is supported'
 
     dev = g.device
@@ -572,7 +571,7 @@ def khop_adj(g, k):
             [1., 3., 3., 1., 0.],
             [0., 1., 3., 3., 1.]])
     """
-    assert g.is_homogeneous(), \
+    assert g.is_homogeneous, \
         'only homogeneous graph is supported'
     adj_k = g.adj(scipy_fmt=g.formats()['created'][0]) ** k
     return F.tensor(adj_k.todense().astype(np.float32))
@@ -637,7 +636,7 @@ def khop_graph(g, k, copy_ndata=True):
              ndata_schemes={}
              edata_schemes={})
     """
-    assert g.is_homogeneous(), \
+    assert g.is_homogeneous, \
         'only homogeneous graph is supported'
     n = g.number_of_nodes()
     adj_k = g.adj(transpose=True, scipy_fmt=g.formats()['created'][0]) ** k
@@ -958,12 +957,9 @@ def metapath_reachable_graph(g, metapath):
     adj = (adj != 0).tocsr()
     srctype = g.to_canonical_etype(metapath[0])[0]
     dsttype = g.to_canonical_etype(metapath[-1])[2]
-    if srctype == dsttype:
-        assert adj.shape[0] == adj.shape[1]
-        new_g = convert.graph(adj, ntype=srctype, idtype=g.idtype, device=g.device)
-    else:
-        new_g = convert.bipartite(adj, utype=srctype, vtype=dsttype,
-                                  idtype=g.idtype, device=g.device)
+    new_g = convert.heterograph({(srctype, '_E', dsttype): adj.nonzero()},
+                                {srctype: adj.shape[0], dsttype: adj.shape[1]},
+                                idtype=g.idtype, device=g.device)
 
     # copy srcnode features
     new_g.nodes[srctype].data.update(g.nodes[srctype].data)
@@ -1516,7 +1512,8 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
     The following code constructs a bipartite graph with 20 users and 10 games, but
     only user #1 and #3, as well as game #3 and #5, have connections:
 
-    >>> g = dgl.bipartite([(1, 3), (3, 5)], 'user', 'plays', 'game', num_nodes=(20, 10))
+    >>> g = dgl.heterograph({('user', 'plays', 'game'): ([1, 3], [3, 5])},
+    >>>                      {'user': 20, 'game': 10})
 
     The following would compact the graph above to another bipartite graph with only
     two users and two games.
@@ -1538,7 +1535,8 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
     of the given graphs are removed.  So if you compact ``g`` and the following ``g2``
     graphs together:
 
-    >>> g2 = dgl.bipartite([(1, 6), (6, 8)], 'user', 'plays', 'game', num_nodes=(20, 10))
+    >>> g2 = dgl.heterograph({('user', 'plays', 'game'): ([1, 6], [6, 8])},
+    >>>                      {'user': 20, 'game': 10})
     >>> (new_g, new_g2), induced_nodes = dgl.compact_graphs([g, g2])
     >>> induced_nodes
     {'user': tensor([1, 3, 6]), 'game': tensor([3, 5, 6, 8])}
@@ -1671,8 +1669,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     Examples
     --------
     Converting a homogeneous graph to a block as described above:
-
-    >>> g = dgl.graph([(0, 1), (1, 2), (2, 3)])
+    >>> g = dgl.graph(([0, 1, 2], [1, 2, 3]))
     >>> block = dgl.to_block(g, torch.LongTensor([3, 2]))
 
     The output nodes would be exactly the same as the ones given: [3, 2].
@@ -1708,7 +1705,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     Converting a heterogeneous graph to a block is similar, except that when specifying
     the output nodes, you have to give a dict:
 
-    >>> g = dgl.bipartite([(0, 1), (1, 2), (2, 3)], utype='A', vtype='B')
+    >>> g = dgl.heterograph({('A', '_E', 'B'): ([0, 1, 2], [1, 2, 3])})
 
     If you don't specify any node of type A on the output side, the node type ``A``
     in the block would have zero nodes on the output side.

@@ -51,7 +51,7 @@ def get_local_usable_addr():
 
 def create_random_graph(n):
     arr = (spsp.random(n, n, density=0.001, format='coo', random_state=100) != 0).astype(np.int64)
-    return dgl.graph(arr)
+    return dgl.from_scipy(arr)
 
 def run_server(graph_name, server_id, server_count, num_clients, shared_mem):
     g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients, server_count,
