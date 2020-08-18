@@ -4,10 +4,7 @@ dgl
 =============================
 
 .. currentmodule:: dgl
-
-The ``dgl`` package contains data structure for storing structural and feature data
-(i.e., the :class:`DGLGraph` class) and also utilities for generating, manipulating
-and transforming graphs.
+.. automodule:: dgl
 
 .. _api-graph-create-ops:
 

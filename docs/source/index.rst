@@ -103,13 +103,13 @@ Getting Started
    :glob:
 
    api/python/dgl
-   api/python/dgl.DGLGraph
    api/python/dgl.data
+   api/python/dgl.dataloading
+   api/python/dgl.DGLGraph
+   api/python/dgl.function
    api/python/nn
    api/python/dgl.ops
-   api/python/dgl.function
-   api/python/sampling
-   api/python/dgl.dataloading
+   api/python/dgl.sampling
 
 .. toctree::
    :maxdepth: 3
