@@ -11,7 +11,8 @@ __all__ = [
     'sample_neighbors',
     'select_topk']
 
-def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
+def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
+                     copy_ndata=True, copy_edata=True):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -53,11 +54,30 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         to sum up to one).  Otherwise, the result will be undefined.
     replace : bool, optional
         If True, sample with replacement.
+    copy_ndata: bool, optional
+        If True, the node features of the new graph are copied from
+        the original graph. If False, the new graph will not have any
+        node features.
+
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the edge features of the new graph are copied from
+        the original graph.  If False, the new graph will not have any
+        edge features.
+
+        (Default: True)
 
     Returns
     -------
     DGLGraph
         A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
+
+    Notes
+    -----
+    If :attr:`copy_ndata` or :attr:`copy_edata` is True, same tensors are used as
+    the node or edge features of the original graph and the new graph.
+    As a result, users should avoid performing in-place operations
+    on the node features of the new graph to avoid feature corruption.
 
     Examples
     --------
@@ -130,11 +150,20 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
                                        edge_dir, prob_arrays, replace)
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
-    for i, etype in enumerate(ret.canonical_etypes):
-        ret.edges[etype].data[EID] = induced_edges[i]
+
+    # handle features
+    if copy_ndata:
+        node_frames = utils.extract_node_subframes(g, None)
+        utils.set_new_frames(new_g, node_frames=node_frames)
+
+    if copy_edata:
+        edge_frames = utils.extract_edge_subframes(g, induced_edges)
+        utils.set_new_frames(new_g, edge_frames=edge_frames)
+
     return ret
 
-def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
+def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
+                copy_ndata=True, copy_edata=True):
     """Select the neighboring edges with k-largest (or k-smallest) weights of the given
     nodes and return the induced subgraph.
 
@@ -176,11 +205,30 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
     ascending : bool, optional
         If True, DGL will return edges with k-smallest weights instead of
         k-largest weights.
+    copy_ndata: bool, optional
+        If True, the node features of the new graph are copied from
+        the original graph. If False, the new graph will not have any
+        node features.
+
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the edge features of the new graph are copied from
+        the original graph.  If False, the new graph will not have any
+        edge features.
+
+        (Default: True)
 
     Returns
     -------
     DGLGraph
         A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
+
+    Notes
+    -----
+    If :attr:`copy_ndata` or :attr:`copy_edata` is True, same tensors are used as
+    the node or edge features of the original graph and the new graph.
+    As a result, users should avoid performing in-place operations
+    on the node features of the new graph to avoid feature corruption.
 
     Examples
     --------
@@ -231,8 +279,15 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
         g._graph, nodes_all_types, k_array, edge_dir, weight_arrays, bool(ascending))
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
-    for i, etype in enumerate(ret.canonical_etypes):
-        ret.edges[etype].data[EID] = induced_edges[i]
+
+    # handle features
+    if copy_ndata:
+        node_frames = utils.extract_node_subframes(g, None)
+        utils.set_new_frames(new_g, node_frames=node_frames)
+
+    if copy_edata:
+        edge_frames = utils.extract_edge_subframes(g, induced_edges)
+        utils.set_new_frames(new_g, edge_frames=edge_frames)
     return ret
 
 _init_api('dgl.sampling.neighbor', __name__)
