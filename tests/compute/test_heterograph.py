@@ -1009,6 +1009,12 @@ def test_convert(idtype):
     assert hg.number_of_edges('e0') == 2
     assert hg.number_of_edges('e1') == 1
     assert hg.number_of_edges('e2') == 1
+    assert F.array_equal(hg.ndata[dgl.NID]['l0'], F.tensor([0, 1], F.int64))
+    assert F.array_equal(hg.ndata[dgl.NID]['l1'], F.tensor([2], F.int64))
+    assert F.array_equal(hg.ndata[dgl.NID]['l2'], F.tensor([3], F.int64))
+    assert F.array_equal(hg.edata[dgl.EID][('l0', 'e0', 'l1')], F.tensor([0, 1], F.int64))
+    assert F.array_equal(hg.edata[dgl.EID][('l0', 'e2', 'l2')], F.tensor([3], F.int64))
+    assert F.array_equal(hg.edata[dgl.EID][('l1', 'e1', 'l2')], F.tensor([2], F.int64))
 
     # hetero_from_homo test case 3
     mg = nx.MultiDiGraph([
