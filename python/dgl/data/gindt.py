@@ -157,7 +157,7 @@ class GINDataset(DGLBuiltinDataset):
 
                 self.labels.append(self.glabel_dict[glabel])
 
-                g = dgl_graph([])
+                g = dgl_graph(([], []))
                 g.add_nodes(n_nodes)
 
                 nlabels = []  # node labels

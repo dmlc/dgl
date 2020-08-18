@@ -10,7 +10,6 @@ from dgl.data import register_data_args, load_data
 class GraphData:
     def __init__(self, csr, num_feats, graph_name):
         num_nodes = csr.shape[0]
-        num_edges = mx.nd.contrib.getnnz(csr).asnumpy()[0]
         self.graph = dgl.graph_index.from_csr(csr.indptr, csr.indices, False, 'in')
         self.graph = self.graph.copyto_shared_mem(dgl.contrib.graph_store._get_graph_path(graph_name))
         self.features = mx.nd.random.normal(shape=(csr.shape[0], num_feats))
