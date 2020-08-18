@@ -6,8 +6,16 @@ dgl.DGLGraph
 .. currentmodule:: dgl
 .. class:: DGLGraph
 
+``DGLGraph`` is a data structure for storing both structural data and feature data.
+Read the user guide chapter :ref:`guide-graph` for an in-depth explanation about its
+usage. The recommended ways to create a ``DGLGraph`` object are via the
+:ref:`api-graph-create-ops`.
+
 Querying metagraph structure
 ----------------------------
+
+Methods for getting information about the node and edge types. They are typically useful
+when the graph is heterogeneous.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -24,6 +32,9 @@ Querying metagraph structure
 
 Querying graph structure
 ------------------------
+
+Methods for getting information about the graph structure such as capacity, connectivity,
+neighborhood, etc.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -53,14 +64,19 @@ Querying graph structure
 Querying and manipulating sparse format
 ---------------------------------------
 
+Methods for getting or manipulating the internal storage formats of a ``DGLGraph``.
+
 .. autosummary::
     :toctree: ../../generated/
 
     DGLGraph.formats
     DGLGraph.create_format_
 
-Querying and manipulating index data type
+Querying and manipulating node/edge ID type
 -----------------------------------------
+
+Methods for getting or manipulating the data type for storing structure-related
+data such as node and edge IDs.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -71,6 +87,9 @@ Querying and manipulating index data type
 
 Using Node/edge features
 ------------------------
+
+Methods for getting or setting the data type for storing structure-related
+data such as node and edge IDs.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -85,11 +104,13 @@ Using Node/edge features
     DGLGraph.dstnodes
     DGLGraph.srcdata
     DGLGraph.dstdata
-    DGLGraph.local_var
-    DGLGraph.local_scope
 
 Transforming graph
 ------------------
+
+Methods for generating a new graph by transforming the current ones. Most of them
+are alias of the :ref:`api-subgraph-extraction` and :ref:`api-transform`
+under the ``dgl`` namespace.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -99,9 +120,16 @@ Transforming graph
     DGLGraph.node_type_subgraph
     DGLGraph.edge_type_subgraph
     DGLGraph.__getitem__
+    DGLGraph.line_graph
+    DGLGraph.reverse
+    DGLGraph.add_self_loop
+    DGLGraph.remove_self_loop
+    DGLGraph.to_simple
 
-Converting to other formats
----------------------------
+Adjacency and incidence matrix
+---------------------------------
+
+Methods for getting the adjacency and the incidence matrix of the graph.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -113,6 +141,8 @@ Converting to other formats
 
 Computing with DGLGraph
 -----------------------------
+
+Methods for performing message passing, applying functions on node/edge features, etc.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -130,7 +160,11 @@ Computing with DGLGraph
     DGLGraph.filter_edges
 
 Querying batch summary
-----------------------
+---------------------------------
+
+Methods for getting the batching information if the current graph is a batched
+graph generated from :func:`dgl.batch`. They are also widely used in the
+:ref:`api-batch`.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -141,6 +175,8 @@ Querying batch summary
 
 Mutating topology
 -----------------
+
+Methods for mutating the graph structure *in-place*.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -153,8 +189,20 @@ Mutating topology
 Device Control
 --------------
 
+Methods for getting or changing the device on which the graph is hosted.
+
 .. autosummary::
     :toctree: ../../generated/
 
     DGLGraph.to
     DGLGraph.device
+
+Misc
+----
+
+Other utility methods.
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    DGLGraph.local_scope

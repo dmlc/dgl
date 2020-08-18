@@ -130,6 +130,7 @@ def node_subgraph(graph, nodes):
     return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges)
 
 DGLHeteroGraph.subgraph = node_subgraph
+DGLHeteroGraph.subgraph.__doc__ = utils.alias_of('dgl.node_subgraph')
 
 def edge_subgraph(graph, edges, preserve_nodes=False):
     """Return the subgraph induced on given edges.
@@ -253,6 +254,7 @@ def edge_subgraph(graph, edges, preserve_nodes=False):
     return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges)
 
 DGLHeteroGraph.edge_subgraph = edge_subgraph
+DGLHeteroGraph.edge_subgraph.__doc__ = utils.alias_of('dgl.edge_subgraph')
 
 def in_subgraph(g, nodes):
     """Return the subgraph induced on the inbound edges of all edge types of the
@@ -342,6 +344,7 @@ def in_subgraph(g, nodes):
     return _create_hetero_subgraph(g, sgi, None, induced_edges)
 
 DGLHeteroGraph.in_subgraph = in_subgraph
+DGLHeteroGraph.in_subgraph.__doc__ = utils.alias_of('dgl.in_subgraph')
 
 def out_subgraph(g, nodes):
     """Return the subgraph induced on the outbound edges of all edge types of the
@@ -431,6 +434,7 @@ def out_subgraph(g, nodes):
     return _create_hetero_subgraph(g, sgi, None, induced_edges)
 
 DGLHeteroGraph.out_subgraph = out_subgraph
+DGLHeteroGraph.out_subgraph.__doc__ = utils.alias_of('dgl.out_subgraph')
 
 def node_type_subgraph(graph, ntypes):
     """Return the subgraph induced on given node types.
@@ -499,6 +503,7 @@ def node_type_subgraph(graph, ntypes):
     return edge_type_subgraph(graph, etypes)
 
 DGLHeteroGraph.node_type_subgraph = node_type_subgraph
+DGLHeteroGraph.node_type_subgraph.__doc__ = utils.alias_of('dgl.node_type_subgraph')
 
 def edge_type_subgraph(graph, etypes):
     """Return the subgraph induced on given edge types.
@@ -580,6 +585,7 @@ def edge_type_subgraph(graph, etypes):
     return hg
 
 DGLHeteroGraph.edge_type_subgraph = edge_type_subgraph
+DGLHeteroGraph.edge_type_subgraph.__doc__ = utils.alias_of('dgl.edge_type_subgraph')
 
 #################### Internal functions ####################
 

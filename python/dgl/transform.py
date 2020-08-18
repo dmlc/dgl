@@ -533,6 +533,7 @@ def line_graph(g, backtracking=True, shared=False):
     return lg
 
 DGLHeteroGraph.line_graph = line_graph
+DGLHeteroGraph.line_graph.__doc__ = utils.alias_of('dgl.line_graph')
 
 def khop_adj(g, k):
     """Return the matrix of :math:`A^k` where :math:`A` is the adjacency matrix of the graph
@@ -805,6 +806,7 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
     return new_g
 
 DGLHeteroGraph.reverse = reverse
+DGLHeteroGraph.reverse.__doc__ = utils.alias_of('dgl.reverse')
 
 def to_simple_graph(g):
     """Convert the graph to a simple graph with no multi-edge.
@@ -1378,6 +1380,7 @@ def add_self_loop(g, etype=None):
     return new_g
 
 DGLHeteroGraph.add_self_loop = add_self_loop
+DGLHeteroGraph.add_self_loop.__doc__ = utils.alias_of('dgl.add_self_loop')
 
 def remove_self_loop(g, etype=None):
     r""" Remove self loops for each node in the graph.
@@ -1443,6 +1446,7 @@ def remove_self_loop(g, etype=None):
     return new_g
 
 DGLHeteroGraph.remove_self_loop = remove_self_loop
+DGLHeteroGraph.remove_self_loop.__doc__ = utils.alias_of('dgl.remove_self_loop')
 
 def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=True):
     """Given a list of graphs with the same set of nodes, find and eliminate the common
@@ -1969,6 +1973,7 @@ def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True
     return simple_graph
 
 DGLHeteroGraph.to_simple = to_simple
+DGLHeteroGraph.to_simple.__doc__ = utils.alias_of('dgl.to_simple')
 
 def as_heterograph(g, ntype='_U', etype='_E'):  # pylint: disable=unused-argument
     """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.
