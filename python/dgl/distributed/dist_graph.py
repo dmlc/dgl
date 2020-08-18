@@ -552,6 +552,14 @@ class DistGraph:
         return ['_E']
 
     def number_of_nodes(self):
+        """Alias of :func:`num_nodes`"""
+        return self.num_nodes()
+
+    def number_of_edges(self):
+        """Alias of :func:`num_edges`"""
+        return self.num_edges()
+
+    def num_nodes(self):
         """Return the total number of nodes in the distributed graph.
 
         Returns
@@ -567,7 +575,7 @@ class DistGraph:
         """
         return self._num_nodes
 
-    def number_of_edges(self):
+    def num_edges(self):
         """Return the total number of edges in the distributed graph.
 
         Returns
