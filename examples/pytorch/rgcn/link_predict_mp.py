@@ -408,6 +408,44 @@ class LinkNeighborSampler:
 
         return (bsize, p_g, n_g, p_blocks, n_blocks)
 
+@thread_wrapped_func
+def filter_edges(g, pos_score, eids, su, sv, n_v, n_u, t_neg_score, h_neg_score, start, end):
+    # exclude false neg edges
+    for idx in range(start, end):
+        tail_pos = g.has_edges_between(th.full((n_v.shape[0],), su[idx], dtype=th.long), n_v)
+        head_pos = g.has_edges_between(n_u, th.full((n_u.shape[0],), sv[idx], dtype=th.long))
+        etype = g.edata['etype'][eids[idx]]
+
+        loc = tail_pos == 1
+        u_ec = su[idx]
+        n_v_ec = n_v[loc]
+        false_neg_comp = th.full((n_v_ec.shape[0],), 0)
+        for idx_ec in range(n_v_ec.shape[0]):
+            sn_v_ec = n_v_ec[idx_ec]
+            _, _, eid_ec = g.edge_ids(u_ec.unsqueeze(dim=0), sn_v_ec.unsqueeze(dim=0), return_uv=True)
+            etype_ec = g.edata['etype'][eid_ec]
+            loc_ec = etype_ec == etype
+            eid_ec = eid_ec[loc_ec]
+            # has edge
+            if eid_ec.shape[0] > 0:
+                false_neg_comp[idx_ec] = -th.abs(pos_score[idx])
+        t_neg_score[idx][loc] += false_neg_comp
+
+        loc = head_pos == 1
+        n_u_ec = n_u[loc]
+        v_ec = sv[idx]
+        false_neg_comp = th.full((n_u_ec.shape[0],), 0)
+        for idx_ec in range(n_u_ec.shape[0]):
+            sn_u_ec = n_u_ec[idx_ec]
+            _, _, eid_ec = g.edge_ids(sn_u_ec.unsqueeze(dim=0), v_ec.unsqueeze(dim=0), return_uv=True)
+            etype_ec = g.edata['etype'][eid_ec]
+            loc_ec = etype_ec == etype
+            eid_ec = eid_ec[loc_ec]
+            # has edge
+            if eid_ec.shape[0] > 0:
+                false_neg_comp[idx_ec] = -th.abs(pos_score[idx])
+        h_neg_score[idx][loc] += false_neg_comp
+
 def fullgraph_emb(g, embed_layer, model, node_feats, dim_size, device):
     in_feats = th.zeros(g.number_of_nodes(), dim_size)
 
@@ -425,7 +463,7 @@ def fullgraph_emb(g, embed_layer, model, node_feats, dim_size, device):
     return emb
 
 def fullgraph_eval(train_g, g, embed_layer, model, device, node_feats,
-    dim_size, pos_eids, neg_eids, neg_cnt=-1, queue=None, filterred_test=True):
+    dim_size, pos_eids, neg_eids, neg_cnt=-1, queue=None, filterred_test=True, num_test_worker=0):
     """ The evaluation is done in a minibatch fasion.
 
     Firstly, we use fullgraph_emb to generate the node embeddings for all the nodes
@@ -466,6 +504,9 @@ def fullgraph_eval(train_g, g, embed_layer, model, device, node_feats,
     filterred_test: bool
         whether to filter TRUE positive edges
         Default: True
+    num_test_worker: int
+        how many workers are used in filtering positive edges in evalution
+        Default: 0
     """
     model.eval()
     embed_layer.eval()
@@ -562,41 +603,44 @@ def fullgraph_eval(train_g, g, embed_layer, model, device, node_feats,
             # t_neg_score = F.logsigmoid(t_neg_score).reshape(t_neg_score.shape[0], -1)
             # h_neg_score = F.logsigmoid(h_neg_score).reshape(h_neg_score.shape[0], -1)
             if filterred_test:
-                # exclude false neg edges
-                for idx in range(eids.shape[0]):
-                    tail_pos = g.has_edges_between(th.full((n_v.shape[0],), su[idx], dtype=th.long), n_v)
-                    head_pos = g.has_edges_between(n_u, th.full((n_u.shape[0],), sv[idx], dtype=th.long))
-                    etype = g.edata['etype'][eids[idx]]
+                pos_score_cpu = pos_score.cpu()
+                t_neg_score = t_neg_score.cpu()
+                h_neg_score = h_neg_score.cpu()
+                if args.num_test_worker <= 0:
+                    filter_edges(g, pos_score_cpu, eids, su, sv, n_v, n_u, t_neg_score, h_neg_score, 0, eids.shape[0])
+                else:
+                    pos_score_cpu.share_memory_()
+                    eids.share_memory_()
+                    su.share_memory_()
+                    sv.share_memory_()
+                    n_v.share_memory_()
+                    n_u.share_memory_()
+                    t_neg_score.share_memory_()
+                    h_neg_score.share_memory_()
+                    num_eids = eids.shape[0]
+                    per_worker = num_eids // args.num_test_worker
+                    procs = []
+                    for w_id in range(args.num_test_worker):
+                        p = mp.Process(target=filter_edges,
+                                       args=(g,
+                                             pos_score_cpu,
+                                             eids,
+                                             su,
+                                             sv,
+                                             n_v,
+                                             n_u,
+                                             t_neg_score,
+                                             h_neg_score,
+                                             w_id * per_worker,
+                                             (w_id+1) * per_worker if (w_id+1) * per_worker < eids.shape[0]
+                                                                   else eids.shape[0]))
 
-                    loc = tail_pos == 1
-                    u_ec = su[idx]
-                    n_v_ec = n_v[loc]
-                    false_neg_comp = th.full((n_v_ec.shape[0],), 0, device=device)
-                    for idx_ec in range(n_v_ec.shape[0]):
-                        sn_v_ec = n_v_ec[idx_ec]
-                        _, _, eid_ec = g.edge_ids(u_ec.unsqueeze(dim=0), sn_v_ec.unsqueeze(dim=0), return_uv=True)
-                        etype_ec = g.edata['etype'][eid_ec]
-                        loc_ec = etype_ec == etype
-                        eid_ec = eid_ec[loc_ec]
-                        # has edge
-                        if eid_ec.shape[0] > 0:
-                            false_neg_comp[idx_ec] = -th.abs(pos_score[idx])
-                    t_neg_score[idx][loc] += false_neg_comp
-
-                    loc = head_pos == 1
-                    n_u_ec = n_u[loc]
-                    v_ec = sv[idx]
-                    false_neg_comp = th.full((n_u_ec.shape[0],), 0, device=device)
-                    for idx_ec in range(n_u_ec.shape[0]):
-                        sn_u_ec = n_u_ec[idx_ec]
-                        _, _, eid_ec = g.edge_ids(sn_u_ec.unsqueeze(dim=0), v_ec.unsqueeze(dim=0), return_uv=True)
-                        etype_ec = g.edata['etype'][eid_ec]
-                        loc_ec = etype_ec == etype
-                        eid_ec = eid_ec[loc_ec]
-                        # has edge
-                        if eid_ec.shape[0] > 0:
-                            false_neg_comp[idx_ec] = -th.abs(pos_score[idx])
-                    h_neg_score[idx][loc] += false_neg_comp
+                        p.start()
+                        procs.append(p)
+                    for p in procs:
+                        p.join()
+                t_neg_score = t_neg_score.to(device)
+                h_neg_score = h_neg_score.to(device)
 
             pos_score = pos_score.view(-1,1)
             # perturb object
@@ -1093,6 +1137,8 @@ def config():
             help="Validation negative sample cnt.")
     parser.add_argument("--test-neg-cnt", type=int, default=-1,
             help="Test negative sample cnt.")
+    parser.add_argument("--num-test-worker", type=int, default=0,
+            help="Number of test workers used in filter positive edges")
     parser.add_argument("--num-workers", type=int, default=0,
             help="Number of workers for dataloader.")
     parser.add_argument("--low-mem", default=False, action='store_true',
