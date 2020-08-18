@@ -20,7 +20,7 @@ def _AXWb(A, X, W, b):
 def test_graph_conv0():
     g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(ctx=ctx)
+    adj = g.adjacency_matrix(transpose=False, ctx=ctx)
 
     conv = nn.GraphConv(5, 2, norm='none', bias=True)
     conv = conv.to(ctx)
@@ -125,7 +125,7 @@ def test_tagconv():
     g = dgl.DGLGraph(nx.path_graph(3))
     g = g.to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(ctx=ctx)
+    adj = g.adjacency_matrix(transpose=False, ctx=ctx)
     norm = th.pow(g.in_degrees().float(), -0.5)
 
     conv = nn.TAGConv(5, 2, bias=True)
@@ -599,7 +599,7 @@ def test_dense_graph_conv(norm_type, g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
     # TODO(minjie): enable the following option after #1385
-    adj = g.adjacency_matrix(ctx=ctx).to_dense()
+    adj = g.adjacency_matrix(transpose=False, ctx=ctx).to_dense()
     conv = nn.GraphConv(5, 2, norm=norm_type, bias=True)
     dense_conv = nn.DenseGraphConv(5, 2, norm=norm_type, bias=True)
     dense_conv.weight.data = conv.weight.data
@@ -616,7 +616,7 @@ def test_dense_graph_conv(norm_type, g, idtype):
 def test_dense_sage_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(ctx=ctx).to_dense()
+    adj = g.adjacency_matrix(transpose=False, ctx=ctx).to_dense()
     sage = nn.SAGEConv(5, 2, 'gcn')
     dense_sage = nn.DenseSAGEConv(5, 2)
     dense_sage.fc.weight.data = sage.fc_neigh.weight.data
@@ -662,7 +662,7 @@ def test_dense_cheb_conv():
         ctx = F.ctx()
         g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
         g = g.to(F.ctx())
-        adj = g.adjacency_matrix(ctx=ctx).to_dense()
+        adj = g.adjacency_matrix(transpose=False, ctx=ctx).to_dense()
         cheb = nn.ChebConv(5, 2, k, None)
         dense_cheb = nn.DenseChebConv(5, 2, k)
         #for i in range(len(cheb.fc)):
