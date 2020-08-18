@@ -369,7 +369,10 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
     type name, but can be distinguished by a canonical edge type tuple.
 
     This function will copy any node/edge features from :attr:`G` to the returned heterogeneous
-    graph, except for node/edge types and IDs used to recover the heterogeneous graph.
+    graph, except for node/edge types to recover the heterogeneous graph.
+
+    One can retrieve the IDs of the nodes/edges in :attr:`G` from the returned heterogeneous
+    graph with node feature ``dgl.NID`` and edge feature ``dgl.EID`` respectively.
 
     Parameters
     ----------
@@ -408,15 +411,19 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
     Examples
     --------
 
+    The following example uses PyTorch backend.
+
     >>> import dgl
+    >>> import torch
+
     >>> hg = dgl.heterograph({
-    ...     ('user', 'develops', 'activity'): ([0, 1], [1, 2]),
-    ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+    ...     ('user', 'develops', 'activity'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+    ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]), torch.tensor([0, 1]))
     ... })
     >>> print(hg)
-    Graph(num_nodes={'user': 2, 'activity': 3, 'developer': 2, 'game': 2},
-          num_edges={('user', 'develops', 'activity'): 2, ('developer', 'develops', 'game'): 2},
-          metagraph=[('user', 'activity'), ('developer', 'game')])
+    Graph(num_nodes={'activity': 3, 'developer': 2, 'game': 2, 'user': 2},
+          num_edges={('developer', 'develops', 'game'): 2, ('user', 'develops', 'activity'): 2},
+          metagraph=[('developer', 'game', 'develops'), ('user', 'activity', 'develops')])
 
     We first convert the heterogeneous graph to a homogeneous graph.
 
@@ -428,19 +435,30 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
           edata_schemes={'_TYPE': Scheme(shape=(), dtype=torch.int64),
                          '_ID': Scheme(shape=(), dtype=torch.int64)})
     >>> g.ndata
-    {'_TYPE': tensor([0, 0, 1, 1, 1, 2, 2, 3, 3]), '_ID': tensor([0, 1, 0, 1, 2, 0, 1, 0, 1])}
-    Nodes 0, 1 for 'user', 2, 3, 4 for 'activity', 5, 6 for 'developer', 7, 8 for 'game'
+    {'_TYPE': tensor([0, 0, 0, 1, 1, 2, 2, 3, 3]), '_ID': tensor([0, 1, 2, 0, 1, 0, 1, 0, 1])}
+    Nodes 0, 1, 2 for 'activity', 3, 4 for 'developer', 5, 6 for 'game', 7, 8 for 'user'
     >>> g.edata
     {'_TYPE': tensor([0, 0, 1, 1]), '_ID': tensor([0, 1, 0, 1])}
-    Edges 0, 1 for ('user', 'develops', 'activity'), 2, 3 for ('developer', 'develops', 'game')
+    Edges 0, 1 for ('developer', 'develops', 'game'), 2, 3 for ('user', 'develops', 'activity')
 
     Now convert the homogeneous graph back to a heterogeneous graph.
 
     >>> hg_2 = dgl.to_heterogeneous(g, hg.ntypes, hg.etypes)
     >>> print(hg_2)
-    Graph(num_nodes={'user': 2, 'activity': 3, 'developer': 2, 'game': 2},
-          num_edges={('user', 'develops', 'activity'): 2, ('developer', 'develops', 'game'): 2},
-          metagraph=[('user', 'activity'), ('developer', 'game')])
+    Graph(num_nodes={'activity': 3, 'developer': 2, 'game': 2, 'user': 2},
+          num_edges={('developer', 'develops', 'game'): 2, ('user', 'develops', 'activity'): 2},
+          metagraph=[('developer', 'game', 'develops'), ('user', 'activity', 'develops')])
+
+    Retrieve the original node/edge IDs.
+
+    >>> hg_2.ndata[dgl.NID]
+    {'activity': tensor([0, 1, 2]),
+     'developer': tensor([3, 4]),
+     'game': tensor([5, 6]),
+     'user': tensor([7, 8])}
+    >>> hg_2.edata[dgl.EID]
+    {('developer', 'develops', 'game'): tensor([0, 1]),
+     ('user', 'develops', 'activity'): tensor([2, 3])}
 
     See Also
     --------
@@ -529,6 +547,13 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
             rows = F.copy_to(F.tensor(edge_groups[etid]), F.context(data))
             hg._edge_frames[hg.get_etype_id(canonical_etypes[etid])][key] = \
                 F.gather_row(data, rows)
+
+    # Record the original IDs of the nodes/edges
+    for ntid, ntype in enumerate(hg.ntypes):
+        hg._node_frames[ntid][NID] = F.copy_to(F.tensor(ntype2ngrp[ntype]), device)
+    for etid in range(len(hg.canonical_etypes)):
+        hg._edge_frames[hg.get_etype_id(canonical_etypes[etid])][EID] = \
+            F.copy_to(F.tensor(edge_groups[etid]), device)
 
     return hg
 
