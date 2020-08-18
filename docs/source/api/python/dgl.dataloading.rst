@@ -4,10 +4,10 @@ dgl.dataloading
 =================================
 
 .. automodule:: dgl.dataloading
-.. currentmodule:: dgl.dataloading.pytorch
 
 DataLoaders
 -----------
+.. currentmodule:: dgl.dataloading.pytorch
 
 DGL DataLoader for mini-batch training works similarly to PyTorch's DataLoader.
 It has a generator interface that returns mini-batches sampled from some given graphs.
@@ -18,9 +18,9 @@ and an ``EdgeDataLoader`` for edge/link prediction task.
 .. autoclass:: EdgeDataLoader
 
 .. _api-dataloading-neighbor-sampling:
-
 Neighbor Sampler
 -----------------------------
+.. currentmodule:: dgl.dataloading.neighbor
 
 Neighbor samplers are classes that control the behavior of ``DataLoader`` s
 to sample neighbors. All of them inherit the base :class:`BlockSampler` class, but implement
@@ -29,8 +29,6 @@ the ``sample_blocks`` methods.
 
 .. autoclass:: BlockSampler
     :members: sample_frontier, sample_blocks
-
-.. currentmodule:: dgl.dataloading.neighbor
 
 .. autoclass:: MultiLayerNeighborSampler
     :members: sample_frontier
@@ -43,11 +41,10 @@ the ``sample_blocks`` methods.
 
 Negative Samplers for Link Prediction
 -------------------------------------
+.. currentmodule:: dgl.dataloading.negative_sampler
 
 Negative samplers are classes that control the behavior of the ``EdgeDataLoader``
 to generate negative edges.
-
-.. currentmodule:: dgl.dataloading.negative_sampler
 
 .. autoclass:: Uniform
     :members: __call__

@@ -7,8 +7,8 @@
 
 * Negative samplers for link prediction.
 
-For an holistic explanation on how different components work together.
-Read our user guide :ref:`guide-minibatch`.
+For a holistic explanation on how different components work together.
+Read the user guide :ref:`guide-minibatch`.
 
 .. note::
     This package is experimental and the interfaces may be subject
