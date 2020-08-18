@@ -60,7 +60,7 @@ class IGMC(nn.Module):
         block = edge_drop(block, self.edge_dropout, self.training)
 
         concat_states = []
-        x = block.ndata['x']
+        x = block.ndata['nlabel'] # th.cat([subgraph.ndata['nlabel'], subgraph.ndata['refex']], dim=1)
         for conv in self.convs:
             # edge mask zero denotes the edge dropped
             x = th.tanh(conv(block, x, block.edata['etype'], 
