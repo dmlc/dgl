@@ -1,10 +1,11 @@
 import dgl
 import backend as F
 import unittest
+import pytest
 
 from dgl.base import ALL
 from utils import parametrize_dtype
-from test_utils import check_graph_equal
+from test_utils import check_graph_equal, get_cases
 
 def check_equivalence_between_heterographs(g1, g2, node_attrs=None, edge_attrs=None):
     assert g1.ntypes == g2.ntypes
@@ -40,19 +41,13 @@ def check_equivalence_between_heterographs(g1, g2, node_attrs=None, edge_attrs=N
             for feat_name in edge_attrs[ety]:
                 assert F.allclose(g1.edges[ety].data[feat_name], g2.edges[ety].data[feat_name])
 
+@pytest.mark.parametrize('gs', get_cases(['two_hetero_batch']))
 @parametrize_dtype
-def test_topology(idtype):
+def test_topology(gs, idtype):
     """Test batching two DGLHeteroGraphs where some nodes are isolated in some relations"""
-    g1 = dgl.heterograph({
-        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
-        ('user', 'follows', 'developer'): ([0, 1], [1, 2]),
-        ('user', 'plays', 'game'): ([0, 1, 2, 3], [0, 0, 1, 1])
-    }, idtype=idtype, device=F.ctx())
-    g2 = dgl.heterograph({
-        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
-        ('user', 'follows', 'developer'): ([0, 1], [1, 2]),
-        ('user', 'plays', 'game'): ([0, 1, 2], [0, 0, 1])
-    }, idtype=idtype, device=F.ctx())
+    g1, g2 = gs
+    g1 = g1.astype(idtype).to(F.ctx())
+    g2 = g2.astype(idtype).to(F.ctx())
     bg = dgl.batch([g1, g2])
 
     assert bg.idtype == idtype

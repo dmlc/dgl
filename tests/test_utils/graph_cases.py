@@ -109,3 +109,31 @@ def random_bipartite(size_src, size_dst):
 def random_block(size):
     g = dgl.from_networkx(nx.erdos_renyi_graph(size, 0.1))
     return dgl.to_block(g, np.unique(F.zerocopy_to_numpy(g.edges()[1])))
+
+@register_case(['two_hetero_batch'])
+def two_hetero_batch():
+    g1 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'follows', 'developer'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2, 3], [0, 0, 1, 1])
+    })
+    g2 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'follows', 'developer'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2], [0, 0, 1])
+    })
+    return [g1, g2]
+
+@register_case(['two_hetero_batch'])
+def two_hetero_batch_with_isolated_ntypes():
+    g1 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'follows', 'developer'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2, 3], [0, 0, 1, 1])
+        }, num_nodes_dict={'user': 4, 'game': 2, 'developer': 3, 'platform': 2})
+    g2 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'follows', 'developer'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2], [0, 0, 1])
+        }, num_nodes_dict={'user': 3, 'game': 2, 'developer': 3, 'platform': 3})
+    return [g1, g2]
