@@ -45,6 +45,13 @@ SAGEConv
     :members: forward
     :show-inheritance:
     
+ChebConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.tensorflow.conv.ChebConv
+    :members: forward
+    :show-inheritance:
+    
 SGConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -106,3 +113,13 @@ GlobalAttentionPooling
 .. autoclass:: dgl.nn.tensorflow.glob.GlobalAttentionPooling
     :members:
     :show-inheritance:
+
+Heterogeneous Graph Convolution Module
+----------------------------------------
+
+HeteroGraphConv
+~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.tensorflow.HeteroGraphConv
+   :members:
+   :show-inheritance:

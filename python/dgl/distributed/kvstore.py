@@ -737,7 +737,7 @@ class KVServer(object):
             shared_data = empty_shared_mem(name+'-kvdata-', True, data_tensor.shape, data_type)
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
-            self._data_store[name][:] = data_tensor[:]
+            rpc.copy_data_to_shared_memory(self._data_store[name], data_tensor)
             assert self._part_policy[name].get_part_size() == data_tensor.shape[0], \
                     'kvserver expect partition {} for {} has {} rows, but gets {} rows'.format(
                         self._part_policy[name].part_id,
