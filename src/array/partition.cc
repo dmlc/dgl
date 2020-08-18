@@ -144,7 +144,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLPartition1D")
   HeteroGraphRef hg = args[0];
   dgl_type_t etype = args[1];
   int64_t num_cols_per_partition = args[2];
-  CSRMatrix csr = hg->GetCSRMatrix(etype);
+  CSRMatrix csr = hg->GetCSCMatrix(etype);
   csr = CSRSort(csr);
   ATEN_ID_TYPE_SWITCH(hg->DataType(), IdType, {
     *rv = ConvertNDArrayVectorToPackedFunc(
