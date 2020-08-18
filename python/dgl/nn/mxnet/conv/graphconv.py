@@ -159,6 +159,20 @@ class GraphConv(gluon.Block):
 
         self._activation = activation
 
+    def set_allow_zero_in_degree(self, set_value):
+        r"""
+
+        Description
+        -----------
+        Set allow_zero_in_degree flag.
+
+        Parameters
+        ----------
+        set_value : bool
+            The value to be set to the flag.
+        """
+        self._allow_zero_in_degree = set_value
+
     def forward(self, graph, feat, weight=None):
         r"""
 
@@ -204,7 +218,7 @@ class GraphConv(gluon.Block):
         """
         with graph.local_scope():
             if not self._allow_zero_in_degree:
-                if (graph.in_degrees() == 0).asnumpy().any():
+                if graph.in_degrees().min() == 0:
                     raise DGLError('There are 0-in-degree nodes in the graph, '
                                    'output for those nodes will be invalid. '
                                    'This is harmful for some applications, '

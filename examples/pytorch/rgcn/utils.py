@@ -135,7 +135,7 @@ def build_graph_from_triplets(num_nodes, num_rels, triplets):
         This function also generates edge type and normalization factor
         (reciprocal of node incoming degree)
     """
-    g = dgl.graph([])
+    g = dgl.graph(([], []))
     g.add_nodes(num_nodes)
     src, rel, dst = triplets
     src, dst = np.concatenate((src, dst)), np.concatenate((dst, src))

@@ -135,7 +135,7 @@ g.edata['w'][th.tensor([0, 1, 2])] = th.zeros(3, 2)
 g.edata['w'][g.edge_id(1, 0)] = th.ones(1, 2)                   # edge 1 -> 0
 g.edata['w'][g.edge_ids([1, 2, 3], [0, 0, 0])] = th.ones(3, 2)  # edges [1, 2, 3] -> 0
 # Use edge broadcasting whenever applicable.
-g.edata['w'][g.edge_ids([1, 2, 3], 0)] = th.ones(3, 2)          # edges [1, 2, 3] -> 0
+g.edata['w'][g.edge_ids([1, 2, 3], [0, 0, 0])] = th.ones(3, 2)          # edges [1, 2, 3] -> 0
 
 ###############################################################################
 # After assignments, each node or edge field will be associated with a scheme

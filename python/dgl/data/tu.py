@@ -100,7 +100,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
         DS_graph_labels = self._idx_from_zero(
             np.genfromtxt(self._file_path("graph_labels"), dtype=int))
 
-        g = dgl_graph([])
+        g = dgl_graph(([], []))
         g.add_nodes(int(DS_edge_list.max()) + 1)
         g.add_edges(DS_edge_list[:, 0], DS_edge_list[:, 1])
 
@@ -296,7 +296,7 @@ class TUDataset(DGLBuiltinDataset):
         DS_graph_labels = self._idx_from_zero(
             loadtxt(self._file_path("graph_labels"), delimiter=",").astype(int))
 
-        g = dgl_graph([])
+        g = dgl_graph(([], []))
         g.add_nodes(int(DS_edge_list.max()) + 1)
         g.add_edges(DS_edge_list[:, 0], DS_edge_list[:, 1])
 
