@@ -18,13 +18,11 @@ class DistEmbedding:
     Currently, DGL provides only one optimizer: `SparseAdagrad`. DGL will provide more
     optimizers in the future.
 
-    Like distributed tensors, distributed embeddings are sharded and stored in a cluster
-    of machines. Many aspects of distributed embeddings are the same as distributed tensors.
-    Distributed embeddings are sharded in the same way as distributed tensors; they can be
-    identified by unique names in the system; their values are initialized by an init function.
-    Please see `DistTensor` for more details. Because distributed embeddings are sharded
+    Distributed embeddings are sharded and stored in a cluster of machines in the same way as
+    py:meth:`dgl.distributed.DistTensor`, except that distributed embeddings are trainable.
+    Because distributed embeddings are sharded
     in the same way as nodes and edges of a distributed graph, it is usually much more
-    efficient than the sparse embeddings provided by the deep learning frameworks.
+    efficient to access than the sparse embeddings provided by the deep learning frameworks.
 
     Parameters
     ----------
@@ -53,10 +51,16 @@ class DistEmbedding:
     >>> emb = dgl.distributed.DistEmbedding(g.number_of_nodes(), 10, init_func=initializer)
     >>> optimizer = dgl.distributed.SparseAdagrad([emb], lr=0.001)
     >>> for blocks in dataloader:
-    >>>     feats = emb(nids)
-    >>>     loss = F.sum(feats + 1, 0)
-    >>>     loss.backward()
-    >>>     optimizer.step()
+    ...     feats = emb(nids)
+    ...     loss = F.sum(feats + 1, 0)
+    ...     loss.backward()
+    ...     optimizer.step()
+
+    Note
+    ----
+    When a ``DistEmbedding``  object is used when the deep learning framework is recording
+    the forward computation, users have to invoke py:meth:`~dgl.distributed.SparseAdagrad.step`
+    afterwards. Otherwise, there will be some memory leak.
     '''
     def __init__(self, num_embeddings, embedding_dim, name=None,
                  init_func=None, part_policy=None):

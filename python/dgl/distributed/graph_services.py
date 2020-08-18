@@ -248,7 +248,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     """Sample from the neighbors of the given nodes from a distributed graph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
-    will be randomly chosen.  The graph returned will then contain all the nodes in the
+    will be randomly chosen.  The returned graph will contain all the nodes in the
     original graph, but only the sampled edges.
 
     Node/edge features are not preserved. The original IDs of

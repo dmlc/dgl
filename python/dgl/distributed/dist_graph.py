@@ -353,15 +353,15 @@ class DistGraph:
     The code below shows the mini-batch training using ``DistGraph``.
 
     >>> def sample(seeds):
-            seeds = th.LongTensor(np.asarray(seeds))
-            frontier = dgl.distributed.sample_neighbors(g, seeds, 10)
-            return dgl.to_block(frontier, seeds)
+    ...     seeds = th.LongTensor(np.asarray(seeds))
+    ...     frontier = dgl.distributed.sample_neighbors(g, seeds, 10)
+    ...     return dgl.to_block(frontier, seeds)
     >>> dataloader = dgl.distributed.DistDataLoader(dataset=nodes, batch_size=1000,
                                                     collate_fn=sample, shuffle=True)
     >>> for block in dataloader:
-            feat = g.ndata['features'][block.srcdata[dgl.NID]]
-            labels = g.ndata['labels'][block.dstdata[dgl.NID]]
-            pred = model(block, feat)
+    ...     feat = g.ndata['features'][block.srcdata[dgl.NID]]
+    ...     labels = g.ndata['labels'][block.dstdata[dgl.NID]]
+    ...     pred = model(block, feat)
 
     Note
     ----
