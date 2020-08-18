@@ -292,6 +292,7 @@ def run(args, device, data):
         train_nid, val_nid, test_nid, labels, global_val_nid, global_test_nid = data
 
     fanouts = [int(fanout) for fanout in args.fanout.split(',')]
+    val_fanouts = [int(fanout) for fanout in args.validation_fanout.split(',')]
     sampler = NeighborSampler(g, fanouts, dgl.distributed.sample_neighbors)
     # Create DataLoader for constructing blocks
     dataloader = DistDataLoader(
@@ -301,7 +302,7 @@ def run(args, device, data):
         shuffle=True,
         drop_last=False)
 
-    valid_sampler = NeighborSampler(g, [-1] * args.n_layers, dgl.distributed.sample_neighbors)
+    valid_sampler = NeighborSampler(g, val_fanouts, dgl.distributed.sample_neighbors)
     # Create DataLoader for constructing blocks
     valid_dataloader = DistDataLoader(
         dataset=val_nid.numpy(),
@@ -505,6 +506,8 @@ if __name__ == '__main__':
             help="remove untouched nodes and relabel")
     parser.add_argument("--fanout", type=str, default="4, 4",
             help="Fan-out of neighbor sampling.")
+    parser.add_argument("--validation-fanout", type=str, default=None,
+            help="Fan-out of neighbor sampling during validation.")
     parser.add_argument("--use-self-loop", default=False, action='store_true',
             help="include self feature as a special relation")
     parser.add_argument("--batch-size", type=int, default=100,
@@ -532,5 +535,8 @@ if __name__ == '__main__':
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
     args = parser.parse_args()
 
+    # if validation_fanout is None, set it with args.fanout
+    if args.validation_fanout is None:
+        args.validation_fanout = args.fanout
     print(args)
     main(args)
