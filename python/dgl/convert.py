@@ -35,7 +35,7 @@ def graph(data,
           idtype=None,
           device=None,
           **deprecated_kwargs):
-    """Create a graph.
+    """Create a graph and return.
 
     Parameters
     ----------
@@ -199,7 +199,7 @@ def heterograph(data_dict,
                 num_nodes_dict=None,
                 idtype=None,
                 device=None):
-    """Create a heterogeneous graph.
+    """Create a heterogeneous graph and return.
 
     Parameters
     ----------
@@ -670,7 +670,7 @@ def from_scipy(sp_mat,
                eweight_name=None,
                idtype=None,
                device=None):
-    """Create a graph from a SciPy sparse matrix.
+    """Create a graph from a SciPy sparse matrix and return.
 
     Parameters
     ----------
@@ -760,7 +760,7 @@ def bipartite_from_scipy(sp_mat,
                          eweight_name=None,
                          idtype=None,
                          device=None):
-    """Create a unidirectional bipartite graph from a SciPy sparse matrix.
+    """Create a uni-directional bipartite graph from a SciPy sparse matrix and return.
 
     The created graph will have two types of nodes ``utype`` and ``vtype`` as well as one
     edge type ``etype`` whose edges are from ``utype`` to ``vtype``.
@@ -856,11 +856,12 @@ def from_networkx(nx_graph,
                   edge_id_attr_name=None,
                   idtype=None,
                   device=None):
-    """Create a graph from a NetworkX graph.
+    """Create a graph from a NetworkX graph and return.
 
-    Creating a DGLGraph from a NetworkX graph is not fast especially for large scales.
-    It is recommended to first convert a NetworkX graph into a tuple of node-tensors
-    and then construct a DGLGraph with :func:`dgl.graph`.
+    .. note::
+        Creating a DGLGraph from a NetworkX graph is not fast especially for large scales.
+        It is recommended to first convert a NetworkX graph into a tuple of node-tensors
+        and then construct a DGLGraph with :func:`dgl.graph`.
 
     Parameters
     ----------
@@ -878,7 +879,7 @@ def from_networkx(nx_graph,
         The names of the edge attributes to retrieve from the NetworkX graph. If given, DGL
         stores the retrieved edge attributes in ``edata`` of the returned graph using their
         original names. The attribute data must be convertible to Tensor type (e.g., scalar,
-        numpy.ndarray, list, etc.). It must be None if :attr:`nx_graph` is undirected.
+        ``numpy.ndarray``, list, etc.). It must be None if :attr:`nx_graph` is undirected.
     edge_id_attr_name : str, optional
         The name of the edge attribute that stores the edge IDs. If given, DGL will assign edge
         IDs accordingly when creating the graph, so the attribute must be valid IDs, i.e.
@@ -1021,14 +1022,15 @@ def bipartite_from_networkx(nx_graph,
                             edge_id_attr_name=None,
                             idtype=None,
                             device=None):
-    """Create a unidirectional bipartite graph from a NetworkX graph.
+    """Create a unidirectional bipartite graph from a NetworkX graph and return.
 
     The created graph will have two types of nodes ``utype`` and ``vtype`` as well as one
     edge type ``etype`` whose edges are from ``utype`` to ``vtype``.
 
-    Creating a DGLGraph from a NetworkX graph is not fast especially for large scales.
-    It is recommended to first convert a NetworkX graph into a tuple of node-tensors
-    and then construct a DGLGraph with :func:`dgl.heterograph`.
+    .. note::
+        Creating a DGLGraph from a NetworkX graph is not fast especially for large scales.
+        It is recommended to first convert a NetworkX graph into a tuple of node-tensors
+        and then construct a DGLGraph with :func:`dgl.heterograph`.
 
     Parameters
     ----------
@@ -1049,7 +1051,7 @@ def bipartite_from_networkx(nx_graph,
         The names of the node attributes for node type :attr:`utype` to retrieve from the
         NetworkX graph. If given, DGL stores the retrieved node attributes in
         ``nodes[utype].data`` of the returned graph using their original names. The attribute
-        data must be convertible to Tensor type (e.g., scalar, numpy.array, list, etc.).
+        data must be convertible to Tensor type (e.g., scalar, ``numpy.ndarray``, list, etc.).
     e_attrs : list[str], optional
         The names of the edge attributes to retrieve from the NetworkX graph. If given, DGL
         stores the retrieved edge attributes in ``edata`` of the returned graph using their

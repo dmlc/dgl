@@ -59,30 +59,29 @@ def pairwise_squared_distance(x):
 
 #pylint: disable=invalid-name
 def knn_graph(x, k):
-    """Convert a tensor into k-nearest-neighbor (KNN) graph(s) according
-    to Euclidean distance.
+    """Construct a graph from a set of points according to k-nearest-neighbor (KNN)
+    and return.
 
     The function transforms the coordinates/features of a point set
-    into a directed homogeneous graph.  The coordinates of the point
+    into a directed homogeneous graph. The coordinates of the point
     set is specified as a matrix whose rows correspond to points and
     columns correspond to coordinate/feature dimensions.
 
-    The nodes of the returned graph correspond to the points.  An edge
-    exists if the source node is one of the k-nearest neighbors of the
-    destination node.
+    The nodes of the returned graph correspond to the points, where the predecessors
+    of each point are its k-nearest neighbors measured by the Euclidean distance.
 
-    If you give a 3D tensor, then each submatrix will be transformed
-    into a separate graph.  DGL then composes the graphs into a large
+    If :attr:`x` is a 3D tensor, then each submatrix will be transformed
+    into a separate graph. DGL then composes the graphs into a large
     graph of multiple connected components.
 
     Parameters
     ----------
-    x : 2D or 3D Tensor
-        The input tensor.  It can be either on CPU or GPU.
+    x : Tensor
+        The point coordinates. It can be either on CPU or GPU.
 
-        * If 2D, ``x[i]`` corresponds to the i-th node in the KNN graph.
+        * If is 2D, ``x[i]`` corresponds to the i-th node in the KNN graph.
 
-        * If 3D, ``x[i]`` corresponds to the i-th KNN graph and
+        * If is 3D, ``x[i]`` corresponds to the i-th KNN graph and
           ``x[i][j]`` corresponds to the j-th node in the i-th KNN graph.
     k : int
         The number of nearest neighbors per node.
@@ -90,7 +89,7 @@ def knn_graph(x, k):
     Returns
     -------
     DGLGraph
-        The graph. The node IDs are in the same order as :attr:`x`.
+        The constructred graph. The node IDs are in the same order as :attr:`x`.
 
         The returned graph is on CPU, regardless of the context of input :attr:`x`.
 
@@ -152,22 +151,25 @@ def knn_graph(x, k):
 
 #pylint: disable=invalid-name
 def segmented_knn_graph(x, k, segs):
-    """Convert a tensor into multiple k-nearest-neighbor (KNN) graph(s)
-    with different number of nodes.
-
-    Each chunk of :attr:`x` contains coordinates/features of a point set.
+    """Construct multiple graphs from multiple sets of points according to
+    k-nearest-neighbor (KNN) and return.
+    
+    Compared with :func:`dgl.knn_graph`, this allows multiple point sets with
+    different capacity. The points from different sets are stored contiguously
+    in the :attr:`x` tensor.
     :attr:`segs` specifies the number of points in each point set. The
     function constructs a KNN graph for each point set, where the predecessors
-    of each point are its k-nearest neighbors. DGL then composes all KNN graphs
+    of each point are its k-nearest neighbors measured by the Euclidean distance.
+    DGL then composes all KNN graphs
     into a graph with multiple connected components.
 
     Parameters
     ----------
-    x : 2D Tensor
-        Coordinates/features of points.  It can be either on CPU or GPU.
+    x : Tensor
+        Coordinates/features of points. Must be 2D. It can be either on CPU or GPU.
     k : int
         The number of nearest neighbors per node.
-    segs : list of int
+    segs : list[int]
         Number of points in each point set. The numbers in :attr:`segs`
         must sum up to the number of rows in :attr:`x`.
 
@@ -532,8 +534,7 @@ def line_graph(g, backtracking=True, shared=False):
 
     return lg
 
-DGLHeteroGraph.line_graph = line_graph
-DGLHeteroGraph.line_graph.__doc__ = utils.alias_of('dgl.line_graph')
+DGLHeteroGraph.line_graph = utils.alias_func(line_graph)
 
 def khop_adj(g, k):
     """Return the matrix of :math:`A^k` where :math:`A` is the adjacency matrix of the graph
@@ -805,8 +806,7 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
 
     return new_g
 
-DGLHeteroGraph.reverse = reverse
-DGLHeteroGraph.reverse.__doc__ = utils.alias_of('dgl.reverse')
+DGLHeteroGraph.reverse = utils.alias_func(reverse)
 
 def to_simple_graph(g):
     """Convert the graph to a simple graph with no multi-edge.
@@ -1379,8 +1379,7 @@ def add_self_loop(g, etype=None):
     new_g = add_edges(g, nodes, nodes, etype=etype)
     return new_g
 
-DGLHeteroGraph.add_self_loop = add_self_loop
-DGLHeteroGraph.add_self_loop.__doc__ = utils.alias_of('dgl.add_self_loop')
+DGLHeteroGraph.add_self_loop = utils.alias_func(add_self_loop)
 
 def remove_self_loop(g, etype=None):
     r""" Remove self loops for each node in the graph.
@@ -1445,8 +1444,7 @@ def remove_self_loop(g, etype=None):
     new_g = remove_edges(g, self_loop_eids, etype=etype)
     return new_g
 
-DGLHeteroGraph.remove_self_loop = remove_self_loop
-DGLHeteroGraph.remove_self_loop.__doc__ = utils.alias_of('dgl.remove_self_loop')
+DGLHeteroGraph.remove_self_loop = utils.alias_func(remove_self_loop)
 
 def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=True):
     """Given a list of graphs with the same set of nodes, find and eliminate the common
@@ -1972,8 +1970,7 @@ def to_simple(g, return_counts='count', writeback_mapping=False, copy_ndata=True
 
     return simple_graph
 
-DGLHeteroGraph.to_simple = to_simple
-DGLHeteroGraph.to_simple.__doc__ = utils.alias_of('dgl.to_simple')
+DGLHeteroGraph.to_simple = utils.alias_func(to_simple)
 
 def as_heterograph(g, ntype='_U', etype='_E'):  # pylint: disable=unused-argument
     """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.
