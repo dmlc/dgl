@@ -23,7 +23,4 @@ Neighbor sampling functions
     sample_neighbors
     select_topk
 
-Builtin sampler classes for more complicated sampling algorithms
-----------------------------------------------------------------
-.. autoclass:: RandomWalkNeighborSampler
 .. autoclass:: PinSAGESampler

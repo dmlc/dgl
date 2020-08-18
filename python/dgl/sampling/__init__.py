@@ -1,5 +1,8 @@
-"""This module contains the implementations of various sampling operators.
+"""The ``dgl.sampling`` package contains
+
+This module contains the implementations of various sampling operators.
 """
+
 from .randomwalks import *
 from .pinsage import *
 from .neighbor import *

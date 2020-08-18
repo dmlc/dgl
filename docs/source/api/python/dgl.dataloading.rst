@@ -51,25 +51,3 @@ to generate negative edges.
 
 .. autoclass:: Uniform
     :members: __call__
-
-Collators
----------------------------
-
-Collators are adaptor classes to make DGL's neighbor samplers or negative samplers
-compatible with the collate function in PyTorch's DataLoader. In most cases, the
-``NodeDataLoader`` and ``EdgeDataLoader`` are sufficient to train a GNN stochastically.
-The collators are useful when the users need more flexible control or wish to implement
-new sampling algorithms that go out of the scope of the ``BlockSampler`` framework.
-
-.. currentmodule:: dgl.dataloading.dataloader
-
-.. autoclass:: Collator
-    :members: dataset, collate
-
-.. autoclass:: NodeCollator
-    :members: dataset, collate
-    :show-inheritance:
-
-.. autoclass:: EdgeCollator
-    :members: dataset, collate
-    :show-inheritance:
