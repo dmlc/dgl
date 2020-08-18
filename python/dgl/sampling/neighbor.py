@@ -2,7 +2,7 @@
 
 from .._ffi.function import _init_api
 from .. import backend as F
-from ..base import DGLError, EID
+from ..base import DGLError
 from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from .. import utils
