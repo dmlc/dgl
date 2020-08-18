@@ -24,7 +24,7 @@ def test_graph_conv(idtype):
     g = dgl.from_networkx(nx.path_graph(3))
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(ctx=ctx)
+    adj = g.adjacency_matrix(transpose=False, ctx=ctx)
 
     conv = nn.GraphConv(5, 2, norm='none', bias=True)
     conv.initialize(ctx=ctx)
@@ -131,7 +131,7 @@ def _S2AXWb(A, N, X, W, b):
 def test_tagconv():
     g = dgl.from_networkx(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(ctx=ctx)
+    adj = g.adjacency_matrix(transpose=False, ctx=ctx)
     norm = mx.nd.power(g.in_degrees().astype('float32'), -0.5)
 
     conv = nn.TAGConv(5, 2, bias=True)
@@ -294,7 +294,7 @@ def test_dense_cheb_conv():
     for k in range(1, 4):
         ctx = F.ctx()
         g = dgl.from_scipy(sp.sparse.random(100, 100, density=0.3)).to(F.ctx())
-        adj = g.adjacency_matrix(ctx=ctx).tostype('default')
+        adj = g.adjacency_matrix(transpose=False, ctx=ctx).tostype('default')
         cheb = nn.ChebConv(5, 2, k)
         dense_cheb = nn.DenseChebConv(5, 2, k)
         cheb.initialize(ctx=ctx)
@@ -318,7 +318,7 @@ def test_dense_cheb_conv():
 def test_dense_graph_conv(idtype, g, norm_type):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(ctx=ctx).tostype('default')
+    adj = g.adjacency_matrix(transpose=False, ctx=ctx).tostype('default')
     conv = nn.GraphConv(5, 2, norm=norm_type, bias=True)
     dense_conv = nn.DenseGraphConv(5, 2, norm=norm_type, bias=True)
     conv.initialize(ctx=ctx)
@@ -337,7 +337,7 @@ def test_dense_graph_conv(idtype, g, norm_type):
 def test_dense_sage_conv(idtype, g):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(ctx=ctx).tostype('default')
+    adj = g.adjacency_matrix(transpose=False, ctx=ctx).tostype('default')
     sage = nn.SAGEConv(5, 2, 'gcn')
     dense_sage = nn.DenseSAGEConv(5, 2)
     sage.initialize(ctx=ctx)

@@ -3329,11 +3329,11 @@ class DGLHeteroGraph(object):
         else:
             return deg
 
-    def adjacency_matrix(self, transpose=None, ctx=F.cpu(), scipy_fmt=None, etype=None):
+    def adjacency_matrix(self, transpose=True, ctx=F.cpu(), scipy_fmt=None, etype=None):
         """Alias of :func:`adj`"""
         return self.adj(transpose, ctx, scipy_fmt, etype)
 
-    def adj(self, transpose=None, ctx=F.cpu(), scipy_fmt=None, etype=None):
+    def adj(self, transpose=True, ctx=F.cpu(), scipy_fmt=None, etype=None):
         """Return the adjacency matrix of edges of the given edge type.
 
         By default, a row of returned adjacency matrix represents the
@@ -3345,7 +3345,7 @@ class DGLHeteroGraph(object):
         Parameters
         ----------
         transpose : bool, optional
-            A flag to transpose the returned adjacency matrix. (Default: False)
+            A flag to transpose the returned adjacency matrix. (Default: True)
         ctx : context, optional
             The context of returned adjacency matrix. (Default: cpu)
         scipy_fmt : str, optional
@@ -3381,31 +3381,24 @@ class DGLHeteroGraph(object):
         Get a backend dependent sparse tensor. Here we use PyTorch for example.
 
         >>> g.adj(etype='develops')
-        tensor(indices=tensor([[0, 2],
-                               [0, 1]]),
+        tensor(indices=tensor([[0, 1],
+                               [0, 2]]),
                values=tensor([1., 1.]),
-               size=(3, 2), nnz=2, layout=torch.sparse_coo)
+               size=(2, 3), nnz=2, layout=torch.sparse_coo)
 
         Get a scipy coo sparse matrix.
 
         >>> g.adj(scipy_fmt='coo', etype='develops')
-        <3x2 sparse matrix of type '<class 'numpy.int64'>'
-        with 2 stored elements in COOrdinate format>
+        <2x3 sparse matrix of type '<class 'numpy.int64'>'
+	    with 2 stored elements in COOrdinate format>
         """
-        if transpose is None:
-            dgl_warning(
-                "Currently adjacency_matrix() returns a matrix with destination as rows"
-                " by default.\n\tIn 0.5 the result will have source as rows"
-                " (i.e. transpose=True)")
-            transpose = False
-
         etid = self.get_etype_id(etype)
         if scipy_fmt is None:
             return self._graph.adjacency_matrix(etid, transpose, ctx)[0]
         else:
             return self._graph.adjacency_matrix_scipy(etid, transpose, scipy_fmt, False)
 
-    def adjacency_matrix_scipy(self, transpose=None, fmt='csr', return_edge_ids=None):
+    def adjacency_matrix_scipy(self, transpose=True, fmt='csr', return_edge_ids=None):
         """DEPRECATED: please use ``dgl.adjacency_matrix(transpose, scipy_fmt=fmt)``.
         """
         dgl_warning('DGLGraph.adjacency_matrix_scipy is deprecated. '
