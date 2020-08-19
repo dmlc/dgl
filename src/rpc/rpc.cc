@@ -478,12 +478,12 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLCopyDataToSharedMemory")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-  NDArray source = args[0];
-  NDArray dst = args[1];
+  NDArray dst = args[0];
+  NDArray source = args[1];
   CHECK_EQ(source.GetSize(), dst.GetSize());
-  char* src_ptr = static_cast<char*>(source->data);
   char* dst_ptr = static_cast<char*>(dst->data);
-  memcpy(src_ptr, dst_ptr, dst.GetSize());
+  char* src_ptr = static_cast<char*>(source->data);
+  memcpy(dst_ptr, src_ptr, dst.GetSize());
 });
 
 }  // namespace rpc

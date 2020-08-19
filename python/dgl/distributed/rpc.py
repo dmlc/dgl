@@ -991,11 +991,11 @@ def register_ctrl_c():
     """
     _CAPI_DGLRPCHandleCtrlC()
 
-def copy_data_to_shared_memory(source, dst):
+def copy_data_to_shared_memory(dst, source):
     """Copy tensor data to shared-memory tensor
     """
-    _CAPI_DGLCopyDataToSharedMemory(F.zerocopy_to_dgl_ndarray(source),
-                                    F.zerocopy_to_dgl_ndarray(dst))
+    _CAPI_DGLCopyDataToSharedMemory(F.zerocopy_to_dgl_ndarray(dst),
+                                    F.zerocopy_to_dgl_ndarray(source))
 
 ############### Some basic services will be defined here #############
 
