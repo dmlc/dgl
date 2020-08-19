@@ -369,7 +369,7 @@ def test_out_subgraph(idtype):
 
 def test_subgraph_message_passing():
     # Unit test for PR #2055
-    g = dgl.graph(([0, 1, 2], [2, 3, 4]))
-    g.ndata['x'] = F.randn(5, 6)
+    g = dgl.graph(([0, 1, 2], [2, 3, 4])).to(F.cpu())
+    g.ndata['x'] = F.randn((5, 6)).to(F.cpu())
     sg = g.subgraph([1, 2, 3]).to(F.ctx())
     sg.update_all(lambda edges: {'x': edges.src['x']}, lambda nodes: {'y': nodes.mailbox['x'].sum(1)})
