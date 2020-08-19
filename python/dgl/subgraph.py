@@ -563,7 +563,8 @@ def edge_type_subgraph(graph, etypes):
         formats are:
 
         * (str, str, str) for source node type, edge type and destination node type.
-        * or str for edge type if the name can uniquely identify a triplet format.
+        * or one string for the edge type name  if the name can uniquely identify a
+          triplet format in the graph.
 
     Returns
     -------

@@ -354,30 +354,34 @@ def heterograph(data_dict,
 
 def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
                      etype_field=ETYPE, metagraph=None):
-    """Convert the given homogeneous graph to a heterogeneous graph.
+    """Convert a homogeneous graph to a heterogeneous graph and return.
 
     The input graph should have only one type of nodes and edges. Each node and edge
-    stores an integer feature (under ``ntype_field`` and ``etype_field``), representing
-    the type id, which can be used to retrieve the type names stored
-    in the given ``ntypes`` and ``etypes`` arguments.
+    stores an integer feature as its type ID
+    (specified by :attr:`ntype_field` and :attr:`etype_field`).
+    DGL uses it to retrieve the type names stored in the given
+    :attr:`ntypes` and :attr:`etypes` arguments.
 
     The function will automatically distinguish edge types that have the same given
-    type IDs but different src and dst type IDs. For example, we allow both edges A and B
+    type IDs but different src and dst type IDs. For example, it allows both edges A and B
     to have the same type ID 0, but one has (0, 1) and the other as (2, 3) as the
     (src, dst) type IDs. In this case, the function will "split" edge type 0 into two types:
     (0, ty_A, 1) and (2, ty_B, 3). In another word, these two edges share the same edge
-    type name, but can be distinguished by a canonical edge type tuple.
+    type name, but can be distinguished by an edge type triplet.
 
-    This function will copy any node/edge features from :attr:`G` to the returned heterogeneous
-    graph, except for node/edge types and IDs used to recover the heterogeneous graph.
+    The function stores the node and edge IDs in the input graph using the ``dgl.NID``
+    and ``dgl.EID`` names in the ``ndata`` and ``edata`` of the resulting graph.
+    It also copies any node/edge features from :attr:`G` to the returned heterogeneous
+    graph, except for reserved fields for storing type IDs (``dgl.NTYPE`` and ``dgl.ETYPE``)
+    and node/edge IDs (``dgl.NID`` and ``dgl.EID``).
 
     Parameters
     ----------
     G : DGLGraph
         The homogeneous graph.
-    ntypes : list of str
+    ntypes : list[str]
         The node type names.
-    etypes : list of str
+    etypes : list[str]
         The edge type names.
     ntype_field : str, optional
         The feature field used to store node type. (Default: ``dgl.NTYPE``)
@@ -386,24 +390,18 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
     metagraph : networkx MultiDiGraph, optional
         Metagraph of the returned heterograph.
         If provided, DGL assumes that G can indeed be described with the given metagraph.
-        If None, DGL will infer the metagraph from the given inputs, which would be
-        potentially slower for large graphs.
+        If None, DGL will infer the metagraph from the given inputs, which could be
+        costly for large graphs.
 
     Returns
     -------
     DGLGraph
-        A heterogeneous graph. The parent node and edge ID are stored in the column
-        ``dgl.NID`` and ``dgl.EID`` respectively for all node/edge types.
+        A heterogeneous graph.
 
     Notes
     -----
     The returned node and edge types may not necessarily be in the same order as
-    ``ntypes`` and ``etypes``.  And edge types may be duplicated if the source
-    and destination types differ.
-
-    The node IDs of a single type in the returned heterogeneous graph is ordered
-    the same as the nodes with the same ``ntype_field`` feature. Edge IDs of
-    a single type is similar.
+    ``ntypes`` and ``etypes``.
 
     Examples
     --------
@@ -543,15 +541,15 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
                             etype_field=etype_field, metagraph=metagraph)
 
 def to_homogeneous(G, ndata=None, edata=None):
-    """Convert the given heterogeneous graph to a homogeneous graph.
+    """Convert a heterogeneous graph to a homogeneous graph and return.
 
-    The returned graph has only one type of nodes and edges.
+    Node and edge types of the input graph are stored as the ``dgl.NTYPE``
+    and ``dgl.ETYPE`` features in the returned graph.
+    Each feature is an integer representing the type id, determined by the
+    :meth:`DGLGraph.get_ntype_id` and :meth:`DGLGraph.get_etype_id` methods.
 
-    Node and edge types are stored as features in the returned graph. Each feature
-    is an integer representing the type id, which can be used to retrieve the type
-    names stored in ``G.ntypes`` and ``G.etypes`` arguments.
-
-    If all
+    The function also stores the original node/edge IDs as the ``dgl.NID``
+    and ``dgl.EID`` features in the returned graph.
 
     Parameters
     ----------
@@ -571,8 +569,7 @@ def to_homogeneous(G, ndata=None, edata=None):
     Returns
     -------
     DGLGraph
-        A homogeneous graph. The parent node and edge type/ID are stored in
-        columns ``dgl.NTYPE/dgl.NID`` and ``dgl.ETYPE/dgl.EID`` respectively.
+        A homogeneous graph.
 
     Examples
     --------
@@ -1219,14 +1216,16 @@ def bipartite_from_networkx(nx_graph,
     return g.to(device)
 
 def to_networkx(g, node_attrs=None, edge_attrs=None):
-    """Convert a homogeneous graph to a NetworkX graph.
+    """Convert a homogeneous graph to a NetworkX graph and return.
 
-    It will save the edge IDs as the ``'id'`` edge attribute in the returned NetworkX graph.
+    The resulting NetworkX graph also contains the node/edge features of the input graph.
+    Additionally, DGL saves the edge IDs as the ``'id'`` edge attribute in the
+    returned NetworkX graph.
 
     Parameters
     ----------
     g : DGLGraph
-        A homogeneous graph on CPU.
+        A homogeneous graph.
     node_attrs : iterable of str, optional
         The node attributes to copy from ``g.ndata``. (Default: None)
     edge_attrs : iterable of str, optional
@@ -1236,6 +1235,10 @@ def to_networkx(g, node_attrs=None, edge_attrs=None):
     -------
     networkx.DiGraph
         The converted NetworkX graph.
+
+    Notes
+    -----
+    The function only supports CPU graph input.
 
     Examples
     --------
