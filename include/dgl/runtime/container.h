@@ -689,6 +689,17 @@ inline std::vector<T> ListValueToVector(const List<Value>& list) {
   return ret;
 }
 
+// (BarclayII) Gets around error raised by MSVC compiler 19.10, the latest version
+// supported by CUDA 9.0.
+template <>
+inline std::vector<std::string> ListValueToVector(const List<Value>& list) {
+  std::vector<std::string> ret;
+  ret.reserve(list.size());
+  for (Value val : list)
+    ret.push_back(val->data.operator std::string());
+  return ret;
+}
+
 }  // namespace runtime
 }  // namespace dgl
 
