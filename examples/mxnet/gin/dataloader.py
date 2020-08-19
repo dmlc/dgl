@@ -30,7 +30,8 @@ def collate(samples):
             g.ndata[key] = nd.array(g.ndata[key])
         # no edge feats
     batched_graph = dgl.batch(graphs)
-    labels = nd.array(labels)
+    labels = [nd.reshape(label, (1,)) for label in labels]
+    labels = nd.concat(*labels, dim=0)
     return batched_graph, labels
 
 class GraphDataLoader():
@@ -78,7 +79,7 @@ class GraphDataLoader():
 
         skf = StratifiedKFold(n_splits=10, shuffle=shuffle, random_state=seed)
         idx_list = []
-        for idx in skf.split(np.zeros(len(labels)), labels):    # split(x, y)
+        for idx in skf.split(np.zeros(len(labels)), [label.asnumpy() for label in labels]):    # split(x, y)
             idx_list.append(idx)
         train_idx, valid_idx = idx_list[fold_idx]
 

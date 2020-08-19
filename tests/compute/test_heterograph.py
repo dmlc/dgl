@@ -453,7 +453,7 @@ def test_edge_ids():
 @parametrize_dtype
 def test_adj(idtype):
     g = create_test_heterograph(idtype)
-    adj = F.sparse_to_numpy(g.adj(etype='follows'))
+    adj = F.sparse_to_numpy(g.adj(transpose=False, etype='follows'))
     assert np.allclose(
             adj,
             np.array([[0., 0., 0.],
@@ -465,7 +465,7 @@ def test_adj(idtype):
             np.array([[0., 1., 0.],
                       [0., 0., 1.],
                       [0., 0., 0.]]))
-    adj = F.sparse_to_numpy(g.adj(etype='plays'))
+    adj = F.sparse_to_numpy(g.adj(transpose=False, etype='plays'))
     assert np.allclose(
             adj,
             np.array([[1., 1., 0.],
@@ -477,29 +477,29 @@ def test_adj(idtype):
                       [1., 1.],
                       [0., 1.]]))
 
-    adj = g.adj(scipy_fmt='csr', etype='follows')
+    adj = g.adj(transpose=False, scipy_fmt='csr', etype='follows')
     assert np.allclose(
             adj.todense(),
             np.array([[0., 0., 0.],
                       [1., 0., 0.],
                       [0., 1., 0.]]))
-    adj = g.adj(scipy_fmt='coo', etype='follows')
+    adj = g.adj(transpose=False, scipy_fmt='coo', etype='follows')
     assert np.allclose(
             adj.todense(),
             np.array([[0., 0., 0.],
                       [1., 0., 0.],
                       [0., 1., 0.]]))
-    adj = g.adj(scipy_fmt='csr', etype='plays')
+    adj = g.adj(transpose=False, scipy_fmt='csr', etype='plays')
     assert np.allclose(
             adj.todense(),
             np.array([[1., 1., 0.],
                       [0., 1., 1.]]))
-    adj = g.adj(scipy_fmt='coo', etype='plays')
+    adj = g.adj(transpose=False, scipy_fmt='coo', etype='plays')
     assert np.allclose(
             adj.todense(),
             np.array([[1., 1., 0.],
                       [0., 1., 1.]]))
-    adj = F.sparse_to_numpy(g['follows'].adj())
+    adj = F.sparse_to_numpy(g['follows'].adj(transpose=False))
     assert np.allclose(
             adj,
             np.array([[0., 0., 0.],
@@ -1009,6 +1009,12 @@ def test_convert(idtype):
     assert hg.number_of_edges('e0') == 2
     assert hg.number_of_edges('e1') == 1
     assert hg.number_of_edges('e2') == 1
+    assert F.array_equal(hg.ndata[dgl.NID]['l0'], F.tensor([0, 1], F.int64))
+    assert F.array_equal(hg.ndata[dgl.NID]['l1'], F.tensor([2], F.int64))
+    assert F.array_equal(hg.ndata[dgl.NID]['l2'], F.tensor([3], F.int64))
+    assert F.array_equal(hg.edata[dgl.EID][('l0', 'e0', 'l1')], F.tensor([0, 1], F.int64))
+    assert F.array_equal(hg.edata[dgl.EID][('l0', 'e2', 'l2')], F.tensor([3], F.int64))
+    assert F.array_equal(hg.edata[dgl.EID][('l1', 'e1', 'l2')], F.tensor([2], F.int64))
 
     # hetero_from_homo test case 3
     mg = nx.MultiDiGraph([
