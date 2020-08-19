@@ -191,8 +191,8 @@ class AtomicConv(nn.Module):
         In the original paper, these are atomic numbers to consider, representing the types
         of atoms. T for the number of types of atomic numbers. Default to None.
 
-    Notes
-    -----
+    Note
+    ----
 
     * This convolution operation is designed for molecular graphs in Chemistry, but it might
       be possible to extend it to more general graphs.
