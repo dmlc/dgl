@@ -12,6 +12,8 @@ please `create an issue <https://github.com/dmlc/dgl/issues>`_ started with "[Fe
 If you want to contribute a NN module, please `create a pull request <https://github.com/dmlc/dgl/pulls>`_ started
 with "[NN] XXXModel in PyTorch NN Modules" and our team member would review this PR.
 
+.. _apinn-pytorch-conv:
+
 Conv Layers
 ----------------------------------------
 
@@ -136,6 +138,7 @@ DotGatConv
     :members: forward
     :show-inheritance:
 
+.. _apinn-pytorch-dense-conv:
 
 Dense Conv Layers
 ----------------------------------------
@@ -160,6 +163,8 @@ DenseChebConv
 .. autoclass:: dgl.nn.pytorch.conv.DenseChebConv
     :members: forward
     :show-inheritance:
+
+.. _apinn-pytorch-pooling:
 
 Global Pooling Layers
 ----------------------------------------
@@ -221,6 +226,18 @@ SetTransformerDecoder
 .. autoclass:: dgl.nn.pytorch.glob.SetTransformerDecoder
     :members:
     :show-inheritance:
+
+Heterogeneous Graph Convolution Module
+----------------------------------------
+
+HeteroGraphConv
+~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.HeteroGraphConv
+   :members:
+   :show-inheritance:
+
+.. _apinn-pytorch-util:
 
 Utility Modules
 ----------------------------------------

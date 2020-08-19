@@ -39,8 +39,8 @@ class EdgeConv(nn.Module):
         0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
         and let the users handle it by themselves. Default: ``False``.
 
-    Notes
-    -----
+    Note
+    ----
     Zero in-degree nodes will lead to invalid output value. This is because no message
     will be passed to those nodes, the aggregation function will be appied on empty input.
     A common practice to avoid this is to add a self-loop for each node in the graph if
@@ -111,6 +111,20 @@ class EdgeConv(nn.Module):
         theta_x = self.theta(edges.dst['x'] - edges.src['x'])
         phi_x = self.phi(edges.src['x'])
         return {'e': theta_x + phi_x}
+
+    def set_allow_zero_in_degree(self, set_value):
+        r"""
+
+        Description
+        -----------
+        Set allow_zero_in_degree flag.
+
+        Parameters
+        ----------
+        set_value : bool
+            The value to be set to the flag.
+        """
+        self._allow_zero_in_degree = set_value
 
     def forward(self, g, feat):
         """

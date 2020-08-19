@@ -60,8 +60,8 @@ class GraphConv(layers.Layer):
     bias : torch.Tensor
         The learnable bias tensor.
 
-    Notes
-    -----
+    Note
+    ----
     Zero in-degree nodes will lead to invalid output value. This is because no message
     will be passed to those nodes, the aggregation function will be appied on empty input.
     A common practice to avoid this is to add a self-loop for each node in the graph if
@@ -117,8 +117,8 @@ class GraphConv(layers.Layer):
     >>> v = [0, 1, 2, 3, 2]
     >>> with tf.device("CPU:0"):
     ...     g = dgl.bipartite((u, v))
-    ...     u_fea = th.rand(2, 5)
-    ...     v_fea = th.rand(4, 5)
+    ...     u_fea = tf.convert_to_tensor(np.random.rand(2, 5))
+    ...     v_fea = tf.convert_to_tensor(np.random.rand(4, 5))
     ...     conv = GraphConv(5, 2, norm='both', weight=True, bias=True)
     ...     res = conv(g, (u_fea, v_fea))
     >>> res
@@ -161,6 +161,20 @@ class GraphConv(layers.Layer):
 
         self._activation = activation
 
+    def set_allow_zero_in_degree(self, set_value):
+        r"""
+
+        Description
+        -----------
+        Set allow_zero_in_degree flag.
+
+        Parameters
+        ----------
+        set_value : bool
+            The value to be set to the flag.
+        """
+        self._allow_zero_in_degree = set_value
+
     def call(self, graph, feat, weight=None):
         r"""
 
@@ -194,8 +208,8 @@ class GraphConv(layers.Layer):
             since no message will be passed to those nodes. This will cause invalid output.
             The error can be ignored by setting ``allow_zero_in_degree`` parameter to ``True``.
 
-        Notes
-        -----
+        Note
+        ----
         * Input shape: :math:`(N, *, \text{in_feats})` where * means any number of additional
           dimensions, :math:`N` is the number of nodes.
         * Output shape: :math:`(N, *, \text{out_feats})` where all but the last dimension are

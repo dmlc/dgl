@@ -84,6 +84,7 @@ Getting Started
    :maxdepth: 2
    :caption: User Guide
    :hidden:
+   :titlesonly:
    :glob:
 
    guide/preface
@@ -109,6 +110,7 @@ Getting Started
    api/python/dgl.function
    api/python/sampling
    api/python/dgl.dataloading
+   api/python/dgl.distributed
 
 .. toctree::
    :maxdepth: 3

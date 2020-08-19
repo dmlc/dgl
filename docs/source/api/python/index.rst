@@ -12,3 +12,4 @@ API Reference
    dgl.function
    sampling
    dgl.dataloading
+   dgl.distributed

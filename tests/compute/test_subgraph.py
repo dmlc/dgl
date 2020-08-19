@@ -94,22 +94,12 @@ def create_test_heterograph(idtype):
     #    ('user', 'wishes', 'game'),
     #    ('developer', 'develops', 'game')])
 
-    plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
-    wishes_nx = nx.DiGraph()
-    wishes_nx.add_nodes_from(['u0', 'u1', 'u2'], bipartite=0)
-    wishes_nx.add_nodes_from(['g0', 'g1'], bipartite=1)
-    wishes_nx.add_edge('u0', 'g1', id=0)
-    wishes_nx.add_edge('u2', 'g0', id=1)
-
-    follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', idtype=idtype, device=F.ctx())
-    plays_g = dgl.bipartite(plays_spmat, 'user', 'plays', 'game', idtype=idtype, device=F.ctx())
-    wishes_g = dgl.bipartite(wishes_nx, 'user', 'wishes', 'game', idtype=idtype, device=F.ctx())
-    develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game', idtype=idtype, device=F.ctx())
-    assert follows_g.idtype == idtype
-    assert plays_g.idtype == idtype
-    assert wishes_g.idtype == idtype
-    assert develops_g.idtype == idtype
-    g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2, 1], [0, 0, 1, 1]),
+        ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
+        ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+    }, idtype=idtype, device=F.ctx())
     assert g.idtype == idtype
     assert g.device == F.ctx()
     return g
@@ -310,7 +300,7 @@ def test_subgraph1(idtype):
     if F._default_context_str != 'gpu':
         # TODO(minjie): enable this later
         for fmt in ['csr', 'csc', 'coo']:
-            g = dgl.graph([(0, 1), (1, 2)]).formats(fmt)
+            g = dgl.graph(([0, 1], [1, 2])).formats(fmt)
             sg = g.subgraph({g.ntypes[0]: [1, 0]})
             nids = F.asnumpy(sg.ndata[dgl.NID])
             assert np.array_equal(nids, np.array([1, 0]))
@@ -323,11 +313,12 @@ def test_subgraph1(idtype):
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_in_subgraph(idtype):
-    g1 = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)], 'user', 'follow', idtype=idtype)
-    g2 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game', idtype=idtype)
-    g3 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user', idtype=idtype)
-    g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', idtype=idtype)
-    hg = dgl.hetero_from_relations([g1, g2, g3, g4])
+    hg = dgl.heterograph({
+        ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]),
+        ('user', 'play', 'game'): ([0, 0, 1, 3], [0, 1, 2, 2]),
+        ('game', 'liked-by', 'user'): ([2, 2, 2, 1, 1, 0], [0, 1, 2, 0, 3, 0]),
+        ('user', 'flips', 'coin'): ([0, 1, 2, 3], [0, 0, 0, 0])
+    }, idtype=idtype)
     subg = dgl.in_subgraph(hg, {'user' : [0,1], 'game' : 0})
     assert subg.idtype == idtype
     assert len(subg.ntypes) == 3
@@ -349,11 +340,12 @@ def test_in_subgraph(idtype):
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_out_subgraph(idtype):
-    g1 = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)], 'user', 'follow', idtype=idtype)
-    g2 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game', idtype=idtype)
-    g3 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user', idtype=idtype)
-    g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', idtype=idtype)
-    hg = dgl.hetero_from_relations([g1, g2, g3, g4])
+    hg = dgl.heterograph({
+        ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]),
+        ('user', 'play', 'game'): ([0, 0, 1, 3], [0, 1, 2, 2]),
+        ('game', 'liked-by', 'user'): ([2, 2, 2, 1, 1, 0], [0, 1, 2, 0, 3, 0]),
+        ('user', 'flips', 'coin'): ([0, 1, 2, 3], [0, 0, 0, 0])
+    }, idtype=idtype)
     subg = dgl.out_subgraph(hg, {'user' : [0,1], 'game' : 0})
     assert subg.idtype == idtype
     assert len(subg.ntypes) == 3

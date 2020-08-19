@@ -22,6 +22,8 @@ Graph Create Ops
     knn_graph
     segmented_knn_graph
 
+.. _api-subgraph-extraction:
+
 Subgraph Extraction Routines
 -------------------------------------
 
@@ -60,8 +62,8 @@ Graph Transform Routines
     to_simple
     to_block
     compact_graphs
-    to_hetero
-    to_homo
+    to_heterogeneous
+    to_homogeneous
     to_networkx
     line_graph
     khop_graph
