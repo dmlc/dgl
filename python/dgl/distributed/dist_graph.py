@@ -570,7 +570,7 @@ class DistGraph:
         Examples
         --------
         >>> g = dgl.distributed.DistGraph('ogb-product')
-        >>> print(g.number_of_nodes())
+        >>> print(g.num_nodes())
         2449029
         """
         return self._num_nodes
@@ -586,7 +586,7 @@ class DistGraph:
         Examples
         --------
         >>> g = dgl.distributed.DistGraph('ogb-product')
-        >>> print(g.number_of_nodes())
+        >>> print(g.num_edges())
         123718280
         """
         return self._num_edges
