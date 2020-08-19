@@ -128,8 +128,8 @@ class NNConv(nn.Module):
         -----------
         Reinitialize learnable parameters.
 
-        Notes
-        -----
+        Note
+        ----
         The model parameters are initialized using Glorot uniform initialization
         and the bias is initialized to be zero.
         """

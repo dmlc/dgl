@@ -214,6 +214,7 @@ class SSTDataset(DGLBuiltinDataset):
 
         self._trees = load_graphs(graph_path)[0]
         self._vocab = load_info(vocab_path)['vocab']
+        self._pretrained_emb = None
         if os.path.exists(emb_path):
             self._pretrained_emb = load_info(emb_path)['embed']
 

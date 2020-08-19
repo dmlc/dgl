@@ -19,8 +19,6 @@ Codes
 The folder contains three implementations of GCN:
 - `gcn.py` uses DGL's predefined graph convolution module.
 - `gcn_mp.py` uses user-defined message and reduce functions.
-- `gcn_spmv.py` improves from `gcn_mp.py` by using DGL's builtin functions
-   so SPMV optimization could be applied.
 Modify `train.py` to switch between different implementations.
 
 The provided implementation in `gcn_concat.py` is a bit different from the
@@ -40,8 +38,7 @@ DGLBACKEND=mxnet python3 train.py --dataset cora --gpu 0 --self-loop
 Results (`gcn_concat.py vs. gcn.py`)
 ------------------------------------
 `gcn_concat.py` uses concatenation of hidden units to account for multi-hop
-  skip-connections, while `gcn_spmv.py` uses simple additions (the original paper
-omitted this detail). We feel concatenation is superior
+  skip-connections. We feel concatenation is superior
 because all neighboring information is presented without additional modeling
 assumptions.
 These results are based on single-run training to minimize the cross-entropy
@@ -56,12 +53,6 @@ factorization. Given the small datasets, we can't draw such conclusions from the
 # Final accuracy 57.70% MLP without GCN
 DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "citeseer" --n-epochs 200 --n-layers 0
 
-# Final accuracy 68.20% with 2-layer GCN
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_spmv.py --dataset "citeseer" --n-epochs 200 --n-layers 1
-
-# Final accuracy 18.40% with 10-layer GCN
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_spmv.py --dataset "citeseer" --n-epochs 200 --n-layers 9
-
 # Final accuracy 65.70% with 10-layer GCN with skip connection
 DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "citeseer" --n-epochs 200 --n-layers 2 --normalization 'sym' --self-loop
 
@@ -74,12 +65,6 @@ DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "citeseer" -
 # Final accuracy 53.20% MLP without GCN
 DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "cora" --n-epochs 200 --n-layers 0
 
-# Final accuracy 81.40% with 2-layer GCN
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_spmv.py --dataset "cora" --n-epochs 200 --n-layers 1
-
-# Final accuracy 27.60% with 10-layer GCN
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_spmv.py --dataset "cora" --n-epochs 200 --n-layers 9
-
 # Final accuracy 72.60% with 2-layer GCN with skip connection
 DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "cora" --n-epochs 200 --n-layers 2 --normalization 'sym' --self-loop
 
@@ -91,12 +76,6 @@ DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "cora" --n-e
 ```
 # Final accuracy 70.30% MLP without GCN
 DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "pubmed" --n-epochs 200 --n-layers 0
-
-# Final accuracy 77.40% with 2-layer GCN
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_spmv.py --dataset "pubmed" --n-epochs 200 --n-layers 1
-
-# Final accuracy 36.20% with 10-layer GCN
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_spmv.py --dataset "pubmed" --n-epochs 200 --n-layers 9
 
 # Final accuracy 78.30% with 2-layer GCN with skip connection
 DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "pubmed" --n-epochs 200 --n-layers 2 --normalization 'sym' --self-loop
