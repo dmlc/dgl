@@ -99,7 +99,7 @@ def setup(args):
     args.update(default_configure)
     set_random_seed(args['seed'])
     args['dataset'] = 'ACMRaw' if args['hetero'] else 'ACM'
-    args['device'] = 'cuda: 0' if torch.cuda.is_available() else 'cpu'
+    args['device'] = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     args['log_dir'] = setup_log_dir(args)
     return args
 
@@ -107,7 +107,7 @@ def setup_for_sampling(args):
     args.update(default_configure)
     args.update(sampling_configure)
     set_random_seed()
-    args['device'] = 'cuda: 0' if torch.cuda.is_available() else 'cpu'
+    args['device'] = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     args['log_dir'] = setup_log_dir(args, sampling=True)
     return args
 
@@ -188,7 +188,7 @@ def load_acm_raw(remove_self_loop):
 
     hg = dgl.heterograph({
         ('paper', 'pa', 'author'): p_vs_a.nonzero(),
-        ('author', 'ap', 'paper'): p_vs_a.transpose.nonzero(),
+        ('author', 'ap', 'paper'): p_vs_a.transpose().nonzero(),
         ('paper', 'pf', 'field'): p_vs_l.nonzero(),
         ('field', 'fp', 'paper'): p_vs_l.transpose().nonzero()
     })

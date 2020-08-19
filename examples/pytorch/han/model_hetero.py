@@ -62,7 +62,8 @@ class HANLayer(nn.Module):
         self.gat_layers = nn.ModuleList()
         for i in range(len(meta_paths)):
             self.gat_layers.append(GATConv(in_size, out_size, layer_num_heads,
-                                           dropout, dropout, activation=F.elu))
+                                           dropout, dropout, activation=F.elu,
+                                           allow_zero_in_degree=True))
         self.semantic_attention = SemanticAttention(in_size=out_size * layer_num_heads)
         self.meta_paths = list(tuple(meta_path) for meta_path in meta_paths)
 
