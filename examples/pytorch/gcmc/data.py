@@ -302,7 +302,8 @@ class MovieLens(object):
             (ones, rating_pairs),
             shape=(self.num_user, self.num_movie), dtype=np.float32)
         g = dgl.bipartite_from_scipy(user_movie_ratings_coo, utype='_U', etype='_E', vtype='_V')
-        return dgl.heterograph({('user', 'rate', 'movie'): g.edges()})
+        return dgl.heterograph({('user', 'rate', 'movie'): g.edges()}, 
+                               num_nodes_dict={'user': self.num_user, 'movie': self.num_movie})
 
     @property
     def num_links(self):
