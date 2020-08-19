@@ -372,4 +372,4 @@ def test_subgraph_message_passing():
     g = dgl.graph(([0, 1, 2], [2, 3, 4])).to(F.cpu())
     g.ndata['x'] = F.copy_to(F.randn((5, 6)), F.cpu())
     sg = g.subgraph([1, 2, 3]).to(F.ctx())
-    sg.update_all(lambda edges: {'x': edges.src['x']}, lambda nodes: {'y': nodes.mailbox['x'].sum(1)})
+    sg.update_all(lambda edges: {'x': edges.src['x']}, lambda nodes: {'y': F.sum(nodes.mailbox['x'], 1)})
