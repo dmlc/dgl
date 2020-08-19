@@ -106,7 +106,7 @@ class AdaptGenerator(object):
     def __init__(self, graph, num_blocks, node_feature=None, sampler=None, num_workers=0, coalesce=False,
                  sampler_weights=None, layer_nodes=None):
         self.node_feature = node_feature
-        adj = graph.adjacency_matrix_scipy()
+        adj = graph.adjacency_matrix_scipy(transpose=False)
         adj.data = np.ones(adj.nnz)
         self.norm_adj = normalize_adj(adj).tocsr()
         self.layer_nodes = layer_nodes
@@ -370,7 +370,7 @@ class AdaptGraphSAGENet(nn.Module):
         ])
         self.sample_weights = sample_weights
         self.node_feature = node_feature
-        self.norm_adj = normalize_adj(trainG.adjacency_matrix_scipy())
+        self.norm_adj = normalize_adj(trainG.adjacency_matrix_scipy(transpose=False))
 
     def forward(self, nf, h, is_test=False):
         for i, layer in enumerate(self.layers):

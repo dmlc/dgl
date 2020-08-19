@@ -44,10 +44,6 @@ class ChebConv(nn.Module):
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
 
-    Note
-    ----
-    ChebConv only support DGLGraph as input for now. Heterograph will report error. To be fixed.
-
     Example
     -------
     >>> import dgl

@@ -8,17 +8,24 @@ Requirements
 ------------
 - requirements
 
-``bash
-pip install requirements
-``
+```bash
+pip install -r requirements.txt
+```
 
 Datasets
 --------
-* [example](https://s3.us-west-2.amazonaws.com/dgl-data/dataset/recsys/GATNE/example.zip)
-* [amazon](https://s3.us-west-2.amazonaws.com/dgl-data/dataset/recsys/GATNE/amazon.zip)
-* [youtube](https://s3.us-west-2.amazonaws.com/dgl-data/dataset/recsys/GATNE/youtube.zip)
-* [twitter](https://s3.us-west-2.amazonaws.com/dgl-data/dataset/recsys/GATNE/twitter.zip)
 
+To prepare the datasets:
+1. ```bash
+   mkdir data
+   cd data
+   ```
+2. Download datasets from the following links:
+    - example: https://s3.us-west-2.amazonaws.com/dgl-data/dataset/recsys/GATNE/example.zip
+    - amazon: https://s3.us-west-2.amazonaws.com/dgl-data/dataset/recsys/GATNE/amazon.zip
+    - youtube: https://s3.us-west-2.amazonaws.com/dgl-data/dataset/recsys/GATNE/youtube.zip
+    - twitter: https://s3.us-west-2.amazonaws.com/dgl-data/dataset/recsys/GATNE/twitter.zip
+3. Unzip the datasets
 
 Training
 --------

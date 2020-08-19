@@ -158,8 +158,10 @@ def run(args, device, data):
         tic_step = time.time()
         for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
             # Load the input features as well as output labels
-            batch_inputs, batch_labels = load_subtensor(train_g, seeds, input_nodes, device)
+            #batch_inputs, batch_labels = load_subtensor(train_g, seeds, input_nodes, device)
             blocks = [block.int().to(device) for block in blocks]
+            batch_inputs = blocks[0].srcdata['features']
+            batch_labels = blocks[-1].dstdata['labels']
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)

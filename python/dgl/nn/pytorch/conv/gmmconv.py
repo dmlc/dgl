@@ -54,8 +54,8 @@ class GMMConv(nn.Module):
         0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
         and let the users handle it by themselves. Default: ``False``.
 
-    Notes
-    -----
+    Note
+    ----
     Zero in-degree nodes will lead to invalid output value. This is because no message
     will be passed to those nodes, the aggregation function will be appied on empty input.
     A common practice to avoid this is to add a self-loop for each node in the graph if
@@ -155,8 +155,8 @@ class GMMConv(nn.Module):
         -----------
         Reinitialize learnable parameters.
 
-        Notes
-        -----
+        Note
+        ----
         The fc parameters are initialized using Glorot uniform initialization
         and the bias is initialized to be zero.
         The mu weight is initialized using normal distribution and

@@ -29,30 +29,6 @@ class DenseChebConv(layers.Layer):
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
 
-    Example
-    -------
-    >>> import dgl
-    >>> import numpy as np
-    >>> import tensorflow as tf
-    >>> from dgl.nn import DenseChebConv
-    >>>
-    >>> feat = tf.ones(6, 10)
-    >>> adj = tf.tensor([[0., 0., 1., 0., 0., 0.],
-    ...         [1., 0., 0., 0., 0., 0.],
-    ...         [0., 1., 0., 0., 0., 0.],
-    ...         [0., 0., 1., 0., 0., 1.],
-    ...         [0., 0., 0., 1., 0., 0.],
-    ...         [0., 0., 0., 0., 0., 0.]])
-    >>> conv = DenseChebConv(10, 2, 2)
-    >>> res = conv(adj, feat)
-    >>> res
-    tensor([[-3.3516, -2.4797],
-            [-3.3516, -2.4797],
-            [-3.3516, -2.4797],
-            [-4.5192, -3.0835],
-            [-2.5259, -2.0527],
-            [-0.5327, -1.0219]])
-
     See also
     --------
     `ChebConv <https://docs.dgl.ai/api/python/nn.tensorflow.html#chebconv>`__
