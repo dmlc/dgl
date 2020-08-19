@@ -119,7 +119,7 @@ def _init_state(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
 
 class SparseAdagrad:
-    ''' The sparse Adagrad optimizer.
+    r''' The sparse Adagrad optimizer.
 
     This optimizer implements a lightweight version of Adagrad algorithm for optimizing
     :func:`dgl.distributed.DistEmbedding`. In each mini-batch, it only updates the embeddings
@@ -132,8 +132,11 @@ class SparseAdagrad:
 
     Instead of maintaining :math:`G_{t,i,j}`, this implementation maintains :math:`G_{t,i}`
     for every embedding :math:`i`:
-        :math:`G_{t,i}=G_{t-1,i} + \frac{1}{p} \Sigma_{0 \le j \lt p} g_{t,i,j}^2`, where
-    :math:`p` is the dimension size of an embedding.
+
+    .. math::
+      G_{t,i}=G_{t-1,i}+ \frac{1}{p} \sum_{0 \le j \lt p}g_{t,i,j}^2
+
+    where :math:`p` is the dimension size of an embedding.
 
     The benefit of the implementation is that it consumes much smaller memory and runs
     much faster if users' model requires learnable embeddings for nodes or edges.
