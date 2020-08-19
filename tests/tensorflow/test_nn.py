@@ -21,7 +21,7 @@ def _AXWb(A, X, W, b):
 def test_graph_conv():
     g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
-    adj = tf.sparse.to_dense(tf.sparse.reorder(g.adjacency_matrix(ctx=ctx)))
+    adj = tf.sparse.to_dense(tf.sparse.reorder(g.adjacency_matrix(transpose=False, ctx=ctx)))
 
     conv = nn.GraphConv(5, 2, norm='none', bias=True)
     # conv = conv
@@ -488,7 +488,7 @@ def test_dense_cheb_conv():
         g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1, random_state=42))
         g = g.to(ctx)
 
-        adj = tf.sparse.to_dense(tf.sparse.reorder(g.adjacency_matrix(ctx=ctx)))
+        adj = tf.sparse.to_dense(tf.sparse.reorder(g.adjacency_matrix(transpose=False, ctx=ctx)))
         cheb = nn.ChebConv(5, 2, k, None, bias=True)
         dense_cheb = nn.DenseChebConv(5, 2, k, bias=True)
 
