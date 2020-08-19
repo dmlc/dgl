@@ -278,7 +278,7 @@ std::vector<int64_t> InferBinaryFeatureShape(
   return CalcBcastInfo(op, lhs, rhs).real_out_shape;
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelInferBinaryFeatureShape")
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelInferBinaryFeatureShape")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string op = args[0];
     NDArray lhs = args[1];
@@ -347,14 +347,14 @@ void csrwrapper_switch(DGLArgValue argval,
     fn(wrapper);
   } else if (argval.IsObjectType<HeteroGraphRef>()) {
     HeteroGraphRef g = argval;
-    auto bgptr = std::dynamic_pointer_cast<UnitGraph>(g.sptr());
+    auto bgptr = std::dynamic_pointer_cast<UnitGraph>(g->GetRelationGraph(0));
     CHECK_NOTNULL(bgptr);
     UnitGraphCSRWrapper wrapper(bgptr.get());
     fn(wrapper);
   }
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce")
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
@@ -427,7 +427,7 @@ void BackwardLhsBinaryOpReduce(
   }
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
@@ -503,7 +503,7 @@ void BackwardRhsBinaryOpReduce(
   }
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
@@ -552,7 +552,7 @@ void CopyReduce(
       in_mapping, aten::NullArray(), out_mapping);
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyReduce")
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelCopyReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     int target = args[2];
@@ -600,7 +600,7 @@ void BackwardCopyReduce(
       grad_in_data, aten::NullArray());
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyReduce")
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelBackwardCopyReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     int target = args[2];

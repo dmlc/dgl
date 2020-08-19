@@ -13,10 +13,10 @@ import numpy as np
 import time
 import torch
 import torch.nn.functional as F
-from dgl import DGLGraph
+import dgl
 from dgl.nn.pytorch import RelGraphConv
-from dgl.contrib.data import load_data
 from functools import partial
+from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 
 from model import BaseRGCN
 
@@ -44,13 +44,28 @@ class EntityClassify(BaseRGCN):
 
 def main(args):
     # load graph data
-    data = load_data(args.dataset, bfs_level=args.bfs_level, relabel=args.relabel)
-    num_nodes = data.num_nodes
-    num_rels = data.num_rels
-    num_classes = data.num_classes
-    labels = data.labels
-    train_idx = data.train_idx
-    test_idx = data.test_idx
+    if args.dataset == 'aifb':
+        dataset = AIFBDataset()
+    elif args.dataset == 'mutag':
+        dataset = MUTAGDataset()
+    elif args.dataset == 'bgs':
+        dataset = BGSDataset()
+    elif args.dataset == 'am':
+        dataset = AMDataset()
+    else:
+        raise ValueError()
+
+    # Load from hetero-graph
+    hg = dataset[0]
+
+    num_rels = len(hg.canonical_etypes)
+    category = dataset.predict_category
+    num_classes = dataset.num_classes
+    train_mask = hg.nodes[category].data.pop('train_mask')
+    test_mask = hg.nodes[category].data.pop('test_mask')
+    train_idx = torch.nonzero(train_mask).squeeze()
+    test_idx = torch.nonzero(test_mask).squeeze()
+    labels = hg.nodes[category].data.pop('labels')
 
     # split dataset into train, validate, test
     if args.validation:
@@ -59,13 +74,34 @@ def main(args):
     else:
         val_idx = train_idx
 
+    # calculate norm for each edge type and store in edge
+    for canonical_etype in hg.canonical_etypes:
+        u, v, eid = hg.all_edges(form='all', etype=canonical_etype)
+        _, inverse_index, count = torch.unique(v, return_inverse=True, return_counts=True)
+        degrees = count[inverse_index]
+        norm = torch.ones(eid.shape[0]).float() / degrees.float()
+        norm = norm.unsqueeze(1)
+        hg.edges[canonical_etype].data['norm'] = norm
+
+    # get target category id
+    category_id = len(hg.ntypes)
+    for i, ntype in enumerate(hg.ntypes):
+        if ntype == category:
+            category_id = i
+
+    g = dgl.to_homogeneous(hg, edata=['norm'])
+    num_nodes = g.number_of_nodes()
+    node_ids = torch.arange(num_nodes)
+    edge_norm = g.edata['norm']
+    edge_type = g.edata[dgl.ETYPE].long()
+
+    # find out the target node ids in g
+    node_tids = g.ndata[dgl.NTYPE]
+    loc = (node_tids == category_id)
+    target_idx = node_ids[loc]
+
     # since the nodes are featureless, the input feature is then the node id.
     feats = torch.arange(num_nodes)
-
-    # edge type and normalization factor
-    edge_type = torch.from_numpy(data.edge_type).long()
-    edge_norm = torch.from_numpy(data.edge_norm).unsqueeze(1).long()
-    labels = torch.from_numpy(labels).view(-1).long()
 
     # check cuda
     use_cuda = args.gpu >= 0 and torch.cuda.is_available()
@@ -76,13 +112,8 @@ def main(args):
         edge_norm = edge_norm.cuda()
         labels = labels.cuda()
 
-    # create graph
-    g = DGLGraph()
-    g.add_nodes(num_nodes)
-    g.add_edges(data.edge_src, data.edge_dst)
-
     # create model
-    model = EntityClassify(len(g),
+    model = EntityClassify(num_nodes,
                            args.n_hidden,
                            num_classes,
                            num_rels,
@@ -94,6 +125,7 @@ def main(args):
 
     if use_cuda:
         model.cuda()
+        g = g.to('cuda:%d' % args.gpu)
 
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)
@@ -107,6 +139,7 @@ def main(args):
         optimizer.zero_grad()
         t0 = time.time()
         logits = model(g, feats, edge_type, edge_norm)
+        logits = logits[target_idx]
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         t1 = time.time()
         loss.backward()
@@ -126,6 +159,7 @@ def main(args):
 
     model.eval()
     logits = model.forward(g, feats, edge_type, edge_norm)
+    logits = logits[target_idx]
     test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
     test_acc = torch.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
     print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
@@ -155,8 +189,6 @@ if __name__ == '__main__':
             help="dataset to use")
     parser.add_argument("--l2norm", type=float, default=0,
             help="l2 norm coef")
-    parser.add_argument("--relabel", default=False, action='store_true',
-            help="remove untouched nodes and relabel")
     parser.add_argument("--use-self-loop", default=False, action='store_true',
             help="include self feature as a special relation")
     fp = parser.add_mutually_exclusive_group(required=False)
@@ -166,5 +198,4 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     print(args)
-    args.bfs_level = args.n_layers + 1 # pruning used nodes for memory
     main(args)

@@ -24,7 +24,7 @@ citation network datasets.
 ## Usage
 
 ```
-python run.py [--gpu] --model MODEL_NAME --dataset DATASET_NAME [--self-loop]
+python run.py [--gpu GPU] --model MODEL_NAME --dataset DATASET_NAME [--self-loop]
 ```
 
 The hyperparameters might not be the optimal, you could specify them manually in `conf.py`.

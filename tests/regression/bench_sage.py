@@ -16,25 +16,25 @@ class SAGEBenchmark:
     param_names = ['backend', 'gpu']
     timeout = 1800
 
-    # def setup_cache(self):
-    #     self.tmp_dir = Path(tempfile.mkdtemp())
+    def __init__(self):
+        self.std_log = {}
 
     def setup(self, backend, gpu):
-        log_filename = Path("sage_sampling_{}_{}.log".format(backend, gpu))
-        if log_filename.exists():
+        key_name = "{}_{}".format(backend, gpu)
+        if key_name in self.std_log:
             return
         run_path = base_path / "examples/{}/graphsage/train_sampling.py".format(backend)
-        bashCommand = "/opt/conda/envs/{}-ci/bin/python {} --num-workers=4 --num-epochs=16 --gpu={}".format(
+        bashCommand = "/opt/conda/envs/{}-ci/bin/python {} --num-workers=2 --num-epochs=16 --gpu={}".format(
             backend, run_path.expanduser(), gpu)
         process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE,env=dict(os.environ, DGLBACKEND=backend))
         output, error = process.communicate()
         print(str(error))
-        log_filename.write_text(str(output))
+        self.std_log[key_name] = str(output)
 
 
-    def track_sage_time(self, backend):
-        log_filename = Path("sage_sampling_{}_{}.log".format(backend, gpu))
-        lines = log_filename.read_text().split("\\n")
+    def track_sage_time(self, backend, gpu):
+        key_name = key_name = "{}_{}".format(backend, gpu)
+        lines = self.std_log[key_name].split("\\n")
         time_list = []
         for line in lines:
             if line.startswith('Epoch Time'):
@@ -42,9 +42,9 @@ class SAGEBenchmark:
                 time_list.append(float(time_str))
         return np.array(time_list).mean()
 
-    def track_sage_accuracy(self, backend):
-        log_filename = Path("sage_sampling_{}_{}.log".format(backend, gpu))
-        lines = log_filename.read_text().split("\\n")
+    def track_sage_accuracy(self, backend, gpu):
+        key_name = key_name = "{}_{}".format(backend, gpu)
+        lines = self.std_log[key_name].split("\\n")
         test_acc = 0.
         for line in lines:
             if line.startswith('Eval Acc'):

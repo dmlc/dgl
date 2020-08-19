@@ -14,10 +14,11 @@ import time
 import mxnet as mx
 from mxnet import gluon
 import mxnet.ndarray as F
-from dgl import DGLGraph
+import dgl
 from dgl.nn.mxnet import RelGraphConv
 from dgl.contrib.data import load_data
 from functools import partial
+from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 
 from model import BaseRGCN
 
@@ -39,13 +40,28 @@ class EntityClassify(BaseRGCN):
 
 def main(args):
     # load graph data
-    data = load_data(args.dataset, bfs_level=args.bfs_level, relabel=args.relabel)
-    num_nodes = data.num_nodes
-    num_rels = data.num_rels
-    num_classes = data.num_classes
-    labels = data.labels
-    train_idx = data.train_idx
-    test_idx = data.test_idx
+    if args.dataset == 'aifb':
+        dataset = AIFBDataset()
+    elif args.dataset == 'mutag':
+        dataset = MUTAGDataset()
+    elif args.dataset == 'bgs':
+        dataset = BGSDataset()
+    elif args.dataset == 'am':
+        dataset = AMDataset()
+    else:
+        raise ValueError()
+
+    # Load from hetero-graph
+    hg = dataset[0]
+
+    num_rels = len(hg.canonical_etypes)
+    category = dataset.predict_category
+    num_classes = dataset.num_classes
+    train_mask = hg.nodes[category].data.pop('train_mask')
+    test_mask = hg.nodes[category].data.pop('test_mask')
+    train_idx = mx.nd.array(np.nonzero(train_mask.asnumpy())[0], dtype='int64')
+    test_idx = mx.nd.array(np.nonzero(test_mask.asnumpy())[0], dtype='int64')
+    labels = mx.nd.array(hg.nodes[category].data.pop('labels'), dtype='int64')
 
     # split dataset into train, validate, test
     if args.validation:
@@ -54,13 +70,35 @@ def main(args):
     else:
         val_idx = train_idx
 
-    train_idx = mx.nd.array(train_idx)
+    # calculate norm for each edge type and store in edge
+    for canonical_etype in hg.canonical_etypes:
+        u, v, eid = hg.all_edges(form='all', etype=canonical_etype)
+        v = v.asnumpy()
+        _, inverse_index, count = np.unique(v, return_inverse=True, return_counts=True)
+        degrees = count[inverse_index]
+        norm = np.ones(eid.shape[0]) / degrees
+        hg.edges[canonical_etype].data['norm'] = mx.nd.expand_dims(mx.nd.array(norm), axis=1)
+
+    # get target category id
+    category_id = len(hg.ntypes)
+    for i, ntype in enumerate(hg.ntypes):
+        if ntype == category:
+            category_id = i
+
+    g = dgl.to_homogeneous(hg, edata=['norm'])
+    num_nodes = g.number_of_nodes()
+    node_ids = mx.nd.arange(num_nodes)
+    edge_norm = g.edata['norm']
+    edge_type = g.edata[dgl.ETYPE]
+
+    # find out the target node ids in g
+    node_tids = g.ndata[dgl.NTYPE]
+    loc = (node_tids == category_id)
+    loc = mx.nd.array(np.nonzero(loc.asnumpy())[0], dtype='int64')
+    target_idx = node_ids[loc]
+
     # since the nodes are featureless, the input feature is then the node id.
     feats = mx.nd.arange(num_nodes, dtype='int32')
-    # edge type and normalization factor
-    edge_type = mx.nd.array(data.edge_type, dtype='int32')
-    edge_norm = mx.nd.array(data.edge_norm).expand_dims(1)
-    labels = mx.nd.array(labels).reshape((-1))
 
     # check cuda
     use_cuda = args.gpu >= 0
@@ -71,16 +109,12 @@ def main(args):
         edge_norm = edge_norm.as_in_context(ctx)
         labels = labels.as_in_context(ctx)
         train_idx = train_idx.as_in_context(ctx)
+        g = g.to(ctx)
     else:
         ctx = mx.cpu(0)
 
-    # create graph
-    g = DGLGraph()
-    g.add_nodes(num_nodes)
-    g.add_edges(data.edge_src, data.edge_dst)
-
     # create model
-    model = EntityClassify(len(g),
+    model = EntityClassify(num_nodes,
                            args.n_hidden,
                            num_classes,
                            num_rels,
@@ -103,6 +137,7 @@ def main(args):
         t0 = time.time()
         with mx.autograd.record():
             pred = model(g, feats, edge_type, edge_norm)
+            pred = pred[target_idx]
             loss = loss_fcn(pred[train_idx], labels[train_idx])
         t1 = time.time()
         loss.backward()
@@ -113,13 +148,15 @@ def main(args):
         backward_time.append(t2 - t1)
         print("Epoch {:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".
               format(epoch, forward_time[-1], backward_time[-1]))
-        train_acc = F.sum(pred[train_idx].argmax(axis=1) == labels[train_idx]).asscalar() / train_idx.shape[0]
-        val_acc = F.sum(pred[val_idx].argmax(axis=1) == labels[val_idx]).asscalar() / len(val_idx)
+
+        train_acc = F.sum(mx.nd.cast(pred[train_idx].argmax(axis=1), 'int64') == labels[train_idx]).asscalar() / train_idx.shape[0]
+        val_acc = F.sum(mx.nd.cast(pred[val_idx].argmax(axis=1), 'int64')  == labels[val_idx]).asscalar() / len(val_idx)
         print("Train Accuracy: {:.4f} | Validation Accuracy: {:.4f}".format(train_acc, val_acc))
     print()
 
     logits = model.forward(g, feats, edge_type, edge_norm)
-    test_acc = F.sum(logits[test_idx].argmax(axis=1) == labels[test_idx]).asscalar() / len(test_idx)
+    logits = logits[target_idx]
+    test_acc = F.sum(mx.nd.cast(logits[test_idx].argmax(axis=1), 'int64')  == labels[test_idx]).asscalar() / len(test_idx)
     print("Test Accuracy: {:.4f}".format(test_acc))
     print()
 
@@ -147,8 +184,6 @@ if __name__ == '__main__':
             help="dataset to use")
     parser.add_argument("--l2norm", type=float, default=0,
             help="l2 norm coef")
-    parser.add_argument("--relabel", default=False, action='store_true',
-            help="remove untouched nodes and relabel")
     parser.add_argument("--use-self-loop", default=False, action='store_true',
             help="include self feature as a special relation")
     fp = parser.add_mutually_exclusive_group(required=False)

@@ -9,12 +9,12 @@ import mxnet.ndarray as nd
 import numbers
 import builtins
 from ... import ndarray as dglnd
-from ... import kernel as K
-from ...function.base import TargetCode 
+from ..._deprecate import kernel as K
+from ...function.base import TargetCode
 
 MX_VERSION = LooseVersion(mx.__version__)
 if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] < 5:
-    raise Exception("DGL has to work with MXNet version >= 1.5")
+    raise RuntimeError("DGL requires mxnet >= 1.5")
 
 # After MXNet 1.5, empty tensors aren't supprted by default.
 # After we turn on the numpy compatible flag, MXNet supports empty NDArray.
@@ -28,20 +28,30 @@ def data_type_dict():
             'int8'    : np.int8,
             'int16'   : np.int16,
             'int32'   : np.int32,
-            'int64'   : np.int64}
+            'int64'   : np.int64,
+            'bool'    : np.bool}  # mxnet does not support bool
 
 def cpu():
     return mx.cpu()
 
 def tensor(data, dtype=None):
-    # MXNet always returns a float tensor regardless of type inside data.
-    # This is a workaround.
-    if dtype is None:
-        if isinstance(data[0], numbers.Integral):
-            dtype = np.int64
+    if dtype == np.bool:
+        # mxnet doesn't support bool
+        dtype =  np.int32
+    if isinstance(data, nd.NDArray):
+        if dtype is None or data.dtype == dtype:
+            return data
         else:
-            dtype = np.float32
-    return nd.array(data, dtype=dtype)
+            return data.astype(dtype)
+    else:
+        if isinstance(data, numbers.Number):
+            data = [data]
+        if dtype is None:
+            if isinstance(data, np.ndarray):
+                dtype = np.int32 if data.dtype == np.bool else data.dtype
+            else:
+                dtype = np.int64 if isinstance(data[0], numbers.Integral) else np.float32
+        return nd.array(data, dtype=dtype)
 
 def as_scalar(data):
     return data.asscalar()
@@ -108,13 +118,24 @@ def device_type(ctx):
 def device_id(ctx):
     return ctx.device_id
 
+def to_backend_ctx(dglctx):
+    dev_type = dglctx.device_type
+    if dev_type == 1:
+        return mx.cpu()
+    elif dev_type == 2:
+        return mx.gpu(dglctx.device_id)
+    else:
+        raise ValueError('Unsupported DGL device context:', dglctx)
+
 def astype(input, ty):
-    return nd.cast(input, ty)
+    if ty == np.bool:
+        ty = np.int32
+    return input.astype(ty)
 
 def asnumpy(input):
     return input.asnumpy()
 
-def copy_to(input, ctx):
+def copy_to(input, ctx, **kwargs):
     return input.as_in_context(ctx)
 
 def sum(input, dim, keepdims=False):
@@ -156,6 +177,9 @@ def argsort(input, dim, descending):
 def exp(input):
     return nd.exp(input)
 
+def sqrt(input):
+    return nd.sqrt(input)
+
 def softmax(input, dim=-1):
     return nd.softmax(input, axis=dim)
 
@@ -185,7 +209,11 @@ def split(x, sizes_or_sections, dim):
         return nd.split(x, sizes_or_sections, axis=dim)
 
 def repeat(input, repeats, dim):
-    return nd.repeat(input, repeats, axis=dim)
+    if isinstance(repeats, nd.NDArray):
+        return nd.array(np.repeat(input.asnumpy(), repeats.asnumpy(), axis=dim),
+                        ctx=input.context, dtype=input.dtype)
+    else:
+        return nd.repeat(input, repeats, axis=dim)
 
 def gather_row(data, row_index):
     # MXNet workaround for empty row index
@@ -213,6 +241,9 @@ def take(data, indices, dim):
 
 def narrow_row(data, start, stop):
     return data[start:stop]
+
+def index_add_inplace(data, row_idx, value):
+    raise NotImplementedError("MXNet doesn't support inplace index_add")
 
 def scatter_row(data, row_index, value):
     return mx.nd.contrib.index_copy(data, row_index, value)
@@ -245,12 +276,14 @@ def ones(shape, dtype, ctx):
 def uniform(shape, dtype, ctx, low, high):
     return nd.random.uniform(low, high, ctx=ctx, dtype=dtype, shape=shape)
 
+def randint(shape, dtype, ctx, low, high):
+    return nd.random.randint(low, high, ctx=ctx, dtype=dtype, shape=shape)
+
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, nd.NDArray):
-        max_len = as_scalar(input.max())
-    else:
-        max_len = builtins.max(lengths)
+        lengths = list(lengths.asnumpy())
+    max_len = builtins.max(lengths)
 
     if l_min is not None:
         max_len = builtins.max(max_len, l_min)
@@ -274,35 +307,6 @@ def pack_padded_tensor(input, lengths):
     index = nd.array(index, ctx=ctx)
     return gather_row(input.reshape(batch_size * max_len, -1), index)
 
-def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
-    # TODO: support other dimensions
-    assert dim == 0, 'MXNet only supports segment sum on first dimension'
-
-    # Use SPMV to simulate segment sum
-    ctx = input.context
-    n_inputs = input.shape[0]
-    input_shape_suffix = input.shape[1:]
-    input = input.reshape(n_inputs, -1)
-    n_range = nd.arange(n_inputs, dtype='int64').as_in_context(input.context)
-    w_nnz = nd.ones(n_inputs).as_in_context(input.context)
-    w_nid = nd.stack(seg_id, n_range, axis=0)
-    w = nd.sparse.csr_matrix((w_nnz, (seg_id, n_range)), (n_segs, n_inputs))
-    w = w.as_in_context(input.context)
-    y = nd.dot(w, input)
-    y = nd.reshape(y, (n_segs,) + input_shape_suffix)
-    return y
-
-def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
-    # TODO: support other dimensions
-    assert dim == 0, 'MXNet only supports segment mean on first dimension'
-
-    n_ones = nd.ones_like(seg_id).astype(input.dtype)
-    w = unsorted_1d_segment_sum(n_ones, seg_id, n_segs, 0)
-    w = nd.clip(w, a_min=1, a_max=np.inf)
-    y = unsorted_1d_segment_sum(input, seg_id, n_segs, dim)
-    y = y / w.reshape((-1,) + (1,) * (y.ndim - 1))
-    return y
-
 def boolean_mask(input, mask):
     return mx.contrib.nd.boolean_mask(input, mask)
 
@@ -311,6 +315,18 @@ def equal(x, y):
 
 def logical_not(input):
     return nd.logical_not(input)
+
+def logical_and(input1, input2):
+    return nd.logical_and(input1, input2)
+
+def clone(input):
+    return input.copy()
+
+def clamp(data, min_val, max_val):
+    return nd.clip(data, min_val, max_val)
+
+def replace_inf_with_zero(x):
+    return nd.where(nd.abs(x) == np.inf, nd.zeros_like(x), x)
 
 def unique(input):
     # TODO: fallback to numpy is unfortunate
@@ -325,7 +341,8 @@ def nonzero_1d(input):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
     tmp = np.nonzero(tmp)[0]
-    return nd.array(tmp, ctx=input.context, dtype=input.dtype)
+    r = nd.array(tmp, ctx=input.context, dtype=tmp.dtype)
+    return r
 
 def sort_1d(input):
     # TODO: this isn't an ideal implementation.
@@ -334,8 +351,11 @@ def sort_1d(input):
     idx = nd.cast(idx, dtype='int64')
     return val, idx
 
-def arange(start, stop):
-    return nd.arange(start, stop, dtype=np.int64)
+def arange(start, stop, dtype=np.int64):
+    if start >= stop:
+        return nd.array([], dtype=dtype)
+    else:
+        return nd.arange(start, stop, dtype=dtype)
 
 def rand_shuffle(arr):
     return mx.nd.random.shuffle(arr)
@@ -354,6 +374,7 @@ def zerocopy_from_numpy(np_data):
     return mx.nd.from_numpy(np_data, zero_copy=True)
 
 def zerocopy_to_dgl_ndarray(arr):
+    arr.to_dlpack_for_read()
     return dglnd.from_dlpack(arr.to_dlpack_for_read())
 
 def zerocopy_to_dgl_ndarray_for_write(arr):
@@ -557,3 +578,31 @@ def sync():
     that all computation is complete after this function call.
     """
     mx.nd.waitall()
+
+def attach_grad(tensor):
+    tensor.attach_grad()
+    return tensor
+
+def backward(x, head_gradient=None):
+    x.backward(head_gradient)
+
+def grad(x):
+    return x.grad
+
+def is_no_grad(x):
+    return (x != 0).sum() == 0
+
+def is_recording():
+    return mx.autograd.is_recording()
+
+record_grad = mx.autograd.record
+
+class no_grad(object):
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass

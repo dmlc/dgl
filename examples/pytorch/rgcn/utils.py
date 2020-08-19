@@ -4,9 +4,13 @@ Most code is adapted from authors' implementation of RGCN link prediction:
 https://github.com/MichSchli/RelationPrediction
 
 """
+import traceback
+from _thread import start_new_thread
+from functools import wraps
 
 import numpy as np
 import torch
+from torch.multiprocessing import Queue
 import dgl
 
 #######################################################################
@@ -131,7 +135,7 @@ def build_graph_from_triplets(num_nodes, num_rels, triplets):
         This function also generates edge type and normalization factor
         (reciprocal of node incoming degree)
     """
-    g = dgl.DGLGraph()
+    g = dgl.graph(([], []))
     g.add_nodes(num_nodes)
     src, rel, dst = triplets
     src, dst = np.concatenate((src, dst)), np.concatenate((dst, src))
@@ -334,3 +338,37 @@ def calc_mrr(embedding, w, train_triplets, valid_triplets, test_triplets, hits=[
     else:
         mrr = calc_raw_mrr(embedding, w, test_triplets, hits, eval_bz)
     return mrr
+
+
+#######################################################################
+#
+# Multithread wrapper
+#
+#######################################################################
+
+# According to https://github.com/pytorch/pytorch/issues/17199, this decorator
+# is necessary to make fork() and openmp work together.
+def thread_wrapped_func(func):
+    """
+    Wraps a process entry point to make it work with OpenMP.
+    """
+    @wraps(func)
+    def decorated_function(*args, **kwargs):
+        queue = Queue()
+        def _queue_result():
+            exception, trace, res = None, None, None
+            try:
+                res = func(*args, **kwargs)
+            except Exception as e:
+                exception = e
+                trace = traceback.format_exc()
+            queue.put((res, exception, trace))
+
+        start_new_thread(_queue_result, ())
+        result, exception, trace = queue.get()
+        if exception is None:
+            return result
+        else:
+            assert isinstance(exception, Exception)
+            raise exception.__class__(trace)
+    return decorated_function

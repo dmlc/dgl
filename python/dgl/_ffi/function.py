@@ -284,7 +284,8 @@ def _init_api_prefix(module_name, prefix):
     module = sys.modules[module_name]
 
     for name in list_global_func_names():
-        if name.startswith("_"):
+        if name.startswith("_") and not name.startswith('_deprecate'):
+            # internal APIs are ignored
             continue
         name_split = name.rsplit('.', 1)
         if name_split[0] != prefix:
@@ -304,7 +305,8 @@ def _init_api_prefix(module_name, prefix):
 
 def _init_internal_api():
     for name in list_global_func_names():
-        if not name.startswith("_"):
+        if not name.startswith("_") or name.startswith('_deprecate'):
+            # normal APIs are ignored
             continue
         target_module = sys.modules["dgl._api_internal"]
         fname = name

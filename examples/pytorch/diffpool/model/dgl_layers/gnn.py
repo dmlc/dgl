@@ -105,8 +105,8 @@ class DiffPoolBatchedGraphLayer(nn.Module):
         assign_tensor = self.pool_gc(g, h)
         device = feat.device
         assign_tensor_masks = []
-        batch_size = len(g.batch_num_nodes)
-        for g_n_nodes in g.batch_num_nodes:
+        batch_size = len(g.batch_num_nodes())
+        for g_n_nodes in g.batch_num_nodes():
             mask = torch.ones((g_n_nodes,
                                int(assign_tensor.size()[1] / batch_size)))
             assign_tensor_masks.append(mask)
@@ -123,7 +123,7 @@ class DiffPoolBatchedGraphLayer(nn.Module):
         assign_tensor = masked_softmax(assign_tensor, mask,
                                        memory_efficient=False)
         h = torch.matmul(torch.t(assign_tensor), feat)
-        adj = g.adjacency_matrix(ctx=device)
+        adj = g.adjacency_matrix(transpose=False, ctx=device)
         adj_new = torch.sparse.mm(adj, assign_tensor)
         adj_new = torch.mm(torch.t(assign_tensor), adj_new)
 

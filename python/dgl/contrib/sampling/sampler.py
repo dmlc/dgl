@@ -10,10 +10,10 @@ from ..._ffi.function import _init_api
 from ..._ffi.object import register_object, ObjectBase
 from ..._ffi.ndarray import empty
 from ... import utils
-from ...nodeflow import NodeFlow
+from ..._deprecate.nodeflow import NodeFlow
 from ... import backend as F
-from ...graph import DGLGraph
-from ...base import NID, EID
+from ..._deprecate.graph import DGLGraph as DGLGraphStale
+from ...base import NID, EID, dgl_warning
 
 try:
     import Queue as queue
@@ -237,8 +237,8 @@ class NeighborSampler(NodeFlowSampler):
 
     Parameters
     ----------
-    g : DGLGraph
-        The DGLGraph where we sample NodeFlows.
+    g : DGLGraphStale
+        The DGLGraphStale where we sample NodeFlows.
     batch_size : int
         The batch size (i.e, the number of nodes in the last layer)
     expand_factor : int
@@ -314,9 +314,11 @@ class NeighborSampler(NodeFlowSampler):
         super(NeighborSampler, self).__init__(
                 g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0,
                 ThreadPrefetchingWrapper)
+        dgl_warning('dgl.contrib.sampling.NeighborSampler is deprecated starting from v0.5.'
+                    ' Please read our guide<link> for how to use the new sampling APIs.')
 
         assert g.is_readonly, "NeighborSampler doesn't support mutable graphs. " + \
-                "Please turn it into an immutable graph with DGLGraph.readonly"
+                "Please turn it into an immutable graph with DGLGraphStale.readonly"
         assert isinstance(expand_factor, Integral), 'non-int expand_factor not supported'
 
         self._expand_factor = int(expand_factor)
@@ -364,8 +366,8 @@ class LayerSampler(NodeFlowSampler):
 
     Parameters
     ----------
-    g : DGLGraph
-        The DGLGraph where we sample NodeFlows.
+    g : DGLGraphStale
+        The DGLGraphStale where we sample NodeFlows.
     batch_size : int
         The batch size (i.e, the number of nodes in the last layer)
     layer_size: int
@@ -413,7 +415,7 @@ class LayerSampler(NodeFlowSampler):
                 ThreadPrefetchingWrapper)
 
         assert g.is_readonly, "LayerSampler doesn't support mutable graphs. " + \
-                "Please turn it into an immutable graph with DGLGraph.readonly"
+                "Please turn it into an immutable graph with DGLGraphStale.readonly"
         assert node_prob is None, 'non-uniform node probability not supported'
 
         self._num_workers = int(num_workers)
@@ -432,7 +434,7 @@ class LayerSampler(NodeFlowSampler):
         nflows = [NodeFlow(self.g, obj) for obj in nfobjs]
         return nflows
 
-class EdgeSubgraph(DGLGraph):
+class EdgeSubgraph(DGLGraphStale):
     ''' The subgraph sampled from an edge sampler.
 
     A user can access the head nodes and tail nodes of the subgraph directly.
@@ -551,8 +553,8 @@ class EdgeSampler(object):
 
     Parameters
     ----------
-    g : DGLGraph
-        The DGLGraph where we sample edges.
+    g : DGLGraphStale
+        The DGLGraphStale where we sample edges.
     batch_size : int
         The batch size (i.e, the number of edges from the graph)
     seed_edges : tensor, optional
@@ -785,7 +787,7 @@ def create_full_nodeflow(g, num_layers, add_self_loop=False):
 
     Parameters
     ----------
-    g : DGLGraph
+    g : DGLGraphStale
         a DGL graph
     num_layers : int
         The number of layers

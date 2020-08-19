@@ -170,9 +170,9 @@ class Transformer(nn.Module):
             y = y.view(-1)
             tgt_embed = self.tgt_embed(y)
             g.ndata['x'][nids['dec']] = self.pos_enc.dropout(tgt_embed + tgt_pos)
-            edges_ed = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'] , eids['ed'])
-            edges_dd = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'], eids['dd'])
-            nodes_d = g.filter_nodes(lambda v: (v.data['pos'] < step) & ~v.data['mask'], nids['dec'])
+            edges_ed = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'].bool(), eids['ed'])
+            edges_dd = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'].bool(), eids['dd'])
+            nodes_d = g.filter_nodes(lambda v: (v.data['pos'] < step) & ~v.data['mask'].bool(), nids['dec'])
             for i in range(self.decoder.N):
                 pre_func, post_func = self.decoder.pre_func(i, 'qkv'), self.decoder.post_func(i)
                 nodes, edges = nodes_d, edges_dd

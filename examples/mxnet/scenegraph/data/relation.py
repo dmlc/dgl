@@ -120,7 +120,7 @@ class VGRelation(VisionDataset):
             img, bbox = self.img_transform(img, bbox)
 
         # build the graph
-        g = dgl.DGLGraph(multigraph=True)
+        g = dgl.DGLGraph()
         g.add_nodes(n_nodes)
         adjmat = np.zeros((n_nodes, n_nodes))
         predicate = []

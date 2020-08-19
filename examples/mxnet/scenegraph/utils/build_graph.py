@@ -49,7 +49,7 @@ def build_graph_train(g_slice, gt_bbox, img, ids, scores, bbox, feat_ind,
         
         n_nodes = len(inds)
         roi_ind = feat_ind[gi, inds].squeeze(axis=1)
-        g_pred = dgl.DGLGraph(multigraph=True)
+        g_pred = dgl.DGLGraph()
         g_pred.add_nodes(n_nodes, {'pred_bbox': bbox[gi, inds],
                                    'node_feat': spatial_feat[gi, roi_ind],
                                    'node_class_pred': ids[gi, inds, 0],

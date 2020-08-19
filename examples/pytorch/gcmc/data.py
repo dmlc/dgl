@@ -5,11 +5,10 @@ import re
 import pandas as pd
 import scipy.sparse as sp
 import torch as th
-from torchtext import data
-from torchtext.vocab import GloVe
 
 import dgl
 from dgl.data.utils import download, extract_archive, get_download_dir
+from utils import to_etype_name
 
 _urls = {
     'ml-100k' : 'http://files.grouplens.org/datasets/movielens/ml-100k.zip',
@@ -84,6 +83,8 @@ class MovieLens(object):
         Dataset name. Could be "ml-100k", "ml-1m", "ml-10m"
     device : torch.device
         Device context
+    mix_cpu_gpu : boo, optional
+        If true, the ``user_feature`` attribute is stored in CPU
     use_one_hot_fea : bool, optional
         If true, the ``user_feature`` attribute is None, representing an one-hot identity
         matrix. (Default: False)
@@ -96,7 +97,8 @@ class MovieLens(object):
         Ratio of validation data
 
     """
-    def __init__(self, name, device, use_one_hot_fea=False, symm=True,
+    def __init__(self, name, device, mix_cpu_gpu=False,
+                 use_one_hot_fea=False, symm=True,
                  test_ratio=0.1, valid_ratio=0.1):
         self._name = name
         self._device = device
@@ -164,8 +166,13 @@ class MovieLens(object):
             self.user_feature = None
             self.movie_feature = None
         else:
-            self.user_feature = th.FloatTensor(self._process_user_fea()).to(device)
-            self.movie_feature = th.FloatTensor(self._process_movie_fea()).to(device)
+            # if mix_cpu_gpu, we put features in CPU
+            if mix_cpu_gpu:
+                self.user_feature = th.FloatTensor(self._process_user_fea())
+                self.movie_feature = th.FloatTensor(self._process_movie_fea())
+            else:
+                self.user_feature = th.FloatTensor(self._process_user_fea()).to(self._device)
+                self.movie_feature = th.FloatTensor(self._process_movie_fea()).to(self._device)
         if self.user_feature is None:
             self.user_feature_shape = (self.num_user, self.num_user)
             self.movie_feature_shape = (self.num_movie, self.num_movie)
@@ -204,6 +211,7 @@ class MovieLens(object):
         def _npairs(graph):
             rst = 0
             for r in self.possible_rating_values:
+                r = to_etype_name(r)
                 rst += graph.number_of_edges(str(r))
             return rst
 
@@ -237,21 +245,20 @@ class MovieLens(object):
     def _generate_enc_graph(self, rating_pairs, rating_values, add_support=False):
         user_movie_R = np.zeros((self._num_user, self._num_movie), dtype=np.float32)
         user_movie_R[rating_pairs] = rating_values
-        movie_user_R = user_movie_R.transpose()
 
-        rating_graphs = []
+        data_dict = dict()
+        num_nodes_dict = {'user': self._num_user, 'movie': self._num_movie}
         rating_row, rating_col = rating_pairs
         for rating in self.possible_rating_values:
             ridx = np.where(rating_values == rating)
             rrow = rating_row[ridx]
             rcol = rating_col[ridx]
-            bg = dgl.bipartite((rrow, rcol), 'user', str(rating), 'movie',
-                               card=(self._num_user, self._num_movie))
-            rev_bg = dgl.bipartite((rcol, rrow), 'movie', 'rev-%s' % str(rating), 'user',
-                               card=(self._num_movie, self._num_user))
-            rating_graphs.append(bg)
-            rating_graphs.append(rev_bg)
-        graph = dgl.hetero_from_relations(rating_graphs)
+            rating = to_etype_name(rating)
+            data_dict.update({
+                ('user', str(rating), 'movie'): (rrow, rcol),
+                ('movie', 'rev-%s' % str(rating), 'user'): (rcol, rrow)
+            })
+        graph = dgl.heterograph(data_dict, num_nodes_dict=num_nodes_dict)
 
         # sanity check
         assert len(rating_pairs[0]) == sum([graph.number_of_edges(et) for et in graph.etypes]) // 2
@@ -261,13 +268,13 @@ class MovieLens(object):
                 x = x.numpy().astype('float32')
                 x[x == 0.] = np.inf
                 x = th.FloatTensor(1. / np.sqrt(x))
-                return x.to(self._device).unsqueeze(1)
+                return x.unsqueeze(1)
             user_ci = []
             user_cj = []
             movie_ci = []
             movie_cj = []
             for r in self.possible_rating_values:
-                r = str(r)
+                r = to_etype_name(r)
                 user_ci.append(graph['rev-%s' % r].in_degrees())
                 movie_ci.append(graph[r].in_degrees())
                 if self._symm:
@@ -282,8 +289,8 @@ class MovieLens(object):
                 user_cj = _calc_norm(sum(user_cj))
                 movie_cj = _calc_norm(sum(movie_cj))
             else:
-                user_cj = th.ones(self.num_user,).to(self._device)
-                movie_cj = th.ones(self.num_movie,).to(self._device)
+                user_cj = th.ones(self.num_user,)
+                movie_cj = th.ones(self.num_movie,)
             graph.nodes['user'].data.update({'ci' : user_ci, 'cj' : user_cj})
             graph.nodes['movie'].data.update({'ci' : movie_ci, 'cj' : movie_cj})
 
@@ -294,7 +301,8 @@ class MovieLens(object):
         user_movie_ratings_coo = sp.coo_matrix(
             (ones, rating_pairs),
             shape=(self.num_user, self.num_movie), dtype=np.float32)
-        return dgl.bipartite(user_movie_ratings_coo, 'user', 'rate', 'movie')
+        g = dgl.bipartite_from_scipy(user_movie_ratings_coo, utype='_U', etype='_E', vtype='_V')
+        return dgl.heterograph({('user', 'rate', 'movie'): g.edges()})
 
     @property
     def num_links(self):
@@ -494,6 +502,8 @@ class MovieLens(object):
             Generate movie features by concatenating embedding and the year
 
         """
+        import torchtext
+
         if self._name == 'ml-100k':
             GENRES = GENRES_ML_100K
         elif self._name == 'ml-1m':
@@ -503,8 +513,8 @@ class MovieLens(object):
         else:
             raise NotImplementedError
 
-        TEXT = data.Field(tokenize='spacy')
-        embedding = GloVe(name='840B', dim=300)
+        TEXT = torchtext.data.Field(tokenize='spacy', tokenizer_language='en_core_web_sm')
+        embedding = torchtext.vocab.GloVe(name='840B', dim=300)
 
         title_embedding = np.zeros(shape=(self.movie_info.shape[0], 300), dtype=np.float32)
         release_years = np.zeros(shape=(self.movie_info.shape[0], 1), dtype=np.float32)

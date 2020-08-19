@@ -45,6 +45,13 @@ SAGEConv
     :members: forward
     :show-inheritance:
     
+ChebConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.tensorflow.conv.ChebConv
+    :members: forward
+    :show-inheritance:
+    
 SGConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -107,12 +114,12 @@ GlobalAttentionPooling
     :members:
     :show-inheritance:
 
-    
-Utility Modules
+Heterogeneous Graph Convolution Module
 ----------------------------------------
-    
-Edge Softmax
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: dgl.nn.tensorflow.softmax
-    :members: edge_softmax
+HeteroGraphConv
+~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.tensorflow.HeteroGraphConv
+   :members:
+   :show-inheritance:

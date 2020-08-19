@@ -49,9 +49,20 @@ HeteroSubgraph SampleNeighbors(
         hg->NumVertices(dst_vtype),
         hg->DataType(), hg->Context());
       induced_edges[etype] = aten::NullArray();
+    } else if (fanouts[etype] == -1) {
+      const auto &earr = (dir == EdgeDir::kOut) ?
+        hg->OutEdges(etype, nodes_ntype) :
+        hg->InEdges(etype, nodes_ntype);
+      subrels[etype] = UnitGraph::CreateFromCOO(
+        hg->GetRelationGraph(etype)->NumVertexTypes(),
+        hg->NumVertices(src_vtype),
+        hg->NumVertices(dst_vtype),
+        earr.src,
+        earr.dst);
+      induced_edges[etype] = earr.id;
     } else {
       // sample from one relation graph
-      auto req_fmt = (dir == EdgeDir::kOut)? SparseFormat::kCSR : SparseFormat::kCSC;
+      auto req_fmt = (dir == EdgeDir::kOut)? csr_code : csc_code;
       auto avail_fmt = hg->SelectFormat(etype, req_fmt);
       COOMatrix sampled_coo;
       switch (avail_fmt) {
@@ -124,9 +135,20 @@ HeteroSubgraph SampleNeighborsTopk(
         hg->NumVertices(dst_vtype),
         hg->DataType(), hg->Context());
       induced_edges[etype] = aten::NullArray();
+    } else if (k[etype] == -1) {
+      const auto &earr = (dir == EdgeDir::kOut) ?
+        hg->OutEdges(etype, nodes_ntype) :
+        hg->InEdges(etype, nodes_ntype);
+      subrels[etype] = UnitGraph::CreateFromCOO(
+        hg->GetRelationGraph(etype)->NumVertexTypes(),
+        hg->NumVertices(src_vtype),
+        hg->NumVertices(dst_vtype),
+        earr.src,
+        earr.dst);
+      induced_edges[etype] = earr.id;
     } else {
       // sample from one relation graph
-      auto req_fmt = (dir == EdgeDir::kOut)? SparseFormat::kCSR : SparseFormat::kCSC;
+      auto req_fmt = (dir == EdgeDir::kOut)? csr_code : csc_code;
       auto avail_fmt = hg->SelectFormat(etype, req_fmt);
       COOMatrix sampled_coo;
       switch (avail_fmt) {
@@ -172,7 +194,8 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighbors")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     const auto& nodes = ListValueToVector<IdArray>(args[1]);
-    const auto& fanouts = ListValueToVector<int64_t>(args[2]);
+    IdArray fanouts_array = args[2];
+    const auto& fanouts = fanouts_array.ToVector<int64_t>();
     const std::string dir_str = args[3];
     const auto& prob = ListValueToVector<FloatArray>(args[4]);
     const bool replace = args[5];
@@ -192,14 +215,15 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsTopk")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     const auto& nodes = ListValueToVector<IdArray>(args[1]);
-    const auto& k = ListValueToVector<int64_t>(args[2]);
+    IdArray k_array = args[2];
+    const auto& k = k_array.ToVector<int64_t>();
     const std::string dir_str = args[3];
     const auto& weight = ListValueToVector<FloatArray>(args[4]);
     const bool ascending = args[5];
 
-  CHECK(dir_str == "in" || dir_str == "out")
-    << "Invalid edge direction. Must be \"in\" or \"out\".";
-    EdgeDir dir = (dir_str == "in")? EdgeDir::kIn : EdgeDir::kOut;
+    CHECK(dir_str == "in" || dir_str == "out")
+      << "Invalid edge direction. Must be \"in\" or \"out\".";
+      EdgeDir dir = (dir_str == "in")? EdgeDir::kIn : EdgeDir::kOut;
 
     std::shared_ptr<HeteroSubgraph> subg(new HeteroSubgraph);
     *subg = sampling::SampleNeighborsTopk(

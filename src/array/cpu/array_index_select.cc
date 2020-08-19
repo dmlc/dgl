@@ -35,20 +35,16 @@ template NDArray IndexSelect<kDLCPU, double, int32_t>(NDArray, IdArray);
 template NDArray IndexSelect<kDLCPU, double, int64_t>(NDArray, IdArray);
 
 template <DLDeviceType XPU, typename DType>
-DType IndexSelect(NDArray array, uint64_t index) {
+DType IndexSelect(NDArray array, int64_t index) {
   const DType* data = static_cast<DType*>(array->data);
   return data[index];
 }
 
-template int32_t IndexSelect<kDLCPU, int32_t>(NDArray array, uint64_t index);
-template int64_t IndexSelect<kDLCPU, int64_t>(NDArray array, uint64_t index);
-template uint32_t IndexSelect<kDLCPU, uint32_t>(NDArray array, uint64_t index);
-template uint64_t IndexSelect<kDLCPU, uint64_t>(NDArray array, uint64_t index);
-template float IndexSelect<kDLCPU, float>(NDArray array, uint64_t index);
-template double IndexSelect<kDLCPU, double>(NDArray array, uint64_t index);
+template int32_t IndexSelect<kDLCPU, int32_t>(NDArray array, int64_t index);
+template int64_t IndexSelect<kDLCPU, int64_t>(NDArray array, int64_t index);
+template float IndexSelect<kDLCPU, float>(NDArray array, int64_t index);
+template double IndexSelect<kDLCPU, double>(NDArray array, int64_t index);
 
-};  // namespace impl
-
-};  // namespace aten
-
-};  // namespace dgl
+}  // namespace impl
+}  // namespace aten
+}  // namespace dgl

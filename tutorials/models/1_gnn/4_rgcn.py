@@ -268,7 +268,6 @@ class Model(nn.Module):
 
 # load graph data
 from dgl.contrib.data import load_data
-import numpy as np
 data = load_data(dataset='aifb')
 num_nodes = data.num_nodes
 num_rels = data.num_rels
@@ -298,9 +297,7 @@ lr = 0.01 # learning rate
 l2norm = 0 # L2 norm coefficient
 
 # create graph
-g = DGLGraph()
-g.add_nodes(num_nodes)
-g.add_edges(data.edge_src, data.edge_dst)
+g = DGLGraph((data.edge_src, data.edge_dst))
 g.edata.update({'rel_type': edge_type, 'norm': edge_norm})
 
 # create model

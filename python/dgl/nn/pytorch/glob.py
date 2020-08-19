@@ -14,31 +14,76 @@ __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
            'SetTransformerEncoder', 'SetTransformerDecoder', 'WeightAndSum']
 
 class SumPooling(nn.Module):
-    r"""Apply sum pooling over the nodes in the graph.
+    r"""
+
+    Description
+    -----------
+    Apply sum pooling over the nodes in a graph .
 
     .. math::
         r^{(i)} = \sum_{k=1}^{N_i} x^{(i)}_k
+
+    Notes
+    -----
+        Input: Could be one graph, or a batch of graphs. If using a batch of graphs,
+        make sure nodes in all graphs have the same feature size, and concatenate
+        nodes' feature together as the input.
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn.pytorch.glob import SumPooling
+    >>>
+    >>> g1 = dgl.DGLGraph()
+    >>> g1.add_nodes(2)
+    >>> g1_node_feats = th.ones(2,5)
+    >>>
+    >>> g2 = dgl.DGLGraph()
+    >>> g2.add_nodes(3)
+    >>> g2_node_feats = th.ones(3,5)
+    >>>
+    >>> sumpool = SumPooling()
+
+    Case 1: Input a single graph
+
+    >>> sumpool(g1, g1_node_feats)
+        tensor([[2., 2., 2., 2., 2.]])
+
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
+    >>>
+    >>> sumpool(batch_g, batch_f)
+        tensor([[2., 2., 2., 2., 2.],
+                [3., 3., 3., 3., 3.]])
     """
     def __init__(self):
         super(SumPooling, self).__init__()
 
     def forward(self, graph, feat):
-        r"""Compute sum pooling.
+        r"""
 
+        Compute sum pooling.
 
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            a DGLGraph or a batch of DGLGraphs
         feat : torch.Tensor
-            The input feature with shape :math:`(N, *)` where
-            :math:`N` is the number of nodes in the graph.
+            The input feature with shape :math:`(N, D)`, where :math:`N` is the number
+            of nodes in the graph, and :math:`D` means the size of features.
 
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(B, *)`, where
-            :math:`B` refers to the batch size.
+            The output feature with shape :math:`(B, D)`, where :math:`B` refers to the
+            batch size of input graphs.
         """
         with graph.local_scope():
             graph.ndata['h'] = feat
@@ -47,30 +92,76 @@ class SumPooling(nn.Module):
 
 
 class AvgPooling(nn.Module):
-    r"""Apply average pooling over the nodes in the graph.
+    r"""
+
+    Description
+    -----------
+    Apply average pooling over the nodes in a graph.
 
     .. math::
         r^{(i)} = \frac{1}{N_i}\sum_{k=1}^{N_i} x^{(i)}_k
+
+    Notes
+    -----
+        Input: Could be one graph, or a batch of graphs. If using a batch of graphs,
+        make sure nodes in all graphs have the same feature size, and concatenate
+        nodes' feature together as the input.
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn.pytorch.glob import AvgPooling
+    >>>
+    >>> g1 = dgl.DGLGraph()
+    >>> g1.add_nodes(2)
+    >>> g1_node_feats = th.ones(2,5)
+    >>>
+    >>> g2 = dgl.DGLGraph()
+    >>> g2.add_nodes(3)
+    >>> g2_node_feats = th.ones(3,5)
+    >>>
+    >>> avgpool = AvgPooling()
+
+    Case 1: Input single graph
+
+    >>> avgpool(g1, g1_node_feats)
+        tensor([[1., 1., 1., 1., 1.]])
+
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' note features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
+    >>>
+    >>> avgpool(batch_g, batch_f)
+        tensor([[1., 1., 1., 1., 1.],
+                [1., 1., 1., 1., 1.]])
     """
     def __init__(self):
         super(AvgPooling, self).__init__()
 
     def forward(self, graph, feat):
-        r"""Compute average pooling.
+        r"""
+
+        Compute average pooling.
 
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, *)` where
-            :math:`N` is the number of nodes in the graph.
+            The input feature with shape :math:`(N, D)`, where :math:`N` is the number
+            of nodes in the graph, and :math:`D` means the size of features.
 
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(B, *)`, where
-            :math:`B` refers to the batch size.
+            The output feature with shape :math:`(B, D)`, where
+            :math:`B` refers to the batch size of input graphs.
         """
         with graph.local_scope():
             graph.ndata['h'] = feat
@@ -79,10 +170,54 @@ class AvgPooling(nn.Module):
 
 
 class MaxPooling(nn.Module):
-    r"""Apply max pooling over the nodes in the graph.
+    r"""
+
+    Description
+    -----------
+    Apply max pooling over the nodes in a graph.
 
     .. math::
         r^{(i)} = \max_{k=1}^{N_i}\left( x^{(i)}_k \right)
+
+    Notes
+    -----
+        Input: Could be one graph, or a batch of graphs. If using a batch of graphs,
+        make sure nodes in all graphs have the same feature size, and concatenate
+        nodes' feature together as the input.
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn.pytorch.glob import MaxPooling
+    >>>
+    >>> g1 = dgl.DGLGraph()
+    >>> g1.add_nodes(2)
+    >>> g1_node_feats = th.ones(2,5)
+    >>>
+    >>> g2 = dgl.DGLGraph()
+    >>> g2.add_nodes(3)
+    >>> g2_node_feats = th.ones(3,5)
+    >>>
+    >>> maxpool = MaxPooling()
+
+    Case 1: Input a single graph
+
+    >>> maxpool(g1, g1_node_feats)
+        tensor([[1., 1., 1., 1., 1.]])
+
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
+    >>>
+    >>> maxpool(batch_g, batch_f)
+        tensor([[1., 1., 1., 1., 1.],
+                [1., 1., 1., 1., 1.]])
     """
     def __init__(self):
         super(MaxPooling, self).__init__()
@@ -93,9 +228,9 @@ class MaxPooling(nn.Module):
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, *)` where
+            The input feature with shape :math:`(N, *)`, where
             :math:`N` is the number of nodes in the graph.
 
         Returns
@@ -111,48 +246,97 @@ class MaxPooling(nn.Module):
 
 
 class SortPooling(nn.Module):
-    r"""Apply Sort Pooling (`An End-to-End Deep Learning Architecture for Graph Classification
-    <https://www.cse.wustl.edu/~ychen/public/DGCNN.pdf>`__) over the nodes in the graph.
+    r"""
+
+    Description
+    -----------
+    Apply Sort Pooling (`An End-to-End Deep Learning Architecture for Graph Classification
+    <https://www.cse.wustl.edu/~ychen/public/DGCNN.pdf>`__) over the nodes in a graph.
 
     Parameters
     ----------
     k : int
         The number of nodes to hold for each graph.
+
+    Notes
+    -----
+        Input: Could be one graph, or a batch of graphs. If using a batch of graphs,
+        make sure nodes in all graphs have the same feature size, and concatenate
+        nodes' feature together as the input.
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn.pytorch.glob import SortPooling
+    >>>
+    >>> g1 = dgl.DGLGraph()
+    >>> g1.add_nodes(2)
+    >>> g1_node_feats = th.ones(2,5)
+    >>>
+    >>> g2 = dgl.DGLGraph()
+    >>> g2.add_nodes(3)
+    >>> g2_node_feats = th.ones(3,5)
+    >>>
+    >>> sortpool = SortPooling(k=2)
+
+    Case 1: Input a single graph
+
+    >>> sortpool(g1, g1_node_feats)
+        tensor([[1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]])
+
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
+    >>>
+    >>> sortpool(batch_g, batch_f)
+        tensor([[1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+                [1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]])
     """
     def __init__(self, k):
         super(SortPooling, self).__init__()
         self.k = k
 
     def forward(self, graph, feat):
-        r"""Compute sort pooling.
+        r"""
+
+        Compute sort pooling.
 
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, D)` where
-            :math:`N` is the number of nodes in the graph.
+            The input feature with shape :math:`(N, D)`, where :math:`N` is the
+            number of nodes in the graph, and :math:`D` means the size of features.
 
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(B, k * D)`, where
-            :math:`B` refers to the batch size.
+            The output feature with shape :math:`(B, k * D)`, where :math:`B` refers
+            to the batch size of input graphs.
         """
         with graph.local_scope():
             # Sort the feature of each node in ascending order.
             feat, _ = feat.sort(dim=-1)
             graph.ndata['h'] = feat
             # Sort nodes according to their last features.
-            ret = topk_nodes(graph, 'h', self.k, idx=-1)[0].view(
+            ret = topk_nodes(graph, 'h', self.k, sortby=-1)[0].view(
                 -1, self.k * feat.shape[-1])
             return ret
 
 
 class GlobalAttentionPooling(nn.Module):
-    r"""Apply Global Attention Pooling (`Gated Graph Sequence Neural Networks
-    <https://arxiv.org/abs/1511.05493.pdf>`__) over the nodes in the graph.
+    r"""
+
+    Description
+    -----------
+    Apply Global Attention Pooling (`Gated Graph Sequence Neural Networks
+    <https://arxiv.org/abs/1511.05493.pdf>`__) over the nodes in a graph.
 
     .. math::
         r^{(i)} = \sum_{k=1}^{N_i}\mathrm{softmax}\left(f_{gate}
@@ -163,8 +347,8 @@ class GlobalAttentionPooling(nn.Module):
     gate_nn : torch.nn.Module
         A neural network that computes attention scores for each feature.
     feat_nn : torch.nn.Module, optional
-        A neural network applied to each feature before combining them
-        with attention scores.
+        A neural network applied to each feature before combining them with attention
+        scores.
     """
     def __init__(self, gate_nn, feat_nn=None):
         super(GlobalAttentionPooling, self).__init__()
@@ -172,21 +356,23 @@ class GlobalAttentionPooling(nn.Module):
         self.feat_nn = feat_nn
 
     def forward(self, graph, feat):
-        r"""Compute global attention pooling.
+        r"""
+
+        Compute global attention pooling.
 
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, D)` where
-            :math:`N` is the number of nodes in the graph.
+            The input feature with shape :math:`(N, D)` where :math:`N` is the
+            number of nodes in the graph, and :math:`D` means the size of features.
 
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(B, D)`, where
-            :math:`B` refers to the batch size.
+            The output feature with shape :math:`(B, D)`, where :math:`B` refers
+            to the batch size.
         """
         with graph.local_scope():
             gate = self.gate_nn(feat)
@@ -205,9 +391,10 @@ class GlobalAttentionPooling(nn.Module):
 
 
 class Set2Set(nn.Module):
-    r"""Apply Set2Set (`Order Matters: Sequence to sequence for sets
-    <https://arxiv.org/pdf/1511.06391.pdf>`__) over the nodes in the graph.
+    r"""
 
+    Description
+    -----------
     For each individual graph in the batch, set2set computes
 
     .. math::
@@ -224,11 +411,11 @@ class Set2Set(nn.Module):
     Parameters
     ----------
     input_dim : int
-        Size of each input sample
+        The size of each input sample.
     n_iters : int
-        Number of iterations.
+        The number of iterations.
     n_layers : int
-        Number of recurrent layers.
+        The number of recurrent layers.
     """
     def __init__(self, input_dim, n_iters, n_layers):
         super(Set2Set, self).__init__()
@@ -244,21 +431,22 @@ class Set2Set(nn.Module):
         self.lstm.reset_parameters()
 
     def forward(self, graph, feat):
-        r"""Compute set2set pooling.
+        r"""
+        Compute set2set pooling.
 
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            The input graph.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, D)` where
-            :math:`N` is the number of nodes in the graph.
+            The input feature with shape :math:`(N, D)` where  :math:`N` is the
+            number of nodes in the graph, and :math:`D` means the size of features.
 
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(B, D)`, where
-            :math:`B` refers to the batch size.
+            The output feature with shape :math:`(B, D)`, where :math:`B` refers to
+            the batch size, and :math:`D` means the size of features.
         """
         with graph.local_scope():
             batch_size = graph.batch_size
@@ -497,31 +685,35 @@ class PMALayer(nn.Module):
 
 
 class SetTransformerEncoder(nn.Module):
-    r"""The Encoder module in `Set Transformer: A Framework for Attention-based
+    r"""
+
+    Description
+    -----------
+    The Encoder module in `Set Transformer: A Framework for Attention-based
     Permutation-Invariant Neural Networks <https://arxiv.org/pdf/1810.00825.pdf>`__.
 
     Parameters
     ----------
     d_model : int
-        Hidden size of the model.
+        The hidden size of the model.
     n_heads : int
-        Number of heads.
+        The number of heads.
     d_head : int
-        Hidden size of each head.
+        The hidden size of each head.
     d_ff : int
-        Kernel size in FFN (Positionwise Feed-Forward Network) layer.
+        The kernel size in FFN (Positionwise Feed-Forward Network) layer.
     n_layers : int
-        Number of layers.
+        The number of layers.
     block_type : str
         Building block type: 'sab' (Set Attention Block) or 'isab' (Induced
         Set Attention Block).
     m : int or None
-        Number of induced vectors in ISAB Block, set to None if block type
+        The number of induced vectors in ISAB Block. Set to None if block type
         is 'sab'.
     dropouth : float
-        Dropout rate of each sublayer.
+        The dropout rate of each sublayer.
     dropouta : float
-        Dropout rate of attention heads.
+        The dropout rate of attention heads.
     """
     def __init__(self, d_model, n_heads, d_head, d_ff,
                  n_layers=1, block_type='sab', m=None, dropouth=0., dropouta=0.):
@@ -554,24 +746,28 @@ class SetTransformerEncoder(nn.Module):
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            The input graph.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, D)` where
-            :math:`N` is the number of nodes in the graph.
+            The input feature with shape :math:`(N, D)`, where :math:`N` is the
+            number of nodes in the graph.
 
         Returns
         -------
         torch.Tensor
             The output feature with shape :math:`(N, D)`.
         """
-        lengths = graph.batch_num_nodes
+        lengths = graph.batch_num_nodes()
         for layer in self.layers:
             feat = layer(feat, lengths)
         return feat
 
 
 class SetTransformerDecoder(nn.Module):
-    r"""The Decoder module in `Set Transformer: A Framework for Attention-based
+    r"""
+
+    Description
+    -----------
+    The Decoder module in `Set Transformer: A Framework for Attention-based
     Permutation-Invariant Neural Networks <https://arxiv.org/pdf/1810.00825.pdf>`__.
 
     Parameters
@@ -579,15 +775,15 @@ class SetTransformerDecoder(nn.Module):
     d_model : int
         Hidden size of the model.
     num_heads : int
-        Number of heads.
+        The number of heads.
     d_head : int
         Hidden size of each head.
     d_ff : int
         Kernel size in FFN (Positionwise Feed-Forward Network) layer.
     n_layers : int
-        Number of layers.
+        The number of layers.
     k : int
-        Number of seed vectors in PMA (Pooling by Multihead Attention) layer.
+        The number of seed vectors in PMA (Pooling by Multihead Attention) layer.
     dropouth : float
         Dropout rate of each sublayer.
     dropouta : float
@@ -615,18 +811,18 @@ class SetTransformerDecoder(nn.Module):
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            The input graph.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, D)` where
-            :math:`N` is the number of nodes in the graph.
+            The input feature with shape :math:`(N, D)`, where :math:`N` is the
+            number of nodes in the graph, and :math:`D` means the size of features.
 
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(B, D)`, where
-            :math:`B` refers to the batch size.
+            The output feature with shape :math:`(B, D)`, where :math:`B` refers to
+            the batch size.
         """
-        len_pma = graph.batch_num_nodes
+        len_pma = graph.batch_num_nodes()
         len_sab = [self.k] * graph.batch_size
         feat = self.pma(feat, len_pma)
         for layer in self.layers:

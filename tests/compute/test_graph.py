@@ -1,10 +1,12 @@
 import math
+import numbers
 import numpy as np
 import scipy.sparse as sp
 import networkx as nx
 import dgl
 import backend as F
 from dgl import DGLError
+import pytest
 
 # graph generation: a random graph with 10 nodes
 #  and 20 edges.
@@ -58,7 +60,6 @@ def test_query():
         assert g.number_of_nodes() == 10
         assert g.number_of_edges() == 20
         assert len(g) == 10
-        assert not g.is_multigraph
 
         for i in range(10):
             assert g.has_node(i)
@@ -131,7 +132,6 @@ def test_query():
         assert g.number_of_nodes() == 10
         assert g.number_of_edges() == 20
         assert len(g) == 10
-        assert not g.is_multigraph
 
         for i in range(10):
             assert g.has_node(i)
@@ -203,20 +203,36 @@ def test_query():
         _test_csr_one(g)
         _test_csr_one(g)
 
+    def _test_edge_ids():
+        g = gen_by_mutation()
+        eids = g.edge_ids([4,0], [4,9])
+        assert eids.shape[0] == 2
+        eid = g.edge_id(4, 4)
+        assert isinstance(eid, numbers.Number)
+        with pytest.raises(DGLError):
+            eids = g.edge_ids([9,0], [4,9])
+
+        with pytest.raises(DGLError):
+            eid = g.edge_id(4, 5)
+
+        g.add_edge(0, 4)
+        eids = g.edge_ids([0,0], [4,9])
+        eid = g.edge_id(0, 4)
+
     _test(gen_by_mutation())
     _test(gen_from_data(elist_input(), False, False))
     _test(gen_from_data(elist_input(), True, False))
     _test(gen_from_data(elist_input(), True, True))
-    _test(gen_from_data(nx_input(), False, False))
-    _test(gen_from_data(nx_input(), True, False))
     _test(gen_from_data(scipy_coo_input(), False, False))
     _test(gen_from_data(scipy_coo_input(), True, False))
 
     _test_csr(gen_from_data(scipy_csr_input(), False, False))
     _test_csr(gen_from_data(scipy_csr_input(), True, False))
+    _test_edge_ids()
 
 def test_mutation():
     g = dgl.DGLGraph()
+    g = g.to(F.ctx())
     # test add nodes with data
     g.add_nodes(5)
     g.add_nodes(5, {'h' : F.ones((5, 2))})
@@ -229,39 +245,19 @@ def test_mutation():
     g.add_edges([0, 1], [1, 2], {'m' : F.ones((2, 2))})
     ans = F.cat([F.zeros((2, 2)), F.ones((2, 2))], 0)
     assert F.allclose(ans, g.edata['m'])
-    # test clear and add again
-    g.clear()
-    g.add_nodes(5)
-    g.ndata['h'] = 3 * F.ones((5, 2))
-    assert F.allclose(3 * F.ones((5, 2)), g.ndata['h'])
-    g.init_ndata('h1', (g.number_of_nodes(), 3), 'float32')
-    assert F.allclose(F.zeros((g.number_of_nodes(), 3)), g.ndata['h1'])
-    g.init_edata('h2', (g.number_of_edges(), 3), 'float32')
-    assert F.allclose(F.zeros((g.number_of_edges(), 3)), g.edata['h2'])
 
 def test_scipy_adjmat():
     g = dgl.DGLGraph()
     g.add_nodes(10)
     g.add_edges(range(9), range(1, 10))
 
-    adj_0 = g.adjacency_matrix_scipy()
-    adj_1 = g.adjacency_matrix_scipy(fmt='coo')
+    adj_0 = g.adj(scipy_fmt='csr')
+    adj_1 = g.adj(scipy_fmt='coo')
     assert np.array_equal(adj_0.toarray(), adj_1.toarray())
 
-    adj_t0 = g.adjacency_matrix_scipy(transpose=True)
-    adj_t_1 = g.adjacency_matrix_scipy(transpose=True, fmt='coo')
+    adj_t0 = g.adj(transpose=True, scipy_fmt='csr')
+    adj_t_1 = g.adj(transpose=True, scipy_fmt='coo')
     assert np.array_equal(adj_0.toarray(), adj_1.toarray())
-
-    g.readonly()
-    adj_2 = g.adjacency_matrix_scipy()
-    adj_3 = g.adjacency_matrix_scipy(fmt='coo')
-    assert np.array_equal(adj_2.toarray(), adj_3.toarray())
-    assert np.array_equal(adj_0.toarray(), adj_2.toarray())
-
-    adj_t2 = g.adjacency_matrix_scipy(transpose=True)
-    adj_t3 = g.adjacency_matrix_scipy(transpose=True, fmt='coo')
-    assert np.array_equal(adj_t2.toarray(), adj_t3.toarray())
-    assert np.array_equal(adj_t0.toarray(), adj_t2.toarray())
 
 def test_incmat():
     g = dgl.DGLGraph()
@@ -296,70 +292,13 @@ def test_incmat():
                       [0., 1., 0., -1., 0.],
                       [0., 0., 1., 1., 0.]]))
 
-def test_readonly():
-    g = dgl.DGLGraph()
-    g.add_nodes(5)
-    g.add_edges([0, 1, 2, 3], [1, 2, 3, 4])
-    g.ndata['x'] = F.zeros((5, 3))
-    g.edata['x'] = F.zeros((4, 4))
-
-    g.readonly(False)
-    assert g._graph.is_readonly() == False
-    assert g.number_of_nodes() == 5
-    assert g.number_of_edges() == 4
-
-    g.readonly()
-    assert g._graph.is_readonly() == True
-    assert g.number_of_nodes() == 5
-    assert g.number_of_edges() == 4
-
-    try:
-        g.add_nodes(5)
-        fail = False
-    except DGLError:
-        fail = True
-    finally:
-        assert fail
-
-    g.readonly()
-    assert g._graph.is_readonly() == True
-    assert g.number_of_nodes() == 5
-    assert g.number_of_edges() == 4
-
-    try:
-        g.add_nodes(5)
-        fail = False
-    except DGLError:
-        fail = True
-    finally:
-        assert fail
-
-    g.readonly(False)
-    assert g._graph.is_readonly() == False
-    assert g.number_of_nodes() == 5
-    assert g.number_of_edges() == 4
-
-    try:
-        g.add_nodes(10)
-        g.add_edges([4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
-                    [5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
-        fail = False
-    except DGLError:
-        fail = True
-    finally:
-        assert not fail
-        assert g.number_of_nodes() == 15
-        assert F.shape(g.ndata['x']) == (15, 3)
-        assert g.number_of_edges() == 14
-        assert F.shape(g.edata['x']) == (14, 4)
-
 def test_find_edges():
     g = dgl.DGLGraph()
     g.add_nodes(10)
     g.add_edges(range(9), range(1, 10))
     e = g.find_edges([1, 3, 2, 4])
-    assert e[0][0] == 1 and e[0][1] == 3 and e[0][2] == 2 and e[0][3] == 4
-    assert e[1][0] == 2 and e[1][1] == 4 and e[1][2] == 3 and e[1][3] == 5
+    assert F.asnumpy(e[0][0]) == 1 and F.asnumpy(e[0][1]) == 3 and F.asnumpy(e[0][2]) == 2 and F.asnumpy(e[0][3]) == 4
+    assert F.asnumpy(e[1][0]) == 2 and F.asnumpy(e[1][1]) == 4 and F.asnumpy(e[1][2]) == 3 and F.asnumpy(e[1][3]) == 5
 
     try:
         g.find_edges([10])
@@ -369,23 +308,20 @@ def test_find_edges():
     finally:
         assert fail
 
-    g.readonly()
-    e = g.find_edges([1, 3, 2, 4])
-    assert e[0][0] == 1 and e[0][1] == 3 and e[0][2] == 2 and e[0][3] == 4
-    assert e[1][0] == 2 and e[1][1] == 4 and e[1][2] == 3 and e[1][3] == 5
-
-    try:
-        g.find_edges([10])
-        fail = False
-    except DGLError:
-        fail = True
-    finally:
-        assert fail
+def test_ismultigraph():
+    g = dgl.DGLGraph()
+    g.add_nodes(10)
+    assert g.is_multigraph == False
+    g.add_edges([0], [0])
+    assert g.is_multigraph == False
+    g.add_edges([1], [2])
+    assert g.is_multigraph == False
+    g.add_edges([0, 2], [0, 3])
+    assert g.is_multigraph == True
 
 if __name__ == '__main__':
     test_query()
     test_mutation()
     test_scipy_adjmat()
     test_incmat()
-    test_readonly()
     test_find_edges()

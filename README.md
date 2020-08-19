@@ -6,7 +6,7 @@
 [![Benchmark by ASV](http://img.shields.io/badge/benchmarked%20by-asv-green.svg?style=flat)](https://asv.dgl.ai/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
-[Documentation](https://docs.dgl.ai) | [DGL at a glance](https://docs.dgl.ai/tutorials/basics/1_first.html#sphx-glr-tutorials-basics-1-first-py) | [Model Tutorials](https://docs.dgl.ai/tutorials/models/index.html) | [Discussion Forum](https://discuss.dgl.ai)
+Documentation ([Latest](https://docs.dgl.ai/en/latest/) | [Stable](https://docs.dgl.ai)) | [DGL at a glance](https://docs.dgl.ai/tutorials/basics/1_first.html#sphx-glr-tutorials-basics-1-first-py) | [Model Tutorials](https://docs.dgl.ai/tutorials/models/index.html) | [Discussion Forum](https://discuss.dgl.ai) | [Slack Channel](https://join.slack.com/t/deep-graph-library/shared_invite/zt-eb4ict1g-xcg3PhZAFAB8p6dtKuP6xQ)
 
 
 DGL is an easy-to-use, high performance and scalable Python package for deep learning on graphs. DGL is framework agnostic, meaning if a deep graph model is a component of an end-to-end application, the rest of the logics can be implemented in any major frameworks, such as PyTorch, Apache MXNet or TensorFlow.
@@ -18,22 +18,31 @@ DGL is an easy-to-use, high performance and scalable Python package for deep lea
 </p>
 
 ## <img src="http://data.dgl.ai/asset/image/new.png" width="30">DGL News
-03/02/2020: **Check out this cool paper: [Benchmarking Graph Neural Networks](https://arxiv.org/abs/2003.00982)!**  It includes a DGL-based benchmark framework for novel medium-scale graph datasets, covering mathematical modeling, computer vision, chemistry and combinatorial problems.  See [repo here](https://github.com/graphdeeplearning/benchmarking-gnns).
+**06/11/2020**: Amazon Shanghai AI Lab and AWS Deep Engine Science team working along with academic collaborators from the University of Minnesota, The Ohio State University, and Hunan University have created the **[Drug Repurposing Knowledge Graph (DRKG)](https://github.com/gnn4dr/DRKG)** and a set of machine learning tools, [DGL-KE](https://github.com/awslabs/dgl-ke), that can be used to prioritize drugs for repurposing studies. 
+DRKG is a comprehensive biological knowledge graph that relates human genes, compounds, biological processes, drug side effects, diseases and symptoms. DRKG includes, curates, and normalizes information from six publicly available databases and data that were collected from recent publications related to Covid-19. It has 97,238 entities belonging to 13 types of entities, and 5,874,261 triplets belonging to 107 types of relations. 
+More about the dataset is in this [blogpost](https://www.dgl.ai/news/2020/06/09/covid.html).
+
+**03/31/2020**: The new **v0.4.3 release** includes official TensorFlow support, with 15 popular GNN modules. DGL-KE and DGL-LifeSci, two packages for knowledge graph embedding and chemi- and bio-informatics respectively, have graduated as standalone packages and can be installed by pip and conda. The new release provides full support of graph sampling on heterogeneous graphs, with multi-GPU acceleration. See our [new feature walkthrough](https://www.dgl.ai/release/2020/04/01/release.html) and [release note](https://github.com/dmlc/dgl/releases/tag/0.4.3).
 
 ## Using DGL
 
-**A data scientist** may want to apply a pre-trained model to your data right away. For this you can use DGL's [Application packages, formally *Model Zoo*](https://github.com/dmlc/dgl/tree/master/apps). Application packages are developed for domain applications, as is the case for [DGL-LifeScience](https://github.com/dmlc/dgl/tree/master/apps/life_sci). We will soon add model zoo for knowledge graph embedding learning and recommender systems. Here's how you will use a pretrained model:
+**A data scientist** may want to apply a pre-trained model to your data right away. For this you can use DGL's [Application packages, formally *Model Zoo*](https://github.com/dmlc/dgl/tree/master/apps). Application packages are developed for domain applications, as is the case for [DGL-LifeScience](https://github.com/awslabs/dgl-lifesci). We will soon add model zoo for knowledge graph embedding learning and recommender systems. Here's how you will use a pretrained model:
 ```python
-from dgl.data.chem import Tox21, smiles_to_bigraph, CanonicalAtomFeaturizer
-from dgl import model_zoo
+from dgllife.data import Tox21
+from dgllife.model import load_pretrained
+from dgllife.utils import smiles_to_bigraph, CanonicalAtomFeaturizer
 
 dataset = Tox21(smiles_to_bigraph, CanonicalAtomFeaturizer())
-model = model_zoo.chem.load_pretrained('GCN_Tox21') # Pretrained model loaded
+model = load_pretrained('GCN_Tox21') # Pretrained model loaded
 model.eval()
 
 smiles, g, label, mask = dataset[0]
 feats = g.ndata.pop('h')
 label_pred = model(g, feats)
+print(smiles)                   # CCOc1ccc2nc(S(N)(=O)=O)sc2c1
+print(label_pred[:, mask != 0]) # Mask non-existing labels
+# tensor([[ 1.4190, -0.1820,  1.2974,  1.4416,  0.6914,  
+# 2.0957,  0.5919,  0.7715, 1.7273,  0.2070]])
 ```
 
 **Further reading**: DGL is released as a managed service on AWS SageMaker, see the medium posts for an easy trip to DGL on SageMaker([part1](https://medium.com/@julsimon/a-primer-on-graph-neural-networks-with-amazon-neptune-and-the-deep-graph-library-5ce64984a276) and [part2](https://medium.com/@julsimon/deep-graph-library-part-2-training-on-amazon-sagemaker-54d318dfc814)).
@@ -105,6 +114,17 @@ class GATLayer(nn.Module):
 
 Table: Training time(in seconds) for 200 epochs and memory consumption(GB)
 
+Here is another comparison of DGL on TensorFlow backend with other TF-based GNN tools (training time in seconds for one epoch):
+
+| Dateset | Model | DGL | GraphNet | tf_geometric |
+| ------- | ----- | --- | -------- | ------------ |
+| Core | GCN | 0.0148 | 0.0152 | 0.0192 |
+| Reddit | GCN | 0.1095 | OOM | OOM |
+| PubMed | GCN | 0.0156 | 0.0553 | 0.0185 |
+| PPI | GCN | 0.09 | 0.16 | 0.21 |
+| Cora | GAT | 0.0442 | n/a | 0.058 |
+| PPI | GAT | 0.398 | n/a | 0.752 |
+
 High memory utilization allows DGL to push the limit of single-GPU performance, as seen in below images.
 | <img src="http://data.dgl.ai/asset/image/DGLvsPyG-time1.png" width="400"> | <img src="http://data.dgl.ai/asset/image/DGLvsPyG-time2.png" width="400"> |
 | -------- | -------- |
@@ -130,8 +150,8 @@ Overall there are 30+ models implemented by using DGL:
 - [TensorFlow](https://github.com/dmlc/dgl/tree/master/examples/tensorflow)
 
 ### DGL for domain applications
-- [DGL-LifeSci](https://github.com/dmlc/dgl/tree/master/apps/life_sci), previously DGL-Chem
-- [DGL-KE](https://github.com/dmlc/dgl/tree/master/apps/kg)
+- [DGL-LifeSci](https://github.com/awslabs/dgl-lifesci), previously DGL-Chem
+- [DGL-KE](https://github.com/awslabs/dgl-ke)
 - DGL-RecSys(coming soon)
 
 ### DGL for NLP/CV problems
@@ -152,7 +172,7 @@ DGL should work on
 
 DGL requires Python 3.5 or later.
 
-Right now, DGL works on [PyTorch](https://pytorch.org) 1.1.0+, [MXNet](https://mxnet.apache.org) nightly build, and [TensorFlow](https://tensorflow.org) 2.0+.
+Right now, DGL works on [PyTorch](https://pytorch.org) 1.2.0+, [MXNet](https://mxnet.apache.org) 1.5.1+, and [TensorFlow](https://tensorflow.org) 2.1.0+.
 
 
 ### Using anaconda
@@ -163,6 +183,7 @@ conda install -c dglteam dgl-cuda9.0   # CUDA 9.0
 conda install -c dglteam dgl-cuda9.2   # CUDA 9.2
 conda install -c dglteam dgl-cuda10.0  # CUDA 10.0
 conda install -c dglteam dgl-cuda10.1  # CUDA 10.1
+conda install -c dglteam dgl-cuda10.2  # CUDA 10.2
 ```
 
 ### Using pip
@@ -175,6 +196,7 @@ conda install -c dglteam dgl-cuda10.1  # CUDA 10.1
 | CUDA 9.2  | `pip install --pre dgl-cu92`  | `pip install dgl-cu92`  |
 | CUDA 10.0 | `pip install --pre dgl-cu100` | `pip install dgl-cu100` |
 | CUDA 10.1 | `pip install --pre dgl-cu101` | `pip install dgl-cu101` |
+| CUDA 10.2 | `pip install --pre dgl-cu102` | `pip install dgl-cu102` |
 
 ### Built from source code
 
@@ -185,6 +207,7 @@ Refer to the guide [here](https://docs.dgl.ai/install/index.html#install-from-so
 
 | Releases  | Date   | Features |
 |-----------|--------|-------------------------|
+| v0.4.3    | 03/31/2020 | - TensorFlow support <br> - DGL-KE <br> - DGL-LifeSci <br> - Heterograph sampling APIs (experimental) |
 | v0.4.2      | 01/24/2020 |  - Heterograph support <br> - TensorFlow support (experimental) <br> - MXNet GNN modules <br> | 
 | v0.3.1 | 08/23/2019 | - APIs for GNN modules <br> - Model zoo (DGL-Chem) <br> - New installation |
 | v0.2 | 03/09/2019 | - Graph sampling APIs <br> - Speed improvement |
@@ -192,7 +215,7 @@ Refer to the guide [here](https://docs.dgl.ai/install/index.html#install-from-so
 
 ## New to Deep Learning and Graph Deep Learning?
 
-Check out the open source book [*Dive into Deep Learning*](http://gluon.ai/).
+Check out the open source book [*Dive into Deep Learning*](https://d2l.ai/).
 
 For those who are new to graph neural network, please see the [basic of DGL](https://docs.dgl.ai/tutorials/basics/index.html).
 

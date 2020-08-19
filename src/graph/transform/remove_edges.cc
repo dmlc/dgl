@@ -28,7 +28,7 @@ RemoveEdges(const HeteroGraphPtr graph, const std::vector<IdArray> &eids) {
   const int64_t num_etypes = graph->NumEdgeTypes();
 
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
-    const SparseFormat fmt = graph->SelectFormat(etype, SparseFormat::kCOO);
+    const SparseFormat fmt = graph->SelectFormat(etype, coo_code);
     const auto src_dst_types = graph->GetEndpointTypes(etype);
     const dgl_type_t srctype = src_dst_types.first;
     const dgl_type_t dsttype = src_dst_types.second;

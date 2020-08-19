@@ -4,9 +4,9 @@ import math
 import numpy as np
 import networkx as nx
 import tensorflow as tf
-from dgl import DGLGraph
-import dgl.function as fn
-from dgl.data import register_data_args, load_data
+import dgl
+from dgl.data import register_data_args
+from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 from tensorflow.keras import layers
 
 def gcn_msg(edge):
@@ -100,19 +100,28 @@ def evaluate(model, features, labels, mask):
 
 def main(args):
     # load and preprocess dataset
-    data = load_data(args)
+    if args.dataset == 'cora':
+        data = CoraGraphDataset()
+    elif args.dataset == 'citeseer':
+        data = CiteseerGraphDataset()
+    elif args.dataset == 'pubmed':
+        data = PubmedGraphDataset()
+    else:
+        raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
+    g = data[0]
     if args.gpu < 0:
         device = "/cpu:0"
     else:
         device = "/gpu:{}".format(args.gpu)
+        g = g.to(device)
 
     with tf.device(device):
-        features = tf.convert_to_tensor(data.features, dtype=tf.float32)
-        labels = tf.convert_to_tensor(data.labels, dtype=tf.int64)
-        train_mask = tf.convert_to_tensor(data.train_mask, dtype=tf.bool)
-        val_mask = tf.convert_to_tensor(data.val_mask, dtype=tf.bool)
-        test_mask = tf.convert_to_tensor(data.test_mask, dtype=tf.bool)
+        features = g.ndata['feat']
+        labels = g.ndata['label']
+        train_mask = g.ndata['train_mask']
+        val_mask = g.ndata['val_mask']
+        test_mask = g.ndata['test_mask']
         in_feats = features.shape[1]
         n_classes = data.num_labels
         n_edges = data.graph.number_of_edges()
@@ -127,12 +136,11 @@ def main(args):
                val_mask.numpy().sum(),
                test_mask.numpy().sum()))
 
-        # graph preprocess and calculate normalization factor
-        g = data.graph
-        g.remove_edges_from(nx.selfloop_edges(g))
-        g = DGLGraph(g)
-        # # add self loop
-        g.add_edges(g.nodes(), g.nodes())
+        # add self loop
+        if args.self_loop:
+            g = dgl.remove_self_loop(g)
+            g = dgl.add_self_loop(g)
+        n_edges = g.number_of_edges()
         n_edges = g.number_of_edges()
         # # normalization
         degs = tf.cast(tf.identity(g.in_degrees()), dtype=tf.float32)
@@ -165,7 +173,7 @@ def main(args):
                 logits = model(features)
                 loss_value = loss_fcn(labels[train_mask], logits[train_mask])
                 # Manually Weight Decay
-                # We found Tensorflow has a different implementation on weight decay 
+                # We found Tensorflow has a different implementation on weight decay
                 # of Adam(W) optimizer with PyTorch. And this results in worse results.
                 # Manually adding weights to the loss to do weight decay solves this problem.
                 for weight in model.trainable_weights:
@@ -180,7 +188,7 @@ def main(args):
             acc = evaluate(model, features, labels, val_mask)
             print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
                   "ETputs(KTEPS) {:.2f}". format(epoch, np.mean(dur), loss_value.numpy().item(),
-                                                 acc, n_edges / np.mean(dur) / 1000))                                        
+                                                 acc, n_edges / np.mean(dur) / 1000))
 
         acc = evaluate(model, features, labels, test_mask)
         print("Test Accuracy {:.4f}".format(acc))
@@ -203,6 +211,8 @@ if __name__ == '__main__':
                         help="number of hidden gcn layers")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
                         help="Weight for L2 loss")
+    parser.add_argument("--self-loop", action='store_true',
+                        help="graph self-loop (default=False)")
     args = parser.parse_args()
     print(args)
 

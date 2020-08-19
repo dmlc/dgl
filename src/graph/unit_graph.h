@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <tuple>
 
 #include "../c_api_common.h"
 
@@ -93,8 +94,10 @@ class UnitGraph : public BaseHeteroGraph {
   uint64_t NumVertices(dgl_type_t vtype) const override;
 
   inline std::vector<int64_t> NumVerticesPerType() const override {
-    LOG(FATAL) << "[BUG] NumVerticesPerType() not supported on unit graphs.";
-    return {};
+    std::vector<int64_t> num_nodes_per_type;
+    for (dgl_type_t vtype = 0; vtype < NumVertexTypes(); ++vtype)
+      num_nodes_per_type.push_back(NumVertices(vtype));
+    return num_nodes_per_type;
   }
 
   uint64_t NumEdges(dgl_type_t etype) const override;
@@ -113,7 +116,9 @@ class UnitGraph : public BaseHeteroGraph {
 
   IdArray EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override;
 
-  EdgeArray EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const override;
+  EdgeArray EdgeIdsAll(dgl_type_t etype, IdArray src, IdArray dst) const override;
+
+  IdArray EdgeIdsOne(dgl_type_t etype, IdArray src, IdArray dst) const override;
 
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype, dgl_id_t eid) const override;
 
@@ -138,6 +143,9 @@ class UnitGraph : public BaseHeteroGraph {
   DegreeArray OutDegrees(dgl_type_t etype, IdArray vids) const override;
 
   DGLIdIters SuccVec(dgl_type_t etype, dgl_id_t vid) const override;
+
+  // 32bit version functions, patch for SuccVec
+  DGLIdIters32 SuccVec32(dgl_type_t etype, dgl_id_t vid) const;
 
   DGLIdIters OutEdgeVec(dgl_type_t etype, dgl_id_t vid) const override;
 
@@ -166,31 +174,31 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Create a graph from COO arrays */
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-      IdArray row, IdArray col, SparseFormat restrict_format = SparseFormat::kAny);
+      IdArray row, IdArray col, dgl_format_code_t formats = all_code);
 
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, const aten::COOMatrix& mat,
-      SparseFormat restrict_format = SparseFormat::kAny);
+      dgl_format_code_t formats = all_code);
 
   /*! \brief Create a graph from (out) CSR arrays */
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids,
-      SparseFormat restrict_format = SparseFormat::kAny);
+      dgl_format_code_t formats = all_code);
 
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_vtypes, const aten::CSRMatrix& mat,
-      SparseFormat restrict_format = SparseFormat::kAny);
+      dgl_format_code_t formats = all_code);
 
   /*! \brief Create a graph from (in) CSC arrays */
   static HeteroGraphPtr CreateFromCSC(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids,
-      SparseFormat restrict_format = SparseFormat::kAny);
+      dgl_format_code_t formats = all_code);
 
   static HeteroGraphPtr CreateFromCSC(
       int64_t num_vtypes, const aten::CSRMatrix& mat,
-      SparseFormat restrict_format = SparseFormat::kAny);
+      dgl_format_code_t formats = all_code);
 
   /*! \brief Convert the graph to use the given number of bits for storage */
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
@@ -198,14 +206,29 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Copy the data to another context */
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
 
-  /*! \return Return the in-edge CSR format. Create from other format if not exist. */
-  CSRPtr GetInCSR() const;
+  /*! 
+   * \brief Create in-edge CSR format of the unit graph.
+   * \param inplace if true and the in-edge CSR format does not exist, the created
+   *                format will be cached in this object unless the format is restricted.
+   * \return Return the in-edge CSR format. Create from other format if not exist.
+   */
+  CSRPtr GetInCSR(bool inplace = true) const;
 
-  /*! \return Return the out-edge CSR format. Create from other format if not exist. */
-  CSRPtr GetOutCSR() const;
+  /*! 
+   * \brief Create out-edge CSR format of the unit graph.
+   * \param inplace if true and the out-edge CSR format does not exist, the created
+   *                format will be cached in this object unless the format is restricted.
+   * \return Return the out-edge CSR format. Create from other format if not exist.
+   */
+  CSRPtr GetOutCSR(bool inplace = true) const;
 
-  /*! \return Return the COO format. Create from other format if not exist. */
-  COOPtr GetCOO() const;
+  /*!
+   * \brief Create COO format of the unit graph.
+   * \param inplace if true and the COO format does not exist, the created
+   *                format will be cached in this object unless the format is restricted.
+   * \return Return the COO format. Create from other format if not exist.
+   */
+  COOPtr GetCOO(bool inplace = true) const;
 
   /*! \return Return the COO matrix form */
   aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const override;
@@ -216,9 +239,23 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \return Return the out-edge CSR in the matrix form */
   aten::CSRMatrix GetCSRMatrix(dgl_type_t etype) const override;
 
-  SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
-    return SelectFormat(preferred_format);
+  SparseFormat SelectFormat(dgl_type_t etype, dgl_format_code_t preferred_formats) const override {
+    return SelectFormat(preferred_formats);
   }
+
+  /*!
+   * \brief Return the graph in the given format. Perform format conversion if the
+   * requested format does not exist.
+   *
+   * \return A graph in the requested format.
+   */
+  HeteroGraphPtr GetFormat(SparseFormat format) const;
+
+  dgl_format_code_t GetCreatedFormats() const override;
+
+  dgl_format_code_t GetAllowedFormats() const override;
+
+  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats) const override;
 
   /*! \return Load UnitGraph from stream, using CSRMatrix*/
   bool Load(dmlc::Stream* fs);
@@ -226,9 +263,23 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \return Save UnitGraph to stream, using CSRMatrix */
   void Save(dmlc::Stream* fs) const;
 
+  /*! \brief Creat a LineGraph of self */
+  HeteroGraphPtr LineGraph(bool backtracking) const;
+
+  /*! \return the reversed graph */
+  UnitGraphPtr Reverse() const;
+
+  /*! \return the simpled (no-multi-edge) graph
+   *          the count recording the number of duplicated edges from the original graph.
+   *          the edge mapping from the edge IDs of original graph to those of the
+   *          returned graph.
+   */
+  std::tuple<UnitGraphPtr, IdArray, IdArray>ToSimple() const;
+
  private:
   friend class Serializer;
   friend class HeteroGraph;
+  friend class ImmutableGraph;
 
   // private empty constructor
   UnitGraph() {}
@@ -241,18 +292,29 @@ class UnitGraph : public BaseHeteroGraph {
    * \param coo coo
    */
   UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
-            SparseFormat restrict_format = SparseFormat::kAny);
+            dgl_format_code_t formats = all_code);
+
+  /*!
+   * \brief constructor
+   * \param metagraph metagraph
+   * \param in_csr in edge csr
+   * \param out_csr out edge csr
+   * \param coo coo
+   * \param has_in_csr whether in_csr is valid
+   * \param has_out_csr whether out_csr is valid
+   * \param has_coo whether coo is valid
+   */
+  static HeteroGraphPtr CreateHomographFrom(
+      const aten::CSRMatrix &in_csr,
+      const aten::CSRMatrix &out_csr,
+      const aten::COOMatrix &coo,
+      bool has_in_csr,
+      bool has_out_csr,
+      bool has_coo,
+      dgl_format_code_t formats = all_code);
 
   /*! \return Return any existing format. */
   HeteroGraphPtr GetAny() const;
-
-  /*!
-   * \brief Return the graph in the given format. Perform format conversion if the
-   * requested format does not exist.
-   *
-   * \return A graph in the requested format.
-   */
-  HeteroGraphPtr GetFormat(SparseFormat format) const;
 
   /*!
    * \brief Determine which format to use with a preference.
@@ -263,10 +325,12 @@ class UnitGraph : public BaseHeteroGraph {
    * Otherwise, it will return whatever DGL thinks is the most appropriate given
    * the arguments.
    */
-  SparseFormat SelectFormat(SparseFormat preferred_format) const;
+  SparseFormat SelectFormat(dgl_format_code_t preferred_formats) const;
 
   /*! \return Whether the graph is hypersparse */
   bool IsHypersparse() const;
+
+  GraphPtr AsImmutableGraph() const override;
 
   // Graph stored in different format. We use an on-demand strategy: the format is
   // only materialized if the operation that suitable for it is invoked.
@@ -278,12 +342,8 @@ class UnitGraph : public BaseHeteroGraph {
   COOPtr coo_;
   /*!
    * \brief Storage format restriction.
-   * If it is not ANY, then conversion is not allowed for graph queries.
-   *
-   * Note that GetInCSR/GetOutCSR/GetCOO() can still be called and the conversion will
-   * still be done if requested explicitly (e.g. in message passing).
    */
-  SparseFormat restrict_format_;
+  dgl_format_code_t formats_;
 };
 
 };  // namespace dgl

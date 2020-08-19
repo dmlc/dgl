@@ -66,6 +66,26 @@ Querying graph structure
     DGLHeteroGraph.out_degree
     DGLHeteroGraph.out_degrees
 
+Querying and manipulating sparse format
+---------------------------------------
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    DGLHeteroGraph.format_in_use
+    DGLHeteroGraph.restrict_format
+    DGLHeteroGraph.to_format
+
+Querying and manipulating index data type
+-----------------------------------------
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    DGLHeteroGraph.idtype
+    DGLHeteroGraph.long
+    DGLHeteroGraph.int
+
 Using Node/edge features
 ------------------------
 

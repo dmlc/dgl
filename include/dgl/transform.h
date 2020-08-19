@@ -66,17 +66,20 @@ CompactGraphs(
  *
  * \param graph The graph.
  * \param rhs_nodes Designated nodes that would appear on the right side.
+ * \param include_rhs_in_lhs If false, do not include the nodes of node type \c ntype_r
+ *        in \c ntype_l.
  *
  * \return A triplet containing
  *         * The bipartite-structured graph,
  *         * The induced node from the left side for each graph,
  *         * The induced edges.
  *
- * \note For each node type \c ntype, the nodes in rhs_nodes[ntype] would always
- *       appear first in the nodes of type \c ntype_l in the new graph.
+ * \note If include_rhs_in_lhs is true, then for each node type \c ntype, the nodes
+ *       in rhs_nodes[ntype] would always appear first in the nodes of type \c ntype_l
+ *       in the new graph.
  */
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
-ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes);
+ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes, bool include_rhs_in_lhs);
 
 /*!
  * \brief Convert a multigraph to a simple graph.
@@ -86,15 +89,15 @@ ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes);
  * * \c count : The array of edge occurrences per edge type.
  * * \c edge_map : The mapping from original edge IDs to new edge IDs per edge type.
  *
- * \note Example: consider the following graph:
+ * \note Example: consider a graph with the following edges
  *
- *     g = dgl.graph([(0, 1), (1, 3), (2, 2), (1, 3), (1, 4), (1, 4)])
+ *     [(0, 1), (1, 3), (2, 2), (1, 3), (1, 4), (1, 4)]
  *
  * Then ToSimpleGraph(g) would yield the following elements:
  *
- * * The first element would be the simple graph itself:
+ * * The first element would be the simple graph itself with the following edges
  *
- *       simple_g = dgl.graph([(0, 1), (1, 3), (1, 4), (2, 2)])
+ *       [(0, 1), (1, 3), (1, 4), (2, 2)]
  *
  * * The second element is an array \c count.  \c count[i] stands for the number of edges
  *   connecting simple_g.src[i] and simple_g.dst[i] in the original graph.

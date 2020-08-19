@@ -202,7 +202,7 @@ def collate_fn(batch):
     # batch graphs and cast to PyTorch tensor
     for graph in graphs:
         for (key, value) in graph.ndata.items():
-            graph.ndata[key] = torch.FloatTensor(value)
+            graph.ndata[key] = value.float()
     batched_graphs = dgl.batch(graphs)
 
     # cast to PyTorch tensor
@@ -234,8 +234,7 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
         computation_time = 0.0
         for (batch_idx, (batch_graph, graph_labels)) in enumerate(dataloader):
             if torch.cuda.is_available():
-                for (key, value) in batch_graph.ndata.items():
-                    batch_graph.ndata[key] = value.cuda()
+                batch_graph = batch_graph.to(torch.cuda.current_device())
                 graph_labels = graph_labels.cuda()
 
             model.zero_grad()
@@ -285,8 +284,7 @@ def evaluate(dataloader, model, prog_args, logger=None):
     with torch.no_grad():
         for batch_idx, (batch_graph, graph_labels) in enumerate(dataloader):
             if torch.cuda.is_available():
-                for (key, value) in batch_graph.ndata.items():
-                    batch_graph.ndata[key] = value.cuda()
+                batch_graph = batch_graph.to(torch.cuda.current_device())
                 graph_labels = graph_labels.cuda()
             ypred = model(batch_graph)
             indi = torch.argmax(ypred, dim=1)

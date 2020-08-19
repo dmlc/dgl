@@ -236,6 +236,7 @@ macro(dgl_config_cuda out_variable)
     src/kernel/cuda/*.cc
     src/kernel/cuda/*.cu
     src/runtime/cuda/*.cc
+    src/geometry/cuda/*.cu
   )
 
   dgl_select_nvcc_arch_flags(NVCC_FLAGS_ARCH)

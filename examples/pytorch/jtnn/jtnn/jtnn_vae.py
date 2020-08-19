@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .nnutils import cuda, move_dgl_to_cuda
+from .nnutils import cuda
 from .chemutils import set_atommap, copy_edit_mol, enum_assemble_nx, \
         attach_mols_nx, decode_stereo
 from .jtnn_enc import DGLJTNNEncoder
@@ -44,24 +44,24 @@ class DGLJTNNVAE(nn.Module):
 
     @staticmethod
     def move_to_cuda(mol_batch):
-        for t in mol_batch['mol_trees']:
-            move_dgl_to_cuda(t)
+        for i in range(len(mol_batch['mol_trees'])):
+            mol_batch['mol_trees'][i].graph = cuda(mol_batch['mol_trees'][i].graph)
 
-        move_dgl_to_cuda(mol_batch['mol_graph_batch'])
+        mol_batch['mol_graph_batch'] = cuda(mol_batch['mol_graph_batch'])
         if 'cand_graph_batch' in mol_batch:
-            move_dgl_to_cuda(mol_batch['cand_graph_batch'])
+            mol_batch['cand_graph_batch'] = cuda(mol_batch['cand_graph_batch'])
         if mol_batch.get('stereo_cand_graph_batch') is not None:
-            move_dgl_to_cuda(mol_batch['stereo_cand_graph_batch'])
+            mol_batch['stereo_cand_graph_batch'] = cuda(mol_batch['stereo_cand_graph_batch'])
 
     def encode(self, mol_batch):
         mol_graphs = mol_batch['mol_graph_batch']
         mol_vec = self.mpn(mol_graphs)
 
-        mol_tree_batch, tree_vec = self.jtnn(mol_batch['mol_trees'])
+        mol_tree_batch, tree_vec = self.jtnn([t.graph for t in mol_batch['mol_trees']])
 
         self.n_nodes_total += mol_graphs.number_of_nodes()
         self.n_edges_total += mol_graphs.number_of_edges()
-        self.n_tree_nodes_total += sum(t.number_of_nodes() for t in mol_batch['mol_trees'])
+        self.n_tree_nodes_total += sum(t.graph.number_of_nodes() for t in mol_batch['mol_trees'])
         self.n_passes += 1
 
         return mol_tree_batch, tree_vec, mol_vec
@@ -93,7 +93,7 @@ class DGLJTNNVAE(nn.Module):
         tree_vec, mol_vec, z_mean, z_log_var = self.sample(tree_vec, mol_vec, e1, e2)
         kl_loss = -0.5 * torch.sum(1.0 + z_log_var - z_mean * z_mean - torch.exp(z_log_var)) / batch_size
 
-        word_loss, topo_loss, word_acc, topo_acc = self.decoder(mol_trees, tree_vec)
+        word_loss, topo_loss, word_acc, topo_acc = self.decoder([t.graph for t in mol_trees], tree_vec)
         assm_loss, assm_acc = self.assm(mol_batch, mol_tree_batch, mol_vec)
         stereo_loss, stereo_acc = self.stereo(mol_batch, mol_vec)
 
@@ -103,9 +103,9 @@ class DGLJTNNVAE(nn.Module):
 
     def assm(self, mol_batch, mol_tree_batch, mol_vec):
         cands = [mol_batch['cand_graph_batch'],
-                 mol_batch['tree_mess_src_e'],
-                 mol_batch['tree_mess_tgt_e'],
-                 mol_batch['tree_mess_tgt_n']]
+                 cuda(mol_batch['tree_mess_src_e']),
+                 cuda(mol_batch['tree_mess_tgt_e']),
+                 cuda(mol_batch['tree_mess_tgt_n'])]
         cand_vec = self.jtmpn(cands, mol_tree_batch)
         cand_vec = self.G_mean(cand_vec)
 
@@ -179,12 +179,11 @@ class DGLJTNNVAE(nn.Module):
             node['idx'] = i
             node['nid'] = i + 1
             node['is_leaf'] = True
-            if mol_tree.in_degree(node_id) > 1:
+            if mol_tree.graph.in_degrees(node_id) > 1:
                 node['is_leaf'] = False
                 set_atommap(node['mol'], node['nid'])
 
-        mol_tree_sg = mol_tree.subgraph(effective_nodes)
-        mol_tree_sg.copy_from_parent()
+        mol_tree_sg = mol_tree.graph.subgraph(effective_nodes.to(tree_vec.device))
         mol_tree_msg, _ = self.jtnn([mol_tree_sg])
         mol_tree_msg = unbatch(mol_tree_msg)[0]
         mol_tree_msg.nodes_dict = nodes_dict
@@ -210,7 +209,7 @@ class DGLJTNNVAE(nn.Module):
         stereo_graphs = [mol2dgl_enc(c) for c in stereo_cands]
         stereo_cand_graphs, atom_x, bond_x = \
                 zip(*stereo_graphs)
-        stereo_cand_graphs = batch(stereo_cand_graphs)
+        stereo_cand_graphs = cuda(batch(stereo_cand_graphs))
         atom_x = cuda(torch.cat(atom_x))
         bond_x = cuda(torch.cat(bond_x))
         stereo_cand_graphs.ndata['x'] = atom_x
@@ -248,9 +247,8 @@ class DGLJTNNVAE(nn.Module):
 
         cands = [(candmol, mol_tree_msg, cur_node_id) for candmol in cand_mols]
         cand_graphs, atom_x, bond_x, tree_mess_src_edges, \
-                tree_mess_tgt_edges, tree_mess_tgt_nodes = mol2dgl_dec(
-                        cands)
-        cand_graphs = batch(cand_graphs)
+                tree_mess_tgt_edges, tree_mess_tgt_nodes = mol2dgl_dec(cands)
+        cand_graphs = batch([g.to(mol_vec.device) for g in cand_graphs])
         atom_x = cuda(atom_x)
         bond_x = cuda(bond_x)
         cand_graphs.ndata['x'] = atom_x

@@ -121,8 +121,8 @@ class GAT(nn.Module):
         # compute edge attention
         graph.apply_edges(fn.u_dot_v('el', 'er', 'e'))
         e =  graph.edata.pop('e') / math.sqrt(self._out_feats * self._num_heads)
-        graph.edata['a'] = edge_softmax(graph, e).unsqueeze(-1)
-       # message passing
+        graph.edata['a'] = edge_softmax(graph, e)
+        # message passing
         graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                          fn.sum('m', 'ft2'))
         rst = graph.ndata['ft2']
@@ -148,6 +148,7 @@ class GraphTrans(nn.Module):
 
     def forward(self, ent, ent_mask, ent_len, rel, rel_mask, graphs):
         device = ent.device
+        graphs = graphs.to(device)
         ent_mask = (ent_mask==0) # reverse mask
         rel_mask = (rel_mask==0)
         init_h = []

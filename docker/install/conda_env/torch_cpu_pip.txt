@@ -1,0 +1,13 @@
+--find-links https://download.pytorch.org/whl/torch_stable.html
+torch==1.5.1+cpu
+torchvision==0.6.1+cpu
+pytest
+nose
+numpy
+cython
+scipy
+networkx
+matplotlib
+nltk
+requests[security]
+tqdm  

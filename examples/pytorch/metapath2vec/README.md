@@ -10,14 +10,26 @@ Dependencies
 
 How to run the code
 -----
-Run with the following procedures:
+Run with either of the following procedures:
 
-1, Run sampler.py on your graph dataset. Note that: the input text file should be list of mappings so you probably need to preprocess your graph dataset. Files with sample format are available in "net_dbis" file. Of course you could also use your own metapath sampler implementation.
+* Running with default AMiner dataset:
+  1. Directly run the following command:
 
-2, Run the following command:
-```bash
-python metapath2vec.py --download "where/you/want/to/download" --output_file "your_output_file_path"
-```
+     ```bash
+     python metapath2vec.py --aminer --path "where/you/want/to/download" --output_file "your_model_output_path"
+     ```
+* Running with another AMiner-like dataset
+  1. Prepare the data in the same format as the ones of AMiner and DBIS in Section B of [Author's code repo](https://ericdongyx.github.io/metapath2vec/m2v.html).
+  2. Run `sampler.py` on your graph dataset with, for instance,
+
+     ```bash
+     python sampler.py net_dbis
+     ```
+  3. Run the following command:
+
+     ```bash
+     python metapath2vec.py --path net_dbis/output_path.txt --output_file "your_model_output_path"
+     ```
 
 Tips: Change num_workers based on your GPU instances; Running 3 or 4 epochs is actually enough. 
 

@@ -150,3 +150,14 @@ cscope.*
 
 # parameters
 *.params
+
+# vscode 
+.clangd
+.vscode
+
+# asv
+.asv
+
+config.cmake
+.ycm_extra_conf.py
+**.png

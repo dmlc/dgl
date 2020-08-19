@@ -3,10 +3,15 @@
  * \file graph/heterograph_capi.cc
  * \brief Heterograph CAPI bindings.
  */
-#include "./heterograph.h"
+#include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
+#include <set>
+
 #include "../c_api_common.h"
+#include "./heterograph.h"
+#include "unit_graph.h"
 
 using namespace dgl::runtime;
 
@@ -23,8 +28,14 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCOO")
     int64_t num_dst = args[2];
     IdArray row = args[3];
     IdArray col = args[4];
-    SparseFormat restrict_format = ParseSparseFormat(args[5]);
-    auto hgptr = CreateFromCOO(nvtypes, num_src, num_dst, row, col, restrict_format);
+    List<Value> formats = args[5];
+    std::vector<SparseFormat> formats_vec;
+    for (Value val : formats) {
+      std::string fmt = val->data;
+      formats_vec.push_back(ParseSparseFormat(fmt));
+    }
+    auto code = SparseFormatsToCode(formats_vec);
+    auto hgptr = CreateFromCOO(nvtypes, num_src, num_dst, row, col, code);
     *rv = HeteroGraphRef(hgptr);
   });
 
@@ -36,9 +47,14 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCSR")
     IdArray indptr = args[3];
     IdArray indices = args[4];
     IdArray edge_ids = args[5];
-    SparseFormat restrict_format = ParseSparseFormat(args[6]);
-    auto hgptr = CreateFromCSR(nvtypes, num_src, num_dst, indptr, indices, edge_ids,
-                               restrict_format);
+    List<Value> formats = args[6];
+    std::vector<SparseFormat> formats_vec;
+    for (Value val : formats) {
+      std::string fmt = val->data;
+      formats_vec.push_back(ParseSparseFormat(fmt));
+    }
+    auto code = SparseFormatsToCode(formats_vec);
+    auto hgptr = CreateFromCSR(nvtypes, num_src, num_dst, indptr, indices, edge_ids, code);
     *rv = HeteroGraphRef(hgptr);
   });
 
@@ -83,12 +99,11 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetRelationGraph")
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
     CHECK_LE(etype, hg->NumEdgeTypes()) << "invalid edge type " << etype;
-    // Test if the heterograph is a unit graph.  If so, return itself.
-    auto bg = std::dynamic_pointer_cast<UnitGraph>(hg.sptr());
-    if (bg != nullptr)
-      *rv = bg;
-    else
-      *rv = HeteroGraphRef(hg->GetRelationGraph(etype));
+    auto unit_graph = hg->GetRelationGraph(etype);
+    auto meta_graph = unit_graph->meta_graph();
+    auto hgptr = CreateHeteroGraph(
+        meta_graph, {unit_graph}, unit_graph->NumVerticesPerType());
+    *rv = HeteroGraphRef(hgptr);
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFlattenedGraph")
@@ -240,14 +255,24 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroEdgeId")
     *rv = hg->EdgeId(etype, src, dst);
   });
 
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroEdgeIds")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroEdgeIdsAll")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
     IdArray src = args[2];
     IdArray dst = args[3];
-    const auto& ret = hg->EdgeIds(etype, src, dst);
+    const auto& ret = hg->EdgeIdsAll(etype, src, dst);
     *rv = ConvertEdgeArrayToPackedFunc(ret);
+  });
+
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroEdgeIdsOne")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    dgl_type_t etype = args[1];
+    IdArray src = args[2];
+    IdArray dst = args[3];
+    *rv = hg->EdgeIdsOne(etype, src, dst);
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroFindEdges")
@@ -409,7 +434,14 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroAsNumBits")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     int bits = args[1];
-    HeteroGraphPtr hg_new = UnitGraph::AsNumBits(hg.sptr(), bits);
+    HeteroGraphPtr bhg_ptr = hg.sptr();
+    auto hg_ptr = std::dynamic_pointer_cast<HeteroGraph>(bhg_ptr);
+    HeteroGraphPtr hg_new;
+    if (hg_ptr) {
+      hg_new = HeteroGraph::AsNumBits(hg_ptr, bits);
+    } else {
+      hg_new = UnitGraph::AsNumBits(bhg_ptr, bits);
+    }
     *rv = HeteroGraphRef(hg_new);
   });
 
@@ -421,30 +453,105 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyTo")
     DLContext ctx;
     ctx.device_type = static_cast<DLDeviceType>(device_type);
     ctx.device_id = device_id;
-    HeteroGraphPtr hg_new = UnitGraph::CopyTo(hg.sptr(), ctx);
+    HeteroGraphPtr hg_new = HeteroGraph::CopyTo(hg.sptr(), ctx);
     *rv = HeteroGraphRef(hg_new);
   });
 
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointUnion")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyToSharedMem")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    std::string name = args[1];
+    List<Value> ntypes = args[2];
+    List<Value> etypes = args[3];
+    List<Value> fmts = args[4];
+    auto ntypes_vec = ListValueToVector<std::string>(ntypes);
+    auto etypes_vec = ListValueToVector<std::string>(etypes);
+    std::set<std::string> fmts_set;
+    for (const auto &fmt : fmts) {
+      std::string fmt_data = fmt->data;
+      fmts_set.insert(fmt_data);
+    }
+    auto hg_share = HeteroGraph::CopyToSharedMem(
+        hg.sptr(), name, ntypes_vec, etypes_vec, fmts_set);
+    *rv = HeteroGraphRef(hg_share);
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateFromSharedMem")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string name = args[0];
+    HeteroGraphPtr hg;
+    std::vector<std::string> ntypes;
+    std::vector<std::string> etypes;
+    std::tie(hg, ntypes, etypes) = HeteroGraph::CreateFromSharedMem(name);
+    List<Value> ntypes_list;
+    List<Value> etypes_list;
+    for (const auto &ntype : ntypes)
+      ntypes_list.push_back(Value(MakeValue(ntype)));
+    for (const auto &etype : etypes)
+      etypes_list.push_back(Value(MakeValue(etype)));
+    List<ObjectRef> ret;
+    ret.push_back(HeteroGraphRef(hg));
+    ret.push_back(ntypes_list);
+    ret.push_back(etypes_list);
+    *rv = ret;
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroJointUnion")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef meta_graph = args[0];
     List<HeteroGraphRef> component_graphs = args[1];
+    CHECK(component_graphs.size() > 1)
+      << "Expect graph list to have at least two graphs";
     std::vector<HeteroGraphPtr> component_ptrs;
     component_ptrs.reserve(component_graphs.size());
+    const int64_t bits = component_graphs[0]->NumBits();
+    const DLContext ctx = component_graphs[0]->Context();
     for (const auto& component : component_graphs) {
       component_ptrs.push_back(component.sptr());
+      CHECK_EQ(component->NumBits(), bits)
+        << "Expect graphs to joint union have the same index dtype(int" << bits
+        << "), but got int" << component->NumBits();
+      CHECK_EQ(component->Context(), ctx)
+        << "Expect graphs to joint union have the same context" << ctx
+        << "), but got " << component->Context();
     }
-    auto hgptr = DisjointUnionHeteroGraph(meta_graph.sptr(), component_ptrs);
+
+    auto hgptr = JointUnionHeteroGraph(meta_graph.sptr(), component_ptrs);
     *rv = HeteroGraphRef(hgptr);
 });
 
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointUnion_v2")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef meta_graph = args[0];
+    List<HeteroGraphRef> component_graphs = args[1];
+    CHECK(component_graphs.size() > 0)
+      << "Expect graph list has at least one graph";
+    std::vector<HeteroGraphPtr> component_ptrs;
+    component_ptrs.reserve(component_graphs.size());
+    const int64_t bits = component_graphs[0]->NumBits();
+    const DLContext ctx = component_graphs[0]->Context();
+    for (const auto& component : component_graphs) {
+      component_ptrs.push_back(component.sptr());
+      CHECK_EQ(component->NumBits(), bits)
+        << "Expect graphs to batch have the same index dtype(int" << bits
+        << "), but got int" << component->NumBits();
+      CHECK_EQ(component->Context(), ctx)
+        << "Expect graphs to batch have the same context" << ctx
+        << "), but got " << component->Context();
+    }
+
+    auto hgptr = DisjointUnionHeteroGraph2(meta_graph.sptr(), component_ptrs);
+    *rv = HeteroGraphRef(hgptr);
+});
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes_v2")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     const IdArray vertex_sizes = args[1];
     const IdArray edge_sizes = args[2];
-    const auto& ret = DisjointPartitionHeteroBySizes(
-      hg->meta_graph(), hg.sptr(), vertex_sizes, edge_sizes);
+    std::vector<HeteroGraphPtr> ret;
+    ret = DisjointPartitionHeteroBySizes2(hg->meta_graph(), hg.sptr(),
+                                          vertex_sizes, edge_sizes);
     List<HeteroGraphRef> ret_list;
     for (HeteroGraphPtr hgptr : ret) {
       ret_list.push_back(HeteroGraphRef(hgptr));
@@ -452,7 +559,96 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes")
     *rv = ret_list;
 });
 
-DGL_REGISTER_GLOBAL("transform._CAPI_DGLInSubgraph")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointUnion")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef meta_graph = args[0];
+    List<HeteroGraphRef> component_graphs = args[1];
+    CHECK(component_graphs.size() > 0)
+      << "Expect graph list has at least one graph";
+    std::vector<HeteroGraphPtr> component_ptrs;
+    component_ptrs.reserve(component_graphs.size());
+    const int64_t bits = component_graphs[0]->NumBits();
+    for (const auto& component : component_graphs) {
+      component_ptrs.push_back(component.sptr());
+      CHECK_EQ(component->NumBits(), bits)
+        << "Expect graphs to batch have the same index dtype(int" << bits
+        << "), but got int" << component->NumBits();
+    }
+    ATEN_ID_BITS_SWITCH(bits, IdType, {
+      auto hgptr =
+        DisjointUnionHeteroGraph<IdType>(meta_graph.sptr(), component_ptrs);
+      *rv = HeteroGraphRef(hgptr);
+    });
+});
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    const IdArray vertex_sizes = args[1];
+    const IdArray edge_sizes = args[2];
+    const int64_t bits = hg->NumBits();
+    std::vector<HeteroGraphPtr> ret;
+    ATEN_ID_BITS_SWITCH(bits, IdType, {
+      ret = DisjointPartitionHeteroBySizes<IdType>(hg->meta_graph(), hg.sptr(),
+                                                   vertex_sizes, edge_sizes);
+    });
+    List<HeteroGraphRef> ret_list;
+    for (HeteroGraphPtr hgptr : ret) {
+      ret_list.push_back(HeteroGraphRef(hgptr));
+    }
+    *rv = ret_list;
+});
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetCreatedFormats")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    List<Value> format_list;
+    dgl_format_code_t code = hg->GetRelationGraph(0)->GetCreatedFormats();
+    for (auto format : CodeToSparseFormats(code)) {
+      format_list.push_back(
+          Value(MakeValue(ToStringSparseFormat(format))));
+    }
+    *rv = format_list;
+});
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetAllowedFormats")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    List<Value> format_list;
+    dgl_format_code_t code = hg->GetRelationGraph(0)->GetAllowedFormats();
+    for (auto format : CodeToSparseFormats(code)) {
+      format_list.push_back(
+          Value(MakeValue(ToStringSparseFormat(format))));
+    }
+    *rv = format_list;
+});
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateFormat")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    dgl_format_code_t code = hg->GetRelationGraph(0)->GetAllowedFormats();
+    for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype) {
+      auto bg = std::dynamic_pointer_cast<UnitGraph>(hg->GetRelationGraph(etype));
+      for (auto format : CodeToSparseFormats(code))
+        bg->GetFormat(format);
+    }
+});
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    List<Value> formats = args[1];
+    std::vector<SparseFormat> formats_vec;
+    for (Value val : formats) {
+      std::string fmt = val->data;
+      formats_vec.push_back(ParseSparseFormat(fmt));
+    }
+    auto hgptr = hg->GetGraphInFormat(
+        SparseFormatsToCode(formats_vec));
+    *rv = HeteroGraphRef(hgptr);
+});
+
+DGL_REGISTER_GLOBAL("subgraph._CAPI_DGLInSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     const auto& nodes = ListValueToVector<IdArray>(args[1]);
@@ -461,7 +657,7 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLInSubgraph")
     *rv = HeteroGraphRef(ret);
   });
 
-DGL_REGISTER_GLOBAL("transform._CAPI_DGLOutSubgraph")
+DGL_REGISTER_GLOBAL("subgraph._CAPI_DGLOutSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     const auto& nodes = ListValueToVector<IdArray>(args[1]);
@@ -470,4 +666,58 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLOutSubgraph")
     *rv = HeteroGraphRef(ret);
   });
 
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLAsImmutableGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    *rv = GraphRef(hg->AsImmutableGraph());
+  });
+
+DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef metagraph = args[0];
+    std::set<int64_t> dst_set;
+    std::set<int64_t> src_set;
+
+    for (int64_t eid = 0; eid < metagraph->NumEdges(); ++eid) {
+      auto edge = metagraph->FindEdge(eid);
+      auto src = edge.first;
+      auto dst = edge.second;
+      dst_set.insert(dst);
+      if (dst_set.count(src))
+        return;
+    }
+
+    List<Value> srclist, dstlist;
+    List<List<Value>> ret_list;
+    for (auto dst : dst_set)
+      dstlist.push_back(Value(MakeValue(dst)));
+    for (int64_t nid = 0 ; nid < metagraph->NumVertices(); ++nid)
+      if (!dst_set.count(nid))
+        srclist.push_back(Value(MakeValue(nid)));
+    ret_list.push_back(srclist);
+    ret_list.push_back(dstlist);
+    *rv = ret_list;
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroReverse")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    CHECK_GT(hg->NumEdgeTypes(), 0);
+    auto g = std::dynamic_pointer_cast<HeteroGraph>(hg.sptr());
+    std::vector<HeteroGraphPtr> rev_ugs;
+    const auto &ugs = g->relation_graphs();
+    rev_ugs.resize(ugs.size());
+
+    for (size_t i = 0; i < ugs.size(); ++i) {
+      const auto &rev_ug = ugs[i]->Reverse();
+      rev_ugs[i] = rev_ug;
+    }
+    // node types are not changed
+    const auto& num_nodes = g->NumVerticesPerType();
+    const auto& meta_edges = hg->meta_graph()->Edges("eid");
+    // reverse the metagraph
+    const auto& rev_meta = ImmutableGraph::CreateFromCOO(hg->meta_graph()->NumVertices(),
+                                                         meta_edges.dst, meta_edges.src);
+    *rv = CreateHeteroGraph(rev_meta, rev_ugs, num_nodes);
+  });
 }  // namespace dgl

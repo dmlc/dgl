@@ -10,13 +10,13 @@ def test_random_choice():
     x = dgl.random.choice(a, 10, replace=True, prob=None)
     assert len(x) == 10
     for i in range(len(x)):
-        assert x[i] >= 0 and x[i] < 100
+        assert F.asnumpy(x[i]) >= 0 and F.asnumpy(x[i]) < 100
     # test 2, replace=False, small num
     a = F.arange(0, 100)
     x = dgl.random.choice(a, 10, replace=False, prob=None)
     assert len(x) == 10
     for i in range(len(x)):
-        assert x[i] >= 0 and x[i] < 100
+        assert F.asnumpy(x[i]) >= 0 and F.asnumpy(x[i]) < 100
     # test 3, replace=False, large num
     a = F.arange(0, 100)
     x = dgl.random.choice(a, 100, replace=False, prob=None)
@@ -35,7 +35,7 @@ def test_random_choice():
     x = dgl.random.choice(100, 97, replace=False, prob=prob)
     assert len(x) == 97
     for i in range(len(x)):
-        assert x[i] < 37 or x[i] >= 40
+        assert F.asnumpy(x[i]) < 37 or F.asnumpy(x[i]) >= 40
 
 if __name__ == '__main__':
     test_random_choice()

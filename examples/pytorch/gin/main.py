@@ -23,7 +23,8 @@ def train(args, net, trainloader, optimizer, criterion, epoch):
     for pos, (graphs, labels) in zip(bar, trainloader):
         # batch graphs will be shipped to device in forward part of model
         labels = labels.to(args.device)
-        feat = graphs.ndata['attr'].to(args.device)
+        feat = graphs.ndata.pop('attr').to(args.device)
+        graphs = graphs.to(args.device)
         outputs = net(graphs, feat)
 
         loss = criterion(outputs, labels)
@@ -52,7 +53,8 @@ def eval_net(args, net, dataloader, criterion):
 
     for data in dataloader:
         graphs, labels = data
-        feat = graphs.ndata['attr'].to(args.device)
+        feat = graphs.ndata.pop('attr').to(args.device)
+        graphs = graphs.to(args.device)
         labels = labels.to(args.device)
         total += len(labels)
         outputs = net(graphs, feat)

@@ -13,13 +13,14 @@ Contributors
 * [Sheng Zha](https://github.com/szha): tree-lstm in MXNet
 * [Yifei Ma](https://github.com/yifeim): GCN in MXNet
 * [Yizhi Liu](https://github.com/yzhliu): RGCN in MXNet
-* [@hbsun2113](https://github.com/hbsun2113): GraphSAGE in Pytorch
-* [Tianyi Zhang](https://github.com/Tiiiger): SGC in Pytorch
-* [Jun Chen](https://github.com/kitaev-chen): GIN in Pytorch
-* [Aymen Waheb](https://github.com/aymenwah): APPNP in Pytorch
+* [@hbsun2113](https://github.com/hbsun2113): GraphSAGE in PyTorch
+* [Tianyi Zhang](https://github.com/Tiiiger): SGC in PyTorch
+* [Jun Chen](https://github.com/kitaev-chen): GIN in PyTorch
+* [Aymen Waheb](https://github.com/aymenwah): APPNP in PyTorch
 * [Chengqiang Lu](https://github.com/geekinglcq): MGCN, SchNet and MPNN in PyTorch
 * [Gongze Cao](https://github.com/Zardinality): Cluster GCN
-* [Yicheng Wu](https://github.com/MilkshakeForReal): RotatE in Pytorch
+* [Yicheng Wu](https://github.com/MilkshakeForReal): RotatE in PyTorch
+* [Hao Xiong](https://github.com/ShawXh): DeepWalk in PyTorch
 
 Other improvement
 * [Brett Koonce](https://github.com/brettkoonce)

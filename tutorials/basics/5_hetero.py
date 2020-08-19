@@ -90,50 +90,21 @@ using the heterograph class and its associated API.
 # You can create a heterograph in DGL using the :func:`dgl.heterograph` API.
 # The argument to :func:`dgl.heterograph` is a dictionary. The keys are tuples
 # in the form of ``(srctype, edgetype, dsttype)`` specifying the relation name
-# and the two entity types it connects. Such tuples are called *canonical edge
-# types*. The values are data to initialize the graph structures, that is, which
+# and the two entity types it connects. Such tuples are called *canonical edge types*
+# The values are data to initialize the graph structures, that is, which
 # nodes the edges actually connect.
 #
 # For instance, the following code creates the user-item interactions heterograph shown earlier.
 
-# Each value of the dictionary is a list of edge tuples.
+# Each value of the dictionary is a pair of source and destination arrays.
 # Nodes are integer IDs starting from zero. Nodes IDs of different types have
 # separate countings.
 import dgl
+import numpy as np
 
 ratings = dgl.heterograph(
-    {('user', '+1', 'movie') : [(0, 0), (0, 1), (1, 0)],
-     ('user', '-1', 'movie') : [(2, 1)]})
-
-###############################################################################
-# DGL supports creating a graph from a variety of data sources. The following
-# code creates the same graph as the above.
-#
-# Creating from scipy matrix
-import scipy.sparse as sp
-plus1 = sp.coo_matrix(([1, 1, 1], ([0, 0, 1], [0, 1, 0])), shape=(3, 2))
-minus1 = sp.coo_matrix(([1], ([2], [1])), shape=(3, 2))
-ratings = dgl.heterograph(
-    {('user', '+1', 'movie') : plus1,
-     ('user', '-1', 'movie') : minus1})
-
-# Creating from networkx graph
-import networkx as nx
-plus1 = nx.DiGraph()
-plus1.add_nodes_from(['u0', 'u1', 'u2'], bipartite=0)
-plus1.add_nodes_from(['m0', 'm1'], bipartite=1)
-plus1.add_edges_from([('u0', 'm0'), ('u0', 'm1'), ('u1', 'm0')])
-# To simplify the example, reuse the minus1 object.
-# This also means that you could use different sources of graph data
-# for different relationships.
-ratings = dgl.heterograph(
-    {('user', '+1', 'movie') : plus1,
-     ('user', '-1', 'movie') : minus1})
-
-# Creating from edge indices
-ratings = dgl.heterograph(
-    {('user', '+1', 'movie') : ([0, 0, 1], [0, 1, 0]),
-     ('user', '-1', 'movie') : ([2], [1])})
+    {('user', '+1', 'movie') : (np.array([0, 0, 1]), np.array([0, 1, 0])),
+     ('user', '-1', 'movie') : (np.array([2]), np.array([1]))})
 
 ###############################################################################
 # Manipulating heterograph
@@ -167,9 +138,7 @@ print('#Links:', data['PvsA'].nnz)
 ###############################################################################
 # Converting this SciPy matrix to a heterograph in DGL is straightforward.
 
-pa_g = dgl.heterograph({('paper', 'written-by', 'author') : data['PvsA']})
-# equivalent (shorter) API for creating heterograph with two node types:
-pa_g = dgl.bipartite(data['PvsA'], 'paper', 'written-by', 'author')
+pa_g = dgl.heterograph({('paper', 'written-by', 'author') : data['PvsA'].nonzero()})
 
 ###############################################################################
 # You can easily print out the type names and other structural information.
@@ -192,13 +161,12 @@ print(pa_g.number_of_edges())  # Only one edge type, the edge type argument coul
 
 ###############################################################################
 # A homogeneous graph is just a special case of a heterograph with only one type
-# of node and edge. In this case, all the APIs are exactly the same as in
-# :class:`DGLGraph`.
+# of node and edge.
 
 # Paper-citing-paper graph is a homogeneous graph
-pp_g = dgl.heterograph({('paper', 'citing', 'paper') : data['PvsP']})
+pp_g = dgl.heterograph({('paper', 'citing', 'paper') : data['PvsP'].nonzero()})
 # equivalent (shorter) API for creating homogeneous graph
-pp_g = dgl.graph(data['PvsP'], 'paper', 'cite')
+pp_g = dgl.from_scipy(data['PvsP'])
 
 # All the ntype and etype arguments could be omitted because the behavior is unambiguous.
 print(pp_g.number_of_nodes())
@@ -211,12 +179,12 @@ print(pp_g.successors(3))
 # relationship to prepare for the later sections.
 
 G = dgl.heterograph({
-        ('paper', 'written-by', 'author') : data['PvsA'],
-        ('author', 'writing', 'paper') : data['PvsA'].transpose(),
-        ('paper', 'citing', 'paper') : data['PvsP'],
-        ('paper', 'cited', 'paper') : data['PvsP'].transpose(),
-        ('paper', 'is-about', 'subject') : data['PvsL'],
-        ('subject', 'has', 'paper') : data['PvsL'].transpose(),
+        ('paper', 'written-by', 'author') : data['PvsA'].nonzero(),
+        ('author', 'writing', 'paper') : data['PvsA'].transpose().nonzero(),
+        ('paper', 'citing', 'paper') : data['PvsP'].nonzero(),
+        ('paper', 'cited', 'paper') : data['PvsP'].transpose().nonzero(),
+        ('paper', 'is-about', 'subject') : data['PvsL'].nonzero(),
+        ('subject', 'has', 'paper') : data['PvsL'].transpose().nonzero(),
     })
 
 print(G)
@@ -238,7 +206,7 @@ def plot_graph(nxg):
     ag.layout('dot')
     ag.draw('graph.png')
 
-plot_graph(G.metagraph)
+plot_graph(G.metagraph())
 
 ###############################################################################
 # Learning tasks associated with heterographs

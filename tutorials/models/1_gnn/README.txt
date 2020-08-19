@@ -27,7 +27,7 @@ Graph neural networks and its variants
   Relational-GCN allows multiple edges among two entities of a
   graph. Edges with distinct relationships are encoded differently. 
 
-* **Line graph neural network (LGNN)** `[research paper] <https://arxiv.org/abs/1705.08415>`__ `[tutorial]
+* **Line graph neural network (LGNN)** `[research paper] <https://openreview.net/pdf?id=H1g0Z3A9Fm>`__ `[tutorial]
   <1_gnn/6_line_graph.html>`__ `[Pytorch code]
   <https://github.com/dmlc/dgl/tree/master/examples/pytorch/line_graph>`__:
   This network focuses on community detection by inspecting graph structures. It

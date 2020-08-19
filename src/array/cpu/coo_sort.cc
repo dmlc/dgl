@@ -10,37 +10,181 @@
 #include <numeric>
 #include <algorithm>
 #include <vector>
+#include <iterator>
+#include <tuple>
+
+namespace {
+
+template <typename IdType>
+struct TupleRef {
+  TupleRef() = delete;
+  TupleRef(const TupleRef& other) = default;
+  TupleRef(TupleRef&& other) = default;
+  TupleRef(IdType *const r, IdType *const c, IdType *const d)
+    : row(r), col(c), data(d) {}
+
+  TupleRef& operator=(const TupleRef& other) {
+    *row = *other.row;
+    *col = *other.col;
+    *data = *other.data;
+    return *this;
+  }
+  TupleRef& operator=(const std::tuple<IdType, IdType, IdType>& val) {
+    *row = std::get<0>(val);
+    *col = std::get<1>(val);
+    *data = std::get<2>(val);
+    return *this;
+  }
+
+  operator std::tuple<IdType, IdType, IdType>() const {
+    return std::make_tuple(*row, *col, *data);
+  }
+
+  void Swap(const TupleRef& other) const {
+    std::swap(*row, *other.row);
+    std::swap(*col, *other.col);
+    std::swap(*data, *other.data);
+  }
+
+  IdType *row, *col, *data;
+};
+
+using std::swap;
+template <typename IdType>
+void swap(const TupleRef<IdType>& r1, const TupleRef<IdType>& r2) {
+  r1.Swap(r2);
+}
+
+template <typename IdType>
+struct CooIterator : public std::iterator<std::random_access_iterator_tag,
+                                          std::tuple<IdType, IdType, IdType>,
+                                          std::ptrdiff_t,
+                                          std::tuple<IdType*, IdType*, IdType*>,
+                                          TupleRef<IdType>> {
+  CooIterator() = default;
+  CooIterator(const CooIterator& other) = default;
+  CooIterator(CooIterator&& other) = default;
+  CooIterator(IdType *r, IdType *c, IdType *d): row(r), col(c), data(d) {}
+
+  CooIterator& operator=(const CooIterator& other) = default;
+  CooIterator& operator=(CooIterator&& other) = default;
+  ~CooIterator() = default;
+
+  bool operator==(const CooIterator& other) const {
+    return row == other.row;
+  }
+
+  bool operator!=(const CooIterator& other) const {
+    return row != other.row;
+  }
+
+  bool operator<(const CooIterator& other) const {
+    return row < other.row;
+  }
+
+  bool operator>(const CooIterator& other) const {
+    return row > other.row;
+  }
+
+  bool operator<=(const CooIterator& other) const {
+    return row <= other.row;
+  }
+
+  bool operator>=(const CooIterator& other) const {
+    return row >= other.row;
+  }
+
+  CooIterator& operator+=(const std::ptrdiff_t& movement) {
+    row += movement;
+    col += movement;
+    data += movement;
+    return *this;
+  }
+
+  CooIterator& operator-=(const std::ptrdiff_t& movement) {
+    row -= movement;
+    col -= movement;
+    data -= movement;
+    return *this;
+  }
+
+  CooIterator& operator++() {
+    return operator+=(1);
+  }
+
+  CooIterator& operator--() {
+    return operator-=(1);
+  }
+
+  CooIterator operator++(int) {
+    CooIterator ret(*this);
+    operator++();
+    return ret;
+  }
+
+  CooIterator operator--(int) {
+    CooIterator ret(*this);
+    operator--();
+    return ret;
+  }
+
+  CooIterator operator+(const std::ptrdiff_t& movement) const {
+    CooIterator ret(*this);
+    ret += movement;
+    return ret;
+  }
+
+  CooIterator operator-(const std::ptrdiff_t& movement) const {
+    CooIterator ret(*this);
+    ret -= movement;
+    return ret;
+  }
+
+  std::ptrdiff_t operator-(const CooIterator& other) const {
+    return row - other.row;
+  }
+
+  TupleRef<IdType> operator*() const {
+    return TupleRef<IdType>(row, col, data);
+  }
+  TupleRef<IdType> operator*() {
+    return TupleRef<IdType>(row, col, data);
+  }
+
+  IdType *row, *col, *data;
+};
+
+}  // namespace
 
 namespace dgl {
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
-COOMatrix COOSort(COOMatrix coo, bool sort_column) {
-  const int64_t nnz = coo.row->shape[0];
-  const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
-  const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
+///////////////////////////// COOSort_ /////////////////////////////
 
-  // Argsort
-  IdArray new_row = IdArray::Empty({nnz}, coo.row->dtype, coo.row->ctx);
-  IdArray new_col = IdArray::Empty({nnz}, coo.col->dtype, coo.col->ctx);
-  IdArray new_idx = IdArray::Empty({nnz}, coo.row->dtype, coo.row->ctx);
-  IdType* new_row_data = static_cast<IdType*>(new_row->data);
-  IdType* new_col_data = static_cast<IdType*>(new_col->data);
-  IdType* new_idx_data = static_cast<IdType*>(new_idx->data);
-  std::iota(new_idx_data, new_idx_data + nnz, 0);
+template <DLDeviceType XPU, typename IdType>
+void COOSort_(COOMatrix* coo, bool sort_column) {
+  const int64_t nnz = coo->row->shape[0];
+  IdType* coo_row = coo->row.Ptr<IdType>();
+  IdType* coo_col = coo->col.Ptr<IdType>();
+  if (!COOHasData(*coo))
+    coo->data = aten::Range(0, nnz, coo->row->dtype.bits, coo->row->ctx);
+  IdType* coo_data = coo->data.Ptr<IdType>();
+
+  typedef std::tuple<IdType, IdType, IdType> Tuple;
+
+  // Arg sort
   if (sort_column) {
 #ifdef PARALLEL_ALGORITHMS
     __gnu_parallel::sort(
 #else
     std::sort(
 #endif
-        new_idx_data,
-        new_idx_data + nnz,
-        [coo_row_data, coo_col_data](const IdType a, const IdType b) {
-          return (coo_row_data[a] != coo_row_data[b]) ?
-            (coo_row_data[a] < coo_row_data[b]) :
-            (coo_col_data[a] < coo_col_data[b]);
+        CooIterator<IdType>(coo_row, coo_col, coo_data),
+        CooIterator<IdType>(coo_row, coo_col, coo_data) + nnz,
+        [](const Tuple& a, const Tuple& b) {
+          return (std::get<0>(a) != std::get<0>(b)) ?
+              (std::get<0>(a) < std::get<0>(b)) : (std::get<1>(a) < std::get<1>(b));
         });
   } else {
 #ifdef PARALLEL_ALGORITHMS
@@ -48,39 +192,41 @@ COOMatrix COOSort(COOMatrix coo, bool sort_column) {
 #else
     std::sort(
 #endif
-        new_idx_data,
-        new_idx_data + nnz,
-        [coo_row_data](const IdType a, const IdType b) {
-          return coo_row_data[a] < coo_row_data[b];
+        CooIterator<IdType>(coo_row, coo_col, coo_data),
+        CooIterator<IdType>(coo_row, coo_col, coo_data) + nnz,
+        [](const Tuple& a, const Tuple& b) {
+          return std::get<0>(a) < std::get<0>(b);
         });
   }
 
-  // Reorder according to shuffle
-#pragma omp parallel for
-  for (IdType i = 0; i < nnz; ++i) {
-    new_row_data[i] = coo_row_data[new_idx_data[i]];
-    new_col_data[i] = coo_col_data[new_idx_data[i]];
-  }
-
-  if (COOHasData(coo)) {
-    const IdType* coo_data_data = static_cast<IdType*>(coo.data->data);
-    IdArray new_data = IdArray::Empty({nnz}, coo.row->dtype, coo.row->ctx);
-    IdType* new_data_data = static_cast<IdType*>(new_data->data);
-#pragma omp parallel for
-    for (IdType i = 0; i < nnz; ++i) {
-      new_data_data[i] = coo_data_data[new_idx_data[i]];
-    }
-
-    new_idx = new_data;
-  }
-
-  return COOMatrix{
-      coo.num_rows, coo.num_cols, std::move(new_row), std::move(new_col),
-      std::move(new_idx), true, sort_column};
+  coo->row_sorted = true;
+  coo->col_sorted = sort_column;
 }
 
-template COOMatrix COOSort<kDLCPU, int32_t>(COOMatrix, bool);
-template COOMatrix COOSort<kDLCPU, int64_t>(COOMatrix, bool);
+template void COOSort_<kDLCPU, int32_t>(COOMatrix*, bool);
+template void COOSort_<kDLCPU, int64_t>(COOMatrix*, bool);
+
+
+///////////////////////////// COOIsSorted /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
+  const int64_t nnz = coo.row->shape[0];
+  IdType* row = coo.row.Ptr<IdType>();
+  IdType* col = coo.col.Ptr<IdType>();
+  bool row_sorted = true;
+  bool col_sorted = true;
+  for (int64_t i = 1; row_sorted && i < nnz; ++i) {
+    row_sorted = (row[i - 1] <= row[i]);
+    col_sorted = col_sorted && (row[i - 1] < row[i] || col[i - 1] <= col[i]);
+  }
+  if (!row_sorted)
+    col_sorted = false;
+  return {row_sorted, col_sorted};
+}
+
+template std::pair<bool, bool> COOIsSorted<kDLCPU, int32_t>(COOMatrix coo);
+template std::pair<bool, bool> COOIsSorted<kDLCPU, int64_t>(COOMatrix coo);
 
 }  // namespace impl
 }  // namespace aten

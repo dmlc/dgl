@@ -8,6 +8,7 @@
 
 #include <dgl/array.h>
 #include <functional>
+#include <algorithm>
 
 namespace dgl {
 namespace aten {
@@ -73,15 +74,13 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
   IdxType* picked_idata = static_cast<IdxType*>(picked_idx->data);
 
   bool all_has_fanout = true;
-  if (replace) {
-    all_has_fanout = true;
-  } else {
 #pragma omp parallel for reduction(&&:all_has_fanout)
-    for (int64_t i = 0; i < num_rows; ++i) {
-      const IdxType rid = rows_data[i];
-      const IdxType len = indptr[rid + 1] - indptr[rid];
-      all_has_fanout = all_has_fanout && (len >= num_picks);
-    }
+  for (int64_t i = 0; i < num_rows; ++i) {
+    const IdxType rid = rows_data[i];
+    const IdxType len = indptr[rid + 1] - indptr[rid];
+    // If a node has no neighbor then all_has_fanout must be false even if replace is
+    // true.
+    all_has_fanout = all_has_fanout && (len >= (replace ? 1 : num_picks));
   }
 
 #pragma omp parallel for
@@ -90,6 +89,9 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
     CHECK_LT(rid, mat.num_rows);
     const IdxType off = indptr[rid];
     const IdxType len = indptr[rid + 1] - off;
+    if (len == 0)
+      continue;
+
     if (len <= num_picks && !replace) {
       // nnz <= num_picks and w/o replacement, take all nnz
       for (int64_t j = 0; j < len; ++j) {

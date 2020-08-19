@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <iostream>
+#include <memory>
 #include <vector>
 #include "../../src/graph/heterograph.h"
 #include "../../src/graph/unit_graph.h"
@@ -18,7 +19,7 @@ TEST(Serialize, UnitGraph_COO) {
   auto src = VecToIdArray<int64_t>({1, 2, 5, 3});
   auto dst = VecToIdArray<int64_t>({1, 6, 2, 6});
   auto mg = std::dynamic_pointer_cast<UnitGraph>(
-      dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, dgl::SparseFormat::kCOO));
+      dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, coo_code));
 
   std::string blob;
   dmlc::MemoryStringStream ifs(&blob);
@@ -39,13 +40,15 @@ TEST(Serialize, UnitGraph_CSR) {
   aten::CSRMatrix csr_matrix;
   auto src = VecToIdArray<int64_t>({1, 2, 5, 3});
   auto dst = VecToIdArray<int64_t>({1, 6, 2, 6});
-  auto mg = std::dynamic_pointer_cast<UnitGraph>(
-      dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, dgl::SparseFormat::kCSR));
+  auto coo_g = std::dynamic_pointer_cast<UnitGraph>(
+      dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst));
+  auto csr_g =
+      std::dynamic_pointer_cast<UnitGraph>(coo_g->GetGraphInFormat(csr_code));
 
   std::string blob;
   dmlc::MemoryStringStream ifs(&blob);
 
-  static_cast<dmlc::Stream *>(&ifs)->Write(mg);
+  static_cast<dmlc::Stream *>(&ifs)->Write(csr_g);
 
   dmlc::MemoryStringStream ofs(&blob);
   auto ug2 = Serializer::make_shared<UnitGraph>();
