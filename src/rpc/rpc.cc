@@ -476,15 +476,5 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   *rv = res_tensor;
 });
 
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLCopyDataToSharedMemory")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  NDArray dst = args[0];
-  NDArray source = args[1];
-  CHECK_EQ(source.GetSize(), dst.GetSize());
-  char* dst_ptr = static_cast<char*>(dst->data);
-  char* src_ptr = static_cast<char*>(source->data);
-  memcpy(dst_ptr, src_ptr, dst.GetSize());
-});
-
 }  // namespace rpc
 }  // namespace dgl
