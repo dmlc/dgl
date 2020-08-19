@@ -58,11 +58,11 @@ g.add_edges(2, 5) # 6
 g.ndata[dgl.NID] = global_nid
 g.edata[dgl.EID] = global_eid
 
-gpb = dgl.distributed.GraphPartitionBook(part_id=0,
-                                         num_parts=1,
-                                         node_map=node_map,
-                                         edge_map=edge_map,
-                                         part_graph=g)
+gpb = dgl.distributed.graph_partition_book.BasicPartitionBook(part_id=0,
+                                                              num_parts=1,
+                                                              node_map=node_map,
+                                                              edge_map=edge_map,
+                                                              part_graph=g)
 
 node_policy = dgl.distributed.PartitionPolicy(policy_str='node',
                                               partition_book=gpb)
