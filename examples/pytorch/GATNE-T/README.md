@@ -8,9 +8,9 @@ Requirements
 ------------
 - requirements
 
-``bash
-pip install requirements
-``
+```bash
+pip install -r requirements.txt
+```
 
 Datasets
 --------
