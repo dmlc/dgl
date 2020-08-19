@@ -685,18 +685,10 @@ inline std::vector<T> ListValueToVector(const List<Value>& list) {
   std::vector<T> ret;
   ret.reserve(list.size());
   for (Value val : list)
-    ret.push_back(val->data);
-  return ret;
-}
-
-// (BarclayII) Gets around error raised by MSVC compiler 19.10, the latest version
-// supported by CUDA 9.0.
-template <>
-inline std::vector<std::string> ListValueToVector(const List<Value>& list) {
-  std::vector<std::string> ret;
-  ret.reserve(list.size());
-  for (Value val : list)
-    ret.push_back(val->data.operator std::string());
+    // (BarclayII) apparently MSVC 2017 CL 19.10 had trouble parsing
+    //     ret.push_back(val->data)
+    // So I kindly tell it how to properly parse it.
+    ret.push_back(val->data.operator T());
   return ret;
 }
 
