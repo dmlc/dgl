@@ -521,11 +521,9 @@ DGLHeteroGraph.line_graph = utils.alias_func(line_graph)
 
 def khop_adj(g, k):
     """Return the matrix of :math:`A^k` where :math:`A` is the adjacency matrix of the graph
-    :math:`g`, where rows represent source nodes and columns represent destination nodes.
+    :math:`g`.
 
-    The returned matrix is a 32-bit float dense matrix on CPU.
-
-    The graph must be homogeneous.
+    The returned matrix is a 32-bit float dense matrix on CPU. The graph must be homogeneous.
 
     Parameters
     ----------
@@ -536,7 +534,7 @@ def khop_adj(g, k):
 
     Returns
     -------
-    tensor
+    Tensor
         The returned tensor.
 
     Examples
@@ -827,14 +825,15 @@ def to_bidirected_stale(g, readonly=True):
 
 def laplacian_lambda_max(g):
     """Return the largest eigenvalue of the normalized symmetric Laplacian of a graph.
+
     If the graph is batched from multiple graphs, return the list of the largest eigenvalue
     for each graph instead.
 
     Parameters
     ----------
     g : DGLGraph
-        The input graph, it should be an undirected graph.  It must be homogeneous.
-
+        The input graph, it must be a bi-directed homogeneous graph, i.e., every edge
+        should have an accompanied reverse edge in the graph.
         The graph can be batched from multiple graphs.
 
     Returns

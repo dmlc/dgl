@@ -8,14 +8,12 @@ from . import ndarray as nd
 __all__ = ['seed']
 
 def seed(val):
-    """Set the seed of randomized methods in DGL.
-
-    The randomized methods include various samplers and random walk routines.
+    """Set the random seed of DGL.
 
     Parameters
     ----------
     val : int
-        The seed
+        The seed.
     """
     _CAPI_SetSeed(val)
 
