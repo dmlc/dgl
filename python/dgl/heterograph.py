@@ -21,158 +21,17 @@ from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdge
 __all__ = ['DGLHeteroGraph', 'combine_names']
 
 class DGLHeteroGraph(object):
-    """Base heterogeneous graph class.
+    """Class for storing graph structure and node/edge feature data.
 
-    **Do NOT instantiate from this class directly; use** :mod:`conversion methods
-    <dgl.convert>` **instead.**
+    There are a few ways to create create a DGLGraph:
 
-    A Heterogeneous graph is defined as a graph with node types and edge
-    types.
+    * To create a homogeneous graph from Tensor data, use :func:`dgl.graph`.
+    * To create a heterogeneous graph from Tensor data, use :func:`dgl.heterograph`.
+    * To create a graph from other data sources, use ``dgl.*`` create ops. See
+      :ref:`api-graph-create-ops`.
 
-    If two edges share the same edge type, then their source nodes, as well
-    as their destination nodes, also have the same type (the source node
-    types don't have to be the same as the destination node types).
-
-    Examples
-    --------
-    Suppose that we want to construct the following heterogeneous graph:
-
-    .. graphviz::
-
-       digraph G {
-           Alice -> Bob [label=follows]
-           Bob -> Carol [label=follows]
-           Alice -> Tetris [label=plays]
-           Bob -> Tetris [label=plays]
-           Bob -> Minecraft [label=plays]
-           Carol -> Minecraft [label=plays]
-           Nintendo -> Tetris [label=develops]
-           Mojang -> Minecraft [label=develops]
-           {rank=source; Alice; Bob; Carol}
-           {rank=sink; Nintendo; Mojang}
-       }
-
-    And suppose that one maps the users, games and developers to the following
-    IDs:
-
-    =========  =====  ===  =====
-    User name  Alice  Bob  Carol
-    =========  =====  ===  =====
-    User ID    0      1    2
-    =========  =====  ===  =====
-
-    =========  ======  =========
-    Game name  Tetris  Minecraft
-    =========  ======  =========
-    Game ID    0       1
-    =========  ======  =========
-
-    ==============  ========  ======
-    Developer name  Nintendo  Mojang
-    ==============  ========  ======
-    Developer ID    0         1
-    ==============  ========  ======
-
-    One can construct the graph as follows:
-
-    >>> g = dgl.heterograph({
-    ...     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
-    ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-    ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
-    ...     })
-
-    Then one can query the graph structure by specifying the ``ntype`` or ``etype`` arguments:
-
-    >>> g.number_of_nodes('user')
-    3
-    >>> g.number_of_edges('plays')
-    4
-    >>> g.out_degrees(etype='develops')  # out-degrees of source nodes of 'develops' edge type
-    tensor([1, 1])
-    >>> g.in_edges(0, etype='develops')  # in-edges of destination node 0 of 'develops' edge type
-    (tensor([0]), tensor([0]))
-
-    Or on the sliced graph for an edge type:
-
-    >>> g['plays'].number_of_edges()
-    4
-    >>> g['develops'].out_degrees()
-    tensor([1, 1])
-    >>> g['develops'].in_edges(0)
-    (tensor([0]), tensor([0]))
-
-    Node type names must be distinct (no two types have the same name). Edge types could
-    have the same name but they must be distinguishable by the ``(src_type, edge_type, dst_type)``
-    triplet (called *canonical edge type*).
-
-    For example, suppose a graph that has two types of relation "user-watches-movie"
-    and "user-watches-TV" as follows:
-
-    >>> GG = dgl.heterograph({
-    ...     ('user', 'watches', 'movie'): ([0, 1, 1], [1, 0, 1]),
-    ...     ('user', 'watches', 'TV'): ([0, 1], [0, 1])
-    ... })
-
-    To distinguish between the two "watches" edge type, one must specify a full triplet:
-
-    >>> GG.number_of_edges(('user', 'watches', 'movie'))
-    3
-    >>> GG.number_of_edges(('user', 'watches', 'TV'))
-    2
-    >>> GG['user', 'watches', 'movie'].out_degrees()
-    tensor([1, 2])
-
-    Using only one single edge type string "watches" is ambiguous and will cause error:
-
-    >>> GG.number_of_edges('watches')  # AMBIGUOUS!!
-
-    In many cases, there is only one type of nodes or one type of edges, and the ``ntype``
-    and ``etype`` argument could be omitted. This is very common when using the sliced
-    graph, which usually contains only one edge type, and sometimes only one node type:
-
-    >>> g['follows'].number_of_nodes()  # OK!! because g['follows'] only has one node type 'user'
-    3
-    >>> g['plays'].number_of_nodes()  # ERROR!! There are two types 'user' and 'game'.
-    >>> g['plays'].number_of_edges()  # OK!! because there is only one edge type 'plays'
-
-    TODO(minjie): docstring about uni-directional bipartite graph
-
-    Metagraph
-    ---------
-    For each heterogeneous graph, one can often infer the *metagraph*, the template of
-    edge connections showing how many types of nodes and edges exist in the graph, and
-    how each edge type could connect between node types.
-
-    One can analyze the example gameplay graph above and figure out the metagraph as
-    follows:
-
-    .. graphviz::
-
-       digraph G {
-           User -> User [label=follows]
-           User -> Game [label=plays]
-           Developer -> Game [label=develops]
-       }
-
-
-    Parameters
-    ----------
-    gidx : HeteroGraphIndex
-        Graph index object.
-    ntypes : list of str, pair of list of str
-        Node type list. ``ntypes[i]`` stores the name of node type i.
-        If a pair is given, the graph created is a uni-directional bipartite graph,
-        and its SRC node types and DST node types are given as in the pair.
-    etypes : list of str
-        Edge type list. ``etypes[i]`` stores the name of edge type i.
-    node_frames : list[Frame], optional
-        Node feature storage. If None, empty frame is created.
-        Otherwise, ``node_frames[i]`` stores the node features
-        of node type i. (default: None)
-    edge_frames : list[Frame], optional
-        Edge feature storage. If None, empty frame is created.
-        Otherwise, ``edge_frames[i]`` stores the edge features
-        of edge type i. (default: None)
+    Read the user guide chapter :ref:`guide-graph` for an in-depth explanation about its
+    usage.
     """
     is_block = False
 
@@ -184,6 +43,27 @@ class DGLHeteroGraph(object):
                  node_frames=None,
                  edge_frames=None,
                  **deprecate_kwargs):
+        """Internal constructor for creating a DGLGraph.
+
+        Parameters
+        ----------
+        gidx : HeteroGraphIndex
+            Graph index object.
+        ntypes : list of str, pair of list of str
+            Node type list. ``ntypes[i]`` stores the name of node type i.
+            If a pair is given, the graph created is a uni-directional bipartite graph,
+            and its SRC node types and DST node types are given as in the pair.
+        etypes : list of str
+            Edge type list. ``etypes[i]`` stores the name of edge type i.
+        node_frames : list[Frame], optional
+            Node feature storage. If None, empty frame is created.
+            Otherwise, ``node_frames[i]`` stores the node features
+            of node type i. (default: None)
+        edge_frames : list[Frame], optional
+            Edge feature storage. If None, empty frame is created.
+            Otherwise, ``edge_frames[i]`` stores the edge features
+            of edge type i. (default: None)
+        """
         if isinstance(gidx, DGLHeteroGraph):
             raise DGLError('The input is already a DGLGraph. No need to create it again.')
         if not isinstance(gidx, heterograph_index.HeteroGraphIndex):
@@ -851,12 +731,17 @@ class DGLHeteroGraph(object):
 
     @property
     def ntypes(self):
-        """Return the node types of the graph.
+        """Return all the node type names in the graph.
 
         Returns
         -------
-        list of str
-            Each ``str`` is a node type.
+        list[str]
+            All the node type names in a list.
+
+        Notes
+        -----
+        DGL internally assigns an integer ID for each node type. The returned
+        node type names are sorted according to their IDs.
 
         Examples
         --------
@@ -877,19 +762,27 @@ class DGLHeteroGraph(object):
 
     @property
     def etypes(self):
-        """Return the edge types of the graph.
+        """Return all the edge type names in the graph.
 
         Returns
         -------
-        list of str
-            Each ``str`` is an edge type.
+        list[str]
+            All the edge type names in a list.
 
         Notes
         -----
-        An edge type can appear in multiple canonical edge types. For example, ``'interacts'``
-        can appear in two canonical edge types ``('drug', 'interacts', 'drug')`` and
-        ``('protein', 'interacts', 'protein')``. It is recommended to use
-        :func:`~dgl.DGLGraph.canonical_etypes` in this case.
+        DGL internally assigns an integer ID for each edge type. The returned
+        edge type names are sorted according to their IDs.
+
+        The complete format to specify an relation is a string triplet ``(str, str, str)``
+        for source node type, edge type and destination node type. DGL calls this
+        format *canonical edge type*. An edge type can appear in multiple canonical edge types.
+        For example, ``'interacts'`` can appear in two canonical edge types
+        ``('drug', 'interacts', 'drug')`` and ``('protein', 'interacts', 'protein')``.
+
+        See Also
+        --------
+        canonical_etypes
 
         Examples
         --------
@@ -910,16 +803,24 @@ class DGLHeteroGraph(object):
 
     @property
     def canonical_etypes(self):
-        """Return the canonical edge types of the graph.
+        """Return all the canonical edge types in the graph.
 
-        A canonical edge type is a 3-tuple of str ``src_type, edge_type, dst_type``, where
-        ``src_type``, ``edge_type``, ``dst_type`` are the type of the source nodes, edges
-        and destination nodes respectively.
+        A canonical edge type is a string triplet ``(str, str, str)``
+        for source node type, edge type and destination node type.
 
         Returns
         -------
-        list of 3-tuple of str
-            Each 3-tuple of str is a canonical edge type.
+        list[(str, str, str)]
+            All the canonical edge type triplets in a list.
+
+        Notes
+        -----
+        DGL internally assigns an integer ID for each edge type. The returned
+        edge type names are sorted according to their IDs.
+
+        See Also
+        --------
+        etypes
 
         Examples
         --------
@@ -942,15 +843,15 @@ class DGLHeteroGraph(object):
 
     @property
     def srctypes(self):
-        """Return the source node types.
+        """Return all the source node type names in this graph.
 
         Returns
         -------
-        list of str
+        list[str]
 
             * If the graph is a uni-bipartite graph, it returns the source node types.
               For a definition of uni-bipartite, see :func:`is_unibipartite`.
-            * Otherwise, it returns all node types in the graph.
+            * Otherwise, it returns all the node types in the graph.
 
         Examples
         --------
@@ -984,7 +885,7 @@ class DGLHeteroGraph(object):
 
     @property
     def dsttypes(self):
-        """Return the destination node types.
+        """Return all the destination node type names in this graph.
 
         Returns
         -------
@@ -1065,28 +966,23 @@ class DGLHeteroGraph(object):
     def to_canonical_etype(self, etype):
         """Convert an edge type to the corresponding canonical edge type in the graph.
 
-        A canonical edge type is a 3-tuple of strings ``src_type, edge_type, dst_type``, where
-        ``src_type``, ``edge_type``, ``dst_type`` are separately the type of source
-        nodes, edges and destination nodes.
+        A canonical edge type is a string triplet ``(str, str, str)``
+        for source node type, edge type and destination node type.
+
+        The function expects the given edge type name can uniquely identify a canonical edge
+        type. DGL will raise error if this is not the case.
 
         Parameters
         ----------
-        etype : str or 3-tuple of str
+        etype : str or (str, str, str)
             If :attr:`etype` is an edge type (str), it returns the corresponding canonical edge
-            type in the graph. If :attr:`etype` is already a canonical edge type
-            (3-tuple of str), it simply returns :attr:`etype`.
+            type in the graph. If :attr:`etype` is already a canonical edge type,
+            it directly returns the input unchanged.
 
         Returns
         -------
-        3-tuple of str
+        (str, str, str)
             The canonical edge type corresponding to the edge type.
-
-        Notes
-        -----
-        If :attr:`etype` is an edge type, the API expects it to appear only once in the graph. For
-        example, in a graph with canonical edge types ``('A', 'follows', 'B')``,
-        ``('A', 'follows', 'C')`` and ``('B', 'watches', 'D')``, ``'follows'`` is an invalid value
-        for :attr:`etype` while ``'watches'`` is a valid one.
 
         Examples
         --------
@@ -1131,7 +1027,7 @@ class DGLHeteroGraph(object):
             return ret
 
     def get_ntype_id(self, ntype):
-        """Return the id of the given node type.
+        """Return the ID of the given node type.
 
         ntype can also be None. If so, there should be only one node type in the
         graph.
@@ -1165,7 +1061,7 @@ class DGLHeteroGraph(object):
         return ntid
 
     def get_ntype_id_from_src(self, ntype):
-        """Return the id of the given SRC node type.
+        """Internal function to return the ID of the given SRC node type.
 
         ntype can also be None. If so, there should be only one node type in the
         SRC category. Callable even when the self graph is not uni-bipartite.
@@ -1190,7 +1086,7 @@ class DGLHeteroGraph(object):
         return ntid
 
     def get_ntype_id_from_dst(self, ntype):
-        """Return the id of the given DST node type.
+        """Internal function to return the ID of the given DST node type.
 
         ntype can also be None. If so, there should be only one node type in the
         DST category. Callable even when the self graph is not uni-bipartite.

@@ -6,10 +6,17 @@ dgl.DGLGraph
 .. currentmodule:: dgl
 .. class:: DGLGraph
 
-``DGLGraph`` is a data structure for storing both structural data and feature data.
-Read the user guide chapter :ref:`guide-graph` for an in-depth explanation about its
-usage. The recommended ways to create a ``DGLGraph`` object are via the
-:ref:`api-graph-create-ops`.
+    Class for storing graph structure and node/edge feature data.
+
+    There are a few ways to create create a DGLGraph:
+
+    * To create a homogeneous graph from Tensor data, use :func:`dgl.graph`.
+    * To create a heterogeneous graph from Tensor data, use :func:`dgl.heterograph`.
+    * To create a graph from other data sources, use ``dgl.*`` create ops. See
+      :ref:`api-graph-create-ops`.
+
+    Read the user guide chapter :ref:`guide-graph` for an in-depth explanation about its
+    usage.
 
 Querying metagraph structure
 ----------------------------
@@ -27,8 +34,6 @@ when the graph is heterogeneous.
     DGLGraph.canonical_etypes
     DGLGraph.metagraph
     DGLGraph.to_canonical_etype
-    DGLGraph.get_ntype_id
-    DGLGraph.get_etype_id
 
 Querying graph structure
 ------------------------
