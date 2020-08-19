@@ -121,10 +121,22 @@ def _init_state(shape, dtype):
 class SparseAdagrad:
     ''' The sparse Adagrad optimizer.
 
-    This optimizer implements a sparse version of the Adagrad algorithm.
-    It works with DistEmbedding and only update the embeddings
-    involved in a mini-batch to support efficient training on a graph with many
+    This optimizer implements a lightweight version of Adagrad algorithm for optimizing
+    :func:`dgl.distributed.DistEmbedding`. In each mini-batch, it only updates the embeddings
+    involved in the mini-batch to support efficient training on a graph with many
     nodes and edges.
+
+    Adagrad maintains a :math:`G_{t,i,j}` for every parameter in the embeddings, where
+    :math:`G_{t,i,j}=G_{t-1,i,j} + g_{t,i,j}^2` and :math:`g_{t,i,j}` is the gradient of
+    the dimension :math:`j` of embedding :math:`i` at step :math:`t`.
+
+    Instead of maintaining :math:`G_{t,i,j}`, this implementation maintains :math:`G_{t,i}`
+    for every embedding :math:`i`:
+        :math:`G_{t,i}=G_{t-1,i} + \frac{1}{p} \Sigma_{0 \le j \lt p} g_{t,i,j}^2`, where
+    :math:`p` is the dimension size of an embedding.
+
+    The benefit of the implementation is that it consumes much smaller memory and runs
+    much faster if users' model requires learnable embeddings for nodes or edges.
 
     Parameters
     ----------
