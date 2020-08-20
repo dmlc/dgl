@@ -1,5 +1,6 @@
 """Module for various graph generator functions."""
 
+import numpy as np
 from . import backend as F
 from . import convert
 from . import random
@@ -48,8 +49,9 @@ def rand_graph(num_nodes, num_edges, idtype=F.int64, device=F.cpu()):
     """
     #TODO(minjie): support RNG as one of the arguments.
     eids = random.choice(num_nodes * num_nodes, num_edges, replace=False)
-    rows = F.copy_to(F.astype(eids // num_nodes, idtype), device)
-    cols = F.copy_to(F.astype(eids % num_nodes, idtype), device)
+    eids = F.zerocopy_to_numpy(eids)
+    rows = (eids // num_nodes).astype(idtype)
+    cols = (eids % num_nodes).astype(idtype)
     return convert.graph((rows, cols),
                          num_nodes=num_nodes,
                          idtype=idtype, device=device)
@@ -106,8 +108,9 @@ def rand_bipartite(utype, etype, vtype,
     """
     #TODO(minjie): support RNG as one of the arguments.
     eids = random.choice(num_src_nodes * num_dst_nodes, num_edges, replace=False)
-    rows = F.copy_to(F.astype(eids // num_dst_nodes, idtype), device)
-    cols = F.copy_to(F.astype(eids % num_dst_nodes, idtype), device)
+    eids = F.zerocopy_to_numpy(eids)
+    rows = (eids // num_dst_nodes).astype(idtype)
+    cols = (eids % num_dst_nodes).astype(idtype)
     return convert.heterograph({(utype, etype, vtype): (rows, cols)},
                                {utype: num_src_nodes, vtype: num_dst_nodes},
                                idtype=idtype, device=device)
