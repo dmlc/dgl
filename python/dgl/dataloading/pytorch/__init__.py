@@ -64,10 +64,19 @@ class NodeDataLoader:
 
 
     def __next__(self):
-        return self.dataloader.__next()
+        """Return the next element of the data loader.
+
+        Only works when the data loader is created from :class:`dgl.distributed.DistGraph`.
+        """
+        return next(self.dataloader)
 
     def __iter__(self):
-        return self.dataloader.__iter__()
+        """Return the iterator of the data loader."""
+        return iter(self.dataloader)
+
+    def __len__(self):
+        """Return the number of batches of the data loader."""
+        return len(self.dataloader)
 
 class EdgeDataLoader(DataLoader):
     """PyTorch dataloader for batch-iterating over a set of edges, generating the list
