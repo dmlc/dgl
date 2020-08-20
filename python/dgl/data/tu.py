@@ -79,7 +79,6 @@ class LegacyTUDataset(DGLBuiltinDataset):
         self.hidden_size = hidden_size
         self.max_allow_node = max_allow_node
         self.use_pandas = use_pandas
-        self.hash = abs(hash((name, use_pandas, hidden_size, max_allow_node)))
         super(LegacyTUDataset, self).__init__(name=name, url=url, raw_dir=raw_dir,
                                               hash_key=(name, use_pandas, hidden_size, max_allow_node),
                                               force_reload=force_reload, verbose=verbose)

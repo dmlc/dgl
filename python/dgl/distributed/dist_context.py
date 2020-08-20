@@ -44,7 +44,15 @@ def _init_rpc(ip_config, num_servers, max_queue_size, net_type, role, num_thread
 def initialize(ip_config, num_servers=1, num_workers=0,
                max_queue_size=MAX_QUEUE_SIZE, net_type='socket',
                num_worker_threads=1):
-    """Init rpc service
+    """Initialize DGL's distributed module
+
+    This function initializes DGL's distributed module. It acts differently in server
+    or client modes. In the server mode, it runs the server code and never returns.
+    In the client mode, it builds connections with servers for communication and
+    creates worker processes for distributed sampling. `num_workers` specifies
+    the number of sampling worker processes per trainer process.
+    Users also have to provide the number of server processes on each machine in order
+    to connect to all the server processes in the cluster of machines correctly.
 
     Parameters
     ----------
@@ -57,12 +65,21 @@ def initialize(ip_config, num_servers=1, num_workers=0,
         for distributed sampling.
     max_queue_size : int
         Maximal size (bytes) of client queue buffer (~20 GB on default).
+
         Note that the 20 GB is just an upper-bound and DGL uses zero-copy and
         it will not allocate 20GB memory at once.
-    net_type : str
-        Networking type. Current options are: 'socket'.
+    net_type : str, optional
+        Networking type. Currently the only valid option is ``'socket'``.
+
+        Default: ``'socket'``
     num_worker_threads: int
         The number of threads in a worker process.
+
+    Note
+    ----
+    Users have to invoke this API before any DGL's distributed API and framework-specific
+    distributed API. For example, when used with Pytorch, users have to invoke this function
+    before Pytorch's `pytorch.distributed.init_process_group`.
     """
     if os.environ.get('DGL_ROLE', 'client') == 'server':
         from .dist_graph import DistGraphServer
@@ -138,7 +155,14 @@ def is_initialized():
     return INITIALIZED
 
 def exit_client():
-    """Register exit callback.
+    """Trainer exits
+
+    This function is called automatically when a Python process exits. Normally,
+    the training script does not need to invoke this function at the end.
+
+    In the case that the training script needs to initialize the distributed module
+    multiple times (so far, this is needed in the unit tests), the training script
+    needs to call `exit_client` before calling `initialize` again.
     """
     # Only client with rank_0 will send shutdown request to servers.
     finalize_worker() # finalize workers should be earilier than barrier, and non-blocking
