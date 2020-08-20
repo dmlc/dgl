@@ -8,6 +8,7 @@ API Reference
    dgl.data
    dgl.dataloading
    dgl.DGLGraph
+   dgl.distributed
    dgl.function
    nn
    dgl.ops

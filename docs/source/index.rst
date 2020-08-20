@@ -106,6 +106,7 @@ Getting Started
    api/python/dgl.data
    api/python/dgl.dataloading
    api/python/dgl.DGLGraph
+   api/python/dgl.distributed
    api/python/dgl.function
    api/python/nn
    api/python/dgl.ops

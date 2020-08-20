@@ -47,8 +47,8 @@ class SGConv(nn.Module):
         0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
         and let the users handle it by themselves. Default: ``False``.
 
-    Notes
-    -----
+    Note
+    ----
     Zero in-degree nodes will lead to invalid output value. This is because no message
     will be passed to those nodes, the aggregation function will be appied on empty input.
     A common practice to avoid this is to add a self-loop for each node in the graph if
@@ -107,8 +107,8 @@ class SGConv(nn.Module):
         -----------
         Reinitialize learnable parameters.
 
-        Notes
-        -----
+        Note
+        ----
         The model parameters are initialized using xavier initialization
         and the bias is initialized to be zero.
         """
@@ -158,8 +158,8 @@ class SGConv(nn.Module):
             since no message will be passed to those nodes. This will cause invalid output.
             The error can be ignored by setting ``allow_zero_in_degree`` parameter to ``True``.
 
-        Notes
-        -----
+        Note
+        ----
         If ``cache`` is set to True, ``feat`` and ``graph`` should not change during
         training, or you will get wrong results.
         """

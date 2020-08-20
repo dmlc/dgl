@@ -24,6 +24,7 @@ def train(args, net, trainloader, trainer, criterion, epoch):
         feat = graphs.ndata['attr'].astype('float32').as_in_context(args.device)
 
         with mx.autograd.record():
+            graphs = graphs.to(args.device)
             outputs = net(graphs, feat)
             loss = criterion(outputs, labels)
             loss = loss.sum() / len(labels)
@@ -54,9 +55,10 @@ def eval_net(args, net, dataloader, criterion):
         feat = graphs.ndata['attr'].astype('float32').as_in_context(args.device)
 
         total += len(labels)
-
+        graphs = graphs.to(args.device)
         outputs = net(graphs, feat)
         predicted = nd.argmax(outputs, axis=1)
+        predicted = predicted.astype('int64')
 
         total_correct += (predicted == labels).sum().asscalar()
         loss = criterion(outputs, labels)

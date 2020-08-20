@@ -3,7 +3,7 @@
 NN Modules (MXNet)
 ===================
 
-Conv Layers 
+Conv Layers
 ----------------------------------------
 
 .. automodule:: dgl.nn.mxnet.conv
@@ -84,7 +84,7 @@ GMMConv
 .. autoclass:: dgl.nn.mxnet.conv.GMMConv
     :members: forward
     :show-inheritance:
- 
+
 ChebConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -104,7 +104,7 @@ NNConv
 
 .. autoclass:: dgl.nn.mxnet.conv.NNConv
     :members: forward
-    :show-inheritance
+    :show-inheritance:
 
 Dense Conv Layers
 ----------------------------------------
@@ -121,12 +121,12 @@ DenseSAGEConv
 
 .. autoclass:: dgl.nn.mxnet.conv.DenseSAGEConv
     :members: forward
-    :show-inheritance
+    :show-inheritance:
 
 DenseChebConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: dgl.nn.pytorch.conv.DenseChebConv
+.. autoclass:: dgl.nn.mxnet.conv.DenseChebConv
     :members: forward
     :show-inheritance:
 
