@@ -49,8 +49,10 @@ def rand_graph(num_nodes, num_edges, idtype=F.int64, device=F.cpu()):
     #TODO(minjie): support RNG as one of the arguments.
     eids = random.choice(num_nodes * num_nodes, num_edges, replace=False)
     eids = F.zerocopy_to_numpy(eids)
-    rows = (eids // num_nodes).astype(idtype)
-    cols = (eids % num_nodes).astype(idtype)
+    rows = F.zerocopy_from_numpy(eids // num_nodes)
+    cols = F.zerocopy_from_numpy(eids % num_nodes)
+    rows = F.copy_to(F.astype(rows, idtype), device)
+    cols = F.copy_to(F.astype(cols, idtype), device)
     return convert.graph((rows, cols),
                          num_nodes=num_nodes,
                          idtype=idtype, device=device)
@@ -108,8 +110,10 @@ def rand_bipartite(utype, etype, vtype,
     #TODO(minjie): support RNG as one of the arguments.
     eids = random.choice(num_src_nodes * num_dst_nodes, num_edges, replace=False)
     eids = F.zerocopy_to_numpy(eids)
-    rows = (eids // num_dst_nodes).astype(idtype)
-    cols = (eids % num_dst_nodes).astype(idtype)
+    rows = F.zerocopy_from_numpy(eids // num_dst_nodes)
+    cols = F.zerocopy_from_numpy(eids % num_dst_nodes)
+    rows = F.copy_to(F.astype(rows, idtype), device)
+    cols = F.copy_to(F.astype(cols, idtype), device)
     return convert.heterograph({(utype, etype, vtype): (rows, cols)},
                                {utype: num_src_nodes, vtype: num_dst_nodes},
                                idtype=idtype, device=device)
