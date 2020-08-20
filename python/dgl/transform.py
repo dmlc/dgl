@@ -153,7 +153,7 @@ def knn_graph(x, k):
 def segmented_knn_graph(x, k, segs):
     """Construct multiple graphs from multiple sets of points according to
     k-nearest-neighbor (KNN) and return.
-    
+
     Compared with :func:`dgl.knn_graph`, this allows multiple point sets with
     different capacity. The points from different sets are stored contiguously
     in the :attr:`x` tensor.
@@ -257,7 +257,7 @@ def to_bidirected(g, copy_ndata=False, readonly=None):
     If :attr:`copy_ndata` is True, the resulting graph will share the node feature
     tensors with the input graph. Hence, users should try to avoid in-place operations
     which will be visible to both graphs.
-    
+
     Examples
     --------
     The following examples use PyTorch backend.
@@ -1185,7 +1185,7 @@ def remove_edges(g, eids, etype=None):
 
 def remove_nodes(g, nids, ntype=None):
     r"""Remove the specified nodes and return a new graph.
-    
+
     Also delete the features. Edges that connect from/to the nodes will be
     removed as well. After the removal, DGL re-labels the remaining nodes and edges
     with IDs from 0.
@@ -2137,9 +2137,9 @@ def to_simple(g,
 
     Notes
     -----
-    If ``copy_ndata`` is ``True``, same tensors will be used for
-    the features of the original graph and the to_simpled graph. As a result, users
-    should avoid performing 
+    If :attr:`copy_ndata` is True, the resulting graph will share the node feature
+    tensors with the input graph. Hence, users should try to avoid in-place operations
+    which will be visible to both graphs.
 
     Examples
     --------

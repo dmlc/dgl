@@ -1,7 +1,7 @@
 """Classes for heterogeneous graphs."""
 #pylint: disable= too-many-lines
-from collections import defaultdict, Iterable
-from collections.abc import Mapping
+from collections import defaultdict
+from collections.abc import Mapping, Iterable
 from contextlib import contextmanager
 import copy
 import numbers
@@ -2445,7 +2445,7 @@ class DGLHeteroGraph(object):
             * Int Tensor: Each element is a node ID. The tensor must have the same device type
               and ID data type as the graph's.
             * iterable[int]: Each element is a node ID.
-        
+
         v : node IDs
             The destination node IDs of the edges. The allowed formats are:
 
@@ -2453,7 +2453,7 @@ class DGLHeteroGraph(object):
             * Int Tensor: Each element is a node ID. The tensor must have the same device type
               and ID data type as the graph's.
             * iterable[int]: Each element is a node ID.
-        
+
         etype : str or (str, str, str), optional
             The type names of the edges. The allowed type name formats are:
 
@@ -2659,7 +2659,7 @@ class DGLHeteroGraph(object):
 
     def edge_ids(self, u, v, force_multi=None, return_uv=False, etype=None):
         """Return the edge ID(s) given the two endpoints of the edge(s).
-        
+
         Parameters
         ----------
         u : node IDs
@@ -2669,7 +2669,7 @@ class DGLHeteroGraph(object):
             * Int Tensor: Each element is a node ID. The tensor must have the same device type
               and ID data type as the graph's.
             * iterable[int]: Each element is a node ID.
-        
+
         v : node IDs
             The destination node IDs of the edges. The allowed formats are:
 
@@ -2792,7 +2792,7 @@ class DGLHeteroGraph(object):
             * Int Tensor: Each element is an ID. The tensor must have the same device type
               and ID data type as the graph's.
             * iterable[int]: Each element is an ID.
-        
+
         etype : str or (str, str, str), optional
             The type names of the edges. The allowed type name formats are:
 
@@ -3903,7 +3903,7 @@ class DGLHeteroGraph(object):
 
     def apply_nodes(self, func, v=ALL, ntype=None, inplace=False):
         """Update the features of the specified nodes by the provided function.
-        
+
         Parameters
         ----------
         func : callable
@@ -3945,7 +3945,7 @@ class DGLHeteroGraph(object):
                 [2., 2.]])
 
         **Heterogeneous graph**
-        
+
         >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1], [1, 2])})
         >>> g.nodes['user'].data['h'] = torch.ones(3, 5)
         >>> g.apply_nodes(lambda nodes: {'h': nodes.data['h'] * 2}, ntype='user')
@@ -4202,7 +4202,7 @@ class DGLHeteroGraph(object):
             * Int Tensor: Each element is a node ID. The tensor must have the same device type
               and ID data type as the graph's.
             * iterable[int]: Each element is a node ID.
-        
+
         message_func : dgl.function.BuiltinFunction or callable
             The message function to generate messages along the edges.
             It must be either a :ref:`api-built-in` or a :ref:`apiudf`.
@@ -4305,7 +4305,7 @@ class DGLHeteroGraph(object):
             * Int Tensor: Each element is a node ID. The tensor must have the same device type
               and ID data type as the graph's.
             * iterable[int]: Each element is a node ID.
-        
+
         message_func : dgl.function.BuiltinFunction or callable
             The message function to generate messages along the edges.
             It must be either a :ref:`api-built-in` or a :ref:`apiudf`.

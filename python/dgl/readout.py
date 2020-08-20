@@ -573,7 +573,7 @@ def _topk_on(graph, typestr, feat, k, descending, sortby, ntype_or_etype):
 def topk_nodes(graph, feat, k, *, descending=True, sortby=None, ntype=None):
     """Return a graph-level representation by a graph-wise top-k on
     node features :attr:`feat` in :attr:`graph` by feature at index :attr:`sortby`.
-    
+
     If :attr:`descending` is set to False, return the k smallest elements instead.
 
     If :attr:`sortby` is set to None, the function would perform top-k on
@@ -681,7 +681,7 @@ def topk_nodes(graph, feat, k, *, descending=True, sortby=None, ntype=None):
 def topk_edges(graph, feat, k, *, descending=True, sortby=None, etype=None):
     """Return a graph-level representation by a graph-wise top-k
     on edge features :attr:`feat` in :attr:`graph` by feature at index :attr:`sortby`.
-    
+
     If :attr:`descending` is set to False, return the k smallest elements instead.
 
     If :attr:`sortby` is set to None, the function would perform top-k on

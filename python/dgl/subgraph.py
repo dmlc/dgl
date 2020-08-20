@@ -48,11 +48,11 @@ def node_subgraph(graph, nodes):
         * iterable[int]: Each element is a node ID.
         * Bool Tensor: Each :math:`i^{th}` element is a bool flag indicating whether
           node :math:`i` is in the subgraph.
-        
+
         If the graph is homogeneous, one can directly pass the above formats.
         Otherwise, the argument must be a dictionary with keys being node types
         and values being the nodes.
-    
+
     Returns
     -------
     G : DGLGraph
@@ -81,7 +81,7 @@ def node_subgraph(graph, nodes):
     tensor([0, 4])
 
     Specify nodes using a boolean mask.
-    
+
     >>> nodes = torch.tensor([True, True, False, False, True])  # choose nodes [0, 1, 4]
     >>> dgl.node_subgraph(g, nodes)
     Graph(num_nodes=3, num_edges=2,
@@ -172,7 +172,7 @@ def edge_subgraph(graph, edges, preserve_nodes=False):
         * iterable[int]: Each element is an edge ID.
         * Bool Tensor: Each :math:`i^{th}` element is a bool flag indicating whether
           edge :math:`i` is in the subgraph.
-        
+
         If the graph is homogeneous, one can directly pass the above formats.
         Otherwise, the argument must be a dictionary with keys being edge types
         and values being the nodes.
@@ -218,7 +218,7 @@ def edge_subgraph(graph, edges, preserve_nodes=False):
     (tensor([0, 4]), tensor([1, 0]))
 
     Specify edges using a boolean mask.
-    
+
     >>> nodes = torch.tensor([True, False, False, False, True])  # choose edges [0, 4]
     >>> dgl.edge_subgraph(g, nodes)
     Graph(num_nodes=3, num_edges=2,
@@ -310,7 +310,7 @@ def in_subgraph(g, nodes):
         * Int Tensor: Each element is an ID. The tensor must have the same device type
           and ID data type as the graph's.
         * iterable[int]: Each element is an ID.
-        
+
         If the graph is homogeneous, one can directly pass the above formats.
         Otherwise, the argument must be a dictionary with keys being node types
         and values being the nodes.
@@ -408,7 +408,7 @@ def out_subgraph(g, nodes):
         * Int Tensor: Each element is a node ID. The tensor must have the same device type
           and ID data type as the graph's.
         * iterable[int]: Each element is a node ID.
-        
+
         If the graph is homogeneous, one can directly pass the above formats.
         Otherwise, the argument must be a dictionary with keys being node types
         and values being the nodes.
