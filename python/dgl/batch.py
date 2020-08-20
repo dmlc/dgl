@@ -10,7 +10,7 @@ from . import utils
 __all__ = ['batch', 'unbatch', 'batch_hetero', 'unbatch_hetero']
 
 def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
-    r"""Batch a collection of ``DGLGraph``s into one graph for more efficient
+    r"""Batch a collection of :class:`DGLGraph` s into one graph for more efficient
     graph computation.
 
     Each input graph becomes one disjoint component of the batched graph. The nodes
@@ -35,8 +35,8 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
 
     The numbers of nodes and edges of the input graphs are accessible via the
     :func:`DGLGraph.batch_num_nodes` and :func:`DGLGraph.batch_num_edges` attributes
-    of the result graph. For homographs, they are 1D integer tensors, with each element
-    being the number of nodes/edges of the corresponding input graph. For
+    of the resulting graph. For homogeneous graphs, they are 1D integer tensors,
+    with each element being the number of nodes/edges of the corresponding input graph. For
     heterographs, they are dictionaries of 1D integer tensors, with node
     type or edge type as the keys.
 
@@ -46,7 +46,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     By default, node/edge features are batched by concatenating the feature tensors
     of all input graphs. This thus requires features of the same name to have
     the same data type and feature size. One can pass ``None`` to the ``ndata``
-    or ``edata`` argument to prevent feature batching, or pass a list of string
+    or ``edata`` argument to prevent feature batching, or pass a list of strings
     to specify which features to batch.
 
     To unbatch the graph back to a list, use the :func:`dgl.unbatch` function.
@@ -68,7 +68,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     Examples
     --------
 
-    Batch homographs
+    Batch homogeneous graphs
 
     >>> import dgl
     >>> import torch as th
@@ -251,13 +251,13 @@ def unbatch(g, node_split=None, edge_split=None):
     """Revert the batch operation by split the given graph into a list of small ones.
 
     This is the reverse operation of :func:``dgl.batch``. If the ``node_split``
-    or the ``edge_split`` is not given, it uses the :func:`DGLGraph.batch_num_nodes`
-    and :func:`DGLGraph.batch_num_edges` of the input graph.
+    or the ``edge_split`` is not given, it calls :func:`DGLGraph.batch_num_nodes`
+    and :func:`DGLGraph.batch_num_edges` of the input graph to get the information.
 
     If the ``node_split`` or the ``edge_split`` arguments are given,
     it will partition the graph according to the given segments. One must assure
     that the partition is valid -- edges of the i^th graph only connect nodes
-    belong to the i^th graph. Otherwise, an error will be thrown.
+    belong to the i^th graph. Otherwise, DGL will throw an error.
 
     The function supports heterograph input, in which case the two split
     section arguments shall be of dictionary type -- similar to the
