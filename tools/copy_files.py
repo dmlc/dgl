@@ -24,7 +24,7 @@ def main():
                         help='Path of user directory of distributed tasks. \
                         This is used to specify a destination location where \
                         data are copied to on remote machines.')
-    parser.add_argument('--rel_data_path', type=str, required=True,
+    parser.add_argument('--data_path', type=str, required=True,
                         help='Relative path in workspace to store the partition data.')
     parser.add_argument('--part_config', type=str, required=True,
                         help='The partition config file. The path is on the local machine.')
@@ -56,35 +56,35 @@ def main():
         if not isinstance(node_map, list):
             assert node_map[-4:] == '.npy', 'node map should be stored in a NumPy array.'
             tmp_part_metadata['node_map'] = '{}/{}/node_map.npy'.format(args.workspace,
-                                                                        args.rel_data_path)
+                                                                        args.data_path)
         if not isinstance(edge_map, list):
             assert edge_map[-4:] == '.npy', 'edge map should be stored in a NumPy array.'
             tmp_part_metadata['edge_map'] = '{}/{}/edge_map.npy'.format(args.workspace,
-                                                                        args.rel_data_path)
+                                                                        args.data_path)
 
         for part_id in range(num_parts):
             part_files = tmp_part_metadata['part-{}'.format(part_id)]
-            part_files['edge_feats'] = '{}/part{}/edge_feat.dgl'.format(args.rel_data_path, part_id)
-            part_files['node_feats'] = '{}/part{}/node_feat.dgl'.format(args.rel_data_path, part_id)
-            part_files['part_graph'] = '{}/part{}/graph.dgl'.format(args.rel_data_path, part_id)
+            part_files['edge_feats'] = '{}/part{}/edge_feat.dgl'.format(args.data_path, part_id)
+            part_files['node_feats'] = '{}/part{}/node_feat.dgl'.format(args.data_path, part_id)
+            part_files['part_graph'] = '{}/part{}/graph.dgl'.format(args.data_path, part_id)
     tmp_part_config = '/tmp/{}.json'.format(graph_name)
     with open(tmp_part_config, 'w') as outfile:
         json.dump(tmp_part_metadata, outfile, sort_keys=True, indent=4)
 
     # Copy ip config.
     for part_id, ip in enumerate(hosts):
-        remote_path = '{}/{}'.format(args.workspace, args.rel_data_path)
+        remote_path = '{}/{}'.format(args.workspace, args.data_path)
         exec_cmd(ip, 'mkdir -p {}'.format(remote_path))
 
         copy_file(args.ip_config, ip, args.workspace)
-        copy_file(tmp_part_config, ip, '{}/{}'.format(args.workspace, args.rel_data_path))
+        copy_file(tmp_part_config, ip, '{}/{}'.format(args.workspace, args.data_path))
         node_map = part_metadata['node_map']
         edge_map = part_metadata['edge_map']
         if not isinstance(node_map, list):
             copy_file(node_map, ip, tmp_part_metadata['node_map'])
         if not isinstance(edge_map, list):
             copy_file(edge_map, ip, tmp_part_metadata['edge_map'])
-        remote_path = '{}/{}/part{}'.format(args.workspace, args.rel_data_path, part_id)
+        remote_path = '{}/{}/part{}'.format(args.workspace, args.data_path, part_id)
         exec_cmd(ip, 'mkdir -p {}'.format(remote_path))
 
         part_files = part_metadata['part-{}'.format(part_id)]

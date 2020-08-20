@@ -43,13 +43,13 @@ cp /home/ubuntu/dgl/examples/pytorch/rgcn/experimental/entity_classify_dist.py ~
 The command below copies partition data, ip config file, as well as training scripts to the machines in the cluster.
 The configuration of the cluster is defined by `ip_config.txt`.
 The data is copied to `~/rgcn/ogbn-mag` on each of the remote machines.
-`--rel_data_path` specifies the relative path in the workspace where the partitioned data will be stored.
+`--data_path` specifies the relative path in the workspace where the partitioned data will be stored.
 `--part_config` specifies the location of the partitioned data in the local machine (a user only needs to specify
 the location of the partition configuration file). `--script_folder` specifies the location of the training scripts.
 ```bash
 python ~/dgl/tools/copy_files.py --ip_config ip_config.txt \
                                  --workspace ~/rgcn \
-                                 --rel_data_path data \
+                                 --data_path data \
 				 --part_config data/ogbn-mag.json \
 			         --script_folder ~/dgl_code
 ```

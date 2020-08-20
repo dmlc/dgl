@@ -49,7 +49,7 @@ the location of the partition configuration file).
 python3 ~/dgl/tools/copy_files.py \
 --ip_config ip_config.txt \
 --workspace ~/graphsage \
---rel_data_path ogb-product \
+--data_path ogb-product \
 --part_config data/ogb-product.json \
 --script_folder ~/dgl_code
 ```
