@@ -26,17 +26,17 @@ passing.
 The following animation shows how the computation would look like (note
 that for every layer only the first three minibatches are drawn).
 
-.. figure:: https://i.imgur.com/rr1FG7S.gif
+.. figure:: https://data.dgl.ai/asset/image/guide_6_6_0.gif
    :alt: Imgur
 
-   Imgur
+
 
 Implementing Offline Inference
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Consider the two-layer GCN we have mentioned in Section 6.5.1. The way
 to implement offline inference still involves using
-```MultiLayerFullNeighborSampler`` <https://todo>`__, but sampling for
+:class:`~dgl.dataloading.neighbor.MultiLayerFullNeighborSampler`, but sampling for
 only one layer at a time. Note that offline inference is implemented as
 a method of the GNN module because the computation on one layer depends
 on how messages are aggregated and combined as well.
