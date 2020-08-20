@@ -307,9 +307,9 @@ def in_subgraph(g, nodes):
     nodes : nodes or dict[str, nodes]
         The nodes to form the subgraph. The allowed nodes formats are:
 
-        * Int Tensor: Each element is a node ID. The tensor must have the same device type
+        * Int Tensor: Each element is an ID. The tensor must have the same device type
           and ID data type as the graph's.
-        * iterable[int]: Each element is a node ID.
+        * iterable[int]: Each element is an ID.
         
         If the graph is homogeneous, one can directly pass the above formats.
         Otherwise, the argument must be a dictionary with keys being node types
@@ -562,8 +562,8 @@ def edge_type_subgraph(graph, etypes):
         The type names of the edges in the subgraph. The allowed type name
         formats are:
 
-        * (str, str, str) for source node type, edge type and destination node type.
-        * or one string for the edge type name  if the name can uniquely identify a
+        * ``(str, str, str)`` for source node type, edge type and destination node type.
+        * or one ``str`` for the edge type name  if the name can uniquely identify a
           triplet format in the graph.
 
     Returns

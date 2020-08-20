@@ -934,7 +934,7 @@ def add_nodes(g, num, data=None, ntype=None):
         Feature data of the added nodes. The keys are feature names
         while the values are feature data.
     ntype : str, optional
-        The type of the new nodes. Can be omitted if there is
+        The node type name. Can be omitted if there is
         only one type of nodes in the graph.
 
     Return

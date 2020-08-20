@@ -845,13 +845,22 @@ class DGLHeteroGraph(object):
     def srctypes(self):
         """Return all the source node type names in this graph.
 
+        If the graph can further divide its node types into two subsets A and B where
+        all the edeges are from nodes of types in A to nodes of types in B, we call
+        this graph a *uni-bipartite* graph and the nodes in A being the *source*
+        nodes and the ones in B being the *destination* nodes. If the graph is not
+        uni-bipartite, the source and destination nodes are just the entire set of
+        nodes in the graph.
+
         Returns
         -------
         list[str]
+            All the source node type names in a list.
 
-            * If the graph is a uni-bipartite graph, it returns the source node types.
-              For a definition of uni-bipartite, see :func:`is_unibipartite`.
-            * Otherwise, it returns all the node types in the graph.
+        See Also
+        --------
+        dsttypes
+        is_unibipartite
 
         Examples
         --------
@@ -887,14 +896,22 @@ class DGLHeteroGraph(object):
     def dsttypes(self):
         """Return all the destination node type names in this graph.
 
+        If the graph can further divide its node types into two subsets A and B where
+        all the edeges are from nodes of types in A to nodes of types in B, we call
+        this graph a *uni-bipartite* graph and the nodes in A being the *source*
+        nodes and the ones in B being the *destination* nodes. If the graph is not
+        uni-bipartite, the source and destination nodes are just the entire set of
+        nodes in the graph.
+
         Returns
         -------
-        list of str
-            Each str is a node type.
+        list[str]
+            All the destination node type names in a list.
 
-            * If the graph is a uni-bipartite graph, it returns the destination node types.
-              For a definition of uni-bipartite, see :func:`is_unibipartite`.
-            * Otherwise, it returns all node types in the graph.
+        See Also
+        --------
+        srctypes
+        is_unibipartite
 
         Examples
         --------
@@ -1953,16 +1970,16 @@ class DGLHeteroGraph(object):
     #################################################################
 
     def number_of_nodes(self, ntype=None):
-        """Alias of :func:`num_nodes`"""
+        """Alias of :meth:`num_nodes`"""
         return self.num_nodes(ntype)
 
     def num_nodes(self, ntype=None):
-        """Return the number of nodes.
+        """Return the number of nodes of in the graph.
 
         Parameters
         ----------
         ntype : str, optional
-            The node type for query. If given, it returns the number of nodes for a particular
+            The node type name. If given, it returns the number of nodes of the
             type. If not given (default), it returns the total number of nodes of all types.
 
         Returns
@@ -2000,23 +2017,35 @@ class DGLHeteroGraph(object):
             return self._graph.number_of_nodes(self.get_ntype_id(ntype))
 
     def number_of_src_nodes(self, ntype=None):
-        """Alias of :func:`num_src_nodes`"""
+        """Alias of :meth:`num_src_nodes`"""
         return self.num_src_nodes(ntype)
 
     def num_src_nodes(self, ntype=None):
-        """Return the number of nodes of the given source node type.
+        """Return the number of source nodes in the graph.
+
+        If the graph can further divide its node types into two subsets A and B where
+        all the edeges are from nodes of types in A to nodes of types in B, we call
+        this graph a *uni-bipartite* graph and the nodes in A being the *source*
+        nodes and the ones in B being the *destination* nodes. If the graph is not
+        uni-bipartite, the source and destination nodes are just the entire set of
+        nodes in the graph.
 
         Parameters
         ----------
         ntype : str, optional
-            The source node type for query. If given, it returns the number of nodes for a
-            particular source node type. If not given (default), it returns the number of
+            The source node type name. If given, it returns the number of nodes for
+            the source node type. If not given (default), it returns the number of
             nodes summed over all source node types.
 
         Returns
         -------
         int
             The number of nodes
+
+        See Also
+        --------
+        num_dst_nodes
+        is_unibipartite
 
         Examples
         --------
@@ -2058,19 +2087,31 @@ class DGLHeteroGraph(object):
         return self.num_dst_nodes(ntype)
 
     def num_dst_nodes(self, ntype=None):
-        """Return the number of nodes of the given destination node type.
+        """Return the number of destination nodes in the graph.
+
+        If the graph can further divide its node types into two subsets A and B where
+        all the edeges are from nodes of types in A to nodes of types in B, we call
+        this graph a *uni-bipartite* graph and the nodes in A being the *source*
+        nodes and the ones in B being the *destination* nodes. If the graph is not
+        uni-bipartite, the source and destination nodes are just the entire set of
+        nodes in the graph.
 
         Parameters
         ----------
         ntype : str, optional
-            The destination node type for query. If given, it returns the number of nodes for a
-            particular destination node type. If not given (default), it returns the number of
-            nodes summed over all destination node types.
+            The destination node type name. If given, it returns the number of nodes of
+            the destination node type. If not given (default), it returns the number of
+            nodes summed over all the destination node types.
 
         Returns
         -------
         int
             The number of nodes
+
+        See Also
+        --------
+        num_src_nodes
+        is_unibipartite
 
         Examples
         --------
@@ -2112,16 +2153,19 @@ class DGLHeteroGraph(object):
         return self.num_edges(etype)
 
     def num_edges(self, etype=None):
-        """Return the number of edges.
+        """Return the number of edges in the graph.
 
         Parameters
         ----------
-        etype : str or tuple of str, optional
-            The edge type for query, which can be an edge type (str) or a canonical edge type
-            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
-            must use a canonical edge type. If given, it returns the number of edges for a
-            particular edge type. If not given (default), it returns the total number of edges
-            of all types.
+        etype : str or (str, str, str), optional
+            The type name of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            If not provided, return the total number of edges regardless of the types
+            in the graph.
 
         Returns
         -------
@@ -2173,22 +2217,21 @@ class DGLHeteroGraph(object):
 
     @property
     def is_multigraph(self):
-        """Whether the graph is a multigraph
+        """Return whether the graph is a multigraph with parallel edges.
 
-        In a multigraph, there can be multiple edges from a node ``u`` to a node ``v``.
-
-        For a heterogeneous graph of multiple canonical edge types, we consider it as a
-        multigraph if there are multiple edges from a node ``u`` to a node ``v`` for any
-        canonical edge type.
+        A multigraph has more than one edges between the same pair of nodes, called
+        *parallel edges*.  For heterogeneous graphs, parallel edge further requires
+        the canonical edge type to be the same (see :meth:`canonical_etypes` for the
+        definition).
 
         Returns
         -------
         bool
-            Whether the graph is a multigraph.
+            True if the graph is a multigraph.
 
         Notes
         -----
-        Checking whether the graph is a multigraph can be expensive for a large one.
+        Checking whether the graph is a multigraph could be expensive for a large one.
 
         Examples
         --------
@@ -2226,14 +2269,14 @@ class DGLHeteroGraph(object):
 
     @property
     def is_homogeneous(self):
-        """Whether the graph is a homogeneous graph.
+        """Return whether the graph is a homogeneous graph.
 
         A homogeneous graph only has one node type and one edge type.
 
         Returns
         -------
         bool
-            Whether the graph is a homogeneous graph.
+            True if the graph is a homogeneous graph.
 
         Examples
         --------
@@ -2262,7 +2305,7 @@ class DGLHeteroGraph(object):
 
     @property
     def is_readonly(self):
-        """Deprecated: DGLGraph will always be mutable.
+        """**DEPRECATED**: DGLGraph will always be mutable.
 
         Returns
         -------
@@ -2320,38 +2363,33 @@ class DGLHeteroGraph(object):
         return self._graph.dtype
 
     def __contains__(self, vid):
-        """Deprecated: please directly call :func:`has_nodes`.
-        """
+        """**DEPRECATED**: please directly call :func:`has_nodes`."""
         dgl_warning('DGLGraph.__contains__ is deprecated.'
                     ' Please directly call has_nodes.')
         return self.has_nodes(vid)
 
     def has_nodes(self, vid, ntype=None):
-        """Whether the graph has some particular node(s) of a given type.
+        """Return whether the graph contains the given nodes.
 
         Parameters
         ----------
         vid : node ID(s)
-            The node ID(s) for query. The allowed formats are:
+            The nodes IDs. The allowed nodes ID formats are:
 
-            - ``int``: The ID of a single node.
-            - ``Tensor``: A 1D tensor that contains the IDs of multiple nodes, whose data type and
-              device should be the same as the :py:attr:`idtype` and device of the graph.
-            - ``iterable[int]``: A sequence (e.g. list, tuple, numpy.ndarray)
-              of integers that contains the IDs of multiple nodes.
+            * ``int``: The ID of a single node.
+            * Int Tensor: Each element is a node ID. The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is a node ID.
+
         ntype : str, optional
-            The node type for query. It is required if the graph has
-            multiple node types.
+            The node type name. Can be omitted if there is
+            only one type of nodes in the graph.
 
         Returns
         -------
         bool or bool Tensor
-
-            - If :attr:`vid` is an ``int``, the result will be a ``bool`` indicating
-              whether the graph has the particular node.
-            - If :attr:`vid` is a 1D ``Tensor`` or ``iterable[int]`` of node IDs,
-              the result will be a bool Tensor whose i-th element indicates whether
-              the graph has node :attr:`vid[i]` of the given type.
+            A tensor of bool flags where each element is True if the node is in the graph.
+            If the input is a single node, return one bool value.
 
         Examples
         --------
@@ -2390,50 +2428,47 @@ class DGLHeteroGraph(object):
     def has_node(self, vid, ntype=None):
         """Whether the graph has a particular node of a given type.
 
-        DEPRECATED: see :func:`~DGLGraph.has_nodes`
+        **DEPRECATED**: see :func:`~DGLGraph.has_nodes`
         """
         dgl_warning("DGLGraph.has_node is deprecated. Please use DGLGraph.has_nodes")
         return self.has_nodes(vid, ntype)
 
     def has_edges_between(self, u, v, etype=None):
-        """Whether the graph has some particular edge(s) of a given type.
+        """Return whether the graph contains the given edges.
 
         Parameters
         ----------
-        u : source node ID(s)
-            The source node(s) of the edges for query. The allowed formats are:
+        u : node IDs
+            The source node IDs of the edges. The allowed formats are:
 
-            - ``int``: The source node of an edge for query.
-            - ``Tensor``: A 1D tensor that contains the source node(s) of edge(s) for query.
-              The data type and device of the tensor must be the same as the :py:attr:`idtype` and
-              device of the graph. Its i-th element represents the source node ID of the
-              i-th edge for query.
-            - ``iterable[int]`` : Similar to the tensor, but stores node IDs in a sequence
-              (e.g. list, tuple, numpy.ndarray).
-        v : destination node ID(s)
-            The destination node(s) of the edges for query. It's a counterpart of :attr:`u`
-            for destination nodes and should have the same format as :attr:`u`. If :attr:`u`
-            and :attr:`v` are not int, they should have the same length.
-        etype : str or tuple of str, optional
-            The edge type for query, which can be an edge type (str) or a canonical edge type
-            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
-            must use a canonical edge type. If the graph has multiple edge types, one must
-            specify the argument. Otherwise, it can be omitted.
+            * ``int``: A single node.
+            * Int Tensor: Each element is a node ID. The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is a node ID.
+        
+        v : node IDs
+            The destination node IDs of the edges. The allowed formats are:
+
+            * ``int``: A single node.
+            * Int Tensor: Each element is a node ID. The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is a node ID.
+        
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
+
 
         Returns
         -------
         bool or bool Tensor
-
-            - If :attr:`u` and :attr:`v` are ``int`` objects, the result will be a ``bool``
-              indicating whether there is an edge from ``u`` to ``v`` of the given edge type.
-            - If :attr:`u` and :attr:`v` are ``Tensor`` or ``iterable[int]`` objects, the
-              result will be a bool Tensor whose i-th element indicates whether there is an
-              edge from ``u[i]`` to ``v[i]`` of the given edge type.
-
-        Notes
-        -----
-        The value(s) of :attr:`u` and :attr:`v` need to be separately smaller than the
-        number of nodes of the source and destination type.
+            A tensor of bool flags where each element is True if the node is in the graph.
+            If the input is a single node, return one bool value.
 
         Examples
         --------
@@ -2491,7 +2526,7 @@ class DGLHeteroGraph(object):
     def has_edge_between(self, u, v, etype=None):
         """Whether the graph has edges of type ``etype``.
 
-        DEPRECATED: please use :func:`~DGLGraph.has_edge_between`.
+        **DEPRECATED**: please use :func:`~DGLGraph.has_edge_between`.
         """
         dgl_warning("DGLGraph.has_edge_between is deprecated. "
                     "Please use DGLGraph.has_edges_between")
@@ -2506,12 +2541,16 @@ class DGLHeteroGraph(object):
         Parameters
         ----------
         v : int
-            The destination node for query.
-        etype : str or tuple of str, optional
-            The edge type for query, which can be an edge type (str) or a canonical edge type
-            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
-            must use a canonical edge type. If the graph has multiple edge types, one must
-            specify the argument. Otherwise, it can be omitted.
+            The node ID.
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
+
 
         Returns
         -------
@@ -2560,12 +2599,15 @@ class DGLHeteroGraph(object):
         Parameters
         ----------
         v : int
-            The source node for query.
-        etype : str or tuple of str, optional
-            The edge type for query, which can be an edge type (str) or a canonical edge type
-            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
-            must use a canonical edge type. If the graph has multiple edge types, one must
-            specify the argument. Otherwise, it can be omitted.
+            The node ID.
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
 
         Returns
         -------
@@ -2616,48 +2658,51 @@ class DGLHeteroGraph(object):
                              return_uv=return_uv, etype=etype)
 
     def edge_ids(self, u, v, force_multi=None, return_uv=False, etype=None):
-        """Return the ID(s) of edge(s) from the given source node(s) to the given destination
-        node(s) with the specified edge type.
-
+        """Return the edge ID(s) given the two endpoints of the edge(s).
+        
         Parameters
         ----------
-        u : source node ID(s)
-            The source node(s) of the edges for query. The allowed formats are:
+        u : node IDs
+            The source node IDs of the edges. The allowed formats are:
 
-            - ``int``: The source node of an edge for query.
-            - ``Tensor``: A 1D tensor that contains the source node(s) of edge(s) for query, whose
-              data type an device should be the same as the :py:attr:`idtype` and device of
-              the graph. Its i-th element is the source node of the i-th edge for query.
-            - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
-              (e.g. list, tuple, numpy.ndarray).
-        v : destination node ID(s)
-            The destination node(s) of the edges for query. It's a counterpart of :attr:`u`
-            for destination nodes and should have the same format as :attr:`u`. If :attr:`u`
-            and :attr:`v` are not int, they should have the same length.
+            * ``int``: A single node.
+            * Int Tensor: Each element is a node ID. The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is a node ID.
+        
+        v : node IDs
+            The destination node IDs of the edges. The allowed formats are:
+
+            * ``int``: A single node.
+            * Int Tensor: Each element is a node ID. The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is a node ID.
         force_multi : bool, optional
-            Deprecated, use :attr:`return_uv` instead. Whether to allow the graph to be a
+            **DEPRECATED**, use :attr:`return_uv` instead. Whether to allow the graph to be a
             multigraph, i.e. there can be multiple edges from one node to another.
         return_uv : bool, optional
             Whether to return the source and destination node IDs along with the edges. If
             False (default), it assumes that the graph is a simple graph and there is only
             one edge from one node to another. If True, there can be multiple edges found
             from one node to another.
-        etype : str or tuple of str, optional
-            The edge type for query, which can be an edge type (str) or a canonical edge type
-            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
-            must use a canonical edge type. If the graph has multiple edge types, one must
-            specify the argument. Otherwise, it can be omitted.
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
 
         Returns
         -------
-        tensor, or (tensor, tensor, tensor)
+        Tensor, or (Tensor, Tensor, Tensor)
 
-            * If ``return_uv=False``, it returns a 1D tensor that contains the IDs of the edges.
-              If :attr:`u` and :attr:`v` are int, the tensor has length 1. Otherwise, the i-th
-              element of the tensor is the ID of the edge ``(u[i], v[i])``.
+            * If ``return_uv=False``, it returns the edge IDs in a tensor, where the i-th
+              element is the ID of the edge ``(u[i], v[i])``.
             * If ``return_uv=True``, it returns a tuple of three 1D tensors ``(eu, ev, e)``.
               ``e[i]`` is the ID of an edge from ``eu[i]`` to ``ev[i]``. It returns all edges
-              from ``eu[i]`` to ``ev[i]`` in this case.
+              (including parallel edges) from ``eu[i]`` to ``ev[i]`` in this case.
 
         Notes
         -----
@@ -2736,34 +2781,35 @@ class DGLHeteroGraph(object):
             return F.as_scalar(eid) if is_int else eid
 
     def find_edges(self, eid, etype=None):
-        """Return the source and destination node(s) of some particular edge(s)
-        with the specified edge type.
+        """Return the source and destination node ID(s) given the edge ID(s).
 
         Parameters
         ----------
         eid : edge ID(s)
-            The IDs of the edges for query. The function expects that :attr:`eid` contains
-            valid edge IDs only, i.e. among consecutive integers :math:`0, 1, ... E - 1`, where
-            :math:`E` is the number of edges with the specified edge type.
+            The edge IDs. The allowed formats are:
 
-            - ``int``: An edge ID for query.
-            - ``Tensor``: A 1D tensor that contains the edge IDs for query, whose data
-              type and device should be the same as the :py:attr:`idtype` and device of the graph.
-            - ``iterable[int]``: Similar to the tensor, but stores edge IDs in a sequence
-              (e.g. list, tuple, numpy.ndarray).
-        etype : str or tuple of str, optional
-            The edge type for query, which can be an edge type (str) or a canonical edge type
-            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
-            must use a canonical edge type.
+            * ``int``: A single ID.
+            * Int Tensor: Each element is an ID. The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is an ID.
+        
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
 
         Returns
         -------
         Tensor
-            The source node IDs of the edges, whose i-th element is the source node of the edge
-            with ID ``eid[i]``.
+            The source node IDs of the edges. The i-th element is the source node ID of
+            the i-th edge.
         Tensor
-            The destination node IDs of the edges, whose i-th element is the destination node of
-            the edge with ID ``eid[i]``.
+            The destination node IDs of the edges. The i-th element is the destination node
+            ID of the i-th edge.
 
         Examples
         --------
@@ -2806,20 +2852,19 @@ class DGLHeteroGraph(object):
         return src, dst
 
     def in_edges(self, v, form='uv', etype=None):
-        """Return the incoming edges of some particular node(s) with the specified edge type.
+        """Return the incoming edges of the given nodes.
 
         Parameters
         ----------
-        v : destination node ID(s)
-            The destination node(s) for query. The allowed formats are:
+        v : node ID(s)
+            The node IDs. The allowed formats are:
 
-            - ``int``: The destination node for query.
-            - ``Tensor``: A 1D tensor that contains the destination node(s) for query, whose data
-              type and device should be the same as the :py:attr:`idtype` and device of the graph.
-            - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
-              (e.g. list, tuple, numpy.ndarray).
+            * ``int``: A single node.
+            * Int Tensor: Each element is a node ID. The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is a node ID.
         form : str, optional
-            The return form, which can be one of the following:
+            The result format, which can be one of the following:
 
             - ``'eid'``: The returned result is a 1D tensor :math:`EID`, representing
               the IDs of all edges.
@@ -2829,11 +2874,14 @@ class DGLHeteroGraph(object):
             - ``'all'``: The returned result is a 3-tuple of 1D tensors :math:`(U, V, EID)`,
               representing the source nodes, destination nodes and IDs of all edges.
               For each :math:`i`, :math:`(U[i], V[i])` forms an edge with ID :math:`EID[i]`.
-        etype : str or tuple of str, optional
-            The edge type for query, which can be an edge type (str) or a canonical edge type
-            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
-            must use a canonical edge type. If the graph has multiple edge types, one must
-            specify the argument. Otherwise, it can be omitted.
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
 
         Returns
         -------
@@ -2888,18 +2936,17 @@ class DGLHeteroGraph(object):
             raise DGLError('Invalid form: {}. Must be "all", "uv" or "eid".'.format(form))
 
     def out_edges(self, u, form='uv', etype=None):
-        """Return the outgoing edges of some particular node(s) with the specified edge type.
+        """Return the outgoing edges of the given nodes.
 
         Parameters
         ----------
-        u : source node ID(s)
-            The source node(s) for query. The allowed formats are:
+        u : node ID(s)
+            The node IDs. The allowed formats are:
 
-            - ``int``: The source node for query.
-            - ``Tensor``: A 1D tensor that contains the source node(s) for query, whose data
-              type and device should be the same as the :py:attr:`idtype` and device of the graph.
-            - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
-              (e.g. list, tuple, numpy.ndarray).
+            * ``int``: A single node.
+            * Int Tensor: Each element is a node ID. The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is a node ID.
         form : str, optional
             The return form, which can be one of the following:
 
@@ -2911,11 +2958,14 @@ class DGLHeteroGraph(object):
             - ``'all'``: The returned result is a 3-tuple of 1D tensors :math:`(U, V, EID)`,
               representing the source nodes, destination nodes and IDs of all edges.
               For each :math:`i`, :math:`(U[i], V[i])` forms an edge with ID :math:`EID[i]`.
-        etype : str or tuple of str, optional
-            The edge type for query, which can be an edge type (str) or a canonical edge type
-            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
-            must use a canonical edge type. If the graph has multiple edge types, one must
-            specify the argument. Otherwise, it can be omitted.
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
 
         Returns
         -------
@@ -3055,43 +3105,41 @@ class DGLHeteroGraph(object):
     def in_degree(self, v, etype=None):
         """Return the in-degree of node ``v`` with edges of type ``etype``.
 
-        DEPRECATED: Please use in_degrees
+        **DEPRECATED**: Please use in_degrees
         """
         dgl_warning("DGLGraph.in_degree is deprecated. Please use DGLGraph.in_degrees")
         return self.in_degrees(v, etype)
 
     def in_degrees(self, v=ALL, etype=None):
-        """Return the in-degree(s) of some particular node(s) with the specified edge type.
+        """Return the in-degree(s) of the given nodes.
+
+        It computes the in-degree(s) w.r.t. to the edges of the given edge type.
 
         Parameters
         ----------
-        v : destination node ID(s), optional
-            The destination node(s) for query. The allowed formats are:
+        v : node IDs
+            The node IDs. The allowed formats are:
 
-            - ``int``: The destination node for query.
-            - ``Tensor``: A 1D tensor that contains the destination node(s) for query, whose data
-              type and device should be the same as the :py:attr:`idtype` and device of the graph.
-            - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
-              (e.g. list, tuple, numpy.ndarray).
+            * ``int``: A single node.
+            * Int Tensor: Each element is a node ID. The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is a node ID.
 
-            By default, it considers all nodes.
-        etype : str or tuple of str, optional
-            The edge type for query, which can be an edge type (str) or a canonical edge type
-            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
-            must use a canonical edge type. If the graph has multiple edge types, one must
-            specify the argument. Otherwise, it can be omitted.
+            If not given, return the in-degrees of all the nodes.
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
 
         Returns
         -------
-        tensor or int
-            The in-degree(s) of the node(s).
-
-            - If :attr:`v` is an ``int`` object, the return result will be an ``int``
-              object as well.
-            - If :attr:`v` is a ``Tensor`` or ``iterable[int]`` object, the return result
-              will be a 1D ``Tensor``. The data type of the result will be the same as the
-              idtype of the graph. The i-th element of the tensor is the in-degree of the
-              node ``v[i]``.
+        int or Tensor
+            The in-degree(s) of the node(s) in a Tensor. The i-th element is the in-degree
+            of the i-th input node. If :attr:`v` is an ``int``, return an ``int`` too.
 
         Examples
         --------
@@ -3147,36 +3195,35 @@ class DGLHeteroGraph(object):
         return self.out_degrees(u, etype)
 
     def out_degrees(self, u=ALL, etype=None):
-        """Return the out-degree(s) of some particular node(s) with the specified edge type.
+        """Return the out-degree(s) of the given nodes.
+
+        It computes the out-degree(s) w.r.t. to the edges of the given edge type.
 
         Parameters
         ----------
-        u : source node ID(s), optional
+        u : node IDs
+            The node IDs. The allowed formats are:
 
-            - ``int``: The source node for query.
-            - ``Tensor``: A 1D tensor that contains the source node(s) for query, whose data
-              type and device should be the same as the :py:attr:`idtype` and device of the graph.
-            - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
-              (e.g. list, tuple, numpy.ndarray).
+            * ``int``: A single node.
+            * Int Tensor: Each element is a node ID. The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is a node ID.
 
-            By default, it considers all nodes.
-        etype : str or tuple of str, optional
-            The edge type for query, which can be an edge type (str) or a canonical edge type
-            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
-            must use a canonical edge type. If the graph has multiple edge types, one must
-            specify the argument. Otherwise, it can be omitted.
+            If not given, return the in-degrees of all the nodes.
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
 
         Returns
         -------
-        tensor or int
-            The out-degree(s) of the node(s).
-
-            - If :attr:`u` is an ``int`` object, the return result will be an ``int``
-              object as well.
-            - If :attr:`u` is a ``Tensor`` or ``iterable[int]`` object, the return result
-              will be a 1D ``Tensor``. The data type of the result will be the same as the
-              idtype of the graph. The i-th element of the tensor is the out-degree of the
-              node ``v[i]``.
+        int or Tensor
+            The out-degree(s) of the node(s) in a Tensor. The i-th element is the out-degree
+            of the i-th input node. If :attr:`v` is an ``int``, return an ``int`` too.
 
         Examples
         --------
@@ -3225,10 +3272,6 @@ class DGLHeteroGraph(object):
         else:
             return deg
 
-    def adjacency_matrix(self, transpose=None, ctx=F.cpu(), scipy_fmt=None, etype=None):
-        """Alias of :func:`adj`"""
-        return self.adj(transpose, ctx, scipy_fmt, etype)
-
     def adj(self, transpose=None, ctx=F.cpu(), scipy_fmt=None, etype=None):
         """Return the adjacency matrix of edges of the given edge type.
 
@@ -3247,12 +3290,15 @@ class DGLHeteroGraph(object):
         scipy_fmt : str, optional
             If specified, return a scipy sparse matrix in the given format.
             Otherwise, return a backend dependent sparse tensor. (Default: None)
-        etype : str or tuple of str, optional
-            The edge type for query, which can be an edge type (str) or a canonical edge type
-            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
-            must use a canonical edge type. If given, it returns the number of edges for a
-            particular edge type. If not given (default), it returns the total number of edges
-            of all types.
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
+
 
         Returns
         -------
@@ -3301,18 +3347,16 @@ class DGLHeteroGraph(object):
         else:
             return self._graph.adjacency_matrix_scipy(etid, transpose, scipy_fmt, False)
 
+    adjacency_matrix = adj
+
     def adjacency_matrix_scipy(self, transpose=None, fmt='csr', return_edge_ids=None):
-        """DEPRECATED: please use ``dgl.adjacency_matrix(transpose, scipy_fmt=fmt)``.
+        """**DEPRECATED**: please use ``dgl.adjacency_matrix(transpose, scipy_fmt=fmt)``.
         """
         dgl_warning('DGLGraph.adjacency_matrix_scipy is deprecated. '
                     'Please replace it with:\n\n\t'
                     'DGLGraph.adjacency_matrix(transpose, scipy_fmt="{}").\n'.format(fmt))
 
         return self.adjacency_matrix(transpose=transpose, scipy_fmt=fmt)
-
-    def incidence_matrix(self, typestr, ctx=F.cpu(), etype=None):
-        """Alias of :func:`inc`"""
-        return self.inc(typestr, ctx, etype)
 
     def inc(self, typestr, ctx=F.cpu(), etype=None):
         """Return the incidence matrix representation of edges with the given
@@ -3349,12 +3393,14 @@ class DGLHeteroGraph(object):
             Can be either ``in``, ``out`` or ``both``
         ctx : context, optional
             The context of returned incidence matrix. (Default: cpu)
-        etype : str or tuple of str, optional
-            The edge type for query, which can be an edge type (str) or a canonical edge type
-            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
-            must use a canonical edge type. If given, it returns the number of edges for a
-            particular edge type. If not given (default), it returns the total number of edges
-            of all types.
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
 
         Returns
         -------
@@ -3388,6 +3434,8 @@ class DGLHeteroGraph(object):
         etid = self.get_etype_id(etype)
         return self._graph.incidence_matrix(etid, typestr, ctx)[0]
 
+    incidence_matrix = inc
+
     #################################################################
     # Features
     #################################################################
@@ -3400,8 +3448,8 @@ class DGLHeteroGraph(object):
         Parameters
         ----------
         ntype : str, optional
-            The node type for query. If the graph has multiple node types, one must
-            specify the argument. Otherwise, it can be omitted.
+            The node type name. Can be omitted if there is only one type of nodes
+            in the graph.
 
         Returns
         -------
@@ -3447,11 +3495,15 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        etype : str or tuple of str, optional
-            The edge type for query, which can be an edge type (str) or a canonical edge type
-            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
-            must use a canonical edge type. If the graph has multiple edge types, one must
-            specify the argument. Otherwise, it can be omitted.
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
+
 
         Returns
         -------
@@ -3517,9 +3569,7 @@ class DGLHeteroGraph(object):
             The name of the feature that the initializer applies. If not given, the
             initializer applies to all features.
         ntype : str, optional
-            The type of the nodes that the initializer applies. If the graph has
-            multiple node types, one must specify the argument. Otherwise, it can
-            be omitted.
+            The type name of the nodes. Can be omitted if the graph has only one type of nodes.
 
         Notes
         -----
@@ -3606,11 +3656,15 @@ class DGLHeteroGraph(object):
         field : str, optional
             The name of the feature that the initializer applies. If not given, the
             initializer applies to all features.
-        etype : str or tuple of str, optional
-            The edge type for query, which can be an edge type (str) or a canonical edge type
-            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
-            must use a canonical edge type. If the graph has multiple edge types, one must
-            specify the argument. Otherwise, it can be omitted.
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
+
 
         Notes
         -----
