@@ -21,7 +21,7 @@ def _AXWb(A, X, W, b):
 def test_graph_conv():
     g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
-    adj = tf.sparse.to_dense(tf.sparse.reorder(g.adjacency_matrix(ctx=ctx)))
+    adj = tf.sparse.to_dense(tf.sparse.reorder(g.adjacency_matrix(transpose=False, ctx=ctx)))
 
     conv = nn.GraphConv(5, 2, norm='none', bias=True)
     # conv = conv
@@ -304,7 +304,7 @@ def test_sage_conv_bi(idtype, g, aggre_type):
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn'])
 def test_sage_conv_bi_empty(idtype, aggre_type):
     # Test the case for graphs without edges
-    g = dgl.bipartite([], num_nodes=(5, 3)).to(F.ctx())
+    g = dgl.heterograph({('_U', '_E', '_V'): ([], [])}, {'_U': 5, '_V': 3}).to(F.ctx())
     g = g.astype(idtype).to(F.ctx())
     sage = nn.SAGEConv((3, 3), 2, 'gcn')
     feat = (F.randn((5, 3)), F.randn((3, 3)))
@@ -385,9 +385,9 @@ def myagg(alist, dsttype):
 @pytest.mark.parametrize('agg', ['sum', 'max', 'min', 'mean', 'stack', myagg])
 def test_hetero_conv(agg, idtype):
     g = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (0, 2), (2, 1), (1, 3)],
-        ('user', 'plays', 'game'): [(0, 0), (0, 2), (0, 3), (1, 0), (2, 2)],
-        ('store', 'sells', 'game'): [(0, 0), (0, 3), (1, 1), (1, 2)]},
+        ('user', 'follows', 'user'): ([0, 0, 2, 1], [1, 2, 1, 3]),
+        ('user', 'plays', 'game'): ([0, 0, 0, 1, 2], [0, 2, 3, 0, 2]),
+        ('store', 'sells', 'game'): ([0, 0, 1, 1], [0, 3, 1, 2])},
         idtype=idtype, device=F.ctx())
     conv = nn.HeteroGraphConv({
         'follows': nn.GraphConv(2, 3, allow_zero_in_degree=True),
@@ -481,6 +481,30 @@ def test_hetero_conv(agg, idtype):
     assert mod3.carg1 == 0
     assert mod3.carg2 == 1
 
+
+def test_dense_cheb_conv():
+    for k in range(3, 4):
+        ctx = F.ctx()
+        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1, random_state=42))
+        g = g.to(ctx)
+
+        adj = tf.sparse.to_dense(tf.sparse.reorder(g.adjacency_matrix(transpose=False, ctx=ctx)))
+        cheb = nn.ChebConv(5, 2, k, None, bias=True)
+        dense_cheb = nn.DenseChebConv(5, 2, k, bias=True)
+
+        # init cheb modules
+        feat = F.ones((100, 5))
+        out_cheb = cheb(g, feat, [2.0])
+
+        dense_cheb.W = tf.reshape(cheb.linear.weights[0], (k, 5, 2))
+        if cheb.linear.bias is not None:
+            dense_cheb.bias = cheb.linear.bias
+
+        out_dense_cheb = dense_cheb(adj, feat, 2.0)
+        print(out_cheb - out_dense_cheb)
+        assert F.allclose(out_cheb, out_dense_cheb)
+
+
 if __name__ == '__main__':
     test_graph_conv()
     # test_set2set()
@@ -500,5 +524,5 @@ if __name__ == '__main__':
     # test_gmm_conv()
     # test_dense_graph_conv()
     # test_dense_sage_conv()
-    # test_dense_cheb_conv()
+    test_dense_cheb_conv()
     # test_sequential()

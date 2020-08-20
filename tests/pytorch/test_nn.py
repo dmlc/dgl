@@ -20,7 +20,7 @@ def _AXWb(A, X, W, b):
 def test_graph_conv0():
     g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(ctx=ctx)
+    adj = g.adjacency_matrix(transpose=False, ctx=ctx)
 
     conv = nn.GraphConv(5, 2, norm='none', bias=True)
     conv = conv.to(ctx)
@@ -125,7 +125,7 @@ def test_tagconv():
     g = dgl.DGLGraph(nx.path_graph(3))
     g = g.to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(ctx=ctx)
+    adj = g.adjacency_matrix(transpose=False, ctx=ctx)
     norm = th.pow(g.in_degrees().float(), -0.5)
 
     conv = nn.TAGConv(5, 2, bias=True)
@@ -419,7 +419,7 @@ def test_sage_conv_bi(idtype, g, aggre_type):
 def test_sage_conv2(idtype):
     # TODO: add test for blocks
     # Test the case for graphs without edges
-    g = dgl.bipartite([], num_nodes=(5, 3))
+    g = dgl.heterograph({('_U', '_E', '_V'): ([], [])}, {'_U': 5, '_V': 3})
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
     sage = nn.SAGEConv((3, 3), 2, 'gcn')
@@ -599,7 +599,7 @@ def test_dense_graph_conv(norm_type, g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
     # TODO(minjie): enable the following option after #1385
-    adj = g.adjacency_matrix(ctx=ctx).to_dense()
+    adj = g.adjacency_matrix(transpose=False, ctx=ctx).to_dense()
     conv = nn.GraphConv(5, 2, norm=norm_type, bias=True)
     dense_conv = nn.DenseGraphConv(5, 2, norm=norm_type, bias=True)
     dense_conv.weight.data = conv.weight.data
@@ -616,7 +616,7 @@ def test_dense_graph_conv(norm_type, g, idtype):
 def test_dense_sage_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(ctx=ctx).to_dense()
+    adj = g.adjacency_matrix(transpose=False, ctx=ctx).to_dense()
     sage = nn.SAGEConv(5, 2, 'gcn')
     dense_sage = nn.DenseSAGEConv(5, 2)
     dense_sage.fc.weight.data = sage.fc_neigh.weight.data
@@ -662,7 +662,7 @@ def test_dense_cheb_conv():
         ctx = F.ctx()
         g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
         g = g.to(F.ctx())
-        adj = g.adjacency_matrix(ctx=ctx).to_dense()
+        adj = g.adjacency_matrix(transpose=False, ctx=ctx).to_dense()
         cheb = nn.ChebConv(5, 2, k, None)
         dense_cheb = nn.DenseChebConv(5, 2, k)
         #for i in range(len(cheb.fc)):
@@ -776,9 +776,9 @@ def myagg(alist, dsttype):
 @pytest.mark.parametrize('agg', ['sum', 'max', 'min', 'mean', 'stack', myagg])
 def test_hetero_conv(agg, idtype):
     g = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (0, 2), (2, 1), (1, 3)],
-        ('user', 'plays', 'game'): [(0, 0), (0, 2), (0, 3), (1, 0), (2, 2)],
-        ('store', 'sells', 'game'): [(0, 0), (0, 3), (1, 1), (1, 2)]},
+        ('user', 'follows', 'user'): ([0, 0, 2, 1], [1, 2, 1, 3]),
+        ('user', 'plays', 'game'): ([0, 0, 0, 1, 2], [0, 2, 3, 0, 2]),
+        ('store', 'sells', 'game'): ([0, 0, 1, 1], [0, 3, 1, 2])},
         idtype=idtype, device=F.ctx())
     conv = nn.HeteroGraphConv({
         'follows': nn.GraphConv(2, 3, allow_zero_in_degree=True),
@@ -789,8 +789,6 @@ def test_hetero_conv(agg, idtype):
     uf = F.randn((4, 2))
     gf = F.randn((4, 4))
     sf = F.randn((2, 3))
-    uf_dst = F.randn((4, 3))
-    gf_dst = F.randn((4, 4))
 
     h = conv(g, {'user': uf})
     assert set(h.keys()) == {'user', 'game'}

@@ -157,7 +157,7 @@ class GINDataset(DGLBuiltinDataset):
 
                 self.labels.append(self.glabel_dict[glabel])
 
-                g = dgl_graph([])
+                g = dgl_graph(([], []))
                 g.add_nodes(n_nodes)
 
                 nlabels = []  # node labels
@@ -257,7 +257,7 @@ class GINDataset(DGLBuiltinDataset):
             for g in self.graphs:
                 g.ndata['attr'] = F.tensor(np.zeros((
                     g.number_of_nodes(), len(label2idx))))
-                g.ndata['attr'][range(g.number_of_nodes()), [label2idx[F.as_scalar(nl)] for nl in g.ndata['label']]] = 1
+                g.ndata['attr'][range(g.number_of_nodes()), [label2idx[F.as_scalar(F.reshape(nl, (1,)))] for nl in g.ndata['label']]] = 1
 
         # after load, get the #classes and #dim
         self.gclasses = len(self.glabel_dict)

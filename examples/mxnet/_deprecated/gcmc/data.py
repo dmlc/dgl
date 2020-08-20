@@ -237,21 +237,19 @@ class MovieLens(object):
     def _generate_enc_graph(self, rating_pairs, rating_values, add_support=False):
         user_movie_R = np.zeros((self._num_user, self._num_movie), dtype=np.float32)
         user_movie_R[rating_pairs] = rating_values
-        movie_user_R = user_movie_R.transpose()
 
-        rating_graphs = []
+        data_dict = dict()
+        num_nodes_dict = {'user': self._num_user, 'movie': self._num_movie}
         rating_row, rating_col = rating_pairs
         for rating in self.possible_rating_values:
             ridx = np.where(rating_values == rating)
             rrow = rating_row[ridx]
             rcol = rating_col[ridx]
-            bg = dgl.bipartite((rrow, rcol), 'user', str(rating), 'movie',
-                               num_nodes=(self._num_user, self._num_movie))
-            rev_bg = dgl.bipartite((rcol, rrow), 'movie', 'rev-%s' % str(rating), 'user',
-                               num_nodes=(self._num_movie, self._num_user))
-            rating_graphs.append(bg)
-            rating_graphs.append(rev_bg)
-        graph = dgl.hetero_from_relations(rating_graphs)
+            data_dict.update({
+                ('user', str(rating), 'movie'): (rrow, rcol),
+                ('movie', 'rev-%s' % str(rating), 'user'): (rcol, rrow)
+            })
+        graph = dgl.heterograph(data_dict, num_nodes_dict=num_nodes_dict)
 
         # sanity check
         assert len(rating_pairs[0]) == sum([graph.number_of_edges(et) for et in graph.etypes]) // 2
@@ -294,7 +292,9 @@ class MovieLens(object):
         user_movie_ratings_coo = sp.coo_matrix(
             (ones, rating_pairs),
             shape=(self.num_user, self.num_movie), dtype=np.float32)
-        return dgl.bipartite(user_movie_ratings_coo, 'user', 'rate', 'movie')
+        g = dgl.bipartite_from_scipy(user_movie_ratings_coo, utype='_U', etype='_E', vtype='_V')
+        return dgl.heterograph({('user', 'rate', 'movie'): g.edges()}, 
+                               num_nodes_dict={'user': self.num_user, 'movie': self.num_movie})
 
     @property
     def num_links(self):

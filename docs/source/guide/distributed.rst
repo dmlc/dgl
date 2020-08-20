@@ -1,2 +1,2 @@
-Distributed Training
-============================
+Chapter 7: Distributed Training
+=====================================

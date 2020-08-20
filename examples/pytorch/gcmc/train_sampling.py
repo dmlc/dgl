@@ -121,6 +121,7 @@ def evaluate(args, dev_id, net, dataset, dataloader, segment='valid'):
         frontier = frontier.to(dev_id)
         head_feat = head_feat.to(dev_id)
         tail_feat = tail_feat.to(dev_id)
+        pair_graph = pair_graph.to(dev_id)
         with th.no_grad():
             pred_ratings = net(pair_graph, frontier,
                                head_feat, tail_feat, possible_rating_values)
@@ -335,7 +336,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
                                       dataset=dataset,
                                       dataloader=valid_dataloader,
                                       segment='valid')
-                logging_str += ',\tVal RMSE={:.4f}'.format(valid_rmse)
+                logging_str = 'Val RMSE={:.4f}'.format(valid_rmse)
 
                 if valid_rmse < best_valid_rmse:
                     best_valid_rmse = valid_rmse

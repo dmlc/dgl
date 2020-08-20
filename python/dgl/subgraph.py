@@ -60,8 +60,9 @@ def node_subgraph(graph, nodes):
     Instantiate a heterograph.
 
     >>> g = dgl.heterograph({
-    ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
-    ...     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])})
+    >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+    >>>     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])
+    >>> })
     >>> # Set node features
     >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
@@ -119,7 +120,11 @@ def node_subgraph(graph, nodes):
             return F.astype(F.nonzero_1d(F.copy_to(v, graph.device)), graph.idtype)
         else:
             return utils.prepare_tensor(graph, v, 'nodes["{}"]'.format(ntype))
-    induced_nodes = [_process_nodes(ntype, nodes.get(ntype, [])) for ntype in graph.ntypes]
+
+    induced_nodes = []
+    for ntype in graph.ntypes:
+        nids = nodes.get(ntype, F.copy_to(F.tensor([], graph.idtype), graph.device))
+        induced_nodes.append(_process_nodes(ntype, nids))
     sgi = graph._graph.node_subgraph(induced_nodes)
     induced_edges = sgi.induced_edges
     return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges)
@@ -176,8 +181,9 @@ def edge_subgraph(graph, edges, preserve_nodes=False):
     Instantiate a heterograph.
 
     >>> g = dgl.heterograph({
-    ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
-    ...     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])})
+    >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+    >>>     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])
+    >>> })
     >>> # Set edge features
     >>> g.edges['follows'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
@@ -238,9 +244,10 @@ def edge_subgraph(graph, edges, preserve_nodes=False):
             return utils.prepare_tensor(graph, e, 'edges["{}"]'.format(etype))
 
     edges = {graph.to_canonical_etype(etype): e for etype, e in edges.items()}
-    induced_edges = [
-        _process_edges(cetype, edges.get(cetype, []))
-        for cetype in graph.canonical_etypes]
+    induced_edges = []
+    for cetype in graph.canonical_etypes:
+        eids = edges.get(cetype, F.copy_to(F.tensor([], graph.idtype), graph.device))
+        induced_edges.append(_process_edges(cetype, eids))
     sgi = graph._graph.edge_subgraph(induced_edges, preserve_nodes)
     induced_nodes = sgi.induced_nodes
     return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges)
@@ -452,8 +459,9 @@ def node_type_subgraph(graph, ntypes):
     Instantiate a heterograph.
 
     >>> g = dgl.heterograph({
-    ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
-    ...     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])})
+    >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+    >>>     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])
+    >>> })
     >>> # Set node features
     >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
@@ -519,8 +527,9 @@ def edge_type_subgraph(graph, etypes):
     Instantiate a heterograph.
 
     >>> g = dgl.heterograph({
-    ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
-    ...     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])})
+    >>>     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+    >>>     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])
+    >>> })
     >>> # Set edge features
     >>> g.edges['follows'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
@@ -549,7 +558,7 @@ def edge_type_subgraph(graph, etypes):
     node_type_subgraph
     """
     etype_ids = [graph.get_etype_id(etype) for etype in etypes]
-    # meta graph is homograph, still using int64
+    # meta graph is homogeneous graph, still using int64
     meta_src, meta_dst, _ = graph._graph.metagraph.find_edges(utils.toindex(etype_ids, "int64"))
     rel_graphs = [graph._graph.get_relation_graph(i) for i in etype_ids]
     meta_src = meta_src.tonumpy()
