@@ -1,6 +1,5 @@
 """Module for various graph generator functions."""
 
-import numpy as np
 from . import backend as F
 from . import convert
 from . import random
