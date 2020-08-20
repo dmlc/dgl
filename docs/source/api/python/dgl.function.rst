@@ -74,6 +74,11 @@ can be used in any `autograd` system. Also, built-in functions can be used not o
 or ``apply_edges`` as shown in the example, but wherever message and reduce functions are
 required (e.g. ``pull``, ``push``, ``send_and_recv``).
 
+.. _api-built-in:
+
+DGL Built-in Function
+-------------------------
+
 Here is a cheatsheet of all the DGL built-in functions.
 
 +-------------------------+-----------------------------------------------------------------+-----------------------+

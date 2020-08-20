@@ -1,4 +1,7 @@
-"""Data related package."""
+"""The ``dgl.data`` package contains datasets hosted by DGL and also utilities
+for downloading, processing, saving and loading data from external resources.
+"""
+
 from __future__ import absolute_import
 
 from . import citation_graph as citegrh

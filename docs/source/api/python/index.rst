@@ -5,11 +5,12 @@ API Reference
    :maxdepth: 2
 
    dgl
-   dgl.DGLGraph
    dgl.data
+   dgl.dataloading
+   dgl.DGLGraph
+   dgl.distributed
+   dgl.function
    nn
    dgl.ops
-   dgl.function
-   sampling
-   dgl.dataloading
-   dgl.distributed
+   dgl.sampling
+   udf
