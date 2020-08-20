@@ -194,7 +194,7 @@ def config():
     parser.add_argument('--train_lr_decay_factor', type=float, default=0.1)
     parser.add_argument('--train_lr_decay_step', type=int, default=50)
     parser.add_argument('--train_epochs', type=int, default=80)
-    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--arr_lambda', type=float, default=0.001)
     parser.add_argument('--num_rgcn_bases', type=int, default=4)
                 
