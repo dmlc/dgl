@@ -110,6 +110,7 @@ Getting Started
    api/python/nn
    api/python/dgl.ops
    api/python/dgl.sampling
+   api/python/udf
 
 .. toctree::
    :maxdepth: 3

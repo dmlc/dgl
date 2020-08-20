@@ -3127,7 +3127,7 @@ class DGLHeteroGraph(object):
 
             If not given, return the in-degrees of all the nodes.
         etype : str or (str, str, str), optional
-            The type names of the edges. The allowed type name formats are:
+            The type name of the edges. The allowed type name formats are:
 
             * ``(str, str, str)`` for source node type, edge type and destination node type.
             * or one ``str`` edge type name if the name can uniquely identify a
@@ -3902,27 +3902,50 @@ class DGLHeteroGraph(object):
     #################################################################
 
     def apply_nodes(self, func, v=ALL, ntype=None, inplace=False):
-        """Apply the function on the nodes with the same type to update their
-        features.
-
-        If None is provided for ``func``, nothing will happen.
-
+        """Update the features of the specified nodes by the provided function.
+        
         Parameters
         ----------
-        func : callable or None
-            Apply function on the nodes. The function should be
-            a :mod:`Node UDF <dgl.udf>`.
-        v : int or iterable of int or tensor, optional
-            The (type-specific) node (ids) on which to apply ``func``. (Default: ALL)
+        func : callable
+            The function to update node features. It must be
+            a :ref:`apiudf`.
+        v : node IDs
+            The node IDs. The allowed formats are:
+
+            * ``int``: A single node.
+            * Int Tensor: Each element is a node ID. The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is a node ID.
+
+            If not given (default), use all the nodes in the graph.
         ntype : str, optional
-            The node type. Can be omitted if there is only one node type
-            in the graph. (Default: None)
+            The node type name. Can be omitted if there is
+            only one type of nodes in the graph.
         inplace : bool, optional
-            **DEPRECATED**. If True, update will be done in place, but autograd will break.
-            (Default: False)
+            **DEPRECATED**.
 
         Examples
         --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        **Homogeneous graph**
+
+        >>> g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]))
+        >>> g.ndata['h'] = torch.ones(5, 2)
+        >>> g.apply_nodes(lambda nodes: {'x' : nodes.data['h'] * 2})
+        >>> g.ndata['x']
+        tensor([[2., 2.],
+                [2., 2.],
+                [2., 2.],
+                [2., 2.],
+                [2., 2.]])
+
+        **Heterogeneous graph**
+        
         >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1], [1, 2])})
         >>> g.nodes['user'].data['h'] = torch.ones(3, 5)
         >>> g.apply_nodes(lambda nodes: {'h': nodes.data['h'] * 2}, ntype='user')
@@ -3947,27 +3970,76 @@ class DGLHeteroGraph(object):
         self._set_n_repr(ntid, v, ndata)
 
     def apply_edges(self, func, edges=ALL, etype=None, inplace=False):
-        """Apply the function on the edges with the same type to update their
-        features.
-
-        If None is provided for ``func``, nothing will happen.
+        """Update the features of the specified edges by the provided function.
 
         Parameters
         ----------
-        func : callable
-            Apply function on the edge. The function should be
-            an :mod:`Edge UDF <dgl.udf>`.
-        edges : optional
-            Edges on which to apply ``func``. See :func:`send` for valid
-            edge specification. (Default: ALL)
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+        func : dgl.function.BuiltinFunction or callable
+            The function to generate new edge features. It must be either
+            a :ref:`api-built-in` or a :ref:`apiudf`.
+        edges : edges
+            The edges to update features on. The allowed input formats are:
+
+            * ``int``: A single edge ID.
+            * Int Tensor: Each element is an edge ID.  The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is an edge ID.
+            * (Tensor, Tensor): The node-tensors format where the i-th elements
+              of the two tensors specify an edge.
+            * (iterable[int], iterable[int]): Similar to the node-tensors format but
+              stores edge endpoints in python iterables.
+
+            Default value specifies all the edges in the graph.
+
+        etype : str or (str, str, str), optional
+            The type name of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
+
         inplace: bool, optional
-            **DEPRECATED**. Must be False.
+            **DEPRECATED**.
+
+        Notes
+        -----
+        DGL recommends using DGL's bulit-in function for the :attr:`func` argument,
+        because DGL will invoke efficient kernels that avoids copying node features to
+        edge features in this case.
 
         Examples
         --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        **Homogeneous graph**
+
+        >>> g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]))
+        >>> g.ndata['h'] = torch.ones(5, 2)
+        >>> g.apply_edges(lambda edges: {'x' : edges.src['h'] + edges.dst['h']})
+        >>> g.edata['x']
+        tensor([[2., 2.],
+                [2., 2.],
+                [2., 2.],
+                [2., 2.]])
+
+        Use built-in function
+
+        >>> import dgl.function as fn
+        >>> g.apply_edges(fn.u_add_v('h', 'h', 'x'))
+        >>> g.edata['x']
+        tensor([[2., 2.],
+                [2., 2.],
+                [2., 2.],
+                [2., 2.]])
+
+        **Heterogeneous graph**
+
         >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1])})
         >>> g.edges[('user', 'plays', 'game')].data['h'] = torch.ones(4, 5)
         >>> g.apply_edges(lambda edges: {'h': edges.data['h'] * 2})
@@ -4005,40 +4077,50 @@ class DGLHeteroGraph(object):
                       apply_node_func=None,
                       etype=None,
                       inplace=False):
-        """Send messages along edges of the specified type, and let destinations
-        receive them.
-
-        Optionally, apply a function to update the node features after "receive".
-
-        This is a convenient combination for performing
-        :mod:`send <dgl.DGLHeteroGraph.send>` along the ``edges`` and
-        :mod:`recv <dgl.DGLHeteroGraph.recv>` for the destinations of the ``edges``.
-
-        **Only works if the graph has one edge type.**  For multiple types, use
-
-        .. code::
-
-           g['edgetype'].send_and_recv(edges, message_func, reduce_func,
-                                       apply_node_func, inplace=inplace)
+        """Send messages along the specified edges and reduce them on
+        the destination nodes to update their features.
 
         Parameters
         ----------
-        edges : See :func:`send` for valid edge specification.
-            Edges on which to apply ``func``.
-        message_func : callable
-            Message function on the edges. The function should be
-            an :mod:`Edge UDF <dgl.udf>`.
-        reduce_func : callable
-            Reduce function on the node. The function should be
-            a :mod:`Node UDF <dgl.udf>`.
+        edges : edges
+            The edges to send and receive messages on. The allowed input formats are:
+
+            * ``int``: A single edge ID.
+            * Int Tensor: Each element is an edge ID.  The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is an edge ID.
+            * (Tensor, Tensor): The node-tensors format where the i-th elements
+              of the two tensors specify an edge.
+            * (iterable[int], iterable[int]): Similar to the node-tensors format but
+              stores edge endpoints in python iterables.
+
+        message_func : dgl.function.BuiltinFunction or callable
+            The message function to generate messages along the edges.
+            It must be either a :ref:`api-built-in` or a :ref:`apiudf`.
+        reduce_func : dgl.function.BuiltinFunction or callable
+            The reduce function to aggregate the messages.
+            It must be either a :ref:`api-built-in` or a :ref:`apiudf`.
         apply_node_func : callable, optional
-            Apply function on the nodes. The function should be
-            a :mod:`Node UDF <dgl.udf>`. (Default: None)
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            An optional apply function to further update the node features
+            after the message reduction. It must be a :ref:`apiudf`.
+        etype : str or (str, str, str), optional
+            The type name of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
+
         inplace: bool, optional
-            **DEPRECATED**. Must be False.
+            **DEPRECATED**.
+
+        Notes
+        -----
+        DGL recommends using DGL's bulit-in function for the :attr:`message_func`
+        and the :attr:`reduce_func` arguments,
+        because DGL will invoke efficient kernels that avoids copying node features to
+        edge features in this case.
 
         Examples
         --------
@@ -4046,6 +4128,29 @@ class DGLHeteroGraph(object):
         >>> import dgl
         >>> import dgl.function as fn
         >>> import torch
+
+        **Homogeneous graph**
+
+        >>> g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]))
+        >>> g.ndata['x'] = torch.ones(5, 2)
+        >>> # Specify edges using (Tensor, Tensor).
+        >>> g.send_and_recv(([1, 2], [2, 3]), fn.copy_u('x', 'm'), fn.sum('m', 'h'))
+        >>> g.ndata['h']
+        tensor([[0., 0.],
+                [0., 0.],
+                [1., 1.],
+                [1., 1.],
+                [0., 0.]])
+        >>> # Specify edges using IDs.
+        >>> g.send_and_recv([0, 2, 3], fn.copy_u('x', 'm'), fn.sum('m', 'h'))
+        >>> g.ndata['h']
+        tensor([[0., 0.],
+                [1., 1.],
+                [0., 0.],
+                [1., 1.],
+                [1., 1.]])
+
+        **Heterogeneous graph**
 
         >>> g = dgl.heterograph({
         ...     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
@@ -4085,45 +4190,50 @@ class DGLHeteroGraph(object):
              apply_node_func=None,
              etype=None,
              inplace=False):
-        """Pull messages from the node(s)' predecessors and then update their features.
-
-        Optionally, apply a function to update the node features after receive.
-
-        This is equivalent to :mod:`send_and_recv <dgl.DGLHeteroGraph.send_and_recv>`
-        on the incoming edges of ``v`` with the specified type.
-
-        Other notes:
-
-        * `reduce_func` will be skipped for nodes with no incoming messages.
-        * If all ``v`` have no incoming message, this will downgrade to an :func:`apply_nodes`.
-        * If some ``v`` have no incoming message, their new feature value will be calculated
-          by the column initializer (see :func:`set_n_initializer`). The feature shapes and
-          dtypes will be inferred.
-
-        **Only works if the graph has one edge type.** For multiple types, use
-
-        .. code::
-
-           g['edgetype'].pull(v, message_func, reduce_func, apply_node_func, inplace=inplace)
+        """Pull messages from the specified node(s)' predecessors along the
+        specified edge type, aggregate them to update the node features.
 
         Parameters
         ----------
-        v : int, container or tensor, optional
-            The node(s) to be updated.
-        message_func : callable
-            Message function on the edges. The function should be
-            an :mod:`Edge UDF <dgl.udf>`.
-        reduce_func : callable
-            Reduce function on the node. The function should be
-            a :mod:`Node UDF <dgl.udf>`.
+        v : node IDs
+            The node IDs. The allowed formats are:
+
+            * ``int``: A single node.
+            * Int Tensor: Each element is a node ID. The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is a node ID.
+        
+        message_func : dgl.function.BuiltinFunction or callable
+            The message function to generate messages along the edges.
+            It must be either a :ref:`api-built-in` or a :ref:`apiudf`.
+        reduce_func : dgl.function.BuiltinFunction or callable
+            The reduce function to aggregate the messages.
+            It must be either a :ref:`api-built-in` or a :ref:`apiudf`.
         apply_node_func : callable, optional
-            Apply function on the nodes. The function should be
-            a :mod:`Node UDF <dgl.udf>`. (Default: None)
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            An optional apply function to further update the node features
+            after the message reduction. It must be a :ref:`apiudf`.
+        etype : str or (str, str, str), optional
+            The type name of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
+
         inplace: bool, optional
-            **DEPRECATED**. Must be False.
+            **DEPRECATED**.
+
+        Notes
+        -----
+        * If some of the given nodes :attr:`v` has no in-edges, DGL does not invoke
+          message and reduce functions for these nodes and fill their aggregated messages
+          with zero. Users can control the filled values via :meth:`set_n_initializer`.
+          DGL still invokes :attr:`apply_node_func` if provided.
+        * DGL recommends using DGL's bulit-in function for the :attr:`message_func`
+          and the :attr:`reduce_func` arguments,
+          because DGL will invoke efficient kernels that avoids copying node features to
+          edge features in this case.
 
         Examples
         --------
@@ -4132,7 +4242,19 @@ class DGLHeteroGraph(object):
         >>> import dgl.function as fn
         >>> import torch
 
-        Instantiate a heterograph.
+        **Homogeneous graph**
+
+        >>> g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]))
+        >>> g.ndata['x'] = torch.ones(5, 2)
+        >>> g.pull([0, 3, 4], fn.copy_u('x', 'm'), fn.sum('m', 'h'))
+        >>> g.ndata['h']
+        tensor([[0., 0.],
+                [0., 0.],
+                [0., 0.],
+                [1., 1.],
+                [1., 1.]])
+
+        **Heterogeneous graph**
 
         >>> g = dgl.heterograph({
         ...     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
@@ -4171,36 +4293,46 @@ class DGLHeteroGraph(object):
              apply_node_func=None,
              etype=None,
              inplace=False):
-        """Send message from the node(s) to their successors and update them.
-
-        This is equivalent to performing
-        :mod:`send_and_recv <DGLHeteroGraph.send_and_recv>` along the outbound
-        edges from ``u``.
-
-        **Only works if the graph has one edge type.** For multiple types, use
-
-        .. code::
-
-           g['edgetype'].push(u, message_func, reduce_func, apply_node_func, inplace=inplace)
+        """Send message from the specified node(s) to their successors
+        along the specified edge type and update their node features.
 
         Parameters
         ----------
-        u : int, container or tensor
-            The node(s) to push out messages.
-        message_func : callable
-            Message function on the edges. The function should be
-            an :mod:`Edge UDF <dgl.udf>`.
-        reduce_func : callable
-            Reduce function on the node. The function should be
-            a :mod:`Node UDF <dgl.udf>`.
+        v : node IDs
+            The node IDs. The allowed formats are:
+
+            * ``int``: A single node.
+            * Int Tensor: Each element is a node ID. The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is a node ID.
+        
+        message_func : dgl.function.BuiltinFunction or callable
+            The message function to generate messages along the edges.
+            It must be either a :ref:`api-built-in` or a :ref:`apiudf`.
+        reduce_func : dgl.function.BuiltinFunction or callable
+            The reduce function to aggregate the messages.
+            It must be either a :ref:`api-built-in` or a :ref:`apiudf`.
         apply_node_func : callable, optional
-            Apply function on the nodes. The function should be
-            a :mod:`Node UDF <dgl.udf>`. (Default: None)
-        etype : str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            An optional apply function to further update the node features
+            after the message reduction. It must be a :ref:`apiudf`.
+        etype : str or (str, str, str), optional
+            The type name of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
+
         inplace: bool, optional
-            **DEPRECATED**. Must be False.
+            **DEPRECATED**.
+
+        Notes
+        -----
+        DGL recommends using DGL's bulit-in function for the :attr:`message_func`
+        and the :attr:`reduce_func` arguments,
+        because DGL will invoke efficient kernels that avoids copying node features to
+        edge features in this case.
 
         Examples
         --------
@@ -4209,7 +4341,19 @@ class DGLHeteroGraph(object):
         >>> import dgl.function as fn
         >>> import torch
 
-        Instantiate a heterograph.
+        **Homogeneous graph**
+
+        >>> g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]))
+        >>> g.ndata['x'] = torch.ones(5, 2)
+        >>> g.push([0, 1], fn.copy_u('x', 'm'), fn.sum('m', 'h'))
+        >>> g.ndata['h']
+        tensor([[0., 0.],
+                [1., 1.],
+                [1., 1.],
+                [0., 0.],
+                [0., 0.]])
+
+        **Heterogeneous graph**
 
         >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 0], [1, 2])})
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
@@ -4232,42 +4376,59 @@ class DGLHeteroGraph(object):
                    reduce_func,
                    apply_node_func=None,
                    etype=None):
-        """Send messages through all edges and update all nodes.
-
-        Optionally, apply a function to update the node features after receive.
-
-        This is equivalent to
-        :mod:`send_and_recv <dgl.DGLHeteroGraph.send_and_recv>` over all edges
-        of the specified type.
-
-        **Only works if the graph has one edge type.** For multiple types, use
-
-        .. code::
-
-           g['edgetype'].update_all(message_func, reduce_func, apply_node_func)
+        """Send messages along all the edges of the specified type
+        and update all the nodes of the corresponding destination type.
 
         Parameters
         ----------
-        message_func : callable
-            Message function on the edges. The function should be
-            an :mod:`Edge UDF <dgl.udf>`.
-        reduce_func : callable
-            Reduce function on the node. The function should be
-            a :mod:`Node UDF <dgl.udf>`.
+        message_func : dgl.function.BuiltinFunction or callable
+            The message function to generate messages along the edges.
+            It must be either a :ref:`api-built-in` or a :ref:`apiudf`.
+        reduce_func : dgl.function.BuiltinFunction or callable
+            The reduce function to aggregate the messages.
+            It must be either a :ref:`api-built-in` or a :ref:`apiudf`.
         apply_node_func : callable, optional
-            Apply function on the nodes. The function should be
-            a :mod:`Node UDF <dgl.udf>`. (Default: None)
-        etype : str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            An optional apply function to further update the node features
+            after the message reduction. It must be a :ref:`apiudf`.
+        etype : str or (str, str, str), optional
+            The type name of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
+
+        Notes
+        -----
+        * If some of the nodes in the graph has no in-edges, DGL does not invoke
+          message and reduce functions for these nodes and fill their aggregated messages
+          with zero. Users can control the filled values via :meth:`set_n_initializer`.
+          DGL still invokes :attr:`apply_node_func` if provided.
+        * DGL recommends using DGL's bulit-in function for the :attr:`message_func`
+          and the :attr:`reduce_func` arguments,
+          because DGL will invoke efficient kernels that avoids copying node features to
+          edge features in this case.
 
         Examples
         --------
-        >>> import torch
         >>> import dgl
         >>> import dgl.function as fn
+        >>> import torch
 
-        Instantiate a heterograph.
+        **Homogeneous graph**
+
+        >>> g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]))
+        >>> g.ndata['x'] = torch.ones(5, 2)
+        >>> g.update_all(fn.copy_u('x', 'm'), fn.sum('m', 'h'))
+        >>> g.ndata['h']
+        tensor([[0., 0.],
+                [1., 1.],
+                [1., 1.],
+                [1., 1.],
+                [1., 1.]])
+
+        **Heterogeneous graph**
 
         >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1, 2], [1, 2, 2])})
 
@@ -4292,35 +4453,48 @@ class DGLHeteroGraph(object):
     #################################################################
 
     def multi_update_all(self, etype_dict, cross_reducer, apply_node_func=None):
-        r"""Send and receive messages along all edges.
-
-        This is equivalent to
-        :mod:`multi_send_and_recv <dgl.DGLHeteroGraph.multi_send_and_recv>`
-        over all edges.
+        r"""Send messages along all the edges, reduce them by first type-wisely
+        then across different types, and then update the node features of all
+        the nodes.
 
         Parameters
         ----------
         etype_dict : dict
-            Mapping an edge type (str or tuple of str) to the type specific
-            configuration (3-tuples). Each 3-tuple represents
-            (msg_func, reduce_func, apply_node_func):
+            Arguments for edge-type-wise message passing. The keys are edge types
+            while the values are message passing arguments.
 
-            * msg_func: callable
-                  Message function on the edges. The function should be
-                  an :mod:`Edge UDF <dgl.udf>`.
-            * reduce_func: callable
-                  Reduce function on the nodes. The function should be
-                  a :mod:`Node UDF <dgl.udf>`.
+            The allowed key formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            The value must be a tuple ``(message_func, reduce_func, [apply_node_func])``, where
+
+            * message_func : dgl.function.BuiltinFunction or callable
+                The message function to generate messages along the edges.
+                It must be either a :ref:`api-built-in` or a :ref:`apiudf`.
+            * reduce_func : dgl.function.BuiltinFunction or callable
+                The reduce function to aggregate the messages.
+                It must be either a :ref:`api-built-in` or a :ref:`apiudf`.
             * apply_node_func : callable, optional
-                  Apply function on the nodes. The function should be
-                  a :mod:`Node UDF <dgl.udf>`. (Default: None)
+                An optional apply function to further update the node features
+                after the message reduction. It must be a :ref:`apiudf`.
+
         cross_reducer : str
             Cross type reducer. One of ``"sum"``, ``"min"``, ``"max"``, ``"mean"``, ``"stack"``.
-        apply_node_func : callable
-            Apply function on the nodes. The function should be
-            a :mod:`Node UDF <dgl.udf>`. (Default: None)
-        inplace: bool, optional
-            **DEPRECATED**. Must be False.
+        apply_node_func : callable, optional
+            An optional apply function after the messages are reduced both
+            type-wisely and across different types.
+            It must be a :ref:`apiudf`.
+
+        Notes
+        -----
+        DGL recommends using DGL's bulit-in function for the message_func
+        and the reduce_func in the type-wise message passing arguments,
+        because DGL will invoke efficient kernels that avoids copying node features to
+        edge features in this case.
+
 
         Examples
         --------
@@ -4388,21 +4562,27 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        nodes_generator : iterable, each element is a list or a tensor of node ids
-            The generator of node frontiers. It specifies which nodes perform
-            :func:`pull` at each timestep.
-        message_func : callable
-            Message function on the edges. The function should be
-            an :mod:`Edge UDF <dgl.udf>`.
-        reduce_func : callable
-            Reduce function on the node. The function should be
-            a :mod:`Node UDF <dgl.udf>`.
+        nodes_generator : iterable[node IDs]
+            The generator of node frontiers. Each frontier is a set of node IDs
+            stored in Tensor or python iterables.
+            It specifies which nodes perform :func:`pull` at each step.
+        message_func : dgl.function.BuiltinFunction or callable
+            The message function to generate messages along the edges.
+            It must be either a :ref:`api-built-in` or a :ref:`apiudf`.
+        reduce_func : dgl.function.BuiltinFunction or callable
+            The reduce function to aggregate the messages.
+            It must be either a :ref:`api-built-in` or a :ref:`apiudf`.
         apply_node_func : callable, optional
-            Apply function on the nodes. The function should be
-            a :mod:`Node UDF <dgl.udf>`. (Default: None)
-        etype : str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            An optional apply function to further update the node features
+            after the message reduction. It must be a :ref:`apiudf`.
+        etype : str or (str, str, str), optional
+            The type name of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
 
         Examples
         --------
@@ -4449,18 +4629,23 @@ class DGLHeteroGraph(object):
         ----------
         edges_generator : generator
             The generator of edge frontiers.
-        message_func : callable
-            Message function on the edges. The function should be
-            an :mod:`Edge UDF <dgl.udf>`.
-        reduce_func : callable
-            Reduce function on the node. The function should be
-            a :mod:`Node UDF <dgl.udf>`.
+        message_func : dgl.function.BuiltinFunction or callable
+            The message function to generate messages along the edges.
+            It must be either a :ref:`api-built-in` or a :ref:`apiudf`.
+        reduce_func : dgl.function.BuiltinFunction or callable
+            The reduce function to aggregate the messages.
+            It must be either a :ref:`api-built-in` or a :ref:`apiudf`.
         apply_node_func : callable, optional
-            Apply function on the nodes. The function should be
-            a :mod:`Node UDF <dgl.udf>`. (Default: None)
-        etype : str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            An optional apply function to further update the node features
+            after the message reduction. It must be a :ref:`apiudf`.
+        etype : str or (str, str, str), optional
+            The type name of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
 
         Examples
         --------
@@ -4520,7 +4705,7 @@ class DGLHeteroGraph(object):
 
         Returns
         -------
-        tensor
+        Tensor
             A 1D tensor that contains the ID(s) of the node(s) that satisfy the predicate.
 
         Examples
@@ -4587,30 +4772,31 @@ class DGLHeteroGraph(object):
             Its output tensor should be a 1D boolean tensor with
             each element indicating whether the corresponding edge in
             the batch satisfies the predicate.
-        edges : edge ID(s) or edge end nodes, optional
-            The edge(s) for query. The allowed formats are:
+        edges : edges
+            The edges to send and receive messages on. The allowed input formats are:
 
-            - Tensor: A 1D tensor that contains the IDs of the edge(s) for query, whose data
-              type and device should be the same as the :py:attr:`idtype` and device of the graph.
-            - iterable[int]: Similar to the tensor, but stores edge IDs in a sequence
-              (e.g. list, tuple, numpy.ndarray).
-            - (Tensor, Tensor): A 2-tuple of the source and destination nodes of multiple
-              edges for query. Each tensor is a 1D tensor containing node IDs. DGL calls this
-              format "tuple of node-tensors". The data type and device of the tensors should
-              be the same as the :py:attr:`idtype` and device of the graph.
-            - (iterable[int], iterable[int]): Similar to the tuple of node-tensors format,
-              but stores node IDs in two sequences (e.g. list, tuple, numpy.ndarray).
+            * ``int``: A single edge ID.
+            * Int Tensor: Each element is an edge ID.  The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is an edge ID.
+            * (Tensor, Tensor): The node-tensors format where the i-th elements
+              of the two tensors specify an edge.
+            * (iterable[int], iterable[int]): Similar to the node-tensors format but
+              stores edge endpoints in python iterables.
 
-            By default, it considers all edges.
-        etype : str or tuple of str, optional
-            The edge type for query, which can be an edge type (str) or a canonical edge type
-            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
-            must use a canonical edge type. If the graph has multiple edge types, one must
-            specify the argument. Otherwise, it can be omitted.
+            By default, it considers all the edges.
+        etype : str or (str, str, str), optional
+            The type name of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
 
         Returns
         -------
-        tensor
+        Tensor
             A 1D tensor that contains the ID(s) of the edge(s) that satisfy the predicate.
 
         Examples

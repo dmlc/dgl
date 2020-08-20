@@ -12,3 +12,4 @@ API Reference
    nn
    dgl.ops
    dgl.sampling
+   udf
