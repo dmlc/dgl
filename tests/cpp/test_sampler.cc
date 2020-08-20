@@ -69,7 +69,7 @@ TEST(SampleUtilsTest, TestWithReplacement) {
 template <typename Idx, typename DType>
 void _TestWithoutReplacementOrder(RandomEngine *re) {
   // TODO(BarclayII): is there a reliable way to do this test?
-  std::vector<DType> _prob = {1e6, 1e-6, 1e-2, 1e2};
+  std::vector<DType> _prob = {1e6f, 1e-6f, 1e-2f, 1e2f};
   FloatArray prob = NDArray::FromVector(_prob);
   std::vector<Idx> ground_truth = {0, 3, 2, 1};
 

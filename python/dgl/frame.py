@@ -143,6 +143,8 @@ class Column(object):
         """
         col = self.clone()
         col.device = (device, kwargs)
+        if self.index is not None:
+            col.index = F.copy_to(self.index, device)
         return col
 
     def __getitem__(self, rowids):

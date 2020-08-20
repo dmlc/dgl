@@ -66,11 +66,7 @@ Speeding-up with mixed CPU & multi-GPU. The used parameters are the same as abov
 
 ## OGB Dataset
 ### How to load ogb data
-To load ogb dataset, you need to run the following command, which will output a network file, ogbl-collab-net.txt:
-```
-python3 load_dataset.py --name ogbl-collab
-```
-Or you can run the code directly with:
+You can run the code directly with:
 ```
 python3 deepwalk --ogbl_name xxx --load_from_ogbl
 ```
