@@ -21,3 +21,15 @@ concepts of :class:`~dgl.DGLGraph`:
 * :ref:`guide-graph-external`
 * :ref:`guide-graph-heterogeneous`
 * :ref:`guide-graph-gpu`
+
+.. toctree::
+    :maxdepth: 1
+    :hidden:
+    :glob:
+
+    graph-basic
+    graph-graphs-nodes-edges
+    graph-feature
+    graph-external
+    graph-heterogeneous
+    graph-gpu
