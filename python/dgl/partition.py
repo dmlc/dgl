@@ -131,7 +131,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
             inner_nids = F.nonzero_1d(subg.ndata['inner_node'])
             # TODO(zhengda) we need to fix utils.toindex() to avoid the dtype cast below.
             inner_nids = F.astype(inner_nids, F.int64)
-            inner_eids = subg.in_edges(inner_nids, form='eid')
+            inner_eids = subg.out_edges(inner_nids, form='eid')
             inner_edge = F.scatter_row(inner_edge, inner_eids,
                                        F.ones((len(inner_eids),), F.dtype(inner_edge), F.cpu()))
         else:
