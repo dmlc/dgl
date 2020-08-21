@@ -1,5 +1,6 @@
 """Utilities for batching/unbatching graphs."""
 from collections.abc import Mapping
+from collections import defaultdict
 
 from . import backend as F
 from .base import ALL, is_all, DGLError, dgl_warning
@@ -9,7 +10,7 @@ from . import utils
 __all__ = ['batch', 'unbatch', 'batch_hetero', 'unbatch_hetero']
 
 def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
-    r"""Batch a collection of ``DGLGraph``s into one graph for more efficient
+    r"""Batch a collection of :class:`DGLGraph` s into one graph for more efficient
     graph computation.
 
     Each input graph becomes one disjoint component of the batched graph. The nodes
@@ -34,8 +35,8 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
 
     The numbers of nodes and edges of the input graphs are accessible via the
     :func:`DGLGraph.batch_num_nodes` and :func:`DGLGraph.batch_num_edges` attributes
-    of the result graph. For homographs, they are 1D integer tensors, with each element
-    being the number of nodes/edges of the corresponding input graph. For
+    of the resulting graph. For homogeneous graphs, they are 1D integer tensors,
+    with each element being the number of nodes/edges of the corresponding input graph. For
     heterographs, they are dictionaries of 1D integer tensors, with node
     type or edge type as the keys.
 
@@ -45,7 +46,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     By default, node/edge features are batched by concatenating the feature tensors
     of all input graphs. This thus requires features of the same name to have
     the same data type and feature size. One can pass ``None`` to the ``ndata``
-    or ``edata`` argument to prevent feature batching, or pass a list of string
+    or ``edata`` argument to prevent feature batching, or pass a list of strings
     to specify which features to batch.
 
     To unbatch the graph back to a list, use the :func:`dgl.unbatch` function.
@@ -67,7 +68,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     Examples
     --------
 
-    Batch homographs
+    Batch homogeneous graphs
 
     >>> import dgl
     >>> import torch as th
@@ -161,28 +162,31 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     if not (is_all(edata) or isinstance(edata, list)):
         raise DGLError('Invalid argument edata: must be a string list but got {}.'.format(
             type(edata)))
+    if any(g.is_block for g in graphs):
+        raise DGLError("Batching a block is not supported.")
 
     utils.check_all_same_device(graphs, 'graphs')
     utils.check_all_same_idtype(graphs, 'graphs')
     relations = graphs[0].canonical_etypes
+    ntypes = graphs[0].ntypes
     idtype = graphs[0].idtype
     device = graphs[0].device
 
     # Batch graph structure for each relation graph
-    edge_dict = {}
-    num_nodes_dict = {}
-    for rel in relations:
-        srctype, etype, dsttype = rel
-        srcnid_off = dstnid_off = 0
-        src, dst = [], []
-        for g in graphs:
+    edge_dict = defaultdict(list)
+    num_nodes_dict = defaultdict(int)
+    for g in graphs:
+        for rel in relations:
+            srctype, etype, dsttype = rel
             u, v = g.edges(order='eid', etype=rel)
-            src.append(u + srcnid_off)
-            dst.append(v + dstnid_off)
-            srcnid_off += g.number_of_nodes(srctype)
-            dstnid_off += g.number_of_nodes(dsttype)
+            src = u + num_nodes_dict[srctype]
+            dst = v + num_nodes_dict[dsttype]
+            edge_dict[rel].append((src, dst))
+        for ntype in ntypes:
+            num_nodes_dict[ntype] += g.number_of_nodes(ntype)
+    for rel in relations:
+        src, dst = zip(*edge_dict[rel])
         edge_dict[rel] = (F.cat(src, 0), F.cat(dst, 0))
-        num_nodes_dict.update({srctype : srcnid_off, dsttype : dstnid_off})
     retg = convert.heterograph(edge_dict, num_nodes_dict, idtype=idtype, device=device)
 
     # Compute batch num nodes
@@ -247,13 +251,13 @@ def unbatch(g, node_split=None, edge_split=None):
     """Revert the batch operation by split the given graph into a list of small ones.
 
     This is the reverse operation of :func:``dgl.batch``. If the ``node_split``
-    or the ``edge_split`` is not given, it uses the :func:`DGLGraph.batch_num_nodes`
-    and :func:`DGLGraph.batch_num_edges` of the input graph.
+    or the ``edge_split`` is not given, it calls :func:`DGLGraph.batch_num_nodes`
+    and :func:`DGLGraph.batch_num_edges` of the input graph to get the information.
 
     If the ``node_split`` or the ``edge_split`` arguments are given,
     it will partition the graph according to the given segments. One must assure
     that the partition is valid -- edges of the i^th graph only connect nodes
-    belong to the i^th graph. Otherwise, an error will be thrown.
+    belong to the i^th graph. Otherwise, DGL will throw an error.
 
     The function supports heterograph input, in which case the two split
     section arguments shall be of dictionary type -- similar to the
@@ -395,7 +399,7 @@ def unbatch(g, node_split=None, edge_split=None):
                           for i in range(num_split)]
 
     # Create graphs
-    gs = [convert.heterograph(edge_dict, num_nodes_dict, validate=True, idtype=g.idtype)
+    gs = [convert.heterograph(edge_dict, num_nodes_dict, idtype=g.idtype)
           for edge_dict, num_nodes_dict in zip(edge_dict_per, num_nodes_dict_per)]
 
     # Unbatch node features

@@ -4,7 +4,7 @@
  * \brief DGL util functions
  */
 
-#include <omp.h>
+#include <dmlc/omp.h>
 
 #include <dgl/packed_func_ext.h>
 #include "../c_api_common.h"

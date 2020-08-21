@@ -96,6 +96,7 @@ class TreeLSTM(gluon.nn.Block):
         self.linear = gluon.nn.Dense(num_classes)
         cell = TreeLSTMCell if cell_type == 'nary' else ChildSumTreeLSTMCell
         self.cell = cell(x_size, h_size)
+        self.ctx = ctx
 
     def forward(self, batch, h, c):
         """Compute tree-lstm prediction given a batch.
@@ -113,6 +114,7 @@ class TreeLSTM(gluon.nn.Block):
             The prediction of each node.
         """
         g = batch.graph
+        g = g.to(self.ctx)
         # feed embedding
         embeds = self.embedding(batch.wordid * batch.mask)
         wiou = self.cell.W_iou(self.dropout(embeds))

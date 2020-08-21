@@ -3,15 +3,6 @@
 NN Modules (Tensorflow)
 ====================
 
-.. contents:: Contents
-    :local:
-
-We welcome your contribution! If you want a model to be implemented in DGL as a NN module,
-please `create an issue <https://github.com/dmlc/dgl/issues>`_ started with "[Feature Request] NN Module XXXModel".
-
-If you want to contribute a NN module, please `create a pull request <https://github.com/dmlc/dgl/pulls>`_ started
-with "[NN] XXXModel in tensorflow NN Modules" and our team member would review this PR.
-
 Conv Layers 
 ----------------------------------------
 
@@ -42,6 +33,13 @@ SAGEConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.tensorflow.conv.SAGEConv
+    :members: forward
+    :show-inheritance:
+    
+ChebConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.tensorflow.conv.ChebConv
     :members: forward
     :show-inheritance:
     
@@ -106,3 +104,13 @@ GlobalAttentionPooling
 .. autoclass:: dgl.nn.tensorflow.glob.GlobalAttentionPooling
     :members:
     :show-inheritance:
+
+Heterogeneous Graph Convolution Module
+----------------------------------------
+
+HeteroGraphConv
+~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.tensorflow.HeteroGraphConv
+   :members:
+   :show-inheritance:

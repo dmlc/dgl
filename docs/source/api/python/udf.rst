@@ -1,6 +1,6 @@
 .. _apiudf:
 
-dgl.udf
+User-defined Function
 ==================================================
 
 .. currentmodule:: dgl.udf

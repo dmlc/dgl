@@ -6,12 +6,16 @@ import torch.nn as nn
 from .... import function as fn
 
 class ShiftedSoftplus(nn.Module):
-    r"""Applies the element-wise function:
+    r"""
+
+    Description
+    -----------
+    Applies the element-wise function:
 
     .. math::
         \text{SSP}(x) = \frac{1}{\beta} * \log(1 + \exp(\beta * x)) - \log(\text{shift})
 
-    Parameters
+    Attributes
     ----------
     beta : int
         :math:`\beta` value for the mathematical formulation. Default to 1.
@@ -25,7 +29,11 @@ class ShiftedSoftplus(nn.Module):
         self.softplus = nn.Softplus(beta=beta, threshold=threshold)
 
     def forward(self, inputs):
-        """Applies the activation function.
+        """
+
+        Description
+        -----------
+        Applies the activation function.
 
         Parameters
         ----------
@@ -40,23 +48,54 @@ class ShiftedSoftplus(nn.Module):
         return self.softplus(inputs) - np.log(float(self.shift))
 
 class CFConv(nn.Module):
-    r"""CFConv in SchNet.
+    r"""
+
+    Description
+    -----------
+    CFConv in SchNet.
 
     SchNet is introduced in `SchNet: A continuous-filter convolutional neural network for
     modeling quantum interactions <https://arxiv.org/abs/1706.08566>`__.
 
     It combines node and edge features in message passing and updates node representations.
 
+    .. math::
+        h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} h_j^{l} \circ W^{(l)}e_ij
+
+    where :math:`\circ` represents element-wise multiplication and for :math:`\text{SPP}` :
+
+    .. math::
+        \text{SSP}(x) = \frac{1}{\beta} * \log(1 + \exp(\beta * x)) - \log(\text{shift})
+
     Parameters
     ----------
     node_in_feats : int
-        Size for the input node features.
+        Size for the input node features :math:`h_j^{(l)}`.
     edge_in_feats : int
-        Size for the input edge features.
+        Size for the input edge features :math:`e_ij`.
     hidden_feats : int
         Size for the hidden representations.
     out_feats : int
-        Size for the output representations.
+        Size for the output representations :math:`h_j^{(l+1)}`.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> from dgl.nn import CFConv
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> nfeat = th.ones(6, 10)
+    >>> efeat = th.ones(6, 5)
+    >>> conv = CFConv(10, 5, 3, 2)
+    >>> res = conv(g, nfeat, efeat)
+    >>> res
+    tensor([[-0.1209, -0.2289],
+            [-0.1209, -0.2289],
+            [-0.1209, -0.2289],
+            [-0.1135, -0.2338],
+            [-0.1209, -0.2289],
+            [-0.1283, -0.2240]], grad_fn=<SubBackward0>)
     """
     def __init__(self, node_in_feats, edge_in_feats, hidden_feats, out_feats):
         super(CFConv, self).__init__()
@@ -74,7 +113,11 @@ class CFConv(nn.Module):
         )
 
     def forward(self, g, node_feats, edge_feats):
-        """Performs message passing and updates node representations.
+        """
+
+        Description
+        -----------
+        Performs message passing and updates node representations.
 
         Parameters
         ----------

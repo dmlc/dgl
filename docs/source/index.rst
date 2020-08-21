@@ -30,52 +30,45 @@ generative models on graphs, (previously) difficult-to-parallelize tree-based
 models like TreeLSTM, etc. We also implement some conventional models in DGL
 from a new graphical perspective yielding simplicity.
 
-Relationship of DGL to other frameworks
----------------------------------------
-DGL is designed to be compatible and agnostic to the existing tensor
-frameworks. It provides a backend adapter interface that allows easy porting
-to other tensor-based, autograd-enabled frameworks.
-
 Getting Started
 ---------------
 
-Follow the :doc:`instructions<install/index>` to install DGL.  
-:doc:`DGL at a glance<tutorials/basics/1_first>` is the most common place to get started with.
-It offers a broad experience of using DGL for deep learning on graph data.
-You can learn other basic concepts of DGL through the dedicated tutorials.
+* :doc:`Installation<install/index>`.
+* :doc:`Quickstart tutorial<tutorials/basics/1_first>` for absolute beginners.
+* :doc:`User guide<guide/index>`.
+* :doc:`API reference manual<api/python/index>`.
+* :doc:`End-to-end model tutorials<tutorials/models/index>` for learning DGL by popular models on graphs.
 
-* Learn constructing graphs and set/get node and edge features :doc:`here<tutorials/basics/2_basics>`.
-* Learn performing computation on graph using message passing :doc:`here<tutorials/basics/3_pagerank>`.
-* Learn processing multiple graph samples in a batch :doc:`here<tutorials/basics/4_batch>`.
-* Learn working with heterogeneous graph data :doc:`here<tutorials/basics/5_hetero>`.
+..
+  Follow the :doc:`instructions<install/index>` to install DGL.
+  :doc:`DGL at a glance<tutorials/basics/1_first>` is the most common place to get started with.
+  It offers a broad experience of using DGL for deep learning on graph data.
 
-End-to-end model tutorials are other good starting points for learning DGL and popular
-models on graphs. The model tutorials are categorized based on the way they utilize DGL APIs.
+  API reference document lists more endetailed specifications of each API and GNN modules,
+  a useful manual for in-depth developers.
 
-* :ref:`Graph Neural Network and its variant <tutorials1-index>`: Learn how to use DGL to train
-  popular **GNN models** on one input graph.
-* :ref:`Dealing with many small graphs <tutorials2-index>`: Learn how to train models for
-  many graph samples such as sentence parse trees.
-* :ref:`Generative models <tutorials3-index>`: Learn how to deal with **dynamically-changing graphs**.
-* :ref:`Old (new) wines in new bottle <tutorials4-index>`: Learn how to combine DGL with tensor-based
-  DGL framework in a flexible way. Explore new perspective on traditional models by graphs.
-* :ref:`Training on giant graphs <tutorials5-index>`: Learn how to train graph neural networks
-  on giant graphs.
+  You can learn other basic concepts of DGL through the dedicated tutorials.
 
-Each tutorial is accompanied with a runnable python script and jupyter notebook that
-can be downloaded. If you would like the tutorials improved, please raise a github issue.
+  * Learn constructing graphs and set/get node and edge features :doc:`here<tutorials/basics/2_basics>`.
+  * Learn performing computation on graph using message passing :doc:`here<tutorials/basics/3_pagerank>`.
+  * Learn processing multiple graph samples in a batch :doc:`here<tutorials/basics/4_batch>`.
+  * Learn working with heterogeneous graph data :doc:`here<tutorials/basics/5_hetero>`.
 
-API reference document lists more endetailed specifications of each API and GNN modules,
-a useful manual for in-depth developers.
+  End-to-end model tutorials are other good starting points for learning DGL and popular
+  models on graphs. The model tutorials are categorized based on the way they utilize DGL APIs.
 
-.. toctree::
-   :maxdepth: 1
-   :caption: Installation
-   :hidden:
-   :glob:
+  * :ref:`Graph Neural Network and its variant <tutorials1-index>`: Learn how to use DGL to train
+    popular **GNN models** on one input graph.
+  * :ref:`Dealing with many small graphs <tutorials2-index>`: Learn how to train models for
+    many graph samples such as sentence parse trees.
+  * :ref:`Generative models <tutorials3-index>`: Learn how to deal with **dynamically-changing graphs**.
+  * :ref:`Old (new) wines in new bottle <tutorials4-index>`: Learn how to combine DGL with tensor-based
+    DGL framework in a flexible way. Explore new perspective on traditional models by graphs.
+  * :ref:`Training on giant graphs <tutorials5-index>`: Learn how to train graph neural networks
+    on giant graphs.
 
-   install/index
-   install/backend
+  Each tutorial is accompanied with a runnable python script and jupyter notebook that
+  can be downloaded. If you would like the tutorials improved, please raise a github issue.
 
 .. toctree::
    :maxdepth: 1
@@ -83,15 +76,25 @@ a useful manual for in-depth developers.
    :hidden:
    :glob:
 
-   tutorials/basics/index
+   install/index
+   install/backend
+   tutorials/basics/1_first
 
 .. toctree::
-   :maxdepth: 3
-   :caption: Tutorials
+   :maxdepth: 2
+   :caption: User Guide
    :hidden:
+   :titlesonly:
    :glob:
 
-   tutorials/models/index
+   guide/preface
+   guide/graph
+   guide/message
+   guide/nn
+   guide/data
+   guide/training
+   guide/minibatch
+   guide/distributed
 
 .. toctree::
    :maxdepth: 2
@@ -99,22 +102,24 @@ a useful manual for in-depth developers.
    :hidden:
    :glob:
 
-   api/python/graph
-   api/python/heterograph
-   api/python/ops
-   api/python/readout
-   api/python/batch_heterograph
+   api/python/dgl
+   api/python/dgl.data
+   api/python/dgl.dataloading
+   api/python/dgl.DGLGraph
+   api/python/dgl.distributed
+   api/python/dgl.function
    api/python/nn
-   api/python/function
+   api/python/dgl.ops
+   api/python/dgl.sampling
    api/python/udf
-   api/python/traversal
-   api/python/propagate
-   api/python/transform
-   api/python/sampler
-   api/python/sampling
-   api/python/data
-   api/python/nodeflow
-   api/python/random
+
+.. toctree::
+   :maxdepth: 3
+   :caption: Model Tutorials
+   :hidden:
+   :glob:
+
+   tutorials/models/index
 
 .. toctree::
    :maxdepth: 1
@@ -134,6 +139,13 @@ a useful manual for in-depth developers.
    faq
    env_var
    resources
+
+Relationship of DGL to other frameworks
+---------------------------------------
+DGL is designed to be compatible and agnostic to the existing tensor
+frameworks. It provides a backend adapter interface that allows easy porting
+to other tensor-based, autograd-enabled frameworks.
+
 
 Free software
 -------------

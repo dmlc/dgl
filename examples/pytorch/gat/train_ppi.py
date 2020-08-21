@@ -119,7 +119,8 @@ def main(args):
     test_score_list = []
     for batch, subgraph in enumerate(test_dataloader):
         subgraph = subgraph.to(device)
-        test_score_list.append(evaluate(subgraph.ndata['feat'], model, subgraph, subgraph.ndata['label'], loss_fcn))
+        score, test_loss = evaluate(subgraph.ndata['feat'], model, subgraph, subgraph.ndata['label'], loss_fcn)
+        test_score_list.append(score)
     print("Test F1-Score: {:.4f}".format(np.array(test_score_list).mean()))
 
 if __name__ == '__main__':

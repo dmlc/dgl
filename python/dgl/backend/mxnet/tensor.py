@@ -276,6 +276,9 @@ def ones(shape, dtype, ctx):
 def uniform(shape, dtype, ctx, low, high):
     return nd.random.uniform(low, high, ctx=ctx, dtype=dtype, shape=shape)
 
+def randint(shape, dtype, ctx, low, high):
+    return nd.random.randint(low, high, ctx=ctx, dtype=dtype, shape=shape)
+
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, nd.NDArray):
@@ -321,6 +324,9 @@ def clone(input):
 
 def clamp(data, min_val, max_val):
     return nd.clip(data, min_val, max_val)
+
+def replace_inf_with_zero(x):
+    return nd.where(nd.abs(x) == np.inf, nd.zeros_like(x), x)
 
 def unique(input):
     # TODO: fallback to numpy is unfortunate
