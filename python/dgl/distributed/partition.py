@@ -284,8 +284,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                                               0)) for i in parts]
             node_map_val = np.cumsum(node_map_val).tolist()
             assert node_map_val[-1] == g.number_of_nodes()
-            edge_map_val = [F.as_scalar(F.sum(F.astype(parts[i].edata['inner_edge'], F.int64),
-                                              0)) for i in parts]
+            edge_map_val = [parts[i].number_of_edges() for i in parts]
             edge_map_val = np.cumsum(edge_map_val).tolist()
             assert edge_map_val[-1] == g.number_of_edges()
         else:
