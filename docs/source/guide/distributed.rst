@@ -88,3 +88,12 @@ the following distributed components:
 * :ref:`guide-distributed-preprocessing`
 * :ref:`guide-distributed-apis`
 * :ref:`guide-distributed-tools`
+
+.. toctree::
+    :maxdepth: 1
+    :hidden:
+    :glob:
+
+    distributed-preprocessing
+    distributed-apis
+    distributed-tools
