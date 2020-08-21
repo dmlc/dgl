@@ -52,7 +52,7 @@ class NeighborSampler(object):
 
         input_nodes = blocks[0].srcdata[dgl.NID]
         seeds = blocks[-1].dstdata[dgl.NID]
-        batch_inputs, batch_labels = load_subtensor(self.g, seeds, input_nodes, self.device)
+        batch_inputs, batch_labels = load_subtensor(self.g, seeds, input_nodes, "cpu")
         blocks[0].srcdata['features'] = batch_inputs
         blocks[-1].dstdata['labels'] = batch_labels
         return blocks
@@ -115,7 +115,7 @@ class DistSAGE(nn.Module):
                 drop_last=False)
 
             for blocks in tqdm.tqdm(dataloader):
-                block = blocks[0]
+                block = blocks[0].to(device)
                 input_nodes = block.srcdata[dgl.NID]
                 output_nodes = block.dstdata[dgl.NID]
                 h = x[input_nodes].to(device)
@@ -211,6 +211,8 @@ def run(args, device, data):
 
             num_seeds += len(blocks[-1].dstdata[dgl.NID])
             num_inputs += len(blocks[0].srcdata[dgl.NID])
+            blocks = [block.to(device) for block in blocks]
+            batch_labels = batch_labels.to(device)
             # Compute loss and prediction
             start = time.time()
             batch_pred = model(blocks, batch_inputs)
@@ -275,7 +277,7 @@ def main(args):
         g.rank(), len(train_nid), len(np.intersect1d(train_nid.numpy(), local_nid)),
         len(val_nid), len(np.intersect1d(val_nid.numpy(), local_nid)),
         len(test_nid), len(np.intersect1d(test_nid.numpy(), local_nid))))
-    device = th.device('cpu')
+    device = th.device('cuda:0')
     labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
     n_classes = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
     print('#labels:', n_classes)
