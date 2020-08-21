@@ -8,7 +8,7 @@ import dask.dataframe as dd
 # This is the train-test split method most of the recommender system papers running on MovieLens
 # takes.  It essentially follows the intuition of "training on the past and predict the future".
 # One can also change the threshold to make validation and test set take larger proportions.
-def train_test_split_by_time(df, timestamp, item):
+def train_test_split_by_time(df, timestamp, user):
     df['train_mask'] = np.ones((len(df),), dtype=np.bool)
     df['val_mask'] = np.zeros((len(df),), dtype=np.bool)
     df['test_mask'] = np.zeros((len(df),), dtype=np.bool)
@@ -22,8 +22,8 @@ def train_test_split_by_time(df, timestamp, item):
             df.iloc[-2, -3] = False
             df.iloc[-2, -2] = True
         return df
-    df = df.groupby(item).apply(train_test_split).compute(scheduler='processes').sort_index()
-    print(df[df[item] == df[item].unique()[0]].sort_values(timestamp))
+    df = df.groupby(user, group_keys=False).apply(train_test_split).compute(scheduler='processes').sort_index()
+    print(df[df[user] == df[user].unique()[0]].sort_values(timestamp))
     return df['train_mask'].to_numpy().nonzero()[0], \
            df['val_mask'].to_numpy().nonzero()[0], \
            df['test_mask'].to_numpy().nonzero()[0]

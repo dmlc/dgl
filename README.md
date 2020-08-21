@@ -18,11 +18,11 @@ DGL is an easy-to-use, high performance and scalable Python package for deep lea
 </p>
 
 ## <img src="http://data.dgl.ai/asset/image/new.png" width="30">DGL News
+**08/21/2020**: The new **v0.5.0 release** includes distributed GNN training, overhauled documentation and user guide, and several more features.  We have also submitted some models to the [OGB](https://ogb.stanford.edu) leaderboard.  See our [release note](https://github.com/dmlc/dgl/releases/tag/0.5.0) for more details.
+
 **06/11/2020**: Amazon Shanghai AI Lab and AWS Deep Engine Science team working along with academic collaborators from the University of Minnesota, The Ohio State University, and Hunan University have created the **[Drug Repurposing Knowledge Graph (DRKG)](https://github.com/gnn4dr/DRKG)** and a set of machine learning tools, [DGL-KE](https://github.com/awslabs/dgl-ke), that can be used to prioritize drugs for repurposing studies. 
 DRKG is a comprehensive biological knowledge graph that relates human genes, compounds, biological processes, drug side effects, diseases and symptoms. DRKG includes, curates, and normalizes information from six publicly available databases and data that were collected from recent publications related to Covid-19. It has 97,238 entities belonging to 13 types of entities, and 5,874,261 triplets belonging to 107 types of relations. 
 More about the dataset is in this [blogpost](https://www.dgl.ai/news/2020/06/09/covid.html).
-
-**03/31/2020**: The new **v0.4.3 release** includes official TensorFlow support, with 15 popular GNN modules. DGL-KE and DGL-LifeSci, two packages for knowledge graph embedding and chemi- and bio-informatics respectively, have graduated as standalone packages and can be installed by pip and conda. The new release provides full support of graph sampling on heterogeneous graphs, with multi-GPU acceleration. See our [new feature walkthrough](https://www.dgl.ai/release/2020/04/01/release.html) and [release note](https://github.com/dmlc/dgl/releases/tag/0.4.3).
 
 ## Using DGL
 

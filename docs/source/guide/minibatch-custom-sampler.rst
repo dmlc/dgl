@@ -35,18 +35,18 @@ predecessors (or *neighbors* if the graph is undirected) of :math:`v` on graph
 For instance, to perform a message passing for updating the red node in
 the following graph:
 
-.. figure:: https://i.imgur.com/xYPtaoy.png
+.. figure:: https://data.dgl.ai/asset/image/guide_6_4_0.png
    :alt: Imgur
 
-   Imgur
+
 
 One needs to aggregate the node features of its neighbors, shown as
 green nodes:
 
-.. figure:: https://i.imgur.com/OuvExp1.png
+.. figure:: https://data.dgl.ai/asset/image/guide_6_4_1.png
    :alt: Imgur
 
-   Imgur
+
 
 Neighborhood sampling with pencil and paper
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -76,10 +76,10 @@ Finding the message passing dependency
 Consider computing with a 2-layer GNN the output of the seed node 8,
 colored red, in the following graph:
 
-.. figure:: https://i.imgur.com/xYPtaoy.png
+.. figure:: https://data.dgl.ai/asset/image/guide_6_4_2.png
    :alt: Imgur
 
-   Imgur
+
 
 By the formulation:
 
@@ -107,10 +107,10 @@ We can tell from the formulation that to compute
 :math:`\boldsymbol{h}_8^{(2)}` we need messages from node 4, 5, 7 and 11
 (colored green) along the edges visualized below.
 
-.. figure:: https://i.imgur.com/Gwjz05H.png
+.. figure:: https://data.dgl.ai/asset/image/guide_6_4_3.png
    :alt: Imgur
 
-   Imgur
+
 
 This graph contains all the nodes in the original graph but only the
 edges necessary for message passing to the given output nodes. We call
@@ -149,10 +149,10 @@ bipartite-structured graph that only contains the necessary input nodes
 and output nodes a *block*. The following figure shows the block of the
 second GNN layer for node 8.
 
-.. figure:: https://i.imgur.com/stB2UlR.png
+.. figure:: https://data.dgl.ai/asset/image/guide_6_4_4.png
    :alt: Imgur
 
-   Imgur
+
 
 Note that the output nodes also appear in the input nodes. The reason is
 that representations of output nodes from the previous layer are needed
@@ -234,10 +234,10 @@ destination of an edge in the frontier.
 
 For example, consider the following frontier
 
-.. figure:: https://i.imgur.com/g5Ptbj7.png
+.. figure:: https://data.dgl.ai/asset/image/guide_6_4_5.png
    :alt: Imgur
 
-   Imgur
+
 
 where the red and green nodes (i.e. node 4, 5, 7, 8, and 11) are all
 nodes that is a destination of an edge. Then the following code will
