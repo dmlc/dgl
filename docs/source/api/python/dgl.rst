@@ -4,9 +4,14 @@ dgl
 =============================
 
 .. currentmodule:: dgl
+.. automodule:: dgl
+
+.. _api-graph-create-ops:
 
 Graph Create Ops
 -------------------------
+
+Operators for constructing :class:`DGLGraph` from raw data formats.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -24,8 +29,10 @@ Graph Create Ops
 
 .. _api-subgraph-extraction:
 
-Subgraph Extraction Routines
+Subgraph Extraction Ops
 -------------------------------------
+
+Operators for extracting and returning subgraphs.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -37,8 +44,12 @@ Subgraph Extraction Routines
     in_subgraph
     out_subgraph
 
-Graph Mutation Routines
----------------------------------
+.. _api-transform:
+
+Graph Transform Ops
+----------------------------------
+
+Operators for generating new graphs by manipulating the structure of the existing ones.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -50,13 +61,6 @@ Graph Mutation Routines
     add_self_loop
     remove_self_loop
     add_reverse_edges
-
-Graph Transform Routines
-----------------------------------
-
-.. autosummary::
-    :toctree: ../../generated/
-
     reverse
     to_bidirected
     to_simple
@@ -69,8 +73,13 @@ Graph Transform Routines
     khop_graph
     metapath_reachable_graph
 
-Batching and Reading Out
+.. _api-batch:
+
+Batching and Reading Out Ops
 -------------------------------
+
+Operators for batching multiple graphs into one for batch processing and
+operators for computing graph-level representation for both single and batched graphs.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -92,8 +101,10 @@ Batching and Reading Out
     topk_nodes
     topk_edges
 
-Adjacency Related Routines
+Adjacency Related Utilities
 -------------------------------
+
+Utilities for computing adjacency matrix and Lapacian matrix.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -101,8 +112,10 @@ Adjacency Related Routines
     khop_adj
     laplacian_lambda_max
 
-Propagate Messages by Traversals
+Traversals
 ------------------------------------------
+
+Utilities for traversing graphs.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -115,6 +128,9 @@ Propagate Messages by Traversals
 
 Utilities
 -----------------------------------------------
+
+Other utilities for controlling randomness, saving and loading graphs, etc.
+
 .. autosummary::
     :toctree: ../../generated/
 

@@ -1,5 +1,4 @@
 """Module for various graph generator functions."""
-# pylint: disable= dangerous-default-value
 
 from . import backend as F
 from . import convert
@@ -7,13 +6,14 @@ from . import random
 
 __all__ = ['rand_graph', 'rand_bipartite']
 
-def rand_graph(num_nodes, num_edges, idtype=F.int64, device=F.cpu(),
-               formats=['coo', 'csr', 'csc']):
-    """Generate a random graph of the given number of nodes/edges.
+def rand_graph(num_nodes, num_edges, idtype=F.int64, device=F.cpu()):
+    """Generate a random graph of the given number of nodes/edges and return.
 
-    It uniformly chooses ``num_edges`` from all pairs and form a graph.
+    It uniformly chooses ``num_edges`` from all possible node pairs and form a graph.
+    The random choice is without replacement, which means there will be no multi-edge
+    in the resulting graph.
 
-    TODO(minjie): support RNG as one of the arguments.
+    To control the randomness, set the random seed via :func:`dgl.seed`.
 
     Parameters
     ----------
@@ -22,34 +22,51 @@ def rand_graph(num_nodes, num_edges, idtype=F.int64, device=F.cpu(),
     num_edges : int
         The number of edges
     idtype : int32, int64, optional
-        Integer ID type. Must be int32 or int64. Default: int64.
+        The data type for storing the structure-related graph information
+        such as node and edge IDs. It should be a framework-specific data type object
+        (e.g., torch.int32). By default, DGL uses int64.
     device : Device context, optional
-        Device on which the graph is created. Default: CPU.
-    formats : str or list of str
-        It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
-        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
+        The device of the resulting graph. It should be a framework-specific device
+        object (e.g., torch.device). By default, DGL stores the graph on CPU.
 
     Returns
     -------
-    DGLHeteroGraph
-        Generated random graph.
+    DGLGraph
+        The generated random graph.
+
+    See Also
+    --------
+    rand_bipartite
+
+    Examples
+    --------
+    >>> import dgl
+    >>> dgl.rand_graph(100, 10)
+    Graph(num_nodes=100, num_edges=10,
+          ndata_schemes={}
+          edata_schemes={})
     """
+    #TODO(minjie): support RNG as one of the arguments.
     eids = random.choice(num_nodes * num_nodes, num_edges, replace=False)
-    rows = F.copy_to(F.astype(eids / num_nodes, idtype), device)
-    cols = F.copy_to(F.astype(eids % num_nodes, idtype), device)
-    g = convert.graph((rows, cols),
-                      num_nodes=num_nodes,
-                      idtype=idtype, device=device)
-    return g.formats(formats)
+    eids = F.zerocopy_to_numpy(eids)
+    rows = F.zerocopy_from_numpy(eids // num_nodes)
+    cols = F.zerocopy_from_numpy(eids % num_nodes)
+    rows = F.copy_to(F.astype(rows, idtype), device)
+    cols = F.copy_to(F.astype(cols, idtype), device)
+    return convert.graph((rows, cols),
+                         num_nodes=num_nodes,
+                         idtype=idtype, device=device)
 
 def rand_bipartite(utype, etype, vtype,
                    num_src_nodes, num_dst_nodes, num_edges,
-                   idtype=F.int64, device=F.cpu(),
-                   formats=['csr', 'coo', 'csc']):
-    """Generate a random bipartite graph of the given number of src/dst nodes and
-    number of edges.
+                   idtype=F.int64, device=F.cpu()):
+    """Generate a random uni-directional bipartite graph and return.
 
-    It uniformly chooses ``num_edges`` from all pairs and form a graph.
+    It uniformly chooses ``num_edges`` from all possible node pairs and form a graph.
+    The random choice is without replacement, which means there will be no multi-edge
+    in the resulting graph.
+
+    To control the randomness, set the random seed via :func:`dgl.seed`.
 
     Parameters
     ----------
@@ -60,28 +77,43 @@ def rand_bipartite(utype, etype, vtype,
     vtype : str, optional
         The name of the destination node type.
     num_src_nodes : int
-        The number of source nodes, the :math:`|U|` in :math:`G=(U,V,E)`.
+        The number of source nodes.
     num_dst_nodes : int
-        The number of destination nodes, the :math:`|V|` in :math:`G=(U,V,E)`.
+        The number of destination nodes.
     num_edges : int
         The number of edges
     idtype : int32, int64, optional
-        Integer ID type. Must be int32 or int64. Default: int64.
+        The data type for storing the structure-related graph information
+        such as node and edge IDs. It should be a framework-specific data type object
+        (e.g., torch.int32). By default, DGL uses int64.
     device : Device context, optional
-        Device on which the graph is created. Default: CPU.
-    formats : str or list of str
-        It can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of them,
-        Force the storage formats.  Default: ``['coo', 'csr', 'csc']``.
+        The device of the resulting graph. It should be a framework-specific device
+        object (e.g., torch.device). By default, DGL stores the graph on CPU.
 
     Returns
     -------
-    DGLHeteroGraph
-        Generated random bipartite graph.
+    DGLGraph
+        The generated random bipartite graph.
+
+    See Also
+    --------
+    rand_graph
+
+    Examples
+    --------
+    >>> import dgl
+    >>> dgl.rand_bipartite('user', 'buys', 'game', 50, 100, 10)
+    Graph(num_nodes={'game': 100, 'user': 50},
+          num_edges={('user', 'buys', 'game'): 10},
+          metagraph=[('user', 'game', 'buys')])
     """
+    #TODO(minjie): support RNG as one of the arguments.
     eids = random.choice(num_src_nodes * num_dst_nodes, num_edges, replace=False)
-    rows = F.copy_to(F.astype(eids / num_dst_nodes, idtype), device)
-    cols = F.copy_to(F.astype(eids % num_dst_nodes, idtype), device)
-    g = convert.heterograph({(utype, etype, vtype): (rows, cols)},
-                            {utype: num_src_nodes, vtype: num_dst_nodes},
-                            idtype=idtype, device=device)
-    return g.formats(formats)
+    eids = F.zerocopy_to_numpy(eids)
+    rows = F.zerocopy_from_numpy(eids // num_dst_nodes)
+    cols = F.zerocopy_from_numpy(eids % num_dst_nodes)
+    rows = F.copy_to(F.astype(rows, idtype), device)
+    cols = F.copy_to(F.astype(cols, idtype), device)
+    return convert.heterograph({(utype, etype, vtype): (rows, cols)},
+                               {utype: num_src_nodes, vtype: num_dst_nodes},
+                               idtype=idtype, device=device)
