@@ -1,125 +1,213 @@
 .. _apigraph:
 
-dgl.DGLHeteroGraph
+dgl.DGLGraph
 =====================================================
 
 .. currentmodule:: dgl
-.. autoclass:: DGLHeteroGraph
+.. class:: DGLGraph
+
+    Class for storing graph structure and node/edge feature data.
+
+    There are a few ways to create create a DGLGraph:
+
+    * To create a homogeneous graph from Tensor data, use :func:`dgl.graph`.
+    * To create a heterogeneous graph from Tensor data, use :func:`dgl.heterograph`.
+    * To create a graph from other data sources, use ``dgl.*`` create ops. See
+      :ref:`api-graph-create-ops`.
+
+    Read the user guide chapter :ref:`guide-graph` for an in-depth explanation about its
+    usage.
 
 Querying metagraph structure
 ----------------------------
 
+Methods for getting information about the node and edge types. They are typically useful
+when the graph is heterogeneous.
+
 .. autosummary::
     :toctree: ../../generated/
 
-    DGLHeteroGraph.ntypes
-    DGLHeteroGraph.etypes
-    DGLHeteroGraph.canonical_etypes
-    DGLHeteroGraph.metagraph
-    DGLHeteroGraph.to_canonical_etype
-    DGLHeteroGraph.get_ntype_id
-    DGLHeteroGraph.get_etype_id
+    DGLGraph.ntypes
+    DGLGraph.etypes
+    DGLGraph.srctypes
+    DGLGraph.dsttypes
+    DGLGraph.canonical_etypes
+    DGLGraph.metagraph
+    DGLGraph.to_canonical_etype
 
 Querying graph structure
 ------------------------
 
+Methods for getting information about the graph structure such as capacity, connectivity,
+neighborhood, etc.
+
 .. autosummary::
     :toctree: ../../generated/
 
-    DGLHeteroGraph.number_of_nodes
-    DGLHeteroGraph.number_of_edges
-    DGLHeteroGraph.is_multigraph
-    DGLHeteroGraph.has_nodes
-    DGLHeteroGraph.has_edges_between
-    DGLHeteroGraph.predecessors
-    DGLHeteroGraph.successors
-    DGLHeteroGraph.edge_ids
-    DGLHeteroGraph.find_edges
-    DGLHeteroGraph.in_edges
-    DGLHeteroGraph.out_edges
-    DGLHeteroGraph.all_edges
-    DGLHeteroGraph.in_degrees
-    DGLHeteroGraph.out_degrees
+    DGLGraph.num_nodes
+    DGLGraph.number_of_nodes
+    DGLGraph.num_edges
+    DGLGraph.number_of_edges
+    DGLGraph.num_src_nodes
+    DGLGraph.number_of_src_nodes
+    DGLGraph.num_dst_nodes
+    DGLGraph.number_of_dst_nodes
+    DGLGraph.is_unibipartite
+    DGLGraph.is_multigraph
+    DGLGraph.is_homogeneous
+    DGLGraph.has_nodes
+    DGLGraph.has_edges_between
+    DGLGraph.predecessors
+    DGLGraph.successors
+    DGLGraph.edge_ids
+    DGLGraph.find_edges
+    DGLGraph.in_edges
+    DGLGraph.out_edges
+    DGLGraph.in_degrees
+    DGLGraph.out_degrees
 
 Querying and manipulating sparse format
 ---------------------------------------
 
+Methods for getting or manipulating the internal storage formats of a ``DGLGraph``.
+
 .. autosummary::
     :toctree: ../../generated/
 
-    DGLHeteroGraph.format_in_use
-    DGLHeteroGraph.restrict_format
-    DGLHeteroGraph.to_format
+    DGLGraph.formats
+    DGLGraph.create_format_
 
-Querying and manipulating index data type
+Querying and manipulating node/edge ID type
 -----------------------------------------
 
+Methods for getting or manipulating the data type for storing structure-related
+data such as node and edge IDs.
+
 .. autosummary::
     :toctree: ../../generated/
 
-    DGLHeteroGraph.idtype
-    DGLHeteroGraph.long
-    DGLHeteroGraph.int
+    DGLGraph.idtype
+    DGLGraph.long
+    DGLGraph.int
 
 Using Node/edge features
 ------------------------
 
-.. autosummary::
-    :toctree: ../../generated/
-
-    DGLHeteroGraph.nodes
-    DGLHeteroGraph.ndata
-    DGLHeteroGraph.edges
-    DGLHeteroGraph.edata
-    DGLHeteroGraph.node_attr_schemes
-    DGLHeteroGraph.edge_attr_schemes
-    DGLHeteroGraph.set_n_initializer
-    DGLHeteroGraph.set_e_initializer
-    DGLHeteroGraph.local_var
-    DGLHeteroGraph.local_scope
-
-Using Node/edge features for blocks
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Please refer to :ref:`guide-minibatch` for the definition of blocks.
+Methods for getting or setting the data type for storing structure-related
+data such as node and edge IDs.
 
 .. autosummary::
     :toctree: ../../generated/
 
-    DGLHeteroGraph.number_of_src_nodes
-    DGLHeteroGraph.number_of_dst_nodes
-    DGLHeteroGraph.srcnodes
-    DGLHeteroGraph.srcdata
-    DGLHeteroGraph.dstnodes
-    DGLHeteroGraph.dstdata
+    DGLGraph.nodes
+    DGLGraph.ndata
+    DGLGraph.edges
+    DGLGraph.edata
+    DGLGraph.node_attr_schemes
+    DGLGraph.edge_attr_schemes
+    DGLGraph.srcnodes
+    DGLGraph.dstnodes
+    DGLGraph.srcdata
+    DGLGraph.dstdata
 
 Transforming graph
 ------------------
 
+Methods for generating a new graph by transforming the current ones. Most of them
+are alias of the :ref:`api-subgraph-extraction` and :ref:`api-transform`
+under the ``dgl`` namespace.
+
 .. autosummary::
     :toctree: ../../generated/
 
-    DGLHeteroGraph.subgraph
-    DGLHeteroGraph.edge_subgraph
-    DGLHeteroGraph.node_type_subgraph
-    DGLHeteroGraph.edge_type_subgraph
-    DGLHeteroGraph.__getitem__
+    DGLGraph.subgraph
+    DGLGraph.edge_subgraph
+    DGLGraph.node_type_subgraph
+    DGLGraph.edge_type_subgraph
+    DGLGraph.__getitem__
+    DGLGraph.line_graph
+    DGLGraph.reverse
+    DGLGraph.add_self_loop
+    DGLGraph.remove_self_loop
+    DGLGraph.to_simple
 
-Computing with DGLHeteroGraph
+Adjacency and incidence matrix
+---------------------------------
+
+Methods for getting the adjacency and the incidence matrix of the graph.
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    DGLGraph.adj
+    DGLGraph.adjacency_matrix
+    DGLGraph.inc
+    DGLGraph.incidence_matrix
+
+Computing with DGLGraph
 -----------------------------
 
+Methods for performing message passing, applying functions on node/edge features, etc.
+
 .. autosummary::
     :toctree: ../../generated/
 
-    DGLHeteroGraph.apply_nodes
-    DGLHeteroGraph.apply_edges
-    DGLHeteroGraph.send_and_recv
-    DGLHeteroGraph.pull
-    DGLHeteroGraph.push
-    DGLHeteroGraph.update_all
-    DGLHeteroGraph.multi_update_all
-    DGLHeteroGraph.prop_nodes
-    DGLHeteroGraph.prop_edges
-    DGLHeteroGraph.filter_nodes
-    DGLHeteroGraph.filter_edges
-    DGLHeteroGraph.to
+    DGLGraph.apply_nodes
+    DGLGraph.apply_edges
+    DGLGraph.send_and_recv
+    DGLGraph.pull
+    DGLGraph.push
+    DGLGraph.update_all
+    DGLGraph.multi_update_all
+    DGLGraph.prop_nodes
+    DGLGraph.prop_edges
+    DGLGraph.filter_nodes
+    DGLGraph.filter_edges
+
+Querying batch summary
+---------------------------------
+
+Methods for getting the batching information if the current graph is a batched
+graph generated from :func:`dgl.batch`. They are also widely used in the
+:ref:`api-batch`.
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    DGLGraph.batch_size
+    DGLGraph.batch_num_nodes
+    DGLGraph.batch_num_edges
+
+Mutating topology
+-----------------
+
+Methods for mutating the graph structure *in-place*.
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    DGLGraph.add_nodes
+    DGLGraph.add_edges
+    DGLGraph.remove_nodes
+    DGLGraph.remove_edges
+
+Device Control
+--------------
+
+Methods for getting or changing the device on which the graph is hosted.
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    DGLGraph.to
+    DGLGraph.device
+
+Misc
+----
+
+Other utility methods.
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    DGLGraph.local_scope

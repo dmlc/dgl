@@ -3,16 +3,7 @@
 NN Modules (MXNet)
 ===================
 
-.. contents:: Contents
-    :local:
-
-We welcome your contribution! If you want a model to be implemented in DGL as a NN module,
-please `create an issue <https://github.com/dmlc/dgl/issues>`_ started with "[Feature Request] NN Module XXXModel".
-
-If you want to contribute a NN module, please `create a pull request <https://github.com/dmlc/dgl/pulls>`_ started
-with "[NN] XXXModel in MXNet NN Modules" and our team member would review this PR.
-
-Conv Layers 
+Conv Layers
 ----------------------------------------
 
 .. automodule:: dgl.nn.mxnet.conv
@@ -93,7 +84,7 @@ GMMConv
 .. autoclass:: dgl.nn.mxnet.conv.GMMConv
     :members: forward
     :show-inheritance:
- 
+
 ChebConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -113,7 +104,7 @@ NNConv
 
 .. autoclass:: dgl.nn.mxnet.conv.NNConv
     :members: forward
-    :show-inheritance
+    :show-inheritance:
 
 Dense Conv Layers
 ----------------------------------------
@@ -130,12 +121,12 @@ DenseSAGEConv
 
 .. autoclass:: dgl.nn.mxnet.conv.DenseSAGEConv
     :members: forward
-    :show-inheritance
+    :show-inheritance:
 
 DenseChebConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: dgl.nn.pytorch.conv.DenseChebConv
+.. autoclass:: dgl.nn.mxnet.conv.DenseChebConv
     :members: forward
     :show-inheritance:
 

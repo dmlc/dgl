@@ -71,7 +71,7 @@ udf_reduce = {
 graphs = [
 #    dgl.rand_graph(30, 0),
     dgl.rand_graph(30, 100),
-    dgl.rand_bipartite(30, 40, 300)
+    dgl.rand_bipartite('_U', '_E', '_V', 30, 40, 300)
 ]
 
 spmm_shapes = [

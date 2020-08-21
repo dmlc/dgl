@@ -1,20 +1,18 @@
-"""Classes that involves iterating over nodes or edges in a graph and generates
-computation dependency of necessary nodes with neighborhood sampling methods.
+"""The ``dgl.dataloading`` package contains:
 
-This includes
-
-* :py:class:`~dgl.dataloading.pytorch.NodeDataLoader` for iterating over the nodes in
-  a graph in minibatches.
-
-* :py:class:`~dgl.dataloading.pytorch.EdgeDataLoader` for iterating over the edges in
-  a graph in minibatches.
+* Data loader classes for iterating over a set of nodes or edges in a graph and generates
+  computation dependency via neighborhood sampling methods.
 
 * Various sampler classes that perform neighborhood sampling for multi-layer GNNs.
 
 * Negative samplers for link prediction.
 
-NOTE: this module is experimental and the interfaces may be subject to changes in
-future releases.
+For a holistic explanation on how different components work together.
+Read the user guide :ref:`guide-minibatch`.
+
+.. note::
+    This package is experimental and the interfaces may be subject
+    to changes in future releases. It currently only has implementations in PyTorch.
 """
 from .neighbor import *
 from .dataloader import *

@@ -81,7 +81,7 @@ here, you can enjoy the same convenience on other frameworks by similar usage):
    >>> F.u_mul_e_sum(g, x, y1).shape  # (2,), (4, 2) -> (4, 2)
    torch.Size([3, 4, 2])
 
-For all operators, the input graph could either be a homograph or a bipartite
+For all operators, the input graph could either be a homogeneous or a bipartite
 graph.
 
 .. autosummary::
@@ -228,7 +228,7 @@ The following is an example showing how GSDDMM works:
     copy_u
     copy_v
 
-Like GSpMM, GSDDMM operators support both homograph and bipartite graph.
+Like GSpMM, GSDDMM operators support both homogeneous and bipartite graph.
 
 Edge Softmax module
 -------------------
