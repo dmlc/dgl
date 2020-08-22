@@ -173,7 +173,8 @@ def run(args, device, data):
     model = DistSAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
     if not args.standalone:
-        model = th.nn.parallel.DistributedDataParallel(model)
+        dev_id = g.rank() % 8
+        model = th.nn.parallel.DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
     loss_fcn = nn.CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -277,7 +278,8 @@ def main(args):
         g.rank(), len(train_nid), len(np.intersect1d(train_nid.numpy(), local_nid)),
         len(val_nid), len(np.intersect1d(val_nid.numpy(), local_nid)),
         len(test_nid), len(np.intersect1d(test_nid.numpy(), local_nid))))
-    device = th.device('cuda:0')
+    device = th.device('cuda:' + str(g.rank() % 8))
+    print(device)
     labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
     n_classes = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
     print('#labels:', n_classes)
