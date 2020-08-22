@@ -49,7 +49,6 @@ IdArray MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
   options[METIS_OPTION_NITER] = 1;
   options[METIS_OPTION_NIPARTS] = 1;
   options[METIS_OPTION_DROPEDGES] = 1;
-  options[METIS_OPTION_OBJTYPE] = METIS_OBJTYPE_VOL;
 
   int ret = METIS_PartGraphKway(&nvtxs,      // The number of vertices
                                 &ncon,       // The number of balancing constraints.
@@ -69,7 +68,7 @@ IdArray MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
   LOG(INFO) << "Partition a graph with " << g->NumVertices()
       << " nodes and " << g->NumEdges()
       << " edges into " << k
-      << " parts and the communication volume is " << objval;
+      << " parts and get " << objval << " edge cuts";
   switch (ret) {
     case METIS_OK:
       return part_arr;
