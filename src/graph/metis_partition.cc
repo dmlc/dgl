@@ -49,7 +49,7 @@ IdArray MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
   options[METIS_OPTION_NITER] = 1;
   options[METIS_OPTION_NIPARTS] = 1;
   options[METIS_OPTION_DROPEDGES] = 1;
-  options[METIS OPTION OBJTYPE] = METIS_OBJTYPE_VOL
+  options[METIS_OPTION_OBJTYPE] = METIS_OBJTYPE_VOL;
 
   int ret = METIS_PartGraphKway(&nvtxs,      // The number of vertices
                                 &ncon,       // The number of balancing constraints.
