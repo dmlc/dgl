@@ -2,7 +2,6 @@
 """Multiprocess dataloader for distributed training"""
 import multiprocessing as mp
 from queue import Queue
-import time
 import traceback
 
 from .dist_context import get_sampler_pool
