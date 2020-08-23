@@ -547,6 +547,9 @@ class HeteroGraphIndex(ObjectBase):
         """
         if order is None:
             order = ""
+        elif order not in ['srcdst', 'eid']:
+            raise DGLError("Expect order to be one of None, 'srcdst', 'eid', "
+                           "got {}".format(order))
         edge_array = _CAPI_DGLHeteroEdges(self, int(etype), order)
         src = F.from_dgl_nd(edge_array(0))
         dst = F.from_dgl_nd(edge_array(1))

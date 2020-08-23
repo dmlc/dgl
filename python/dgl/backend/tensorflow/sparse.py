@@ -1,7 +1,10 @@
 import tensorflow as tf
 import numpy as np
 from .tensor import tensor, copy_to, context
+from ...base import is_all, ALL
 from ...sparse import _gspmm, _gsddmm
+
+__all__ = ['gspmm', 'gsddmm', 'edge_softmax']
 
 
 def _scatter_nd(index, src, n_rows):
@@ -92,9 +95,6 @@ def _addsub(op, x):
 
 
 def _expand(x, shape):
-    padding_zeros = len(shape) + 1 - x.ndim
-    if padding_zeros > 0:
-        x = tf.reshape(x, (x.shape[0],) + (1,) * padding_zeros + x.shape[1:])
     return tf.broadcast_to(x, (x.shape[0], *shape))
 
 
@@ -221,3 +221,30 @@ def gsddmm(gidx, op, X, Y, lhs_target='u', rhs_target='v'):
     if Y is None:
         Y = tf.zeros(())
     return _lambda(X, Y)
+
+
+def edge_softmax_real(gidx, score, eids=ALL, norm_by='dst'):
+    if not is_all(eids):
+        gidx = gidx.edge_subgraph(tf.cast(eids, gidx.dtype), True)
+    if norm_by == 'src':
+        gidx = gidx.reverse()
+    score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
+    score = tf.math.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
+    score_sum = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
+    out = _gsddmm(gidx, 'div', score, score_sum, 'e', 'v')
+
+    def edge_softmax_backward(grad_out):
+        sds = out * grad_out
+        accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
+        grad_score = sds - gsddmm(gidx, 'mul', out, accum, 'e', 'v')
+        return grad_score
+
+    return out, edge_softmax_backward
+
+
+def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
+    @tf.custom_gradient
+    def _lambda(logits):
+        return edge_softmax_real(gidx, logits, eids, norm_by)
+    return _lambda(logits)
+

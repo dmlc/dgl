@@ -1,4 +1,5 @@
-from dgl.ops import gspmm, gsddmm
+from dgl.ops import gspmm, gsddmm, edge_softmax
+from test_utils.graph_cases import get_cases
 from utils import parametrize_dtype
 import dgl
 import random
@@ -6,7 +7,6 @@ import pytest
 import networkx as nx
 import backend as F
 import numpy as np 
-from utils import parametrize_dtype
 
 random.seed(42)
 np.random.seed(42)
@@ -71,7 +71,7 @@ udf_reduce = {
 graphs = [
 #    dgl.rand_graph(30, 0),
     dgl.rand_graph(30, 100),
-    dgl.rand_bipartite(30, 40, 300)
+    dgl.rand_bipartite('_U', '_E', '_V', 30, 40, 300)
 ]
 
 spmm_shapes = [
@@ -88,6 +88,10 @@ sddmm_shapes = [
     ((1, 3, 3), (4, 1, 3)),
     ((3,), (3,)),
     ((1,), (1,))
+]
+
+edge_softmax_shapes = [
+    (1,), (1, 3), (3, 4, 5)
 ]
 
 @pytest.mark.parametrize('g', graphs)
@@ -112,9 +116,6 @@ def test_spmm(idtype, g, shp, msg, reducer):
     e = F.attach_grad(F.clone(he))
     with F.record_grad():
         v = gspmm(g, msg, reducer, u, e)
-        non_degree_indices = F.tensor(
-            np.nonzero(F.asnumpy(g.in_degrees()) != 0)[0])
-        v = F.gather_row(v, non_degree_indices)
         if g.number_of_edges() > 0:
             F.backward(F.reduce_sum(v))
             if msg != 'copy_rhs':
@@ -125,7 +126,7 @@ def test_spmm(idtype, g, shp, msg, reducer):
     with F.record_grad():
         g.update_all(udf_msg[msg], udf_reduce[reducer])
         if g.number_of_edges() > 0:
-            v1 = F.gather_row(g.dstdata['v'], non_degree_indices)
+            v1 = g.dstdata['v']
             assert F.allclose(v, v1)
             print('forward passed')
 
@@ -221,6 +222,37 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg, idtype):
     lhs_frame.pop('x')
     rhs_frame.pop('y')
     if 'm' in g.edata: g.edata.pop('m')
+
+@pytest.mark.parametrize('g', get_cases(['clique']))
+@pytest.mark.parametrize('norm_by', ['src', 'dst'])
+@pytest.mark.parametrize('shp', edge_softmax_shapes)
+@parametrize_dtype
+def test_edge_softmax(g, norm_by, shp, idtype):
+    g = g.astype(idtype).to(F.ctx())
+    edata = F.tensor(np.random.rand(g.number_of_edges(), *shp))
+    e1 = F.attach_grad(F.clone(edata))
+
+    with F.record_grad():
+        score1 = edge_softmax(g, e1, norm_by=norm_by)
+        F.backward(F.reduce_sum(score1))
+        grad_edata = F.grad(e1)
+
+    with F.record_grad():
+        e2 = F.attach_grad(F.clone(edata))
+        e2_2d = F.reshape(
+            e2, (g.number_of_src_nodes(), g.number_of_dst_nodes(), *e2.shape[1:]))
+        if norm_by == 'src':
+            score2 = F.softmax(e2_2d, 1)
+            score2 = F.reshape(score2, (-1, *e2.shape[1:]))
+        if norm_by == 'dst':
+            score2 = F.softmax(e2_2d, 0)
+            score2 = F.reshape(score2, (-1, *e2.shape[1:]))
+        assert F.allclose(score1, score2)
+        print('forward passed')
+
+        F.backward(F.reduce_sum(score2))
+        assert F.allclose(F.grad(e2), grad_edata)
+        print('backward passed')
 
 if __name__ == '__main__':
     test_spmm(F.int32, graphs[0], spmm_shapes[5], 'copy_lhs', 'sum')

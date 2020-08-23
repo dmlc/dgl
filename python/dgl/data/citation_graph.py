@@ -19,7 +19,7 @@ from .. import convert
 from .. import batch
 from .. import backend as F
 from ..convert import graph as dgl_graph
-from ..convert import to_networkx
+from ..convert import from_networkx, to_networkx
 
 backend = os.environ.get('DGLBACKEND', 'pytorch')
 
@@ -119,14 +119,14 @@ class CitationGraphDataset(DGLBuiltinDataset):
         test_mask = _sample_mask(idx_test, labels.shape[0])
 
         self._graph = graph
-        g = dgl_graph(graph)
+        g = from_networkx(graph)
 
         g.ndata['train_mask'] = generate_mask_tensor(train_mask)
         g.ndata['val_mask'] = generate_mask_tensor(val_mask)
         g.ndata['test_mask'] = generate_mask_tensor(test_mask)
         g.ndata['label'] = F.tensor(labels)
         g.ndata['feat'] = F.tensor(_preprocess_features(features), dtype=F.data_type_dict['float32'])
-        self._num_labels = onehot_labels.shape[1]
+        self._num_classes = onehot_labels.shape[1]
         self._labels = labels
         self._g = g
 
@@ -135,7 +135,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
             print('  NumNodes: {}'.format(self._g.number_of_nodes()))
             print('  NumEdges: {}'.format(self._g.number_of_edges()))
             print('  NumFeats: {}'.format(self._g.ndata['feat'].shape[1]))
-            print('  NumClasses: {}'.format(self.num_labels))
+            print('  NumClasses: {}'.format(self.num_classes))
             print('  NumTrainingSamples: {}'.format(
                 F.nonzero_1d(self._g.ndata['train_mask']).shape[0]))
             print('  NumValidationSamples: {}'.format(
@@ -161,7 +161,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
         info_path = os.path.join(self.save_path,
                                  self.save_name + '.pkl')
         save_graphs(str(graph_path), self._g)
-        save_info(str(info_path), {'num_labels': self.num_labels})
+        save_info(str(info_path), {'num_classes': self.num_classes})
 
     def load(self):
         graph_path = os.path.join(self.save_path,
@@ -181,7 +181,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
         graph = to_networkx(graph)
         self._graph = nx.DiGraph(graph)
 
-        self._num_labels = info['num_labels']
+        self._num_classes = info['num_classes']
         self._g.ndata['train_mask'] = generate_mask_tensor(self._g.ndata['train_mask'].numpy())
         self._g.ndata['val_mask'] = generate_mask_tensor(self._g.ndata['val_mask'].numpy())
         self._g.ndata['test_mask'] = generate_mask_tensor(self._g.ndata['test_mask'].numpy())
@@ -191,7 +191,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
             print('  NumNodes: {}'.format(self._g.number_of_nodes()))
             print('  NumEdges: {}'.format(self._g.number_of_edges()))
             print('  NumFeats: {}'.format(self._g.ndata['feat'].shape[1]))
-            print('  NumClasses: {}'.format(self.num_labels))
+            print('  NumClasses: {}'.format(self.num_classes))
             print('  NumTrainingSamples: {}'.format(
                 F.nonzero_1d(self._g.ndata['train_mask']).shape[0]))
             print('  NumValidationSamples: {}'.format(
@@ -212,7 +212,12 @@ class CitationGraphDataset(DGLBuiltinDataset):
 
     @property
     def num_labels(self):
-        return self._num_labels
+        deprecate_property('dataset.num_labels', 'dataset.num_classes')
+        return self.num_classes
+
+    @property
+    def num_classes(self):
+        return self._num_classes
 
     """ Citation graph is used in many examples
         We preserve these properties for compatability.
@@ -339,7 +344,7 @@ class CoraGraphDataset(CitationGraphDataset):
 
     Attributes
     ----------
-    num_labels: int
+    num_classes: int
         Number of label classes
     graph: networkx.DiGraph
         Graph structure
@@ -362,7 +367,7 @@ class CoraGraphDataset(CitationGraphDataset):
     --------
     >>> dataset = CoraGraphDataset()
     >>> g = dataset[0]
-    >>> num_class = g.num_labels
+    >>> num_class = g.num_classes
     >>>
     >>> # get node feature
     >>> feat = g.ndata['feat']
@@ -479,7 +484,7 @@ class CiteseerGraphDataset(CitationGraphDataset):
 
     Attributes
     ----------
-    num_labels: int
+    num_classes: int
         Number of label classes
     graph: networkx.DiGraph
         Graph structure
@@ -505,7 +510,7 @@ class CiteseerGraphDataset(CitationGraphDataset):
     --------
     >>> dataset = CiteseerGraphDataset()
     >>> g = dataset[0]
-    >>> num_class = g.num_labels
+    >>> num_class = g.num_classes
     >>>
     >>> # get node feature
     >>> feat = g.ndata['feat']
@@ -622,7 +627,7 @@ class PubmedGraphDataset(CitationGraphDataset):
 
     Attributes
     ----------
-    num_labels: int
+    num_classes: int
         Number of label classes
     graph: networkx.DiGraph
         Graph structure
@@ -789,13 +794,13 @@ class CoraBinary(DGLBuiltinDataset):
             for line in f.readlines():
                 if line.startswith('graph'):
                     if len(elist) != 0:
-                        self.graphs.append(dgl_graph(elist))
+                        self.graphs.append(dgl_graph(tuple(zip(*elist))))
                     elist = []
                 else:
                     u, v = line.strip().split(' ')
                     elist.append((int(u), int(v)))
             if len(elist) != 0:
-                self.graphs.append(dgl_graph(elist))
+                self.graphs.append(dgl_graph(tuple(zip(*elist))))
         with open("{}/pmpds.pkl".format(root), 'rb') as f:
             self.pmpds = _pickle_load(f)
         self.labels = []

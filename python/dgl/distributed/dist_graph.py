@@ -8,8 +8,7 @@ from ..heterograph import DGLHeteroGraph
 from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID
-from .kvstore import KVServer, init_kvstore, get_kvstore
-from .standalone_kvstore import KVClient as SA_KVClient
+from .kvstore import KVServer, get_kvstore
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
 from .partition import load_partition, load_partition_book
@@ -17,6 +16,7 @@ from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
 from .graph_partition_book import NODE_PART_POLICY, EDGE_PART_POLICY
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from . import rpc
+from . import role
 from .server_state import ServerState
 from .rpc_server import start_server
 from .graph_services import find_edges as dist_find_edges
@@ -141,7 +141,7 @@ class NodeDataView(MutableMapping):
             name1 = _get_data_name(name, policy.policy_str)
             dtype, shape, _ = g._client.get_data_meta(name1)
             # We create a wrapper on the existing tensor in the kvstore.
-            self._data[name] = DistTensor(g, shape, dtype, name, part_policy=policy)
+            self._data[name] = DistTensor(shape, dtype, name, part_policy=policy)
 
     def _get_names(self):
         return list(self._data.keys())
@@ -187,7 +187,7 @@ class EdgeDataView(MutableMapping):
             name1 = _get_data_name(name, policy.policy_str)
             dtype, shape, _ = g._client.get_data_meta(name1)
             # We create a wrapper on the existing tensor in the kvstore.
-            self._data[name] = DistTensor(g, shape, dtype, name, part_policy=policy)
+            self._data[name] = DistTensor(shape, dtype, name, part_policy=policy)
 
     def _get_names(self):
         return list(self._data.keys())
@@ -221,9 +221,9 @@ class EdgeDataView(MutableMapping):
 class DistGraphServer(KVServer):
     ''' The DistGraph server.
 
-    This DistGraph server loads the graph data and sets up a service so that clients can read data
-    of a graph partition (graph structure, node data and edge data) from remote machines.
-    A server is responsible for one graph partition.
+    This DistGraph server loads the graph data and sets up a service so that trainers and
+    samplers can read data of a graph partition (graph structure, node data and edge data)
+    from remote machines. A server is responsible for one graph partition.
 
     Currently, each machine runs only one main server with a set of backup servers to handle
     clients' requests. The main server and the backup servers all handle the requests for the same
@@ -240,6 +240,8 @@ class DistGraphServer(KVServer):
         The server ID (start from 0).
     ip_config : str
         Path of IP configuration file.
+    num_servers : int
+        Server count on each machine.
     num_clients : int
         Total number of client nodes.
     part_config : string
@@ -247,10 +249,14 @@ class DistGraphServer(KVServer):
     disable_shared_mem : bool
         Disable shared memory.
     '''
-    def __init__(self, server_id, ip_config, num_clients, part_config, disable_shared_mem=False):
-        super(DistGraphServer, self).__init__(server_id=server_id, ip_config=ip_config,
+    def __init__(self, server_id, ip_config, num_servers,
+                 num_clients, part_config, disable_shared_mem=False):
+        super(DistGraphServer, self).__init__(server_id=server_id,
+                                              ip_config=ip_config,
+                                              num_servers=num_servers,
                                               num_clients=num_clients)
         self.ip_config = ip_config
+        self.num_servers = num_servers
         # Load graph partition data.
         if self.is_backup_server():
             # The backup server doesn't load the graph partition. It'll initialized afterwards.
@@ -285,50 +291,99 @@ class DistGraphServer(KVServer):
         # start server
         server_state = ServerState(kv_store=self, local_g=self.client_g, partition_book=self.gpb)
         print('start graph service on server {} for part {}'.format(self.server_id, self.part_id))
-        start_server(server_id=self.server_id, ip_config=self.ip_config,
+        start_server(server_id=self.server_id,
+                     ip_config=self.ip_config,
+                     num_servers=self.num_servers,
                      num_clients=self.num_clients, server_state=server_state)
 
 class DistGraph:
-    ''' The DistGraph client.
+    '''The class for accessing a distributed graph.
 
-    This provides the graph interface to access the partitioned graph data for distributed GNN
-    training. All data of partitions are loaded by the DistGraph server.
+    This class provides a subset of DGLGraph APIs for accessing partitioned graph data in
+    distributed GNN training and inference. Thus, its main use case is to work with
+    distributed sampling APIs to generate mini-batches and perform forward and
+    backward computation on the mini-batches.
 
-    DistGraph can run in two modes: the standalone mode and the distributed mode.
+    The class can run in two modes: the standalone mode and the distributed mode.
 
-    * When a user runs the training script normally, DistGraph will be in the standalone mode.
-    In this mode, the input graph has to be constructed with only one partition. This mode is
-    used for testing and debugging purpose.
-    * When a user runs the training script with the distributed launch script, DistGraph will
-    be set into the distributed mode. This is used for actual distributed training.
+    * When a user runs the training script normally, ``DistGraph`` will be in the standalone mode.
+      In this mode, the input data must be constructed by
+      :py:meth:`~dgl.distributed.partition.partition_graph` with only one partition. This mode is
+      used for testing and debugging purpose. In this mode, users have to provide ``part_config``
+      so that ``DistGraph`` can load the input graph.
+    * When a user runs the training script with the distributed launch script, ``DistGraph`` will
+      be set into the distributed mode. This is used for actual distributed training. All data of
+      partitions are loaded by the ``DistGraph`` servers, which are created by DGL's launch script.
+      ``DistGraph`` connects with the servers to access the partitioned graph data.
 
-    When running in the distributed mode, `DistGraph` uses shared-memory to access
-    the partition data in the local machine.
-    This gives the best performance for distributed training when we run `DistGraphServer`
-    and `DistGraph` on the same machine. However, a user may want to run them in separate
-    machines. In this case, a user may want to disable shared memory by passing
-    `disable_shared_mem=False` when creating `DistGraphServer`. When shared-memory is disabled,
+    Currently, the ``DistGraph`` servers and clients run on the same set of machines
+    in the distributed mode. ``DistGraph`` uses shared-memory to access the partition data
+    in the local machine. This gives the best performance for distributed training
+
+    Users may want to run ``DistGraph`` servers and clients on separate sets of machines.
+    In this case, a user may want to disable shared memory by passing
+    ``disable_shared_mem=False`` when creating ``DistGraphServer``. When shared memory is disabled,
     a user has to pass a partition book.
 
     Parameters
     ----------
-    ip_config : str
-        Path of IP configuration file.
     graph_name : str
-        The name of the graph. This name has to be the same as the one used in DistGraphServer.
-    gpb : PartitionBook
-        The partition book object
-    part_config : str
-        The partition config file. It's used in the standalone mode.
+        The name of the graph. This name has to be the same as the one used for
+        partitioning a graph in :py:meth:`dgl.distributed.partition.partition_graph`.
+    gpb : GraphPartitionBook, optional
+        The partition book object. Normally, users do not need to provide the partition book.
+        This argument is necessary only when users want to run server process and trainer
+        processes on different machines.
+    part_config : str, optional
+        The path of partition configuration file generated by
+        :py:meth:`dgl.distributed.partition.partition_graph`. It's used in the standalone mode.
+
+    Examples
+    --------
+    The example shows the creation of ``DistGraph`` in the standalone mode.
+
+    >>> dgl.distributed.partition_graph(g, 'graph_name', 1, num_hops=1, part_method='metis',
+                                        out_path='output/', reshuffle=True)
+    >>> g = dgl.distributed.DistGraph('graph_name', part_config='output/graph_name.json')
+
+    The example shows the creation of ``DistGraph`` in the distributed mode.
+
+    >>> g = dgl.distributed.DistGraph('graph-name')
+
+    The code below shows the mini-batch training using ``DistGraph``.
+
+    >>> def sample(seeds):
+    ...     seeds = th.LongTensor(np.asarray(seeds))
+    ...     frontier = dgl.distributed.sample_neighbors(g, seeds, 10)
+    ...     return dgl.to_block(frontier, seeds)
+    >>> dataloader = dgl.distributed.DistDataLoader(dataset=nodes, batch_size=1000,
+                                                    collate_fn=sample, shuffle=True)
+    >>> for block in dataloader:
+    ...     feat = g.ndata['features'][block.srcdata[dgl.NID]]
+    ...     labels = g.ndata['labels'][block.dstdata[dgl.NID]]
+    ...     pred = model(block, feat)
+
+    Note
+    ----
+    ``DistGraph`` currently only supports graphs with only one node type and one edge type.
+    For heterogeneous graphs, users need to convert them into DGL graphs with one node type and
+    one edge type and store the actual node types and edge types as node data and edge data.
+
+    Note
+    ----
+    DGL's distributed training by default runs server processes and trainer processes on the same
+    set of machines. If users need to run them on different sets of machines, it requires
+    manually setting up servers and trainers. The setup is not fully tested yet.
     '''
-    def __init__(self, ip_config, graph_name, gpb=None, part_config=None):
-        self.ip_config = ip_config
+    def __init__(self, graph_name, gpb=None, part_config=None):
         self.graph_name = graph_name
         self._gpb_input = gpb
         if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
             assert part_config is not None, \
                     'When running in the standalone model, the partition config file is required'
-            self._client = SA_KVClient()
+            self._client = get_kvstore()
+            assert self._client is not None, \
+                    'Distributed module is not initialized. Please call dgl.distributed.initialize.'
             # Load graph partition data.
             g, node_feats, edge_feats, self._gpb, _ = load_partition(part_config, 0)
             assert self._gpb.num_partitions() == 1, \
@@ -340,6 +395,7 @@ class DistGraph:
                 self._client.add_data(_get_data_name(name, NODE_PART_POLICY), node_feats[name])
             for name in edge_feats:
                 self._client.add_data(_get_data_name(name, EDGE_PART_POLICY), edge_feats[name])
+            self._client.map_shared_data(self._gpb)
             rpc.set_num_client(1)
         else:
             self._init()
@@ -360,10 +416,9 @@ class DistGraph:
             self._num_edges += int(part_md['num_edges'])
 
     def _init(self):
-        # Init KVStore client if it's not initialized yet.
-        init_kvstore(self.ip_config)
         self._client = get_kvstore()
-
+        assert self._client is not None, \
+                'Distributed module is not initialized. Please call dgl.distributed.initialize.'
         self._g = _get_graph_from_shared_mem(self.graph_name)
         self._gpb = get_shared_mem_partition_book(self.graph_name, self._g)
         if self._gpb is None:
@@ -371,10 +426,10 @@ class DistGraph:
         self._client.map_shared_data(self._gpb)
 
     def __getstate__(self):
-        return self.ip_config, self.graph_name, self._gpb_input
+        return self.graph_name, self._gpb
 
     def __setstate__(self, state):
-        self.ip_config, self.graph_name, self._gpb_input = state
+        self.graph_name, self._gpb_input = state
         self._init()
 
         self._ndata = NodeDataView(self)
@@ -391,11 +446,12 @@ class DistGraph:
 
         DistGraph provides a global view of the distributed graph. Internally,
         it may contains a partition of the graph if it is co-located with
-        the server. If there is no co-location, this returns None.
+        the server. When servers and clients run on separate sets of machines,
+        this returns None.
 
         Returns
         -------
-        DGLHeterograph
+        DGLGraph
             The local partition
         '''
         return self._g
@@ -423,6 +479,43 @@ class DistGraph:
         return self._edata
 
     @property
+    def idtype(self):
+        """The dtype of graph index
+
+        Returns
+        -------
+        backend dtype object
+            th.int32/th.int64 or tf.int32/tf.int64 etc.
+
+        See Also
+        --------
+        long
+        int
+        """
+        return self._g.idtype
+
+    @property
+    def device(self):
+        """Get the device context of this graph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
+        >>> print(g.device)
+        device(type='cpu')
+        >>> g = g.to('cuda:0')
+        >>> print(g.device)
+        device(type='cuda', index=0)
+
+        Returns
+        -------
+        Device context object
+        """
+        return self._g.device
+
+    @property
     def ntypes(self):
         """Return the list of node types of this graph.
 
@@ -433,7 +526,7 @@ class DistGraph:
         Examples
         --------
 
-        >>> g = DistGraph("ip_config.txt", "test")
+        >>> g = DistGraph("test")
         >>> g.ntypes
         ['_U']
         """
@@ -451,7 +544,7 @@ class DistGraph:
         Examples
         --------
 
-        >>> g = DistGraph("ip_config.txt", "test")
+        >>> g = DistGraph("test")
         >>> g.etypes
         ['_E']
         """
@@ -459,49 +552,111 @@ class DistGraph:
         return ['_E']
 
     def number_of_nodes(self):
-        """Return the number of nodes"""
-        return self._num_nodes
+        """Alias of :func:`num_nodes`"""
+        return self.num_nodes()
 
     def number_of_edges(self):
-        """Return the number of edges"""
+        """Alias of :func:`num_edges`"""
+        return self.num_edges()
+
+    def num_nodes(self):
+        """Return the total number of nodes in the distributed graph.
+
+        Returns
+        -------
+        int
+            The number of nodes
+
+        Examples
+        --------
+        >>> g = dgl.distributed.DistGraph('ogb-product')
+        >>> print(g.num_nodes())
+        2449029
+        """
+        return self._num_nodes
+
+    def num_edges(self):
+        """Return the total number of edges in the distributed graph.
+
+        Returns
+        -------
+        int
+            The number of edges
+
+        Examples
+        --------
+        >>> g = dgl.distributed.DistGraph('ogb-product')
+        >>> print(g.num_edges())
+        123718280
+        """
         return self._num_edges
 
     def node_attr_schemes(self):
-        """Return the node feature and embedding schemes."""
+        """Return the node feature schemes.
+
+        Each feature scheme is a named tuple that stores the shape and data type
+        of the node feature.
+
+        Returns
+        -------
+        dict of str to schemes
+            The schemes of node feature columns.
+
+        Examples
+        --------
+        The following uses PyTorch backend.
+
+        >>> g.node_attr_schemes()
+        {'h': Scheme(shape=(4,), dtype=torch.float32)}
+
+        See Also
+        --------
+        edge_attr_schemes
+        """
         schemes = {}
         for key in self.ndata:
             schemes[key] = infer_scheme(self.ndata[key])
         return schemes
 
     def edge_attr_schemes(self):
-        """Return the edge feature and embedding schemes."""
+        """Return the edge feature schemes.
+
+        Each feature scheme is a named tuple that stores the shape and data type
+        of the edge feature.
+
+        Returns
+        -------
+        dict of str to schemes
+            The schemes of edge feature columns.
+
+        Examples
+        --------
+        The following uses PyTorch backend.
+
+        >>> g.edge_attr_schemes()
+        {'h': Scheme(shape=(4,), dtype=torch.float32)}
+
+        See Also
+        --------
+        node_attr_schemes
+        """
         schemes = {}
         for key in self.edata:
             schemes[key] = infer_scheme(self.edata[key])
         return schemes
 
     def rank(self):
-        ''' The rank of the distributed graph store.
+        ''' The rank of the current DistGraph.
+
+        This returns a unique number to identify the DistGraph object among all of
+        the client processes.
 
         Returns
         -------
         int
-            The rank of the current graph store.
+            The rank of the current DistGraph.
         '''
-        # If DistGraph doesn't have a local partition, it doesn't matter what rank
-        # it returns. There is no data locality any way, as long as the returned rank
-        # is unique in the system.
-        if self._g is None:
-            return rpc.get_rank()
-        else:
-            # If DistGraph has a local partition, we should be careful about the rank
-            # we return. We need to return a rank that node_split or edge_split can split
-            # the workload with respect to data locality.
-            num_client = rpc.get_num_client()
-            num_client_per_part = num_client // self._gpb.num_partitions()
-            # all ranks of the clients in the same machine are in a contiguous range.
-            client_id_in_part = rpc.get_rank() % num_client_per_part
-            return int(self._gpb.partid * num_client_per_part + client_id_in_part)
+        return role.get_global_rank()
 
     def find_edges(self, edges):
         """ Given an edge ID array, return the source
@@ -528,14 +683,15 @@ class DistGraph:
         Returns
         -------
         GraphPartitionBook
-            Object that stores all kinds of partition information.
+            Object that stores all graph partition information.
         """
         return self._gpb
 
     def barrier(self):
         '''Barrier for all client nodes.
 
-        This API will be blocked untill all the clients invoke this API.
+        This API blocks the current process untill all the clients invoke this API.
+        Please use this API with caution.
         '''
         self._client.barrier()
 
@@ -590,10 +746,12 @@ def _get_overlap(mask_arr, ids):
 def _split_local(partition_book, rank, elements, local_eles):
     ''' Split the input element list with respect to data locality.
     '''
-    num_clients = rpc.get_num_client()
+    num_clients = role.get_num_trainers()
     num_client_per_part = num_clients // partition_book.num_partitions()
     if rank is None:
-        rank = rpc.get_rank()
+        rank = role.get_trainer_rank()
+    assert rank < num_clients, \
+            'The input rank ({}) is incorrect. #Trainers: {}'.format(rank, num_clients)
     # all ranks of the clients in the same machine are in a contiguous range.
     client_id_in_part = rank  % num_client_per_part
     local_eles = _get_overlap(elements, local_eles)
@@ -609,11 +767,14 @@ def _split_local(partition_book, rank, elements, local_eles):
 def _split_even(partition_book, rank, elements):
     ''' Split the input element list evenly.
     '''
-    num_clients = rpc.get_num_client()
+    num_clients = role.get_num_trainers()
     num_client_per_part = num_clients // partition_book.num_partitions()
-    if rank is None:
-        rank = rpc.get_rank()
     # all ranks of the clients in the same machine are in a contiguous range.
+    if rank is None:
+        rank = role.get_trainer_rank()
+    assert rank < num_clients, \
+            'The input rank ({}) is incorrect. #Trainers: {}'.format(rank, num_clients)
+    # This conversion of rank is to make the new rank aligned with partitioning.
     client_id_in_part = rank  % num_client_per_part
     rank = client_id_in_part + num_client_per_part * partition_book.partid
 
@@ -656,17 +817,19 @@ def node_split(nodes, partition_book=None, rank=None, force_even=True):
     returns a subset of nodes for the local rank. This method is used for
     dividing workloads for distributed training.
 
-    The input nodes can be stored as a vector of masks. The length of the vector is
+    The input nodes are stored as a vector of masks. The length of the vector is
     the same as the number of nodes in a graph; 1 indicates that the vertex in
     the corresponding location exists.
 
     There are two strategies to split the nodes. By default, it splits the nodes
     in a way to maximize data locality. That is, all nodes that belong to a process
     are returned. If `force_even` is set to true, the nodes are split evenly so
-    that each process gets almost the same number of nodes. The current implementation
-    can still enable data locality when a graph is partitioned with range partitioning.
+    that each process gets almost the same number of nodes.
+
+    When `force_even` is True, the data locality is still preserved if a graph is partitioned
+    with Metis and the node/edge IDs are shuffled.
     In this case, majority of the nodes returned for a process are the ones that
-    belong to the process. If range partitioning is not used, data locality isn't guaranteed.
+    belong to the process. If node/edge IDs are not shuffled, data locality is not guaranteed.
 
     Parameters
     ----------
@@ -714,10 +877,12 @@ def edge_split(edges, partition_book=None, rank=None, force_even=True):
     There are two strategies to split the edges. By default, it splits the edges
     in a way to maximize data locality. That is, all edges that belong to a process
     are returned. If `force_even` is set to true, the edges are split evenly so
-    that each process gets almost the same number of edges. The current implementation
-    can still enable data locality when a graph is partitioned with range partitioning.
-    In this case, majority of the edges returned for a process are the ones that
-    belong to the process. If range partitioning is not used, data locality isn't guaranteed.
+    that each process gets almost the same number of edges.
+
+    When `force_even` is True, the data locality is still preserved if a graph is partitioned
+    with Metis and the node/edge IDs are shuffled.
+    In this case, majority of the nodes returned for a process are the ones that
+    belong to the process. If node/edge IDs are not shuffled, data locality is not guaranteed.
 
     Parameters
     ----------

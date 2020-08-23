@@ -109,7 +109,7 @@ class SAGE(nn.Module):
                 end = start + batch_size
                 batch_nodes = nodes[start:end]
                 block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
-                block = block.to(device)
+                block = block.int().to(device)
                 induced_nodes = block.srcdata[dgl.NID]
 
                 h = x[induced_nodes].to(device)
@@ -188,7 +188,7 @@ def load_subtensor(g, labels, blocks, hist_blocks, dev_id, aggregation_on_device
             hist_block = hist_block.to(dev_id)
         hist_block.update_all(fn.copy_u('hist', 'm'), fn.mean('m', 'agg_hist'))
 
-        block = block.to(dev_id)
+        block = block.int().to(dev_id)
         if not aggregation_on_device:
             hist_block = hist_block.to(dev_id)
         block.dstdata['agg_hist'] = hist_block.dstdata['agg_hist']
@@ -220,8 +220,8 @@ def run(args, dev_id, data):
 
     # Unpack data
     train_mask, val_mask, in_feats, labels, n_classes, g = data
-    train_nid = train_mask.nonzero()[:, 0]
-    val_nid = val_mask.nonzero()[:, 0]
+    train_nid = train_mask.nonzero().squeeze()
+    val_nid = val_mask.nonzero().squeeze()
 
     # Create sampler
     sampler = NeighborSampler(g, [int(_) for _ in args.fan_out.split(',')])

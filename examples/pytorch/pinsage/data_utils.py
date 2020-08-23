@@ -2,46 +2,31 @@ import torch
 import dgl
 import numpy as np
 import scipy.sparse as ssp
+import tqdm
+import dask.dataframe as dd
 
 # This is the train-test split method most of the recommender system papers running on MovieLens
 # takes.  It essentially follows the intuition of "training on the past and predict the future".
 # One can also change the threshold to make validation and test set take larger proportions.
-def train_test_split_by_time(g, column, etype, itype):
-    n_edges = g.number_of_edges(etype)
-    with g.local_scope():
-        def splits(edges):
-            num_edges, count = edges.data['train_mask'].shape
-
-            # sort by timestamp
-            _, sorted_idx = edges.data[column].sort(1)
-
-            train_mask = edges.data['train_mask']
-            val_mask = edges.data['val_mask']
-            test_mask = edges.data['test_mask']
-
-            x = torch.arange(num_edges)
-
-            # If one user has more than one interactions, select the latest one for test.
-            if count > 1:
-                train_mask[x, sorted_idx[:, -1]] = False
-                test_mask[x, sorted_idx[:, -1]] = True
-            # If one user has more than two interactions, select the second latest one for validation.
-            if count > 2:
-                train_mask[x, sorted_idx[:, -2]] = False
-                val_mask[x, sorted_idx[:, -2]] = True
-            return {'train_mask': train_mask, 'val_mask': val_mask, 'test_mask': test_mask}
-
-        g.edges[etype].data['train_mask'] = torch.ones(n_edges, dtype=torch.bool)
-        g.edges[etype].data['val_mask'] = torch.zeros(n_edges, dtype=torch.bool)
-        g.edges[etype].data['test_mask'] = torch.zeros(n_edges, dtype=torch.bool)
-        g.nodes[itype].data['count'] = g.in_degrees(etype=etype)
-        g.group_apply_edges('src', splits, etype=etype)
-
-        train_indices = g.filter_edges(lambda edges: edges.data['train_mask'], etype=etype)
-        val_indices = g.filter_edges(lambda edges: edges.data['val_mask'], etype=etype)
-        test_indices = g.filter_edges(lambda edges: edges.data['test_mask'], etype=etype)
-
-    return train_indices, val_indices, test_indices
+def train_test_split_by_time(df, timestamp, user):
+    df['train_mask'] = np.ones((len(df),), dtype=np.bool)
+    df['val_mask'] = np.zeros((len(df),), dtype=np.bool)
+    df['test_mask'] = np.zeros((len(df),), dtype=np.bool)
+    df = dd.from_pandas(df, npartitions=10)
+    def train_test_split(df):
+        df = df.sort_values([timestamp])
+        if df.shape[0] > 1:
+            df.iloc[-1, -3] = False
+            df.iloc[-1, -1] = True
+        if df.shape[0] > 2:
+            df.iloc[-2, -3] = False
+            df.iloc[-2, -2] = True
+        return df
+    df = df.groupby(user, group_keys=False).apply(train_test_split).compute(scheduler='processes').sort_index()
+    print(df[df[user] == df[user].unique()[0]].sort_values(timestamp))
+    return df['train_mask'].to_numpy().nonzero()[0], \
+           df['val_mask'].to_numpy().nonzero()[0], \
+           df['test_mask'].to_numpy().nonzero()[0]
 
 def build_train_graph(g, train_indices, utype, itype, etype, etype_rev):
     train_g = g.edge_subgraph(

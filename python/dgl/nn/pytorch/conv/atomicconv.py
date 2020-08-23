@@ -5,7 +5,11 @@ import torch as th
 import torch.nn as nn
 
 class RadialPooling(nn.Module):
-    r"""Radial pooling from paper `Atomic Convolutional Networks for
+    r"""
+
+    Description
+    -----------
+    Radial pooling from paper `Atomic Convolutional Networks for
     Predicting Protein-Ligand Binding Affinity <https://arxiv.org/abs/1703.10603>`__.
 
     We denote the distance between atom :math:`i` and :math:`j` by :math:`r_{ij}`.
@@ -53,7 +57,11 @@ class RadialPooling(nn.Module):
             rbf_kernel_scaling.reshape(-1, 1, 1), requires_grad=True)
 
     def forward(self, distances):
-        """Apply the layer to transform edge distances.
+        """
+
+        Description
+        -----------
+        Apply the layer to transform edge distances.
 
         Parameters
         ----------
@@ -81,7 +89,11 @@ class RadialPooling(nn.Module):
         return rbf_kernel_results * cutoff_values
 
 def msg_func(edges):
-    """Send messages along edges.
+    """
+
+    Description
+    -----------
+    Send messages along edges.
 
     Parameters
     ----------
@@ -99,7 +111,11 @@ def msg_func(edges):
         'ij,ik->ijk', edges.src['hv'], edges.data['he']).view(len(edges), -1)}
 
 def reduce_func(nodes):
-    """Collect messages and update node representations.
+    """
+
+    Description
+    -----------
+    Collect messages and update node representations.
 
     Parameters
     ----------
@@ -116,10 +132,14 @@ def reduce_func(nodes):
     return {'hv_new': nodes.mailbox['m'].sum(1)}
 
 class AtomicConv(nn.Module):
-    r"""Atomic Convolution Layer from paper `Atomic Convolutional Networks for
+    r"""
+
+    Description
+    -----------
+    Atomic Convolution Layer from paper `Atomic Convolutional Networks for
     Predicting Protein-Ligand Binding Affinity <https://arxiv.org/abs/1703.10603>`__.
 
-    We denote the type of atom :math:`i` by :math:`z_i` and the distance between atom
+    Denoting the type of atom :math:`i` by :math:`z_i` and the distance between atom
     :math:`i` and :math:`j` by :math:`r_{ij}`.
 
     **Distance Transformation**
@@ -155,20 +175,7 @@ class AtomicConv(nn.Module):
     .. math::
         p_{i, t}^{k} = \sum_{j\in N(i)} e_{ij}^{k} * 1(z_j == t)
 
-    We concatenate the results for all RBF kernels and atom types.
-
-    Notes
-    -----
-
-    * This convolution operation is designed for molecular graphs in Chemistry, but it might
-      be possible to extend it to more general graphs.
-
-    * There seems to be an inconsistency about the definition of :math:`e_{ij}^{k}` in the
-      paper and the author's implementation. We follow the author's implementation. In the
-      paper, :math:`e_{ij}^{k}` was defined as
-      :math:`\exp(-\gamma_{k}|r_{ij}-r_{k}|^2 * f_{ij}^{k})`.
-
-    * :math:`\gamma_{k}`, :math:`r_k` and :math:`c_k` are all learnable.
+    Then concatenate the results for all RBF kernels and atom types.
 
     Parameters
     ----------
@@ -183,6 +190,42 @@ class AtomicConv(nn.Module):
     features_to_use : None or float tensor of shape (T)
         In the original paper, these are atomic numbers to consider, representing the types
         of atoms. T for the number of types of atomic numbers. Default to None.
+
+    Note
+    ----
+
+    * This convolution operation is designed for molecular graphs in Chemistry, but it might
+      be possible to extend it to more general graphs.
+
+    * There seems to be an inconsistency about the definition of :math:`e_{ij}^{k}` in the
+      paper and the author's implementation. We follow the author's implementation. In the
+      paper, :math:`e_{ij}^{k}` was defined as
+      :math:`\exp(-\gamma_{k}|r_{ij}-r_{k}|^2 * f_{ij}^{k})`.
+
+    * :math:`\gamma_{k}`, :math:`r_k` and :math:`c_k` are all learnable.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> from dgl.nn import AtomicConv
+
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 1)
+    >>> edist = th.ones(6, 1)
+    >>> interaction_cutoffs = th.ones(3).float() * 2
+    >>> rbf_kernel_means = th.ones(3).float()
+    >>> rbf_kernel_scaling = th.ones(3).float()
+    >>> conv = AtomicConv(interaction_cutoffs, rbf_kernel_means, rbf_kernel_scaling)
+    >>> res = conv(g, feat, edist)
+    >>> res
+    tensor([[0.5000, 0.5000, 0.5000],
+                [0.5000, 0.5000, 0.5000],
+                [0.5000, 0.5000, 0.5000],
+                [1.0000, 1.0000, 1.0000],
+                [0.5000, 0.5000, 0.5000],
+                [0.0000, 0.0000, 0.0000]], grad_fn=<ViewBackward>)
     """
     def __init__(self, interaction_cutoffs, rbf_kernel_means,
                  rbf_kernel_scaling, features_to_use=None):
@@ -199,23 +242,27 @@ class AtomicConv(nn.Module):
             self.features_to_use = nn.Parameter(features_to_use, requires_grad=False)
 
     def forward(self, graph, feat, distances):
-        """Apply the atomic convolution layer.
+        """
+
+        Description
+        -----------
+        Apply the atomic convolution layer.
 
         Parameters
         ----------
         graph : DGLGraph
             Topology based on which message passing is performed.
-        feat : Float32 tensor of shape (V, 1)
+        feat : Float32 tensor of shape :math:`(V, 1)`
             Initial node features, which are atomic numbers in the paper.
-            V for the number of nodes.
-        distances : Float32 tensor of shape (E, 1)
+            :math:`V` for the number of nodes.
+        distances : Float32 tensor of shape :math:`(E, 1)`
             Distance between end nodes of edges. E for the number of edges.
 
         Returns
         -------
-        Float32 tensor of shape (V, K * T)
-            Updated node representations. V for the number of nodes, K for the
-            number of radial filters, and T for the number of types of atomic numbers.
+        Float32 tensor of shape :math:`(V, K * T)`
+            Updated node representations. :math:`V` for the number of nodes, :math:`K` for the
+            number of radial filters, and :math:`T` for the number of types of atomic numbers.
         """
         with graph.local_scope():
             radial_pooled_values = self.radial_pooling(distances)                # (K, E, 1)

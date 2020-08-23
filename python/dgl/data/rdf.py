@@ -300,10 +300,10 @@ class RDFGraphDataset(DGLBuiltinDataset):
         # convert to heterograph
         if self.verbose:
             print('Convert to heterograph ...')
-        hg = dgl.to_hetero(g,
-                           ntypes,
-                           etypes,
-                           metagraph=mg)
+        hg = dgl.to_heterogeneous(g,
+                                  ntypes,
+                                  etypes,
+                                  metagraph=mg)
         if self.verbose:
             print('#Node types:', len(hg.ntypes))
             print('#Canonical edge types:', len(hg.etypes))

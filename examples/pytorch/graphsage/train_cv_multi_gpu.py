@@ -262,11 +262,11 @@ def run(proc_id, n_gpus, args, devices, data):
 
     # Unpack data
     train_mask, val_mask, in_feats, labels, n_classes, g = data
-    train_nid = train_mask.nonzero()[:, 0]
-    val_nid = val_mask.nonzero()[:, 0]
+    train_nid = train_mask.nonzero().squeeze()
+    val_nid = val_mask.nonzero().squeeze()
 
     # Split train_nid
-    train_nid = th.split(train_nid, math.ceil(len(train_nid) // n_gpus))[proc_id]
+    train_nid = th.split(train_nid, math.ceil(len(train_nid) / n_gpus))[proc_id]
 
     # Create sampler
     sampler = NeighborSampler(g, [int(_) for _ in args.fan_out.split(',')])

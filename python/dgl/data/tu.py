@@ -79,7 +79,6 @@ class LegacyTUDataset(DGLBuiltinDataset):
         self.hidden_size = hidden_size
         self.max_allow_node = max_allow_node
         self.use_pandas = use_pandas
-        self.hash = abs(hash((name, use_pandas, hidden_size, max_allow_node)))
         super(LegacyTUDataset, self).__init__(name=name, url=url, raw_dir=raw_dir,
                                               hash_key=(name, use_pandas, hidden_size, max_allow_node),
                                               force_reload=force_reload, verbose=verbose)
@@ -100,7 +99,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
         DS_graph_labels = self._idx_from_zero(
             np.genfromtxt(self._file_path("graph_labels"), dtype=int))
 
-        g = dgl_graph([])
+        g = dgl_graph(([], []))
         g.add_nodes(int(DS_edge_list.max()) + 1)
         g.add_edges(DS_edge_list[:, 0], DS_edge_list[:, 1])
 
@@ -296,7 +295,7 @@ class TUDataset(DGLBuiltinDataset):
         DS_graph_labels = self._idx_from_zero(
             loadtxt(self._file_path("graph_labels"), delimiter=",").astype(int))
 
-        g = dgl_graph([])
+        g = dgl_graph(([], []))
         g.add_nodes(int(DS_edge_list.max()) + 1)
         g.add_edges(DS_edge_list[:, 0], DS_edge_list[:, 1])
 
