@@ -5,7 +5,6 @@ User Guide
   :maxdepth: 2
   :titlesonly:
 
-  preface
   graph
   message
   nn
