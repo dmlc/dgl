@@ -9,9 +9,15 @@ import requests
 import pickle
 import errno
 import numpy as np
+import scipy.sparse as sp
 
-import pickle
-import errno
+try:
+    import spacy
+    from sklearn.preprocessing import LabelBinarizer
+    from sklearn.preprocessing import MultiLabelBinarizer
+except ImportError:
+    pass
+
 
 from .graph_serialize import save_graphs, load_graphs, load_labels
 from .tensor_serialize import save_tensors, load_tensors
@@ -350,3 +356,332 @@ class Subset(object):
             Number of datapoints in the subset
         """
         return len(self.indices)
+
+################### Feature Processing #######################
+
+def row_normalize(features):
+    mx = sp.csr_matrix(features, dtype=np.float32)
+
+    """Row-normalize sparse matrix"""
+    rowsum = np.array(mx.sum(1))
+    r_inv = np.power(rowsum, -1).flatten()
+    r_inv[np.isinf(r_inv)] = 0.
+    r_mat_inv = sp.diags(r_inv)
+    mx = r_mat_inv.dot(mx)
+    return np.array(mx.todense())
+
+def col_normalize(features):
+    mx = sp.csr_matrix(features, dtype=np.float32)
+
+    colsum = np.array(mx.sum(0))
+    c_inv = np.power(colsum, -1).flatten()
+    c_inv[np.isinf(c_inv)] = 0.
+    c_mat_inv = sp.diags(c_inv).transpose()
+    mx = mx.dot(c_mat_inv)
+    return np.array(mx.todense())
+
+def float_row_l1_normalize(features):
+    rowsum = np.sum(np.abs(features), axis=1)
+    r_inv = np.power(rowsum, -1).reshape(-1,1)
+    r_inv[np.isinf(r_inv)] = 0.
+    return features * r_inv
+
+def float_col_l1_normalize(features):
+    colsum = np.sum(np.abs(features), axis=0)
+    c_inv = np.power(colsum, -1)
+    c_inv[np.isinf(c_inv)] = 0.
+    return features * c_inv
+
+def embed_word2vec(str_val, nlps):
+    """ Use NLP encoder to encode the string into vector
+
+    There can be multiple NLP encoders in nlps. Each encoder
+    is invoded to generate a embedding for the input string and
+    the resulting embeddings are concatenated.
+
+    Parameters
+    ----------
+    str_val : str
+        words to encode
+
+    nlps : list of func
+        a list of nlp encoder functions
+    """
+    vector = None
+    for nlp in nlps:
+        doc = nlp(str_val)
+        if vector is None:
+            vector = doc.vector
+        else:
+            vector = np.concatenate((vector, doc.vector))
+    return vector
+
+def parse_lang_feat(str_feats, nlps, verbose=False):
+    """ Parse a list of strings using word2vec encoding using NLP encoders in nlps
+
+    Parameters
+    ----------
+    str_feats : list of str
+        list of strings to encode
+
+    nlps : list of func
+        a list of nlp encoder functions
+
+    verbose : bool, optional
+        print out debug info
+        Default: False
+
+    Return
+    ------
+    numpy.array
+        the encoded features
+    """
+    features = []
+    num_feats = len(str_feats)
+    num_process = 8 # TODO(xiangsx) get system nproc
+    batch_size = (num_feats + num_process - 1) // num_process
+
+    def embed_lang(d, proc_idx, feats):
+        res_feats = []
+        for feat in feats:
+            res_feats.append(embed_word2vec(feat, nlps))
+        d[proc_idx] = res_feats
+
+    # use multi process to process the feature
+    manager = Manager()
+    d = manager.dict()
+    job=[]
+    for i in range(num_process):
+        sub_info = str_feats[i * batch_size : (i+1) * batch_size \
+                         if (i+1) * batch_size < num_feats else num_feats]
+        job.append(Process(target=embed_lang, args=(d, i, sub_info)))
+
+    for p in job:
+        p.start()
+
+    for p in job:
+        p.join()
+
+    for i in range(num_process):
+        if len(d[i]) > 0:
+            features.append(d[i])
+
+    features = np.concatenate(features)
+    if verbose:
+        print(features.shape)
+
+    return features
+
+def parse_word2vec_node_feature(str_feats, langs, verbose=False):
+    """ Parse a list of strings using word2vec encoding using NLP encoders in nlps
+
+    Parameters
+    ----------
+    str_feats : list of str
+        list of strings to encode
+
+    nlps : list of func
+        a list of nlp encoder functions
+
+    verbose : bool, optional
+        print out debug info
+        Default: False
+
+    Return
+    ------
+    numpy.array
+        the encoded features
+    """
+    import spacy
+
+    nlps = []
+    for lang in langs:
+        nlp = spacy.load(lang)
+        nlps.append(nlp)
+
+    return parse_lang_feat(str_feats, nlps, verbose)
+
+def parse_category_single_feat(category_inputs, norm=None):
+    """ Parse categorical features and convert it into onehot encoding.
+
+    Each entity of category_inputs should only contain only one category.
+
+    Parameters
+    ----------
+    category_inputs : list of str
+        input categorical features
+    norm: str, optional
+        Which kind of normalization is applied to the features.
+        Supported normalization ops include:
+
+        (1) None, do nothing.
+        (2) `col`, column-based normalization. Normalize the data
+        for each column:
+
+        .. math::
+            x_{ij} = \frac{x_{ij}}{\sum_{i=0}^N{x_{ij}}}
+
+        (3) `row`, sane as None
+
+    Note
+    ----
+    sklearn.preprocessing.LabelBinarizer is used to convert
+    categorical features into a onehot encoding format.
+
+    Return
+    ------
+    numpy.array
+        The features in numpy array
+    """
+    lb = LabelBinarizer()
+    feat = lb.fit_transform(category_inputs)
+
+    # if there are only 2 catebories,
+    # fit_transform only create a array of [0, 1, ...]
+    if feat.shape[1] == 2:
+        f = np.zeros(feat.shape[0], 2)
+        f[feat] = 1.
+        feat = f
+
+    if norm == 'col':
+        return col_normalize(feat)
+    else:
+        return feat
+
+def parse_category_multi_feat(category_inputs, norm=None):
+    """ Parse categorical features and convert it into multi-hot encoding.
+
+    Each entity of category_inputs may contain multiple categorical labels.
+    It uses multi-hot encoding to encode these labels.
+
+    Parameters
+    ----------
+    category_inputs : list of list of str
+        input categorical features
+    norm: str, optional
+        Which kind of normalization is applied to the features.
+        Supported normalization ops include:
+
+        (1) None, do nothing.
+        (2) `col`, column-based normalization. Normalize the data
+        for each column:
+
+        .. math::
+            x_{ij} = \frac{x_{ij}}{\sum_{i=0}^N{x_{ij}}}
+
+        (3) `row`, row-based normalization. Normalize the data for
+        each row:
+
+        .. math::
+            x_{ij} = \frac{x_{ij}}{\sum_{j=0}^N{x_{ij}}}
+
+        Default: None
+
+    Note
+    ----
+    sklearn.preprocessing.MultiLabelBinarizer is used to convert
+    categorical features into a multilabel format.
+
+    Return
+    ------
+    numpy.array
+        The features in numpy array
+    """
+    mlb = MultiLabelBinarizer()
+    feat = mlb.fit_transform(category_inputs)
+
+    if norm == 'col':
+        return col_normalize(feat)
+    if norm == 'row':
+        return row_normalize(feat)
+    else:
+        return feat
+
+def parse_numerical_feat(numerical_inputs, norm=None):
+    """ Parse numerical features.
+
+    Parameters
+    ----------
+    numerical_inputs : list of float or list of list of float
+        input numerical features
+    norm: str, optional
+        Which kind of normalization is applied to the features.
+        Supported normalization ops include:
+
+        (1) None, do nothing.
+        (2) `col`, column-based normalization. Normalize the data
+        for each column:
+
+        .. math::
+            x_{ij} = \frac{x_{ij}}{\sum_{i=0}^N{|x_{ij}|}}
+
+        (3) `row`, sane as None
+
+    Return
+    ------
+    numpy.array
+        The features in numpy array
+    """
+    feat = np.array(feat, dtype='float')
+
+    if norm == 'col':
+        return float_col_l1_normalize(feat)
+    else:
+        return feat
+
+def parse_numerical_onehot_feat(input_feats, low, high, bucket_cnt, window_size, norm=None):
+    r""" Parse numerical features by matching them into
+        different buckets.
+
+    Parameters
+    ----------
+    input_feats : list of float
+        Input numerical features
+    low : float
+        Lower bound of the range of the numerical values.
+        All v_i < low will be set to v_i = low.
+    high : float
+        Upper bound of the range of the numerical values.
+        All v_j > high will be set to v_j = high.
+    bucket_cnt: int
+        Number of bucket to use.
+    slide_window_size: int
+        The sliding window used to convert numerical value into bucket number.
+    norm: str, optional
+        Which kind of normalization is applied to the features.
+        Supported normalization ops include:
+
+        (1) None, do nothing.
+        (2) `col`, column-based normalization. Normalize the data
+        for each column:
+
+        .. math::
+            x_{ij} = \frac{x_{ij}}{\sum_{i=0}^N{x_{ij}}}
+
+        (3) `row`, sane as None
+    """
+    raw_feats = np.array(input_feats, dtype=np.float32)
+    num_nodes = raw_feats.shape[0]
+    feat = np.zeros((num_nodes, bucket_cnt), dtype=np.float32)
+
+    bucket_size = (high - low) / bucket_cnt
+    eposilon = bucket_size / 10
+    low_val = raw_feats - window_size/2
+    high_val = raw_feats + window_size/2
+    low_val[low_val < low] = low
+    high_val[high_val >= high] = high - eposilon
+    low_val -= low
+    high_val -= low
+    low_idx = (low_val / bucket_size).astype('int')
+    high_idx = (high_val / bucket_size).astype('int') + 1
+
+    for i in range(raw_feats.shape[0]):
+        idx = np.arange(start=low_idx[i], stop=high_idx[i])
+        feat[i][idx] = 1.
+
+    if norm == 'col':
+        return col_normalize(feat)
+    if norm == 'row':
+        return row_normalize(feat)
+    else:
+        return feat
