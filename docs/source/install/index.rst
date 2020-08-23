@@ -124,12 +124,12 @@ for the same purpose.
       cmake -DUSE_CUDA=ON ..
       make -j4
 
-Finally, upgrade the python depedencies, then call for Python binding.
+Finally, upgrade the python depedencies, then install Python binding.
 
 .. code:: bash
 
    cd ../python
-   pip3 install --user cython numpy networkx scipy
+   pip3 install --user  numpy networkx scipy
    python setup.py install
 
 macOS
