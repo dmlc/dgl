@@ -245,12 +245,19 @@ class GINDataset(DGLBuiltinDataset):
             for g in self.graphs:
                 nlabel_set = nlabel_set.union(
                     set([F.as_scalar(nl) for nl in g.ndata['label']]))
-            nlabel_set = list(nlabel_set)
-            self.ndegree_dict = {
-                nlabel_set[i]: i
-                for i in range(len(nlabel_set))
-            }
-            label2idx = self.ndegree_dict
+            nlabel_set = sorted(list(nlabel_set))
+            print(nlabel_set)
+            if len(nlabel_set) == np.max(nlabel_set):
+                label2idx = {
+                    i: i
+                    for i in range(len(nlabel_set))
+                }
+            else:
+                print("NON contiguous")
+                label2idx = {
+                    nlabel_set[i]: i
+                    for i in range(len(nlabel_set))
+                }
             # generate node attr by node label
             for g in self.graphs:
                 attr = np.zeros((
