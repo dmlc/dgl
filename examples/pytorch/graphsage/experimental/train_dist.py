@@ -305,7 +305,8 @@ if __name__ == '__main__':
     parser.add_argument('--num_clients', type=int, help='The number of clients')
     parser.add_argument('--num_servers', type=int, default=1, help='The number of servers')
     parser.add_argument('--n_classes', type=int, help='the number of classes')
-    parser.add_argument('--num_gpus', type=int, help="the number of GPU device. Use -1 for CPU training")
+    parser.add_argument('--num_gpus', type=int, default=-1, 
+                        help="the number of GPU device. Use -1 for CPU training")
     parser.add_argument('--num_epochs', type=int, default=20)
     parser.add_argument('--num_hidden', type=int, default=16)
     parser.add_argument('--num_layers', type=int, default=2)
