@@ -176,7 +176,7 @@ def run(args, device, data):
         if args.num_gpus == -1:
             model = th.nn.parallel.DistributedDataParallel(model)
         else:
-            dev_id = g.rank() % 8
+            dev_id = g.rank() % args.num_gpus
             model = th.nn.parallel.DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
     loss_fcn = nn.CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
