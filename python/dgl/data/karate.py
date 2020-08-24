@@ -6,7 +6,7 @@ import networkx as nx
 from .. import backend as F
 from .dgl_dataset import DGLDataset
 from .utils import deprecate_property
-from ..convert import graph as dgl_graph
+from ..convert import from_networkx
 
 __all__ = ['KarateClubDataset', 'KarateClub']
 
@@ -16,7 +16,7 @@ class KarateClubDataset(DGLDataset):
 
     .. deprecated:: 0.5.0
 
-        ``data`` is deprecated, it is replaced by:
+        - ``data`` is deprecated, it is replaced by:
 
             >>> dataset = KarateClubDataset()
             >>> g = dataset[0]
@@ -56,7 +56,7 @@ class KarateClubDataset(DGLDataset):
         label = np.asarray(
             [kc_graph.nodes[i]['club'] != 'Mr. Hi' for i in kc_graph.nodes]).astype(np.int64)
         label = F.tensor(label)
-        g = dgl_graph(kc_graph)
+        g = from_networkx(kc_graph)
         g.ndata['label'] = label
         self._graph = g
         self._data = [g]

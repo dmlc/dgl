@@ -8,7 +8,11 @@ from .. import utils
 
 
 class RelGraphConv(nn.Module):
-    r"""Relational graph convolution layer.
+    r"""
+
+    Description
+    -----------
+    Relational graph convolution layer.
 
     Relational graph convolution is introduced in "`Modeling Relational Data with Graph
     Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
@@ -30,35 +34,82 @@ class RelGraphConv(nn.Module):
 
        W_r^{(l)} = \sum_{b=1}^B a_{rb}^{(l)}V_b^{(l)}
 
-    where :math:`B` is the number of bases.
+    where :math:`B` is the number of bases, :math:`V_b^{(l)}` are linearly combined
+    with coefficients :math:`a_{rb}^{(l)}`.
 
     The block-diagonal-decomposition regularization decomposes :math:`W_r` into :math:`B`
     number of block diagonal matrices. We refer :math:`B` as the number of bases.
 
+    The block regularization decomposes :math:`W_r` by:
+
+    .. math::
+
+       W_r^{(l)} = \oplus_{b=1}^B Q_{rb}^{(l)}
+
+    where :math:`B` is the number of bases, :math:`Q_{rb}^{(l)}` are block
+    bases with shape :math:`R^{(d^{(l+1)}/B)*(d^{l}/B)}`.
+
     Parameters
     ----------
     in_feat : int
-        Input feature size.
+        Input feature size; i.e, the number of dimensions of :math:`h_j^{(l)}`.
     out_feat : int
-        Output feature size.
+        Output feature size; i.e., the number of dimensions of :math:`h_i^{(l+1)}`.
     num_rels : int
-        Number of relations.
+        Number of relations. .
     regularizer : str
-        Which weight regularizer to use "basis" or "bdd"
+        Which weight regularizer to use "basis" or "bdd".
+        "basis" is short for basis-diagonal-decomposition.
+        "bdd" is short for block-diagonal-decomposition.
     num_bases : int, optional
-        Number of bases. If is none, use number of relations. Default: None.
+        Number of bases. If is none, use number of relations. Default: ``None``.
     bias : bool, optional
-        True if bias is added. Default: True
+        True if bias is added. Default: ``True``.
     activation : callable, optional
-        Activation function. Default: None
+        Activation function. Default: ``None``.
     self_loop : bool, optional
-        True to include self loop message. Default: False
+        True to include self loop message. Default: ``True``.
     low_mem : bool, optional
-        True to use low memory implementation of relation message passing function. Default: False
-        This option trade speed with memory consumption, and will slowdown the forward/backward.
-        Turn it on when you encounter OOM problem during training or evaluation.
+        True to use low memory implementation of relation message passing function. Default: False.
+        This option trades speed with memory consumption, and will slowdown the forward/backward.
+        Turn it on when you encounter OOM problem during training or evaluation. Default: ``False``.
     dropout : float, optional
-        Dropout rate. Default: 0.0
+        Dropout rate. Default: ``0.0``
+    layer_norm: float, optional
+        Add layer norm. Default: ``False``
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> from dgl.nn import RelGraphConv
+    >>>
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 10)
+    >>> conv = RelGraphConv(10, 2, 3, regularizer='basis', num_bases=2)
+    >>> conv.weight.shape
+    torch.Size([2, 10, 2])
+    >>> etype = th.tensor(np.array([0,1,2,0,1,2]).astype(np.int64))
+    >>> res = conv(g, feat, etype)
+    >>> res
+    tensor([[ 0.3996, -2.3303],
+            [-0.4323, -0.1440],
+            [ 0.3996, -2.3303],
+            [ 2.1046, -2.8654],
+            [-0.4323, -0.1440],
+            [-0.1309, -1.0000]], grad_fn=<AddBackward0>)
+
+    >>> # One-hot input
+    >>> one_hot_feat = th.tensor(np.array([0,1,2,3,4,5]).astype(np.int64))
+    >>> res = conv(g, one_hot_feat, etype)
+    >>> res
+    tensor([[ 0.5925,  0.0985],
+            [-0.3953,  0.8408],
+            [-0.9819,  0.5284],
+            [-1.0085, -0.1721],
+            [ 0.5962,  1.2002],
+            [ 0.0365, -0.3532]], grad_fn=<AddBackward0>)
     """
     def __init__(self,
                  in_feat,
@@ -68,9 +119,10 @@ class RelGraphConv(nn.Module):
                  num_bases=None,
                  bias=True,
                  activation=None,
-                 self_loop=False,
+                 self_loop=True,
                  low_mem=False,
-                 dropout=0.0):
+                 dropout=0.0,
+                 layer_norm=False):
         super(RelGraphConv, self).__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
@@ -83,6 +135,7 @@ class RelGraphConv(nn.Module):
         self.activation = activation
         self.self_loop = self_loop
         self.low_mem = low_mem
+        self.layer_norm = layer_norm
 
         if regularizer == "basis":
             # add basis weights
@@ -119,6 +172,10 @@ class RelGraphConv(nn.Module):
         if self.bias:
             self.h_bias = nn.Parameter(th.Tensor(out_feat))
             nn.init.zeros_(self.h_bias)
+
+        # layer norm
+        if self.layer_norm:
+            self.layer_norm_weight = nn.LayerNorm(n_hidden, elementwise_affine=True)
 
         # weight for self loop
         if self.self_loop:
@@ -185,22 +242,28 @@ class RelGraphConv(nn.Module):
             msg = msg * edges.data['norm']
         return {'msg': msg}
 
-    def forward(self, g, x, etypes, norm=None):
-        """ Forward computation
+    def forward(self, g, feat, etypes, norm=None):
+        """
+
+        Description
+        -----------
+
+        Forward computation
 
         Parameters
         ----------
         g : DGLGraph
             The graph.
-        x : torch.Tensor
+        feat : torch.Tensor
             Input node features. Could be either
+
                 * :math:`(|V|, D)` dense tensor
                 * :math:`(|V|,)` int64 vector, representing the categorical values of each
-                  node. We then treat the input feature as an one-hot encoding feature.
+                  node. It then treat the input feature as an one-hot encoding feature.
         etypes : torch.Tensor
             Edge type tensor. Shape: :math:`(|E|,)`
         norm : torch.Tensor
-            Optional edge normalizer tensor. Shape: :math:`(|E|, 1)`
+            Optional edge normalizer tensor. Shape: :math:`(|E|, 1)`.
 
         Returns
         -------
@@ -208,17 +271,19 @@ class RelGraphConv(nn.Module):
             New node features.
         """
         with g.local_scope():
-            g.srcdata['h'] = x
+            g.srcdata['h'] = feat
             g.edata['type'] = etypes
             if norm is not None:
                 g.edata['norm'] = norm
             if self.self_loop:
-                loop_message = utils.matmul_maybe_select(x[:g.number_of_dst_nodes()],
+                loop_message = utils.matmul_maybe_select(feat[:g.number_of_dst_nodes()],
                                                          self.loop_weight)
             # message passing
             g.update_all(self.message_func, fn.sum(msg='msg', out='h'))
             # apply bias and activation
             node_repr = g.dstdata['h']
+            if self.layer_norm:
+                node_repr = self.layer_norm_weight(node_repr)
             if self.bias:
                 node_repr = node_repr + self.h_bias
             if self.self_loop:

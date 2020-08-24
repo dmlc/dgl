@@ -69,7 +69,7 @@ def main(args):
     else:
         cuda = True
         ctx = mx.gpu(args.gpu)
-        g = g.to(ctx)
+        g = g.int().to(ctx)
 
     features = g.ndata['feat']
     labels = mx.nd.array(g.ndata['label'], dtype="float32", ctx=ctx)

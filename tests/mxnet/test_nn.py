@@ -21,10 +21,10 @@ def _AXWb(A, X, W, b):
 
 @parametrize_dtype
 def test_graph_conv(idtype):
-    g = dgl.graph(nx.path_graph(3))
+    g = dgl.from_networkx(nx.path_graph(3))
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(ctx=ctx)
+    adj = g.adjacency_matrix(transpose=False, ctx=ctx)
 
     conv = nn.GraphConv(5, 2, norm='none', bias=True)
     conv.initialize(ctx=ctx)
@@ -129,9 +129,9 @@ def _S2AXWb(A, N, X, W, b):
     return Y + b
 
 def test_tagconv():
-    g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
+    g = dgl.from_networkx(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(ctx=ctx)
+    adj = g.adjacency_matrix(transpose=False, ctx=ctx)
     norm = mx.nd.power(g.in_degrees().astype('float32'), -0.5)
 
     conv = nn.TAGConv(5, 2, bias=True)
@@ -157,7 +157,7 @@ def test_tagconv():
     assert h1.shape[-1] == 2
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 def test_gat_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -169,7 +169,7 @@ def test_gat_conv(g, idtype):
     assert h.shape == (g.number_of_nodes(), 5, 20)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
 def test_gat_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -209,7 +209,7 @@ def test_sage_conv_bi(idtype, g, aggre_type):
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn'])
 def test_sage_conv_bi2(idtype, aggre_type):
     # Test the case for graphs without edges
-    g = dgl.bipartite([], num_nodes=(5, 3))
+    g = dgl.heterograph({('_U', '_E', '_V'): ([], [])}, {'_U': 5, '_V': 3})
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
     sage = nn.SAGEConv((3, 3), 2, 'gcn')
@@ -227,7 +227,7 @@ def test_sage_conv_bi2(idtype, aggre_type):
         assert h.shape[0] == 3
 
 def test_gg_conv():
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3)).to(F.ctx())
+    g = dgl.from_networkx(nx.erdos_renyi_graph(20, 0.3)).to(F.ctx())
     ctx = F.ctx()
 
     gg_conv = nn.GatedGraphConv(10, 20, 3, 4) # n_step = 3, n_etypes = 4
@@ -241,7 +241,7 @@ def test_gg_conv():
     assert h1.shape == (20, 20)
 
 def test_cheb_conv():
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3)).to(F.ctx())
+    g = dgl.from_networkx(nx.erdos_renyi_graph(20, 0.3)).to(F.ctx())
     ctx = F.ctx()
 
     cheb = nn.ChebConv(10, 20, 3) # k = 3
@@ -254,7 +254,7 @@ def test_cheb_conv():
     assert h1.shape == (20, 20)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 def test_agnn_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -266,7 +266,7 @@ def test_agnn_conv(g, idtype):
     assert h.shape == (g.number_of_nodes(), 10)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
 def test_agnn_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -278,7 +278,7 @@ def test_agnn_conv_bi(g, idtype):
     assert h.shape == (g.number_of_dst_nodes(), 5)
 
 def test_appnp_conv():
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3)).to(F.ctx())
+    g = dgl.from_networkx(nx.erdos_renyi_graph(20, 0.3)).to(F.ctx())
     ctx = F.ctx()
 
     appnp_conv = nn.APPNPConv(3, 0.1, 0)
@@ -293,8 +293,8 @@ def test_appnp_conv():
 def test_dense_cheb_conv():
     for k in range(1, 4):
         ctx = F.ctx()
-        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.3)).to(F.ctx())
-        adj = g.adjacency_matrix(ctx=ctx).tostype('default')
+        g = dgl.from_scipy(sp.sparse.random(100, 100, density=0.3)).to(F.ctx())
+        adj = g.adjacency_matrix(transpose=False, ctx=ctx).tostype('default')
         cheb = nn.ChebConv(5, 2, k)
         dense_cheb = nn.DenseChebConv(5, 2, k)
         cheb.initialize(ctx=ctx)
@@ -314,11 +314,11 @@ def test_dense_cheb_conv():
 
 @parametrize_dtype
 @pytest.mark.parametrize('norm_type', ['both', 'right', 'none'])
-@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 def test_dense_graph_conv(idtype, g, norm_type):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(ctx=ctx).tostype('default')
+    adj = g.adjacency_matrix(transpose=False, ctx=ctx).tostype('default')
     conv = nn.GraphConv(5, 2, norm=norm_type, bias=True)
     dense_conv = nn.DenseGraphConv(5, 2, norm=norm_type, bias=True)
     conv.initialize(ctx=ctx)
@@ -337,7 +337,7 @@ def test_dense_graph_conv(idtype, g, norm_type):
 def test_dense_sage_conv(idtype, g):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(ctx=ctx).tostype('default')
+    adj = g.adjacency_matrix(transpose=False, ctx=ctx).tostype('default')
     sage = nn.SAGEConv(5, 2, 'gcn')
     dense_sage = nn.DenseSAGEConv(5, 2)
     sage.initialize(ctx=ctx)
@@ -359,7 +359,7 @@ def test_dense_sage_conv(idtype, g):
     assert F.allclose(out_sage, out_dense_sage)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 def test_edge_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -372,7 +372,7 @@ def test_edge_conv(g, idtype):
     assert h1.shape == (g.number_of_nodes(), 2)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
 def test_edge_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -419,7 +419,7 @@ def test_gin_conv_bi(g, idtype, aggregator_type):
 
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 def test_gmm_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -431,7 +431,7 @@ def test_gmm_conv(g, idtype):
     assert h1.shape == (g.number_of_nodes(), 2)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['bipartite']))
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
 def test_gmm_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
@@ -472,7 +472,7 @@ def test_nn_conv_bi(g, idtype):
     assert h1.shape == (g.number_of_dst_nodes(), 2)
 
 def test_sg_conv():
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3)).to(F.ctx())
+    g = dgl.from_networkx(nx.erdos_renyi_graph(20, 0.3)).to(F.ctx())
     ctx = F.ctx()
 
     sgc = nn.SGConv(5, 2, 2)
@@ -485,7 +485,7 @@ def test_sg_conv():
     assert h1.shape == (g.number_of_nodes(), 2)
 
 def test_set2set():
-    g = dgl.DGLGraph(nx.path_graph(10)).to(F.ctx())
+    g = dgl.from_networkx(nx.path_graph(10)).to(F.ctx())
     ctx = F.ctx()
 
     s2s = nn.Set2Set(5, 3, 3) # hidden size 5, 3 iters, 3 layers
@@ -504,7 +504,7 @@ def test_set2set():
     assert h1.shape[0] == 3 and h1.shape[1] == 10 and h1.ndim == 2
 
 def test_glob_att_pool():
-    g = dgl.DGLGraph(nx.path_graph(10)).to(F.ctx())
+    g = dgl.from_networkx(nx.path_graph(10)).to(F.ctx())
     ctx = F.ctx()
 
     gap = nn.GlobalAttentionPooling(gluon.nn.Dense(1), gluon.nn.Dense(10))
@@ -522,7 +522,7 @@ def test_glob_att_pool():
     assert h1.shape[0] == 4 and h1.shape[1] == 10 and h1.ndim == 2
 
 def test_simple_pool():
-    g = dgl.DGLGraph(nx.path_graph(15)).to(F.ctx())
+    g = dgl.from_networkx(nx.path_graph(15)).to(F.ctx())
 
     sum_pool = nn.SumPooling()
     avg_pool = nn.AvgPooling()
@@ -542,7 +542,7 @@ def test_simple_pool():
     assert h1.shape[0] == 1 and h1.shape[1] == 10 * 5 and h1.ndim == 2
 
     # test#2: batched graph
-    g_ = dgl.DGLGraph(nx.path_graph(5)).to(F.ctx())
+    g_ = dgl.from_networkx(nx.path_graph(5)).to(F.ctx())
     bg = dgl.batch([g, g_, g, g_, g])
     h0 = F.randn((bg.number_of_nodes(), 5))
     h1 = sum_pool(bg, h0)
@@ -572,62 +572,10 @@ def test_simple_pool():
     h1 = sort_pool(bg, h0)
     assert h1.shape[0] == 5 and h1.shape[1] == 10 * 5 and h1.ndim == 2
 
-def uniform_attention(g, shape):
-    a = mx.nd.ones(shape).as_in_context(g.device)
-    target_shape = (g.number_of_edges(),) + (1,) * (len(shape) - 1)
-    return a / g.in_degrees(g.edges()[1]).reshape(target_shape).astype('float32')
-
-def test_edge_softmax():
-    # Basic
-    g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
-    edata = F.ones((g.number_of_edges(), 1))
-    a = nn.edge_softmax(g, edata)
-    assert len(g.ndata) == 0
-    assert len(g.edata) == 0
-    assert np.allclose(a.asnumpy(), uniform_attention(g, a.shape).asnumpy(),
-            1e-4, 1e-4)
-
-    # Test higher dimension case
-    edata = F.ones((g.number_of_edges(), 3, 1))
-    a = nn.edge_softmax(g, edata)
-    assert len(g.ndata) == 0
-    assert len(g.edata) == 0
-    assert np.allclose(a.asnumpy(), uniform_attention(g, a.shape).asnumpy(),
-            1e-4, 1e-4)
-
-def test_partial_edge_softmax():
-    g = dgl.DGLGraph().to(F.ctx())
-    g.add_nodes(30)
-    # build a complete graph
-    for i in range(30):
-        for j in range(30):
-            g.add_edge(i, j)
-
-    score = F.randn((300, 1))
-    score.attach_grad()
-    grad = F.randn((300, 1))
-    import numpy as np
-    eids = F.tensor(np.random.choice(900, 300, replace=False), g.idtype)
-    # compute partial edge softmax
-    with mx.autograd.record():
-        y_1 = nn.edge_softmax(g, score, eids)
-        y_1.backward(grad)
-        grad_1 = score.grad
-
-    # compute edge softmax on edge subgraph
-    subg = g.edge_subgraph(eids, preserve_nodes=True)
-    with mx.autograd.record():
-        y_2 = nn.edge_softmax(subg, score)
-        y_2.backward(grad)
-        grad_2 = score.grad
-
-    assert F.allclose(y_1, y_2)
-    assert F.allclose(grad_1, grad_2)
-
 def test_rgcn():
     ctx = F.ctx()
     etype = []
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True).to(F.ctx())
+    g = dgl.from_scipy(sp.sparse.random(100, 100, density=0.1)).to(F.ctx())
     # 5 etypes
     R = 5
     for i in range(g.number_of_edges()):
@@ -691,7 +639,7 @@ def test_sequential():
             e_feat += graph.edata['e']
             return n_feat, e_feat
 
-    g = dgl.DGLGraph().to(F.ctx())
+    g = dgl.graph(([], [])).to(F.ctx())
     g.add_nodes(3)
     g.add_edges([0, 1, 2, 0, 1, 2, 0, 1, 2], [0, 0, 0, 1, 1, 1, 2, 2, 2])
     net = nn.Sequential()
@@ -717,9 +665,10 @@ def test_sequential():
             n_feat += graph.ndata['h']
             return n_feat.reshape(graph.number_of_nodes() // 2, 2, -1).sum(1)
 
-    g1 = dgl.DGLGraph(nx.erdos_renyi_graph(32, 0.05)).to(F.ctx())
-    g2 = dgl.DGLGraph(nx.erdos_renyi_graph(16, 0.2)).to(F.ctx())
-    g3 = dgl.DGLGraph(nx.erdos_renyi_graph(8, 0.8)).to(F.ctx())
+    g1 = dgl.from_networkx(nx.erdos_renyi_graph(32, 0.05)).to(F.ctx())
+    g2 = dgl.from_networkx(nx.erdos_renyi_graph(16, 0.2)).to(F.ctx())
+    g3 = dgl.from_networkx(nx.erdos_renyi_graph(8, 0.8)).to(F.ctx())
+
     net = nn.Sequential()
     net.add(ExampleLayer())
     net.add(ExampleLayer())
@@ -739,14 +688,14 @@ def myagg(alist, dsttype):
 @pytest.mark.parametrize('agg', ['sum', 'max', 'min', 'mean', 'stack', myagg])
 def test_hetero_conv(agg, idtype):
     g = dgl.heterograph({
-        ('user', 'follows', 'user'): [(0, 1), (0, 2), (2, 1), (1, 3)],
-        ('user', 'plays', 'game'): [(0, 0), (0, 2), (0, 3), (1, 0), (2, 2)],
-        ('store', 'sells', 'game'): [(0, 0), (0, 3), (1, 1), (1, 2)]},
+        ('user', 'follows', 'user'): ([0, 0, 2, 1], [1, 2, 1, 3]),
+        ('user', 'plays', 'game'): ([0, 0, 0, 1, 2], [0, 2, 3, 0, 2]),
+        ('store', 'sells', 'game'): ([0, 0, 1, 1], [0, 3, 1, 2])},
         idtype=idtype, device=F.ctx())
     conv = nn.HeteroGraphConv({
-        'follows': nn.GraphConv(2, 3),
-        'plays': nn.GraphConv(2, 4),
-        'sells': nn.GraphConv(3, 4)},
+        'follows': nn.GraphConv(2, 3, allow_zero_in_degree=True),
+        'plays': nn.GraphConv(2, 4, allow_zero_in_degree=True),
+        'sells': nn.GraphConv(3, 4, allow_zero_in_degree=True)},
         agg)
     conv.initialize(ctx=F.ctx())
     print(conv)
@@ -848,8 +797,6 @@ if __name__ == '__main__':
     test_gmm_conv()
     test_nn_conv()
     test_sg_conv()
-    test_edge_softmax()
-    test_partial_edge_softmax()
     test_set2set()
     test_glob_att_pool()
     test_simple_pool()

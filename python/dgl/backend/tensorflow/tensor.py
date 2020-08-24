@@ -281,7 +281,11 @@ def narrow_row(x, start, stop):
 
 def scatter_row(data, row_index, value):
     row_index = tf.expand_dims(row_index, 1)
-    return tf.tensor_scatter_nd_update(data, row_index, value)
+    # XXX(minjie): Normally, the copy_to here is unnecessary. However, TF has this
+    #   notorious legacy issue that int32 type data is always on CPU, which will
+    #   crash the program since DGL requires feature data to be on the same device
+    #   as graph structure.
+    return copy_to(tf.tensor_scatter_nd_update(data, row_index, value), data.device)
 
 
 def index_add_inplace(data, row_idx, value):
@@ -330,6 +334,12 @@ def uniform(shape, dtype, ctx, low, high):
     return t
 
 
+def randint(shape, dtype, ctx, low, high):
+    with tf.device(ctx):
+        t = tf.random.uniform(shape, dtype=dtype, minval=low, maxval=high)
+    return t
+
+
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, tf.Tensor):
@@ -364,18 +374,6 @@ def pack_padded_tensor(input, lengths):
     return tf.concat(out_list, axis=0)
 
 
-def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
-    assert dim == 0  # Why we need dim for 1d?
-    return tf.math.unsorted_segment_sum(input, seg_id, n_segs)
-
-
-def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
-    assert dim == 0  # Why we need dim for 1d?
-    return tf.math.unsorted_segment_mean(input, seg_id, n_segs)
-
-# TODO: TF has unsorted_segment_max, which can accelerate _max_on on batched graph
-
-
 def boolean_mask(input, mask):
     return tf.boolean_mask(input, mask)
 
@@ -393,6 +391,12 @@ def logical_and(input1, input2):
 def clone(input):
     # TF tensor is always immutable so returning the input is safe.
     return input
+
+def clamp(data, min_val, max_val):
+    return tf.clip_by_value(data, min_val, max_val)
+
+def replace_inf_with_zero(x):
+    return tf.where(tf.abs(x) == np.inf, 0, x)
 
 def unique(input):
     return tf.unique(input).y

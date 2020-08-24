@@ -99,7 +99,7 @@ def setup(args):
     args.update(default_configure)
     set_random_seed(args['seed'])
     args['dataset'] = 'ACMRaw' if args['hetero'] else 'ACM'
-    args['device'] = 'cuda: 0' if torch.cuda.is_available() else 'cpu'
+    args['device'] = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     args['log_dir'] = setup_log_dir(args)
     return args
 
@@ -107,7 +107,7 @@ def setup_for_sampling(args):
     args.update(default_configure)
     args.update(sampling_configure)
     set_random_seed()
-    args['device'] = 'cuda: 0' if torch.cuda.is_available() else 'cpu'
+    args['device'] = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     args['log_dir'] = setup_log_dir(args, sampling=True)
     return args
 
@@ -136,8 +136,8 @@ def load_acm(remove_self_loop):
 
     # Adjacency matrices for meta path based neighbors
     # (Mufei): I verified both of them are binary adjacency matrices with self loops
-    author_g = dgl.graph(data['PAP'], ntype='paper', etype='author')
-    subject_g = dgl.graph(data['PLP'], ntype='paper', etype='subject')
+    author_g = dgl.from_scipy(data['PAP'])
+    subject_g = dgl.from_scipy(data['PLP'])
     gs = [author_g, subject_g]
 
     train_idx = torch.from_numpy(data['train_idx']).long().squeeze(0)
@@ -186,11 +186,12 @@ def load_acm_raw(remove_self_loop):
     p_vs_t = p_vs_t[p_selected]
     p_vs_c = p_vs_c[p_selected]
 
-    pa = dgl.bipartite(p_vs_a, 'paper', 'pa', 'author')
-    ap = dgl.bipartite(p_vs_a.transpose(), 'author', 'ap', 'paper')
-    pl = dgl.bipartite(p_vs_l, 'paper', 'pf', 'field')
-    lp = dgl.bipartite(p_vs_l.transpose(), 'field', 'fp', 'paper')
-    hg = dgl.hetero_from_relations([pa, ap, pl, lp])
+    hg = dgl.heterograph({
+        ('paper', 'pa', 'author'): p_vs_a.nonzero(),
+        ('author', 'ap', 'paper'): p_vs_a.transpose().nonzero(),
+        ('paper', 'pf', 'field'): p_vs_l.nonzero(),
+        ('field', 'fp', 'paper'): p_vs_l.transpose().nonzero()
+    })
 
     features = torch.FloatTensor(p_vs_t.toarray())
 

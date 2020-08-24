@@ -1,7 +1,8 @@
 import torch as th
+from ...base import is_all, ALL
 from ...sparse import _gspmm, _gsddmm
 
-__all__ = ['gspmm', 'gsddmm']
+__all__ = ['gspmm', 'gsddmm', 'edge_softmax']
 
 
 def _reduce_grad(grad, shape):
@@ -52,9 +53,6 @@ def _addsub(op, x):
 
 
 def _expand(x, shape):
-    padding_zeros = len(shape) + 1 - x.ndim
-    if padding_zeros > 0:
-        x = x.view((x.shape[0],) + (1,) * padding_zeros + x.shape[1:])
     return x.expand(-1, *shape)
 
 
@@ -104,7 +102,6 @@ class GSpMM(th.autograd.Function):
             else:  # max/min
                 dY = th.zeros((Y.shape[0],) + dZ.shape[1:],
                               dtype=Y.dtype, device=Y.device)
-                print(X.shape, dZ.shape)
                 if op in ['mul',  'div']:
                     grad = _expand(X, dZ.shape[1:]).gather(
                         0, argX.long()) * dZ
@@ -178,9 +175,67 @@ class GSDDMM(th.autograd.Function):
         return None, None, dX, dY, None, None
 
 
+class EdgeSoftmax(th.autograd.Function):
+    @staticmethod
+    def forward(ctx, gidx, score, eids, norm_by):
+        """Forward function.
+
+        Pseudo-code:
+
+        .. code:: python
+
+            score = dgl.EData(g, score)
+            score_max = score.dst_max()  # of type dgl.NData
+            score = score - score_max  # edge_sub_dst, ret dgl.EData
+            score_sum = score.dst_sum()  # of type dgl.NData
+            out = score / score_sum    # edge_div_dst, ret dgl.EData
+            return out.data
+        """
+        # remember to save the graph to backward cache before making it
+        # a local variable
+        if not is_all(eids):
+            gidx = gidx.edge_subgraph(eids.type(gidx.dtype), True)
+        if norm_by == 'src':
+            gidx = gidx.reverse()
+        score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
+        score = th.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
+        score_sum = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
+        out = _gsddmm(gidx, 'div', score, score_sum, 'e', 'v')
+        ctx.backward_cache = gidx
+        ctx.save_for_backward(out)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_out):
+        """Backward function.
+
+        Pseudo-code:
+
+        .. code:: python
+
+            g, out = ctx.backward_cache
+            grad_out = dgl.EData(g, grad_out)
+            out = dgl.EData(g, out)
+            sds = out * grad_out  # type dgl.EData
+            sds_sum = sds.dst_sum()  # type dgl.NData
+            grad_score = sds - out * sds_sum  # multiple expressions
+            return grad_score.data
+        """
+        gidx = ctx.backward_cache
+        out, = ctx.saved_tensors
+        sds = out * grad_out
+        accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
+        grad_score = sds - gsddmm(gidx, 'mul', out, accum, 'e', 'v')
+        return None, grad_score, None, None
+
+
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     return GSpMM.apply(gidx, op, reduce_op, lhs_data, rhs_data)
 
 
 def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     return GSDDMM.apply(gidx, op, lhs_data, rhs_data, lhs_target, rhs_target)
+
+
+def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
+    return EdgeSoftmax.apply(gidx, logits, eids, norm_by)

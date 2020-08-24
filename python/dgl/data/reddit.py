@@ -8,7 +8,7 @@ import os
 from .dgl_dataset import DGLBuiltinDataset
 from .utils import _get_dgl_url, generate_mask_tensor, load_graphs, save_graphs, deprecate_property
 from .. import backend as F
-from ..convert import graph as dgl_graph
+from ..convert import from_scipy
 
 
 class RedditDataset(DGLBuiltinDataset):
@@ -94,11 +94,11 @@ class RedditDataset(DGLBuiltinDataset):
         Graph of the dataset
     num_labels : int
         Number of classes for each node
-    train_mask: Tensor
+    train_mask: numpy.ndarray
         Mask of training nodes
-    val_mask: Tensor
+    val_mask: numpy.ndarray
         Mask of validation nodes
-    test_mask: Tensor
+    test_mask: numpy.ndarray
         Mask of test nodes
     features : Tensor
         Node features
@@ -140,7 +140,7 @@ class RedditDataset(DGLBuiltinDataset):
         # graph
         coo_adj = sp.load_npz(os.path.join(
             self.raw_path, "reddit{}_graph.npz".format(self._self_loop_str)))
-        self._graph = dgl_graph(coo_adj)
+        self._graph = from_scipy(coo_adj)
         # features and labels
         reddit_data = np.load(os.path.join(self.raw_path, "reddit_data.npz"))
         features = reddit_data["feature"]
@@ -171,6 +171,9 @@ class RedditDataset(DGLBuiltinDataset):
         graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
         graphs, _ = load_graphs(graph_path)
         self._graph = graphs[0]
+        self._graph.ndata['train_mask'] = generate_mask_tensor(self._graph.ndata['train_mask'].numpy())
+        self._graph.ndata['val_mask'] = generate_mask_tensor(self._graph.ndata['val_mask'].numpy())
+        self._graph.ndata['test_mask'] = generate_mask_tensor(self._graph.ndata['test_mask'].numpy())
         self._print_info()
 
     def _print_info(self):
@@ -202,17 +205,17 @@ class RedditDataset(DGLBuiltinDataset):
     @property
     def train_mask(self):
         deprecate_property('dataset.train_mask', 'graph.ndata[\'train_mask\']')
-        return self._graph.ndata['train_mask']
+        return F.asnumpy(self._graph.ndata['train_mask'])
 
     @property
     def val_mask(self):
         deprecate_property('dataset.val_mask', 'graph.ndata[\'val_mask\']')
-        return self._graph.ndata['val_mask']
+        return F.asnumpy(self._graph.ndata['val_mask'])
 
     @property
     def test_mask(self):
         deprecate_property('dataset.test_mask', 'graph.ndata[\'test_mask\']')
-        return self._graph.ndata['test_mask']
+        return F.asnumpy(self._graph.ndata['test_mask'])
 
     @property
     def features(self):

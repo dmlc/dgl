@@ -64,8 +64,8 @@ class SAGE(nn.Module):
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
-            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
-            dataloader = dgl.sampling.NodeDataLoader(
+            sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
+            dataloader = dgl.dataloading.NodeDataLoader(
                 g,
                 th.arange(g.number_of_nodes()),
                 sampler,
@@ -77,7 +77,7 @@ class SAGE(nn.Module):
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0]
 
-                block = block.to(device)
+                block = block.int().to(device)
                 h = x[input_nodes].to(device)
                 h = layer(block, h)
                 if l != len(self.layers) - 1:
@@ -129,9 +129,9 @@ def run(args, device, data):
     test_nid = th.nonzero(~(test_g.ndata['train_mask'] | test_g.ndata['val_mask']), as_tuple=True)[0]
 
     # Create PyTorch DataLoader for constructing blocks
-    sampler = dgl.sampling.MultiLayerNeighborSampler(
+    sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
-    dataloader = dgl.sampling.NodeDataLoader(
+    dataloader = dgl.dataloading.NodeDataLoader(
         train_g,
         train_nid,
         sampler,
@@ -158,8 +158,10 @@ def run(args, device, data):
         tic_step = time.time()
         for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
             # Load the input features as well as output labels
-            batch_inputs, batch_labels = load_subtensor(train_g, seeds, input_nodes, device)
-            blocks = [block.to(device) for block in blocks]
+            #batch_inputs, batch_labels = load_subtensor(train_g, seeds, input_nodes, device)
+            blocks = [block.int().to(device) for block in blocks]
+            batch_inputs = blocks[0].srcdata['features']
+            batch_labels = blocks[-1].dstdata['labels']
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -202,7 +204,7 @@ if __name__ == '__main__':
     argparser.add_argument('--eval-every', type=int, default=5)
     argparser.add_argument('--lr', type=float, default=0.003)
     argparser.add_argument('--dropout', type=float, default=0.5)
-    argparser.add_argument('--num-workers', type=int, default=0,
+    argparser.add_argument('--num-workers', type=int, default=4,
         help="Number of sampling processes. Use 0 for no extra process.")
     argparser.add_argument('--inductive', action='store_true',
         help="Inductive learning setting")
@@ -221,8 +223,6 @@ if __name__ == '__main__':
         raise Exception('unknown dataset')
 
     in_feats = g.ndata['features'].shape[1]
-
-    g = dgl.as_heterograph(g)
 
     if args.inductive:
         train_g, val_g, test_g = inductive_split(g)

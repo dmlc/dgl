@@ -12,7 +12,7 @@ import dgl
 from ..base import ALL, NID, EID, is_all, DGLError, dgl_warning
 from .. import backend as F
 from .. import init
-from ..frame import FrameRef, Frame, Scheme, sync_frame_initializer
+from .frame import FrameRef, Frame, Scheme, sync_frame_initializer
 from .. import graph_index
 from .runtime import ir, scheduler, Runtime, GraphAdapter
 from .. import utils
@@ -4038,6 +4038,7 @@ class DGLGraph(DGLBaseGraph):
         self._node_frame = old_nframe
         self._edge_frame = old_eframe
 
+    @property
     def is_homogeneous(self):
         """Return if the graph is homogeneous."""
         return True
