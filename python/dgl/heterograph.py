@@ -23,7 +23,7 @@ __all__ = ['DGLHeteroGraph', 'combine_names']
 class DGLHeteroGraph(object):
     """Class for storing graph structure and node/edge feature data.
 
-    There are a few ways to create create a DGLGraph:
+    There are a few ways to create a DGLGraph:
 
     * To create a homogeneous graph from Tensor data, use :func:`dgl.graph`.
     * To create a heterogeneous graph from Tensor data, use :func:`dgl.heterograph`.
@@ -1974,7 +1974,7 @@ class DGLHeteroGraph(object):
         return self.num_nodes(ntype)
 
     def num_nodes(self, ntype=None):
-        """Return the number of nodes of in the graph.
+        """Return the number of nodes in the graph.
 
         Parameters
         ----------
