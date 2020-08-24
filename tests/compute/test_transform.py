@@ -1004,6 +1004,15 @@ def test_add_edges(idtype):
     u, v = g.edges(form='uv', order='eid')
     assert F.array_equal(u, F.tensor([0, 1, 0, 0, 0], dtype=idtype))
     assert F.array_equal(v, F.tensor([1, 2, 1, 1, 1], dtype=idtype))
+    g = dgl.add_edges(g, [], [])
+    g = dgl.add_edges(g, 0, [])
+    g = dgl.add_edges(g, [], 0)
+    assert g.device == F.ctx()
+    assert g.number_of_nodes() == 3
+    assert g.number_of_edges() == 5
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([0, 1, 0, 0, 0], dtype=idtype))
+    assert F.array_equal(v, F.tensor([1, 2, 1, 1, 1], dtype=idtype))
 
     # node id larger than current max node id
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())

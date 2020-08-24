@@ -49,6 +49,8 @@ def tensor(data, dtype=None):
         if dtype is None:
             if isinstance(data, np.ndarray):
                 dtype = np.int32 if data.dtype == np.bool else data.dtype
+            elif len(data) == 0:
+                dtype = np.int64
             else:
                 dtype = np.int64 if isinstance(data[0], numbers.Integral) else np.float32
         return nd.array(data, dtype=dtype)
