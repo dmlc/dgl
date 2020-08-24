@@ -173,7 +173,11 @@ def run(args, device, data):
     model = DistSAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
     if not args.standalone:
-        model = th.nn.parallel.DistributedDataParallel(model)
+        if args.num_gpus == -1:
+            model = th.nn.parallel.DistributedDataParallel(model)
+        else:
+            dev_id = g.rank() % 8
+            model = th.nn.parallel.DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
     loss_fcn = nn.CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -277,7 +281,10 @@ def main(args):
         g.rank(), len(train_nid), len(np.intersect1d(train_nid.numpy(), local_nid)),
         len(val_nid), len(np.intersect1d(val_nid.numpy(), local_nid)),
         len(test_nid), len(np.intersect1d(test_nid.numpy(), local_nid))))
-    device = th.device('cuda:0')
+    if args.num_gpus == -1:
+        device = th.device('cpu')
+    else:
+        device = th.device('cuda:'+str(g.rank() % args.num_gpus))
     labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
     n_classes = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
     print('#labels:', n_classes)
@@ -298,8 +305,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_clients', type=int, help='The number of clients')
     parser.add_argument('--num_servers', type=int, default=1, help='The number of servers')
     parser.add_argument('--n_classes', type=int, help='the number of classes')
-    parser.add_argument('--gpu', type=int, default=0,
-        help="GPU device ID. Use -1 for CPU training")
+    parser.add_argument('--num_gpus', type=int, help="the number of GPU device. Use -1 for CPU training")
     parser.add_argument('--num_epochs', type=int, default=20)
     parser.add_argument('--num_hidden', type=int, default=16)
     parser.add_argument('--num_layers', type=int, default=2)
@@ -317,4 +323,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     print(args)
-    main(args)
+    #main(args)
