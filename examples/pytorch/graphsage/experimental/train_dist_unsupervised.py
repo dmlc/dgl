@@ -308,7 +308,7 @@ def run(args, device, data):
                               dgl.distributed.sample_neighbors, args.num_negs, args.remove_edge)
 
     # Create PyTorch DataLoader for constructing blocks
-    dataloader = dgl.distributed.DisDataLoader(
+    dataloader = dgl.distributed.DistDataLoader(
         dataset=train_eids.numpy(),
         batch_size=args.batch_size,
         collate_fn=sampler.sample_blocks,
