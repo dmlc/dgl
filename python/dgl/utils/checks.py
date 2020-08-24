@@ -35,7 +35,8 @@ def prepare_tensor(g, data, name):
         ret = data
     else:
         data = F.tensor(data)
-        if F.dtype(data) not in (F.int32, F.int64):
+        if (not (F.ndim(data) > 0 and F.shape(data)[0] == 0) and        # empty tensor
+                F.dtype(data) not in (F.int32, F.int64)):
             raise DGLError('Expect argument "{}" to have data type int32 or int64,'
                            ' but got {}.'.format(name, F.dtype(data)))
         ret = F.copy_to(F.astype(data, g.idtype), g.device)
