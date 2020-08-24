@@ -151,7 +151,7 @@ class NeighborSampler(object):
             blocks.insert(0, block)
 
         input_nodes = blocks[0].srcdata[dgl.NID]
-        blocks[0].srcdata['feature'] = load_subtensor(self.g, input_nodes, 'cpu')
+        blocks[0].srcdata['features'] = load_subtensor(self.g, input_nodes, 'cpu')
         # Pre-generate CSR format that it can be used in training directly
         return pos_graph, neg_graph, blocks
 
