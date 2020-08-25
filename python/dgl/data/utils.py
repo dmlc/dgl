@@ -29,7 +29,7 @@ from .. import backend as F
 __all__ = ['loadtxt','download', 'check_sha1', 'extract_archive',
            'get_download_dir', 'Subset', 'split_dataset',
            'save_graphs', "load_graphs", "load_labels", "save_tensors", "load_tensors",
-           'parse_word2vec_node_feature', 'parse_category_single_feat',
+           'parse_word2vec_feature', 'parse_category_single_feat',
            'parse_category_multi_feat', 'parse_numerical_feat',
            'parse_numerical_multihot_feat']
 
@@ -397,6 +397,14 @@ def float_col_l1_normalize(features):
     c_inv[np.isinf(c_inv)] = 0.
     return features * c_inv
 
+def float_col_maxmin_normalize(features):
+    feats = np.transpose(features)
+    min_val = np.reshape(np.amin(feats, axis=1), (-1, 1))
+    max_val = np.reshape(np.amax(feats, axis=1), (-1, 1))
+    norm = (feats - min_val) / (max_val - min_val)
+    norm[np.isnan(norm)] = 0.
+    return np.transpose(norm)
+
 def embed_word2vec(str_val, nlps):
     """ Use NLP encoder to encode the string into vector
 
@@ -421,7 +429,7 @@ def embed_word2vec(str_val, nlps):
             vector = np.concatenate((vector, doc.vector))
     return vector
 
-def parse_lang_feat(str_feats, nlps, verbose=False):
+def parse_lang_feat(str_feats, nlp_encoders, verbose=False):
     """ Parse a list of strings using word2vec encoding using NLP encoders in nlps
 
     Parameters
@@ -429,7 +437,7 @@ def parse_lang_feat(str_feats, nlps, verbose=False):
     str_feats : list of str
         list of strings to encode
 
-    nlps : list of func
+    nlp_encoders : list of func
         a list of nlp encoder functions
 
     verbose : bool, optional
@@ -449,7 +457,7 @@ def parse_lang_feat(str_feats, nlps, verbose=False):
     def embed_lang(d, proc_idx, feats):
         res_feats = []
         for s_feat in feats:
-            res_feats.append(embed_word2vec(s_feat, nlps))
+            res_feats.append(embed_word2vec(s_feat, nlp_encoders))
         d[proc_idx] = res_feats
 
     # use multi process to process the feature
@@ -477,7 +485,7 @@ def parse_lang_feat(str_feats, nlps, verbose=False):
 
     return features
 
-def parse_word2vec_node_feature(str_feats, langs, verbose=False):
+def parse_word2vec_feature(str_feats, languages, verbose=False):
     """ Parse a list of strings using word2vec encoding using NLP encoders in nlps
 
     Parameters
@@ -485,8 +493,8 @@ def parse_word2vec_node_feature(str_feats, langs, verbose=False):
     str_feats : list of str
         list of strings to encode
 
-    nlps : list of func
-        a list of nlp encoder functions
+    languages : list of string
+        list of languages used to encode the feature string.
 
     verbose : bool, optional
         print out debug info
@@ -507,12 +515,12 @@ def parse_word2vec_node_feature(str_feats, langs, verbose=False):
     """
     import spacy
 
-    nlps = []
-    for lang in langs:
-        nlp = spacy.load(lang)
-        nlps.append(nlp)
+    nlp_encoders = []
+    for lang in languages:
+        encoder = spacy.load(lang)
+        nlp_encoders.append(encoder)
 
-    return parse_lang_feat(str_feats, nlps, verbose)
+    return parse_lang_feat(str_feats, nlp_encoders, verbose)
 
 def parse_category_single_feat(category_inputs, norm=None):
     """ Parse categorical features and convert it into onehot encoding.
@@ -640,13 +648,18 @@ def parse_numerical_feat(numerical_inputs, norm=None):
         Supported normalization ops include:
 
         (1) None, do nothing.
-        (2) `col`, column-based normalization. Normalize the data
+        (2) `standard`:, column-based normalization. Normalize the data
         for each column:
 
         .. math::
             x_{ij} = \frac{x_{ij}}{\sum_{i=0}^N{|x_{ij}|}}
 
-        (3) `row`, sane as None
+        (3) `min-max`: column-based min-max normalization. Normalize the data
+        for each column:
+
+        .. math::
+            norm_i = \frac{x_i - min(x[:])}{max(x[:])-min(x[:])}
+
 
     Return
     ------
@@ -663,8 +676,10 @@ def parse_numerical_feat(numerical_inputs, norm=None):
     """
     feat = np.array(numerical_inputs, dtype='float')
 
-    if norm == 'col':
+    if norm == 'standard':
         return float_col_l1_normalize(feat)
+    elif norm == 'min-max':
+        return float_col_maxmin_normalize(feat)
     else:
         return feat
 

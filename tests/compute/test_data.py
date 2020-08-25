@@ -124,6 +124,32 @@ def test_float_col_normalize():
     assert np.allclose(np.array([[0.25, 0.],[0.5, 1./3.],[0.25, -2./3.]]),
                        col_norm_feat)
 
+def test_float_col_maxmin_normalize():
+    features = np.array([[1., 2., -3.]])
+    col_norm_feat = data.utils.float_col_maxmin_normalize(features)
+    assert np.allclose(np.array([[0., 0., 0.]]), col_norm_feat)
+
+    features = np.array([[1.], [2.], [-3.]])
+    col_norm_feat = data.utils.float_col_maxmin_normalize(features)
+    assert np.allclose(np.array([[4./5.],[5./5.], [0.]]), col_norm_feat)
+
+    features = np.array([[1., 0., 0.],[2., 1., 1.],[1., 2., -3.]])
+    col_norm_feat = data.utils.float_col_maxmin_normalize(features)
+    assert np.allclose(np.array([[0., 0., 3./4.],[1., 0.5, 1.],[0., 1., 0.]]),
+                       col_norm_feat)
+
+    # input (2. 3)
+    features = np.array([[1., 0., 0.],[2., 1., -1.]])
+    col_norm_feat = data.utils.float_col_maxmin_normalize(features)
+    assert np.allclose(np.array([[0., 0., 1.],[1., 1., 0.]]),
+                       col_norm_feat)
+
+    # input (3. 2)
+    features = np.array([[1., 0.],[2., 1.],[4., -2.]])
+    col_norm_feat = data.utils.float_col_maxmin_normalize(features)
+    assert np.allclose(np.array([[0., 2./3.],[1./3., 1.],[1., 0.]]),
+                       col_norm_feat)
+
 @unittest.skip("spacy language test is too heavy")
 def test_embed_word2vec():
     import spacy
@@ -173,7 +199,7 @@ def test_parse_lang_feat():
     assert np.allclose(feats, res_feats)
 
     inputs = ["1", "2", "3", "4", "1", "2", "3", "4", "5", "6", "7", "8"]
-    feats = data.utils.parse_word2vec_node_feature(inputs, languages)
+    feats = data.utils.parse_word2vec_feature(inputs, languages)
 
     res_feats = []
     for input in inputs:
@@ -216,38 +242,50 @@ def test_parse_numerical_feat():
     inputs = [[1., 2., -3.]]
     feat = data.utils.parse_numerical_feat(inputs)
     assert np.allclose(inputs, feat)
-    col_norm_feat = data.utils.parse_numerical_feat(inputs, norm='col')
+    col_norm_feat = data.utils.parse_numerical_feat(inputs, norm='standard')
     assert np.allclose(np.array([[1., 1., -1.]]), col_norm_feat)
+    col_norm_feat = data.utils.parse_numerical_feat(inputs, norm='min-max')
+    assert np.allclose(np.array([[0., 0., 0.]]), col_norm_feat)
 
     inputs = [[1.], [2.], [-3.]]
     feat = data.utils.parse_numerical_feat(inputs)
     assert np.allclose(inputs, feat)
-    col_norm_feat = data.utils.parse_numerical_feat(inputs, norm='col')
+    col_norm_feat = data.utils.parse_numerical_feat(inputs, norm='standard')
     assert np.allclose(np.array([[1./6.],[2./6.], [-3./6.]]), col_norm_feat)
+    col_norm_feat = data.utils.parse_numerical_feat(inputs, norm='min-max')
+    assert np.allclose(np.array([[4./5.],[5./5.], [0.]]), col_norm_feat)
 
     inputs = [[1., 0., 0.],[2., 1., 1.],[1., 2., -3.]]
     feat = data.utils.parse_numerical_feat(inputs)
     assert np.allclose(inputs, feat)
-    col_norm_feat = data.utils.parse_numerical_feat(inputs, norm='col')
+    col_norm_feat = data.utils.parse_numerical_feat(inputs, norm='standard')
     assert np.allclose(np.array([[0.25, 0., 0.],[0.5, 1./3., 0.25],[0.25, 2./3., -0.75]]),
+                       col_norm_feat)
+    col_norm_feat = data.utils.parse_numerical_feat(inputs, norm='min-max')
+    assert np.allclose(np.array([[0., 0., 3./4.],[1., 0.5, 1.],[0., 1., 0.]]),
                        col_norm_feat)
 
     # input (2. 3)
     inputs = [[1., 0., 0.],[2., 1., -1.]]
     feat = data.utils.parse_numerical_feat(inputs)
     assert np.allclose(inputs, feat)
-    col_norm_feat = data.utils.parse_numerical_feat(inputs, norm='col')
+    col_norm_feat = data.utils.parse_numerical_feat(inputs, norm='standard')
     assert np.allclose(np.array([[1./3., 0., 0.],[2./3., 1.0, -1.]]),
+                       col_norm_feat)
+    col_norm_feat = data.utils.parse_numerical_feat(inputs, norm='min-max')
+    assert np.allclose(np.array([[0., 0., 1.],[1., 1., 0.]]),
                        col_norm_feat)
 
     # input (3. 2)
     inputs = [[1., 0.],[2., 1.],[1., -2.]]
     feat = data.utils.parse_numerical_feat(inputs)
     assert np.allclose(inputs, feat)
-    col_norm_feat = data.utils.parse_numerical_feat(inputs, norm='col')
+    col_norm_feat = data.utils.parse_numerical_feat(inputs, norm='standard')
     assert np.allclose(np.array([[0.25, 0.],[0.5, 1./3.],[0.25, -2./3.]]),
                        col_norm_feat)
-
+    col_norm_feat = data.utils.parse_numerical_feat(inputs, norm='min-max')
+    assert np.allclose(np.array([[0., 2./3.],[1., 1.],[0., 0.]]),
+                       col_norm_feat)
 
 def test_parse_numerical_multihot_feat():
     inputs = [0., 15., 20., 10.1, 25., 40.]
@@ -303,6 +341,7 @@ if __name__ == '__main__':
     test_col_normalize()
     test_float_row_normalize()
     test_float_col_normalize()
+    test_float_col_maxmin_normalize()
     #test_embed_word2vec()
 
     #test_parse_lang_feat()
