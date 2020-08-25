@@ -8,6 +8,8 @@ import warnings
 import requests
 import pickle
 import errno
+from multiprocessing import Manager,Process
+
 import numpy as np
 import scipy.sparse as sp
 
@@ -438,13 +440,13 @@ def parse_lang_feat(str_feats, nlps, verbose=False):
     """
     features = []
     num_feats = len(str_feats)
-    num_process = 8 # TODO(xiangsx) get system nproc
+    num_process = num_feats if num_feats < 8 else 8 # TODO(xiangsx) get system nproc
     batch_size = (num_feats + num_process - 1) // num_process
 
     def embed_lang(d, proc_idx, feats):
         res_feats = []
-        for feat in feats:
-            res_feats.append(embed_word2vec(feat, nlps))
+        for s_feat in feats:
+            res_feats.append(embed_word2vec(s_feat, nlps))
         d[proc_idx] = res_feats
 
     # use multi process to process the feature
@@ -491,6 +493,14 @@ def parse_word2vec_node_feature(str_feats, langs, verbose=False):
     ------
     numpy.array
         the encoded features
+
+    Examples
+    --------
+
+    >>> inputs = ['hello', 'world']
+    >>> languages = ['en_core_web_lg', 'fr_core_news_lg']
+    >>> feats = parse_word2vec_node_feature(inputs, languages)
+
     """
     import spacy
 
@@ -532,15 +542,24 @@ def parse_category_single_feat(category_inputs, norm=None):
     ------
     numpy.array
         The features in numpy array
+
+    Examples
+    --------
+
+    >>> inputs = ['A', 'B', 'C', 'A']
+    >>> feats = parse_category_single_feat(inputs)
+    >>> feats
+        array([[1.,0.,0.],[0.,1.,0.],[0.,0.,1.],[1.,0.,0.]])
+
     """
     lb = LabelBinarizer()
     feat = lb.fit_transform(category_inputs)
 
     # if there are only 2 catebories,
     # fit_transform only create a array of [0, 1, ...]
-    if feat.shape[1] == 2:
-        f = np.zeros(feat.shape[0], 2)
-        f[feat] = 1.
+    if feat.shape[1] == 1:
+        f = np.zeros((feat.shape[0], 2))
+        f[range(f.shape[0]),feat.squeeze()] = 1.
         feat = f
 
     if norm == 'col':
@@ -586,6 +605,15 @@ def parse_category_multi_feat(category_inputs, norm=None):
     ------
     numpy.array
         The features in numpy array
+
+    Example
+    -------
+
+    >>> inputs = [['A', 'B', 'C',], ['A', 'B'], ['C'], ['A']]
+    >>> feats = parse_category_multi_feat(inputs)
+    >>> feats
+        array([[1.,1.,1.],[1.,1.,0.],[0.,0.,1.],[1.,0.,0.]])
+
     """
     mlb = MultiLabelBinarizer()
     feat = mlb.fit_transform(category_inputs)
@@ -621,17 +649,33 @@ def parse_numerical_feat(numerical_inputs, norm=None):
     ------
     numpy.array
         The features in numpy array
+
+    Example
+
+    >>> inputs = [[1., 0., 0.],[2., 1., 1.],[1., 2., -3.]]
+    >>> feat = parse_numerical_feat(inputs, norm='col')
+    >>> feat
+    array([[0.25, 0., 0.],[0.5, 0.33333333, 0.25],[0.25, 0.66666667, -0.75]])
+
     """
-    feat = np.array(feat, dtype='float')
+    feat = np.array(numerical_inputs, dtype='float')
 
     if norm == 'col':
         return float_col_l1_normalize(feat)
     else:
         return feat
 
-def parse_numerical_onehot_feat(input_feats, low, high, bucket_cnt, window_size, norm=None):
+def parse_numerical_multihot_feat(input_feats, low, high, bucket_cnt, window_size, norm=None):
     r""" Parse numerical features by matching them into
         different buckets.
+
+    A bucket range based algorithm is used to convert numerical value into multi-hop
+    encoding features.
+
+    A numerical value range [low, high) is defined, and it is
+    divied into #bucket_cnt buckets. For a input V, we get its effected range as
+    [V - window_size/2, V + window_size/2] and check how many buckets it covers in
+    [low, high).
 
     Parameters
     ----------
@@ -658,7 +702,26 @@ def parse_numerical_onehot_feat(input_feats, low, high, bucket_cnt, window_size,
         .. math::
             x_{ij} = \frac{x_{ij}}{\sum_{i=0}^N{x_{ij}}}
 
-        (3) `row`, sane as None
+        (3) `row`, row-based normalization. Normalize the data for
+        each row:
+
+        .. math::
+            x_{ij} = \frac{x_{ij}}{\sum_{j=0}^N{x_{ij}}}
+
+    Example
+    -------
+
+    >>> inputs = [0., 15., 25., 40.]
+    >>> low = 10.
+    >>> high = 30.
+    >>> bucket_cnt = 4
+    >>> window_size = 10.
+    >>> feat = parse_numerical_multihot_feat(inputs, low, high, bucket_cnt, window_size)
+    >>> feat
+        array([[1., 0., 0., 0],
+               [1., 1., 1., 0.],
+               [0., 0., 1., 1.],
+               [0., 0., 0., 1.]])
     """
     raw_feats = np.array(input_feats, dtype=np.float32)
     num_nodes = raw_feats.shape[0]
@@ -669,7 +732,9 @@ def parse_numerical_onehot_feat(input_feats, low, high, bucket_cnt, window_size,
     low_val = raw_feats - window_size/2
     high_val = raw_feats + window_size/2
     low_val[low_val < low] = low
+    high_val[high_val < low] = low
     high_val[high_val >= high] = high - eposilon
+    low_val[low_val >= high] = high - eposilon
     low_val -= low
     high_val -= low
     low_idx = (low_val / bucket_size).astype('int')
