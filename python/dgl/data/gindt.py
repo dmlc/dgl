@@ -245,15 +245,13 @@ class GINDataset(DGLBuiltinDataset):
             for g in self.graphs:
                 nlabel_set = nlabel_set.union(
                     set([F.as_scalar(nl) for nl in g.ndata['label']]))
-            nlabel_set = sorted(list(nlabel_set))
-            print(nlabel_set)
-            if len(nlabel_set) == np.max(nlabel_set):
-                label2idx = {
-                    i: i
-                    for i in range(len(nlabel_set))
-                }
+            nlabel_set = list(nlabel_set)
+            if len(nlabel_set) == np.max(nlabel_set) + 1 and np.min(nlabel_set) == 0:
+                # Note this is different from the author's implementation. In weihua916's implementation,
+                # the labels are relabeled anyway. But here we didn't relabel it if the labels are contiguous
+                # to make it consistent with the original dataset
+                label2idx = self.nlabel_dict
             else:
-                print("NON contiguous")
                 label2idx = {
                     nlabel_set[i]: i
                     for i in range(len(nlabel_set))
