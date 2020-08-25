@@ -180,7 +180,7 @@ how to process datasets related to these tasks.
 Here we focus on the standard way to process graphs, features and masks.
 We will use builtin datasets as examples and skip the implementations
 for building graphs from files, but add links to the detailed
-implementations. Please refer to `Creating graphs from external sources <https://>`__ to see a
+implementations. Please refer to :ref:`guide-graph-external` to see a
 complete guide on how to build graphs from external sources.
 
 Processing Graph Classification datasets
@@ -237,7 +237,7 @@ In ``process()``, the raw data is processed to a list of graphs and a
 list of labels. We must implement ``__getitem__(idx)`` and ``__len__()``
 for iteration. We recommend to make ``__getitem__(idx)`` to return a
 tuple ``(graph, label)`` as above. Please check the `QM7bDataset source
-code <https://docs.dgl.ai/en/latest/_modules/dgl/data/qm7b.html#QM7bDataset>`__
+code <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/qm7b.html#QM7bDataset>`__
 for details of ``self._load_graph()`` and ``__getitem__``.
 
 We can also add properties to the class to indicate some useful
@@ -280,7 +280,7 @@ follows:
             pass
 
 A complete guide for training graph classification models can be found
-in `Training Graph Classification models <https://>`__.
+in :ref:`guide-training-graph-classification`.
 
 For more examples of graph classification datasets, please refer to our builtin graph classification
 datasets: 
@@ -299,7 +299,7 @@ Processing Node Classification datasets
 Different from graph classification, node classification is typically on
 a single graph. As such, splits of the dataset are on the nodes of the
 graph. We recommend using node masks to specify the splits. We use
-builtin dataset `CitationGraphDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#citation-network-dataset>`__ as an example:
+builtin dataset `CitationGraphDataset <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/citation_graph.html#CitationGraphDataset>`__ as an example:
 
 .. code:: 
 
@@ -354,7 +354,7 @@ For brevity, we skip some code in ``process()`` to highlight the key
 part for processing node classification dataset: spliting masks, node
 features and node labels are stored in ``g.ndata``. For detailed
 implementation, please refer to `CitationGraphDataset source
-code <https://docs.dgl.ai/en/latest/_modules/dgl/data/citation_graph.html#CitationGraphDataset>`__.
+code <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/citation_graph.html#CitationGraphDataset>`__.
 
 Notice that the implementations of ``__getitem__(idx)`` and
 ``__len__()`` are changed as well, since there is often only one graph
@@ -382,7 +382,7 @@ to show the usage of it:
     labels = graph.ndata['label']
 
 A complete guide for training node classification models can be found in
-`Training Node Classification/Regression models <https://>`__.
+:ref:`guide-training-node-classification`.
 
 For more examples of node classification datasets, please refer to our
 builtin datasets:
@@ -414,7 +414,7 @@ The processing of link prediction datasets is similar to that for node
 classification’s, there is often one graph in the dataset.
 
 We use builtin dataset
-`KnowledgeGraphDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#knowlege-graph-dataset>`__
+`KnowledgeGraphDataset <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/knowledge_graph.html#KnowledgeGraphDataset>`__
 as example, and still skip the detailed data processing code to
 highlight the key part for processing link prediction datasets:
 
@@ -455,7 +455,7 @@ highlight the key part for processing link prediction datasets:
 
 As shown in the code, we add splitting masks into ``edata`` field of the
 graph. Check `KnowledgeGraphDataset source
-code <https://docs.dgl.ai/en/latest/_modules/dgl/data/knowledge_graph.html#KnowledgeGraphDataset>`__
+code <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/knowledge_graph.html#KnowledgeGraphDataset>`__
 to see the complete code. We use a subclass of ``KnowledgeGraphDataset``, :class:`dgl.data.FB15k237Dataset`,
 to show the usage of it:
 
@@ -476,7 +476,7 @@ to show the usage of it:
 
 
 A complete guide for training link prediction models can be found in
-`Training Link Prediction models <https://>`__.
+:ref:`guide-training-link-prediction`.
 
 For more examples of link prediction datasets, please refer to our
 builtin datasets: 

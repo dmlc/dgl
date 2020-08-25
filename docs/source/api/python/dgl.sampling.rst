@@ -5,7 +5,7 @@ dgl.sampling
 
 .. automodule:: dgl.sampling
 
-Random walk sampling functions
+Random walk
 ------------------------------
 
 .. autosummary::
@@ -14,7 +14,7 @@ Random walk sampling functions
     random_walk
     pack_traces
 
-Neighbor sampling functions
+Neighbor sampling
 ---------------------------
 
 .. autosummary::
@@ -22,8 +22,4 @@ Neighbor sampling functions
 
     sample_neighbors
     select_topk
-
-Builtin sampler classes for more complicated sampling algorithms
-----------------------------------------------------------------
-.. autoclass:: RandomWalkNeighborSampler
-.. autoclass:: PinSAGESampler
+    PinSAGESampler

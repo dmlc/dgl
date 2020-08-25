@@ -25,10 +25,10 @@ process continues until we reach the input. This iterative process
 builds the dependency graph starting from the output and working
 backwards to the input, as the figure below shows:
 
-.. figure:: https://i.imgur.com/Y0z0qcC.png
+.. figure:: https://data.dgl.ai/asset/image/guide_6_0_0.png
    :alt: Imgur
 
-   Imgur
+
 
 With this, one can save the workload and computation resources for
 training a GNN on a large graph.

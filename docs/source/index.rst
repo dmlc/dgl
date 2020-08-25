@@ -87,7 +87,6 @@ Getting Started
    :titlesonly:
    :glob:
 
-   guide/preface
    guide/graph
    guide/message
    guide/nn
@@ -103,14 +102,15 @@ Getting Started
    :glob:
 
    api/python/dgl
-   api/python/dgl.DGLGraph
    api/python/dgl.data
+   api/python/dgl.dataloading
+   api/python/dgl.DGLGraph
+   api/python/dgl.distributed
+   api/python/dgl.function
    api/python/nn
    api/python/dgl.ops
-   api/python/dgl.function
-   api/python/sampling
-   api/python/dgl.dataloading
-   api/python/dgl.distributed
+   api/python/dgl.sampling
+   api/python/udf
 
 .. toctree::
    :maxdepth: 3
