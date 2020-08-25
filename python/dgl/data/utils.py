@@ -28,7 +28,10 @@ from .. import backend as F
 
 __all__ = ['loadtxt','download', 'check_sha1', 'extract_archive',
            'get_download_dir', 'Subset', 'split_dataset',
-           'save_graphs', "load_graphs", "load_labels", "save_tensors", "load_tensors"]
+           'save_graphs', "load_graphs", "load_labels", "save_tensors", "load_tensors",
+           'parse_word2vec_node_feature', 'parse_category_single_feat',
+           'parse_category_multi_feat', 'parse_numerical_feat',
+           'parse_numerical_multihot_feat']
 
 def loadtxt(path, delimiter, dtype=None):
     try:
