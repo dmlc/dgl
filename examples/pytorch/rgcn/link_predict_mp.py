@@ -272,13 +272,7 @@ class NodeSampler:
                 frontier = dgl.in_subgraph(self.g, curr)
             else:
                 frontier = dgl.sampling.sample_neighbors(self.g, curr, fanout)
-            etypes = self.g.edata['etype'][frontier.edata[dgl.EID]]
-            norm = self.g.edata['norm'][frontier.edata[dgl.EID]]
             block = dgl.to_block(frontier, curr)
-            block.srcdata['ntype'] = self.g.ndata['ntype'][block.srcdata[dgl.NID]]
-            block.srcdata['type_id'] = self.g.ndata['type_id'][block.srcdata[dgl.NID]]
-            block.edata['etype'] = etypes[block.edata[dgl.EID]]
-            block.edata['norm'] = norm[block.edata[dgl.EID]]
             curr = block.srcdata[dgl.NID]
             blocks.insert(0, block.int())
 
@@ -326,7 +320,7 @@ class LinkPathSampler:
         # calculate norm for compact_subg
         in_deg = subg.in_degrees(range(subg.number_of_nodes())).float()
         norm = 1.0 / in_deg
-        norm[th.isinf(norm)] = 0
+        norm[th.isinf(norm)] = 0.
         subg.ndata['norm'] = norm
         subg.apply_edges(lambda edges : {'norm' : edges.dst['norm']})
         subg.edata['norm'] = subg.edata['norm'].unsqueeze(1)
@@ -379,28 +373,8 @@ class LinkNeighborSampler:
             else:
                 p_frontier = dgl.sampling.sample_neighbors(g, p_curr, fanout)
                 n_frontier = dgl.sampling.sample_neighbors(g, n_curr, fanout)
-
-            '''
-            if self.keep_pos_edges is False and \
-                self.is_train and i == 0:
-                old_frontier = p_frontier
-                p_frontier = dgl.remove_edges(old_frontier, pseeds)
-            '''
-            p_etypes = g.edata['etype'][p_frontier.edata[dgl.EID]]
-            # print(p_etypes)
-            n_etypes = g.edata['etype'][n_frontier.edata[dgl.EID]]
-            p_norm = g.edata['norm'][p_frontier.edata[dgl.EID]]
-            n_norm = g.edata['norm'][n_frontier.edata[dgl.EID]]
             p_block = dgl.to_block(p_frontier, p_curr)
             n_block = dgl.to_block(n_frontier, n_curr)
-            p_block.srcdata['ntype'] = g.ndata['ntype'][p_block.srcdata[dgl.NID]]
-            n_block.srcdata['ntype'] = g.ndata['ntype'][n_block.srcdata[dgl.NID]]
-            p_block.srcdata['type_id'] = g.ndata['type_id'][p_block.srcdata[dgl.NID]]
-            n_block.srcdata['type_id'] = g.ndata['type_id'][n_block.srcdata[dgl.NID]]
-            p_block.edata['etype'] = p_etypes
-            n_block.edata['etype'] = n_etypes
-            p_block.edata['norm'] = p_norm
-            n_block.edata['norm'] = n_norm
             p_curr = p_block.srcdata[dgl.NID]
             n_curr = n_block.srcdata[dgl.NID]
             p_blocks.insert(0, p_block.int())
