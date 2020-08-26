@@ -266,8 +266,7 @@ def run(args, device, data):
     print(profiler.output_text(unicode=True, color=True))
 
 def main(args):
-    assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER'), \
-        'The arguments num_workers and num_samplers must be the same value.'
+    assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')
     dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
