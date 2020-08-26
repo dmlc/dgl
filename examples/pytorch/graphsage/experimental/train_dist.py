@@ -266,7 +266,6 @@ def run(args, device, data):
     print(profiler.output_text(unicode=True, color=True))
 
 def main(args):
-    assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')
     dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
@@ -323,6 +322,7 @@ if __name__ == '__main__':
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
     args = parser.parse_args()
+    assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')
 
     print(args)
     main(args)

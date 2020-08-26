@@ -425,7 +425,6 @@ def run(args, device, data):
         th.save(pred, 'emb.pt')
 
 def main(args):
-    assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')
     dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
@@ -487,6 +486,7 @@ if __name__ == '__main__':
     parser.add_argument('--remove_edge', default=False, action='store_true',
         help="whether to remove edges during sampling")
     args = parser.parse_args()
+    assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')
 
     print(args)
     main(args)
