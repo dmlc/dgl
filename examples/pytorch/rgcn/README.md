@@ -120,3 +120,16 @@ Average HITS@10: 0.3168425681618294
 ```
 python3 link_predict_mp.py --lr 0.002 --n-bases 100 --n-layers 2 --n-epochs 2000 --batch-size 30000 --regularization-coef 0.01 --valid-neg-cnt 1000 --test-neg-cnt -1 --use-self-loop --num-worker 4 --n-hidden 500 --dropout 0.4 --dataset FB15k-237 --sampler=path --chunk-size 20 --global-norm --relation-regularizer bdd --gamma 200.0 --no-test-filter
 ```
+#### FB15k
+filtered MRR 0.469, 0.696 (paper)
+
+```
+Average MRR: 0.4691785477453558
+Average MR: 66.79721013695384
+Average HITS@10: 0.6976350493473955
+Average HITS@3: 0.5368454910192819
+Average HITS@1: 0.3478864417396015
+```
+```
+python3 link_predict_mp.py --lr 0.002 --n-bases 100 --n-layers 2 --n-epochs 2000 --batch-size 30000 --regularization-coef 0.01 --valid-neg-cnt 1000 --test-neg-cnt -1 --use-self-loop --num-worker 4 --n-hidden 500 --dropout 0.4 --dataset FB15k --sampler=path --chunk-size 10 --global-norm --relation-regularizer bdd --gamma 20.0
+```

@@ -310,7 +310,7 @@ class LinkPathSampler:
         p_u, p_v = subg.edges()
         p_rel = subg.edata['etype']
         org_nid = subg.ndata[dgl.NID]
-        subg.ndata['type_id'] = g.ndata['type_id'][subg.ndata[dgl.NID]]
+        #subg.ndata['type_id'] = g.ndata['type_id'][subg.ndata[dgl.NID]]
 
         # only half of the edges will be used as graph structure
         pos_idx = np.random.choice(bsize, size=bsize//2, replace=False)
@@ -419,7 +419,7 @@ def filter_edges(g, pos_score, eids, su, sv, n_v, n_u, t_neg_score, h_neg_score,
         loc = tail_pos == 1
         u_ec = su[idx]
         n_v_ec = n_v[loc]
-        false_neg_comp = th.full((n_v_ec.shape[0],), 0)
+        false_neg_comp = th.full((n_v_ec.shape[0],), 0.)
         for idx_ec in range(n_v_ec.shape[0]):
             sn_v_ec = n_v_ec[idx_ec]
             _, _, eid_ec = g.edge_ids(u_ec.unsqueeze(dim=0), sn_v_ec.unsqueeze(dim=0), return_uv=True)
@@ -434,7 +434,7 @@ def filter_edges(g, pos_score, eids, su, sv, n_v, n_u, t_neg_score, h_neg_score,
         loc = head_pos == 1
         n_u_ec = n_u[loc]
         v_ec = sv[idx]
-        false_neg_comp = th.full((n_u_ec.shape[0],), 0)
+        false_neg_comp = th.full((n_u_ec.shape[0],), 0.)
         for idx_ec in range(n_u_ec.shape[0]):
             sn_u_ec = n_u_ec[idx_ec]
             _, _, eid_ec = g.edge_ids(sn_u_ec.unsqueeze(dim=0), v_ec.unsqueeze(dim=0), return_uv=True)
@@ -986,7 +986,7 @@ def main(args, devices):
         norm = norm.unsqueeze(1)
         train_g.edata['norm'] = norm
     else:
-        train_g.edata['norm'] = th.full((eid.shape[0],1), 1)
+        train_g.edata['norm'] = th.full((eid.shape[0],1), 1.)
         for rel_id in range(edge_rels):
             idx = (train_g.edata['etype'] == rel_id)
             u_r = u[idx]
@@ -1010,7 +1010,7 @@ def main(args, devices):
         norm = norm.unsqueeze(1)
         valid_g.edata['norm'] = norm
     else:
-        valid_g.edata['norm'] = th.full((eid.shape[0],1), 1)
+        valid_g.edata['norm'] = th.full((eid.shape[0],1), 1.)
         for rel_id in range(edge_rels):
             idx = (valid_g.edata['etype'] == rel_id)
             u_r = u[idx]
@@ -1034,7 +1034,7 @@ def main(args, devices):
         norm = norm.unsqueeze(1)
         test_g.edata['norm'] = norm
     else:
-        test_g.edata['norm'] = th.full((eid.shape[0],1), 1)
+        test_g.edata['norm'] = th.full((eid.shape[0],1), 1.)
         for rel_id in range(edge_rels):
             idx = (test_g.edata['etype'] == rel_id)
             u_r = u[idx]
