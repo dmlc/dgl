@@ -486,7 +486,8 @@ if __name__ == '__main__':
     parser.add_argument('--remove_edge', default=False, action='store_true',
         help="whether to remove edges during sampling")
     args = parser.parse_args()
-    assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')
+    assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')), \
+    'The arguments num_workers and num_samplers need to be the same value.'
 
     print(args)
     main(args)
