@@ -104,6 +104,12 @@ class HeteroGraphConv(layers.Layer):
     def __init__(self, mods, aggregate='sum'):
         super(HeteroGraphConv, self).__init__()
         self.mods = mods
+        # Do not break if graph has 0-in-degree nodes.
+        # Because there is no general rule to add self-loop for heterograph.
+        for _, v in self.mods.items():
+            set_allow_zero_in_degree_fn = getattr(v, 'set_allow_zero_in_degree', None)
+            if callable(set_allow_zero_in_degree_fn):
+                set_allow_zero_in_degree_fn(True)
         if isinstance(aggregate, str):
             self.agg_fn = get_aggregate_fn(aggregate)
         else:

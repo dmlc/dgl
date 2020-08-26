@@ -4,6 +4,7 @@ import urllib.request
 import torch
 import numpy as np
 from sudoku_data import _basic_sudoku_graph
+from sudoku import SudokuNN
 
 
 def solve_sudoku(puzzle):
@@ -23,7 +24,9 @@ def solve_sudoku(puzzle):
         url = 'https://data.dgl.ai/models/rrn-sudoku.pkl'
         urllib.request.urlretrieve(url, model_filename)
 
-    model = torch.load(model_filename, map_location='cpu')
+    model = SudokuNN(num_steps=64, edge_drop=0.)
+    model.load_state_dict(torch.load(model_filename, map_location='cpu'))
+    model.eval()
 
     g = _basic_sudoku_graph()
     sudoku_indices = np.arange(0, 81)

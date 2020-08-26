@@ -27,10 +27,9 @@ RPCStatus SendRPCMessage(const RPCMessage& msg, const int32_t target_id) {
   std::shared_ptr<std::string> zerocopy_blob(new std::string());
   StreamWithBuffer zc_write_strm(zerocopy_blob.get(), true);
   zc_write_strm.Write(msg);
-  int32_t ndarray_count = msg.tensors.size();
-  zerocopy_blob->append(
-    reinterpret_cast<char*>(&ndarray_count),
-    sizeof(int32_t));
+  int32_t nonempty_ndarray_count = zc_write_strm.buffer_list().size();
+  zerocopy_blob->append(reinterpret_cast<char*>(&nonempty_ndarray_count),
+                        sizeof(int32_t));
   network::Message rpc_meta_msg;
   rpc_meta_msg.data = const_cast<char*>(zerocopy_blob->data());
   rpc_meta_msg.size = zerocopy_blob->size();
@@ -61,10 +60,10 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
   CHECK_EQ(RPCContext::ThreadLocal()->receiver->Recv(
     &rpc_meta_msg, &send_id), REMOVE_SUCCESS);
   char* count_ptr = rpc_meta_msg.data+rpc_meta_msg.size-sizeof(int32_t);
-  int32_t ndarray_count = *(reinterpret_cast<int32_t*>(count_ptr));
+  int32_t nonempty_ndarray_count = *(reinterpret_cast<int32_t*>(count_ptr));
   // Recv real ndarray data
-  std::vector<void* > buffer_list(ndarray_count);
-  for (int i = 0; i < ndarray_count; ++i) {
+  std::vector<void*> buffer_list(nonempty_ndarray_count);
+  for (int i = 0; i < nonempty_ndarray_count; ++i) {
     network::Message ndarray_data_msg;
     CHECK_EQ(RPCContext::ThreadLocal()->receiver->RecvFrom(
         &ndarray_data_msg, send_id), REMOVE_SUCCESS);
