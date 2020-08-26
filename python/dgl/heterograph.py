@@ -5280,7 +5280,7 @@ class DGLHeteroGraph(object):
         {'created': ['coo', 'csr', 'csc'], 'not created': []}
         """
         if self.num_edges() == 0:
-            return self
+            return 0
 
         return self._graph.create_format_()
 
