@@ -54,7 +54,7 @@ built-in funcs is ``u`` represents ``src`` nodes, ``v`` represents
 ``dst`` nodes, ``e`` represents ``edges``. The parameters for those
 functions are strings indicating the input and output field names for
 the corresponding nodes and edges. Here is the
-`list <https://docs.dgl.ai/api/python/function.html#>`__ of supported
+:ref:`dgl.function` of supported
 built-in functions. For example, to add the ``hu`` feature from src
 nodes and ``hv`` feature from dst nodes then save the result on the edge
 at ``he`` field, we can use built-in function
@@ -79,11 +79,9 @@ to the Reduce UDF that sums up the message ``m``:
          return {'h': torch.sum(nodes.mailbox['m'], dim=1)}
 
 In DGL, the interface to call edge-wise computation is
-`apply_edges() <https://docs.dgl.ai/generated/dgl.DGLGraph.apply_edges.html>`__.
+:meth:`~dgl.DGLGraph.apply_edges`.
 The parameters for ``apply_edges`` are a message function and valid
-edge type (see
-`send() <https://docs.dgl.ai/en/0.4.x/generated/dgl.DGLGraph.send.html#dgl.DGLGraph.send>`_
-for valid edge types, by default, all edges will be updated). For
+edge type as described in the API Doc (by default, all edges will be updated). For
 example:
 
 .. code::
@@ -92,7 +90,7 @@ example:
     graph.apply_edges(fn.u_add_v('el', 'er', 'e'))
 
 the interface to call node-wise computation is
-`update_all() <https://docs.dgl.ai/generated/dgl.DGLGraph.update_all.html>`__.
+:meth:`~dgl.DGLGraph.update_all`.
 The parameters for ``update_all`` are a message function, a
 reduce function and a update function. update function can
 be called outside of ``update_all`` by leaving the third parameter as
@@ -161,7 +159,7 @@ a combination of ``update_all`` calls with built-in functions as
 parameters.
 
 For some cases like
-`GAT <https://github.com/dmlc/dgl/blob/master/python/dgl/nn/pytorch/conv/gatconv.py>`__
+:class:`~dgl.nn.pytorch.conv.GATConv`
 where we have to save message on the edges, we need to call
 ``apply_edges`` with built-in functions. Sometimes the message on
 the edges can be high dimensional, which is memory consuming. We suggest
@@ -220,8 +218,7 @@ example:
     sg = g.subgraph(nid)
     sg.update_all(message_func, reduce_func, apply_node_func)
 
-This is a common usage in mini-batch training. Check `mini-batch
-training <https://docs.dgl.ai/generated/guide/minibatch.html>`__ user guide for more detailed
+This is a common usage in mini-batch training. Check :ref:`guide-minibatch` user guide for more detailed
 usages.
 
 Apply Edge Weight In Message Passing
@@ -250,8 +247,7 @@ usually be a scalar.
 Message Passing on Heterogeneuous Graph
 ---------------------------------------
 
-`Heterogeneous
-graphs <https://docs.dgl.ai/tutorials/basics/5_hetero.html>`__, or
+Heterogeneous (user guide for :ref:`guide-graph-heterogeneous`), or
 heterographs for short, are graphs that contain different types of nodes
 and edges. The different types of nodes and edges tend to have different
 types of attributes that are designed to capture the characteristics of
