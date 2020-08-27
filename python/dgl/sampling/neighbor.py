@@ -6,15 +6,13 @@ from ..base import DGLError, EID
 from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from .. import utils
-from .. import subgraph as subg
-from .dataloader import BlockSampler, assign_block_eids
 
 __all__ = [
     'sample_neighbors',
-    'select_topk',
-    'MultiLayerNeighborSampler']
+    'select_topk']
 
-def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
+def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
+                     copy_ndata=True, copy_edata=True, _dist_training=False):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -27,7 +25,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     Parameters
     ----------
     g : DGLGraph
-        The graph
+        The graph.  Must be on CPU.
     nodes : tensor or dict
         Node IDs to sample neighbors from.
 
@@ -56,11 +54,34 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         to sum up to one).  Otherwise, the result will be undefined.
     replace : bool, optional
         If True, sample with replacement.
+    copy_ndata: bool, optional
+        If True, the node features of the new graph are copied from
+        the original graph. If False, the new graph will not have any
+        node features.
+
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the edge features of the new graph are copied from
+        the original graph.  If False, the new graph will not have any
+        edge features.
+
+        (Default: True)
+    _dist_training : bool, optional
+        Internal argument.  Do not use.
+
+        (Default: False)
 
     Returns
     -------
     DGLGraph
-        A sampled subgraph containing only the sampled neighboring edges.
+        A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
+
+    Notes
+    -----
+    If :attr:`copy_ndata` or :attr:`copy_edata` is True, same tensors are used as
+    the node or edge features of the original graph and the new graph.
+    As a result, users should avoid performing in-place operations
+    on the node features of the new graph to avoid feature corruption.
 
     Examples
     --------
@@ -98,6 +119,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")
         nodes = {g.ntypes[0] : nodes}
+    assert g.device == F.cpu(), "Graph must be on CPU."
+
     nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
     nodes_all_types = []
     for ntype in g.ntypes:
@@ -131,11 +154,30 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
                                        edge_dir, prob_arrays, replace)
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
-    for i, etype in enumerate(ret.canonical_etypes):
-        ret.edges[etype].data[EID] = induced_edges[i]
+
+    # handle features
+    # (TODO) (BarclayII) DGL distributed fails with bus error, freezes, or other
+    # incomprehensible errors with lazy feature copy.
+    # So in distributed training context, we fall back to old behavior where we
+    # only set the edge IDs.
+    if not _dist_training:
+        if copy_ndata:
+            print(g, type(g))
+            node_frames = utils.extract_node_subframes(g, None)
+            utils.set_new_frames(ret, node_frames=node_frames)
+
+        if copy_edata:
+            print(g, type(g))
+            edge_frames = utils.extract_edge_subframes(g, induced_edges)
+            utils.set_new_frames(ret, edge_frames=edge_frames)
+    else:
+        for i, etype in enumerate(ret.canonical_etypes):
+            ret.edges[etype].data[EID] = induced_edges[i]
+
     return ret
 
-def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
+def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
+                copy_ndata=True, copy_edata=True):
     """Select the neighboring edges with k-largest (or k-smallest) weights of the given
     nodes and return the induced subgraph.
 
@@ -150,7 +192,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
     Parameters
     ----------
     g : DGLGraph
-        The graph
+        The graph.  Must be on CPU.
     k : int or dict[etype, int]
         The number of edges to be selected for each node on each edge type.
 
@@ -177,11 +219,30 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
     ascending : bool, optional
         If True, DGL will return edges with k-smallest weights instead of
         k-largest weights.
+    copy_ndata: bool, optional
+        If True, the node features of the new graph are copied from
+        the original graph. If False, the new graph will not have any
+        node features.
+
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the edge features of the new graph are copied from
+        the original graph.  If False, the new graph will not have any
+        edge features.
+
+        (Default: True)
 
     Returns
     -------
     DGLGraph
-        A sampled subgraph containing only the sampled neighboring edges.
+        A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
+
+    Notes
+    -----
+    If :attr:`copy_ndata` or :attr:`copy_edata` is True, same tensors are used as
+    the node or edge features of the original graph and the new graph.
+    As a result, users should avoid performing in-place operations
+    on the node features of the new graph to avoid feature corruption.
 
     Examples
     --------
@@ -198,6 +259,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")
         nodes = {g.ntypes[0] : nodes}
+    assert g.device == F.cpu(), "Graph must be on CPU."
 
     # Parse nodes into a list of NDArrays.
     nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
@@ -231,78 +293,17 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
         g._graph, nodes_all_types, k_array, edge_dir, weight_arrays, bool(ascending))
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
-    for i, etype in enumerate(ret.canonical_etypes):
-        ret.edges[etype].data[EID] = induced_edges[i]
+
+    # handle features
+    if copy_ndata:
+        print(g, type(g))
+        node_frames = utils.extract_node_subframes(g, None)
+        utils.set_new_frames(ret, node_frames=node_frames)
+
+    if copy_edata:
+        print(g, type(g))
+        edge_frames = utils.extract_edge_subframes(g, induced_edges)
+        utils.set_new_frames(ret, edge_frames=edge_frames)
     return ret
-
-
-class MultiLayerNeighborSampler(BlockSampler):
-    """Sampler that builds computational dependency of node representations via
-    neighbor sampling for multilayer GNN.
-
-    This sampler will make every node gather messages from a fixed number of neighbors
-    per edge type.  The neighbors are picked uniformly.
-
-    Parameters
-    ----------
-    fanouts : list[int] or list[dict[etype, int] or None]
-        List of neighbors to sample per edge type for each GNN layer, starting from the
-        first layer.
-
-        If the graph is homogeneous, only an integer is needed for each layer.
-
-        If None is provided for one layer, all neighbors will be included regardless of
-        edge types.
-
-        If -1 is provided for one edge type on one layer, then all inbound edges
-        of that edge type will be included.
-    replace : bool, default True
-        Whether to sample with replacement
-    return_eids : bool, default False
-        Whether to return edge IDs of the original graph in the sampled blocks.
-
-        If True, the edge IDs will be stored as ``dgl.EID`` feature for each edge type.
-
-    Examples
-    --------
-    To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
-    a homogeneous graph where each node takes messages from all neighbors (assume
-    the backend is PyTorch):
-    >>> sampler = dgl.sampling.NeighborSampler([None, None, None])
-    >>> collator = dgl.sampling.NodeCollator(g, train_nid, sampler)
-    >>> dataloader = torch.utils.data.DataLoader(
-    ...     collator.dataset, collate_fn=collator.collate,
-    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
-    >>> for blocks in dataloader:
-    ...     train_on(blocks)
-
-    If we wish to gather from 5 neighbors on the first layer, 10 neighbors on the second,
-    and 15 layers on the third:
-    >>> sampler = dgl.sampling.NeighborSampler([5, 10, 15])
-
-    If training on a heterogeneous graph and you want different number of neighbors for each
-    edge type, one should instead provide a list of dicts.  Each dict would specify the
-    number of neighbors to pick per edge type.
-    >>> sampler = dgl.sampling.NeighborSampler([
-    ...     {('user', 'follows', 'user'): 5,
-    ...      ('user', 'plays', 'game'): 4,
-    ...      ('game', 'played-by', 'user'): 3}] * 3)
-    """
-    def __init__(self, fanouts, replace=False, return_eids=False):
-        super().__init__(len(fanouts))
-
-        self.fanouts = fanouts
-        self.replace = replace
-        self.return_eids = return_eids
-        if return_eids:
-            self.set_block_postprocessor(assign_block_eids)
-
-    def sample_frontier(self, block_id, g, seed_nodes, *args, **kwargs):
-        fanout = self.fanouts[block_id]
-        if fanout is None:
-            frontier = subg.in_subgraph(g, seed_nodes)
-        else:
-            frontier = sample_neighbors(g, seed_nodes, fanout, replace=self.replace)
-        return frontier
 
 _init_api('dgl.sampling.neighbor', __name__)

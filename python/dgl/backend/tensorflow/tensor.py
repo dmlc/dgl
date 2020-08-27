@@ -336,6 +336,12 @@ def uniform(shape, dtype, ctx, low, high):
     return t
 
 
+def randint(shape, dtype, ctx, low, high):
+    with tf.device(ctx):
+        t = tf.random.uniform(shape, dtype=dtype, minval=low, maxval=high)
+    return t
+
+
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, tf.Tensor):
@@ -390,6 +396,9 @@ def clone(input):
 
 def clamp(data, min_val, max_val):
     return tf.clip_by_value(data, min_val, max_val)
+
+def replace_inf_with_zero(x):
+    return tf.where(tf.abs(x) == np.inf, 0, x)
 
 def unique(input):
     return tf.unique(input).y

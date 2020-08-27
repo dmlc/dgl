@@ -4,6 +4,10 @@
  * \brief Call Metis partitioning
  */
 
+#if !defined(_WIN32)
+#include <GKlib.h>
+#endif  // !defined(_WIN32)
+
 #include <dgl/base_heterograph.h>
 #include <dgl/packed_func_ext.h>
 
@@ -14,6 +18,11 @@ using namespace dgl::runtime;
 
 namespace dgl {
 
+#if !defined(_WIN32)
+gk_csr_t *Convert2GKCsr(const aten::CSRMatrix mat, bool is_row);
+aten::CSRMatrix Convert2DGLCsr(gk_csr_t *gk_csr, bool is_row);
+#endif  // !defined(_WIN32)
+
 namespace transform {
 
 class HaloHeteroSubgraph : public HeteroSubgraph {
@@ -22,18 +31,28 @@ class HaloHeteroSubgraph : public HeteroSubgraph {
 };
 
 HeteroGraphPtr ReorderUnitGraph(UnitGraphPtr ug, IdArray new_order) {
+  auto format = ug->GetCreatedFormats();
   // We only need to reorder one of the graph structure.
-  // Only to in_csr for now
-  auto csrmat = ug->GetCSRMatrix(0);
-  auto new_csrmat = aten::CSRReorder(csrmat, new_order, new_order);
-  return UnitGraph::CreateFromCSR(ug->NumVertexTypes(), new_csrmat);
+  if (format & csc_code) {
+    auto cscmat = ug->GetCSCMatrix(0);
+    auto new_cscmat = aten::CSRReorder(cscmat, new_order, new_order);
+    return UnitGraph::CreateFromCSC(ug->NumVertexTypes(), new_cscmat, ug->GetAllowedFormats());
+  } else if (format & csr_code) {
+    auto csrmat = ug->GetCSRMatrix(0);
+    auto new_csrmat = aten::CSRReorder(csrmat, new_order, new_order);
+    return UnitGraph::CreateFromCSR(ug->NumVertexTypes(), new_csrmat, ug->GetAllowedFormats());
+  } else {
+    auto coomat = ug->GetCOOMatrix(0);
+    auto new_coomat = aten::COOReorder(coomat, new_order, new_order);
+    return UnitGraph::CreateFromCOO(ug->NumVertexTypes(), new_coomat, ug->GetAllowedFormats());
+  }
 }
 
 HaloHeteroSubgraph GetSubgraphWithHalo(std::shared_ptr<HeteroGraph> hg,
                                        IdArray nodes, int num_hops) {
   CHECK_EQ(hg->NumBits(), 64) << "halo subgraph only supports 64bits graph";
   CHECK_EQ(hg->relation_graphs().size(), 1)
-    << "halo subgraph only supports homograph";
+    << "halo subgraph only supports homogeneous graph";
   CHECK_EQ(nodes->dtype.bits, 64)
     << "halo subgraph only supports 64bits nodes tensor";
   const dgl_id_t *nid = static_cast<dgl_id_t *>(nodes->data);
@@ -254,6 +273,34 @@ DGL_REGISTER_GLOBAL("partition._CAPI_GetHaloSubgraphInnerNodes_Hetero")
     auto gptr = std::dynamic_pointer_cast<HaloHeteroSubgraph>(g.sptr());
     CHECK(gptr) << "The input graph has to be HaloHeteroSubgraph";
     *rv = gptr->inner_nodes[0];
+  });
+
+
+DGL_REGISTER_GLOBAL("partition._CAPI_DGLMakeSymmetric_Hetero")
+  .set_body([](DGLArgs args, DGLRetValue *rv) {
+    HeteroGraphRef g = args[0];
+    auto hgptr = std::dynamic_pointer_cast<HeteroGraph>(g.sptr());
+    CHECK(hgptr) << "Invalid HeteroGraph object";
+    CHECK_EQ(hgptr->relation_graphs().size(), 1)
+      << "Metis partition only supports homogeneous graph";
+    auto ugptr = hgptr->relation_graphs()[0];
+
+#if !defined(_WIN32)
+    // TODO(zhengda) should we get whatever CSR exists in the graph.
+    gk_csr_t *gk_csr = Convert2GKCsr(ugptr->GetCSCMatrix(0), true);
+    gk_csr_t *sym_gk_csr = gk_csr_MakeSymmetric(gk_csr, GK_CSR_SYM_SUM);
+    auto mat = Convert2DGLCsr(sym_gk_csr, true);
+    gk_csr_Free(&gk_csr);
+    gk_csr_Free(&sym_gk_csr);
+
+    auto new_ugptr = UnitGraph::CreateFromCSC(ugptr->NumVertexTypes(), mat,
+                                              ugptr->GetAllowedFormats());
+    std::vector<HeteroGraphPtr> rel_graphs = {new_ugptr};
+    *rv = HeteroGraphRef(std::make_shared<HeteroGraph>(
+      hgptr->meta_graph(), rel_graphs, hgptr->NumVerticesPerType()));
+#else
+    LOG(FATAL) << "The fast version of making symmetric graph is not supported in Windows.";
+#endif  // !defined(_WIN32)
   });
 
 }  // namespace transform

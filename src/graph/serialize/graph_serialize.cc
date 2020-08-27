@@ -144,6 +144,14 @@ DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadGraphFiles_V1")
     *rv = LoadDGLGraphs(filename, idx_list, onlyMeta);
   });
 
+DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_DGLAsHeteroGraph")
+  .set_body([](DGLArgs args, DGLRetValue *rv) {
+    GraphRef g = args[0];
+    ImmutableGraphPtr ig = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
+    CHECK(ig) << "graph is not readonly";
+    *rv = HeteroGraphRef(ig->AsHeteroGraph());
+  });
+
 DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadGraphFiles_V2")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];

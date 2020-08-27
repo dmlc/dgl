@@ -216,6 +216,9 @@ def ones(shape, dtype, ctx):
 def uniform(shape, dtype, ctx, low, high):
     return th.empty(shape, dtype=dtype, device=ctx).uniform_(low, high)
 
+def randint(shape, dtype, ctx, low, high):
+    return th.randint(low, high, shape, dtype=dtype, device=ctx)
+
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, th.Tensor):
@@ -265,6 +268,9 @@ def clone(input):
 def clamp(data, min_val, max_val):
     return th.clamp(data, min_val, max_val)
 
+def replace_inf_with_zero(x):
+    return th.masked_fill(x, th.isinf(x), 0)
+
 def unique(input):
     if input.dtype == th.bool:
         input = input.type(th.int8)
@@ -274,7 +280,7 @@ def full_1d(length, fill_value, dtype, ctx):
     return th.full((length,), fill_value, dtype=dtype, device=ctx)
 
 def nonzero_1d(input):
-    x = th.nonzero(input).squeeze()
+    x = th.nonzero(input, as_tuple=False).squeeze()
     return x if x.dim() == 1 else x.view(-1)
 
 def sort_1d(input):

@@ -21,75 +21,22 @@ import sklearn.metrics as skm
 
 from utils import thread_wrapped_func
 
-#### Negative sampler
-
 class NegativeSampler(object):
-    def __init__(self, g):
+    def __init__(self, g, k, neg_share=False):
         self.weights = g.in_degrees().float() ** 0.75
-
-    def __call__(self, num_samples):
-        return self.weights.multinomial(num_samples, replacement=True)
-
-#### Neighbor sampler
-
-class NeighborSampler(object):
-    def __init__(self, g, fanouts, num_negs, neg_share=False):
-        self.g = g
-        self.fanouts = fanouts
-        self.neg_sampler = NegativeSampler(g)
-        self.num_negs = num_negs
+        self.k = k
         self.neg_share = neg_share
 
-    def sample_blocks(self, seed_edges):
-        n_edges = len(seed_edges)
-        seed_edges = th.LongTensor(np.asarray(seed_edges))
-        heads, tails = self.g.find_edges(seed_edges)
-        if self.neg_share and n_edges % self.num_negs == 0:
-            neg_tails = self.neg_sampler(n_edges)
-            neg_tails = neg_tails.view(-1, 1, self.num_negs).expand(n_edges//self.num_negs,
-                                                                    self.num_negs,
-                                                                    self.num_negs).flatten()
-            neg_heads = heads.view(-1, 1).expand(n_edges, self.num_negs).flatten()
+    def __call__(self, g, eids):
+        src, _ = g.find_edges(eids)
+        n = len(src)
+        if self.neg_share and n % self.k == 0:
+            dst = self.weights.multinomial(n, replacement=True)
+            dst = dst.view(-1, 1, self.k).expand(-1, self.k, -1).flatten()
         else:
-            neg_tails = self.neg_sampler(self.num_negs * n_edges)
-            neg_heads = heads.view(-1, 1).expand(n_edges, self.num_negs).flatten()
-
-        # Maintain the correspondence between heads, tails and negative tails as two
-        # graphs.
-        # pos_graph contains the correspondence between each head and its positive tail.
-        # neg_graph contains the correspondence between each head and its negative tails.
-        # Both pos_graph and neg_graph are first constructed with the same node space as
-        # the original graph.  Then they are compacted together with dgl.compact_graphs.
-        pos_graph = dgl.graph((heads, tails), num_nodes=self.g.number_of_nodes())
-        neg_graph = dgl.graph((neg_heads, neg_tails), num_nodes=self.g.number_of_nodes())
-        pos_graph, neg_graph = dgl.compact_graphs([pos_graph, neg_graph])
-
-        # Obtain the node IDs being used in either pos_graph or neg_graph. Since they
-        # are compacted together, pos_graph and neg_graph share the same compacted node
-        # space.
-        seeds = pos_graph.ndata[dgl.NID]
-        blocks = []
-        for fanout in self.fanouts:
-            # For each seed node, sample ``fanout`` neighbors.
-            frontier = dgl.sampling.sample_neighbors(self.g, seeds, fanout, replace=True)
-            # Remove all edges between heads and tails, as well as heads and neg_tails.
-            _, _, edge_ids = frontier.edge_ids(
-                th.cat([heads, tails, neg_heads, neg_tails]),
-                th.cat([tails, heads, neg_tails, neg_heads]),
-                return_uv=True)
-            frontier = dgl.remove_edges(frontier, edge_ids)
-            # Then we compact the frontier into a bipartite graph for message passing.
-            block = dgl.to_block(frontier, seeds)
-
-            # Pre-generate CSR format that it can be used in training directly
-            block.create_format_()
-            # Obtain the seed nodes for next layer.
-            seeds = block.srcdata[dgl.NID]
-
-            blocks.insert(0, block)
-
-        # Pre-generate CSR format that it can be used in training directly
-        return pos_graph, neg_graph, blocks
+            dst = self.weights.multinomial(n, replacement=True)
+        src = src.repeat_interleave(self.k)
+        return src, dst
 
 def load_subtensor(g, input_nodes, device):
     """
@@ -145,12 +92,18 @@ class SAGE(nn.Module):
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
-            for start in tqdm.trange(0, len(nodes), batch_size):
-                end = start + batch_size
-                batch_nodes = nodes[start:end]
-                block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
-                block = block.int().to(device)
-                input_nodes = block.srcdata[dgl.NID]
+            sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
+            dataloader = dgl.dataloading.NodeDataLoader(
+                g,
+                th.arange(g.number_of_nodes()),
+                sampler,
+                batch_size=args.batch_size,
+                shuffle=True,
+                drop_last=False,
+                num_workers=args.num_workers)
+
+            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
+                block = blocks[0].to(device)
 
                 h = x[input_nodes].to(device)
                 h = layer(block, h)
@@ -158,7 +111,7 @@ class SAGE(nn.Module):
                     h = self.activation(h)
                     h = self.dropout(h)
 
-                y[start:end] = h.cpu()
+                y[output_nodes] = h.cpu()
 
             x = y
         return y
@@ -245,11 +198,9 @@ def run(proc_id, n_gpus, args, devices, data):
     #val_nid = th.LongTensor(np.nonzero(val_mask)[0])
     #test_nid = th.LongTensor(np.nonzero(test_mask)[0])
 
-    # Create sampler
-    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], args.num_negs, args.neg_share)
-
     # Create PyTorch DataLoader for constructing blocks
-    train_seeds = np.arange(g.number_of_edges())
+    n_edges = g.number_of_edges()
+    train_seeds = np.arange(n_edges)
     if n_gpus > 0:
         num_per_gpu = (train_seeds.shape[0] + n_gpus -1) // n_gpus
         train_seeds = train_seeds[proc_id * num_per_gpu :
@@ -257,10 +208,17 @@ def run(proc_id, n_gpus, args, devices, data):
                                   if (proc_id + 1) * num_per_gpu < train_seeds.shape[0]
                                   else train_seeds.shape[0]]
 
-    dataloader = DataLoader(
-        dataset=train_seeds,
+    # Create sampler
+    sampler = dgl.dataloading.MultiLayerNeighborSampler(
+        [int(fanout) for fanout in args.fan_out.split(',')])
+    dataloader = dgl.dataloading.EdgeDataLoader(
+        g, train_seeds, sampler, exclude='reverse_id',
+        # For each edge with ID e in Reddit dataset, the reverse edge is e ± |E|/2.
+        reverse_eids=th.cat([
+            th.arange(n_edges // 2, n_edges),
+            th.arange(0, n_edges // 2)]),
+        negative_sampler=NegativeSampler(g, args.num_negs),
         batch_size=args.batch_size,
-        collate_fn=sampler.sample_blocks,
         shuffle=True,
         drop_last=False,
         pin_memory=True,
@@ -290,10 +248,7 @@ def run(proc_id, n_gpus, args, devices, data):
         # blocks.
 
         tic_step = time.time()
-        for step, (pos_graph, neg_graph, blocks) in enumerate(dataloader):
-            # The nodes for input lies at the LHS side of the first block.
-            # The nodes for output lies at the RHS side of the last block.
-            input_nodes = blocks[0].srcdata[dgl.NID]
+        for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
             batch_inputs = load_subtensor(g, input_nodes, device)
             d_step = time.time()
 

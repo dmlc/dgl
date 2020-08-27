@@ -5,6 +5,7 @@ import numpy as np
 
 from . import rpc
 from .graph_partition_book import PartitionPolicy
+from .standalone_kvstore import KVClient as SA_KVClient
 
 from .. import backend as F
 from .. import utils
@@ -590,11 +591,14 @@ class KVServer(object):
         ID of current server (starts from 0).
     ip_config : str
         Path of IP configuration file.
+    num_servers : int
+        Server count on each machine.
     num_clients : int
         Total number of KVClients that will be connected to the KVServer.
     """
-    def __init__(self, server_id, ip_config, num_clients):
+    def __init__(self, server_id, ip_config, num_servers, num_clients):
         assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
+        assert num_servers > 0, 'num_servers (%d) must be a positive number.' % num_servers
         assert os.path.exists(ip_config), 'Cannot open file: %s' % ip_config
         assert num_clients >= 0, 'num_clients (%d) cannot be a negative number.' % num_clients
         # Register services on server
@@ -635,7 +639,7 @@ class KVServer(object):
         self._part_policy = {}
         # Basic information
         self._server_id = server_id
-        self._server_namebook = rpc.read_ip_config(ip_config)
+        self._server_namebook = rpc.read_ip_config(ip_config, num_servers)
         assert server_id in self._server_namebook, \
                 'Trying to start server {}, but there are {} servers in the config file'.format(
                     server_id, len(self._server_namebook))
@@ -733,12 +737,12 @@ class KVServer(object):
             shared_data = empty_shared_mem(name+'-kvdata-', True, data_tensor.shape, data_type)
             dlpack = shared_data.to_dlpack()
             self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
-            self._data_store[name][:] = data_tensor[:]
-            assert self._part_policy[name].get_data_size() == data_tensor.shape[0], \
+            rpc.copy_data_to_shared_memory(self._data_store[name], data_tensor)
+            assert self._part_policy[name].get_part_size() == data_tensor.shape[0], \
                     'kvserver expect partition {} for {} has {} rows, but gets {} rows'.format(
                         self._part_policy[name].part_id,
                         policy_str,
-                        self._part_policy[name].get_data_size(),
+                        self._part_policy[name].get_part_size(),
                         data_tensor.shape[0])
         self._pull_handlers[name] = default_pull_handler
         self._push_handlers[name] = default_push_handler
@@ -772,13 +776,16 @@ class KVClient(object):
     ----------
     ip_config : str
         Path of IP configuration file.
+    num_servers : int
+        Server count on each machine.
     role : str
         We can set different role for kvstore.
     """
-    def __init__(self, ip_config, role='default'):
-        assert rpc.get_rank() != -1, 'Please invoke rpc.connect_to_server() \
-        before creating KVClient.'
+    def __init__(self, ip_config, num_servers, role='default'):
+        assert rpc.get_rank() != -1, \
+                'Please invoke rpc.connect_to_server() before creating KVClient.'
         assert os.path.exists(ip_config), 'Cannot open file: %s' % ip_config
+        assert num_servers > 0, 'num_servers (%d) must be a positive number.' % num_servers
         # Register services on client
         rpc.register_service(KVSTORE_PULL,
                              PullRequest,
@@ -814,12 +821,14 @@ class KVClient(object):
         self._data_store = {}
         # Store the partition information with specified data name
         self._part_policy = {}
+        # This stores all unique partition policies in the kvstore. The key is the policy name.
+        self._all_possible_part_policy = {}
         # Store the full data shape across kvserver
         self._full_data_shape = {}
         # Store all the data name
         self._data_name_list = set()
         # Basic information
-        self._server_namebook = rpc.read_ip_config(ip_config)
+        self._server_namebook = rpc.read_ip_config(ip_config, num_servers)
         self._server_count = len(self._server_namebook)
         self._group_count = self._server_namebook[0][3]
         self._machine_count = int(self._server_count / self._group_count)
@@ -832,6 +841,11 @@ class KVClient(object):
         self._push_handlers = {}
         # register role on server-0
         self._role = role
+
+    @property
+    def all_possible_part_policy(self):
+        """Get all possible partition policies"""
+        return self._all_possible_part_policy
 
     @property
     def client_id(self):
@@ -954,7 +968,7 @@ class KVClient(object):
         # Send request to the servers to initialize data.
         # The servers may handle the duplicated initializations.
         part_shape = shape.copy()
-        part_shape[0] = part_policy.get_data_size()
+        part_shape[0] = part_policy.get_part_size()
         request = InitDataRequest(name,
                                   tuple(part_shape),
                                   F.reverse_data_type_dict[dtype],
@@ -971,7 +985,7 @@ class KVClient(object):
         self.barrier()
         # Create local shared-data
         local_shape = shape.copy()
-        local_shape[0] = part_policy.get_data_size()
+        local_shape[0] = part_policy.get_part_size()
         if name in self._part_policy:
             raise RuntimeError("Policy %s has already exists!" % name)
         if name in self._data_store:
@@ -979,6 +993,7 @@ class KVClient(object):
         if name in self._full_data_shape:
             raise RuntimeError("Data shape %s has already exists!" % name)
         self._part_policy[name] = part_policy
+        self._all_possible_part_policy[part_policy.policy_str] = part_policy
         shared_data = empty_shared_mem(name+'-kvdata-', False, \
             local_shape, F.reverse_data_type_dict[dtype])
         dlpack = shared_data.to_dlpack()
@@ -1055,6 +1070,7 @@ class KVClient(object):
                 dlpack = shared_data.to_dlpack()
                 self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
                 self._part_policy[name] = PartitionPolicy(policy_str, partition_book)
+                self._all_possible_part_policy[policy_str] = self._part_policy[name]
                 self._pull_handlers[name] = default_pull_handler
                 self._push_handlers[name] = default_push_handler
         # Get full data shape across servers
@@ -1229,11 +1245,14 @@ class KVClient(object):
 
 KVCLIENT = None
 
-def init_kvstore(ip_config, role):
+def init_kvstore(ip_config, num_servers, role):
     """initialize KVStore"""
     global KVCLIENT
     if KVCLIENT is None:
-        KVCLIENT = KVClient(ip_config, role)
+        if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
+            KVCLIENT = SA_KVClient()
+        else:
+            KVCLIENT = KVClient(ip_config, num_servers, role)
 
 def close_kvstore():
     """Close the current KVClient"""

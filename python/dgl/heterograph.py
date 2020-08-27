@@ -1,6 +1,6 @@
 """Classes for heterogeneous graphs."""
 #pylint: disable= too-many-lines
-from collections import defaultdict
+from collections import defaultdict, Iterable
 from collections.abc import Mapping
 from contextlib import contextmanager
 import copy
@@ -75,28 +75,11 @@ class DGLHeteroGraph(object):
 
     One can construct the graph as follows:
 
-    >>> follows_g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
-    >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 1, 1]), 'user', 'plays', 'game')
-    >>> devs_g = dgl.bipartite(([0, 1], [0, 1]), 'developer', 'develops', 'game')
-    >>> g = dgl.hetero_from_relations([follows_g, plays_g, devs_g])
-
-    Or equivalently
-
     >>> g = dgl.heterograph({
     ...     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
     ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
     ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
     ...     })
-
-    :func:`dgl.graph` and :func:`dgl.bipartite` can create a graph from a variety of
-    data types including:
-
-    * edge list
-    * edge tuples
-    * networkx graph
-    * scipy sparse matrix
-
-    Click the function names for more details.
 
     Then one can query the graph structure by specifying the ``ntype`` or ``etype`` arguments:
 
@@ -104,9 +87,9 @@ class DGLHeteroGraph(object):
     3
     >>> g.number_of_edges('plays')
     4
-    >>> g.out_degrees(etype='develops')  # out-degrees of source nodes of 'develops' relation
+    >>> g.out_degrees(etype='develops')  # out-degrees of source nodes of 'develops' edge type
     tensor([1, 1])
-    >>> g.in_edges(0, etype='develops')  # in-edges of destination node 0 of 'develops' relation
+    >>> g.in_edges(0, etype='develops')  # in-edges of destination node 0 of 'develops' edge type
     (tensor([0]), tensor([0]))
 
     Or on the sliced graph for an edge type:
@@ -125,9 +108,10 @@ class DGLHeteroGraph(object):
     For example, suppose a graph that has two types of relation "user-watches-movie"
     and "user-watches-TV" as follows:
 
-    >>> g0 = dgl.bipartite(([0, 1, 1], [1, 0, 1]), 'user', 'watches', 'movie')
-    >>> g1 = dgl.bipartite(([0, 1], [0, 1]), 'user', 'watches', 'TV')
-    >>> GG = dgl.hetero_from_relations([g0, g1]) # Merge the two graphs
+    >>> GG = dgl.heterograph({
+    ...     ('user', 'watches', 'movie'): ([0, 1, 1], [1, 0, 1]),
+    ...     ('user', 'watches', 'TV'): ([0, 1], [0, 1])
+    ... })
 
     To distinguish between the two "watches" edge type, one must specify a full triplet:
 
@@ -400,11 +384,11 @@ class DGLHeteroGraph(object):
         **Heterogeneous Graphs with Multiple Node Types**
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
-        >>>                                 torch.tensor([0, 0, 1, 1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
-        >>>                                         torch.tensor([0, 1]))
-        >>>     })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        ...                                         torch.tensor([0, 1]))
+        ...     })
         >>> g.add_nodes(2)
         DGLError: Node type name must be specified
         if there are more than one node types.
@@ -547,7 +531,7 @@ class DGLHeteroGraph(object):
         We can also assign features for the new edges in adding new edges.
 
         >>> g.add_edges(torch.tensor([0, 0]), torch.tensor([2, 2]),
-        >>>             {'h': torch.tensor([[1.], [2.]]), 'w': torch.ones(2, 1)})
+        ...             {'h': torch.tensor([[1.], [2.]]), 'w': torch.ones(2, 1)})
         >>> g.edata['h']
         tensor([[1.], [1.], [1.], [1.], [0.], [1.], [2.]])
 
@@ -560,17 +544,17 @@ class DGLHeteroGraph(object):
         **Heterogeneous Graphs with Multiple Edge Types**
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
-        >>>                                 torch.tensor([0, 0, 1, 1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
-        >>>                                         torch.tensor([0, 1]))
-        >>>     })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        ...                                         torch.tensor([0, 1]))
+        ...     })
         >>> g.add_edges(torch.tensor([3]), torch.tensor([3]))
         DGLError: Edge type name must be specified
         if there are more than one edge types.
         >>> g.number_of_edges('plays')
         4
-        >>>  g.add_edges(torch.tensor([3]), torch.tensor([3]), etype='plays')
+        >>> g.add_edges(torch.tensor([3]), torch.tensor([3]), etype='plays')
         >>> g.number_of_edges('plays')
         5
 
@@ -696,11 +680,11 @@ class DGLHeteroGraph(object):
         **Heterogeneous Graphs with Multiple Edge Types**
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
-        >>>                                 torch.tensor([0, 0, 1, 1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
-        >>>                                         torch.tensor([0, 1]))
-        >>>     })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        ...                                         torch.tensor([0, 1]))
+        ...     })
         >>> g.remove_edges(torch.tensor([0, 1]))
         DGLError: Edge type name must be specified
         if there are more than one edge types.
@@ -784,11 +768,11 @@ class DGLHeteroGraph(object):
         **Heterogeneous Graphs with Multiple Node Types**
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
-        >>>                                 torch.tensor([0, 0, 1, 1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
-        >>>                                         torch.tensor([0, 1]))
-        >>>     })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        ...                                         torch.tensor([0, 1]))
+        ...     })
         >>> g.remove_nodes(torch.tensor([0, 1]))
         DGLError: Node type name must be specified
         if there are more than one node types.
@@ -853,7 +837,7 @@ class DGLHeteroGraph(object):
 
         A uni-bipartite heterograph can further divide its node types into two sets:
         SRC and DST. All edges are from nodes in SRC to nodes in DST. The following APIs
-        can be used to get the nodes and types that belong to SRC and DST sets:
+        can be used to get the type, data, and nodes that belong to SRC and DST sets:
 
         * :func:`srctype` and :func:`dsttype`
         * :func:`srcdata` and :func:`dstdata`
@@ -867,67 +851,131 @@ class DGLHeteroGraph(object):
 
     @property
     def ntypes(self):
-        """Return the list of node types of this graph.
+        """Return the node types of the graph.
 
         Returns
         -------
         list of str
+            Each ``str`` is a node type.
 
         Examples
         --------
+        The following example uses PyTorch backend.
 
-        >>> follows_g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 1, 1]), 'user', 'plays', 'game')
-        >>> g = dgl.hetero_from_relations([follows_g, plays_g])
+        >>> import dgl
+        >>> import torch
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
+        ... })
         >>> g.ntypes
-        ['user', 'game']
+        ['game', 'user']
         """
         return self._ntypes
 
     @property
     def etypes(self):
-        """Return the list of edge types of this graph.
+        """Return the edge types of the graph.
 
         Returns
         -------
         list of str
+            Each ``str`` is an edge type.
+
+        Notes
+        -----
+        An edge type can appear in multiple canonical edge types. For example, ``'interacts'``
+        can appear in two canonical edge types ``('drug', 'interacts', 'drug')`` and
+        ``('protein', 'interacts', 'protein')``. It is recommended to use
+        :func:`~dgl.DGLGraph.canonical_etypes` in this case.
 
         Examples
         --------
+        The following example uses PyTorch backend.
 
-        >>> follows_g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 1, 1]), 'user', 'plays', 'game')
-        >>> g = dgl.hetero_from_relations([follows_g, plays_g])
+        >>> import dgl
+        >>> import torch
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
+        ... })
         >>> g.etypes
-        ['follows', 'plays']
+        ['follows', 'follows', 'plays']
         """
         return self._etypes
 
     @property
     def canonical_etypes(self):
-        """Return the list of canonical edge types of this graph.
+        """Return the canonical edge types of the graph.
 
-        A canonical edge type is a tuple of string (src_type, edge_type, dst_type).
+        A canonical edge type is a 3-tuple of str ``src_type, edge_type, dst_type``, where
+        ``src_type``, ``edge_type``, ``dst_type`` are the type of the source nodes, edges
+        and destination nodes respectively.
 
         Returns
         -------
-        list of 3-tuples
+        list of 3-tuple of str
+            Each 3-tuple of str is a canonical edge type.
 
         Examples
         --------
+        The following example uses PyTorch backend.
 
-        >>> follows_g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 1, 1]), 'user', 'plays', 'game')
-        >>> g = dgl.hetero_from_relations([follows_g, plays_g])
+        >>> import dgl
+        >>> import torch
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
+        ... })
         >>> g.canonical_etypes
-        [('user', 'follows', 'user'), ('user', 'plays', 'game')]
+        [('user', 'follows', 'user'),
+         ('user', 'follows', 'game'),
+         ('user', 'plays', 'game')]
         """
         return self._canonical_etypes
 
     @property
     def srctypes(self):
-        """Return the node types in the SRC category. Return :attr:``ntypes`` if
-        the graph is not a uni-bipartite graph.
+        """Return the source node types.
+
+        Returns
+        -------
+        list of str
+
+            * If the graph is a uni-bipartite graph, it returns the source node types.
+              For a definition of uni-bipartite, see :func:`is_unibipartite`.
+            * Otherwise, it returns all node types in the graph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Query for a uni-bipartite graph.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): (torch.tensor([0]), torch.tensor([1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        ... })
+        >>> g.srctypes
+        ['developer', 'user']
+
+        Query for a graph that is not uni-bipartite.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0]), torch.tensor([1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        ... })
+        >>> g.srctypes
+        ['developer', 'game', 'user']
         """
         if self.is_unibipartite:
             return sorted(list(self._srctypes_invmap.keys()))
@@ -936,8 +984,41 @@ class DGLHeteroGraph(object):
 
     @property
     def dsttypes(self):
-        """Return the node types in the DST category. Return :attr:``ntypes`` if
-        the graph is not a uni-bipartite graph.
+        """Return the destination node types.
+
+        Returns
+        -------
+        list of str
+            Each str is a node type.
+
+            * If the graph is a uni-bipartite graph, it returns the destination node types.
+              For a definition of uni-bipartite, see :func:`is_unibipartite`.
+            * Otherwise, it returns all node types in the graph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Query for a uni-bipartite graph.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): (torch.tensor([0]), torch.tensor([1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        ... })
+        >>> g.dsttypes
+        ['game']
+
+        Query for a graph that is not uni-bipartite.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0]), torch.tensor([1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        ... })
+        >>> g.dsttypes
+        ['developer', 'game', 'user']
         """
         if self.is_unibipartite:
             return sorted(list(self._dsttypes_invmap.keys()))
@@ -945,33 +1026,34 @@ class DGLHeteroGraph(object):
             return self.ntypes
 
     def metagraph(self):
-        """Return the metagraph as networkx.MultiDiGraph.
+        """Return the metagraph of the heterograph.
 
-        The nodes are labeled with node type names.
-        The edges have their keys holding the edge type names.
+        The metagraph (or network schema) of a heterogeneous network specifies type constraints
+        on the sets of nodes and edges between the nodes. For a formal definition, refer to
+        `Yizhou et al. <https://www.kdd.org/exploration_files/V14-02-03-Sun.pdf>`_.
 
         Returns
         -------
         networkx.MultiDiGraph
+            The metagraph.
 
         Examples
         --------
+        The following example uses PyTorch backend.
 
-        >>> follows_g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 1, 1]), 'user', 'plays', 'game')
-        >>> g = dgl.hetero_from_relations([follows_g, plays_g])
+        >>> import dgl
+        >>> import torch
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
+        ... })
         >>> meta_g = g.metagraph()
-
-        The metagraph then has two nodes and two edges.
-
         >>> meta_g.nodes()
         NodeView(('user', 'game'))
-        >>> meta_g.number_of_nodes()
-        2
         >>> meta_g.edges()
-        OutMultiEdgeDataView([('user', 'user'), ('user', 'game')])
-        >>> meta_g.number_of_edges()
-        2
+        OutMultiEdgeDataView([('user', 'user'), ('user', 'game'), ('user', 'game')])
         """
         nx_graph = self._graph.metagraph.to_networkx()
         nx_metagraph = nx.MultiDiGraph()
@@ -981,38 +1063,56 @@ class DGLHeteroGraph(object):
         return nx_metagraph
 
     def to_canonical_etype(self, etype):
-        """Convert edge type to canonical etype: (srctype, etype, dsttype).
+        """Convert an edge type to the corresponding canonical edge type in the graph.
 
-        The input can already be a canonical tuple.
+        A canonical edge type is a 3-tuple of strings ``src_type, edge_type, dst_type``, where
+        ``src_type``, ``edge_type``, ``dst_type`` are separately the type of source
+        nodes, edges and destination nodes.
 
         Parameters
         ----------
-        etype : str or tuple of str
-            Edge type
+        etype : str or 3-tuple of str
+            If :attr:`etype` is an edge type (str), it returns the corresponding canonical edge
+            type in the graph. If :attr:`etype` is already a canonical edge type
+            (3-tuple of str), it simply returns :attr:`etype`.
 
         Returns
         -------
-        tuple of str
+        3-tuple of str
+            The canonical edge type corresponding to the edge type.
+
+        Notes
+        -----
+        If :attr:`etype` is an edge type, the API expects it to appear only once in the graph. For
+        example, in a graph with canonical edge types ``('A', 'follows', 'B')``,
+        ``('A', 'follows', 'C')`` and ``('B', 'watches', 'D')``, ``'follows'`` is an invalid value
+        for :attr:`etype` while ``'watches'`` is a valid one.
 
         Examples
         --------
+        The following example uses PyTorch backend.
 
-        Instantiate a heterograph.
+        >>> import dgl
+        >>> import torch
 
-        >>> g1 = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
-        >>> g2 = dgl.bipartite(([0, 1, 1, 2], [0, 0, 1, 1]), 'user', 'plays', 'game')
-        >>> g3 = dgl.bipartite(([0, 1], [0, 1]), 'developer', 'follows', 'game')
-        >>> g = dgl.hetero_from_relations([g1, g2, g3])
+        Create a heterograph.
 
-        Get canonical edge types.
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
+        ...     ('developer', 'follows', 'game'): ([0, 1], [0, 1])
+        ... })
+
+        Map an edge type to its corresponding canonical edge type.
 
         >>> g.to_canonical_etype('plays')
         ('user', 'plays', 'game')
         >>> g.to_canonical_etype(('user', 'plays', 'game'))
         ('user', 'plays', 'game')
-        >>> g.to_canonical_etype('follows')
-        DGLError: Edge type "follows" is ambiguous.
-        Please use canonical etype type in the form of (srctype, etype, dsttype)
+
+        See Also
+        --------
+        canonical_etypes
         """
         if etype is None:
             if len(self.etypes) != 1:
@@ -1026,8 +1126,8 @@ class DGLHeteroGraph(object):
             if ret is None:
                 raise DGLError('Edge type "{}" does not exist.'.format(etype))
             if len(ret) == 0:
-                raise DGLError('Edge type "%s" is ambiguous. Please use canonical etype '
-                               'type in the form of (srctype, etype, dsttype)' % etype)
+                raise DGLError('Edge type "%s" is ambiguous. Please use canonical edge type '
+                               'in the form of (srctype, etype, dsttype)' % etype)
             return ret
 
     def get_ntype_id(self, ntype):
@@ -1144,11 +1244,93 @@ class DGLHeteroGraph(object):
     #################################################################
     @property
     def batch_size(self):
-        """TBD"""
+        """Return the number of graphs in the batched graph.
+
+        Returns
+        -------
+        int
+            The Number of graphs in the batch. If the graph is not a batched one,
+            it will return 1.
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Query for homogeneous graphs.
+
+        >>> g1 = dgl.graph((torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])))
+        >>> g1.batch_size
+        1
+        >>> g2 = dgl.graph((torch.tensor([0, 0, 0, 1]), torch.tensor([0, 1, 2, 0])))
+        >>> bg = dgl.batch([g1, g2])
+        >>> bg.batch_size
+        2
+
+        Query for heterogeneous graphs.
+
+        >>> hg1 = dgl.heterograph({
+        ...       ('user', 'plays', 'game') : (torch.tensor([0, 1]), torch.tensor([0, 0]))})
+        >>> hg1.batch_size
+        1
+        >>> hg2 = dgl.heterograph({
+        ...       ('user', 'plays', 'game') : (torch.tensor([0, 0]), torch.tensor([1, 0]))})
+        >>> bg = dgl.batch([hg1, hg2])
+        >>> bg.batch_size
+        2
+        """
         return len(self.batch_num_nodes(self.ntypes[0]))
 
     def batch_num_nodes(self, ntype=None):
-        """TBD"""
+        """Return the number of nodes for each graph in the batch with the specified node type.
+
+        Parameters
+        ----------
+        ntype : str, optional
+            The node type for query. If the graph has multiple node types, one must
+            specify the argument. Otherwise, it can be omitted. If the graph is not a batched
+            one, it will return a list of length 1 that holds the number of nodes in the graph.
+
+        Returns
+        -------
+        Tensor
+            The number of nodes with the specified type for each graph in the batch. The i-th
+            element of it is the number of nodes with the specified type for the i-th graph.
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Query for homogeneous graphs.
+
+        >>> g1 = dgl.graph((torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])))
+        >>> g1.batch_num_nodes()
+        tensor([4])
+        >>> g2 = dgl.graph((torch.tensor([0, 0, 0, 1]), torch.tensor([0, 1, 2, 0])))
+        >>> bg = dgl.batch([g1, g2])
+        >>> bg.batch_num_nodes()
+        tensor([4, 3])
+
+        Query for heterogeneous graphs.
+
+        >>> hg1 = dgl.heterograph({
+        ...       ('user', 'plays', 'game') : (torch.tensor([0, 1]), torch.tensor([0, 0]))})
+        >>> hg2 = dgl.heterograph({
+        ...       ('user', 'plays', 'game') : (torch.tensor([0, 0]), torch.tensor([1, 0]))})
+        >>> bg = dgl.batch([hg1, hg2])
+        >>> bg.batch_num_nodes('user')
+        tensor([2, 1])
+        """
+        if ntype is not None and ntype not in self.ntypes:
+            raise DGLError('Expect ntype in {}, got {}'.format(self.ntypes, ntype))
+
         if self._batch_num_nodes is None:
             self._batch_num_nodes = {}
             for ty in self.ntypes:
@@ -1170,7 +1352,52 @@ class DGLHeteroGraph(object):
         self._batch_num_nodes = val
 
     def batch_num_edges(self, etype=None):
-        """TBD"""
+        """Return the number of edges for each graph in the batch with the specified edge type.
+
+        Parameters
+        ----------
+        etype : str or tuple of str, optional
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
+
+        Returns
+        -------
+        Tensor
+            The number of edges with the specified type for each graph in the batch. The i-th
+            element of it is the number of edges with the specified type for the i-th graph.
+            If the graph is not a batched one, it will return a list of length 1 that holds
+            the number of edges in the graph.
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Query for homogeneous graphs.
+
+        >>> g1 = dgl.graph((torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])))
+        >>> g1.batch_num_edges()
+        tensor([3])
+        >>> g2 = dgl.graph((torch.tensor([0, 0, 0, 1]), torch.tensor([0, 1, 2, 0])))
+        >>> bg = dgl.batch([g1, g2])
+        >>> bg.batch_num_edges()
+        tensor([3, 4])
+
+        Query for heterogeneous graphs.
+
+        >>> hg1 = dgl.heterograph({
+        ...       ('user', 'plays', 'game') : (torch.tensor([0, 1]), torch.tensor([0, 0]))})
+        >>> hg2 = dgl.heterograph({
+        ...       ('user', 'plays', 'game') : (torch.tensor([0, 0]), torch.tensor([1, 0]))})
+        >>> bg = dgl.batch([hg1, hg2])
+        >>> bg.batch_num_edges('plays')
+        tensor([2, 2])
+        """
         if self._batch_num_edges is None:
             self._batch_num_edges = {}
             for ty in self.canonical_etypes:
@@ -1181,6 +1408,8 @@ class DGLHeteroGraph(object):
                 raise DGLError('Edge type name must be specified if there are more than one '
                                'edge types.')
             etype = self.canonical_etypes[0]
+        else:
+            etype = self.to_canonical_etype(etype)
         return self._batch_num_edges[etype]
 
     def set_batch_num_edges(self, val):
@@ -1197,37 +1426,114 @@ class DGLHeteroGraph(object):
 
     @property
     def nodes(self):
-        """Return a node view that can be used to set/get feature
-        data of a single node type.
+        """Return a node view
+
+        One can use it for:
+
+        1. Getting the node IDs for a single node type.
+        2. Setting/getting features for all nodes of a single node type.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        To set features of all users
+        >>> import dgl
+        >>> import torch
 
-        >>> g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
-        >>> g.nodes['user'].data['h'] = torch.zeros(3, 5)
+        Create a homogeneous graph and a heterogeneous graph of two node types.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> hg = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
+
+        Get the node IDs of the homogeneous graph.
+
+        >>> g.nodes()
+        tensor([0, 1, 2])
+
+        Get the node IDs of the heterogeneous graph. With multiple node types introduced,
+        one needs to specify the node type for query.
+
+        >>> hg.nodes('user')
+        tensor([0, 1, 2, 3, 4])
+
+        Set and get a feature 'h' for all nodes of a single type in the heterogeneous graph.
+
+        >>> hg.nodes['user'].data['h'] = torch.ones(5, 1)
+        >>> hg.nodes['user'].data['h']
+        tensor([[1.], [1.], [1.], [1.], [1.]])
+
+        To set node features for a graph with a single node type, use :func:`DGLGraph.ndata`.
 
         See Also
         --------
         ndata
         """
+        # Todo (Mufei) Replace the syntax g.nodes[...].ndata[...] with g.nodes[...][...]
         return HeteroNodeView(self, self.get_ntype_id)
 
     @property
     def srcnodes(self):
-        """Return a SRC node view that can be used to set/get feature
-        data of a single node type.
+        """Return a node view for source nodes
+
+        If the graph is a uni-bipartite graph (see :func:`is_unibipartite` for reference),
+        this is :func:`nodes` restricted to source node types. Otherwise, it is an alias
+        for :func:`nodes`.
+
+        One can use it for:
+
+        1. Getting the node IDs for a single node type.
+        2. Setting/getting features for all nodes of a single node type.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        To set features of all users
+        >>> import dgl
+        >>> import torch
 
-        >>> g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game')
-        >>> g.srcnodes['user'].data['h'] = torch.zeros(2, 5)
+        Create a uni-bipartite graph.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): (torch.tensor([0]), torch.tensor([1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        ... })
+
+        Get the node IDs for source node types.
+
+        >>> g.srcnodes('user')
+        tensor([0])
+        >>> g.srcnodes('developer')
+        tensor([0, 1])
+
+        Set/get features for source node types.
+
+        >>> g.srcnodes['user'].data['h'] = torch.ones(1, 1)
+        >>> g.srcnodes['user'].data['h']
+        tensor([[1.]])
+
+        Create a graph that is not uni-bipartite.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0]), torch.tensor([1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        ... })
+
+        :func:`dgl.DGLGraph.srcnodes` falls back to :func:`dgl.DGLGraph.nodes` and one can
+        get the node IDs for both source and destination node types.
+
+        >>> g.srcnodes('game')
+        tensor([0, 1, 2])
+
+        One can also set/get features for destination node types in this case.
+
+        >>> g.srcnodes['game'].data['h'] = torch.ones(3, 1)
+        >>> g.srcnodes['game'].data['h']
+        tensor([[1.],
+                [1.],
+                [1.]])
 
         See Also
         --------
@@ -1237,17 +1543,63 @@ class DGLHeteroGraph(object):
 
     @property
     def dstnodes(self):
-        """Return a DST node view that can be used to set/get feature
-        data of a single node type.
+        """Return a node view for destination nodes
+
+        If the graph is a uni-bipartite graph (see :func:`is_unibipartite` for reference),
+        this is :func:`nodes` restricted to destination node types. Otherwise, it is an alias
+        for :func:`nodes`.
+
+        One can use it for:
+
+        1. Getting the node IDs for a single node type.
+        2. Setting/getting features for all nodes of a single node type.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        To set features of all games
+        >>> import dgl
+        >>> import torch
 
-        >>> g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game')
-        >>> g.dstnodes['game'].data['h'] = torch.zeros(3, 5)
+        Create a uni-bipartite graph.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): (torch.tensor([0]), torch.tensor([1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        ... })
+
+        Get the node IDs for destination node types.
+
+        >>> g.dstnodes('game')
+        tensor([0, 1, 2])
+
+        Set/get features for destination node types.
+
+        >>> g.dstnodes['game'].data['h'] = torch.ones(3, 1)
+        >>> g.dstnodes['game'].data['h']
+        tensor([[1.],
+                [1.],
+                [1.]])
+
+        Create a graph that is not uni-bipartite.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0]), torch.tensor([1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([1]), torch.tensor([2]))
+        ... })
+
+        :func:`dgl.DGLGraph.dstnodes` falls back to :func:`dgl.DGLGraph.nodes` and one can
+        get the node IDs for both source and destination node types.
+
+        >>> g.dstnodes('developer')
+        tensor([0, 1])
+
+        One can also set/get features for source node types in this case.
+
+        >>> g.dstnodes['developer'].data['h'] = torch.ones(2, 1)
+        >>> g.dstnodes['developer'].data['h']
+        tensor([[1.],
+                [1.]])
 
         See Also
         --------
@@ -1257,50 +1609,53 @@ class DGLHeteroGraph(object):
 
     @property
     def ndata(self):
-        """Return the data view of all the nodes.
+        """Return a node data view for setting/getting node features
 
-        If the graph has only one node type, ``g.ndata['feat']`` gives
-        the node feature data under name ``'feat'``.
-        If the graph has multiple node types, then ``g.ndata['feat']``
-        returns a dictionary where the key is the node type and the
-        value is the node feature tensor. If the node type does not
-        have feature `'feat'`, it is not included in the dictionary.
+        Let ``g`` be a DGLGraph. If ``g`` is a graph of a single node type, ``g.ndata[feat]``
+        returns the node feature associated with the name ``feat``. One can also set a node
+        feature associated with the name ``feat`` by setting ``g.ndata[feat]`` to a tensor.
+
+        If ``g`` is a graph of multiple node types, ``g.ndata[feat]`` returns a
+        dict[str, Tensor] mapping node types to the node features associated with the name
+        ``feat`` for the corresponding type. One can also set a node feature associated
+        with the name ``feat`` for some node type(s) by setting ``g.ndata[feat]`` to a
+        dictionary as described.
+
+        Notes
+        -----
+        For setting features, the device of the features must be the same as the device
+        of the graph.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        To set features of all nodes in a heterogeneous graph
-        with only one node type:
+        >>> import dgl
+        >>> import torch
 
-        >>> g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
-        >>> g.ndata['h'] = torch.zeros(3, 5)
+        Set and get feature 'h' for a graph of a single node type.
 
-        To set features of all nodes in a heterogeneous graph
-        with multiple node types:
-
-        >>> g = dgl.heterograph({('user', 'like', 'movie') : ([0, 1, 1], [1, 2, 0])})
-        >>> g.ndata['h'] = {'user': torch.zeros(2, 5),
-        ...                 'movie': torch.zeros(3, 5)}
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> g.ndata['h'] = torch.ones(3, 1)
         >>> g.ndata['h']
-        ... {'user': tensor([[0., 0., 0., 0., 0.],
-        ...                 [0., 0., 0., 0., 0.]]),
-        ...  'movie': tensor([[0., 0., 0., 0., 0.],
-        ...                   [0., 0., 0., 0., 0.],
-        ...                   [0., 0., 0., 0., 0.]])}
+        tensor([[1.],
+                [1.],
+                [1.]])
 
-        To set features of part of nodes in a heterogeneous graph
-        with multiple node types:
+        Set and get feature 'h' for a graph of multiple node types.
 
-        >>> g = dgl.heterograph({('user', 'like', 'movie') : ([0, 1, 1], [1, 2, 0])})
-        >>> g.ndata['h'] = {'user': torch.zeros(2, 5)}
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
+        ...     ('player', 'plays', 'game'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
+        ... })
+        >>> g.ndata['h'] = {'game': torch.zeros(2, 1), 'player': torch.ones(3, 1)}
         >>> g.ndata['h']
-        ... {'user': tensor([[0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.]])}
-        >>> # clean the feature 'h' and no node type contains 'h'
-        >>> g.ndata.pop('h')
+        {'game': tensor([[0.], [0.]]),
+         'player': tensor([[1.], [1.], [1.]])}
+        >>> g.ndata['h'] = {'game': torch.ones(2, 1)}
         >>> g.ndata['h']
-        ... {}
+        {'game': tensor([[1.], [1.]]),
+         'player': tensor([[1.], [1.], [1.]])}
 
         See Also
         --------
@@ -1315,84 +1670,62 @@ class DGLHeteroGraph(object):
             ntypes = self.ntypes
             return HeteroNodeDataView(self, ntypes, ntids, ALL)
 
-
     @property
     def srcdata(self):
-        """Return the data view of all nodes in the SRC category.
+        """Return a node data view for setting/getting source node features.
 
-        If the source nodes have only one node type, ``g.srcdata['feat']``
-        gives the node feature data under name ``'feat'``.
-        If the source nodes have multiple node types, then
-        ``g.srcdata['feat']`` returns a dictionary where the key is
-        the source node type and the value is the node feature
-        tensor. If the source node type does not have feature
-        `'feat'`, it is not included in the dictionary.
+        Let ``g`` be a DGLGraph. If ``g`` is a graph of a single source node type,
+        ``g.srcdata[feat]`` returns the source node feature associated with the name ``feat``.
+        One can also set a source node feature associated with the name ``feat`` by
+        setting ``g.srcdata[feat]`` to a tensor.
+
+        If ``g`` is a graph of multiple source node types, ``g.srcdata[feat]`` returns a
+        dict[str, Tensor] mapping source node types to the node features associated with
+        the name ``feat`` for the corresponding type. One can also set a node feature
+        associated with the name ``feat`` for some source node type(s) by setting
+        ``g.srcdata[feat]`` to a dictionary as described.
+
+        Notes
+        -----
+        For setting features, the device of the features must be the same as the device
+        of the graph.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        To set features of all source nodes in a graph with only one edge type:
+        >>> import dgl
+        >>> import torch
 
-        >>> g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game')
-        >>> g.srcdata['h'] = torch.zeros(2, 5)
-
-        This is equivalent to
-
-        >>> g.nodes['user'].data['h'] = torch.zeros(2, 5)
-
-        Also work on more complex uni-bipartite graph
+        Set and get feature 'h' for a graph of a single source node type.
 
         >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game') : ([0, 1], [1, 2]),
-        ...     ('user', 'reads', 'book') : ([0, 1], [1, 0]),
-        ...     })
-        >>> print(g.is_unibipartite)
-        True
-        >>> g.srcdata['h'] = torch.zeros(2, 5)
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1]), torch.tensor([1, 2]))})
+        >>> g.srcdata['h'] = torch.ones(2, 1)
+        >>> g.srcdata['h']
+        tensor([[1.],
+                [1.]])
 
-        To set features of all source nodes in a uni-bipartite graph
-        with multiple source node types:
+        Set and get feature 'h' for a graph of multiple source node types.
 
         >>> g = dgl.heterograph({
-        ...     ('game', 'liked-by', 'user') : ([1, 2], [0, 1]),
-        ...     ('book', 'liked-by', 'user') : ([0, 1], [1, 0]),
-        ...     })
-        >>> print(g.is_unibipartite)
-        True
-        >>> g.srcdata['h'] = {'game' : torch.zeros(3, 5),
-        ...                   'book' : torch.zeros(2, 5)}
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
+        ...     ('player', 'plays', 'game'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
+        ... })
+        >>> g.srcdata['h'] = {'user': torch.zeros(3, 1), 'player': torch.ones(3, 1)}
         >>> g.srcdata['h']
-        ... {'game': tensor([[0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.]]),
-        ...  'book': tensor([[0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.]])}
-
-        To set features of part of source nodes in a uni-bipartite graph
-        with multiple source node types:
-        >>> g = dgl.heterograph({
-        ...     ('game', 'liked-by', 'user') : ([1, 2], [0, 1]),
-        ...     ('book', 'liked-by', 'user') : ([0, 1], [1, 0]),
-        ...     })
-        >>> g.srcdata['h'] = {'game' : torch.zeros(3, 5)}
+        {'player': tensor([[1.], [1.], [1.]]),
+         'user': tensor([[0.], [0.], [0.]])}
+        >>> g.srcdata['h'] = {'user': torch.ones(3, 1)}
         >>> g.srcdata['h']
-        >>> {'game': tensor([[0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.]])}
-        >>> # clean the feature 'h' and no source node type contains 'h'
-        >>> g.srcdata.pop('h')
-        >>> g.srcdata['h']
-        ... {}
-
-
-        Notes
-        -----
-        This is identical to :any:`DGLHeteroGraph.ndata` if the graph is homogeneous.
+        {'player': tensor([[1.], [1.], [1.]]),
+         'user': tensor([[1.], [1.], [1.]])}
 
         See Also
         --------
         nodes
+        ndata
+        srcnodes
         """
         if len(self.srctypes) == 1:
             ntype = self.srctypes[0]
@@ -1405,81 +1738,61 @@ class DGLHeteroGraph(object):
 
     @property
     def dstdata(self):
-        """Return the data view of all destination nodes.
+        """Return a node data view for setting/getting destination node features.
 
-        If the destination nodes have only one node type,
-        ``g.dstdata['feat']`` gives the node feature data under name
-        ``'feat'``.
-        If the destination nodes have multiple node types, then
-        ``g.dstdata['feat']`` returns a dictionary where the key is
-        the destination node type and the value is the node feature
-        tensor. If the destination node type does not have feature
-        `'feat'`, it is not included in the dictionary.
+        Let ``g`` be a DGLGraph. If ``g`` is a graph of a single destination node type,
+        ``g.dstdata[feat]`` returns the destination node feature associated with the name
+        ``feat``. One can also set a destination node feature associated with the name
+        ``feat`` by setting ``g.dstdata[feat]`` to a tensor.
+
+        If ``g`` is a graph of multiple destination node types, ``g.dstdata[feat]`` returns a
+        dict[str, Tensor] mapping destination node types to the node features associated with
+        the name ``feat`` for the corresponding type. One can also set a node feature
+        associated with the name ``feat`` for some destination node type(s) by setting
+        ``g.dstdata[feat]`` to a dictionary as described.
+
+        Notes
+        -----
+        For setting features, the device of the features must be the same as the device
+        of the graph.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        To set features of all source nodes in a graph with only one edge type:
+        >>> import dgl
+        >>> import torch
 
-        >>> g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game')
-        >>> g.dstdata['h'] = torch.zeros(3, 5)
-
-        This is equivalent to
-
-        >>> g.nodes['game'].data['h'] = torch.zeros(3, 5)
-
-        Also work on more complex uni-bipartite graph
+        Set and get feature 'h' for a graph of a single destination node type.
 
         >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game') : ([0, 1], [1, 2]),
-        ...     ('store', 'sells', 'game') : ([0, 1], [1, 0]),
-        ...     })
-        >>> print(g.is_unibipartite)
-        True
-        >>> g.dstdata['h'] = torch.zeros(3, 5)
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1]), torch.tensor([1, 2]))})
+        >>> g.dstdata['h'] = torch.ones(3, 1)
+        >>> g.dstdata['h']
+        tensor([[1.],
+                [1.],
+                [1.]])
 
-        To set features of all destination nodes in a uni-bipartite graph
-        with multiple destination node types::
+        Set and get feature 'h' for a graph of multiple destination node types.
 
         >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game') : ([0, 1], [1, 2]),
-        ...     ('user', 'reads', 'book') : ([0, 1], [1, 0]),
-        ...     })
-        >>> print(g.is_unibipartite)
-        True
-        >>> g.dstdata['h'] = {'game' : torch.zeros(3, 5),
-        ...                   'book' : torch.zeros(2, 5)}
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 2]), torch.tensor([1, 2])),
+        ...     ('user', 'watches', 'movie'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
+        ... })
+        >>> g.dstdata['h'] = {'game': torch.zeros(3, 1), 'movie': torch.ones(2, 1)}
         >>> g.dstdata['h']
-        ... {'game': tensor([[0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.]]),
-        ...  'book': tensor([[0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.]])}
-
-        To set features of part of destination nodes in a uni-bipartite graph
-        with multiple destination node types:
-        >>> g = dgl.heterograph({
-        ...     ('user', 'plays', 'game') : ([0, 1], [1, 2]),
-        ...     ('user', 'reads', 'book') : ([0, 1], [1, 0]),
-        ...     })
-        >>> g.dstdata['h'] = {'game' : torch.zeros(3, 5)}
+        {'game': tensor([[0.], [0.], [0.]]),
+         'movie': tensor([[1.], [1.]])}
+        >>> g.dstdata['h'] = {'game': torch.ones(3, 1)}
         >>> g.dstdata['h']
-        ... {'game': tensor([[0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.],
-        ...                  [0., 0., 0., 0., 0.]])}
-        >>> # clean the feature 'h' and no destination node type contains 'h'
-        >>> g.dstdata.pop('h')
-        >>> g.dstdata['h']
-        ... {}
-
-        Notes
-        -----
-        This is identical to :any:`DGLHeteroGraph.ndata` if the graph is homogeneous.
+        {'game': tensor([[1.], [1.], [1.]]),
+         'movie': tensor([[1.], [1.]])}
 
         See Also
         --------
         nodes
+        ndata
+        dstnodes
         """
         if len(self.dsttypes) == 1:
             ntype = self.dsttypes[0]
@@ -1492,78 +1805,142 @@ class DGLHeteroGraph(object):
 
     @property
     def edges(self):
-        """Return an edge view that can be used to set/get feature
-        data of a single edge type.
+        """Return an edge view
+
+        One can use it for:
+
+        1. Getting the edges for a single edge type. In this case, it can take the
+           following optional arguments:
+
+            - form : str, optional
+                  The return form, which can be one of the following:
+
+                  - ``'uv'`` (default): The returned result is a 2-tuple of 1D tensors
+                    :math:`(U, V)`, representing the source and destination nodes of all edges.
+                    For each :math:`i`, :math:`(U[i], V[i])` forms an edge.
+                  - ``'eid'``: The returned result is a 1D tensor :math:`EID`, representing
+                    the IDs of all edges.
+                  - ``'all'``: The returned result is a 3-tuple of 1D tensors :math:`(U, V, EID)`,
+                    representing the source nodes, destination nodes and IDs of all edges.
+                    For each :math:`i`, :math:`(U[i], V[i])` forms an edge with ID :math:`EID[i]`.
+            - order : str, optional
+                  The order of the returned edges, which can be one of the following:
+
+                  - ``'eid'`` (default): The edges are sorted by their IDs.
+                  - ``'srcdst'``: The edges are sorted first by their source node IDs and then
+                    by their destination node IDs to break ties.
+            - etype : str or tuple of str, optional
+                  The edge type for query, which can be an edge type (str) or a canonical edge
+                  type (3-tuple of str). When an edge type appears in multiple canonical edge
+                  types, one must use a canonical edge type. If the graph has multiple edge
+                  types, one must specify the argument. Otherwise, it can be omitted.
+        2. Setting/getting features for all edges of a single edge type. To set/get a feature
+           ``feat`` for edges of type ``etype`` in a graph ``g``, one can use
+           ``g.edges[etype].data[feat]``.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        To set features of all "play" relationships:
+        >>> import dgl
+        >>> import torch
 
-        >>> g = dgl.bipartite(([0, 1, 1], [0, 0, 2]), 'user', 'plays', 'game')
-        >>> g.edges['plays'].data['h'] = torch.zeros(3, 4)
+        **Get the Edges for a Single Edge Type**
+
+        Create a graph with a single edge type.
+
+        >>> g = dgl.graph((torch.tensor([1, 0, 0]), torch.tensor([1, 1, 0])))
+        >>> g.edges()
+        (tensor([1, 0, 0]), tensor([1, 1, 0]))
+
+        Specify a different value for :attr:`form` and :attr:`order`.
+
+        >>> g.edges(form='all', order='srcdst')
+        (tensor([0, 0, 1]), tensor([0, 1, 1]), tensor([2, 1, 0]))
+
+        For a graph of multiple edge types, it is required to specify the edge type in query.
+
+        >>> hg = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
+        >>> hg.edges(etype='plays')
+        (tensor([3, 4]), tensor([5, 6]))
+
+        **Set/get Features for All Edges of a Single Edge Type**
+
+        Create a heterogeneous graph of two edge types.
+
+        >>> hg = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
+
+        Set and get a feature 'h' for all edges of a single type in the heterogeneous graph.
+
+        >>> hg.edges['follows'].data['h'] = torch.ones(2, 1)
+        >>> hg.edges['follows'].data['h']
+        tensor([[1.], [1.]])
+
+        To set edge features for a graph with a single edge type, use :func:`DGLGraph.edata`.
 
         See Also
         --------
         edata
         """
+        # TODO(Mufei): Replace the syntax g.edges[...].edata[...] with g.edges[...][...]
         return HeteroEdgeView(self)
 
     @property
     def edata(self):
-        """Return the data view of all the edges.
+        """Return an edge data view for setting/getting edge features.
 
-        If the graph has only one edge type, ``g.edata['feat']`` gives the
-        edge feature data under name ``'feat'``.
-        If the graph has multiple edge types, then ``g.edata['feat']``
-        returns a dictionary where the key is the edge type and the value
-        is the edge feature tensor. If the edge type does not have feature
-        ``'feat'``, it is not included in the dictionary.
+        Let ``g`` be a DGLGraph. If ``g`` is a graph of a single edge type, ``g.edata[feat]``
+        returns the edge feature associated with the name ``feat``. One can also set an
+        edge feature associated with the name ``feat`` by setting ``g.edata[feat]`` to a tensor.
 
-        Note: When the graph has multiple edge type, The key used in
-        ``g.edata['feat']`` should be the canonical_etypes, i.e.
-        (h_ntype, r_type, t_ntype).
+        If ``g`` is a graph of multiple edge types, ``g.edata[feat]`` returns a
+        dict[str, Tensor] mapping canonical edge types to the edge features associated with
+        the name ``feat`` for the corresponding type. One can also set an edge feature
+        associated with the name ``feat`` for some edge type(s) by setting
+        ``g.edata[feat]`` to a dictionary as described.
+
+        Notes
+        -----
+        For setting features, the device of the features must be the same as the device
+        of the graph.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        To set features of all edges in a heterogeneous graph
-        with only one edge type:
+        >>> import dgl
+        >>> import torch
 
-        >>> g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
-        >>> g.edata['h'] = torch.zeros(2, 5)
+        Set and get feature 'h' for a graph of a single edge type.
 
-        To set features of all edges in a heterogeneous graph
-        with multiple edge types:
-
-        >>> g0 = dgl.bipartite(([0, 1, 1], [1, 0, 1]), 'user', 'watches', 'movie')
-        >>> g1 = dgl.bipartite(([0, 1], [0, 1]), 'user', 'watches', 'TV')
-        >>> g = dgl.hetero_from_relations([g0, g1])
-        >>> g.edata['h'] = {('user', 'watches', 'movie') : torch.zeros(3, 5),
-                            ('user', 'watches', 'TV') : torch.zeros(2, 5)}
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> g.edata['h'] = torch.ones(2, 1)
         >>> g.edata['h']
-        ... {('user', 'watches', 'movie'): tensor([[0., 0., 0., 0., 0.],
-        ...                                        [0., 0., 0., 0., 0.],
-        ...                                        [0., 0., 0., 0., 0.]]),
-        ...  ('user', 'watches', 'TV'): tensor([[0., 0., 0., 0., 0.],
-        ...                                     [0., 0., 0., 0., 0.]])}
+        tensor([[1.],
+                [1.]])
 
-        To set features of part of edges in a heterogeneous graph
-        with multiple edge types:
-        >>> g0 = dgl.bipartite(([0, 1, 1], [1, 0, 1]), 'user', 'watches', 'movie')
-        >>> g1 = dgl.bipartite(([0, 1], [0, 1]), 'user', 'watches', 'TV')
-        >>> g = dgl.hetero_from_relations([g0, g1])
-        >>> g.edata['h'] = {('user', 'watches', 'movie') : torch.zeros(3, 5)}
+        Set and get feature 'h' for a graph of multiple edge types.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
+        ...     ('user', 'plays', 'user'): (torch.tensor([2, 2]), torch.tensor([1, 1])),
+        ...     ('player', 'plays', 'game'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
+        ... })
+        >>> g.edata['h'] = {('user', 'follows', 'user'): torch.zeros(2, 1),
+        ...                 ('user', 'plays', 'user'): torch.ones(2, 1)}
         >>> g.edata['h']
-        ... {('user', 'watches', 'movie'): tensor([[0., 0., 0., 0., 0.],
-        ...                                        [0., 0., 0., 0., 0.],
-        ...                                        [0., 0., 0., 0., 0.]])}
-        >>> # clean the feature 'h' and no edge type contains 'h'
-        >>> g.edata.pop('h')
+        {('user', 'follows', 'user'): tensor([[0.], [0.]]),
+         ('user', 'plays', 'user'): tensor([[1.], [1.]])}
+        >>> g.edata['h'] = {('user', 'follows', 'user'): torch.ones(2, 1)}
         >>> g.edata['h']
-        ... {}
+        {('user', 'follows', 'user'): tensor([[1.], [1.]]),
+         ('user', 'plays', 'user'): tensor([[1.], [1.]])}
 
         See Also
         --------
@@ -1598,7 +1975,7 @@ class DGLHeteroGraph(object):
         equivalent to ``self.edge_type_subgraph(etype)``.  The node and edge features
         of the returned graph would be shared with thew original graph.
 
-        If there are multiple canonical edge type found, then the source/edge/destination
+        If there are multiple canonical edge types found, then the source/edge/destination
         node types would be a *concatenation* of original node/edge types.  The
         new source/destination node type would have the concatenation determined by
         :func:`dgl.combine_names() <dgl.combine_names>` called on original source/destination
@@ -1680,40 +2057,65 @@ class DGLHeteroGraph(object):
     #################################################################
 
     def number_of_nodes(self, ntype=None):
-        """Return the number of nodes of the given type in the heterograph.
+        """Alias of :func:`num_nodes`"""
+        return self.num_nodes(ntype)
+
+    def num_nodes(self, ntype=None):
+        """Return the number of nodes.
 
         Parameters
         ----------
         ntype : str, optional
-            The node type. Can be omitted if there is only one node type
-            in the graph. (Default: None)
+            The node type for query. If given, it returns the number of nodes for a particular
+            type. If not given (default), it returns the total number of nodes of all types.
 
         Returns
         -------
         int
-            The number of nodes
+            The number of nodes.
 
         Examples
         --------
 
-        >>> g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
-        >>> g.number_of_nodes('user')
-        3
-        >>> g.number_of_nodes()
-        3
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a graph with two node types -- 'user' and 'game'.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
+
+        Query for the number of nodes.
+
+        >>> g.num_nodes('user')
+        5
+        >>> g.num_nodes('game')
+        7
+        >>> g.num_nodes()
+        12
         """
-        return self._graph.number_of_nodes(self.get_ntype_id(ntype))
+        if ntype is None:
+            return sum([self._graph.number_of_nodes(ntid) for ntid in range(len(self.ntypes))])
+        else:
+            return self._graph.number_of_nodes(self.get_ntype_id(ntype))
 
     def number_of_src_nodes(self, ntype=None):
-        """Return the number of nodes of the given SRC node type in the heterograph.
+        """Alias of :func:`num_src_nodes`"""
+        return self.num_src_nodes(ntype)
 
-        The heterograph is usually a unidirectional bipartite graph.
+    def num_src_nodes(self, ntype=None):
+        """Return the number of nodes of the given source node type.
 
         Parameters
         ----------
         ntype : str, optional
-            Node type.
-            If omitted, there should be only one node type in the SRC category.
+            The source node type for query. If given, it returns the number of nodes for a
+            particular source node type. If not given (default), it returns the number of
+            nodes summed over all source node types.
 
         Returns
         -------
@@ -1722,26 +2124,52 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        >>> g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game')
-        >>> g.number_of_src_nodes('user')
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph for query.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> g.num_src_nodes()
+        3
+
+        Create a heterogeneous graph with two source node types -- 'developer' and 'user'.
+
+        >>> g = dgl.heterograph({
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
+
+        Query for the number of nodes.
+
+        >>> g.num_src_nodes('developer')
         2
-        >>> g.number_of_src_nodes()
-        2
-        >>> g.number_of_nodes('user')
-        2
+        >>> g.num_src_nodes('user')
+        5
+        >>> g.num_src_nodes()
+        7
         """
-        return self._graph.number_of_nodes(self.get_ntype_id_from_src(ntype))
+        if ntype is None:
+            return sum([self._graph.number_of_nodes(self.get_ntype_id_from_src(nty))
+                        for nty in self.srctypes])
+        else:
+            return self._graph.number_of_nodes(self.get_ntype_id_from_src(ntype))
 
     def number_of_dst_nodes(self, ntype=None):
-        """Return the number of nodes of the given DST node type in the heterograph.
+        """Alias of :func:`num_dst_nodes`"""
+        return self.num_dst_nodes(ntype)
 
-        The heterograph is usually a unidirectional bipartite graph.
+    def num_dst_nodes(self, ntype=None):
+        """Return the number of nodes of the given destination node type.
 
         Parameters
         ----------
         ntype : str, optional
-            Node type.
-            If omitted, there should be only one node type in the DST category.
+            The destination node type for query. If given, it returns the number of nodes for a
+            particular destination node type. If not given (default), it returns the number of
+            nodes summed over all destination node types.
 
         Returns
         -------
@@ -1750,42 +2178,95 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        >>> g = dgl.bipartite(([0, 1], [1, 2]), 'user', 'plays', 'game')
-        >>> g.number_of_dst_nodes('game')
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph for query.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> g.num_dst_nodes()
         3
-        >>> g.number_of_dst_nodes()
-        3
-        >>> g.number_of_nodes('game')
-        3
+
+        Create a heterogeneous graph with two destination node types -- 'user' and 'game'.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
+
+        Query for the number of nodes.
+
+        >>> g.num_dst_nodes('user')
+        5
+        >>> g.num_dst_nodes('game')
+        7
+        >>> g.num_dst_nodes()
+        12
         """
-        return self._graph.number_of_nodes(self.get_ntype_id_from_dst(ntype))
+        if ntype is None:
+            return sum([self._graph.number_of_nodes(self.get_ntype_id_from_dst(nty))
+                        for nty in self.dsttypes])
+        else:
+            return self._graph.number_of_nodes(self.get_ntype_id_from_dst(ntype))
 
     def number_of_edges(self, etype=None):
-        """Return the number of edges of the given type in the heterograph.
+        """Alias of :func:`num_edges`"""
+        return self.num_edges(etype)
+
+    def num_edges(self, etype=None):
+        """Return the number of edges.
 
         Parameters
         ----------
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If given, it returns the number of edges for a
+            particular edge type. If not given (default), it returns the total number of edges
+            of all types.
 
         Returns
         -------
         int
-            The number of edges
+            The number of edges.
 
         Examples
         --------
 
-        >>> g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
-        >>> g.number_of_edges(('user', 'follows', 'user'))
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a graph with three canonical edge types.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
+        ... })
+
+        Query for the number of edges.
+
+        >>> g.num_edges('plays')
         2
-        >>> g.number_of_edges('follows')
+        >>> g.num_edges()
+        7
+
+        Use a canonical edge type instead when there is ambiguity for an edge type.
+
+        >>> g.num_edges(('user', 'follows', 'user'))
         2
-        >>> g.number_of_edges()
-        2
+        >>> g.num_edges(('user', 'follows', 'game'))
+        3
         """
-        return self._graph.number_of_edges(self.get_etype_id(etype))
+        if etype is None:
+            return sum([self._graph.number_of_edges(etid)
+                        for etid in range(len(self.canonical_etypes))])
+        else:
+            return self._graph.number_of_edges(self.get_etype_id(etype))
 
     def __len__(self):
         """Deprecated: please directly call :func:`number_of_nodes`
@@ -1798,12 +2279,90 @@ class DGLHeteroGraph(object):
     def is_multigraph(self):
         """Whether the graph is a multigraph
 
+        In a multigraph, there can be multiple edges from a node ``u`` to a node ``v``.
+
+        For a heterogeneous graph of multiple canonical edge types, we consider it as a
+        multigraph if there are multiple edges from a node ``u`` to a node ``v`` for any
+        canonical edge type.
+
         Returns
         -------
         bool
-            True if the graph is a multigraph, False otherwise.
+            Whether the graph is a multigraph.
+
+        Notes
+        -----
+        Checking whether the graph is a multigraph can be expensive for a large one.
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Check for homogeneous graphs.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 3])))
+        >>> g.is_multigraph
+        False
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([1, 3, 3])))
+        >>> g.is_multigraph
+        True
+
+        Check for heterogeneous graphs.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3]))
+        ... })
+        >>> g.is_multigraph
+        False
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1, 1]), torch.tensor([1, 2, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3]))
+        ... })
+        >>> g.is_multigraph
+        True
         """
         return self._graph.is_multigraph()
+
+    @property
+    def is_homogeneous(self):
+        """Whether the graph is a homogeneous graph.
+
+        A homogeneous graph only has one node type and one edge type.
+
+        Returns
+        -------
+        bool
+            Whether the graph is a homogeneous graph.
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph for check.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 0, 2, 3])))
+        >>> g.is_homogeneous
+        True
+
+        Create a heterogeneous graph for check.
+
+        If the graph has multiple edge types, one need to specify the edge type.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3]))})
+        >>> g.is_homogeneous
+        False
+        """
+        return len(self.ntypes) == 1 and len(self.etypes) == 1
 
     @property
     def is_readonly(self):
@@ -1821,12 +2380,30 @@ class DGLHeteroGraph(object):
 
     @property
     def idtype(self):
-        """The dtype of graph index
+        """The data type for storing the structure-related graph information
+        such as node and edge IDs.
 
         Returns
         -------
-        backend dtype object
-            th.int32/th.int64 or tf.int32/tf.int64 etc.
+        Framework-specific device object
+            For example, this can be ``torch.int32`` or ``torch.int64`` for PyTorch.
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        >>> src_ids = torch.tensor([0, 0, 1])
+        >>> dst_ids = torch.tensor([1, 2, 2])
+        >>> g = dgl.graph((src_ids, dst_ids))
+        >>> g.idtype
+        torch.int64
+        >>> g = dgl.graph((src_ids, dst_ids), idtype=torch.int32)
+        >>> g.idtype
+        torch.int32
 
         See Also
         --------
@@ -1854,41 +2431,68 @@ class DGLHeteroGraph(object):
         return self.has_nodes(vid)
 
     def has_nodes(self, vid, ntype=None):
-        """Whether the graph has a node with a particular id and type.
+        """Whether the graph has some particular node(s) of a given type.
 
         Parameters
         ----------
-        vid : int, iterable, tensor
-            Node ID(s).
+        vid : node ID(s)
+            The node ID(s) for query. The allowed formats are:
+
+            - ``int``: The ID of a single node.
+            - ``Tensor``: A 1D tensor that contains the IDs of multiple nodes, whose data type and
+              device should be the same as the :py:attr:`idtype` and device of the graph.
+            - ``iterable[int]``: A sequence (e.g. list, tuple, numpy.ndarray)
+              of integers that contains the IDs of multiple nodes.
         ntype : str, optional
-            The node type. Can be omitted if there is only one node type
-            in the graph. (Default: None)
+            The node type for query. It is required if the graph has
+            multiple node types.
 
         Returns
         -------
         bool or bool Tensor
-            Each element is a bool flag, which is True if the node exists,
-            and is False otherwise.
+
+            - If :attr:`vid` is an ``int``, the result will be a ``bool`` indicating
+              whether the graph has the particular node.
+            - If :attr:`vid` is a 1D ``Tensor`` or ``iterable[int]`` of node IDs,
+              the result will be a bool Tensor whose i-th element indicates whether
+              the graph has node :attr:`vid[i]` of the given type.
 
         Examples
         --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a graph with two node types -- 'user' and 'game'.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([0, 1]))
+        ... })
+
+        Query for the nodes.
+
         >>> g.has_nodes(0, 'user')
         True
-        >>> g.has_nodes(4, 'user')
+        >>> g.has_nodes(3, 'game')
         False
-        >>> g.has_nodes([0, 1, 2, 3, 4], 'user')
-        tensor([True, True, True, False, False])
+        >>> g.has_nodes(torch.tensor([3, 0, 1]), 'game')
+        tensor([False,  True,  True])
         """
+        vid_tensor = utils.prepare_tensor(self, vid, "vid")
+        if len(vid_tensor) > 0 and F.as_scalar(F.min(vid_tensor, 0)) < 0 < len(vid_tensor):
+            raise DGLError('All IDs must be non-negative integers.')
         ret = self._graph.has_nodes(
-            self.get_ntype_id(ntype),
-            utils.prepare_tensor(self, vid, "vid"))
+            self.get_ntype_id(ntype), vid_tensor)
         if isinstance(vid, numbers.Integral):
             return bool(F.as_scalar(ret))
         else:
             return F.astype(ret, F.bool)
 
     def has_node(self, vid, ntype=None):
-        """Whether the graph has a node with ids and a particular type.
+        """Whether the graph has a particular node of a given type.
 
         DEPRECATED: see :func:`~DGLGraph.has_nodes`
         """
@@ -1896,38 +2500,93 @@ class DGLHeteroGraph(object):
         return self.has_nodes(vid, ntype)
 
     def has_edges_between(self, u, v, etype=None):
-        """Whether the graph has an edge (u, v) of type ``etype``.
+        """Whether the graph has some particular edge(s) of a given type.
 
         Parameters
         ----------
-        u : int, iterable of int, Tensor
-            Source node ID(s).
-        v : int, iterable of int, Tensor
-            Destination node ID(s).
+        u : source node ID(s)
+            The source node(s) of the edges for query. The allowed formats are:
+
+            - ``int``: The source node of an edge for query.
+            - ``Tensor``: A 1D tensor that contains the source node(s) of edge(s) for query.
+              The data type and device of the tensor must be the same as the :py:attr:`idtype` and
+              device of the graph. Its i-th element represents the source node ID of the
+              i-th edge for query.
+            - ``iterable[int]`` : Similar to the tensor, but stores node IDs in a sequence
+              (e.g. list, tuple, numpy.ndarray).
+        v : destination node ID(s)
+            The destination node(s) of the edges for query. It's a counterpart of :attr:`u`
+            for destination nodes and should have the same format as :attr:`u`. If :attr:`u`
+            and :attr:`v` are not int, they should have the same length.
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
-        a : Tensor
-            Binary tensor indicating the existence of edges. ``a[i]=1`` if the graph
-            contains edge ``(u[i], v[i])`` of type ``etype``, 0 otherwise.
+        bool or bool Tensor
+
+            - If :attr:`u` and :attr:`v` are ``int`` objects, the result will be a ``bool``
+              indicating whether there is an edge from ``u`` to ``v`` of the given edge type.
+            - If :attr:`u` and :attr:`v` are ``Tensor`` or ``iterable[int]`` objects, the
+              result will be a bool Tensor whose i-th element indicates whether there is an
+              edge from ``u[i]`` to ``v[i]`` of the given edge type.
+
+        Notes
+        -----
+        The value(s) of :attr:`u` and :attr:`v` need to be separately smaller than the
+        number of nodes of the source and destination type.
 
         Examples
         --------
 
-        >>> g.has_edge_between(0, 1, ('user', 'plays', 'game'))
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 0, 2, 3])))
+
+        Query for the edges.
+
+        >>> g.has_edges_between(1, 2)
         True
-        >>> g.has_edge_between(0, 2, ('user', 'plays', 'game'))
-        False
-        >>> g.has_edge_between([0, 0], [1, 2], ('user', 'plays', 'game'))
-        tensor([1, 0])
+        >>> g.has_edges_between(torch.tensor([1, 2]), torch.tensor([2, 3]))
+        tensor([ True, False])
+
+        If the graph has multiple edge types, one need to specify the edge type.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
+        ... })
+        >>> g.has_edges_between(torch.tensor([1, 2]), torch.tensor([2, 3]), 'plays')
+        tensor([ True, False])
+
+        Use a canonical edge type instead when there is ambiguity for an edge type.
+
+        >>> g.has_edges_between(torch.tensor([1, 2]), torch.tensor([2, 3]),
+        ...                     ('user', 'follows', 'user'))
+        tensor([ True, False])
+        >>> g.has_edges_between(torch.tensor([1, 2]), torch.tensor([2, 3]),
+        ...                     ('user', 'follows', 'game'))
+        tensor([True, True])
         """
+        srctype, _, dsttype = self.to_canonical_etype(etype)
+        u_tensor = utils.prepare_tensor(self, u, 'u')
+        if F.as_scalar(F.sum(self.has_nodes(u_tensor, ntype=srctype), dim=0)) != len(u_tensor):
+            raise DGLError('u contains invalid node IDs')
+        v_tensor = utils.prepare_tensor(self, v, 'v')
+        if F.as_scalar(F.sum(self.has_nodes(v_tensor, ntype=dsttype), dim=0)) != len(v_tensor):
+            raise DGLError('v contains invalid node IDs')
         ret = self._graph.has_edges_between(
             self.get_etype_id(etype),
-            utils.prepare_tensor(self, u, 'u'),
-            utils.prepare_tensor(self, v, 'v'))
+            u_tensor, v_tensor)
         if isinstance(u, numbers.Integral) and isinstance(v, numbers.Integral):
             return bool(F.as_scalar(ret))
         else:
@@ -1943,79 +2602,111 @@ class DGLHeteroGraph(object):
         return self.has_edges_between(u, v, etype)
 
     def predecessors(self, v, etype=None):
-        """Return the predecessors of node `v` in the graph with the specified
-        edge type.
+        """Return the predecessor(s) of a particular node with the specified edge type.
 
-        Node `u` is a predecessor of `v` if an edge `(u, v)` with type `etype`
-        exists in the graph.
+        Node ``u`` is a predecessor of node ``v`` if there is an edge ``(u, v)`` with type
+        ``etype`` in the graph.
 
         Parameters
         ----------
         v : int
-            The destination node.
+            The destination node for query.
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
-        tensor
-            Array of predecessor node IDs with the specified edge type.
+        Tensor
+            The predecessors of :attr:`v` with the specified edge type.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 1, 1]), 'user', 'plays', 'game')
-        >>> devs_g = dgl.bipartite(([0, 1], [0, 1]), 'developer', 'develops', 'game')
-        >>> g = dgl.hetero_from_relations([plays_g, devs_g])
-        >>> g.predecessors(0, 'plays')
-        tensor([0, 1])
-        >>> g.predecessors(0, 'develops')
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 1, 2, 3])))
+
+        Query for node 1.
+
+        >>> g.predecessors(1)
+        tensor([0, 0])
+
+        For a graph of multiple edge types, it is required to specify the edge type in query.
+
+        >>> hg = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
+        >>> hg.predecessors(1, etype='follows')
         tensor([0])
 
         See Also
         --------
         successors
         """
+        if not self.has_nodes(v, self.to_canonical_etype(etype)[-1]):
+            raise DGLError('Non-existing node ID {}'.format(v))
         return self._graph.predecessors(self.get_etype_id(etype), v)
 
     def successors(self, v, etype=None):
-        """Return the successors of node `v` in the graph with the specified edge
-        type.
+        """Return the successor(s) of a particular node with the specified edge type.
 
-        Node `u` is a successor of `v` if an edge `(v, u)` with type `etype` exists
-        in the graph.
+        Node ``u`` is a successor of node ``v`` if there is an edge ``(v, u)`` with type
+        ``etype`` in the graph.
 
         Parameters
         ----------
         v : int
-            The source node.
+            The source node for query.
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
-        tensor
-            Array of successor node IDs with the specified edge type.
+        Tensor
+            The successors of :attr:`v` with the specified edge type.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 1, 1]), 'user', 'plays', 'game')
-        >>> follows_g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
-        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
-        >>> g.successors(0, 'plays')
-        tensor([0])
-        >>> g.successors(0, 'follows')
-        tensor([1])
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 1, 2, 3])))
+
+        Query for node 1.
+
+        >>> g.successors(1)
+        tensor([2, 3])
+
+        For a graph of multiple edge types, it is required to specify the edge type in query.
+
+        >>> hg = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
+        >>> hg.successors(1, etype='follows')
+        tensor([2])
 
         See Also
         --------
         predecessors
         """
+        if not self.has_nodes(v, self.to_canonical_etype(etype)[0]):
+            raise DGLError('Non-existing node ID {}'.format(v))
         return self._graph.successors(self.get_etype_id(etype), v)
 
     def edge_id(self, u, v, force_multi=None, return_uv=False, etype=None):
@@ -2029,67 +2720,107 @@ class DGLHeteroGraph(object):
                              return_uv=return_uv, etype=etype)
 
     def edge_ids(self, u, v, force_multi=None, return_uv=False, etype=None):
-        """Return all edge IDs between source node array `u` and destination
-        node array `v` with the specified edge type.
+        """Return the ID(s) of edge(s) from the given source node(s) to the given destination
+        node(s) with the specified edge type.
 
         Parameters
         ----------
-        u : int, list, tensor
-            The node ID array of source type.
-        v : int, list, tensor
-            The node ID array of destination type.
+        u : source node ID(s)
+            The source node(s) of the edges for query. The allowed formats are:
+
+            - ``int``: The source node of an edge for query.
+            - ``Tensor``: A 1D tensor that contains the source node(s) of edge(s) for query, whose
+              data type an device should be the same as the :py:attr:`idtype` and device of
+              the graph. Its i-th element is the source node of the i-th edge for query.
+            - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
+              (e.g. list, tuple, numpy.ndarray).
+        v : destination node ID(s)
+            The destination node(s) of the edges for query. It's a counterpart of :attr:`u`
+            for destination nodes and should have the same format as :attr:`u`. If :attr:`u`
+            and :attr:`v` are not int, they should have the same length.
         force_multi : bool, optional
-            Deprecated (Will be deleted in the future).
-            Whether to always treat the graph as a multigraph. See the
-            "Returns" for their effects. (Default: False)
-        return_uv : bool
-            See the "Returns" for their effects. (Default: False)
+            Deprecated, use :attr:`return_uv` instead. Whether to allow the graph to be a
+            multigraph, i.e. there can be multiple edges from one node to another.
+        return_uv : bool, optional
+            Whether to return the source and destination node IDs along with the edges. If
+            False (default), it assumes that the graph is a simple graph and there is only
+            one edge from one node to another. If True, there can be multiple edges found
+            from one node to another.
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
         tensor, or (tensor, tensor, tensor)
 
-            * If ``return_uv=False``, return a single edge ID array ``e``.
-            ``e[i]`` is the edge ID between ``u[i]`` and ``v[i]``.
-
-            * Otherwise, return three arrays ``(eu, ev, e)``.  ``e[i]`` is the ID
-            of an edge between ``eu[i]`` and ``ev[i]``.  All edges between ``u[i]``
-            and ``v[i]`` are returned.
+            * If ``return_uv=False``, it returns a 1D tensor that contains the IDs of the edges.
+              If :attr:`u` and :attr:`v` are int, the tensor has length 1. Otherwise, the i-th
+              element of the tensor is the ID of the edge ``(u[i], v[i])``.
+            * If ``return_uv=True``, it returns a tuple of three 1D tensors ``(eu, ev, e)``.
+              ``e[i]`` is the ID of an edge from ``eu[i]`` to ``ev[i]``. It returns all edges
+              from ``eu[i]`` to ``ev[i]`` in this case.
 
         Notes
         -----
-        If the graph is a simple graph, ``return_uv=False``, and no edge
-        exists between some pairs of ``u[i]`` and ``v[i]``, the result is undefined
-        and an empty tensor is returned.
+        If the graph is a simple graph, ``return_uv=False``, and there are no edges
+        between some pairs of node(s), it will raise an error.
 
-        If the graph is a multi graph, ``return_uv=False``, and multi edges
-        exist between some pairs of `u[i]` and `v[i]`, the result is undefined.
+        If the graph is a multigraph, ``return_uv=False``, and there are multiple edges
+        between some pairs of node(s), it returns an arbitrary one from them.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        Instantiate a heterograph.
+        >>> import dgl
+        >>> import torch
 
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-        >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+        Create a homogeneous graph.
 
-        Query for edge ids.
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1, 1]), torch.tensor([1, 0, 2, 3, 2])))
 
-        >>> plays_g.edge_ids([0], [2], etype=('user', 'plays', 'game'))
-        tensor([], dtype=torch.int64)
-        >>> plays_g.edge_ids([1], [2], etype=('user', 'plays', 'game'))
-        tensor([2])
-        >>> g.edge_ids([1], [2], return_uv=True, etype=('user', 'follows', 'user'))
-        (tensor([1, 1]), tensor([2, 2]), tensor([1, 2]))
+        Query for the edges.
+
+        >>> g.edge_ids(0, 0)
+        1
+        >>> g.edge_ids(torch.tensor([1, 0]), torch.tensor([3, 1]))
+        tensor([3, 0])
+
+        Get all edges for pairs of nodes.
+
+        >>> g.edge_ids(torch.tensor([1, 0]), torch.tensor([3, 1]), return_uv=True)
+        (tensor([1, 0]), tensor([3, 1]), tensor([3, 0]))
+
+        If the graph has multiple edge types, one need to specify the edge type.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'follows', 'game'): (torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([1, 3]), torch.tensor([2, 3]))
+        ... })
+        >>> g.edge_ids(torch.tensor([1]), torch.tensor([2]), etype='plays')
+        tensor([0])
+
+        Use a canonical edge type instead when there is ambiguity for an edge type.
+
+        >>> g.edge_ids(torch.tensor([0, 1]), torch.tensor([1, 2]),
+        ...            etype=('user', 'follows', 'user'))
+        tensor([0, 1])
+        >>> g.edge_ids(torch.tensor([1, 2]), torch.tensor([2, 3]),
+        ...            etype=('user', 'follows', 'game'))
+        tensor([1, 2])
         """
         is_int = isinstance(u, numbers.Integral) and isinstance(v, numbers.Integral)
+        srctype, _, dsttype = self.to_canonical_etype(etype)
         u = utils.prepare_tensor(self, u, 'u')
+        if F.as_scalar(F.sum(self.has_nodes(u, ntype=srctype), dim=0)) != len(u):
+            raise DGLError('u contains invalid node IDs')
         v = utils.prepare_tensor(self, v, 'v')
+        if F.as_scalar(F.sum(self.has_nodes(v, ntype=dsttype), dim=0)) != len(v):
+            raise DGLError('v contains invalid node IDs')
         if force_multi is not None:
             dgl_warning("force_multi will be deprecated, " \
                         "Please use return_uv instead")
@@ -2109,88 +2840,145 @@ class DGLHeteroGraph(object):
             return F.as_scalar(eid) if is_int else eid
 
     def find_edges(self, eid, etype=None):
-        """Given an edge ID array with the specified type, return the source
-        and destination node ID array ``s`` and ``d``.  ``s[i]`` and ``d[i]``
-        are source and destination node ID for edge ``eid[i]``.
+        """Return the source and destination node(s) of some particular edge(s)
+        with the specified edge type.
 
         Parameters
         ----------
-        eid : list, tensor
-            The edge ID array.
+        eid : edge ID(s)
+            The IDs of the edges for query. The function expects that :attr:`eid` contains
+            valid edge IDs only, i.e. among consecutive integers :math:`0, 1, ... E - 1`, where
+            :math:`E` is the number of edges with the specified edge type.
+
+            - ``int``: An edge ID for query.
+            - ``Tensor``: A 1D tensor that contains the edge IDs for query, whose data
+              type and device should be the same as the :py:attr:`idtype` and device of the graph.
+            - ``iterable[int]``: Similar to the tensor, but stores edge IDs in a sequence
+              (e.g. list, tuple, numpy.ndarray).
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type.
 
         Returns
         -------
-        tensor
-            The source node ID array.
-        tensor
-            The destination node ID array.
+        Tensor
+            The source node IDs of the edges, whose i-th element is the source node of the edge
+            with ID ``eid[i]``.
+        Tensor
+            The destination node IDs of the edges, whose i-th element is the destination node of
+            the edge with ID ``eid[i]``.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        >>> g = dgl.bipartite(([0, 1, 1], [0, 0, 2]), 'user', 'plays', 'game')
-        >>> g.find_edges([0, 2], ('user', 'plays', 'game'))
-        (tensor([0, 1]), tensor([0, 2]))
-        >>> g.find_edges([0, 2])
-        (tensor([0, 1]), tensor([0, 2]))
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 0, 2, 3])))
+
+        Find edges of IDs 0 and 2.
+
+        >>> g.find_edges(torch.tensor([0, 2]))
+        (tensor([0, 1]), tensor([1, 2]))
+
+        For a graph of multiple edge types, it is required to specify the edge type in query.
+
+        >>> hg = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
+        >>> hg.find_edges(torch.tensor([1, 0]), 'plays')
+        (tensor([4, 3]), tensor([6, 5]))
         """
         eid = utils.prepare_tensor(self, eid, 'eid')
+        if len(eid) > 0:
+            min_eid = F.as_scalar(F.min(eid, 0))
+            if min_eid < 0:
+                raise DGLError('Invalid edge ID {:d}'.format(min_eid))
+            max_eid = F.as_scalar(F.max(eid, 0))
+            if max_eid >= self.num_edges(etype):
+                raise DGLError('Invalid edge ID {:d}'.format(max_eid))
+
         if len(eid) == 0:
             empty = F.copy_to(F.tensor([], self.idtype), self.device)
             return empty, empty
-        # sanity check
-        max_eid = F.as_scalar(F.max(eid, dim=0))
-        if max_eid >= self.number_of_edges(etype):
-            raise DGLError('Expect edge IDs to be smaller than number of edges ({}). '
-                           ' But got {}.'.format(self.number_of_edges(etype), max_eid))
         src, dst, _ = self._graph.find_edges(self.get_etype_id(etype), eid)
         return src, dst
 
     def in_edges(self, v, form='uv', etype=None):
-        """Return the inbound edges of the node(s) with the specified type.
+        """Return the incoming edges of some particular node(s) with the specified edge type.
 
         Parameters
         ----------
-        v : int, list, tensor
-            The node id(s) of destination type.
-        form : str, optional
-            The return form. Currently support:
+        v : destination node ID(s)
+            The destination node(s) for query. The allowed formats are:
 
-            - ``'eid'`` : one eid tensor
-            - ``'all'`` : a tuple ``(u, v, eid)``
-            - ``'uv'``  : a pair ``(u, v)``, default
+            - ``int``: The destination node for query.
+            - ``Tensor``: A 1D tensor that contains the destination node(s) for query, whose data
+              type and device should be the same as the :py:attr:`idtype` and device of the graph.
+            - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
+              (e.g. list, tuple, numpy.ndarray).
+        form : str, optional
+            The return form, which can be one of the following:
+
+            - ``'eid'``: The returned result is a 1D tensor :math:`EID`, representing
+              the IDs of all edges.
+            - ``'uv'`` (default): The returned result is a 2-tuple of 1D tensors :math:`(U, V)`,
+              representing the source and destination nodes of all edges. For each :math:`i`,
+              :math:`(U[i], V[i])` forms an edge.
+            - ``'all'``: The returned result is a 3-tuple of 1D tensors :math:`(U, V, EID)`,
+              representing the source nodes, destination nodes and IDs of all edges.
+              For each :math:`i`, :math:`(U[i], V[i])` forms an edge with ID :math:`EID[i]`.
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
-        tensor or (tensor, tensor, tensor) or (tensor, tensor)
-            All inbound edges to ``v`` are returned.
-
-            * If ``form='eid'``, return a tensor for the ids of the
-              inbound edges of the nodes with the specified type.
-            * If ``form='all'``, return a 3-tuple of tensors
-              ``(eu, ev, eid)``. ``eid[i]`` gives the ID of the
-              edge from ``eu[i]`` to ``ev[i]``.
-            * If ``form='uv'``, return a 2-tuple of tensors ``(eu, ev)``.
-              ``eu[i]`` is the source node of an edge to ``ev[i]``.
+        Tensor or (Tensor, Tensor) or (Tensor, Tensor, Tensor)
+            All incoming edges of the nodes with the specified type. For a description of the
+            returned result, see the description of :attr:`form`.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        >>> g = dgl.bipartite(([0, 1, 1], [0, 1, 2]), 'user', 'plays', 'game')
-        >>> g.in_edges([0, 2], form='eid')
-        tensor([0, 2])
-        >>> g.in_edges([0, 2], form='all')
-        (tensor([0, 1]), tensor([0, 2]), tensor([0, 2]))
-        >>> g.in_edges([0, 2], form='uv')
-        (tensor([0, 1]), tensor([0, 2]))
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 0, 2, 3])))
+
+        Query for the nodes 1 and 0.
+
+        >>> g.in_edges(torch.tensor([1, 0]))
+        (tensor([0, 0]), tensor([1, 0]))
+
+        Specify a different value for :attr:`form`.
+
+        >>> g.in_edges(torch.tensor([1, 0]), form='all')
+        (tensor([0, 0]), tensor([1, 0]), tensor([0, 1]))
+
+        For a graph of multiple edge types, it is required to specify the edge type in query.
+
+        >>> hg = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
+        >>> hg.in_edges(torch.tensor([1, 0]), etype='follows')
+        (tensor([0]), tensor([1]))
+
+        See Also
+        --------
+        edges
+        out_edges
         """
         v = utils.prepare_tensor(self, v, 'v')
         src, dst, eid = self._graph.in_edges(self.get_etype_id(etype), v)
@@ -2204,46 +2992,80 @@ class DGLHeteroGraph(object):
             raise DGLError('Invalid form: {}. Must be "all", "uv" or "eid".'.format(form))
 
     def out_edges(self, u, form='uv', etype=None):
-        """Return the outbound edges of the node(s) with the specified type.
+        """Return the outgoing edges of some particular node(s) with the specified edge type.
 
         Parameters
         ----------
-        u : int, list, tensor
-            The node id(s) of source type.
-        form : str, optional
-            The return form. Currently support:
+        u : source node ID(s)
+            The source node(s) for query. The allowed formats are:
 
-            - ``'eid'`` : one eid tensor
-            - ``'all'`` : a tuple ``(u, v, eid)``
-            - ``'uv'``  : a pair ``(u, v)``, default
+            - ``int``: The source node for query.
+            - ``Tensor``: A 1D tensor that contains the source node(s) for query, whose data
+              type and device should be the same as the :py:attr:`idtype` and device of the graph.
+            - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
+              (e.g. list, tuple, numpy.ndarray).
+        form : str, optional
+            The return form, which can be one of the following:
+
+            - ``'eid'``: The returned result is a 1D tensor :math:`EID`, representing
+              the IDs of all edges.
+            - ``'uv'`` (default): The returned result is a 2-tuple of 1D tensors :math:`(U, V)`,
+              representing the source and destination nodes of all edges. For each :math:`i`,
+              :math:`(U[i], V[i])` forms an edge.
+            - ``'all'``: The returned result is a 3-tuple of 1D tensors :math:`(U, V, EID)`,
+              representing the source nodes, destination nodes and IDs of all edges.
+              For each :math:`i`, :math:`(U[i], V[i])` forms an edge with ID :math:`EID[i]`.
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
-        tensor or (tensor, tensor, tensor) or (tensor, tensor)
-            All outbound edges from ``u`` are returned.
-
-            * If ``form='eid'``, return a tensor for the ids of the outbound edges
-              of the nodes with the specified type.
-            * If ``form='all'``, return a 3-tuple of tensors ``(eu, ev, eid)``.
-              ``eid[i]`` gives the ID of the edge from ``eu[i]`` to ``ev[i]``.
-            * If ``form='uv'``, return a 2-tuple of tensors ``(eu, ev)``.
-              ``ev[i]`` is the destination node of the edge from ``eu[i]``.
+        Tensor or (Tensor, Tensor) or (Tensor, Tensor, Tensor)
+            All outgoing edges of the nodes with the specified type. For a description of the
+            returned result, see the description of :attr:`form`.
 
         Examples
         --------
+        The following example uses PyTorch backend.
 
-        >>> g = dgl.bipartite(([0, 1, 1], [0, 1, 2]), 'user', 'plays', 'game')
-        >>> g.out_edges([0, 1], form='eid')
-        tensor([0, 1, 2])
-        >>> g.out_edges([0, 1], form='all')
-        (tensor([0, 1, 1]), tensor([0, 1, 2]), tensor([0, 1, 2]))
-        >>> g.out_edges([0, 1], form='uv')
-        (tensor([0, 1, 1]), tensor([0, 1, 2]))
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 0, 2, 3])))
+
+        Query for the nodes 1 and 2.
+
+        >>> g.out_edges(torch.tensor([1, 2]))
+        (tensor([1, 1]), tensor([2, 3]))
+
+        Specify a different value for :attr:`form`.
+
+        >>> g.out_edges(torch.tensor([1, 2]), form='all')
+        (tensor([1, 1]), tensor([2, 3]), tensor([2, 3]))
+
+        For a graph of multiple edge types, it is required to specify the edge type in query.
+
+        >>> hg = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
+        >>> hg.out_edges(torch.tensor([1, 2]), etype='follows')
+        (tensor([1]), tensor([2]))
+
+        See Also
+        --------
+        edges
+        in_edges
         """
         u = utils.prepare_tensor(self, u, 'u')
+        srctype, _, _ = self.to_canonical_etype(etype)
+        if F.as_scalar(F.sum(self.has_nodes(u, ntype=srctype), dim=0)) != len(u):
+            raise DGLError('u contains invalid node IDs')
         src, dst, eid = self._graph.out_edges(self.get_etype_id(etype), u)
         if form == 'all':
             return src, dst, eid
@@ -2254,49 +3076,75 @@ class DGLHeteroGraph(object):
         else:
             raise DGLError('Invalid form: {}. Must be "all", "uv" or "eid".'.format(form))
 
-    def all_edges(self, form='uv', order=None, etype=None):
-        """Return all edges with the specified type.
+    def all_edges(self, form='uv', order='eid', etype=None):
+        """Return all edges with the specified edge type.
 
         Parameters
         ----------
         form : str, optional
-            The return form. Currently support:
+            The return form, which can be one of the following:
 
-            - ``'eid'`` : one eid tensor
-            - ``'all'`` : a tuple ``(u, v, eid)``
-            - ``'uv'``  : a pair ``(u, v)``, default
-        order : str or None
-            The order of the returned edges. Currently support:
+            - ``'eid'``: The returned result is a 1D tensor :math:`EID`, representing
+              the IDs of all edges.
+            - ``'uv'`` (default): The returned result is a 2-tuple of 1D tensors :math:`(U, V)`,
+              representing the source and destination nodes of all edges. For each :math:`i`,
+              :math:`(U[i], V[i])` forms an edge.
+            - ``'all'``: The returned result is a 3-tuple of 1D tensors :math:`(U, V, EID)`,
+              representing the source nodes, destination nodes and IDs of all edges.
+              For each :math:`i`, :math:`(U[i], V[i])` forms an edge with ID :math:`EID[i]`.
+        order : str, optional
+            The order of the returned edges, which can be one of the following:
 
-            - ``'srcdst'`` : sorted by their src and dst ids.
-            - ``'eid'``    : sorted by edge Ids.
-            - ``None``     : arbitrary order, default
+            - ``'srcdst'``: The edges are sorted first by their source node IDs and then
+              by their destination node IDs to break ties.
+            - ``'eid'`` (default): The edges are sorted by their IDs.
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
-        tensor or (tensor, tensor, tensor) or (tensor, tensor)
-
-            * If ``form='eid'``, return a tensor for the ids of all edges
-              with the specified type.
-            * If ``form='all'``, return a 3-tuple of tensors ``(eu, ev, eid)``.
-              ``eid[i]`` gives the ID of the edge from ``eu[i]`` to ``ev[i]``.
-            * If ``form='uv'``, return a 2-tuple of tensors ``(eu, ev)``.
-              ``ev[i]`` is the destination node of the edge from ``eu[i]``.
+        Tensor or (Tensor, Tensor) or (Tensor, Tensor, Tensor)
+            All edges of the specified edge type. For a description of the returned result,
+            see the description of :attr:`form`.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        >>> g = dgl.bipartite(([1, 0, 1], [1, 0, 2]), 'user', 'plays', 'game')
-        >>> g.all_edges(form='eid', order='srcdst')
-        tensor([1, 0, 2])
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 0, 2, 3])))
+
+        Query for edges.
+
+        >>> g.all_edges()
+        (tensor([0, 0, 1, 1]), tensor([1, 0, 2, 3]))
+
+        Specify a different value for :attr:`form` and :attr:`order`.
+
         >>> g.all_edges(form='all', order='srcdst')
-        (tensor([0, 1, 1]), tensor([0, 1, 2]), tensor([1, 0, 2]))
-        >>> g.all_edges(form='uv', order='eid')
-        (tensor([1, 0, 1]), tensor([1, 0, 2]))
+        (tensor([0, 0, 1, 1]), tensor([0, 1, 2, 3]), tensor([1, 0, 2, 3]))
+
+        For a graph of multiple edge types, it is required to specify the edge type in query.
+
+        >>> hg = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
+        >>> hg.all_edges(etype='plays')
+        (tensor([3, 4]), tensor([5, 6]))
+
+        See Also
+        --------
+        edges
+        in_edges
+        out_edges
         """
         src, dst, eid = self._graph.edges(self.get_etype_id(etype), order)
         if form == 'all':
@@ -2317,46 +3165,78 @@ class DGLHeteroGraph(object):
         return self.in_degrees(v, etype)
 
     def in_degrees(self, v=ALL, etype=None):
-        """Return the in-degrees of nodes v with edges of type ``etype``.
+        """Return the in-degree(s) of some particular node(s) with the specified edge type.
 
         Parameters
         ----------
-        v : int, iterable of int or tensor, optional.
-            The node ID array of the destination type. Default is to return the
-            degrees of all nodes.
-        etype : str or tuple of str or None, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+        v : destination node ID(s), optional
+            The destination node(s) for query. The allowed formats are:
+
+            - ``int``: The destination node for query.
+            - ``Tensor``: A 1D tensor that contains the destination node(s) for query, whose data
+              type and device should be the same as the :py:attr:`idtype` and device of the graph.
+            - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
+              (e.g. list, tuple, numpy.ndarray).
+
+            By default, it considers all nodes.
+        etype : str or tuple of str, optional
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
-        d : tensor or int
-            The in-degree array. ``d[i]`` gives the in-degree of node ``v[i]``
-            with edges of type ``etype``. If the argument is an integer, so will
-            be the return.
+        tensor or int
+            The in-degree(s) of the node(s).
+
+            - If :attr:`v` is an ``int`` object, the return result will be an ``int``
+              object as well.
+            - If :attr:`v` is a ``Tensor`` or ``iterable[int]`` object, the return result
+              will be a 1D ``Tensor``. The data type of the result will be the same as the
+              idtype of the graph. The i-th element of the tensor is the in-degree of the
+              node ``v[i]``.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        Instantiate a heterograph.
+        >>> import dgl
+        >>> import torch
 
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-        >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+        Create a homogeneous graph.
 
-        Query for node degree.
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 1, 2, 3])))
 
-        >>> g.in_degrees(0, 'plays')
-        2
-        >>> g.in_degrees(etype='follows')
-        tensor([0, 1, 2])
+        Query for all nodes.
+
+        >>> g.in_degrees()
+        tensor([0, 2, 1, 1])
+
+        Query for nodes 1 and 2.
+
+        >>> g.in_degrees(torch.tensor([1, 2]))
+        tensor([2, 1])
+
+        For a graph of multiple edge types, it is required to specify the edge type in query.
+
+        >>> hg = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
+        >>> hg.in_degrees(torch.tensor([1, 0]), etype='follows')
+        tensor([1, 0])
+
+        See Also
+        --------
+        out_degrees
         """
         dsttype = self.to_canonical_etype(etype)[2]
         etid = self.get_etype_id(etype)
         if is_all(v):
             v = self.dstnodes(dsttype)
-        deg = self._graph.in_degrees(etid, utils.prepare_tensor(self, v, 'v'))
+        v_tensor = utils.prepare_tensor(self, v, 'v')
+        deg = self._graph.in_degrees(etid, v_tensor)
         if isinstance(v, numbers.Integral):
             return F.as_scalar(deg)
         else:
@@ -2371,55 +3251,89 @@ class DGLHeteroGraph(object):
         return self.out_degrees(u, etype)
 
     def out_degrees(self, u=ALL, etype=None):
-        """Return the out-degrees of nodes u with edges of type ``etype``.
+        """Return the out-degree(s) of some particular node(s) with the specified edge type.
 
         Parameters
         ----------
-        u : list, tensor
-            The node ID array of source type. Default is to return the degrees
-            of all the nodes.
+        u : source node ID(s), optional
+
+            - ``int``: The source node for query.
+            - ``Tensor``: A 1D tensor that contains the source node(s) for query, whose data
+              type and device should be the same as the :py:attr:`idtype` and device of the graph.
+            - ``iterable[int]``: Similar to the tensor, but stores node IDs in a sequence
+              (e.g. list, tuple, numpy.ndarray).
+
+            By default, it considers all nodes.
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
-        d : tensor
-            The out-degree array. ``d[i]`` gives the out-degree of node ``u[i]``
-            with edges of type ``etype``.
+        tensor or int
+            The out-degree(s) of the node(s).
+
+            - If :attr:`u` is an ``int`` object, the return result will be an ``int``
+              object as well.
+            - If :attr:`u` is a ``Tensor`` or ``iterable[int]`` object, the return result
+              will be a 1D ``Tensor``. The data type of the result will be the same as the
+              idtype of the graph. The i-th element of the tensor is the out-degree of the
+              node ``v[i]``.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        Instantiate a heterograph.
+        >>> import dgl
+        >>> import torch
 
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-        >>> follows_g = dgl.graph(([0, 1, 1], [1, 2, 2]), 'user', 'follows')
-        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+        Create a homogeneous graph.
 
-        Query for node degree.
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 1, 2, 3])))
 
-        >>> g.out_degrees(0, 'plays')
-        1
-        >>> g.out_degrees(etype='follows')
-        tensor([1, 2, 0])
+        Query for all nodes.
+
+        >>> g.out_degrees()
+        tensor([2, 2, 0, 0])
+
+        Query for nodes 1 and 2.
+
+        >>> g.out_degrees(torch.tensor([1, 2]))
+        tensor([2, 0])
+
+        For a graph of multiple edge types, it is required to specify the edge type in query.
+
+        >>> hg = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
+        >>> hg.out_degrees(torch.tensor([1, 0]), etype='follows')
+        tensor([1, 1])
 
         See Also
         --------
-        out_degree
+        in_degrees
         """
         srctype = self.to_canonical_etype(etype)[0]
         etid = self.get_etype_id(etype)
         if is_all(u):
             u = self.srcnodes(srctype)
+        u_tensor = utils.prepare_tensor(self, u, 'u')
+        if F.as_scalar(F.sum(self.has_nodes(u_tensor, ntype=srctype), dim=0)) != len(u_tensor):
+            raise DGLError('u contains invalid node IDs')
         deg = self._graph.out_degrees(etid, utils.prepare_tensor(self, u, 'u'))
         if isinstance(u, numbers.Integral):
             return F.as_scalar(deg)
         else:
             return deg
 
-    def adjacency_matrix(self, transpose=None, ctx=F.cpu(), scipy_fmt=None, etype=None):
+    def adjacency_matrix(self, transpose=True, ctx=F.cpu(), scipy_fmt=None, etype=None):
+        """Alias of :func:`adj`"""
+        return self.adj(transpose, ctx, scipy_fmt, etype)
+
+    def adj(self, transpose=True, ctx=F.cpu(), scipy_fmt=None, etype=None):
         """Return the adjacency matrix of edges of the given edge type.
 
         By default, a row of returned adjacency matrix represents the
@@ -2431,15 +3345,18 @@ class DGLHeteroGraph(object):
         Parameters
         ----------
         transpose : bool, optional
-            A flag to transpose the returned adjacency matrix. (Default: False)
+            A flag to transpose the returned adjacency matrix. (Default: True)
         ctx : context, optional
             The context of returned adjacency matrix. (Default: cpu)
         scipy_fmt : str, optional
             If specified, return a scipy sparse matrix in the given format.
             Otherwise, return a backend dependent sparse tensor. (Default: None)
-        etype : str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+        etype : str or tuple of str, optional
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If given, it returns the number of edges for a
+            particular edge type. If not given (default), it returns the total number of edges
+            of all types.
 
         Returns
         -------
@@ -2449,43 +3366,39 @@ class DGLHeteroGraph(object):
         Examples
         --------
 
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
         Instantiate a heterogeneous graph.
 
-        >>> follows_g = dgl.graph(([0, 1], [0, 1]), 'user', 'follows')
-        >>> devs_g = dgl.bipartite(([0, 1], [0, 2]), 'developer', 'develops', 'game')
-        >>> g = dgl.hetero_from_relations([follows_g, devs_g])
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): ([0, 1], [0, 1]),
+        ...     ('developer', 'develops', 'game'): ([0, 1], [0, 2])
+        ... })
 
         Get a backend dependent sparse tensor. Here we use PyTorch for example.
 
-        >>> g.adjacency_matrix(etype='develops')
-        tensor(indices=tensor([[0, 2],
-                               [0, 1]]),
+        >>> g.adj(etype='develops')
+        tensor(indices=tensor([[0, 1],
+                               [0, 2]]),
                values=tensor([1., 1.]),
-               size=(3, 2), nnz=2, layout=torch.sparse_coo)
+               size=(2, 3), nnz=2, layout=torch.sparse_coo)
 
         Get a scipy coo sparse matrix.
 
-        >>> g.adjacency_matrix(scipy_fmt='coo', etype='develops')
-        <3x2 sparse matrix of type '<class 'numpy.int64'>'
-        with 2 stored elements in COOrdinate format>
+        >>> g.adj(scipy_fmt='coo', etype='develops')
+        <2x3 sparse matrix of type '<class 'numpy.int64'>'
+	    with 2 stored elements in COOrdinate format>
         """
-        if transpose is None:
-            dgl_warning(
-                "Currently adjacency_matrix() returns a matrix with destination as rows"
-                " by default.\n\tIn 0.5 the result will have source as rows"
-                " (i.e. transpose=True)")
-            transpose = False
-
         etid = self.get_etype_id(etype)
         if scipy_fmt is None:
             return self._graph.adjacency_matrix(etid, transpose, ctx)[0]
         else:
             return self._graph.adjacency_matrix_scipy(etid, transpose, scipy_fmt, False)
 
-    # Alias of ``adjacency_matrix``
-    adj = adjacency_matrix
-
-    def adjacency_matrix_scipy(self, transpose=None, fmt='csr', return_edge_ids=None):
+    def adjacency_matrix_scipy(self, transpose=True, fmt='csr', return_edge_ids=None):
         """DEPRECATED: please use ``dgl.adjacency_matrix(transpose, scipy_fmt=fmt)``.
         """
         dgl_warning('DGLGraph.adjacency_matrix_scipy is deprecated. '
@@ -2495,6 +3408,10 @@ class DGLHeteroGraph(object):
         return self.adjacency_matrix(transpose=transpose, scipy_fmt=fmt)
 
     def incidence_matrix(self, typestr, ctx=F.cpu(), etype=None):
+        """Alias of :func:`inc`"""
+        return self.inc(typestr, ctx, etype)
+
+    def inc(self, typestr, ctx=F.cpu(), etype=None):
         """Return the incidence matrix representation of edges with the given
         edge type.
 
@@ -2529,9 +3446,12 @@ class DGLHeteroGraph(object):
             Can be either ``in``, ``out`` or ``both``
         ctx : context, optional
             The context of returned incidence matrix. (Default: cpu)
-        etype : str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
+        etype : str or tuple of str, optional
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If given, it returns the number of edges for a
+            particular edge type. If not given (default), it returns the total number of edges
+            of all types.
 
         Returns
         -------
@@ -2541,18 +3461,22 @@ class DGLHeteroGraph(object):
         Examples
         --------
 
-        >>> g = dgl.graph(([0, 1], [0, 2]), 'user', 'follows')
-        >>> g.incidence_matrix('in')
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+
+        >>> g = dgl.graph(([0, 1], [0, 2]))
+        >>> g.inc('in')
         tensor(indices=tensor([[0, 2],
                                [0, 1]]),
                values=tensor([1., 1.]),
                size=(3, 2), nnz=2, layout=torch.sparse_coo)
-        >>> g.incidence_matrix('out')
+        >>> g.inc('out')
         tensor(indices=tensor([[0, 1],
                                [0, 1]]),
                values=tensor([1., 1.]),
                size=(3, 2), nnz=2, layout=torch.sparse_coo)
-        >>> g.incidence_matrix('both')
+        >>> g.inc('both')
         tensor(indices=tensor([[1, 2],
                                [1, 1]]),
                values=tensor([-1.,  1.]),
@@ -2561,9 +3485,6 @@ class DGLHeteroGraph(object):
         etid = self.get_etype_id(etype)
         return self._graph.incidence_matrix(etid, typestr, ctx)[0]
 
-    # Alias of ``incidence_matrix``
-    inc = incidence_matrix
-
     #################################################################
     # Features
     #################################################################
@@ -2571,29 +3492,44 @@ class DGLHeteroGraph(object):
     def node_attr_schemes(self, ntype=None):
         """Return the node feature schemes for the specified type.
 
-        Each feature scheme is a named tuple that stores the shape and data type
-        of the node feature.
+        The scheme of a feature describes the shape and data type of it.
 
         Parameters
         ----------
         ntype : str, optional
-            The node type. Can be omitted if there is only one node
-            type in the graph. Error will be raised otherwise.
-            (Default: None)
+            The node type for query. If the graph has multiple node types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
-        dict of str to schemes
-            The schemes of node feature columns.
+        dict[str, Scheme]
+            A dictionary mapping a feature name to its associated feature scheme.
 
         Examples
         --------
-        The following uses PyTorch backend.
+        The following example uses PyTorch backend.
 
-        >>> g = dgl.graph(([0, 1], [0, 2]), 'user', 'follows')
-        >>> g.nodes['user'].data['h'] = torch.randn(3, 4)
+        >>> import dgl
+        >>> import torch
+
+        Query for a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> g.ndata['h1'] = torch.randn(3, 1)
+        >>> g.ndata['h2'] = torch.randn(3, 2)
+        >>> g.node_attr_schemes()
+        {'h1': Scheme(shape=(1,), dtype=torch.float32),
+         'h2': Scheme(shape=(2,), dtype=torch.float32)}
+
+        Query for a heterogeneous graph of multiple node types.
+
+        >>> g = dgl.heterograph({('user', 'plays', 'game'):
+        ...                      (torch.tensor([1, 2]), torch.tensor([3, 4]))})
+        >>> g.nodes['user'].data['h1'] = torch.randn(3, 1)
+        >>> g.nodes['user'].data['h2'] = torch.randn(3, 2)
         >>> g.node_attr_schemes('user')
-        {'h': Scheme(shape=(4,), dtype=torch.float32)}
+        {'h1': Scheme(shape=(1,), dtype=torch.float32),
+         'h2': Scheme(shape=(2,), dtype=torch.float32)}
 
         See Also
         --------
@@ -2604,28 +3540,48 @@ class DGLHeteroGraph(object):
     def edge_attr_schemes(self, etype=None):
         """Return the edge feature schemes for the specified type.
 
-        Each feature scheme is a named tuple that stores the shape and data type
-        of the edge feature.
+        The scheme of a feature describes the shape and data type of it.
 
         Parameters
         ----------
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
-        dict of str to schemes
-            The schemes of edge feature columns.
+        dict[str, Scheme]
+            A dictionary mapping a feature name to its associated feature scheme.
 
         Examples
         --------
-        The following uses PyTorch backend.
+        The following example uses PyTorch backend.
 
-        >>> g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-        >>> g.edges['user', 'plays', 'game'].data['h'] = torch.randn(4, 4)
-        >>> g.edge_attr_schemes(('user', 'plays', 'game'))
-        {'h': Scheme(shape=(4,), dtype=torch.float32)}
+        >>> import dgl
+        >>> import torch
+
+        Query for a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> g.edata['h1'] = torch.randn(2, 1)
+        >>> g.edata['h2'] = torch.randn(2, 2)
+        >>> g.edge_attr_schemes()
+        {'h1': Scheme(shape=(1,), dtype=torch.float32),
+         'h2': Scheme(shape=(2,), dtype=torch.float32)}
+
+        Query for a heterogeneous graph of multiple edge types.
+
+        >>> g = dgl.heterograph({('user', 'plays', 'game'):
+        ...                      (torch.tensor([1, 2]), torch.tensor([3, 4])),
+        ...                      ('user', 'follows', 'user'):
+        ...                      (torch.tensor([3, 4]), torch.tensor([5, 6]))})
+        >>> g.edges['plays'].data['h1'] = torch.randn(2, 1)
+        >>> g.edges['plays'].data['h2'] = torch.randn(2, 2)
+        >>> g.edge_attr_schemes('plays')
+        {'h1': Scheme(shape=(1,), dtype=torch.float32),
+         'h2': Scheme(shape=(2,), dtype=torch.float32)}
 
         See Also
         --------
@@ -2634,67 +3590,180 @@ class DGLHeteroGraph(object):
         return self._edge_frames[self.get_etype_id(etype)].schemes
 
     def set_n_initializer(self, initializer, field=None, ntype=None):
-        """Set the initializer for empty node features.
+        """Set the initializer for node features.
 
-        Initializer is a callable that returns a tensor given the shape, data type
-        and device context.
-
-        When a subset of the nodes are assigned a new feature, initializer is
-        used to create feature for the rest of the nodes.
+        When only part of the nodes have a feature (e.g. new nodes are added,
+        features are set for a subset of nodes), the initializer initializes
+        features for the rest nodes.
 
         Parameters
         ----------
         initializer : callable
-            The initializer, mapping (shape, data type, context) to tensor.
+            A function of signature ``func(shape, dtype, ctx, id_range) -> Tensor``.
+            The tensor will be the initialized features. The arguments are:
+
+            - ``shape``: The shape of the tensor to return, which is a tuple of int.
+              The first dimension is the number of nodes for feature initialization.
+            - ``dtype``: The data type of the tensor to return, which is a
+              framework-specific data type object.
+            - ``ctx``: The device of the tensor to return, which is a framework-specific
+              device object.
+            - ``id_range``: The start and end ID of the nodes for feature initialization,
+              which is a slice.
         field : str, optional
-            The feature field name. Default is to set an initializer for all the
-            feature fields.
+            The name of the feature that the initializer applies. If not given, the
+            initializer applies to all features.
         ntype : str, optional
-            The node type. Can be omitted if there is only one node
-            type in the graph. Error will be raised otherwise.
-            (Default: None)
+            The type of the nodes that the initializer applies. If the graph has
+            multiple node types, one must specify the argument. Otherwise, it can
+            be omitted.
 
-        Note
+        Notes
         -----
-        User defined initializer must follow the signature of
-        :func:`dgl.init.base_initializer() <dgl.init.base_initializer>`
+        Without setting a node feature initializer, zero tensors are generated
+        for nodes without a feature.
 
-        See Also
+        Examples
         --------
-        set_e_initializer
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Define a function for initializer.
+
+        >>> def init_feats(shape, dtype, device, id_range):
+        ...     return torch.ones(shape, dtype=dtype, device=device)
+
+        An example for a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0]), torch.tensor([1])))
+        >>> g.ndata['h1'] = torch.zeros(2, 2)
+        >>> g.ndata['h2'] = torch.ones(2, 1)
+        >>> # Apply the initializer to feature 'h2' only.
+        >>> g.set_n_initializer(init_feats, field='h2')
+        >>> g.add_nodes(1)
+        >>> print(g.ndata['h1'])
+        tensor([[0., 0.],
+                [0., 0.],
+                [0., 0.]])
+        >>> print(g.ndata['h2'])
+        tensor([[1.], [1.], [1.]])
+
+        An example for a heterogeneous graph of multiple node types.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        ...                                         torch.tensor([0, 1]))
+        ...     })
+        >>> g.nodes['user'].data['h'] = torch.zeros(3, 2)
+        >>> g.nodes['game'].data['w'] = torch.ones(2, 2)
+        >>> g.set_n_initializer(init_feats, ntype='game')
+        >>> g.add_nodes(1, ntype='user')
+        >>> # Initializer not set for 'user', use zero tensors by default
+        >>> g.nodes['user'].data['h']
+        tensor([[0., 0.],
+                [0., 0.],
+                [0., 0.],
+                [0., 0.]])
+        >>> # Initializer set for 'game'
+        >>> g.add_nodes(1, ntype='game')
+        >>> g.nodes['game'].data['w']
+        tensor([[1., 1.],
+                [1., 1.],
+                [1., 1.]])
         """
         ntid = self.get_ntype_id(ntype)
         self._node_frames[ntid].set_initializer(initializer, field)
 
     def set_e_initializer(self, initializer, field=None, etype=None):
-        """Set the initializer for empty edge features.
+        """Set the initializer for edge features.
 
-        Initializer is a callable that returns a tensor given the shape, data
-        type and device context.
-
-        When a subset of the edges are assigned a new feature, initializer is
-        used to create feature for rest of the edges.
+        When only part of the edges have a feature (e.g. new edges are added,
+        features are set for a subset of edges), the initializer initializes
+        features for the rest edges.
 
         Parameters
         ----------
         initializer : callable
-            The initializer, mapping (shape, data type, context) to tensor.
+            A function of signature ``func(shape, dtype, ctx, id_range) -> Tensor``.
+            The tensor will be the initialized features. The arguments are:
+
+            - ``shape``: The shape of the tensor to return, which is a tuple of int.
+              The first dimension is the number of edges for feature initialization.
+            - ``dtype``: The data type of the tensor to return, which is a
+              framework-specific data type object.
+            - ``ctx``: The device of the tensor to return, which is a framework-specific
+              device object.
+            - ``id_range``: The start and end ID of the edges for feature initialization,
+              which is a slice.
         field : str, optional
-            The feature field name. Default is set an initializer for all the
-            feature fields.
+            The name of the feature that the initializer applies. If not given, the
+            initializer applies to all features.
         etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. Error will be raised otherwise.
-            (Default: None)
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
-        Note
+        Notes
         -----
-        User defined initializer must follow the signature of
-        :func:`dgl.init.base_initializer() <dgl.init.base_initializer>`
+        Without setting an edge feature initializer, zero tensors are generated
+        for edges without a feature.
 
-        See Also
+        Examples
         --------
-        set_n_initializer
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Define a function for initializer.
+
+        >>> def init_feats(shape, dtype, device, id_range):
+        ...     return torch.ones(shape, dtype=dtype, device=device)
+
+        An example for a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0]), torch.tensor([1])))
+        >>> g.edata['h1'] = torch.zeros(1, 2)
+        >>> g.edata['h2'] = torch.ones(1, 1)
+        >>> # Apply the initializer to feature 'h2' only.
+        >>> g.set_e_initializer(init_feats, field='h2')
+        >>> g.add_edges(torch.tensor([1]), torch.tensor([1]))
+        >>> print(g.edata['h1'])
+        tensor([[0., 0.],
+                [0., 0.]])
+        >>> print(g.edata['h2'])
+        tensor([[1.], [1.]])
+
+        An example for a heterogeneous graph of multiple edge types.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1]),
+        ...                                 torch.tensor([0, 0])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        ...                                         torch.tensor([0, 1]))
+        ...     })
+        >>> g.edges['plays'].data['h'] = torch.zeros(2, 2)
+        >>> g.edges['develops'].data['w'] = torch.ones(2, 2)
+        >>> g.set_e_initializer(init_feats, etype='plays')
+        >>> # Initializer not set for 'develops', use zero tensors by default
+        >>> g.add_edges(torch.tensor([1]), torch.tensor([1]), etype='develops')
+        >>> g.edges['develops'].data['w']
+        tensor([[1., 1.],
+                [1., 1.],
+                [0., 0.]])
+        >>> # Initializer set for 'plays'
+        >>> g.add_edges(torch.tensor([1]), torch.tensor([1]), etype='plays')
+        >>> g.edges['plays'].data['h']
+        tensor([[0., 0.],
+                [0., 0.],
+                [1., 1.]])
         """
         etid = self.get_etype_id(etype)
         self._edge_frames[etid].set_initializer(initializer, field)
@@ -2756,7 +3825,7 @@ class DGLHeteroGraph(object):
             Representation dict from feature name to feature tensor.
         """
         if is_all(u):
-            return dict(self._node_frames[ntid])
+            return self._node_frames[ntid]
         else:
             u = utils.prepare_tensor(self, u, 'u')
             return self._node_frames[ntid].subframe(u)
@@ -2897,7 +3966,7 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        >>> g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
+        >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1], [1, 2])})
         >>> g.nodes['user'].data['h'] = torch.ones(3, 5)
         >>> g.apply_nodes(lambda nodes: {'h': nodes.data['h'] * 2}, ntype='user')
         >>> g.nodes['user'].data['h']
@@ -2942,7 +4011,7 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        >>> g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
+        >>> g = dgl.heterograph({('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1])})
         >>> g.edges[('user', 'plays', 'game')].data['h'] = torch.ones(4, 5)
         >>> g.apply_edges(lambda edges: {'h': edges.data['h'] * 2})
         >>> g.edges[('user', 'plays', 'game')].data['h']
@@ -3021,12 +4090,13 @@ class DGLHeteroGraph(object):
         >>> import dgl.function as fn
         >>> import torch
 
-        >>> follows_g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
-        >>> plays_g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 1, 1]), 'user', 'plays', 'game')
-        >>> g = dgl.hetero_from_relations([follows_g, plays_g])
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1])
+        ... })
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
         >>> g.send_and_recv(g['follows'].edges(), fn.copy_src('h', 'm'),
-        >>>                 fn.sum('m', 'h'), etype='follows')
+        ...                 fn.sum('m', 'h'), etype='follows')
         >>> g.nodes['user'].data['h']
         tensor([[0.],
                 [0.],
@@ -3045,7 +4115,8 @@ class DGLHeteroGraph(object):
             return
         u, v = self.find_edges(eid, etype=etype)
         # call message passing onsubgraph
-        ndata = core.message_passing(_create_compute_graph(self, u, v, eid),
+        g = self if etype is None else self[etype]
+        ndata = core.message_passing(_create_compute_graph(g, u, v, eid),
                                      message_func, reduce_func, apply_node_func)
         dstnodes = F.unique(v)
         self._set_n_repr(dtid, dstnodes, ndata)
@@ -3106,9 +4177,10 @@ class DGLHeteroGraph(object):
 
         Instantiate a heterograph.
 
-        >>> follows_g = dgl.graph(([0, 1], [1, 2]), 'user', 'follows')
-        >>> plays_g = dgl.bipartite(([0, 2], [0, 1]), 'user', 'plays', 'game')
-        >>> g = dgl.hetero_from_relations([follows_g, plays_g])
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ...     ('user', 'plays', 'game'): ([0, 2], [0, 1])
+        ... })
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
         Pull.
@@ -3131,7 +4203,7 @@ class DGLHeteroGraph(object):
         g = self if etype is None else self[etype]
         # call message passing on subgraph
         src, dst, eid = g.in_edges(v, form='all')
-        ndata = core.message_passing(_create_compute_graph(self, src, dst, eid, v),
+        ndata = core.message_passing(_create_compute_graph(g, src, dst, eid, v),
                                      message_func, reduce_func, apply_node_func)
         self._set_n_repr(dtid, v, ndata)
 
@@ -3182,7 +4254,7 @@ class DGLHeteroGraph(object):
 
         Instantiate a heterograph.
 
-        >>> g = dgl.graph(([0, 0], [1, 2]), 'user', 'follows')
+        >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 0], [1, 2])})
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
         Push.
@@ -3240,7 +4312,7 @@ class DGLHeteroGraph(object):
 
         Instantiate a heterograph.
 
-        >>> g = dgl.graph(([0, 1, 2], [1, 2, 2]), 'user', 'follows')
+        >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1, 2], [1, 2, 2])})
 
         Update all.
 
@@ -3301,18 +4373,19 @@ class DGLHeteroGraph(object):
 
         Instantiate a heterograph.
 
-        >>> g1 = dgl.graph(([0, 1], [1, 1]), 'user', 'follows')
-        >>> g2 = dgl.bipartite(([0], [1]), 'game', 'attracts', 'user')
-        >>> g = dgl.hetero_from_relations([g1, g2])
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): ([0, 1], [1, 1]),
+        ...     ('game', 'attracts', 'user'): ([0], [1])
+        ... })
         >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.]])
         >>> g.nodes['game'].data['h'] = torch.tensor([[1.]])
 
         Update all.
 
         >>> g.multi_update_all(
-        >>>     {'follows': (fn.copy_src('h', 'm'), fn.sum('m', 'h')),
-        >>>      'attracts': (fn.copy_src('h', 'm'), fn.sum('m', 'h'))},
-        >>> "sum")
+        ...     {'follows': (fn.copy_src('h', 'm'), fn.sum('m', 'h')),
+        ...      'attracts': (fn.copy_src('h', 'm'), fn.sum('m', 'h'))},
+        ... "sum")
         >>> g.nodes['user'].data['h']
         tensor([[0.],
                 [4.]])
@@ -3327,7 +4400,8 @@ class DGLHeteroGraph(object):
                 raise DGLError('Invalid arguments for edge type "{}". Should be '
                                '(msg_func, reduce_func, [apply_node_func])'.format(etype))
             mfunc, rfunc, afunc = args
-            all_out[dtid].append(core.message_passing(self[etype], mfunc, rfunc, afunc))
+            g = self if etype is None else self[etype]
+            all_out[dtid].append(core.message_passing(g, mfunc, rfunc, afunc))
             merge_order[dtid].append(etid)  # use edge type id as merge order hint
         for dtid, frames in all_out.items():
             # merge by cross_reducer
@@ -3381,10 +4455,10 @@ class DGLHeteroGraph(object):
 
         Instantiate a heterogrph and perform multiple rounds of message passing.
 
-        >>> g = dgl.graph(([0, 1, 2, 3], [2, 3, 4, 4]), 'user', 'follows')
+        >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1, 2, 3], [2, 3, 4, 4])})
         >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.], [3.], [4.], [5.]])
         >>> g['follows'].prop_nodes([[2, 3], [4]], fn.copy_src('h', 'm'),
-        >>>                         fn.sum('m', 'h'), etype='follows')
+        ...                         fn.sum('m', 'h'), etype='follows')
         tensor([[1.],
                 [2.],
                 [1.],
@@ -3439,10 +4513,10 @@ class DGLHeteroGraph(object):
 
         Instantiate a heterogrph and perform multiple rounds of message passing.
 
-        >>> g = dgl.graph(([0, 1, 2, 3], [2, 3, 4, 4]), 'user', 'follows')
+        >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1, 2, 3], [2, 3, 4, 4])})
         >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.], [3.], [4.], [5.]])
         >>> g['follows'].prop_edges([[0, 1], [2, 3]], fn.copy_src('h', 'm'),
-        >>>                         fn.sum('m', 'h'), etype='follows')
+        ...                         fn.sum('m', 'h'), etype='follows')
         >>> g.nodes['user'].data['h']
         tensor([[1.],
                 [2.],
@@ -3463,38 +4537,78 @@ class DGLHeteroGraph(object):
     #################################################################
 
     def filter_nodes(self, predicate, nodes=ALL, ntype=None):
-        """Return a tensor of node IDs with the given node type that satisfy
+        """Return the IDs of the nodes with the given node type that satisfy
         the given predicate.
 
         Parameters
         ----------
         predicate : callable
-            A function of signature ``func(nodes) -> tensor``.
-            ``nodes`` are :class:`NodeBatch` objects as in :mod:`~dgl.udf`.
-            The ``tensor`` returned should be a 1-D boolean tensor with
+            A function of signature ``func(nodes) -> Tensor``.
+            ``nodes`` are :class:`dgl.NodeBatch` objects.
+            Its output tensor should be a 1D boolean tensor with
             each element indicating whether the corresponding node in
             the batch satisfies the predicate.
-        nodes : int, iterable or tensor of ints
-            The nodes to filter on. Default value is all the nodes.
+        nodes : node ID(s), optional
+            The node(s) for query. The allowed formats are:
+
+            - Tensor: A 1D tensor that contains the node(s) for query, whose data type
+              and device should be the same as the :py:attr:`idtype` and device of the graph.
+            - iterable[int] : Similar to the tensor, but stores node IDs in a sequence
+              (e.g. list, tuple, numpy.ndarray).
+
+            By default, it considers all nodes.
         ntype : str, optional
-            The node type. Can be omitted if there is only one node type
-            in the graph. (Default: None)
+            The node type for query. If the graph has multiple node types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
         tensor
-            Node ids indicating the nodes that satisfy the predicate.
+            A 1D tensor that contains the ID(s) of the node(s) that satisfy the predicate.
 
         Examples
         --------
-        >>> import torch
+
+        The following example uses PyTorch backend.
+
         >>> import dgl
-        >>> import dgl.function as fn
-        >>> g = dgl.graph([], 'user', 'follows', num_nodes=4)
-        >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [1.], [0.]])
-        >>> g.filter_nodes(lambda nodes: (nodes.data['h'] == 1.).squeeze(1), ntype='user')
+        >>> import torch
+
+        Define a predicate function.
+
+        >>> def nodes_with_feature_one(nodes):
+        ...     # Whether a node has feature 1
+        ...     return (nodes.data['h'] == 1.).squeeze(1)
+
+        Filter nodes for a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])))
+        >>> g.ndata['h'] = torch.tensor([[0.], [1.], [1.], [0.]])
+        >>> print(g.filter_nodes(nodes_with_feature_one))
+        tensor([1, 2])
+
+        Filter on nodes with IDs 0 and 1
+
+        >>> print(g.filter_nodes(nodes_with_feature_one, nodes=torch.tensor([0, 1])))
+        tensor([1])
+
+        Filter nodes for a heterogeneous graph.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1]))})
+        >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [1.]])
+        >>> g.nodes['game'].data['h'] = torch.tensor([[0.], [1.]])
+        >>> # Filter for 'user' nodes
+        >>> print(g.filter_nodes(nodes_with_feature_one, ntype='user'))
         tensor([1, 2])
         """
+        if is_all(nodes):
+            nodes = self.nodes(ntype)
+        v = utils.prepare_tensor(self, nodes, 'nodes')
+        if F.as_scalar(F.sum(self.has_nodes(v, ntype=ntype), dim=0)) != len(v):
+            raise DGLError('v contains invalid node IDs')
+
         with self.local_scope():
             self.apply_nodes(lambda nbatch: {'_mask' : predicate(nbatch)}, nodes, ntype)
             ntype = self.ntypes[0] if ntype is None else ntype
@@ -3502,43 +4616,105 @@ class DGLHeteroGraph(object):
             if is_all(nodes):
                 return F.nonzero_1d(mask)
             else:
-                v = utils.prepare_tensor(self, nodes, 'nodes')
                 return F.boolean_mask(v, F.gather_row(mask, v))
 
     def filter_edges(self, predicate, edges=ALL, etype=None):
-        """Return a tensor of edge IDs with the given edge type that satisfy
+        """Return the IDs of the edges with the given edge type that satisfy
         the given predicate.
 
         Parameters
         ----------
         predicate : callable
-            A function of signature ``func(edges) -> tensor``.
-            ``edges`` are :class:`EdgeBatch` objects as in :mod:`~dgl.udf`.
-            The ``tensor`` returned should be a 1-D boolean tensor with
+            A function of signature ``func(edges) -> Tensor``.
+            ``edges`` are :class:`dgl.EdgeBatch` objects.
+            Its output tensor should be a 1D boolean tensor with
             each element indicating whether the corresponding edge in
             the batch satisfies the predicate.
-        edges : valid edges type
-            Edges on which to apply ``func``. See :func:`send` for valid
-            edges type. Default value is all the edges.
-        etype : str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
+        edges : edge ID(s) or edge end nodes, optional
+            The edge(s) for query. The allowed formats are:
+
+            - Tensor: A 1D tensor that contains the IDs of the edge(s) for query, whose data
+              type and device should be the same as the :py:attr:`idtype` and device of the graph.
+            - iterable[int]: Similar to the tensor, but stores edge IDs in a sequence
+              (e.g. list, tuple, numpy.ndarray).
+            - (Tensor, Tensor): A 2-tuple of the source and destination nodes of multiple
+              edges for query. Each tensor is a 1D tensor containing node IDs. DGL calls this
+              format "tuple of node-tensors". The data type and device of the tensors should
+              be the same as the :py:attr:`idtype` and device of the graph.
+            - (iterable[int], iterable[int]): Similar to the tuple of node-tensors format,
+              but stores node IDs in two sequences (e.g. list, tuple, numpy.ndarray).
+
+            By default, it considers all edges.
+        etype : str or tuple of str, optional
+            The edge type for query, which can be an edge type (str) or a canonical edge type
+            (3-tuple of str). When an edge type appears in multiple canonical edge types, one
+            must use a canonical edge type. If the graph has multiple edge types, one must
+            specify the argument. Otherwise, it can be omitted.
 
         Returns
         -------
         tensor
-            Edge ids indicating the edges that satisfy the predicate.
+            A 1D tensor that contains the ID(s) of the edge(s) that satisfy the predicate.
 
         Examples
         --------
-        >>> import torch
+
+        The following example uses PyTorch backend.
+
         >>> import dgl
-        >>> import dgl.function as fn
-        >>> g = dgl.graph(([0, 0, 1, 2], [0, 1, 2, 3]), 'user', 'follows')
-        >>> g.edges['follows'].data['h'] = torch.tensor([[0.], [1.], [1.], [0.]])
-        >>> g.filter_edges(lambda edges: (edges.data['h'] == 1.).squeeze(1), etype='follows')
+        >>> import torch
+
+        Define a predicate function.
+
+        >>> def edges_with_feature_one(edges):
+        ...     # Whether an edge has feature 1
+        ...     return (edges.data['h'] == 1.).squeeze(1)
+
+        Filter edges for a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 1, 2]), torch.tensor([1, 2, 3])))
+        >>> g.edata['h'] = torch.tensor([[0.], [1.], [1.]])
+        >>> print(g.filter_edges(edges_with_feature_one))
+        tensor([1, 2])
+
+        Filter on edges with IDs 0 and 1
+
+        >>> print(g.filter_edges(edges_with_feature_one, edges=torch.tensor([0, 1])))
+        tensor([1])
+
+        Filter edges for a heterogeneous graph.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1])),
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2]))})
+        >>> g.edges['plays'].data['h'] = torch.tensor([[0.], [1.], [1.], [0.]])
+        >>> # Filter for 'plays' nodes
+        >>> print(g.filter_edges(edges_with_feature_one, etype='plays'))
         tensor([1, 2])
         """
+        if is_all(edges):
+            pass
+        elif isinstance(edges, tuple):
+            u, v = edges
+            srctype, _, dsttype = self.to_canonical_etype(etype)
+            u = utils.prepare_tensor(self, u, 'u')
+            if F.as_scalar(F.sum(self.has_nodes(u, ntype=srctype), dim=0)) != len(u):
+                raise DGLError('edges[0] contains invalid node IDs')
+            v = utils.prepare_tensor(self, v, 'v')
+            if F.as_scalar(F.sum(self.has_nodes(v, ntype=dsttype), dim=0)) != len(v):
+                raise DGLError('edges[1] contains invalid node IDs')
+        elif isinstance(edges, Iterable) or F.is_tensor(edges):
+            edges = utils.prepare_tensor(self, edges, 'edges')
+            min_eid = F.as_scalar(F.min(edges, 0))
+            if len(edges) > 0 > min_eid:
+                raise DGLError('Invalid edge ID {:d}'.format(min_eid))
+            max_eid = F.as_scalar(F.max(edges, 0))
+            if len(edges) > 0 and max_eid >= self.num_edges(etype):
+                raise DGLError('Invalid edge ID {:d}'.format(max_eid))
+        else:
+            raise ValueError('Unsupported type of edges:', type(edges))
+
         with self.local_scope():
             self.apply_edges(lambda ebatch: {'_mask' : predicate(ebatch)}, edges, etype)
             etype = self.canonical_etypes[0] if etype is None else etype
@@ -3554,53 +4730,77 @@ class DGLHeteroGraph(object):
 
     @property
     def device(self):
-        """Get the device context of this graph.
+        """Get the device of the graph.
+
+        Returns
+        -------
+        device context
+            The device of the graph, which should be a framework-specific device object
+            (e.g., ``torch.device``).
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        >>> g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph for demonstration.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
         >>> print(g.device)
         device(type='cpu')
-        >>> g = g.to('cuda:0')
-        >>> print(g.device)
-        device(type='cuda', index=0)
 
-        Returns
-        -------
-        Device context object
+        The case of heterogeneous graphs is the same.
         """
         return F.to_backend_ctx(self._graph.ctx)
 
     def to(self, device, **kwargs):  # pylint: disable=invalid-name
         """Move ndata, edata and graph structure to the targeted device (cpu/gpu).
 
+        If the graph is already on the specified device, the function directly returns it.
+        Otherwise, it returns a cloned graph on the specified device.
+
         Parameters
         ----------
         device : Framework-specific device context object
-            The context to move data to.
+            The context to move data to (e.g., ``torch.device``).
         kwargs : Key-word arguments.
             Key-word arguments fed to the framework copy function.
 
         Returns
         -------
-        g : DGLHeteroGraph
-          Moved DGLHeteroGraph of the targeted mode.
+        DGLGraph
+            The graph on the specified device.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
+        >>> import dgl
         >>> import torch
-        >>> g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
-        >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
-        >>> g.edges['plays'].data['h'] = torch.tensor([[0.], [1.], [2.], [3.]])
+
+        >>> g = dgl.graph((torch.tensor([1, 0]), torch.tensor([1, 2])))
+        >>> g.ndata['h'] = torch.ones(3, 1)
+        >>> g.edata['h'] = torch.zeros(2, 2)
         >>> g1 = g.to(torch.device('cuda:0'))
         >>> print(g1.device)
         device(type='cuda', index=0)
+        >>> print(g1.ndata['h'].device)
+        device(type='cuda', index=0)
+        >>> print(g1.nodes().device)
+        device(type='cuda', index=0)
+
+        The original graph is still on CPU.
+
         >>> print(g.device)
         device(type='cpu')
+        >>> print(g.ndata['h'].device)
+        device(type='cpu')
+        >>> print(g.nodes().device)
+        device(type='cpu')
+
+        The case of heterogeneous graphs is the same.
         """
         if device is None or self.device == device:
             return self
@@ -3614,14 +4814,12 @@ class DGLHeteroGraph(object):
         # TODO(minjie): handle initializer
         new_nframes = []
         for nframe in self._node_frames:
-            new_feats = {k : F.copy_to(feat, device, **kwargs) for k, feat in nframe.items()}
-            new_nframes.append(Frame(new_feats, num_rows=nframe.num_rows))
+            new_nframes.append(nframe.to(device, **kwargs))
         ret._node_frames = new_nframes
 
         new_eframes = []
         for eframe in self._edge_frames:
-            new_feats = {k : F.copy_to(feat, device, **kwargs) for k, feat in eframe.items()}
-            new_eframes.append(Frame(new_feats, num_rows=eframe.num_rows))
+            new_eframes.append(eframe.to(device, **kwargs))
         ret._edge_frames = new_eframes
 
         # 2. Copy misc info
@@ -3682,62 +4880,72 @@ class DGLHeteroGraph(object):
         return ret
 
     def local_var(self):
-        """Return a heterograph object that can be used in a local function scope.
+        """Return a graph object for usage in a local function scope.
 
         The returned graph object shares the feature data and graph structure of this graph.
         However, any out-place mutation to the feature data will not reflect to this graph,
-        thus making it easier to use in a function scope.
+        thus making it easier to use in a function scope (e.g. forward computation of a model).
 
         If set, the local graph object will use same initializers for node features and
         edge features.
 
         Returns
         -------
-        DGLHeteroGraph
-            The graph object that can be used as a local variable.
+        DGLGraph
+            The graph object for a local variable.
 
         Notes
         -----
-        Internally, the returned graph shares the same feature tensors, but construct a new
-        dictionary structure (aka. Frame) so adding/removing feature tensors from the returned
-        graph will not reflect to the original graph. However, inplace operations do change
-        the shared tensor values, so will be reflected to the original graph. This function
-        also has little overhead when the number of feature tensors in this graph is small.
+        Inplace operations do reflect to the original graph. This function also has little
+        overhead when the number of feature tensors in this graph is small.
 
         Examples
         --------
+
         The following example uses PyTorch backend.
 
-        Avoid accidentally overriding existing feature data. This is quite common when
-        implementing a NN module:
+        >>> import dgl
+        >>> import torch
+
+        Create a function for computation on graphs.
 
         >>> def foo(g):
-        >>>     g = g.local_var()
-        >>>     g.edata['h'] = torch.ones((g.number_of_edges(), 3))
-        >>>     return g.edata['h']
-        >>>
-        >>> g = dgl.bipartite(([0, 1, 1], [0, 0, 2]), 'user', 'plays', 'game')
-        >>> g.edata['h'] = torch.zeros((g.number_of_edges(), 3))
-        >>> newh = foo(g)        # get tensor of all ones
+        ...     g = g.local_var()
+        ...     g.edata['h'] = torch.ones((g.num_edges(), 3))
+        ...     g.edata['h2'] = torch.ones((g.num_edges(), 3))
+        ...     return g.edata['h']
+
+        ``local_var`` avoids changing the graph features when exiting the function.
+
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([0, 0, 2])))
+        >>> g.edata['h'] = torch.zeros((g.num_edges(), 3))
+        >>> newh = foo(g)
         >>> print(g.edata['h'])  # still get tensor of all zeros
+        tensor([[0., 0., 0.],
+                [0., 0., 0.],
+                [0., 0., 0.]])
+        >>> 'h2' in g.edata      # new feature set in the function scope is not found
+        False
 
-        Automatically garbage collect locally-defined tensors without the need to manually
-        ``pop`` the tensors.
+        In-place operations will still reflect to the original graph.
 
         >>> def foo(g):
-        >>>     g = g.local_var()
-        >>>     # This 'h' feature will stay local and be GCed when the function exits
-        >>>     g.edata['h'] = torch.ones((g.number_of_edges(), 3))
-        >>>     return g.edata['h']
-        >>>
-        >>> g = dgl.bipartite(([0, 1, 1], [0, 0, 2]), 'user', 'plays', 'game')
-        >>> h = foo(g)
-        >>> print('h' in g.edata)
-        False
+        ...     g = g.local_var()
+        ...     # in-place operation
+        ...     g.edata['h'] += 1
+        ...     return g.edata['h']
+
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([0, 0, 2])))
+        >>> g.edata['h'] = torch.zeros((g.num_edges(), 1))
+        >>> newh = foo(g)
+        >>> print(g.edata['h'])  # the result changes
+        tensor([[1.],
+                [1.],
+                [1.]])
 
         See Also
         --------
-        local_var
+        local_scope
         """
         ret = copy.copy(self)
         ret._node_frames = [fr.clone() for fr in self._node_frames]
@@ -3746,44 +4954,63 @@ class DGLHeteroGraph(object):
 
     @contextmanager
     def local_scope(self):
-        """Enter a local scope context for this graph.
+        """Enter a local scope context for the graph.
 
         By entering a local scope, any out-place mutation to the feature data will
-        not reflect to the original graph, thus making it easier to use in a function scope.
+        not reflect to the original graph, thus making it easier to use in a function scope
+        (e.g. forward computation of a model).
 
         If set, the local scope will use same initializers for node features and
         edge features.
 
+        Notes
+        -----
+        Inplace operations do reflect to the original graph. This function also has little
+        overhead when the number of feature tensors in this graph is small.
+
         Examples
         --------
+
         The following example uses PyTorch backend.
 
-        Avoid accidentally overriding existing feature data. This is quite common when
-        implementing a NN module:
+        >>> import dgl
+        >>> import torch
+
+        Create a function for computation on graphs.
 
         >>> def foo(g):
-        >>>     with g.local_scope():
-        >>>         g.edata['h'] = torch.ones((g.number_of_edges(), 3))
-        >>>         return g.edata['h']
-        >>>
-        >>> g = dgl.bipartite(([0, 1, 1], [0, 0, 2]), 'user', 'plays', 'game')
-        >>> g.edata['h'] = torch.zeros((g.number_of_edges(), 3))
-        >>> newh = foo(g)        # get tensor of all ones
+        ...     with g.local_scope():
+        ...         g.edata['h'] = torch.ones((g.num_edges(), 3))
+        ...         g.edata['h2'] = torch.ones((g.num_edges(), 3))
+        ...         return g.edata['h']
+
+        ``local_scope`` avoids changing the graph features when exiting the function.
+
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([0, 0, 2])))
+        >>> g.edata['h'] = torch.zeros((g.num_edges(), 3))
+        >>> newh = foo(g)
         >>> print(g.edata['h'])  # still get tensor of all zeros
+        tensor([[0., 0., 0.],
+                [0., 0., 0.],
+                [0., 0., 0.]])
+        >>> 'h2' in g.edata      # new feature set in the function scope is not found
+        False
 
-        Automatically garbage collect locally-defined tensors without the need to manually
-        ``pop`` the tensors.
+        In-place operations will still reflect to the original graph.
 
         >>> def foo(g):
-        >>>     with g.local_scope():
-        >>>         # This 'h' feature will stay local and be GCed when the function exits
-        >>>         g.edata['h'] = torch.ones((g.number_of_edges(), 3))
-        >>>         return g.edata['h']
-        >>>
-        >>> g = dgl.bipartite(([0, 1, 1], [0, 0, 2]), 'user', 'plays', 'game')
-        >>> h = foo(g)
-        >>> print('h' in g.edata)
-        False
+        ...     with g.local_scope():
+        ...         # in-place operation
+        ...         g.edata['h'] += 1
+        ...         return g.edata['h']
+
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([0, 0, 2])))
+        >>> g.edata['h'] = torch.zeros((g.num_edges(), 1))
+        >>> newh = foo(g)
+        >>> print(g.edata['h'])  # the result changes
+        tensor([[1.],
+                [1.],
+                [1.]])
 
         See Also
         --------
@@ -3796,10 +5023,6 @@ class DGLHeteroGraph(object):
         yield
         self._node_frames = old_nframes
         self._edge_frames = old_eframes
-
-    def is_homogeneous(self):
-        """Return if the graph is homogeneous."""
-        return len(self.ntypes) == 1 and len(self.etypes) == 1
 
     def formats(self, formats=None):
         r"""Get a cloned graph with the specified sparse format(s) or query
@@ -3837,7 +5060,7 @@ class DGLHeteroGraph(object):
 
         **Homographs or Heterographs with A Single Edge Type**
 
-        >>> g = dgl.graph([(0, 2), (0, 3), (1, 2)])
+        >>> g = dgl.graph(([0, 0, 1], [2, 3, 2]))
         >>> g.ndata['h'] = torch.ones(4, 1)
         >>> # Check status of format usage
         >>> g.formats()
@@ -3857,11 +5080,11 @@ class DGLHeteroGraph(object):
         **Heterographs with Multiple Edge Types**
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
-        >>>                                 torch.tensor([0, 0, 1, 1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
-        >>>                                         torch.tensor([0, 1]))
-        >>>     })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        ...                                         torch.tensor([0, 1]))
+        ...     })
         >>> g.formats()
         {'created': ['coo'], 'not created': ['csr', 'csc']}
         >>> # Get a clone of the graph with 'csr' format
@@ -3896,7 +5119,7 @@ class DGLHeteroGraph(object):
 
         **Homographs or Heterographs with A Single Edge Type**
 
-        >>> g = dgl.graph([(0, 2), (0, 3), (1, 2)])
+        >>> g = dgl.graph(([0, 0, 1], [2, 3, 2]))
         >>> g.format()
         {'created': ['coo'], 'not created': ['csr', 'csc']}
         >>> g.create_format_()
@@ -3906,11 +5129,11 @@ class DGLHeteroGraph(object):
         **Heterographs with Multiple Edge Types**
 
         >>> g = dgl.heterograph({
-        >>>     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
-        >>>                                 torch.tensor([0, 0, 1, 1])),
-        >>>     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
-        >>>                                         torch.tensor([0, 1]))
-        >>>     })
+        ...     ('user', 'plays', 'game'): (torch.tensor([0, 1, 1, 2]),
+        ...                                 torch.tensor([0, 0, 1, 1])),
+        ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
+        ...                                         torch.tensor([0, 1]))
+        ...     })
         >>> g.format()
         {'created': ['coo'], 'not created': ['csr', 'csc']}
         >>> g.create_format_()
@@ -3936,8 +5159,7 @@ class DGLHeteroGraph(object):
         """
         if idtype is None:
             return self
-        if not idtype in (F.int32, F.int64):
-            raise DGLError("ID type must be int32 or int64, but got {}.".format(idtype))
+        utils.check_valid_idtype(idtype)
         if self.idtype == idtype:
             return self
         bits = 32 if idtype == F.int32 else 64
@@ -3976,51 +5198,102 @@ class DGLHeteroGraph(object):
 
 
     def long(self):
-        """Cast this graph to use int64 IDs.
+        """Cast the graph to one with idtype int64
 
-        Features are copied (shallow copy) to the new graph.
+        If the graph already has idtype int64, the function directly returns it. Otherwise,
+        it returns a cloned graph of idtype int64 with features copied (shallow copy).
 
         Returns
         -------
-        DGLHeteroGraph
-            The graph object
+        DGLGraph
+            The graph of idtype int64.
 
         Examples
         --------
 
-        >>> g = dgl.bipartite(([0, 1, 1], [0, 0, 2]), 'user', 'plays', 'game',
-        >>>                   idtype=torch.int32)
-        >>> g_long = g.long() # Convert g to int64 indexed, not changing the original `g`
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a graph of idtype int32.
+
+        >>> # (0, 1), (0, 2), (1, 2)
+        >>> g = dgl.graph((torch.tensor([0, 0, 1]).int(), torch.tensor([1, 2, 2]).int()))
+        >>> g.ndata['feat'] = torch.ones(3, 1)
+        >>> g.idtype
+        torch.int32
+
+        Cast the graph to one of idtype int64.
+
+        >>> # A cloned graph with an idtype of int64
+        >>> g_long = g.long()
+        >>> g_long.idtype
+        torch.int64
+        >>> # The idtype of the original graph does not change.
+        >>> g.idtype
+        torch.int32
+        >>> g_long.edges()
+        (tensor([0, 0, 1]), tensor([1, 2, 2]))
+        >>> g_long.ndata
+        {'feat': tensor([[1.],
+                         [1.],
+                         [1.]])}
 
         See Also
         --------
         int
         idtype
-        astype
         """
         return self.astype(F.int64)
 
     def int(self):
-        """Return a heterograph object use int32 as index dtype,
-        with the ndata and edata as the original object
+        """Cast the graph to one with idtype int32
+
+        If the graph already has idtype int32, the function directly returns it. Otherwise,
+        it returns a cloned graph of idtype int32 with features copied (shallow copy).
 
         Returns
         -------
-        DGLHeteroGraph
-            The graph object
+        DGLGraph
+            The graph of idtype int32.
 
         Examples
         --------
 
-        >>> g = dgl.bipartite(([0, 1, 1], [0, 0, 2]), 'user', 'plays', 'game',
-        >>>                   idtype=torch.int64)
-        >>> g_int = g.int() # Convert g to int32 indexed, not changing the original `g`
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a graph of idtype int64.
+
+        >>> # (0, 1), (0, 2), (1, 2)
+        >>> g = dgl.graph((torch.tensor([0, 0, 1]), torch.tensor([1, 2, 2])))
+        >>> g.ndata['feat'] = torch.ones(3, 1)
+        >>> g.idtype
+        torch.int64
+
+        Cast the graph to one of idtype int32.
+
+        >>> # A cloned graph with an idtype of int32
+        >>> g_int = g.int()
+        >>> g_int.idtype
+        torch.int32
+        >>> # The idtype of the original graph does not change.
+        >>> g.idtype
+        torch.int64
+        >>> g_int.edges()
+        (tensor([0, 0, 1], dtype=torch.int32), tensor([1, 2, 2], dtype=torch.int32))
+        >>> g_int.ndata
+        {'feat': tensor([[1.],
+                         [1.],
+                         [1.]])}
 
         See Also
         --------
         long
         idtype
-        astype
         """
         return self.astype(F.int32)
 
@@ -4282,7 +5555,7 @@ def reduce_dict_data(frames, reducer, order=None):
         ret[k] = merger(flist)
     return ret
 
-def combine_frames(frames, ids):
+def combine_frames(frames, ids, col_names=None):
     """Merge the frames into one frame, taking the common columns.
 
     Return None if there is no common columns.
@@ -4293,6 +5566,8 @@ def combine_frames(frames, ids):
         List of frames
     ids : List[int]
         List of frame IDs
+    col_names : List[str], optional
+        Column names to consider. If not given, it considers all columns.
 
     Returns
     -------
@@ -4300,7 +5575,10 @@ def combine_frames(frames, ids):
         The resulting frame
     """
     # find common columns and check if their schemes match
-    schemes = {key: scheme for key, scheme in frames[ids[0]].schemes.items()}
+    if col_names is None:
+        schemes = {key: scheme for key, scheme in frames[ids[0]].schemes.items()}
+    else:
+        schemes = {key: frames[ids[0]].schemes[key] for key in col_names}
     for frame_id in ids:
         frame = frames[frame_id]
         for key, scheme in list(schemes.items()):
