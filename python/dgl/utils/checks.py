@@ -27,7 +27,6 @@ def prepare_tensor(g, data, name):
     Tensor
         Data in tensor object.
     """
-    ret = None
     if F.is_tensor(data):
         if F.dtype(data) != g.idtype or F.context(data) != g.device:
             raise DGLError('Expect argument "{}" to have data type {} and device '
@@ -35,9 +34,16 @@ def prepare_tensor(g, data, name):
                                name, g.idtype, g.device, F.dtype(data), F.context(data)))
         ret = data
     else:
-        ret = F.copy_to(F.tensor(data, g.idtype), g.device)
+        data = F.tensor(data)
+        if (not (F.ndim(data) > 0 and F.shape(data)[0] == 0) and        # empty tensor
+                F.dtype(data) not in (F.int32, F.int64)):
+            raise DGLError('Expect argument "{}" to have data type int32 or int64,'
+                           ' but got {}.'.format(name, F.dtype(data)))
+        ret = F.copy_to(F.astype(data, g.idtype), g.device)
 
-    if F.ndim(ret) != 1:
+    if F.ndim(ret) == 0:
+        ret = F.unsqueeze(ret, 0)
+    if F.ndim(ret) > 1:
         raise DGLError('Expect a 1-D tensor for argument "{}". But got {}.'.format(
             name, ret))
     return ret
@@ -158,3 +164,15 @@ def check_all_same_schema(feat_dict_list, keys, name):
                                ' and feature size, but got\n\t{} {}\nand\n\t{} {}.'.format(
                                    name, k, F.dtype(t1), F.shape(t1)[1:],
                                    F.dtype(t2), F.shape(t2)[1:]))
+
+def check_valid_idtype(idtype):
+    """Check whether the value of the idtype argument is valid (int32/int64)
+
+    Parameters
+    ----------
+    idtype : data type
+        The framework object of a data type.
+    """
+    if idtype not in [None, F.int32, F.int64]:
+        raise DGLError('Expect idtype to be a framework object of int32/int64, '
+                       'got {}'.format(idtype))

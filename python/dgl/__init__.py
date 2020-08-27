@@ -1,4 +1,10 @@
-"""DGL root package."""
+"""
+The ``dgl`` package contains data structure for storing structural and feature data
+(i.e., the :class:`DGLGraph` class) and also utilities for generating, manipulating
+and transforming graphs.
+"""
+
+
 # Windows compatibility
 # This initializes Winsock and performs cleanup at termination as required
 import socket

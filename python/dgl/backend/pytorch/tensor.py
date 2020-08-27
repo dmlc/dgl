@@ -13,8 +13,8 @@ from ..._deprecate import kernel as K
 from ...function.base import TargetCode
 from ...base import dgl_warning
 
-if LooseVersion(th.__version__) < LooseVersion("1.2.0"):
-    dgl_warning("Detected an old version of PyTorch. Suggest using torch>=1.2.0 "
+if LooseVersion(th.__version__) < LooseVersion("1.5.0"):
+    dgl_warning("Detected an old version of PyTorch. Suggest using torch>=1.5.0 "
                 "for the best experience.")
 
 def data_type_dict():
@@ -267,6 +267,9 @@ def clone(input):
 
 def clamp(data, min_val, max_val):
     return th.clamp(data, min_val, max_val)
+
+def replace_inf_with_zero(x):
+    return th.masked_fill(x, th.isinf(x), 0)
 
 def unique(input):
     if input.dtype == th.bool:

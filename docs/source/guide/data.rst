@@ -1,9 +1,9 @@
+.. _guide-data-pipeline:
 
-Graph data input pipeline in DGL
-==================================
+Chapter 4: Graph Data Pipeline
+====================================================
 
-DGL implements many commonly used graph datasets in
-`dgl.data <https://docs.dgl.ai/en/latest/api/python/dgl.data.html>`__. They
+DGL implements many commonly used graph datasets in :ref:`apidata`. They
 follow a standard pipeline defined in class :class:`dgl.data.DGLDataset`. We highly
 recommend processing graph data into a :class:`dgl.data.DGLDataset` subclass, as the
 pipeline provides simple and clean solution for loading, processing and
@@ -17,7 +17,7 @@ DGLDataset class
 --------------------
 
 :class:`dgl.data.DGLDataset` is the base class for processing, loading and saving
-graph datasets defined in ``dgl.data``. It implements the basic pipeline
+graph datasets defined in :ref:`apidata`. It implements the basic pipeline
 for processing graph data. The following flow chart shows how the
 pipeline works.
 
@@ -25,11 +25,10 @@ To process a graph dataset located in a remote server or local disk, we
 define a class, say ``MyDataset``, inherits from :class:`dgl.data.DGLDataset`. The
 template of ``MyDataset`` is as follows.
 
-.. figure:: assets/data_flow_chart.png
-	:align: center
-	:scale: 50 %
+.. figure:: https://data.dgl.ai/asset/image/userguide_data_flow.png
+    :align: center
 
-	Flow chart for graph data input pipeline defined in class DGLDataset.
+    Flow chart for graph data input pipeline defined in class DGLDataset.
 
 .. code:: 
 
@@ -101,8 +100,7 @@ template of ``MyDataset`` is as follows.
 ``__getitem__(idx)`` and ``__len__()`` that must be implemented in the
 subclass. But we recommend to implement saving and loading as well,
 since they can save significant time for processing large datasets, and
-there are several APIs making it easy (see `Save and load data 
-<file:///Users/xiangkhu/Documents/GitHub/dgl/docs/build/html/guide/data.html#save-and-load-data>`__).
+there are several APIs making it easy (see :ref:`ref-save-load-data`).
 
 Note that the purpose of :class:`dgl.data.DGLDataset` is to provide a standard and
 convenient way to load graph data. We can store graphs, features,
@@ -182,7 +180,7 @@ how to process datasets related to these tasks.
 Here we focus on the standard way to process graphs, features and masks.
 We will use builtin datasets as examples and skip the implementations
 for building graphs from files, but add links to the detailed
-implementations. Please refer to `Creating graphs from external sources <https://>`__ to see a
+implementations. Please refer to :ref:`guide-graph-external` to see a
 complete guide on how to build graphs from external sources.
 
 Processing Graph Classification datasets
@@ -239,7 +237,7 @@ In ``process()``, the raw data is processed to a list of graphs and a
 list of labels. We must implement ``__getitem__(idx)`` and ``__len__()``
 for iteration. We recommend to make ``__getitem__(idx)`` to return a
 tuple ``(graph, label)`` as above. Please check the `QM7bDataset source
-code <https://docs.dgl.ai/en/latest/_modules/dgl/data/qm7b.html#QM7bDataset>`__
+code <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/qm7b.html#QM7bDataset>`__
 for details of ``self._load_graph()`` and ``__getitem__``.
 
 We can also add properties to the class to indicate some useful
@@ -282,18 +280,18 @@ follows:
             pass
 
 A complete guide for training graph classification models can be found
-in `Training Graph Classification models <https://>`__.
+in :ref:`guide-training-graph-classification`.
 
 For more examples of graph classification datasets, please refer to our builtin graph classification
 datasets: 
 
-* `GINDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#graph-isomorphism-network-dataset>`__
+* :ref:`gindataset`
 
-* `MiniGCDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#mini-graph-classification-dataset>`__
+* :ref:`minigcdataset`
 
-* `QM7bDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#qm7b-dataset>`__
+* :ref:`qm7bdata`
 
-* `TUDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#tu-dataset>`__
+* :ref:`tudata`
 
 Processing Node Classification datasets
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -301,7 +299,7 @@ Processing Node Classification datasets
 Different from graph classification, node classification is typically on
 a single graph. As such, splits of the dataset are on the nodes of the
 graph. We recommend using node masks to specify the splits. We use
-builtin dataset `CitationGraphDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#citation-network-dataset>`__ as an example:
+builtin dataset `CitationGraphDataset <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/citation_graph.html#CitationGraphDataset>`__ as an example:
 
 .. code:: 
 
@@ -356,7 +354,7 @@ For brevity, we skip some code in ``process()`` to highlight the key
 part for processing node classification dataset: spliting masks, node
 features and node labels are stored in ``g.ndata``. For detailed
 implementation, please refer to `CitationGraphDataset source
-code <https://docs.dgl.ai/en/latest/_modules/dgl/data/citation_graph.html#CitationGraphDataset>`__.
+code <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/citation_graph.html#CitationGraphDataset>`__.
 
 Notice that the implementations of ``__getitem__(idx)`` and
 ``__len__()`` are changed as well, since there is often only one graph
@@ -384,30 +382,30 @@ to show the usage of it:
     labels = graph.ndata['label']
 
 A complete guide for training node classification models can be found in
-`Training Node Classification/Regression models <https://>`__.
+:ref:`guide-training-node-classification`.
 
 For more examples of node classification datasets, please refer to our
 builtin datasets:
 
-* `CitationGraphDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#citation-network-dataset>`__
+* :ref:`citationdata`
 
-* `CoraFullDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#corafull-dataset>`__
+* :ref:`corafulldata`
 
-* `Amazon Co-Purchase dataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#amazon-co-purchase-dataset>`__
+* :ref:`amazoncobuydata`
 
-* `Coauthor dataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#coauthor-dataset>`__
+* :ref:`coauthordata`
 
-* `KarateClubDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#karate-club-dataset>`__
+* :ref:`karateclubdata`
 
-* `PPIDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#protein-protein-interaction-dataset>`__
+* :ref:`ppidata`
 
-* `RedditDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#reddit-dataset>`__
+* :ref:`redditdata`
 
-* `SBMMixtureDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#symmetric-stochastic-block-model-mixture-dataset>`__
+* :ref:`sbmdata`
 
-* `SSTDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#stanford-sentiment-treebank-dataset>`__
+* :ref:`sstdata`
 
-* `RDF datasets <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#rdf-datasets>`__
+* :ref:`rdfdata`
 
 Processing dataset for Link Prediction datasets
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -416,7 +414,7 @@ The processing of link prediction datasets is similar to that for node
 classification’s, there is often one graph in the dataset.
 
 We use builtin dataset
-`KnowledgeGraphDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#knowlege-graph-dataset>`__
+`KnowledgeGraphDataset <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/knowledge_graph.html#KnowledgeGraphDataset>`__
 as example, and still skip the detailed data processing code to
 highlight the key part for processing link prediction datasets:
 
@@ -457,7 +455,7 @@ highlight the key part for processing link prediction datasets:
 
 As shown in the code, we add splitting masks into ``edata`` field of the
 graph. Check `KnowledgeGraphDataset source
-code <https://docs.dgl.ai/en/latest/_modules/dgl/data/knowledge_graph.html#KnowledgeGraphDataset>`__
+code <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/knowledge_graph.html#KnowledgeGraphDataset>`__
 to see the complete code. We use a subclass of ``KnowledgeGraphDataset``, :class:`dgl.data.FB15k237Dataset`,
 to show the usage of it:
 
@@ -478,14 +476,16 @@ to show the usage of it:
 
 
 A complete guide for training link prediction models can be found in
-`Training Link Prediction models <https://>`__.
+:ref:`guide-training-link-prediction`.
 
 For more examples of link prediction datasets, please refer to our
 builtin datasets: 
 
-* `Knowlege graph dataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#knowlege-graph-dataset>`__
+* :ref:`kgdata`
 
-* `BitcoinOTCDataset <https://docs.dgl.ai/en/latest/api/python/dgl.data.html#bitcoinotc-dataset>`__
+* :ref:`bitcoinotcdata`
+
+.. _ref-save-load-data:
 
 Save and load data
 ----------------------
@@ -494,7 +494,7 @@ We recommend to implement saving and loading functions to cache the
 processed data in local disk. This saves a lot of data processing time
 in most cases. We provide four functions to make things simple:
 
--  :func:`dgl.data.utils.save_graphs` and :func:`dgl.data.utils.load_graphs`: save/load DGLGraph objects and labels to/from local disk.
+-  :func:`dgl.save_graphs` and :func:`dgl.load_graphs`: save/load DGLGraph objects and labels to/from local disk.
 -  :func:`dgl.data.utils.save_info` and :func:`dgl.data.utils.load_info`: save/load useful information of the dataset (python ``dict`` object) to/from local disk.
 
 The following example shows how to save and load a list of graphs and
@@ -503,8 +503,8 @@ dataset information.
 .. code:: 
 
     import os
-    from dgl.data.utils import makedirs, \
-        save_graphs, load_graphs, save_info, load_info
+    from dgl import save_graphs, load_graphs
+    from dgl.data.utils import makedirs, save_info, load_info
     
     def save(self):
         # save graphs and labels

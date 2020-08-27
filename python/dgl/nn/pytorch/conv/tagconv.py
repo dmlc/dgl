@@ -82,8 +82,8 @@ class TAGConv(nn.Module):
         -----------
         Reinitialize learnable parameters.
 
-        Notes
-        -----
+        Note
+        ----
         The model parameters are initialized using Glorot uniform initialization.
         """
         gain = nn.init.calculate_gain('relu')
@@ -111,7 +111,7 @@ class TAGConv(nn.Module):
             is size of output feature.
         """
         with graph.local_scope():
-            assert graph.is_homogeneous(), 'Graph is not homogeneous'
+            assert graph.is_homogeneous, 'Graph is not homogeneous'
 
             norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
             shp = norm.shape + (1,) * (feat.dim() - 1)

@@ -27,7 +27,11 @@ def start_sample_client(rank, tmpdir, disable_shared_mem):
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_sampling.json', rank)
     dgl.distributed.initialize("rpc_ip_config.txt", 1)
     dist_graph = DistGraph("test_sampling", gpb=gpb)
-    sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
+    try:
+        sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
+    except Exception as e:
+        print(e)
+        sampled_graph = None
     dgl.distributed.exit_client()
     return sampled_graph
 
@@ -37,7 +41,11 @@ def start_find_edges_client(rank, tmpdir, disable_shared_mem, eids):
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_find_edges.json', rank)
     dgl.distributed.initialize("rpc_ip_config.txt", 1)
     dist_graph = DistGraph("test_find_edges", gpb=gpb)
-    u, v = find_edges(dist_graph, eids)
+    try:
+        u, v = find_edges(dist_graph, eids)
+    except Exception as e:
+        print(e)
+        u, v = None, None
     dgl.distributed.exit_client()
     return u, v
 
@@ -201,7 +209,11 @@ def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
     if disable_shared_mem:
         _, _, _, gpb, _ = load_partition(tmpdir / 'test_in_subgraph.json', rank)
     dist_graph = DistGraph("test_in_subgraph", gpb=gpb)
-    sampled_graph = dgl.distributed.in_subgraph(dist_graph, nodes)
+    try:
+        sampled_graph = dgl.distributed.in_subgraph(dist_graph, nodes)
+    except Exception as e:
+        print(e)
+        sampled_graph = None
     dgl.distributed.exit_client()
     return sampled_graph
 

@@ -435,7 +435,7 @@ class EdgeCollator(Collator):
           or a dictionary of edge types and such pairs if the graph is heterogenenous.
 
         A set of builtin negative samplers are provided in
-        :ref:`the negative sampling module <negative-sampling>`.
+        :ref:`the negative sampling module <api-dataloading-negative-sampling>`.
 
     Examples
     --------
@@ -596,8 +596,11 @@ class EdgeCollator(Collator):
                 'graph has multiple or no edge types; '\
                 'please return a dict in negative sampler.'
             neg_srcdst = {self.g.canonical_etypes[0]: neg_srcdst}
+        # Get dtype from a tuple of tensors
+        dtype = F.dtype(list(neg_srcdst.values())[0][0])
         neg_edges = {
-            etype: neg_srcdst.get(etype, []) for etype in self.g.canonical_etypes}
+            etype: neg_srcdst.get(etype, (F.tensor([], dtype), F.tensor([], dtype)))
+            for etype in self.g.canonical_etypes}
         neg_pair_graph = heterograph(
             neg_edges, {ntype: self.g.number_of_nodes(ntype) for ntype in self.g.ntypes})
 

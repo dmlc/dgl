@@ -15,7 +15,7 @@ It *fuses* two steps into one kernel.
 
 1. Computes messages by add/sub/mul/div source node and edge features,
    or copy node features to edges.
-2. Aggregate the messages by sum/max/min as the features on destination nodes.
+2. Aggregate the messages by sum/max/min/mean as the features on destination nodes.
 
 Our implementation supports tensors on CPU/GPU in PyTorch/MXNet/Tensorflow
 as input. All operators are equipped with autograd (computing the input gradients
@@ -81,7 +81,7 @@ here, you can enjoy the same convenience on other frameworks by similar usage):
    >>> F.u_mul_e_sum(g, x, y1).shape  # (2,), (4, 2) -> (4, 2)
    torch.Size([3, 4, 2])
 
-For all operators, the input graph could either be a homograph or a bipartite
+For all operators, the input graph could either be a homogeneous or a bipartite
 graph.
 
 .. autosummary::
@@ -100,12 +100,18 @@ graph.
     u_sub_e_min
     u_mul_e_min
     u_div_e_min
+    u_add_e_mean
+    u_sub_e_mean
+    u_mul_e_mean
+    u_div_e_mean
     copy_u_sum
     copy_e_sum
     copy_u_max
     copy_e_max
     copy_u_min
     copy_e_min 
+    copy_u_mean
+    copy_e_mean
 
 GSDDMM functions
 ----------------
@@ -228,7 +234,7 @@ The following is an example showing how GSDDMM works:
     copy_u
     copy_v
 
-Like GSpMM, GSDDMM operators support both homograph and bipartite graph.
+Like GSpMM, GSDDMM operators support both homogeneous and bipartite graph.
 
 Edge Softmax module
 -------------------

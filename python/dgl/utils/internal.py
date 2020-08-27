@@ -891,4 +891,12 @@ def set_num_threads(num_threads):
     """
     _CAPI_DGLSetOMPThreads(num_threads)
 
+def alias_func(func):
+    """Return an alias function with proper docstring."""
+    @wraps(func)
+    def _fn(*args, **kwargs):
+        return func(*args, **kwargs)
+    _fn.__doc__ = """Alias of :func:`dgl.{}`.""".format(func.__name__)
+    return _fn
+
 _init_api("dgl.utils.internal")

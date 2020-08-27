@@ -85,8 +85,8 @@ class GatedGraphConv(nn.Module):
         -----------
         Reinitialize learnable parameters.
 
-        Notes
-        -----
+        Note
+        ----
         The model parameters are initialized using Glorot uniform initialization
         and the bias is initialized to be zero.
         """
@@ -95,6 +95,20 @@ class GatedGraphConv(nn.Module):
         for linear in self.linears:
             init.xavier_normal_(linear.weight, gain=gain)
             init.zeros_(linear.bias)
+
+    def set_allow_zero_in_degree(self, set_value):
+        r"""
+
+        Description
+        -----------
+        Set allow_zero_in_degree flag.
+
+        Parameters
+        ----------
+        set_value : bool
+            The value to be set to the flag.
+        """
+        self._allow_zero_in_degree = set_value
 
     def forward(self, graph, feat, etypes):
         """
@@ -122,8 +136,9 @@ class GatedGraphConv(nn.Module):
             is the output feature size.
         """
         with graph.local_scope():
-            assert graph.is_homogeneous(), \
-                "not a homograph; convert it with to_homo and pass in the edge type as argument"
+            assert graph.is_homogeneous, \
+                "not a homogeneous graph; convert it with to_homogeneous " \
+                "and pass in the edge type as argument"
             assert etypes.min() >= 0 and etypes.max() < self._n_etypes, \
                 "edge type indices out of range [0, {})".format(self._n_etypes)
             zero_pad = feat.new_zeros((feat.shape[0], self._out_feats - feat.shape[1]))
