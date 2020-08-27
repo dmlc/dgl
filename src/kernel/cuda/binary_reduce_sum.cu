@@ -115,6 +115,7 @@ void CusparseCsrmm2(
   DType* valptr = static_cast<DType*>(device->AllocWorkspace(rtcfg.ctx, nnz * sizeof(DType)));
   utils::Fill<kDLGPU>(rtcfg.ctx, valptr, nnz, static_cast<DType>(1.));
 #if CUDART_VERSION >= 11000
+  auto ctx = rtcfg.ctx;
   cusparseSpMatDescr_t matA;
   cusparseDnMatDescr_t matB, matC;
   constexpr auto cuda_dtype = std::is_same<DType, float>::value ? CUDA_R_32F: CUDA_R_64F;
@@ -122,7 +123,7 @@ void CusparseCsrmm2(
       m, k, nnz,
       static_cast<int32_t*>(csr.indptr->data),
       static_cast<int32_t*>(csr.indices->data),
-      const_cast<DType*>(valptr? valptr : A_data),
+      const_cast<DType*>(valptr),
       CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I,
       CUSPARSE_INDEX_BASE_ZERO, cuda_dtype));
   CUSPARSE_CALL(cusparseCreateDnMat(&matB,
