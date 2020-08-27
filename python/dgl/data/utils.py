@@ -563,6 +563,7 @@ def parse_category_single_feat(category_inputs, norm=None):
         array([[1.,0.,0.],[0.,1.,0.],[0.,0.,1.],[1.,0.,0.]])
 
     """
+    from sklearn.preprocessing import LabelBinarizer
     lb = LabelBinarizer()
     feat = lb.fit_transform(category_inputs)
 
@@ -626,6 +627,7 @@ def parse_category_multi_feat(category_inputs, norm=None):
         array([[1.,1.,1.],[1.,1.,0.],[0.,0.,1.],[1.,0.,0.]])
 
     """
+    from sklearn.preprocessing import MultiLabelBinarizer
     mlb = MultiLabelBinarizer()
     feat = mlb.fit_transform(category_inputs)
 
