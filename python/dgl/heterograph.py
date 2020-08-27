@@ -5279,6 +5279,9 @@ class DGLHeteroGraph(object):
         >>> g.format()
         {'created': ['coo', 'csr', 'csc'], 'not created': []}
         """
+        if self.num_edges() == 0:
+            return 0
+
         return self._graph.create_format_()
 
     def astype(self, idtype):
