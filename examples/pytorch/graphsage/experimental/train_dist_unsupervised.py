@@ -150,6 +150,8 @@ class NeighborSampler(object):
 
             blocks.insert(0, block)
 
+        input_nodes = blocks[0].srcdata[dgl.NID]
+        blocks[0].srcdata['features'] = load_subtensor(self.g, input_nodes, 'cpu')
         # Pre-generate CSR format that it can be used in training directly
         return pos_graph, neg_graph, blocks
 
@@ -214,7 +216,7 @@ class DistSAGE(SAGE):
                 num_workers=args.num_workers)
 
             for blocks in tqdm.tqdm(dataloader):
-                block = blocks[0]
+                block = blocks[0].to(device)
                 input_nodes = block.srcdata[dgl.NID]
                 output_nodes = block.dstdata[dgl.NID]
                 h = x[input_nodes].to(device)
@@ -306,19 +308,22 @@ def run(args, device, data):
                               dgl.distributed.sample_neighbors, args.num_negs, args.remove_edge)
 
     # Create PyTorch DataLoader for constructing blocks
-    dataloader = DataLoader(
+    dataloader = dgl.distributed.DistDataLoader(
         dataset=train_eids.numpy(),
         batch_size=args.batch_size,
         collate_fn=sampler.sample_blocks,
         shuffle=True,
-        drop_last=False,
-        num_workers=args.num_workers)
+        drop_last=False)
 
     # Define model and optimizer
     model = DistSAGE(in_feats, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
     if not args.standalone:
-        model = th.nn.parallel.DistributedDataParallel(model)
+        if args.num_gpus == -1:
+            model = th.nn.parallel.DistributedDataParallel(model)
+        else:
+            dev_id = g.rank() % args.num_gpus
+            model = th.nn.parallel.DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
     loss_fcn = CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -352,12 +357,14 @@ def run(args, device, data):
             tic_step = time.time()
             sample_t.append(tic_step - start)
 
+            pos_graph = pos_graph.to(device)
+            neg_graph = neg_graph.to(device)
+            blocks = [block.to(device) for block in blocks]
             # The nodes for input lies at the LHS side of the first block.
             # The nodes for output lies at the RHS side of the last block.
-            input_nodes = blocks[0].srcdata[dgl.NID]
 
             # Load the input features as well as output labels
-            batch_inputs = load_subtensor(g, input_nodes, device)
+            batch_inputs = blocks[0].srcdata['features']
             copy_time = time.time()
             feat_copy_t.append(copy_time - tic_step)
 
@@ -431,7 +438,10 @@ def main(args):
     global_valid_nid = th.LongTensor(np.nonzero(g.ndata['val_mask'][np.arange(g.number_of_nodes())]))
     global_test_nid = th.LongTensor(np.nonzero(g.ndata['test_mask'][np.arange(g.number_of_nodes())]))
     labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
-    device = th.device('cpu')
+    if args.num_gpus == -1:
+        device = th.device('cpu')
+    else:
+        device = th.device('cuda:'+str(g.rank() % args.num_gpus))
 
     # Pack data
     in_feats = g.ndata['features'].shape[1]
@@ -454,8 +464,8 @@ if __name__ == '__main__':
     parser.add_argument('--part_config', type=str, help='The path to the partition config file')
     parser.add_argument('--num_servers', type=int, default=1, help='Server count on each machine.')
     parser.add_argument('--n_classes', type=int, help='the number of classes')
-    parser.add_argument('--gpu', type=int, default=0,
-        help="GPU device ID. Use -1 for CPU training")
+    parser.add_argument('--num_gpus', type=int, default=-1, 
+                        help="the number of GPU device. Use -1 for CPU training")
     parser.add_argument('--num_epochs', type=int, default=20)
     parser.add_argument('--num_hidden', type=int, default=16)
     parser.add_argument('--num-layers', type=int, default=2)
