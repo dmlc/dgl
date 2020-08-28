@@ -108,11 +108,11 @@ def save_graphs(filename, g_list, labels=None):
     load_graphs
     """
     # if it is local file, do some sanity check
-    if filename.startswith('s3://') is False:
+    if not filename.startswith('s3://'):
         if os.path.isdir(filename):
             raise DGLError("Filename {} is an existing directory.".format(filename))
-        f_path, _ = os.path.split(filename)
-        if not os.path.exists(f_path):
+        f_path = os.path.dirname(filename)
+        if f_path and not os.path.exists(f_path):
             os.makedirs(f_path)
 
     g_sample = g_list[0] if isinstance(g_list, list) else g_list
