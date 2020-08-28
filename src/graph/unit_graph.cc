@@ -1446,8 +1446,11 @@ SparseFormat UnitGraph::SelectFormat(dgl_format_code_t preferred_formats) const 
   dgl_format_code_t created = GetCreatedFormats();
   if (common & created)
     return DecodeFormat(common & created);
-  if (coo_->defined() && coo_->IsHypersparse())  // only allow coo for hypersparse graph.
-    return SparseFormat::kCOO;
+
+  // NOTE(zihao): hypersparse is currently disabled since many CUDA operators on COO have
+  // not been implmented yet.
+  // if (coo_->defined() && coo_->IsHypersparse())  // only allow coo for hypersparse graph.
+  //   return SparseFormat::kCOO;
   if (common)
     return DecodeFormat(common);
   return DecodeFormat(created);
