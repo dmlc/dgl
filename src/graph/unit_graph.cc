@@ -410,8 +410,11 @@ class UnitGraph::COO : public BaseHeteroGraph {
    * nodes than edges.
    */
   bool IsHypersparse() const {
-    return (NumVertices(SrcType()) / 8 > NumEdges(EdgeType())) &&
-           (NumVertices(SrcType()) > 1000000);
+    // TODO(BarclayII) Some of the COO operators are not implemented on GPU.  Temporarily disabling
+    // this optimization until we support all the COO operators.
+    return false;
+    //return (NumVertices(SrcType()) / 8 > NumEdges(EdgeType())) &&
+    //       (NumVertices(SrcType()) > 1000000);
   }
 
   bool Load(dmlc::Stream* fs) {
