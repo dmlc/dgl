@@ -28,6 +28,7 @@ void _Fill(DType* ptr, size_t length, DType val) {
 
 namespace cusparse {
 
+#if CUDART_VERSION < 11000
 template <typename DType>
 cusparseStatus_t Xcsrmm2(cusparseHandle_t handle, cusparseOperation_t transA,
     cusparseOperation_t transB, int m, int n, int k, int nnz,
@@ -59,6 +60,7 @@ cusparseStatus_t Xcsrmm2<double>(cusparseHandle_t handle, cusparseOperation_t tr
       alpha, descrA, csrValA, csrRowPtrA, csrColIndA,
       B, ldb, beta, C, ldc);
 }
+#endif
 
 template <typename DType>
 cublasStatus_t Xgeam(cublasHandle_t handle, cublasOperation_t transa,
@@ -127,6 +129,44 @@ void CusparseCsrmm2(
     valptr = static_cast<DType*>(device->AllocWorkspace(ctx, nnz * sizeof(DType)));
     _Fill(valptr, nnz, static_cast<DType>(1.));
   }
+#if CUDART_VERSION >= 11000
+  cusparseSpMatDescr_t matA;
+  cusparseDnMatDescr_t matB, matC;
+  constexpr auto cuda_dtype = std::is_same<DType, float>::value ? CUDA_R_32F: CUDA_R_64F;
+  CUSPARSE_CALL(cusparseCreateCsr(&matA,
+      m, k, nnz,
+      static_cast<int32_t*>(csr.indptr->data),
+      static_cast<int32_t*>(csr.indices->data),
+      const_cast<DType*>(valptr? valptr : A_data),
+      CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I,
+      CUSPARSE_INDEX_BASE_ZERO, cuda_dtype));
+  CUSPARSE_CALL(cusparseCreateDnMat(&matB,
+      n, k, n,
+      const_cast<DType*>(B_data), cuda_dtype, CUSPARSE_ORDER_COL));
+  CUSPARSE_CALL(cusparseCreateDnMat(&matC,
+      m, n, m,
+      trans_out, cuda_dtype, CUSPARSE_ORDER_COL));
+
+  auto transA = CUSPARSE_OPERATION_NON_TRANSPOSE;
+  auto transB = CUSPARSE_OPERATION_TRANSPOSE;
+  size_t workspace_size;
+  CUSPARSE_CALL(cusparseSpMM_bufferSize(
+      thr_entry->cusparse_handle, transA, transB,
+      &alpha, matA, matB, &beta, matC,
+      cuda_dtype, CUSPARSE_CSRMM_ALG1,
+      &workspace_size));
+  void* workspace = device->AllocWorkspace(ctx, workspace_size);
+  CUSPARSE_CALL(cusparseSpMM(
+      thr_entry->cusparse_handle, transA, transB,
+      &alpha, matA, matB, &beta, matC,
+      cuda_dtype, CUSPARSE_CSRMM_ALG1,
+      workspace));
+  device->FreeWorkspace(ctx, workspace);
+
+  CUSPARSE_CALL(cusparseDestroySpMat(matA));
+  CUSPARSE_CALL(cusparseDestroyDnMat(matB));
+  CUSPARSE_CALL(cusparseDestroyDnMat(matC));
+#else
   cusparseMatDescr_t descr;
   CUSPARSE_CALL(cusparseCreateMatDescr(&descr));
   CUSPARSE_CALL(cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL));
@@ -141,6 +181,7 @@ void CusparseCsrmm2(
       static_cast<int32_t*>(csr.indices->data),
       B_data, n, &beta, trans_out, m));
   CUSPARSE_CALL(cusparseDestroyMatDescr(descr));
+#endif
   if (valptr)
     device->FreeWorkspace(ctx, valptr);
   // transpose the output matrix

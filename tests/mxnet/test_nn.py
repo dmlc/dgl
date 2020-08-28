@@ -473,6 +473,7 @@ def test_nn_conv_bi(g, idtype):
 
 def test_sg_conv():
     g = dgl.from_networkx(nx.erdos_renyi_graph(20, 0.3)).to(F.ctx())
+    g = dgl.add_self_loop(g)
     ctx = F.ctx()
 
     sgc = nn.SGConv(5, 2, 2)
