@@ -413,8 +413,8 @@ class UnitGraph::COO : public BaseHeteroGraph {
     // TODO(BarclayII) Some of the COO operators are not implemented on GPU.  Temporarily disabling
     // this optimization until we support all the COO operators.
     return false;
-    //return (NumVertices(SrcType()) / 8 > NumEdges(EdgeType())) &&
-    //       (NumVertices(SrcType()) > 1000000);
+    // return (NumVertices(SrcType()) / 8 > NumEdges(EdgeType())) &&
+    //        (NumVertices(SrcType()) > 1000000);
   }
 
   bool Load(dmlc::Stream* fs) {
