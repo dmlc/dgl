@@ -366,7 +366,7 @@ def test_query(idtype):
     print(g)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU does not have COO impl.")
-def test_hypersparse():
+def _test_hypersparse():
     N1 = 1 << 50        # should crash if allocated a CSR
     N2 = 1 << 48
 
@@ -431,7 +431,7 @@ def test_hypersparse():
     assert g.out_degrees(N2, 'plays') == 0
     assert F.asnumpy(g.out_degrees([0, N2], 'plays')).tolist() == [1, 0]
 
-def test_edge_ids():
+def _test_edge_ids():
     N1 = 1 << 50        # should crash if allocated a CSR
     N2 = 1 << 48
 
