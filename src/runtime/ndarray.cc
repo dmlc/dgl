@@ -137,7 +137,10 @@ bool NDArray::IsContiguous() const {
   CHECK(data_ != nullptr);
   if (data_->dl_tensor.strides == nullptr)
     return true;
-  for (int i = 0; i < data_->dl_tensor.ndim - 1; ++i) {
+  int i = 0;
+  if (data_->dl_tensor.ndim > 0 && data_->dl_tensor.shape[0] == 1)
+    i = 1;  // See https://github.com/dmlc/dgl/issues/2118
+  for (; i < data_->dl_tensor.ndim - 1; ++i) {
     if (data_->dl_tensor.strides[i] !=
         data_->dl_tensor.shape[i+1] * data_->dl_tensor.strides[i+1])
       return false;
