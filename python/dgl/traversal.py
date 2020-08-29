@@ -44,7 +44,8 @@ def bfs_nodes_generator(graph, source, reverse=False):
         'DGLGraph is deprecated, Please use DGLHeteroGraph'
     assert len(graph.canonical_etypes) == 1, \
         'bfs_nodes_generator only support homogeneous graph'
-    gidx = graph._graph
+    # Workaround before support for GPU graph
+    gidx = graph._graph.copy_to(utils.to_dgl_context(F.cpu()))
     source = utils.toindex(source, dtype=graph._idtype_str)
     ret = _CAPI_DGLBFSNodes_v2(gidx, source.todgltensor(), reverse)
     all_nodes = utils.toindex(ret(0), dtype=graph._idtype_str).tousertensor()
@@ -88,7 +89,8 @@ def bfs_edges_generator(graph, source, reverse=False):
         'DGLGraph is deprecated, Please use DGLHeteroGraph'
     assert len(graph.canonical_etypes) == 1, \
         'bfs_edges_generator only support homogeneous graph'
-    gidx = graph._graph
+    # Workaround before support for GPU graph
+    gidx = graph._graph.copy_to(utils.to_dgl_context(F.cpu()))
     source = utils.toindex(source, dtype=graph._idtype_str)
     ret = _CAPI_DGLBFSEdges_v2(gidx, source.todgltensor(), reverse)
     all_edges = utils.toindex(ret(0), dtype=graph._idtype_str).tousertensor()
@@ -129,7 +131,8 @@ def topological_nodes_generator(graph, reverse=False):
         'DGLGraph is deprecated, Please use DGLHeteroGraph'
     assert len(graph.canonical_etypes) == 1, \
         'topological_nodes_generator only support homogeneous graph'
-    gidx = graph._graph
+    # Workaround before support for GPU graph
+    gidx = graph._graph.copy_to(utils.to_dgl_context(F.cpu()))
     ret = _CAPI_DGLTopologicalNodes_v2(gidx, reverse)
     all_nodes = utils.toindex(ret(0), dtype=graph._idtype_str).tousertensor()
     # TODO(minjie): how to support directly creating python list
@@ -177,7 +180,8 @@ def dfs_edges_generator(graph, source, reverse=False):
         'DGLGraph is deprecated, Please use DGLHeteroGraph'
     assert len(graph.canonical_etypes) == 1, \
         'dfs_edges_generator only support homogeneous graph'
-    gidx = graph._graph
+    # Workaround before support for GPU graph
+    gidx = graph._graph.copy_to(utils.to_dgl_context(F.cpu()))
     source = utils.toindex(source, dtype=graph._idtype_str)
     ret = _CAPI_DGLDFSEdges_v2(gidx, source.todgltensor(), reverse)
     all_edges = utils.toindex(ret(0), dtype=graph._idtype_str).tousertensor()
@@ -252,7 +256,8 @@ def dfs_labeled_edges_generator(
         'DGLGraph is deprecated, Please use DGLHeteroGraph'
     assert len(graph.canonical_etypes) == 1, \
         'dfs_labeled_edges_generator only support homogeneous graph'
-    gidx = graph._graph
+    # Workaround before support for GPU graph
+    gidx = graph._graph.copy_to(utils.to_dgl_context(F.cpu()))
     source = utils.toindex(source, dtype=graph._idtype_str)
     ret = _CAPI_DGLDFSLabeledEdges_v2(
         gidx,
