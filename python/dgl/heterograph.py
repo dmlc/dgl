@@ -5241,7 +5241,7 @@ class DGLHeteroGraph(object):
             ret._graph = self._graph.formats(formats)
             return ret
 
-    def create_format_(self):
+    def create_formats_(self):
         r"""Create all sparse matrices allowed for the graph.
 
         By default, we create sparse matrices for a graph only when necessary.
@@ -5261,7 +5261,7 @@ class DGLHeteroGraph(object):
         >>> g = dgl.graph(([0, 0, 1], [2, 3, 2]))
         >>> g.format()
         {'created': ['coo'], 'not created': ['csr', 'csc']}
-        >>> g.create_format_()
+        >>> g.create_formats_()
         >>> g.format()
         {'created': ['coo', 'csr', 'csc'], 'not created': []}
 
@@ -5275,14 +5275,14 @@ class DGLHeteroGraph(object):
         ...     })
         >>> g.format()
         {'created': ['coo'], 'not created': ['csr', 'csc']}
-        >>> g.create_format_()
+        >>> g.create_formats_()
         >>> g.format()
         {'created': ['coo', 'csr', 'csc'], 'not created': []}
         """
         if self.num_edges() == 0:
             return 0
 
-        return self._graph.create_format_()
+        return self._graph.create_formats_()
 
     def astype(self, idtype):
         """Cast this graph to use another ID type.

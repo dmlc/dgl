@@ -317,7 +317,7 @@ if __name__ == '__main__':
     train_mask = g.ndata['train_mask']
     val_mask = g.ndata['val_mask']
     g.ndata['features'] = features
-    g.create_format_()
+    g.create_formats_()
     # Pack data
     data = train_mask, val_mask, in_feats, labels, n_classes, g
 
