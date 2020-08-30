@@ -57,7 +57,7 @@ def submit_jobs(args, udf_command):
 
     tot_num_clients = args.num_trainers * (1 + args.num_samplers) * len(hosts)
     # launch server tasks
-    server_cmd = 'DGL_ROLE=server'
+    server_cmd = 'DGL_ROLE=server DGL_NUM_SAMPLER=' + str(args.num_samplers)
     server_cmd = server_cmd + ' ' + 'OMP_NUM_THREADS=' + str(args.num_server_threads)
     server_cmd = server_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(tot_num_clients)
     server_cmd = server_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.part_config)
@@ -70,7 +70,7 @@ def submit_jobs(args, udf_command):
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         execute_remote(cmd, ip, args.ssh_port, thread_list)
     # launch client tasks
-    client_cmd = 'DGL_DIST_MODE="distributed" DGL_ROLE=client'
+    client_cmd = 'DGL_DIST_MODE="distributed" DGL_ROLE=client DGL_NUM_SAMPLER=' + str(args.num_samplers)
     client_cmd = client_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(tot_num_clients)
     client_cmd = client_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.part_config)
     client_cmd = client_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
