@@ -14,6 +14,7 @@ from .graph_partition_book import BasicPartitionBook, RangePartitionBook
 
 def load_partition(part_config, part_id):
     ''' Load data of a partition from the data path.
+
     A partition data includes a graph structure of the partition, a dict of node tensors,
     a dict of edge tensors and some metadata. The partition may contain the HALO nodes,
     which are the nodes replicated from other partitions. However, the dict of node tensors
@@ -21,13 +22,16 @@ def load_partition(part_config, part_id):
     only contains the edge data that belongs to the local partition. The metadata include
     the information of the global graph (not the local partition), which includes the number
     of nodes, the number of edges as well as the node assignment of the global graph.
+
     The function currently loads data through the local filesystem interface.
+
     Parameters
     ----------
     part_config : str
         The path of the partition config file.
     part_id : int
         The partition Id.
+
     Returns
     -------
     DGLGraph
@@ -63,6 +67,7 @@ def load_partition(part_config, part_id):
 
 def load_partition_book(part_config, part_id, graph=None):
     ''' Load a graph partition book from the partition config file.
+
     Parameters
     ----------
     part_config : str
@@ -71,6 +76,7 @@ def load_partition_book(part_config, part_id, graph=None):
         The partition Id.
     graph : DGLGraph
         The graph structure
+
     Returns
     -------
     GraphPartitionBook
@@ -109,17 +115,22 @@ def load_partition_book(part_config, part_id, graph=None):
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
                     reshuffle=True, balance_ntypes=None, balance_edges=False):
     ''' Partition a graph for distributed training and store the partitions on files.
+
     The partitioning occurs in three steps: 1) run a partition algorithm (e.g., Metis) to
     assign nodes to partitions; 2) construct partition graph structure based on
     the node assignment; 3) split the node features and edge features based on
     the partition result.
+
     When a graph is partitioned, each partition can contain *HALO* nodes and edges, which are
     the ones that belong to
     other partitions but are included in this partition for integrity or efficiency concerns.
     In this document, *local nodes/edges* refers to the nodes and edges that truly belong to
     a partition. The rest are "HALO nodes/edges".
+
     The partitioned data is stored into multiple files organized as follows:
+
     .. code-block:: none
+
         data_root_dir/
           |-- graph_name.json     # partition configuration file in JSON
           |-- node_map.npy        # partition id of each node stored in a numpy array (optional)
@@ -132,10 +143,13 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
               |-- node_feats.dgl
               |-- edge_feats.dgl
               |-- graph.dgl
+
     First, the metadata of the original graph and the partitioning is stored in a JSON file
     named after `graph_name`. This JSON file contains the information of the original graph
     as well as the path of the files that store each partition. Below show an example.
+
     .. code-block:: none
+
         {
            "graph_name" : "test",
            "part_method" : "metis",
@@ -156,7 +170,9 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
              "part_graph" : "data_root_dir/part1/graph.dgl",
            },
         }
+
     Here are the definition of the fields in the partition configuration file:
+
     * `graph_name` is the name of the graph given by a user.
     * `part_method` is the method used to assign nodes to partitions.
       Currently, it supports "random" and "metis".
@@ -167,10 +183,12 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     * `num_nodes` is the number of nodes in the global graph.
     * `num_edges` is the number of edges in the global graph.
     * `part-*` stores the data of a partition.
+
     If node IDs and edge IDs are not shuffled to ensure that all nodes/edges in a partition
     fall into a contiguous ID range, DGL needs to store node/edge mappings (from
     node/edge IDs to partition IDs) in separate files (node_map.npy and edge_map.npy).
     The node/edge mappings are stored in numpy files.
+
     The graph structure of a partition is stored in a file with the DGLGraph format.
     Nodes in each partition is *relabeled* to always start with zero. We call the node
     ID in the original graph, *global ID*, while the relabeled ID in each partition,
@@ -178,23 +196,30 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     `dgl.NID` and each value is the node's global ID. Similarly, edges are relabeled too
     and the mapping from local ID to global ID is stored as an integer edge data tensor
     under name `dgl.EID`.
+
     The partition graph contains additional node data ("inner_node" and "orig_id") and
     edge data ("inner_edge"):
+
     * "inner_node" indicates whether a node belongs to a partition.
     * "inner_edge" indicates whether an edge belongs to a partition.
     * "orig_id" exists when reshuffle=True. It indicates the original node Ids in the original
     graph before reshuffling.
+
     Node and edge features are splitted and stored together with each graph partition.
     All node/edge features in a partition are stored in a file with DGL format. The node/edge
     features are stored in dictionaries, in which the key is the node/edge data name and
     the value is a tensor. We do not store features of HALO nodes and edges.
+
     When performing Metis partitioning, we can put some constraint on the partitioning.
     Current, it supports two constrants to balance the partitioning. By default, Metis
     always tries to balance the number of nodes in each partition.
+
     * `balance_ntypes` balances the number of nodes of different types in each partition.
     * `balance_edges` balances the number of edges in each partition.
+
     To balance the node types, a user needs to pass a vector of N elements to indicate
     the type of each node. N is the number of nodes in the input graph.
+
     Parameters
     ----------
     g : DGLGraph
@@ -223,6 +248,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     balance_edges : bool
         Indicate whether to balance the edges in each partition. This argument is used by
         the Metis algorithm.
+
     Examples
     --------
     >>> dgl.distributed.partition_graph(g, 'test', 4, num_hops=1, part_method='metis',
