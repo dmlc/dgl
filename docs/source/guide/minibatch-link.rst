@@ -240,7 +240,7 @@ source-destination array pairs. An example is given as follows:
     
     dataloader = dgl.dataloading.EdgeDataLoader(
         g, train_eid_dict, sampler,
-        negative_sampler=negative_sampler=NegativeSampler(g, 5),
+        negative_sampler=NegativeSampler(g, 5),
         batch_size=1024,
         shuffle=True,
         drop_last=False,

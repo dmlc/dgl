@@ -175,7 +175,7 @@ class RelGraphConv(nn.Module):
 
         # layer norm
         if self.layer_norm:
-            self.layer_norm_weight = nn.LayerNorm(n_hidden, elementwise_affine=True)
+            self.layer_norm_weight = nn.LayerNorm(out_feat, elementwise_affine=True)
 
         # weight for self loop
         if self.self_loop:

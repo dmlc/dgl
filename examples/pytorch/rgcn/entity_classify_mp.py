@@ -86,19 +86,19 @@ class EntityClassify(nn.Module):
         self.layers.append(RelGraphConv(
             self.h_dim, self.h_dim, self.num_rels, "basis",
             self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-            low_mem=self.low_mem, dropout=self.dropout))
+            low_mem=self.low_mem, dropout=self.dropout, layer_norm = layer_norm))
         # h2h
         for idx in range(self.num_hidden_layers):
             self.layers.append(RelGraphConv(
                 self.h_dim, self.h_dim, self.num_rels, "basis",
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-                low_mem=self.low_mem, dropout=self.dropout))
+                low_mem=self.low_mem, dropout=self.dropout, layer_norm = layer_norm))
         # h2o
         self.layers.append(RelGraphConv(
             self.h_dim, self.out_dim, self.num_rels, "basis",
             self.num_bases, activation=None,
             self_loop=self.use_self_loop,
-            low_mem=self.low_mem))
+            low_mem=self.low_mem, layer_norm = layer_norm))
 
     def forward(self, blocks, feats, norm=None):
         if blocks is None:
@@ -152,12 +152,10 @@ class NeighborSampler:
             else:
                 frontier = dgl.sampling.sample_neighbors(self.g, cur, fanout)
             etypes = self.g.edata[dgl.ETYPE][frontier.edata[dgl.EID]]
-            norm = self.g.edata['norm'][frontier.edata[dgl.EID]]
             block = dgl.to_block(frontier, cur)
             block.srcdata[dgl.NTYPE] = self.g.ndata[dgl.NTYPE][block.srcdata[dgl.NID]]
-            block.srcdata['type_id'] =self.g.ndata[dgl.NID][block.srcdata[dgl.NID]]
+            block.srcdata['type_id'] = self.g.ndata[dgl.NID][block.srcdata[dgl.NID]]
             block.edata['etype'] = etypes
-            block.edata['norm'] = norm
             cur = block.srcdata[dgl.NID]
             blocks.insert(0, block)
         return seeds, blocks
