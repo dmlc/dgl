@@ -1,28 +1,40 @@
 .. _apiudf:
 
-User-defined Function
+User-defined Functions
 ==================================================
 
 .. currentmodule:: dgl.udf
 
-User-defined functions (UDFs) are flexible ways to configure message passing computation.
-There are two types of UDFs in DGL:
+User-defined functions (UDFs) allow arbitrary computation following the Message Passing Paradigm
+(see :ref:`guide-message-passing`). They bring more flexibility when :ref:`apifunction` cannot
+realize a desired computation.
 
-* **Node UDF** of signature ``NodeBatch -> dict``. The argument represents
-  a batch of nodes. The returned dictionary should have ``str`` type key and ``tensor``
-  type values.
-* **Edge UDF** of signature ``EdgeBatch -> dict``. The argument represents
-  a batch of edges. The returned dictionary should have ``str`` type key and ``tensor``
-  type values.
+User-defined Message Function
+-----------------------------
 
-The size of the batch dimension is determined by the DGL framework
-for good efficiency and small memory footprint. Users should not make
-assumption in the batch dimension.
+A message function takes a batch of edges as input and returns some message(s) for each edge,
+which may combine the features of the edges and their end nodes. Formally, it takes the following
+form
 
-EdgeBatch
----------
+.. code::
 
-The class that can represent a batch of edges.
+    def message_func(edges):
+        """
+        Parameters
+        ----------
+        edges : EdgeBatch
+            A batch of edges.
+
+        Returns
+        -------
+        dict[str, tensor]
+            The messages generated. It maps a message name to the corresponding messages of all
+            edges in the batch. The order of the messages is the same as the order of the edges
+            in the input argument.
+        """
+
+DGL generates :class:`~dgl.udf.EdgeBatch` instances internally, which expose the following
+interface for defining ``message_func``.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -32,12 +44,33 @@ The class that can represent a batch of edges.
     EdgeBatch.data
     EdgeBatch.edges
     EdgeBatch.batch_size
-    EdgeBatch.__len__
 
-NodeBatch
----------
+User-defined Reduce Function
+----------------------------
 
-The class that can represent a batch of nodes.
+A reduce function takes a batch of nodes as input and returns the updated features for each node,
+which may combine the current node features and the messages nodes received. Formally, it takes
+the following form
+
+.. code::
+
+    def reduce_func(nodes):
+        """
+        Parameters
+        ----------
+        nodes : NodeBatch
+            A batch of nodes.
+
+        Returns
+        -------
+        dict[str, tensor]
+            The updated node features. It maps a feature name to the corresponding features of
+            all nodes in the batch. The order of the nodes is the same as the order of the nodes
+            in the input argument.
+        """
+
+DGL generates :class:`~dgl.udf.NodeBatch` instances internally, which expose the following
+interface for defining ``reduce_func``.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -46,4 +79,10 @@ The class that can represent a batch of nodes.
     NodeBatch.mailbox
     NodeBatch.nodes
     NodeBatch.batch_size
-    NodeBatch.__len__
+
+Degree Bucketing
+----------------
+
+DGL employs a degree-bucketing mechanism for message passing with UDFs. It groups nodes with
+a same in-degree and invokes message passing for each group of nodes. As a result, one shall
+not make any assumptions about the batch size of :class:`~dgl.udf.NodeBatch` instances.

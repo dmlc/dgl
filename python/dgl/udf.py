@@ -29,54 +29,60 @@ class EdgeBatch(object):
 
     @property
     def src(self):
-        """Return the feature data of the source nodes.
+        """Return a view of the source node features for the edges in the batch.
 
-        Returns
-        -------
-        dict with str keys and tensor values
-            Features of the source nodes.
+        Examples
+        --------
+
+        >>> # For an EdgeBatch instance, get the feature 'h' for all source nodes.
+        >>> # The feature is a tensor of shape (E, *),
+        >>> # where E is the number of edges in the batch.
+        >>> edges.src['h']
         """
         return self._src_data
 
     @property
     def dst(self):
-        """Return the feature data of the destination nodes.
+        """Return a view of the destination node features for the edges in the batch.
 
-        Returns
-        -------
-        dict with str keys and tensor values
-            Features of the destination nodes.
+        Examples
+        --------
+
+        >>> # For an EdgeBatch instance, get the feature 'h' for all destination nodes.
+        >>> # The feature is a tensor of shape (E, *),
+        >>> # where E is the number of edges in the batch.
+        >>> edges.dst['h']
         """
         return self._dst_data
 
     @property
     def data(self):
-        """Return the edge feature data.
+        """Return a view of the edge features for the edges in the batch.
 
-        Returns
-        -------
-        dict with str keys and tensor values
-            Features of the edges.
+        Examples
+        --------
+
+        >>> # For an EdgeBatch instance, get the feature 'h' for all edges
+        >>> # The feature is a tensor of shape (E, *),
+        >>> # where E is the number of edges in the batch.
+        >>> edges.data['h']
         """
         return self._edge_data
 
     def edges(self):
-        """Return the edges contained in this batch.
+        """Return the edges in the batch
 
         Returns
         -------
-        Tensor
-            Source node IDs.
-        Tensor
-            Destination node IDs.
-        Tensor
-            Edge IDs.
+        (U, V, EID) : (Tensor, Tensor, Tensor)
+            The edges in the batch. For each :math:`i`, :math:`(U[i], V[i])` is an edge
+            from :math:`U[i]` to :math:`V[i]` with ID :math:`EID[i]`.
         """
         u, v = self._graph.find_edges(self._eid, etype=self.canonical_etype)
         return u, v, self._eid
 
     def batch_size(self):
-        """Return the number of edges in this edge batch.
+        """Return the number of edges in the batch.
 
         Returns
         -------
@@ -124,41 +130,46 @@ class NodeBatch(object):
 
     @property
     def data(self):
-        """Return the node feature data.
+        """Return a view of the node features for the nodes in the batch.
 
-        Returns
-        -------
-        dict with str keys and tensor values
-            Features of the nodes.
+        Examples
+        --------
+
+        >>> # For a NodeBatch instance, get the feature 'h' for all nodes
+        >>> # The feature is a tensor of shape (N, *),
+        >>> # where N is the number of nodes in the batch.
+        >>> nodes.data['h']
         """
         return self._data
 
     @property
     def mailbox(self):
-        """Return the received messages.
+        """Return a view of the messages received.
 
-        If no messages received, a ``None`` will be returned.
+        Examples
+        --------
 
-        Returns
-        -------
-        dict or None
-            The messages nodes received. If dict, the keys are
-            ``str`` and the values are ``tensor``.
+        >>> # For a NodeBatch instance, get the messages 'm' for all nodes.
+        >>> # The messages is a tensor of shape (N, M, *), where N is the
+        >>> # number of nodes in the batch and M is the number of messages
+        >>> # each node receives.
+        >>> nodes.mailbox['m']
         """
         return self._msgs
 
     def nodes(self):
-        """Return the nodes contained in this batch.
+        """Return the nodes in the batch.
 
         Returns
         -------
-        tensor
-            The nodes.
+        NID : Tensor
+            The IDs of the nodes in the batch. :math:`NID[i]` gives the ID of
+            the i-th node.
         """
         return self._nodes
 
     def batch_size(self):
-        """Return the number of nodes in this batch.
+        """Return the number of nodes in the batch.
 
         Returns
         -------
