@@ -74,7 +74,8 @@ class LinkPredict(nn.Module):
                  use_self_loop=True,
                  low_mem=False,
                  relation_regularizer = "bdd",
-                 gamma=-1):
+                 gamma=-1,
+                 layer_norm=False):
         super(LinkPredict, self).__init__()
         self.device = th.device(device if device >= 0 else 'cpu')
         self.h_dim = h_dim
@@ -85,6 +86,7 @@ class LinkPredict(nn.Module):
         self.dropout = dropout
         self.use_self_loop = use_self_loop
         self.relation_regularizer = relation_regularizer
+        self.layer_norm = layer_norm
 
         self.w_relation = nn.Parameter(th.Tensor(num_rels, h_dim).to(self.device))
         if gamma > 0:
@@ -101,7 +103,7 @@ class LinkPredict(nn.Module):
             self.layers.append(RelGraphConv(
                 self.h_dim, self.h_dim, self.edge_rels, self.relation_regularizer,
                 self.num_bases, activation=act, self_loop=self.use_self_loop,
-                low_mem=low_mem, dropout=self.dropout))
+                low_mem=low_mem, dropout=self.dropout, layer_norm=layer_norm))
 
     def forward(self, p_blocks, p_feats, n_blocks=None, n_feats=None, sample='neighbor'):
         """
@@ -732,7 +734,8 @@ def run(proc_id, n_gpus, args, devices, node_feats, dataset, pos_seeds, neg_seed
                         use_self_loop=args.use_self_loop,
                         low_mem=args.low_mem,
                         relation_regularizer=args.relation_regularizer,
-                        gamma=args.gamma)
+                        gamma=args.gamma,
+                        layer_norm=args.layer_norm)
     if dev_id >= 0:
         model.cuda(dev_id)
         if args.mix_cpu_gpu is False:
@@ -1129,6 +1132,8 @@ def config():
             help="perform evaluation every n epochs")
     parser.add_argument("--gamma", type=float, default=-1,
             help="init value for embedding")
+    parser.add_argument('--layer-norm', default=False, action='store_true',
+            help='Use layer norm')
 
     args = parser.parse_args()
 
