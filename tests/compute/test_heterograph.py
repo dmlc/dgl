@@ -1714,7 +1714,7 @@ def test_format(idtype):
     assert g.formats()['created'] == ['coo']
     g1 = g.formats(['coo', 'csr', 'csc'])
     assert len(g1.formats()['created']) + len(g1.formats()['not created']) == 3
-    g1.create_format_()
+    g1.create_formats_()
     assert len(g1.formats()['created']) == 3
     assert g.formats()['created'] == ['coo']
 
