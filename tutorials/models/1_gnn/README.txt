@@ -36,11 +36,3 @@ Graph neural networks and its variants
   graphs, this implementation shows how you can judiciously mix simple tensor
   operations and sparse-matrix tensor operations, along with message-passing with
   DGL.
-
-* **Stochastic steady-state embedding (SSE)** `[research paper] <http://proceedings.mlr.press/v80/dai18a/dai18a.pdf>`__ `[tutorial]
-  <1_gnn/8_sse_mx.html>`__ `[MXNet code]
-  <https://github.com/dmlc/dgl/blob/master/examples/mxnet/sse>`__:
-  SSE is an example to illustrate the co-design of both algorithm and
-  system. Sampling to guarantee asymptotic convergence while lowering
-  complexity and batching across samples for maximum parallelism. The emphasis 
-  here is that a giant graph that cannot fit comfortably on one GPU card. 
