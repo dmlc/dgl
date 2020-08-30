@@ -1025,9 +1025,9 @@ def main(args, devices):
     test_g.edata['etype'].share_memory_()
     test_g.ndata['ntype'].share_memory_()
 
-    train_g.create_format_()
-    valid_g.create_format_()
-    test_g.create_format_()
+    train_g.create_formats_()
+    valid_g.create_formats_()
+    test_g.create_formats_()
 
     n_gpus = len(devices)
     # cpu
