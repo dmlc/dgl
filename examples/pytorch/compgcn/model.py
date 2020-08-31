@@ -1,7 +1,4 @@
 
-# import os
-# os.environ['KMP_DUPLICATE_LIB_OK']='True'
-
 import torch as th
 import dgl
 
@@ -9,7 +6,6 @@ import torch.nn as nn
 import dgl.function as dglfn
 import dgl.nn as dglnn
 from dgl import DGLError
-from dgl.utils import expand_as_pair
 from utils import ccorr
 
 
