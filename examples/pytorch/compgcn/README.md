@@ -25,9 +25,5 @@ Results
 
 Run with following (available dataset: "cora", "citeseer", "pubmed")
 ```bash
-python3 train.py --dataset cora --gpu 0 --self-loop
+python3 ***
 ```
-
-* cora: ~0.810 (0.79-0.83) (paper: 0.815)
-* citeseer: 0.707 (paper: 0.703)
-* pubmed: 0.792 (paper: 0.790)
