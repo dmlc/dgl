@@ -298,6 +298,9 @@ def main(args, devices):
     val_mask = g.ndata['val_mask']
     test_mask = g.ndata['test_mask']
     g.ndata['features'] = features
+
+    # Create csr/coo/csc formats before launching training processes with multi-gpu.
+    # This avoids creating certain formats in each sub-process, which saves momory and CPU.
     g.create_formats_()
     # Pack data
     data = train_mask, val_mask, test_mask, in_feats, labels, n_classes, g

@@ -234,6 +234,8 @@ if __name__ == '__main__':
 
     in_feats = graph.ndata['feat'].shape[1]
     n_classes = (labels.max() + 1).item()
+    # Create csr/coo/csc formats before launching sampling processes
+    # This avoids creating certain formats in each data loader process, which saves momory and CPU.
     graph.create_formats_()
     # Pack data
     data = train_idx, val_idx, test_idx, in_feats, labels, n_classes, graph
