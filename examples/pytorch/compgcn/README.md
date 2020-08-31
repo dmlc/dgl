@@ -6,11 +6,11 @@ Composition-based Graph Convolutional Networks (CompGCN)
 
 Dependencies
 ------------
-- PyTorch 0.4.1+
-- requests
+- DGL 0.5
+- PyTorch 1.5 +
 
 ``bash
-pip install torch requests
+pip install ***
 ``
 
 Codes
