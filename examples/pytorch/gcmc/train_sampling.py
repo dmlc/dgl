@@ -403,8 +403,8 @@ if __name__ == '__main__':
         run(0, n_gpus, args, devices, dataset)
     # multi gpu
     else:
-        dataset.train_enc_graph.create_format_()
-        dataset.train_dec_graph.create_format_()
+        dataset.train_enc_graph.create_formats_()
+        dataset.train_dec_graph.create_formats_()
         procs = []
         for proc_id in range(n_gpus):
             p = mp.Process(target=thread_wrapped_func(run), args=(proc_id, n_gpus, args, devices, dataset))

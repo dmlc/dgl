@@ -63,10 +63,10 @@ Test-bd: P3-8xlarge
 
 OGBN-MAG accuracy 46.22
 ```
-python3 entity_classify_mp.py -d ogbn-mag --testing --fanout='25,30' --batch-size 512 --n-hidden 64 --lr 0.01 --num-worker 0 --eval-batch-size 8 --low-mem --gpu 0,1,2,3,4,5,6,7 --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --mix-cpu-gpu --node-feats --layer-norm
+python3 entity_classify_mp.py -d ogbn-mag --testing --fanout='25,30' --batch-size 512 --n-hidden 64 --lr 0.01 --num-worker 0 --eval-batch-size 8 --low-mem --gpu 0,1,2,3,4,5,6,7 --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --mix-cpu-gpu --node-feats
 ```
 
-OGBN-MAG without node-feats 43.24
+OGBN-MAG without node-feats 43.63
 ```
 python3 entity_classify_mp.py -d ogbn-mag --testing --fanout='25,25' --batch-size 256 --n-hidden 64 --lr 0.01 --num-worker 0 --eval-batch-size 8 --low-mem --gpu 0,1,2,3,4,5,6,7 --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --mix-cpu-gpu --layer-norm
 ```
@@ -134,15 +134,15 @@ python3 link_predict_mp.py --lr 0.002 --n-bases 100 --n-layers 2 --n-epochs 2000
 ```
 
 #### FB15k
-filtered MRR 0.469, 0.696 (paper)
+filtered MRR 0.473s, 0.696 (paper)
 
 ```
-Average MRR: 0.4691785477453558
-Average MR: 66.79721013695384
-Average HITS@10: 0.6976350493473955
-Average HITS@3: 0.5368454910192819
-Average HITS@1: 0.3478864417396015
+Average MRR: 0.4727096785053779
+Average MR: 55.634710771783105
+Average HITS@1: 0.34635438709349764
+Average HITS@3: 0.543515430583535
+Average HITS@10: 0.7106109596925734
 ```
 ```
-python3 link_predict_mp.py --lr 0.002 --n-bases 100 --n-layers 2 --n-epochs 2000 --batch-size 30000 --regularization-coef 0.01 --valid-neg-cnt 1000 --test-neg-cnt -1 --use-self-loop --num-worker 4 --n-hidden 500 --dropout 0.4 --dataset FB15k --sampler=path --chunk-size 10 --global-norm --relation-regularizer bdd --gamma 20.0
+python3 link_predict_mp.py --lr 0.005 --n-bases 100 --n-layers 2 --n-epochs 2000 --batch-size 60000 --regularization-coef 0.01 --valid-neg-cnt 1000 --test-neg-cnt -1 --use-self-loop --num-worker 4 --n-hidden 500 --dropout 0.4 --dataset FB15k --sampler=path --chunk-size 10 --global-norm --relation-regularizer bdd --gamma 20.0 --num-test-worker 8 --layer-norm
 ```

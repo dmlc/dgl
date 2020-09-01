@@ -319,9 +319,29 @@ def test_ismultigraph():
     g.add_edges([0, 2], [0, 3])
     assert g.is_multigraph == True
 
+def test_hypersparse_query():
+    g = dgl.DGLGraph()
+    g = g.to(F.ctx())
+    g.add_nodes(1000001)
+    g.add_edges([0], [1])
+    for i in range(10):
+        assert g.has_node(i)
+        assert i in g
+    assert not g.has_node(1000002)
+    assert g.edge_id(0, 1) == 0
+    src, dst = g.find_edges([0])
+    src, dst, eid = g.in_edges(1, form='all')
+    src, dst, eid = g.out_edges(0, form='all')
+    src, dst = g.edges()
+    assert g.in_degree(0) == 0
+    assert g.in_degree(1) == 1
+    assert g.out_degree(0) == 1
+    assert g.out_degree(1) == 0
+
 if __name__ == '__main__':
     test_query()
     test_mutation()
     test_scipy_adjmat()
     test_incmat()
     test_find_edges()
+    test_hypersparse_query()
