@@ -384,7 +384,7 @@ if __name__ == '__main__':
     g.ndata['features'] = features.share_memory_()
     create_history_storage(g, args, n_classes)
 
-    g.create_format_()
+    g.create_formats_()
     # Pack data
     data = train_mask, val_mask, in_feats, labels, n_classes, g
 
