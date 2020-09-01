@@ -157,7 +157,7 @@ def _gspmm(gidx, op, reduce_op, u, e, advise=True,
     if target == 'cpu' and num_feat_partitions == 1 and num_col_partitions == 1 and advise:
         # search for parameter
         pass
-        # num_col_partitions = 2
+        # num_col_partitions = 8
         # num_feat_partitions = 2
     if target == 'cuda' and (num_col_partitions > 1 or num_feat_partitions > 1):
         print('Partitioning not supported on GPU')
@@ -182,7 +182,7 @@ def _gspmm(gidx, op, reduce_op, u, e, advise=True,
     f_input = [indptr, indices]
     key = (num_rows, num_cols, nnz, op, reduce_op, u_shp, e_shp, use_idx, \
            num_feat_partitions, num_col_partitions, indice_type, feat_type, target)
-    print(key)
+    # print(key)
     if key not in compiled_gspmm_kernels:
         if target == 'cpu':
             target = 'llvm'
@@ -220,11 +220,9 @@ def _gspmm(gidx, op, reduce_op, u, e, advise=True,
             f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(arg_u).to_dlpack()))
     v = F.zeros(v_shp, feat_type, ctx)
     f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(v).to_dlpack()))
-    # print('hello')
     mod(*f_input)
     if use_cmp and use_e and edge_shuffled and not use_idx:
         arg_e = F.zerocopy_from_dgl_ndarray(edge_mapping)[arg_e.long()]
-    # print(v, arg_u, arg_e)
     return v, (arg_u, arg_e)
 
 
@@ -317,7 +315,8 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
     srctype, dsttype = gidx.metagraph.find_edge(0)
     num_cols = gidx.number_of_nodes(dsttype)
     num_rows = gidx.number_of_nodes(srctype)
-    if num_row_partitions == 1 and num_col_partitions == 1 and num_feat_partitions == 1 and advise:
+    if target == 'cpu' and num_row_partitions == 1 and num_col_partitions == 1 and num_feat_partitions == 1 and advise:
+        # search for parameters
         pass
         # num_row_partitions, num_col_partitions = 2, 2
         # num_feat_partitions = 2
@@ -347,7 +346,7 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
         f_input.append(edge_mapping)
     key = (num_rows, num_cols, nnz, op, lhs_target, rhs_target, num_feat_partitions,\
            use_idx, lhs_shp, rhs_shp, indice_type, feat_type, target)
-    print(key)
+    # print(key)
     if key not in compiled_gsddmm_kernels:
         if target == 'cpu':
             target = 'llvm'
