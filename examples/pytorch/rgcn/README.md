@@ -105,8 +105,14 @@ Average HITS@1: 0.1804211863578618
 Average HITS@3: 0.28664614482556433
 Average HITS@10: 0.4319603244405355
 ```
+
+Single gpu
 ```
 python3 link_predict_mp.py --lr 0.002 --n-bases 100 --n-layers 2 --n-epochs 2000 --batch-size 30000 --regularization-coef 0.01 --valid-neg-cnt 1000 --test-neg-cnt -1 --use-self-loop --num-worker 4 --n-hidden 500 --dropout 0.4 --dataset FB15k-237 --sampler=path --chunk-size 20 --global-norm --relation-regularizer bdd --gamma 200.0
+```
+Multi gpu
+```
+python3 link_predict_mp.py --lr 0.002 --n-bases 100 --n-layers 2 --n-epochs 2000 --batch-size 30000 --regularization-coef 0.01 --valid-neg-cnt 1000 --test-neg-cnt -1 --use-self-loop --num-worker 4 --n-hidden 500 --dropout 0.4 --dataset FB15k-237 --sampler=path --chunk-size 20 --global-norm --relation-regularizer bdd --gamma 200.0 --gpu 0,1,2,3,4,5,6,7
 ```
 
 Raw MRR 0.149 (DGL), 0.156 (paper)
@@ -117,9 +123,16 @@ Average HITS@1: 0.06591419915958174
 Average HITS@3: 0.16400371347600898
 Average HITS@10: 0.3168425681618294
 ```
+
+Single gpu
 ```
 python3 link_predict_mp.py --lr 0.002 --n-bases 100 --n-layers 2 --n-epochs 2000 --batch-size 30000 --regularization-coef 0.01 --valid-neg-cnt 1000 --test-neg-cnt -1 --use-self-loop --num-worker 4 --n-hidden 500 --dropout 0.4 --dataset FB15k-237 --sampler=path --chunk-size 20 --global-norm --relation-regularizer bdd --gamma 200.0 --no-test-filter
 ```
+Multi gpu
+```
+python3 link_predict_mp.py --lr 0.002 --n-bases 100 --n-layers 2 --n-epochs 2000 --batch-size 30000 --regularization-coef 0.01 --valid-neg-cnt 1000 --test-neg-cnt -1 --use-self-loop --num-worker 4 --n-hidden 500 --dropout 0.4 --dataset FB15k-237 --sampler=path --chunk-size 20 --global-norm --relation-regularizer bdd --gamma 200.0 --no-test-filter --gpu 0,1,2,3,4,5,6,7
+```
+
 #### FB15k
 filtered MRR 0.469, 0.696 (paper)
 
