@@ -504,6 +504,9 @@ def main(args, devices):
     train_idx.share_memory_()
     val_idx.share_memory_()
     test_idx.share_memory_()
+    # Create csr/coo/csc formats before launching training processes with multi-gpu.
+    # This avoids creating certain formats in each sub-process, which saves momory and CPU.
+    g.create_formats_()
 
     n_gpus = len(devices)
     # cpu
