@@ -7,8 +7,7 @@ from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
 import tvm
-from featgraph.module import gsddmm, gspmm
-
+from .tvm import gsddmm, gspmm
 
 def infer_broadcast_shape(op, shp1, shp2):
     r"""Check the shape validity, and infer the output shape given input shape and operator.
@@ -77,7 +76,11 @@ target_mapping = {
 compiled_gspmm_kernels = {}
 compiled_gsddmm_kernels = {}
 
-def _gspmm(gidx, op, reduce_op, u, e):
+partitioned_1d_graphs = {}
+partitioned_2d_graphs = {}
+
+def _gspmm(gidx, op, reduce_op, u, e, advise=True,
+           num_feat_partitions=1, num_col_partitions=1):
     r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
     :attr:`op` on source node feature and edge feature, leads to a message on edge.
     Then aggregates the message by :attr:`reduce_op` on destination nodes.
@@ -105,7 +108,20 @@ def _gspmm(gidx, op, reduce_op, u, e):
         The feature on source nodes, could be None if op is ``copy_rhs``.
     e : tensor or None
         The feature on edges, could be None if op is ``copy_lhs``.
-
+    advise: Boolean
+        If True, dgl will search for optimal parameters for partitions to speedup.
+        default is True
+        It will be overrided if any number of partitions(below) is set to larger than 1.
+    num_feat_partitions: int
+        Number of partitions on feature dimension. 
+        It must be positive, and is smaller than feature length of result.
+        If feature has multiple dimensions, this parameter is applied
+        on flatten features of result.
+    num_col_partitions: int
+        Number of partitions on the columns of the sparse matrix. 
+        It must be positive, and is smaller than number of columns.
+        If this value is larger than 1, a partitioning algorithm is run on the graph. 
+        The partitioned results is then cached for following runs. 
     Returns
     -------
     tuple
@@ -123,8 +139,6 @@ def _gspmm(gidx, op, reduce_op, u, e):
     nnz = gidx.number_of_edges(0)
     if nnz <= 0:
         return None
-    indptr, indices, edge_mapping = map(lambda x: tvm.nd.from_dlpack(x.to_dlpack()), gidx.get_csc_dlpack(0))
-    f_input = [indptr, indices]
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
     if use_u and F.ndim(u) == 1:
@@ -140,7 +154,34 @@ def _gspmm(gidx, op, reduce_op, u, e):
     num_rows = gidx.number_of_nodes(dsttype)
     num_cols = gidx.number_of_nodes(srctype)
     target = F.device_type(ctx)
-    key = (num_rows, num_cols, nnz, op, reduce_op, u_shp, e_shp, indice_type, feat_type, target)
+    if target == 'cpu' and num_feat_partitions == 1 and num_col_partitions == 1 and advise:
+        # search for parameter
+        pass
+        # num_col_partitions = 2
+        # num_feat_partitions = 2
+    if target == 'cuda' and (num_col_partitions > 1 or num_feat_partitions > 1):
+        print('Partitioning not supported on GPU')
+        num_col_partitions, num_feat_partitions = 1, 1
+    if num_col_partitions == 1:
+        indptr, indices, edge_mapping = map(lambda x: tvm.nd.from_dlpack(x.to_dlpack()), gidx.get_csc_dlpack(0))
+    else:
+        graph_key = (id(gidx), num_col_partitions, num_rows, num_cols, nnz)
+        if graph_key in partitioned_1d_graphs:
+            dds = partitioned_1d_graphs[graph_key]
+        else:
+            # perform partition and cache the result
+            tmp = _CAPI_DGLPartition1D(gidx, 0, num_col_partitions)
+            dds = [tvm.nd.from_dlpack(tmp(x).to_dlpack()) for x in range(3)]
+            partitioned_1d_graphs[graph_key] = dds
+        indptr, indices, edge_mapping = dds
+        # print(indptr, indices, edge_mapping)
+    edge_shuffled = edge_mapping.shape != (0,)
+    use_bcast = op not in ['copy_lhs', 'copy_rhs'] and u_shp[1:] != e_shp[1:]
+    # pass edge_mapping to tvm only when array packing will be used
+    use_idx = edge_shuffled and num_feat_partitions > 1 and not use_bcast and use_e
+    f_input = [indptr, indices]
+    key = (num_rows, num_cols, nnz, op, reduce_op, u_shp, e_shp, use_idx, \
+           num_feat_partitions, num_col_partitions, indice_type, feat_type, target)
     print(key)
     if key not in compiled_gspmm_kernels:
         if target == 'cpu':
@@ -150,35 +191,45 @@ def _gspmm(gidx, op, reduce_op, u, e):
         mod = gspmm.spmm(
             op, reduce_op, nnz, num_rows, num_cols,
             u_shp[1:], e_shp[1:], v_shp[1:], indice_type, str(feat_type),
-            use_idx=True, target=target
+            use_idx=use_idx, target=target,
+            num_feat_partitions=num_feat_partitions,
+            num_col_partitions=num_col_partitions
         )
         compiled = (mod, v_shp)
         compiled_gspmm_kernels[key] = compiled
     else:
         compiled = compiled_gspmm_kernels[key]
     mod, v_shp = compiled
+    if use_idx:
+        f_input.append(tvm.nd.from_dlpack(edge_mapping.to_dlpack()))
     if use_u:
         f_input.append(tvm.nd.from_dlpack(to_dgl_nd(u).to_dlpack()))
     if use_e:
+        if edge_shuffled and not use_idx:
+            e = e[F.zerocopy_from_dgl_ndarray(edge_mapping).long()]
         f_input.append(tvm.nd.from_dlpack(to_dgl_nd(e).to_dlpack()))
     idtype = getattr(F, gidx.dtype)
     arg_u, arg_e = None, None
     use_cmp = reduce_op != 'sum'
     if use_cmp:
-        if use_u:
-            arg_u = F.zeros(v_shp, idtype, ctx)
-            f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(arg_u).to_dlpack()))
         if use_e:
             arg_e = F.zeros(v_shp, idtype, ctx)
             f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(arg_e).to_dlpack()))
-    f_input.append(tvm.nd.from_dlpack(edge_mapping.to_dlpack()))
+        if use_u:
+            arg_u = F.zeros(v_shp, idtype, ctx)
+            f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(arg_u).to_dlpack()))
     v = F.zeros(v_shp, feat_type, ctx)
     f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(v).to_dlpack()))
+    # print('hello')
     mod(*f_input)
+    if use_cmp and use_e and edge_shuffled and not use_idx:
+        arg_e = F.zerocopy_from_dgl_ndarray(edge_mapping)[arg_e.long()]
+    # print(v, arg_u, arg_e)
     return v, (arg_u, arg_e)
 
 
-def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
+def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
+            num_feat_partitions=1, num_row_partitions=1, num_col_partitions=1):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
     takes the result of :attr:`op` on source node feature and destination node
     feature, leads to a feature on edge.
@@ -208,6 +259,24 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     rhs_target : str
         The target of right hand operand, could be ``src``, ``edge``, ``dst``
         or their alias ``u``, ``e``, ``v``.
+    advise: Boolean
+        If True, dgl will search for optimal partition parameters.
+        default is True
+        It will be overrided if any number of partitions(below) is set to larger than 1.
+    num_feat_partitions: int
+        Number of partitions on feature dimension. 
+        It must be positive, and is smaller than feature length of result.
+        If feature has multiple dimensions, this parameter is applied
+        on flatten features of result.
+    num_row_partitions: int
+        Number of partitions on the rows of the sparse matrix.
+        It must be positive, and is smaller than number of rows.
+        If this value and/or the next parameter is larger than 1, 
+        a partitioning algorithm is run on the graph. 
+        The partitioned results is then cached for following runs. 
+    num_col_partitions: int
+        Number of partitions on the columns of the sparse matrix.
+        It must be positive, and is smaller than number of columns.
 
     Returns
     -------
@@ -225,68 +294,88 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
         return None
     lhs_target = target_mapping[lhs_target]
     rhs_target = target_mapping[rhs_target]
-    row, col, edge_id = gidx.get_coo_dlpack(0)
     if op in ['copy_lhs', 'copy_rhs']:
+        row, col, edge_mapping = gidx.get_coo_dlpack(0)
         t = lhs_target if op == 'copy_lhs' else rhs_target
         if t == 0:
             ind = F.zerocopy_from_dgl_ndarray(row).long()
         elif t == 1:
-            if not edge_id:
-                return lhs if op == 'copy_lhs' else rhs
-            ind = F.zerocopy_from_dgl_ndarray(edge_id).long()
+            return lhs if op == 'copy_lhs' else rhs
         else:
             ind = F.zerocopy_from_dgl_ndarray(col).long()
         return lhs[ind] if op == 'copy_lhs' else rhs[ind]
-    row, col, edge_id = map(lambda x: tvm.nd.from_dlpack(x.to_dlpack()), [row, col, edge_id])
+    ctx = F.context(lhs)
+    target = F.device_type(ctx)
+    feat_type = F.dtype(lhs)
+    if F.ndim(lhs) == 1:
+        lhs = F.unsqueeze(lhs, -1)
+    if F.ndim(rhs) == 1:
+        rhs = F.unsqueeze(rhs, -1)
+    lhs_shp = F.shape(lhs)
+    rhs_shp = F.shape(rhs)
+    indice_type = gidx.dtype
+    srctype, dsttype = gidx.metagraph.find_edge(0)
+    num_cols = gidx.number_of_nodes(dsttype)
+    num_rows = gidx.number_of_nodes(srctype)
+    if num_row_partitions == 1 and num_col_partitions == 1 and num_feat_partitions == 1 and advise:
+        pass
+        # num_row_partitions, num_col_partitions = 2, 2
+        # num_feat_partitions = 2
+    if target == 'cuda' and (num_row_partitions > 1 or num_col_partitions > 1 or num_feat_partitions > 1):
+        print('Partitioning not supported on GPU')
+        num_row_partitions, num_col_partitions, num_feat_partitions = 1, 1, 1
+    graph_key = (id(gidx), num_row_partitions, num_col_partitions, num_rows, num_cols, nnz)
+    if graph_key in partitioned_2d_graphs:
+        row, col, edge_mapping, reverse_mapping = partitioned_2d_graphs[graph_key]
+    else:
+        if num_row_partitions == 1 and num_col_partitions == 1:
+            row, col, edge_mapping = map(lambda x: tvm.nd.from_dlpack(x.to_dlpack()), gidx.get_coo_dlpack(0))
+        else:
+            tmp = _CAPI_DGLPartition2D(gidx, 0, num_row_partitions, num_col_partitions)
+            row, col, edge_mapping = [tvm.nd.from_dlpack(tmp(x).to_dlpack()) for x in range(3)]
+        reverse_mapping = F.zerocopy_to_dgl_ndarray(F.argsort(F.from_dgl_nd(edge_mapping), 0, False))
+        partitioned_2d_graphs[graph_key] = (row, col, edge_mapping, reverse_mapping)
+    use_bcast = lhs_shp[1:] != rhs_shp[1:]
+    edge_shuffled = edge_mapping.shape != (0,)
+    use_idx = (lhs_target == 1 or rhs_target == 1) and num_feat_partitions > 1 and not use_bcast and edge_shuffled
     f_input = []
     if lhs_target == 0 or rhs_target == 0:
         f_input.append(row)
     if lhs_target == 2 or rhs_target == 2:
         f_input.append(col)
-    use_lhs = op != 'copy_rhs'
-    use_rhs = op != 'copy_lhs'
-    feat_type = F.dtype(lhs) if use_lhs else F.dtype(rhs)
-    ctx = F.context(lhs) if use_lhs else F.context(rhs)
-    if use_lhs and F.ndim(lhs) == 1:
-        lhs = F.unsqueeze(lhs, -1)
-    if use_rhs and F.ndim(rhs) == 1:
-        rhs = F.unsqueeze(rhs, -1)
-    lhs_shp = F.shape(lhs) if use_lhs else (0,)
-    rhs_shp = F.shape(rhs) if use_rhs else (0,)
-    indice_type = gidx.dtype
-    srctype, dsttype = gidx.metagraph.find_edge(0)
-    num_cols = gidx.number_of_nodes(dsttype)
-    num_rows = gidx.number_of_nodes(srctype)
-    target = F.device_type(ctx)
-    key = (num_rows, num_cols, nnz, op, lhs_target, rhs_target, \
-         lhs_shp, rhs_shp, indice_type, feat_type, target)
+    if use_idx:
+        f_input.append(edge_mapping)
+    key = (num_rows, num_cols, nnz, op, lhs_target, rhs_target, num_feat_partitions,\
+           use_idx, lhs_shp, rhs_shp, indice_type, feat_type, target)
+    print(key)
     if key not in compiled_gsddmm_kernels:
-        if target == 'cuda':
-            tvm_ctx = tvm.gpu(0)
-        elif target == 'cpu':
-            tvm_ctx = tvm.cpu(0)
+        if target == 'cpu':
             target = 'llvm'
-        else:
-            raise DGLError("We only support graph on cpu or gpu")
         out_shp = (gidx.number_of_edges(0), ) +\
             infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])
         mod = gsddmm.sddmm(
             op, nnz, num_rows, num_cols,
             lhs_shp[1:], rhs_shp[1:], out_shp[1:], str(indice_type), str(feat_type),
-            lhs_target=lhs_target, rhs_target=rhs_target, target=target
+            lhs_target=lhs_target, rhs_target=rhs_target, target=target,
+            num_feat_partitions=num_feat_partitions, is_sorted=2, use_idx=use_idx
         )
         compiled = (mod, out_shp)
         compiled_gsddmm_kernels[key] = compiled
     else:
         compiled = compiled_gsddmm_kernels[key]
     mod, out_shp = compiled
-    if use_lhs:
-        f_input.append(tvm.nd.from_dlpack(to_dgl_nd(lhs).to_dlpack()))
-    if use_rhs:
-        f_input.append(tvm.nd.from_dlpack(to_dgl_nd(rhs).to_dlpack()))
+    if (lhs_target == 1 or rhs_target == 1) and edge_shuffled and not use_idx:
+        if lhs_target == 1:
+            lhs = lhs[F.from_dgl_nd(edge_mapping).long()]
+        elif rhs_target == 1:
+            rhs = rhs[F.from_dgl_nd(edge_mapping).long()]
+    f_input.append(tvm.nd.from_dlpack(to_dgl_nd(lhs).to_dlpack()))
+    f_input.append(tvm.nd.from_dlpack(to_dgl_nd(rhs).to_dlpack()))
     out = F.zeros(out_shp, feat_type, ctx)
     f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(out).to_dlpack()))
     mod(*f_input)
+    if edge_shuffled:
+        out = out[F.from_dgl_nd(reverse_mapping).long()]
     return out
 
 _init_api("dgl.sparse")

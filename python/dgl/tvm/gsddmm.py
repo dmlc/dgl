@@ -229,7 +229,7 @@ def sddmm(binary_op, nnz, num_rows, num_cols,
     binds = {}
     if use_bcast:
         binds = {lhs:lhs_buffer, rhs:rhs_buffer}
-    print(tvm.lower(s, f_input, binds=binds))
+    # print(tvm.lower(s, f_input, binds=binds))
     return tvm.build(s, f_input, target=target, name=f_name, binds=binds)
 
 if __name__ == '__main__':

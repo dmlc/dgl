@@ -216,14 +216,15 @@ def spmm(binary_op, reduce_op, nnz, num_rows, num_cols,
     use_e = binary_op != 'copy_lhs'
     def edge_id(x):
         return edge_mapping[x] if use_idx else x
+    use_pack = num_feat_partitions > 1 and not use_bcast
     if num_col_partitions == 1:
         # cannot use pack with bcast
         rst, inlines, reshapes = _spmm((num_rows,) + out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
-                        ufeat, efeat, edge_id, not use_bcast, num_feat_partitions)
+                        ufeat, efeat, edge_id, use_pack, num_feat_partitions)
     else:
         # same
         rst, intermediate, inlines, reshapes = _spmm_dds((num_rows,) + out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
-            ufeat, efeat, edge_id, not use_bcast, num_feat_partitions)
+            ufeat, efeat, edge_id, use_pack, num_feat_partitions)
     out = rst[-1]
     # schedule
     s = te.create_schedule(out.op)
@@ -262,7 +263,7 @@ def spmm(binary_op, reduce_op, nnz, num_rows, num_cols,
     binds = {}
     if use_bcast:
         binds = {ufeat:u_buffer, efeat: e_buffer}
-    print(tvm.lower(s, f_input, binds=binds))
+    # print(tvm.lower(s, f_input, binds=binds))
     return tvm.build(s, f_input, target=target, name=f_name, binds=binds)
 
 if __name__ == '__main__':
@@ -276,6 +277,6 @@ if __name__ == '__main__':
     feat_type = 'float32'
     f = spmm('mul', 'sum', nnz, num_rows, num_cols, 
          lhs_shp, rhs_shp, out_shp,
-         indice_type, feat_type, use_idx=True,
-         num_col_partitions=2, num_feat_partitions=2, target=target)
-    # print(f.imported_modules[0].get_source())
+         indice_type, feat_type, use_idx=False,
+         num_col_partitions=1, num_feat_partitions=1, target=target)
+    print(f.imported_modules[0].get_source())

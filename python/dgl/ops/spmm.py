@@ -64,7 +64,8 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
                          lhs_data, rhs_data)
     # Replace infinity with zero for isolated nodes when reducer is min/max
     if reduce_op in ['min', 'max']:
-        ret = F.replace_inf_with_zero(ret)
+        #ret = F.replace_inf_with_zero(ret)
+        ret[g.in_degrees() == 0] = 0.
 
     # divide in degrees for mean reducer.
     if reduce_op == 'mean':

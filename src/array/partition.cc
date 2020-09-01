@@ -20,7 +20,7 @@ namespace aten
 
 ///////////////////////////// Partition1D /////////////////////////////
 template <typename IdType>
-std::vector<IdArray> partition1D(CSRMatrix csr, int64_t num_cols_per_partition) {
+std::vector<IdArray> partition1D(CSRMatrix csr, int64_t num_col_partitions) {
   // original csr
   const int64_t M = csr.num_rows;
   const int64_t N = csr.num_cols;
@@ -29,7 +29,7 @@ std::vector<IdArray> partition1D(CSRMatrix csr, int64_t num_cols_per_partition) 
   IdType *indices = csr.indices.Ptr<IdType>();
   const IdType *data = csr.data.Ptr<IdType>();
   // partitioned csr
-  int64_t num_col_partitions = (N + num_cols_per_partition - 1) / num_cols_per_partition;
+  int64_t num_cols_per_partition = (N + num_col_partitions - 1) / num_col_partitions;
   IdArray ret_indptr = NDArray::Empty({num_col_partitions, M + 1}, csr.indptr->dtype, csr.indptr->ctx);
   IdArray ret_indices = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
   IdArray ret_eid = NDArray::Empty({nnz}, csr.indptr->dtype, csr.indptr->ctx);
@@ -68,12 +68,12 @@ std::vector<IdArray> partition1D(CSRMatrix csr, int64_t num_cols_per_partition) 
   return { ret_indptr, ret_indices, ret_eid };
 }
 
-template std::vector<IdArray> partition1D<int64_t>(CSRMatrix csr, int64_t num_cols_per_partition);
-template std::vector<IdArray> partition1D<int32_t>(CSRMatrix csr, int64_t num_cols_per_partition);
+template std::vector<IdArray> partition1D<int64_t>(CSRMatrix csr, int64_t num_col_partitions);
+template std::vector<IdArray> partition1D<int32_t>(CSRMatrix csr, int64_t num_col_partitions);
 
 ///////////////////////////// Partition1D /////////////////////////////
 template <typename IdType>
-std::vector<IdArray> partition2D(CSRMatrix csr, int64_t num_rows_per_partition, int64_t num_cols_per_partition) {
+std::vector<IdArray> partition2D(CSRMatrix csr, int64_t num_row_partitions, int64_t num_col_partitions) {
   // original csr
   const int64_t M = csr.num_rows;
   const int64_t N = csr.num_cols;
@@ -82,8 +82,8 @@ std::vector<IdArray> partition2D(CSRMatrix csr, int64_t num_rows_per_partition, 
   IdType *indices = csr.indices.Ptr<IdType>();
   const IdType *data = csr.data.Ptr<IdType>();
   // partitioned csr
-  int64_t num_col_partitions = (N + num_cols_per_partition - 1) / num_cols_per_partition;
-  int64_t num_row_partitions = (M + num_rows_per_partition - 1) / num_rows_per_partition;
+  int64_t num_cols_per_partition = (N + num_col_partitions - 1) / num_col_partitions;
+  int64_t num_rows_per_partition = (M + num_row_partitions - 1) / num_row_partitions;
   NDArray ret_row = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
   NDArray ret_col = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
   NDArray ret_eid = NDArray::Empty({nnz}, csr.indptr->dtype, csr.indptr->ctx);
@@ -136,8 +136,8 @@ std::vector<IdArray> partition2D(CSRMatrix csr, int64_t num_rows_per_partition, 
 }
 
 
-template std::vector<IdArray> partition2D<int64_t>(CSRMatrix csr, int64_t num_cols_per_partition, int64_t num_rows_per_partition);
-template std::vector<IdArray> partition2D<int32_t>(CSRMatrix csr, int64_t num_cols_per_partition, int64_t num_rows_per_partition);
+template std::vector<IdArray> partition2D<int64_t>(CSRMatrix csr, int64_t num_row_partitions, int64_t num_col_partitions);
+template std::vector<IdArray> partition2D<int32_t>(CSRMatrix csr, int64_t num_row_partitions, int64_t num_col_partitions);
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLPartition1D")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
