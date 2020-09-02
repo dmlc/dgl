@@ -16,6 +16,15 @@ def _remove_kwargs_dist(kwargs):
 # The following code is a fix to the PyTorch-specific issue in
 # https://github.com/dmlc/dgl/issues/2137
 #
+# Basically the sampled blocks/subgraphs contain the features extracted from the
+# parent graph.  In DGL, the blocks/subgraphs will hold a reference to the parent
+# graph feature tensor and an index tensor, so that the features could be extracted upon
+# request.  However, in the context of multiprocessed sampling, we do not need to
+# transmit the parent graph feature tensor from the subprocess to the main process,
+# since they are exactly the same tensor, and transmitting a tensor from a subprocess
+# to the main process is costly in PyTorch as it uses shared memory.  We work around
+# it with the following trick:
+#
 # In the collator running in the sampler processes:
 # For each frame in the block, we check each column and the column with the same name
 # in the corresponding parent frame.  If the storage of the former column is the
