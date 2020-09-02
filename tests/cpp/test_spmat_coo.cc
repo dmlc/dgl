@@ -269,6 +269,7 @@ TEST(SpmatTest, COOSort) {
   _TestCOOSort<int64_t>(GPU);
 #endif
 }
+
 template <typename IDX>
 void _TestCOOReorder() {
   auto coo = COO2<IDX>();

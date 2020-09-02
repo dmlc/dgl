@@ -71,6 +71,7 @@ def tensor(data, dtype=None):
             data = [data]
         return tf.convert_to_tensor(data, dtype=dtype)
 
+
 def initialize_context():
     tf.zeros(1)
 
@@ -78,6 +79,7 @@ def initialize_context():
 def as_scalar(data):
     data = data.numpy()
     return data if np.isscalar(data) else data.item()
+
 
 def get_preferred_sparse_format():
     """Get the preferred sparse matrix format supported by the backend.
@@ -449,6 +451,7 @@ def zerocopy_to_dgl_ndarray(data):
     else:
         return nd.from_dlpack(zerocopy_to_dlpack(data))
 
+
 def zerocopy_to_dgl_ndarray_for_write(input):
     return zerocopy_to_dgl_ndarray(input)
 
@@ -589,6 +592,7 @@ def copy_reduce_real(reducer, graph, target, in_data, out_size, in_map,
             return grad_in
     return out_data, grad
 
+
 def _reduce_grad(grad, shape):
     """Reduce gradient on the broadcast dimension
 
@@ -626,6 +630,7 @@ def _reduce_grad(grad, shape):
 def sync():
     context = context().context()
     context.async_wait()
+
 
 class GradContext:
     def __init__(self):

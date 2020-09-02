@@ -76,6 +76,7 @@ def _reduce_grad(grad, shape):
     grad = tf.reduce_sum(grad, axis=reduce_idx_tensor, keepdims=True)
     return tf.reshape(grad, shape)
 
+
 def _need_reduce_last_dim(ufeat, efeat):
     """Indicates whether to reduce the last dimension on edges
     in the backward pass of spmm,
@@ -83,6 +84,7 @@ def _need_reduce_last_dim(ufeat, efeat):
     ushp = ufeat.shape
     eshp = efeat.shape
     return ushp[1:-1] == eshp[1:-1] and eshp[-1] == 1 and ushp[-1] > 1
+
 
 def _muldiv(op, x):
     return 1. / x if op == 'div' else x

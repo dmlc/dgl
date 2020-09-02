@@ -3,7 +3,6 @@ import torch as th
 import torch.nn as nn
 from torch.nn import init
 import dgl.function as fn
-import dgl.ops as F
 import dgl.nn.pytorch as dglnn
 
 from utils import get_activation, to_etype_name
@@ -89,11 +88,10 @@ class GCMCGraphConv(nn.Module):
                 feat = dot_or_identity(feat, weight, self.device)
 
             feat = feat * self.dropout(cj)
-            #graph.srcdata['h'] = feat
-            #graph.update_all(fn.copy_src(src='h', out='m'),
-            #                 fn.sum(msg='m', out='h'))
-            #rst = graph.dstdata['h']
-            rst = F.copy_u_sum(graph, feat)
+            graph.srcdata['h'] = feat
+            graph.update_all(fn.copy_src(src='h', out='m'),
+                             fn.sum(msg='m', out='h'))
+            rst = graph.dstdata['h']
             rst = rst * ci
 
         return rst
@@ -340,11 +338,9 @@ class BiDecoder(nn.Module):
             graph.nodes['movie'].data['h'] = ifeat
             basis_out = []
             for i in range(self._num_basis):
-                #graph.nodes['user'].data['h'] = ufeat @ self.Ps[i]
-                #graph.apply_edges(fn.u_dot_v('h', 'h', 'sr'))
-                #basis_out.append(graph.edata['sr'].unsqueeze(1))
-                u = ufeat @ self.Ps[i]
-                basis_out.append(F.u_dot_v(graph, u, ifeat))
+                graph.nodes['user'].data['h'] = ufeat @ self.Ps[i]
+                graph.apply_edges(fn.u_dot_v('h', 'h', 'sr'))
+                basis_out.append(graph.edata['sr'])
             out = th.cat(basis_out, dim=1)
             out = self.combine_basis(out)
         return out

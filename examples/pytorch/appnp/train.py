@@ -62,9 +62,6 @@ def main(args):
     g = dgl.remove_self_loop(g)
     g = dgl.add_self_loop(g)
 
-    if args.gpu >= 0:
-        g = g.to(args.gpu)
-
     # create APPNP model
     model = APPNP(g,
                   in_feats,

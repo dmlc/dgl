@@ -203,11 +203,6 @@ class GINDataset(DGLBuiltinDataset):
                                 j + 1, i + 1))
                         print('this node has {} edgs.'.format(
                             nrow[1]))
-                
-                # Add self loops
-                if self.self_loop:
-                    m_edges += n_nodes
-                    g.add_edges(F.arange(0, n_nodes), F.arange(0, n_nodes))
 
                 if nattrs != []:
                     nattrs = np.stack(nattrs)

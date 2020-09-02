@@ -75,11 +75,11 @@ graphs = [
 ]
 
 spmm_shapes = [
-    ((1,), (1,)),
     ((1, 2, 1, 3, 1), (4, 1, 3, 1, 1)),
     ((3, 3), (1, 3)),
     ((1,), (3,)),
-    ((3,), (1,))
+    ((3,), (1,)),
+    ((1,), (1,))
 ]
 
 sddmm_shapes = [
@@ -255,5 +255,4 @@ def test_edge_softmax(g, norm_by, shp, idtype):
         print('backward passed')
 
 if __name__ == '__main__':
-    # test_spmm(F.int32, graphs[0], spmm_shapes[5], 'copy_lhs', 'sum')
-    test_sddmm(graphs[1], sddmm_shapes[2], 'v', 'u', 'sub', F.int32)
+    test_spmm(F.int32, graphs[0], spmm_shapes[5], 'copy_lhs', 'sum')

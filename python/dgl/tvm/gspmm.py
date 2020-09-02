@@ -200,7 +200,7 @@ def spmm(binary_op, reduce_op, nnz, num_rows, num_cols,
     #     nnz = tvm.tir.IntImm('int64', nnz)
 
     # check if use broadcast
-    use_bcast = (binary_op in ['copy_lhs', 'copy_rhs']) or lhs_shp != rhs_shp
+    use_bcast = (binary_op not in ['copy_lhs', 'copy_rhs']) and lhs_shp != rhs_shp
     # placeholder for sparse matrix
     if num_col_partitions > 1:
         adj_indptr = te.placeholder((num_col_partitions, num_rows+1), indice_type, 'adj_indptr')
@@ -216,7 +216,7 @@ def spmm(binary_op, reduce_op, nnz, num_rows, num_cols,
     use_e = binary_op != 'copy_lhs'
     def edge_id(x):
         return edge_mapping[x] if use_idx else x
-    use_pack = num_feat_partitions > 1 and not use_bcast
+    use_pack = num_feat_partitions > 1 and not use_bcast and binary_op != 'copy_lhs'
     if num_col_partitions == 1:
         # cannot use pack with bcast
         rst, inlines, reshapes = _spmm((num_rows,) + out_shp, binary_op, reduce_op, adj_indptr, adj_indices,

@@ -64,6 +64,7 @@ def main(args):
         g = dgl.remove_self_loop(g)
         g = dgl.add_self_loop(g)
     n_edges = g.number_of_edges()
+
     # normalization
     degs = g.in_degrees().float()
     norm = torch.pow(degs, -0.5)
