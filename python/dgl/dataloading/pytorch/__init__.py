@@ -111,26 +111,26 @@ class _EdgeCollator(EdgeCollator):
 class _NodeDataLoaderIter:
     def __init__(self, node_dataloader):
         self.node_dataloader = node_dataloader
-        self.it = iter(node_dataloader.dataloader)
+        self.iter_ = iter(node_dataloader.dataloader)
 
     def __next__(self):
-        input_nodes, output_nodes, blocks = next(self.it)
+        input_nodes, output_nodes, blocks = next(self.iter_)
         _restore_blocks_storage(blocks, self.node_dataloader.collator.g)
         return input_nodes, output_nodes, blocks
 
 class _EdgeDataLoaderIter:
     def __init__(self, edge_dataloader):
         self.edge_dataloader = edge_dataloader
-        self.it = iter(edge_dataloader.dataloader)
+        self.iter_ = iter(edge_dataloader.dataloader)
 
     def __next__(self):
         if self.edge_dataloader.collator.negative_sampler is None:
-            input_nodes, pair_graph, blocks = next(self.it)
+            input_nodes, pair_graph, blocks = next(self.iter_)
             _restore_subgraph_storage(pair_graph, self.edge_dataloader.collator.g)
             _restore_blocks_storage(blocks, self.edge_dataloader.collator.g_sampling)
             return input_nodes, pair_graph, blocks
         else:
-            input_nodes, pair_graph, neg_pair_graph, blocks = next(self.it)
+            input_nodes, pair_graph, neg_pair_graph, blocks = next(self.iter_)
             _restore_subgraph_storage(pair_graph, self.edge_dataloader.collator.g)
             _restore_subgraph_storage(neg_pair_graph, self.edge_dataloader.collator.g)
             _restore_blocks_storage(blocks, self.edge_dataloader.collator.g_sampling)
