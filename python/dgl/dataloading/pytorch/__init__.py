@@ -34,10 +34,14 @@ def _pop_subframe_storage(subframe, frame):
 
 def _pop_subgraph_storage(subg, g):
     for ntype in subg.ntypes:
+        if ntype not in g.ntypes:
+            continue
         subframe = subg._node_frames[subg.get_ntype_id(ntype)]
         frame = g._node_frames[g.get_ntype_id(ntype)]
         _pop_subframe_storage(subframe, frame)
     for etype in subg.canonical_etypes:
+        if etype not in g.canonical_etypes:
+            continue
         subframe = subg._edge_frames[subg.get_etype_id(etype)]
         frame = g._edge_frames[g.get_etype_id(etype)]
         _pop_subframe_storage(subframe, frame)
@@ -45,14 +49,20 @@ def _pop_subgraph_storage(subg, g):
 def _pop_blocks_storage(blocks, g):
     for block in blocks:
         for ntype in block.srctypes:
+            if ntype not in g.ntypes:
+                continue
             subframe = block._node_frames[block.get_ntype_id_from_src(ntype)]
             frame = g._node_frames[g.get_ntype_id(ntype)]
             _pop_subframe_storage(subframe, frame)
         for ntype in block.dsttypes:
+            if ntype not in g.ntypes:
+                continue
             subframe = block._node_frames[block.get_ntype_id_from_dst(ntype)]
             frame = g._node_frames[g.get_ntype_id(ntype)]
             _pop_subframe_storage(subframe, frame)
         for etype in block.canonical_etypes:
+            if etype not in g.canonical_etypes:
+                continue
             subframe = block._edge_frames[block.get_etype_id(etype)]
             frame = g._edge_frames[g.get_etype_id(etype)]
             _pop_subframe_storage(subframe, frame)
@@ -65,10 +75,14 @@ def _restore_subframe_storage(subframe, frame):
 
 def _restore_subgraph_storage(subg, g):
     for ntype in subg.ntypes:
+        if ntype not in g.ntypes:
+            continue
         subframe = subg._node_frames[subg.get_ntype_id(ntype)]
         frame = g._node_frames[g.get_ntype_id(ntype)]
         _restore_subframe_storage(subframe, frame)
     for etype in subg.canonical_etypes:
+        if etype not in g.canonical_etypes:
+            continue
         subframe = subg._edge_frames[subg.get_etype_id(etype)]
         frame = g._edge_frames[g.get_etype_id(etype)]
         _restore_subframe_storage(subframe, frame)
@@ -76,14 +90,20 @@ def _restore_subgraph_storage(subg, g):
 def _restore_blocks_storage(blocks, g):
     for block in blocks:
         for ntype in block.srctypes:
+            if ntype not in g.ntypes:
+                continue
             subframe = block._node_frames[block.get_ntype_id_from_src(ntype)]
             frame = g._node_frames[g.get_ntype_id(ntype)]
             _restore_subframe_storage(subframe, frame)
         for ntype in block.dsttypes:
+            if ntype not in g.ntypes:
+                continue
             subframe = block._node_frames[block.get_ntype_id_from_dst(ntype)]
             frame = g._node_frames[g.get_ntype_id(ntype)]
             _restore_subframe_storage(subframe, frame)
         for etype in block.canonical_etypes:
+            if etype not in g.canonical_etypes:
+                continue
             subframe = block._edge_frames[block.get_etype_id(etype)]
             frame = g._edge_frames[g.get_etype_id(etype)]
             _restore_subframe_storage(subframe, frame)
@@ -180,14 +200,20 @@ class NodeDataLoader:
             self.dataloader = DistDataLoader(self.collator.dataset,
                                              collate_fn=self.collator.collate,
                                              **dataloader_kwargs)
+            self.is_distributed = True
         else:
             self.dataloader = DataLoader(self.collator.dataset,
                                          collate_fn=self.collator.collate,
                                          **dataloader_kwargs)
+            self.is_distributed = False
 
     def __iter__(self):
         """Return the iterator of the data loader."""
-        return _NodeDataLoaderIter(self)
+        if self.is_distributed:
+            # Directly use the iterator of DistDataLoader, which doesn't copy features anyway.
+            return iter(self.dataloader)
+        else:
+            return _NodeDataLoaderIter(self)
 
     def __len__(self):
         """Return the number of batches of the data loader."""
