@@ -230,7 +230,7 @@ class Column(object):
 
         The operation triggers index selection.
         """
-        return Column(F.clone(self.data), self.scheme)
+        return Column(F.clone(self.data), copy.deepcopy(self.scheme))
 
     def subcolumn(self, rowids):
         """Return a subcolumn.
@@ -273,9 +273,6 @@ class Column(object):
 
     def __copy__(self):
         return self.clone()
-
-    def __deepcopy__(self):
-        return self.deepclone()
 
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
