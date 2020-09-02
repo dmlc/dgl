@@ -194,14 +194,18 @@ class NodeDataLoader:
                 collator_kwargs[k] = v
             else:
                 dataloader_kwargs[k] = v
-        self.collator = _NodeCollator(g, nids, block_sampler, **collator_kwargs)
+
         if isinstance(g, DistGraph):
+            # Distributed DataLoader currently does not support heterogeneous graphs
+            # and does not copy features.  Fallback to normal solution
+            self.collator = NodeCollator(g, nids, block_sampler, **collator_kwargs)
             _remove_kwargs_dist(dataloader_kwargs)
             self.dataloader = DistDataLoader(self.collator.dataset,
                                              collate_fn=self.collator.collate,
                                              **dataloader_kwargs)
             self.is_distributed = True
         else:
+            self.collator = _NodeCollator(g, nids, block_sampler, **collator_kwargs)
             self.dataloader = DataLoader(self.collator.dataset,
                                          collate_fn=self.collator.collate,
                                          **dataloader_kwargs)
