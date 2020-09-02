@@ -165,6 +165,7 @@ def test_pickling_batched_heterograph():
     new_bg = _reconstruct_pickle(bg)
     test_utils.check_graph_equal(bg, new_bg)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU edge_subgraph w/ relabeling not implemented")
 def test_pickling_subgraph():
     f1 = io.BytesIO()
     f2 = io.BytesIO()
