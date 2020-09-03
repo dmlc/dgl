@@ -322,6 +322,8 @@ if __name__ == '__main__':
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
     args = parser.parse_args()
+    assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')), \
+    'The num_workers should be the same value with num_samplers.'
 
     print(args)
     main(args)

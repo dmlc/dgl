@@ -18,7 +18,6 @@ def toset(x):
     # F.zerocopy_to_numpy may return a int
     return set(F.zerocopy_to_numpy(x).tolist())
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_bfs(idtype, n=100):
     def _bfs_nx(g_nx, src):
@@ -60,7 +59,6 @@ def test_bfs(idtype, n=100):
     assert len(edges_dgl) == len(edges_nx)
     assert all(toset(x) == y for x, y in zip(edges_dgl, edges_nx))
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_topological_nodes(idtype, n=100):
     a = sp.random(n, n, 3 / n, data_rvs=lambda n: np.ones(n))
@@ -88,7 +86,6 @@ def test_topological_nodes(idtype, n=100):
     assert all(toset(x) == toset(y) for x, y in zip(layers_dgl, layers_spmv))
 
 DFS_LABEL_NAMES = ['forward', 'reverse', 'nontree']
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_dfs_labeled_edges(idtype, example=False):
     dgl_g = dgl.DGLGraph().astype(idtype)
