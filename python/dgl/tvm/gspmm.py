@@ -13,7 +13,7 @@ def _spmm(out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
         feat_len_per_partition = feat_len // num_feat_partitions
         def reshape(fo, n, fi):
             ff = fo * feat_len_per_partition + fi
-            return efeat.__getitem__((n,) + tuple(topi.util.unravel_index(ff, efeat.shape[1:])))
+            return efeat.__getitem__((edge_id(n),) + tuple(topi.util.unravel_index(ff, efeat.shape[1:])))
         reshaped_efeat = te.compute((num_feat_partitions, nnz, feat_len_per_partition), 
                                     reshape, name='reshaped_efeat')
         reshapes.append(reshaped_efeat)
@@ -56,7 +56,7 @@ def _spmm_dds(out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
         feat_len_per_partition = feat_len // num_feat_partitions
         def reshape(fo, n, fi):
             ff = fo * feat_len_per_partition + fi
-            return efeat.__getitem__((n,) + tuple(topi.util.unravel_index(ff, efeat.shape[1:])))
+            return efeat.__getitem__((edge_id(n),) + tuple(topi.util.unravel_index(ff, efeat.shape[1:])))
         reshaped_efeat = te.compute((num_feat_partitions, nnz, feat_len_per_partition), 
                                     reshape, name='reshaped_efeat')
         reshapes.append(reshaped_efeat)

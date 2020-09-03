@@ -15,16 +15,16 @@ def _sddmm_compute(out_shp, binary_op, lhs, rhs,
     # assume feat_len is a multiply of num_feat_partitions
     feat_len_per_partition = feat_len // num_feat_partitions
     reshapes = []
-    def reshape(fo, n, fi, t):
+    def reshape(fo, n, fi, t, idx):
         ff = fo * feat_len_per_partition + fi
-        return t.__getitem__((n,) + tuple(topi.util.unravel_index(ff, t.shape[1:])))
+        return t.__getitem__((idx(n, True),) + tuple(topi.util.unravel_index(ff, t.shape[1:])))
     if lhs_pack:
         reshaped_lhs = te.compute((num_feat_partitions, lhs.shape[0], feat_len_per_partition), \
-                                  lambda fo, idx, fi: reshape(fo, idx, fi, lhs), name='reshaped_lhs')
+                                  lambda fo, idx, fi: reshape(fo, idx, fi, lhs, lhs_idx), name='reshaped_lhs')
         reshapes.append(reshaped_lhs)
     if rhs_pack:
         reshaped_rhs = te.compute((num_feat_partitions, rhs.shape[0], feat_len_per_partition), \
-                                  lambda fo, idx, fi: reshape(fo, idx, fi, rhs), name='reshaped_rhs')
+                                  lambda fo, idx, fi: reshape(fo, idx, fi, rhs, rhs_idx), name='reshaped_rhs')
         reshapes.append(reshaped_rhs)
     if binary_op == 'dot':
         k = te.reduce_axis((0, reduce_size), name='k')

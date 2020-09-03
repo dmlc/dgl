@@ -332,15 +332,13 @@ def _gspmm_tvm(gidx, op, reduce_op, u, e, advise=True,
             dds = [tvm.nd.from_dlpack(tmp(x).to_dlpack()) for x in range(3)]
             partitioned_1d_graphs[graph_key] = dds
         indptr, indices, edge_mapping = dds
-        # print(indptr, indices, edge_mapping)
     edge_shuffled = edge_mapping.shape != (0,)
     use_bcast = op not in ['copy_lhs', 'copy_rhs'] and u_shp[1:] != e_shp[1:]
     # pass edge_mapping to tvm only when array packing will be used
-    use_idx = num_feat_partitions > 1 and not use_bcast and use_e
+    use_idx = edge_shuffled and num_feat_partitions > 1 and not use_bcast and use_e
     f_input = [indptr, indices]
     key = (num_rows, num_cols, nnz, op, reduce_op, u_shp, e_shp, use_idx, \
            num_feat_partitions, num_col_partitions, indice_type, feat_type, target)
-    # print(key)
     if key not in compiled_gspmm_kernels:
         if target == 'cpu':
             target = 'llvm'
@@ -497,7 +495,7 @@ def _gsddmm_tvm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
     # please check tvm/gsddmm.py array-packing prerequistes
     # check how coo is sorted is currently not available in python
     use_idx = (lhs_target == TargetCode.EDGE or rhs_target == TargetCode.EDGE) \
-              and num_feat_partitions > 1 and not use_bcast
+              and num_feat_partitions > 1 and not use_bcast and edge_shuffled
     f_input = []
     if lhs_target == TargetCode.SRC or rhs_target == TargetCode.SRC:
         f_input.append(row)
@@ -507,7 +505,6 @@ def _gsddmm_tvm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
         f_input.append(edge_mapping)
     key = (num_rows, num_cols, nnz, op, lhs_target, rhs_target, num_feat_partitions,\
            use_idx, lhs_shp, rhs_shp, indice_type, feat_type, target)
-    # print(key)
     if key not in compiled_gsddmm_kernels:
         if target == 'cpu':
             target = 'llvm'
