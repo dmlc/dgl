@@ -2,6 +2,13 @@
 
 This is an example of training RGCN node classification in a distributed fashion. Currently, the example only support training RGCN graphs with no input features. The current implementation follows ../rgcn/entity_claasify_mp.py.
 
+Before training, please install some python libs by pip:
+
+```bash
+sudo pip3 install ogb
+sudo pip3 install pyinstrument
+```
+
 To train RGCN, it has four steps:
 
 ### Step 0: set IP configuration file.
