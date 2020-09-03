@@ -3,7 +3,6 @@
 
 import argparse
 import math
-import random
 import time
 
 import numpy as np
@@ -18,12 +17,6 @@ from models import GCN
 
 device = None
 in_feats, n_classes = None, None
-
-feat_std = None, None
-
-
-def normalize(feat):
-    return feat / (feat_std + 1e-6)
 
 
 def compute_acc(pred, labels):
@@ -51,7 +44,7 @@ def train(model, graph, labels, train_idx, optimizer, use_labels):
     feat = graph.ndata["feat"]
 
     if use_labels:
-        mask_rate = random.uniform(0, 0.5)
+        mask_rate = 0.5
         mask = th.rand(train_idx.shape) < mask_rate
 
         train_labels_idx = train_idx[mask]
@@ -62,8 +55,6 @@ def train(model, graph, labels, train_idx, optimizer, use_labels):
         mask_rate = 0.5
         mask = th.rand(train_idx.shape) < mask_rate
         train_pred_idx = train_idx[mask]
-
-    feat = normalize(feat)
 
     optimizer.zero_grad()
     pred = model(graph, feat)
@@ -82,8 +73,6 @@ def evaluate(model, graph, labels, train_idx, val_idx, test_idx, use_labels):
 
     if use_labels:
         feat = add_labels(feat, labels, train_idx)
-
-    feat = normalize(feat)
 
     pred = model(graph, feat)
     train_loss = cross_entropy(pred[train_idx], labels[train_idx])
@@ -218,9 +207,9 @@ def count_parameters(args):
 
 
 def main():
-    global device, in_feats, n_classes, feat_std
+    global device, in_feats, n_classes
 
-    argparser = argparse.ArgumentParser("GCN on OGBN-Arxiv")
+    argparser = argparse.ArgumentParser("GCN on OGBN-Arxiv", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argparser.add_argument("--cpu", action="store_true", help="CPU mode. This option overrides --gpu.")
     argparser.add_argument("--gpu", type=int, default=0, help="GPU device ID.")
     argparser.add_argument("--n-runs", type=int, default=10)
@@ -268,14 +257,6 @@ def main():
     test_idx = test_idx.to(device)
     labels = labels.to(device)
     graph = graph.to(device)
-
-    feat = graph.ndata["feat"]
-    if args.use_labels:
-        feat = add_labels(feat, labels, train_idx)
-        feat[:, -int(n_classes) :] *= 0.5  # multiply random mask rate for training
-    train_feat = feat[train_idx]
-
-    feat_std = th.std(train_feat, 0, keepdim=True)
 
     # run
     val_accs = []
