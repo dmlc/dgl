@@ -34,6 +34,17 @@ namespace runtime {
         << "CUDA: " << cudaGetErrorString(e);                      \
   }
 
+#define CUDA_KERNEL_CALL(func, nblks, nthrs)                       \
+  {                                                                \
+    if ((nblks) != 0 and (nthrs) != 0) {                           \
+      cudaError_t e = (func);                                      \
+      CHECK(e == cudaSuccess || e == cudaErrorCudartUnloading)     \
+          << "CUDA Kernel launch error, nblks: " << (nblks)        \
+          << " nthrs: " << (nthrs) << " "                          \
+          << cudaGetErrorString(e);                                \
+    }                                                              \
+  }
+
 #define CUSPARSE_CALL(func)                                        \
   {                                                                \
     cusparseStatus_t e = (func);                                   \

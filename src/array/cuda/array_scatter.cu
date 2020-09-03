@@ -33,7 +33,7 @@ void Scatter_(IdArray index, NDArray value, NDArray out) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const int nt = cuda::FindNumThreads(len);
   const int nb = (len + nt - 1) / nt;
-  _ScatterKernel<<<nb, nt, 0, thr_entry->stream>>>(idx, val, len, outd);
+  CUDA_KERNEL_CALL(_ScatterKernel<<<nb, nt, 0, thr_entry->stream>>>(idx, val, len, outd), nb, nt);
 }
 
 template void Scatter_<kDLGPU, int32_t, int32_t>(IdArray, NDArray, NDArray);
