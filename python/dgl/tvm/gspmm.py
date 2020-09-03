@@ -5,18 +5,17 @@ from .util import binary_op_map, reduce_op_map
 
 def _spmm(out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
           ufeat, efeat, edge_id, pack, num_feat_partitions):
-    inlines, reshapes = [], []
+    reshapes = []
     if pack:
         # apply array packing on efeat because it can be continuous
         nnz = efeat.shape[0]
         feat_len = topi.util.get_const_int(topi.util.prod(efeat.shape[1:]))
-        # flatten_ufeat = topi.reshape(ufeat, (num_cols, feat_len))
-        flatten_efeat = topi.reshape(efeat, (nnz, feat_len))
         feat_len_per_partition = feat_len // num_feat_partitions
-        reshaped_efeat = te.compute((num_feat_partitions, nnz, feat_len_per_partition), \
-                                lambda fo, idx, fi: flatten_efeat[edge_id(idx), fo * feat_len_per_partition + fi],
-                                name='reshaped_efeat')
-        inlines.append(flatten_efeat)
+        def reshape(fo, n, fi):
+            ff = fo * feat_len_per_partition + fi
+            return efeat.__getitem__((n,) + tuple(topi.util.unravel_index(ff, efeat.shape[1:])))
+        reshaped_efeat = te.compute((num_feat_partitions, nnz, feat_len_per_partition), 
+                                    reshape, name='reshaped_efeat')
         reshapes.append(reshaped_efeat)
     def msgfunc(*args):
         row = args[0]
@@ -43,23 +42,23 @@ def _spmm(out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
     rst = te.compute(out_shp, msgfunc, name='out')
     if reduce_op == 'sum':
         rst = (rst,)
-    return rst, inlines, reshapes
+    return rst, reshapes
     
 def _spmm_dds(out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
               ufeat, efeat, edge_id, pack, num_feat_partitions):
     num_col_partitions = adj_indptr.shape[0]
-    inlines, reshapes = [], []
+    reshapes = []
     if pack:
         #same as above
         nnz = efeat.shape[0]
         feat_len = topi.util.get_const_int(topi.util.prod(ufeat.shape[1:]))
         # assume divide num_feat_partitions
         feat_len_per_partition = feat_len // num_feat_partitions
-        flatten_efeat = topi.reshape(efeat, (nnz, feat_len))
-        reshaped_efeat = te.compute((num_feat_partitions, nnz, feat_len_per_partition), \
-                                lambda fo, idx, fi: flatten_efeat[edge_id(idx), fo * feat_len_per_partition + fi],
-                                name='reshaped_efeat')
-        inlines.append(flatten_efeat)
+        def reshape(fo, n, fi):
+            ff = fo * feat_len_per_partition + fi
+            return efeat.__getitem__((n,) + tuple(topi.util.unravel_index(ff, efeat.shape[1:])))
+        reshaped_efeat = te.compute((num_feat_partitions, nnz, feat_len_per_partition), 
+                                    reshape, name='reshaped_efeat')
         reshapes.append(reshaped_efeat)
     def msgfunc(*args):
         col_part_idx = args[0]
@@ -113,7 +112,7 @@ def _spmm_dds(out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
                 lambda *args: reduce_op_map[reduce_op]((arge.__getitem__((k,) + args),
                     argu.__getitem__((k,) + args), intermediate.__getitem__((k,) + args)), axis=k), 
                     name='out')
-    return rst, intermediate, inlines, reshapes
+    return rst, intermediate, reshapes
     
 def _spmm_cuda_general(s, out):
     edge_axis = out.op.axis[0]
@@ -130,7 +129,7 @@ def _spmm_cuda_tree_reduce(s, out):
     s[out].bind(feat_axis, te.thread_axis('threadIdx.y'))
     s[out].bind(edge_axis, te.thread_axis('blockIdx.x'))
 
-def _spmm_cpu(s, out, num_feat_partitions, inlines, reshapes):
+def _spmm_cpu(s, out, num_feat_partitions, reshapes):
     reduce_axis = out.op.reduce_axis[0]
     row_axis = out.op.axis[0]
     if num_feat_partitions == 1:
@@ -139,14 +138,12 @@ def _spmm_cpu(s, out, num_feat_partitions, inlines, reshapes):
         feat_axis = s[out].fuse(*out.op.axis[1:])
         fo, fi = s[out].split(feat_axis, nparts=num_feat_partitions)
         s[out].reorder(fo, row_axis, reduce_axis, fi)
-        for t in inlines:
-            s[t].compute_inline()
         for rs in reshapes:
             s[rs].compute_at(s[out], fo)
             s[rs].parallel(rs.op.axis[1])
     s[out].parallel(row_axis)
 
-def _spmm_dds_sched(s, out, I, num_feat_partitions, inlines, reshapes):
+def _spmm_dds_sched(s, out, I, num_feat_partitions, reshapes):
     ifeat_axis = s[I].fuse(*I.op.axis[2:])
     s[I].reorder(I.op.axis[0], I.op.axis[1], I.op.reduce_axis[0], ifeat_axis)
     ofeat_axis = s[out].fuse(*out.op.axis[1:])
@@ -156,8 +153,6 @@ def _spmm_dds_sched(s, out, I, num_feat_partitions, inlines, reshapes):
         # only need to partition feature axis of out
         ofo, ofi = s[out].split(ofeat_axis, nparts=num_feat_partitions)
         s[out].reorder(ofo, out.op.reduce_axis[0], out.op.axis[0], ofi)
-        for t in inlines:
-            s[t].compute_inline()
         for t in reshapes:
             s[t].compute_at(s[out], ofo)
             s[t].parallel(t.op.axis[1])
@@ -194,11 +189,11 @@ def spmm(binary_op, reduce_op, nnz, num_rows, num_cols,
         nnz = te.var('nnz', indice_type)
         if num_col_partitions > 1:
             raise NotImplementedError
-    # else:
-    #     num_rows = tvm.tir.IntImm('int64', num_rows)
-    #     num_cols = tvm.tir.IntImm('int64', num_cols)
-    #     nnz = tvm.tir.IntImm('int64', nnz)
-
+    else:
+        # convert python int into tir nodes so that type of iterator in generated code is correct
+        num_rows = tvm.tir.IntImm(indice_type, num_rows)
+        num_cols = tvm.tir.IntImm(indice_type, num_cols)
+        nnz = tvm.tir.IntImm(indice_type, nnz)
     # check if use broadcast
     use_bcast = (binary_op not in ['copy_lhs', 'copy_rhs']) and lhs_shp != rhs_shp
     # placeholder for sparse matrix
@@ -219,11 +214,11 @@ def spmm(binary_op, reduce_op, nnz, num_rows, num_cols,
     use_pack = num_feat_partitions > 1 and not use_bcast and binary_op != 'copy_lhs'
     if num_col_partitions == 1:
         # cannot use pack with bcast
-        rst, inlines, reshapes = _spmm((num_rows,) + out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
+        rst, reshapes = _spmm((num_rows,) + out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
                         ufeat, efeat, edge_id, use_pack, num_feat_partitions)
     else:
         # same
-        rst, intermediate, inlines, reshapes = _spmm_dds((num_rows,) + out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
+        rst, intermediate, reshapes = _spmm_dds((num_rows,) + out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
             ufeat, efeat, edge_id, use_pack, num_feat_partitions)
     out = rst[-1]
     # schedule
@@ -239,9 +234,9 @@ def spmm(binary_op, reduce_op, nnz, num_rows, num_cols,
     else:
         # llvm schedule
         if num_col_partitions == 1:
-            _spmm_cpu(s, out, num_feat_partitions, inlines, reshapes)
+            _spmm_cpu(s, out, num_feat_partitions, reshapes)
         else:
-            _spmm_dds_sched(s, out, intermediate, num_feat_partitions, inlines, reshapes)
+            _spmm_dds_sched(s, out, intermediate, num_feat_partitions, reshapes)
         # prepare input
     f_input = [adj_indptr, adj_indices]
     f_name = '_'.join(str(x) for x in [

@@ -8,6 +8,7 @@ from .base import DGLError
 from . import backend as F
 import tvm
 from .tvm import gsddmm, gspmm
+from .function import TargetCode
 
 def infer_broadcast_shape(op, shp1, shp2):
     r"""Check the shape validity, and infer the output shape given input shape and operator.
@@ -65,13 +66,170 @@ def to_dgl_nd_for_write(x):
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
 
 target_mapping = {
-    'u': 0,
-    'e': 1,
-    'v': 2,
-    'src': 0,
-    'edge': 1,
-    'dst': 2
+    'u': TargetCode.SRC,
+    'e': TargetCode.EDGE,
+    'v': TargetCode.DST,
+    'src': TargetCode.SRC,
+    'edge': TargetCode.EDGE,
+    'dst': TargetCode.DST
 }
+
+def _gspmm(gidx, op, reduce_op, u, e):
+    r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
+    :attr:`op` on source node feature and edge feature, leads to a message on edge.
+    Then aggregates the message by :attr:`reduce_op` on destination nodes.
+    .. math::
+        x_v = \psi_{(u, v, e)\in \mathcal{G}}(\rho(x_u, x_e))
+    where :math:`x_v` is the returned feature on destination nodes, and :math`x_u`,
+    :math:`x_e` refers to :attr:`u`, :attr:`e` respectively. :math:`\rho` means binary
+    operator :attr:`op` and :math:`\psi` means reduce operator :attr:`reduce_op`,
+    :math:`\mathcal{G}` is the graph we apply gspmm on: :attr:`g`.
+    Note that this function does not handle gradients.
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The input graph index.
+    op : str
+        The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``, ``copy_lhs``,
+        ``copy_rhs``.
+    reduce_op : str
+        Reduce operator, could be ``sum``, ``max``, ``min``.
+    u : tensor or None
+        The feature on source nodes, could be None if op is ``copy_rhs``.
+    e : tensor or None
+        The feature on edges, could be None if op is ``copy_lhs``.
+    Returns
+    -------
+    tuple
+        The returned tuple is composed of two elements:
+        - The first element refers to the result tensor.
+        - The second element refers to a tuple composed of arg_u and arg_e
+          (which is useful when reducer is `min`/`max`).
+    Notes
+    -----
+    This function does not handle gradients.
+    """
+    if gidx.number_of_etypes() != 1:
+        raise DGLError("We only support gspmm on graph with one edge type")
+    use_u = op != 'copy_rhs'
+    use_e = op != 'copy_lhs'
+    # deal with scalar features.
+    expand_u, expand_e = False, False
+    if use_u:
+        if F.ndim(u) == 1:
+            u = F.unsqueeze(u, -1)
+            expand_u = True
+    if use_e:
+        if F.ndim(e) == 1:
+            e = F.unsqueeze(e, -1)
+            expand_e = True
+    ctx = F.context(u) if use_u else F.context(e)
+    dtype = F.dtype(u) if use_u else F.dtype(e)
+    u_shp = F.shape(u) if use_u else (0,)
+    e_shp = F.shape(e) if use_e else (0,)
+    _, dsttype = gidx.metagraph.find_edge(0)
+    v_shp = (gidx.number_of_nodes(dsttype), ) +\
+        infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
+    v = F.zeros(v_shp, dtype, ctx)
+    use_cmp = reduce_op in ['max', 'min']
+    arg_u, arg_e = None, None
+    idtype = getattr(F, gidx.dtype)
+    if use_cmp:
+        if use_u:
+            arg_u = F.zeros(v_shp, idtype, ctx)
+        if use_e:
+            arg_e = F.zeros(v_shp, idtype, ctx)
+    arg_u_nd = to_dgl_nd_for_write(arg_u)
+    arg_e_nd = to_dgl_nd_for_write(arg_e)
+    if gidx.number_of_edges(0) > 0:
+        _CAPI_DGLKernelSpMM(gidx, op, reduce_op,
+                            to_dgl_nd(u if use_u else None),
+                            to_dgl_nd(e if use_e else None),
+                            to_dgl_nd_for_write(v),
+                            arg_u_nd,
+                            arg_e_nd)
+    # NOTE(zihao): actually we can avoid the following step, because arg_*_nd
+    # refers to the data that stores arg_*. After we call _CAPI_DGLKernelSpMM,
+    # arg_* should have already been changed. But we found this doesn't work
+    # under Tensorflow when index type is int32. (arg_u and arg_e would be
+    # all zero).
+    # The workaround is proposed by Jinjing, and we still need to investigate
+    # where the problem is.
+    arg_u = None if arg_u is None else F.zerocopy_from_dgl_ndarray(arg_u_nd)
+    arg_e = None if arg_e is None else F.zerocopy_from_dgl_ndarray(arg_e_nd)
+    # To deal with scalar node/edge features.
+    if (expand_u or not use_u) and (expand_e or not use_e):
+        v = F.squeeze(v, -1)
+    return v, (arg_u, arg_e)
+
+
+def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
+    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
+    takes the result of :attr:`op` on source node feature and destination node
+    feature, leads to a feature on edge.
+    .. math::
+        x_{e} = \phi(x_u, x_e, x_v), \forall (u,e,v)\in \mathcal{G}
+    where :math:`x_{e}` is the returned feature on edges and :math:`x_u`,
+    :math:`x_v` refers to :attr:`u`, :attr:`v` respectively. :math:`\phi`
+    is the binary operator :attr:`op`, and :math:`\mathcal{G}` is the graph
+    we apply gsddmm on: :attr:`g`.
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The input graph index.
+    op : str
+        Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``,
+        ``copy_lhs``, ``copy_rhs``.
+    lhs : tensor or None
+        Left hand operand.
+    rhs : tensor or None
+        Right hand operand.
+    lhs_target : str
+        The target of left hand operand, could be ``src``, ``edge``, ``dst``
+        or their alias ``u``, ``e``, ``v``.
+    rhs_target : str
+        The target of right hand operand, could be ``src``, ``edge``, ``dst``
+        or their alias ``u``, ``e``, ``v``.
+    Returns
+    -------
+    tensor
+        The result tensor.
+    Notes
+    -----
+    This function does not handle gradients.
+    """
+    if gidx.number_of_etypes() != 1:
+        raise DGLError("We only support gsddmm on graph with one edge type")
+    use_lhs = op != 'copy_rhs'
+    use_rhs = op != 'copy_lhs'
+    # deal with scalar features.
+    expand_lhs, expand_rhs = False, False
+    if use_lhs:
+        if F.ndim(lhs) == 1:
+            lhs = F.unsqueeze(lhs, -1)
+            expand_lhs = True
+    if use_rhs:
+        if F.ndim(rhs) == 1:
+            rhs = F.unsqueeze(rhs, -1)
+            expand_rhs = True
+    lhs_target = target_mapping[lhs_target]
+    rhs_target = target_mapping[rhs_target]
+    ctx = F.context(lhs) if use_lhs else F.context(rhs)
+    dtype = F.dtype(lhs) if use_lhs else F.dtype(rhs)
+    lhs_shp = F.shape(lhs) if use_lhs else (0,)
+    rhs_shp = F.shape(rhs) if use_rhs else (0,)
+    out_shp = (gidx.number_of_edges(0), ) +\
+        infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])
+    out = F.zeros(out_shp, dtype, ctx)
+    if gidx.number_of_edges(0) > 0:
+        _CAPI_DGLKernelSDDMM(gidx, op,
+                             to_dgl_nd(lhs if use_lhs else None),
+                             to_dgl_nd(rhs if use_rhs else None),
+                             to_dgl_nd_for_write(out),
+                             lhs_target, rhs_target)
+    if (expand_lhs or not use_lhs) and (expand_rhs or not use_rhs):
+        out = F.squeeze(out, -1)
+    return out
 
 compiled_gspmm_kernels = {}
 compiled_gsddmm_kernels = {}
@@ -79,7 +237,7 @@ compiled_gsddmm_kernels = {}
 partitioned_1d_graphs = {}
 partitioned_2d_graphs = {}
 
-def _gspmm(gidx, op, reduce_op, u, e, advise=True,
+def _gspmm_tvm(gidx, op, reduce_op, u, e, advise=True,
            num_feat_partitions=1, num_col_partitions=1):
     r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
     :attr:`op` on source node feature and edge feature, leads to a message on edge.
@@ -178,7 +336,7 @@ def _gspmm(gidx, op, reduce_op, u, e, advise=True,
     edge_shuffled = edge_mapping.shape != (0,)
     use_bcast = op not in ['copy_lhs', 'copy_rhs'] and u_shp[1:] != e_shp[1:]
     # pass edge_mapping to tvm only when array packing will be used
-    use_idx = edge_shuffled and num_feat_partitions > 1 and not use_bcast and use_e
+    use_idx = num_feat_partitions > 1 and not use_bcast and use_e
     f_input = [indptr, indices]
     key = (num_rows, num_cols, nnz, op, reduce_op, u_shp, e_shp, use_idx, \
            num_feat_partitions, num_col_partitions, indice_type, feat_type, target)
@@ -226,7 +384,7 @@ def _gspmm(gidx, op, reduce_op, u, e, advise=True,
     return v, (arg_u, arg_e)
 
 
-def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
+def _gsddmm_tvm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
             num_feat_partitions=1, num_row_partitions=1, num_col_partitions=1):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
     takes the result of :attr:`op` on source node feature and destination node
@@ -336,11 +494,14 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
         partitioned_2d_graphs[graph_key] = (row, col, edge_mapping, reverse_mapping)
     use_bcast = lhs_shp[1:] != rhs_shp[1:]
     edge_shuffled = edge_mapping.shape != (0,)
-    use_idx = (lhs_target == 1 or rhs_target == 1) and num_feat_partitions > 1 and not use_bcast and edge_shuffled
+    # please check tvm/gsddmm.py array-packing prerequistes
+    # check how coo is sorted is currently not available in python
+    use_idx = (lhs_target == TargetCode.EDGE or rhs_target == TargetCode.EDGE) \
+              and num_feat_partitions > 1 and not use_bcast
     f_input = []
-    if lhs_target == 0 or rhs_target == 0:
+    if lhs_target == TargetCode.SRC or rhs_target == TargetCode.SRC:
         f_input.append(row)
-    if lhs_target == 2 or rhs_target == 2:
+    if lhs_target == TargetCode.DST or rhs_target == TargetCode.DST:
         f_input.append(col)
     if use_idx:
         f_input.append(edge_mapping)
@@ -363,10 +524,10 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
     else:
         compiled = compiled_gsddmm_kernels[key]
     mod, out_shp = compiled
-    if (lhs_target == 1 or rhs_target == 1) and edge_shuffled and not use_idx:
-        if lhs_target == 1:
+    if (lhs_target == TargetCode.EDGE or rhs_target == TargetCode.EDGE) and edge_shuffled and not use_idx:
+        if lhs_target == TargetCode.EDGE:
             lhs = lhs[F.from_dgl_nd(edge_mapping).long()]
-        elif rhs_target == 1:
+        elif rhs_target == TargetCode.EDGE:
             rhs = rhs[F.from_dgl_nd(edge_mapping).long()]
     f_input.append(tvm.nd.from_dlpack(to_dgl_nd(lhs).to_dlpack()))
     f_input.append(tvm.nd.from_dlpack(to_dgl_nd(rhs).to_dlpack()))

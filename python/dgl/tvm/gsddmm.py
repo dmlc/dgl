@@ -2,6 +2,7 @@ import tvm
 from tvm import te
 from tvm import topi
 from .util import binary_op_map
+from ..function import TargetCode
 
 def _sddmm_compute(out_shp, binary_op, lhs, rhs, 
                    lhs_idx, rhs_idx, num_feat_partitions=1,
@@ -13,20 +14,17 @@ def _sddmm_compute(out_shp, binary_op, lhs, rhs,
     feat_len *= reduce_size
     # assume feat_len is a multiply of num_feat_partitions
     feat_len_per_partition = feat_len // num_feat_partitions
-    inlines, reshapes = [], []
+    reshapes = []
+    def reshape(fo, n, fi, t):
+        ff = fo * feat_len_per_partition + fi
+        return t.__getitem__((n,) + tuple(topi.util.unravel_index(ff, t.shape[1:])))
     if lhs_pack:
-        flatten_lhs = topi.reshape(lhs, (lhs.shape[0], feat_len))
         reshaped_lhs = te.compute((num_feat_partitions, lhs.shape[0], feat_len_per_partition), \
-                                    lambda fo, idx, fi: flatten_lhs[lhs_idx(idx, True), fo * feat_len_per_partition + fi],
-                                    name='reshaped_lhs')
-        inlines.append(flatten_lhs)
+                                  lambda fo, idx, fi: reshape(fo, idx, fi, lhs), name='reshaped_lhs')
         reshapes.append(reshaped_lhs)
     if rhs_pack:
-        flatten_rhs = topi.reshape(rhs, (rhs.shape[0], feat_len))
         reshaped_rhs = te.compute((num_feat_partitions, rhs.shape[0], feat_len_per_partition), \
-                                    lambda fo, idx, fi: flatten_rhs[rhs_idx(idx, True), fo * feat_len_per_partition + fi],
-                                    name='reshaped_rhs')
-        inlines.append(flatten_rhs)
+                                  lambda fo, idx, fi: reshape(fo, idx, fi, rhs), name='reshaped_rhs')
         reshapes.append(reshaped_rhs)
     if binary_op == 'dot':
         k = te.reduce_axis((0, reduce_size), name='k')
@@ -62,7 +60,7 @@ def _sddmm_compute(out_shp, binary_op, lhs, rhs,
                 rval = rhs.__getitem__((rhs_idx(args[0]),) + args[1:])
             return binary_op_map[binary_op](lval, rval)
         out = te.compute(out_shp, edge_func, name='out')
-    return out, inlines, reshapes
+    return out, reshapes
 
 def _sddmm_cuda_general(s, out):
     out_len = topi.util.get_const_int(topi.util.prod(out.shape[1:]))
@@ -93,9 +91,7 @@ def _sddmm_cpu_general(s, out):
     edge_axis = out.op.axis[0]
     s[out].parallel(edge_axis)
     
-def _sddmm_cpu_feat_partition(s, out, op, inlines, reshapes, reduce_size, num_feat_partitions):
-    for t in inlines:
-        s[t].compute_inline()
+def _sddmm_cpu_feat_partition(s, out, op, reshapes, reduce_size, num_feat_partitions):
     edge_axis = out.op.axis[0]
     feat_axis = s[out].fuse(*out.op.axis[1:])
     feat_len = topi.util.get_const_int(topi.util.prod(out.shape[1:])) * reduce_size
@@ -149,6 +145,11 @@ def sddmm(binary_op, nnz, num_rows, num_cols,
         num_rows = te.var('num_rows', indice_type)
         num_cols = te.var('num_cols', indice_type)
         nnz = te.var('nnz', indice_type)
+    else:
+        # convert python int into tir nodes so that type of iterator in generated code is correct
+        num_rows = tvm.tir.IntImm(indice_type, num_rows)
+        num_cols = tvm.tir.IntImm(indice_type, num_cols)
+        nnz = tvm.tir.IntImm(indice_type, nnz)
     # check if use bcast
     use_bcast = lhs_shp != rhs_shp
     # check should be done in infer_out_shape
@@ -162,11 +163,11 @@ def sddmm(binary_op, nnz, num_rows, num_cols,
     edge_mapping = te.placeholder((nnz,), indice_type, 'edge_mapping')
     # placeholder for dense features
     def switch_target(t, s, name):
-        if t == 0:
+        if t == TargetCode.SRC:
             return te.placeholder((num_rows,) + s, feat_type, name)
-        elif t == 1:
+        elif t == TargetCode.EDGE:
             return te.placeholder((nnz,) + s, feat_type, name)
-        elif t == 2:
+        elif t == TargetCode.DST:
             return te.placeholder((num_cols,) + s, feat_type, name)
     lhs = switch_target(lhs_target, lhs_shp, 'lhs')
     rhs = switch_target(rhs_target, rhs_shp, 'rhs')
@@ -176,21 +177,25 @@ def sddmm(binary_op, nnz, num_rows, num_cols,
         def foo(eid, pack=False):
             if pack:
                 return edge_mapping[eid] if use_idx and t == 1 else eid
-            if t == 0:
+            if t == TargetCode.SRC:
                 return adj_row_indices[eid]
-            elif t == 1:
+            elif t == TargetCode.EDGE:
                 return eid
-            elif t == 2:
+            elif t == TargetCode.DST:
                 return adj_col_indices[eid]
         return foo
     # if feature partition, decide whether to apply array packing
     # sorted = 0 means row-sorted, 1 means col-sorted, 2 means not sorted
     lhs_pack = (num_feat_partitions > 1 and not use_bcast) and \
-               ((lhs_target == 0 and is_sorted == 0) or (lhs_target == 2 and is_sorted == 1) or lhs_target == 1)
+               ((lhs_target == TargetCode.SRC and is_sorted == 0) or \
+                (lhs_target == TargetCode.DST and is_sorted == 1) or \
+                lhs_target == TargetCode.EDGE)
     rhs_pack = (num_feat_partitions > 1 and not use_bcast) and \
-               ((rhs_target == 0 and is_sorted == 0) or (rhs_target == 2 and is_sorted == 1) or rhs_target == 1)
+               ((rhs_target == TargetCode.SRC and is_sorted == 0) or \
+                (rhs_target == TargetCode.DST and is_sorted == 1) or \
+                rhs_target == TargetCode.EDGE)
     # compute
-    out, inlines, reshapes = _sddmm_compute((nnz,) + out_shp, binary_op, lhs, rhs, \
+    out, reshapes = _sddmm_compute((nnz,) + out_shp, binary_op, lhs, rhs, \
                                             idx_target(lhs_target), idx_target(rhs_target),
                                             num_feat_partitions, lhs_pack, rhs_pack)
     # schedule
@@ -206,12 +211,12 @@ def sddmm(binary_op, nnz, num_rows, num_cols,
         if num_feat_partitions == 1:
             _sddmm_cpu_general(s, out)
         else:
-            _sddmm_cpu_feat_partition(s, out, binary_op, inlines, reshapes, reduce_size, num_feat_partitions)
+            _sddmm_cpu_feat_partition(s, out, binary_op, reshapes, reduce_size, num_feat_partitions)
     # prepare input
     f_input = []
-    if lhs_target == 0 or rhs_target == 0:
+    if lhs_target == TargetCode.SRC or rhs_target == TargetCode.SRC:
         f_input.append(adj_row_indices)
-    if lhs_target == 2 or rhs_target == 2:
+    if lhs_target == TargetCode.DST or rhs_target == TargetCode.DST:
         f_input.append(adj_col_indices)
     # use_idx should only be set when array packing is applied
     # otherwise mapping should be done outside of tvm
