@@ -6,10 +6,10 @@ from collections import defaultdict
 from functools import wraps
 import numpy as np
 
-from ..base import DGLError, dgl_warning
+from ..base import DGLError, dgl_warning, NID, EID
 from .. import backend as F
 from .. import ndarray as nd
-
+from .._ffi.function import _init_api
 
 class InconsistentDtypeException(DGLError):
     """Exception class for inconsistent dtype between graph and tensor"""
@@ -667,6 +667,11 @@ class FlattenedDict(object):
         group_sizes = {k: len(v) for k, v in groups.items()}
         self._group_keys, self._group_sizes = zip(*group_sizes.items())
         self._group_offsets = np.insert(np.cumsum(self._group_sizes), 0, 0)
+        # TODO: this is faster (37s -> 21s per epoch compared to searchsorted in GCMC) but takes
+        # O(E) memory.
+        self._idx_to_group = np.zeros(self._group_offsets[-1], dtype='int32')
+        for i in range(len(self._groups)):
+            self._idx_to_group[self._group_offsets[i]:self._group_offsets[i + 1]] = i
 
     def __len__(self):
         """Return the total number of items."""
@@ -680,10 +685,11 @@ class FlattenedDict(object):
 
     def __getitem__(self, idx):
         """Return the item at the given position with the key of its original group."""
-        i = np.searchsorted(self._group_offsets, idx, 'right') - 1
+        i = self._idx_to_group[idx]
         k = self._group_keys[i]
         j = idx - self._group_offsets[i]
-        return k, self._groups[k][j]
+        g = self._groups[k]
+        return k, g[j]
 
 def compensate(ids, origin_ids):
     """computing the compensate set of ids from origin_ids
@@ -708,3 +714,189 @@ def compensate(ids, origin_ids):
                          ids,
                          F.full_1d(len(ids), 0, F.dtype(ids), F.context(ids)))
     return F.tensor(F.nonzero_1d(mask), dtype=F.dtype(ids))
+
+def relabel(x):
+    """Relabel the input ids to continuous ids that starts from zero.
+
+    Ids are assigned new ids according to their ascending order.
+
+    Examples
+    --------
+    >>> x = [1, 5, 3, 6]
+    >>> n2o, o2n = build_relabel_map(x)
+    >>> n2o
+    [1, 3, 5, 6]
+    >>> o2n
+    [n/a, 0, n/a, 1, n/a, 2, 3]
+
+    "n/a" will be filled with 0
+
+    Parameters
+    ----------
+    x : Tensor
+        ID tensor.
+
+    Returns
+    -------
+    new_to_old : Tensor
+        The mapping from new id to old id.
+    old_to_new : Tensor
+        The mapping from old id to new id. It is a vector of length MAX(x).
+        One can use advanced indexing to convert an old id tensor to a
+        new id tensor: new_id = old_to_new[old_id]
+    """
+    unique_x = F.unique(x)
+    map_len = F.as_scalar(F.max(unique_x, dim=0)) + 1
+    ctx = F.context(x)
+    dtype = F.dtype(x)
+    old_to_new = F.zeros((map_len,), dtype=dtype, ctx=ctx)
+    old_to_new = F.scatter_row(old_to_new, unique_x,
+                               F.copy_to(F.arange(0, len(unique_x), dtype), ctx))
+    return unique_x, old_to_new
+
+def extract_node_subframes(graph, nodes):
+    """Extract node features of the given nodes from :attr:`graph`
+    and return them in frames.
+
+    Note that this function does not perform actual tensor memory copy but using `Frame.subframe`
+    to get the features. If :attr:`nodes` is None, it performs a shallow copy of the
+    original node frames that only copies the dictionary structure but not the tensor
+    contents.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph to extract features from.
+    nodes : list[Tensor] or None
+        Node IDs. If not None, the list length must be equal to the number of node types
+        in the graph. The returned frames store the node IDs in the ``dgl.NID`` field
+        unless it is None, which means the whole frame is shallow-copied.
+
+    Returns
+    -------
+    list[Frame]
+        Extracted node frames.
+    """
+    if nodes is None:
+        node_frames = [nf.clone() for nf in graph._node_frames]
+    else:
+        node_frames = []
+        for i, ind_nodes in enumerate(nodes):
+            subf = graph._node_frames[i].subframe(ind_nodes)
+            subf[NID] = ind_nodes
+            node_frames.append(subf)
+    return node_frames
+
+def extract_node_subframes_for_block(graph, srcnodes, dstnodes):
+    """Extract the input node features and output node features of the given nodes from
+    :attr:`graph` and return them in frames ready for a block.
+
+    Note that this function does not perform actual tensor memory copy but using `Frame.subframe`
+    to get the features. If :attr:`srcnodes` or :attr:`dstnodes` is None, it performs a
+    shallow copy of the original node frames that only copies the dictionary structure
+    but not the tensor contents.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph to extract features from.
+    srcnodes : list[Tensor]
+        Input node IDs. The list length must be equal to the number of node types
+        in the graph. The returned frames store the node IDs in the ``dgl.NID`` field.
+    dstnodes : list[Tensor]
+        Output node IDs. The list length must be equal to the number of node types
+        in the graph. The returned frames store the node IDs in the ``dgl.NID`` field.
+
+    Returns
+    -------
+    list[Frame]
+        Extracted node frames.
+    """
+    node_frames = []
+    for i, ind_nodes in enumerate(srcnodes):
+        subf = graph._node_frames[i].subframe(ind_nodes)
+        subf[NID] = ind_nodes
+        node_frames.append(subf)
+    for i, ind_nodes in enumerate(dstnodes):
+        subf = graph._node_frames[i].subframe(ind_nodes)
+        subf[NID] = ind_nodes
+        node_frames.append(subf)
+    return node_frames
+
+def extract_edge_subframes(graph, edges):
+    """Extract edge features of the given edges from :attr:`graph`
+    and return them in frames.
+
+    Note that this function does not perform actual tensor memory copy but using `Frame.subframe`
+    to get the features. If :attr:`edges` is None, it performs a shallow copy of the
+    original edge frames that only copies the dictionary structure but not the tensor
+    contents.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph to extract features from.
+    edges : list[Tensor] or None
+        Edge IDs. If not None, the list length must be equal to the number of edge types
+        in the graph. The returned frames store the edge IDs in the ``dgl.NID`` field
+        unless it is None, which means the whole frame is shallow-copied.
+
+    Returns
+    -------
+    list[Frame]
+        Extracted edge frames.
+    """
+    if edges is None:
+        edge_frames = [nf.clone() for nf in graph._edge_frames]
+    else:
+        edge_frames = []
+        for i, ind_edges in enumerate(edges):
+            subf = graph._edge_frames[i].subframe(ind_edges)
+            subf[EID] = ind_edges
+            edge_frames.append(subf)
+    return edge_frames
+
+def set_new_frames(graph, *, node_frames=None, edge_frames=None):
+    """Set the node and edge frames of a given graph to new ones.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph whose node and edge frames are to be updated.
+    node_frames : list[Frame], optional
+        New node frames.
+
+        Default is None, where the node frames are not updated.
+    edge_frames : list[Frame], optional
+        New edge frames
+
+        Default is None, where the edge frames are not updated.
+    """
+    if node_frames is not None:
+        assert len(node_frames) == len(graph.ntypes), \
+            "[BUG] number of node frames different from number of node types"
+        graph._node_frames = node_frames
+    if edge_frames is not None:
+        assert len(edge_frames) == len(graph.etypes), \
+            "[BUG] number of edge frames different from number of edge types"
+        graph._edge_frames = edge_frames
+
+def set_num_threads(num_threads):
+    """Set the number of OMP threads in the process.
+
+    Parameters
+    ----------
+    num_threads : int
+        The number of OMP threads in the process.
+    """
+    _CAPI_DGLSetOMPThreads(num_threads)
+
+def alias_func(func):
+    """Return an alias function with proper docstring."""
+    @wraps(func)
+    def _fn(*args, **kwargs):
+        return func(*args, **kwargs)
+    _fn.__doc__ = """Alias of :func:`dgl.{}`.""".format(func.__name__)
+    return _fn
+
+_init_api("dgl.utils.internal")

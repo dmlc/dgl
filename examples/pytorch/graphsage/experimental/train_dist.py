@@ -12,6 +12,7 @@ from dgl.data import register_data_args, load_data
 from dgl.data.utils import load_graphs
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
+from dgl.distributed import DistDataLoader
 
 import torch as th
 import torch.nn as nn
@@ -21,11 +22,20 @@ import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 from pyinstrument import Profiler
 
+def load_subtensor(g, seeds, input_nodes, device):
+    """
+    Copys features and labels of a set of nodes onto GPU.
+    """
+    batch_inputs = g.ndata['features'][input_nodes].to(device)
+    batch_labels = g.ndata['labels'][seeds].to(device)
+    return batch_inputs, batch_labels
+
 class NeighborSampler(object):
-    def __init__(self, g, fanouts, sample_neighbors):
+    def __init__(self, g, fanouts, sample_neighbors, device):
         self.g = g
         self.fanouts = fanouts
         self.sample_neighbors = sample_neighbors
+        self.device = device
 
     def sample_blocks(self, seeds):
         seeds = th.LongTensor(np.asarray(seeds))
@@ -39,6 +49,12 @@ class NeighborSampler(object):
             seeds = block.srcdata[dgl.NID]
 
             blocks.insert(0, block)
+
+        input_nodes = blocks[0].srcdata[dgl.NID]
+        seeds = blocks[-1].dstdata[dgl.NID]
+        batch_inputs, batch_labels = load_subtensor(self.g, seeds, input_nodes, "cpu")
+        blocks[0].srcdata['features'] = batch_inputs
+        blocks[-1].dstdata['labels'] = batch_labels
         return blocks
 
 class DistSAGE(nn.Module):
@@ -81,26 +97,25 @@ class DistSAGE(nn.Module):
         # TODO: can we standardize this?
         nodes = dgl.distributed.node_split(np.arange(g.number_of_nodes()),
                                            g.get_partition_book(), force_even=True)
-        y = dgl.distributed.DistTensor(g, (g.number_of_nodes(), self.n_hidden), th.float32, 'h',
+        y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_hidden), th.float32, 'h',
                                        persistent=True)
         for l, layer in enumerate(self.layers):
             if l == len(self.layers) - 1:
-                y = dgl.distributed.DistTensor(g, (g.number_of_nodes(), self.n_classes),
+                y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_classes),
                                                th.float32, 'h_last', persistent=True)
 
-            sampler = NeighborSampler(g, [-1], dgl.distributed.sample_neighbors)
+            sampler = NeighborSampler(g, [-1], dgl.distributed.sample_neighbors, device)
             print('|V|={}, eval batch size: {}'.format(g.number_of_nodes(), batch_size))
             # Create PyTorch DataLoader for constructing blocks
-            dataloader = DataLoader(
+            dataloader = DistDataLoader(
                 dataset=nodes,
                 batch_size=batch_size,
                 collate_fn=sampler.sample_blocks,
                 shuffle=False,
-                drop_last=False,
-                num_workers=args.num_workers)
+                drop_last=False)
 
             for blocks in tqdm.tqdm(dataloader):
-                block = blocks[0]
+                block = blocks[0].to(device)
                 input_nodes = block.srcdata[dgl.NID]
                 output_nodes = block.dstdata[dgl.NID]
                 h = x[input_nodes].to(device)
@@ -139,35 +154,30 @@ def evaluate(model, g, inputs, labels, val_nid, test_nid, batch_size, device):
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid]), compute_acc(pred[test_nid], labels[test_nid])
 
-def load_subtensor(g, seeds, input_nodes, device):
-    """
-    Copys features and labels of a set of nodes onto GPU.
-    """
-    batch_inputs = g.ndata['features'][input_nodes].to(device)
-    batch_labels = g.ndata['labels'][seeds].to(device)
-    return batch_inputs, batch_labels
-
 def run(args, device, data):
     # Unpack data
     train_nid, val_nid, test_nid, in_feats, n_classes, g = data
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')],
-                              dgl.distributed.sample_neighbors)
+                              dgl.distributed.sample_neighbors, device)
 
-    # Create PyTorch DataLoader for constructing blocks
-    dataloader = DataLoader(
+    # Create DataLoader for constructing blocks
+    dataloader = DistDataLoader(
         dataset=train_nid.numpy(),
         batch_size=args.batch_size,
         collate_fn=sampler.sample_blocks,
         shuffle=True,
-        drop_last=False,
-        num_workers=args.num_workers)
+        drop_last=False)
 
     # Define model and optimizer
     model = DistSAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
     if not args.standalone:
-        model = th.nn.parallel.DistributedDataParallel(model)
+        if args.num_gpus == -1:
+            model = th.nn.parallel.DistributedDataParallel(model)
+        else:
+            dev_id = g.rank() % args.num_gpus
+            model = th.nn.parallel.DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
     loss_fcn = nn.CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -199,18 +209,14 @@ def run(args, device, data):
 
             # The nodes for input lies at the LHS side of the first block.
             # The nodes for output lies at the RHS side of the last block.
-            input_nodes = blocks[0].srcdata[dgl.NID]
-            seeds = blocks[-1].dstdata[dgl.NID]
-
-            # Load the input features as well as output labels
-            start = time.time()
-            batch_inputs, batch_labels = load_subtensor(g, seeds, input_nodes, device)
-            assert th.all(th.logical_not(th.isnan(batch_labels)))
+            batch_inputs = blocks[0].srcdata['features']
+            batch_labels = blocks[-1].dstdata['labels']
             batch_labels = batch_labels.long()
-            copy_time += time.time() - start
 
             num_seeds += len(blocks[-1].dstdata[dgl.NID])
             num_inputs += len(blocks[0].srcdata[dgl.NID])
+            blocks = [block.to(device) for block in blocks]
+            batch_labels = batch_labels.to(device)
             # Compute loss and prediction
             start = time.time()
             batch_pred = model(blocks, batch_inputs)
@@ -258,14 +264,12 @@ def run(args, device, data):
 
     profiler.stop()
     print(profiler.output_text(unicode=True, color=True))
-    # clean up
-    if not args.standalone:
-        g._client.barrier()
 
 def main(args):
+    dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
-    g = dgl.distributed.DistGraph(args.ip_config, args.graph_name, part_config=args.conf_path)
+    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
     print('rank:', g.rank())
 
     pb = g.get_partition_book()
@@ -277,7 +281,10 @@ def main(args):
         g.rank(), len(train_nid), len(np.intersect1d(train_nid.numpy(), local_nid)),
         len(val_nid), len(np.intersect1d(val_nid.numpy(), local_nid)),
         len(test_nid), len(np.intersect1d(test_nid.numpy(), local_nid))))
-    device = th.device('cpu')
+    if args.num_gpus == -1:
+        device = th.device('cpu')
+    else:
+        device = th.device('cuda:'+str(g.rank() % args.num_gpus))
     labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
     n_classes = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
     print('#labels:', n_classes)
@@ -291,29 +298,32 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
     register_data_args(parser)
-    parser.add_argument('--graph-name', type=str, help='graph name')
+    parser.add_argument('--graph_name', type=str, help='graph name')
     parser.add_argument('--id', type=int, help='the partition id')
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
-    parser.add_argument('--conf_path', type=str, help='The path to the partition config file')
-    parser.add_argument('--num-client', type=int, help='The number of clients')
-    parser.add_argument('--n-classes', type=int, help='the number of classes')
-    parser.add_argument('--gpu', type=int, default=0,
-        help="GPU device ID. Use -1 for CPU training")
-    parser.add_argument('--num-epochs', type=int, default=20)
-    parser.add_argument('--num-hidden', type=int, default=16)
-    parser.add_argument('--num-layers', type=int, default=2)
-    parser.add_argument('--fan-out', type=str, default='10,25')
-    parser.add_argument('--batch-size', type=int, default=1000)
-    parser.add_argument('--batch-size-eval', type=int, default=100000)
-    parser.add_argument('--log-every', type=int, default=20)
-    parser.add_argument('--eval-every', type=int, default=5)
+    parser.add_argument('--part_config', type=str, help='The path to the partition config file')
+    parser.add_argument('--num_clients', type=int, help='The number of clients')
+    parser.add_argument('--num_servers', type=int, default=1, help='The number of servers')
+    parser.add_argument('--n_classes', type=int, help='the number of classes')
+    parser.add_argument('--num_gpus', type=int, default=-1, 
+                        help="the number of GPU device. Use -1 for CPU training")
+    parser.add_argument('--num_epochs', type=int, default=20)
+    parser.add_argument('--num_hidden', type=int, default=16)
+    parser.add_argument('--num_layers', type=int, default=2)
+    parser.add_argument('--fan_out', type=str, default='10,25')
+    parser.add_argument('--batch_size', type=int, default=1000)
+    parser.add_argument('--batch_size_eval', type=int, default=100000)
+    parser.add_argument('--log_every', type=int, default=20)
+    parser.add_argument('--eval_every', type=int, default=5)
     parser.add_argument('--lr', type=float, default=0.003)
     parser.add_argument('--dropout', type=float, default=0.5)
-    parser.add_argument('--num-workers', type=int, default=0,
+    parser.add_argument('--num_workers', type=int, default=4,
         help="Number of sampling processes. Use 0 for no extra process.")
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
     args = parser.parse_args()
+    assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')), \
+    'The num_workers should be the same value with num_samplers.'
 
     print(args)
     main(args)

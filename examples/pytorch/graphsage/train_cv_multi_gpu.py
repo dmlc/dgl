@@ -11,6 +11,7 @@ import time
 import argparse
 import tqdm
 import traceback
+import math
 from _thread import start_new_thread
 from functools import wraps
 from dgl.data import RedditDataset
@@ -261,13 +262,11 @@ def run(proc_id, n_gpus, args, devices, data):
 
     # Unpack data
     train_mask, val_mask, in_feats, labels, n_classes, g = data
-    train_nid = th.LongTensor(np.nonzero(train_mask)[0])
-    val_nid = th.LongTensor(np.nonzero(val_mask)[0])
-    train_mask = th.BoolTensor(train_mask)
-    val_mask = th.BoolTensor(val_mask)
+    train_nid = train_mask.nonzero().squeeze()
+    val_nid = val_mask.nonzero().squeeze()
 
     # Split train_nid
-    train_nid = th.split(train_nid, len(train_nid) // n_gpus)[proc_id]
+    train_nid = th.split(train_nid, math.ceil(len(train_nid) / n_gpus))[proc_id]
 
     # Create sampler
     sampler = NeighborSampler(g, [int(_) for _ in args.fan_out.split(',')])
@@ -385,7 +384,9 @@ if __name__ == '__main__':
     g.ndata['features'] = features.share_memory_()
     create_history_storage(g, args, n_classes)
 
-    g.create_format_()
+    # Create csr/coo/csc formats before launching training processes with multi-gpu.
+    # This avoids creating certain formats in each sub-process, which saves momory and CPU.
+    g.create_formats_()
     # Pack data
     data = train_mask, val_mask, in_feats, labels, n_classes, g
 

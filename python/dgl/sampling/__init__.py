@@ -1,13 +1,10 @@
-"""Sampling operators.
-
-This module contains the implementations of various sampling operators.
+"""The ``dgl.sampling`` package contains operators and utilities for
+sampling from a graph via random walks, neighbor sampling, etc. They
+are typically used together with the ``DataLoader`` s in the
+``dgl.dataloading`` package. The user guide :ref:`guide-minibatch`
+gives a holistic explanation on how different components work together.
 """
+
 from .randomwalks import *
 from .pinsage import *
 from .neighbor import *
-from .dataloader import *
-
-from .. import backend as F
-
-if F.get_preferred_backend() == 'pytorch':
-    from .pytorch import *

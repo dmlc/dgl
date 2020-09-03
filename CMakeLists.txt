@@ -26,6 +26,8 @@ dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
+dgl_option(USE_S3 "Build with S3 support" OFF)
+dgl_option(USE_HDFS "Build with HDFS support" OFF) # Set env HADOOP_HDFS_HOME if needed
 
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
 if (NOT MSVC)
@@ -137,19 +139,21 @@ else(USE_CUDA)
 endif(USE_CUDA)
 
 # For serialization
+if (USE_HDFS)
+  option(DMLC_HDFS_SHARED "dgl has to build with dynamic hdfs library" ON)
+endif()
 add_subdirectory("third_party/dmlc-core")
-# dmlc-core options for support S3/HDFS
-add_definitions(-DUSE_S3=OFF)
-add_definitions(-DUSE_HDFS=OFF)
 list(APPEND DGL_LINKER_LIBS dmlc)
 set(GOOGLE_TEST 0) # Turn off dmlc-core test
 
 # Compile METIS
-set(GKLIB_PATH "${CMAKE_SOURCE_DIR}/third_party/METIS/GKlib")
-include(${GKLIB_PATH}/GKlibSystem.cmake)
-include_directories(${GKLIB_PATH})
-add_subdirectory("third_party/METIS/libmetis/")
-list(APPEND DGL_LINKER_LIBS metis)
+if(NOT MSVC)
+  set(GKLIB_PATH "${CMAKE_SOURCE_DIR}/third_party/METIS/GKlib")
+  include(${GKLIB_PATH}/GKlibSystem.cmake)
+  include_directories(${GKLIB_PATH})
+  add_subdirectory("third_party/METIS/libmetis/")
+  list(APPEND DGL_LINKER_LIBS metis)
+endif(NOT MSVC)
 
 # support PARALLEL_ALGORITHMS
 if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)

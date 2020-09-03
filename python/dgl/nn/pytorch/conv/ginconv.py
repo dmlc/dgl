@@ -8,7 +8,11 @@ from ....utils import expand_as_pair
 
 
 class GINConv(nn.Module):
-    r"""Graph Isomorphism Network layer from paper `How Powerful are Graph
+    r"""
+
+    Description
+    -----------
+    Graph Isomorphism Network layer from paper `How Powerful are Graph
     Neural Networks? <https://arxiv.org/pdf/1810.00826.pdf>`__.
 
     .. math::
@@ -26,7 +30,33 @@ class GINConv(nn.Module):
     init_eps : float, optional
         Initial :math:`\epsilon` value, default: ``0``.
     learn_eps : bool, optional
-        If True, :math:`\epsilon` will be a learnable parameter.
+        If True, :math:`\epsilon` will be a learnable parameter. Default: ``False``.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> from dgl.nn import GINConv
+    >>>
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 10)
+    >>> lin = th.nn.Linear(10, 10)
+    >>> conv = GINConv(lin, 'max')
+    >>> res = conv(g, feat)
+    >>> res
+    tensor([[-0.4821,  0.0207, -0.7665,  0.5721, -0.4682, -0.2134, -0.5236,  1.2855,
+            0.8843, -0.8764],
+            [-0.4821,  0.0207, -0.7665,  0.5721, -0.4682, -0.2134, -0.5236,  1.2855,
+            0.8843, -0.8764],
+            [-0.4821,  0.0207, -0.7665,  0.5721, -0.4682, -0.2134, -0.5236,  1.2855,
+            0.8843, -0.8764],
+            [-0.4821,  0.0207, -0.7665,  0.5721, -0.4682, -0.2134, -0.5236,  1.2855,
+            0.8843, -0.8764],
+            [-0.4821,  0.0207, -0.7665,  0.5721, -0.4682, -0.2134, -0.5236,  1.2855,
+            0.8843, -0.8764],
+            [-0.1804,  0.0758, -0.5159,  0.3569, -0.1408, -0.1395, -0.2387,  0.7773,
+            0.5266, -0.4465]], grad_fn=<AddmmBackward>)
     """
     def __init__(self,
                  apply_func,
@@ -35,6 +65,7 @@ class GINConv(nn.Module):
                  learn_eps=False):
         super(GINConv, self).__init__()
         self.apply_func = apply_func
+        self._aggregator_type = aggregator_type
         if aggregator_type == 'sum':
             self._reducer = fn.sum
         elif aggregator_type == 'max':
@@ -50,7 +81,11 @@ class GINConv(nn.Module):
             self.register_buffer('eps', th.FloatTensor([init_eps]))
 
     def forward(self, graph, feat):
-        r"""Compute Graph Isomorphism Network layer.
+        r"""
+
+        Description
+        -----------
+        Compute Graph Isomorphism Network layer.
 
         Parameters
         ----------

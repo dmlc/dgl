@@ -18,7 +18,6 @@ def toset(x):
     # F.zerocopy_to_numpy may return a int
     return set(F.zerocopy_to_numpy(x).tolist())
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_bfs(idtype, n=100):
     def _bfs_nx(g_nx, src):
@@ -30,7 +29,7 @@ def test_bfs(idtype, n=100):
         for u, v in edges:
             if u in layers_nx[-1]:
                 frontier.add(v)
-                edge_frontier.add(g.edge_ids(u, v))
+                edge_frontier.add(g.edge_ids(int(u), int(v)))
             else:
                 layers_nx.append(frontier)
                 edges_nx.append(edge_frontier)
@@ -43,7 +42,7 @@ def test_bfs(idtype, n=100):
         return layers_nx, edges_nx
 
     a = sp.random(n, n, 3 / n, data_rvs=lambda n: np.ones(n))
-    g = dgl.graph(a).astype(idtype)
+    g = dgl.from_scipy(a).astype(idtype)
 
     g_nx = g.to_networkx()
     src = random.choice(range(n))
@@ -53,23 +52,22 @@ def test_bfs(idtype, n=100):
     assert all(toset(x) == y for x, y in zip(layers_dgl, layers_nx))
 
     g_nx = nx.random_tree(n, seed=42)
-    g = dgl.graph(g_nx).astype(idtype)
+    g = dgl.from_networkx(g_nx).astype(idtype)
     src = 0
     _, edges_nx = _bfs_nx(g_nx, src)
     edges_dgl = dgl.bfs_edges_generator(g, src)
     assert len(edges_dgl) == len(edges_nx)
     assert all(toset(x) == y for x, y in zip(edges_dgl, edges_nx))
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_topological_nodes(idtype, n=100):
     a = sp.random(n, n, 3 / n, data_rvs=lambda n: np.ones(n))
     b = sp.tril(a, -1).tocoo()
-    g = dgl.graph(b).astype(idtype)
+    g = dgl.from_scipy(b).astype(idtype)
 
     layers_dgl = dgl.topological_nodes_generator(g)
 
-    adjmat = g.adjacency_matrix()
+    adjmat = g.adjacency_matrix(transpose=False)
     def tensor_topo_traverse():
         n = g.number_of_nodes()
         mask = F.copy_to(F.ones((n, 1)), F.cpu())
@@ -88,7 +86,6 @@ def test_topological_nodes(idtype, n=100):
     assert all(toset(x) == toset(y) for x, y in zip(layers_dgl, layers_spmv))
 
 DFS_LABEL_NAMES = ['forward', 'reverse', 'nontree']
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_dfs_labeled_edges(idtype, example=False):
     dgl_g = dgl.DGLGraph().astype(idtype)

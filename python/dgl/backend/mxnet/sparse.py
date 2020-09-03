@@ -2,8 +2,10 @@ import mxnet as mx
 import numpy as np
 from mxnet import nd
 from ...sparse import _gspmm, _gsddmm
-from ...base import dgl_warning
+from ...base import dgl_warning, is_all, ALL
 from .tensor import asnumpy, copy_to, zerocopy_from_numpy, context, to_backend_ctx
+
+__all__ = ['gspmm', 'gsddmm', 'edge_softmax']
 
 
 def _scatter_nd(index, src, n_rows):
@@ -103,6 +105,10 @@ def _addsub(op, x):
     return -x if op == 'sub' else x
 
 
+def _expand(x, shape):
+    return x.broadcast_to((x.shape[0], *shape))
+
+
 class GSpMM(mx.autograd.Function):
     def __init__(self, gidx, op, reduce_op):
         super(GSpMM, self).__init__()
@@ -132,7 +138,7 @@ class GSpMM(mx.autograd.Function):
                 if op in ['mul', 'div']:
                     dX = _scatter_nd(
                         argX,
-                        _muldiv(op, _gather_nd(argY, Y.broadcast_to((Y.shape[0], *dZ.shape[1:])))) * dZ,
+                        _muldiv(op, _gather_nd(argY, _expand(Y, dZ.shape[1:]))) * dZ,
                         X.shape[0])
                 elif op in ['add', 'sub', 'copy_lhs']:
                     dX = _scatter_nd(argX, dZ, X.shape[0])
@@ -153,7 +159,7 @@ class GSpMM(mx.autograd.Function):
                 if op in ['mul',  'div']:
                     dY = _scatter_nd(
                         argY,
-                        _gather_nd(argX, X.broadcast_to((X.shape[0], *dZ.shape[1:]))) * dZ,
+                        _gather_nd(argX, _expand(X, dZ.shape[1:])) * dZ,
                         Y.shape[0])
                     if op == 'div':
                         dY = -dY / (Y ** 2)
@@ -169,10 +175,17 @@ class GSpMM(mx.autograd.Function):
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     func = GSpMM(gidx, op, reduce_op)
     ctx = to_backend_ctx(gidx.ctx)
+    # XXX(minjie): There is a bug in MXNet's autograd system when one of the inputs
+    #   does not require gradient. Although it still invokes the backward function,
+    #   it does not set the gradient value to the correct buffer, resulting all the
+    #   input gradients to be zero. Fix this by enforcing all the inputs to require
+    #   gradients.
     if lhs_data is None:
         lhs_data = nd.zeros((1,), ctx=ctx)
+        lhs_data.attach_grad()
     if rhs_data is None:
         rhs_data = nd.zeros((1,), ctx=ctx)
+        rhs_data.attach_grad()
     return func(lhs_data, rhs_data)
 
 
@@ -250,3 +263,62 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     if rhs_data is None:
         rhs_data = nd.zeros((1,), ctx=ctx)
     return func(lhs_data, rhs_data)
+
+
+class EdgeSoftmax(mx.autograd.Function):
+    def __init__(self, gidx, eids, norm_by):
+        super(EdgeSoftmax, self).__init__()
+        if not is_all(eids):
+            gidx = gidx.edge_subgraph(eids.astype(gidx.dtype), True)
+        if norm_by == 'src':
+            gidx = gidx.reverse()
+        self.gidx = gidx
+
+    def forward(self, score):
+        """Forward function.
+
+        Pseudo-code:
+
+        .. code:: python
+
+            score = dgl.EData(g, score)
+            score_max = score.dst_max()  # of type dgl.NData
+            score = score - score_max  # edge_sub_dst, ret dgl.EData
+            score_sum = score.dst_sum()  # of type dgl.NData
+            out = score / score_sum    # edge_div_dst, ret dgl.EData
+            return out.data
+        """
+        gidx = self.gidx
+        score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
+        score = mx.nd.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
+        score_sum = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
+        out = _gsddmm(gidx, 'div', score, score_sum, 'e', 'v')
+        self.save_for_backward(out)
+        return out
+
+    def backward(self, grad_out):
+        """Backward function.
+
+        Pseudo-code:
+
+        .. code:: python
+
+            g, out = ctx.backward_cache
+            grad_out = dgl.EData(g, grad_out)
+            out = dgl.EData(g, out)
+            sds = out * grad_out  # type dgl.EData
+            sds_sum = sds.dst_sum()  # type dgl.NData
+            grad_score = sds - sds * sds_sum  # multiple expressions
+        """
+        out, = self.saved_tensors
+        gidx = self.gidx
+        sds = out * grad_out
+        accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
+        grad_score = sds - gsddmm(gidx, 'mul', out, accum, 'e', 'v')
+        self.save_tensors = None
+        return grad_score
+
+
+def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
+    softmax_op = EdgeSoftmax(gidx, eids, norm_by)
+    return softmax_op(logits)

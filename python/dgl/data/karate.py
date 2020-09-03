@@ -6,7 +6,7 @@ import networkx as nx
 from .. import backend as F
 from .dgl_dataset import DGLDataset
 from .utils import deprecate_property
-from ..convert import graph as dgl_graph
+from ..convert import from_networkx
 
 __all__ = ['KarateClubDataset', 'KarateClub']
 
@@ -15,7 +15,9 @@ class KarateClubDataset(DGLDataset):
     r""" Karate Club dataset for Node Classification
 
     .. deprecated:: 0.5.0
-        `data` is deprecated, it is replaced by:
+
+        - ``data`` is deprecated, it is replaced by:
+
             >>> dataset = KarateClubDataset()
             >>> g = dataset[0]
 
@@ -24,19 +26,20 @@ class KarateClubDataset(DGLDataset):
     Model for Conflict and Fission in Small Groups" by Wayne W. Zachary.
     The network became a popular example of community structure in
     networks after its use by Michelle Girvan and Mark Newman in 2002.
-    Official website: http://konect.cc/networks/ucidata-zachary/
+    Official website: `<http://konect.cc/networks/ucidata-zachary/>`_
 
     Karate Club dataset statistics:
-    Nodes: 34
-    Edges: 156
-    Number of Classes: 2
+
+    - Nodes: 34
+    - Edges: 156
+    - Number of Classes: 2
 
     Attributes
     ----------
     num_classes : int
         Number of node classes
     data : list
-        A list of DGLGraph objects
+        A list of :class:`dgl.DGLGraph` objects
 
     Examples
     --------
@@ -53,7 +56,7 @@ class KarateClubDataset(DGLDataset):
         label = np.asarray(
             [kc_graph.nodes[i]['club'] != 'Mr. Hi' for i in kc_graph.nodes]).astype(np.int64)
         label = F.tensor(label)
-        g = dgl_graph(kc_graph)
+        g = from_networkx(kc_graph)
         g.ndata['label'] = label
         self._graph = g
         self._data = [g]
@@ -78,9 +81,11 @@ class KarateClubDataset(DGLDataset):
 
         Returns
         -------
-        dgl.DGLGraph
+        :class:`dgl.DGLGraph`
+
             graph structure and labels.
-            - ndata['label']: ground truth labels
+
+            - ``ndata['label']``: ground truth labels
         """
         assert idx == 0, "This dataset has only one graph"
         return self._graph

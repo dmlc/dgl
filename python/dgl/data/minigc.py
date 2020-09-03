@@ -6,23 +6,24 @@ import numpy as np
 from .dgl_dataset import DGLDataset
 from .utils import save_graphs, load_graphs, makedirs
 from .. import backend as F
-from ..convert import graph as dgl_graph
+from ..convert import from_networkx
 from ..transform import add_self_loop
 
 __all__ = ['MiniGCDataset']
 
 class MiniGCDataset(DGLDataset):
-    """The dataset class.
+    """The synthetic graph classification dataset class.
 
     The datset contains 8 different types of graphs.
-    * class 0 : cycle graph
-    * class 1 : star graph
-    * class 2 : wheel graph
-    * class 3 : lollipop graph
-    * class 4 : hypercube graph
-    * class 5 : grid graph
-    * class 6 : clique graph
-    * class 7 : circular ladder graph
+
+    - class 0 : cycle graph
+    - class 1 : star graph
+    - class 2 : wheel graph
+    - class 3 : lollipop graph
+    - class 4 : hypercube graph
+    - class 5 : grid graph
+    - class 6 : clique graph
+    - class 7 : circular ladder graph
 
     Parameters
     ----------
@@ -50,7 +51,7 @@ class MiniGCDataset(DGLDataset):
     --------
     >>> data = MiniGCDataset(100, 16, 32, seed=0)
 
-    **The dataset instance is an iterable**
+    The dataset instance is an iterable
 
     >>> len(data)
     100
@@ -62,7 +63,7 @@ class MiniGCDataset(DGLDataset):
     >>> label
     tensor(5)
 
-    **Batch the graphs and labels for mini-batch training**
+    Batch the graphs and labels for mini-batch training
 
     >>> graphs, labels = zip(*[data[i] for i in range(16)])
     >>> batched_graphs = dgl.batch(graphs)
@@ -96,13 +97,15 @@ class MiniGCDataset(DGLDataset):
 
     def __getitem__(self, idx):
         """Get the idx-th sample.
-        Paramters
+
+        Parameters
         ---------
         idx : int
             The sample index.
+
         Returns
         -------
-        (dgl.Graph, int)
+        (:class:`dgl.Graph`, Tensor)
             The graph and its label.
         """
         return self.graphs[idx], self.labels[idx]
@@ -143,8 +146,8 @@ class MiniGCDataset(DGLDataset):
         self._gen_circular_ladder(self.num_graphs - len(self.graphs))
         # preprocess
         for i in range(self.num_graphs):
-            # convert to Graph, and add self loops
-            self.graphs[i] = add_self_loop(dgl_graph(self.graphs[i]))
+            # convert to DGLGraph, and add self loops
+            self.graphs[i] = add_self_loop(from_networkx(self.graphs[i]))
         self.labels = F.tensor(np.array(self.labels).astype(np.int))
 
     def _gen_cycle(self, n):

@@ -1,4 +1,7 @@
-"""Data related package."""
+"""The ``dgl.data`` package contains datasets hosted by DGL and also utilities
+for downloading, processing, saving and loading data from external resources.
+"""
+
 from __future__ import absolute_import
 
 from . import citation_graph as citegrh
@@ -20,6 +23,8 @@ from .icews18 import ICEWS18, ICEWS18Dataset
 from .qm7b import QM7b, QM7bDataset
 from .dgl_dataset import DGLDataset, DGLBuiltinDataset
 from .citation_graph import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
+from .knowledge_graph import FB15k237Dataset, FB15kDataset, WN18Dataset
+from .rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 
 
 def register_data_args(parser):

@@ -118,10 +118,12 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
 
         Returns
         -------
-        dgl.DGLGraph
-            graph structure, node features and node labels
-            - ndata['feat']: node features
-            - ndata['label']: node labels
+        :class:`dgl.DGLGraph`
+
+            The graph contains:
+
+            - ``ndata['feat']``: node features
+            - ``ndata['label']``: node labels
         """
         assert idx == 0, "This dataset has only one graph"
         return self._graph
@@ -135,7 +137,9 @@ class CoraFullDataset(GNNBenchmarkDataset):
     r"""CORA-Full dataset for node classification task.
 
     .. deprecated:: 0.5.0
-        `data` is deprecated, it is repalced by:
+
+        - ``data`` is deprecated, it is repalced by:
+
         >>> dataset = CoraFullDataset()
         >>> graph = dataset[0]
 
@@ -143,14 +147,14 @@ class CoraFullDataset(GNNBenchmarkDataset):
     Unsupervised Inductive Learning via Ranking`.
     Nodes represent paper and edges represent citations.
 
-    Reference: https://github.com/shchur/gnn-benchmark#datasets
+    Reference: `<https://github.com/shchur/gnn-benchmark#datasets>`_
 
-    Statistics
-    ----------
-    Nodes: 19,793
-    Edges: 130,622
-    Number of Classes: 70
-    Node feature size: 8,710
+    Statistics:
+
+    - Nodes: 19,793
+    - Edges: 130,622
+    - Number of Classes: 70
+    - Node feature size: 8,710
 
     Parameters
     ----------
@@ -185,7 +189,12 @@ class CoraFullDataset(GNNBenchmarkDataset):
 
     @property
     def num_classes(self):
-        """Number of classes."""
+        """Number of classes.
+
+        Return
+        -------
+        int
+        """
         return 70
 
 
@@ -193,7 +202,9 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
     r""" 'Computer Science (CS)' part of the Coauthor dataset for node classification task.
 
     .. deprecated:: 0.5.0
-        `data` is deprecated, it is repalced by:
+
+        - ``data`` is deprecated, it is repalced by:
+
         >>> dataset = CoauthorCSDataset()
         >>> graph = dataset[0]
 
@@ -202,14 +213,14 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
     co-authored a paper; node features represent paper keywords for each author’s papers, and class
     labels indicate most active fields of study for each author.
 
-    Reference: https://github.com/shchur/gnn-benchmark#datasets
+    Reference: `<https://github.com/shchur/gnn-benchmark#datasets>`_
 
-    Statistics
-    ----------
-    Nodes: 18,333
-    Edges: 327,576
-    Number of classes: 15
-    Node feature size: 6,805
+    Statistics:
+
+    - Nodes: 18,333
+    - Edges: 327,576
+    - Number of classes: 15
+    - Node feature size: 6,805
 
     Parameters
     ----------
@@ -244,7 +255,12 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
 
     @property
     def num_classes(self):
-        """Number of classes."""
+        """Number of classes.
+
+        Return
+        -------
+        int
+        """
         return 15
 
 
@@ -252,7 +268,9 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
     r""" 'Physics' part of the Coauthor dataset for node classification task.
 
     .. deprecated:: 0.5.0
-        `data` is deprecated, it is repalced by:
+
+        - ``data`` is deprecated, it is repalced by:
+
         >>> dataset = CoauthorPhysicsDataset()
         >>> graph = dataset[0]
 
@@ -261,14 +279,14 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
     co-authored a paper; node features represent paper keywords for each author’s papers, and class
     labels indicate most active fields of study for each author.
 
-    Reference: https://github.com/shchur/gnn-benchmark#datasets
+    Reference: `<https://github.com/shchur/gnn-benchmark#datasets>`_
 
     Statistics
-    ----------
-    Nodes: 34,493
-    Edges: 991,848
-    Number of classes: 5
-    Node feature size: 8,415
+
+    - Nodes: 34,493
+    - Edges: 991,848
+    - Number of classes: 5
+    - Node feature size: 8,415
 
     Parameters
     ----------
@@ -303,7 +321,12 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
 
     @property
     def num_classes(self):
-        """Number of classes."""
+        """Number of classes.
+
+        Return
+        -------
+        int
+        """
         return 5
 
 
@@ -311,7 +334,9 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
     r""" 'Computer' part of the AmazonCoBuy dataset for node classification task.
 
     .. deprecated:: 0.5.0
-        `data` is deprecated, it is repalced by:
+
+        - ``data`` is deprecated, it is repalced by:
+
         >>> dataset = AmazonCoBuyComputerDataset()
         >>> graph = dataset[0]
 
@@ -319,14 +344,14 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
     where nodes represent goods, edges indicate that two goods are frequently bought together, node
     features are bag-of-words encoded product reviews, and class labels are given by the product category.
 
-    Reference: https://github.com/shchur/gnn-benchmark#datasets
+    Reference: `<https://github.com/shchur/gnn-benchmark#datasets>`_
 
-    Statistics
-    ----------
-    Nodes: 13,752
-    Edges: 574,418
-    Number of classes: 5
-    Node feature size: 767
+    Statistics:
+
+    - Nodes: 13,752
+    - Edges: 574,418
+    - Number of classes: 5
+    - Node feature size: 767
 
     Parameters
     ----------
@@ -361,7 +386,12 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
 
     @property
     def num_classes(self):
-        """Number of classes."""
+        """Number of classes.
+
+        Return
+        -------
+        int
+        """
         return 5
 
 
@@ -369,7 +399,9 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
     r"""AmazonCoBuy dataset for node classification task.
 
     .. deprecated:: 0.5.0
-        `data` is deprecated, it is repalced by:
+
+        - ``data`` is deprecated, it is repalced by:
+
         >>> dataset = AmazonCoBuyPhotoDataset()
         >>> graph = dataset[0]
 
@@ -377,14 +409,14 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
     where nodes represent goods, edges indicate that two goods are frequently bought together, node
     features are bag-of-words encoded product reviews, and class labels are given by the product category.
 
-    Reference: https://github.com/shchur/gnn-benchmark#datasets
+    Reference: `<https://github.com/shchur/gnn-benchmark#datasets>`_
 
     Statistics
-    ----------
-    Nodes: 7,650
-    Edges: 287,326
-    Number of classes: 5
-    Node feature size: 745
+
+    - Nodes: 7,650
+    - Edges: 287,326
+    - Number of classes: 5
+    - Node feature size: 745
 
     Parameters
     ----------
@@ -419,7 +451,12 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
 
     @property
     def num_classes(self):
-        """Number of classes."""
+        """Number of classes.
+
+        Return
+        -------
+        int
+        """
         return 5
 
 

@@ -14,13 +14,13 @@ class DGLDataset(object):
     The following steps will are executed automatically:
 
       1. Check whether there is a dataset cache on disk
-      (already processed and stored on the disk) by
-      invoking ``has_cache()``. If true, goto 5.
+         (already processed and stored on the disk) by
+         invoking ``has_cache()``. If true, goto 5.
       2. Call ``download()`` to download the data.
       3. Call ``process()`` to process the data.
       4. Call ``save()`` to save the processed dataset on disk and goto 6.
       5. Call ``load()`` to load the processed dataset from disk.
-      6. Done
+      6. Done.
 
     Users can overwite these functions with their
     own data processing logic.
@@ -43,11 +43,31 @@ class DGLDataset(object):
         A tuple of values as the input for the hash function.
         Users can distinguish instances (and their caches on the disk)
         from the same dataset class by comparing the hash values.
-        Default: (), the corresponding hash value is 'f9065fa7'.
+        Default: (), the corresponding hash value is ``'f9065fa7'``.
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
         Whether to print out progress information
+
+    Attributes
+    ----------
+    url : str
+        The URL to download the dataset
+    name : str
+        The dataset name
+    raw_dir : str
+        Raw file directory contains the input data folder
+    raw_path : str
+        Directory contains the input data files.
+        Default : ``os.path.join(self.raw_dir, self.name)``
+    save_dir : str
+        Directory to save the processed dataset
+    save_path : str
+        File path to save the processed dataset
+    verbose : bool
+        Whether to print information
+    hash : str
+        Hash value for the dataset and the setting.
     """
     def __init__(self, name, url=None, raw_dir=None, save_dir=None,
                  hash_key=(), force_reload=False, verbose=False):
@@ -75,7 +95,7 @@ class DGLDataset(object):
 
         It is recommended to download the to the :obj:`self.raw_dir`
         folder. Can be ignored if the dataset is
-        already in self.raw_dir
+        already in :obj:`self.raw_dir`.
         """
         pass
 
@@ -83,9 +103,9 @@ class DGLDataset(object):
         r"""Overwite to realize your own logic of
         saving the processed dataset into files.
 
-        It is recommended to use dgl.utils.data.save_graphs
+        It is recommended to use ``dgl.utils.data.save_graphs``
         to save dgl graph into files and use
-        dgl.utils.data.save_info to save extra
+        ``dgl.utils.data.save_info`` to save extra
         information into files.
         """
         pass
@@ -94,9 +114,9 @@ class DGLDataset(object):
         r"""Overwite to realize your own logic of
         loading the saved dataset from files.
 
-        It is recommended to use dgl.utils.data.load_graphs
+        It is recommended to use ``dgl.utils.data.load_graphs``
         to load dgl graph from files and use
-        dgl.utils.data.load_info to load extra information
+        ``dgl.utils.data.load_info`` to load extra information
         into python dict object.
         """
         pass
@@ -116,9 +136,9 @@ class DGLDataset(object):
 
     @retry_method_with_fix(download)
     def _download(self):
-        r"""Download dataset by calling self.download() if the dataset does not exists under self.raw_path.
-            By default self.raw_path = os.path.join(self.raw_dir, self.name)
-            One can overwrite raw_path() function to change the path.
+        r"""Download dataset by calling ``self.download()`` if the dataset does not exists under ``self.raw_path``.
+            By default ``self.raw_path = os.path.join(self.raw_dir, self.name)``
+            One can overwrite ``raw_path()`` function to change the path.
         """
         if os.path.exists(self.raw_path):  # pragma: no cover
             return
@@ -185,13 +205,13 @@ class DGLDataset(object):
 
     @property
     def raw_dir(self):
-        r"""Raw file directory contains the input data directory.
+        r"""Raw file directory contains the input data folder.
         """
         return self._raw_dir
 
     @property
     def raw_path(self):
-        r"""File directory contains the input data.
+        r"""Directory contains the input data files.
             By default raw_path = os.path.join(self.raw_dir, self.name)
         """
         return os.path.join(self.raw_dir, self.name)
@@ -216,7 +236,7 @@ class DGLDataset(object):
 
     @property
     def hash(self):
-        r"""Hash value for the dataset.
+        r"""Hash value for the dataset and the setting.
         """
         return self._hash
 
@@ -235,6 +255,7 @@ class DGLBuiltinDataset(DGLDataset):
     r"""The Basic DGL Builtin Dataset.
 
     Parameters
+    ----------
     name : str
         Name of the dataset.
     url : str

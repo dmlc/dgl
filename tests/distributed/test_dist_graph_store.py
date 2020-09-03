@@ -51,10 +51,10 @@ def get_local_usable_addr():
 
 def create_random_graph(n):
     arr = (spsp.random(n, n, density=0.001, format='coo', random_state=100) != 0).astype(np.int64)
-    return dgl.graph(arr)
+    return dgl.from_scipy(arr)
 
-def run_server(graph_name, server_id, num_clients, shared_mem):
-    g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients,
+def run_server(graph_name, server_id, server_count, num_clients, shared_mem):
+    g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients, server_count,
                         '/tmp/dist_graph/{}.json'.format(graph_name),
                         disable_shared_mem=not shared_mem)
     print('start server', server_id)
@@ -66,11 +66,12 @@ def emb_init(shape, dtype):
 def rand_init(shape, dtype):
     return F.tensor(np.random.normal(size=shape), F.float32)
 
-def run_client(graph_name, part_id, num_clients, num_nodes, num_edges):
+def run_client(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
     time.sleep(5)
+    dgl.distributed.initialize("kv_ip_config.txt", server_count)
     gpb, graph_name = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                                           part_id, None)
-    g = DistGraph("kv_ip_config.txt", graph_name, gpb=gpb)
+    g = DistGraph(graph_name, gpb=gpb)
     check_dist_graph(g, num_clients, num_nodes, num_edges)
 
 def check_dist_graph(g, num_clients, num_nodes, num_edges):
@@ -92,34 +93,42 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
 
     # Test init node data
     new_shape = (g.number_of_nodes(), 2)
-    g.ndata['test1'] = dgl.distributed.DistTensor(g, new_shape, F.int32)
+    g.ndata['test1'] = dgl.distributed.DistTensor(new_shape, F.int32)
     feats = g.ndata['test1'][nids]
     assert np.all(F.asnumpy(feats) == 0)
 
     # reference to a one that exists
-    test2 = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test2', init_func=rand_init)
-    test3 = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test2')
+    test2 = dgl.distributed.DistTensor(new_shape, F.float32, 'test2', init_func=rand_init)
+    test3 = dgl.distributed.DistTensor(new_shape, F.float32, 'test2')
     assert np.all(F.asnumpy(test2[nids]) == F.asnumpy(test3[nids]))
 
     # create a tensor and destroy a tensor and create it again.
-    test3 = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test3', init_func=rand_init)
+    test3 = dgl.distributed.DistTensor(new_shape, F.float32, 'test3', init_func=rand_init)
     del test3
-    test3 = dgl.distributed.DistTensor(g, (g.number_of_nodes(), 3), F.float32, 'test3')
+    test3 = dgl.distributed.DistTensor((g.number_of_nodes(), 3), F.float32, 'test3')
     del test3
 
+    # add tests for anonymous distributed tensor.
+    test3 = dgl.distributed.DistTensor(new_shape, F.float32, init_func=rand_init)
+    data = test3[0:10]
+    test4 = dgl.distributed.DistTensor(new_shape, F.float32, init_func=rand_init)
+    del test3
+    test5 = dgl.distributed.DistTensor(new_shape, F.float32, init_func=rand_init)
+    assert np.sum(F.asnumpy(test5[0:10] != data)) > 0
+
     # test a persistent tesnor
-    test4 = dgl.distributed.DistTensor(g, new_shape, F.float32, 'test4', init_func=rand_init,
+    test4 = dgl.distributed.DistTensor(new_shape, F.float32, 'test4', init_func=rand_init,
                                        persistent=True)
     del test4
     try:
-        test4 = dgl.distributed.DistTensor(g, (g.number_of_nodes(), 3), F.float32, 'test4')
+        test4 = dgl.distributed.DistTensor((g.number_of_nodes(), 3), F.float32, 'test4')
         raise Exception('')
     except:
         pass
 
     # Test sparse emb
     try:
-        emb = DistEmbedding(g, g.number_of_nodes(), 1, 'emb1', emb_init)
+        emb = DistEmbedding(g.number_of_nodes(), 1, 'emb1', emb_init)
         lr = 0.001
         optimizer = SparseAdagrad([emb], lr=lr)
         with F.record_grad():
@@ -136,12 +145,13 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
         assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
 
         policy = dgl.distributed.PartitionPolicy('node', g.get_partition_book())
-        grad_sum = dgl.distributed.DistTensor(g, (g.number_of_nodes(),), F.float32,
+        grad_sum = dgl.distributed.DistTensor((g.number_of_nodes(),), F.float32,
                                               'emb1_sum', policy)
-        assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)) * num_clients)
+        if num_clients == 1:
+            assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)) * num_clients)
         assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
 
-        emb = DistEmbedding(g, g.number_of_nodes(), 1, 'emb2', emb_init)
+        emb = DistEmbedding(g.number_of_nodes(), 1, 'emb2', emb_init)
         with F.no_grad():
             feats1 = emb(nids)
         assert np.all(F.asnumpy(feats1) == 0)
@@ -191,7 +201,7 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
     print('end')
 
 def check_server_client(shared_mem, num_servers, num_clients):
-    prepare_dist(num_servers)
+    prepare_dist()
     g = create_random_graph(10000)
 
     # Partition the graph
@@ -206,7 +216,7 @@ def check_server_client(shared_mem, num_servers, num_clients):
     serv_ps = []
     ctx = mp.get_context('spawn')
     for serv_id in range(num_servers):
-        p = ctx.Process(target=run_server, args=(graph_name, serv_id,
+        p = ctx.Process(target=run_server, args=(graph_name, serv_id, num_servers,
                                                  num_clients, shared_mem))
         serv_ps.append(p)
         p.start()
@@ -214,7 +224,7 @@ def check_server_client(shared_mem, num_servers, num_clients):
     cli_ps = []
     for cli_id in range(num_clients):
         print('start client', cli_id)
-        p = ctx.Process(target=run_client, args=(graph_name, 0, num_clients, g.number_of_nodes(),
+        p = ctx.Process(target=run_client, args=(graph_name, 0, num_servers, num_clients, g.number_of_nodes(),
                                                  g.number_of_edges()))
         p.start()
         cli_ps.append(p)
@@ -227,6 +237,7 @@ def check_server_client(shared_mem, num_servers, num_clients):
 
     print('clients have terminated')
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_server_client():
     os.environ['DGL_DIST_MODE'] = 'distributed'
@@ -238,6 +249,7 @@ def test_server_client():
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_standalone():
     os.environ['DGL_DIST_MODE'] = 'standalone'
+
     g = create_random_graph(10000)
     # Partition the graph
     num_parts = 1
@@ -245,10 +257,16 @@ def test_standalone():
     g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
     g.edata['features'] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
     partition_graph(g, graph_name, num_parts, '/tmp/dist_graph')
-    dist_g = DistGraph("kv_ip_config.txt", graph_name,
-                       part_config='/tmp/dist_graph/{}.json'.format(graph_name))
-    check_dist_graph(dist_g, 1, g.number_of_nodes(), g.number_of_edges())
 
+    dgl.distributed.initialize("kv_ip_config.txt")
+    dist_g = DistGraph(graph_name, part_config='/tmp/dist_graph/{}.json'.format(graph_name))
+    try:
+        check_dist_graph(dist_g, 1, g.number_of_nodes(), g.number_of_edges())
+    except Exception as e:
+        print(e)
+    dgl.distributed.exit_client() # this is needed since there's two test here in one process
+
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_split():
     #prepare_dist()
     g = create_random_graph(10000)
@@ -260,8 +278,17 @@ def test_split():
     edge_mask = np.random.randint(0, 100, size=g.number_of_edges()) > 30
     selected_nodes = np.nonzero(node_mask)[0]
     selected_edges = np.nonzero(edge_mask)[0]
+
+    # The code now collects the roles of all client processes and use the information
+    # to determine how to split the workloads. Here is to simulate the multi-client
+    # use case.
+    def set_roles(num_clients):
+        dgl.distributed.role.CUR_ROLE = 'default'
+        dgl.distributed.role.GLOBAL_RANK = {i:i for i in range(num_clients)}
+        dgl.distributed.role.PER_ROLE_RANK['default'] = {i:i for i in range(num_clients)}
+
     for i in range(num_parts):
-        dgl.distributed.set_num_client(num_parts)
+        set_roles(num_parts)
         part_g, node_feats, edge_feats, gpb, _ = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
         local_nids = F.nonzero_1d(part_g.ndata['inner_node'])
         local_nids = F.gather_row(part_g.ndata[dgl.NID], local_nids)
@@ -272,13 +299,13 @@ def test_split():
         for n in nodes1:
             assert n in local_nids
 
-        dgl.distributed.set_num_client(num_parts * 2)
+        set_roles(num_parts * 2)
         nodes3 = node_split(node_mask, gpb, i * 2, force_even=False)
         nodes4 = node_split(node_mask, gpb, i * 2 + 1, force_even=False)
         nodes5 = F.cat([nodes3, nodes4], 0)
         assert np.all(np.sort(nodes1) == np.sort(F.asnumpy(nodes5)))
 
-        dgl.distributed.set_num_client(num_parts)
+        set_roles(num_parts)
         local_eids = F.nonzero_1d(part_g.edata['inner_edge'])
         local_eids = F.gather_row(part_g.edata[dgl.EID], local_eids)
         edges1 = np.intersect1d(selected_edges, F.asnumpy(local_eids))
@@ -288,12 +315,13 @@ def test_split():
         for e in edges1:
             assert e in local_eids
 
-        dgl.distributed.set_num_client(num_parts * 2)
+        set_roles(num_parts * 2)
         edges3 = edge_split(edge_mask, gpb, i * 2, force_even=False)
         edges4 = edge_split(edge_mask, gpb, i * 2 + 1, force_even=False)
         edges5 = F.cat([edges3, edges4], 0)
         assert np.all(np.sort(edges1) == np.sort(F.asnumpy(edges5)))
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_split_even():
     #prepare_dist(1)
     g = create_random_graph(10000)
@@ -309,8 +337,17 @@ def test_split_even():
     all_nodes2 = []
     all_edges1 = []
     all_edges2 = []
+
+    # The code now collects the roles of all client processes and use the information
+    # to determine how to split the workloads. Here is to simulate the multi-client
+    # use case.
+    def set_roles(num_clients):
+        dgl.distributed.role.CUR_ROLE = 'default'
+        dgl.distributed.role.GLOBAL_RANK = {i:i for i in range(num_clients)}
+        dgl.distributed.role.PER_ROLE_RANK['default'] = {i:i for i in range(num_clients)}
+
     for i in range(num_parts):
-        dgl.distributed.set_num_client(num_parts)
+        set_roles(num_parts)
         part_g, node_feats, edge_feats, gpb, _ = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
         local_nids = F.nonzero_1d(part_g.ndata['inner_node'])
         local_nids = F.gather_row(part_g.ndata[dgl.NID], local_nids)
@@ -319,7 +356,7 @@ def test_split_even():
         subset = np.intersect1d(F.asnumpy(nodes), F.asnumpy(local_nids))
         print('part {} get {} nodes and {} are in the partition'.format(i, len(nodes), len(subset)))
 
-        dgl.distributed.set_num_client(num_parts * 2)
+        set_roles(num_parts * 2)
         nodes1 = node_split(node_mask, gpb, i * 2, force_even=True)
         nodes2 = node_split(node_mask, gpb, i * 2 + 1, force_even=True)
         nodes3 = F.cat([nodes1, nodes2], 0)
@@ -327,7 +364,7 @@ def test_split_even():
         subset = np.intersect1d(F.asnumpy(nodes), F.asnumpy(nodes3))
         print('intersection has', len(subset))
 
-        dgl.distributed.set_num_client(num_parts)
+        set_roles(num_parts)
         local_eids = F.nonzero_1d(part_g.edata['inner_edge'])
         local_eids = F.gather_row(part_g.edata[dgl.EID], local_eids)
         edges = edge_split(edge_mask, gpb, i, force_even=True)
@@ -335,7 +372,7 @@ def test_split_even():
         subset = np.intersect1d(F.asnumpy(edges), F.asnumpy(local_eids))
         print('part {} get {} edges and {} are in the partition'.format(i, len(edges), len(subset)))
 
-        dgl.distributed.set_num_client(num_parts * 2)
+        set_roles(num_parts * 2)
         edges1 = edge_split(edge_mask, gpb, i * 2, force_even=True)
         edges2 = edge_split(edge_mask, gpb, i * 2 + 1, force_even=True)
         edges3 = F.cat([edges1, edges2], 0)
@@ -353,10 +390,10 @@ def test_split_even():
     assert np.all(all_nodes == F.asnumpy(all_nodes2))
     assert np.all(all_edges == F.asnumpy(all_edges2))
 
-def prepare_dist(num_servers):
+def prepare_dist():
     ip_config = open("kv_ip_config.txt", "w")
     ip_addr = get_local_usable_addr()
-    ip_config.write('{} {}\n'.format(ip_addr, num_servers))
+    ip_config.write('{}\n'.format(ip_addr))
     ip_config.close()
 
 if __name__ == '__main__':

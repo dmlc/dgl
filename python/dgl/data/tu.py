@@ -16,17 +16,18 @@ class LegacyTUDataset(DGLBuiltinDataset):
     Parameters
     ----------
     name : str
-        Dataset Name, such as `ENZYMES`, `DD`, `COLLAB`
+        Dataset Name, such as ``ENZYMES``, ``DD``, ``COLLAB``, ``MUTAG``, can be the 
+        datasets name on `<https://chrsmrrs.github.io/datasets/docs/datasets/>`_.
     use_pandas : bool
         Numpy's file read function has performance issue when file is large,
         using pandas can be faster.
         Default: False
     hidden_size : int
         Some dataset doesn't contain features.
-        Use constant node features initialization instead, with hidden size as `hidden_size`.
+        Use constant node features initialization instead, with hidden size as ``hidden_size``.
         Default : 10
     max_allow_node : int
-        Remove graphs that contains more nodes than `max_allow_node`.
+        Remove graphs that contains more nodes than ``max_allow_node``.
         Default : None
 
     Attributes
@@ -40,7 +41,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
     --------
     >>> data = LegacyTUDataset('DD')
 
-    **The dataset instance is an iterable**
+    The dataset instance is an iterable
 
     >>> len(data)
     1178
@@ -52,7 +53,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
     >>> label
     tensor(1)
 
-    **Batch the graphs and labels for mini-batch training*
+    Batch the graphs and labels for mini-batch training
 
     >>> graphs, labels = zip(*[data[i] for i in range(16)])
     >>> batched_graphs = dgl.batch(graphs)
@@ -78,7 +79,6 @@ class LegacyTUDataset(DGLBuiltinDataset):
         self.hidden_size = hidden_size
         self.max_allow_node = max_allow_node
         self.use_pandas = use_pandas
-        self.hash = abs(hash((name, use_pandas, hidden_size, max_allow_node)))
         super(LegacyTUDataset, self).__init__(name=name, url=url, raw_dir=raw_dir,
                                               hash_key=(name, use_pandas, hidden_size, max_allow_node),
                                               force_reload=force_reload, verbose=verbose)
@@ -99,7 +99,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
         DS_graph_labels = self._idx_from_zero(
             np.genfromtxt(self._file_path("graph_labels"), dtype=int))
 
-        g = dgl_graph([])
+        g = dgl_graph(([], []))
         g.add_nodes(int(DS_edge_list.max()) + 1)
         g.add_edges(DS_edge_list[:, 0], DS_edge_list[:, 1])
 
@@ -190,20 +190,23 @@ class LegacyTUDataset(DGLBuiltinDataset):
 
     def __getitem__(self, idx):
         """Get the idx-th sample.
-        Paramters
+
+        Parameters
         ---------
         idx : int
             The sample index.
+
         Returns
         -------
-        (dgl.Graph, int)
-            Graph with node feature stored in `feat` field and node label in `node_label` if available.
+        (:class:`dgl.DGLGraph`, Tensor)
+            Graph with node feature stored in ``feat`` field and node label in ``node_label`` if available.
             And its label.
         """
         g = self.graph_lists[idx]
         return g, self.graph_labels[idx]
 
     def __len__(self):
+        """Return the number of graphs in the dataset."""
         return len(self.graph_lists)
 
     def _file_path(self, category):
@@ -234,8 +237,8 @@ class TUDataset(DGLBuiltinDataset):
     Parameters
     ----------
     name : str
-        Dataset Name, such as `ENZYMES`, `DD`, `COLLAB`, `MUTAG`, can be the 
-        datasets name on https://ls11-www.cs.tu-dortmund.de/staff/morris/graphkerneldatasets.
+        Dataset Name, such as ``ENZYMES``, ``DD``, ``COLLAB``, ``MUTAG``, can be the 
+        datasets name on `<https://chrsmrrs.github.io/datasets/docs/datasets/>`_.
 
     Attributes
     ----------
@@ -248,7 +251,7 @@ class TUDataset(DGLBuiltinDataset):
     --------
     >>> data = TUDataset('DD')
 
-    **The dataset instance is an iterable**
+    The dataset instance is an iterable
 
     >>> len(data)
     188
@@ -260,7 +263,7 @@ class TUDataset(DGLBuiltinDataset):
     >>> label
     tensor([1])
 
-    **Batch the graphs and labels for mini-batch training*
+    Batch the graphs and labels for mini-batch training
 
     >>> graphs, labels = zip(*[data[i] for i in range(16)])
     >>> batched_graphs = dgl.batch(graphs)
@@ -292,7 +295,7 @@ class TUDataset(DGLBuiltinDataset):
         DS_graph_labels = self._idx_from_zero(
             loadtxt(self._file_path("graph_labels"), delimiter=",").astype(int))
 
-        g = dgl_graph([])
+        g = dgl_graph(([], []))
         g.add_nodes(int(DS_edge_list.max()) + 1)
         g.add_edges(DS_edge_list[:, 0], DS_edge_list[:, 1])
 
@@ -355,20 +358,23 @@ class TUDataset(DGLBuiltinDataset):
 
     def __getitem__(self, idx):
         """Get the idx-th sample.
-        Paramters
+
+        Parameters
         ---------
         idx : int
             The sample index.
+
         Returns
         -------
-        (dgl.Graph, int)
-            Graph with node feature stored in `feat` field and node label in `node_label` if available.
+        (:class:`dgl.DGLGraph`, Tensor)
+            Graph with node feature stored in ``feat`` field and node label in ``node_label`` if available.
             And its label.
         """
         g = self.graph_lists[idx]
         return g, self.graph_labels[idx]
 
     def __len__(self):
+        """Return the number of graphs in the dataset."""
         return len(self.graph_lists)
 
     def _file_path(self, category):

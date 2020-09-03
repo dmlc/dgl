@@ -547,6 +547,9 @@ class HeteroGraphIndex(ObjectBase):
         """
         if order is None:
             order = ""
+        elif order not in ['srcdst', 'eid']:
+            raise DGLError("Expect order to be one of None, 'srcdst', 'eid', "
+                           "got {}".format(order))
         edge_array = _CAPI_DGLHeteroEdges(self, int(etype), order)
         src = F.from_dgl_nd(edge_array(0))
         dst = F.from_dgl_nd(edge_array(1))
@@ -906,7 +909,7 @@ class HeteroGraphIndex(ObjectBase):
                 formats = [formats]
             return _CAPI_DGLHeteroGetFormatGraph(self, formats)
 
-    def create_format_(self):
+    def create_formats_(self):
         """Create all sparse matrices allowed for the graph."""
         return _CAPI_DGLHeteroCreateFormat(self)
 

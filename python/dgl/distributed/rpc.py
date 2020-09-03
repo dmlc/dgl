@@ -16,27 +16,34 @@ __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
 'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call', \
 'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', \
-'get_num_client', 'set_num_client', 'client_barrier']
+'get_num_client', 'set_num_client', 'client_barrier', 'copy_data_to_shared_memory']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
 SERVICE_ID_TO_PROPERTY = {}
 
-def read_ip_config(filename):
+DEFUALT_PORT = 30050
+
+def read_ip_config(filename, num_servers):
     """Read network configuration information of server from file.
 
-    The format of configuration file should be:
+    For exampple, the following TXT shows a 4-machine configuration:
 
-        [ip] [base_port] [server_count]
+        172.31.40.143
+        172.31.36.140
+        172.31.47.147
+        172.31.30.180
 
-        172.31.40.143 30050 2
-        172.31.36.140 30050 2
-        172.31.47.147 30050 2
-        172.31.30.180 30050 2
+    Users can also set user-specified port for this network configuration. For example:
+
+        172.31.40.143 20090
+        172.31.36.140 20090
+        172.31.47.147 20090
+        172.31.30.180 20090
 
     Note that, DGL supports multiple backup servers that shares data with each others
-    on the same machine via shared-memory tensor. The server_count should be >= 1. For example,
-    if we set server_count to 5, it means that we have 1 main server and 4 backup servers on
+    on the same machine via shared-memory tensor. The num_servers should be >= 1. For example,
+    if we set num_servers to 5, it means that we have 1 main server and 4 backup servers on
     current machine.
 
     Parameters
@@ -44,12 +51,15 @@ def read_ip_config(filename):
     filename : str
         Path of IP configuration file.
 
+    num_servers : int
+        Server count on each machine.
+
     Returns
     -------
     dict
         server namebook.
         The key is server_id (int)
-        The value is [machine_id, ip, port, group_count] ([int, str, int, int])
+        The value is [machine_id, ip, port, num_servers] ([int, str, int, int])
 
         e.g.,
 
@@ -63,21 +73,33 @@ def read_ip_config(filename):
            7:[3, '172.31.30.180', 30051, 2]}
     """
     assert len(filename) > 0, 'filename cannot be empty.'
+    assert num_servers > 0, 'num_servers (%d) must be a positive number.' % num_servers
     server_namebook = {}
     try:
         server_id = 0
         machine_id = 0
         lines = [line.rstrip('\n') for line in open(filename)]
         for line in lines:
-            ip_addr, port, server_count = line.split(' ')
-            for s_count in range(int(server_count)):
-                server_namebook[server_id] = \
-                [int(machine_id), ip_addr, int(port)+s_count, int(server_count)]
+            result = line.split()
+            if len(result) == 2:
+                port = int(result[1])
+            elif len(result) == 1:
+                port = DEFUALT_PORT
+            else:
+                raise RuntimeError('length of result can only be 1 or 2.')
+            ip_addr = result[0]
+            for s_count in range(num_servers):
+                server_namebook[server_id] = [machine_id, ip_addr, port+s_count, num_servers]
                 server_id += 1
             machine_id += 1
-    except ValueError:
-        print("Error: data format on each line should be: [ip] [base_port] [server_count]")
+    except RuntimeError:
+        print("Error: data format on each line should be: [ip] [port]")
     return server_namebook
+
+def reset():
+    """Reset the rpc context
+    """
+    _CAPI_DGLRPCReset()
 
 def create_sender(max_queue_size, net_type):
     """Create rpc sender of this process.
@@ -968,6 +990,11 @@ def register_ctrl_c():
     """HandleCtrlC Register for handling Ctrl+C event.
     """
     _CAPI_DGLRPCHandleCtrlC()
+
+def copy_data_to_shared_memory(dst, source):
+    """Copy tensor data to shared-memory tensor
+    """
+    F.zerocopy_to_dgl_ndarray(dst).copyfrom(F.zerocopy_to_dgl_ndarray(source))
 
 ############### Some basic services will be defined here #############
 
