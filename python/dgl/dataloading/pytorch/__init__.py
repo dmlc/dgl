@@ -79,7 +79,6 @@ def _pop_blocks_storage(blocks, g):
 def _restore_subframe_storage(subframe, frame):
     for key, col in subframe._columns.items():
         if col.storage is None:
-            assert key in frame._columns
             col.storage = frame._columns[key].storage
 
 def _restore_subgraph_storage(subg, g):
