@@ -3,51 +3,20 @@
 
 import argparse
 import math
-import random
 import time
 
 import numpy as np
 import torch as th
-import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from matplotlib import pyplot as plt
+from matplotlib.ticker import AutoMinorLocator, MultipleLocator
 from ogb.nodeproppred import DglNodePropPredDataset
 
-import dgl.nn.pytorch as dglnn
+from models import GCN
 
-
-class GCN(nn.Module):
-    def __init__(
-        self, in_feats, n_hidden, n_classes, n_layers, activation, dropout,
-    ):
-        super().__init__()
-        self.n_layers = n_layers
-        self.n_hidden = n_hidden
-        self.n_classes = n_classes
-
-        self.convs = nn.ModuleList()
-        self.bns = nn.ModuleList()
-
-        for i in range(n_layers):
-            in_hidden = n_hidden if i > 0 else in_feats
-            out_hidden = n_hidden if i < n_layers - 1 else n_classes
-            self.convs.append(dglnn.GraphConv(in_hidden, out_hidden, "both"))
-            if i < n_layers - 1:
-                self.bns.append(nn.BatchNorm1d(out_hidden))
-
-        self.dropout = nn.Dropout(dropout)
-        self.activation = activation
-
-    def forward(self, graph, feat):
-        h = feat
-        for l in range(self.n_layers):
-            h = self.convs[l](graph, h)
-            if l < self.n_layers - 1:
-                h = self.bns[l](h)
-                h = self.activation(h)
-                h = self.dropout(h)
-        return h
+device = None
+in_feats, n_classes = None, None
 
 
 def compute_acc(pred, labels):
@@ -63,16 +32,33 @@ def cross_entropy(x, labels):
     return th.mean(y)
 
 
-def train(model, graph, labels, train_idx, optimizer):
+def add_labels(feat, labels, idx):
+    onehot = th.zeros([feat.shape[0], n_classes]).to(device)
+    onehot[idx, labels[idx]] = 1
+    return th.cat([feat, onehot], dim=-1)
+
+
+def train(model, graph, labels, train_idx, optimizer, use_labels):
     model.train()
 
     feat = graph.ndata["feat"]
-    mask = th.rand(train_idx.shape) < 0.5
-    # mask = th.ones(train_idx.shape, dtype=th.bool)
+
+    if use_labels:
+        mask_rate = 0.5
+        mask = th.rand(train_idx.shape) < mask_rate
+
+        train_labels_idx = train_idx[mask]
+        train_pred_idx = train_idx[~mask]
+
+        feat = add_labels(feat, labels, train_labels_idx)
+    else:
+        mask_rate = 0.5
+        mask = th.rand(train_idx.shape) < mask_rate
+        train_pred_idx = train_idx[mask]
 
     optimizer.zero_grad()
     pred = model(graph, feat)
-    loss = cross_entropy(pred[train_idx[mask]], labels[train_idx[mask]])
+    loss = cross_entropy(pred[train_pred_idx], labels[train_pred_idx])
     loss.backward()
     optimizer.step()
 
@@ -80,96 +66,165 @@ def train(model, graph, labels, train_idx, optimizer):
 
 
 @th.no_grad()
-def evaluate(model, graph, labels, train_idx, val_idx, test_idx):
-    """
-    Evaluate the model on the validation set specified by ``val_mask``.
-    graph : The entire graph.
-    inputs : The features of all the nodes.
-    labels : The labels of all the nodes.
-    val_idx : A 0-1 mask indicating which nodes do we actually compute the accuracy for.
-    """
+def evaluate(model, graph, labels, train_idx, val_idx, test_idx, use_labels):
     model.eval()
 
     feat = graph.ndata["feat"]
+
+    if use_labels:
+        feat = add_labels(feat, labels, train_idx)
+
     pred = model(graph, feat)
+    train_loss = cross_entropy(pred[train_idx], labels[train_idx])
     val_loss = cross_entropy(pred[val_idx], labels[val_idx])
+    test_loss = cross_entropy(pred[test_idx], labels[test_idx])
 
     return (
         compute_acc(pred[train_idx], labels[train_idx]),
         compute_acc(pred[val_idx], labels[val_idx]),
         compute_acc(pred[test_idx], labels[test_idx]),
+        train_loss,
         val_loss,
+        test_loss,
     )
 
 
-def warmup_learning_rate(optimizer, lr, epoch):
+def adjust_learning_rate(optimizer, lr, epoch):
     if epoch <= 50:
-        lr *= epoch / 50
-
         for param_group in optimizer.param_groups:
-            param_group["lr"] = lr
+            param_group["lr"] = lr * epoch / 50
 
 
-def run(args, device, graph, in_feats, n_classes, labels, train_idx, val_idx, test_idx):
-    # Define model and optimizer
-    model = GCN(in_feats, args.n_hidden, n_classes, args.n_layers, F.relu, args.dropout)
+def gen_model(args):
+    if args.use_labels:
+        model = GCN(
+            in_feats + n_classes, args.n_hidden, n_classes, args.n_layers, F.relu, args.dropout, args.use_linear
+        )
+    else:
+        model = GCN(in_feats, args.n_hidden, n_classes, args.n_layers, F.relu, args.dropout, args.use_linear)
+    return model
 
+
+def run(args, graph, labels, train_idx, val_idx, test_idx, n_running):
+    # define model and optimizer
+    model = gen_model(args)
     model = model.to(device)
-    optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wd)
-    lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=100, verbose=True)
 
-    # Training loop
+    optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wd)
+    lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", factor=0.5, patience=100, verbose=True, min_lr=1e-3
+    )
+
+    # training loop
     total_time = 0
-    best_val_acc = 0
-    best_test_acc = 0
-    best_val_loss = float("inf")
+    best_val_acc, best_test_acc, best_val_loss = 0, 0, float("inf")
+
+    accs, train_accs, val_accs, test_accs = [], [], [], []
+    losses, train_losses, val_losses, test_losses = [], [], [], []
 
     for epoch in range(1, args.n_epochs + 1):
         tic = time.time()
 
-        warmup_learning_rate(optimizer, args.lr, epoch)
+        adjust_learning_rate(optimizer, args.lr, epoch)
 
-        loss, pred = train(model, graph, labels, train_idx, optimizer)
-
+        loss, pred = train(model, graph, labels, train_idx, optimizer, args.use_labels)
         acc = compute_acc(pred[train_idx], labels[train_idx])
+
+        train_acc, val_acc, test_acc, train_loss, val_loss, test_loss = evaluate(
+            model, graph, labels, train_idx, val_idx, test_idx, args.use_labels
+        )
+
+        lr_scheduler.step(loss)
 
         toc = time.time()
         total_time += toc - tic
 
-        train_acc, val_acc, test_acc, val_loss = evaluate(model, graph, labels, train_idx, val_idx, test_idx)
-
-        lr_scheduler.step(val_loss)
-
+        # if val_acc > best_val_acc:
         if val_loss < best_val_loss:
             best_val_loss = val_loss.item()
             best_val_acc = val_acc.item()
             best_test_acc = test_acc.item()
 
         if epoch % args.log_every == 0:
-            print(f"*** Epoch: {epoch} ***")
+            print(f"Epoch: {epoch}/{args.n_epochs}")
             print(
                 f"Loss: {loss.item():.4f}, Acc: {acc.item():.4f}\n"
-                f"Train/Val/Best val Acc: {train_acc:.4f}/{val_acc:.4f}/{best_val_acc:.4f}, Val Loss: {val_loss:.4f}, Test Acc: {best_test_acc:.4f}"
+                f"Train/Val/Test loss: {train_loss:.4f}/{val_loss:.4f}/{test_loss:.4f}\n"
+                f"Train/Val/Test/Best val/Best test acc: {train_acc:.4f}/{val_acc:.4f}/{test_acc:.4f}/{best_val_acc:.4f}/{best_test_acc:.4f}"
             )
 
-    print("******")
-    print(f"Avg epoch time: {total_time / args.n_epochs}")
+        for l, e in zip(
+            [accs, train_accs, val_accs, test_accs, losses, train_losses, val_losses, test_losses],
+            [acc, train_acc, val_acc, test_acc, loss, train_loss, val_loss, test_loss],
+        ):
+            l.append(e)
+
+    print("*" * 50)
+    print(f"Average epoch time: {total_time / args.n_epochs}, Test acc: {best_test_acc}")
+
+    if args.plot_curves:
+        fig = plt.figure(figsize=(24, 24))
+        ax = fig.gca()
+        ax.set_xticks(np.arange(0, args.n_epochs, 100))
+        ax.set_yticks(np.linspace(0, 1.0, 101))
+        ax.tick_params(labeltop=True, labelright=True)
+        for y, label in zip([accs, train_accs, val_accs, test_accs], ["acc", "train acc", "val acc", "test acc"]):
+            plt.plot(range(args.n_epochs), y, label=label)
+        ax.xaxis.set_major_locator(MultipleLocator(100))
+        ax.xaxis.set_minor_locator(AutoMinorLocator(1))
+        ax.yaxis.set_major_locator(MultipleLocator(0.01))
+        ax.yaxis.set_minor_locator(AutoMinorLocator(2))
+        plt.grid(which="major", color="red", linestyle="dotted")
+        plt.grid(which="minor", color="orange", linestyle="dotted")
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(f"gcn_acc_{n_running}.png")
+
+        fig = plt.figure(figsize=(24, 24))
+        ax = fig.gca()
+        ax.set_xticks(np.arange(0, args.n_epochs, 100))
+        ax.tick_params(labeltop=True, labelright=True)
+        for y, label in zip(
+            [losses, train_losses, val_losses, test_losses], ["loss", "train loss", "val loss", "test loss"]
+        ):
+            plt.plot(range(args.n_epochs), y, label=label)
+        ax.xaxis.set_major_locator(MultipleLocator(100))
+        ax.xaxis.set_minor_locator(AutoMinorLocator(1))
+        ax.yaxis.set_major_locator(MultipleLocator(0.1))
+        ax.yaxis.set_minor_locator(AutoMinorLocator(5))
+        plt.grid(which="major", color="red", linestyle="dotted")
+        plt.grid(which="minor", color="orange", linestyle="dotted")
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(f"gcn_loss_{n_running}.png")
 
     return best_val_acc, best_test_acc
 
 
+def count_parameters(args):
+    model = gen_model(args)
+    return sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
+
+
 def main():
-    argparser = argparse.ArgumentParser("OGBN-Arxiv")
+    global device, in_feats, n_classes
+
+    argparser = argparse.ArgumentParser("GCN on OGBN-Arxiv", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argparser.add_argument("--cpu", action="store_true", help="CPU mode. This option overrides --gpu.")
     argparser.add_argument("--gpu", type=int, default=0, help="GPU device ID.")
     argparser.add_argument("--n-runs", type=int, default=10)
     argparser.add_argument("--n-epochs", type=int, default=1000)
+    argparser.add_argument(
+        "--use-labels", action="store_true", help="Use labels in the training set as input features."
+    )
+    argparser.add_argument("--use-linear", action="store_true", help="Use linear layer.")
+    argparser.add_argument("--lr", type=float, default=0.005)
     argparser.add_argument("--n-layers", type=int, default=3)
     argparser.add_argument("--n-hidden", type=int, default=256)
-    argparser.add_argument("--lr", type=float, default=0.005)
     argparser.add_argument("--dropout", type=float, default=0.5)
     argparser.add_argument("--wd", type=float, default=0)
     argparser.add_argument("--log-every", type=int, default=20)
+    argparser.add_argument("--plot-curves", action="store_true")
     args = argparser.parse_args()
 
     if args.cpu:
@@ -208,7 +263,7 @@ def main():
     test_accs = []
 
     for i in range(args.n_runs):
-        val_acc, test_acc = run(args, device, graph, in_feats, n_classes, labels, train_idx, val_idx, test_idx)
+        val_acc, test_acc = run(args, graph, labels, train_idx, val_idx, test_idx, i)
         val_accs.append(val_acc)
         test_accs.append(test_acc)
 
@@ -217,8 +272,8 @@ def main():
     print("Test Accs:", test_accs)
     print(f"Average val accuracy: {np.mean(val_accs)} ± {np.std(val_accs)}")
     print(f"Average test accuracy: {np.mean(test_accs)} ± {np.std(test_accs)}")
+    print(f"Number of params: {count_parameters(args)}")
 
 
 if __name__ == "__main__":
     main()
-
