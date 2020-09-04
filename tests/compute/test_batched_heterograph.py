@@ -57,11 +57,14 @@ def test_topology(gs, idtype):
     assert bg.canonical_etypes == g2.canonical_etypes
     assert bg.batch_size == 2
 
+    print(g1, g2)
+    print(bg)
     # Test number of nodes
     for ntype in bg.ntypes:
         print(ntype)
         assert F.asnumpy(bg.batch_num_nodes(ntype)).tolist() == [
             g1.number_of_nodes(ntype), g2.number_of_nodes(ntype)]
+        print('fuck: ', bg.number_of_nodes(ntype))
         assert bg.number_of_nodes(ntype) == (
                 g1.number_of_nodes(ntype) + g2.number_of_nodes(ntype))
 

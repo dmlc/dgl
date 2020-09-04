@@ -18,7 +18,7 @@ HeteroGraphPtr JointUnionHeteroGraph(
   for (dgl_type_t etype = 0; etype < meta_graph->NumEdges(); ++etype) {
     auto pair = meta_graph->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
-    const dgl_type_t dst_vtype = pair.second;
+    const dgl_type_t dst_vtype = pair.second; 
     uint64_t num_src_v = component_graphs[0]->NumVertices(src_vtype);
     uint64_t num_dst_v = component_graphs[0]->NumVertices(dst_vtype);
     HeteroGraphPtr rgptr = nullptr;
@@ -96,6 +96,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
     auto pair = meta_graph->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
     const dgl_type_t dst_vtype = pair.second;
+    LOG(INFO) << src_vtype << " " << dst_vtype;
     uint64_t src_offset = 0, dst_offset = 0;
     HeteroGraphPtr rgptr = nullptr;
 
@@ -112,6 +113,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
       src_offset += cg->NumVertices(src_vtype);
       dst_offset += cg->NumVertices(dst_vtype);
     }
+    LOG(INFO) << src_offset << " " << dst_offset;
 
     // prefer COO
     if (FORMAT_HAS_COO(code)) {

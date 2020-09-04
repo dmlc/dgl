@@ -4,6 +4,9 @@ from collections import defaultdict
 
 from . import backend as F
 from .base import ALL, is_all, DGLError, dgl_warning
+from .heterograph_index import disjoint_union
+from .graph_index import from_coo
+from .heterograph import DGLHeteroGraph
 from . import convert
 from . import utils
 
@@ -167,12 +170,13 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
 
     utils.check_all_same_device(graphs, 'graphs')
     utils.check_all_same_idtype(graphs, 'graphs')
-    relations = graphs[0].canonical_etypes
-    ntypes = graphs[0].ntypes
+    relations = list(sorted(graphs[0].canonical_etypes))
+    ntypes = list(sorted(graphs[0].ntypes))
     idtype = graphs[0].idtype
     device = graphs[0].device
 
     # Batch graph structure for each relation graph
+    """
     edge_dict = defaultdict(list)
     num_nodes_dict = defaultdict(int)
     for g in graphs:
@@ -188,29 +192,42 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
         src, dst = zip(*edge_dict[rel])
         edge_dict[rel] = (F.cat(src, 0), F.cat(dst, 0))
     retg = convert.heterograph(edge_dict, num_nodes_dict, idtype=idtype, device=device)
+    """
+    ntype_dict = {ntype: i for i, ntype in enumerate(ntypes)}
+    etypes = []
+    meta_edges_src = []
+    meta_edges_dst = []
+    for srctype, etype, dsttype in relations:
+        etypes.append(etype)
+        meta_edges_src.append(ntype_dict[srctype])
+        meta_edges_dst.append(ntype_dict[dsttype])
+    
+    metagraph = from_coo(len(ntypes), meta_edges_src, meta_edges_dst, True)
+    retg = DGLHeteroGraph(disjoint_union(metagraph, [g._graph for g in graphs]),
+                          ntypes, etypes).to(device)
 
     # Compute batch num nodes
     bnn = {}
-    for ntype in graphs[0].ntypes:
+    for ntype in ntypes:
         bnn[ntype] = F.cat([g.batch_num_nodes(ntype) for g in graphs], 0)
     retg.set_batch_num_nodes(bnn)
 
     # Compute batch num edges
     bne = {}
-    for etype in graphs[0].canonical_etypes:
+    for etype in etypes:
         bne[etype] = F.cat([g.batch_num_edges(etype) for g in graphs], 0)
     retg.set_batch_num_edges(bne)
 
     # Batch node feature
     if ndata is not None:
-        for ntype in graphs[0].ntypes:
+        for ntype in ntypes:
             feat_dicts = [g.nodes[ntype].data for g in graphs if g.number_of_nodes(ntype) > 0]
             ret_feat = _batch_feat_dicts(feat_dicts, ndata, 'nodes["{}"].data'.format(ntype))
             retg.nodes[ntype].data.update(ret_feat)
 
     # Batch edge feature
     if edata is not None:
-        for etype in graphs[0].canonical_etypes:
+        for etype in etypes:
             feat_dicts = [g.edges[etype].data for g in graphs if g.number_of_edges(etype) > 0]
             ret_feat = _batch_feat_dicts(feat_dicts, edata, 'edges[{}].data'.format(etype))
             retg.edges[etype].data.update(ret_feat)
