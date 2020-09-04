@@ -384,6 +384,8 @@ if __name__ == '__main__':
     g.ndata['features'] = features.share_memory_()
     create_history_storage(g, args, n_classes)
 
+    # Create csr/coo/csc formats before launching training processes with multi-gpu.
+    # This avoids creating certain formats in each sub-process, which saves momory and CPU.
     g.create_formats_()
     # Pack data
     data = train_mask, val_mask, in_feats, labels, n_classes, g

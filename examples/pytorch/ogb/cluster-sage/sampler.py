@@ -63,9 +63,4 @@ class ClusterIter(object):
 def subgraph_collate_fn(g, batch):
     nids = np.concatenate(batch).reshape(-1).astype(np.int64)
     g1 = g.subgraph(nids)
-    nid = g1.ndata[dgl.NID]
-    g1.ndata['feat'] = g.ndata['feat'][nid]
-    g1.ndata['labels'] = g.ndata['labels'][nid]
-    g1.ndata['train_mask'] = g.ndata['train_mask'][nid]
-    g1.create_formats_()
     return g1
