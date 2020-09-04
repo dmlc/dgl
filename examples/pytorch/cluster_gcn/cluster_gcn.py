@@ -202,7 +202,7 @@ if __name__ == '__main__':
     parser.add_argument("--self-loop", action='store_true',
                         help="graph self-loop (default=False)")
     parser.add_argument("--use-pp", action='store_true',
-                        help="whether to use percomputation")
+                        help="whether to use precomputation")
     parser.add_argument("--normalize", action='store_true',
                         help="whether to use normalized feature")
     parser.add_argument("--use-val", action='store_true',
