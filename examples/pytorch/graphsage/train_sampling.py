@@ -229,6 +229,8 @@ if __name__ == '__main__':
     else:
         train_g = val_g = test_g = g
 
+    # Create csr/coo/csc formats before launching training processes with multi-gpu.
+    # This avoids creating certain formats in each sub-process, which saves momory and CPU.
     train_g.create_formats_()
     val_g.create_formats_()
     test_g.create_formats_()
