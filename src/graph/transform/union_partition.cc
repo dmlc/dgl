@@ -18,7 +18,7 @@ HeteroGraphPtr JointUnionHeteroGraph(
   for (dgl_type_t etype = 0; etype < meta_graph->NumEdges(); ++etype) {
     auto pair = meta_graph->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
-    const dgl_type_t dst_vtype = pair.second; 
+    const dgl_type_t dst_vtype = pair.second;
     uint64_t num_src_v = component_graphs[0]->NumVertices(src_vtype);
     uint64_t num_dst_v = component_graphs[0]->NumVertices(dst_vtype);
     HeteroGraphPtr rgptr = nullptr;
@@ -93,9 +93,9 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
 
   // Loop over all ntypes
   for (dgl_type_t vtype = 0; vtype < meta_graph->NumVertices(); ++vtype) {
-		uint64_t offset = 0;
-		for (const auto &cg: component_graphs)
-			offset += cg->NumVertices(vtype);
+    uint64_t offset = 0;
+    for (const auto &cg : component_graphs)
+      offset += cg->NumVertices(vtype);
     num_nodes_per_type[vtype] = offset;
   }
 
@@ -104,14 +104,12 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
     auto pair = meta_graph->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
     const dgl_type_t dst_vtype = pair.second;
-    uint64_t src_offset = 0, dst_offset = 0;
     HeteroGraphPtr rgptr = nullptr;
 
     const dgl_format_code_t code =\
       component_graphs[0]->GetRelationGraph(etype)->GetAllowedFormats();
     // do some preprocess
-    for (size_t i = 0; i < component_graphs.size(); ++i) {
-      const auto& cg = component_graphs[i];
+    for (const auto &cg : component_graphs) {
       const dgl_format_code_t cur_code = cg->GetRelationGraph(etype)->GetAllowedFormats();
       if (cur_code != code)
         LOG(FATAL) << "All components should have the same formats";
@@ -120,8 +118,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
     // prefer COO
     if (FORMAT_HAS_COO(code)) {
       std::vector<aten::COOMatrix> coos;
-      for (size_t i = 0; i < component_graphs.size(); ++i) {
-        const auto& cg = component_graphs[i];
+      for (const auto &cg : component_graphs) {
         aten::COOMatrix coo = cg->GetCOOMatrix(etype);
         coos.push_back(coo);
       }
@@ -132,8 +129,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
           (src_vtype == dst_vtype) ? 1 : 2, res, code);
     } else if (FORMAT_HAS_CSR(code)) {
       std::vector<aten::CSRMatrix> csrs;
-      for (size_t i = 0; i < component_graphs.size(); ++i) {
-        const auto& cg = component_graphs[i];
+      for (const auto &cg : component_graphs) {
         aten::CSRMatrix csr = cg->GetCSRMatrix(etype);
         csrs.push_back(csr);
       }
@@ -145,8 +141,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
     } else if (FORMAT_HAS_CSC(code)) {
       // CSR and CSC have the same storage format, i.e. CSRMatrix
       std::vector<aten::CSRMatrix> cscs;
-      for (size_t i = 0; i < component_graphs.size(); ++i) {
-        const auto& cg = component_graphs[i];
+      for (const auto &cg : component_graphs) {
         aten::CSRMatrix csc = cg->GetCSCMatrix(etype);
         cscs.push_back(csc);
       }
