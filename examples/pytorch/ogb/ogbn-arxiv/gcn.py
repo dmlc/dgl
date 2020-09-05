@@ -134,8 +134,9 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
         lr_scheduler.step(loss)
 
-        toc = time.time()
-        total_time += toc - tic
+        train_acc, val_acc, test_acc, train_loss, val_loss, test_loss = evaluate(
+            model, graph, labels, train_idx, val_idx, test_idx, args.use_labels
+        )
 
         # if val_acc > best_val_acc:
         if val_loss < best_val_loss:
