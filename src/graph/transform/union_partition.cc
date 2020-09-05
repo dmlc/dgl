@@ -91,12 +91,19 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
   std::vector<HeteroGraphPtr> rel_graphs(meta_graph->NumEdges());
   std::vector<int64_t> num_nodes_per_type(meta_graph->NumVertices(), 0);
 
+  // Loop over all ntypes
+  for (dgl_type_t vtype = 0; vtype < meta_graph->NumVertices(); ++vtype) {
+		uint64_t offset = 0;
+		for (const auto &cg: component_graphs)
+			offset += cg->NumVertices(vtype);
+    num_nodes_per_type[vtype] = offset;
+  }
+
   // Loop over all canonical etypes
   for (dgl_type_t etype = 0; etype < meta_graph->NumEdges(); ++etype) {
     auto pair = meta_graph->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
     const dgl_type_t dst_vtype = pair.second;
-    LOG(INFO) << src_vtype << " " << dst_vtype;
     uint64_t src_offset = 0, dst_offset = 0;
     HeteroGraphPtr rgptr = nullptr;
 
@@ -108,12 +115,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
       const dgl_format_code_t cur_code = cg->GetRelationGraph(etype)->GetAllowedFormats();
       if (cur_code != code)
         LOG(FATAL) << "All components should have the same formats";
-
-      // Update offsets
-      src_offset += cg->NumVertices(src_vtype);
-      dst_offset += cg->NumVertices(dst_vtype);
     }
-    LOG(INFO) << src_offset << " " << dst_offset;
 
     // prefer COO
     if (FORMAT_HAS_COO(code)) {
@@ -154,8 +156,6 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
         (src_vtype == dst_vtype) ? 1 : 2, res, code);
     }
     rel_graphs[etype] = rgptr;
-    num_nodes_per_type[src_vtype] = src_offset;
-    num_nodes_per_type[dst_vtype] = dst_offset;
   }
 
   return CreateHeteroGraph(meta_graph, rel_graphs, std::move(num_nodes_per_type));
