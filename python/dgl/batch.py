@@ -1,6 +1,5 @@
 """Utilities for batching/unbatching graphs."""
 from collections.abc import Mapping
-from collections import defaultdict
 
 from . import backend as F
 from .base import ALL, is_all, DGLError, dgl_warning
