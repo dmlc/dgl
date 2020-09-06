@@ -8,6 +8,9 @@ from .heterograph import DGLHeteroGraph
 from . import convert
 from . import utils
 
+import itertools
+import operator
+
 __all__ = ['batch', 'unbatch', 'batch_hetero', 'unbatch_hetero']
 
 def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
@@ -157,10 +160,10 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
         dgl_warning('Arguments edge_attrs has been deprecated. Please use'
                     ' edata instead.')
         edata = edge_attrs
-    if not (is_all(ndata) or isinstance(ndata, list)):
+    if not (is_all(ndata) or isinstance(ndata, list) or ndata is None):
         raise DGLError('Invalid argument ndata: must be a string list but got {}.'.format(
             type(ndata)))
-    if not (is_all(edata) or isinstance(edata, list)):
+    if not (is_all(edata) or isinstance(edata, list) or edata is None):
         raise DGLError('Invalid argument edata: must be a string list but got {}.'.format(
             type(edata)))
     if any(g.is_block for g in graphs):
@@ -189,18 +192,16 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     # Batch node feature
     if ndata is not None:
         for ntype in ntypes:
-            if len(graphs[0].node_attr_schemes(ntype)) > 0:
-                feat_dicts = [g.nodes[ntype].data for g in graphs if g.number_of_nodes(ntype) > 0]
-                ret_feat = _batch_feat_dicts(feat_dicts, ndata, 'nodes["{}"].data'.format(ntype))
-                retg.nodes[ntype].data.update(ret_feat)
+            feat_dicts = [g.nodes[ntype].data for g in graphs if g.number_of_nodes(ntype) > 0]
+            ret_feat = _batch_feat_dicts(feat_dicts, ndata, 'nodes["{}"].data'.format(ntype))
+            retg.nodes[ntype].data.update(ret_feat)
 
     # Batch edge feature
     if edata is not None:
         for etype in relations:
-            if len(graphs[0].edge_attr_schemes(etype)) > 0:
-                feat_dicts = [g.edges[etype].data for g in graphs if g.number_of_edges(etype) > 0]
-                ret_feat = _batch_feat_dicts(feat_dicts, edata, 'edges[{}].data'.format(etype))
-                retg.edges[etype].data.update(ret_feat)
+            feat_dicts = [g.edges[etype].data for g in graphs if g.number_of_edges(etype) > 0]
+            ret_feat = _batch_feat_dicts(feat_dicts, edata, 'edges[{}].data'.format(etype))
+            retg.edges[etype].data.update(ret_feat)
 
     return retg
 
