@@ -8,8 +8,6 @@ from .heterograph import DGLHeteroGraph
 from . import convert
 from . import utils
 
-import itertools
-import operator
 
 __all__ = ['batch', 'unbatch', 'batch_hetero', 'unbatch_hetero']
 
