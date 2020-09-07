@@ -362,7 +362,7 @@ def _gspmm_tvm(gidx, op, reduce_op, u, e, advise=True,
         f_input.append(tvm.nd.from_dlpack(to_dgl_nd(u).to_dlpack()))
     if use_e:
         if edge_shuffled and not use_idx:
-            e = e[F.zerocopy_from_dgl_ndarray(edge_mapping).long()]
+            e = F.gather_row(e, F.zerocopy_from_dgl_ndarray(edge_mapping))
         f_input.append(tvm.nd.from_dlpack(to_dgl_nd(e).to_dlpack()))
     idtype = getattr(F, gidx.dtype)
     arg_u, arg_e = None, None
@@ -378,7 +378,7 @@ def _gspmm_tvm(gidx, op, reduce_op, u, e, advise=True,
     f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(v).to_dlpack()))
     mod(*f_input)
     if use_cmp and use_e and edge_shuffled and not use_idx:
-        arg_e = F.zerocopy_from_dgl_ndarray(edge_mapping)[arg_e.long()]
+        arg_e = F.gather_row(F.zerocopy_from_dgl_ndarray(edge_mapping), arg_e)
     return v, (arg_u, arg_e)
 
 
@@ -523,16 +523,16 @@ def _gsddmm_tvm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
     mod, out_shp = compiled
     if (lhs_target == TargetCode.EDGE or rhs_target == TargetCode.EDGE) and edge_shuffled and not use_idx:
         if lhs_target == TargetCode.EDGE:
-            lhs = lhs[F.from_dgl_nd(edge_mapping).long()]
+            lhs = F.gather_row(lhs, F.from_dgl_nd(edge_mapping))
         elif rhs_target == TargetCode.EDGE:
-            rhs = rhs[F.from_dgl_nd(edge_mapping).long()]
+            rhs = F.gather_row(rhs, F.from_dgl_nd(edge_mapping))
     f_input.append(tvm.nd.from_dlpack(to_dgl_nd(lhs).to_dlpack()))
     f_input.append(tvm.nd.from_dlpack(to_dgl_nd(rhs).to_dlpack()))
     out = F.zeros(out_shp, feat_type, ctx)
     f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(out).to_dlpack()))
     mod(*f_input)
     if edge_shuffled:
-        out = out[F.from_dgl_nd(reverse_mapping).long()]
+        out = F.gather_row(out, F.from_dgl_nd(reverse_mapping))
     return out
 
 _init_api("dgl.sparse")
