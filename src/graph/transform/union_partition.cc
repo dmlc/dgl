@@ -270,56 +270,6 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
 }
 
 template <class IdType>
-HeteroGraphPtr DisjointUnionHeteroGraph(
-    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs) {
-  CHECK_GT(component_graphs.size(), 0) << "Input graph list is empty";
-  std::vector<HeteroGraphPtr> rel_graphs(meta_graph->NumEdges());
-  std::vector<int64_t> num_nodes_per_type(meta_graph->NumVertices(), 0);
-
-  // Loop over all canonical etypes
-  for (dgl_type_t etype = 0; etype < meta_graph->NumEdges(); ++etype) {
-    auto pair = meta_graph->FindEdge(etype);
-    const dgl_type_t src_vtype = pair.first;
-    const dgl_type_t dst_vtype = pair.second;
-    IdType src_offset = 0, dst_offset = 0;
-    std::vector<IdType> result_src, result_dst;
-
-    // Loop over all graphs
-    for (size_t i = 0; i < component_graphs.size(); ++i) {
-      const auto& cg = component_graphs[i];
-      EdgeArray edges = cg->Edges(etype);
-      size_t num_edges = cg->NumEdges(etype);
-      const IdType* edges_src_data = static_cast<const IdType*>(edges.src->data);
-      const IdType* edges_dst_data = static_cast<const IdType*>(edges.dst->data);
-
-      // Loop over all edges
-      for (size_t j = 0; j < num_edges; ++j) {
-        // TODO(mufei): Should use array operations to implement this.
-        result_src.push_back(edges_src_data[j] + src_offset);
-        result_dst.push_back(edges_dst_data[j] + dst_offset);
-      }
-      // Update offsets
-      src_offset += cg->NumVertices(src_vtype);
-      dst_offset += cg->NumVertices(dst_vtype);
-    }
-    HeteroGraphPtr rgptr = UnitGraph::CreateFromCOO(
-        (src_vtype == dst_vtype) ? 1 : 2, src_offset, dst_offset,
-        aten::VecToIdArray(result_src, sizeof(IdType) * 8),
-        aten::VecToIdArray(result_dst, sizeof(IdType) * 8));
-    rel_graphs[etype] = rgptr;
-    num_nodes_per_type[src_vtype] = src_offset;
-    num_nodes_per_type[dst_vtype] = dst_offset;
-  }
-  return CreateHeteroGraph(meta_graph, rel_graphs, std::move(num_nodes_per_type));
-}
-
-template HeteroGraphPtr DisjointUnionHeteroGraph<int32_t>(
-    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
-
-template HeteroGraphPtr DisjointUnionHeteroGraph<int64_t>(
-    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
-
-template <class IdType>
 std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
     GraphPtr meta_graph, HeteroGraphPtr batched_graph, IdArray vertex_sizes, IdArray edge_sizes) {
   // Sanity check for vertex sizes
