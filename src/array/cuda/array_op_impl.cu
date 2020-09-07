@@ -34,10 +34,12 @@ IdArray BinaryElewise(IdArray lhs, IdArray rhs) {
   const IdType* rhs_data = static_cast<IdType*>(rhs->data);
   IdType* ret_data = static_cast<IdType*>(ret->data);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  int nt = cuda::FindNumThreads(len);
-  int nb = (len + nt - 1) / nt;
-  _BinaryElewiseKernel<IdType, Op><<<nb, nt, 0, thr_entry->stream>>>(
-      lhs_data, rhs_data, ret_data, len);
+  if (len > 0) {
+    int nt = cuda::FindNumThreads(len);
+    int nb = (len + nt - 1) / nt;
+    _BinaryElewiseKernel<IdType, Op><<<nb, nt, 0, thr_entry->stream>>>(
+        lhs_data, rhs_data, ret_data, len);
+  }
   return ret;
 }
 
@@ -83,10 +85,12 @@ IdArray BinaryElewise(IdArray lhs, IdType rhs) {
   const IdType* lhs_data = static_cast<IdType*>(lhs->data);
   IdType* ret_data = static_cast<IdType*>(ret->data);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  int nt = cuda::FindNumThreads(len);
-  int nb = (len + nt - 1) / nt;
-  _BinaryElewiseKernel<IdType, Op><<<nb, nt, 0, thr_entry->stream>>>(
-      lhs_data, rhs, ret_data, len);
+  if (len > 0) {
+    int nt = cuda::FindNumThreads(len);
+    int nb = (len + nt - 1) / nt;
+    _BinaryElewiseKernel<IdType, Op><<<nb, nt, 0, thr_entry->stream>>>(
+        lhs_data, rhs, ret_data, len);
+  }
   return ret;
 }
 
