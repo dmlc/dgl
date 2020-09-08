@@ -74,7 +74,15 @@ target_mapping = {
     'dst': TargetCode.DST
 }
 
+use_tvm = True
+
 def _gspmm(gidx, op, reduce_op, u, e):
+    return _gspmm_tvm(gidx, op, reduce_op, u, e) if use_tvm else _gspmm_native(gidx, op, reduce_op, u, e)
+
+def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
+    return _gsddmm_tvm(gidx, op, lhs, rhs, lhs_target, rhs_target) if use_tvm else _gsddmm_native(gidx, op, lhs, rhs, lhs_target, rhs_target)
+
+def _gspmm_native(gidx, op, reduce_op, u, e):
     r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
     :attr:`op` on source node feature and edge feature, leads to a message on edge.
     Then aggregates the message by :attr:`reduce_op` on destination nodes.
@@ -163,7 +171,7 @@ def _gspmm(gidx, op, reduce_op, u, e):
     return v, (arg_u, arg_e)
 
 
-def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
+def _gsddmm_native(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
     takes the result of :attr:`op` on source node feature and destination node
     feature, leads to a feature on edge.
@@ -333,9 +341,7 @@ def _gspmm_tvm(gidx, op, reduce_op, u, e, advise=True,
             partitioned_1d_graphs[graph_key] = dds
         indptr, indices, edge_mapping = dds
     edge_shuffled = edge_mapping.shape != (0,)
-    use_bcast = op not in ['copy_lhs', 'copy_rhs'] and u_shp[1:] != e_shp[1:]
-    # pass edge_mapping to tvm only when array packing will be used
-    use_idx = edge_shuffled and num_feat_partitions > 1 and not use_bcast and use_e
+    use_idx = edge_shuffled and use_e
     f_input = [indptr, indices]
     key = (num_rows, num_cols, nnz, op, reduce_op, u_shp, e_shp, use_idx, \
            num_feat_partitions, num_col_partitions, indice_type, feat_type, target)
@@ -361,8 +367,6 @@ def _gspmm_tvm(gidx, op, reduce_op, u, e, advise=True,
     if use_u:
         f_input.append(tvm.nd.from_dlpack(to_dgl_nd(u).to_dlpack()))
     if use_e:
-        if edge_shuffled and not use_idx:
-            e = F.gather_row(e, F.zerocopy_from_dgl_ndarray(edge_mapping))
         f_input.append(tvm.nd.from_dlpack(to_dgl_nd(e).to_dlpack()))
     idtype = getattr(F, gidx.dtype)
     arg_u, arg_e = None, None
@@ -377,8 +381,6 @@ def _gspmm_tvm(gidx, op, reduce_op, u, e, advise=True,
     v = F.zeros(v_shp, feat_type, ctx)
     f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(v).to_dlpack()))
     mod(*f_input)
-    if use_cmp and use_e and edge_shuffled and not use_idx:
-        arg_e = F.gather_row(F.zerocopy_from_dgl_ndarray(edge_mapping), arg_e)
     return v, (arg_u, arg_e)
 
 
@@ -490,12 +492,9 @@ def _gsddmm_tvm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
             row, col, edge_mapping = [tvm.nd.from_dlpack(tmp(x).to_dlpack()) for x in range(3)]
         reverse_mapping = F.zerocopy_to_dgl_ndarray(F.argsort(F.from_dgl_nd(edge_mapping), 0, False))
         partitioned_2d_graphs[graph_key] = (row, col, edge_mapping, reverse_mapping)
-    use_bcast = lhs_shp[1:] != rhs_shp[1:]
     edge_shuffled = edge_mapping.shape != (0,)
-    # please check tvm/gsddmm.py array-packing prerequistes
-    # check how coo is sorted is currently not available in python
     use_idx = (lhs_target == TargetCode.EDGE or rhs_target == TargetCode.EDGE) \
-              and num_feat_partitions > 1 and not use_bcast and edge_shuffled
+              and edge_shuffled
     f_input = []
     if lhs_target == TargetCode.SRC or rhs_target == TargetCode.SRC:
         f_input.append(row)
@@ -521,11 +520,6 @@ def _gsddmm_tvm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
     else:
         compiled = compiled_gsddmm_kernels[key]
     mod, out_shp = compiled
-    if (lhs_target == TargetCode.EDGE or rhs_target == TargetCode.EDGE) and edge_shuffled and not use_idx:
-        if lhs_target == TargetCode.EDGE:
-            lhs = F.gather_row(lhs, F.from_dgl_nd(edge_mapping))
-        elif rhs_target == TargetCode.EDGE:
-            rhs = F.gather_row(rhs, F.from_dgl_nd(edge_mapping))
     f_input.append(tvm.nd.from_dlpack(to_dgl_nd(lhs).to_dlpack()))
     f_input.append(tvm.nd.from_dlpack(to_dgl_nd(rhs).to_dlpack()))
     out = F.zeros(out_shp, feat_type, ctx)

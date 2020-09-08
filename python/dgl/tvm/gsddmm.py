@@ -1,8 +1,10 @@
+from .util import binary_op_map
+from ..function import TargetCode
+
 import tvm
 from tvm import te
 from tvm import topi
-from .util import binary_op_map
-from ..function import TargetCode
+from tvm.tir import IntImm
 
 def _sddmm_compute(out_shp, binary_op, lhs, rhs, 
                    lhs_idx, rhs_idx, num_feat_partitions=1,
@@ -17,7 +19,7 @@ def _sddmm_compute(out_shp, binary_op, lhs, rhs,
     reshapes = []
     def reshape(fo, n, fi, t, idx):
         ff = fo * feat_len_per_partition + fi
-        return t.__getitem__((idx(n, True),) + tuple(topi.util.unravel_index(ff, t.shape[1:])))
+        return t.__getitem__((n,) + tuple(topi.util.unravel_index(ff, t.shape[1:])))
     if lhs_pack:
         reshaped_lhs = te.compute((num_feat_partitions, lhs.shape[0], feat_len_per_partition), \
                                   lambda fo, idx, fi: reshape(fo, idx, fi, lhs, lhs_idx), name='reshaped_lhs')
@@ -36,12 +38,12 @@ def _sddmm_compute(out_shp, binary_op, lhs, rhs,
                 lval = reshaped_lhs[(fid + k) // feat_len_per_partition, \
                             lhs_idx(eid), (fid + k) % feat_len_per_partition]
             else:
-                lval = lhs.__getitem__((lhs_idx(args[0]),) + args[1:-1] +(k,))
+                lval = lhs.__getitem__((lhs_idx(eid),) + args[1:-1] +(k,))
             if rhs_pack:
                 rval = reshaped_rhs[(fid + k) // feat_len_per_partition, \
                             rhs_idx(eid), (fid + k) % feat_len_per_partition]
             else:
-                rval = rhs.__getitem__((rhs_idx(args[0]),) + args[1:-1] +(k,))
+                rval = rhs.__getitem__((rhs_idx(eid),) + args[1:-1] +(k,))
             return te.sum(lval * rval, axis=k)
         out = te.compute(out_shp, dot_edge_func, name='out')
     else:
@@ -52,12 +54,12 @@ def _sddmm_compute(out_shp, binary_op, lhs, rhs,
                 lval = reshaped_lhs[fid // feat_len_per_partition, \
                              lhs_idx(eid), fid % feat_len_per_partition]
             else:
-                lval = lhs.__getitem__((lhs_idx(args[0]),) + args[1:])
+                lval = lhs.__getitem__((lhs_idx(eid),) + args[1:])
             if rhs_pack:
                 rval = reshaped_rhs[fid // feat_len_per_partition, \
                              rhs_idx(eid), fid % feat_len_per_partition]
             else:
-                rval = rhs.__getitem__((rhs_idx(args[0]),) + args[1:])
+                rval = rhs.__getitem__((rhs_idx(eid),) + args[1:])
             return binary_op_map[binary_op](lval, rval)
         out = te.compute(out_shp, edge_func, name='out')
     return out, reshapes
@@ -169,35 +171,34 @@ def sddmm(binary_op, nnz, num_rows, num_cols,
             return te.placeholder((nnz,) + s, feat_type, name)
         elif t == TargetCode.DST:
             return te.placeholder((num_cols,) + s, feat_type, name)
-    lhs = switch_target(lhs_target, lhs_shp, 'lhs')
-    rhs = switch_target(rhs_target, rhs_shp, 'rhs')
+    lhs = switch_target(lhs_target, tuple([IntImm(indice_type, s) for s in lhs_shp]), 'lhs')
+    rhs = switch_target(rhs_target, tuple([IntImm(indice_type, s) for s in rhs_shp]), 'rhs')
     # idx wrapper for corresponding target
-    # if use_idx and use packing, edge_mapping can be done in packing phase to save memory
     def idx_target(t):
-        def foo(eid, pack=False):
-            if pack:
-                return edge_mapping[eid] if use_idx and t == 1 else eid
+        def foo(eid):
             if t == TargetCode.SRC:
                 return adj_row_indices[eid]
             elif t == TargetCode.EDGE:
-                return eid
+                return edge_mapping[eid] if use_idx else eid
             elif t == TargetCode.DST:
                 return adj_col_indices[eid]
         return foo
     # if feature partition, decide whether to apply array packing
     # sorted = 0 means row-sorted, 1 means col-sorted, 2 means not sorted
+    # if edge_mapping is present, do not use array packing
     lhs_pack = (num_feat_partitions > 1 and not use_bcast) and \
                ((lhs_target == TargetCode.SRC and is_sorted == 0) or \
                 (lhs_target == TargetCode.DST and is_sorted == 1) or \
-                lhs_target == TargetCode.EDGE)
+                (lhs_target == TargetCode.EDGE and not use_idx))
     rhs_pack = (num_feat_partitions > 1 and not use_bcast) and \
                ((rhs_target == TargetCode.SRC and is_sorted == 0) or \
                 (rhs_target == TargetCode.DST and is_sorted == 1) or \
-                rhs_target == TargetCode.EDGE)
+                (rhs_target == TargetCode.EDGE and not use_idx))
     # compute
-    out, reshapes = _sddmm_compute((nnz,) + out_shp, binary_op, lhs, rhs, \
-                                            idx_target(lhs_target), idx_target(rhs_target),
-                                            num_feat_partitions, lhs_pack, rhs_pack)
+    out, reshapes = _sddmm_compute((nnz,) + tuple([IntImm(indice_type, s) for s in out_shp]),
+                                    binary_op, lhs, rhs, 
+                                    idx_target(lhs_target), idx_target(rhs_target),
+                                    num_feat_partitions, lhs_pack, rhs_pack)
     # schedule
     s = te.create_schedule(out.op)
     if target == 'cuda':
@@ -236,18 +237,3 @@ def sddmm(binary_op, nnz, num_rows, num_cols,
         binds = {lhs:lhs_buffer, rhs:rhs_buffer}
     # print(tvm.lower(s, f_input, binds=binds))
     return tvm.build(s, f_input, target=target, name=f_name, binds=binds)
-
-if __name__ == '__main__':
-    target = 'llvm'
-    lhs_shp, rhs_shp = (8,), (8,)
-    out_shp = (1,)
-    nnz = 5
-    num_rows = 10
-    num_cols = 10
-    indice_type = 'int32'
-    feat_type = 'float32'
-    f = sddmm('dot', nnz, num_rows, num_cols, 
-         lhs_shp, rhs_shp, out_shp,
-         indice_type, feat_type, use_idx=False,
-         num_feat_partitions=2, target=target)
-    # print(f.imported_modules[0].get_source())

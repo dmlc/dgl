@@ -1,19 +1,20 @@
+from .util import binary_op_map, reduce_op_map
+
 import tvm
 from tvm import te
 from tvm import topi
-from .util import binary_op_map, reduce_op_map
+from tvm.tir import IntImm
 
 def _spmm(out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
           ufeat, efeat, edge_id, pack, num_feat_partitions):
     reshapes = []
     if pack:
-        # apply array packing on efeat because it can be continuous
         nnz = efeat.shape[0]
         feat_len = topi.util.get_const_int(topi.util.prod(efeat.shape[1:]))
         feat_len_per_partition = feat_len // num_feat_partitions
         def reshape(fo, n, fi):
             ff = fo * feat_len_per_partition + fi
-            return efeat.__getitem__((edge_id(n),) + tuple(topi.util.unravel_index(ff, efeat.shape[1:])))
+            return efeat.__getitem__((n,) + tuple(topi.util.unravel_index(ff, efeat.shape[1:])))
         reshaped_efeat = te.compute((num_feat_partitions, nnz, feat_len_per_partition), 
                                     reshape, name='reshaped_efeat')
         reshapes.append(reshaped_efeat)
@@ -56,7 +57,7 @@ def _spmm_dds(out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
         feat_len_per_partition = feat_len // num_feat_partitions
         def reshape(fo, n, fi):
             ff = fo * feat_len_per_partition + fi
-            return efeat.__getitem__((edge_id(n),) + tuple(topi.util.unravel_index(ff, efeat.shape[1:])))
+            return efeat.__getitem__((n,) + tuple(topi.util.unravel_index(ff, efeat.shape[1:])))
         reshaped_efeat = te.compute((num_feat_partitions, nnz, feat_len_per_partition), 
                                     reshape, name='reshaped_efeat')
         reshapes.append(reshaped_efeat)
@@ -191,9 +192,9 @@ def spmm(binary_op, reduce_op, nnz, num_rows, num_cols,
             raise NotImplementedError
     else:
         # convert python int into tir nodes so that type of iterator in generated code is correct
-        num_rows = tvm.tir.IntImm(indice_type, num_rows)
-        num_cols = tvm.tir.IntImm(indice_type, num_cols)
-        nnz = tvm.tir.IntImm(indice_type, nnz)
+        num_rows = IntImm(indice_type, num_rows)
+        num_cols = IntImm(indice_type, num_cols)
+        nnz = IntImm(indice_type, nnz)
     # check if use broadcast
     use_bcast = (binary_op not in ['copy_lhs', 'copy_rhs']) and lhs_shp != rhs_shp
     # placeholder for sparse matrix
@@ -202,23 +203,25 @@ def spmm(binary_op, reduce_op, nnz, num_rows, num_cols,
     else:
         adj_indptr = te.placeholder((num_rows+1,), indice_type, 'adj_indptr')
     adj_indices = te.placeholder((nnz,), indice_type, 'adj_indices')
-    efeat = te.placeholder((nnz,) + rhs_shp, feat_type, 'efeat')
+    efeat = te.placeholder((nnz,) + tuple([IntImm(indice_type, s) for s in rhs_shp]), feat_type, 'efeat')
     edge_mapping = te.placeholder((nnz,), indice_type, 'edge_mapping')
     # placeholder for dense features
-    ufeat = te.placeholder((num_cols,) + lhs_shp, feat_type, 'ufeat')
-    # compute
+    ufeat = te.placeholder((num_cols,) + tuple([IntImm(indice_type, s) for s in lhs_shp]), feat_type, 'ufeat')
     use_u = binary_op != 'copy_rhs'
     use_e = binary_op != 'copy_lhs'
     def edge_id(x):
         return edge_mapping[x] if use_idx else x
-    use_pack = num_feat_partitions > 1 and not use_bcast and binary_op != 'copy_lhs'
+    # if edge_mapping is present, do not use array packing
+    # cannot use pack with bcast
+    use_pack = num_feat_partitions > 1 and not use_bcast and use_e and not use_idx
+    # compute
+    out_shp = (num_rows,) + tuple([IntImm(indice_type, s) for s in out_shp])
     if num_col_partitions == 1:
-        # cannot use pack with bcast
-        rst, reshapes = _spmm((num_rows,) + out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
+        rst, reshapes = _spmm(out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
                         ufeat, efeat, edge_id, use_pack, num_feat_partitions)
     else:
         # same
-        rst, intermediate, reshapes = _spmm_dds((num_rows,) + out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
+        rst, intermediate, reshapes = _spmm_dds(out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
             ufeat, efeat, edge_id, use_pack, num_feat_partitions)
     out = rst[-1]
     # schedule
@@ -260,18 +263,4 @@ def spmm(binary_op, reduce_op, nnz, num_rows, num_cols,
         binds = {ufeat:u_buffer, efeat: e_buffer}
     # print(tvm.lower(s, f_input, binds=binds))
     return tvm.build(s, f_input, target=target, name=f_name, binds=binds)
-
-if __name__ == '__main__':
-    target = 'cuda'
-    lhs_shp, rhs_shp = (8,), (8,)
-    out_shp = (8,)
-    nnz = 5
-    num_rows = 10
-    num_cols = 10
-    indice_type = 'int32'
-    feat_type = 'float32'
-    f = spmm('mul', 'sum', nnz, num_rows, num_cols, 
-         lhs_shp, rhs_shp, out_shp,
-         indice_type, feat_type, use_idx=False,
-         num_col_partitions=1, num_feat_partitions=1, target=target)
-    print(f.imported_modules[0].get_source())
+    
