@@ -93,16 +93,14 @@ class CUDADeviceAPI final : public DeviceAPI {
     CUDA_CALL(cudaSetDevice(ctx.device_id));
     CHECK_EQ(256 % alignment, 0U)
         << "CUDA space is aligned at 256 bytes";
-    void *ret = nullptr;
-    if (nbytes > 0)
-      CUDA_CALL(cudaMalloc(&ret, nbytes));
+    void *ret;
+    CUDA_CALL(cudaMalloc(&ret, nbytes));
     return ret;
   }
 
   void FreeDataSpace(DGLContext ctx, void* ptr) final {
     CUDA_CALL(cudaSetDevice(ctx.device_id));
-    if (ptr)
-      CUDA_CALL(cudaFree(ptr));
+    CUDA_CALL(cudaFree(ptr));
   }
 
   void CopyDataFromTo(const void* from,
