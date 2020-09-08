@@ -237,11 +237,10 @@ We expect all contributions discussed in the issue tracker and going through PRs
 If you use DGL in a scientific publication, we would appreciate citations to the following paper:
 ```
 @article{wang2019dgl,
-    title={Deep Graph Library: Towards Efficient and Scalable Deep Learning on Graphs},
-    url={https://arxiv.org/abs/1909.01315},
-    author={Wang, Minjie and Yu, Lingfan and Zheng, Da and Gan, Quan and Gai, Yu and Ye, Zihao and Li, Mufei and Zhou, Jinjing and Huang, Qi and Ma, Chao and Huang, Ziyue and Guo, Qipeng and Zhang, Hao and Lin, Haibin and Zhao, Junbo and Li, Jinyang and Smola, Alexander J and Zhang, Zheng},
-    journal={ICLR Workshop on Representation Learning on Graphs and Manifolds},
-    year={2019}
+    title={Deep Graph Library: A Graph-Centric, Highly-Performant Package for Graph Neural Networks},
+    author={Minjie Wang and Da Zheng and Zihao Ye and Quan Gan and Mufei Li and Xiang Song and Jinjing Zhou and Chao Ma and Lingfan Yu and Yu Gai and Tianjun Xiao and Tong He and George Karypis and Jinyang Li and Zheng Zhang},
+    year={2019},
+    journal={arXiv preprint arXiv:1909.01315}
 }
 ```
 
