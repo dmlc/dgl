@@ -1735,7 +1735,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     assert new_graph.is_unibipartite  # sanity check
 
     src_node_ids = [F.from_dgl_nd(src) for src in src_nodes_nd]
-    dst_node_ids = [F.from_dgl_nd(dst) for dst in dst_nodes_nd]
+    dst_node_ids = [dst_nodes[ntype] for ntype in g.ntypes]
     edge_ids = [F.from_dgl_nd(eid) for eid in induced_edges_nd]
 
     node_frames = utils.extract_node_subframes_for_block(g, src_node_ids, dst_node_ids)
