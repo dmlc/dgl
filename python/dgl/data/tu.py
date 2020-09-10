@@ -323,6 +323,8 @@ class TUDataset(DGLBuiltinDataset):
                                delimiter=',').astype(int)
                 if 'label' in filename:
                     data = F.tensor(self._idx_from_zero(data))
+                else:
+                    data = F.tensor(data)
                 getattr(g, field_name[0])[field_name[1]] = data
             except IOError:
                 pass
