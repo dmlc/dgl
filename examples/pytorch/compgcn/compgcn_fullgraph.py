@@ -75,7 +75,9 @@ def main(args):
 
         if use_cuda:
             n_feats[ntype] = n_feats[ntype].cuda()
+            print(n_feats[ntype].device)
             in_feat_dict[ntype] = in_feat_dict[ntype].cuda()
+            print(in_feat_dict[ntype].device)
 
     if use_cuda:
         labels = labels.cuda()
