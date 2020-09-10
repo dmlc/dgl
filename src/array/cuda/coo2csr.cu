@@ -131,7 +131,8 @@ CSRMatrix COOToCSR<kDLGPU, int64_t>(COOMatrix coo) {
   const int nt = cuda::FindNumThreads(coo.num_rows);
   const int nb = (coo.num_rows + nt - 1) / nt;
   IdArray indptr = Full(0, coo.num_rows + 1, nbits, ctx);
-  _SortedSearchKernelUpperBound<<<nb, nt, 0, thr_entry->stream>>>(
+  CUDA_KERNEL_CALL(_SortedSearchKernelUpperBound,
+      nb, nt, 0, thr_entry->stream,
       coo.row.Ptr<int64_t>(), nnz,
       rowids.Ptr<int64_t>(), coo.num_rows,
       indptr.Ptr<int64_t>() + 1);
