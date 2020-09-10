@@ -95,7 +95,7 @@ def main(args):
 
     # Step 3: Create training components ===================================================== #
     loss_fn = th.nn.CrossEntropyLoss().to('cuda:{}'.format(args.gpu))
-    optimizer = optim.Adam(compgcn_model.parameters(), lr=0.002, weight_decay=5e-4)
+    optimizer = optim.Adam(compgcn_model.parameters(), lr=0.001, weight_decay=5e-4)
 
     # Step 4: training epoches =============================================================== #
     for epoch in range(args.max_epoch):
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     parser.add_argument("--num_basis", type=int, default=40, help="Number of basis")
     parser.add_argument("--rev_indicator", type=str, default='_inv', help="Indicator of reversed edge")
     parser.add_argument("--comp_fn", type=str, default='sub', help="Composition function")
-    parser.add_argument("--max_epoch", type=int, default=100, help="The max number of epoches")
+    parser.add_argument("--max_epoch", type=int, default=200, help="The max number of epoches")
     fp = parser.add_mutually_exclusive_group(required=False)
     fp.add_argument('--validation', dest='validation', action='store_true')
     fp.add_argument('--testing', dest='validation', action='store_false')
