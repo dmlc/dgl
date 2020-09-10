@@ -64,9 +64,6 @@ def main(args):
     use_cuda = (args.gpu >= 0 and th.cuda.is_available())
     print("If use GPU: {}".format(use_cuda))
 
-    if use_cuda:
-        th.cuda.set_device(args.gpu)
-
     in_feat_dict = {}
     n_feats = {}
     for ntype in heterograph.ntypes:
@@ -74,10 +71,10 @@ def main(args):
         in_feat_dict[ntype] = 1
 
         if use_cuda:
-            n_feats[ntype] = n_feats[ntype].cuda()
+            n_feats[ntype] = n_feats[ntype].to('cuda:{}'.format(args.gpu))
 
     if use_cuda:
-        labels = labels.cuda()
+        labels = labels.to('cuda:{}'.format(args.gpu))
 
     # Step 2: Create model =================================================================== #
     compgcn_model = CompGCN(in_feat_dict=in_feat_dict,

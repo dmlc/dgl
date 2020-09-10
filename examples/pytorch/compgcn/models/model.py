@@ -249,7 +249,6 @@ class CompGCN(nn.Module):
         h_n = {}
         for ntype, feat in nfeats.items():
             print("################################", feat.device)
-            print(self.input_layer[ntype].device)
             h_n[ntype] = self.input_layer[ntype](feat)
             print("================================", h_n[ntype].device)
 
