@@ -292,7 +292,7 @@ class TUDataset(DGLBuiltinDataset):
             loadtxt(self._file_path("A"), delimiter=",").astype(int))
         DS_indicator = self._idx_from_zero(
             loadtxt(self._file_path("graph_indicator"), delimiter=",").astype(int))
-        DS_graph_labels = self._idx_from_zero(
+        DS_graph_labels = self._idx_reset(
             loadtxt(self._file_path("graph_labels"), delimiter=",").astype(int))
 
         g = dgl_graph(([], []))
@@ -386,6 +386,14 @@ class TUDataset(DGLBuiltinDataset):
     @staticmethod
     def _idx_from_zero(idx_tensor):
         return idx_tensor - np.min(idx_tensor)
+
+    @staticmethod
+    def _idx_reset(idx_tensor):
+        """Maps n unique labels to {0, ..., n-1} in an ordered fashion."""
+        labels = np.unique(idx_tensor)
+        relabel_map = {x: i for i, x in enumerate(labels)}
+        new_idx_tensor = np.vectorize(relabel_map.get)(idx_tensor)
+        return new_idx_tensor
 
     def statistics(self):
         return self.graph_lists[0].ndata['feat'].shape[1], \
