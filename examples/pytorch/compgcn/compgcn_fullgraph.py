@@ -71,13 +71,10 @@ def main(args):
     n_feats = {}
     for ntype in heterograph.ntypes:
         n_feats[ntype] = th.arange(heterograph.number_of_nodes(ntype)).view(-1, 1).float()
-        in_feat_dict[ntype] = th.tensor(1)
+        in_feat_dict[ntype] = 1
 
         if use_cuda:
             n_feats[ntype] = n_feats[ntype].cuda()
-            print(n_feats[ntype].device)
-            in_feat_dict[ntype] = in_feat_dict[ntype].cuda()
-            print(in_feat_dict[ntype].device)
 
     if use_cuda:
         labels = labels.cuda()
@@ -98,6 +95,8 @@ def main(args):
     if use_cuda:
         compgcn_model.cuda()
         heterograph = heterograph.to(th.device('cuda:{}'.format(args.gpu)))
+
+    print(heterograph.device)
 
     # Step 3: Create training components ===================================================== #
     loss_fn = th.nn.CrossEntropyLoss()
