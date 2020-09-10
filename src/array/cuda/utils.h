@@ -25,7 +25,7 @@ namespace cuda {
 inline int FindNumThreads(int dim, int max_nthrs = CUDA_MAX_NUM_THREADS) {
   CHECK_GE(dim, 0);
   if (dim == 0)
-    return 0;
+    return 1;
   int ret = max_nthrs;
   while (ret > dim) {
     ret = ret >> 1;
