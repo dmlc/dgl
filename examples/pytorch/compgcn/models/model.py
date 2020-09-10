@@ -101,6 +101,8 @@ class CompGraphConv(nn.Module):
                 # extract a subgraph in one edge type
                 rel_graph = g[stype, etype, dtype]
 
+                print("=============================", rel_graph.device)
+
                 # check edge numbers
                 if rel_graph.number_of_edges() == 0:
                     continue
