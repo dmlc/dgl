@@ -488,7 +488,7 @@ FlattenedHeteroGraphPtr HeteroGraph::FlattenImpl(const std::vector<dgl_type_t>& 
   CHECK_EQ(gptr->NumBits(), NumBits());
 
   FlattenedHeteroGraph* result = new FlattenedHeteroGraph;
-  result->graph = HeteroGraphRef(gptr);
+  result->graph = HeteroGraphRef(HeteroGraphPtr(new HeteroGraph(gptr->meta_graph(), {gptr})));
   result->induced_srctype = aten::VecToIdArray(induced_srctype).CopyTo(Context());
   result->induced_srctype_set = aten::VecToIdArray(srctype_set).CopyTo(Context());
   result->induced_srcid = aten::VecToIdArray(induced_srcid).CopyTo(Context());
