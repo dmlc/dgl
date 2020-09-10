@@ -135,7 +135,7 @@ if __name__ == '__main__':
     parser.add_argument("-d", "--dataset", type=str, required=True, help="dataset to use")
     parser.add_argument("--gpu", type=int, default=-1, help="GPU Index")
     parser.add_argument("--hid_dim", type=int, default=10, help="Hidden layer dimensionalities")
-    parser.add_argument("--num_layers", type=int, default=3, help="Number of layers")
+    parser.add_argument("--num_layers", type=int, default=4, help="Number of layers")
     parser.add_argument("--num_basis", type=int, default=5, help="Number of basis")
     parser.add_argument("--rev_indicator", type=str, default='_inv', help="Indicator of reversed edge")
     parser.add_argument("--comp_fn", type=str, default='sub', help="Composition function")
