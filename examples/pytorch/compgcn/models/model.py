@@ -218,7 +218,7 @@ class CompGCN(nn.Module):
         self.basis = dglnn.WeightBasis([self.rel_emb_dim], self.num_basis, self.num_rel)
 
         # 2. define matrices for convert node dimensions to relation embedding dimensions
-        self.input_layer = {}
+        self.input_layer = nn.ModuleDict()
         for ntype, in_feat in in_feat_dict.items():
             self.input_layer[ntype] = nn.Linear(in_feat, self.rel_emb_dim, bias=True)
 
@@ -247,9 +247,9 @@ class CompGCN(nn.Module):
         # Convert node input dimension to relation dimension
         h_n = {}
         for ntype, feat in nfeats.items():
-            # print("################################", feat.device)
+            print("################################", feat.device)
             h_n[ntype] = self.input_layer[ntype](feat)
-            # print("================================", h_n[ntype].device)
+            print("================================", h_n[ntype].device)
 
         # Forward of n layers of CompGraphConv
         for layer in self.layers:
