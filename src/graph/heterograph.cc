@@ -124,6 +124,10 @@ void HeteroGraphSanityCheck(GraphPtr meta_graph, const std::vector<HeteroGraphPt
   for (const auto &rg : rel_graphs) {
     CHECK_EQ(rg->NumEdgeTypes(), 1) << "Each relation graph must have only one edge type.";
   }
+  auto ctx = rel_graphs[0]->Context();
+  for (const auto &rg : rel_graphs) {
+    CHECK_EQ(rg->Context(), ctx) << "Each relation graph must have the same context.";
+  }
 }
 
 std::vector<int64_t>
