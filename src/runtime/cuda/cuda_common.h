@@ -16,6 +16,16 @@
 namespace dgl {
 namespace runtime {
 
+template <typename T>
+inline bool is_zero(T size) {
+    return size == 0;
+}
+
+template <>
+inline bool is_zero<dim3>(dim3 size) {
+    return size.x == 0 || size.y == 0 || size.z == 0;
+}
+
 #define CUDA_DRIVER_CALL(x)                                             \
   {                                                                     \
     CUresult result = x;                                                \
@@ -36,8 +46,8 @@ namespace runtime {
 
 #define CUDA_KERNEL_CALL(func, nblks, nthrs)                       \
   {                                                                \
-    if ((nblks) != 0 && (nthrs) != 0) {                            \
-      func;                                                        \
+    if (!is_zero((nblks)) && !is_zero((nthrs))) {                  \
+      (func);                                                      \
       cudaError_t e = cudaGetLastError();                          \
       CHECK(e == cudaSuccess || e == cudaErrorCudartUnloading)     \
           << "CUDA kernel launch error, nblks=" << (nblks)         \
