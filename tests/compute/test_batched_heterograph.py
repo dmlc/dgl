@@ -237,10 +237,16 @@ def test_features(idtype):
 @parametrize_dtype
 def test_empty_relation(idtype):
     """Test the features of batched DGLHeteroGraphs"""
+    def force_cpu_tensor(t):
+        return F.copy_to(F.tensor(t, dtype=idtype), F.cpu())
+    # Test here fix for tensorflow
+    # Because tf cannot create empty tensor on cuda, therefore we create the graph on gpu
+    # and copy it to cuda by dgl mechanism
     g1 = dgl.heterograph({
-        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'follows', 'user'): (force_cpu_tensor([0, 1]), force_cpu_tensor([1, 2])),
         ('user', 'plays', 'game'): ([], [])
-    }, idtype=idtype, device=F.ctx())
+    }, idtype=idtype, device=F.cpu())
+    g1 = g1.to(F.ctx())
     g1.nodes['user'].data['h1'] = F.tensor([[0.], [1.], [2.]])
     g1.nodes['user'].data['h2'] = F.tensor([[3.], [4.], [5.]])
     g1.edges['follows'].data['h1'] = F.tensor([[0.], [1.]])
@@ -325,6 +331,6 @@ if __name__ == '__main__':
     #test_topology('int32')
     #test_batching_batched('int32')
     #test_batched_features('int32')
-    #test_empty_relation('int32')
+    # test_empty_relation('int64')
     #test_to_device('int32')
     pass
