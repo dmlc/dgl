@@ -114,9 +114,6 @@ def main(args):
         tr_loss.backward()
         optimizer.step()
 
-        if epoch % 2 == 0:
-            print('In epoch:{:03d}, train_loss:{:4f}|validation_loss:{:4f}'.format(epoch, tr_loss, val_loss))
-
         train_acc = th.sum(logits[target][train_idx].argmax(dim=1) == labels[train_idx]).item() / len(train_idx)
         val_acc = th.sum(logits[target][val_idx].argmax(dim=1) == labels[val_idx]).item() / len(val_idx)
         print("Train Accuracy: {:.4f} | Train Loss: {:.4f} | Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
@@ -144,7 +141,7 @@ if __name__ == '__main__':
     parser.add_argument("--num_basis", type=int, default=50, help="Number of basis")
     parser.add_argument("--rev_indicator", type=str, default='_inv', help="Indicator of reversed edge")
     parser.add_argument("--comp_fn", type=str, default='sub', help="Composition function")
-    parser.add_argument("--max_epoch", type=int, default=10, help="The max number of epoches")
+    parser.add_argument("--max_epoch", type=int, default=100, help="The max number of epoches")
     fp = parser.add_mutually_exclusive_group(required=False)
     fp.add_argument('--validation', dest='validation', action='store_true')
     fp.add_argument('--testing', dest='validation', action='store_false')
