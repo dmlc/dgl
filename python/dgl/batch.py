@@ -1,11 +1,13 @@
 """Utilities for batching/unbatching graphs."""
 from collections.abc import Mapping
-from collections import defaultdict
 
 from . import backend as F
 from .base import ALL, is_all, DGLError, dgl_warning
+from .heterograph_index import disjoint_union
+from .heterograph import DGLHeteroGraph
 from . import convert
 from . import utils
+
 
 __all__ = ['batch', 'unbatch', 'batch_hetero', 'unbatch_hetero']
 
@@ -156,61 +158,44 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
         dgl_warning('Arguments edge_attrs has been deprecated. Please use'
                     ' edata instead.')
         edata = edge_attrs
-    if not (is_all(ndata) or isinstance(ndata, list)):
+    if not (is_all(ndata) or isinstance(ndata, list) or ndata is None):
         raise DGLError('Invalid argument ndata: must be a string list but got {}.'.format(
             type(ndata)))
-    if not (is_all(edata) or isinstance(edata, list)):
+    if not (is_all(edata) or isinstance(edata, list) or edata is None):
         raise DGLError('Invalid argument edata: must be a string list but got {}.'.format(
             type(edata)))
     if any(g.is_block for g in graphs):
         raise DGLError("Batching a block is not supported.")
 
-    utils.check_all_same_device(graphs, 'graphs')
-    utils.check_all_same_idtype(graphs, 'graphs')
-    relations = graphs[0].canonical_etypes
-    ntypes = graphs[0].ntypes
-    idtype = graphs[0].idtype
-    device = graphs[0].device
+    relations = list(sorted(graphs[0].canonical_etypes))
+    ntypes = list(sorted(graphs[0].ntypes))
+    etypes = [etype for _, etype, _ in relations]
 
-    # Batch graph structure for each relation graph
-    edge_dict = defaultdict(list)
-    num_nodes_dict = defaultdict(int)
-    for g in graphs:
-        for rel in relations:
-            srctype, etype, dsttype = rel
-            u, v = g.edges(order='eid', etype=rel)
-            src = u + num_nodes_dict[srctype]
-            dst = v + num_nodes_dict[dsttype]
-            edge_dict[rel].append((src, dst))
-        for ntype in ntypes:
-            num_nodes_dict[ntype] += g.number_of_nodes(ntype)
-    for rel in relations:
-        src, dst = zip(*edge_dict[rel])
-        edge_dict[rel] = (F.cat(src, 0), F.cat(dst, 0))
-    retg = convert.heterograph(edge_dict, num_nodes_dict, idtype=idtype, device=device)
+    gidx = disjoint_union(graphs[0]._graph.metagraph, [g._graph for g in graphs])
+    retg = DGLHeteroGraph(gidx, ntypes, etypes)
 
     # Compute batch num nodes
     bnn = {}
-    for ntype in graphs[0].ntypes:
+    for ntype in ntypes:
         bnn[ntype] = F.cat([g.batch_num_nodes(ntype) for g in graphs], 0)
     retg.set_batch_num_nodes(bnn)
 
     # Compute batch num edges
     bne = {}
-    for etype in graphs[0].canonical_etypes:
+    for etype in relations:
         bne[etype] = F.cat([g.batch_num_edges(etype) for g in graphs], 0)
     retg.set_batch_num_edges(bne)
 
     # Batch node feature
     if ndata is not None:
-        for ntype in graphs[0].ntypes:
+        for ntype in ntypes:
             feat_dicts = [g.nodes[ntype].data for g in graphs if g.number_of_nodes(ntype) > 0]
             ret_feat = _batch_feat_dicts(feat_dicts, ndata, 'nodes["{}"].data'.format(ntype))
             retg.nodes[ntype].data.update(ret_feat)
 
     # Batch edge feature
     if edata is not None:
-        for etype in graphs[0].canonical_etypes:
+        for etype in relations:
             feat_dicts = [g.edges[etype].data for g in graphs if g.number_of_edges(etype) > 0]
             ret_feat = _batch_feat_dicts(feat_dicts, edata, 'edges[{}].data'.format(etype))
             retg.edges[etype].data.update(ret_feat)
