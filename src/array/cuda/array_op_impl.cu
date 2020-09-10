@@ -211,7 +211,9 @@ IdArray Full(IdType val, int64_t length, DLContext ctx) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(length);
   int nb = (length + nt - 1) / nt;
-  CUDA_KERNEL_CALL((_FullKernel<IdType><<<nb, nt, 0, thr_entry->stream>>>(ret_data, length, val)), nb, nt);
+  CUDA_KERNEL_CALL(
+      (_FullKernel<IdType><<<nb, nt, 0, thr_entry->stream>>>(ret_data, length, val)),
+      nb, nt);
   return ret;
 }
 
@@ -242,7 +244,9 @@ IdArray Range(IdType low, IdType high, DLContext ctx) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(length);
   int nb = (length + nt - 1) / nt;
-  CUDA_KERNEL_CALL((_RangeKernel<IdType><<<nb, nt, 0, thr_entry->stream>>>(ret_data, low, length)), nb, nt);
+  CUDA_KERNEL_CALL(
+      (_RangeKernel<IdType><<<nb, nt, 0, thr_entry->stream>>>(ret_data, low, length)),
+      nb, nt);
   return ret;
 }
 

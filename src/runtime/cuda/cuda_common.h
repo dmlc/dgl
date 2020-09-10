@@ -36,7 +36,7 @@ namespace runtime {
 
 #define CUDA_KERNEL_CALL(func, nblks, nthrs)                       \
   {                                                                \
-    if ((nblks) != 0 and (nthrs) != 0) {                           \
+    if ((nblks) != 0 && (nthrs) != 0) {                            \
       func;                                                        \
       cudaError_t e = cudaGetLastError();                          \
       CHECK(e == cudaSuccess || e == cudaErrorCudartUnloading)     \
