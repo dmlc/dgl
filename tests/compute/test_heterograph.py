@@ -794,6 +794,8 @@ def test_flatten(idtype):
     assert fg.etypes == ['plays+wishes']
     assert fg.idtype == g.idtype
     assert fg.device == g.device
+    etype = fg.etypes[0]
+    assert fg[etype] is not None        # Issue #2166
 
     assert F.array_equal(fg.nodes['user'].data['h'], F.ones((3, 5)))
     assert F.array_equal(fg.nodes['game'].data['i'], F.ones((2, 5)))
