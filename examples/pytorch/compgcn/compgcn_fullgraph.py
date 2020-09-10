@@ -61,7 +61,9 @@ def main(args):
     print(heterograph.etypes)
 
     # check cuda
-    use_cuda = args.gpu >= 0 and th.cuda.is_available()
+    use_cuda = (args.gpu >= 0 and th.cuda.is_available())
+    print("If use GPU: {}".format(use_cuda))
+
     if use_cuda:
         th.cuda.set_device(args.gpu)
 
