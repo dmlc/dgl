@@ -170,7 +170,6 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     relations = list(sorted(graphs[0].canonical_etypes))
     ntypes = list(sorted(graphs[0].ntypes))
     etypes = [etype for _, etype, _ in relations]
-    device = graphs[0].device
 
     gidx = disjoint_union(graphs[0]._graph.metagraph, [g._graph for g in graphs])
     retg = DGLHeteroGraph(gidx, ntypes, etypes)
