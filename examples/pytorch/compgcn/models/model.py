@@ -128,7 +128,7 @@ class CompGraphConv(nn.Module):
                 elif self.comp_fn == 'mul':
                     rel_graph.update_all(dglfn.u_mul_e(lhs_field='h', rhs_field='h', out='m'),
                                          dglfn.sum(msg='m', out='comp_h'))
-                elif self.comp_fn == 'corr':
+                elif self.comp_fn == 'ccorr':
                     rel_graph.update_all(lambda edges: {'corr_h': ccorr(edges.src['h'], edges.data['h'])},
                                      dglfn.sum(msg='corr_h', out='comp_h'))
                 else:
