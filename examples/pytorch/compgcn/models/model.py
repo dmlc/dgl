@@ -248,7 +248,7 @@ class CompGCN(nn.Module):
         h_n = {}
         for ntype, feat in nfeats.items():
             print("################################", feat.device)
-            h_n[ntype] = self.input_layer[ntype](feat).to('cuda:0')
+            h_n[ntype] = self.input_layer[ntype](feat)
             print("================================", h_n[ntype].device)
 
         # Forward of n layers of CompGraphConv

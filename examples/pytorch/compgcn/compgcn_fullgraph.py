@@ -90,7 +90,7 @@ def main(args):
                             )
 
     if use_cuda:
-        compgcn_model.to('cuda:{}'.format(args.gpu))
+        compgcn_model = compgcn_model.to('cuda:{}'.format(args.gpu))
         heterograph = heterograph.to('cuda:{}'.format(args.gpu))
 
     # Step 3: Create training components ===================================================== #
