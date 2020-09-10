@@ -79,18 +79,18 @@ def main(args):
         labels = labels.cuda()
 
     # Step 2: Create model =================================================================== #
-    if args.gpu < 0:
-        compgcn_model = CompGCN(in_feat_dict=in_feat_dict,
-                                hid_dim=args.hid_dim,
-                                num_layers=args.num_layers,
-                                out_feat=num_classes,
-                                num_basis=args.num_basis,
-                                num_rel=num_rels,
-                                comp_fn=args.comp_fn,
-                                dropout=0.0,
-                                activation=None,
-                                batchnorm=False
-                                )
+    compgcn_model = CompGCN(in_feat_dict=in_feat_dict,
+                            hid_dim=args.hid_dim,
+                            num_layers=args.num_layers,
+                            out_feat=num_classes,
+                            num_basis=args.num_basis,
+                            num_rel=num_rels,
+                            comp_fn=args.comp_fn,
+                            dropout=0.0,
+                            activation=None,
+                            batchnorm=False
+                            )
+
     if use_cuda:
         compgcn_model.cuda()
         heterograph = heterograph.to('cuda:%d' % args.gpu)
