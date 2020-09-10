@@ -13,12 +13,12 @@
 
 using namespace dgl::runtime;
 
-namespace dgl
-{
-namespace aten
-{
+namespace dgl {
+namespace aten {
 
 ///////////////////////////// Partition1D /////////////////////////////
+// Divede src nodes into multiple partitions, and calculate the resulting dds format
+// dds is just multiple csr sharing the same indices and data tensor
 template <typename IdType>
 std::vector<IdArray> partition1D(CSRMatrix csr, int64_t num_col_partitions) {
   // original csr
@@ -30,7 +30,8 @@ std::vector<IdArray> partition1D(CSRMatrix csr, int64_t num_col_partitions) {
   const IdType *data = csr.data.Ptr<IdType>();
   // partitioned csr
   int64_t num_cols_per_partition = (N + num_col_partitions - 1) / num_col_partitions;
-  IdArray ret_indptr = NDArray::Empty({num_col_partitions, M + 1}, csr.indptr->dtype, csr.indptr->ctx);
+  IdArray ret_indptr = NDArray::Empty({num_col_partitions, M + 1}, \
+      csr.indptr->dtype, csr.indptr->ctx);
   IdArray ret_indices = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
   IdArray ret_eid = NDArray::Empty({nnz}, csr.indptr->dtype, csr.indptr->ctx);
   IdType *ret_indptr_data = static_cast<IdType *>(ret_indptr->data);
@@ -71,9 +72,13 @@ std::vector<IdArray> partition1D(CSRMatrix csr, int64_t num_col_partitions) {
 template std::vector<IdArray> partition1D<int64_t>(CSRMatrix csr, int64_t num_col_partitions);
 template std::vector<IdArray> partition1D<int32_t>(CSRMatrix csr, int64_t num_col_partitions);
 
-///////////////////////////// Partition1D /////////////////////////////
+///////////////////////////// Partition2D /////////////////////////////
+// Divide both src and dst nodes into multiple partitions, and calculate
+// the resulting COO.
 template <typename IdType>
-std::vector<IdArray> partition2D(CSRMatrix csr, int64_t num_row_partitions, int64_t num_col_partitions) {
+std::vector<IdArray> partition2D(CSRMatrix csr,
+                                 int64_t num_row_partitions,
+                                 int64_t num_col_partitions) {
   // original csr
   const int64_t M = csr.num_rows;
   const int64_t N = csr.num_cols;
@@ -135,9 +140,12 @@ std::vector<IdArray> partition2D(CSRMatrix csr, int64_t num_row_partitions, int6
   return {ret_row, ret_col, ret_eid};
 }
 
-
-template std::vector<IdArray> partition2D<int64_t>(CSRMatrix csr, int64_t num_row_partitions, int64_t num_col_partitions);
-template std::vector<IdArray> partition2D<int32_t>(CSRMatrix csr, int64_t num_row_partitions, int64_t num_col_partitions);
+template std::vector<IdArray> partition2D<int64_t>(CSRMatrix csr,
+                                                   int64_t num_row_partitions,
+                                                   int64_t num_col_partitions);
+template std::vector<IdArray> partition2D<int32_t>(CSRMatrix csr,
+                                                   int64_t num_row_partitions,
+                                                   int64_t num_col_partitions);
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLPartition1D")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
@@ -146,10 +154,11 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLPartition1D")
   int64_t num_cols_per_partition = args[2];
   CSRMatrix csr = hg->GetCSCMatrix(etype);
   csr = CSRSort(csr);
-  ATEN_ID_TYPE_SWITCH(hg->DataType(), IdType, {
-    *rv = ConvertNDArrayVectorToPackedFunc(
-      partition1D<IdType>(csr, num_cols_per_partition)
-      );
+  ATEN_XPU_SWITCH(hg->Context().device_type, XPU, "Partition1D", {
+    ATEN_ID_TYPE_SWITCH(hg->DataType(), IdType, {
+      *rv = ConvertNDArrayVectorToPackedFunc(
+        partition1D<IdType>(csr, num_cols_per_partition));
+    });
   });
 });
 
@@ -161,12 +170,13 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLPartition2D")
   int64_t num_cols_per_partition = args[3];
   CSRMatrix csr = hg->GetCSRMatrix(etype);
   csr = CSRSort(csr);
-  ATEN_ID_TYPE_SWITCH(hg->DataType(), IdType, {
-    *rv = ConvertNDArrayVectorToPackedFunc(
-      partition2D<IdType>(csr, num_rows_per_partition, num_cols_per_partition)
-      );
+  ATEN_XPU_SWITCH(hg->Context().device_type, XPU, "Partition2D", {
+    ATEN_ID_TYPE_SWITCH(hg->DataType(), IdType, {
+      *rv = ConvertNDArrayVectorToPackedFunc(
+        partition2D<IdType>(csr, num_rows_per_partition, num_cols_per_partition));
+    });
   });
 });
 
-} // namespace aten
-} // namespace dgl
+}  // namespace aten
+}  // namespace dgl

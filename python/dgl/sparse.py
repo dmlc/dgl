@@ -1,14 +1,16 @@
 """Module for sparse matrix operators."""
 # pylint: disable= invalid-name
 from __future__ import absolute_import
+import logging
+
+import tvm
 
 import dgl.ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
-import tvm
-from .tvm import gsddmm, gspmm
 from .function import TargetCode
+from .tvm import gsddmm, gspmm
 
 def infer_broadcast_shape(op, shp1, shp2):
     r"""Check the shape validity, and infer the output shape given input shape and operator.
@@ -77,10 +79,12 @@ target_mapping = {
 use_tvm = True
 
 def _gspmm(gidx, op, reduce_op, u, e):
-    return _gspmm_tvm(gidx, op, reduce_op, u, e) if use_tvm else _gspmm_native(gidx, op, reduce_op, u, e)
+    return _gspmm_tvm(gidx, op, reduce_op, u, e) if use_tvm \
+        else _gspmm_native(gidx, op, reduce_op, u, e)
 
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
-    return _gsddmm_tvm(gidx, op, lhs, rhs, lhs_target, rhs_target) if use_tvm else _gsddmm_native(gidx, op, lhs, rhs, lhs_target, rhs_target)
+    return _gsddmm_tvm(gidx, op, lhs, rhs, lhs_target, rhs_target) if use_tvm \
+        else _gsddmm_native(gidx, op, lhs, rhs, lhs_target, rhs_target)
 
 def _gspmm_native(gidx, op, reduce_op, u, e):
     r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
@@ -246,7 +250,7 @@ partitioned_1d_graphs = {}
 partitioned_2d_graphs = {}
 
 def _gspmm_tvm(gidx, op, reduce_op, u, e, advise=True,
-           num_feat_partitions=1, num_col_partitions=1):
+               num_feat_partitions=1, num_col_partitions=1):
     r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
     :attr:`op` on source node feature and edge feature, leads to a message on edge.
     Then aggregates the message by :attr:`reduce_op` on destination nodes.
@@ -279,15 +283,15 @@ def _gspmm_tvm(gidx, op, reduce_op, u, e, advise=True,
         default is True
         It will be overrided if any number of partitions(below) is set to larger than 1.
     num_feat_partitions: int
-        Number of partitions on feature dimension. 
+        Number of partitions on feature dimension.
         It must be positive, and is smaller than feature length of result.
         If feature has multiple dimensions, this parameter is applied
         on flatten features of result.
     num_col_partitions: int
-        Number of partitions on the columns of the sparse matrix. 
+        Number of partitions on the columns of the sparse matrix.
         It must be positive, and is smaller than number of columns.
-        If this value is larger than 1, a partitioning algorithm is run on the graph. 
-        The partitioned results is then cached for following runs. 
+        If this value is larger than 1, a partitioning algorithm is run on the graph.
+        The partitioned results is then cached for following runs.
     Returns
     -------
     tuple
@@ -326,10 +330,11 @@ def _gspmm_tvm(gidx, op, reduce_op, u, e, advise=True,
         # num_col_partitions = 8
         # num_feat_partitions = 2
     if target == 'cuda' and (num_col_partitions > 1 or num_feat_partitions > 1):
-        print('Partitioning not supported on GPU')
+        logging.info('Partitioning not supported on GPU')
         num_col_partitions, num_feat_partitions = 1, 1
     if num_col_partitions == 1:
-        indptr, indices, edge_mapping = map(lambda x: tvm.nd.from_dlpack(x.to_dlpack()), gidx.get_csc_dlpack(0))
+        indptr, indices, edge_mapping = map(lambda x: tvm.nd.from_dlpack(x.to_dlpack()), \
+            gidx.get_csc_dlpack(0))
     else:
         graph_key = (id(gidx), num_col_partitions, num_rows, num_cols, nnz)
         if graph_key in partitioned_1d_graphs:
@@ -383,9 +388,8 @@ def _gspmm_tvm(gidx, op, reduce_op, u, e, advise=True,
     mod(*f_input)
     return v, (arg_u, arg_e)
 
-
 def _gsddmm_tvm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
-            num_feat_partitions=1, num_row_partitions=1, num_col_partitions=1):
+                num_feat_partitions=1, num_row_partitions=1, num_col_partitions=1):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
     takes the result of :attr:`op` on source node feature and destination node
     feature, leads to a feature on edge.
@@ -420,16 +424,16 @@ def _gsddmm_tvm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
         default is True
         It will be overrided if any number of partitions(below) is set to larger than 1.
     num_feat_partitions: int
-        Number of partitions on feature dimension. 
+        Number of partitions on feature dimension.
         It must be positive, and is smaller than feature length of result.
         If feature has multiple dimensions, this parameter is applied
         on flatten features of result.
     num_row_partitions: int
         Number of partitions on the rows of the sparse matrix.
         It must be positive, and is smaller than number of rows.
-        If this value and/or the next parameter is larger than 1, 
-        a partitioning algorithm is run on the graph. 
-        The partitioned results is then cached for following runs. 
+        If this value and/or the next parameter is larger than 1,
+        a partitioning algorithm is run on the graph.
+        The partitioned results is then cached for following runs.
     num_col_partitions: int
         Number of partitions on the columns of the sparse matrix.
         It must be positive, and is smaller than number of columns.
@@ -473,24 +477,28 @@ def _gsddmm_tvm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
     srctype, dsttype = gidx.metagraph.find_edge(0)
     num_cols = gidx.number_of_nodes(dsttype)
     num_rows = gidx.number_of_nodes(srctype)
-    if target == 'cpu' and num_row_partitions == 1 and num_col_partitions == 1 and num_feat_partitions == 1 and advise:
+    if target == 'cpu' and num_row_partitions == 1 and num_col_partitions == 1 \
+        and num_feat_partitions == 1 and advise:
         # search for parameters
         pass
         # num_row_partitions, num_col_partitions = 2, 2
         # num_feat_partitions = 2
-    if target == 'cuda' and (num_row_partitions > 1 or num_col_partitions > 1 or num_feat_partitions > 1):
-        print('Partitioning not supported on GPU')
+    if target == 'cuda' and (num_row_partitions > 1 or num_col_partitions > 1 \
+        or num_feat_partitions > 1):
+        logging.info('Partitioning not supported on GPU')
         num_row_partitions, num_col_partitions, num_feat_partitions = 1, 1, 1
     graph_key = (id(gidx), num_row_partitions, num_col_partitions, num_rows, num_cols, nnz)
     if graph_key in partitioned_2d_graphs:
         row, col, edge_mapping, reverse_mapping = partitioned_2d_graphs[graph_key]
     else:
         if num_row_partitions == 1 and num_col_partitions == 1:
-            row, col, edge_mapping = map(lambda x: tvm.nd.from_dlpack(x.to_dlpack()), gidx.get_coo_dlpack(0))
+            row, col, edge_mapping = map(lambda x: tvm.nd.from_dlpack(x.to_dlpack()),
+                gidx.get_coo_dlpack(0))
         else:
             tmp = _CAPI_DGLPartition2D(gidx, 0, num_row_partitions, num_col_partitions)
             row, col, edge_mapping = [tvm.nd.from_dlpack(tmp(x).to_dlpack()) for x in range(3)]
-        reverse_mapping = F.zerocopy_to_dgl_ndarray(F.argsort(F.from_dgl_nd(edge_mapping), 0, False))
+        reverse_mapping = F.zerocopy_to_dgl_ndarray(\
+            F.argsort(F.from_dgl_nd(edge_mapping), 0, False))
         partitioned_2d_graphs[graph_key] = (row, col, edge_mapping, reverse_mapping)
     edge_shuffled = edge_mapping.shape != (0,)
     use_idx = (lhs_target == TargetCode.EDGE or rhs_target == TargetCode.EDGE) \

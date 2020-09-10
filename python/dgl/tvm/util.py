@@ -12,11 +12,11 @@ def max_combine(x, y):
         val = Select(x[1] > y[1], x[1], y[1])
         return idx, val
 
-def max_identity(t0, t1, t2=None):
-    if t2:
-        return const(0, t0), const(0, t1), te.min_value(t2)
+def max_identity(x, y, z=None):
+    if z:
+        return const(0, x), const(0, y), te.min_value(z)
     else:
-        return const(0, t0), te.min_value(t1)
+        return const(0, x), te.min_value(y)
 
 def min_combine(x, y):
     if len(x) == 3:
@@ -29,11 +29,11 @@ def min_combine(x, y):
         val = Select(x[1] < y[1], x[1], y[1])
         return idx, val
 
-def min_identity(t0, t1, t2=None):
-    if t2:
-        return const(0, t0), const(0, t1), te.max_value(t2)
+def min_identity(x, y, z=None):
+    if z:
+        return const(0, x), const(0, y), te.max_value(z)
     else:
-        return const(0, t0), te.max_value(t1)
+        return const(0, x), te.max_value(y)
 
 argmax = te.comm_reducer(max_combine, max_identity, name='argmax')
 argmin = te.comm_reducer(min_combine, min_identity, name='argmin')
@@ -44,10 +44,10 @@ reduce_op_map = {
 }
 
 binary_op_map = {
-    'add': lambda x,y : x+y,
-    'sub': lambda x,y : x-y,
-    'mul': lambda x,y : x*y,
-    'div': lambda x,y : x/y,
-    'copy_lhs' : lambda x,y : x,
-    'copy_rhs' : lambda x,y : y,
+    'add': lambda x, y: x+y,
+    'sub': lambda x, y: x-y,
+    'mul': lambda x, y: x*y,
+    'div': lambda x, y: x/y,
+    'copy_lhs' : lambda x, y: x,
+    'copy_rhs' : lambda x, y: y,
 }
