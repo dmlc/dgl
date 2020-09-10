@@ -61,6 +61,9 @@ class CompGraphConv(nn.Module):
         # define weights of >0 edge matric
         self.W_rel = nn.Linear(self.hid_dim, self.hid_dim, bias=self.bias)
 
+        if self.batchnorm:
+            self.bn = nn.BatchNorm1d(self.hid_dim)
+
     def forward(self, g, n_in_feats, e_in_feats):
         """
         Input graph g should include reversed edges, and at the end of
@@ -161,9 +164,7 @@ class CompGraphConv(nn.Module):
                                      self.dropout(self_rsts.get(ntype)) * 1/3
 
                 # add batchnorm
-                if self.batchnorm:
-                    bn = nn.BatchNorm1d(self.hid_dim)
-                    n_out_feats[ntype] = bn(n_out_feats[ntype])
+                n_out_feats[ntype] = self.bn(n_out_feats[ntype])
 
                 # use activate to compute non-linear
                 if self.activation is not None:
