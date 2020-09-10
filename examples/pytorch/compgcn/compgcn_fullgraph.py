@@ -139,6 +139,8 @@ if __name__ == '__main__':
     parser.add_argument("--rev_indicator", type=str, default='_inv', help="Indicator of reversed edge")
     parser.add_argument("--comp_fn", type=str, default='sub', help="Composition function")
     parser.add_argument("--max_epoch", type=int, default=200, help="The max number of epoches")
+    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
+    parser.add_argument("--drop_out", type=float, default=0.1, help="Composition function")
     fp = parser.add_mutually_exclusive_group(required=False)
     fp.add_argument('--validation', dest='validation', action='store_true')
     fp.add_argument('--testing', dest='validation', action='store_false')
