@@ -1,6 +1,7 @@
 """dgl edge_softmax operator module."""
 from ..backend import edge_softmax as edge_softmax_internal
-from ..base import ALL
+from ..backend import astype
+from ..base import ALL, is_all
 
 __all__ = ['edge_softmax']
 
@@ -103,5 +104,7 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
                 [1.0000],
                 [0.5000]])
     """
+    if not is_all(eids):
+        eids = astype(eids, graph.idtype)
     return edge_softmax_internal(graph._graph, logits,
                                  eids=eids, norm_by=norm_by)
