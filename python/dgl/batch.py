@@ -173,7 +173,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     device = graphs[0].device
 
     gidx = disjoint_union(graphs[0]._graph.metagraph, [g._graph for g in graphs])
-    retg = DGLHeteroGraph(gidx, ntypes, etypes).to(device)
+    retg = DGLHeteroGraph(gidx, ntypes, etypes)
 
     # Compute batch num nodes
     bnn = {}

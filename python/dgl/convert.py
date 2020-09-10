@@ -346,7 +346,6 @@ def heterograph(data_dict,
     # metagraph is DGLGraph, currently still using int64 as index dtype
     metagraph = graph_index.from_coo(len(ntypes), meta_edges_src, meta_edges_dst, True)
     # create graph index
-    print(list(rgrh.device for rgrh in rel_graphs))
     hgidx = heterograph_index.create_heterograph_from_relations(
         metagraph, [rgrh._graph for rgrh in rel_graphs], num_nodes_per_type)
     retg = DGLHeteroGraph(hgidx, ntypes, etypes)
