@@ -56,6 +56,19 @@ def data_type_dict():
             'bool' : tf.bool}
 
 
+_tf_dtype_to_np_dtype = {
+    tf.float16: np.float16,
+    tf.float32: np.float32,
+    tf.float64: np.float64,
+    tf.uint8: np.uint8,
+    tf.int8: np.int8,
+    tf.int16: np.int16,
+    tf.int32: np.int32,
+    tf.int64: np.int64,
+    tf.bool: np.bool
+}
+
+
 def cpu():
     return "/cpu:0"
 
@@ -69,9 +82,7 @@ def tensor(data, dtype=None):
     else:
         if isinstance(data, numbers.Number):
             data = [data]
-        print(dtype)
-        x = nd.array(np.array([data], dtype=dtype))
-        return zerocopy_from_dgl_ndarray(x)
+        return tf.convert_to_tensor(data, dtype=dtype)
 
 
 def initialize_context():
@@ -147,7 +158,8 @@ def to_backend_ctx(dglctx):
 
 
 def astype(input, ty):
-    return tf.cast(input, dtype=ty)
+    with tf.device(input.device):
+        return tf.cast(input, dtype=ty)
 
 
 def asnumpy(input):
