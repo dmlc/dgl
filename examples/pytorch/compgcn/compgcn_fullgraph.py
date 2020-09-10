@@ -95,7 +95,7 @@ def main(args):
 
     # Step 3: Create training components ===================================================== #
     loss_fn = th.nn.CrossEntropyLoss()
-    optimizer = optim.Adam(compgcn_model.parameters(), lr=0.005, weight_decay=5e-4)
+    optimizer = optim.Adam(compgcn_model.parameters(), lr=0.001, weight_decay=5e-4)
 
     # Step 4: training epoches =============================================================== #
     for epoch in range(args.max_epoch):
@@ -134,9 +134,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='BoSH CompGCN Full Graph')
     parser.add_argument("-d", "--dataset", type=str, required=True, help="dataset to use")
     parser.add_argument("--gpu", type=int, default=-1, help="GPU Index")
-    parser.add_argument("--hid_dim", type=int, default=32, help="Hidden layer dimensionalities")
+    parser.add_argument("--hid_dim", type=int, default=10, help="Hidden layer dimensionalities")
     parser.add_argument("--num_layers", type=int, default=3, help="Number of layers")
-    parser.add_argument("--num_basis", type=int, default=50, help="Number of basis")
+    parser.add_argument("--num_basis", type=int, default=5, help="Number of basis")
     parser.add_argument("--rev_indicator", type=str, default='_inv', help="Indicator of reversed edge")
     parser.add_argument("--comp_fn", type=str, default='sub', help="Composition function")
     parser.add_argument("--max_epoch", type=int, default=100, help="The max number of epoches")
