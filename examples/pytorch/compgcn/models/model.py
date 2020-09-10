@@ -101,8 +101,6 @@ class CompGraphConv(nn.Module):
                 # extract a subgraph in one edge type
                 rel_graph = g[stype, etype, dtype]
 
-                print("=============================", rel_graph.device)
-
                 # check edge numbers
                 if rel_graph.number_of_edges() == 0:
                     continue
@@ -111,7 +109,6 @@ class CompGraphConv(nn.Module):
                 if stype not in n_in_feats or dtype not in n_in_feats:
                     continue
                 else:
-                    print("################################", n_in_feats[stype].device)
                     rel_graph.nodes[stype].data['h'] = n_in_feats[stype]
                     rel_graph.nodes[dtype].data['h'] = n_in_feats[dtype]
 
@@ -252,7 +249,7 @@ class CompGCN(nn.Module):
         h_n = {}
         for ntype, feat in nfeats.items():
             print("################################", feat.device)
-
+            print(self.input_layer[ntype].device)
             h_n[ntype] = self.input_layer[ntype](feat)
             print("================================", h_n[ntype].device)
 
