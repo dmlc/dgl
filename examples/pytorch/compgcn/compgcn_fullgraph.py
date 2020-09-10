@@ -107,7 +107,7 @@ def main(args):
 
         # 计算loss
         tr_loss = loss_fn(logits[target][train_idx], labels[train_idx])
-        va_loss = loss_fn(logits[target][val_idx], labels[val_idx])
+        val_loss = loss_fn(logits[target][val_idx], labels[val_idx])
 
         # 反向传播
         optimizer.zero_grad()
@@ -115,10 +115,24 @@ def main(args):
         optimizer.step()
 
         if epoch % 2 == 0:
-            print('In epoch:{:03d}, train_loss:{:4f}|validation_loss:{:4f}'.format(epoch, tr_loss, va_loss))
+            print('In epoch:{:03d}, train_loss:{:4f}|validation_loss:{:4f}'.format(epoch, tr_loss, val_loss))
 
-    # 步骤5： 如果需要，结果输出和模型保存 ============================================================== #
-    # TODO: 保存模型
+        train_acc = th.sum(logits[target][train_idx].argmax(dim=1) == labels[train_idx]).item() / len(train_idx)
+        val_acc = th.sum(logits[target][val_idx].argmax(dim=1) == labels[val_idx]).item() / len(val_idx)
+        print("Train Accuracy: {:.4f} | Train Loss: {:.4f} | Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
+              format(train_acc, tr_loss.item(), val_acc, val_loss.item()))
+
+    print()
+
+    compgcn_model.eval()
+    logits = compgcn_model.forward(heterograph, n_feats)
+    logits = logits[target][test_idx]
+    test_loss = loss_fn(logits[target][test_idx], labels[test_idx])
+    test_acc = th.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
+    print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
+    print()
+
+    # Step 5: If need, save model to file ============================================================== #
 
 
 if __name__ == '__main__':
