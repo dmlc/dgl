@@ -95,7 +95,7 @@ def main(args):
 
     if use_cuda:
         compgcn_model.cuda()
-        heterograph = heterograph.to('cuda:%d' % args.gpu)
+        heterograph = heterograph.to('cuda:{}'.format(args.gpu))
 
     # Step 3: Create training components ===================================================== #
     loss_fn = th.nn.CrossEntropyLoss()
