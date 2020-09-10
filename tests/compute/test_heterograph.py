@@ -366,7 +366,7 @@ def test_query(idtype):
     print(g)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU does not have COO impl.")
-def test_hypersparse():
+def _test_hypersparse():
     N1 = 1 << 50        # should crash if allocated a CSR
     N2 = 1 << 48
 
@@ -431,7 +431,7 @@ def test_hypersparse():
     assert g.out_degrees(N2, 'plays') == 0
     assert F.asnumpy(g.out_degrees([0, N2], 'plays')).tolist() == [1, 0]
 
-def test_edge_ids():
+def _test_edge_ids():
     N1 = 1 << 50        # should crash if allocated a CSR
     N2 = 1 << 48
 
@@ -794,6 +794,8 @@ def test_flatten(idtype):
     assert fg.etypes == ['plays+wishes']
     assert fg.idtype == g.idtype
     assert fg.device == g.device
+    etype = fg.etypes[0]
+    assert fg[etype] is not None        # Issue #2166
 
     assert F.array_equal(fg.nodes['user'].data['h'], F.ones((3, 5)))
     assert F.array_equal(fg.nodes['game'].data['i'], F.ones((2, 5)))
@@ -1714,7 +1716,7 @@ def test_format(idtype):
     assert g.formats()['created'] == ['coo']
     g1 = g.formats(['coo', 'csr', 'csc'])
     assert len(g1.formats()['created']) + len(g1.formats()['not created']) == 3
-    g1.create_format_()
+    g1.create_formats_()
     assert len(g1.formats()['created']) == 3
     assert g.formats()['created'] == ['coo']
 

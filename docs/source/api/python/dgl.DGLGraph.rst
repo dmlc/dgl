@@ -8,7 +8,7 @@ dgl.DGLGraph
 
     Class for storing graph structure and node/edge feature data.
 
-    There are a few ways to create create a DGLGraph:
+    There are a few ways to create a DGLGraph:
 
     * To create a homogeneous graph from Tensor data, use :func:`dgl.graph`.
     * To create a heterogeneous graph from Tensor data, use :func:`dgl.heterograph`.

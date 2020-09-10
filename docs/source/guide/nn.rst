@@ -48,8 +48,7 @@ The construction function will do the following:
                      aggregator_type,
                      bias=True,
                      norm=None,
-                     activation=None,
-                     allow_zero_in_degree=False):
+                     activation=None):
             super(SAGEConv, self).__init__()
 
             self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
@@ -57,7 +56,6 @@ The construction function will do the following:
             self._aggre_type = aggregator_type
             self.norm = norm
             self.activation = activation
-            self._allow_zero_in_degree = allow_zero_in_degree
 
 In construction function, we first need to set the data dimensions. For
 general Pytorch module, the dimensions are usually input dimension,
@@ -115,7 +113,7 @@ DGL NN Module Forward Function
 In NN module, ``forward()`` function does the actual message passing and
 computating. Compared with Pytorch’s NN module which usually takes
 tensors as the parameters, DGL NN module takes an additional parameter
-`DGLGraph <https://docs.dgl.ai/api/python/graph.html>`__. The
+:class:`dgl.DGLGraph`. The
 workload for ``forward()`` function can be splitted into three parts:
 
 -  Graph checking and graph type specification.
@@ -133,37 +131,16 @@ Graph checking and graph type specification
 
         def forward(self, graph, feat):
             with graph.local_scope():
-                # Graph checking
-                if not self._allow_zero_in_degree:
-                    if (graph.in_degrees() == 0).any():
-                        raise DGLError('There are 0-in-degree nodes in the graph,
-                                      'output for those nodes will be invalid.'
-                                      'This is harmful for some applications, '
-                                      'causing silent performance regression.'
-                                      'Adding self-loop on the input graph by calling
-                                      '`g = dgl.add_self_loop(g)` will resolve the issue.'
-                                      'Setting ``allow_zero_in_degree`` to be `True`
-                                      'when constructing this module will suppress the '
-                                      'check and let the code run.')
                 # Specify graph type then expand input feature according to graph type
                 feat_src, feat_dst = expand_as_pair(feat, graph)
 
-**This part of code is usually shared by all the NN modules.**
-
 ``forward()`` needs to handle many corner cases on the input that can
-lead to invalid values in computing and message passing. The above
-example handles the case where there are 0-in-degree nodes in the input
-graph.
-
-When a node has 0-in-degree, the ``mailbox`` will be empty and the
-reduce function will not produce valid values. For example, if the
-reduce function is ``max``, the output for the 0-in-degree nodes
-will be ``-inf``.
+lead to invalid values in computing and message passing. One typical check in conv modules like :class:`~dgl.nn.pytorch.conv.GraphConv` is to verify no 0-in-degree node in the input graph. When a node has 0-in-degree, the ``mailbox`` will be empty and the reduce function will produce all-zero values. This may cause silent regression in model performance. However, in :class:`~dgl.nn.pytorch.conv.SAGEConv` module, the aggregated representation will be concatenated with the original node feature, the output of ``forward()`` will not be all-zero. No such check is needed in this case.
 
 DGL NN module should be reusable across different types of graph input
-including: homogeneous graph, `heterogeneous
-graph <https://docs.dgl.ai/tutorials/basics/5_hetero.html>`__, `subgraph
-block <https://docs.dgl.ai/guide/minibatch.html>`__.
+including: homogeneous graph, heterogeneous
+graph (:ref:`guide-graph-heterogeneous`), subgraph
+block (:ref:`guide-minibatch`).
 
 The math formulas for SAGEConv are:
 
@@ -186,7 +163,7 @@ We need to specify the source node feature ``feat_src`` and destination
 node feature ``feat_dst`` according to the graph type. The function to
 specify the graph type and expand ``feat`` into ``feat_src`` and
 ``feat_dst`` is
-`expand_as_pair() <https://github.com/dmlc/dgl/blob/master/python/dgl/utils/internal.py#L553>`__.
+``expand_as_pair()``.
 The detail of this function is shown below.
 
 .. code::
@@ -382,76 +359,4 @@ relations with no edge or no node with the its src type will be skipped.
                 rsts[nty] = self.agg_fn(alist, nty)
 
 Finally, the results on the same destination node type from multiple
-relationships are aggregated using ``self.agg_fn`` function.
-
-HeteroGraphConv examplar usage code
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Create a heterograph
-^^^^^^^^^^^^^^^^^^^^
-
-.. code::
-
-    >>> import dgl
-    >>> g = dgl.heterograph({
-    >>>     ('user', 'follows', 'user') : edges1,
-    >>>     ('user', 'plays', 'game') : edges2,
-    >>>     ('store', 'sells', 'game')  : edges3})
-
-This heterograph has three types of relations and nodes.
-
-Create a HeteroGraphConv module
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. code::
-
-    >>> import dgl.nn.pytorch as dglnn
-    >>> conv = dglnn.HeteroGraphConv({
-    >>>     'follows' : dglnn.GraphConv(...),
-    >>>     'plays' : dglnn.GraphConv(...),
-    >>>     'sells' : dglnn.SAGEConv(...)},
-    >>>     aggregate='sum')
-
-This module applies different convolution modules to different
-relations. Note that the modules for ``'follows'`` and ``'plays'`` do
-not share weights. The ``aggregate`` parameter indicates how results are
-aggregated if multiple relations have the same destination node types.
-
-Call forward with different inputs
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Case 1: Call forward with some ``'user'`` features. This computes new
-features for both ``'user'`` and ``'game'`` nodes.
-
-.. code::
-
-    >>> import torch as th
-    >>> h1 = {'user' : th.randn((g.number_of_nodes('user'), 5))}
-    >>> h2 = conv(g, h1)
-    >>> print(h2.keys())
-    dict_keys(['user', 'game'])
-
-Case 2: Call forward with both ``'user'`` and ``'store'`` features.
-
-.. code::
-
-    >>> f1 = {'user' : ..., 'store' : ...}
-    >>> f2 = conv(g, f1)
-    >>> print(f2.keys())
-    dict_keys(['user', 'game'])
-
-Because both the ``'plays'`` and ``'sells'`` relations will update the
-``'game'`` features, their results are aggregated by the specified
-method (i.e., summation here).
-
-Case 3: Call forward with a pair of inputs.
-
-.. code::
-
-    >>> x_src = {'user' : ..., 'store' : ...}
-    >>> x_dst = {'user' : ..., 'game' : ...}
-    >>> y_dst = conv(g, (x_src, x_dst))
-    >>> print(y_dst.keys())
-    dict_keys(['user', 'game'])
-
-Each submodule will also be invoked with a pair of inputs.
+relationships are aggregated using ``self.agg_fn`` function. Examples can be found in the API Doc for :class:`dgl.nn.pytorch.HeteroGraphConv`.

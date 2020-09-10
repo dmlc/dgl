@@ -87,7 +87,6 @@ Getting Started
    :titlesonly:
    :glob:
 
-   guide/preface
    guide/graph
    guide/message
    guide/nn
