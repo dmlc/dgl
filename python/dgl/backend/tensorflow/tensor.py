@@ -56,19 +56,6 @@ def data_type_dict():
             'bool' : tf.bool}
 
 
-_tf_dtype_to_np_dtype = {
-    tf.float16: np.float16,
-    tf.float32: np.float32,
-    tf.float64: np.float64,
-    tf.uint8: np.uint8,
-    tf.int8: np.int8,
-    tf.int16: np.int16,
-    tf.int32: np.int32,
-    tf.int64: np.int64,
-    tf.bool: np.bool
-}
-
-
 def cpu():
     return "/cpu:0"
 
