@@ -122,7 +122,7 @@ def main(args):
     compgcn_model.eval()
     logits = compgcn_model.forward(heterograph, n_feats)
     test_loss = loss_fn(logits[target][test_idx], labels[test_idx])
-    test_acc = th.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
+    test_acc = th.sum(logits[target][test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
     print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
     print()
 
