@@ -93,8 +93,8 @@ def main(args):
                             )
 
     if use_cuda:
-        compgcn_model.cuda()
-        heterograph = heterograph.to(th.device('cuda:{}'.format(args.gpu)))
+        compgcn_model.to('cuda:{}'.format(args.gpu))
+        heterograph = heterograph.to('cuda:{}'.format(args.gpu))
 
     print(heterograph.device)
 
@@ -104,15 +104,15 @@ def main(args):
 
     # Step 4: training epoches =============================================================== #
     for epoch in range(args.max_epoch):
-        # 前向传播
+        # forward
         compgcn_model.train()
         logits = compgcn_model.forward(heterograph, n_feats)
 
-        # 计算loss
+        # compute loss
         tr_loss = loss_fn(logits[target][train_idx], labels[train_idx])
         val_loss = loss_fn(logits[target][val_idx], labels[val_idx])
 
-        # 反向传播
+        # backward
         optimizer.zero_grad()
         tr_loss.backward()
         optimizer.step()
