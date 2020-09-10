@@ -1632,7 +1632,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     Examples
     --------
     Converting a homogeneous graph to a block as described above:
-    >>> g = dgl.graph(([0, 1, 2], [1, 2, 3]))
+    >>> g = dgl.graph(([1, 2], [2, 3]))
     >>> block = dgl.to_block(g, torch.LongTensor([3, 2]))
 
     The output nodes would be exactly the same as the ones given: [3, 2].
@@ -1665,10 +1665,17 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     >>> induced_src[src], induced_dst[dst]
     (tensor([2, 1]), tensor([3, 2]))
 
+    The output nodes specified must be a superset of the nodes that have edges connecting
+    to them.  For example, the following will raise an error since the output nodes
+    does not contain node 3, which has an edge connecting to it.
+
+    >>> g = dgl.graph(([1, 2], [2, 3]))
+    >>> dgl.to_block(g, torch.LongTensor([2]))     # error
+
     Converting a heterogeneous graph to a block is similar, except that when specifying
     the output nodes, you have to give a dict:
 
-    >>> g = dgl.heterograph({('A', '_E', 'B'): ([0, 1, 2], [1, 2, 3])})
+    >>> g = dgl.heterograph({('A', '_E', 'B'): ([1, 2], [2, 3])})
 
     If you don't specify any node of type A on the output side, the node type ``A``
     in the block would have zero nodes on the output side.
