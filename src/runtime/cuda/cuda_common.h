@@ -44,14 +44,15 @@ inline bool is_zero<dim3>(dim3 size) {
         << "CUDA: " << cudaGetErrorString(e);                      \
   }
 
-#define CUDA_KERNEL_CALL(func, nblks, nthrs)                       \
+#define CUDA_KERNEL_CALL(kernel, nblks, nthrs, shmem, stream, ...) \
   {                                                                \
-    if (!is_zero((nblks)) && !is_zero((nthrs))) {                  \
-      (func);                                                      \
+    if (!dgl::runtime::is_zero((nblks)) &&                         \
+        !dgl::runtime::is_zero((nthrs))) {                         \
+      (kernel) <<< (nblks), (nthrs), (shmem), (stream) >>>         \
+        (__VA_ARGS__);                                             \
       cudaError_t e = cudaGetLastError();                          \
       CHECK(e == cudaSuccess || e == cudaErrorCudartUnloading)     \
-          << "CUDA kernel launch error, nblks=" << (nblks)         \
-          << ", nthrs=" << (nthrs) << " "                          \
+          << "CUDA kernel launch error: "                          \
           << cudaGetErrorString(e);                                \
     }                                                              \
   }

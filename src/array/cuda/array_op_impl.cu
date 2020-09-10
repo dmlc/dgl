@@ -36,8 +36,9 @@ IdArray BinaryElewise(IdArray lhs, IdArray rhs) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(len);
   int nb = (len + nt - 1) / nt;
-  CUDA_KERNEL_CALL((_BinaryElewiseKernel<IdType, Op><<<nb, nt, 0, thr_entry->stream>>>(
-      lhs_data, rhs_data, ret_data, len)), nb, nt);
+  CUDA_KERNEL_CALL((_BinaryElewiseKernel<IdType, Op>),
+      nb, nt, 0, thr_entry->stream,
+      lhs_data, rhs_data, ret_data, len);
   return ret;
 }
 
@@ -85,8 +86,9 @@ IdArray BinaryElewise(IdArray lhs, IdType rhs) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(len);
   int nb = (len + nt - 1) / nt;
-  CUDA_KERNEL_CALL((_BinaryElewiseKernel<IdType, Op><<<nb, nt, 0, thr_entry->stream>>>(
-      lhs_data, rhs, ret_data, len)), nb, nt);
+  CUDA_KERNEL_CALL((_BinaryElewiseKernel<IdType, Op>),
+      nb, nt, 0, thr_entry->stream,
+      lhs_data, rhs, ret_data, len);
   return ret;
 }
 
@@ -135,8 +137,9 @@ IdArray BinaryElewise(IdType lhs, IdArray rhs) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(len);
   int nb = (len + nt - 1) / nt;
-  CUDA_KERNEL_CALL((_BinaryElewiseKernel<IdType, Op><<<nb, nt, 0, thr_entry->stream>>>(
-      lhs, rhs_data, ret_data, len)), nb, nt);
+  CUDA_KERNEL_CALL((_BinaryElewiseKernel<IdType, Op>),
+      nb, nt, 0, thr_entry->stream,
+      lhs, rhs_data, ret_data, len);
   return ret;
 }
 
@@ -183,8 +186,9 @@ IdArray UnaryElewise(IdArray lhs) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(len);
   int nb = (len + nt - 1) / nt;
-  CUDA_KERNEL_CALL((_UnaryElewiseKernel<IdType, Op><<<nb, nt, 0, thr_entry->stream>>>(
-      lhs_data, ret_data, len)), nb, nt);
+  CUDA_KERNEL_CALL((_UnaryElewiseKernel<IdType, Op>),
+      nb, nt, 0, thr_entry->stream,
+      lhs_data, ret_data, len);
   return ret;
 }
 
@@ -211,9 +215,8 @@ IdArray Full(IdType val, int64_t length, DLContext ctx) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(length);
   int nb = (length + nt - 1) / nt;
-  CUDA_KERNEL_CALL(
-      (_FullKernel<IdType><<<nb, nt, 0, thr_entry->stream>>>(ret_data, length, val)),
-      nb, nt);
+  CUDA_KERNEL_CALL((_FullKernel<IdType>), nb, nt, 0, thr_entry->stream,
+      ret_data, length, val);
   return ret;
 }
 
@@ -244,9 +247,9 @@ IdArray Range(IdType low, IdType high, DLContext ctx) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(length);
   int nb = (length + nt - 1) / nt;
-  CUDA_KERNEL_CALL(
-      (_RangeKernel<IdType><<<nb, nt, 0, thr_entry->stream>>>(ret_data, low, length)),
-      nb, nt);
+  CUDA_KERNEL_CALL((_RangeKernel<IdType>),
+      nb, nt, 0, thr_entry->stream,
+      ret_data, low, length);
   return ret;
 }
 
@@ -274,11 +277,13 @@ IdArray AsNumBits(IdArray arr, uint8_t bits) {
   int nt = cuda::FindNumThreads(length);
   int nb = (length + nt - 1) / nt;
   if (bits == 32) {
-    CUDA_KERNEL_CALL((_CastKernel<IdType, int32_t><<<nb, nt, 0, thr_entry->stream>>>(
-        static_cast<IdType*>(arr->data), static_cast<int32_t*>(ret->data), length)), nb, nt);
+    CUDA_KERNEL_CALL((_CastKernel<IdType, int32_t>),
+        nb, nt, 0, thr_entry->stream,
+        static_cast<IdType*>(arr->data), static_cast<int32_t*>(ret->data), length);
   } else {
-    CUDA_KERNEL_CALL((_CastKernel<IdType, int64_t><<<nb, nt, 0, thr_entry->stream>>>(
-        static_cast<IdType*>(arr->data), static_cast<int64_t*>(ret->data), length)), nb, nt);
+    CUDA_KERNEL_CALL((_CastKernel<IdType, int64_t>),
+        nb, nt, 0, thr_entry->stream,
+        static_cast<IdType*>(arr->data), static_cast<int64_t*>(ret->data), length);
   }
   return ret;
 }
