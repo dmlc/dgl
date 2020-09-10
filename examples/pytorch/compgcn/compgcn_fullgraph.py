@@ -96,8 +96,6 @@ def main(args):
         compgcn_model.to('cuda:{}'.format(args.gpu))
         heterograph = heterograph.to('cuda:{}'.format(args.gpu))
 
-    print(heterograph.device)
-
     # Step 3: Create training components ===================================================== #
     loss_fn = th.nn.CrossEntropyLoss()
     optimizer = optim.Adam(compgcn_model.parameters(), lr=0.005, weight_decay=5e-4)

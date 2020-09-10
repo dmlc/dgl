@@ -111,6 +111,7 @@ class CompGraphConv(nn.Module):
                 if stype not in n_in_feats or dtype not in n_in_feats:
                     continue
                 else:
+                    print("################################", n_in_feats[stype].device)
                     rel_graph.nodes[stype].data['h'] = n_in_feats[stype]
                     rel_graph.nodes[dtype].data['h'] = n_in_feats[dtype]
 
