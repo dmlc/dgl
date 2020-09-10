@@ -184,7 +184,6 @@ class CompGraphConv(nn.Module):
 class CompGCN(nn.Module):
     """
     1. Will use dgl.nn.WeightBasis module to create basis vector of edge；
-    2.
 
     """
     def __init__(self,
@@ -249,7 +248,7 @@ class CompGCN(nn.Module):
         h_n = {}
         for ntype, feat in nfeats.items():
             print("################################", feat.device)
-            h_n[ntype] = self.input_layer[ntype](feat)
+            h_n[ntype] = self.input_layer[ntype](feat).to('cuda:0')
             print("================================", h_n[ntype].device)
 
         # Forward of n layers of CompGraphConv
