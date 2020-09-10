@@ -69,7 +69,9 @@ def tensor(data, dtype=None):
     else:
         if isinstance(data, numbers.Number):
             data = [data]
-        return tf.convert_to_tensor(data, dtype=dtype)
+        print(dtype)
+        x = nd.array(np.array([data], dtype=dtype))
+        return zerocopy_from_dgl_ndarray(x)
 
 
 def initialize_context():
