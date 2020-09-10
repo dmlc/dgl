@@ -44,7 +44,8 @@ bool CSRIsSorted(CSRMatrix csr) {
   int8_t* flags = static_cast<int8_t*>(device->AllocWorkspace(ctx, csr.num_rows));
   const int nt = cuda::FindNumThreads(csr.num_rows);
   const int nb = (csr.num_rows + nt - 1) / nt;
-  _SegmentIsSorted<<<nb, nt, 0, thr_entry->stream>>>(
+  CUDA_KERNEL_CALL(_SegmentIsSorted,
+      nb, nt, 0, thr_entry->stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
       csr.num_rows, flags);
   bool ret = cuda::AllTrue(flags, csr.num_rows, ctx);
