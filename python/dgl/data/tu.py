@@ -276,7 +276,7 @@ class TUDataset(DGLBuiltinDataset):
     Notes
     -----
     Graphs may have node labels, node attributes, edge labels, and edge attributes,
-    varing from different dataset. This class does not perform additional process.
+    varing from different dataset. 
     """
 
     _url = r"https://www.chrsmrrs.com/graphkerneldatasets/{}.zip"
