@@ -14,7 +14,7 @@ import os
 import dgl
 import torch as th
 import torch.optim as optim
-
+import torch.nn.functional as F
 from dgl.data import AMDataset, MUTAGDataset, AIFBDataset, BGSDataset
 from data_utils import build_dummy_comp_data
 from models.model import CompGCN
@@ -85,8 +85,8 @@ def main(args):
                             num_rel=num_rels,
                             comp_fn=args.comp_fn,
                             dropout=0.0,
-                            activation=None,
-                            batchnorm=False
+                            activation=F.relu,
+                            batchnorm=True
                             )
 
     if use_cuda:
