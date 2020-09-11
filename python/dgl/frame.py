@@ -77,6 +77,11 @@ class Column(object):
         tensor of this column when the index tensor is not None.
         This typically happens when the column is extracted from another
         column using the `subcolumn` method.
+
+        It can also be None, which may only happen when transmitting a
+        not-yet-materialized subcolumn from a subprocess to the main process.
+        In this case, the main process should already maintain the content of
+        the storage, and is responsible for restoring the subcolumn's storage pointer.
     data : Tensor
         The actual data tensor of this column.
     scheme : Scheme
@@ -225,7 +230,7 @@ class Column(object):
 
         The operation triggers index selection.
         """
-        return Column(F.clone(self.data), self.scheme)
+        return Column(F.clone(self.data), copy.deepcopy(self.scheme))
 
     def subcolumn(self, rowids):
         """Return a subcolumn.
@@ -260,6 +265,14 @@ class Column(object):
 
     def __repr__(self):
         return repr(self.data)
+
+    def __getstate__(self):
+        if self.storage is not None:
+            _ = self.data               # evaluate feature slicing
+        return self.__dict__
+
+    def __copy__(self):
+        return self.clone()
 
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
