@@ -35,12 +35,19 @@ def _check_neighbor_sampling_dataloader(g, nids, dl, mode):
                 uu, vv = block.all_edges(order='eid', etype=canonical_etype)
                 src = block.srcnodes[utype].data[dgl.NID]
                 dst = block.dstnodes[vtype].data[dgl.NID]
+                assert F.array_equal(
+                    block.srcnodes[utype].data['feat'], g.nodes[utype].data['feat'][src])
+                assert F.array_equal(
+                    block.dstnodes[vtype].data['feat'], g.nodes[vtype].data['feat'][dst])
                 if prev_dst[utype] is not None:
                     assert F.array_equal(src, prev_dst[utype])
                 u = src[uu]
                 v = dst[vv]
                 assert F.asnumpy(g.has_edges_between(u, v, etype=canonical_etype)).all()
                 eid = block.edges[canonical_etype].data[dgl.EID]
+                assert F.array_equal(
+                    block.edges[canonical_etype].data['feat'],
+                    g.edges[canonical_etype].data['feat'][eid])
                 ufound, vfound = g.find_edges(eid, etype=canonical_etype)
                 assert F.array_equal(ufound, u)
                 assert F.array_equal(vfound, v)
@@ -75,6 +82,8 @@ def test_neighbor_sampler_dataloader():
     g = dgl.heterograph({('user', 'follow', 'user'): ([0, 0, 0, 1, 1], [1, 2, 3, 3, 4])}, 
                         {'user': 6}).long()
     g = dgl.to_bidirected(g)
+    g.ndata['feat'] = F.randn((6, 8))
+    g.edata['feat'] = F.randn((10, 4))
     reverse_eids = F.tensor([5, 6, 7, 8, 9, 0, 1, 2, 3, 4], dtype=F.int64)
     g_sampler1 = dgl.dataloading.MultiLayerNeighborSampler([2, 2], return_eids=True)
     g_sampler2 = dgl.dataloading.MultiLayerFullNeighborSampler(2, return_eids=True)
@@ -85,6 +94,10 @@ def test_neighbor_sampler_dataloader():
          ('user', 'play', 'game'): ([0, 1, 1, 3, 5], [0, 1, 2, 0, 2]),
          ('game', 'played-by', 'user'): ([0, 1, 2, 0, 2], [0, 1, 1, 3, 5])
     }).long()
+    for ntype in hg.ntypes:
+        hg.nodes[ntype].data['feat'] = F.randn((hg.number_of_nodes(ntype), 8))
+    for etype in hg.canonical_etypes:
+        hg.edges[etype].data['feat'] = F.randn((hg.number_of_edges(etype), 4))
     hg_sampler1 = dgl.dataloading.MultiLayerNeighborSampler(
         [{'play': 1, 'played-by': 1, 'follow': 2, 'followed-by': 1}] * 2, return_eids=True)
     hg_sampler2 = dgl.dataloading.MultiLayerFullNeighborSampler(2, return_eids=True)

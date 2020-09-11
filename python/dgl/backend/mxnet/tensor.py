@@ -49,6 +49,8 @@ def tensor(data, dtype=None):
         if dtype is None:
             if isinstance(data, np.ndarray):
                 dtype = np.int32 if data.dtype == np.bool else data.dtype
+            elif len(data) == 0:
+                dtype = np.int64
             else:
                 dtype = np.int64 if isinstance(data[0], numbers.Integral) else np.float32
         return nd.array(data, dtype=dtype)
@@ -139,6 +141,8 @@ def copy_to(input, ctx, **kwargs):
     return input.as_in_context(ctx)
 
 def sum(input, dim, keepdims=False):
+    if len(input) == 0:
+        return nd.array([0.], dtype=input.dtype, ctx=input.context)
     return nd.sum(input, axis=dim, keepdims=keepdims)
 
 def reduce_sum(input):

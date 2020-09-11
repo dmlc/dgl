@@ -34,7 +34,7 @@ class NegativeSampler(object):
             dst = self.weights.multinomial(n, replacement=True)
             dst = dst.view(-1, 1, self.k).expand(-1, self.k, -1).flatten()
         else:
-            dst = self.weights.multinomial(n, replacement=True)
+            dst = self.weights.multinomial(n*self.k, replacement=True)
         src = src.repeat_interleave(self.k)
         return src, dst
 
@@ -298,7 +298,10 @@ def main(args, devices):
     val_mask = g.ndata['val_mask']
     test_mask = g.ndata['test_mask']
     g.ndata['features'] = features
-    g.create_format_()
+
+    # Create csr/coo/csc formats before launching training processes with multi-gpu.
+    # This avoids creating certain formats in each sub-process, which saves momory and CPU.
+    g.create_formats_()
     # Pack data
     data = train_mask, val_mask, test_mask, in_feats, labels, n_classes, g
 

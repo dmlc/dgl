@@ -165,6 +165,43 @@ def test_pickling_batched_heterograph():
     new_bg = _reconstruct_pickle(bg)
     test_utils.check_graph_equal(bg, new_bg)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU edge_subgraph w/ relabeling not implemented")
+def test_pickling_subgraph():
+    f1 = io.BytesIO()
+    f2 = io.BytesIO()
+    g = dgl.rand_graph(10000, 100000)
+    g.ndata['x'] = F.randn((10000, 4))
+    g.edata['x'] = F.randn((100000, 5))
+    pickle.dump(g, f1)
+    sg = g.subgraph([0, 1])
+    sgx = sg.ndata['x'] # materialize
+    pickle.dump(sg, f2)
+    # TODO(BarclayII): How should I test that the size of the subgraph pickle file should not
+    # be as large as the size of the original pickle file?
+    assert f1.tell() > f2.tell() * 50
+
+    f2.seek(0)
+    f2.truncate()
+    sgx = sg.edata['x'] # materialize
+    pickle.dump(sg, f2)
+    assert f1.tell() > f2.tell() * 50
+
+    f2.seek(0)
+    f2.truncate()
+    sg = g.edge_subgraph([0])
+    sgx = sg.edata['x'] # materialize
+    pickle.dump(sg, f2)
+    assert f1.tell() > f2.tell() * 50
+
+    f2.seek(0)
+    f2.truncate()
+    sgx = sg.ndata['x'] # materialize
+    pickle.dump(sg, f2)
+    assert f1.tell() > f2.tell() * 50
+
+    f1.close()
+    f2.close()
+
 if __name__ == '__main__':
     test_pickling_index()
     test_pickling_graph_index()
