@@ -63,7 +63,8 @@ class GSpMM(th.autograd.Function):
     def forward(ctx, gidx, op, reduce_op, X, Y):
         out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
         ctx.backward_cache = gidx, op, reduce_op
-        ctx.save_for_backward(X, Y, argX, argY)
+        if op != 'copy_lhs' or reduce_op != 'sum':
+            ctx.save_for_backward(X, Y, argX, argY)
         return out
 
     @staticmethod
