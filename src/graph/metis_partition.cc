@@ -103,8 +103,9 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLMetisPartition")
     GraphRef g = args[0];
     int k = args[1];
     NDArray vwgt = args[2];
+    bool obj_cut = args[3]
 #if !defined(_WIN32)
-    *rv = MetisPartition(g.sptr(), k, vwgt);
+    *rv = MetisPartition(g.sptr(), k, vwgt, obj_cut);
 #else
     LOG(FATAL) << "Metis partition does not support Windows.";
 #endif  // !defined(_WIN32)
