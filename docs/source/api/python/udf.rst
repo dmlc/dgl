@@ -86,3 +86,26 @@ Degree Bucketing
 DGL employs a degree-bucketing mechanism for message passing with UDFs. It groups nodes with
 a same in-degree and invokes message passing for each group of nodes. As a result, one shall
 not make any assumptions about the batch size of :class:`~dgl.udf.NodeBatch` instances.
+
+For a batch of nodes, DGL stacks the incoming messages of each node along the second dimension,
+ordering them by edge ID.  An example goes as follows:
+
+.. code:: python
+
+    >>> import dgl
+    >>> import torch
+    >>> import dgl.function as fn
+    >>> g = dgl.graph(([1, 3, 5, 0, 4, 2, 3, 3, 4, 5], [1, 1, 0, 0, 1, 2, 2, 0, 3, 3]))
+    >>> g.edata['eid'] = torch.arange(10)
+    >>> def reducer(nodes):
+    ...     print(nodes.mailbox['eid'])
+    ...     return {'n': nodes.mailbox['eid'].sum(1)}
+    >>> g.update_all(fn.copy_e('eid', 'eid'), reducer)
+    tensor([[5, 6],
+            [8, 9]])
+    tensor([[3, 7, 2],
+            [0, 1, 4]])
+
+Essentially, node #2 and node #3 are grouped into one bucket with in-degree of 2, and node
+#0 and node #1 are grouped into one bucket with in-degree of 3.  Within each bucket, the
+edges are ordered by the edge IDs for each node.
