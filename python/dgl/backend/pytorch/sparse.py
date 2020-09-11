@@ -65,8 +65,6 @@ class GSpMM(th.autograd.Function):
         ctx.backward_cache = gidx, op, reduce_op
         if op != 'copy_lhs' or reduce_op != 'sum':
             ctx.save_for_backward(X, Y, argX, argY)
-        else:
-            ctx.save_for_backward(X.shape)
         return out
 
     @staticmethod
@@ -74,9 +72,6 @@ class GSpMM(th.autograd.Function):
         gidx, op, reduce_op = ctx.backward_cache
         if op != 'copy_lhs' or reduce_op != 'sum':
             X, Y, argX, argY = ctx.saved_tensors
-            x_shape = X.shape
-        else:
-            x_shape = ctx.saved_tensors
         if op != 'copy_rhs' and ctx.needs_input_grad[3]:
             g_rev = gidx.reverse()
             if reduce_op == 'sum':
@@ -95,7 +90,6 @@ class GSpMM(th.autograd.Function):
                     dX.scatter_add_(0, argX.long(), grad)
                 elif op in ['add', 'sub', 'copy_lhs']:
                     dX.scatter_add_(0, argX.long(), dZ)
-            dX = _reduce_grad(dX, x_shape)
         else:  # X has not gradient
             dX = None
         if op != 'copy_lhs' and ctx.needs_input_grad[4]:
