@@ -88,6 +88,8 @@ on how messages are aggregated and combined as well.
                     h = F.relu(layer(block, (h, h_dst)))
                     # Copy to output back to CPU.
                     y[output_nodes] = h.cpu()
+
+                x = y
     
             return y
 
