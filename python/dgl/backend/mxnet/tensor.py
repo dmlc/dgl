@@ -141,6 +141,8 @@ def copy_to(input, ctx, **kwargs):
     return input.as_in_context(ctx)
 
 def sum(input, dim, keepdims=False):
+    if len(input) == 0:
+        return nd.array([0.], dtype=input.dtype, ctx=input.context)
     return nd.sum(input, axis=dim, keepdims=keepdims)
 
 def reduce_sum(input):
