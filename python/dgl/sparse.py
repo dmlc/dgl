@@ -2,15 +2,19 @@
 # pylint: disable= invalid-name
 from __future__ import absolute_import
 import logging
-
-import tvm
-
+import os
 import dgl.ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
 from .function import TargetCode
-from .tvm import gsddmm, gspmm
+
+
+use_tvm = True if 'DGLENGINE' in os.environ and os.getenv('DGLENGINE') == 'tvm' else False
+if use_tvm:
+    import tvm
+    from .tvm import gsddmm, gspmm
+
 
 def infer_broadcast_shape(op, shp1, shp2):
     r"""Check the shape validity, and infer the output shape given input shape and operator.
@@ -67,6 +71,7 @@ def to_dgl_nd_for_write(x):
     """Convert framework-specific tensor/None to dgl ndarray for write."""
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
 
+
 target_mapping = {
     'u': TargetCode.SRC,
     'e': TargetCode.EDGE,
@@ -76,15 +81,16 @@ target_mapping = {
     'dst': TargetCode.DST
 }
 
-use_tvm = True
 
 def _gspmm(gidx, op, reduce_op, u, e):
     return _gspmm_tvm(gidx, op, reduce_op, u, e) if use_tvm \
         else _gspmm_native(gidx, op, reduce_op, u, e)
 
+
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     return _gsddmm_tvm(gidx, op, lhs, rhs, lhs_target, rhs_target) if use_tvm \
         else _gsddmm_native(gidx, op, lhs, rhs, lhs_target, rhs_target)
+
 
 def _gspmm_native(gidx, op, reduce_op, u, e):
     r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
@@ -243,11 +249,12 @@ def _gsddmm_native(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
         out = F.squeeze(out, -1)
     return out
 
+
 compiled_gspmm_kernels = {}
 compiled_gsddmm_kernels = {}
-
 partitioned_1d_graphs = {}
 partitioned_2d_graphs = {}
+
 
 def _gspmm_tvm(gidx, op, reduce_op, u, e, advise=True,
                num_feat_partitions=1, num_col_partitions=1):
@@ -387,6 +394,7 @@ def _gspmm_tvm(gidx, op, reduce_op, u, e, advise=True,
     f_input.append(tvm.nd.from_dlpack(to_dgl_nd_for_write(v).to_dlpack()))
     mod(*f_input)
     return v, (arg_u, arg_e)
+
 
 def _gsddmm_tvm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
                 num_feat_partitions=1, num_row_partitions=1, num_col_partitions=1):
@@ -536,5 +544,6 @@ def _gsddmm_tvm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
     if edge_shuffled:
         out = F.gather_row(out, F.from_dgl_nd(reverse_mapping))
     return out
+
 
 _init_api("dgl.sparse")

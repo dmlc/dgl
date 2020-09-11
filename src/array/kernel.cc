@@ -144,8 +144,8 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
     const dgl_type_t src_vtype = pair.first;
     const dgl_type_t dst_vtype = pair.second;
     CheckShape(
-        {graph->NumVertices(src_vtype), graph->NumEdges(0), graph->NumVertices(dst_vtype)},
-        {0, 1, 2, 2, 2},
+        {graph->NumVertices(src_vtype), graph->NumVertices(dst_vtype), graph->NumEdges(0)},
+        {0, 2, 1, 1, 1},
         {U, E, V, ArgU, ArgE},
         {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
     SpMM(op, reduce_op, graph.sptr(), U, E, V, {ArgU, ArgE});
@@ -167,10 +167,10 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMM")
     const dgl_type_t src_vtype = pair.first;
     const dgl_type_t dst_vtype = pair.second;
     CheckShape(
-        {graph->NumVertices(src_vtype), graph->NumEdges(0), graph->NumVertices(dst_vtype)},
-        {lhs_target, rhs_target, 1},
+        {graph->NumVertices(src_vtype), graph->NumVertices(dst_vtype), graph->NumEdges(0)},
+        {lhs_target, rhs_target, 2},
         {lhs, rhs, out},
-        {"U_data", "E_data", "V_data"});
+        {"lhs_data", "rhs_data", "E_data"});
     SDDMM(op, graph.sptr(), lhs, rhs, out, lhs_target, rhs_target);
   });
 

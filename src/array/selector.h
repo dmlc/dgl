@@ -45,13 +45,13 @@ DGLDEVICE DGLINLINE T Selector<0>::Call(T src, T edge, T dst) {
 template <>
 template <typename T>
 DGLDEVICE DGLINLINE T Selector<1>::Call(T src, T edge, T dst) {
-  return edge;
+  return dst;
 }
 
 template <>
 template <typename T>
 DGLDEVICE DGLINLINE T Selector<2>::Call(T src, T edge, T dst) {
-  return dst;
+  return edge;
 }
 
 }  // namespace dgl
