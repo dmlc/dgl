@@ -73,12 +73,12 @@ IdArray MetisPartition(GraphPtr g, int k, NDArray vwgt_arr, bool obj_cut) {
                                 part);
   
   if (obj_cut) {
-    LOG(INFO) << "Partition a graph with " << g->NumVertices(0) << " nodes and "
-              << g->NumEdges(0) << " edges into " << k << " parts and "
+    LOG(INFO) << "Partition a graph with " << g->NumVertices() << " nodes and "
+              << g->NumEdges() << " edges into " << k << " parts and "
               << "get " << objval << " edge cuts";
   } else {
-    LOG(INFO) << "Partition a graph with " << g->NumVertices(0) << " nodes and "
-              << g->NumEdges(0) << " edges into " << k << " parts and "
+    LOG(INFO) << "Partition a graph with " << g->NumVertices() << " nodes and "
+              << g->NumEdges() << " edges into " << k << " parts and "
               << "the communication volume is " << objval;
   }
 
