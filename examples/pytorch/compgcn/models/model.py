@@ -164,7 +164,8 @@ class CompGraphConv(nn.Module):
                                      self.dropout(self_rsts.get(ntype)) * 1/3
 
                 # add batchnorm
-                n_out_feats[ntype] = self.bn(n_out_feats[ntype])
+                if self.batchnorm:
+                    n_out_feats[ntype] = self.bn(n_out_feats[ntype])
 
                 # use activate to compute non-linear
                 if self.activation is not None:
