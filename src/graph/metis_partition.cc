@@ -15,7 +15,7 @@ namespace dgl {
 
 #if !defined(_WIN32)
 
-IdArray MetisPartition(GraphPtr g, int k, NDArray vwgt_arr, obj_cut) {
+IdArray MetisPartition(GraphPtr g, int k, NDArray vwgt_arr, bool obj_cut) {
   // The index type of Metis needs to be compatible with DGL index type.
   CHECK_EQ(sizeof(idx_t), sizeof(dgl_id_t));
   ImmutableGraphPtr ig = std::dynamic_pointer_cast<ImmutableGraph>(g);

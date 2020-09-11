@@ -19,7 +19,7 @@ namespace transform {
 
 #if !defined(_WIN32)
 
-IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr, obj_cut) {
+IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr, bool obj_cut) {
   // The index type of Metis needs to be compatible with DGL index type.
   CHECK_EQ(sizeof(idx_t), sizeof(int64_t))
     << "Metis only supports int64 graph for now";
