@@ -65,6 +65,8 @@ class GSpMM(th.autograd.Function):
         ctx.backward_cache = gidx, op, reduce_op
         if op != 'copy_lhs' or reduce_op != 'sum':
             ctx.save_for_backward(X, Y, argX, argY)
+        else:
+            ctx.save_for_backward(None, None, None, None)
         return out
 
     @staticmethod
