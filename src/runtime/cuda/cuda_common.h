@@ -16,6 +16,16 @@
 namespace dgl {
 namespace runtime {
 
+template <typename T>
+inline bool is_zero(T size) {
+    return size == 0;
+}
+
+template <>
+inline bool is_zero<dim3>(dim3 size) {
+    return size.x == 0 || size.y == 0 || size.z == 0;
+}
+
 #define CUDA_DRIVER_CALL(x)                                             \
   {                                                                     \
     CUresult result = x;                                                \
@@ -32,6 +42,19 @@ namespace runtime {
     cudaError_t e = (func);                                        \
     CHECK(e == cudaSuccess || e == cudaErrorCudartUnloading)       \
         << "CUDA: " << cudaGetErrorString(e);                      \
+  }
+
+#define CUDA_KERNEL_CALL(kernel, nblks, nthrs, shmem, stream, ...) \
+  {                                                                \
+    if (!dgl::runtime::is_zero((nblks)) &&                         \
+        !dgl::runtime::is_zero((nthrs))) {                         \
+      (kernel) <<< (nblks), (nthrs), (shmem), (stream) >>>         \
+        (__VA_ARGS__);                                             \
+      cudaError_t e = cudaGetLastError();                          \
+      CHECK(e == cudaSuccess || e == cudaErrorCudartUnloading)     \
+          << "CUDA kernel launch error: "                          \
+          << cudaGetErrorString(e);                                \
+    }                                                              \
   }
 
 #define CUSPARSE_CALL(func)                                        \

@@ -91,7 +91,8 @@ COOMatrix CSRToCOO<kDLGPU, int64_t>(CSRMatrix csr) {
 
   const int nt = cuda::FindNumThreads(csr.num_rows);
   const int nb = (csr.num_rows + nt - 1) / nt;
-  _RepeatKernel<<<nb, nt, 0, thr_entry->stream>>>(
+  CUDA_KERNEL_CALL(_RepeatKernel,
+      nb, nt, 0, thr_entry->stream,
       rowids.Ptr<int64_t>(), row_nnz.Ptr<int64_t>(),
       csr.indptr.Ptr<int64_t>(), ret_row.Ptr<int64_t>(),
       csr.num_rows);
