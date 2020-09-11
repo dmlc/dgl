@@ -145,7 +145,8 @@ def to_backend_ctx(dglctx):
 
 
 def astype(input, ty):
-    return tf.cast(input, dtype=ty)
+    with tf.device(input.device):
+        return tf.cast(input, dtype=ty)
 
 
 def asnumpy(input):
