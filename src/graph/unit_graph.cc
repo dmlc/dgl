@@ -232,6 +232,8 @@ class UnitGraph::COO : public BaseHeteroGraph {
 
   EdgeArray FindEdges(dgl_type_t etype, IdArray eids) const override {
     CHECK(aten::IsValidIdArray(eids)) << "Invalid edge id array";
+    BUG_ON(aten::IsNullArray(adj_.data)) <<
+      "FindEdges requires the internal COO matrix not having EIDs.";
     return EdgeArray{aten::IndexSelect(adj_.row, eids),
                      aten::IndexSelect(adj_.col, eids),
                      eids};
@@ -1446,8 +1448,11 @@ SparseFormat UnitGraph::SelectFormat(dgl_format_code_t preferred_formats) const 
   dgl_format_code_t created = GetCreatedFormats();
   if (common & created)
     return DecodeFormat(common & created);
-  if (coo_->defined() && coo_->IsHypersparse())  // only allow coo for hypersparse graph.
-    return SparseFormat::kCOO;
+
+  // NOTE(zihao): hypersparse is currently disabled since many CUDA operators on COO have
+  // not been implmented yet.
+  // if (coo_->defined() && coo_->IsHypersparse())  // only allow coo for hypersparse graph.
+  //   return SparseFormat::kCOO;
   if (common)
     return DecodeFormat(common);
   return DecodeFormat(created);
