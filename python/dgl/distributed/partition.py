@@ -113,7 +113,7 @@ def load_partition_book(part_config, part_id, graph=None):
                                   graph), part_metadata['graph_name']
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
-                    reshuffle=True, balance_ntypes=None, balance_edges=False):
+                    reshuffle=True, balance_ntypes=None, balance_edges=False, objtype='cut'):
     ''' Partition a graph for distributed training and store the partitions on files.
 
     The partitioning occurs in three steps: 1) run a partition algorithm (e.g., Metis) to
@@ -258,6 +258,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     >>> g, node_feats, edge_feats, gpb, graph_name = dgl.distributed.load_partition(
     ...                                 'output/test.json', 0)
     '''
+    if objtype not in ['cut', 'vol']:
+        raise ValueError
     if num_parts == 1:
         parts = {0: g}
         node_parts = F.zeros((g.number_of_nodes(),), F.int64, F.cpu())
@@ -270,7 +272,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             g.edata['orig_id'] = F.arange(0, g.number_of_edges())
     elif part_method == 'metis':
         node_parts = metis_partition_assignment(g, num_parts, balance_ntypes=balance_ntypes,
-                                                balance_edges=balance_edges)
+                                                balance_edges=balance_edges, objtype=objtype)
         parts = partition_graph_with_halo(g, node_parts, num_hops, reshuffle=reshuffle)
     elif part_method == 'random':
         node_parts = random_choice(num_parts, g.number_of_nodes())

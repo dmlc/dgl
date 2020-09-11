@@ -19,7 +19,7 @@ namespace transform {
 
 #if !defined(_WIN32)
 
-IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr) {
+IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr, obj_cut) {
   // The index type of Metis needs to be compatible with DGL index type.
   CHECK_EQ(sizeof(idx_t), sizeof(int64_t))
     << "Metis only supports int64 graph for now";
@@ -53,7 +53,12 @@ IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr) {
   options[METIS_OPTION_NITER] = 1;
   options[METIS_OPTION_NIPARTS] = 1;
   options[METIS_OPTION_DROPEDGES] = 1;
-  options[METIS_OPTION_OBJTYPE] = METIS_OBJTYPE_VOL;
+
+  if (obj_cut) {
+    options[METIS_OPTION_OBJTYPE] = METIS_OBJTYPE_CUT;
+  } else {
+    options[METIS_OPTION_OBJTYPE] = METIS_OBJTYPE_VOL;
+  }
 
   int ret = METIS_PartGraphKway(
     &nvtxs,  // The number of vertices
@@ -71,9 +76,17 @@ IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr) {
     &objval,  // the edge-cut or the total communication volume of
     // the partitioning solution
     part);
-  LOG(INFO) << "Partition a graph with " << g->NumVertices(0) << " nodes and "
-            << g->NumEdges(0) << " edges into " << k << " parts and "
-            << "the communication volume is " << objval;
+
+  if (obj_cut) {
+    LOG(INFO) << "Partition a graph with " << g->NumVertices(0) << " nodes and "
+              << g->NumEdges(0) << " edges into " << k << " parts and "
+              << "get " << objval << " edge cuts";
+  } else {
+    LOG(INFO) << "Partition a graph with " << g->NumVertices(0) << " nodes and "
+              << g->NumEdges(0) << " edges into " << k << " parts and "
+              << "the communication volume is " << objval;
+  }
+  
   switch (ret) {
     case METIS_OK:
       return part_arr;
