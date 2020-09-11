@@ -655,5 +655,5 @@ def test_degree_bucket_edge_ordering(idtype):
     def reducer(nodes):
         eid = F.asnumpy(F.copy_to(nodes.mailbox['eid'], F.cpu()))
         assert np.array_equal(eid, np.sort(eid, 1))
-        return {'n': nodes.mailbox['eid'].sum(1)}
+        return {'n': F.sum(nodes.mailbox['eid'], 1)}
     g.update_all(fn.copy_e('eid', 'eid'), reducer)
