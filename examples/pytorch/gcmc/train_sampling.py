@@ -403,6 +403,8 @@ if __name__ == '__main__':
         run(0, n_gpus, args, devices, dataset)
     # multi gpu
     else:
+        # Create csr/coo/csc formats before launching training processes with multi-gpu.
+        # This avoids creating certain formats in each sub-process, which saves momory and CPU.
         dataset.train_enc_graph.create_formats_()
         dataset.train_dec_graph.create_formats_()
         procs = []

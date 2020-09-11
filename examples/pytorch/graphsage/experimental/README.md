@@ -1,6 +1,13 @@
 ## Distributed training
 
-This is an example of training GraphSage in a distributed fashion. To train GraphSage, it has five steps:
+This is an example of training GraphSage in a distributed fashion. Before training, please install some python libs by pip:
+
+```bash
+sudo pip3 install ogb
+sudo pip3 install pyinstrument
+```
+
+To train GraphSage, it has five steps:
 
 ### Step 0: set IP configuration file.
 
