@@ -15,7 +15,7 @@ namespace dgl {
 
 #if !defined(_WIN32)
 
-IdArray MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
+IdArray MetisPartition(GraphPtr g, int k, NDArray vwgt_arr, bool obj_cut) {
   // The index type of Metis needs to be compatible with DGL index type.
   CHECK_EQ(sizeof(idx_t), sizeof(dgl_id_t));
   ImmutableGraphPtr ig = std::dynamic_pointer_cast<ImmutableGraph>(g);
@@ -49,6 +49,12 @@ IdArray MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
   options[METIS_OPTION_NITER] = 1;
   options[METIS_OPTION_NIPARTS] = 1;
   options[METIS_OPTION_DROPEDGES] = 1;
+  
+  if (obj_cut) {
+    options[METIS_OPTION_OBJTYPE] = METIS_OBJTYPE_CUT;
+  } else {
+    options[METIS_OPTION_OBJTYPE] = METIS_OBJTYPE_VOL;
+  }
 
   int ret = METIS_PartGraphKway(&nvtxs,      // The number of vertices
                                 &ncon,       // The number of balancing constraints.
@@ -65,10 +71,17 @@ IdArray MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
                                 &objval,      // the edge-cut or the total communication volume of
                                 // the partitioning solution
                                 part);
-  LOG(INFO) << "Partition a graph with " << g->NumVertices()
-      << " nodes and " << g->NumEdges()
-      << " edges into " << k
-      << " parts and get " << objval << " edge cuts";
+  
+  if (obj_cut) {
+    LOG(INFO) << "Partition a graph with " << g->NumVertices() << " nodes and "
+              << g->NumEdges() << " edges into " << k << " parts and "
+              << "get " << objval << " edge cuts";
+  } else {
+    LOG(INFO) << "Partition a graph with " << g->NumVertices() << " nodes and "
+              << g->NumEdges() << " edges into " << k << " parts and "
+              << "the communication volume is " << objval;
+  }
+
   switch (ret) {
     case METIS_OK:
       return part_arr;
@@ -90,8 +103,9 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLMetisPartition")
     GraphRef g = args[0];
     int k = args[1];
     NDArray vwgt = args[2];
+    bool obj_cut = args[3];
 #if !defined(_WIN32)
-    *rv = MetisPartition(g.sptr(), k, vwgt);
+    *rv = MetisPartition(g.sptr(), k, vwgt, obj_cut);
 #else
     LOG(FATAL) << "Metis partition does not support Windows.";
 #endif  // !defined(_WIN32)

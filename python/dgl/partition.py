@@ -142,7 +142,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     return subg_dict
 
 
-def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
+def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False, objtype='cut'):
     ''' This assigns nodes to different partitions with Metis partitioning algorithm.
 
     When performing Metis partitioning, we can put some constraint on the partitioning.
@@ -224,7 +224,7 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
         vwgt = F.to_dgl_nd(vwgt)
 
     start = time.time()
-    node_part = _CAPI_DGLMetisPartition_Hetero(sym_g._graph, k, vwgt)
+    node_part = _CAPI_DGLMetisPartition_Hetero(sym_g._graph, k, vwgt, (objtype == 'cut'))
     print('Metis partitioning: {:.3f} seconds'.format(time.time() - start))
     if len(node_part) == 0:
         return None
