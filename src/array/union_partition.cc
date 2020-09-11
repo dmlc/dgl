@@ -10,8 +10,6 @@ namespace dgl {
 namespace aten {
 ///////////////////////// COO Based Operations/////////////////////////
 COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
-  CHECK(coos.size() > 1) <<
-    "The length of input COOMatrix vector should be larger than 1";
   uint64_t src_offset = 0, dst_offset = 0;
   int64_t edge_data_offset = 0;
   bool has_data = false;
@@ -114,8 +112,6 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
 
 ///////////////////////// CSR Based Operations/////////////////////////
 CSRMatrix DisjointUnionCsr(const std::vector<CSRMatrix>& csrs) {
-  CHECK(csrs.size() > 1) <<
-    "The length of input CSRMatrix vector should be larger than 1";
   uint64_t src_offset = 0, dst_offset = 0;
   int64_t indices_offset = 0;
   bool has_data = false;

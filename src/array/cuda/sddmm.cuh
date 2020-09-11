@@ -182,14 +182,13 @@ void SDDMMCoo(
   const bool use_idx = !IsNullArray(coo.data);
 
   BCAST_IDX_CTX_SWITCH(bcast, use_idx, out->ctx, lhs_off, rhs_off, {
-    SDDMMCooKernel<Idx, DType, Op, UseBcast, UseIdx, LhsTarget, RhsTarget>
-      <<<nblks, nthrs, 0, thr_entry->stream>>>(
+    CUDA_KERNEL_CALL((SDDMMCooKernel<Idx, DType, Op, UseBcast, UseIdx, LhsTarget, RhsTarget>),
+        nblks, nthrs, 0, thr_entry->stream,
         lhs_data, rhs_data, out_data,
         row, col, edge_map,
         coo.num_rows, coo.num_cols, nnz, reduce_dim,
         lhs_off, rhs_off,
-        lhs_len, rhs_len, len
-      );
+        lhs_len, rhs_len, len);
   });
 }
 
@@ -233,14 +232,13 @@ void SDDMMCsr(
   const bool use_idx = !IsNullArray(csr.data);
 
   BCAST_IDX_CTX_SWITCH(bcast, use_idx, out->ctx, lhs_off, rhs_off, {
-    SDDMMCsrKernel<Idx, DType, Op, UseBcast, UseIdx, LhsTarget, RhsTarget>
-      <<<nblks, nthrs, 0, thr_entry->stream>>>(
+    CUDA_KERNEL_CALL((SDDMMCsrKernel<Idx, DType, Op, UseBcast, UseIdx, LhsTarget, RhsTarget>),
+        nblks, nthrs, 0, thr_entry->stream,
         lhs_data, rhs_data, out_data,
         indptr, indices, edge_map,
         N, M, E, reduce_dim,
         lhs_off, rhs_off,
-        lhs_len, rhs_len, len
-      );
+        lhs_len, rhs_len, len);
   });
 }
 
