@@ -276,7 +276,13 @@ class TUDataset(DGLBuiltinDataset):
     Notes
     -----
     Graphs may have node labels, node attributes, edge labels, and edge attributes,
-    varing from different dataset. 
+    varing from different dataset.
+
+    Labels are mapped to :math:`\lbrace 0,\cdots,n-1 \rbrace` where :math:`n` is the
+    number of labels (some datasets have raw labels :math:`\lbrace -1, 1 \rbrace` which
+    will be mapped to :math:`\lbrace 0, 1 \rbrace`). In previous versions, the minimum
+    label was added so that :math:`\lbrace -1, 1 \rbrace` was mapped to
+    :math:`\lbrace 0, 2 \rbrace`.
     """
 
     _url = r"https://www.chrsmrrs.com/graphkerneldatasets/{}.zip"
