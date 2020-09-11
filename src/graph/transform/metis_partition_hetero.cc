@@ -113,7 +113,7 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLMetisPartition_Hetero")
     auto ugptr = hgptr->relation_graphs()[0];
     int k = args[1];
     NDArray vwgt = args[2];
-    int obj_cut = args[3]
+    bool obj_cut = args[3];
 #if !defined(_WIN32)
     *rv = MetisPartition(ugptr, k, vwgt, obj_cut);
 #else
