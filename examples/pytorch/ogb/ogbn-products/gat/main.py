@@ -230,7 +230,7 @@ if __name__ == '__main__':
     else:
         device = th.device('cpu')
 
-    # load reddit data
+    # load data
     data = DglNodePropPredDataset(name='ogbn-products')
     splitted_idx = data.get_idx_split()
     train_idx, val_idx, test_idx = splitted_idx['train'], splitted_idx['valid'], splitted_idx['test']
