@@ -88,7 +88,7 @@ a same in-degree and invokes message passing for each group of nodes. As a resul
 not make any assumptions about the batch size of :class:`~dgl.udf.NodeBatch` instances.
 
 For a batch of nodes, DGL stacks the incoming messages of each node along the second dimension,
-ordering them by edge ID.  An example goes as follows:
+ordered by edge ID.  An example goes as follows:
 
 .. code:: python
 
