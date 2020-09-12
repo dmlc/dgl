@@ -63,14 +63,22 @@ class GSpMM(th.autograd.Function):
     def forward(ctx, gidx, op, reduce_op, X, Y):
         out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
         ctx.backward_cache = gidx, op, reduce_op
-        if op != 'copy_lhs' or reduce_op != 'sum':
+        if op == 'copy_lhs' and reduce_op == 'sum':
+            pass
+        elif op == 'copy_lhs' and reduce_op == 'max':
+            ctx.save_for_backward(argX)
+        else:
             ctx.save_for_backward(X, Y, argX, argY)
         return out
 
     @staticmethod
     def backward(ctx, dZ):
         gidx, op, reduce_op = ctx.backward_cache
-        if op != 'copy_lhs' or reduce_op != 'sum':
+        if op == 'copy_lhs' or reduce_op == 'sum':
+            pass
+        elif op == 'copy_lhs' and reduce_op == 'max':
+            argX = ctx.saved_tensors
+        else:
             X, Y, argX, argY = ctx.saved_tensors
         if op != 'copy_rhs' and ctx.needs_input_grad[3]:
             g_rev = gidx.reverse()
