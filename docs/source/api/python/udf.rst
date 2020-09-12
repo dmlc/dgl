@@ -5,20 +5,25 @@ User-defined Functions
 
 .. currentmodule:: dgl.udf
 
-User-defined functions (UDFs) allow arbitrary computation following the Message Passing Paradigm
-(see :ref:`guide-message-passing`). They bring more flexibility when :ref:`apifunction` cannot
-realize a desired computation.
+User-defined functions (UDFs) allow arbitrary computation in message passing
+(see :ref:`guide-message-passing`) and edge feature update with
+:func:`~dgl.DGLGraph.apply_edges`. They bring more flexibility when :ref:`apifunction`
+cannot realize a desired computation.
 
-User-defined Message Function
------------------------------
+Edge-wise User-defined Function
+-------------------------------
 
-A message function takes a batch of edges as input and returns some message(s) for each edge,
-which may combine the features of the edges and their end nodes. Formally, it takes the following
-form
+One can use an edge-wise user defined function for a message function in message passing or
+a function to apply in :func:`~dgl.DGLGraph.apply_edges`. It takes a batch of edges as input
+and returns messages (in message passing) or features (in :func:`~dgl.DGLGraph.apply_edges`)
+for each edge. The function may combine the features of the edges and their end nodes in
+computation.
+
+Formally, it takes the following form
 
 .. code::
 
-    def message_func(edges):
+    def edge_udf(edges):
         """
         Parameters
         ----------
@@ -28,13 +33,13 @@ form
         Returns
         -------
         dict[str, tensor]
-            The messages generated. It maps a message name to the corresponding messages of all
-            edges in the batch. The order of the messages is the same as the order of the edges
-            in the input argument.
+            The messages or edge features generated. It maps a message/feature name to the
+            corresponding messages/features of all edges in the batch. The order of the
+            messages/features is the same as the order of the edges in the input argument.
         """
 
 DGL generates :class:`~dgl.udf.EdgeBatch` instances internally, which expose the following
-interface for defining ``message_func``.
+interface for defining ``edge_udf``.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -45,16 +50,16 @@ interface for defining ``message_func``.
     EdgeBatch.edges
     EdgeBatch.batch_size
 
-User-defined Reduce Function
-----------------------------
+Node-wise User-defined Function
+-------------------------------
 
-A reduce function takes a batch of nodes as input and returns the updated features for each node,
-which may combine the current node features and the messages nodes received. Formally, it takes
-the following form
+One can use a node-wise user defined function for a reduce function in message passing. It takes
+a batch of nodes as input and returns the updated features for each node. It may combine the
+current node features and the messages nodes received. Formally, it takes the following form
 
 .. code::
 
-    def reduce_func(nodes):
+    def node_udf(nodes):
         """
         Parameters
         ----------
@@ -70,7 +75,7 @@ the following form
         """
 
 DGL generates :class:`~dgl.udf.NodeBatch` instances internally, which expose the following
-interface for defining ``reduce_func``.
+interface for defining ``node_udf``.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -80,8 +85,8 @@ interface for defining ``reduce_func``.
     NodeBatch.nodes
     NodeBatch.batch_size
 
-Degree Bucketing
-----------------
+Degree Bucketing for Message Passing with User Defined Functions
+----------------------------------------------------------------
 
 DGL employs a degree-bucketing mechanism for message passing with UDFs. It groups nodes with
 a same in-degree and invokes message passing for each group of nodes. As a result, one shall

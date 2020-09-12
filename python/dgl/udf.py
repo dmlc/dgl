@@ -33,11 +33,34 @@ class EdgeBatch(object):
 
         Examples
         --------
+        The following example uses PyTorch backend.
 
-        >>> # For an EdgeBatch instance, get the feature 'h' for all source nodes.
-        >>> # The feature is a tensor of shape (E, *),
-        >>> # where E is the number of edges in the batch.
-        >>> edges.src['h']
+        >>> import dgl
+        >>> import torch
+
+        >>> # Instantiate a graph and set a node feature 'h'
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([1, 1, 0])))
+        >>> g.ndata['h'] = torch.ones(2, 1)
+
+        >>> # Define a UDF that retrieves the source node features for edges
+        >>> def edge_udf(edges):
+        >>>     # edges.src['h'] is a tensor of shape (E, 1),
+        >>>     # where E is the number of edges in the batch.
+        >>>     return {'src': edges.src['h']}
+
+        >>> # Copy features from source nodes to edges
+        >>> g.apply_edges(edge_udf)
+        >>> g.edata['src']
+        tensor([[1.],
+                [1.],
+                [1.]])
+
+        >>> # Use edge UDF in message passing, which is equivalent to dgl.function.copy_u
+        >>> import dgl.function as fn
+        >>> g.update_all(edge_udf, fn.sum('src', 'h'))
+        >>> g.ndata['h']
+        tensor([[1.],
+                [2.]])
         """
         return self._src_data
 
@@ -47,11 +70,34 @@ class EdgeBatch(object):
 
         Examples
         --------
+        The following example uses PyTorch backend.
 
-        >>> # For an EdgeBatch instance, get the feature 'h' for all destination nodes.
-        >>> # The feature is a tensor of shape (E, *),
-        >>> # where E is the number of edges in the batch.
-        >>> edges.dst['h']
+        >>> import dgl
+        >>> import torch
+
+        >>> # Instantiate a graph and set a node feature 'h'
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([1, 1, 0])))
+        >>> g.ndata['h'] = torch.tensor([[0.], [1.]])
+
+        >>> # Define a UDF that retrieves the destination node features for edges
+        >>> def edge_udf(edges):
+        >>>     # edges.dst['h'] is a tensor of shape (E, 1),
+        >>>     # where E is the number of edges in the batch.
+        >>>     return {'dst': edges.dst['h']}
+
+        >>> # Copy features from destination nodes to edges
+        >>> g.apply_edges(edge_udf)
+        >>> g.edata['dst']
+        tensor([[1.],
+                [1.],
+                [1.]])
+
+        >>> # Use edge UDF in message passing
+        >>> import dgl.function as fn
+        >>> g.update_all(edge_udf, fn.sum('dst', 'h'))
+        >>> g.ndata['h']
+        tensor([[0.],
+                [2.]])
         """
         return self._dst_data
 
@@ -61,11 +107,34 @@ class EdgeBatch(object):
 
         Examples
         --------
+        The following example uses PyTorch backend.
 
-        >>> # For an EdgeBatch instance, get the feature 'h' for all edges
-        >>> # The feature is a tensor of shape (E, *),
-        >>> # where E is the number of edges in the batch.
-        >>> edges.data['h']
+        >>> import dgl
+        >>> import torch
+
+        >>> # Instantiate a graph and set an edge feature 'h'
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([1, 1, 0])))
+        >>> g.edata['h'] = torch.tensor([[1.], [1.], [1.]])
+
+        >>> # Define a UDF that retrieves the feature 'h' for all edges
+        >>> def edge_udf(edges):
+        >>>     # edges.data['h'] is a tensor of shape (E, 1),
+        >>>     # where E is the number of edges in the batch.
+        >>>     return {'data': edges.data['h']}
+
+        >>> # Make a copy of the feature with name 'data'
+        >>> g.apply_edges(edge_udf)
+        >>> g.edata['data']
+        tensor([[1.],
+                [1.],
+                [1.]])
+
+        >>> # Use edge UDF in message passing, which is equivalent to dgl.function.copy_e
+        >>> import dgl.function as fn
+        >>> g.update_all(edge_udf, fn.sum('data', 'h'))
+        >>> g.ndata['h']
+        tensor([[1.],
+                [2.]])
         """
         return self._edge_data
 
@@ -77,6 +146,35 @@ class EdgeBatch(object):
         (U, V, EID) : (Tensor, Tensor, Tensor)
             The edges in the batch. For each :math:`i`, :math:`(U[i], V[i])` is an edge
             from :math:`U[i]` to :math:`V[i]` with ID :math:`EID[i]`.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        >>> # Instantiate a graph
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([1, 1, 0])))
+
+        >>> # Define a UDF that retrieves and concatenates the end nodes of the edges
+        >>> def edge_udf(edges):
+        >>>     src, dst, _ = edges.edges()
+        >>>     return {'uv': torch.stack([src, dst], dim=1).float()}
+
+        >>> # Create a feature 'uv' with the end nodes of the edges
+        >>> g.apply_edges(edge_udf)
+        >>> g.edata['uv']
+        tensor([[0., 1.],
+                [1., 1.],
+                [1., 0.]])
+
+        >>> # Use edge UDF in message passing
+        >>> import dgl.function as fn
+        >>> g.update_all(edge_udf, fn.sum('uv', 'h'))
+        >>> g.ndata['h']
+        tensor([[1., 0.],
+                [1., 2.]])
         """
         u, v = self._graph.find_edges(self._eid, etype=self.canonical_etype)
         return u, v, self._eid
@@ -87,6 +185,34 @@ class EdgeBatch(object):
         Returns
         -------
         int
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        >>> # Instantiate a graph
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([1, 1, 0])))
+
+        >>> # Define a UDF that returns one for each edge
+        >>> def edge_udf(edges):
+        >>>     return {'h': torch.ones(edges.batch_size(), 1)}
+
+        >>> # Creates a feature 'h'
+        >>> g.apply_edges(edge_udf)
+        >>> g.edata['h']
+        tensor([[1.],
+                [1.],
+                [1.]])
+
+        >>> # Use edge UDF in message passing
+        >>> import dgl.function as fn
+        >>> g.update_all(edge_udf, fn.sum('h', 'h'))
+        >>> g.ndata['h']
+        tensor([[1.],
+                [2.]])
         """
         return len(self._eid)
 
@@ -134,11 +260,30 @@ class NodeBatch(object):
 
         Examples
         --------
+        The following example uses PyTorch backend.
 
-        >>> # For a NodeBatch instance, get the feature 'h' for all nodes
-        >>> # The feature is a tensor of shape (N, *),
-        >>> # where N is the number of nodes in the batch.
-        >>> nodes.data['h']
+        >>> import dgl
+        >>> import torch
+
+        >>> # Instantiate a graph and set a feature 'h'
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([1, 1, 0])))
+        >>> g.ndata['h'] = torch.ones(2, 1)
+
+        >>> # Define a UDF that computes the sum of the messages received and the original feature
+        >>> # for each node
+        >>> def node_udf(nodes):
+        >>>     # nodes.data['h'] is a tensor of shape (N, 1),
+        >>>     # nodes.mailbox['m'] is a tensor of shape (N, D, 1),
+        >>>     # where N is the number of nodes in the batch,
+        >>>     # D is the number of messages received per node for this node batch
+        >>>     return {'h': nodes.data['h'] + nodes.mailbox['m'].sum(1)}
+
+        >>> # Use node UDF in message passing
+        >>> import dgl.function as fn
+        >>> g.update_all(fn.copy_u('h', 'm'), node_udf)
+        >>> g.ndata['h']
+        tensor([[2.],
+                [3.]])
         """
         return self._data
 
@@ -148,12 +293,30 @@ class NodeBatch(object):
 
         Examples
         --------
+        The following example uses PyTorch backend.
 
-        >>> # For a NodeBatch instance, get the messages 'm' for all nodes.
-        >>> # The messages is a tensor of shape (N, M, *), where N is the
-        >>> # number of nodes in the batch and M is the number of messages
-        >>> # each node receives.
-        >>> nodes.mailbox['m']
+        >>> import dgl
+        >>> import torch
+
+        >>> # Instantiate a graph and set a feature 'h'
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([1, 1, 0])))
+        >>> g.ndata['h'] = torch.ones(2, 1)
+
+        >>> # Define a UDF that computes the sum of the messages received and the original feature
+        >>> # for each node
+        >>> def node_udf(nodes):
+        >>>     # nodes.data['h'] is a tensor of shape (N, 1),
+        >>>     # nodes.mailbox['m'] is a tensor of shape (N, D, 1),
+        >>>     # where N is the number of nodes in the batch,
+        >>>     # D is the number of messages received per node for this node batch
+        >>>     return {'h': nodes.data['h'] + nodes.mailbox['m'].sum(1)}
+
+        >>> # Use node UDF in message passing
+        >>> import dgl.function as fn
+        >>> g.update_all(fn.copy_u('h', 'm'), node_udf)
+        >>> g.ndata['h']
+        tensor([[2.],
+                [3.]])
         """
         return self._msgs
 
@@ -165,6 +328,33 @@ class NodeBatch(object):
         NID : Tensor
             The IDs of the nodes in the batch. :math:`NID[i]` gives the ID of
             the i-th node.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        >>> # Instantiate a graph and set a feature 'h'
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([1, 1, 0])))
+        >>> g.ndata['h'] = torch.ones(2, 1)
+
+        >>> # Define a UDF that computes the sum of the messages received and the original ID
+        >>> # for each node
+        >>> def node_udf(nodes):
+        >>>     # nodes.nodes() is a tensor of shape (N),
+        >>>     # nodes.mailbox['m'] is a tensor of shape (N, D, 1),
+        >>>     # where N is the number of nodes in the batch,
+        >>>     # D is the number of messages received per node for this node batch
+        >>>     return {'h': nodes.nodes().unsqueeze(-1).float() + nodes.mailbox['m'].sum(1)}
+
+        >>> # Use node UDF in message passing
+        >>> import dgl.function as fn
+        >>> g.update_all(fn.copy_u('h', 'm'), node_udf)
+        >>> g.ndata['h']
+        tensor([[1.],
+                [3.]])
         """
         return self._nodes
 
@@ -174,6 +364,29 @@ class NodeBatch(object):
         Returns
         -------
         int
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        >>> # Instantiate a graph
+        >>> g = dgl.graph((torch.tensor([0, 1, 1]), torch.tensor([1, 1, 0])))
+        >>> g.ndata['h'] = torch.ones(2, 1)
+
+        >>> # Define a UDF that computes the sum of the messages received for each node
+        >>> # and increments the result by 1
+        >>> def node_udf(nodes):
+        >>>     return {'h': torch.ones(nodes.batch_size(), 1) + nodes.mailbox['m'].sum(1)}
+
+        >>> # Use node UDF in message passing
+        >>> import dgl.function as fn
+        >>> g.update_all(fn.copy_u('h', 'm'), node_udf)
+        >>> g.ndata['h']
+        tensor([[2.],
+                [3.]])
         """
         return len(self._nodes)
 
