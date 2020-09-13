@@ -66,6 +66,7 @@ class GSpMM(th.autograd.Function):
         if op == 'copy_lhs' and reduce_op == 'sum':
             ctx.save_for_backward(th.LongTensor(list(X.shape)))
         elif op == 'copy_lhs' and reduce_op == 'max':
+            print(th.LongTensor(list(X.shape)), argX)
             ctx.save_for_backward(th.LongTensor(list(X.shape)), argX)
         else:
             ctx.save_for_backward(X, Y, argX, argY)
