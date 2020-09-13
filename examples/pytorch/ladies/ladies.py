@@ -8,7 +8,7 @@ def compute_prob(g, seed_nodes, weight):
         return torch.zeros(g.number_of_nodes(), device=g.device), torch.zeros(0, device=g.device)
 
     if weight is None:
-        edge_weight = torch.ones(out_frontier.number_of_edges()).to(weight)
+        edge_weight = torch.ones(out_frontier.number_of_edges(), device=out_frontier.device)
     else:
         edge_weight = out_frontier.edata[weight]
     with out_frontier.local_scope():
@@ -17,7 +17,7 @@ def compute_prob(g, seed_nodes, weight):
         out_frontier.edata['w'] = out_frontier.edata['w'] ** 2
         out_frontier.update_all(fn.copy_e('w', 'm'), fn.sum('m', 'prob'))
         prob = out_frontier.ndata['prob']
-        return prob, edge_weight
+        return prob
 
 class LADIESNeighborSampler(dgl.dataloading.BlockSampler):
     def __init__(self, nodes_per_layer, weight=None, out_weight=None, replace=False):
@@ -28,9 +28,8 @@ class LADIESNeighborSampler(dgl.dataloading.BlockSampler):
         self.out_weight = out_weight
 
     def sample_frontier(self, block_id, g, seed_nodes):
-        seed_nodes = torch.stack(seed_nodes)
         num_nodes = self.nodes_per_layer[block_id]
-        prob, edge_weight = compute_prob(g, seed_nodes, self.weight)
+        prob = compute_prob(g, seed_nodes, self.weight)
         candidate_nodes = torch.nonzero(prob, as_tuple=True)[0]
 
         if not self.replace and len(candidate_nodes) < num_nodes:
@@ -42,12 +41,15 @@ class LADIESNeighborSampler(dgl.dataloading.BlockSampler):
         neighbor_nodes = torch.unique(neighbor_nodes)
 
         neighbor_graph = dgl.in_subgraph(g, seed_nodes)
-        neighbor_graph = dgl.out_subgraph(g, neighbor_nodes)
+        neighbor_graph = dgl.out_subgraph(neighbor_graph, neighbor_nodes)
 
         # Compute output edge weight
         if self.out_weight is not None:
             with neighbor_graph.local_scope():
-                neighbor_graph.edata['P'] = edge_weight
+                if self.weight is not None:
+                    neighbor_graph.edata['P'] = neighbor_graph.edata[self.weight]
+                else:
+                    neighbor_graph.edata['P'] = torch.ones(neighbor_graph.number_of_edges(), device=neighbor_graph.device)
                 neighbor_graph.ndata['S'] = prob
                 neighbor_graph.apply_edges(dgl.function.e_div_u('P', 'S', 'P_tilde'))
                 neighbor_graph.update_all(

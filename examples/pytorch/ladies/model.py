@@ -45,7 +45,7 @@ class Model(nn.Module):
         self.convs.append(GraphConv(n_hidden, n_classes))
 
     def forward(self, blocks, x):
-        for i, (conv, block) in enumerate(zip(self.convs, self.blocks)):
+        for i, (conv, block) in enumerate(zip(self.convs, blocks)):
             x = conv(block, x, block.edata['w'])
             if i != len(self.convs) - 1:
                 x = F.relu(x)

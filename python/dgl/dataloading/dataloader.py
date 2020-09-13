@@ -243,7 +243,11 @@ class BlockSampler(object):
             if self.return_eids:
                 assign_block_eids(block, frontier)
 
-            seed_nodes = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
+            if len(g.ntypes) > 1:
+                seed_nodes = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
+            else:
+                seed_nodes = block.srcdata[NID]
+
             # Pre-generate CSR format so that it can be used in training directly
             block.create_formats_()
             blocks.insert(0, block)
@@ -352,6 +356,9 @@ class NodeCollator(Collator):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
+            items = utils.prepare_tensor_dict(self.g, items, 'items')
+        else:
+            items = utils.prepare_tensor(self.g, items, 'items')
         blocks = self.block_sampler.sample_blocks(self.g, items)
         output_nodes = blocks[-1].dstdata[NID]
         input_nodes = blocks[0].srcdata[NID]
@@ -559,10 +566,11 @@ class EdgeCollator(Collator):
 
     def _collate(self, items):
         if isinstance(items[0], tuple):
+            # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-            items = {k: F.zerocopy_from_numpy(np.asarray(v)) for k, v in items.items()}
+            items = utils.prepare_tensor_dict(self.g_sampling, items, 'items')
         else:
-            items = F.zerocopy_from_numpy(np.asarray(items))
+            items = utils.prepare_tensor(self.g_sampling, items, 'items')
 
         pair_graph = self.g.edge_subgraph(items)
         seed_nodes = pair_graph.ndata[NID]
@@ -582,10 +590,11 @@ class EdgeCollator(Collator):
 
     def _collate_with_negative_sampling(self, items):
         if isinstance(items[0], tuple):
+            # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-            items = {k: F.zerocopy_from_numpy(np.asarray(v)) for k, v in items.items()}
+            items = utils.prepare_tensor_dict(self.g_sampling, items, 'items')
         else:
-            items = F.zerocopy_from_numpy(np.asarray(items))
+            items = utils.prepare_tensor(self.g_sampling, items, 'items')
 
         pair_graph = self.g.edge_subgraph(items, preserve_nodes=True)
         induced_edges = pair_graph.edata[EID]

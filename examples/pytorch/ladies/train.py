@@ -45,7 +45,7 @@ def train(g, n_classes, args):
             for step, (input_nodes, seeds, blocks) in enumerate(tq):
                 blocks = [block.to(device) for block in blocks]
                 batch_inputs = blocks[0].srcdata['features']
-                batch_labels = blocks[-1].dstdata['labels']
+                batch_labels = blocks[-1].dstdata['label']
 
                 batch_pred = model(blocks, batch_inputs)
                 loss = F.cross_entropy(batch_pred, batch_labels)
@@ -77,7 +77,7 @@ def train(g, n_classes, args):
 
 if __name__ == '__main__':
     g = dgl.graph((torch.randint(0, 2000, (10000,)), torch.randint(0, 2000, (10000,))))
-    g = dgl.to_simple(dgl.add_reverse_edges(g))
+    g = dgl.to_simple(dgl.add_reverse_edges(g), return_counts=None)
     g.ndata['features'] = torch.randn(2000, 15)
     g.ndata['label'] = torch.randint(0, 5, (2000,))
     g.ndata['mask'] = torch.randint(0, 10, (2000,))
@@ -91,6 +91,6 @@ if __name__ == '__main__':
         'batch_size': 10,
         'hidden_dim': 8,
         'lr': 1e-4,
-        'num_nodes': '60,40,20',
+        'num_nodes': '20,20,20',
         'device': 'cpu'}
     train(g, 5, args)
