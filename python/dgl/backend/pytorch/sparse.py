@@ -79,6 +79,7 @@ class GSpMM(th.autograd.Function):
             x_shape = th.Size(x_shape.tolist())
         elif op == 'copy_lhs' and reduce_op == 'max':
             x_shape, argX = ctx.saved_tensors
+            print(x_shape, type(x_shape))
             x_shape = th.Size(x_shape.tolist())
         else:
             X, Y, argX, argY = ctx.saved_tensors
