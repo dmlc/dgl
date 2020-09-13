@@ -124,6 +124,10 @@ void HeteroGraphSanityCheck(GraphPtr meta_graph, const std::vector<HeteroGraphPt
   for (const auto &rg : rel_graphs) {
     CHECK_EQ(rg->NumEdgeTypes(), 1) << "Each relation graph must have only one edge type.";
   }
+  auto ctx = rel_graphs[0]->Context();
+  for (const auto &rg : rel_graphs) {
+    CHECK_EQ(rg->Context(), ctx) << "Each relation graph must have the same context.";
+  }
 }
 
 std::vector<int64_t>
@@ -484,7 +488,7 @@ FlattenedHeteroGraphPtr HeteroGraph::FlattenImpl(const std::vector<dgl_type_t>& 
   CHECK_EQ(gptr->NumBits(), NumBits());
 
   FlattenedHeteroGraph* result = new FlattenedHeteroGraph;
-  result->graph = HeteroGraphRef(gptr);
+  result->graph = HeteroGraphRef(HeteroGraphPtr(new HeteroGraph(gptr->meta_graph(), {gptr})));
   result->induced_srctype = aten::VecToIdArray(induced_srctype).CopyTo(Context());
   result->induced_srctype_set = aten::VecToIdArray(srctype_set).CopyTo(Context());
   result->induced_srcid = aten::VecToIdArray(induced_srcid).CopyTo(Context());

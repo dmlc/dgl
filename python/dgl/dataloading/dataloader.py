@@ -299,7 +299,7 @@ class NodeCollator(Collator):
     a homogeneous graph where each node takes messages from all neighbors (assume
     the backend is PyTorch):
 
-    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> collator = dgl.dataloading.NodeCollator(g, train_nid, sampler)
     >>> dataloader = torch.utils.data.DataLoader(
     ...     collator.dataset, collate_fn=collator.collate,
@@ -460,9 +460,9 @@ class EdgeCollator(Collator):
     computation dependencies of the incident nodes.  This is a common trick to avoid
     information leakage.
 
-    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> collator = dgl.dataloading.EdgeCollator(
-    ...     g, train_eid, sampler, exclude='reverse',
+    ...     g, train_eid, sampler, exclude='reverse_id',
     ...     reverse_eids=reverse_eids)
     >>> dataloader = torch.utils.data.DataLoader(
     ...     collator.dataset, collate_fn=collator.collate,
@@ -474,10 +474,10 @@ class EdgeCollator(Collator):
     homogeneous graph where each node takes messages from all neighbors (assume the
     backend is PyTorch), with 5 uniformly chosen negative samples per edge:
 
-    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
     >>> collator = dgl.dataloading.EdgeCollator(
-    ...     g, train_eid, sampler, exclude='reverse',
+    ...     g, train_eid, sampler, exclude='reverse_id',
     ...     reverse_eids=reverse_eids, negative_sampler=neg_sampler,
     >>> dataloader = torch.utils.data.DataLoader(
     ...     collator.dataset, collate_fn=collator.collate,
@@ -498,7 +498,7 @@ class EdgeCollator(Collator):
     To train a 3-layer GNN for edge classification on a set of edges ``train_eid`` with
     type ``click``, you can write
 
-    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> collator = dgl.dataloading.EdgeCollator(
     ...     g, {'click': train_eid}, sampler, exclude='reverse_types',
     ...     reverse_etypes={'click': 'clicked-by', 'clicked-by': 'click'})
@@ -511,7 +511,7 @@ class EdgeCollator(Collator):
     To train a 3-layer GNN for link prediction on a set of edges ``train_eid`` with type
     ``click``, you can write
 
-    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
     >>> collator = dgl.dataloading.EdgeCollator(
     ...     g, train_eid, sampler, exclude='reverse_types',
