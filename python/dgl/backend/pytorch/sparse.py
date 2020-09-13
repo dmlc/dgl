@@ -64,9 +64,9 @@ class GSpMM(th.autograd.Function):
         out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
         ctx.backward_cache = gidx, op, reduce_op
         if op == 'copy_lhs' and reduce_op == 'sum':
-            pass
+            ctx.save_for_backward(torch.LongTensor(list(X.shape)))
         elif op == 'copy_lhs' and reduce_op == 'max':
-            ctx.save_for_backward(argX)
+            ctx.save_for_backward(torch.LongTensor(list(X.shape)), argX)
         else:
             ctx.save_for_backward(X, Y, argX, argY)
         return out
@@ -75,9 +75,11 @@ class GSpMM(th.autograd.Function):
     def backward(ctx, dZ):
         gidx, op, reduce_op = ctx.backward_cache
         if op == 'copy_lhs' or reduce_op == 'sum':
-            pass
+            x_shape = ctx.saved_tensors
+            x_shape = torch.Size(x_shape)
         elif op == 'copy_lhs' and reduce_op == 'max':
-            argX = ctx.saved_tensors
+            x_shape, argX = ctx.saved_tensors
+            x_shape = torch.Size(x_shape)
         else:
             X, Y, argX, argY = ctx.saved_tensors
         if op != 'copy_rhs' and ctx.needs_input_grad[3]:
@@ -90,7 +92,7 @@ class GSpMM(th.autograd.Function):
                 elif op == 'copy_lhs':
                     dX = gspmm(g_rev, 'copy_lhs', 'sum', dZ, None)
             else:  # max/min
-                dX = th.zeros((X.shape[0],) + dZ.shape[1:],
+                dX = th.zeros((x_shape[0],) + dZ.shape[1:],
                               dtype=X.dtype, device=X.device)
                 if op in ['mul', 'div']:
                     grad = _muldiv(op, _expand(Y, dZ.shape[1:]).gather(
@@ -98,6 +100,7 @@ class GSpMM(th.autograd.Function):
                     dX.scatter_add_(0, argX.long(), grad)
                 elif op in ['add', 'sub', 'copy_lhs']:
                     dX.scatter_add_(0, argX.long(), dZ)
+            dX = _reduce_grad(dX, x_shape)
         else:  # X has not gradient
             dX = None
         if op != 'copy_lhs' and ctx.needs_input_grad[4]:
