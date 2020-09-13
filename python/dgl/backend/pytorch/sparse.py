@@ -93,7 +93,7 @@ class GSpMM(th.autograd.Function):
                     dX = gspmm(g_rev, 'copy_lhs', 'sum', dZ, None)
             else:  # max/min
                 dX = th.zeros((x_shape[0],) + dZ.shape[1:],
-                              dtype=X.dtype, device=X.device)
+                              dtype=dZ.dtype, device=dZ.device)
                 if op in ['mul', 'div']:
                     grad = _muldiv(op, _expand(Y, dZ.shape[1:]).gather(
                         0, argY.long())) * dZ
