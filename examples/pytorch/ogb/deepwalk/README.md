@@ -101,7 +101,7 @@ python3 mlp.py --device 2 --runs 10
 
 ogbl-citation
 ```
-python3 deepwalk.py --ogbl_name ogbl-citation --load_from_ogbl --save_in_pt --output_emb_file embedding.pt --window_size 2 --num_walks 10 --negative 1 --neg_weight 1 --walk_length 80 --batch_size 128 --print_loss --print_interval 1000 --mix --gpus 0 --use_context_weight --num_threads 4 --lap_norm 0.05 --lr 0.1
+python3 deepwalk.py --ogbl_name ogbl-citation --load_from_ogbl --save_in_pt --output_emb_file embedding.pt --window_size 2 --num_walks 10 --negative 1 --neg_weight 1 --walk_length 80 --batch_size 128 --print_loss --print_interval 1000 --mix --gpus 0 --use_context_weight --num_threads 4 --lap_norm 0.01 --lr 0.1
 cp embedding_pt_file_path ./
 python3 mlp.py --device 2 --runs 10 --use_node_embedding
 ```
@@ -165,8 +165,7 @@ ogbl-collab
 <br>ogbl-citation
 <br>#params: 757811178(model) + 131841(mlp) = 757943019
 <br>MRR
-<br>&emsp;Highest Train: 0.8994 ± 0.0004
-<br>&emsp;Highest Valid: 0.8271 ± 0.0003
-<br>&emsp;&emsp;Final Train: 0.8991 ± 0.0007
-<br>&emsp;&emsp;Final Test: 0.8284 ± 0.0005
-
+<br>&emsp;Highest Train: 0.9381 ± 0.0003
+<br>&emsp;Highest Valid: 0.8469 ± 0.0003
+<br>&emsp;&emsp;Final Train: 0.9377 ± 0.0004
+<br>&emsp;&emsp;Final Test: 0.8479 ± 0.0003
