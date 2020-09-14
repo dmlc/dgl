@@ -169,9 +169,17 @@ ogbl-collab
 <br>&emsp;&emsp;Final Train: 0.9377 ± 0.0004
 <br>&emsp;&emsp;Final Test: 0.8479 ± 0.0003
 
-### Other Notes
-For efficiency, the results given above are run with multi-GPU. Since ogb is somehow incompatible with our multi-GPU implementation, we need to do some preprocessing. The command is:
+### Notes
+#### Multi-GPU issues
+For efficiency, the results of ogbl-collab, ogbl-ppa, ogbl-ddi are run with multi-GPU. Since ogb is somehow incompatible with our multi-GPU implementation, we need to do some preprocessing. The command is:
 ```
 python3 load_dataset.py --name dataset_name
 ```
-It will output a data file to the local. if `dataset_name` is 
+It will output a data file to the local. For example, if `dataset_name` is `ogbl-collab`, then a file `ogbl-collab-net.txt` will be generated. Then we run 
+```
+python3 deepwalk.py --data_file ogbl-collab-net.txt
+```
+where the other parameters are the same with used configs without using `--load_from_ogbl` and `--ogbl_name`.
+
+#### Others
+The performance on ogbl-ddi and ogbl-ppa can be not that stable.
