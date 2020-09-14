@@ -177,7 +177,7 @@ python3 load_dataset.py --name dataset_name
 ```
 It will output a data file to the local. For example, if `dataset_name` is `ogbl-collab`, then a file `ogbl-collab-net.txt` will be generated. Then we run 
 ```
-python3 deepwalk.py --data_file ogbl-collab-net.txt
+python3 deepwalk.py --data_file data_file_path
 ```
 where the other parameters are the same with used configs without using `--load_from_ogbl` and `--ogbl_name`.
 
