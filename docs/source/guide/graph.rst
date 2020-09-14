@@ -9,6 +9,11 @@ graph-centric programming abstraction with its core data structure -- :class:`~d
 provides its interface to handle a graph's structure, its node/edge features, and the resulting
 computations that can be performed using these components.
 
+
+图表示实体(节点)和它们的关系(边)，其中节点和边可以是有类型的 (例如，``用户``和``物品``是两种不同类型的节点)。
+DGL通过其核心数据结构:class:`~dgl.DGLGraph`提供了一个以图为中心的编程抽象。:class:`~dgl.DGLGraph`提供了接口来处理图的结构、节点/边
+特征以及使用这些组件可以执行的。
+
 Roadmap
 -------
 
