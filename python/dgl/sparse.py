@@ -334,8 +334,6 @@ def _gspmm_tvm(gidx, op, reduce_op, u, e, advise=True,
     if target == 'cpu' and num_feat_partitions == 1 and num_col_partitions == 1 and advise:
         # search for parameter
         pass
-        # num_col_partitions = 8
-        # num_feat_partitions = 2
     if target == 'cuda' and (num_col_partitions > 1 or num_feat_partitions > 1):
         logging.info('Partitioning not supported on GPU')
         num_col_partitions, num_feat_partitions = 1, 1

@@ -84,8 +84,8 @@ def _sddmm_cuda_general(sched, out):
 def _sddmm_cuda_tree_reduce(sched, out):
     edge_axis = out.op.axis[0]
     reduce_axis = out.op.reduce_axis[0]
-    # eo, ei = s[out].split(edge_axis, factor = (1024 // reduce_size))
-    # s[out].bind(reduce_axis, te.thread_axis('threadIdx.x'))
+    # sched[out].bind(reduce_axis, te.thread_axis('threadIdx.x'))
+    # sched[out].bind(edge_axis, te.thread_axis('blockIdx.x'))
     _, red_inner = sched[out].split(reduce_axis, factor=32)
     edge_outer, edge_inner = sched[out].split(edge_axis, factor=32)
     sched[out].bind(red_inner, te.thread_axis('threadIdx.x'))

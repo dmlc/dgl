@@ -130,19 +130,28 @@ def _spmm_dds(out_shp, binary_op, reduce_op, adj_indptr, adj_indices,
     return rst, intermediate, reshapes
 
 def _spmm_cuda_general(sched, out):
+    out_len = topi.util.get_const_int(topi.util.prod(out.shape[1:]))
     node_axis = out.op.axis[0]
     feat_axis = sched[out].fuse(*out.op.axis[1:])
-    sched[out].bind(node_axis, te.thread_axis('blockIdx.x'))
-    sched[out].bind(feat_axis, te.thread_axis('threadIdx.x'))
+    ntx = tvm.autotvm.task.space.get_pow2s(out_len)[-1]
+    ntx = 1024 if ntx > 1024 else ntx
+    feat_outer, feat_inner = sched[out].split(feat_axis, factor=ntx)
+    nbx = 2**31 - 1 if out.shape[0] > 2**31 - 1 else out.shape[0]
+    node_outer, _ = sched[out].split(node_axis, nparts=nbx)
+    sched[out].bind(node_outer, te.thread_axis('blockIdx.x'))
+    sched[out].bind(feat_outer, te.thread_axis('blockIdx.y'))
+    sched[out].bind(feat_inner, te.thread_axis('threadIdx.x'))
 
 def _spmm_cuda_tree_reduce(sched, out):
     reduce_axis = out.op.reduce_axis[0]
     node_axis = out.op.axis[0]
     feat_axis = sched[out].fuse(*out.op.axis[1:])
     _, red_inner = sched[out].split(reduce_axis, factor=32)
+    nbx = 2**31 - 1 if out.shape[0] > 2**31 - 1 else out.shape[0]
+    node_outer, _ = sched[out].split(node_axis, nparts=nbx)
     sched[out].bind(red_inner, te.thread_axis('threadIdx.x'))
     sched[out].bind(feat_axis, te.thread_axis('threadIdx.y'))
-    sched[out].bind(node_axis, te.thread_axis('blockIdx.x'))
+    sched[out].bind(node_outer, te.thread_axis('blockIdx.x'))
 
 def _spmm_cpu(sched, out, num_feat_partitions, reshapes):
     reduce_axis = out.op.reduce_axis[0]
