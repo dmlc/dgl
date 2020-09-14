@@ -75,7 +75,7 @@ class GSpMM(th.autograd.Function):
     def backward(ctx, dZ):
         gidx, op, reduce_op = ctx.backward_cache
         if op == 'copy_lhs' and reduce_op == 'sum':
-            x_shape = ctx.saved_tensors
+            x_shape, = ctx.saved_tensors
             x_shape = th.Size(x_shape)
         elif op == 'copy_lhs' and reduce_op == 'max':
             x_shape, argX = ctx.saved_tensors
