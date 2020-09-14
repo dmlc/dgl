@@ -106,7 +106,7 @@ cp embedding_pt_file_path ./
 python3 mlp.py --device 2 --runs 10 --use_node_embedding
 ```
 
-### OGBL Resuls
+### OGBL Results
 ogbl-collab
 <br>#params: 61258346(model) + 131841(mlp) = 61390187
 <br>Hits@10
@@ -143,7 +143,6 @@ ogbl-collab
 <br>&emsp;&emsp;Final Train: 50.99 ± 1.72
 <br>&emsp;&emsp;Final Test: 33.56 ± 3.95
 
-
 <br>ogbl-ppa
 <br>#params: 150024820(model) + 113921(mlp) = 150138741
 <br>Hits@10
@@ -169,3 +168,10 @@ ogbl-collab
 <br>&emsp;Highest Valid: 0.8469 ± 0.0003
 <br>&emsp;&emsp;Final Train: 0.9377 ± 0.0004
 <br>&emsp;&emsp;Final Test: 0.8479 ± 0.0003
+
+### Other Notes
+For efficiency, the results given above are run with multi-GPU. Since ogb is somehow incompatible with our multi-GPU implementation, we need to do some preprocessing. The command is:
+```
+python3 load_dataset.py --name dataset_name
+```
+It will output a data file to the local. if `dataset_name` is 
