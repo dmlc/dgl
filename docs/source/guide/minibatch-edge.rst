@@ -54,7 +54,7 @@ advantage.
 Therefore in edge classification you sometimes would like to exclude the
 edges sampled in the minibatch from the original graph for neighborhood
 sampling, as well as the reverse edges of the sampled edges on an
-undirected graph. You can specify ``exclude='reverse'`` in instantiation
+undirected graph. You can specify ``exclude='reverse_id'`` in instantiation
 of :class:`~dgl.dataloading.pytorch.EdgeDataLoader`, with the mapping of the edge
 IDs to their reverse edges IDs.  Usually doing so will lead to much slower
 sampling process due to locating the reverse edges involving in the minibatch
@@ -69,7 +69,7 @@ and removing them.
         # The following two arguments are specifically for excluding the minibatch
         # edges and their reverse edges from the original graph for neighborhood
         # sampling.
-        exclude='reverse',
+        exclude='reverse_id',
         reverse_eids=torch.cat([
             torch.arange(n_edges // 2, n_edges), torch.arange(0, n_edges // 2)]),
     
