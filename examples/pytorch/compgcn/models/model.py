@@ -220,9 +220,14 @@ class CompGCN(nn.Module):
         self.basis = dglnn.WeightBasis([self.rel_emb_dim], self.num_basis, self.num_rel)
 
         # 2. define matrices for convert node dimensions to relation embedding dimensions
+        # In order to reduce the number of parameters, if the input dimension is equal to
+        # the dimension of relation embedding, will not use linear transformation.
         self.input_layer = nn.ModuleDict()
         for ntype, in_feat in in_feat_dict.items():
-            self.input_layer[ntype] = nn.Linear(in_feat, self.rel_emb_dim, bias=True)
+            if in_feat != self.rel_emb_dim:
+                self.input_layer[ntype] = nn.Linear(in_feat, self.rel_emb_dim, bias=True)
+            else:
+                self.input_layer[ntype] = None
 
         # Hidden layers with n - 1 CompGraphConv layers
         self.layers = nn.ModuleList()
@@ -247,9 +252,13 @@ class CompGCN(nn.Module):
             h_e[etype] = basis_vec[i]
 
         # Convert node input dimension to relation dimension
+        # If same dimension, just assign it to the h_n, else do transformation
         h_n = {}
         for ntype, feat in nfeats.items():
-            h_n[ntype] = self.input_layer[ntype](feat)
+            if self.input_layer[ntype] == None:
+                h_n[ntype] = feat
+            else:
+                h_n[ntype] = self.input_layer[ntype](feat)
 
         # Forward of n layers of CompGraphConv
         for layer in self.layers:

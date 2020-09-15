@@ -14,6 +14,7 @@ import argparse
 import os
 import dgl
 import torch as th
+import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from dgl.data import AMDataset, MUTAGDataset, AIFBDataset, BGSDataset
@@ -67,9 +68,11 @@ def main(args):
 
     in_feat_dict = {}
     n_feats = {}
+
+    # For node featureless, use an additional embedding layer to transform the data
     for ntype in heterograph.ntypes:
-        n_feats[ntype] = th.arange(heterograph.number_of_nodes(ntype)).view(-1, 1).float()
-        in_feat_dict[ntype] = 1
+        n_feats[ntype] = th.arange(heterograph.number_of_nodes(ntype))
+        in_feat_dict[ntype] = num_rels
 
         if use_cuda:
             n_feats[ntype] = n_feats[ntype].to('cuda:{}'.format(args.gpu))
@@ -78,6 +81,10 @@ def main(args):
         labels = labels.to('cuda:{}'.format(args.gpu))
 
     # Step 2: Create model =================================================================== #
+    input_embs = nn.ModuleDict()
+    for ntype in heterograph.ntypes:
+        input_embs[ntype] = nn.Embedding(heterograph.number_of_nodes(ntype), num_rels)
+
     compgcn_model = CompGCN(in_feat_dict=in_feat_dict,
                             hid_dim=args.hid_dim,
                             num_layers=args.num_layers,
@@ -96,13 +103,19 @@ def main(args):
 
     # Step 3: Create training components ===================================================== #
     loss_fn = th.nn.CrossEntropyLoss().to('cuda:{}'.format(args.gpu))
-    optimizer = optim.Adam(compgcn_model.parameters(), lr=0.005, weight_decay=5e-4)
+    optimizer = optim.Adam([input_embs.parameters(), compgcn_model.parameters()], lr=0.005, weight_decay=5e-4)
 
     # Step 4: training epoches =============================================================== #
     for epoch in range(args.max_epoch):
         # forward
+        input_embs.train()
         compgcn_model.train()
-        logits = compgcn_model.forward(heterograph, n_feats)
+
+        in_n_feats ={}
+        for ntype, feat in n_feats.items():
+            in_n_feats[ntype] = input_embs[ntype](feat)
+
+        logits = compgcn_model.forward(heterograph, in_n_feats)
 
         # compute loss
         tr_loss = loss_fn(logits[target][train_idx], labels[train_idx])
