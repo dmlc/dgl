@@ -233,7 +233,7 @@ def run(args, device, data):
 
             step_t = time.time() - tic_step
             step_time.append(step_t)
-            iter_tput.append(num_seeds / (step_t))
+            iter_tput.append(len(blocks[-1].dstdata[dgl.NID]) / step_t)
             if step % args.log_every == 0:
                 acc = compute_acc(batch_pred, batch_labels)
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
