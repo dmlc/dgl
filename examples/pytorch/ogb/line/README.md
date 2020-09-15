@@ -2,6 +2,8 @@
 - Paper link: [here](https://arxiv.org/pdf/1503.03578)
 - Official implementation: [here](https://github.com/tangjianpku/LINE)
 
+This implementation includes both LINE-1st and LINE-2nd. The detailed usage is shown in the arguments in line.py.
+
 ## How to load ogb data
 To load ogb dataset, you need to run the following command, which will output a network file, ogbn-products-net.txt:
 ```
