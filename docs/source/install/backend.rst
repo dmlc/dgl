@@ -5,6 +5,7 @@ Working with different backends
 
 DGL supports PyTorch, MXNet and Tensorflow backends. 
 DGL will choose the backend on the following options (high priority to low priority)
+
 - `DGLBACKEND` environment
    - You can use `DGLBACKEND=[BACKEND] python gcn.py ...` to specify the backend
    - Or `export DGLBACKEND=[BACKEND]` to set the global environment variable 
