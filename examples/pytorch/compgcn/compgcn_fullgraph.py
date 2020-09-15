@@ -83,7 +83,7 @@ def main(args):
     # Step 2: Create model =================================================================== #
     input_embs = nn.ModuleDict()
     for ntype in heterograph.ntypes:
-        input_embs[ntype] = nn.Embedding(heterograph.number_of_nodes(ntype), num_rels)
+        input_embs[ntype] = nn.Embedding(heterograph.number_of_nodes(ntype), num_rels).to('cuda:{}'.format(args.gpu))
 
     compgcn_model = CompGCN(in_feat_dict=in_feat_dict,
                             hid_dim=args.hid_dim,
