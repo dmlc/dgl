@@ -229,7 +229,7 @@ class LineTrainer:
             self.emb_model.save_embedding(self.dataset, self.args.output_emb_file)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="DeepWalk")
+    parser = argparse.ArgumentParser(description="Implementation of LINE.")
     # input files
     ## personal datasets
     parser.add_argument('--data_file', type=str, 
@@ -240,7 +240,7 @@ if __name__ == '__main__':
     parser.add_argument('--load_from_ogbl', default=False, action="store_true",
             help="whether load dataset from ogbl")
     parser.add_argument('--ogbn_name', type=str, 
-            help="name of ogbl dataset, e.g. ogbl-ddi")
+            help="name of ogbn dataset, e.g. ogbn-proteins")
     parser.add_argument('--load_from_ogbn', default=False, action="store_true",
             help="whether load dataset from ogbn")
 
