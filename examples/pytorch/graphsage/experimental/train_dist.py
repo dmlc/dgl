@@ -194,7 +194,6 @@ def run(args, device, data):
         tic = time.time()
 
         sample_time = 0
-        copy_time = 0
         forward_time = 0
         backward_time = 0
         update_time = 0
@@ -243,8 +242,8 @@ def run(args, device, data):
             start = time.time()
 
         toc = time.time()
-        print('Part {}, Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
-            g.rank(), toc - tic, sample_time, copy_time, forward_time, backward_time, update_time, num_seeds, num_inputs))
+        print('Part {}, Epoch Time(s): {:.4f}, sample+data_copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
+            g.rank(), toc - tic, sample_time, forward_time, backward_time, update_time, num_seeds, num_inputs))
         epoch += 1
 
 
