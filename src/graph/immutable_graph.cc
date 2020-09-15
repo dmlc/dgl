@@ -325,6 +325,8 @@ std::pair<dgl_id_t, dgl_id_t> COO::FindEdge(dgl_id_t eid) const {
 
 EdgeArray COO::FindEdges(IdArray eids) const {
   CHECK(aten::IsValidIdArray(eids)) << "Invalid edge id array";
+  BUG_ON(aten::IsNullArray(adj_.data)) <<
+    "FindEdges requires the internal COO matrix not having EIDs.";
   return EdgeArray{aten::IndexSelect(adj_.row, eids),
                    aten::IndexSelect(adj_.col, eids),
                    eids};

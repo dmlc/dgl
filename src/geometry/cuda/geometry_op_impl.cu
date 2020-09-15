@@ -108,9 +108,10 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
   // sample for each cloud in the batch
   IdType* start_idx_data = static_cast<IdType*>(start_idx->data);
 
-  fps_kernel<<<batch_size, THREADS, 0, thr_entry->stream>>>(
-    array_data, batch_size, sample_points,
-    point_in_batch, dim, start_idx_data, dist_data, ret_data);
+  CUDA_KERNEL_CALL(fps_kernel,
+      batch_size, THREADS, 0, thr_entry->stream,
+      array_data, batch_size, sample_points,
+      point_in_batch, dim, start_idx_data, dist_data, ret_data);
 }
 
 template void FarthestPointSampler<kDLGPU, float, int32_t>(

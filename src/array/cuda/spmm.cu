@@ -21,7 +21,7 @@ void _Fill(DType* ptr, size_t length, DType val) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = FindNumThreads(length);
   int nb = (length + nt - 1) / nt;  // on x-axis, no need to worry about upperbound.
-  cuda::_FillKernel<<<nb, nt, 0, thr_entry->stream>>>(ptr, length, val);
+  CUDA_KERNEL_CALL(cuda::_FillKernel, nb, nt, 0, thr_entry->stream, ptr, length, val);
 }
 
 }  // namespace

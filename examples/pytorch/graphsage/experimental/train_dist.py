@@ -228,14 +228,6 @@ def run(args, device, data):
             forward_time += forward_end - start
             backward_time += compute_end - forward_end
 
-            # Aggregate gradients in multiple nodes.
-            if not args.standalone:
-                for param in model.parameters():
-                    if param.requires_grad and param.grad is not None:
-                        th.distributed.all_reduce(param.grad.data,
-                                                  op=th.distributed.ReduceOp.SUM)
-                        param.grad.data /= dgl.distributed.get_num_client()
-
             optimizer.step()
             update_time += time.time() - compute_end
 
