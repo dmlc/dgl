@@ -139,8 +139,15 @@ def main(args):
 
     print()
 
+    input_embs.eval()
     compgcn_model.eval()
-    logits = compgcn_model.forward(heterograph, n_feats)
+
+    in_n_feats = {}
+    for ntype, feat in n_feats.items():
+        in_n_feats[ntype] = input_embs[ntype](feat)
+
+    logits = compgcn_model.forward(heterograph, in_n_feats)
+
     test_loss = loss_fn(logits[target][test_idx], labels[test_idx])
     test_acc = th.sum(logits[target][test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
     print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
