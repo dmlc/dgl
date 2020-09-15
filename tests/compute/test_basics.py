@@ -644,3 +644,16 @@ def test_issue_1088(idtype):
     g = dgl.heterograph({('U', 'E', 'V'): ([0, 1, 2], [1, 2, 3])}, idtype=idtype, device=F.ctx())
     g.nodes['U'].data['x'] = F.randn((3, 3))
     g.update_all(fn.copy_u('x', 'm'), fn.sum('m', 'y'))
+
+@parametrize_dtype
+def test_degree_bucket_edge_ordering(idtype):
+    import dgl.function as fn
+    g = dgl.graph(
+        ([1, 3, 5, 0, 4, 2, 3, 3, 4, 5], [1, 1, 0, 0, 1, 2, 2, 0, 3, 3]),
+        idtype=idtype, device=F.ctx())
+    g.edata['eid'] = F.copy_to(F.arange(0, 10), F.ctx())
+    def reducer(nodes):
+        eid = F.asnumpy(F.copy_to(nodes.mailbox['eid'], F.cpu()))
+        assert np.array_equal(eid, np.sort(eid, 1))
+        return {'n': F.sum(nodes.mailbox['eid'], 1)}
+    g.update_all(fn.copy_e('eid', 'eid'), reducer)

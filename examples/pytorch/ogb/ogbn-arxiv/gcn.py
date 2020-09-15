@@ -249,7 +249,7 @@ def main():
 
     in_feats = graph.ndata["feat"].shape[1]
     n_classes = (labels.max() + 1).item()
-    graph.create_format_()
+    graph.create_formats_()
 
     train_idx = train_idx.to(device)
     val_idx = val_idx.to(device)

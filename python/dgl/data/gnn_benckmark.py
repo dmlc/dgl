@@ -143,9 +143,7 @@ class CoraFullDataset(GNNBenchmarkDataset):
         >>> dataset = CoraFullDataset()
         >>> graph = dataset[0]
 
-    Extended Cora dataset from `Deep Gaussian Embedding of Graphs:
-    Unsupervised Inductive Learning via Ranking`.
-    Nodes represent paper and edges represent citations.
+    Extended Cora dataset. Nodes represent paper and edges represent citations.
 
     Reference: `<https://github.com/shchur/gnn-benchmark#datasets>`_
 
