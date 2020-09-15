@@ -11,7 +11,7 @@ Or you can run the code directly with:
 ```
 python3 line.py --ogbn_name xxx --load_from_ogbn
 ```
-However, ogb.nodeproppred might not be compatible with mixed training with multi-gpu. If you want to do mixed training, please use no more than 1 gpu by the command above.
+However, ogb.nodeproppred might not be compatible with mixed training with multi-gpu. If you want to do mixed training, please use no more than 1 gpu by the command above. We leave the commands to run with multi-gpu at the end.
 
 ## Evaluation
 For evaluatation we follow the code mlp.py provided by ogb [here](https://github.com/snap-stanford/ogb/blob/master/examples/nodeproppred/).
@@ -56,7 +56,6 @@ ogbn-arxiv
 <br>Final Train: 77.66 ± 10.27
 <br>Final Test: 62.07 ± 1.25
 
-
 <br>ogbn-products
 <br>#params: 477570049(model) + 136495(mlp) = 477706544
 <br>Highest Train: 98.01 ± 0.32
@@ -65,7 +64,7 @@ ogbn-arxiv
 <br>Final Test: 72.52 ± 0.29
 
 ## Notes
-Since ogb is somehow incompatible with multi-GPU training, to utlize multi-GPU, we need to load datasets as a local file before training by the following command:
+To utlize multi-GPU training, we need to load datasets as a local file before training by the following command:
 ```
 python3 load_dataset.py --name dataset_name
 ```
