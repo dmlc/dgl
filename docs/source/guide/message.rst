@@ -53,9 +53,8 @@ for unary for now. For binary funcs, we now support ``add``, ``sub``,
 built-in funcs is ``u`` represents ``src`` nodes, ``v`` represents
 ``dst`` nodes, ``e`` represents ``edges``. The parameters for those
 functions are strings indicating the input and output field names for
-the corresponding nodes and edges. Here is the
-:ref:`dgl.function` of supported
-built-in functions. For example, to add the ``hu`` feature from src
+the corresponding nodes and edges. The list of supported built-in functions
+can be found in :ref:`~dgl.function`. For example, to add the ``hu`` feature from src
 nodes and ``hv`` feature from dst nodes then save the result on the edge
 at ``he`` field, we can use built-in function
 ``dgl.function.u_add_v('hu', 'hv', 'he')`` this is equivalent to the
