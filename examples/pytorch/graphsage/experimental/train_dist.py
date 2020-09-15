@@ -187,7 +187,8 @@ def run(args, device, data):
     # Training loop
     iter_tput = []
     profiler = Profiler()
-    profiler.start()
+    if args.close_profiler == False:
+        profiler.start()
     epoch = 0
     for epoch in range(args.num_epochs):
         tic = time.time()
@@ -253,9 +254,9 @@ def run(args, device, data):
                                          g.ndata['labels'], val_nid, test_nid, args.batch_size_eval, device)
             print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc,
                                                                                   time.time() - start))
-
-    profiler.stop()
-    print(profiler.output_text(unicode=True, color=True))
+    if args.close_profiler == False:
+        profiler.stop()
+        print(profiler.output_text(unicode=True, color=True))
 
 def main(args):
     dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
@@ -313,6 +314,7 @@ if __name__ == '__main__':
         help="Number of sampling processes. Use 0 for no extra process.")
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
+    parser.add_argument('--close_profiler', action='store_true', help='Close pyinstrument profiler')
     args = parser.parse_args()
     assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')), \
     'The num_workers should be the same value with num_samplers.'
