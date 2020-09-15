@@ -104,9 +104,12 @@ def main(args):
     # Step 3: Create training components ===================================================== #
     loss_fn = th.nn.CrossEntropyLoss().to('cuda:{}'.format(args.gpu))
 
-    paras = [input_emb.parameters() for _, input_emb in input_embs.items()]
-    paras.append(compgcn_model.parameters())
-    optimizer = optim.Adam(paras, lr=0.005, weight_decay=5e-4)
+    # paras = [input_emb.parameters() for _, input_emb in input_embs.items()]
+    # paras.append(compgcn_model.parameters())
+    optimizer = optim.Adam([
+                            {'params': input_embs.parameters(), 'lr':0.005, 'weight_decay':5e-4},
+                            {'params': compgcn_model.parameters(), 'lr':0.005, 'weight_decay':5e-4}
+                            ])
 
     # Step 4: training epoches =============================================================== #
     for epoch in range(args.max_epoch):
