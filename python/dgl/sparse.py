@@ -272,6 +272,10 @@ def _gspmm_tvm(gidx, op, reduce_op, u, e, advise=True,
 
     Note that this function does not handle gradients.
 
+    This function uses TVM to compile a kernel to perform the computation.
+    The implementation varies depending on graph, feature and parameters.
+    This is now an experimental feature.
+
     Parameters
     ----------
     gidx : HeteroGraphIndex
@@ -408,6 +412,10 @@ def _gsddmm_tvm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
     is the binary operator :attr:`op`, and :math:`\mathcal{G}` is the graph
     we apply gsddmm on: :attr:`g`.
 
+    This function uses TVM to compile a kernel to perform the computation.
+    The implementation varies depending on graph, feature and parameters.
+    This is now an experimental feature.
+
     Parameters
     ----------
     gidx : HeteroGraphIndex
@@ -499,7 +507,7 @@ def _gsddmm_tvm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v', advise=True,
     else:
         if num_row_partitions == 1 and num_col_partitions == 1:
             row, col, edge_mapping = map(lambda x: tvm.nd.from_dlpack(x.to_dlpack()),
-                gidx.get_coo_dlpack(0))
+                                         gidx.get_coo_dlpack(0))
         else:
             tmp = _CAPI_DGLPartition2D(gidx, 0, num_row_partitions, num_col_partitions)
             row, col, edge_mapping = [tvm.nd.from_dlpack(tmp(x).to_dlpack()) for x in range(3)]

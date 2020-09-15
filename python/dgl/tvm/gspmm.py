@@ -192,6 +192,46 @@ def spmm(binary_op, reduce_op, nnz, num_rows, num_cols,
          lhs_shp, rhs_shp, out_shp,
          indice_type, feat_type, use_idx=False,
          num_col_partitions=1, num_feat_partitions=1, target='llvm'):
+    """
+    Compile SpMM kernel using TVM. 
+
+    Parameters
+    ----------
+    binary_op : str
+        Type of binary operatiin. Supports add, sub, mul, div, copy_lhs, and copy_rhs.
+    reduce_op : str
+        Type of reduction. Support min, max, and sum.
+    nnz : int
+        Number of edges in the graph
+    num_rows : int
+        Number of dst nodes in the graph
+    num_cols : int
+        Number of src nodes in the graph
+    lhs_shp : Tuple of int
+        Shape of node feature. Does not include num_cols
+    rhs_shp : Tuple of int
+        Shape of edge feature. Does not include nnz
+    out_shp : Tuple of int
+        Shape of result. Broadcasting shape of above two shapes
+    indice_type : str
+        Type of graph indices. int32 and int64 are supported
+    feat_type : str
+        Type of features. float32 and float64 are supported
+    use_idx : Boolean
+        Whether edge mapping is used
+    num_col_partitions : int
+        Support 1D graph partitioning.
+        Number of partitions of graph source nodes.
+    num_feat_partitions : int
+        Number of partitions of feature.
+        Applied on result shape.
+    target : str
+        Indicates where kernels are run, i.e. CPU or GPU.
+
+    Returns
+    -------
+    A TVM Module, representing compiled kernel. 
+    """
     if target == 'cuda' and (num_col_partitions > 1 or num_feat_partitions > 1):
         raise DGLError('Cannot build cuda kernel with partition')
     if '32' in indice_type:

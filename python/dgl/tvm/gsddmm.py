@@ -127,8 +127,53 @@ def _sddmm_cpu_feat_partition(sched, out, op, reshapes, reduce_size, num_feat_pa
 
 def sddmm(binary_op, nnz, num_rows, num_cols,
           lhs_shp, rhs_shp, out_shp, indice_type, feat_type,
-          lhs_target=0, rhs_target=2, is_sorted=2, use_idx=False,
+          lhs_target=TargetCode.SRC, rhs_target=TargetCode.DST,
+          is_sorted=2, use_idx=False,
           target='llvm', num_feat_partitions=1):
+    """
+    Compile SDDMM kernel using TVM. 
+
+    Parameters
+    ----------
+    binary_op : str
+        Type of binary operatiin. Supports add, sub, mul, and div.
+    nnz : int
+        Number of edges in the graph
+    num_rows : int
+        Number of dst nodes in the graph
+    num_cols : int
+        Number of src nodes in the graph
+    lhs_shp : Tuple of int
+        Shape of left-hand-side tensor. Does not include first dimension
+    rhs_shp : Tuple of int
+        Shape of right-hand-side tensor. Does not include first dimension
+    out_shp : Tuple of int
+        Shape of result. Broadcasting shape of above two shapes
+    indice_type : str
+        Type of graph indices. int32 and int64 are supported
+    feat_type : str
+        Type of features. float32 and float64 are supported
+    lhs_target : TargetCode
+        Indicate the left-hand-side tensor's target.
+    rhs_target : TargetCode
+        Indicate the right-hand-side tensor's target.
+    is_sorted : int
+        Indicate how COO is sorted. 
+    use_idx : Boolean
+        Whether edge mapping is used
+    num_col_partitions : int
+        Support 1D graph partitioning.
+        Number of partitions of graph source nodes.
+    target : str
+        Indicates where kernels are run, i.e. CPU or GPU.
+    num_feat_partitions : int
+        Number of partitions of feature.
+        Applied on result shape.
+
+    Returns
+    -------
+    A TVM Module, representing compiled kernel. 
+    """
     if binary_op in ['copy_lhs', 'copy_rhs']:
         raise DGLError('SDDMM {} op should not use tvm kernel'.format(binary_op))
     if '32' in indice_type:
