@@ -2596,7 +2596,8 @@ class DGLHeteroGraph(object):
         Parameters
         ----------
         v : int
-            The node ID.
+            The node ID. If the graph has multiple edge types, the ID is for the destination 
+            type corresponding to the edge type.
         etype : str or (str, str, str), optional
             The type names of the edges. The allowed type name formats are:
 
@@ -2654,7 +2655,8 @@ class DGLHeteroGraph(object):
         Parameters
         ----------
         v : int
-            The node ID.
+            The node ID. If the graph has multiple edge types, the ID is for the source 
+            type corresponding to the edge type.
         etype : str or (str, str, str), optional
             The type names of the edges. The allowed type name formats are:
 
