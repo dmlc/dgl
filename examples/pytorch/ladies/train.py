@@ -27,6 +27,12 @@ def train(g, n_classes, args):
         shuffle=True,
         drop_last=False,
         num_workers=args['num_workers'])
+    sampled_list = []
+    for input_nodes, seeds, blocks in enumerate(train_dataloader):
+        sampled = blocks[-1].srcdata[dgl.NID].cpu().numpy()
+        sampled_list.append(sampled)
+    count = np.bincount(np.concatenate(sampled_list), minlength=2000)
+    print(count)
     val_dataloader = dgl.dataloading.NodeDataLoader(
         g,
         val_nid,
@@ -76,12 +82,17 @@ def train(g, n_classes, args):
 
 
 if __name__ == '__main__':
-    g = dgl.graph((torch.randint(0, 2000, (10000,)), torch.randint(0, 2000, (10000,))))
+    src = torch.randint(0, 2000, (10000,))
+    dst = torch.randint(0, 2000, (10000,))
+    src = torch.cat([src, torch.arange(0, 20).repeat_interleave(200)])
+    dst = torch.cat([dst, torch.arange(0, 200).repeat_interleave(20)])
+    g = dgl.graph((src, dst))
     g = dgl.to_simple(dgl.add_reverse_edges(g), return_counts=None)
     g.ndata['features'] = torch.randn(2000, 15)
     g.ndata['label'] = torch.randint(0, 5, (2000,))
     g.ndata['mask'] = torch.randint(0, 10, (2000,))
-    g.ndata['train_mask'] = g.ndata['mask'] < 8
+    g.ndata['train_mask'] = torch.zeros(2000, dtype=torch.bool)
+    g.ndata['train_mask'][:200] = 1
     g.ndata['val_mask'] = g.ndata['mask'] == 8
     g.ndata['test_mask'] = g.ndata['mask'] == 9
 
