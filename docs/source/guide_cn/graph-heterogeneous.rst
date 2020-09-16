@@ -151,7 +151,7 @@ If the graph only has one node/edge type, there is no need to specify the node/e
     >>> # 设置/获取单一类型的节点/边特征，不必使用新的语法
     >>> g.ndata['hv'] = th.ones(4, 1)
 
-.. 注意::
+.. note::
 
     When the edge type uniquely determines the types of source and destination nodes, one
     can just use one string instead of a string triplet to specify the edge type. For example, for a
@@ -164,41 +164,58 @@ If the graph only has one node/edge type, there is no need to specify the node/e
 
 
 Loading Heterographs from Disk
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+从磁盘加载异构图
+^^^^^^^^^^^^^
 
 Comma Separated Values (CSV)
-""""""""""""""""""""""""""""
+
+（CSV）格式
+""""""""""
 
 A common way to store a heterograph is to store nodes and edges of different types in different CSV files.
 An example is as follows.
+
+一种存储异构图的常见方法是在不同的CSV文件中存储不同类型的节点和边。下面是一个例子。
 
 .. code::
 
     # data folder
     data/
-    |-- drug.csv        # drug nodes
-    |-- gene.csv        # gene nodes
-    |-- disease.csv     # disease nodes
-    |-- drug-interact-drug.csv  # drug-drug interaction edges
-    |-- drug-interact-gene.csv  # drug-gene interaction edges
-    |-- drug-treat-disease.csv  # drug-treat-disease edges
+    |-- drug.csv        # drug节点
+    |-- gene.csv        # gene节点
+    |-- disease.csv     # disease节点
+    |-- drug-interact-drug.csv  # drug-drug交互边
+    |-- drug-interact-gene.csv  # drug-gene交互边
+    |-- drug-treat-disease.csv  # drug-disease治疗边
 
 Similar to the case of homogeneous graphs, one can use packages like Pandas to parse
 CSV files into numpy arrays or framework tensors, build a relation dictionary and
 construct a heterograph from that. The approach also applies to other popular formats like
 GML/JSON.
 
+与同构图的情况类似，用户可以使用像Pandas这样的包先将CSV文件解析为numpy数组或框架张量，再构建一个关系字典，并从中构造一个异构图。
+这种方法也适用于其他流行的文件格式，比如GML或JSON。
+
 DGL Binary Format
-"""""""""""""""""
+
+DGL二进制格式
+"""""""""""
 
 DGL provides :func:`dgl.save_graphs` and :func:`dgl.load_graphs` respectively for saving
 heterogeneous graphs in binary format and loading them from binary format.
 
+DGL提供了 :func:`dgl.save_graphs` 和 :func:`dgl.load_graphs` 函数，分别用于以二进制格式保存异构图和加载它们。
+
 Edge Type Subgraph
-^^^^^^^^^^^^^^^^^^
+
+边类型子图
+^^^^^^^^
 
 One can create a subgraph of a heterogeneous graph by specifying the relations to retain, with
 features copied if any.
+
+用户可以通过指定要保留的关系来创建异构图的子图，相关的特征也会被拷贝。
 
 .. code::
 
@@ -209,35 +226,47 @@ features copied if any.
     ... })
     >>> g.nodes['drug'].data['hv'] = th.ones(3, 1)
 
-    >>> # Retain relations ('drug', 'interacts', 'drug') and ('drug', 'treats', 'disease')
-    >>> # All nodes for 'drug' and 'disease' will be retained
+    >>> 保留关系 ('drug', 'interacts', 'drug') 和 ('drug', 'treats', 'disease') 。
+    >>> 'drug' 和 'disease' 类型的节点将会被保留
     >>> eg = dgl.edge_type_subgraph(g, [('drug', 'interacts', 'drug'),
     ...                                 ('drug', 'treats', 'disease')])
     >>> eg
     Graph(num_nodes={'disease': 3, 'drug': 3},
           num_edges={('drug', 'interacts', 'drug'): 2, ('drug', 'treats', 'disease'): 1},
           metagraph=[('drug', 'drug', 'interacts'), ('drug', 'disease', 'treats')])
-    >>> # The associated features will be copied as well
+    >>> # 相关的特征也将被拷贝
     >>> eg.nodes['drug'].data['hv']
     tensor([[1.],
             [1.],
             [1.]])
 
 Converting Heterogeneous Graphs to Homogeneous Graphs
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+将异构图转化为同构图
+^^^^^^^^^^^^^^^^
 
 Heterographs provide a clean interface for managing nodes/edges of different types and
 their associated features. This is particularly helpful when:
 
+异构图为管理不同类型的节点/边及其相关特征提供了一个清晰的接口。这在以下情况下尤其有用:
+
 1. The features for nodes/edges of different types have different data types or sizes.
 2. We want to apply different operations to nodes/edges of different types.
+
+1. 不同类型的节点/边的特征具有不同的数据类型或大小。
+2. 用户希望对不同类型的节点/边应用不同的操作。
 
 If the above conditions do not hold and one does not want to distinguish node/edge types in
 modeling, then DGL allows converting a heterogeneous graph to a homogeneous graph with :func:`dgl.DGLGraph.to_homogeneous` API.
 It proceeds as follows:
 
+如果上述情况不适用，并且用户不希望在建模中区分节点/边类型，则DGL允许使用 :func:`dgl.DGLGraph.to_homogeneous` API将异构图转换为同构图。具体行为如下:
+
 1. Relabels nodes/edges of all types using consecutive integers starting from 0
 2. Merges the features across node/edge types specified by the user.
+
+1. 用从0开始的连续整数重新标记所有类型的节点/边。
+2. 对所有的节点/边合并用户指定的特征。
 
 .. code::
 
@@ -249,18 +278,17 @@ It proceeds as follows:
     >>> g.edges['interacts'].data['he'] = th.zeros(2, 1)
     >>> g.edges['treats'].data['he'] = th.zeros(1, 2)
 
-    >>> # By default, it does not merge any features
+    >>> # 默认情况下不进行特征合并
     >>> hg = dgl.to_homogeneous(g)
     >>> 'hv' in hg.ndata
     False
 
-    >>> # Copy edge features
-    >>> # For feature copy, it expects features to have
-    >>> # the same size and dtype across node/edge types
+    >>> # 拷贝边的特征
+    >>> # 对于要拷贝的特征，DGL假定不同类型的节点/边的合并特征具有相同的大小和数据类型
     >>> hg = dgl.to_homogeneous(g, edata=['he'])
     DGLError: Cannot concatenate column ‘he’ with shape Scheme(shape=(2,), dtype=torch.float32) and shape Scheme(shape=(1,), dtype=torch.float32)
 
-    >>> # Copy node features
+    >>> # 拷贝节点特征
     >>> hg = dgl.to_homogeneous(g, ndata=['hv'])
     >>> hg.ndata['hv']
     tensor([[1.],
@@ -271,32 +299,35 @@ It proceeds as follows:
             [0.]])
 
     The original node/edge types and type-specific IDs are stored in :py:attr:`~dgl.DGLGraph.ndata` and :py:attr:`~dgl.DGLGraph.edata`.
+    原始的节点/边的类型和对应的ID被存储在 :py:attr:`~dgl.DGLGraph.ndata` 和 :py:attr:`~dgl.DGLGraph.edata` 中。
 
 .. code::
 
-    >>> # Order of node types in the heterograph
+    >>> # 异构图中节点类型的顺序
     >>> g.ntypes
     ['disease', 'drug']
-    >>> # Original node types
+    >>> # 原始节点类型
     >>> hg.ndata[dgl.NTYPE]
     tensor([0, 0, 0, 1, 1, 1])
-    >>> # Original type-specific node IDs
+    >>> # 原始的特定类型节点ID
     >>> hg.ndata[dgl.NID]
     >>> tensor([0, 1, 2, 0, 1, 2])
 
-    >>> # Order of edge types in the heterograph
+    >>> # 异构图中边类型的顺序
     >>> g.etypes
     ['interacts', 'treats']
-    >>> # Original edge types
+    >>> # 原始边类型
     >>> hg.edata[dgl.ETYPE]
     tensor([0, 0, 1])
-    >>> # Original type-specific edge IDs
+    >>> # 原始的特定类型边ID
     >>> hg.edata[dgl.EID]
     tensor([0, 1, 0])
 
 For modeling purposes, one may want to group some relations together and apply the same
 operation to them. To address this need, one can first take an edge type subgraph of the
 heterograph and then convert the subgraph to a homogeneous graph.
+
+出于建模的目的，用户可能需要将一些关系合并，并对它们应用相同的操作。为了实现这一目的，可以先抽取异构图的边类型子图，然后将该子图转换为同构图。
 
 .. code::
 
