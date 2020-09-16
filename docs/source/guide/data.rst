@@ -20,3 +20,13 @@ Roadmap
 * :ref:`guide-data-pipeline-download`
 * :ref:`guide-data-pipeline-process`
 * :ref:`guide-data-pipeline-savenload`
+
+.. toctree::
+    :maxdepth: 1
+    :hidden:
+    :glob:
+
+    data-pipeline-dataset`
+    data-pipeline-download`
+    data-pipeline-process`
+    data-pipeline-savenload`
