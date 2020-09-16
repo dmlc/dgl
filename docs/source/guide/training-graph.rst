@@ -270,7 +270,8 @@ The rest of the code is not different from that for homogeneous graphs.
 
 .. code:: python
 
-    model = HeteroClassifier(10, 20, 5, g.etypes)
+    # etypes is the list of edge types as strings.
+    model = HeteroClassifier(10, 20, 5, etypes)
     opt = torch.optim.Adam(model.parameters())
     for epoch in range(20):
         for batched_graph, labels in dataloader:

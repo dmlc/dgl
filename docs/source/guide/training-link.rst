@@ -52,7 +52,8 @@ Model Implementation Difference from Edge Classification
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The neural network model to compute the score between :math:`u` and
-:math:`v` is identical to the edge regression model described above.
+:math:`v` is identical to the edge regression model described
+:ref:`above <guide-training-edge-classification>`.
 
 Here is an example of using dot product to compute the scores on edges.
 
@@ -143,8 +144,9 @@ Link prediction on heterogeneous graphs is not very different from that
 on homogeneous graphs. The following assumes that we are predicting on
 one edge type, and it is easy to extend it to multiple edge types.
 
-For example, you can reuse the ``HeteroDotProductPredictor`` above for
-computing the scores of the edges of an edge type for link prediction.
+For example, you can reuse the ``HeteroDotProductPredictor``
+:ref:`above <guide-training-edge-classification-heterogeneous-graph>`
+for computing the scores of the edges of an edge type for link prediction.
 
 .. code:: python
 
