@@ -2,7 +2,7 @@
 
 第1章：图
 ======================
-(English Version)
+ :ref:`English Version<guide-graph>`
 
 Graphs express entities (nodes) along with their relations (edges), and both nodes and
 edges can be typed (e.g., ``"user"`` and ``"item"`` are two different types of nodes). DGL provides a
