@@ -72,6 +72,6 @@ python3 load_dataset.py --name dataset_name
 ```
 where `dataset_name` can be `ogbn-arxiv`, `ogbn-proteins`, and `ogbn-products`. After that, a local file `$dataset_name$-graph.bin` will be generated. Then run:
 ```
-python3 deepwalk.py --data_file $dataset_name$-graph.bin
+python3 line.py --data_file $dataset_name$-graph.bin
 ```
 where the other parameters are the same with used configs without using `--load_from_ogbn` and `--ogbn_name`.
