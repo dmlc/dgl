@@ -486,7 +486,9 @@ if __name__ == '__main__':
         help="whether to remove edges during sampling")
     args = parser.parse_args()
     assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')), \
-    'The num_workers should be the same value with num_samplers.'
-
+    'The num_workers should be the same value with DGL_NUM_SAMPLER.'
+    assert args.num_servers == int(os.environ.get('DGL_NUM_SERVER')), \
+    'The num_servers should be the same value with DGL_NUM_SERVER.'
+    
     print(args)
     main(args)
