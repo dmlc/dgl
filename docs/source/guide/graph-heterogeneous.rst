@@ -18,12 +18,6 @@ In DGL, a heterogeneous graph (heterograph for short) is specified with a series
 relation. Each relation is a string triplet ``(source node type, edge type, destination node type)``.
 Since relations disambiguate the edge types, DGL calls them canonical edge types.
 
-.. code::
-
-    {relation1 : node_tensor_tuple1,
-     relation2 : node_tensor_tuple2,
-     ...}
-
 The following code snippet is an example for creating a heterogeneous graph in DGL.
 
 .. code::

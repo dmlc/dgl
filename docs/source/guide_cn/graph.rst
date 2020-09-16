@@ -30,13 +30,6 @@ concepts of :class:`~dgl.DGLGraph`:
 * :ref:`guide_cn-graph-heterogeneous`
 * :ref:`guide_cn-graph-gpu`
 
-* :ref:`关于图的基本概念`
-* :ref:`图、节点和边`
-* :ref:`节点和边的特征`
-* :ref:`从外部源创建图`
-* :ref:`异构图`
-* :ref:`在GPU上使用DGLGraph`
-
 .. toctree::
     :maxdepth: 1
     :hidden:

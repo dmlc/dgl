@@ -7,7 +7,7 @@ A heterogeneous graph can have nodes and edges of different types. Nodes/Edges o
 different types have independent ID space and feature storage. For example in the figure below, the
 user and game node IDs both start from zero and the they have different features.
 
-异构图里可以有不同类型的节点和边。这些不同类型的节点和边具有独立的ID空间和特征。
+相比同构图，异构图里可以有不同类型的节点和边。这些不同类型的节点和边具有独立的ID空间和特征。
 例如在下面的图中，"用户"和"游戏"节点的ID都是从0开始的，而且两种节点具有不同的特征。
 
 .. figure:: https://data.dgl.ai/asset/image/user_guide_graphch_2.png
@@ -27,13 +27,6 @@ Since relations disambiguate the edge types, DGL calls them canonical edge types
 在DGL中，一个异构图由一系列子图构成，一个子图对应一种关系。每个关系由一个字符串三元组
 定义 ``(源节点类型, 边类型, 目标节点类型)`` 。由于这里的关系定义消除了边类型的歧义，DGL称
 它们为规范边类型。
-
-
-.. code::
-
-    {relation1 : node_tensor_tuple1,
-     relation2 : node_tensor_tuple2,
-     ...}
 
 The following code snippet is an example for creating a heterogeneous graph in DGL.
 
@@ -63,19 +56,22 @@ The following code snippet is an example for creating a heterogeneous graph in D
 Note that homogeneous and bipartite graphs are just special heterogeneous graphs with one
 relation.
 
-注意，同构图和二部图只是有一种关系的特殊的异构图。
+注意，同构图和二部图只是一种特殊的异构图，它们只包括一种关系。
 
 .. code::
 
-    >>> # A homogeneous graph
+    >>> # 一个同构图
     >>> dgl.heterograph({('node_type', 'edge_type', 'node_type'): (u, v)})
-    >>> # A bipartite graph
+    >>> # 一个二部图
     >>> dgl.heterograph({('source_type', 'edge_type', 'destination_type'): (u, v)})
 
 The *metagraph* associated with a heterogeneous graph is the schema of the graph. It specifies
 type constraints on the sets of nodes and edges between the nodes. A node :math:`u` in a metagraph
 corresponds to a node type in the associated heterograph. An edge :math:`(u, v)` in a metagraph indicates that
 there are edges from nodes of type :math:`u` to nodes of type :math:`v` in the associated heterograph.
+
+与异类图相关联的 *metagraph* 就是图的模式。它指定节点集和节点之间的边的类型约束。*metagraph* 中的一个节点 :math:`u` 对应于
+相关异构图中的一个节点类型。*metagraph* 中的边 :math:`(u,v)` 表示在相关异构图中存在从 :math:`u` 型节点到 :math:`v` 型节点的边。
 
 .. code::
 
@@ -93,7 +89,12 @@ there are edges from nodes of type :math:`u` to nodes of type :math:`v` in the a
 See APIs: :func:`dgl.heterograph`, :py:attr:`~dgl.DGLGraph.ntypes`, :py:attr:`~dgl.DGLGraph.etypes`,
 :py:attr:`~dgl.DGLGraph.canonical_etypes`, :py:attr:`~dgl.DGLGraph.metagraph`.
 
+相关API： :func:`dgl.heterograph`、 :py:attr:`~dgl.DGLGraph.ntypes`、 :py:attr:`~dgl.DGLGraph.etypes`、
+:py:attr:`~dgl.DGLGraph.canonical_etypes`、 :py:attr:`~dgl.DGLGraph.metagraph`。
+
 Working with Multiple Types
+
+使用多种类型
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When multiple node/edge types are introduced, users need to specify the particular
