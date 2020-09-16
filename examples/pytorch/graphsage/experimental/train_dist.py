@@ -317,6 +317,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')), \
     'The num_workers should be the same value with num_samplers.'
+    assert args.num_servers == int(os.environ.get('DGL_NUM_SERVER')), \
+    'The num_servers should be the same value with DGL_NUM_SERVER.'
 
     print(args)
     main(args)
