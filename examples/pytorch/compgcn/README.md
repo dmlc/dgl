@@ -7,6 +7,7 @@
 * PyTorch 1.6
 * DGL 0.5.1
 * pandas
+* rdflib
 
 ```
 pip install dgl torch pandas

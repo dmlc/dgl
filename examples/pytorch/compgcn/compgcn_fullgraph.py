@@ -83,7 +83,7 @@ def main(args):
     # Step 2: Create model =================================================================== #
     input_embs = nn.ModuleDict()
     for ntype in heterograph.ntypes:
-        input_embs[ntype] = nn.Embedding(heterograph.number_of_nodes(ntype), num_rels).to('cuda:{}'.format(args.gpu))
+        input_embs[ntype] = nn.Embedding(heterograph.number_of_nodes(ntype), num_rels)
 
     compgcn_model = CompGCN(in_feat_dict=in_feat_dict,
                             hid_dim=args.hid_dim,
@@ -98,14 +98,13 @@ def main(args):
                             )
 
     if use_cuda:
+        input_embs.to('cuda:{}'.format(args.gpu))
         compgcn_model = compgcn_model.to('cuda:{}'.format(args.gpu))
         heterograph = heterograph.to('cuda:{}'.format(args.gpu))
 
     # Step 3: Create training components ===================================================== #
     loss_fn = th.nn.CrossEntropyLoss().to('cuda:{}'.format(args.gpu))
 
-    # paras = [input_emb.parameters() for _, input_emb in input_embs.items()]
-    # paras.append(compgcn_model.parameters())
     optimizer = optim.Adam([
                             {'params': input_embs.parameters(), 'lr':0.005, 'weight_decay':5e-4},
                             {'params': compgcn_model.parameters(), 'lr':0.005, 'weight_decay':5e-4}
