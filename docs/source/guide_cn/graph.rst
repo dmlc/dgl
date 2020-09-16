@@ -17,7 +17,7 @@ DGL通过其核心数据结构  :class:`~dgl.DGLGraph` 提供了一个以图为�
 
 
 本章路线图
--------
+--------
 
 The chapter starts with a brief introduction to graph definitions in 1.1 and then introduces some core
 concepts of :class:`~dgl.DGLGraph`:
@@ -36,9 +36,9 @@ concepts of :class:`~dgl.DGLGraph`:
     :hidden:
     :glob:
 
-    graph-basic
-    graph-graphs-nodes-edges
-    graph-feature
-    graph-external
-    graph-heterogeneous
-    graph-gpu
+    graph_cn-basic
+    graph_cn-graphs-nodes-edges
+    graph_cn-feature
+    graph_cn-external
+    graph_cn-heterogeneous
+    graph_cn-gpu
