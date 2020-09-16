@@ -89,28 +89,29 @@ there are edges from nodes of type :math:`u` to nodes of type :math:`v` in the a
 See APIs: :func:`dgl.heterograph`, :py:attr:`~dgl.DGLGraph.ntypes`, :py:attr:`~dgl.DGLGraph.etypes`,
 :py:attr:`~dgl.DGLGraph.canonical_etypes`, :py:attr:`~dgl.DGLGraph.metagraph`.
 
-相关API： :func:`dgl.heterograph`、 :py:attr:`~dgl.DGLGraph.ntypes`、 :py:attr:`~dgl.DGLGraph.etypes`、
+相关API: :func:`dgl.heterograph`、 :py:attr:`~dgl.DGLGraph.ntypes`、 :py:attr:`~dgl.DGLGraph.etypes`、
 :py:attr:`~dgl.DGLGraph.canonical_etypes`、 :py:attr:`~dgl.DGLGraph.metagraph`。
 
 Working with Multiple Types
 
 使用多种类型
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^
 
 When multiple node/edge types are introduced, users need to specify the particular
 node/edge type when invoking a DGLGraph API for type-specific information. In addition,
 nodes/edges of different types have separate IDs.
 
+当引入多种节点/边类型时，用户在调用DGLGraph API以获取特定类型的信息时，需要指定具体的节点/边类型。此外，不同类型的节点/边具有单独的ID。
+
 .. code::
 
-    >>> # Get the number of all nodes in the graph
+    >>> # 获取图中所有节点的数量
     >>> g.num_nodes()
     10
-    >>> # Get the number of drug nodes
+    >>> # 获取drug节点的数量
     >>> g.num_nodes('drug')
     3
-    >>> # Nodes of different types have separate IDs,
-    >>> # hence not well-defined without a type specified
+    >>> # 不同类型的节点有单独的ID。因此，没有指定节点类型就没有明确的返回值。
     >>> g.nodes()
     DGLError: Node type name must be specified if there are more than one node types.
     >>> g.nodes('drug')
@@ -119,20 +120,25 @@ nodes/edges of different types have separate IDs.
 To set/get features for a specific node/edge type, DGL provides two new types of syntax --
 `g.nodes['node_type'].data['feat_name']` and `g.edges['edge_type'].data['feat_name']`.
 
+为了设置/获取特定节点/边类型的特征，DGL提供了两种新类型的语法：--
+`g.nodes['node_type'].data['feat_name']` 和 `g.edges['edge_type'].data['feat_name']` 。
+
 .. code::
 
-    >>> # Set/get feature 'hv' for nodes of type 'drug'
+    >>> # 设置/获取"drug"类型的节点的"hv"特征
     >>> g.nodes['drug'].data['hv'] = th.ones(3, 1)
     >>> g.nodes['drug'].data['hv']
     tensor([[1.],
             [1.],
             [1.]])
-    >>> # Set/get feature 'he' for edge of type 'treats'
+    >>> # 设置/获取"treats"类型的边的"he"特征
     >>> g.edges['treats'].data['he'] = th.zeros(1, 1)
     >>> g.edges['treats'].data['he']
     tensor([[0.]])
 
 If the graph only has one node/edge type, there is no need to specify the node/edge type.
+
+如果图里只有一种节点/边类型，则不需要指定节点/边类型。
 
 .. code::
 
@@ -142,15 +148,20 @@ If the graph only has one node/edge type, there is no need to specify the node/e
     ... })
     >>> g.nodes()
     tensor([0, 1, 2, 3])
-    >>> # To set/get feature with a single type, no need to use the new syntax
+    >>> # 设置/获取单一类型的节点/边特征，不必使用新的语法
     >>> g.ndata['hv'] = th.ones(4, 1)
 
-.. note::
+.. 注意::
 
     When the edge type uniquely determines the types of source and destination nodes, one
     can just use one string instead of a string triplet to specify the edge type. For example, for a
     heterograph with two relations ``('user', 'plays', 'game')`` and ``('user', 'likes', 'game')``, it
     is safe to just use ``'plays'`` or ``'likes'`` to refer to the two relations.
+
+    当边类型唯一地确定了源节点和目标节点的类型时，用户可以只使用一个字符串而不是字符串三元组来指定边类型。例如，
+    对于具有两个关系 ``('user', 'plays', 'game')`` 和  ``('user', 'likes', 'game')`` 的异构图，
+    只使用 ``'plays'`` 或 ``'like'`` 来指代这两个关系是可以的。
+
 
 Loading Heterographs from Disk
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
