@@ -1,6 +1,7 @@
 import torch
 import dgl
 import dgl.function as fn
+from collections import Counter
 
 def compute_prob(g, seed_nodes, weight):
     out_frontier = dgl.reverse(dgl.in_subgraph(g, seed_nodes), copy_edata=True)
@@ -52,6 +53,7 @@ class LADIESNeighborSampler(dgl.dataloading.BlockSampler):
                     neighbor_graph.edata['P'] = torch.ones(neighbor_graph.number_of_edges(), device=neighbor_graph.device)
                 neighbor_graph.ndata['S'] = prob
                 neighbor_graph.apply_edges(dgl.function.e_div_u('P', 'S', 'P_tilde'))
+                # Row normalize
                 neighbor_graph.update_all(
                     dgl.function.copy_e('P_tilde', 'P_tilde'),
                     dgl.function.sum('P_tilde', 'P_tilde_sum'))

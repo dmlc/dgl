@@ -8,6 +8,7 @@ from ..base import NID, EID
 from .. import backend as F
 from .. import utils
 from ..convert import heterograph
+from ..distributed.dist_graph import DistGraph
 
 # pylint: disable=unused-argument
 def assign_block_eids(block, frontier):
@@ -313,6 +314,7 @@ class NodeCollator(Collator):
     """
     def __init__(self, g, nids, block_sampler):
         self.g = g
+        self._is_distributed = isinstance(g, DistGraph)
         if not isinstance(nids, Mapping):
             assert len(g.ntypes) == 1, \
                 "nids should be a dict of node type and ids for graph with multiple node types"
@@ -356,9 +358,15 @@ class NodeCollator(Collator):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-            items = utils.prepare_tensor_dict(self.g, items, 'items')
-        else:
-            items = utils.prepare_tensor(self.g, items, 'items')
+
+        # TODO(BarclayII) Because DistGraph doesn't have idtype and device implemented,
+        # this function does not work.  I'm again skipping this step as a workaround.
+        # We need to fix this.
+        if not self._is_distributed:
+            if isinstance(items, dict):
+                items = utils.prepare_tensor_dict(self.g, items, 'items')
+            else:
+                items = utils.prepare_tensor(self.g, items, 'items')
         blocks = self.block_sampler.sample_blocks(self.g, items)
         output_nodes = blocks[-1].dstdata[NID]
         input_nodes = blocks[0].srcdata[NID]
