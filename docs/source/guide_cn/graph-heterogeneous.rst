@@ -16,8 +16,9 @@ user and game node IDs both start from zero and the they have different features
     一个异构图示例。该图具有两种类型的节点("用户"和"游戏")和两种类型的边("关注"和"玩")。
 
 Creating a Heterogeneous Graph
+
 创建异构图
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^
 
 In DGL, a heterogeneous graph (heterograph for short) is specified with a series of graphs as below, one per
 relation. Each relation is a string triplet ``(source node type, edge type, destination node type)``.
