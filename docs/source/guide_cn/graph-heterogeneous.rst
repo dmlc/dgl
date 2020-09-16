@@ -3,6 +3,8 @@
 1.5 异构图
 ------------------------
 
+:ref:`(English Version)<guide-graph-heterogeneous>`
+
 A heterogeneous graph can have nodes and edges of different types. Nodes/Edges of
 different types have independent ID space and feature storage. For example in the figure below, the
 user and game node IDs both start from zero and the they have different features.
