@@ -233,14 +233,14 @@ representations for each node type.
     class RGCN(nn.Module):
         def __init__(self, in_feats, hid_feats, out_feats, rel_names):
             super().__init__()
-            
+    
             self.conv1 = dglnn.HeteroGraphConv({
                 rel: dglnn.GraphConv(in_feats, hid_feats)
                 for rel in rel_names}, aggregate='sum')
             self.conv2 = dglnn.HeteroGraphConv({
                 rel: dglnn.GraphConv(hid_feats, out_feats)
                 for rel in rel_names}, aggregate='sum')
-      
+    
         def forward(self, graph, inputs):
             # inputs are features of nodes
             h = self.conv1(graph, inputs)
@@ -251,21 +251,13 @@ representations for each node type.
     class HeteroClassifier(nn.Module):
         def __init__(self, in_dim, hidden_dim, n_classes, rel_names):
             super().__init__()
-            
-            self.conv1 = dglnn.HeteroGraphConv({
-                rel: dglnn.GraphConv(in_feats, hid_feats)
-                for rel in rel_names}, aggregate='sum')
-            self.conv2 = dglnn.HeteroGraphConv({
-                rel: dglnn.GraphConv(hid_feats, out_feats)
-                for rel in rel_names}, aggregate='sum')
+
+            self.rgcn = RGCN(in_dim, hidden_dim, hidden_dim, rel_names)
             self.classify = nn.Linear(hidden_dim, n_classes)
     
         def forward(self, g):
             h = g.ndata['feat']
-            # Apply graph convolution and activation.
-            h = F.relu(self.conv1(g, h))
-            h = F.relu(self.conv2(g, h))
-    
+            h = self.rgcn(g, h)
             with g.local_scope():
                 g.ndata['h'] = h
                 # Calculate graph representation by average readout.
@@ -278,7 +270,8 @@ The rest of the code is not different from that for homogeneous graphs.
 
 .. code:: python
 
-    model = HeteroClassifier(10, 20, 5)
+    # etypes is the list of edge types as strings.
+    model = HeteroClassifier(10, 20, 5, etypes)
     opt = torch.optim.Adam(model.parameters())
     for epoch in range(20):
         for batched_graph, labels in dataloader:
