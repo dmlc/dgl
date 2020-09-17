@@ -225,7 +225,7 @@ def gsddmm(gidx, op, X, Y, lhs_target='u', rhs_target='v'):
 
 def edge_softmax_real(gidx, score, eids=ALL, norm_by='dst'):
     if not is_all(eids):
-        gidx = gidx.edge_subgraph(tf.cast(eids, gidx.dtype), True)
+        gidx = gidx.edge_subgraph([eids], True).graph
     if norm_by == 'src':
         gidx = gidx.reverse()
     score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]

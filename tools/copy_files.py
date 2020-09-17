@@ -9,9 +9,9 @@ import logging
 import json
 import copy
 
-def copy_file(file_name, ip, workspace):
+def copy_file(file_name, ip, workspace, param=''):
     print('copy {} to {}'.format(file_name, ip + ':' + workspace + '/'))
-    cmd = 'rsync -e \"ssh -o StrictHostKeyChecking=no\" -arvc ' + file_name + ' ' + ip + ':' + workspace + '/'
+    cmd = 'scp ' + param + ' ' + file_name + ' ' + ip + ':' + workspace + '/'
     subprocess.check_call(cmd, shell = True)
 
 def exec_cmd(ip, cmd):
@@ -92,7 +92,7 @@ def main():
         copy_file(part_files['edge_feats'], ip, remote_path)
         copy_file(part_files['part_graph'], ip, remote_path)
         # copy script folder
-        copy_file(args.script_folder, ip, args.workspace)
+        copy_file(args.script_folder, ip, args.workspace, '-r')
 
 
 def signal_handler(signal, frame):

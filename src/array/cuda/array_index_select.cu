@@ -36,7 +36,8 @@ NDArray IndexSelect(NDArray array, IdArray index) {
   DType* ret_data = static_cast<DType*>(ret->data);
   const int nt = cuda::FindNumThreads(len);
   const int nb = (len + nt - 1) / nt;
-  _IndexSelectKernel<<<nb, nt, 0, thr_entry->stream>>>(array_data, idx_data, len, ret_data);
+  CUDA_KERNEL_CALL(_IndexSelectKernel, nb, nt, 0, thr_entry->stream,
+      array_data, idx_data, len, ret_data);
   return ret;
 }
 
