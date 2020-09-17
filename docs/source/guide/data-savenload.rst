@@ -47,7 +47,7 @@ the processed data is quite large, so it’s more effective to process
 each data example in ``__getitem__(idx)``.
 
 Loading OGB datasets using ``ogb`` package
-----------------------------------------------
+------------------------------------------
 
 `Open Graph Benchmark (OGB) <https://ogb.stanford.edu/docs/home/>`__ is
 a collection of benchmark datasets. The official OGB package
