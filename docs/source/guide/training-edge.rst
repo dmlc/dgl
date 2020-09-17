@@ -52,7 +52,7 @@ node representations on each edge.
     class DotProductPredictor(nn.Module):
         def forward(self, graph, h):
             # h contains the node representations computed from the GNN defined
-            # in the node classification section.
+            # in the node classification section (Section 5.1).
             with graph.local_scope():
                 graph.ndata['h'] = h
                 graph.apply_edges(fn.u_dot_v('h', 'h', 'score'))
@@ -77,7 +77,7 @@ e.g. as logits of a categorical distribution.
     
         def forward(self, graph, h):
             # h contains the node representations computed from the GNN defined
-            # in the node classification section.
+            # in the node classification section (Section 5.1).
             with graph.local_scope():
                 graph.ndata['h'] = h
                 graph.apply_edges(self.apply_edges)
@@ -145,7 +145,7 @@ heterogeneous graph, you only need to specify the edge type in
         def forward(self, graph, h, etype):
             # h contains the node representations for each edge type computed from
             # the GNN for heterogeneous graphs defined in the node classification
-            # section.
+            # section (Section 5.1).
             with graph.local_scope():
                 graph.ndata['h'] = h   # assigns 'h' of all node types in one shot
                 graph.apply_edges(fn.u_dot_v('h', 'h', 'score'), etype=etype)
@@ -169,7 +169,7 @@ You can similarly write a ``HeteroMLPPredictor``.
         def forward(self, graph, h, etype):
             # h contains the node representations for each edge type computed from
             # the GNN for heterogeneous graphs defined in the node classification
-            # section.
+            # section (Section 5.1).
             with graph.local_scope():
                 graph.ndata['h'] = h   # assigns 'h' of all node types in one shot
                 graph.apply_edges(self.apply_edges, etype=etype)
@@ -279,7 +279,7 @@ can write your predictor module as follows.
         def forward(self, graph, h):
             # h contains the node representations for each edge type computed from
             # the GNN for heterogeneous graphs defined in the node classification
-            # section.
+            # section (Section 5.1).
             with graph.local_scope():
                 graph.ndata['h'] = h   # assigns 'h' of all node types in one shot
                 graph.apply_edges(self.apply_edges)

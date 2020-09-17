@@ -61,7 +61,8 @@ Here is an example of using dot product to compute the scores on edges.
 
     class DotProductPredictor(nn.Module):
         def forward(self, graph, h):
-            # h contains the node representations computed from the GNN above.
+            # h contains the node representations computed from the GNN defined
+            # in the node classification section (Section 5.1).
             with graph.local_scope():
                 graph.ndata['h'] = h
                 graph.apply_edges(fn.u_dot_v('h', 'h', 'score'))
@@ -152,8 +153,8 @@ for computing the scores of the edges of an edge type for link prediction.
 
     class HeteroDotProductPredictor(nn.Module):
         def forward(self, graph, h, etype):
-            # h contains the node representations for each edge type computed from
-            # the GNN above.
+            # h contains the node representations for each node type computed from
+            # the GNN defined in the previous section (Section 5.1).
             with graph.local_scope():
                 graph.ndata['h'] = h
                 graph.apply_edges(fn.u_dot_v('h', 'h', 'score'), etype=etype)
