@@ -210,9 +210,9 @@ DGL implements
 `GIN <https://github.com/dmlc/dgl/tree/master/examples/pytorch/gin>`__
 as an example of graph classification. The training loop is inside the
 function ``train`` in
-```main.py`` <https://github.com/dmlc/dgl/blob/master/examples/pytorch/gin/main.py>`__.
+`main.py <https://github.com/dmlc/dgl/blob/master/examples/pytorch/gin/main.py>`__.
 The model implementation is inside
-```gin.py`` <https://github.com/dmlc/dgl/blob/master/examples/pytorch/gin/gin.py>`__
+`gin.py <https://github.com/dmlc/dgl/blob/master/examples/pytorch/gin/gin.py>`__
 with more components such as using
 :class:`dgl.nn.pytorch.GINConv` (also available in MXNet and Tensorflow)
 as the graph convolution layer, batch normalization, etc.
