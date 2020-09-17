@@ -17,6 +17,7 @@ from models import GCN
 
 device = None
 in_feats, n_classes = None, None
+epsilon = 1 - math.log(2)
 
 
 def gen_model(args):
@@ -31,7 +32,7 @@ def gen_model(args):
 
 def cross_entropy(x, labels):
     y = F.cross_entropy(x, labels[:, 0], reduction="none")
-    y = th.log(0.5 + y) - math.log(0.5)
+    y = th.log(epsilon + y) - math.log(epsilon)
     return th.mean(y)
 
 
@@ -249,7 +250,7 @@ def main():
 
     in_feats = graph.ndata["feat"].shape[1]
     n_classes = (labels.max() + 1).item()
-    graph.create_formats_()
+    # graph.create_format_()
 
     train_idx = train_idx.to(device)
     val_idx = val_idx.to(device)
