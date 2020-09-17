@@ -20,6 +20,7 @@ Roadmap
 * :ref:`guide-data-pipeline-download`
 * :ref:`guide-data-pipeline-process`
 * :ref:`guide-data-pipeline-savenload`
+* :ref:`guide-data-pipeline-loadogb`
 
 .. toctree::
     :maxdepth: 1
@@ -30,3 +31,4 @@ Roadmap
     data-download
     data-process
     data-savenload
+    data-loadogb
