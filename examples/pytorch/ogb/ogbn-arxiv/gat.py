@@ -21,6 +21,8 @@ epsilon = 1 - math.log(2)
 
 
 def gen_model(args):
+    norm = "both" if args.use_norm else "none"
+
     if args.use_labels:
         model = GAT(
             in_feats + n_classes,
@@ -31,7 +33,7 @@ def gen_model(args):
             activation=F.relu,
             dropout=args.dropout,
             attn_drop=args.attn_drop,
-            norm="both",
+            norm=norm,
         )
     else:
         model = GAT(
@@ -43,8 +45,9 @@ def gen_model(args):
             activation=F.relu,
             dropout=args.dropout,
             attn_drop=args.attn_drop,
-            norm="both",
+            norm=norm,
         )
+
     return model
 
 
@@ -229,6 +232,7 @@ def main():
     argparser.add_argument(
         "--use-labels", action="store_true", help="Use labels in the training set as input features."
     )
+    argparser.add_argument("--use-norm", action="store_true", help="Use symmetrically normalized adjacency matrix.")
     argparser.add_argument("--lr", type=float, default=0.002)
     argparser.add_argument("--n-layers", type=int, default=3)
     argparser.add_argument("--n-heads", type=int, default=3)
