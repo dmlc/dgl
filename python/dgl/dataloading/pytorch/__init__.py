@@ -240,8 +240,8 @@ class EdgeDataLoader:
     ----------
     g : DGLGraph
         The graph.
-    nids : Tensor or dict[ntype, Tensor]
-        The node set to compute outputs.
+    eids : Tensor or dict[ntype, Tensor]
+        The edge set to compute outputs.
     block_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
     g_sampling : DGLGraph, optional
