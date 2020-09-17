@@ -15,7 +15,7 @@ python3 gcn.py --use-linear --use-labels
 Run `gat.py` with `--use-labels` enabled and you should directly see the result.
 
 ```bash
-python3 gat.py --use-labels
+python3 gat.py --use-norm --use-labels
 ```
 
 ## Usage & Options
@@ -47,8 +47,8 @@ optional arguments:
 ### GAT
 
 ```
-usage: GAT on OGBN-Arxiv [-h] [--cpu] [--gpu GPU] [--n-runs N_RUNS] [--n-epochs N_EPOCHS] [--use-labels] [--lr LR]
-                         [--n-layers N_LAYERS] [--n-heads N_HEADS] [--n-hidden N_HIDDEN] [--dropout DROPOUT]
+usage: GAT on OGBN-Arxiv [-h] [--cpu] [--gpu GPU] [--n-runs N_RUNS] [--n-epochs N_EPOCHS] [--use-labels] [--use-norm]
+                         [--lr LR] [--n-layers N_LAYERS] [--n-heads N_HEADS] [--n-hidden N_HIDDEN] [--dropout DROPOUT]
                          [--attn_drop ATTN_DROP] [--wd WD] [--log-every LOG_EVERY] [--plot-curves]
 
 optional arguments:
@@ -58,6 +58,7 @@ optional arguments:
   --n-runs N_RUNS
   --n-epochs N_EPOCHS
   --use-labels          Use labels in the training set as input features. (default: False)
+  --use-norm            Use symmetrically normalized adjacency matrix. (default: False)
   --lr LR
   --n-layers N_LAYERS
   --n-heads N_HEADS
