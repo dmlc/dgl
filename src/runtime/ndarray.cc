@@ -204,9 +204,10 @@ NDArray NDArray::Empty(std::vector<int64_t> shape,
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
   size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
-  ret.data_->dl_tensor.data =
-      DeviceAPI::Get(ret->ctx)->AllocDataSpace(
-          ret->ctx, size, alignment, ret->dtype);
+  if (size > 0)
+    ret.data_->dl_tensor.data =
+        DeviceAPI::Get(ret->ctx)->AllocDataSpace(
+            ret->ctx, size, alignment, ret->dtype);
   return ret;
 }
 
