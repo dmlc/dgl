@@ -46,5 +46,7 @@ example, in the builtin dataset :class:`dgl.data.GDELTDataset`,
 the processed data is quite large, so it’s more effective to process
 each data example in ``__getitem__(idx)``.
 
+.. code::
+
     print(split_edge['valid'].keys())
     print(split_edge['test'].keys())
