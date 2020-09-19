@@ -22,6 +22,9 @@ with the features of its incident nodes; :math:`\psi` is an
 by aggregating its incoming messages using the **reduce function**
 :math:`\rho`.
 
+This chapter will introduce DGL's message passing APIs, and how to efficiently use them in both nodes and edges.
+The last section of this chapter will explain how to use implement message passing in heterogeneous graphs.
+
 Roadmap
 -------
 
