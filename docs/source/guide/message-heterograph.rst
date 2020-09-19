@@ -1,9 +1,9 @@
 .. _guide-message-passing-heterograph:
 
-2.5 Message Passing on Heterogeneuous Graph
----------------------------------------
+2.5 Message Passing on Heterogeneous Graph
+------------------------------------------
 
-Heterogeneous (user guide for :ref:`guide-graph-heterogeneous`), or
+Heterogeneous graphs (:ref:`guide-graph-heterogeneous`), or
 heterographs for short, are graphs that contain different types of nodes
 and edges. The different types of nodes and edges tend to have different
 types of attributes that are designed to capture the characteristics of
@@ -14,18 +14,20 @@ dimensions.
 
 The message passing on heterographs can be split into two parts:
 
-1. Message computation and aggregation within each relation r.
-2. Reduction that merges the results on the same node type from multiple
-   relationships.
+1. Message computation and aggregation for each relation r.
+2. Reduction that merges the aggregation results from all relations for each node type.
 
 DGL’s interface to call message passing on heterographs is
 :meth:`~dgl.DGLGraph.multi_update_all`.
-``multi_update_all`` takes a dictionary containing the parameters for
-``update_all`` within each relation using relation as the key, and a
-string represents the cross type reducer. The reducer can be one of
-``sum``, ``min``, ``max``, ``mean``, ``stack``. Here’s an example:
+:meth:`~dgl.DGLGraph.multi_update_all` takes a dictionary containing
+the parameters for :meth:`~dgl.DGLGraph.update_all` within each relation
+using relation as the key, and a string representing the cross type reducer.
+The reducer can be one of ``sum``, ``min``, ``max``, ``mean``, ``stack``.
+Here’s an example:
 
 .. code::
+
+    import dgl.function as fn
 
     for c_etype in G.canonical_etypes:
         srctype, etype, dsttype = c_etype

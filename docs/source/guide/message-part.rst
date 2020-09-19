@@ -3,10 +3,10 @@
 2.3 Apply Message Passing On Part Of The Graph
 ----------------------------------------------
 
-If we only want to update part of the nodes in the graph, the practice
-is to create a subgraph by providing the ids for the nodes we want to
-include in the update, then call ``update_all`` on the subgraph. For
-example:
+If one only wants to update part of the nodes in the graph, the practice
+is to create a subgraph by providing the IDs for the nodes to
+include in the update, then call :meth:`~dgl.DGLGraph.update_all` on the
+subgraph. For example:
 
 .. code::
 
@@ -14,5 +14,5 @@ example:
     sg = g.subgraph(nid)
     sg.update_all(message_func, reduce_func, apply_node_func)
 
-This is a common usage in mini-batch training. Check :ref:`guide-minibatch` user guide for more detailed
+This is a common usage in mini-batch training. Check :ref:`guide-minibatch` for more detailed
 usages.
