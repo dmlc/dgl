@@ -34,6 +34,6 @@ Roadmap
     :hidden:
     :glob:
 
-    guide-nn-construction
-    guide-nn-forward
-    guide-nn-heterograph
+    nn-construction
+    nn-forward
+    nn-heterograph
