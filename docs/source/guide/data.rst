@@ -9,12 +9,12 @@ recommend processing graph data into a :class:`dgl.data.DGLDataset` subclass, as
 pipeline provides simple and clean solution for loading, processing and
 saving graph data.
 
+Roadmap
+-------
+
 This chapter introduces how to create a DGL-Dataset for our own graph
 data. The following contents explain how the pipeline works, and
 show how to implement each component of it.
-
-Roadmap
--------
 
 * :ref:`guide-data-pipeline-dataset`
 * :ref:`guide-data-pipeline-download`
