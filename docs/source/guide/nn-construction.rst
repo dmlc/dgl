@@ -1,7 +1,7 @@
 .. _guide-nn-construction:
 
 3.1 DGL NN Module Construction Function
------------------------------------
+---------------------------------------
 
 The construction function will do the following:
 

@@ -1,7 +1,7 @@
 .. _guide-nn-heterograph:
 
 3.3 Heterogeneous GraphConv Module
-------------------------------
+----------------------------------
 
 :class:`dgl.nn.pytorch.HeteroGraphConv`
 is a module-level encapsulation to run DGL NN module on heterogeneous
