@@ -14,7 +14,7 @@ template <DLDeviceType XPU, typename IdType>
 IdArray CumSum(IdArray array, bool prepend_zero) {
   const int64_t len = array.NumElements();
   if (len == 0)
-    return array;
+    return !prepend_zero ? array : aten::Full(0, 1, array->dtype.bits, array->ctx);
   if (prepend_zero) {
     IdArray ret = aten::NewIdArray(len + 1, array->ctx, array->dtype.bits);
     const IdType* in_d = array.Ptr<IdType>();

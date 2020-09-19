@@ -179,7 +179,8 @@ all node types.
 feature tensors as input, and returns another dictionary of node types
 and node features.
 
-So given that we have the user and item features in the example above.
+So given that we have the user and item features in the
+:ref:`heterogeneous graph example <guide-training-heterogeneous-graph-example>`.
 
 .. code:: python
 

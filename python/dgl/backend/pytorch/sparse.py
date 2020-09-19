@@ -196,7 +196,7 @@ class EdgeSoftmax(th.autograd.Function):
         # remember to save the graph to backward cache before making it
         # a local variable
         if not is_all(eids):
-            gidx = gidx.edge_subgraph(eids.type(gidx.dtype), True)
+            gidx = gidx.edge_subgraph([eids], True).graph
         if norm_by == 'src':
             gidx = gidx.reverse()
         score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]

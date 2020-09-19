@@ -1,5 +1,6 @@
 """Implementation for core graph computation."""
 # pylint: disable=not-callable
+import numpy as np
 
 from .base import DGLError, is_all, NID, EID, ALL
 from . import backend as F
@@ -121,8 +122,13 @@ def invoke_udf_reduce(graph, func, msgdata, *, orig_nid=None):
             continue
         bkt_nodes.append(node_bkt)
         ndata_bkt = dstdata.subframe(node_bkt)
-        eid_bkt = graph.in_edges(node_bkt, form='eid')
+
+        # order the incoming edges per node by edge ID
+        eid_bkt = F.zerocopy_to_numpy(graph.in_edges(node_bkt, form='eid'))
         assert len(eid_bkt) == deg * len(node_bkt)
+        eid_bkt = np.sort(eid_bkt.reshape((len(node_bkt), deg)), 1)
+        eid_bkt = F.zerocopy_from_numpy(eid_bkt.flatten())
+
         msgdata_bkt = msgdata.subframe(eid_bkt)
         # reshape all msg tensors to (num_nodes_bkt, degree, feat_size)
         maildata = {}
