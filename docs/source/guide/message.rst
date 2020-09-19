@@ -25,8 +25,8 @@ by aggregating its incoming messages using the **reduce function**
 Roadmap
 -------
 
-This chapter will introduce DGL's message passing APIs, and how to efficiently use them in both nodes and edges.
-The last section of this chapter will explain how to use implement message passing in heterogeneous graphs.
+This chapter introduces DGL's message passing APIs, and how to efficiently use them on both nodes and edges.
+The last section of it explains how to implement message passing on heterogeneous graphs.
 
 * :ref:`guide-message-passing-api`
 * :ref:`guide-message-passing-efficient`
