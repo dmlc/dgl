@@ -3,14 +3,14 @@
 3.3 Heterogeneous GraphConv Module
 ----------------------------------
 
-:class:`dgl.nn.pytorch.HeteroGraphConv`
+:class:`~dgl.nn.pytorch.HeteroGraphConv`
 is a module-level encapsulation to run DGL NN module on heterogeneous
-graph. The implementation logic is the same as message passing level API
-``multi_update_all()``:
+graphs. The implementation logic is the same as message passing level API
+:meth:`~dgl.DGLGraph.multi_update_all`:
 
 -  DGL NN module within each relation :math:`r`.
 -  Reduction that merges the results on the same node type from multiple
-   relationships.
+   relations.
 
 This can be formulated as:
 
@@ -24,17 +24,20 @@ HeteroGraphConv implementation logic:
 
 .. code::
 
+    import torch.nn as nn
+
     class HeteroGraphConv(nn.Module):
         def __init__(self, mods, aggregate='sum'):
             super(HeteroGraphConv, self).__init__()
             self.mods = nn.ModuleDict(mods)
             if isinstance(aggregate, str):
+                # An internal function to get common aggregation functions
                 self.agg_fn = get_aggregate_fn(aggregate)
             else:
                 self.agg_fn = aggregate
 
-The heterograph convolution takes a dictonary ``mods`` that maps each
-relation to a nn module. And set the function that aggregates results on
+The heterograph convolution takes a dictionary ``mods`` that maps each
+relation to an nn module and sets the function that aggregates results on
 the same node type from multiple relations.
 
 .. code::
@@ -50,13 +53,13 @@ Besides input graph and input tensors, the ``forward()`` function takes
 two additional dictionary parameters ``mod_args`` and ``mod_kwargs``.
 These two dictionaries have the same keys as ``self.mods``. They are
 used as customized parameters when calling their corresponding NN
-modules in ``self.mods``\ for different types of relations.
+modules in ``self.mods`` for different types of relations.
 
 An output dictionary is created to hold output tensor for each
-destination type\ ``nty`` . Note that the value for each ``nty`` is a
+destination type ``nty`` . Note that the value for each ``nty`` is a
 list, indicating a single node type may get multiple outputs if more
-than one relations have ``nty`` as the destination type. We will hold
-them in list for further aggregation.
+than one relations have ``nty`` as the destination type. ``HeteroGraphConv``
+will perform a further aggregation on the lists.
 
 .. code::
 
@@ -68,7 +71,7 @@ them in list for further aggregation.
 
           for stype, etype, dtype in g.canonical_etypes:
               rel_graph = g[stype, etype, dtype]
-              if rel_graph.number_of_edges() == 0:
+              if rel_graph.num_edges() == 0:
                   continue
               if stype not in src_inputs or dtype not in dst_inputs:
                   continue
@@ -84,12 +87,12 @@ heterogeneous graph. As in ordinary NN module, the ``forward()``
 function need to handle different input graph types separately.
 
 Each relation is represented as a ``canonical_etype``, which is
-``(stype, etype, dtype)``. Using ``canonical_etype`` as the key, we can
+``(stype, etype, dtype)``. Using ``canonical_etype`` as the key, one can
 extract out a bipartite graph ``rel_graph``. For bipartite graph, the
 input feature will be organized as a tuple
 ``(src_inputs[stype], dst_inputs[dtype])``. The NN module for each
 relation is called and the output is saved. To avoid unnecessary call,
-relations with no edge or no node with the its src type will be skipped.
+relations with no edges or no nodes with the src type will be skipped.
 
 .. code::
 
@@ -99,4 +102,5 @@ relations with no edge or no node with the its src type will be skipped.
                 rsts[nty] = self.agg_fn(alist, nty)
 
 Finally, the results on the same destination node type from multiple
-relationships are aggregated using ``self.agg_fn`` function. Examples can be found in the API Doc for :class:`dgl.nn.pytorch.HeteroGraphConv`.
+relations are aggregated using ``self.agg_fn`` function. Examples can
+be found in the API Doc for :class:`~dgl.nn.pytorch.HeteroGraphConv`.

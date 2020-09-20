@@ -4,18 +4,18 @@
 ----------------------------------
 
 In NN module, ``forward()`` function does the actual message passing and
-computating. Compared with Pytorch’s NN module which usually takes
+computation. Compared with PyTorch’s NN module which usually takes
 tensors as the parameters, DGL NN module takes an additional parameter
 :class:`dgl.DGLGraph`. The
-workload for ``forward()`` function can be splitted into three parts:
+workload for ``forward()`` function can be split into three parts:
 
 -  Graph checking and graph type specification.
 
--  Message passing and reducing.
+-  Message passing.
 
--  Update feature after reducing for output.
+-  Feature update.
 
-Let’s dive deep into the ``forward()`` function in SAGEConv example.
+The rest of the section takes a deep dive into the ``forward()`` function in SAGEConv example.
 
 Graph checking and graph type specification
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -28,7 +28,13 @@ Graph checking and graph type specification
                 feat_src, feat_dst = expand_as_pair(feat, graph)
 
 ``forward()`` needs to handle many corner cases on the input that can
-lead to invalid values in computing and message passing. One typical check in conv modules like :class:`~dgl.nn.pytorch.conv.GraphConv` is to verify no 0-in-degree node in the input graph. When a node has 0-in-degree, the ``mailbox`` will be empty and the reduce function will produce all-zero values. This may cause silent regression in model performance. However, in :class:`~dgl.nn.pytorch.conv.SAGEConv` module, the aggregated representation will be concatenated with the original node feature, the output of ``forward()`` will not be all-zero. No such check is needed in this case.
+lead to invalid values in computing and message passing. One typical check in conv modules
+like :class:`~dgl.nn.pytorch.conv.GraphConv` is to verify that the input graph has no 0-in-degree nodes.
+When a node has 0 in-degree, the ``mailbox`` will be empty and the reduce function will produce
+all-zero values. This may cause silent regression in model performance. However, in
+:class:`~dgl.nn.pytorch.conv.SAGEConv` module, the aggregated representation will be concatenated
+with the original node feature, the output of ``forward()`` will not be all-zero. No such check is
+needed in this case.
 
 DGL NN module should be reusable across different types of graph input
 including: homogeneous graph, heterogeneous
@@ -52,11 +58,10 @@ The math formulas for SAGEConv are:
 
     h_{dst}^{(l+1)} = \mathrm{norm}(h_{dst}^{l})
 
-We need to specify the source node feature ``feat_src`` and destination
-node feature ``feat_dst`` according to the graph type. The function to
-specify the graph type and expand ``feat`` into ``feat_src`` and
-``feat_dst`` is
-``expand_as_pair()``.
+One needs to specify the source node feature ``feat_src`` and destination
+node feature ``feat_dst`` according to the graph type.
+:meth:``~dgl.utils.expand_as_pair`` is a function that specifies the graph
+type and expand ``feat`` into ``feat_src`` and ``feat_dst``.
 The detail of this function is shown below.
 
 .. code::
@@ -75,25 +80,25 @@ The detail of this function is shown below.
                 input_dst = F.narrow_row(input_, 0, g.number_of_dst_nodes())
             return input_, input_dst
         else:
-            # Homograph case
+            # Homogeneous graph case
             return input_, input_
 
 For homogeneous whole graph training, source nodes and destination nodes
 are the same. They are all the nodes in the graph.
 
-For heterogeneous case, the graph can be splitted into several bipartite
+For heterogeneous case, the graph can be split into several bipartite
 graphs, one for each relation. The relations are represented as
-``(src_type, edge_type, dst_dtype)``. When we identify the input feature
-``feat`` is a tuple, we will treat the graph as bipartite. The first
+``(src_type, edge_type, dst_dtype)``. When it identifies that the input feature
+``feat`` is a tuple, it will treat the graph as bipartite. The first
 element in the tuple will be the source node feature and the second
 element will be the destination node feature.
 
 In mini-batch training, the computing is applied on a subgraph sampled
-by given a bunch of destination nodes. The subgraph is called as
+based on a bunch of destination nodes. The subgraph is called as
 ``block`` in DGL. After message passing, only those destination nodes
 will be updated since they have the same neighborhood as the one they
 have in the original full graph. In the block creation phase,
-``dst nodes`` are in the front of the node list. We can find the
+``dst nodes`` are in the front of the node list. One can find the
 ``feat_dst`` by the index ``[0:g.number_of_dst_nodes()]``.
 
 After determining ``feat_src`` and ``feat_dst``, the computing for the
@@ -103,6 +108,10 @@ Message passing and reducing
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code::
+
+                import dgl.function as fn
+                import torch.nn.functional as F
+                from dgl.utils import check_eq_shape
 
                 if self._aggre_type == 'mean':
                     graph.srcdata['h'] = feat_src
@@ -130,10 +139,10 @@ Message passing and reducing
                     rst = self.fc_self(h_self) + self.fc_neigh(h_neigh)
 
 The code actually does message passing and reducing computing. This part
-of code varies module by module. Note that all the message passings in
-the above code are implemented using ``update_all()`` API and
+of code varies module by module. Note that all the message passing in
+the above code are implemented using :meth:`~dgl.DGLGraph.update_all` API and
 ``built-in`` message/reduce functions to fully utilize DGL’s performance
-optimization as described in :ref:`guide-message-passing`.
+optimization as described in :ref:`guide-message-passing-efficient`.
 
 Update feature after reducing for output
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

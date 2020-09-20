@@ -1,7 +1,7 @@
 .. _guide-message-passing:
 
 Chapter 2: Message Passing
-================================
+==========================
 
 Message Passing Paradigm
 ------------------------

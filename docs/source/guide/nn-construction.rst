@@ -3,21 +3,17 @@
 3.1 DGL NN Module Construction Function
 ---------------------------------------
 
-The construction function will do the following:
+The construction function performs the following steps:
 
 1. Set options.
-2. Register learnable paramesters or submodules.
+2. Register learnable parameters or submodules.
 3. Reset parameters.
 
 .. code::
 
-    import torch as th
-    from torch import nn
-    from torch.nn import init
+    import torch.nn as nn
 
-    from .... import function as fn
-    from ....base import DGLError
-    from ....utils import expand_as_pair, check_eq_shape
+    from dgl.utils import expand_as_pair
 
     class SAGEConv(nn.Module):
         def __init__(self,
@@ -35,8 +31,8 @@ The construction function will do the following:
             self.norm = norm
             self.activation = activation
 
-In construction function, we first need to set the data dimensions. For
-general Pytorch module, the dimensions are usually input dimension,
+In construction function, one first needs to set the data dimensions. For
+general PyTorch module, the dimensions are usually input dimension,
 output dimension and hidden dimensions. For graph neural, the input
 dimension can be split into source node dimension and destination node
 dimension.
@@ -46,10 +42,10 @@ aggregation type (``self._aggre_type``). Aggregation type determines how
 messages on different edges are aggregated for a certain destination
 node. Commonly used aggregation types include ``mean``, ``sum``,
 ``max``, ``min``. Some modules may apply more complicated aggregation
-like a ``lstm``.
+like an ``lstm``.
 
-``norm`` here is a callable function for feature normalization. On the
-SAGEConv paper, such normalization can be l2 norm:
+``norm`` here is a callable function for feature normalization. In the
+SAGEConv paper, such normalization can be l2 normalization:
 :math:`h_v = h_v / \lVert h_v \rVert_2`.
 
 .. code::
@@ -67,7 +63,7 @@ SAGEConv paper, such normalization can be l2 norm:
             self.reset_parameters()
 
 Register parameters and submodules. In SAGEConv, submodules vary
-according to the aggregation type. Those modules are pure Pytorch nn
+according to the aggregation type. Those modules are pure PyTorch nn
 modules like ``nn.Linear``, ``nn.LSTM``, etc. At the end of construction
 function, weight initialization is applied by calling
 ``reset_parameters()``.
