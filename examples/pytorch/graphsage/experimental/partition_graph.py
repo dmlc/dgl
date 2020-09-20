@@ -42,7 +42,7 @@ if __name__ == '__main__':
         balance_ntypes = None
 
     if args.undirected:
-        sym_g = dgl.to_bidirected_stale(g, readonly=True)
+        sym_g = dgl.to_bidirected(g, readonly=True)
         for key in g.ndata:
             sym_g.ndata[key] = g.ndata[key]
         g = sym_g

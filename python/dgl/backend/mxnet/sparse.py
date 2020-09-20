@@ -269,7 +269,7 @@ class EdgeSoftmax(mx.autograd.Function):
     def __init__(self, gidx, eids, norm_by):
         super(EdgeSoftmax, self).__init__()
         if not is_all(eids):
-            gidx = gidx.edge_subgraph(eids.astype(gidx.dtype), True)
+            gidx = gidx.edge_subgraph([eids], True).graph
         if norm_by == 'src':
             gidx = gidx.reverse()
         self.gidx = gidx

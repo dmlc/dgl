@@ -540,6 +540,21 @@ DGL_DLL int DGLStreamStreamSynchronize(int device_type,
                                        DGLStreamHandle src,
                                        DGLStreamHandle dst);
 
+/*!
+ * \brief Bug report macro.
+ *
+ * This serves as a sanity check on system side to make sure the code is correct by
+ * checking whether a condition always holds for complex reasons.  Failing the
+ * condition signifies a system bug instead of users giving invalid inputs or using
+ * the functionality incorrectly.
+ *
+ * Hints the user to file a bug report if the condition fails.
+ */
+#define BUG_ON(cond) \
+  CHECK(cond) << "A bug has been occurred.  " \
+                 "Please file a bug report at https://github.com/dmlc/dgl/issues.  " \
+                 "Message: "
+
 #ifdef __cplusplus
 }  // DGL_EXTERN_C
 #endif

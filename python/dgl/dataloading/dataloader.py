@@ -8,6 +8,7 @@ from ..base import NID, EID
 from .. import backend as F
 from .. import utils
 from ..convert import heterograph
+from ..distributed.dist_graph import DistGraph
 
 # pylint: disable=unused-argument
 def assign_block_eids(block, frontier):
@@ -244,6 +245,7 @@ class BlockSampler(object):
                 assign_block_eids(block, frontier)
 
             seed_nodes = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
+
             # Pre-generate CSR format so that it can be used in training directly
             block.create_formats_()
             blocks.insert(0, block)
@@ -299,7 +301,7 @@ class NodeCollator(Collator):
     a homogeneous graph where each node takes messages from all neighbors (assume
     the backend is PyTorch):
 
-    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> collator = dgl.dataloading.NodeCollator(g, train_nid, sampler)
     >>> dataloader = torch.utils.data.DataLoader(
     ...     collator.dataset, collate_fn=collator.collate,
@@ -309,6 +311,7 @@ class NodeCollator(Collator):
     """
     def __init__(self, g, nids, block_sampler):
         self.g = g
+        self._is_distributed = isinstance(g, DistGraph)
         if not isinstance(nids, Mapping):
             assert len(g.ntypes) == 1, \
                 "nids should be a dict of node type and ids for graph with multiple node types"
@@ -352,6 +355,15 @@ class NodeCollator(Collator):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
+
+        # TODO(BarclayII) Because DistGraph doesn't have idtype and device implemented,
+        # this function does not work.  I'm again skipping this step as a workaround.
+        # We need to fix this.
+        if not self._is_distributed:
+            if isinstance(items, dict):
+                items = utils.prepare_tensor_dict(self.g, items, 'items')
+            else:
+                items = utils.prepare_tensor(self.g, items, 'items')
         blocks = self.block_sampler.sample_blocks(self.g, items)
         output_nodes = blocks[-1].dstdata[NID]
         input_nodes = blocks[0].srcdata[NID]
@@ -460,9 +472,9 @@ class EdgeCollator(Collator):
     computation dependencies of the incident nodes.  This is a common trick to avoid
     information leakage.
 
-    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> collator = dgl.dataloading.EdgeCollator(
-    ...     g, train_eid, sampler, exclude='reverse',
+    ...     g, train_eid, sampler, exclude='reverse_id',
     ...     reverse_eids=reverse_eids)
     >>> dataloader = torch.utils.data.DataLoader(
     ...     collator.dataset, collate_fn=collator.collate,
@@ -474,10 +486,10 @@ class EdgeCollator(Collator):
     homogeneous graph where each node takes messages from all neighbors (assume the
     backend is PyTorch), with 5 uniformly chosen negative samples per edge:
 
-    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
     >>> collator = dgl.dataloading.EdgeCollator(
-    ...     g, train_eid, sampler, exclude='reverse',
+    ...     g, train_eid, sampler, exclude='reverse_id',
     ...     reverse_eids=reverse_eids, negative_sampler=neg_sampler,
     >>> dataloader = torch.utils.data.DataLoader(
     ...     collator.dataset, collate_fn=collator.collate,
@@ -498,7 +510,7 @@ class EdgeCollator(Collator):
     To train a 3-layer GNN for edge classification on a set of edges ``train_eid`` with
     type ``click``, you can write
 
-    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> collator = dgl.dataloading.EdgeCollator(
     ...     g, {'click': train_eid}, sampler, exclude='reverse_types',
     ...     reverse_etypes={'click': 'clicked-by', 'clicked-by': 'click'})
@@ -511,7 +523,7 @@ class EdgeCollator(Collator):
     To train a 3-layer GNN for link prediction on a set of edges ``train_eid`` with type
     ``click``, you can write
 
-    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
     >>> collator = dgl.dataloading.EdgeCollator(
     ...     g, train_eid, sampler, exclude='reverse_types',
@@ -559,10 +571,11 @@ class EdgeCollator(Collator):
 
     def _collate(self, items):
         if isinstance(items[0], tuple):
+            # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-            items = {k: F.zerocopy_from_numpy(np.asarray(v)) for k, v in items.items()}
+            items = utils.prepare_tensor_dict(self.g_sampling, items, 'items')
         else:
-            items = F.zerocopy_from_numpy(np.asarray(items))
+            items = utils.prepare_tensor(self.g_sampling, items, 'items')
 
         pair_graph = self.g.edge_subgraph(items)
         seed_nodes = pair_graph.ndata[NID]
@@ -582,10 +595,11 @@ class EdgeCollator(Collator):
 
     def _collate_with_negative_sampling(self, items):
         if isinstance(items[0], tuple):
+            # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-            items = {k: F.zerocopy_from_numpy(np.asarray(v)) for k, v in items.items()}
+            items = utils.prepare_tensor_dict(self.g_sampling, items, 'items')
         else:
-            items = F.zerocopy_from_numpy(np.asarray(items))
+            items = utils.prepare_tensor(self.g_sampling, items, 'items')
 
         pair_graph = self.g.edge_subgraph(items, preserve_nodes=True)
         induced_edges = pair_graph.edata[EID]
