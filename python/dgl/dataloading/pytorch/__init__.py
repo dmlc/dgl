@@ -306,7 +306,7 @@ class EdgeDataLoader:
 
     >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> dataloader = dgl.dataloading.EdgeDataLoader(
-    ...     g, train_eid, sampler, exclude='reverse',
+    ...     g, train_eid, sampler, exclude='reverse_id',
     ...     reverse_eids=reverse_eids,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, pair_graph, blocks in dataloader:
@@ -319,7 +319,7 @@ class EdgeDataLoader:
     >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
     >>> dataloader = dgl.dataloading.EdgeDataLoader(
-    ...     g, train_eid, sampler, exclude='reverse',
+    ...     g, train_eid, sampler, exclude='reverse_id',
     ...     reverse_eids=reverse_eids, negative_sampler=neg_sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
