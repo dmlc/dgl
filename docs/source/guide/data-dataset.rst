@@ -3,13 +3,13 @@
 4.1 DGLDataset class
 --------------------
 
-:class:`dgl.data.DGLDataset` is the base class for processing, loading and saving
+:class:`~dgl.data.DGLDataset` is the base class for processing, loading and saving
 graph datasets defined in :ref:`apidata`. It implements the basic pipeline
 for processing graph data. The following flow chart shows how the
 pipeline works.
 
-To process a graph dataset located in a remote server or local disk, we
-define a class, say ``MyDataset``, inherits from :class:`dgl.data.DGLDataset`. The
+To process a graph dataset located in a remote server or local disk, one can
+define a class, say ``MyDataset``, inheriting from :class:`dgl.data.DGLDataset`. The
 template of ``MyDataset`` is as follows.
 
 .. figure:: https://data.dgl.ai/asset/image/userguide_data_flow.png
@@ -83,17 +83,17 @@ template of ``MyDataset`` is as follows.
             pass
 
 
-:class:`dgl.data.DGLDataset` class has abstract functions ``process()``,
+:class:`~dgl.data.DGLDataset` class has abstract functions ``process()``,
 ``__getitem__(idx)`` and ``__len__()`` that must be implemented in the
-subclass. But we recommend to implement saving and loading as well,
+subclass. DGL also recommends implementing saving and loading as well,
 since they can save significant time for processing large datasets, and
-there are several APIs making it easy (see :ref:`ref-save-load-data`).
+there are several APIs making it easy (see :ref:`guide-data-pipeline-savenload`).
 
-Note that the purpose of :class:`dgl.data.DGLDataset` is to provide a standard and
-convenient way to load graph data. We can store graphs, features,
+Note that the purpose of :class:`~dgl.data.DGLDataset` is to provide a standard and
+convenient way to load graph data. One can store graphs, features,
 labels, masks and basic information about the dataset, such as number of
 classes, number of labels, etc. Operations such as sampling, partition
-or feature normalization are done outside of the :class:`dgl.data.DGLDataset`
+or feature normalization are done outside of the :class:`~dgl.data.DGLDataset`
 subclass.
 
 The rest of this chapter shows the best practices to implement the

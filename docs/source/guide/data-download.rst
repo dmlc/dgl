@@ -3,15 +3,14 @@
 4.2 Download raw data (optional)
 --------------------------------
 
-If our dataset is already in local disk, make sure it’s in directory
-``raw_dir``. If we want to run our code anywhere without bothering to
-download and move data to the right directory, we can do it
+If a dataset is already in local disk, make sure it’s in directory
+``raw_dir``. If one wants to run the code anywhere without bothering to
+download and move data to the right directory, one can do it
 automatically by implementing function ``download()``.
 
 If the dataset is a zip file, make ``MyDataset`` inherit from
 :class:`dgl.data.DGLBuiltinDataset` class, which handles the zip file extraction for us. Otherwise,
-implement ``download()`` like in
-:class:`dgl.data.QM7bDataset`:
+one needs to implement ``download()`` like in :class:`~dgl.data.QM7bDataset`:
 
 .. code:: 
 
@@ -25,13 +24,13 @@ implement ``download()`` like in
         download(self.url, path=file_path)
 
 The above code downloads a .mat file to directory ``self.raw_dir``. If
-the file is a .gz, .tar, .tar.gz or .tgz file, use :func:`dgl.data.utils.extract_archive`
+the file is a .gz, .tar, .tar.gz or .tgz file, use :func:`~dgl.data.utils.extract_archive`
 function to extract. The following code shows how to download a .gz file
-in :class:`dgl.data.BitcoinOTCDataset`:
+in :class:`~dgl.data.BitcoinOTCDataset`:
 
 .. code:: 
 
-    from dgl.data.utils import download, extract_archive
+    from dgl.data.utils import download, check_sha1
     
     def download(self):
         # path to store the file
@@ -52,6 +51,6 @@ The above code will extract the file into directory ``self.name`` under
 to handle zip file, it will extract the file into directory ``self.name`` 
 as well.
 
-Optionally, we can check SHA-1 string of the downloaded file as the
+Optionally, one can check SHA-1 string of the downloaded file as the
 example above does, in case the author changed the file in the remote
 server some day.

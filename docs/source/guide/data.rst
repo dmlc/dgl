@@ -1,20 +1,20 @@
 .. _guide-data-pipeline:
 
 Chapter 4: Graph Data Pipeline
-====================================================
+==============================
 
 DGL implements many commonly used graph datasets in :ref:`apidata`. They
-follow a standard pipeline defined in class :class:`dgl.data.DGLDataset`. We highly
-recommend processing graph data into a :class:`dgl.data.DGLDataset` subclass, as the
+follow a standard pipeline defined in class :class:`dgl.data.DGLDataset`. DGL highly
+recommends processing graph data into a :class:`dgl.data.DGLDataset` subclass, as the
 pipeline provides simple and clean solution for loading, processing and
 saving graph data.
 
 Roadmap
 -------
 
-This chapter introduces how to create a DGL-Dataset for our own graph
-data. The following contents explain how the pipeline works, and
-show how to implement each component of it.
+This chapter introduces how to create a custom DGL-Dataset.
+The following sections explain how the pipeline works, and
+shows how to implement each component of it.
 
 * :ref:`guide-data-pipeline-dataset`
 * :ref:`guide-data-pipeline-download`

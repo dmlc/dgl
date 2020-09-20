@@ -3,31 +3,33 @@
 4.3 Process data
 ----------------
 
-We implement the data processing code in function ``process()``, and it
+One can implement the data processing code in function ``process()``, and it
 assumes that the raw data is located in ``self.raw_dir`` already. There
 are typically three types of tasks in machine learning on graphs: graph
-classification, node classification, and link prediction. We will show
+classification, node classification, and link prediction. This section will show
 how to process datasets related to these tasks.
 
-Here we focus on the standard way to process graphs, features and masks.
-We will use builtin datasets as examples and skip the implementations
+The section focuses on the standard way to process graphs, features and masks.
+It will use builtin datasets as examples and skip the implementations
 for building graphs from files, but add links to the detailed
 implementations. Please refer to :ref:`guide-graph-external` to see a
 complete guide on how to build graphs from external sources.
 
 Processing Graph Classification datasets
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Graph classification datasets are almost the same as most datasets in
-typical machine learning tasks, where mini-batch training is used. So we
+typical machine learning tasks, where mini-batch training is used. So one can
 process the raw data to a list of :class:`dgl.DGLGraph` objects and a list of
-label tensors. In addition, if the raw data has been splitted into
-several files, we can add a parameter ``split`` to load specific part of
+label tensors. In addition, if the raw data has been split into
+several files, one can add a parameter ``split`` to load specific part of
 the data.
 
-Take :class:`dgl.data.QM7bDataset` as example:
+Take :class:`~dgl.data.QM7bDataset` as example:
 
 .. code:: 
+
+    from dgl.data import DGLDataset
 
     class QM7bDataset(DGLDataset):
         _url = 'http://deepchem.io.s3-website-us-west-1.amazonaws.com/' \
@@ -66,14 +68,14 @@ Take :class:`dgl.data.QM7bDataset` as example:
 
 
 In ``process()``, the raw data is processed to a list of graphs and a
-list of labels. We must implement ``__getitem__(idx)`` and ``__len__()``
-for iteration. We recommend to make ``__getitem__(idx)`` to return a
+list of labels. One must implement ``__getitem__(idx)`` and ``__len__()``
+for iteration. DGL recommends making ``__getitem__(idx)`` return a
 tuple ``(graph, label)`` as above. Please check the `QM7bDataset source
 code <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/qm7b.html#QM7bDataset>`__
 for details of ``self._load_graph()`` and ``__getitem__``.
 
-We can also add properties to the class to indicate some useful
-information of the dataset. In :class:`dgl.data.QM7bDataset`, we can add a property
+One can also add properties to the class to indicate some useful
+information of the dataset. In :class:`~dgl.data.QM7bDataset`, one can add a property
 ``num_labels`` to indicate the total number of prediction tasks in this
 multi-task dataset:
 
@@ -84,10 +86,13 @@ multi-task dataset:
         """Number of labels for each graph, i.e. number of prediction tasks."""
         return 14
 
-After all these coding, we can finally use the :class:`dgl.data.QM7bDataset` as
+After all these coding, one can finally use :class:`~dgl.data.QM7bDataset` as
 follows:
 
 .. code:: 
+
+    import dgl
+    import torch
 
     from torch.utils.data import DataLoader
     
@@ -114,7 +119,7 @@ follows:
 A complete guide for training graph classification models can be found
 in :ref:`guide-training-graph-classification`.
 
-For more examples of graph classification datasets, please refer to our builtin graph classification
+For more examples of graph classification datasets, please refer to DGL's builtin graph classification
 datasets: 
 
 * :ref:`gindataset`
@@ -126,17 +131,17 @@ datasets:
 * :ref:`tudata`
 
 Processing Node Classification datasets
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Different from graph classification, node classification is typically on
 a single graph. As such, splits of the dataset are on the nodes of the
-graph. We recommend using node masks to specify the splits. We use
+graph. DGL recommends using node masks to specify the splits. The section uses
 builtin dataset `CitationGraphDataset <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/citation_graph.html#CitationGraphDataset>`__ as an example:
 
 .. code:: 
 
-    import dgl
     from dgl.data import DGLBuiltinDataset
+    from dgl.data.utils import _get_dgl_url, generate_mask_tensor
     
     class CitationGraphDataset(DGLBuiltinDataset):
         _urls = {
@@ -167,10 +172,10 @@ builtin dataset `CitationGraphDataset <https://docs.dgl.ai/en/0.5.x/_modules/dgl
             g.ndata['val_mask'] = generate_mask_tensor(val_mask)
             g.ndata['test_mask'] = generate_mask_tensor(test_mask)
             # node labels
-            g.ndata['label'] = F.tensor(labels)
+            g.ndata['label'] = torch.tensor(labels)
             # node features
-            g.ndata['feat'] = F.tensor(_preprocess_features(features), 
-                                       dtype=F.data_type_dict['float32'])
+            g.ndata['feat'] = torch.tensor(_preprocess_features(features),
+                                           dtype=F.data_type_dict['float32'])
             self._num_labels = onehot_labels.shape[1]
             self._labels = labels
             self._g = g
@@ -182,18 +187,18 @@ builtin dataset `CitationGraphDataset <https://docs.dgl.ai/en/0.5.x/_modules/dgl
         def __len__(self):
             return 1
 
-For brevity, we skip some code in ``process()`` to highlight the key
-part for processing node classification dataset: spliting masks, node
+For brevity, this section skips some code in ``process()`` to highlight the key
+part for processing node classification dataset: splitting masks. Node
 features and node labels are stored in ``g.ndata``. For detailed
 implementation, please refer to `CitationGraphDataset source
 code <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/citation_graph.html#CitationGraphDataset>`__.
 
-Notice that the implementations of ``__getitem__(idx)`` and
+Note that the implementations of ``__getitem__(idx)`` and
 ``__len__()`` are changed as well, since there is often only one graph
 for node classification tasks. The masks are ``bool tensors`` in PyTorch
 and TensorFlow, and ``float tensors`` in MXNet.
 
-We use a subclass of ``CitationGraphDataset``, :class:`dgl.data.CiteseerGraphDataset`,
+The section uses a subclass of ``CitationGraphDataset``, :class:`dgl.data.CiteseerGraphDataset`,
 to show the usage of it:
 
 .. code:: 
@@ -216,7 +221,7 @@ to show the usage of it:
 A complete guide for training node classification models can be found in
 :ref:`guide-training-node-classification`.
 
-For more examples of node classification datasets, please refer to our
+For more examples of node classification datasets, please refer to DGL's
 builtin datasets:
 
 * :ref:`citationdata`
@@ -240,14 +245,14 @@ builtin datasets:
 * :ref:`rdfdata`
 
 Processing dataset for Link Prediction datasets
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The processing of link prediction datasets is similar to that for node
 classification’s, there is often one graph in the dataset.
 
-We use builtin dataset
+The section uses builtin dataset
 `KnowledgeGraphDataset <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/knowledge_graph.html#KnowledgeGraphDataset>`__
-as example, and still skip the detailed data processing code to
+as an example, and still skips the detailed data processing code to
 highlight the key part for processing link prediction datasets:
 
 .. code:: 
@@ -285,16 +290,16 @@ highlight the key part for processing link prediction datasets:
         def __len__(self):
             return 1
 
-As shown in the code, we add splitting masks into ``edata`` field of the
+As shown in the code, it adds splitting masks into ``edata`` field of the
 graph. Check `KnowledgeGraphDataset source
 code <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/knowledge_graph.html#KnowledgeGraphDataset>`__
-to see the complete code. We use a subclass of ``KnowledgeGraphDataset``, :class:`dgl.data.FB15k237Dataset`,
-to show the usage of it:
+to see the complete code. The following code uses a subclass of ``KnowledgeGraphDataset``,
+:class:`dgl.data.FB15k237Dataset`, to show the usage of it:
 
 .. code:: 
 
-    import torch
-    
+    from dgl.data import FB15k237Dataset
+
     # load data
     dataset = FB15k237Dataset()
     graph = dataset[0]
@@ -310,7 +315,7 @@ to show the usage of it:
 A complete guide for training link prediction models can be found in
 :ref:`guide-training-link-prediction`.
 
-For more examples of link prediction datasets, please refer to our
+For more examples of link prediction datasets, please refer to DGL's
 builtin datasets: 
 
 * :ref:`kgdata`

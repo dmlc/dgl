@@ -3,9 +3,9 @@
 4.4 Save and load data
 ----------------------
 
-We recommend to implement saving and loading functions to cache the
+DGL recommends implementing saving and loading functions to cache the
 processed data in local disk. This saves a lot of data processing time
-in most cases. We provide four functions to make things simple:
+in most cases. DGL provides four functions to make things simple:
 
 -  :func:`dgl.save_graphs` and :func:`dgl.load_graphs`: save/load DGLGraph objects and labels to/from local disk.
 -  :func:`dgl.data.utils.save_info` and :func:`dgl.data.utils.load_info`: save/load useful information of the dataset (python ``dict`` object) to/from local disk.
@@ -42,7 +42,7 @@ dataset information.
         return os.path.exists(graph_path) and os.path.exists(info_path)
 
 Note that there are cases not suitable to save processed data. For
-example, in the builtin dataset :class:`dgl.data.GDELTDataset`,
+example, in the builtin dataset :class:`~dgl.data.GDELTDataset`,
 the processed data is quite large, so it’s more effective to process
 each data example in ``__getitem__(idx)``.
 

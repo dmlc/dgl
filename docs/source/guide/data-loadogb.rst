@@ -6,7 +6,7 @@
 `Open Graph Benchmark (OGB) <https://ogb.stanford.edu/docs/home/>`__ is
 a collection of benchmark datasets. The official OGB package
 `ogb <https://github.com/snap-stanford/ogb>`__ provides APIs for
-downloading and processing OGB datasets into :class:`dgl.data.DGLGraph` objects. We
+downloading and processing OGB datasets into :class:`dgl.data.DGLGraph` objects. The section
 introduce their basic usage here.
 
 First install ogb package using pip:
