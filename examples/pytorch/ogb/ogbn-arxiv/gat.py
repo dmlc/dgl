@@ -13,7 +13,7 @@ from matplotlib import pyplot as plt
 from matplotlib.ticker import AutoMinorLocator, MultipleLocator
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 
-from models import GCN
+from models import GAT
 
 device = None
 in_feats, n_classes = None, None
@@ -21,12 +21,33 @@ epsilon = 1 - math.log(2)
 
 
 def gen_model(args):
+    norm = "both" if args.use_norm else "none"
+
     if args.use_labels:
-        model = GCN(
-            in_feats + n_classes, args.n_hidden, n_classes, args.n_layers, F.relu, args.dropout, args.use_linear
+        model = GAT(
+            in_feats + n_classes,
+            n_classes,
+            n_hidden=args.n_hidden,
+            n_layers=args.n_layers,
+            n_heads=args.n_heads,
+            activation=F.relu,
+            dropout=args.dropout,
+            attn_drop=args.attn_drop,
+            norm=norm,
         )
     else:
-        model = GCN(in_feats, args.n_hidden, n_classes, args.n_layers, F.relu, args.dropout, args.use_linear)
+        model = GAT(
+            in_feats,
+            n_classes,
+            n_hidden=args.n_hidden,
+            n_layers=args.n_layers,
+            n_heads=args.n_heads,
+            activation=F.relu,
+            dropout=args.dropout,
+            attn_drop=args.attn_drop,
+            norm=norm,
+        )
+
     return model
 
 
@@ -109,10 +130,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
     model = gen_model(args)
     model = model.to(device)
 
-    optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wd)
-    lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=100, verbose=True, min_lr=1e-3
-    )
+    optimizer = optim.RMSprop(model.parameters(), lr=args.lr, weight_decay=args.wd)
 
     # training loop
     total_time = 0
@@ -133,19 +151,16 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
             model, graph, labels, train_idx, val_idx, test_idx, args.use_labels, evaluator
         )
 
-        lr_scheduler.step(loss)
-
         toc = time.time()
         total_time += toc - tic
 
-        # if val_acc > best_val_acc:
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             best_val_acc = val_acc
             best_test_acc = test_acc
 
         if epoch % args.log_every == 0:
-            print(f"Epoch: {epoch}/{args.n_epochs}")
+            print(f"Run: {n_running}/{args.n_runs}, Epoch: {epoch}/{args.n_epochs}")
             print(
                 f"Loss: {loss.item():.4f}, Acc: {acc:.4f}\n"
                 f"Train/Val/Test loss: {train_loss:.4f}/{val_loss:.4f}/{test_loss:.4f}\n"
@@ -154,7 +169,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
         for l, e in zip(
             [accs, train_accs, val_accs, test_accs, losses, train_losses, val_losses, test_losses],
-            [acc, train_acc, val_acc, test_acc, loss, train_loss, val_loss, test_loss],
+            [acc, train_acc, val_acc, test_acc, loss.item(), train_loss, val_loss, test_loss],
         ):
             l.append(e)
 
@@ -177,7 +192,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         plt.grid(which="minor", color="orange", linestyle="dotted")
         plt.legend()
         plt.tight_layout()
-        plt.savefig(f"gcn_acc_{n_running}.png")
+        plt.savefig(f"gat_acc_{n_running}.png")
 
         fig = plt.figure(figsize=(24, 24))
         ax = fig.gca()
@@ -195,32 +210,35 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         plt.grid(which="minor", color="orange", linestyle="dotted")
         plt.legend()
         plt.tight_layout()
-        plt.savefig(f"gcn_loss_{n_running}.png")
+        plt.savefig(f"gat_loss_{n_running}.png")
 
     return best_val_acc, best_test_acc
 
 
 def count_parameters(args):
     model = gen_model(args)
+    print([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
     return sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
 
 
 def main():
-    global device, in_feats, n_classes
+    global device, in_feats, n_classes, epsilon
 
-    argparser = argparse.ArgumentParser("GCN on OGBN-Arxiv", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    argparser = argparse.ArgumentParser("GAT on OGBN-Arxiv", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argparser.add_argument("--cpu", action="store_true", help="CPU mode. This option overrides --gpu.")
     argparser.add_argument("--gpu", type=int, default=0, help="GPU device ID.")
     argparser.add_argument("--n-runs", type=int, default=10)
-    argparser.add_argument("--n-epochs", type=int, default=1000)
+    argparser.add_argument("--n-epochs", type=int, default=2000)
     argparser.add_argument(
         "--use-labels", action="store_true", help="Use labels in the training set as input features."
     )
-    argparser.add_argument("--use-linear", action="store_true", help="Use linear layer.")
-    argparser.add_argument("--lr", type=float, default=0.005)
+    argparser.add_argument("--use-norm", action="store_true", help="Use symmetrically normalized adjacency matrix.")
+    argparser.add_argument("--lr", type=float, default=0.002)
     argparser.add_argument("--n-layers", type=int, default=3)
+    argparser.add_argument("--n-heads", type=int, default=3)
     argparser.add_argument("--n-hidden", type=int, default=256)
-    argparser.add_argument("--dropout", type=float, default=0.5)
+    argparser.add_argument("--dropout", type=float, default=0.75)
+    argparser.add_argument("--attn_drop", type=float, default=0.05)
     argparser.add_argument("--wd", type=float, default=0)
     argparser.add_argument("--log-every", type=int, default=20)
     argparser.add_argument("--plot-curves", action="store_true")
@@ -262,7 +280,7 @@ def main():
     val_accs = []
     test_accs = []
 
-    for i in range(args.n_runs):
+    for i in range(1, args.n_runs + 1):
         val_acc, test_acc = run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, i)
         val_accs.append(val_acc)
         test_accs.append(test_acc)
@@ -277,3 +295,11 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# Runned 10 times
+# Val Accs: [0.7505956575724018, 0.7489177489177489, 0.7502600758414711, 0.7498573777643545, 0.75079700661096, 0.7504278667069365, 0.7505285412262156, 0.7512332628611699, 0.7503271921876573, 0.750729890264774]
+# Test Accs: [0.7374853404110857, 0.7357982017570932, 0.7359216509268975, 0.736826944838796, 0.7385140834927885, 0.7370944180400387, 0.7358187766187272, 0.7365183219142851, 0.7343168117194412, 0.7371767174865749]
+# Average val accuracy: 0.750367461995369 ± 0.0005934770264509258
+# Average test accuracy: 0.7365471267205728 ± 0.0010945826389317434
+# Number of params: 1628440
