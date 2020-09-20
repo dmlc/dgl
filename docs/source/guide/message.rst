@@ -153,7 +153,7 @@ passing. The optimization includes:
    built-in. There is no message materialization on edges. (Memory
    optimization)
 
-According to the above, a common practise to leverage those
+According to the above, a common practice to leverage those
 optimizations is to construct your own message passing functionality as
 a combination of ``update_all`` calls with built-in functions as
 parameters.
