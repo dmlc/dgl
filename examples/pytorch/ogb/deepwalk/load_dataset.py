@@ -2,6 +2,7 @@
 
 import argparse
 from ogb.linkproppred import DglLinkPropPredDataset
+import time
 
 def load_from_ogbl_with_name(name):    
     choices = ['ogbl-collab', 'ogbl-ddi', 'ogbl-ppa', 'ogbl-citation']
@@ -17,6 +18,7 @@ if __name__ == "__main__":
         help="name of datasets by ogb")
     args = parser.parse_args()
 
+    print("loading graph... it might take some time")
     name = args.name
     g = load_from_ogbl_with_name(name=name)
 
@@ -26,13 +28,23 @@ if __name__ == "__main__":
     except:
         weighted = False
 
+    
+    edge_num = g.edges()[0].shape[0]
+    src = list(g.edges()[0])
+    tgt = list(g.edges()[1])
+    if weighted:
+        weight = list(g.edata['edge_weight'])
+
+    print("writing...")
+    start_time = time.time()
     with open(name + "-net.txt", "w") as f:
-        for i in range(g.edges()[0].shape[0]):
+        for i in range(edge_num):
             if weighted:
-                f.write(str(g.edges()[0][i].item()) + " "\
-                    +str(g.edges()[1][i].item()) + " "\
-                    +str(g.edata['edge_weight'][i].item()) + "\n")
+                f.write(str(src[i].item()) + " "\
+                    +str(tgt[i].item()) + " "\
+                    +str(weight[i].item()) + "\n")
             else:
-                f.write(str(g.edges()[0][i].item()) + " "\
-                    +str(g.edges()[1][i].item()) + " "\
+                f.write(str(src[i].item()) + " "\
+                    +str(tgt[i].item()) + " "\
                     +"1\n")
+    print("writing used time: %d s" % int(time.time() - start_time))
