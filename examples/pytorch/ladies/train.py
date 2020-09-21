@@ -37,6 +37,9 @@ def train(g, n_classes, args):
         shuffle=True,
         drop_last=False,
         num_workers=args['num_workers'])
+    for _ in tqdm.trange(5000):
+        for batch in train_dataloader:
+            pass
 
     model = Model(in_feats, args['hidden_dim'], n_classes, len(num_nodes))
     model = model.to(device)
@@ -80,6 +83,8 @@ def train(g, n_classes, args):
 if __name__ == '__main__':
     src = torch.randint(0, 2000, (10000,))
     dst = torch.randint(0, 2000, (10000,))
+    src = torch.cat([src, torch.arange(50, 70).repeat_interleave(2000)])
+    dst = torch.cat([dst, torch.arange(0, 2000).repeat_interleave(20)])
     g = dgl.graph((src, dst))
     g = dgl.to_simple(dgl.add_reverse_edges(g), return_counts=None)
     g.ndata['features'] = torch.randn(2000, 15)
