@@ -190,7 +190,7 @@ TU dataset
 
 Graph isomorphism network dataset
 ```````````````````````````````````
-A compact subset of graph kernel dataset
+
 .. autoclass:: GINDataset
     :members: __getitem__, __len__
 
