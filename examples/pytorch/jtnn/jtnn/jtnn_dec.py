@@ -143,7 +143,7 @@ class DGLJTNNDecoder(nn.Module):
 
         # Predict root
         mol_tree_batch.pull(root_ids, DGLF.copy_e('m', 'm'), DGLF.sum('m', 'h'))
-        mol_tree_batch.apply_nodes(dec_tree_node_update)
+        mol_tree_batch.apply_nodes(dec_tree_node_update, v=root_ids)
         # Extract hidden states and store them for stop/label prediction
         h = mol_tree_batch.nodes[root_ids].data['h']
         x = mol_tree_batch.nodes[root_ids].data['x']
@@ -170,12 +170,12 @@ class DGLJTNNDecoder(nn.Module):
             mol_tree_batch_lg.ndata.update(mol_tree_batch.edata)
             mol_tree_batch_lg.pull(eid, DGLF.copy_u('m', 'm'), DGLF.sum('m', 's'))
             mol_tree_batch_lg.pull(eid, DGLF.copy_u('rm', 'rm'), DGLF.sum('rm', 'accum_rm'))
-            mol_tree_batch_lg.apply_nodes(self.dec_tree_edge_update)
+            mol_tree_batch_lg.apply_nodes(self.dec_tree_edge_update, v=eid)
             mol_tree_batch.edata.update(mol_tree_batch_lg.ndata)
 
             is_new = mol_tree_batch.nodes[v].data['new']
             mol_tree_batch.pull(v, DGLF.copy_e('m', 'm'), DGLF.sum('m', 'h'))
-            mol_tree_batch.apply_nodes(dec_tree_node_update)
+            mol_tree_batch.apply_nodes(dec_tree_node_update, v=v)
 
             # Extract
             n_repr = mol_tree_batch.nodes[v].data
@@ -302,7 +302,7 @@ class DGLJTNNDecoder(nn.Module):
                     uv,
                     DGLF.copy_u('rm', 'rm'),
                     DGLF.sum('rm', 'accum_rm'))
-                mol_tree_graph_lg.apply_nodes(self.dec_tree_edge_update.update_zm)
+                mol_tree_graph_lg.apply_nodes(self.dec_tree_edge_update.update_zm, v=uv)
                 mol_tree_graph.edata.update(mol_tree_graph_lg.ndata)
                 mol_tree_graph.pull(v, DGLF.copy_e('m', 'm'), DGLF.sum('m', 'h'))
 
@@ -358,7 +358,7 @@ class DGLJTNNDecoder(nn.Module):
 
                 mol_tree_graph_lg.pull(u_pu, DGLF.copy_u('m', 'm'), DGLF.sum('m', 's'))
                 mol_tree_graph_lg.pull(u_pu, DGLF.copy_u('rm', 'rm'), DGLF.sum('rm', 'accum_rm'))
-                mol_tree_graph_lg.apply_nodes(self.dec_tree_edge_update)
+                mol_tree_graph_lg.apply_nodes(self.dec_tree_edge_update, v=u_pu)
                 mol_tree_graph.edata.update(mol_tree_graph_lg.ndata)
                 mol_tree_graph.pull(pu, DGLF.copy_e('m', 'm'), DGLF.sum('m', 'h'))
                 stack.pop()
