@@ -1296,7 +1296,7 @@ def test_apply(idtype):
     def node_udf(nodes):
         return {'h': nodes.data['h'] * 2}
     def node_udf2(nodes):
-        return {'h': F.sum(nodes.data['h'], dim=1, keepdim=True)}
+        return {'h': F.sum(nodes.data['h'], dim=1, keepdims=True)}
     def edge_udf(edges):
         return {'h': edges.data['h'] * 2 + edges.src['h']}
 
