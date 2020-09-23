@@ -185,8 +185,7 @@ class BlockSampler(object):
         """
         raise NotImplementedError
 
-    @staticmethod
-    def _convert_exclude_eids(exclude_eids):
+    def _convert_exclude_eids(self, exclude_eids):
         return _tensor_or_dict_to_numpy(exclude_eids) if exclude_eids is not None else None
 
     def _exclude_eids(self, frontier, exclude_eids):

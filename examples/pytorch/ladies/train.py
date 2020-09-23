@@ -5,7 +5,7 @@ import tqdm
 import numpy as np
 from collections import Counter
 from model import *
-from ladies import *
+from ladies2 import *
 
 def compute_acc(pred, label):
     return (pred.argmax(1) == label).float().mean()
