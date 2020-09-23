@@ -262,7 +262,6 @@ class DGLJTNNDecoder(nn.Module):
             # Predict stop
             p_input = torch.cat([x, h, mol_vec], 1)
             p_score = torch.sigmoid(self.U_s(torch.relu(self.U(p_input))))
-            p_score[:] = 0
             backtrack = (p_score.item() < 0.5)
 
             if not backtrack:
