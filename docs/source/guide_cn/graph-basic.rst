@@ -1,6 +1,5 @@
 .. _guide_cn-graph-basic:
 
-1.1 Some Basic Definitions about Graphs (Graphs 101)
 1.1 关于图的基本概念
 -----------------
 

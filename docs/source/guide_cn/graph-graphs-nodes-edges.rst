@@ -1,7 +1,5 @@
 .. _guide_cn-graph-graphs-nodes-edges:
 
-1.2 Graphs, Nodes, and Edges
-
 1.2 图、节点和边
 --------------
 
@@ -96,7 +94,7 @@ one should use :math:`32`-bit integers as it leads to better speed and requires 
 DGL provides methods for making such conversions. See below for an example.
 
 DGL支持使用 :math:`32` 位或 :math:`64` 位的整数作为节点ID和边ID。节点和边的ID的数据类型必须一致。如果使用 :math:`64` 位整数，
-DGL可以处理最多 :math:`2^{63} - 1` 个节点或边。不过，如果图里的节点或者边的数量小于 :math:`2^{63} - 1` ，用户最好使用 :math:`32`位整数，
+DGL可以处理最多 :math:`2^{63} - 1` 个节点或边。不过，如果图里的节点或者边的数量小于 :math:`2^{63} - 1` ，用户最好使用 :math:`32` 位整数，
 这样不仅能提升速度，还能减少内存的使用。DGL提供了进行数据类型转换的方法，如下例所示。
 
 .. code::

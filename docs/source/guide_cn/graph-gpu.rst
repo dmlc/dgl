@@ -1,7 +1,5 @@
 .. _guide_cn-graph-gpu:
 
-1.6 Using DGLGraph on a GPU
-
 1.6 在GPU上使用DGLGraph
 ----------------------
 
