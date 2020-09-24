@@ -1,7 +1,7 @@
 .. _guide_cn-graph-heterogeneous:
 
 1.5 异构图
-------------------------
+---------
 
 :ref:`(English Version)<guide-graph-heterogeneous>`
 
