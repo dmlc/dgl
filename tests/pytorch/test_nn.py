@@ -651,7 +651,7 @@ def test_edge_conv(g, idtype):
 def test_gcnii(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    gcnii = nn.GraphConvII(5, 0.5, 0.2)
+    gcnii = nn.GraphConvII(5, 0.5, 0.2).to(ctx)
     print(g.number_of_src_nodes(), g.number_of_dst_nodes())
     h0 = F.randn((g.number_of_src_nodes(), 5))
     h1 = gcnii(g, h0, h0, 1)
