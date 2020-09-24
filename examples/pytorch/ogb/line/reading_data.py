@@ -9,8 +9,6 @@ import random
 import time
 import dgl
 
-from utils import shuffle_walks
-
 def ReadTxtNet(file_path="", undirected=True):
     """ Read the txt network file. 
     Notations: The network is unweighted.
@@ -116,22 +114,21 @@ def make_undirected(G):
     return G
 
 def find_connected_nodes(G):
-    nodes = G.out_degrees().nonzero().squeeze(-1)
+    nodes = torch.nonzero(G.out_degrees()).squeeze(-1)
     return nodes
 
-class DeepwalkDataset:
+class LineDataset:
     def __init__(self, 
             net_file,
-            map_file,
-            walk_length,
-            window_size,
-            num_walks,
             batch_size,
+            num_samples,
             negative=5,
             gpus=[0],
             fast_neg=True,
             ogbl_name="",
             load_from_ogbl=False,
+            ogbn_name="",
+            load_from_ogbn=False,
             ):
         """ This class has the following functions:
         1. Transform the txt network file into DGL graph;
@@ -141,7 +138,7 @@ class DeepwalkDataset:
 
         Parameter
         ---------
-        net_file str : path of the txt network file
+        net_file str : path of the dgl network file
         walk_length int : number of nodes in a sequence
         window_size int : context window size
         num_walks int : number of walks for each node
@@ -149,49 +146,48 @@ class DeepwalkDataset:
         negative int : negative samples for each positve node pair
         fast_neg bool : whether do negative sampling inside a batch
         """
-        self.walk_length = walk_length
-        self.window_size = window_size
-        self.num_walks = num_walks
         self.batch_size = batch_size
         self.negative = negative
+        self.num_samples = num_samples
         self.num_procs = len(gpus)
         self.fast_neg = fast_neg
 
         if load_from_ogbl:
-            assert len(gpus) == 1, "ogb.linkproppred is not compatible with multi-gpu training (CUDA error)."
+            assert len(gpus) == 1, "ogb.linkproppred is not compatible with multi-gpu training."
             from load_dataset import load_from_ogbl_with_name
             self.G = load_from_ogbl_with_name(ogbl_name)
-            self.G = make_undirected(self.G)
+        elif load_from_ogbn:
+            assert len(gpus) == 1, "ogb.linkproppred is not compatible with multi-gpu training."
+            from load_dataset import load_from_ogbn_with_name
+            self.G = load_from_ogbn_with_name(ogbn_name)
         else:
-            self.net, self.node2id, self.id2node, self.sm = ReadTxtNet(net_file)
-            self.save_mapping(map_file)
-            self.G = net2graph(self.sm)
+            self.G = dgl.load_graphs(net_file)[0][0]
+        self.G = make_undirected(self.G)
+        print("Finish reading graph")
 
         self.num_nodes = self.G.number_of_nodes()
 
-        # random walk seeds
         start = time.time()
-        self.valid_seeds = find_connected_nodes(self.G)
-        if len(self.valid_seeds) != self.num_nodes:
-            print("WARNING: The node ids are not serial. Some nodes are invalid.")
-        
-        seeds = torch.cat([torch.LongTensor(self.valid_seeds)] * num_walks)
-        self.seeds = torch.split(shuffle_walks(seeds), 
-            int(np.ceil(len(self.valid_seeds) * self.num_walks / self.num_procs)), 
+        seeds = np.random.choice(np.arange(self.G.number_of_edges()), 
+                            self.num_samples, 
+                            replace=True) # edge index
+        self.seeds = torch.split(torch.LongTensor(seeds), 
+            int(np.ceil(self.num_samples / self.num_procs)), 
             0)
         end = time.time()
         t = end - start
-        print("%d seeds in %.2fs" % (len(seeds), t))
+        print("generate %d samples in %.2fs" % (len(seeds), t))
 
         # negative table for true negative sampling
+        self.valid_nodes = find_connected_nodes(self.G)
         if not fast_neg:
-            node_degree = self.G.out_degrees(self.valid_seeds).numpy()
+            node_degree = self.G.out_degrees(self.valid_nodes).numpy()
             node_degree = np.power(node_degree, 0.75)
             node_degree /= np.sum(node_degree)
             node_degree = np.array(node_degree * 1e8, dtype=np.int)
             self.neg_table = []
             
-            for idx, node in enumerate(self.valid_seeds):
+            for idx, node in enumerate(self.valid_nodes):
                 self.neg_table += [node] * node_degree[idx]
             self.neg_table_size = len(self.neg_table)
             self.neg_table = np.array(self.neg_table, dtype=np.long)
@@ -199,27 +195,18 @@ class DeepwalkDataset:
 
     def create_sampler(self, i):
         """ create random walk sampler """
-        return DeepwalkSampler(self.G, self.seeds[i], self.walk_length)
+        return EdgeSampler(self.G, self.seeds[i])
 
     def save_mapping(self, map_file):
-        """ save the mapping dict that maps node IDs to embedding indices """
         with open(map_file, "wb") as f:
             pickle.dump(self.node2id, f)
 
-class DeepwalkSampler(object):
-    def __init__(self, G, seeds, walk_length):
-        """ random walk sampler 
-        
-        Parameter
-        ---------
-        G dgl.Graph : the input graph
-        seeds torch.LongTensor : starting nodes
-        walk_length int : walk length
-        """
+class EdgeSampler(object):
+    def __init__(self, G, seeds):
         self.G = G
         self.seeds = seeds
-        self.walk_length = walk_length
+        self.edges = torch.cat((self.G.edges()[0].unsqueeze(0), self.G.edges()[1].unsqueeze(0)), 0).t()
     
     def sample(self, seeds):
-        walks = dgl.sampling.random_walk(self.G, seeds, length=self.walk_length-1)[0]
-        return walks
+        """ seeds torch.LongTensor : a batch of indices of edges """
+        return self.edges[torch.LongTensor(seeds)]
