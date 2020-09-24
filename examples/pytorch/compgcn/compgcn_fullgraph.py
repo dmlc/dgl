@@ -92,7 +92,7 @@ def main(args):
                             num_basis=args.num_basis,
                             num_rel=num_rels,
                             comp_fn=args.comp_fn,
-                            dropout=0.0,
+                            dropout=args.drop_out,
                             activation=F.relu,
                             batchnorm=True
                             )
