@@ -251,18 +251,7 @@ def run(proc_id, n_gpus, args, devices, data):
         )
     torch.cuda.set_device(dev_id)
 
-    (
-        g,
-        train_pairs,
-        index2word,
-        edge_types,
-        num_nodes,
-        edge_type_count,
-        valid_true_data_by_edge,
-        valid_false_data_by_edge,
-        testing_true_data_by_edge,
-        testing_false_data_by_edge,
-    ) = data
+    g, train_pairs, index2word, edge_types, num_nodes, edge_type_count = data
 
     epochs = args.epoch
     batch_size = args.batch_size
@@ -302,8 +291,13 @@ def run(proc_id, n_gpus, args, devices, data):
 
     nsloss.to(dev_id)
 
-    embeddings_params = list(map(id, model.module.node_embeddings.parameters())) + list(
-        map(id, model.module.node_type_embeddings.parameters())
+    if n_gpus > 1:
+        mmodel = model.module
+    else:
+        mmodel = model
+
+    embeddings_params = list(map(id, mmodel.node_embeddings.parameters())) + list(
+        map(id, mmodel.node_type_embeddings.parameters())
     )
     weights_params = list(map(id, nsloss.weights.parameters()))
 
@@ -320,16 +314,16 @@ def run(proc_id, n_gpus, args, devices, data):
                 )
             },
         ],
-        lr=3e-3,
+        lr=1e-3,
     )
 
     sparse_optimizer = torch.optim.SparseAdam(
         [
-            {"params": model.module.node_embeddings.parameters()},
-            {"params": model.module.node_type_embeddings.parameters()},
+            {"params": mmodel.node_embeddings.parameters()},
+            {"params": mmodel.node_type_embeddings.parameters()},
             {"params": nsloss.weights.parameters()},
         ],
-        lr=3e-3,
+        lr=1e-3,
     )
 
     if n_gpus > 1:
@@ -482,7 +476,7 @@ def train_model(network_data):
         all_walks.append(traces)
 
     train_pairs = generate_pairs(all_walks, args.window_size, num_workers)
-    data = (g, train_pairs, index2word, edge_types, num_nodes, edge_type_count)
+    data = g, train_pairs, index2word, edge_types, num_nodes, edge_type_count
 
     if n_gpus == 1:
         run(0, n_gpus, args, devices, data)
