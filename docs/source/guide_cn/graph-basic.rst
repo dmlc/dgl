@@ -1,7 +1,9 @@
 .. _guide-graph-basic:
 
 1.1 Some Basic Definitions about Graphs (Graphs 101)
-----------------------------------------------------
+
+1.1 关于图的基本概念
+-----------------
 
 A graph :math:`G=(V, E)` is a structure used to represent entities and their relations. It consists of
 two sets -- the set of nodes :math:`V` (also called vertices) and the set of edges :math:`E` (also called
@@ -12,6 +14,11 @@ graph is used to model the friendships relations of people in a social network, 
 will be undirected as friendship is mutual; however, if the graph is used to model how people
 follow each other on Twitter, then the edges are directed. Depending on the edges'
 directionality, a graph can be *directed* or *undirected*.
+图是用以保存实体及其关系的的结构，记为 :math:`G=(V, E)` 。图由两个集合组成，一是节点的集 :math:`V` ，二是边的集 :math:`E` 。
+边集E中，一条边 :math:`(u, v) \in E` 连接一对节点 :math:`u` 和 :math:`v` ，表明两节点间存在关系。关系可以是无向的，
+如描述节点之间的对称关系；也可以是有向的，如描述非对称关系。例如，若用图对社交网络中人们的友谊关系进行建模，因为友谊是相互的，则边是无向的；
+若用图对Twitter用户的关注行为进行建模，则边是有向的。图可以是 *有向的* 或 *无向的* ，这取决于边的方向性。
+
 
 Graphs can be *weighted* or *unweighted*. In a weighted graph, each edge is associated with a
 scalar weight. For example, such weights might represent lengths or connectivity strengths.
