@@ -1,6 +1,5 @@
 .. _guide_cn-graph-feature:
 
-1.3 Node and Edge Features
 1.3 节点和边的特征
 ---------------
 
