@@ -105,8 +105,8 @@ def main(args):
     # Step 3: Create training components ===================================================== #
     loss_fn = th.nn.CrossEntropyLoss()
     optimizer = optim.Adam([
-                            {'params': input_embs.parameters(), 'lr':0.005, 'weight_decay':5e-4},
-                            {'params': compgcn_model.parameters(), 'lr':0.005, 'weight_decay':5e-4}
+                            {'params': input_embs.parameters(), 'lr':args.lr, 'weight_decay':5e-4},
+                            {'params': compgcn_model.parameters(), 'lr':args.lr, 'weight_decay':5e-4}
                             ])
 
     # Step 4: training epoches =============================================================== #
@@ -165,7 +165,7 @@ if __name__ == '__main__':
     parser.add_argument("--comp_fn", type=str, default='sub', help="Composition function")
     parser.add_argument("--max_epoch", type=int, default=200, help="The max number of epoches")
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
-    parser.add_argument("--drop_out", type=float, default=0.1, help="Composition function")
+    parser.add_argument("--drop_out", type=float, default=0.1, help="Drop out rate")
     fp = parser.add_mutually_exclusive_group(required=False)
     fp.add_argument('--validation', dest='validation', action='store_true')
     fp.add_argument('--testing', dest='validation', action='store_false')
