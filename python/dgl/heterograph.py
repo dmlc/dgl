@@ -4016,10 +4016,10 @@ class DGLHeteroGraph(object):
         ntid = self.get_ntype_id(ntype)
         ntype = self.ntypes[ntid]
         if is_all(v):
-            v = self.nodes(ntype)
+            v_id = self.nodes(ntype)
         else:
-            v = utils.prepare_tensor(self, v, 'v')
-        ndata = core.invoke_node_udf(self, v, ntype, func, orig_nid=v)
+            v_id = utils.prepare_tensor(self, v, 'v')
+        ndata = core.invoke_node_udf(self, v_id, ntype, func, orig_nid=v_id)
         self._set_n_repr(ntid, v, ndata)
 
     def apply_edges(self, func, edges=ALL, etype=None, inplace=False):
