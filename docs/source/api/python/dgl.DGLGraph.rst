@@ -75,7 +75,7 @@ Methods for getting or manipulating the internal storage formats of a ``DGLGraph
     :toctree: ../../generated/
 
     DGLGraph.formats
-    DGLGraph.create_format_
+    DGLGraph.create_formats_
 
 Querying and manipulating node/edge ID type
 -----------------------------------------

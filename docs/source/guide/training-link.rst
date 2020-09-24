@@ -52,7 +52,8 @@ Model Implementation Difference from Edge Classification
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The neural network model to compute the score between :math:`u` and
-:math:`v` is identical to the edge regression model described above.
+:math:`v` is identical to the edge regression model described
+:ref:`above <guide-training-edge-classification>`.
 
 Here is an example of using dot product to compute the scores on edges.
 
@@ -60,7 +61,8 @@ Here is an example of using dot product to compute the scores on edges.
 
     class DotProductPredictor(nn.Module):
         def forward(self, graph, h):
-            # h contains the node representations computed from the GNN above.
+            # h contains the node representations computed from the GNN defined
+            # in the node classification section (Section 5.1).
             with graph.local_scope():
                 graph.ndata['h'] = h
                 graph.apply_edges(fn.u_dot_v('h', 'h', 'score'))
@@ -143,15 +145,16 @@ Link prediction on heterogeneous graphs is not very different from that
 on homogeneous graphs. The following assumes that we are predicting on
 one edge type, and it is easy to extend it to multiple edge types.
 
-For example, you can reuse the ``HeteroDotProductPredictor`` above for
-computing the scores of the edges of an edge type for link prediction.
+For example, you can reuse the ``HeteroDotProductPredictor``
+:ref:`above <guide-training-edge-classification-heterogeneous-graph>`
+for computing the scores of the edges of an edge type for link prediction.
 
 .. code:: python
 
     class HeteroDotProductPredictor(nn.Module):
         def forward(self, graph, h, etype):
-            # h contains the node representations for each edge type computed from
-            # the GNN above.
+            # h contains the node representations for each node type computed from
+            # the GNN defined in the previous section (Section 5.1).
             with graph.local_scope():
                 graph.ndata['h'] = h
                 graph.apply_edges(fn.u_dot_v('h', 'h', 'score'), etype=etype)

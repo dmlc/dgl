@@ -155,7 +155,7 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
   int8_t* col_flags = static_cast<int8_t*>(device->AllocWorkspace(ctx, nnz));
   const int nt = cuda::FindNumThreads(nnz);
   const int nb = (nnz + nt - 1) / nt;
-  _COOIsSortedKernel<<<nb, nt, 0, thr_entry->stream>>>(
+  CUDA_KERNEL_CALL(_COOIsSortedKernel, nb, nt, 0, thr_entry->stream,
       coo.row.Ptr<IdType>(), coo.col.Ptr<IdType>(),
       nnz, row_flags, col_flags);
 

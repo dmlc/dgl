@@ -224,7 +224,8 @@ void SpMMCoo(
   int64_t out_size = out.NumElements();
   const int nt = FindNumThreads(out_size);
   const int nb = (out_size + nt - 1) / nt;
-  _FillKernel<<<nb, nt, 0, thr_entry->stream>>>(out_data, out_size, ReduceOp::zero);
+  CUDA_KERNEL_CALL(_FillKernel, nb, nt, 0, thr_entry->stream,
+      out_data, out_size, ReduceOp::zero);
 
   const int ntx = FindNumThreads(len);
   const int nty = CUDA_MAX_NUM_THREADS / ntx;
@@ -236,23 +237,21 @@ void SpMMCoo(
   const bool use_idx = !IsNullArray(coo.data);
 
   BCAST_IDX_CTX_SWITCH(bcast, use_idx, ufeat->ctx, ubcast_off, ebcast_off, {
-    SpMMCooKernel<Idx, DType, BinaryOp, ReduceOp, UseBcast, UseIdx>
-      <<<nblks, nthrs, 0, thr_entry->stream>>>(
+    CUDA_KERNEL_CALL((SpMMCooKernel<Idx, DType, BinaryOp, ReduceOp, UseBcast, UseIdx>),
+        nblks, nthrs, 0, thr_entry->stream,
         ufeat_data, efeat_data, out_data, argu_data, arge_data,
         row, col, edge_map,
         N, M, E,
         ubcast_off, ebcast_off,
-        lhs_len, rhs_len, len
-      );
+        lhs_len, rhs_len, len);
     if (ReduceOp::require_arg) {
-      ArgSpMMCooKernel<Idx, DType, BinaryOp, ReduceOp, UseBcast, UseIdx>
-        <<<nblks, nthrs, 0, thr_entry->stream>>>(
+      CUDA_KERNEL_CALL((ArgSpMMCooKernel<Idx, DType, BinaryOp, ReduceOp, UseBcast, UseIdx>),
+          nblks, nthrs, 0, thr_entry->stream,
           ufeat_data, efeat_data, out_data, argu_data, arge_data,
           row, col, edge_map,
           N, M, E,
           ubcast_off, ebcast_off,
-          lhs_len, rhs_len, len
-        );
+          lhs_len, rhs_len, len);
     }
   });
 }
@@ -303,14 +302,13 @@ void SpMMCsr(
   const bool use_idx = !IsNullArray(csr.data);
 
   BCAST_IDX_CTX_SWITCH(bcast, use_idx, ufeat->ctx, ubcast_off, ebcast_off, {
-    SpMMCsrKernel<Idx, DType, BinaryOp, ReduceOp, UseBcast, UseIdx>
-      <<<nblks, nthrs, 0, thr_entry->stream>>>(
+    CUDA_KERNEL_CALL((SpMMCsrKernel<Idx, DType, BinaryOp, ReduceOp, UseBcast, UseIdx>),
+        nblks, nthrs, 0, thr_entry->stream,
         ufeat_data, efeat_data, out_data, argu_data, arge_data,
         indptr, indices, edge_map,
         csr.num_rows, csr.num_cols, efeat->shape[0],
         ubcast_off, ebcast_off,
-        lhs_len, rhs_len, len
-      );
+        lhs_len, rhs_len, len)
   });
 }
 
