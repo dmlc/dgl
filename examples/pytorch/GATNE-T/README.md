@@ -40,13 +40,18 @@ To run on "twitter" dataset, use
 python src/main.py --input data/twitter --eval-type 1
 ```
 
+For a big dataset, use sparse to avoid cuda out of memory in backward
+```bash
+python src/main_sparse.py --input data/example
+```
+
 Results
 -------
 All the results match the [official code](https://github.com/THUDM/GATNE/blob/master/src/main_pytorch.py) with the same hyper parameter values, including twiiter dataset (auc, pr, f1 is 76.29, 76.17, 69.34, respectively).
 
-|          |  auc   |   pr  |  f1   |
-|  ------  |  ----  |  ---  | ----- |
-|  amazon  |  96.88 | 96.31 | 92.12 |
-|  youtube |  82.29 | 80.35 | 74.63 |
-|  twitter |  72.40 | 74.40 | 65.89 |
-|  example |  94.65 | 94.57 | 89.99 |
+|         | auc   | pr    | f1    |
+| ------- | ----- | ----- | ----- |
+| amazon  | 96.88 | 96.31 | 92.12 |
+| youtube | 82.29 | 80.35 | 74.63 |
+| twitter | 72.40 | 74.40 | 65.89 |
+| example | 94.65 | 94.57 | 89.99 |
