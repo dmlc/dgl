@@ -10,11 +10,12 @@ different types have independent ID space and feature storage. For example in th
 user and game node IDs both start from zero and the they have different features.
 
 相比同构图，异构图里可以有不同类型的节点和边。这些不同类型的节点和边具有独立的ID空间和特征。
-例如在下面的图中，"用户"和"游戏"节点的ID都是从0开始的，而且两种节点具有不同的特征。
+例如在下图中，"用户"和"游戏"节点的ID都是从0开始的，而且两种节点具有不同的特征。
 
 .. figure:: https://data.dgl.ai/asset/image/user_guide_graphch_2.png
 
     An example heterogeneous graph with two types of nodes (user and game) and two types of edges (follows and plays).
+
     一个异构图示例。该图具有两种类型的节点("用户"和"游戏")和两种类型的边("关注"和"玩")。
 
 Creating a Heterogeneous Graph
@@ -58,13 +59,13 @@ The following code snippet is an example for creating a heterogeneous graph in D
 Note that homogeneous and bipartite graphs are just special heterogeneous graphs with one
 relation.
 
-注意，同构图和二部图只是一种特殊的异构图，它们只包括一种关系。
+注意，同构图和二分图只是一种特殊的异构图，它们只包括一种关系。
 
 .. code::
 
     >>> # 一个同构图
     >>> dgl.heterograph({('node_type', 'edge_type', 'node_type'): (u, v)})
-    >>> # 一个二部图
+    >>> # 一个二分图
     >>> dgl.heterograph({('source_type', 'edge_type', 'destination_type'): (u, v)})
 
 The *metagraph* associated with a heterogeneous graph is the schema of the graph. It specifies
@@ -72,7 +73,7 @@ type constraints on the sets of nodes and edges between the nodes. A node :math:
 corresponds to a node type in the associated heterograph. An edge :math:`(u, v)` in a metagraph indicates that
 there are edges from nodes of type :math:`u` to nodes of type :math:`v` in the associated heterograph.
 
-与异类图相关联的 *metagraph* 就是图的模式。它指定节点集和节点之间的边的类型约束。*metagraph* 中的一个节点 :math:`u` 对应于
+与异构图相关联的 *metagraph* 就是图的模式。它指定节点集和节点之间的边的类型约束。*metagraph* 中的一个节点 :math:`u` 对应于
 相关异构图中的一个节点类型。*metagraph* 中的边 :math:`(u,v)` 表示在相关异构图中存在从 :math:`u` 型节点到 :math:`v` 型节点的边。
 
 .. code::
@@ -103,7 +104,7 @@ When multiple node/edge types are introduced, users need to specify the particul
 node/edge type when invoking a DGLGraph API for type-specific information. In addition,
 nodes/edges of different types have separate IDs.
 
-当引入多种节点/边类型时，用户在调用DGLGraph API以获取特定类型的信息时，需要指定具体的节点/边类型。此外，不同类型的节点/边具有单独的ID。
+当引入多种节点和边类型后，用户在调用DGLGraph API以获取特定类型的信息时，需要指定具体的节点和边类型。此外，不同类型的节点和边具有单独的ID。
 
 .. code::
 
@@ -122,7 +123,7 @@ nodes/edges of different types have separate IDs.
 To set/get features for a specific node/edge type, DGL provides two new types of syntax --
 `g.nodes['node_type'].data['feat_name']` and `g.edges['edge_type'].data['feat_name']`.
 
-为了设置/获取特定节点/边类型的特征，DGL提供了两种新类型的语法：--
+为了设置/获取特定节点和边类型的特征，DGL提供了两种新类型的语法：--
 `g.nodes['node_type'].data['feat_name']` 和 `g.edges['edge_type'].data['feat_name']` 。
 
 .. code::
@@ -140,7 +141,7 @@ To set/get features for a specific node/edge type, DGL provides two new types of
 
 If the graph only has one node/edge type, there is no need to specify the node/edge type.
 
-如果图里只有一种节点/边类型，则不需要指定节点/边类型。
+如果图里只有一种节点或边类型，则不需要指定节点或边的类型。
 
 .. code::
 
@@ -150,7 +151,7 @@ If the graph only has one node/edge type, there is no need to specify the node/e
     ... })
     >>> g.nodes()
     tensor([0, 1, 2, 3])
-    >>> # 设置/获取单一类型的节点/边特征，不必使用新的语法
+    >>> # 设置/获取单一类型的节点或边特征，不必使用新的语法
     >>> g.ndata['hv'] = th.ones(4, 1)
 
 .. note::
@@ -196,7 +197,7 @@ CSV files into numpy arrays or framework tensors, build a relation dictionary an
 construct a heterograph from that. The approach also applies to other popular formats like
 GML/JSON.
 
-与同构图的情况类似，用户可以使用像Pandas这样的包先将CSV文件解析为numpy数组或框架张量，再构建一个关系字典，并从中构造一个异构图。
+与同构图的情况类似，用户可以使用像Pandas这样的包先将CSV文件解析为numpy数组或框架张量，再构建一个关系字典，并用它构造一个异构图。
 这种方法也适用于其他流行的文件格式，比如GML或JSON。
 
 DGL Binary Format
@@ -228,15 +229,15 @@ features copied if any.
     ... })
     >>> g.nodes['drug'].data['hv'] = th.ones(3, 1)
 
-    >>> 保留关系 ('drug', 'interacts', 'drug') 和 ('drug', 'treats', 'disease') 。
-    >>> 'drug' 和 'disease' 类型的节点将会被保留
+    >>> # 保留关系 ('drug', 'interacts', 'drug') 和 ('drug', 'treats', 'disease') 。
+    >>> # 'drug' 和 'disease' 类型的节点也会被保留
     >>> eg = dgl.edge_type_subgraph(g, [('drug', 'interacts', 'drug'),
     ...                                 ('drug', 'treats', 'disease')])
     >>> eg
     Graph(num_nodes={'disease': 3, 'drug': 3},
           num_edges={('drug', 'interacts', 'drug'): 2, ('drug', 'treats', 'disease'): 1},
           metagraph=[('drug', 'drug', 'interacts'), ('drug', 'disease', 'treats')])
-    >>> # 相关的特征也将被拷贝
+    >>> # 相关的特征也会被拷贝
     >>> eg.nodes['drug'].data['hv']
     tensor([[1.],
             [1.],
@@ -250,25 +251,25 @@ Converting Heterogeneous Graphs to Homogeneous Graphs
 Heterographs provide a clean interface for managing nodes/edges of different types and
 their associated features. This is particularly helpful when:
 
-异构图为管理不同类型的节点/边及其相关特征提供了一个清晰的接口。这在以下情况下尤其有用:
+异构图为管理不同类型的节点和边及其相关特征提供了一个清晰的接口。这在以下情况下尤其有用:
 
 1. The features for nodes/edges of different types have different data types or sizes.
 2. We want to apply different operations to nodes/edges of different types.
 
-1. 不同类型的节点/边的特征具有不同的数据类型或大小。
-2. 用户希望对不同类型的节点/边应用不同的操作。
+1. 不同类型的节点和边的特征具有不同的数据类型或大小。
+2. 用户希望对不同类型的节点和边应用不同的操作。
 
 If the above conditions do not hold and one does not want to distinguish node/edge types in
 modeling, then DGL allows converting a heterogeneous graph to a homogeneous graph with :func:`dgl.DGLGraph.to_homogeneous` API.
 It proceeds as follows:
 
-如果上述情况不适用，并且用户不希望在建模中区分节点/边类型，则DGL允许使用 :func:`dgl.DGLGraph.to_homogeneous` API将异构图转换为同构图。具体行为如下:
+如果上述情况不适用，并且用户不希望在建模中区分节点和边的类型，则DGL允许使用 :func:`dgl.DGLGraph.to_homogeneous` API将异构图转换为同构图。具体行为如下:
 
 1. Relabels nodes/edges of all types using consecutive integers starting from 0
 2. Merges the features across node/edge types specified by the user.
 
-1. 用从0开始的连续整数重新标记所有类型的节点/边。
-2. 对所有的节点/边合并用户指定的特征。
+1. 用从0开始的连续整数重新标记所有类型的节点和边。
+2. 对所有的节点和边合并用户指定的特征。
 
 .. code::
 
@@ -286,7 +287,7 @@ It proceeds as follows:
     False
 
     >>> # 拷贝边的特征
-    >>> # 对于要拷贝的特征，DGL假定不同类型的节点/边的合并特征具有相同的大小和数据类型
+    >>> # 对于要拷贝的特征，DGL假定不同类型的节点或边的合并特征具有相同的大小和数据类型
     >>> hg = dgl.to_homogeneous(g, edata=['he'])
     DGLError: Cannot concatenate column ‘he’ with shape Scheme(shape=(2,), dtype=torch.float32) and shape Scheme(shape=(1,), dtype=torch.float32)
 
@@ -300,8 +301,10 @@ It proceeds as follows:
             [0.],
             [0.]])
 
-    The original node/edge types and type-specific IDs are stored in :py:attr:`~dgl.DGLGraph.ndata` and :py:attr:`~dgl.DGLGraph.edata`.
-    原始的节点/边的类型和对应的ID被存储在 :py:attr:`~dgl.DGLGraph.ndata` 和 :py:attr:`~dgl.DGLGraph.edata` 中。
+
+The original node/edge types and type-specific IDs are stored in :py:attr:`~dgl.DGLGraph.ndata` and :py:attr:`~dgl.DGLGraph.edata`.
+
+原始的节点或边的类型和对应的ID被存储在 :py:attr:`~dgl.DGLGraph.ndata` 和 :py:attr:`~dgl.DGLGraph.edata` 中。
 
 .. code::
 

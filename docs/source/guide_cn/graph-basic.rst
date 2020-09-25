@@ -3,6 +3,8 @@
 1.1 关于图的基本概念
 -----------------
 
+:ref:`(English Version)<guide-graph-basic>`
+
 A graph :math:`G=(V, E)` is a structure used to represent entities and their relations. It consists of
 two sets -- the set of nodes :math:`V` (also called vertices) and the set of edges :math:`E` (also called
 arcs). An edge :math:`(u, v) \in E` connecting a pair of nodes :math:`u` and :math:`v` indicates that there is a
