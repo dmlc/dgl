@@ -3,6 +3,8 @@
 1.3 节点和边的特征
 ---------------
 
+:ref:`(English Version)<guide-graph-feature>`
+
 The nodes and edges of a :class:`~dgl.DGLGraph` can have several user-defined named features for
 storing graph-specific properties of the nodes and edges. These features can be accessed
 via the :py:attr:`~dgl.DGLGraph.ndata` and :py:attr:`~dgl.DGLGraph.edata` interface. For example,
@@ -11,7 +13,7 @@ edge feature (named ``'x'`` in line 9).
 
 :class:`~dgl.DGLGraph` 对象的节点和边可具有多个用户定义的、可命名的特征，以储存图的节点和边的属性。
 通过 :py:attr:`~dgl.DGLGraph.ndata` 和 :py:attr:`~dgl.DGLGraph.edata` 接口可访问这些特征。
-例如，以下代码创建了2个节点特征（分别在第5、9行命名为 ``'x'`` 、 ``'y'`` ）和1个边特征（在第6行命名为 ``'x'`` ）。
+例如，以下代码创建了2个节点特征（分别在第8、15行命名为 ``'x'`` 、 ``'y'`` ）和1个边特征（在第9行命名为 ``'x'`` ）。
 
 .. code-block:: python
     :linenos:
@@ -24,7 +26,7 @@ edge feature (named ``'x'`` in line 9).
           ndata_schemes={}
           edata_schemes={})
     >>> g.ndata['x'] = th.ones(g.num_nodes(), 3)               # 长度为3的节点特征
-    >>> g.edata['x'] = th.ones(g.num_edges(), dtype=th.int32)  # 量整型特征
+    >>> g.edata['x'] = th.ones(g.num_edges(), dtype=th.int32)  # 标量整型特征
     >>> g
     Graph(num_nodes=6, num_edges=4,
           ndata_schemes={'x' : Scheme(shape=(3,), dtype=torch.float32)}
@@ -54,14 +56,14 @@ Important facts about the :py:attr:`~dgl.DGLGraph.ndata`/:py:attr:`~dgl.DGLGraph
 
 - 仅允许使用数值类型（如单精度浮点型、双精度浮点型和整型）的特征。这些特征可以是标量、向量或多维张量。
 - 每个节点特征具有唯一名称，每个边特征也具有唯一名称。节点和边的特征可以具有相同的名称（如上述示例代码中的 ``'x'`` ）。
-- 通过张量分配创建特征，分配时将特征赋给图中的每个节点和每条边。该张量的第一维必须与图中节点或边的数量一致。
+- 通过张量分配创建特征时，DGL会将特征赋给图中的每个节点和每条边。该张量的第一维必须与图中节点或边的数量一致。
   不能将特征赋给图中节点或边的子集。
 - 相同名称的特征必须具有相同的维度和数据类型。
-- 特征张量使用"行优先"的原则，即每个行切片储存1个节点或1条边的特征（参考上述示例代码的第10～11行）。
+- 特征张量使用"行优先"的原则，即每个行切片储存1个节点或1条边的特征（参考上述示例代码的第16～18行）。
 
 For weighted graphs, one can store the weights as an edge feature as below.
 
-对于加权图，用户可以将权重储存为1个边特征，如下。
+对于加权图，用户可以将权重储存为一个边特征，如下。
 
 .. code-block:: python
 
@@ -78,4 +80,4 @@ For weighted graphs, one can store the weights as an edge feature as below.
 
 See APIs: :py:attr:`~dgl.DGLGraph.ndata`, :py:attr:`~dgl.DGLGraph.edata`.
 
-相关API： :py:attr:`~dgl.DGLGraph.ndata` 、 :py:attr:`~dgl.DGLGraph.edata` 。
+相关API： :py:attr:`~dgl.DGLGraph.ndata`、 :py:attr:`~dgl.DGLGraph.edata`。

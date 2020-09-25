@@ -3,6 +3,8 @@
 1.2 图、节点和边
 --------------
 
+:ref:`(English Version)<guide-graph-nodes-edges>`
+
 DGL represents each node by a unique integer, called its node ID, and each edge by a pair
 of integers corresponding to the IDs of its end nodes. DGL assigns to each edge a unique
 integer, called its **edge ID**, based on the order in which it was added to the graph. The
@@ -18,15 +20,15 @@ TensorFlow's Tensor, or MXNet's ndarray) of node IDs. DGL calls this format "nod
 To specify multiple edges, it uses a tuple of node-tensors :math:`(U, V)`. :math:`(U[i], V[i])`
 decides an edge from :math:`U[i]` to :math:`V[i]`.
 
-对于多个节点，DGL使用一个一维的张量（如，PyTorch的Tensor类，TensorFlow的Tensor类或MXNet的ndarray类）来保存图的点ID。
+对于多个节点，DGL使用一个一维的张量（如，PyTorch的Tensor类，TensorFlow的Tensor类或MXNet的ndarray类）来保存图的点ID，
 DGL称之为"节点张量"。为了指代多条边，DGL使用一个包含2个节点张量的元组 :math:`(U, V)` ，其中，用 :math:`(U[i], V[i])` 指代一条
 :math:`U[i]` 到 :math:`V[i]` 的边。
 
 One way to create a :class:`~dgl.DGLGraph` is to use the :func:`dgl.graph` method, which takes
 as input a set of edges. DGL also supports creating graphs from other data sources, see :ref:`guide-graph-external`.
 
-创建一个DGLGraph对象的一种方法是使用 :func:`dgl.graph` 函数。它接受一个边的集合作为输入。DGL也支持从其他的数据源来创建图对象。
-可参考 :ref:`guide_cn-graph-external` 。
+创建一个 :class:`~dgl.DGLGraph` 对象的一种方法是使用 :func:`dgl.graph` 函数。它接受一个边的集合作为输入。DGL也支持从其他的数据源来创建图对象。
+读者可参考 :ref:`guide_cn-graph-external`。
 
 The following code snippet uses the :func:`dgl.graph` method to create a :class:`~dgl.DGLGraph`
 corresponding to the four-node graph shown below and illustrates some of its APIs for
@@ -93,8 +95,8 @@ up to :math:`2^{63} - 1` nodes or edges. However, if a graph contains less than 
 one should use :math:`32`-bit integers as it leads to better speed and requires less memory.
 DGL provides methods for making such conversions. See below for an example.
 
-DGL支持使用 :math:`32` 位或 :math:`64` 位的整数作为节点ID和边ID。节点和边的ID的数据类型必须一致。如果使用 :math:`64` 位整数，
-DGL可以处理最多 :math:`2^{63} - 1` 个节点或边。不过，如果图里的节点或者边的数量小于 :math:`2^{63} - 1` ，用户最好使用 :math:`32` 位整数，
+DGL支持使用 :math:`32` 位或 :math:`64` 位的整数作为节点ID和边ID。节点和边ID的数据类型必须一致。如果使用 :math:`64` 位整数，
+DGL可以处理最多 :math:`2^{63} - 1` 个节点或边。不过，如果图里的节点或者边的数量小于 :math:`2^{63} - 1` ，用户最好使用 :math:`32` 位整数。
 这样不仅能提升速度，还能减少内存的使用。DGL提供了进行数据类型转换的方法，如下例所示。
 
 .. code::
