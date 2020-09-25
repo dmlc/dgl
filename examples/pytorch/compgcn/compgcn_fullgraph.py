@@ -135,8 +135,6 @@ def main(args):
         print("Train Accuracy: {:.4f} | Train Loss: {:.4f} | Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
               format(train_acc, tr_loss.item(), val_acc, val_loss.item()))
 
-    print()
-
     input_embs.eval()
     compgcn_model.eval()
 
