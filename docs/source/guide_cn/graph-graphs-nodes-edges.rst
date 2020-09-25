@@ -3,7 +3,7 @@
 1.2 图、节点和边
 --------------
 
-:ref:`(English Version)<guide-graph-nodes-edges>`
+:ref:`(English Version)<guide-graph-graph-nodes-edges>`
 
 DGL represents each node by a unique integer, called its node ID, and each edge by a pair
 of integers corresponding to the IDs of its end nodes. DGL assigns to each edge a unique

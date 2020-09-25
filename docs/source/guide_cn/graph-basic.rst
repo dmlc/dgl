@@ -23,14 +23,14 @@ directionality, a graph can be *directed* or *undirected*.
 Graphs can be *weighted* or *unweighted*. In a weighted graph, each edge is associated with a
 scalar weight. For example, such weights might represent lengths or connectivity strengths.
 
-图可以是*加权的*或*未加权的*。在加权图中，每条边都与一个标量权重值相关联。例如，该权重可以表示长度或连接的强度。
+图可以是 *加权的* 或 *未加权的* 。在加权图中，每条边都与一个标量权重值相关联。例如，该权重可以表示长度或连接的强度。
 
 Graphs can also be either *homogeneous* or *heterogeneous*. In a homogeneous graph, all
 the nodes represent instances of the same type and all the edges represent relations of the
 same type. For instance, a social network is a graph consisting of people and their
 connections, representing the same entity type.
 
-图可以是*同构的*或是*异构的*。在同构图中，所有节点表示同一类型的实体，所有边表示同一类型的关系。
+图可以是 *同构的* 或是 *异构的* 。在同构图中，所有节点表示同一类型的实体，所有边表示同一类型的关系。
 例如，社交网络的图由表示同一实体类型的人及其相互之间的社交关系组成。
 
 In contrast, in a heterogeneous graph, the nodes and edges can be of different types. For
