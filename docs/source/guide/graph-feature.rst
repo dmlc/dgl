@@ -3,6 +3,8 @@
 1.3 Node and Edge Features
 --------------------------
 
+:ref:`(中文版)<guide_cn-graph-feature>`
+
 The nodes and edges of a :class:`~dgl.DGLGraph` can have several user-defined named features for
 storing graph-specific properties of the nodes and edges. These features can be accessed
 via the :py:attr:`~dgl.DGLGraph.ndata` and :py:attr:`~dgl.DGLGraph.edata` interface. For example, the following code creates two node
