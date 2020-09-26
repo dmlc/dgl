@@ -3,7 +3,7 @@
 1.1 关于图的基本概念
 -----------------
 
-:ref:`(English Version)<guide-graph-basic>`
+:ref:`(English Version) <guide-graph-basic>`
 
 图是用以保存实体及其关系的的结构，记为 :math:`G=(V, E)` 。图由两个集合组成，一是节点的集合 :math:`V` ，一个是边的集合 :math:`E` 。
 在边集 :math:`E` 中，一条边 :math:`(u, v) \in E` 连接一对节点 :math:`u` 和 :math:`v` ，表明两节点间存在关系。关系可以是无向的，
