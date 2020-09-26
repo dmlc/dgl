@@ -18,6 +18,7 @@ AIFB: accuracy 91.67% (20 runs,DGL), 95.83% (paper)
 ```
 python compgcn_fullgraph.py -d aifb --rev_indicator rev_ --gpu 0 --lr 0.001 --comp_fn ccorr --max_epoch 100 --num_layers 4 --drop_out 0.1
 ```
+Note: The accuracy of "paper" is referred to the accuracy at [RGCN](https://arxiv.org/pdf/1703.06103.pdf) paper.
 
 BGS: accuracy 89.66% (20 runs,DGL)
 ```
