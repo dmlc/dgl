@@ -97,7 +97,7 @@ CSV是一种常见的格式，以表格格式储存节点、边及其特征：
 JSON/GML 格式
 """"""""""""
 
-如果对速度不太关注的话，读者可以参考NetworkX提供的工具来解析 `各种数据格式<https://networkx.github.io/documentation/stable/reference/readwrite/index.html>`_ ，
+如果对速度不太关注的话，读者可以参考NetworkX提供的工具来解析 `各种数据格式 <https://networkx.github.io/documentation/stable/reference/readwrite/index.html>`_，
 DGL可以间接地从这些来源创建图。
 
 DGL 二进制格式

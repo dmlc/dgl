@@ -89,8 +89,7 @@
     >>> g.nodes('drug')
     tensor([0, 1, 2])
 
-为了设置/获取特定节点和边类型的特征，DGL提供了两种新类型的语法：--
-`g.nodes['node_type'].data['feat_name']` 和 `g.edges['edge_type'].data['feat_name']` 。
+为了设置/获取特定节点和边类型的特征，DGL提供了两种新类型的语法： `g.nodes['node_type'].data['feat_name']` 和 `g.edges['edge_type'].data['feat_name']` 。
 
 .. code::
 
