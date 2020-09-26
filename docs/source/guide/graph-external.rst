@@ -3,6 +3,8 @@
 1.4 Creating Graphs from External Sources
 -----------------------------------------
 
+:ref:`(中文版)<guide_cn-graph-external>`
+
 The options to construct a :class:`~dgl.DGLGraph` from external sources include:
 
 - Conversion from external python libraries for graphs and sparse matrices (NetworkX and SciPy).
