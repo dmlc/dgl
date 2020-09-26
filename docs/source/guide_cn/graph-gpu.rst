@@ -5,10 +5,6 @@
 
 :ref:`(English Version)<guide-graph-gpu>`
 
-One can create a :class:`~dgl.DGLGraph` on a GPU by passing two GPU tensors during construction.
-Another approach is to use the :func:`~dgl.DGLGraph.to` API to copy a :class:`~dgl.DGLGraph` to a GPU, which
-copies the graph structure as well as the feature data to the given device.
-
 用户可以通过在构造过程中传入两个GPU张量来创建GPU上的 :class:`~dgl.DGLGraph` 。
 另一种方法是使用 :func:`~dgl.DGLGraph.to` API将 :class:`~dgl.DGLGraph` 复制到GPU，这会将图结构和特征数据都拷贝到指定的设备。
 
@@ -32,10 +28,6 @@ copies the graph structure as well as the feature data to the given device.
     >>> g = dgl.graph((u, v))
     >>> g.device
     device(type='cuda', index=0)
-
-Any operations involving a GPU graph are performed on a GPU. Thus, they require all
-tensor arguments to be placed on GPU already and the results (graph or tensor) will be on
-GPU too. Furthermore, a GPU graph only accepts feature data on a GPU.
 
 任何涉及GPU图的操作都是在GPU上运行的。因此，这要求所有张量参数都已经放在GPU上，其结果(图或张量)也将在GPU上。
 此外，GPU图只接受GPU上的特征数据。
