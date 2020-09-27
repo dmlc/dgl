@@ -172,9 +172,9 @@ DGL should work on
 * macOS X
 * Windows 10
 
-DGL requires Python 3.5 or later.
+DGL requires Python 3.6 or later.
 
-Right now, DGL works on [PyTorch](https://pytorch.org) 1.2.0+, [MXNet](https://mxnet.apache.org) 1.5.1+, and [TensorFlow](https://tensorflow.org) 2.1.0+.
+Right now, DGL works on [PyTorch](https://pytorch.org) 1.5.0+, [MXNet](https://mxnet.apache.org) 1.6+, and [TensorFlow](https://tensorflow.org) 2.3+.
 
 
 ### Using anaconda
