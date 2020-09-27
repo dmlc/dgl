@@ -1,11 +1,20 @@
 #-*- coding:utf-8 -*-
 
 # Author:james Zhang
-# Datetime:20-09-03 18:32
+# Datetime:20-09-27 10:48
 # Project: DGL
 """
-    This file is the running entry point for full graph training with the DGL datasets:
-    1. Only used for code testing.
+    This file is designed for hyper-parameter tuning to achieve the best accuary performance in 4 DGL dataset:
+    - AIDB, MUTAG, BGS, and AM
+
+    Basically use
+
+    Main hyper-parameters would invovle:
+    0. The composition function: SUB, MUL, and CCORR
+    1. Vector Basis for edge type;
+    2. The number of layers of the CompGCN model;
+    3. The number of hidden dimensionality;
+    4. The dropout rate
 
 """
 
