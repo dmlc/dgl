@@ -188,7 +188,7 @@ classification/regression.
 .. code:: python
 
     class StochasticTwoLayerRGCN(nn.Module):
-        def __init__(self, in_feat, hidden_feat, out_feat):
+        def __init__(self, in_feat, hidden_feat, out_feat, rel_names):
             super().__init__()
             self.conv1 = dglnn.HeteroGraphConv({
                     rel : dglnn.GraphConv(in_feat, hidden_feat, norm='right')
@@ -225,6 +225,18 @@ over the edge types for :meth:`~dgl.DGLHeteroGraph.apply_edges`.
                 for etype in edge_subgraph.canonical_etypes:
                     edge_subgraph.apply_edges(self.apply_edges, etype=etype)
                 return edge_subgraph.edata['score']
+
+    class Model(nn.Module):
+        def __init__(self, in_features, hidden_features, out_features, num_classes,
+                     etypes):
+            super().__init__()
+            self.rgcn = StochasticTwoLayerRGCN(
+                in_features, hidden_features, out_features, etypes)
+            self.pred = ScorePredictor(num_classes, out_features)
+
+        def forward(self, edge_subgraph, blocks, x):
+            x = self.rgcn(blocks, x)
+            return self.pred(edge_subgraph, x)
 
 Data loader definition is also very similar to that of node
 classification. The only difference is that you need
@@ -279,7 +291,7 @@ dictionaries of node types and predictions here.
 
 .. code:: python
 
-    model = Model(in_features, hidden_features, out_features, num_classes)
+    model = Model(in_features, hidden_features, out_features, num_classes, etypes)
     model = model.cuda()
     opt = torch.optim.Adam(model.parameters())
     

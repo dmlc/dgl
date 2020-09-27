@@ -28,7 +28,7 @@ class NNConv(nn.Module):
     ----------
     in_feats : int
         Input feature size; i.e, the number of dimensions of :math:`h_j^{(l)}`.
-        NN can be applied on homogeneous graph and unidirectional
+        NNConv can be applied on homogeneous graph and unidirectional
         `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`__.
         If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
