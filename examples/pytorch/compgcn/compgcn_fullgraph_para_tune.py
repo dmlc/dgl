@@ -227,6 +227,7 @@ if __name__ == '__main__':
 
                         print(drop_out, '|', hid_dim, '|', num_layer, '|', num_basis, '|', comp_fn)
                         print(test_acc, '|', test_loss)
+                        print()
 
                         # Save results in a test result file
                         results.append([hid_dim, num_layer, num_basis, comp_fn, test_acc, test_loss])
