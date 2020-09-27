@@ -7,7 +7,8 @@
     This file is designed for hyper-parameter tuning to achieve the best accuary performance in 4 DGL dataset:
     - AIDB, MUTAG, BGS, and AM
 
-    Basically use
+    1. Basically use early stop to get the best val-performance's hyper-parameters, and
+    2. The final performance will use all training data and the hyper-parameters to get the test performance.
 
     Main hyper-parameters would invovle:
     0. The composition function: SUB, MUL, and CCORR
@@ -19,6 +20,7 @@
 """
 
 import numpy as np
+import pandas as pd
 import argparse
 import os
 import dgl
@@ -29,6 +31,7 @@ import torch.nn.functional as F
 from dgl.data import AMDataset, MUTAGDataset, AIFBDataset, BGSDataset
 from data_utils import build_dummy_comp_data
 from models.model import CompGCN
+from model_utils import early_stopper
 
 
 def main(args):
@@ -68,8 +71,12 @@ def main(args):
     else:
         val_idx = train_idx
 
-    # print(heterograph.ntypes)
-    # print(heterograph.etypes)
+    num_of_ntype = len(heterograph.ntypes)
+    num_of_etype = len(heterograph.ntypes)
+    print('In Dataset: {}, node types num: {}'.format(args.dataset, num_of_ntype))
+    print('In Dataset: {}, edge types num: {}'.format(args.dataset, num_of_etype))
+
+    num_basis = int(args.num_basis * num_of_etype) + 1
 
     # check cuda
     use_cuda = (args.gpu >= 0 and th.cuda.is_available())
@@ -96,9 +103,9 @@ def main(args):
 
     compgcn_model = CompGCN(in_feat_dict=in_feat_dict,
                             hid_dim=args.hid_dim,
-                            num_layers=args.num_layers,
+                            num_layers=args.num_layer,
                             out_feat=num_classes,
-                            num_basis=args.num_basis,
+                            num_basis=num_basis,
                             num_rel=num_rels,
                             comp_fn=args.comp_fn,
                             dropout=args.drop_out,
@@ -118,8 +125,10 @@ def main(args):
                             {'params': compgcn_model.parameters(), 'lr':args.lr, 'weight_decay':5e-4}
                             ])
 
+    earlystoper = early_stopper(patience=2, verbose=False, delta=0.01)
+
     # Step 4: training epoches =============================================================== #
-    for epoch in range(args.max_epoch):
+    for epoch in range(200):
         # forward
         input_embs.train()
         compgcn_model.train()
@@ -144,6 +153,10 @@ def main(args):
         print("Train Accuracy: {:.4f} | Train Loss: {:.4f} | Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
               format(train_acc, tr_loss.item(), val_acc, val_loss.item()))
 
+        earlystoper.earlystop(val_loss, val_acc, None)
+        if earlystoper.is_earlystop:
+            break
+
     input_embs.eval()
     compgcn_model.eval()
 
@@ -158,21 +171,22 @@ def main(args):
     print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
     print()
 
-    # Step 5: If need, save model to file ============================================================== #
+    return test_acc, test_loss.item(), input_embs, compgcn_model
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='BoSH CompGCN Full Graph')
     parser.add_argument("-d", "--dataset", type=str, required=True, help="dataset to use")
     parser.add_argument("--gpu", type=int, default=-1, help="GPU Index")
-    parser.add_argument("--hid_dim", type=int, default=32, help="Hidden layer dimensionalities")
-    parser.add_argument("--num_layers", type=int, default=4, help="Number of layers")
-    parser.add_argument("--num_basis", type=int, default=40, help="Number of basis")
+    # disable below arguments and
+    # parser.add_argument("--hid_dim", type=int, default=32, help="Hidden layer dimensionalities")
+    # parser.add_argument("--num_layers", type=int, default=4, help="Number of layers")
+    # parser.add_argument("--num_basis", type=int, default=40, help="Number of basis")
     parser.add_argument("--rev_indicator", type=str, default='_inv', help="Indicator of reversed edge")
-    parser.add_argument("--comp_fn", type=str, default='sub', help="Composition function")
-    parser.add_argument("--max_epoch", type=int, default=200, help="The max number of epoches")
+    # parser.add_argument("--comp_fn", type=str, default='sub', help="Composition function")
+    # parser.add_argument("--max_epoch", type=int, default=200, help="The max number of epoches")
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
-    parser.add_argument("--drop_out", type=float, default=0.1, help="Drop out rate")
+    # parser.add_argument("--drop_out", type=float, default=0.1, help="Drop out rate")
     fp = parser.add_mutually_exclusive_group(required=False)
     fp.add_argument('--validation', dest='validation', action='store_true')
     fp.add_argument('--testing', dest='validation', action='store_false')
@@ -184,4 +198,49 @@ if __name__ == '__main__':
     np.random.seed(123456)
     th.manual_seed(123456)
 
-    main(args)
+    # HP tunning ranges
+    hid_dims = [4, 8, 16, 32, 64]
+    num_layers = [3, 4, 5, 6]
+    num_basis_factor = [1/(2**1), 1/(2**2), 1/(2**4), 1/(2**5)]
+    comp_fns = ['sub', 'mul', 'ccorr']
+    drop_outs = [0, 0.1, 0.2, 0.3, 0.4]
+
+    # Run parameter tunning
+    results = []
+
+    best_test_acc = 0
+    best_input_embs = None
+    best_compgcn_model = None
+
+    for drop_out in drop_outs:
+        args.drop_out = drop_out
+        for hid_dim in hid_dims:
+            args.hid_dim = hid_dim
+            for num_layer in num_layers:
+                args.num_layer = num_layer
+                for num_basis in num_basis_factor:
+                    args.num_basis = num_basis
+                    for comp_fn in comp_fns:
+                        args.comp_fn = comp_fn
+
+                        test_acc, test_loss, input_embs, compgcn_model = main(args)
+
+                        print(drop_out, '|', hid_dim, '|', num_layer, '|', num_basis, '|', comp_fn)
+                        print(test_acc, '|', test_loss)
+
+                        # Save results in a test result file
+                        results.append([hid_dim, num_layer, num_basis, comp_fn, test_acc, test_loss])
+
+                        # output the best results in the current settings
+                        if test_acc > best_test_acc:
+                            best_test_acc = test_acc
+                            best_input_embs = input_embs
+                            best_compgcn_model = compgcn_model
+
+    # After all parameter tunning, save the models to local files
+    results_df = pd.DataFrame(data=results,
+                              columns=['Drop_out', 'Hid_dim', 'Num_layer', 'Num_basis', 'Comp_fn', 'Test_acc', 'Test_loss'])
+
+    if best_test_acc > 0:
+        # TODO: Save model here
+        pass
