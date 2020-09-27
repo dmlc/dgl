@@ -5,7 +5,7 @@ import tqdm
 import numpy as np
 from collections import Counter
 from model import *
-from ladies2 import *
+from ladies3 import *
 
 def compute_acc(pred, label):
     return (pred.argmax(1) == label).float().mean()
@@ -20,7 +20,8 @@ def train(g, n_classes, args):
     g.edata['weight'] = normalized_laplacian_edata(g)
 
     num_nodes = [int(n) for n in args['num_nodes'].split(',')]
-    sampler = LADIESNeighborSampler(num_nodes, weight='weight', out_weight='w', replace=False)
+    #sampler = LADIESNeighborSampler(num_nodes, weight='weight', out_weight='w', replace=False)
+    sampler = LADIESNeighborSampler(g, num_nodes, weight='weight', out_weight='w', replace=False)
     train_dataloader = dgl.dataloading.NodeDataLoader(
         g,
         train_nid,
@@ -37,9 +38,6 @@ def train(g, n_classes, args):
         shuffle=True,
         drop_last=False,
         num_workers=args['num_workers'])
-    for _ in tqdm.trange(5000):
-        for batch in train_dataloader:
-            pass
 
     model = Model(in_feats, args['hidden_dim'], n_classes, len(num_nodes))
     model = model.to(device)
@@ -50,7 +48,7 @@ def train(g, n_classes, args):
             for step, (input_nodes, seeds, blocks) in enumerate(tq):
                 blocks = [block.to(device) for block in blocks]
                 batch_inputs = blocks[0].srcdata['features']
-                batch_labels = blocks[-1].dstdata['label']
+                batch_labels = blocks[-1].dstdata['labels']
 
                 batch_pred = model(blocks, batch_inputs)
                 loss = F.cross_entropy(batch_pred, batch_labels)
@@ -62,44 +60,55 @@ def train(g, n_classes, args):
 
                 tq.set_postfix({'loss': '%.06f' % loss.item(), 'acc': '%.03f' % acc.item()})
 
-        with tqdm.tqdm(val_dataloader) as tq:
-            all_labels = []
-            all_pred = []
-            for step, (input_nodes, seeds, blocks) in enumerate(tq):
-                blocks = [block.to(device) for block in blocks]
-                batch_inputs = blocks[0].srcdata['features']
-                batch_labels = blocks[-1].dstdata['label']
+        pred = model.inference(g, g.ndata['features'], g.edata['weight'], args['batch_size'], args['device'], args['num_workers'])
+        val_pred = pred[val_nid]
+        val_label = g.ndata['labels'][val_nid]
+        test_pred = pred[test_nid]
+        test_label = g.ndata['labels'][test_nid]
+        print('Val Acc', compute_acc(val_pred, val_label))
+        print('Test Acc', compute_acc(test_pred, test_label))
 
-                batch_pred = model(blocks, batch_inputs)
+def load_ogb(name):
+    from ogb.nodeproppred import DglNodePropPredDataset
 
-                all_labels.append(batch_labels)
-                all_pred.append(batch_pred)
+    print('load', name)
+    data = DglNodePropPredDataset(name=name)
+    print('finish loading', name)
+    splitted_idx = data.get_idx_split()
+    graph, labels = data[0]
+    labels = labels[:, 0]
 
-            all_labels = torch.cat(all_labels, 0)
-            all_pred = torch.cat(all_pred, 0)
-            print('Val Acc', compute_acc(all_pred, all_labels))
+    graph.ndata['features'] = graph.ndata['feat']
+    graph.ndata['labels'] = labels
+    in_feats = graph.ndata['features'].shape[1]
+    num_labels = len(torch.unique(labels[torch.logical_not(torch.isnan(labels))]))
+
+    # Find the node IDs in the training, validation, and test set.
+    train_nid, val_nid, test_nid = splitted_idx['train'], splitted_idx['valid'], splitted_idx['test']
+    train_mask = torch.zeros((graph.number_of_nodes(),), dtype=torch.bool)
+    train_mask[train_nid] = True
+    val_mask = torch.zeros((graph.number_of_nodes(),), dtype=torch.bool)
+    val_mask[val_nid] = True
+    test_mask = torch.zeros((graph.number_of_nodes(),), dtype=torch.bool)
+    test_mask[test_nid] = True
+    graph.ndata['train_mask'] = train_mask
+    graph.ndata['val_mask'] = val_mask
+    graph.ndata['test_mask'] = test_mask
+    print('finish constructing', name)
+    return graph, num_labels
 
 
 if __name__ == '__main__':
-    src = torch.randint(0, 2000, (10000,))
-    dst = torch.randint(0, 2000, (10000,))
-    src = torch.cat([src, torch.arange(50, 70).repeat_interleave(2000)])
-    dst = torch.cat([dst, torch.arange(0, 2000).repeat_interleave(20)])
-    g = dgl.graph((src, dst))
-    g = dgl.to_simple(dgl.add_reverse_edges(g), return_counts=None)
-    g.ndata['features'] = torch.randn(2000, 15)
-    g.ndata['label'] = torch.randint(0, 5, (2000,))
-    g.ndata['mask'] = torch.randint(0, 10, (2000,))
-    g.ndata['train_mask'] = g.ndata['mask'] < 8
-    g.ndata['val_mask'] = g.ndata['mask'] == 8
-    g.ndata['test_mask'] = g.ndata['mask'] == 9
+    g, num_labels = load_ogb('ogbn-products')
+    g = dgl.remove_self_loop(g)
+    g = dgl.add_self_loop(g)
 
     args = {
         'num_epochs': 20,
         'num_workers': 0,
-        'batch_size': 10,
-        'hidden_dim': 8,
-        'lr': 1e-4,
-        'num_nodes': '10,10,10',
-        'device': 'cpu'}
-    train(g, 5, args)
+        'batch_size': 1000,
+        'hidden_dim': 256,
+        'lr': 0.003,
+        'num_nodes': '5000,5000,5000',
+        'device': 'cuda:0'}
+    train(g, num_labels, args)

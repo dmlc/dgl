@@ -2,6 +2,7 @@ import torch
 import dgl
 import dgl.function as fn
 from collections import Counter
+import numpy as np
 
 def compute_prob(g, seed_nodes, weight):
     out_frontier = dgl.reverse(dgl.in_subgraph(g, seed_nodes), copy_edata=True)

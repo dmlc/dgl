@@ -52,29 +52,31 @@ class Model(nn.Module):
         return x
 
     def inference(self, g, x, w, batch_size, device, num_workers):
-        for l, layer in enumerate(self.convs):
-            y = torch.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
+        with torch.no_grad():
+            for l, layer in enumerate(self.convs):
+                y = torch.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.convs) - 1 else self.n_classes)
 
-            sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
-            dataloader = dgl.dataloading.NodeDataLoader(
-                g,
-                torch.arange(g.number_of_nodes()),
-                sampler,
-                batch_size=batch_size,
-                shuffle=True,
-                drop_last=False,
-                num_workers=num_workers)
+                sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
+                dataloader = dgl.dataloading.NodeDataLoader(
+                    g,
+                    torch.arange(g.number_of_nodes()),
+                    sampler,
+                    batch_size=batch_size,
+                    shuffle=True,
+                    drop_last=False,
+                    num_workers=num_workers)
 
-            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
-                block = blocks[0]
+                for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
+                    block = blocks[0]
 
-                block = block.int().to(device)
-                h = x[input_nodes].to(device)
-                h = layer(block, h)
-                if l != len(self.layers) - 1:
-                    h = F.relu(h)
+                    block = block.int().to(device)
+                    h = x[input_nodes].to(device)
+                    w_block = w[block.edata[dgl.EID]].to(device)
+                    h = layer(block, h, w_block)
+                    if l != len(self.convs) - 1:
+                        h = F.relu(h)
 
-                y[output_nodes] = h.cpu()
+                    y[output_nodes] = h.cpu()
 
-            x = y
-        return y
+                x = y
+            return y
