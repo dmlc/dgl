@@ -240,6 +240,7 @@ if __name__ == '__main__':
     # After all parameter tunning, save the models to local files
     results_df = pd.DataFrame(data=results,
                               columns=['Drop_out', 'Hid_dim', 'Num_layer', 'Num_basis', 'Comp_fn', 'Test_acc', 'Test_loss'])
+    results_df.to_csv('/data/{}.csv'.format(args.dataset), index=False)
 
     if best_test_acc > 0:
         # TODO: Save model here
