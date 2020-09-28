@@ -10,13 +10,16 @@
 #include <dgl/bcast.h>
 #include <limits>
 #include <algorithm>
-
+#include "spmm_binary_ops.h"
+#if !defined(_WIN32)
+#include "intel/cpu_support.h"
+#endif
 namespace dgl {
 namespace aten {
 namespace cpu {
 
 /*!
- * \brief CPU kernel of SpMM on Csr format.
+ * \brief CPU kernelCore of SpMM on Csr format.
  * \param bcast Broadcast information.
  * \param csr The Csr matrix.
  * \param ufeat The feature on source nodes.
@@ -25,12 +28,12 @@ namespace cpu {
  * \note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes.
  */
-template <typename IdType, typename DType, typename Op>
-void SpMMSumCsr(
-    const BcastOff& bcast,
+template<class IdType, class DType , class Op>
+struct SpMMSumCsrCore {
+    static inline void call(const BcastOff& bcast,
     const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat,
-    NDArray out) {
+    NDArray out ) {
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   const IdType* indices = csr.indices.Ptr<IdType>();
@@ -57,9 +60,90 @@ void SpMMSumCsr(
         const DType *rhs_off =
             Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
         out_off[k] += Op::Call(lhs_off, rhs_off);
+          }
+       }
+    }
+  }
+};
+
+/*!
+ * \brief CPU kernelCore of SpMM<float> specialization CopyLhs.
+ * \param bcast Broadcast information.
+ * \param csr The Csr matrix.
+ * \param ufeat The feature on source nodes.
+ * \param efeat The feature on edges.
+ * \param out The result feature on destination nodes.
+ * \note it uses node parallel strategy, different threads are responsible
+ *       for the computation of different nodes.
+ */
+#if !defined(_WIN32)
+template <class IdType>
+struct SpMMSumCsrCore<IdType, float, dgl::aten::cpu::op::CopyLhs<float>> {
+        static inline void call(const BcastOff &bcast,
+                                const CSRMatrix &csr,
+                                NDArray ufeat, NDArray efeat,
+                                NDArray out) {
+          typedef float DType;
+          const IdType *indptr = csr.indptr.Ptr<IdType>();
+          const IdType *indices = csr.indices.Ptr<IdType>();
+          const DType *X = ufeat.Ptr<DType>();
+          int64_t dim = bcast.out_len,
+                  lhs_dim = bcast.lhs_len;
+          DType *O = out.Ptr<DType>();
+          typedef intel::elem_wise_add_update<DType> ElemWiseUpd;
+
+          /* Prepare an assembler code for this paricular dimension */
+          thread_local intel::Uptr<ElemWiseUpd> th_cpu_spec((intel::IntelKernel<DType>::enabled())
+           ? new ElemWiseUpd(dim) : nullptr);
+          /* Check if the code has been created */
+          ElemWiseUpd *cpu_spec = (th_cpu_spec && th_cpu_spec->is_applicable())
+           ? th_cpu_spec.get() : nullptr;
+          if (cpu_spec && cpu_spec->require_new_instance<bool>(dim)) {
+            th_cpu_spec.reset(new ElemWiseUpd(dim));
+            cpu_spec = (th_cpu_spec && th_cpu_spec->is_applicable()) ? th_cpu_spec.get() : nullptr;
+          }
+
+#pragma omp parallel for
+  for (IdType rid = 0; rid < csr.num_rows; ++rid) {
+    const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
+    DType *out_off = O + rid * dim;
+    std::fill(out_off, out_off + dim, 0);
+    for (IdType j = row_start; j < row_end; ++j) {
+      const IdType cid = indices[j];
+      if (!bcast.use_bcast && cpu_spec) {
+          /* Forward to cpu asm kernel */
+          cpu_spec->run(out_off, X + cid * lhs_dim , dim);
+          continue;
+      }
+      for (int64_t k = 0; k < dim; ++k) {
+        const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
+        typedef dgl::aten::cpu::op::CopyLhs<DType> Op;
+        const DType *lhs_off =
+        Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
+        out_off[k] += Op::Call(lhs_off, nullptr);
+        }
       }
     }
   }
+};
+#endif
+/*!
+ * \brief CPU kernel of SpMM on Csr format.
+ * \param bcast Broadcast information.
+ * \param csr The Csr matrix.
+ * \param ufeat The feature on source nodes.
+ * \param efeat The feature on edges.
+ * \param out The result feature on destination nodes.
+ * \note it uses node parallel strategy, different threads are responsible
+ *       for the computation of different nodes.
+ */
+template <typename IdType, typename DType, typename Op>
+void SpMMSumCsr(
+    const BcastOff& bcast,
+    const CSRMatrix& csr,
+    NDArray ufeat, NDArray efeat,
+    NDArray out) {
+    SpMMSumCsrCore<IdType, DType, Op>::call(bcast, csr, ufeat, efeat, out);
 }
 
 /*!
@@ -120,10 +204,10 @@ void SpMMSumCoo(
  * \param ufeat The feature on source nodes.
  * \param efeat The feature on edges.
  * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes, which refers the source node indices 
+ * \param argu Arg-Min/Max on source nodes, which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \param arge Arg-Min/Max on edges. which refers the source node indices 
+ * \param arge Arg-Min/Max on edges. which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
  * \note It uses node parallel strategy, different threads are responsible
@@ -187,10 +271,10 @@ void SpMMCmpCsr(
  * \param ufeat The feature on source nodes.
  * \param efeat The feature on edges.
  * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes, which refers the source node indices 
+ * \param argu Arg-Min/Max on source nodes, which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \param arge Arg-Min/Max on edges. which refers the source node indices 
+ * \param arge Arg-Min/Max on edges. which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
  * \note it uses node parallel strategy, different threads are responsible
@@ -245,123 +329,6 @@ void SpMMCmpCoo(
     }
   }
 }
-
-namespace op {
-
-//////////////////////////////// binary operators on CPU ////////////////////////////////
-template <typename DType>
-struct Add {
-  static constexpr bool use_lhs = true;
-  static constexpr bool use_rhs = true;
-  inline static DType Call(const DType* lhs_off, const DType* rhs_off) {
-    return *lhs_off + *rhs_off;
-  }
-};
-template <typename DType> constexpr bool Add<DType>::use_lhs;
-template <typename DType> constexpr bool Add<DType>::use_rhs;
-
-template <typename DType>
-struct Sub {
-  static constexpr bool use_lhs = true;
-  static constexpr bool use_rhs = true;
-  inline static DType Call(const DType* lhs_off, const DType* rhs_off) {
-    return *lhs_off - *rhs_off;
-  }
-};
-template <typename DType> constexpr bool Sub<DType>::use_lhs;
-template <typename DType> constexpr bool Sub<DType>::use_rhs;
-
-template <typename DType>
-struct Mul {
-  static constexpr bool use_lhs = true;
-  static constexpr bool use_rhs = true;
-  inline static DType Call(const DType* lhs_off, const DType* rhs_off) {
-    return *lhs_off * *rhs_off;
-  }
-};
-template <typename DType> constexpr bool Mul<DType>::use_lhs;
-template <typename DType> constexpr bool Mul<DType>::use_rhs;
-
-template <typename DType>
-struct Div {
-  static constexpr bool use_lhs = true;
-  static constexpr bool use_rhs = true;
-  inline static DType Call(const DType* lhs_off, const DType* rhs_off) {
-    return *lhs_off / *rhs_off;
-  }
-};
-template <typename DType> constexpr bool Div<DType>::use_lhs;
-template <typename DType> constexpr bool Div<DType>::use_rhs;
-
-template <typename DType>
-struct CopyLhs {
-  static constexpr bool use_lhs = true;
-  static constexpr bool use_rhs = false;
-  inline static DType Call(const DType* lhs_off, const DType* ) {
-    return *lhs_off;
-  }
-};
-template <typename DType> constexpr bool CopyLhs<DType>::use_lhs;
-template <typename DType> constexpr bool CopyLhs<DType>::use_rhs;
-
-template <typename DType>
-struct CopyRhs {
-  static constexpr bool use_lhs = false;
-  static constexpr bool use_rhs = true;
-  inline static DType Call(const DType* , const DType* rhs_off) {
-    return *rhs_off;
-  }
-};
-template <typename DType> constexpr bool CopyRhs<DType>::use_lhs;
-template <typename DType> constexpr bool CopyRhs<DType>::use_rhs;
-
-//////////////////////////////// Reduce operators on CPU ////////////////////////////////
-template <typename DType>
-struct Max {
-  static constexpr DType zero = -std::numeric_limits<DType>::infinity();
-  // return true if accum should be replaced
-  inline static DType Call(DType accum, DType val) {
-    return accum < val;
-  }
-};
-template <typename DType> constexpr DType Max<DType>::zero;
-
-template <typename DType>
-struct Min {
-  static constexpr DType zero = std::numeric_limits<DType>::infinity();
-  // return true if accum should be replaced
-  inline static DType Call(DType accum, DType val) {
-    return accum > val;
-  }
-};
-template <typename DType> constexpr DType Min<DType>::zero;
-
-#define SWITCH_OP(op, Op, ...)                                      \
-  do {                                                              \
-    if ((op) == "add") {                                            \
-      typedef dgl::aten::cpu::op::Add<DType> Op;                    \
-      { __VA_ARGS__ }                                               \
-    } else if ((op) == "sub") {                                     \
-      typedef dgl::aten::cpu::op::Sub<DType> Op;                    \
-      { __VA_ARGS__ }                                               \
-    } else if ((op) == "mul") {                                     \
-      typedef dgl::aten::cpu::op::Mul<DType> Op;                    \
-      { __VA_ARGS__ }                                               \
-    } else if ((op) == "div") {                                     \
-      typedef dgl::aten::cpu::op::Div<DType> Op;                    \
-      { __VA_ARGS__ }                                               \
-    } else if ((op) == "copy_lhs") {                                \
-      typedef dgl::aten::cpu::op::CopyLhs<DType> Op;                \
-      { __VA_ARGS__ }                                               \
-    } else if ((op) == "copy_rhs") {                                \
-      typedef dgl::aten::cpu::op::CopyRhs<DType> Op;                \
-      { __VA_ARGS__ }                                               \
-    } else {                                                        \
-      LOG(FATAL) << "Unsupported SpMM binary operator: " << op;     \
-    }                                                               \
-  } while (0)
-
-}  // namespace op
 
 }  // namespace cpu
 }  // namespace aten
