@@ -9,7 +9,7 @@ DGL使用一个唯一的整数来表示一个节点，称为点ID；并用对应
 给每条边分配一个唯一的整数编号，称为边ID。节点和边的ID都是从0开始构建的。在DGL的图里，所有的边都是有方向的，
 即边 :math:`(u, v)` 表示它是从节点 :math:`u` 指向节点 :math:`v` 的。
 
-对于多个节点，DGL使用一个一维的张量（如，PyTorch的Tensor类，TensorFlow的Tensor类或MXNet的ndarray类）来保存图的点ID，
+对于多个节点，DGL使用一个一维的整型张量（如，PyTorch的Tensor类，TensorFlow的Tensor类或MXNet的ndarray类）来保存图的点ID，
 DGL称之为"节点张量"。为了指代多条边，DGL使用一个包含2个节点张量的元组 :math:`(U, V)` ，其中，用 :math:`(U[i], V[i])` 指代一条
 :math:`U[i]` 到 :math:`V[i]` 的边。
 
@@ -50,7 +50,7 @@ DGL称之为"节点张量"。为了指代多条边，DGL使用一个包含2个�
     >>> # 如果具有最大ID的节点没有边，在创建图的时候，用户需要明确地指明节点的数量。
     >>> g = dgl.graph((u, v), num_nodes=8)
 
-对于无向的图，用户需要为每条边都创建两个方向的边。可以 :func:`dgl.to_bidirected` 函数使用来实现这个目的。
+对于无向的图，用户需要为每条边都创建两个方向的边。可以使用 :func:`dgl.to_bidirected` 函数来实现这个目的。
 如下面的代码段所示，这个函数可以把原图转换成一个包含反向边的图。
 
 .. code::

@@ -97,13 +97,13 @@ CSV是一种常见的格式，以表格格式储存节点、边及其特征：
 JSON/GML 格式
 """"""""""""
 
-如果对速度不太关注的话，读者可以参考NetworkX提供的工具来解析 `各种数据格式 <https://networkx.github.io/documentation/stable/reference/readwrite/index.html>`_，
+如果对速度不太关注的话，读者可以使用NetworkX提供的工具来解析 `各种数据格式 <https://networkx.github.io/documentation/stable/reference/readwrite/index.html>`_，
 DGL可以间接地从这些来源创建图。
 
 DGL 二进制格式
 """"""""""""
 
-DGL提供了API以从磁盘中保存和加载二进制格式的图。除了图结构，API也能处理特征数据和图级别的标签数据。
-DGL也支持直接使用S3或HDFS的检查点图。参考手册提供了该用法的更多细节。
+DGL提供了API以从磁盘中加载或向磁盘里保存二进制格式的图。除了图结构，API也能处理特征数据和图级别的标签数据。
+DGL也支持直接从S3/HDFS中加载或向S3/HDFS保存图。参考手册提供了该用法的更多细节。
 
 相关API： :func:`dgl.save_graphs`、 :func:`dgl.load_graphs`。

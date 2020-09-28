@@ -16,8 +16,7 @@
 ^^^^^^^^
 
 在DGL中，一个异构图由一系列子图构成，一个子图对应一种关系。每个关系由一个字符串三元组
-定义 ``(源节点类型, 边类型, 目标节点类型)`` 。由于这里的关系定义消除了边类型的歧义，DGL称
-它们为规范边类型。
+定义 ``(源节点类型, 边类型, 目标节点类型)`` 。由于这里的关系定义消除了边类型的歧义，DGL称它们为规范边类型。
 
 下面的代码是一个在DGL中创建异构图的示例。
 
@@ -51,8 +50,9 @@
     >>> # 一个二分图
     >>> dgl.heterograph({('source_type', 'edge_type', 'destination_type'): (u, v)})
 
-与异构图相关联的 *metagraph* 就是图的模式。它指定节点集和节点之间的边的类型约束。*metagraph* 中的一个节点 :math:`u` 对应于
-相关异构图中的一个节点类型。*metagraph* 中的边 :math:`(u,v)` 表示在相关异构图中存在从 :math:`u` 型节点到 :math:`v` 型节点的边。
+与异构图相关联的 *metagraph* 就是图的模式。它指定节点集和节点之间的边的类型约束。
+*metagraph* 中的一个节点 :math:`u` 对应于相关异构图中的一个节点类型。
+*metagraph* 中的边 :math:`(u,v)` 表示在相关异构图中存在从 :math:`u` 型节点到 :math:`v` 型节点的边。
 
 .. code::
 
@@ -126,20 +126,20 @@
 从磁盘加载异构图
 ^^^^^^^^^^^^^
 
-（CSV）格式
-""""""""""
+逗号分隔值（CSV）
+""""""""""""""
 
 一种存储异构图的常见方法是在不同的CSV文件中存储不同类型的节点和边。下面是一个例子。
 
 .. code::
 
-    # data folder
+    # 数据文件夹
     data/
     |-- drug.csv        # drug节点
     |-- gene.csv        # gene节点
     |-- disease.csv     # disease节点
-    |-- drug-interact-drug.csv  # drug-drug交互边
-    |-- drug-interact-gene.csv  # drug-gene交互边
+    |-- drug-interact-drug.csv  # drug-drug相互作用边
+    |-- drug-interact-gene.csv  # drug-gene相互作用边
     |-- drug-treat-disease.csv  # drug-disease治疗边
 
 与同构图的情况类似，用户可以使用像Pandas这样的包先将CSV文件解析为numpy数组或框架张量，再构建一个关系字典，并用它构造一个异构图。
@@ -209,7 +209,7 @@ DGL提供了 :func:`dgl.save_graphs` 和 :func:`dgl.load_graphs` 函数，分别
     False
 
     >>> # 拷贝边的特征
-    >>> # 对于要拷贝的特征，DGL假定不同类型的节点或边的合并特征具有相同的大小和数据类型
+    >>> # 对于要拷贝的特征，DGL假定不同类型的节点或边的需要合并的特征具有相同的大小和数据类型
     >>> hg = dgl.to_homogeneous(g, edata=['he'])
     DGLError: Cannot concatenate column ‘he’ with shape Scheme(shape=(2,), dtype=torch.float32) and shape Scheme(shape=(1,), dtype=torch.float32)
 
