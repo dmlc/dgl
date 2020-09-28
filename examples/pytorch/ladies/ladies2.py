@@ -68,14 +68,13 @@ class LADIESNeighborSampler(dgl.dataloading.BlockSampler):
         # so that we can compute the edge weights of the block.
         # This is why we need a find_indices_in() function.
         neighbor_nodes_idx = torch.multinomial(prob, num, replacement=replace).cpu().numpy()
-        _i = neighbor_nodes_idx
         seed_nodes_idx = find_indices_in(seed_nodes.cpu().numpy(), cand_nodes.cpu().numpy())
         assert seed_nodes_idx.min() != -1
         neighbor_nodes_idx = union(neighbor_nodes_idx, seed_nodes_idx)
         seed_nodes_local_idx = torch.from_numpy(find_indices_in(seed_nodes_idx, neighbor_nodes_idx))
         assert seed_nodes_idx.min().item() != -1
         neighbor_nodes_idx = torch.from_numpy(neighbor_nodes_idx)
-        return neighbor_nodes_idx, seed_nodes_local_idx, cand_nodes.cpu().numpy()[_i]
+        return neighbor_nodes_idx, seed_nodes_local_idx
 
     
     def generate_block(self, insg, neighbor_nodes_idx, seed_nodes_local_idx, P_sg, W_sg, weight_name,
@@ -118,7 +117,7 @@ class LADIESNeighborSampler(dgl.dataloading.BlockSampler):
             W = g.edata[self.edge_weight]
             prob, insg = self.compute_prob(g, seed_nodes, W, exclude_eids)
             cand_nodes = insg.ndata[dgl.NID]
-            neighbor_nodes_idx, seed_nodes_local_idx, _i = self.select_neighbors(
+            neighbor_nodes_idx, seed_nodes_local_idx = self.select_neighbors(
                 seed_nodes, cand_nodes, prob, num_nodes_to_sample, self.replace)
             block = self.generate_block(
                 insg, neighbor_nodes_idx, seed_nodes_local_idx, prob,
