@@ -37,13 +37,21 @@ python src/main.py --input data/example
 
 To run on "twitter" dataset, use
 ```bash
-python src/main.py --input data/twitter --eval-type 1
+python src/main.py --input data/twitter --eval-type 1 --gpu 0
 ```
 
 For a big dataset, use sparse to avoid cuda out of memory in backward
 ```bash
-python src/main_sparse.py --input data/example
+python src/main_sparse.py --input data/example --gpu 0
 ```
+
+If you have multiple GPUs, you can also accelerate training with [`DistributedDataParallel`](https://pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html)
+```bash
+python src/main_sparse_multi_gpus.py --input data/example --gpu 0,1
+```
+
+**It is worth noting that DistributedDataParallel will cause more cuda memory consumption and a certain loss of preformance.**
+
 
 Results
 -------
