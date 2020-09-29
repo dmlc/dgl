@@ -167,6 +167,10 @@ def _gspmm(gidx, op, reduce_op, u, e):
     # To deal with scalar node/edge features.
     if (expand_u or not use_u) and (expand_e or not use_e):
         v = F.squeeze(v, -1)
+    if expand_u and use_cmp:
+        arg_u = F.squeeze(arg_u, -1)
+    if expand_e and use_cmp:
+        arg_e = F.squeeze(arg_e, -1)
     return v, (arg_u, arg_e)
 
 

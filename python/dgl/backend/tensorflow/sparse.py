@@ -72,7 +72,7 @@ def _reduce_grad(grad, shape):
     reduce_idx = np.asarray(np.nonzero(np.asarray(grad_shape) - np.asarray(in_shape)))
     reduce_idx += 1  # skip batch dim
     reduce_idx_tensor = tf.constant(tuple(
-        reduce_idx.flatten().tolist()))
+        reduce_idx.flatten().tolist()), dtype=tf.int32)
     grad = tf.reduce_sum(grad, axis=reduce_idx_tensor, keepdims=True)
     return tf.reshape(grad, shape)
 
