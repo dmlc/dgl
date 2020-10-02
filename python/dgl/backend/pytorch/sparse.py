@@ -10,12 +10,14 @@ def _reduce_grad(grad, shape):
     If there is broadcast in forward pass, gradients need to be reduced on
     broadcast dimension. This function checks the input tensor shape and
     gradient shape and perform the reduction.
+
     Parameters
     ----------
     grad: Tensor
         Gradient tensor
     shape: tuple
         Shape of input tensor
+
     Returns
     -------
     Tensor
@@ -61,13 +63,25 @@ class GSpMM(th.autograd.Function):
     def forward(ctx, gidx, op, reduce_op, X, Y):
         out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
         ctx.backward_cache = gidx, op, reduce_op
-        ctx.save_for_backward(X, Y, argX, argY)
+        if op == 'copy_lhs' and reduce_op == 'sum':
+            ctx.save_for_backward(th.LongTensor(list(X.shape)))
+        elif op == 'copy_lhs' and reduce_op == 'max':
+            ctx.save_for_backward(th.LongTensor(list(X.shape)), argX)
+        else:
+            ctx.save_for_backward(X, Y, argX, argY)
         return out
 
     @staticmethod
     def backward(ctx, dZ):
         gidx, op, reduce_op = ctx.backward_cache
-        X, Y, argX, argY = ctx.saved_tensors
+        if op == 'copy_lhs' and reduce_op == 'sum':
+            x_shape, = ctx.saved_tensors
+            x_shape = th.Size(x_shape)
+        elif op == 'copy_lhs' and reduce_op == 'max':
+            x_shape, argX = ctx.saved_tensors
+            x_shape = th.Size(x_shape)
+        else:
+            X, Y, argX, argY = ctx.saved_tensors
         if op != 'copy_rhs' and ctx.needs_input_grad[3]:
             g_rev = gidx.reverse()
             if reduce_op == 'sum':
@@ -78,15 +92,15 @@ class GSpMM(th.autograd.Function):
                 elif op == 'copy_lhs':
                     dX = gspmm(g_rev, 'copy_lhs', 'sum', dZ, None)
             else:  # max/min
-                dX = th.zeros((X.shape[0],) + dZ.shape[1:],
-                              dtype=X.dtype, device=X.device)
+                dX = th.zeros((x_shape[0],) + dZ.shape[1:],
+                              dtype=dZ.dtype, device=dZ.device)
                 if op in ['mul', 'div']:
                     grad = _muldiv(op, _expand(Y, dZ.shape[1:]).gather(
                         0, argY.long())) * dZ
                     dX.scatter_add_(0, argX.long(), grad)
                 elif op in ['add', 'sub', 'copy_lhs']:
                     dX.scatter_add_(0, argX.long(), dZ)
-            dX = _reduce_grad(dX, X.shape)
+            dX = _reduce_grad(dX, x_shape)
         else:  # X has not gradient
             dX = None
         if op != 'copy_lhs' and ctx.needs_input_grad[4]:
@@ -179,8 +193,11 @@ class EdgeSoftmax(th.autograd.Function):
     @staticmethod
     def forward(ctx, gidx, score, eids, norm_by):
         """Forward function.
+
         Pseudo-code:
+
         .. code:: python
+
             score = dgl.EData(g, score)
             score_max = score.dst_max()  # of type dgl.NData
             score = score - score_max  # edge_sub_dst, ret dgl.EData
@@ -191,7 +208,7 @@ class EdgeSoftmax(th.autograd.Function):
         # remember to save the graph to backward cache before making it
         # a local variable
         if not is_all(eids):
-            gidx = gidx.edge_subgraph(eids.type(gidx.dtype), True)
+            gidx = gidx.edge_subgraph([eids], True).graph
         if norm_by == 'src':
             gidx = gidx.reverse()
         score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
@@ -205,8 +222,11 @@ class EdgeSoftmax(th.autograd.Function):
     @staticmethod
     def backward(ctx, grad_out):
         """Backward function.
+
         Pseudo-code:
+
         .. code:: python
+
             g, out = ctx.backward_cache
             grad_out = dgl.EData(g, grad_out)
             out = dgl.EData(g, out)
