@@ -3,6 +3,8 @@
 1.6 Using DGLGraph on a GPU
 ---------------------------
 
+:ref:`(中文版)<guide_cn-graph-gpu>`
+
 One can create a :class:`~dgl.DGLGraph` on a GPU by passing two GPU tensors during construction.
 Another approach is to use the :func:`~dgl.DGLGraph.to` API to copy a :class:`~dgl.DGLGraph` to a GPU, which
 copies the graph structure as well as the feature data to the given device.
