@@ -22,4 +22,4 @@ subgraph. For example:
 This is a common usage in mini-batch training. Check :ref:`guide-minibatch` for more detailed
 usages.
 
-这是小批量训练中的常见用法。更多详细用法请参考用户指南 :ref:`第6章：在大图上的随机（批次）训练 <guide_cn-minibatch>` 。
+这是小批量训练中的常见用法。更多详细用法请参考用户指南 :ref:`第6章：在大图上的随机（批次）训练 <guide-minibatch>`。
