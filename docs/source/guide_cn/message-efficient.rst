@@ -1,7 +1,5 @@
 .. _guide_cn-message-passing-efficient:
 
-2.2 Writing Efficient Message Passing Code
-
 2.2 编写高效的消息传递代码
 ----------------------
 

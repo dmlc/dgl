@@ -1,7 +1,5 @@
 .. _guide_cn-message-passing:
 
-Chapter 2: Message Passing
-
 第2章：消息传递范式
 ================
 
@@ -15,8 +13,8 @@ and :math:`w_{e}\in\mathbb{R}^{d_2}` be the feature for edge
 :math:`({u}, {v})`. The **message passing paradigm** defines the
 following node-wise and edge-wise computation at step :math:`t+1`:
 
-设 :math:`x_v\in\mathbb{R}^{d_1}` 是节点 :math:`v`的特征， :math:`w_{e}\in\mathbb{R}^{d_2}` 是边 :math:`({u}, {v})` 的特征。
-**消息传递范式**在步骤 :math:`t+1` 定义了以下逐节点和边上的计算：
+设 :math:`x_v\in\mathbb{R}^{d_1}` 是节点 :math:`v` 的特征， :math:`w_{e}\in\mathbb{R}^{d_2}` 是边 :math:`({u}, {v})` 的特征。
+**消息传递范式** 在步骤 :math:`t+1` 定义了以下逐节点和边上的计算：
 
 .. math::  \text{逐边的: } m_{e}^{(t+1)} = \phi \left( x_v^{(t)}, x_u^{(t)}, w_{e}^{(t)} \right) , ({u}, {v},{e}) \in \mathcal{E}.
 
@@ -30,7 +28,7 @@ by aggregating its incoming messages using the **reduce function**
 :math:`\rho`.
 
 在上面的等式中， :math:`\phi` 是定义在每条边上的消息函数，通过将边上特征与其两端节点的特征相结合来生成消息；
- :math:`\psi` 是定义在每个节点上的 **更新函数** ，通过使用 **聚合函数** :math:`\rho` 聚合其接受到的消息来更新节点特征。
+:math:`\psi` 是定义在每个节点上的 **更新函数** ，通过使用 **聚合函数** :math:`\rho` 聚合其接受到的消息来更新节点特征。
 
 Roadmap
 

@@ -1,7 +1,5 @@
 .. _guide_cn-message-passing-api:
 
-2.1 Built-in Functions and Message Passing APIs
-
 2.1 内置函数和消息传递API
 ----------------------
 

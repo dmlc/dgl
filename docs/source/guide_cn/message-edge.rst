@@ -1,7 +1,5 @@
 .. _guide_cn-message-passing-edge:
 
-2.4 Apply Edge Weight In Message Passing
-
 2.4 在消息传递中使用边的权重
 -----------------------
 

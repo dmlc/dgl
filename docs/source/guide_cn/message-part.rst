@@ -1,7 +1,5 @@
 .. _guide_cn-message-passing-part:
 
-2.3 Apply Message Passing On Part Of The Graph
-
 2.3 在图的一部分上进行消息传递
 -------------------------
 

@@ -1,7 +1,5 @@
 .. _guide_cn-message-passing-heterograph:
 
-2.5 Message Passing on Heterogeneous Graph
-
 2.5 在异构图上进行消息传递
 ----------------------
 
