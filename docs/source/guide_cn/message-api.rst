@@ -90,7 +90,7 @@ without invoking message passing. :meth:`~dgl.DGLGraph.apply_edges` takes a mess
 for parameter and by default updates the features of all edges. For example:
 
 在DGL中，也可以调用逐边计算的接口 :meth:`~dgl.DGLGraph.apply_edges`，而不必显式地调用消息传递函数。
- :meth:`~dgl.DGLGraph.apply_edges` 的参数是一个消息函数，并且在默认情况下，这个接口将更新所有的边。例如：
+:meth:`~dgl.DGLGraph.apply_edges` 的参数是一个消息函数，并且在默认情况下，这个接口将更新所有的边。例如：
 
 .. code::
 
