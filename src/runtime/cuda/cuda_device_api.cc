@@ -8,12 +8,41 @@
 #include <dmlc/thread_local.h>
 #include <dgl/runtime/registry.h>
 #include <cuda_runtime.h>
+#include <mutex>
 #include "cuda_common.h"
 
 namespace dgl {
 namespace runtime {
 
-static WorkspacePool& getGlobalCudaWorkspace();
+class ThreadSafeWorkspacePool
+{
+  public:
+    ThreadSafeWorkspacePool(
+        DLDeviceType device_type,
+        std::shared_ptr<DeviceAPI> device) :
+      pool_(device_type, device),
+      mtx_()
+    {
+    }
+
+    void* AllocWorkspace(DGLContext ctx, size_t size)
+    {
+      std::lock_guard<std::mutex> guard(mtx_);
+      return pool_.AllocWorkspace(ctx, size);
+    }
+
+    void FreeWorkspace(DGLContext ctx, void* ptr)
+    {
+      std::lock_guard<std::mutex> guard(mtx_);
+      pool_.FreeWorkspace(ctx, ptr);
+    }
+
+  private:
+    WorkspacePool pool_;
+    std::mutex mtx_;
+};
+
+static ThreadSafeWorkspacePool& getGlobalCudaWorkspace();
 
 class CUDADeviceAPI final : public DeviceAPI {
  public:
@@ -88,16 +117,12 @@ class CUDADeviceAPI final : public DeviceAPI {
     }
     *rv = value;
   }
+
   void* AllocDataSpace(DGLContext ctx,
                        size_t nbytes,
-                       size_t alignment,
-                       DGLType type_hint) final {
-
-
-    CHECK_EQ(256 % alignment, 0U)
-        << "CUDA space is aligned at 256 bytes";
+                       size_t /* alignment */,
+                       DGLType /* type_hint */) final {
     void *ret = getGlobalCudaWorkspace().AllocWorkspace(ctx, nbytes);
-
     return ret;
   }
 
@@ -217,10 +242,9 @@ class CUDADeviceAPI final : public DeviceAPI {
   }
 };
 
-WorkspacePool& getGlobalCudaWorkspace()
+ThreadSafeWorkspacePool& getGlobalCudaWorkspace()
 {
-  static WorkspacePool pool(kDLGPU, CUDADeviceAPI::Global());
-
+  static ThreadSafeWorkspacePool pool(kDLGPU, CUDADeviceAPI::Global());
   return pool;
 }
 
