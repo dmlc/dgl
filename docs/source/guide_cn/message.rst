@@ -3,6 +3,8 @@
 第2章：消息传递范式
 ================
 
+:ref:`(English Version) guide-message-passing`
+
 Message Passing Paradigm
 
 消息传递范式
