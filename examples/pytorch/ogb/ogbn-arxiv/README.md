@@ -4,7 +4,7 @@ Requires DGL 0.5 or later versions.
 
 ### GCN
 
-Run `gcn.py` with `--use-linear` and `--use-labels` enabled and you should directly see the result.
+For the best score, run `gcn.py` with `--use-linear` and `--use-labels` enabled and you should directly see the result.
 
 ```bash
 python3 gcn.py --use-linear --use-labels
@@ -12,7 +12,7 @@ python3 gcn.py --use-linear --use-labels
 
 ### GAT
 
-Run `gat.py` with `--use-labels` enabled and you should directly see the result.
+For the best score, run `gat.py` with `use-norm` and `--use-labels` enabled and you should directly see the result.
 
 ```bash
 python3 gat.py --use-norm --use-labels
@@ -23,59 +23,64 @@ python3 gat.py --use-norm --use-labels
 ### GCN
 
 ```
-usage: GCN on OGBN-Arxiv [-h] [--cpu] [--gpu GPU] [--n-runs N_RUNS] [--n-epochs N_EPOCHS] [--use-labels] [--use-linear]
-                         [--lr LR] [--n-layers N_LAYERS] [--n-hidden N_HIDDEN] [--dropout DROPOUT] [--wd WD]
-                         [--log-every LOG_EVERY] [--plot-curves]
+Using backend: pytorch
+usage: GCN on OGBN-Arxiv [-h] [--cpu] [--gpu GPU] [--n-runs N_RUNS] [--n-epochs N_EPOCHS] [--use-labels] [--use-linear] [--lr LR] [--n-layers N_LAYERS] [--n-hidden N_HIDDEN]
+                         [--dropout DROPOUT] [--wd WD] [--log-every LOG_EVERY] [--plot-curves]
 
 optional arguments:
   -h, --help            show this help message and exit
   --cpu                 CPU mode. This option overrides --gpu. (default: False)
   --gpu GPU             GPU device ID. (default: 0)
-  --n-runs N_RUNS
-  --n-epochs N_EPOCHS
+  --n-runs N_RUNS       running times (default: 10)
+  --n-epochs N_EPOCHS   number of epochs (default: 1000)
   --use-labels          Use labels in the training set as input features. (default: False)
   --use-linear          Use linear layer. (default: False)
-  --lr LR
-  --n-layers N_LAYERS
-  --n-hidden N_HIDDEN
-  --dropout DROPOUT
-  --wd WD
+  --lr LR               learning rate (default: 0.005)
+  --n-layers N_LAYERS   number of layers (default: 3)
+  --n-hidden N_HIDDEN   number of hidden units (default: 256)
+  --dropout DROPOUT     dropout rate (default: 0.75)
+  --wd WD               weight decay (default: 0)
   --log-every LOG_EVERY
-  --plot-curves
+                        log every LOG_EVERY epochs (default: 20)
+  --plot-curves         plot learning curves (default: False)
 ```
 
 ### GAT
 
 ```
-usage: GAT on OGBN-Arxiv [-h] [--cpu] [--gpu GPU] [--n-runs N_RUNS] [--n-epochs N_EPOCHS] [--use-labels] [--use-norm]
-                         [--lr LR] [--n-layers N_LAYERS] [--n-heads N_HEADS] [--n-hidden N_HIDDEN] [--dropout DROPOUT]
-                         [--attn_drop ATTN_DROP] [--wd WD] [--log-every LOG_EVERY] [--plot-curves]
+Using backend: pytorch
+usage: GAT on OGBN-Arxiv [-h] [--cpu] [--gpu GPU] [--n-runs N_RUNS] [--n-epochs N_EPOCHS] [--use-labels] [--use-norm] [--lr LR] [--n-layers N_LAYERS] [--n-heads N_HEADS]
+                         [--n-hidden N_HIDDEN] [--dropout DROPOUT] [--attn_drop ATTN_DROP] [--wd WD] [--log-every LOG_EVERY] [--plot-curves]
 
 optional arguments:
   -h, --help            show this help message and exit
   --cpu                 CPU mode. This option overrides --gpu. (default: False)
   --gpu GPU             GPU device ID. (default: 0)
-  --n-runs N_RUNS
-  --n-epochs N_EPOCHS
+  --n-runs N_RUNS       running times (default: 10)
+  --n-epochs N_EPOCHS   number of epochs (default: 2000)
   --use-labels          Use labels in the training set as input features. (default: False)
   --use-norm            Use symmetrically normalized adjacency matrix. (default: False)
-  --lr LR
-  --n-layers N_LAYERS
-  --n-heads N_HEADS
-  --n-hidden N_HIDDEN
-  --dropout DROPOUT
+  --lr LR               learning rate (default: 0.002)
+  --n-layers N_LAYERS   number of layers (default: 3)
+  --n-heads N_HEADS     number of heads (default: 3)
+  --n-hidden N_HIDDEN   number of hidden units (default: 256)
+  --dropout DROPOUT     dropout rate (default: 0.75)
   --attn_drop ATTN_DROP
-  --wd WD
+                        attention dropout rate (default: 0.05)
+  --wd WD               weight decay (default: 0)
   --log-every LOG_EVERY
-  --plot-curves
+                        log every LOG_EVERY epochs (default: 20)
+  --plot-curves         plot learning curves (default: False)
 ```
 
 ## Results
 
 Here are the results over 10 runs.
 
-|             |       GCN       |   GCN+linear    |   GCN+labels    | GCN+linear+labels |   GAT*+labels   |
-|-------------|:---------------:|:---------------:|:---------------:|:-----------------:|:---------------:|
-| Val acc     | 0.7361 ± 0.0009 | 0.7397 ± 0.0010 | 0.7399 ± 0.0008 |  0.7442 ± 0.0012  | 0.7504 ± 0.0006 |
-| Test acc    | 0.7246 ± 0.0021 | 0.7270 ± 0.0016 | 0.7259 ± 0.0006 |  0.7306 ± 0.0024  | 0.7365 ± 0.0011 |
-| #Parameters |     109608      |     218152      |     119848      |      238632       |     1628440     |
+|                        |     Val acc     |    Test acc     | #Parameters |
+|:----------------------:|:---------------:|:---------------:|:-----------:|
+|          GCN           | 0.7361 ± 0.0009 | 0.7246 ± 0.0021 |   109,608   |
+|       GCN+linear       | 0.7397 ± 0.0010 | 0.7270 ± 0.0016 |   218,152   |
+|       GCN+labels       | 0.7399 ± 0.0008 | 0.7259 ± 0.0006 |   119,848   |
+|   GCN+linear+labels    | 0.7442 ± 0.0012 | 0.7306 ± 0.0024 |   238,632   |
+| GAT(norm. adj.)+labels | 0.7504 ± 0.0006 | 0.7365 ± 0.0011 |  1,628,440  |

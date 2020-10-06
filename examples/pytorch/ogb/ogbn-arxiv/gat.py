@@ -227,21 +227,21 @@ def main():
     argparser = argparse.ArgumentParser("GAT on OGBN-Arxiv", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argparser.add_argument("--cpu", action="store_true", help="CPU mode. This option overrides --gpu.")
     argparser.add_argument("--gpu", type=int, default=0, help="GPU device ID.")
-    argparser.add_argument("--n-runs", type=int, default=10)
-    argparser.add_argument("--n-epochs", type=int, default=2000)
+    argparser.add_argument("--n-runs", type=int, help="running times", default=10)
+    argparser.add_argument("--n-epochs", type=int, help="number of epochs", default=2000)
     argparser.add_argument(
         "--use-labels", action="store_true", help="Use labels in the training set as input features."
     )
     argparser.add_argument("--use-norm", action="store_true", help="Use symmetrically normalized adjacency matrix.")
-    argparser.add_argument("--lr", type=float, default=0.002)
-    argparser.add_argument("--n-layers", type=int, default=3)
-    argparser.add_argument("--n-heads", type=int, default=3)
-    argparser.add_argument("--n-hidden", type=int, default=256)
-    argparser.add_argument("--dropout", type=float, default=0.75)
-    argparser.add_argument("--attn_drop", type=float, default=0.05)
-    argparser.add_argument("--wd", type=float, default=0)
-    argparser.add_argument("--log-every", type=int, default=20)
-    argparser.add_argument("--plot-curves", action="store_true")
+    argparser.add_argument("--lr", type=float, help="learning rate", default=0.002)
+    argparser.add_argument("--n-layers", type=int, help="number of layers", default=3)
+    argparser.add_argument("--n-heads", type=int, help="number of heads", default=3)
+    argparser.add_argument("--n-hidden", type=int, help="number of hidden units", default=256)
+    argparser.add_argument("--dropout", type=float, help="dropout rate", default=0.75)
+    argparser.add_argument("--attn_drop", type=float, help="attention dropout rate", default=0.05)
+    argparser.add_argument("--wd", type=float, help="weight decay", default=0)
+    argparser.add_argument("--log-every", type=int, help="log every LOG_EVERY epochs", default=20)
+    argparser.add_argument("--plot-curves", help="plot learning curves", action="store_true")
     args = argparser.parse_args()
 
     if args.cpu:
@@ -268,7 +268,7 @@ def main():
 
     in_feats = graph.ndata["feat"].shape[1]
     n_classes = (labels.max() + 1).item()
-    # graph.create_format_()
+    graph.create_formats_()
 
     train_idx = train_idx.to(device)
     val_idx = val_idx.to(device)
