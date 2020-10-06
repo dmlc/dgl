@@ -14,32 +14,28 @@
 namespace dgl {
 namespace runtime {
 
-class ThreadSafeWorkspacePool
-{
-  public:
-    ThreadSafeWorkspacePool(
-        DLDeviceType device_type,
-        std::shared_ptr<DeviceAPI> device) :
-      pool_(device_type, device),
-      mtx_()
-    {
-    }
+class ThreadSafeWorkspacePool {
+ public:
+  ThreadSafeWorkspacePool(
+      DLDeviceType device_type,
+      std::shared_ptr<DeviceAPI> device) :
+    pool_(device_type, device),
+    mtx_() {
+  }
 
-    void* AllocWorkspace(DGLContext ctx, size_t size)
-    {
-      std::lock_guard<std::mutex> guard(mtx_);
-      return pool_.AllocWorkspace(ctx, size);
-    }
+  void* AllocWorkspace(DGLContext ctx, size_t size) {
+    std::lock_guard<std::mutex> guard(mtx_);
+    return pool_.AllocWorkspace(ctx, size);
+  }
 
-    void FreeWorkspace(DGLContext ctx, void* ptr)
-    {
-      std::lock_guard<std::mutex> guard(mtx_);
-      pool_.FreeWorkspace(ctx, ptr);
-    }
+  void FreeWorkspace(DGLContext ctx, void* ptr) {
+    std::lock_guard<std::mutex> guard(mtx_);
+    pool_.FreeWorkspace(ctx, ptr);
+  }
 
-  private:
-    WorkspacePool pool_;
-    std::mutex mtx_;
+ private:
+  WorkspacePool pool_;
+  std::mutex mtx_;
 };
 
 static ThreadSafeWorkspacePool& getGlobalCudaWorkspace();
@@ -127,7 +123,7 @@ class CUDADeviceAPI final : public DeviceAPI {
   }
 
   void FreeDataSpace(DGLContext ctx, void* ptr) final {
-    getGlobalCudaWorkspace().FreeWorkspace(ctx, ptr); 
+    getGlobalCudaWorkspace().FreeWorkspace(ctx, ptr);
   }
 
   void* AllocRawDataSpace(DGLContext ctx,
@@ -241,8 +237,7 @@ class CUDADeviceAPI final : public DeviceAPI {
   }
 };
 
-ThreadSafeWorkspacePool& getGlobalCudaWorkspace()
-{
+ThreadSafeWorkspacePool& getGlobalCudaWorkspace() {
   static ThreadSafeWorkspacePool pool(kDLGPU, CUDADeviceAPI::Global());
   return pool;
 }
