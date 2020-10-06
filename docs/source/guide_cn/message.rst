@@ -30,7 +30,7 @@ by aggregating its incoming messages using the **reduce function**
 :math:`\rho`.
 
 在上面的等式中， :math:`\phi` 是定义在每条边上的消息函数，它通过将边上特征与其两端节点的特征相结合来生成消息。
- **聚合函数** :math:`\rho` 会聚合节点接受到的消息，并与节点本身的特征一起通过 :math:`\psi` 定义的 **更新函数** 来更新节点的特征。
+**聚合函数** :math:`\rho` 会聚合节点接受到的消息，并与节点本身的特征一起通过 :math:`\psi` 定义的 **更新函数** 来更新节点的特征。
 
 Roadmap
 
