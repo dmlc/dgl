@@ -19,7 +19,7 @@ DGL generates it internally to represent a batch of nodes. It has member
 ``mailbox`` to access the messages received for the nodes in the batch.
 Some of the most common reduce operations include ``sum``, ``max``, ``min``, etc.
 
-**聚合函数** 接受一个参数 ``nodes``，它是一个:class:`~dgl.udf.NodeBatch` 的实例，
+**聚合函数** 接受一个参数 ``nodes``，它是一个 :class:`~dgl.udf.NodeBatch` 的实例，
 在消息传递时，DGL在内部生成以表示一批节点。这些节点的成员属性 ``mailbox`` 可以用来访问节点收到的消息。
 一些最常见的聚合操作包括 ``sum``、``max``、``min`` 等。
 
@@ -42,7 +42,7 @@ DGL在命名空间 ``dgl.function`` 中实现了常用的消息函数和聚合�
 If your message passing functions cannot be implemented with built-ins,
 you can implement user-defined message/reduce function (aka. **UDF**).
 
-如果用户的消息传递函数不能用内置函数实现，用户可以实现自己的消息或聚合函数（也称为 **用户定义函数** ）。
+如果用户的消息传递函数不能用内置函数实现，用户可以实现自己的消息或聚合函数(也称为 **用户定义函数** )。
 
 Built-in message functions can be unary or binary. DGL supports ``copy``
 for unary. For binary funcs, DGL supports ``add``, ``sub``, ``mul``, ``div``,
