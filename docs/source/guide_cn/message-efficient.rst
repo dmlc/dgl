@@ -65,7 +65,7 @@ messages on the edges can be high dimensional, which is memory consuming.
 DGL recommends keeping the dimension of edge features as low as possible.
 
 对于某些情况，比如 :class:`~dgl.nn.pytorch.conv.GATConv`，计算必须在边上保存消息，
-用户需要调用基于内置函数的:meth:`~dgl.DGLGraph.apply_edges` 。有时边上的消息可能是高维的，这会非常消耗内存。
+用户需要调用基于内置函数的 :meth:`~dgl.DGLGraph.apply_edges`。有时边上的消息可能是高维的，这会非常消耗内存。
 DGL建议用户尽可能降低edata维数。
 
 Here’s an example on how to achieve this by splitting operations on the

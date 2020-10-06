@@ -109,9 +109,9 @@ DGL recommends this approach since the update function can usually be
 written as pure tensor operations to make the code concise. For
 example：
 
- :meth:`~dgl.DGLGraph.update_all` 的参数是一个消息函数、一个聚合函数和一个更新函数。
+:meth:`~dgl.DGLGraph.update_all` 的参数是一个消息函数、一个聚合函数和一个更新函数。
 更新函数是一个选择性的参数。用户也可在 ``update_all`` 执行完后直接对节点特征进行操做。
-由于更新函数通常可以以纯张量操作实现，DGL推荐不在 ``update_all`` 中指定更新函数，
+由于更新函数通常可以以纯张量操作实现，DGL不推荐在 ``update_all`` 中指定更新函数，
 而是在它执行完后直接对节点特征进行操作。例如：
 
 .. code::
