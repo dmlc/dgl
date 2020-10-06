@@ -2,12 +2,15 @@ from __future__ import absolute_import
 
 
 import jax
-import jax.numpy as jnp
-from jax import scipy as jcp
+from jax.config import config
+config.update("jax_enable_x64", True)
+from jax import numpy as jnp
+import numpy as onp
+from jax import dlpack
 
 import builtins
 import numbers
-from torch.utils import dlpack
+# from torch.utils import dlpack
 
 
 from ... import ndarray as nd
@@ -35,7 +38,7 @@ def cpu():
 def tensor(data, dtype=None):
     if isinstance(data, numbers.Number):
         data = [data]
-    return jnp.asarray(data, dtype=dtype)
+    return jnp.array(data, dtype=dtype)
 
 def as_scalar(data):
     return data.item()
@@ -99,46 +102,33 @@ def ndim(input):
     return input.ndim
 
 def context(input):
-    return input.device
+    return input.device_buffer.device()
 
 def device_type(ctx):
-    return jax.devices(ctx)[0].device_kind
+    return ctx.device_kind
 
 def device_id(ctx):
-    ctx = jax.devices(ctx)[0]
-    if ctx.index is None:
-        return 0
-    else:
-        return ctx.index
+    return ctx.id
 
 def to_backend_ctx(dglctx):
     dev_type = dglctx.device_type
     if dev_type == 1:
-        return th.device('cpu')
+        return jax.devices('cpu')[0]
     elif dev_type == 2:
-        return th.device('cuda', dglctx.device_id)
+        return jax.devices('gpu')[0]
     else:
         raise ValueError('Unsupported DGL device context:', dglctx)
 
 def astype(input, ty):
-    return input.type(ty)
+    return input.astype(ty)
 
 def asnumpy(input):
-    if isinstance(input, th.sparse.FloatTensor):
-        return input.to_dense().cpu().detach().numpy()
-    else:
-        return input.cpu().detach().numpy()
+    return onp.array(input)
 
 def copy_to(input, ctx, **kwargs):
-    ctx = th.device(ctx)
-    if ctx.type == 'cpu':
-        return input.cpu()
-    elif ctx.type == 'cuda':
-        if ctx.index is not None:
-            th.cuda.set_device(ctx.index)
-        return input.cuda(**kwargs)
-    else:
-        raise RuntimeError('Invalid context', ctx)
+    # TODO:
+    return jax.device_put(input, ctx)
+
 
 def sum(input, dim, keepdims=False):
     return jnp.sum(input, axis=dim, keepdims=keepdims)
@@ -154,14 +144,14 @@ def reduce_mean(input):
 
 def max(input, dim):
     # NOTE: the second argmax array is not returned
-    return jnp.max(input, axis=dim)[0]
+    return jnp.max(input, axis=dim)
 
 def reduce_max(input):
     return input.max()
 
 def min(input, dim):
     # NOTE: the second argmin array is not returned
-    return jnp.min(input, axis=dim)[0]
+    return jnp.min(input, axis=dim)
 
 def reduce_min(input):
     return input.min()
@@ -202,7 +192,7 @@ def repeat(input, repeats, dim):
     return jnp.repeat(input, repeats=repeats, axis=dim)
 
 def gather_row(data, row_index):
-    return jnp.take(data, 0, row_index)
+    return jnp.take(data, row_index, 0)
 
 def slice_axis(data, axis, begin, end):
     return jnp.take(
@@ -222,15 +212,17 @@ def narrow_row(x, start, stop):
     return x[start:stop]
 
 def index_add_inplace(data, row_idx, value):
-    data[row_idx] += value
+    raise NotImplementedError
 
 def scatter_row(data, row_index, value):
-    new_data = jnp.copy(data)
-    new_data[row_index] = value
-    return new_data
+    return jax.ops.index_update(
+        data,
+        row_index,
+        value
+    )
 
 def scatter_row_inplace(data, row_index, value):
-    data[row_index.long()] = value
+    raise NotImplementedError
 
 def squeeze(input, dim):
     return jnp.squeeze(input, dim)
@@ -245,7 +237,9 @@ def swapaxes(input, axis1, axis2):
     return jnp.transpose(input, axis1, axis2)
 
 def zeros(shape, dtype, ctx):
-    return jnp.zeros(shape, dtype=dtype, device=ctx)
+    # TODO: device
+
+    return jnp.zeros(shape, dtype=dtype,)
 
 def zeros_like(input):
     return jnp.zeros_like(input)
@@ -354,45 +348,37 @@ def arange(start, stop, dtype=jnp.int64):
 def rand_shuffle(arr):
     key = jax.random.PRNGKey(2666)
     idx = jnp.random.permuataion(
-        key=key,
+        key,
         jnp.arrange(len(arr)),
     )
     return arr[idx]
 
 def zerocopy_to_dlpack(input):
-    return dlpack.to_dlpack(
-        jnp.ascontiguousarray(
-            input,
-        )
-    )
+    return jax.dlpack.to_dlpack(input)
 
 def zerocopy_from_dlpack(dlpack_tensor):
-    return dlpack.from_dlpack(dlpack_tensor)
+    return jax.dlpack.from_dlpack(dlpack_tensor)
 
 def zerocopy_to_numpy(input):
     # NOTE: not zerocopy
     return asnumpy(input)
 
 def zerocopy_from_numpy(np_array):
-    return th.as_tensor(np_array)
+    return jnp.asarray(np_array)
 
 def zerocopy_to_dgl_ndarray(data):
-    return nd.from_dlpack(
-        dlpack.to_dlpack(
-            jnp.ascontiguousarray(
-                input,
-            )
-        )
-    )
+    # TODO: this still copies data which might be bad
+    data = jnp.array(data)
+    return nd.from_dlpack(jax.dlpack.to_dlpack(data))
 
 def zerocopy_to_dgl_ndarray_for_write(input):
     return zerocopy_to_dgl_ndarray(input)
 
 def zerocopy_from_dgl_ndarray(data):
-    return dlpack.from_dlpack(data.to_dlpack())
+    return jax.dlpack.from_dlpack(data.to_dlpack())
 
 
-class BinaryReduce(th.autograd.Function):
+class BinaryReduce(object):
     @staticmethod
     def forward(ctx, reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data, out_data,
                 out_size, lhs_map, rhs_map, out_map):
@@ -485,7 +471,7 @@ def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
             out_size, lhs_map, rhs_map, out_map)
 
 
-class CopyReduce(th.autograd.Function):
+class CopyReduce(object):
     @staticmethod
     def forward(ctx, reducer, graph, target, in_data, out_data, out_size, in_map,
                 out_map):
@@ -574,26 +560,22 @@ def sync():
     pass
 
 def attach_grad(x):
-    if x.grad is not None:
-        x.grad.zero_()
-        return x
-    else:
-        return x.requires_grad_()
+    # there is no concept of grad attribute in jax
+    return x
 
 def backward(x, head_gradient=None):
-    if head_gradient is not None and head_gradient.shape[0] == 1 and len(head_gradient.shape) == 1:
-        # Fix for torch 1.3.1
-        head_gradient = th.tensor(head_gradient.item()).to(head_gradient.device)
-    x.backward(head_gradient)
+    # there is no concept of grad attribute in jax
+    pass
 
 def grad(x):
-    return x.grad
+    # there is no concept of grad attribute in jax
+    pass
 
 def is_no_grad(x):
-    return x.grad is None or (x.grad == 0).all()
+    return True
 
 def is_recording():
-    return th.is_grad_enabled()
+    return True
 
 class record_grad(object):
     def __init__(self):
@@ -605,4 +587,6 @@ class record_grad(object):
     def __exit__(self, exc_type, exc_value, exc_traceback):
         pass
 
-no_grad = th.no_grad
+
+def no_grad():
+    raise NotImplementedError
