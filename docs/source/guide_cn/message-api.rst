@@ -3,7 +3,7 @@
 2.1 内置函数和消息传递API
 ----------------------
 
-:ref:`(English Version) guide-message-passing-api`
+:ref:`(English Version) <guide-message-passing-api>`
 
 In DGL, **message function** takes a single argument ``edges``,
 which is an :class:`~dgl.udf.EdgeBatch` instance. During message passing,

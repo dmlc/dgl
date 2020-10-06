@@ -3,7 +3,7 @@
 2.3 在图的一部分上进行消息传递
 -------------------------
 
-:ref:`(English Version) guide-message-passing-part`
+:ref:`(English Version) <guide-message-passing-part>`
 
 If one only wants to update part of the nodes in the graph, the practice
 is to create a subgraph by providing the IDs for the nodes to

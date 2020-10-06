@@ -3,7 +3,7 @@
 2.1 Built-in Functions and Message Passing APIs
 -----------------------------------------------
 
-:ref:`(中文版) guide_cn-message-passing-api`
+:ref:`(中文版) <guide_cn-message-passing-api>`
 
 In DGL, **message function** takes a single argument ``edges``,
 which is an :class:`~dgl.udf.EdgeBatch` instance. During message passing,
