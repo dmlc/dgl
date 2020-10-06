@@ -74,7 +74,7 @@ class WorkspacePool::Pool {
     } else {
       int index = static_cast<int>(allocated_.size()) - 2;
       for (; index > 0 && allocated_[index].data != data; --index) {}
-      CHECK_GT(index, 0) << "trying to free things that has not been allocated: " << data;
+      CHECK_GT(index, 0) << "trying to free things that has not been allocated";
       e = allocated_[index];
       allocated_.erase(allocated_.begin() + index);
     }
