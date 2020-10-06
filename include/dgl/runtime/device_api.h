@@ -82,8 +82,7 @@ class DeviceAPI {
   virtual void* AllocDataSpace(DGLContext ctx,
                                size_t nbytes,
                                size_t alignment,
-                               DGLType type_hint)
-  {
+                               DGLType type_hint) {
     return AllocRawDataSpace(ctx, nbytes, alignment, type_hint);
   }
   /*!
@@ -97,8 +96,7 @@ class DeviceAPI {
    * \param ctx The device context to perform operation.
    * \param ptr The data space.
    */
-  virtual void FreeDataSpace(DGLContext ctx, void* ptr)
-  {
+  virtual void FreeDataSpace(DGLContext ctx, void* ptr) {
       FreeRawDataSpace(ctx, ptr);
   }
   /*!
