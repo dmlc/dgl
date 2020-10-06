@@ -13,6 +13,8 @@
 namespace dgl {
 namespace runtime {
 
+static WorkspacePool& getGlobalCudaWorkspace();
+
 class CUDADeviceAPI final : public DeviceAPI {
  public:
   void SetDevice(DGLContext ctx) final {
@@ -90,6 +92,23 @@ class CUDADeviceAPI final : public DeviceAPI {
                        size_t nbytes,
                        size_t alignment,
                        DGLType type_hint) final {
+
+
+    CHECK_EQ(256 % alignment, 0U)
+        << "CUDA space is aligned at 256 bytes";
+    void *ret = getGlobalCudaWorkspace().AllocWorkspace(ctx, nbytes);
+
+    return ret;
+  }
+
+  void FreeDataSpace(DGLContext ctx, void* ptr) final {
+    getGlobalCudaWorkspace().FreeWorkspace(ctx, ptr); 
+  }
+
+  void* AllocRawDataSpace(DGLContext ctx,
+                       size_t nbytes,
+                       size_t alignment,
+                       DGLType type_hint) final {
     CUDA_CALL(cudaSetDevice(ctx.device_id));
     CHECK_EQ(256 % alignment, 0U)
         << "CUDA space is aligned at 256 bytes";
@@ -98,7 +117,7 @@ class CUDADeviceAPI final : public DeviceAPI {
     return ret;
   }
 
-  void FreeDataSpace(DGLContext ctx, void* ptr) final {
+  void FreeRawDataSpace(DGLContext ctx, void* ptr) final {
     CUDA_CALL(cudaSetDevice(ctx.device_id));
     CUDA_CALL(cudaFree(ptr));
   }
@@ -196,6 +215,13 @@ class CUDADeviceAPI final : public DeviceAPI {
     }
   }
 };
+
+WorkspacePool& getGlobalCudaWorkspace()
+{
+  static WorkspacePool pool(kDLGPU, CUDADeviceAPI::Global());
+
+  return pool;
+}
 
 typedef dmlc::ThreadLocalStore<CUDAThreadEntry> CUDAThreadStore;
 
