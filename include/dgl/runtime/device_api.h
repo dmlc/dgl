@@ -58,6 +58,19 @@ class DeviceAPI {
    */
   virtual void GetAttr(DGLContext ctx, DeviceAttrKind kind, DGLRetValue* rv) = 0;
   /*!
+   * \brief Allocate a data space on device using system mechanisms.
+   * \param ctx The device context to perform operation.
+   * \param nbytes The number of bytes in memory.
+   * \param alignment The alignment of the memory.
+   * \param type_hint The type of elements. Only needed by certain backends such
+   * as OpenGL, as nbytes & alignment are sufficient for most backends.
+   * \return The allocated device pointer.
+   */
+  virtual void* AllocRawDataSpace(DGLContext ctx,
+                               size_t nbytes,
+                               size_t alignment,
+                               DGLType type_hint) = 0;
+  /*!
    * \brief Allocate a data space on device.
    * \param ctx The device context to perform operation.
    * \param nbytes The number of bytes in memory.
@@ -69,13 +82,25 @@ class DeviceAPI {
   virtual void* AllocDataSpace(DGLContext ctx,
                                size_t nbytes,
                                size_t alignment,
-                               DGLType type_hint) = 0;
+                               DGLType type_hint)
+  {
+    return AllocRawDataSpace(ctx, nbytes, alignment, type_hint);
+  }
   /*!
-   * \brief Free a data space on device.
+   * \brief Free a data space on device using system mechanisms.
    * \param ctx The device context to perform operation.
    * \param ptr The data space.
    */
-  virtual void FreeDataSpace(DGLContext ctx, void* ptr) = 0;
+  virtual void FreeRawDataSpace(DGLContext ctx, void* ptr) = 0;
+  /*!
+   * \brief Free a data space on the device.
+   * \param ctx The device context to perform operation.
+   * \param ptr The data space.
+   */
+  virtual void FreeDataSpace(DGLContext ctx, void* ptr)
+  {
+      FreeRawDataSpace(ctx, ptr);
+  }
   /*!
    * \brief copy data from one place to another
    * \param from The source array.

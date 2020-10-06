@@ -101,11 +101,11 @@ DeviceAPI* DeviceAPI::Get(DGLContext ctx, bool allow_missing) {
 void* DeviceAPI::AllocWorkspace(DGLContext ctx,
                                 size_t size,
                                 DGLType type_hint) {
-  return AllocDataSpace(ctx, size, kTempAllocaAlignment, type_hint);
+  return AllocRawDataSpace(ctx, size, kTempAllocaAlignment, type_hint);
 }
 
 void DeviceAPI::FreeWorkspace(DGLContext ctx, void* ptr) {
-  FreeDataSpace(ctx, ptr);
+  FreeRawDataSpace(ctx, ptr);
 }
 
 DGLStreamHandle DeviceAPI::CreateStream(DGLContext ctx) {

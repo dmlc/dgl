@@ -20,7 +20,8 @@ class CPUDeviceAPI final : public DeviceAPI {
       *rv = 1;
     }
   }
-  void* AllocDataSpace(DGLContext ctx,
+
+  void* AllocRawDataSpace(DGLContext ctx,
                        size_t nbytes,
                        size_t alignment,
                        DGLType type_hint) final {
@@ -38,7 +39,7 @@ class CPUDeviceAPI final : public DeviceAPI {
     return ptr;
   }
 
-  void FreeDataSpace(DGLContext ctx, void* ptr) final {
+  void FreeRawDataSpace(DGLContext ctx, void* ptr) final {
 #if _MSC_VER || defined(__MINGW32__)
     _aligned_free(ptr);
 #else
