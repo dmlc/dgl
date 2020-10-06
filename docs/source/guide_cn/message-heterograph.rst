@@ -12,7 +12,7 @@ depending on their complexity, certain node and edge types might need to
 be modeled with representations that have a different number of
 dimensions.
 
-异构图（参考用户指南 :ref:`第一章1.5 异构图 <guide-graph-heterogeneous>` ）是包含不同类型的节点和边的图。
+异构图（参考用户指南 :ref:`第一章1.5 异构图 <guide_cn-graph-heterogeneous>` ）是包含不同类型的节点和边的图。
 不同类型的节点和边常常具有不同类型的属性。这些属性旨在刻画每一种节点和边的特征。在使用图神经网络时，根据其复杂性，
 可能需要使用不同维数的表示来对不同类型的节点和边进行建模。
 
