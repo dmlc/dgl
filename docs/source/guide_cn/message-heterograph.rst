@@ -14,13 +14,13 @@ depending on their complexity, certain node and edge types might need to
 be modeled with representations that have a different number of
 dimensions.
 
-异构图（参考用户指南 :ref:`第一章1.5 异构图 <guide_cn-graph-heterogeneous>` ）是包含不同类型的节点和边的图。
+异构图（参考用户指南 :ref:`1.5 异构图 <guide_cn-graph-heterogeneous>` ）是包含不同类型的节点和边的图。
 不同类型的节点和边常常具有不同类型的属性。这些属性旨在刻画每一种节点和边的特征。在使用图神经网络时，根据其复杂性，
-可能需要使用不同维数的表示来对不同类型的节点和边进行建模。
+可能需要使用不同维度数的表示来对不同类型的节点和边进行建模。
 
 The message passing on heterographs can be split into two parts:
 
-异构图上的消息传递可以分为2个部分：
+异构图上的消息传递可以分为两个部分：
 
 1. Message computation and aggregation for each relation r.
 2. Reduction that merges the aggregation results from all relations for each node type.
@@ -40,7 +40,7 @@ Here’s an example:
 :meth:`~dgl.DGLGraph.multi_update_all` 接受一个字典。这个字典的每一个键值对里，键是一种关系，
 值是这种关系对应 :meth:`~dgl.DGLGraph.update_all` 的参数。
 :meth:`~dgl.DGLGraph.multi_update_all` 还接受一个字符串来表示跨类型整合函数，
-这个整合函数可以是 ``sum``， ``min``， ``max``， ``mean`` 和 ``stack`` 中的一个。以下是一个例子：
+这个整合函数可以是 ``sum``、 ``min``、 ``max``、 ``mean`` 和 ``stack`` 中的一个。以下是一个例子：
 
 .. code::
 

@@ -29,8 +29,8 @@ with the features of its incident nodes; :math:`\psi` is an
 by aggregating its incoming messages using the **reduce function**
 :math:`\rho`.
 
-在上面的等式中， :math:`\phi` 是定义在每条边上的消息函数，通过将边上特征与其两端节点的特征相结合来生成消息；
-:math:`\psi` 是定义在每个节点上的 **更新函数** ，通过使用 **聚合函数** :math:`\rho` 聚合节点接受到的消息来更新节点的特征。
+在上面的等式中， :math:`\phi` 是定义在每条边上的消息函数，它通过将边上特征与其两端节点的特征相结合来生成消息。
+ **聚合函数** :math:`\rho` 会聚合节点接受到的消息，并与节点本身的特征一起通过 :math:`\psi` 定义的 **更新函数** 来更新节点的特征。
 
 Roadmap
 
@@ -40,7 +40,7 @@ Roadmap
 This chapter introduces DGL's message passing APIs, and how to efficiently use them on both nodes and edges.
 The last section of it explains how to implement message passing on heterogeneous graphs.
 
-本章首先介绍了DGL的消息传递API。然后讲解了如何高效地在点和边上使用这些API。章节的最后部分解释了如何在异构图上实现消息传递。
+本章首先介绍了DGL的消息传递API。然后讲解了如何高效地在点和边上使用这些API。本章的最后部分解释了如何在异构图上实现消息传递。
 
 * :ref:`guide_cn-message-passing-api`
 * :ref:`guide_cn-message-passing-efficient`

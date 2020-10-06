@@ -11,7 +11,7 @@ message before message aggregation, for examples, in
 variants <https://arxiv.org/abs/2004.00445>`__. In DGL, the way to
 handle this is:
 
-在GNN建模中的一类常见做法是在消息聚合前使用边的权重。
+一类常见的图神经网络建模的做法是在消息聚合前使用边的权重，
 比如在 `图注意力网络(GAT) <https://arxiv.org/pdf/1710.10903.pdf>`__ 和一些 `GCN的变种 <https://arxiv.org/abs/2004.00445>`__ 。
 DGL的处理方法是：
 

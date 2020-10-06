@@ -12,8 +12,8 @@ members ``src``, ``dst`` and ``data`` to access features of source nodes,
 destination nodes, and edges, respectively.
 
 在DGL中，**消息函数** 接受一个参数 ``edges``，它是一个 :class:`~dgl.udf.EdgeBatch` 的实例，
-在消息传递时，DGL在内部生成以表示一批边。这些边有 ``src``、 ``dst`` 和 ``data`` 三个成员属性，
-分别可以用于访问源节点、目标节点和边的特征。
+在消息传递时，DGL在内部生成以表示一批边。这些边有 ``src``、 ``dst`` 和 ``data`` 共3个成员属性，
+分别用于访问源节点、目标节点和边的特征。
 
 **reduce function** takes a single argument ``nodes``, which is a
 :class:`~dgl.udf.NodeBatch` instance. During message passing,
@@ -31,7 +31,7 @@ combining it with a node’s original feature at the the last step and saving th
 as a node feature.
 
 **更新函数** 接受一个参数 ``nodes``。此函数对 ``聚合函数`` 的聚合结果进行操作，
-通常在消息传递的最后一步将其与节点的特征相结合，并将输出为节点特征。
+通常在消息传递的最后一步将其与节点的特征相结合，并将输出作为节点的新特征。
 
 DGL has implemented commonly used message functions and reduce functions
 as **built-in** in the namespace ``dgl.function``. In general, DGL
@@ -44,7 +44,7 @@ DGL在命名空间 ``dgl.function`` 中实现了常用的消息函数和聚合�
 If your message passing functions cannot be implemented with built-ins,
 you can implement user-defined message/reduce function (aka. **UDF**).
 
-如果用户的消息传递函数不能用内置函数实现，用户可以实现自己的消息或聚合函数(也称为 **用户定义函数** )。
+如果用户的消息传递函数无法用内置函数实现，则可以实现自己的消息或聚合函数(也称为 **用户定义函数** )。
 
 Built-in message functions can be unary or binary. DGL supports ``copy``
 for unary. For binary funcs, DGL supports ``add``, ``sub``, ``mul``, ``div``,
@@ -58,9 +58,9 @@ at ``he`` field, one can use built-in function ``dgl.function.u_add_v('hu', 'hv'
 This is equivalent to the Message UDF:
 
 内置消息函数可以是一元函数或二元函数。对于一元函数，DGL支持 ``copy`` 函数。对于二元函数，
-DGL现在支持 ``add``、 ``sub``、 ``mul``、 ``div``、 ``dot``。消息内置函数的命名约定是 ``u`` 表示 ``源`` 节点，
-``v`` 表示 ``目标`` 节点，``e``表示 ``边``。这些函数的参数是字符串，指示相应节点和边的输入和输出特征字段名。
-关于内置函数，见 :ref:`api-built-in`。例如，要对源节点的 ``hu`` 特征和目标节点的 ``hv`` 特征求和，
+DGL现在支持 ``add``、 ``sub``、 ``mul``、 ``div``、 ``dot`` 函数。消息的内置函数的命名约定是 ``u`` 表示 ``源`` 节点，
+``v`` 表示 ``目标`` 节点，``e`` 表示 ``边``。这些函数的参数是字符串，指示相应节点和边的输入和输出特征字段名。
+关于内置函数，请参见 :ref:`api-built-in`。例如，要对源节点的 ``hu`` 特征和目标节点的 ``hv`` 特征求和，
 然后将结果保存在边的 ``he`` 特征上，用户可以使用内置函数 ``dgl.function.u_add_v('hu', 'hv', 'he')``。
 而以下用户定义消息函数与此内置函数等价。
 
@@ -75,7 +75,7 @@ for field name in ``mailbox``, one for field name in node features, both
 are strings. For example, ``dgl.function.sum('m', 'h')`` is equivalent
 to the Reduce UDF that sums up the message ``m``:
 
-内置的聚合函数支持 ``sum``、 ``max``、 ``min``、 ``prod`` 和 ``mean`` 操作。
+DGL支持内置的聚合函数 ``sum``、 ``max``、 ``min``、 ``prod`` 和 ``mean`` 操作。
 聚合函数通常有两个参数，它们的类型都是字符串。一个用于指定 ``mailbox`` 中的字段名，一个用于指示目标节点特征的字段名，
 例如， ``dgl.function.sum('m', 'h')`` 等价于如下所示的对接收到消息求和的用户定义函数：
 
@@ -102,7 +102,7 @@ API that merges message generation, message aggregation and node update
 in a single call, which leaves room for optimization as a whole.
 
 对于消息传递， :meth:`~dgl.DGLGraph.update_all` 是一个高级API。它聚合了消息生成、
-消息聚合和节点特征更新为一体，从而能从整体上进行系统优化。
+消息聚合和节点特征更新，这为从整体上进行系统优化提供了空间。
 
 The parameters for :meth:`~dgl.DGLGraph.update_all` are a message function, a
 reduce function and an update function. One can call update function outside of
@@ -112,15 +112,15 @@ written as pure tensor operations to make the code concise. For
 example：
 
 :meth:`~dgl.DGLGraph.update_all` 的参数是一个消息函数、一个聚合函数和一个更新函数。
-更新函数是一个选择性的参数。用户也可在 ``update_all`` 执行完后直接对节点特征进行操做。
-由于更新函数通常可以以纯张量操作实现，DGL不推荐在 ``update_all`` 中指定更新函数，
+更新函数是一个选择性的参数。用户也可以在 ``update_all`` 执行完后直接对节点特征进行操做。
+由于更新函数通常可以用纯张量操作实现，所以DGL不推荐在 ``update_all`` 中指定更新函数，
 而是在它执行完后直接对节点特征进行操作。例如：
 
 .. code::
 
     def updata_all_example(graph):
         # store the result in graph.ndata['ft']
-        # 在 graph.ndata['ft']中存储结果
+        # 在graph.ndata['ft']中存储结果
         graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                          fn.sum('m', 'ft'))
         # Call update function outside of update_all
@@ -135,7 +135,7 @@ features ``ft``, and finally multiply ``ft`` by 2 to get the result
 The math formula for the above function is:
 
 此调用通过将源节点特征 ``ft`` 与边特征 ``a`` 相乘生成消息 ``m``，
-然后对所有消息求和来更新节点特征 ``ft``，最后将 ``ft`` 乘以2得到最终结果 ``final_ft``。
+然后对所有消息求和来更新节点特征 ``ft``，再将 ``ft`` 乘以2得到最终结果 ``final_ft``。
 
 调用后，中间消息 ``m`` 将被清除。上述函数的数学公式为：
 
