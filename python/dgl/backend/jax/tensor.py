@@ -1,67 +1,93 @@
 from __future__ import absolute_import
 
-from distutils.version import LooseVersion
 
-import scipy # Weird bug in new pytorch when import scipy after import torch
-import torch as th
+import jax
+import jax.numpy as jnp
+from jax import scipy as jcp
+
 import builtins
 import numbers
 from torch.utils import dlpack
+
 
 from ... import ndarray as nd
 from ..._deprecate import kernel as K
 from ...function.base import TargetCode
 from ...base import dgl_warning
 
-if LooseVersion(th.__version__) < LooseVersion("1.5.0"):
-    dgl_warning("Detected an old version of PyTorch. Suggest using torch>=1.5.0 "
-                "for the best experience.")
 
 def data_type_dict():
-    return {'float16' : th.float16,
-            'float32' : th.float32,
-            'float64' : th.float64,
-            'uint8'   : th.uint8,
-            'int8'    : th.int8,
-            'int16'   : th.int16,
-            'int32'   : th.int32,
-            'int64'   : th.int64,
-            'bool'    : th.bool}
+    return {'float16' : jnp.float16,
+            'float32' : jnp.float32,
+            'float64' : jnp.float64,
+            'uint8'   : jnp.uint8,
+            'int8'    : jnp.int8,
+            'int16'   : jnp.int16,
+            'int32'   : jnp.int32,
+            'int64'   : jnp.int64,
+            'bool'    : jnp.bool_}
 
 def cpu():
-    return th.device('cpu')
+    # TODO:
+    # figure out whether multiple cpu is needed at any point
+    return jax.devices('cpu')[0]
 
 def tensor(data, dtype=None):
     if isinstance(data, numbers.Number):
         data = [data]
-    if isinstance(data, th.Tensor):
-        return th.as_tensor(data, dtype=dtype, device=data.device)
-    else:
-        return th.as_tensor(data, dtype=dtype)
+    return jnp.asarray(data, dtype=dtype)
 
 def as_scalar(data):
     return data.item()
 
-def get_preferred_sparse_format():
-    """Get the preferred sparse matrix format supported by the backend.
+class SparseMatrix(object):
+    def __init__(self, index, data, shape):
+        self.index = jnp.atleast_2d(index)
+        self.data = jnp.asarray(data)
+        self._shape = shape
 
-    Different backends have their preferred backend. This info is useful when
-    constructing a sparse matrix.
-    """
+    def todense(self):
+        dense = jnp.zeros(self.shape, self.dtype)
+        return dense.at[tupe(self.index)].add(self.data)
+
+    @classmethod
+    def fromdense(cls, x):
+        x = jnp.asarray(x)
+        nz = (x != 0)
+        return cls(jnp.where(nz), x[nz], x.shape)
+
+    @property
+    def dtype(self):
+        return self.data.dtype
+
+    @property
+    def shape(self):
+        return tuple(self._shape)
+
+
+def get_preferred_sparse_format():
     return "coo"
 
 def sparse_matrix(data, index, shape, force_format=False):
     fmt = index[0]
     if fmt != 'coo':
-        raise TypeError('Pytorch backend only supports COO format. But got %s.' % fmt)
-    spmat = th.sparse_coo_tensor(index[1], data, shape)
+        raise TypeError(
+            'JAX backend only supports COO format. But got %s.' % fmt
+        )
+    # spmat = th.sparse_coo_tensor(index[1], data, shape)
+    spmat = SparseMatrix(
+        index=index[1],
+        data=data,
+        shape=shape,
+    )
+
     return spmat, None
 
 def sparse_matrix_indices(spmat):
-    return ('coo', spmat._indices())
+    return ('coo', spmat.index)
 
 def is_tensor(obj):
-    return isinstance(obj, th.Tensor)
+    return isinstance(obj, jnp.ndarray)
 
 def shape(input):
     return input.shape
@@ -70,16 +96,16 @@ def dtype(input):
     return input.dtype
 
 def ndim(input):
-    return input.dim()
+    return input.ndim
 
 def context(input):
     return input.device
 
 def device_type(ctx):
-    return th.device(ctx).type
+    return jax.devices(ctx)[0].device_kind
 
 def device_id(ctx):
-    ctx = th.device(ctx)
+    ctx = jax.devices(ctx)[0]
     if ctx.index is None:
         return 0
     else:
@@ -115,113 +141,142 @@ def copy_to(input, ctx, **kwargs):
         raise RuntimeError('Invalid context', ctx)
 
 def sum(input, dim, keepdims=False):
-    return th.sum(input, dim=dim, keepdim=keepdims)
+    return jnp.sum(input, axis=dim, keepdims=keepdims)
 
 def reduce_sum(input):
     return input.sum()
 
 def mean(input, dim):
-    return th.mean(input, dim=dim)
+    return jnp.mean(input, axis=dim)
 
 def reduce_mean(input):
     return input.mean()
 
 def max(input, dim):
     # NOTE: the second argmax array is not returned
-    return th.max(input, dim=dim)[0]
+    return jnp.max(input, axis=dim)[0]
 
 def reduce_max(input):
     return input.max()
 
 def min(input, dim):
     # NOTE: the second argmin array is not returned
-    return th.min(input, dim=dim)[0]
+    return jnp.min(input, axis=dim)[0]
 
 def reduce_min(input):
     return input.min()
 
 def argsort(input, dim, descending):
-    return th.argsort(input, dim=dim, descending=descending)
+    _sorted = jnp.argsort(input, axis=dim, descending=descending)
+    if descending is True:
+        _sorted = jnp.flip(_sorted, axis=dim)
+    return _sorted
 
 def topk(input, k, dim, descending=True):
-    return th.topk(input, k, dim, largest=descending)[0]
+    _sorted = jnp.sort(input, axis=dim, descending=descending)
+    return _sorted[:k]
 
 def argtopk(input, k, dim, descending=True):
-    return th.topk(input, k, dim, largest=descending)[1]
+    _sorted = jnp.argsort(input, axis=dim, descending=descending)
+    return _sorted[:k]
 
 def exp(input):
-    return th.exp(input)
+    return jnp.exp(input)
 
 def sqrt(input):
-    return th.sqrt(input)
+    return jnp.sqrt(input)
 
 def softmax(input, dim=-1):
-    return th.softmax(input, dim=dim)
+    return jax.nn.softmax(input, axis=dim)
 
 def cat(seq, dim):
-    return th.cat(seq, dim=dim)
+    return jnp.concatenate(seq, axis=dim)
 
 def stack(seq, dim):
-    return th.stack(seq, dim=dim)
+    return jnp.stack(seq, axis=dim)
 
 def split(input, sizes_or_sections, dim):
-    return th.split(input, sizes_or_sections, dim)
+    return jnp.split(input, sizes_or_sections, axis=dim)
 
 def repeat(input, repeats, dim):
-    return th.repeat_interleave(input, repeats, dim) # PyTorch 1.1
+    return jnp.repeat(input, repeats=repeats, axis=dim)
 
 def gather_row(data, row_index):
-    return th.index_select(data, 0, row_index.long())
+    return jnp.take(data, 0, row_index)
 
 def slice_axis(data, axis, begin, end):
-    return th.narrow(data, axis, begin, end - begin)
+    return jnp.take(
+        data,
+        indices=jnp.arange(start=begin, stop=end),
+        axis=axis,
+    )
 
 def take(data, indices, dim):
-    new_shape = data.shape[:dim] + indices.shape + data.shape[dim+1:]
-    return th.index_select(data, dim, indices.view(-1)).view(new_shape)
+    return jnp.take(
+        data,
+        indices=indices,
+        axis=dim,
+    )
 
 def narrow_row(x, start, stop):
     return x[start:stop]
 
 def index_add_inplace(data, row_idx, value):
-    data.index_add_(0, row_idx, value)
+    data[row_idx] += value
 
 def scatter_row(data, row_index, value):
-    return data.index_copy(0, row_index.long(), value)
+    new_data = jnp.copy(data)
+    new_data[row_index] = value
+    return new_data
 
 def scatter_row_inplace(data, row_index, value):
     data[row_index.long()] = value
 
 def squeeze(input, dim):
-    return th.squeeze(input, dim)
+    return jnp.squeeze(input, dim)
 
 def unsqueeze(input, dim):
-    return th.unsqueeze(input, dim)
+    return jnp.unsqueeze(input, dim)
 
 def reshape(input, shape):
-    return th.reshape(input ,shape)
+    return jnp.reshape(input ,shape)
 
 def swapaxes(input, axis1, axis2):
-    return th.transpose(input, axis1, axis2)
+    return jnp.transpose(input, axis1, axis2)
 
 def zeros(shape, dtype, ctx):
-    return th.zeros(shape, dtype=dtype, device=ctx)
+    return jnp.zeros(shape, dtype=dtype, device=ctx)
 
 def zeros_like(input):
-    return th.zeros_like(input)
+    return jnp.zeros_like(input)
 
 def ones(shape, dtype, ctx):
-    return th.ones(shape, dtype=dtype, device=ctx)
+    # TODO: no device here
+    return jnp.ones(shape, dtype=dtype,)
 
 def uniform(shape, dtype, ctx, low, high):
-    return th.empty(shape, dtype=dtype, device=ctx).uniform_(low, high)
+    key = jax.random.PRNGKey(2666)
+    return jax.random.uniform(
+        key=key,
+        shape=shape,
+        minval=low,
+        maxval=high,
+        dtype=dtype,
+    )
 
 def randint(shape, dtype, ctx, low, high):
-    return th.randint(low, high, shape, dtype=dtype, device=ctx)
+    key = jax.random.PRNGKey(2666)
+    return jax.random.randint(
+        key=key,
+        shape=shape,
+        minval=low,
+        maxval=high,
+        dtype=dtype,
+    )
 
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
-    if isinstance(lengths, th.Tensor):
+    if isinstance(lengths, jnp.ndarray):
         max_len = as_scalar(lengths.max())
     else:
         max_len = builtins.max(lengths)
@@ -230,13 +285,16 @@ def pad_packed_tensor(input, lengths, value, l_min=None):
         max_len = builtins.max(max_len, l_min)
 
     batch_size = len(lengths)
-    device = input.device
-    x = input.new(batch_size * max_len, *old_shape[1:])
-    x.fill_(value)
+    x = jnp.zeros(
+        shape=(batch_size * max_len, *old_shape[1:]),
+        dtype=x.dtype,
+    )
+    x.fill(value)
+
     index = []
     for i, l in enumerate(lengths):
         index.extend(range(i * max_len, i * max_len + l))
-    index = th.tensor(index).to(device)
+    index = jnp.asarray(index)
     return scatter_row(x, index, input).view(batch_size, max_len, *old_shape[1:])
 
 def pack_padded_tensor(input, lengths):
@@ -250,7 +308,7 @@ def pack_padded_tensor(input, lengths):
 
 def boolean_mask(input, mask):
     if 'bool' not in str(mask.dtype):
-        mask = th.tensor(mask, dtype=th.bool)
+        mask = jnp.asarray(mask, dtype=jnp.bool_)
     return input[mask]
 
 def equal(x, y):
@@ -263,38 +321,50 @@ def logical_and(input1, input2):
     return input1 & input2
 
 def clone(input):
-    return input.clone()
+    return jnp.copy(0)
 
 def clamp(data, min_val, max_val):
-    return th.clamp(data, min_val, max_val)
+    return jnp.clip(data, min_val, max_val)
 
 def replace_inf_with_zero(x):
-    return th.masked_fill(x, th.isinf(x), 0)
+    return jnp.where(
+        jnp.isinf(x),
+        x,
+        jnp.zeros_like(x),
+    )
 
 def unique(input):
-    if input.dtype == th.bool:
-        input = input.type(th.int8)
-    return th.unique(input)
+    if input.dtype == jnp.bool_:
+        input = input.type(jnp.int8)
+    return jnp.unique(input)
 
 def full_1d(length, fill_value, dtype, ctx):
-    return th.full((length,), fill_value, dtype=dtype, device=ctx)
+    return jnp.full((length,), fill_value, dtype=dtype)
 
 def nonzero_1d(input):
-    x = th.nonzero(input, as_tuple=False).squeeze()
-    return x if x.dim() == 1 else x.view(-1)
+    x = jnp.nonzero(input, as_tuple=False).squeeze()
+    return x.flatten()
 
 def sort_1d(input):
-    return th.sort(input)
+    return jnp.sort(input)
 
-def arange(start, stop, dtype=th.int64):
-    return th.arange(start, stop, dtype=dtype)
+def arange(start, stop, dtype=jnp.int64):
+    return jnp.arange(start, stop, dtype=dtype)
 
 def rand_shuffle(arr):
-    idx = th.randperm(len(arr))
+    key = jax.random.PRNGKey(2666)
+    idx = jnp.random.permuataion(
+        key=key,
+        jnp.arrange(len(arr)),
+    )
     return arr[idx]
 
 def zerocopy_to_dlpack(input):
-    return dlpack.to_dlpack(input.contiguous())
+    return dlpack.to_dlpack(
+        jnp.ascontiguousarray(
+            input,
+        )
+    )
 
 def zerocopy_from_dlpack(dlpack_tensor):
     return dlpack.from_dlpack(dlpack_tensor)
@@ -307,20 +377,19 @@ def zerocopy_from_numpy(np_array):
     return th.as_tensor(np_array)
 
 def zerocopy_to_dgl_ndarray(data):
-    return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
+    return nd.from_dlpack(
+        dlpack.to_dlpack(
+            jnp.ascontiguousarray(
+                input,
+            )
+        )
+    )
 
 def zerocopy_to_dgl_ndarray_for_write(input):
     return zerocopy_to_dgl_ndarray(input)
 
 def zerocopy_from_dgl_ndarray(data):
-    if data.shape == (0,):
-        # NOTE: PyTorch v1.5 does not accept DLPack object representing empty CUDA tensor.
-        #  Related issue: https://github.com/pytorch/pytorch/issues/41182
-        #  The issue will be fixed in v1.6 and later.
-        return th.tensor([], dtype=getattr(th, data.dtype),
-                         device=to_backend_ctx(data.ctx))
-    else:
-        return dlpack.from_dlpack(data.to_dlpack())
+    return dlpack.from_dlpack(data.to_dlpack())
 
 
 class BinaryReduce(th.autograd.Function):
@@ -495,9 +564,9 @@ def _reduce_grad(grad, shape):
     num_to_squeeze = len(grad_shape) - len(in_shape)
     # pad inshape
     in_shape = (1,) * num_to_squeeze + in_shape
-    reduce_idx = th.nonzero(th.tensor(grad_shape) - th.tensor(in_shape))
+    reduce_idx = jnp.nonzero(jnp.asarray(grad_shape) - jnp.asarray(in_shape))
     reduce_idx += 1  # skip batch dim
-    grad = grad.sum(dim=tuple(reduce_idx), keepdim=True)
+    grad = grad.sum(axis=tuple(reduce_idx), keepdims=True)
     return grad.view(shape)
 
 def sync():
