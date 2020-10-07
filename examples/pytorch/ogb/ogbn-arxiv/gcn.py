@@ -220,7 +220,7 @@ def main():
     argparser.add_argument("--lr", type=float, help="learning rate", default=0.005)
     argparser.add_argument("--n-layers", type=int, help="number of layers", default=3)
     argparser.add_argument("--n-hidden", type=int, help="number of hidden units", default=256)
-    argparser.add_argument("--dropout", type=float, help="dropout rate", default=0.75)
+    argparser.add_argument("--dropout", type=float, help="dropout rate", default=0.5)
     argparser.add_argument("--wd", type=float, help="weight decay", default=0)
     argparser.add_argument("--log-every", type=int, help="log every LOG_EVERY epochs", default=20)
     argparser.add_argument("--plot-curves", help="plot learning curves", action="store_true")
