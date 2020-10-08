@@ -115,7 +115,10 @@ class Column(object):
             # copy index to the same context of storage.
             # Copy index is usually cheaper than copy data
             if F.context(self.storage) != F.context(self.index):
-                self.index = F.copy_to(self.index, F.context(self.storage))
+                kwargs = {}
+                if self.device is not None:
+                    kwargs = self.device[1]
+                self.index = F.copy_to(self.index, F.context(self.storage), **kwargs)
             self.storage = F.gather_row(self.storage, self.index)
             self.index = None
 
@@ -148,8 +151,6 @@ class Column(object):
         """
         col = self.clone()
         col.device = (device, kwargs)
-        if self.index is not None:
-            col.index = F.copy_to(self.index, device, **kwargs)
         return col
 
     def __getitem__(self, rowids):
@@ -253,7 +254,13 @@ class Column(object):
         if self.index is None:
             return Column(self.storage, self.scheme, rowids, self.device)
         else:
-            return Column(self.storage, self.scheme, F.gather_row(self.index, rowids), self.device)
+            index = self.index
+            if F.context(index) != F.context(rowids):
+                kwargs = {}
+                if self.device is not None:
+                    kwargs = self.device[1]
+                index = F.copy_to(self.index, F.context(rowids), **kwargs)
+            return Column(self.storage, self.scheme, F.gather_row(index, rowids), self.device)
 
     @staticmethod
     def create(data):
