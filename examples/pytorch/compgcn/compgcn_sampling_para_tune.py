@@ -153,7 +153,7 @@ def main(args):
 
             in_n_feats ={}
             for ntype, feat in n_feats.items():
-                in_n_feats[ntype] = input_embs[ntype](feat[input_nodes]).to('cuda:{}'.format(args.gpu))
+                in_n_feats[ntype] = input_embs[ntype](feat[input_nodes].to('cuda:{}'.format(args.gpu)))
 
             blocks = [blk.to('cuda:{}'.format(args.gpu)) for blk in blocks]
 
@@ -179,7 +179,7 @@ def main(args):
 
             in_n_feats ={}
             for ntype, feat in n_feats.items():
-                in_n_feats[ntype] = input_embs[ntype](feat[input_nodes]).to('cuda:{}'.format(args.gpu))
+                in_n_feats[ntype] = input_embs[ntype](feat[input_nodes].to('cuda:{}'.format(args.gpu)))
 
             blocks = [blk.to('cuda:{}'.format(args.gpu)) for blk in blocks]
 
