@@ -159,6 +159,8 @@ def main(args):
 
         for input_nodes, seeds, block in train_dataloader:
 
+            print(block)
+
             in_n_feats = extract_embed(n_feats, input_nodes)
             in_n_feats = {k : e.to('cuda:{}'.format(args.gpu)) for k, e in in_n_feats.items()}
             block = [blk.to('cuda:{}'.format(args.gpu)) for blk in block]
