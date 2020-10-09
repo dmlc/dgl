@@ -105,6 +105,7 @@ def main(args):
                                       num_workers=4)
     valid_dataloader = NodeDataLoader(g=heterograph,
                                       nids={target: val_idx},
+                                      block_sampler=sampler,
                                       batch_size=args.batch_size,
                                       shuffle=False,
                                       drop_last=False,
