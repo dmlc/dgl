@@ -161,9 +161,9 @@ def main(args):
 
             in_n_feats = extract_embed(n_feats, input_nodes)
             in_n_feats = {k : e.to('cuda:{}'.format(args.gpu)) for k, e in in_n_feats.items()}
-            blocks = [blk.to('cuda:{}'.format(args.gpu)) for blk in blocks]
+            block = [blk.to('cuda:{}'.format(args.gpu)) for blk in block]
 
-            logits = compgcn_model.forward(blocks, in_n_feats)
+            logits = compgcn_model.forward(block, in_n_feats)
 
             # compute loss
             seeds = seeds[target]
@@ -181,11 +181,11 @@ def main(args):
         input_embs.eval()
         compgcn_model.eval()
 
-        for input_nodes, seeds, blocks in valid_dataloader:
+        for input_nodes, seeds, block in valid_dataloader:
 
             in_n_feats = extract_embed(n_feats, input_nodes)
             in_n_feats = {k : e.to('cuda:{}'.format(args.gpu)) for k, e in in_n_feats.items()}
-            blocks = [blk.to('cuda:{}'.format(args.gpu)) for blk in blocks]
+            block = [blk.to('cuda:{}'.format(args.gpu)) for blk in block]
 
             val_loss = loss_fn(logits[target], labels[seeds])
             val_acc = th.sum(logits[target].argmax(dim=1) == labels[seeds]).item() / len(seeds)
