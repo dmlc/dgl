@@ -18,6 +18,16 @@ def normalized_laplacian_edata(g, weight=None):
         return g.edata['w']
 
 
+def normalized_edata(g, weight=None):
+    with g.local_scope():
+        if weight is None:
+            weight = 'W'
+            g.edata[weight] = torch.ones(g.number_of_edges(), device=g.device)
+        g.update_all(fn.copy_e(weight, weight), fn.sum(weight, 'v'))
+        g.apply_edges(lambda edges: {'w': 1 / edges.dst['v']})
+        return g.edata['w']
+
+
 class GraphConv(nn.Module):
     def __init__(self, in_feats, n_classes):
         super().__init__()
@@ -31,21 +41,41 @@ class GraphConv(nn.Module):
             return g.dstdata['y']
 
 
+class SAGEConv(nn.Module):
+    def __init__(self, in_feats, n_classes):
+        super().__init__()
+        self.W = nn.Linear(in_feats * 2, n_classes)
+
+    def forward(self, g, x, w):
+        with g.local_scope():
+            g.srcdata['x'] = x
+            g.dstdata['x'] = x[:g.number_of_dst_nodes()]
+            #g.edata['w'] = w
+            #g.update_all(fn.u_mul_e('x', 'w', 'm'), fn.sum('m', 'y'))
+            g.update_all(fn.copy_u('x', 'm'), fn.mean('m', 'y'))
+            h = torch.cat([g.dstdata['x'], g.dstdata['y']], 1)
+            return self.W(h)
+
+
 class Model(nn.Module):
-    def __init__(self, in_feats, n_hidden, n_classes, n_layers):
+    def __init__(self, in_feats, n_hidden, n_classes, n_layers, conv=GraphConv, dropout=0):
         super().__init__()
 
         self.n_hidden = n_hidden
         self.n_classes = n_classes
 
+        self.dropout = nn.Dropout(dropout)
         self.convs = nn.ModuleList()
-        self.convs.append(GraphConv(in_feats, n_hidden))
+        self.convs.append(conv(in_feats, n_hidden))
         for i in range(n_layers - 2):
-            self.convs.append(GraphConv(n_hidden, n_hidden))
-        self.convs.append(GraphConv(n_hidden, n_classes))
+            self.convs.append(conv(n_hidden, n_hidden))
+        self.convs.append(conv(n_hidden, n_classes))
 
     def forward(self, blocks, x):
+        if not isinstance(blocks, list):
+            blocks = [blocks] * len(self.convs)
         for i, (conv, block) in enumerate(zip(self.convs, blocks)):
+            x = self.dropout(x)
             x = conv(block, x, block.edata['w'])
             if i != len(self.convs) - 1:
                 x = F.relu(x)

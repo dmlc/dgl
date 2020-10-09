@@ -126,3 +126,20 @@ class LADIESNeighborSampler(dgl.dataloading.BlockSampler):
             block.create_formats_()
             blocks.insert(0, block)
         return blocks
+
+
+    def sample_subgraph(self, g, seed_nodes, exclude_eids=None):
+        exclude_eids = self._convert_exclude_eids(exclude_eids)
+        for layer_id in reversed(range(self.num_layers)):
+            num_nodes_to_sample = self.nodes_per_layer[layer_id]
+            W = g.edata[self.edge_weight]
+            prob, insg = self.compute_prob(g, seed_nodes, W, exclude_eids)
+            cand_nodes = insg.ndata[dgl.NID]
+            neighbor_nodes_idx, _ = self.select_neighbors(
+                seed_nodes, cand_nodes, prob, num_nodes_to_sample, self.replace)
+            seed_nodes = cand_nodes[neighbor_nodes_idx]
+
+        subgraph = g.subgraph(seed_nodes)
+        if exclude_eids is not None:
+            subgraph = dgl.remove_edges(g, exclude_eids)
+        return subgraph

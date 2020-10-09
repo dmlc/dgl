@@ -28,10 +28,14 @@ def sumbykey(keys, values):
             d[k] = v
         else:
             d[k] += v
-    k = np.asarray(list(d.keys()))
-    v = np.asarray(list(d.values()))
+    k = np.zeros((len(d),), np.int64)
+    v = np.zeros((len(d),), np.float32)
+    for i, (dk, dv) in enumerate(d.items()):
+        k[i] = dk
+        v[i] = dv
     return k, v
 
+@profile
 def sum_rows(csr):
     indices = csr.indices
     data = csr.data
@@ -58,6 +62,7 @@ class LADIESNeighborSampler(dgl.dataloading.BlockSampler):
             shape=(g.num_nodes(), g.num_nodes()))
         self.T = 0
 
+    @profile
     def sample_frontier(self, block_id, g, seed_nodes):
         t0 = time.time()
         seed_nodes = seed_nodes.cpu().numpy()
