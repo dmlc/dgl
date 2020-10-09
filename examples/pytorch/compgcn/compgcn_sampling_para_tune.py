@@ -88,11 +88,11 @@ def main(args):
         n_feats[ntype] = th.arange(heterograph.number_of_nodes(ntype))
         in_feat_dict[ntype] = num_rels
 
-        if use_cuda:
-            n_feats[ntype] = n_feats[ntype].to('cuda:{}'.format(args.gpu))
+        # if use_cuda:
+        #     n_feats[ntype] = n_feats[ntype].to('cuda:{}'.format(args.gpu))
 
-    if use_cuda:
-        labels = labels.to('cuda:{}'.format(args.gpu))
+    # if use_cuda:
+    #     labels = labels.to('cuda:{}'.format(args.gpu))
 
     # build sampler from dataloader
     sampler = MultiLayerFullNeighborSampler(n_layers=args.num_layer)
@@ -153,7 +153,8 @@ def main(args):
 
             in_n_feats ={}
             for ntype, feat in n_feats.items():
-                in_n_feats[ntype] = input_embs[ntype](feat[input_nodes].to('cuda:{}'.format(args.gpu)))
+                feat = feat[input_nodes].to('cuda:{}'.format(args.gpu))
+                in_n_feats[ntype] = input_embs[ntype](feat)
 
             blocks = [blk.to('cuda:{}'.format(args.gpu)) for blk in blocks]
 
@@ -179,7 +180,8 @@ def main(args):
 
             in_n_feats ={}
             for ntype, feat in n_feats.items():
-                in_n_feats[ntype] = input_embs[ntype](feat[input_nodes].to('cuda:{}'.format(args.gpu)))
+                feat = feat[input_nodes].to('cuda:{}'.format(args.gpu))
+                in_n_feats[ntype] = input_embs[ntype](feat)
 
             blocks = [blk.to('cuda:{}'.format(args.gpu)) for blk in blocks]
 
