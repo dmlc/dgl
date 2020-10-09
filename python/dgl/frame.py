@@ -254,13 +254,13 @@ class Column(object):
         if self.index is None:
             return Column(self.storage, self.scheme, rowids, self.device)
         else:
-            index = self.index
-            if F.context(index) != F.context(rowids):
+            if F.context(self.index) != F.context(rowids):
+                # make sure index and row ids are on the same context
                 kwargs = {}
                 if self.device is not None:
                     kwargs = self.device[1]
-                index = F.copy_to(self.index, F.context(rowids), **kwargs)
-            return Column(self.storage, self.scheme, F.gather_row(index, rowids), self.device)
+                rowids = F.copy_to(rowids, F.context(self.index), **kwargs)
+            return Column(self.storage, self.scheme, F.gather_row(self.index, rowids), self.device)
 
     @staticmethod
     def create(data):
