@@ -38,6 +38,14 @@ from models.model import CompGCN
 from model_utils import early_stopper
 
 
+def extract_embed(node_embed, input_nodes):
+    emb = {}
+    for ntype, nid in input_nodes.items():
+        nid = input_nodes[ntype]
+        emb[ntype] = node_embed[ntype][nid]
+    return emb
+
+
 def main(args):
 
     # Step 1： Prepare graph data and split into train/validation ============================= #
@@ -151,11 +159,8 @@ def main(args):
 
         for input_nodes, seeds, block in train_dataloader:
 
-            in_n_feats ={}
-            for ntype, feat in n_feats.items():
-                feat = feat[input_nodes].to('cuda:{}'.format(args.gpu))
-                in_n_feats[ntype] = input_embs[ntype](feat)
-
+            in_n_feats = extract_embed(n_feats, input_nodes)
+            in_n_feats = {k : e.to('cuda:{}'.format(args.gpu)) for k, e in in_n_feats.items()}
             blocks = [blk.to('cuda:{}'.format(args.gpu)) for blk in blocks]
 
             logits = compgcn_model.forward(blocks, in_n_feats)
@@ -178,11 +183,8 @@ def main(args):
 
         for input_nodes, seeds, blocks in valid_dataloader:
 
-            in_n_feats ={}
-            for ntype, feat in n_feats.items():
-                feat = feat[input_nodes].to('cuda:{}'.format(args.gpu))
-                in_n_feats[ntype] = input_embs[ntype](feat)
-
+            in_n_feats = extract_embed(n_feats, input_nodes)
+            in_n_feats = {k : e.to('cuda:{}'.format(args.gpu)) for k, e in in_n_feats.items()}
             blocks = [blk.to('cuda:{}'.format(args.gpu)) for blk in blocks]
 
             val_loss = loss_fn(logits[target], labels[seeds])
