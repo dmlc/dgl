@@ -103,7 +103,7 @@ def main(args):
     #     labels = labels.to('cuda:{}'.format(args.gpu))
 
     # build sampler from dataloader
-    sampler = MultiLayerFullNeighborSampler(n_layers=args.num_layer)
+    sampler = MultiLayerFullNeighborSampler(n_layers=args.num_layer - 2)
     train_dataloader = NodeDataLoader(g=heterograph,
                                       nids={target: train_idx},
                                       block_sampler=sampler,
