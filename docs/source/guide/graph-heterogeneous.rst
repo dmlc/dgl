@@ -3,6 +3,8 @@
 1.5 Heterogeneous Graphs
 ------------------------
 
+:ref:`(中文版)<guide_cn-graph-heterogeneous>`
+
 A heterogeneous graph can have nodes and edges of different types. Nodes/Edges of
 different types have independent ID space and feature storage. For example in the figure below, the
 user and game node IDs both start from zero and the they have different features.
@@ -17,12 +19,6 @@ Creating a Heterogeneous Graph
 In DGL, a heterogeneous graph (heterograph for short) is specified with a series of graphs as below, one per
 relation. Each relation is a string triplet ``(source node type, edge type, destination node type)``.
 Since relations disambiguate the edge types, DGL calls them canonical edge types.
-
-.. code::
-
-    {relation1 : node_tensor_tuple1,
-     relation2 : node_tensor_tuple2,
-     ...}
 
 The following code snippet is an example for creating a heterogeneous graph in DGL.
 
@@ -243,7 +239,7 @@ It proceeds as follows:
             [0.],
             [0.]])
 
-    The original node/edge types and type-specific IDs are stored in :py:attr:`~dgl.DGLGraph.ndata` and :py:attr:`~dgl.DGLGraph.edata`.
+The original node/edge types and type-specific IDs are stored in :py:attr:`~dgl.DGLGraph.ndata` and :py:attr:`~dgl.DGLGraph.edata`.
 
 .. code::
 
