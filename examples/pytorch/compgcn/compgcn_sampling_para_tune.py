@@ -78,7 +78,7 @@ def main(args):
         val_idx = train_idx
 
     num_of_ntype = len(heterograph.ntypes)
-    num_of_etype = len(heterograph.ntypes)
+    num_of_etype = len(heterograph.etypes)
     print('In Dataset: {}, node types num: {}'.format(args.dataset, num_of_ntype))
     print('In Dataset: {}, edge types num: {}'.format(args.dataset, num_of_etype))
 

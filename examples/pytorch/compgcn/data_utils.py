@@ -3,6 +3,8 @@
 
 import torch as th
 import dgl
+from dgl.dataloading import MultiLayerFullNeighborSampler
+from dgl.dataloading import NodeDataLoader
 
 def build_dummy_comp_data():
     """
@@ -50,3 +52,4 @@ def build_dummy_comp_data():
     }
 
     return g, n_feats, e_feats
+
