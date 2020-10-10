@@ -200,10 +200,10 @@ if __name__ == '__main__':
 
     # HP tunning ranges
     hid_dims = [4, 8, 16, 32, 64]
-    num_layers = [3, 4, 5, 6]
+    num_layers = [3, 4, 5]
     num_basis_factor = [1/(2**0), 1/(2**1), 1/(2**2), 1/(2**4), 1/(2**5)]
     comp_fns = ['sub', 'mul', 'ccorr']
-    drop_outs = [0, 0.1, 0.2, 0.3, 0.4]
+    drop_outs = [0, 0.1, 0.2, 0.3]
 
     # Run parameter tunning
     results = []
