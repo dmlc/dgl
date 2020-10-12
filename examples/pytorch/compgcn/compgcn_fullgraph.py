@@ -59,8 +59,8 @@ def main(args):
     else:
         val_idx = train_idx
 
-    print('In Dataset: {}, node types num: {}'.format(heterograph.ntypes))
-    print('In Dataset: {}, edge types num: {}'.format(heterograph.etypes))
+    print('In Dataset: {}, node types num: {}'.format(args.dataset, heterograph.ntypes))
+    print('In Dataset: {}, edge types num: {}'.format(args.dataset, heterograph.etypes))
 
     # check cuda
     use_cuda = (args.gpu >= 0 and th.cuda.is_available())
