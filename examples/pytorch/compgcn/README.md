@@ -14,11 +14,10 @@ pip install dgl torch pandas
 ```
 
 ### Entity Classification
-AIFB: accuracy 91.67% (20 runs,DGL), 95.83% (paper)
+AIFB: accuracy 94.44%, 95.83% (in original [RGCN paper](https://arxiv.org/pdf/1703.06103.pdf))
 ```
-python compgcn_fullgraph.py -d aifb --rev_indicator rev_ --gpu 0 --lr 0.001 --comp_fn ccorr --max_epoch 100 --num_layers 4 --drop_out 0.1
+python dgl/examples/pytorch/compgcn/compgcn_fullgraph.py -d aifb --rev_indicator rev_ --hid_dim 64 --num_layers 3 --comp_fn ccorr --drop_out 0.1 --max_epoch 29 --num_basis 5 --testing
 ```
-Note: The accuracy of "paper" is referred to the accuracy at [RGCN](https://arxiv.org/pdf/1703.06103.pdf) paper.
 
 BGS: accuracy 89.66% (20 runs,DGL)
 ```
