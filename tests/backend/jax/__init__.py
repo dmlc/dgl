@@ -65,13 +65,13 @@ def div(a, b):
     return a / b
 
 def sum(x, dim, keepdims=False):
-    return x.sum(dim, keepdim=keepdims)
+    return x.sum(dim, keepdims=keepdims)
 
 def max(x, dim):
-    return x.max(dim)[0]
+    return x.max(dim)
 
 def min(x, dim):
-    return x.min(dim)[0]
+    return x.min(dim)
 
 def prod(x, dim):
     return x.prod(dim)

@@ -189,7 +189,8 @@ def reduce_mean(input):
     return input.mean()
 
 def max(input, dim):
-    # NOTE: the second argmax array is not returned
+    # NOTE: JAX handles the shape of `max` over multiple dimensions differently
+    # from pytorch or tensorflow
     return jnp.max(input, axis=dim)
 
 def reduce_max(input):
@@ -327,7 +328,7 @@ def pad_packed_tensor(input, lengths, value, l_min=None):
     batch_size = len(lengths)
     x = jnp.zeros(
         shape=(batch_size * max_len, *old_shape[1:]),
-        dtype=x.dtype,
+        dtype=input.dtype,
     )
     x.fill(value)
 
@@ -382,11 +383,12 @@ def full_1d(length, fill_value, dtype, ctx):
     return jnp.full((length,), fill_value, dtype=dtype)
 
 def nonzero_1d(input):
-    x = jnp.nonzero(input, as_tuple=False).squeeze()
+    x = (jnp.nonzero(input)[0]).squeeze()
     return x.flatten()
 
 def sort_1d(input):
-    return jnp.sort(input)
+    idxs = jnp.argsort(input)
+    return input[idxs], idxs
 
 def arange(start, stop, dtype=jnp.int64):
     return jnp.arange(start, stop, dtype=dtype)
@@ -414,6 +416,12 @@ def zerocopy_from_numpy(np_array):
 
 def zerocopy_to_dgl_ndarray(data):
     # TODO: this still copies data which might be bad
+
+    # try:
+    #     return nd.from_dlpack(jax.dlpack.to_dlpack(data))
+    # except:
+    #     data = jnp.array(data)
+    #     return nd.from_dlpack(jax.dlpack.to_dlpack(data))
     data = jnp.array(data)
     return nd.from_dlpack(jax.dlpack.to_dlpack(data))
 
@@ -422,7 +430,6 @@ def zerocopy_to_dgl_ndarray_for_write(input):
 
 def zerocopy_from_dgl_ndarray(data):
     return jax.dlpack.from_dlpack(data.to_dlpack())
-
 
 class BinaryReduce(object):
     @staticmethod

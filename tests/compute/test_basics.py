@@ -159,6 +159,7 @@ def test_batch_setter_getter(idtype):
     v = F.tensor([6, 9, 7], g.idtype)
     assert _pfc(g.edges[u, v].data['l']) == [1.0, 1.0, 0.0]
 
+@unittest.skipIf(dgl.backend.backend_name == "jax", reason="no tensor grad in jax")
 @parametrize_dtype
 def test_batch_setter_autograd(idtype):
     g = generate_graph(idtype, grad=True)
@@ -619,6 +620,9 @@ def test_send_multigraph(idtype):
     def _message_b(edges):
         return {'a': edges.data['a'] * 3}
     def _reduce(nodes):
+        print(F.max)
+        print(nodes.mailbox['a'])
+        print(F.max(nodes.mailbox['a'], 1))
         return {'a': F.max(nodes.mailbox['a'], 1)}
 
     def answer(*args):
