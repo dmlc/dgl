@@ -454,7 +454,8 @@ def zerocopy_to_dgl_ndarray(data):
         elif data.dtype == tf.int64:
             data = tf.cast(data, tf.uint64)
         return nd.cast_to_signed(nd.from_dlpack(zerocopy_to_dlpack(data)))
-    return nd.from_dlpack(zerocopy_to_dlpack(data))
+    else:
+        return nd.from_dlpack(zerocopy_to_dlpack(data))
 
 
 def zerocopy_to_dgl_ndarray_for_write(input):
