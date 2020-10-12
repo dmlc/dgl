@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-
+import abc
 import jax
 from jax.config import config
 config.update("jax_enable_x64", True)
@@ -43,18 +43,30 @@ def tensor(data, dtype=None):
 def as_scalar(data):
     return data.item()
 
-class SparseMatrix(object):
-    def __init__(self, index, data, shape):
+
+class SparseMatrix(abc.ABC):
+    """ Base class for sparse matrix. """
+    def __init__(self):
+        super(SparseMatrix, self).__init__()
+        # implement more general sparse matrix
+
+# =============================================================================
+# MODULE CLASS
+# =============================================================================
+class SparseMatrix2D(SparseMatrix):
+    """ Two-dimensional sparse matrix. """
+    def __init__(self, index=None, data=None, shape=None):
+        super(SparseMatrix2D, self).__init__()
         self.index = jnp.atleast_2d(index)
         self.data = jnp.asarray(data)
         self._shape = shape
 
-    def todense(self):
+    def to_dense(self):
         dense = jnp.zeros(self.shape, self.dtype)
-        return dense.at[tupe(self.index)].add(self.data)
+        return dense.at[self.index].add(self.data)
 
     @classmethod
-    def fromdense(cls, x):
+    def from_dense(cls, x):
         x = jnp.asarray(x)
         nz = (x != 0)
         return cls(jnp.where(nz), x[nz], x.shape)
@@ -67,6 +79,41 @@ class SparseMatrix(object):
     def shape(self):
         return tuple(self._shape)
 
+    @property
+    def ndim(self):
+        return len(self._shape)
+
+    # @jax.jit
+    def __matmul__(self, x):
+        if not self.ndim == 2 and x.ndim == 2:
+            raise NotImplementedError
+
+        assert self.shape[1] == x.shape[0]
+
+        # (n_entries, )
+        rows = self.index[0, :]
+        cols = self.index[1, :]
+
+        # (n_entries, x_shape[1])
+        in_ = x.take(cols, axis=0)
+
+        # data: shape=(n_entries)
+        prod = in_ * self.data[:, None]
+
+        return jax.ops.segment_sum(prod, rows, self.shape[0])
+
+    def __repr__(self):
+        return 'Sparse Matrix with shape=%s, indices=%s, and data=%s' % (
+            self.shape,
+            self.index,
+            self.data,
+        )
+
+    def __eq__(self, x):
+        if not isinstance(x, type(self)):
+            return False
+        else:
+            return self.to_dense() == x.to_dense()
 
 def get_preferred_sparse_format():
     return "coo"
@@ -128,7 +175,6 @@ def asnumpy(input):
 def copy_to(input, ctx, **kwargs):
     # TODO:
     return jax.device_put(input, ctx)
-
 
 def sum(input, dim, keepdims=False):
     return jnp.sum(input, axis=dim, keepdims=keepdims)
