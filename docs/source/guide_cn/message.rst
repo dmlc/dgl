@@ -16,12 +16,12 @@
 .. math::  \text{逐节点的: } x_v^{(t+1)} = \psi \left(x_v^{(t)}, \rho\left(\left\lbrace m_{e}^{(t+1)} : ({u}, {v},{e}) \in \mathcal{E} \right\rbrace \right) \right).
 
 在上面的等式中， :math:`\phi` 是定义在每条边上的消息函数，它通过将边上特征与其两端节点的特征相结合来生成消息。
-**聚合函数** :math:`\rho` 会聚合节点接受到的消息，并与节点本身的特征一起通过 :math:`\psi` 定义的 **更新函数** 来更新节点的特征。
+**聚合函数** :math:`\rho` 会聚合节点接受到的消息。 **更新函数** :math:`\psi` 会结合聚合后的消息和节点本身的特征来更新节点的特征。
 
 本章路线图
 --------
 
-本章首先介绍了DGL的消息传递API。然后讲解了如何高效地在点和边上使用这些API。本章的最后部分解释了如何在异构图上实现消息传递。
+本章首先介绍了DGL的消息传递API。然后讲解了如何高效地在点和边上使用这些API。本章的最后一节解释了如何在异构图上实现消息传递。
 
 * :ref:`guide_cn-message-passing-api`
 * :ref:`guide_cn-message-passing-efficient`
