@@ -24,9 +24,9 @@ BGS: accuracy 93.10% (20 runs,DGL), 83.10% (in original [RGCN paper](https://arx
 python dgl/examples/pytorch/compgcn/compgcn_fullgraph.py -d bgs --rev_indicator rev_ --hid_dim 64 --num_layers 4 --comp_fn ccorr --drop_out 0.1 --max_epoch 24 --num_basis 4 --testing
 ```
 
-MUTAG: accuracy 79.41% (11 runs, DGL), 85.3% (in CompGCN paper)
+MUTAG: accuracy 76.47% (11 runs, DGL), 85.3% (in CompGCN paper), 73.23% (in original [RGCN paper](https://arxiv.org/pdf/1703.06103.pdf))
 ```
-python compgcn_fullgraph.py -d mutag --rev_indicator rev_ --gpu 0 --lr 0.001 --comp_fn ccorr --max_epoch 11 --num_layers 4 --drop_out 0.1
+python dgl/examples/pytorch/compgcn/compgcn_fullgraph.py -d mutag --rev_indicator rev_ --hid_dim 64 --num_layers 4 --comp_fn ccorr --drop_out 0.1 --num_basis 51 --max_epoch 11
 ```
 
 AM: accuracy 75% (11 runs, DGL), 90.6% (paper)
