@@ -6,7 +6,7 @@ import random
 import pytest
 import networkx as nx
 import backend as F
-import numpy as np 
+import numpy as np
 
 random.seed(42)
 np.random.seed(42)

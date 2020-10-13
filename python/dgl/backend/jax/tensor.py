@@ -63,7 +63,7 @@ class SparseMatrix2D(SparseMatrix):
 
     def to_dense(self):
         dense = jnp.zeros(self.shape, self.dtype)
-        return dense.at[self.index].add(self.data)
+        return dense.at[tuple(self.index)].add(self.data)
 
     @classmethod
     def from_dense(cls, x):
@@ -119,13 +119,16 @@ def get_preferred_sparse_format():
     return "coo"
 
 def sparse_matrix(data, index, shape, force_format=False):
+    if not len(shape) == 2:
+        raise NotImplementedError
+
     fmt = index[0]
     if fmt != 'coo':
         raise TypeError(
             'JAX backend only supports COO format. But got %s.' % fmt
         )
     # spmat = th.sparse_coo_tensor(index[1], data, shape)
-    spmat = SparseMatrix(
+    spmat = SparseMatrix2D(
         index=index[1],
         data=data,
         shape=shape,
@@ -137,7 +140,7 @@ def sparse_matrix_indices(spmat):
     return ('coo', spmat.index)
 
 def is_tensor(obj):
-    return isinstance(obj, jnp.ndarray)
+    return isinstance(obj, jnp.ndarray) and hasattr(obj, 'device_buffer')
 
 def shape(input):
     return input.shape
@@ -275,13 +278,13 @@ def squeeze(input, dim):
     return jnp.squeeze(input, dim)
 
 def unsqueeze(input, dim):
-    return jnp.unsqueeze(input, dim)
+    return jnp.expand_dims(input, dim)
 
 def reshape(input, shape):
     return jnp.reshape(input ,shape)
 
 def swapaxes(input, axis1, axis2):
-    return jnp.transpose(input, axis1, axis2)
+    return jnp.swapaxes(input, axis1, axis2)
 
 def zeros(shape, dtype, ctx):
     # TODO: device

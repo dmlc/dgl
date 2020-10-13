@@ -11,7 +11,7 @@ def is_cuda_available():
     return 'gpu' in str(xla_bridge.get_backend().platform)
 
 def array_equal(a, b):
-    return a == b
+    return (a == b).all()
 
 def allclose(a, b, rtol=1e-4, atol=1e-4):
     return jnp.allclose(
@@ -41,7 +41,7 @@ def sparse_to_numpy(x):
     return x.to_dense()
 
 def clone(x):
-    return jnp.copy(x)
+    return jnp.asarray(x)
 
 def reduce_sum(x):
     return jnp.sum(x)
