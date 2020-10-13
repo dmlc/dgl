@@ -1,15 +1,18 @@
 /*!
  *  Copyright (c) 2017-2020 by Contributors
  * \file cuda_device_api.cc
- * \brief Memory pool implementation for GPU. 
+ * \brief Memory pool implementation for GPU.
  */
 
 #include "cuda_memory_pool.h"
-#include "cuda_common.h"
 
 #include <cuda_runtime.h>
 #include <mutex>
 #include <cstdlib>
+#include <map>
+#include <algorithm>
+
+#include "cuda_common.h"
 
 namespace dgl {
 namespace runtime {
@@ -32,7 +35,7 @@ constexpr const size_t kMaxAllocMultiple = 2;
  * 100 MB of memory at one time, we cannot have more than 200 MB allocated.
  */
 constexpr const size_t kMaxTotalMultiple = 2;
-}
+}  // namespace
 
 class CudaMemoryPool::Pool {
  public:
@@ -100,17 +103,11 @@ class CudaMemoryPool::Pool {
     total_unused_ += e.size;
   }
 
-  size_t TotalUnused() const
-  {
-    return total_unused_;
-  }
-
   size_t TotalUsed() const {
     return total_ - total_unused_;
   }
 
-  size_t TotalSize() const
-  {
+  size_t TotalSize() const {
     return total_;
   }
 
@@ -134,9 +131,9 @@ class CudaMemoryPool::Pool {
 
   std::mutex mtx_;
 
-  size_t AllocSize(const size_t nbytes) const
-  {
-    return std::max(kCudaPageSize, (nbytes + (kCudaPageSize - 1)) / kCudaPageSize * kCudaPageSize);
+  size_t AllocSize(const size_t nbytes) const {
+    return std::max(kCudaPageSize,
+        (nbytes + (kCudaPageSize - 1)) / kCudaPageSize * kCudaPageSize);
   }
 
   void Release(DGLContext ctx, DeviceAPI* device) {
@@ -152,8 +149,7 @@ class CudaMemoryPool::Pool {
 };
 
 CudaMemoryPool::CudaMemoryPool(
-    std::shared_ptr<DeviceAPI> device) : array_(), device_(device)
-{
+    std::shared_ptr<DeviceAPI> device) : array_(), device_(device) {
   int nDevices;
   CUDA_CALL(cudaGetDeviceCount(&nDevices));
   array_.resize(nDevices);
@@ -177,5 +173,5 @@ CudaMemoryPool::Pool* const CudaMemoryPool::GetMemoryPool(const size_t device_id
   return array_[device_id];
 }
 
-}
-}
+}  // namespace runtime
+}  // namespace dgl
