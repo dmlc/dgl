@@ -22,3 +22,11 @@ Data Repository
 * ``DGL_DOWNLOAD_DIR``:
     * Values: String (default="${HOME}/.dgl")
     * The local directory to cache the downloaded data.
+
+GPU Options
+-----------
+* ``DGL_USE_CUDA_MEMORY_POOL``:
+    * values: `true`/`1` to enable, or `false`/`0` to disable (default=`false`).
+    * If enabled, GPU allocations will be saved to pool, to be re-used for
+    * subsequent allocatoins. This may enable faster execution at the cost
+      of higher memory consumption.
