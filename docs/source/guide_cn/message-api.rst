@@ -33,7 +33,7 @@ DGL现在支持 ``add``、 ``sub``、 ``mul``、 ``div``、 ``dot`` 函数。消
     def message_func(edges):
          return {'he': edges.src['hu'] + edges.dst['hv']}
 
-DGL支持内置的聚合函数 ``sum``、 ``max``、 ``min``、 ``prod`` 和 ``mean`` 操作。
+DGL支持内置的聚合函数 ``sum``、 ``max``、 ``min`` 和 ``mean`` 操作。
 聚合函数通常有两个参数，它们的类型都是字符串。一个用于指定 ``mailbox`` 中的字段名，一个用于指示目标节点特征的字段名，
 例如， ``dgl.function.sum('m', 'h')`` 等价于如下所示的对接收到消息求和的用户定义函数：
 
@@ -44,20 +44,19 @@ DGL支持内置的聚合函数 ``sum``、 ``max``、 ``min``、 ``prod`` 和 ``m
          return {'h': torch.sum(nodes.mailbox['m'], dim=1)}
 
 在DGL中，也可以调用逐边计算的接口 :meth:`~dgl.DGLGraph.apply_edges`，而不必显式地调用消息传递函数。
-:meth:`~dgl.DGLGraph.apply_edges` 的参数是一个消息函数，并且在默认情况下，这个接口将更新所有的边。例如：
+:meth:`~dgl.DGLGraph.apply_edges` 的参数是一个消息函数。并且在默认情况下，这个接口将更新所有的边。例如：
 
 .. code::
 
     import dgl.function as fn
     graph.apply_edges(fn.u_add_v('el', 'er', 'e'))
 
-对于消息传递， :meth:`~dgl.DGLGraph.update_all` 是一个高级API。它聚合了消息生成、
+对于消息传递， :meth:`~dgl.DGLGraph.update_all` 是一个高级API。它在单个API调用里合并了消息生成、
 消息聚合和节点特征更新，这为从整体上进行系统优化提供了空间。
 
 :meth:`~dgl.DGLGraph.update_all` 的参数是一个消息函数、一个聚合函数和一个更新函数。
-更新函数是一个选择性的参数。用户也可以在 ``update_all`` 执行完后直接对节点特征进行操做。
-由于更新函数通常可以用纯张量操作实现，所以DGL不推荐在 ``update_all`` 中指定更新函数，
-而是在它执行完后直接对节点特征进行操作。例如：
+更新函数是一个可选择的参数，用户也可以不使用它，而是在 ``update_all`` 执行完后直接对节点特征进行操作。
+由于更新函数通常可以用纯张量操作实现，所以DGL不推荐在 ``update_all`` 中指定更新函数。例如：
 
 .. code::
 
