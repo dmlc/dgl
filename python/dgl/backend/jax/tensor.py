@@ -236,7 +236,8 @@ def stack(seq, dim):
     return jnp.stack(seq, axis=dim)
 
 def split(input, sizes_or_sections, dim):
-    return jnp.split(input, sizes_or_sections, axis=dim)
+    sizes_or_sections = jnp.cumsum(tensor(sizes_or_sections))
+    return jnp.split(input, sizes_or_sections, axis=dim)[:-1]
 
 def repeat(input, repeats, dim):
     return jnp.repeat(input, repeats=repeats, axis=dim)

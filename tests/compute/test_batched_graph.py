@@ -96,7 +96,7 @@ def test_batch_unbatch_frame(idtype):
     t1.edata['h'] = F.randn((E1, D))
     t2.ndata['h'] = F.randn((N2, D))
     t2.edata['h'] = F.randn((E2, D))
-    
+
     b1 = dgl.batch([t1, t2])
     b2 = dgl.batch([t2])
     b1.ndata['h'][:N1] = F.zeros((N1, D))

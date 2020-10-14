@@ -131,22 +131,23 @@ def test_spmm(idtype, g, shp, msg, reducer):
             assert F.allclose(v, v1)
             print('forward passed')
 
-            F.backward(F.reduce_sum(v1))
-            if msg != 'copy_rhs':
-                if reducer in ['min', 'max']: # there might be some numerical errors
-                    rate = F.reduce_sum(F.abs(F.grad(g.srcdata['x']) - grad_u)) /\
-                           F.reduce_sum(F.abs(grad_u))
-                    assert F.as_scalar(rate) < 1e-2, rate
-                else:
-                    assert F.allclose(F.grad(g.srcdata['x']), grad_u)
-            if msg != 'copy_lhs':
-                if reducer in ['min', 'max']:
-                    rate = F.reduce_sum(F.abs(F.grad(g.edata['w']) - grad_e)) /\
-                           F.reduce_sum(F.abs(grad_e))
-                    assert F.as_scalar(rate) < 1e-2, rate
-                else:
-                    assert F.allclose(F.grad(g.edata['w']), grad_e)
-            print('backward passed')
+            if F.backend_name != "jax":
+                F.backward(F.reduce_sum(v1))
+                if msg != 'copy_rhs':
+                    if reducer in ['min', 'max']: # there might be some numerical errors
+                        rate = F.reduce_sum(F.abs(F.grad(g.srcdata['x']) - grad_u)) /\
+                               F.reduce_sum(F.abs(grad_u))
+                        assert F.as_scalar(rate) < 1e-2, rate
+                    else:
+                        assert F.allclose(F.grad(g.srcdata['x']), grad_u)
+                if msg != 'copy_lhs':
+                    if reducer in ['min', 'max']:
+                        rate = F.reduce_sum(F.abs(F.grad(g.edata['w']) - grad_e)) /\
+                               F.reduce_sum(F.abs(grad_e))
+                        assert F.as_scalar(rate) < 1e-2, rate
+                    else:
+                        assert F.allclose(F.grad(g.edata['w']), grad_e)
+                print('backward passed')
 
     g.srcdata.pop('x')
     g.edata.pop('w')
