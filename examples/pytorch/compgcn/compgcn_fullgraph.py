@@ -66,7 +66,7 @@ def main(args):
         print('There are total {} nodes in type {}'.format(heterograph.number_of_nodes(ntype), ntype))
 
     for src, etype, dst in heterograph.canonical_etypes:
-        print('There are total {} edges in type {}'.format(heterograph.number_of_edges((src, etype, dst)), etype))
+        print('There are total {} edges in type {}'.format(heterograph.number_of_edges((src, etype, dst)), (src, etype, dst)))
 
     # check cuda
     use_cuda = (args.gpu >= 0 and th.cuda.is_available())
