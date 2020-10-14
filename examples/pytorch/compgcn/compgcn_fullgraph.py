@@ -62,6 +62,12 @@ def main(args):
     print('In Dataset: {}, node types num: {}'.format(args.dataset, len(heterograph.ntypes)))
     print('In Dataset: {}, edge types num: {}'.format(args.dataset, len(heterograph.etypes)))
 
+    for ntype in heterograph.ntypes:
+        print('There are total {} nodes in type {}'.format(heterograph.number_of_nodes(ntype), ntype))
+
+    for etype in heterograph.etypes:
+        print('There are total {} edges in type {}'.format(heterograph.number_of_edges(etype), etype))
+
     # check cuda
     use_cuda = (args.gpu >= 0 and th.cuda.is_available())
     print("If use GPU: {}".format(use_cuda))
