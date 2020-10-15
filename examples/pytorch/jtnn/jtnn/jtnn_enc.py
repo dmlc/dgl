@@ -99,8 +99,8 @@ class DGLJTNNEncoder(nn.Module):
         for eid in level_order(mol_tree_batch, root_ids):
             eid = eid.to(mol_tree_batch_lg.device)
             mol_tree_batch_lg.pull(eid, DGLF.copy_u('m', 'm'), DGLF.sum('m', 's'))
-            mol_tree_batch_lg.pull(eid, DGLF.copy_u('rm', 'rm'), DGLF.sum('rm', 'rm'))
-            mol_tree_batch_lg.apply_nodes(self.enc_tree_update)
+            mol_tree_batch_lg.pull(eid, DGLF.copy_u('rm', 'rm'), DGLF.sum('rm', 'accum_rm'))
+            mol_tree_batch_lg.apply_nodes(self.enc_tree_update, v=eid)
 
         # Readout
         mol_tree_batch.edata.update(mol_tree_batch_lg.ndata)

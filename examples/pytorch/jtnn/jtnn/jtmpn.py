@@ -195,6 +195,7 @@ class DGLJTMPN(nn.Module):
         cand_graphs.apply_edges(
             func=lambda edges: {'src_x': edges.src['x']},
         )
+        cand_line_graph.ndata.update(cand_graphs.edata)
 
         bond_features = cand_line_graph.ndata['x']
         source_features = cand_line_graph.ndata['src_x']
