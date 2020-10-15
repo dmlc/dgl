@@ -1,36 +1,46 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/async_transferrer.h
- * \brief The AsyncTransferrer class for copying the data to/from the GPU on a
+ * \file array/async_transferer.h
+ * \brief The AsyncTransferer class for copying the data to/from the GPU on a
  * separate stream. 
  */
 
 
-#ifndef DGL_ARRAY_ASYNCTRANSFERRER_H_
-#define DGL_ARRAY_ASYNCTRANSFERRER_H_
+#ifndef DGL_ARRAY_ASYNCTRANSFERER_H_
+#define DGL_ARRAY_ASYNCTRANSFERER_H_
 
 #include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/ndarray.h>
+#include <dgl/runtime/object.h>
 #include <unordered_map>
 #include <memory>
 
 namespace dgl {
 namespace runtime {
 
-class AsyncTransferrer {
+class AsyncTransferer : public Object {
   public:
     using TransferId = int;
 
-    AsyncTransferrer(
+    explicit AsyncTransferer(
         DGLContext ctx);
-    ~AsyncTransferrer();
+    ~AsyncTransferer();
 
-    TransferId CreateTransfer(
+    // disable copying
+    AsyncTransferer(
+        const AsyncTransferer&) = delete;
+    AsyncTransferer& operator=(
+        const AsyncTransferer&) = delete;
+
+    TransferId StartTransfer(
         NDArray data,
         DGLContext ctx);
 
     NDArray Wait(
         TransferId id);
+
+    static constexpr const char* _type_key = "ndarray.AsyncTransferer";
+    DGL_DECLARE_OBJECT_TYPE_INFO(AsyncTransferer, Object);
 
   private:
     struct Event;
@@ -48,6 +58,8 @@ class AsyncTransferrer {
 
     TransferId GenerateId();
 };
+
+DGL_DEFINE_OBJECT_REF(AsyncTransfererRef, AsyncTransferer);
 
 }  // namespace runtime
 }  // namespace dgl
