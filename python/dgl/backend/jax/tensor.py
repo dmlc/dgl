@@ -38,7 +38,9 @@ def cpu():
 def tensor(data, dtype=None):
     if isinstance(data, numbers.Number):
         data = [data]
-    return jnp.array(data, dtype=dtype)
+    data = jnp.array(data, dtype=dtype)
+    # data.device_buffer.block_host_until_ready()
+    return data
 
 def as_scalar(data):
     return data.item()
@@ -419,14 +421,11 @@ def zerocopy_from_numpy(np_array):
     return jnp.asarray(np_array)
 
 def zerocopy_to_dgl_ndarray(data):
-    # TODO: this still copies data which might be bad
-
-    # try:
-    #     return nd.from_dlpack(jax.dlpack.to_dlpack(data))
-    # except:
-    #     data = jnp.array(data)
-    #     return nd.from_dlpack(jax.dlpack.to_dlpack(data))
-    data = jnp.array(data)
+    # TODO: figure out why device buffer
+    # is sometimes deleted
+    # data._check_if_deleted()
+    # data.device_buffer.block_host_until_ready()
+    # data = jnp.array(data)
     return nd.from_dlpack(jax.dlpack.to_dlpack(data))
 
 def zerocopy_to_dgl_ndarray_for_write(input):
