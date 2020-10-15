@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/async_transferer.h
+ * \file array/async_transferer.cc
  * \brief The AsyncTransferer implementation.
  */
 
