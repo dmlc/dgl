@@ -21,7 +21,7 @@ DGL优化了消息传递的内存消耗和计算速度，这包括：
    在调用 :meth:`~dgl.DGLGraph.update_all` 时，如果消息函数和聚合函数是内置的，则它们会被合并到一个内核中。
    边上的消息不会被具体化。(内存优化)
 
-根据以上所述，利用这些优化的一个常见实践是通过基于内置的 :meth:`~dgl.DGLGraph.update_all` 来开发消息传递功能。
+根据以上所述，利用这些优化的一个常见实践是通过基于内置函数的 :meth:`~dgl.DGLGraph.update_all` 来开发消息传递功能。
 
 对于某些情况，比如 :class:`~dgl.nn.pytorch.conv.GATConv`，计算必须在边上保存消息，
 那么用户就需要调用基于内置函数的 :meth:`~dgl.DGLGraph.apply_edges`。有时边上的消息可能是高维的，这会非常消耗内存。

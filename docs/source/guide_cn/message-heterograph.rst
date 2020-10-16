@@ -17,7 +17,7 @@
 在DGL中，对异构图进行消息传递的接口是 :meth:`~dgl.DGLGraph.multi_update_all`。
 :meth:`~dgl.DGLGraph.multi_update_all` 接受一个字典。这个字典的每一个键值对里，键是一种关系，
 值是这种关系对应 :meth:`~dgl.DGLGraph.update_all` 的参数。
-:meth:`~dgl.DGLGraph.multi_update_all` 还接受一个字符串来表示跨类型整合函数，
+:meth:`~dgl.DGLGraph.multi_update_all` 还接受一个字符串来表示跨类型整合函数，来指定整合不同关系聚合结果的方式。
 这个整合方式可以是 ``sum``、 ``min``、 ``max``、 ``mean`` 和 ``stack`` 中的一个。以下是一个例子：
 
 .. code::

@@ -5,7 +5,7 @@
 
 :ref:`(English Version) <guide-message-passing-part>`
 
-如果用户只想更新图中的部分节点，可以先通过想要更新的节点编号创建一个子图，
+如果用户只想更新图中的部分节点，可以先通过想要囊括的节点编号创建一个子图，
 然后在子图上调用 :meth:`~dgl.DGLGraph.update_all` 方法。例如：
 
 .. code::
