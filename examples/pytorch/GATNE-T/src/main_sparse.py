@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from tqdm.auto import tqdm
+import tqdm
 from numpy import random
 from torch.nn.parameter import Parameter
 import dgl
@@ -56,7 +56,8 @@ class NeighborSampler(object):
         self.num_fanouts = num_fanouts
 
     def sample(self, pairs):
-        heads, tails, types = zip(*pairs)
+        pairs = np.stack(pairs)
+        heads, tails, types = pairs[:, 0], pairs[:, 1], pairs[:, 2]
         seeds, head_invmap = torch.unique(torch.LongTensor(heads), return_inverse=True)
         blocks = []
         for fanout in reversed(self.num_fanouts):
@@ -90,9 +91,9 @@ class DGLGATNE(nn.Module):
         self.edge_type_count = edge_type_count
         self.dim_a = dim_a
 
-        self.node_embeddings = Parameter(torch.FloatTensor(num_nodes, embedding_size))
-        self.node_type_embeddings = Parameter(
-            torch.FloatTensor(num_nodes, edge_type_count, embedding_u_size)
+        self.node_embeddings = nn.Embedding(num_nodes, embedding_size, sparse=True)
+        self.node_type_embeddings = nn.Embedding(
+            num_nodes * edge_type_count, embedding_u_size, sparse=True
         )
         self.trans_weights = Parameter(
             torch.FloatTensor(edge_type_count, embedding_u_size, embedding_size)
@@ -105,8 +106,8 @@ class DGLGATNE(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        self.node_embeddings.data.uniform_(-1.0, 1.0)
-        self.node_type_embeddings.data.uniform_(-1.0, 1.0)
+        self.node_embeddings.weight.data.uniform_(-1.0, 1.0)
+        self.node_type_embeddings.weight.data.uniform_(-1.0, 1.0)
         self.trans_weights.data.normal_(std=1.0 / math.sqrt(self.embedding_size))
         self.trans_weights_s1.data.normal_(std=1.0 / math.sqrt(self.embedding_size))
         self.trans_weights_s2.data.normal_(std=1.0 / math.sqrt(self.embedding_size))
@@ -116,14 +117,17 @@ class DGLGATNE(nn.Module):
         input_nodes = block.srcdata[dgl.NID]
         output_nodes = block.dstdata[dgl.NID]
         batch_size = block.number_of_dst_nodes()
-        node_embed = self.node_embeddings
         node_type_embed = []
 
         with block.local_scope():
             for i in range(self.edge_type_count):
                 edge_type = self.edge_types[i]
-                block.srcdata[edge_type] = self.node_type_embeddings[input_nodes, i]
-                block.dstdata[edge_type] = self.node_type_embeddings[output_nodes, i]
+                block.srcdata[edge_type] = self.node_type_embeddings(
+                    input_nodes * self.edge_type_count + i
+                )
+                block.dstdata[edge_type] = self.node_type_embeddings(
+                    output_nodes * self.edge_type_count + i
+                )
                 block.update_all(
                     fn.copy_u(edge_type, "m"), fn.sum("m", edge_type), etype=edge_type
                 )
@@ -166,7 +170,7 @@ class DGLGATNE(nn.Module):
             node_type_embed = torch.matmul(attention, node_type_embed).view(
                 -1, 1, self.embedding_u_size
             )
-            node_embed = node_embed[output_nodes].unsqueeze(1).repeat(
+            node_embed = self.node_embeddings(output_nodes).unsqueeze(1).repeat(
                 1, self.edge_type_count, 1
             ) + torch.matmul(node_type_embed, trans_w).view(
                 -1, self.edge_type_count, self.embedding_size
@@ -182,7 +186,7 @@ class NSLoss(nn.Module):
         self.num_nodes = num_nodes
         self.num_sampled = num_sampled
         self.embedding_size = embedding_size
-        self.weights = Parameter(torch.FloatTensor(num_nodes, embedding_size))
+
         # [ (log(i+2) - log(i+1)) / log(num_nodes + 1)]
         self.sample_weights = F.normalize(
             torch.Tensor(
@@ -193,21 +197,25 @@ class NSLoss(nn.Module):
             ),
             dim=0,
         )
-
+        self.weights = nn.Embedding(num_nodes, embedding_size, sparse=True)
         self.reset_parameters()
 
     def reset_parameters(self):
-        self.weights.data.normal_(std=1.0 / math.sqrt(self.embedding_size))
+        self.weights.weight.data.normal_(std=1.0 / math.sqrt(self.embedding_size))
 
     def forward(self, input, embs, label):
         n = input.shape[0]
         log_target = torch.log(
-            torch.sigmoid(torch.sum(torch.mul(embs, self.weights[label]), 1))
+            torch.sigmoid(torch.sum(torch.mul(embs, self.weights(label)), 1))
         )
-        negs = torch.multinomial(
-            self.sample_weights, self.num_sampled * n, replacement=True
-        ).view(n, self.num_sampled)
-        noise = torch.neg(self.weights[negs])
+        negs = (
+            torch.multinomial(
+                self.sample_weights, self.num_sampled * n, replacement=True
+            )
+            .view(n, self.num_sampled)
+            .to(input.device)
+        )
+        noise = torch.neg(self.weights(negs))
         sum_log_sampled = torch.sum(
             torch.log(torch.sigmoid(torch.bmm(noise, embs.unsqueeze(2)))), 1
         ).squeeze()
@@ -256,24 +264,54 @@ def train_model(network_data):
         num_workers=num_workers,
         pin_memory=True,
     )
+
     model = DGLGATNE(
-        num_nodes, embedding_size, embedding_u_size, edge_types, edge_type_count, dim_a
+        num_nodes, embedding_size, embedding_u_size, edge_types, edge_type_count, dim_a,
     )
+
     nsloss = NSLoss(num_nodes, num_sampled, embedding_size)
+
     model.to(device)
     nsloss.to(device)
 
+    embeddings_params = list(map(id, model.node_embeddings.parameters())) + list(
+        map(id, model.node_type_embeddings.parameters())
+    )
+    weights_params = list(map(id, nsloss.weights.parameters()))
+
     optimizer = torch.optim.Adam(
-        [{"params": model.parameters()}, {"params": nsloss.parameters()}], lr=1e-3
+        [
+            {
+                "params": filter(
+                    lambda p: id(p) not in embeddings_params, model.parameters(),
+                )
+            },
+            {
+                "params": filter(
+                    lambda p: id(p) not in weights_params, nsloss.parameters(),
+                )
+            },
+        ],
+        lr=1e-3,
+    )
+
+    sparse_optimizer = torch.optim.SparseAdam(
+        [
+            {"params": model.node_embeddings.parameters()},
+            {"params": model.node_type_embeddings.parameters()},
+            {"params": nsloss.weights.parameters()},
+        ],
+        lr=1e-3,
     )
 
     best_score = 0
     patience = 0
     for epoch in range(epochs):
         model.train()
+
         random.shuffle(train_pairs)
 
-        data_iter = tqdm(
+        data_iter = tqdm.tqdm(
             train_dataloader,
             desc="epoch %d" % (epoch),
             total=(len(train_pairs) + (batch_size - 1)) // batch_size,
@@ -282,11 +320,12 @@ def train_model(network_data):
 
         for i, (block, head_invmap, tails, block_types) in enumerate(data_iter):
             optimizer.zero_grad()
+            sparse_optimizer.zero_grad()
             # embs: [batch_size, edge_type_count, embedding_size]
             block_types = block_types.to(device)
             embs = model(block[0].to(device))[head_invmap]
             embs = embs.gather(
-                1, block_types.view(-1, 1, 1).expand(embs.shape[0], 1, embs.shape[2])
+                1, block_types.view(-1, 1, 1).expand(embs.shape[0], 1, embs.shape[2]),
             )[:, 0]
             loss = nsloss(
                 block[0].dstdata[dgl.NID][head_invmap].to(device),
@@ -295,6 +334,7 @@ def train_model(network_data):
             )
             loss.backward()
             optimizer.step()
+            sparse_optimizer.step()
             avg_loss += loss.item()
 
             post_fix = {
@@ -325,7 +365,7 @@ def train_model(network_data):
                 train_invmap,
                 fake_tails,
                 train_types,
-            ) = neighbor_sampler.sample(pairs)
+            ) = neighbor_sampler.sample(pairs.cpu())
 
             node_emb = model(train_blocks[0].to(device))[train_invmap]
             node_emb = node_emb.gather(
@@ -395,6 +435,7 @@ if __name__ == "__main__":
     testing_true_data_by_edge, testing_false_data_by_edge = load_testing_data(
         file_name + "/test.txt"
     )
+
     start = time.time()
     average_auc, average_f1, average_pr = train_model(training_data_by_type)
     end = time.time()
