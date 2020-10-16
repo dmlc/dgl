@@ -4,6 +4,9 @@ import torch as th
 import argparse
 import time
 
+from distutils.version import LooseVersion
+assert LooseVersion(dgl.__version__) > LooseVersion("0.5"), "Please update dgl to version > 0.5 to run the script"
+
 from load_graph import load_reddit, load_ogb
 
 if __name__ == '__main__':
