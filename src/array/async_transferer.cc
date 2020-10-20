@@ -11,6 +11,8 @@
 #include <dgl/runtime/registry.h>
 #include <dgl/runtime/device_api.h>
 #include <cuda_runtime.h>
+#include <vector>
+#include <utility>
 #include "../runtime/cuda/cuda_common.h"
 
 namespace dgl {
@@ -41,11 +43,10 @@ AsyncTransferer::~AsyncTransferer() {
 
 TransferId AsyncTransferer::StartTransfer(
     NDArray src,
-    DGLContext dst_ctx)
-{
+    DGLContext dst_ctx) {
   const TransferId id = GenerateId();
 
-  // get tensor information 
+  // get tensor information
   DGLContext src_ctx = src->ctx;
   DLDataType dtype = src->dtype;
   std::vector<int64_t> shape(src->shape, src->shape+src->ndim);
@@ -58,20 +59,19 @@ TransferId AsyncTransferer::StartTransfer(
   CHECK(dst_ctx == ctx_ || src_ctx == ctx_) <<
       "One side of the async copy must involve the AsyncTransfer's context";
 
-  t.dst = NDArray::Empty(shape, dtype, dst_ctx); 
+  t.dst = NDArray::Empty(shape, dtype, dst_ctx);
 
   t.dst.CopyFrom(t.src, stream_);
 
   CUDA_CALL(cudaEventRecord(t.event->id, static_cast<cudaStream_t>(stream_)));
-  
+
   transfers_.emplace(id, std::move(t));
 
   return id;
 }
 
 NDArray AsyncTransferer::Wait(
-    const TransferId id)
-{
+    const TransferId id) {
   auto iter = transfers_.find(id);
   CHECK(iter != transfers_.end()) << "Unknown transfer: " << id;
 
@@ -84,8 +84,7 @@ NDArray AsyncTransferer::Wait(
   return t.dst;
 }
 
-TransferId AsyncTransferer::GenerateId()
-{
+TransferId AsyncTransferer::GenerateId() {
   return ++next_id_;
 }
 
