@@ -253,4 +253,3 @@ def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
     def _lambda(logits):
         return edge_softmax_real(gidx, logits, eids, norm_by)
     return _lambda(logits)
-

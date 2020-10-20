@@ -5,6 +5,7 @@ import jax
 from jax.config import config
 config.update("jax_enable_x64", True)
 from jax import numpy as jnp
+from jax import xla
 import numpy as onp
 from jax import dlpack
 
@@ -368,7 +369,7 @@ def logical_and(input1, input2):
     return input1 & input2
 
 def clone(input):
-    return jnp.copy(0)
+    return input + 0
 
 def clamp(data, min_val, max_val):
     return jnp.clip(data, min_val, max_val)
@@ -421,15 +422,10 @@ def zerocopy_from_numpy(np_array):
     return jnp.asarray(np_array)
 
 def zerocopy_to_dgl_ndarray(data):
-    # TODO: figure out why device buffer
-    # is sometimes deleted
-    # data._check_if_deleted()
-    # data.device_buffer.block_host_until_ready()
-    # data = jnp.array(data)
-    return nd.from_dlpack(jax.dlpack.to_dlpack(data))
+    return nd.from_dlpack(jax.dlpack.to_dlpack(data, take_ownership=False))
 
 def zerocopy_to_dgl_ndarray_for_write(input):
-    return zerocopy_to_dgl_ndarray(input)
+    return nd.from_dlpack(jax.dlpack.to_dlpack(input, take_ownership=True))
 
 def zerocopy_from_dgl_ndarray(data):
     return jax.dlpack.from_dlpack(data.to_dlpack())
