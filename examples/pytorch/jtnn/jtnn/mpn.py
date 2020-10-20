@@ -136,6 +136,7 @@ class DGLMPN(nn.Module):
         mol_graph.apply_edges(
             func=lambda edges: {'src_x': edges.src['x']},
         )
+        mol_line_graph.ndata.update(mol_graph.edata)
 
         e_repr = mol_line_graph.ndata
         bond_features = e_repr['x']

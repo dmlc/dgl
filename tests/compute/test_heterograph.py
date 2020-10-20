@@ -1736,6 +1736,13 @@ def test_bipartite(idtype):
     }, idtype=idtype, device=F.ctx())
     assert not g3.is_unibipartite
 
+    g4 = dgl.heterograph({
+        ('A', 'AB', 'B'): ([0, 0, 1], [1, 2, 5]),
+        ('C', 'CA', 'A'): ([1, 0], [0, 0])
+    }, idtype=idtype, device=F.ctx())
+
+    assert not g4.is_unibipartite
+
 @parametrize_dtype
 def test_dtype_cast(idtype):
     g = dgl.graph(([0, 1, 0, 2], [0, 1, 1, 0]), idtype=idtype, device=F.ctx())
