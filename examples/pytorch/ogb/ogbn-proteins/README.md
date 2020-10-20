@@ -39,8 +39,8 @@ python3 gat.py
 
 Here are the results over 6 runs.
 
-|      |     Val acc     |    Test acc     | #Parameters |
-|:----:|:---------------:|:---------------:|:-----------:|
-| GAT* | 0.9163 ± 0.0005 | 0.8665 ± 0.0010 |  2,436,304  |
+|      | Validation ROC-AUC |  Test ROC-AUC   | #Parameters |
+|:----:|:------------------:|:---------------:|:-----------:|
+| GAT* |  0.9163 ± 0.0005   | 0.8665 ± 0.0010 |  2,436,304  |
 
 *GAT\* modified the method in GAT paper by removing the "leaky_relu" in calculating attention, thus reducing the amount of calculation: $\text{softmax}(a^T[Wh_i||Wh_j])=\text{softmax}(a^T Wh_i)$  where $\text{j}$ indicates the destination node of an edge.*
