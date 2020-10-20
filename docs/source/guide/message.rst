@@ -243,7 +243,7 @@ For example:
 In the above, we use affinity as the edge weight. The edge weight should
 usually be a scalar.
 
-Message Passing on Heterogeneuous Graph
+Message Passing on Heterogeneous Graph
 ---------------------------------------
 
 Heterogeneous (user guide for :ref:`guide-graph-heterogeneous`), or
