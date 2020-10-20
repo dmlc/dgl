@@ -10,8 +10,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from dgl.dataloading import (MultiLayerFullNeighborSampler,
-                             MultiLayerNeighborSampler)
+from dgl.dataloading import MultiLayerFullNeighborSampler, MultiLayerNeighborSampler
 from dgl.dataloading.pytorch import NodeDataLoader
 from matplotlib.ticker import AutoMinorLocator, MultipleLocator
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
@@ -252,7 +251,7 @@ def main():
     argparser.add_argument("--lr", type=float, default=0.01)
     argparser.add_argument("--n-layers", type=int, default=6)
     argparser.add_argument("--n-hidden", type=int, default=32)
-    argparser.add_argument("--dropout", type=float, default=0.1)
+    argparser.add_argument("--dropout", type=float, default=0.3)
     argparser.add_argument("--attn-dropout", type=float, default=0.1)
     argparser.add_argument("--wd", type=float, default=0)
     argparser.add_argument("--eval-every", type=int, default=5)
