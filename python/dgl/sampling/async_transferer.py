@@ -1,6 +1,6 @@
 
-from ... import backend as F
-from ._ffi.function import _init_api
+from .. import backend as F
+from .._ffi.function import _init_api
 
 class Transfer(object):
     def __init__(self, transfer_id, handle):
