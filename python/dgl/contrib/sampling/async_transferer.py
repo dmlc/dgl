@@ -1,4 +1,5 @@
 
+from ... import backend as F
 from ._ffi.function import _init_api
 
 class Transfer(object):
@@ -9,7 +10,7 @@ class Transfer(object):
     def wait(self):
         res_tensor = _CAPI_DGLAsyncSamplerWait(self._handle,
                 self._transfer_id)
-        return F.zerocopy(from_dgl_ndarray(res_tensor)
+        return F.zerocopy(F.from_dgl_ndarray(res_tensor))
 
 
 
