@@ -6,8 +6,8 @@
  */
 
 
-#ifndef DGL_ARRAY_ASYNC_TRANSFERER_H_
-#define DGL_ARRAY_ASYNC_TRANSFERER_H_
+#ifndef DGL_ARRAY_CUDA_ASYNC_TRANSFERER_H_
+#define DGL_ARRAY_CUDA_ASYNC_TRANSFERER_H_
 
 #include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/ndarray.h>
@@ -64,4 +64,4 @@ DGL_DEFINE_OBJECT_REF(AsyncTransfererRef, AsyncTransferer);
 }  // namespace runtime
 }  // namespace dgl
 
-#endif  // DGL_ARRAY_ASYNC_TRANSFERER_H_
+#endif  // DGL_ARRAY_CUDA_ASYNC_TRANSFERER_H_
