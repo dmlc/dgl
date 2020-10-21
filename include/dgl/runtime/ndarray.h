@@ -139,7 +139,8 @@ class NDArray {
   /*!
    * \brief Copy data content from another array.
    * \param other The source array to be copied from.
-   * \param stream The stream to perform the copy on.
+   * \param stream The stream to perform the copy on if it involves a GPU
+   *        context, otherwise this parameter is ignored.
    * \note The copy may happen asynchrously if it involves a GPU context.
    *       DGLSynchronize is necessary.
    */
