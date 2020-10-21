@@ -1,4 +1,4 @@
-.. _guide-nn-heterograph:
+.. _guide_cn-nn-heterograph:
 
 3.3 异构图上的GraphConv模块
 -------------------------
