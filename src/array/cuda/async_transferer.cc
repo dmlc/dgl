@@ -13,7 +13,7 @@
 #include <cuda_runtime.h>
 #include <vector>
 #include <utility>
-#include "../runtime/cuda/cuda_common.h"
+#include "../../runtime/cuda/cuda_common.h"
 
 namespace dgl {
 namespace runtime {
