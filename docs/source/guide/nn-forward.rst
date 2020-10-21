@@ -3,6 +3,8 @@
 3.2 DGL NN Module Forward Function
 ----------------------------------
 
+:ref:`(中文版) <guide_cn-nn-forward>`
+
 In NN module, ``forward()`` function does the actual message passing and
 computation. Compared with PyTorch’s NN module which usually takes
 tensors as the parameters, DGL NN module takes an additional parameter

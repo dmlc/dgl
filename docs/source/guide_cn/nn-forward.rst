@@ -1,7 +1,9 @@
 .. _guide_cn-nn-forward:
 
 3.2 编写DGL NN模块的forward函数
------------------------------
+---------------------------------
+
+:ref:`(English Version) <guide-nn-forward>`
 
 In NN module, ``forward()`` function does the actual message passing and
 computation. Compared with PyTorch’s NN module which usually takes
@@ -9,8 +11,8 @@ tensors as the parameters, DGL NN module takes an additional parameter
 :class:`dgl.DGLGraph`. The
 workload for ``forward()`` function can be split into three parts:
 
-在NN模块中，forward()函数执行了实际的消息传递和计算。与通常以张量为参数的PyTorch NN模块相比，
-DGL NN模块采用了1个附加参数dgl.DGLGraph。forward()函数的工作可以分为3个部分：
+在NN模块中， ``forward()`` 函数执行了实际的消息传递和计算。与通常以张量为参数的PyTorch NN模块相比，
+DGL NN模块额外增加了1个参数 :class:`dgl.DGLGraph`。``forward()`` 函数的内容一般可以分为3个部分：
 
 -  Graph checking and graph type specification.
 
@@ -18,18 +20,20 @@ DGL NN模块采用了1个附加参数dgl.DGLGraph。forward()函数的工作可�
 
 -  Feature update.
 
-● 图检验和图类型规范。
-● 消息传递和聚合。
-● 聚合后，更新特征作为输出。
+-  图检验和图类型规范。
+
+-  消息传递和聚合。
+
+-  聚合后，更新特征作为输出。
 
 The rest of the section takes a deep dive into the ``forward()`` function in SAGEConv example.
 
-下面展示了SAGEConv示例中的forward()函数。
+下文展示了SAGEConv示例中的 ``forward()`` 函数。
 
 Graph checking and graph type specification
 
 图检验和图类型规范
-~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 
 .. code::
 
@@ -48,21 +52,21 @@ all-zero values. This may cause silent regression in model performance. However,
 with the original node feature, the output of ``forward()`` will not be all-zero. No such check is
 needed in this case.
 
-forward()函数需要处理输入上的许多极端情况，这些情况可能导致计算和消息传递中的值无效。在GraphConv等conv模块中，
-一个典型的检验方法是验证输入图中没有入度为0的节点。当1个节点入度为0时，mailbox将为空，并且聚合函数的输出值全为0。
-这可能会导致模型性能的无声回归。但是，在SAGEConv模块中，被聚合的表示将与初始节点特征连接起来，forward()函数的输出不会全为0。
-在这种情况下，无需进行此类检验。
+ ``forward()`` 函数需要处理输入的许多极端情况，这些情况可能导致计算和消息传递中的值无效。在 :class:`~dgl.nn.pytorch.conv.GraphConv` 等conv模块中，
+一个典型的检验方法是检查输入图中没有入度为0的节点。当1个节点入度为0时， ``mailbox`` 将为空，并且聚合函数的输出值全为0，
+这可能会导致模型性能不易被发现的退化。但是，在 :class:`~dgl.nn.pytorch.conv.SAGEConv` 模块中，被聚合的表征将会与节点的初始特征连接起来，
+``forward()`` 函数的输出不会全为0。在这种情况下，无需进行此类检验。
 
 DGL NN module should be reusable across different types of graph input
 including: homogeneous graph, heterogeneous
 graph (:ref:`guide-graph-heterogeneous`), subgraph
 block (:ref:`guide-minibatch`).
 
-DGL NN模块可在不同类型的图输入中重复使用，包括：同构图、异构图（1.5 异构图）和子图区块（第6章：在大图上的随机训练）。
+DGL NN模块可在不同类型的图输入中重复使用，包括：同构图、异构图（:ref:`guide_cn-graph-heterogeneous`）和子图区块（:ref:`guide-minibatch`）。
 
 The math formulas for SAGEConv are:
 
-SAGEConv的数学公式为：
+SAGEConv的数学公式如下：
 
 .. math::
 
@@ -85,8 +89,8 @@ node feature ``feat_dst`` according to the graph type.
 type and expand ``feat`` into ``feat_src`` and ``feat_dst``.
 The detail of this function is shown below.
 
-源节点特征feat_src和目标节点特征feat_dst需要根据图类型被指定。
-用于指定图类型并将feat扩展为feat_src和feat_dst的函数为expand_as_pair()。
+源节点特征 ``feat_src`` 和目标节点特征 ``feat_dst`` 需要根据图类型被指定。
+用于指定图类型并将 ``feat`` 扩展为 ``feat_src`` 和 ``feat_dst`` 的函数是 :meth:``~dgl.utils.expand_as_pair``。
 该函数的细节如下所示。
 
 .. code::
@@ -123,8 +127,8 @@ graphs, one for each relation. The relations are represented as
 element in the tuple will be the source node feature and the second
 element will be the destination node feature.
 
-在异构的情况下，图可以分为几个二部图，每种关系对应1个。关系表示为(src_type, edge_type, dst_dtype)。
-当输入特征feat是1个元组时，图将会被视为二部图。元组中的第1个元素为源节点特征，第2个元素为目标节点特征。
+在异构图的情况下，图可以分为几个二部图，每种关系对应一个。关系表示为 ``(src_type, edge_type, dst_dtype)``。
+当输入特征 ``feat`` 是1个元组时，图将会被视为二部图。元组中的第1个元素为源节点特征，第2个元素为目标节点特征。
 
 In mini-batch training, the computing is applied on a subgraph sampled
 based on a bunch of destination nodes. The subgraph is called as
@@ -134,19 +138,19 @@ have in the original full graph. In the block creation phase,
 ``dst nodes`` are in the front of the node list. One can find the
 ``feat_dst`` by the index ``[0:g.number_of_dst_nodes()]``.
 
-在小批次训练中，计算应用于给定的一堆目标节点所采样的子图。子图在DGL中称为block。
-消息传递后，由于那些目标节点拥有和初始完整图中相同的邻域，因此仅更新这些目标节点。
-在区块创建的阶段，dst nodes位于节点列表的最前面。通过索引[0:g.number_of_dst_nodes()]可以找到feat_dst。
+在小批次训练中，计算应用于给定的一堆目标节点所采样的子图。子图在DGL中称为 ``block``。
+消息传递后，由于那些目标节点拥有和初始完整图中相同的邻居，因此这些目标节点会被更新。
+在区块创建的阶段，``dst nodes`` 位于节点列表的最前面。通过索引 ``[0:g.number_of_dst_nodes()]`` 可以找到 ``feat_dst``。
 
 After determining ``feat_src`` and ``feat_dst``, the computing for the
 above three graph types are the same.
 
-确定feat_src和feat_dst之后，以上3种图类型的计算相同。
+确定 ``feat_src`` 和 ``feat_dst`` 之后，以上3种图类型的计算方法是相同的。
 
 Message passing and reducing
 
 消息传递和聚合
-~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
 
 .. code::
 
@@ -175,7 +179,7 @@ Message passing and reducing
                     raise KeyError('Aggregator type {} not recognized.'.format(self._aggre_type))
 
                 # GraphSAGE GCN does not require fc_self.
-                # GraphSAGE图卷积网络不需要
+                # GraphSAGE图卷积网络不需要fc_self
                 if self._aggre_type == 'gcn':
                     rst = self.fc_neigh(h_neigh)
                 else:
@@ -187,14 +191,13 @@ the above code are implemented using :meth:`~dgl.DGLGraph.update_all` API and
 ``built-in`` message/reduce functions to fully utilize DGL’s performance
 optimization as described in :ref:`guide-message-passing-efficient`.
 
-该代码实际上执行消息传递和聚合的计算。这部分代码因模块而异。
-请注意，以上代码中的所有消息传递均使用update_all()API和built-in消息/聚合函数来实现，
-以充分利用DGL的性能优化，如第2章：消息传递中所述。
+上面的代码执行了消息传递和聚合的计算。这部分代码会因模块而异。请注意，代码中的所有消息传递均使用  :meth:`~dgl.DGLGraph.update_all` API和
+``built-in`` 的消息/聚合函数来实现，以充分利用 :ref:`guide_cn-message-passing-efficient` 里所介绍的性能优化。
 
 Update feature after reducing for output
 
 聚合后，更新特征作为输出
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code::
 
@@ -212,5 +215,5 @@ the ``reduce function``. Common update operations are applying
 activation function and normalization according to the option set in the
 object construction phase.
 
-forward()函数的最后一部分是在reduce function后更新特征。
-常见的更新操作是根据对象构造阶段中设置的选项应用激活函数和归一化。
+``forward()`` 函数的最后一部分是在 ``reduce function`` 后更新特征。
+常见的更新操作是根据构造函数中设置的选项来应用激活函数和归一化。
