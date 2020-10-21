@@ -52,7 +52,7 @@ all-zero values. This may cause silent regression in model performance. However,
 with the original node feature, the output of ``forward()`` will not be all-zero. No such check is
 needed in this case.
 
- ``forward()`` 函数需要处理输入的许多极端情况，这些情况可能导致计算和消息传递中的值无效。在 :class:`~dgl.nn.pytorch.conv.GraphConv` 等conv模块中，
+``forward()`` 函数需要处理输入的许多极端情况，这些情况可能导致计算和消息传递中的值无效。在 :class:`~dgl.nn.pytorch.conv.GraphConv` 等conv模块中，
 一个典型的检验方法是检查输入图中没有入度为0的节点。当1个节点入度为0时， ``mailbox`` 将为空，并且聚合函数的输出值全为0，
 这可能会导致模型性能不易被发现的退化。但是，在 :class:`~dgl.nn.pytorch.conv.SAGEConv` 模块中，被聚合的表征将会与节点的初始特征连接起来，
 ``forward()`` 函数的输出不会全为0。在这种情况下，无需进行此类检验。
@@ -90,7 +90,7 @@ type and expand ``feat`` into ``feat_src`` and ``feat_dst``.
 The detail of this function is shown below.
 
 源节点特征 ``feat_src`` 和目标节点特征 ``feat_dst`` 需要根据图类型被指定。
-用于指定图类型并将 ``feat`` 扩展为 ``feat_src`` 和 ``feat_dst`` 的函数是 :meth:``~dgl.utils.expand_as_pair``。
+用于指定图类型并将 ``feat`` 扩展为 ``feat_src`` 和 ``feat_dst`` 的函数是 :meth:`~dgl.utils.expand_as_pair`。
 该函数的细节如下所示。
 
 .. code::

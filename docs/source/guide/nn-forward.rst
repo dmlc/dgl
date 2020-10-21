@@ -62,7 +62,7 @@ The math formulas for SAGEConv are:
 
 One needs to specify the source node feature ``feat_src`` and destination
 node feature ``feat_dst`` according to the graph type.
-:meth:``~dgl.utils.expand_as_pair`` is a function that specifies the graph
+:meth:`~dgl.utils.expand_as_pair` is a function that specifies the graph
 type and expand ``feat`` into ``feat_src`` and ``feat_dst``.
 The detail of this function is shown below.
 
