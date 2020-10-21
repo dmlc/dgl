@@ -1,7 +1,7 @@
 .. _guide_cn-nn-heterograph:
 
 3.3 异构图上的GraphConv模块
--------------------------
+--------------------------------
 
 :ref:`(English Version) <guide-nn-heterograph>`
 
@@ -34,7 +34,7 @@ where :math:`f_r` is the NN module for each relation :math:`r`,
 HeteroGraphConv implementation logic:
 
 HeteroGraphConv的实现逻辑：
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code::
 
