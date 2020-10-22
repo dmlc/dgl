@@ -5,8 +5,8 @@
 
 :ref:`(English Version) <guide-nn-heterograph>`
 
-:class:`~dgl.nn.pytorch.HeteroGraphConv` 是模块级封装，用于在异构图上运行DGL NN模块。
-实现逻辑与消息传递级别API :meth:`~dgl.DGLGraph.multi_update_all` 相同，包括：
+DGL的 :class:`~dgl.nn.pytorch.HeteroGraphConv` 是模块级封装，用于在异构图上运行多个不同的DGL NN模块。
+实现逻辑与消息传递级别的API :meth:`~dgl.DGLGraph.multi_update_all` 相同，它包括：
 
 -  每个关系 :math:`r` 上的DGL NN模块。
 -  合并来自多个关系的相同节点类型上的结果的聚合方式。
@@ -17,7 +17,7 @@
 
 其中 :math:`f_r` 是对应每个关系 :math:`r` 的NN模块，:math:`AGG` 是聚合函数。
 
-HeteroGraphConv的实现逻辑：
+HeteroGraphConv的实现逻辑
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code::
@@ -34,7 +34,7 @@ HeteroGraphConv的实现逻辑：
             else:
                 self.agg_fn = aggregate
 
-异构图的卷积操作接受1个字典 ``mods``，将每个关系映射到1个nn模块。并设置将来自多个关系的结果聚合到相同节点类型的函数。
+异构图的卷积操作接受1个字典 ``mods``，这个字典将每个关系映射到1个NN模块。然后设置将来自多个关系的结果聚合到相同节点类型的函数。
 
 .. code::
 
@@ -46,10 +46,10 @@ HeteroGraphConv的实现逻辑：
         outputs = {nty : [] for nty in g.dsttypes}
 
 除了输入图和输入张量，``forward()`` 函数还使用2个额外的字典参数 ``mod_args`` 和 ``mod_kwargs``。
-这2个字典与 ``self.mods`` 具有相同的键。当针对不同类型的关系在 ``self.mods`` 中调用其相应的NN模块时，它们将用作自定义参数。
+这2个字典与 ``self.mods`` 具有相同的键。当针对不同类型的关系在 ``self.mods`` 中调用其对应的NN模块时，它们将被用作自定义参数。
 
-1个输出字典(``output``)被创建出来以保存每个目标类型 ``nty`` 的输出张量。请注意，每个 ``nty`` 的值是1个列表，
-指示如果多个关系中有 ``nty`` 作为目标类型，则单个节点类型可能会获得多个输出。它们将会被保留在列表中以让
+1个输出字典(``output``)被创建出来以保存每个目标节点类型 ``nty`` 的输出张量。请注意，每个 ``nty`` 的值是1个列表，
+指示如果多个关系中有 ``nty`` 作为目标节点类型，则单个节点类型可能会获得多个输出。它们将会被保留在列表中以让
 ``HeteroGraphConv`` 进行进一步聚合。
 
 .. code::
@@ -73,11 +73,11 @@ HeteroGraphConv的实现逻辑：
                   **mod_kwargs.get(etype, {}))
               outputs[dtype].append(dstdata)
 
-输入 ``g`` 可以是异构图或来自异构图的子图块。和普通的NN模块一样，``forward()`` 函数需要分别处理不同的输入图类型。
+输入 ``g`` 可以是异构图或来自异构图的子图区块。和普通的NN模块一样，``forward()`` 函数需要分别处理不同的输入图类型。
 
 每个关系都被表示为1个 ``canonical_etype``，即 ``(stype, etype, dtype)``。使用 ``canonical_etype`` 作为键，
 二部图 ``rel_graph`` 可被提取出来。对于二部图，输入特征将被组织为元组 ``(src_inputs[stype], dst_inputs[dtype])``。
-调用每个关系的NN模块，并保存输出。为了避免不必要的调用，将跳过没有边或没有其源类型的节点的关系。
+然后调用每个关系的NN模块，并保存输出。为了避免不必要的调用，将跳过没有边或没有其源类型的节点的关系。
 
 .. code::
 
@@ -87,4 +87,4 @@ HeteroGraphConv的实现逻辑：
                 rsts[nty] = self.agg_fn(alist, nty)
 
 最后，使用 ``self.agg_fn`` 函数聚合来自多个关系的相同目标节点类型上的结果。
-可以在API文档中找到 :class:`~dgl.nn.pytorch.HeteroGraphConv` 的示例。
+读者可以在API文档中找到 :class:`~dgl.nn.pytorch.HeteroGraphConv` 的示例。

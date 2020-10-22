@@ -27,8 +27,8 @@ DGL NN模块额外增加了1个参数 :class:`dgl.DGLGraph`。``forward()`` 函�
                 feat_src, feat_dst = expand_as_pair(feat, graph)
 
 ``forward()`` 函数需要处理输入的许多极端情况，这些情况可能导致计算和消息传递中的值无效。在 :class:`~dgl.nn.pytorch.conv.GraphConv` 等conv模块中，
-一个典型的检验方法是检查输入图中没有入度为0的节点。当1个节点入度为0时， ``mailbox`` 将为空，并且聚合函数的输出值全为0，
-这可能会导致模型性能不易被发现的退化。但是，在 :class:`~dgl.nn.pytorch.conv.SAGEConv` 模块中，被聚合的表征将会与节点的初始特征连接起来，
+一个典型的检验任务是检查输入图中是否有入度为0的节点。当1个节点入度为0时， ``mailbox`` 将为空，并且聚合函数的输出值全为0，
+这可能会导致模型性能出现不易被发现的退化。但是，在 :class:`~dgl.nn.pytorch.conv.SAGEConv` 模块中，被聚合的表征将会与节点的初始特征连接起来，
 ``forward()`` 函数的输出不会全为0。在这种情况下，无需进行此类检验。
 
 DGL NN模块可在不同类型的图输入中重复使用，包括：同构图、异构图（:ref:`guide_cn-graph-heterogeneous`）和子图区块（:ref:`guide-minibatch`）。
@@ -78,7 +78,7 @@ SAGEConv的数学公式如下：
 在异构图的情况下，图可以分为几个二部图，每种关系对应一个。关系表示为 ``(src_type, edge_type, dst_dtype)``。
 当输入特征 ``feat`` 是1个元组时，图将会被视为二部图。元组中的第1个元素为源节点特征，第2个元素为目标节点特征。
 
-在小批次训练中，计算应用于给定的一堆目标节点所采样的子图。子图在DGL中称为 ``block``。
+在小批次训练中，计算应用于给定的一堆目标节点所采样的子图。子图在DGL中称为区块(``block``)。
 消息传递后，由于那些目标节点拥有和初始完整图中相同的邻居，因此这些目标节点会被更新。
 在区块创建的阶段，``dst nodes`` 位于节点列表的最前面。通过索引 ``[0:g.number_of_dst_nodes()]`` 可以找到 ``feat_dst``。
 
@@ -100,7 +100,7 @@ SAGEConv的数学公式如下：
                 elif self._aggre_type == 'gcn':
                     check_eq_shape(feat)
                     graph.srcdata['h'] = feat_src
-                    graph.dstdata['h'] = feat_dst     # 在同构图的情况下，和上述相同
+                    graph.dstdata['h'] = feat_dst     # 在同构图的情况下，源特征和目标特征相同
                     graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'neigh'))
                     # 除以入度
                     degs = graph.in_degrees().to(feat_dst)
@@ -112,7 +112,7 @@ SAGEConv的数学公式如下：
                 else:
                     raise KeyError('Aggregator type {} not recognized.'.format(self._aggre_type))
 
-                # GraphSAGE图卷积网络不需要fc_self
+                # GraphSAGE中gcn聚合不需要fc_self
                 if self._aggre_type == 'gcn':
                     rst = self.fc_neigh(h_neigh)
                 else:
@@ -126,13 +126,13 @@ SAGEConv的数学公式如下：
 
 .. code::
 
-                # 激活
+                # 激活函数
                 if self.activation is not None:
                     rst = self.activation(rst)
-                # normalization
+                # 归一化
                 if self.norm is not None:
                     rst = self.norm(rst)
                 return rst
 
 ``forward()`` 函数的最后一部分是在 ``reduce function`` 后更新特征。
-常见的更新操作是根据构造函数中设置的选项来应用激活函数和归一化。
+常见的更新操作是根据构造函数中设置的选项来应用激活函数和进行归一化。

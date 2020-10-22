@@ -56,7 +56,7 @@
             self.fc_neigh = nn.Linear(self._in_src_feats, out_feats, bias=bias)
             self.reset_parameters()
 
-注册参数和子模块。在SAGEConv中，子模块根据聚合类型而有所不同。这些模块是纯PyTorch nn模块，例如 ``nn.Linear``、 ``nn.LSTM`` 等。
+注册参数和子模块。在SAGEConv中，子模块根据聚合类型而有所不同。这些模块是纯PyTorch NN模块，例如 ``nn.Linear``、 ``nn.LSTM`` 等。
 构造函数的最后调用了 ``reset_parameters()`` 进行权重初始化。
 
 .. code::
