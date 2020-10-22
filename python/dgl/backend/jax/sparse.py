@@ -1,5 +1,6 @@
 import jax
 from jax import numpy as jnp
+from .tensor import SparseMatrix2D
 from ...base import is_all, ALL
 from ...sparse import _gspmm, _gsddmm
 
@@ -59,8 +60,63 @@ def _addsub(op, x):
 def _expand(x, shape):
     return x.expand(-1, *shape)
 
+OP_NAME_TO_OP = {
+    "add": lambda x, y: x + y,
+    "sub": lambda x, y: x - y,
+    "mul": lambda x, y: x * y,
+    "div": lambda x, y: x / y,
+    "copy_lhs": lambda x, y: x,
+    "copy_rhs": lambda x, y: y,
+}
+
 def gspmm(gidx, op, reduce_op, X, Y):
-    out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
+    # get the adjacency matrix
+    # (n_nodes, n_nodes)
+    a, _ = gidx.adjacency_matrix(0, False, X.device_buffer.device())
+
+    # read the source and destination index
+    src_idxs, dst_idxs = a.index
+
+    # read the number of nodes and edges
+    n_nodes = a.shape[0]
+    n_edges = src_idxs.shape[0]
+
+    # compute the adjacency matrix between sources and edges
+    a_src_to_edge = SparseMatrix2D(
+        index=[
+            src_idxs,
+            jnp.arange(n_edges),
+        ],
+        data=jnp.ones(n_edges),
+        shape=(
+            n_edges,
+            n_nodes,
+        )
+    )
+
+    # compute the adjacency matrix between edges and destinations
+    a_edge_to_dst = SparseMatrix2D(
+        index=[
+            jnp.arange(n_edges),
+            dst_idxs,
+        ],
+        data=jnp.ones(n_edges),
+        shape=(
+            n_nodes,
+            n_edges,
+        )
+    )
+
+    # transfer from sources to edges
+    X_on_edge = a_src_to_edge @ X
+
+    # compute $\rho(x_u, x_e)$
+    Z = OP_NAME_TO_OP[op](X_on_edge, Y)
+
+    if reduce_op == "sum":
+        out = a_edge_to_dst @ Z
+
+    # out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
     return out
 
 def gsddmm(gidx, op, X, Y, lhs_target, rhs_target):

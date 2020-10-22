@@ -59,13 +59,6 @@ def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
             rhs_data = F.reshape(rhs_data, new_rhs_shape)
     ret = gsddmm_internal(
         g._graph, op, lhs_data, rhs_data, lhs_target, rhs_target)
-
-    # TODO: figure out the weird behavior
-    # that if no such statemenet is used, for JAX, it returns zeros
-    # when such tensor is used for computation
-    if F.backend_name == "jax":
-        ret = F.tensor(ret)
-
     return ret
 
 

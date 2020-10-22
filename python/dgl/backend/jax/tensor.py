@@ -19,6 +19,7 @@ from ..._deprecate import kernel as K
 from ...function.base import TargetCode
 from ...base import dgl_warning
 
+from functools import partial
 
 def data_type_dict():
     return {'float16' : jnp.float16,
@@ -86,24 +87,29 @@ class SparseMatrix2D(SparseMatrix):
     def ndim(self):
         return len(self._shape)
 
-    # @jax.jit
-    def __matmul__(self, x):
-        if not self.ndim == 2 and x.ndim == 2:
-            raise NotImplementedError
-
-        assert self.shape[1] == x.shape[0]
-
+    @staticmethod
+    @partial(jax.jit, static_argnums=(3,))
+    def _matmul(x, index, data, num_segments):
         # (n_entries, )
-        rows = self.index[0, :]
-        cols = self.index[1, :]
+        rows = index[0, :]
+        cols = index[1, :]
 
         # (n_entries, x_shape[1])
         in_ = x.take(cols, axis=0)
 
         # data: shape=(n_entries)
-        prod = in_ * self.data[:, None]
+        prod = in_ * data
 
-        return jax.ops.segment_sum(prod, rows, self.shape[0])
+        return jax.ops.segment_sum(prod, rows, num_segments)
+
+    # @jax.jit
+    def __matmul__(self, x):
+        if not self.ndim == 2:
+            raise NotImplementedError
+
+        assert self.shape[1] == x.shape[0]
+
+        return self._matmul(x, self.index, self.data, self.shape[0])
 
     def __repr__(self):
         return 'Sparse Matrix with shape=%s, indices=%s, and data=%s' % (
@@ -292,15 +298,14 @@ def swapaxes(input, axis1, axis2):
 
 def zeros(shape, dtype, ctx):
     # TODO: device
-
-    return jnp.zeros(shape, dtype=dtype,)
+    return jnp.zeros(shape, dtype=dtype,) + 0 # eval lazy
 
 def zeros_like(input):
-    return jnp.zeros_like(input)
+    return jnp.zeros_like(input) + 0 # eval lazy
 
 def ones(shape, dtype, ctx):
     # TODO: no device here
-    return jnp.ones(shape, dtype=dtype,)
+    return jnp.ones(shape, dtype=dtype,) + 0 # eval lazy
 
 def uniform(shape, dtype, ctx, low, high):
     key = jax.random.PRNGKey(2666)
@@ -425,7 +430,7 @@ def zerocopy_to_dgl_ndarray(data):
     return nd.from_dlpack(jax.dlpack.to_dlpack(data, take_ownership=False))
 
 def zerocopy_to_dgl_ndarray_for_write(input):
-    return nd.from_dlpack(jax.dlpack.to_dlpack(input, take_ownership=True))
+    return nd.from_dlpack(jax.dlpack.to_dlpack(jnp.array(input), take_ownership=False))
 
 def zerocopy_from_dgl_ndarray(data):
     return jax.dlpack.from_dlpack(data.to_dlpack())
