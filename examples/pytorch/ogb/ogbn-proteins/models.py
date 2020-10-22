@@ -255,6 +255,7 @@ class GAT(nn.Module):
         self.pred_linear = nn.Linear(n_heads * n_hidden, n_classes)
 
         self.dropout = nn.Dropout(dropout)
+        self.dropout0 = nn.Dropout(min(0.05, dropout))
         self.activation = activation
 
     def forward(self, g):
@@ -266,6 +267,7 @@ class GAT(nn.Module):
         h = subgraphs[0].srcdata["feat"]
         h = self.node_encoder(h)
         h = F.relu(h, inplace=True)
+        h = self.dropout0(h)
 
         h_last = None
 
