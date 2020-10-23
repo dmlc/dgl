@@ -90,7 +90,7 @@ TransferId AsyncTransferer::GenerateId() {
 
 DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLAsyncTransfererCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    DGLContext ctx = rv[0];
+    DGLContext ctx = args[0];
     *rv = AsyncTransfererRef(std::make_shared<AsyncTransferer>(ctx));
 });
 
