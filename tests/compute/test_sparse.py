@@ -214,12 +214,13 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg, idtype):
             assert F.allclose(e, e1)
             print('forward passed')
 
-            F.backward(F.reduce_sum(e1))
-            if msg != 'copy_rhs':
-                assert F.allclose(F.grad(lhs_frame['x']), grad_lhs)
-            if msg != 'copy_lhs':
-                assert F.allclose(F.grad(rhs_frame['y']), grad_rhs)
-            print('backward passed')
+            if F.backend_name != "jax":
+                F.backward(F.reduce_sum(e1))
+                if msg != 'copy_rhs':
+                    assert F.allclose(F.grad(lhs_frame['x']), grad_lhs)
+                if msg != 'copy_lhs':
+                    assert F.allclose(F.grad(rhs_frame['y']), grad_rhs)
+                print('backward passed')
 
     lhs_frame.pop('x')
     rhs_frame.pop('y')
@@ -252,9 +253,10 @@ def test_edge_softmax(g, norm_by, shp, idtype):
         assert F.allclose(score1, score2)
         print('forward passed')
 
-        F.backward(F.reduce_sum(score2))
-        assert F.allclose(F.grad(e2), grad_edata)
-        print('backward passed')
+        if F.backend_name != "jax":
+            F.backward(F.reduce_sum(score2))
+            assert F.allclose(F.grad(e2), grad_edata)
+            print('backward passed')
 
 if __name__ == '__main__':
     test_spmm(F.int32, graphs[0], spmm_shapes[5], 'copy_lhs', 'sum')

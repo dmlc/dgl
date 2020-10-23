@@ -98,7 +98,9 @@ class SparseMatrix2D(SparseMatrix):
         in_ = x.take(cols, axis=0)
 
         # data: shape=(n_entries)
-        prod = in_ * data
+        prod = in_ * jax.lax.broadcast(data, in_.shape[1:][::-1]).transpose(
+            list(range(len(in_.shape)))[::-1]
+        )
 
         return jax.ops.segment_sum(prod, rows, num_segments)
 
@@ -380,10 +382,12 @@ def clamp(data, min_val, max_val):
     return jnp.clip(data, min_val, max_val)
 
 def replace_inf_with_zero(x):
-    return jnp.where(
-        jnp.isinf(x),
+    return jnp.nan_to_num(
         x,
-        jnp.zeros_like(x),
+        copy=False,
+        nan=0.0,
+        posinf=0.0,
+        neginf=0.0,
     )
 
 def unique(input):

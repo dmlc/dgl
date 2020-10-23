@@ -2,8 +2,8 @@ import jax
 from jax import numpy as jnp
 from .tensor import SparseMatrix2D
 from ...base import is_all, ALL
-from ...sparse import _gspmm, _gsddmm
-
+from ...sparse import _gspmm, _gsddmm, infer_broadcast_shape
+from functools import partial
 
 __all__ = ['gspmm', 'gsddmm', 'edge_softmax']
 
@@ -60,76 +60,181 @@ def _addsub(op, x):
 def _expand(x, shape):
     return x.expand(-1, *shape)
 
-OP_NAME_TO_OP = {
+OPS = {
     "add": lambda x, y: x + y,
     "sub": lambda x, y: x - y,
     "mul": lambda x, y: x * y,
     "div": lambda x, y: x / y,
     "copy_lhs": lambda x, y: x,
     "copy_rhs": lambda x, y: y,
+    "dot": lambda x, y: jnp.sum(x * y, -1, keepdims=True)
 }
 
+
+@partial(jax.jit, static_argnums=(5, 6))
+def _jax_gspmm(X, Y, Z, dst_idxs, src_idxs, _op, _reduce_op):
+    def body_fun(edge_idx, Z):
+        dst_idx = dst_idxs[edge_idx]
+        src_idx = src_idxs[edge_idx]
+        _X = X[src_idx]
+        _Y = Y[edge_idx]
+        _Z = _op(_X, _Y)
+        Z = _reduce_op(Z, dst_idx, _Z)
+        return Z
+
+    Z = jax.lax.fori_loop(
+        lower=0,
+        upper=dst_idxs.shape[0],
+        body_fun=body_fun,
+        init_val=Z,
+    )
+
+    return Z
+
+@partial(jax.jit, static_argnums=(4, 5))
+def _jax_gspmm_only_u(X, Z, dst_idxs, src_idxs, _op, _reduce_op):
+    def body_fun(edge_idx, Z):
+        dst_idx = dst_idxs[edge_idx]
+        src_idx = src_idxs[edge_idx]
+        _X = X[src_idx]
+        _Z = _op(_X, None)
+        Z = _reduce_op(Z, dst_idx, _Z)
+        return Z
+
+    Z = jax.lax.fori_loop(
+        lower=0,
+        upper=dst_idxs.shape[0],
+        body_fun=body_fun,
+        init_val=Z,
+    )
+
+    return Z
+
+@partial(jax.jit, static_argnums=(4, 5))
+def _jax_gspmm_only_e(Y, Z, dst_idxs, src_idxs, _op, _reduce_op):
+    def body_fun(edge_idx, Z):
+        dst_idx = dst_idxs[edge_idx]
+        _Y = Y[edge_idx]
+        _Z = _op(None, _Y)
+        Z = _reduce_op(Z, dst_idx, _Z)
+        return Z
+
+    Z = jax.lax.fori_loop(
+        lower=0,
+        upper=dst_idxs.shape[0],
+        body_fun=body_fun,
+        init_val=Z,
+    )
+
+    return Z
+
 def gspmm(gidx, op, reduce_op, X, Y):
-    # get the adjacency matrix
-    # (n_nodes, n_nodes)
-    a, _ = gidx.adjacency_matrix(0, False, X.device_buffer.device())
-
-    # read the source and destination index
-    src_idxs, dst_idxs = a.index
-
-    # read the number of nodes and edges
-    n_nodes = a.shape[0]
-    n_edges = src_idxs.shape[0]
-
-    # compute the adjacency matrix between sources and edges
-    a_src_to_edge = SparseMatrix2D(
-        index=[
-            src_idxs,
-            jnp.arange(n_edges),
-        ],
-        data=jnp.ones(n_edges),
-        shape=(
-            n_edges,
-            n_nodes,
-        )
-    )
-
-    # compute the adjacency matrix between edges and destinations
-    a_edge_to_dst = SparseMatrix2D(
-        index=[
-            jnp.arange(n_edges),
-            dst_idxs,
-        ],
-        data=jnp.ones(n_edges),
-        shape=(
-            n_nodes,
-            n_edges,
-        )
-    )
-
-    # transfer from sources to edges
-    X_on_edge = a_src_to_edge @ X
-
-    # compute $\rho(x_u, x_e)$
-    Z = OP_NAME_TO_OP[op](X_on_edge, Y)
-
-    if reduce_op == "sum":
-        out = a_edge_to_dst @ Z
-
     # out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
-    return out
+    # return out
+
+    if gidx.number_of_etypes() != 1:
+        from .base import DGLError
+        raise DGLError("We only support gspmm on graph with one edge type")
+
+    use_u = op != 'copy_rhs'
+    use_e = op != 'copy_lhs'
+
+    if use_u:
+        if X.ndim == 1:
+            jnp.expand_dims(X, -1)
+    if use_e:
+        if Y.ndim == 1:
+            jnp.expand_dims(Y, -1)
+
+    u_shp = X.shape if use_u else (0,)
+    e_shp = Y.shape if use_e else (0,)
+    _, dsttype = gidx.metagraph.find_edge(0)
+    v_shp = (gidx.number_of_nodes(dsttype), ) +\
+        infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
+    dtype = X.dtype if use_u else Y.dtype
+
+    if use_u:
+        ctx = X.device_buffer.device()
+    elif use_e:
+        ctx = Y.device_buffer.device()
+
+    a, _ = gidx.adjacency_matrix(0, False, ctx)
+    dst_idxs, src_idxs = a.index
+
+    _reduce_op = "add" if reduce_op == "mean" or reduce_op == "sum" else reduce_op
+    _reduce_op = getattr(jax.ops, "index_%s" % _reduce_op)
+
+    if reduce_op == "mean" or reduce_op == "sum":
+        Z = jnp.zeros(v_shp, dtype)
+
+    elif reduce_op == "min":
+        Z = jnp.ones(v_shp, dtype) * jnp.inf
+
+    elif reduce_op == "max":
+        Z = jnp.ones(v_shp, dtype) * (-jnp.inf)
+
+    _op = OPS[op]
+
+    if not use_u:
+        return _jax_gspmm_only_e(Y, Z, dst_idxs, src_idxs, _op, _reduce_op)
+
+    if not use_e:
+        return _jax_gspmm_only_u(X, Z, dst_idxs, src_idxs, _op, _reduce_op)
+
+    return _jax_gspmm(X, Y, Z, dst_idxs, src_idxs, _op, _reduce_op)
 
 def gsddmm(gidx, op, X, Y, lhs_target, rhs_target):
-    out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
-    return out
+    # out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
+    # return out
+    if gidx.number_of_etypes() != 1:
+        from .base import DGLError
+        raise DGLError("We only support gsddmm on graph with one edge type")
+    use_lhs = op != 'copy_rhs'
+    use_rhs = op != 'copy_lhs'
+    expand_lhs, expand_rhs = False, False
+    # deal with scalar features.
+    if use_lhs:
+        if X.ndim == 1:
+            X = jnp.expand_dims(X, -1)
+            expand_lhs = True
+    if use_rhs:
+        if Y.ndim == 1:
+            Y = jnp.expand_dims(Y, -1)
+            expand_rhs = True
+
+    if use_lhs:
+        ctx = X.device_buffer.device()
+    elif use_rhs:
+        ctx = Y.device_buffer.device()
+
+    a, _ = gidx.adjacency_matrix(0, False, ctx)
+    dst_idxs, src_idxs = a.index
+    edge_idxs = jnp.arange(dst_idxs.shape[0])
+    idxs_mapping = {
+        'u': src_idxs,
+        'e': edge_idxs,
+        'v': dst_idxs,
+        'src': src_idxs,
+        'edge': edge_idxs,
+        'dst': dst_idxs,
+    }
+    _X = jnp.take(X, idxs_mapping[lhs_target], axis=0)
+    _Y = jnp.take(Y, idxs_mapping[rhs_target], axis=0)
+
+    Z = OPS[op](_X, _Y)
+
+    if (expand_lhs or not use_lhs) and (expand_rhs or not use_rhs):
+        Z = jnp.expand_dims(Z, -1)
+
+    return Z
 
 def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
     if not is_all(eids):
         gidx = gidx.edge_subgraph([eids], True).graph
     if norm_by == 'src':
         gidx = gidx.reverse()
-    score_max = _gspmm(gidx, 'copy_rhs', 'max', None, logits)[0]
-    score = jnp.exp(_gsddmm(gidx, 'sub', logits, score_max, 'e', 'v'))
-    score_sum = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
-    out = _gsddmm(gidx, 'div', score, score_sum, 'e', 'v')
+    score_max = gspmm(gidx, 'copy_rhs', 'max', None, logits)
+    score = jnp.exp(gsddmm(gidx, 'sub', logits, score_max, 'e', 'v'))
+    score_sum = gspmm(gidx, 'copy_rhs', 'sum', None, score)
+    out = gsddmm(gidx, 'div', score, score_sum, 'e', 'v')
     return out
