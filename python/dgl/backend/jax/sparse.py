@@ -218,8 +218,16 @@ def gsddmm(gidx, op, X, Y, lhs_target, rhs_target):
         'edge': edge_idxs,
         'dst': dst_idxs,
     }
-    _X = jnp.take(X, idxs_mapping[lhs_target], axis=0)
-    _Y = jnp.take(Y, idxs_mapping[rhs_target], axis=0)
+
+    if X is not None:
+        _X = jnp.take(X, idxs_mapping[lhs_target], axis=0)
+    else:
+        _X = None
+
+    if Y is not None:
+        _Y = jnp.take(Y, idxs_mapping[rhs_target], axis=0)
+    else:
+        _Y = None
 
     Z = OPS[op](_X, _Y)
 

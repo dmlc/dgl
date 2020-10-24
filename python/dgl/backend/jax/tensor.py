@@ -40,7 +40,8 @@ def cpu():
 def tensor(data, dtype=None):
     if isinstance(data, numbers.Number):
         data = [data]
-    data = jnp.array(data, dtype=dtype)
+    if not is_tensor(data):
+        data = jnp.array(data, dtype=dtype)
     # data.device_buffer.block_host_until_ready()
     return data
 
@@ -218,7 +219,7 @@ def reduce_min(input):
     return input.min()
 
 def argsort(input, dim, descending):
-    _sorted = jnp.argsort(input, axis=dim, descending=descending)
+    _sorted = jnp.argsort(input, axis=dim)
     if descending is True:
         _sorted = jnp.flip(_sorted, axis=dim)
     return _sorted
@@ -340,17 +341,16 @@ def pad_packed_tensor(input, lengths, value, l_min=None):
         max_len = builtins.max(max_len, l_min)
 
     batch_size = len(lengths)
-    x = jnp.zeros(
+    x = jnp.ones(
         shape=(batch_size * max_len, *old_shape[1:]),
         dtype=input.dtype,
-    )
-    x.fill(value)
+    ) * value
 
     index = []
     for i, l in enumerate(lengths):
         index.extend(range(i * max_len, i * max_len + l))
     index = jnp.asarray(index)
-    return scatter_row(x, index, input).view(batch_size, max_len, *old_shape[1:])
+    return scatter_row(x, index, input).reshape((batch_size, max_len, *old_shape[1:]))
 
 def pack_padded_tensor(input, lengths):
     batch_size, max_len = input.shape[:2]
@@ -358,7 +358,7 @@ def pack_padded_tensor(input, lengths):
     index = []
     for i, l in enumerate(lengths):
         index.extend(range(i * max_len, i * max_len + l))
-    index = th.tensor(index).to(device)
+    index = tensor(index).to(device)
     return gather_row(input.view(batch_size * max_len, -1), index)
 
 def boolean_mask(input, mask):
@@ -431,6 +431,7 @@ def zerocopy_from_numpy(np_array):
     return jnp.asarray(np_array)
 
 def zerocopy_to_dgl_ndarray(data):
+    if not is_tensor(data): data = tensor(data)
     return nd.from_dlpack(jax.dlpack.to_dlpack(data, take_ownership=False))
 
 def zerocopy_to_dgl_ndarray_for_write(input):
@@ -647,7 +648,6 @@ class record_grad(object):
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         pass
-
 
 def no_grad():
     raise NotImplementedError

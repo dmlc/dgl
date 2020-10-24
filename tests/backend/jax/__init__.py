@@ -11,6 +11,8 @@ def is_cuda_available():
     return 'gpu' in str(xla_bridge.get_backend().platform)
 
 def array_equal(a, b):
+    if a is None or b is None:
+        return False
     return (a == b).all()
 
 def allclose(a, b, rtol=1e-4, atol=1e-4):
@@ -50,7 +52,7 @@ def softmax(x, dim):
     return jax.nn.softmax(x, axis=dim)
 
 def spmm(x, y):
-    raise NotImplementedError
+    return x @ y
 
 def add(a, b):
     return a + b
