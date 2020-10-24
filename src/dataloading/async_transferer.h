@@ -6,8 +6,8 @@
  */
 
 
-#ifndef DGL_ARRAY_CUDA_ASYNC_TRANSFERER_H_
-#define DGL_ARRAY_CUDA_ASYNC_TRANSFERER_H_
+#ifndef DGL_DATALOADING_ASYNC_TRANSFERER_H_
+#define DGL_DATALOADING_ASYNC_TRANSFERER_H_
 
 #include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/ndarray.h>
@@ -16,9 +16,9 @@
 #include <memory>
 
 namespace dgl {
-namespace runtime {
+namespace dataloading {
 
-class AsyncTransferer : public Object {
+class AsyncTransferer : public runtime::Object {
  public:
   using TransferId = int;
 
@@ -33,10 +33,10 @@ class AsyncTransferer : public Object {
       const AsyncTransferer&) = delete;
 
   TransferId StartTransfer(
-      NDArray data,
+      runtime::NDArray data,
       DGLContext ctx);
 
-  NDArray Wait(
+  runtime::NDArray Wait(
       TransferId id);
 
   static constexpr const char* _type_key = "ndarray.AsyncTransferer";
@@ -47,8 +47,8 @@ class AsyncTransferer : public Object {
   struct Transfer {
     std::unique_ptr<Event> event;
     bool recorded;
-    NDArray src;
-    NDArray dst;
+    runtime::NDArray src;
+    runtime::NDArray dst;
   };
 
   DGLContext ctx_;
@@ -61,7 +61,7 @@ class AsyncTransferer : public Object {
 
 DGL_DEFINE_OBJECT_REF(AsyncTransfererRef, AsyncTransferer);
 
-}  // namespace runtime
+}  // namespace dataloading
 }  // namespace dgl
 
-#endif  // DGL_ARRAY_CUDA_ASYNC_TRANSFERER_H_
+#endif  // DGL_DATALOADING_ASYNC_TRANSFERER_H_

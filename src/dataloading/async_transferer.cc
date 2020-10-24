@@ -13,10 +13,14 @@
 #include <cuda_runtime.h>
 #include <vector>
 #include <utility>
-#include "../../runtime/cuda/cuda_common.h"
+#include "../runtime/cuda/cuda_common.h"
+
 
 namespace dgl {
-namespace runtime {
+
+using namespace runtime;
+
+namespace dataloading {
 
 using TransferId = AsyncTransferer::TransferId;
 
@@ -33,12 +37,17 @@ AsyncTransferer::AsyncTransferer(
   ctx_(ctx),
   next_id_(0),
   transfers_(),
-  stream_(DeviceAPI::Get(ctx_)->CreateStream(ctx_)) {
+  stream_(nullptr) {
+  if (ctx_.device_type == kDLGPU) {
+    stream_ = DeviceAPI::Get(ctx_)->CreateStream(ctx_);
+  }
 }
 
 
 AsyncTransferer::~AsyncTransferer() {
-  DeviceAPI::Get(ctx_)->FreeStream(ctx_, stream_);
+  if (stream_) {
+    DeviceAPI::Get(ctx_)->FreeStream(ctx_, stream_);
+  }
 }
 
 TransferId AsyncTransferer::StartTransfer(
@@ -46,25 +55,25 @@ TransferId AsyncTransferer::StartTransfer(
     DGLContext dst_ctx) {
   const TransferId id = GenerateId();
 
-  // get tensor information
-  DGLContext src_ctx = src->ctx;
-  DLDataType dtype = src->dtype;
-  std::vector<int64_t> shape(src->shape, src->shape+src->ndim);
-
   Transfer t;
   t.src = src;
-  t.event.reset(new Event);
-  CUDA_CALL(cudaEventCreate(&t.event->id));
 
-  CHECK(dst_ctx == ctx_ || src_ctx == ctx_) <<
-      "One side of the async copy must involve the AsyncTransfer's context";
-
+  DLDataType dtype = src->dtype;
+  std::vector<int64_t> shape(src->shape, src->shape+src->ndim);
   t.dst = NDArray::Empty(shape, dtype, dst_ctx);
 
-  t.dst.CopyFrom(t.src, stream_);
+  if (stream_) {
+    // get tensor information
+    t.event.reset(new Event);
+    CUDA_CALL(cudaEventCreate(&t.event->id));
+    t.dst.CopyFrom(t.src, stream_);
 
-  CUDA_CALL(cudaEventRecord(t.event->id, static_cast<cudaStream_t>(stream_)));
-
+    CUDA_CALL(cudaEventRecord(t.event->id, static_cast<cudaStream_t>(stream_)));
+  } else {
+    // copy synchronously since we don't have the notion of streams on the CPU
+    t.event.reset(nullptr);
+    t.dst.CopyFrom(t.src);
+  }
   transfers_.emplace(id, std::move(t));
 
   return id;
@@ -78,8 +87,10 @@ NDArray AsyncTransferer::Wait(
   Transfer t = std::move(iter->second);
   transfers_.erase(iter);
 
-  // wait for it
-  CUDA_CALL(cudaEventSynchronize(t.event->id));
+  if (t.event) {
+    // wait for it
+    CUDA_CALL(cudaEventSynchronize(t.event->id));
+  }
 
   return t.dst;
 }
@@ -88,13 +99,13 @@ TransferId AsyncTransferer::GenerateId() {
   return ++next_id_;
 }
 
-DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLAsyncTransfererCreate")
+DGL_REGISTER_GLOBAL("dataloading._CAPI_DGLAsyncTransfererCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     DGLContext ctx = args[0];
     *rv = AsyncTransfererRef(std::make_shared<AsyncTransferer>(ctx));
 });
 
-DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLAsyncTransfererStartTransfer")
+DGL_REGISTER_GLOBAL("dataloading._CAPI_DGLAsyncTransfererStartTransfer")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   AsyncTransfererRef ref = args[0];
   NDArray array = args[1];
@@ -103,7 +114,7 @@ DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLAsyncTransfererStartTransfer")
   *rv = id;
 });
 
-DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLAsyncTransfererWait")
+DGL_REGISTER_GLOBAL("dataloading._CAPI_DGLAsyncTransfererWait")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   AsyncTransfererRef ref = args[0];
   int id = args[1];
@@ -111,5 +122,5 @@ DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLAsyncTransfererWait")
   *rv = arr;
 });
 
-}  // namespace runtime
+}  // namespace dataloading
 }  // namespace dgl

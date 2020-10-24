@@ -31,7 +31,7 @@ class Transfer(object):
         Tensor
             The new tensor on the target context.
         """
-        res_tensor = ndarray._CAPI_DGLAsyncTransfererWait(self._handle, self._transfer_id)
+        res_tensor = _CAPI_DGLAsyncTransfererWait(self._handle, self._transfer_id)
         return F.zerocopy_from_dgl_ndarray(res_tensor)
 
 
@@ -53,7 +53,7 @@ class AsyncTransferer(object):
         else:
             ctx = utils.to_dgl_context(device)
         print("ctx = {}".format(ctx))
-        self._handle = ndarray._CAPI_DGLAsyncTransfererCreate(ctx)
+        self._handle = _CAPI_DGLAsyncTransfererCreate(ctx)
 
     def async_copy(self, tensor, device):
         """ Initiate an asynchronous copy on the internal stream.
@@ -78,7 +78,7 @@ class AsyncTransferer(object):
 
         tensor = F.zerocopy_to_dgl_ndarray(tensor)
 
-        transfer_id = ndarray._CAPI_DGLAsyncTransfererStartTransfer(self._handle, tensor, ctx)
+        transfer_id = _CAPI_DGLAsyncTransfererStartTransfer(self._handle, tensor, ctx)
         return Transfer(transfer_id, self._handle)
 
 
