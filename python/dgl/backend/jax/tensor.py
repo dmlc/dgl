@@ -164,7 +164,10 @@ def ndim(input):
     return input.ndim
 
 def context(input):
-    return input.device_buffer.device()
+    try:
+        return input.device_buffer.device()
+    except:
+        return jax.devices('cpu')[0]
 
 def device_type(ctx):
     return ctx.device_kind

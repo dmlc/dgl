@@ -153,10 +153,13 @@ def gspmm(gidx, op, reduce_op, X, Y):
         infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
     dtype = X.dtype if use_u else Y.dtype
 
-    if use_u:
-        ctx = X.device_buffer.device()
-    elif use_e:
-        ctx = Y.device_buffer.device()
+    try:
+        if use_u:
+            ctx = X.device_buffer.device()
+        elif use_e:
+            ctx = Y.device_buffer.device()
+    except:
+        ctx = jax.devices('cpu')[0]
 
     a, _ = gidx.adjacency_matrix(0, False, ctx)
     dst_idxs, src_idxs = a.index
