@@ -82,4 +82,4 @@ class AsyncTransferer(object):
         return Transfer(transfer_id, self._handle)
 
 
-_init_api("dgl.ndarray")
+_init_api("dgl.dataloading.async_transferer")

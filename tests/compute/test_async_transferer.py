@@ -2,7 +2,7 @@ import dgl
 import unittest
 import backend as F
 
-from dgl.sampling import AsyncTransferer
+from dgl.dataloading import AsyncTransferer
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Async transfer tests require a GPU to transfer to.")
 def test_async_transferer_to_gpu():

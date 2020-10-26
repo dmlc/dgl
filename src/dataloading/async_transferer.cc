@@ -99,13 +99,13 @@ TransferId AsyncTransferer::GenerateId() {
   return ++next_id_;
 }
 
-DGL_REGISTER_GLOBAL("dataloading._CAPI_DGLAsyncTransfererCreate")
+DGL_REGISTER_GLOBAL("dataloading.async_transferer._CAPI_DGLAsyncTransfererCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     DGLContext ctx = args[0];
     *rv = AsyncTransfererRef(std::make_shared<AsyncTransferer>(ctx));
 });
 
-DGL_REGISTER_GLOBAL("dataloading._CAPI_DGLAsyncTransfererStartTransfer")
+DGL_REGISTER_GLOBAL("dataloading.async_transferer._CAPI_DGLAsyncTransfererStartTransfer")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   AsyncTransfererRef ref = args[0];
   NDArray array = args[1];
@@ -114,7 +114,7 @@ DGL_REGISTER_GLOBAL("dataloading._CAPI_DGLAsyncTransfererStartTransfer")
   *rv = id;
 });
 
-DGL_REGISTER_GLOBAL("dataloading._CAPI_DGLAsyncTransfererWait")
+DGL_REGISTER_GLOBAL("dataloading.async_transferer._CAPI_DGLAsyncTransfererWait")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   AsyncTransfererRef ref = args[0];
   int id = args[1];
