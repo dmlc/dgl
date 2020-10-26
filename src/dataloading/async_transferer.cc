@@ -10,10 +10,13 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/registry.h>
 #include <dgl/runtime/device_api.h>
-#include <cuda_runtime.h>
 #include <vector>
 #include <utility>
+
+#ifdef DGL_USE_CUDA
+#include <cuda_runtime.h>
 #include "../runtime/cuda/cuda_common.h"
+#endif
 
 
 namespace dgl {
@@ -25,11 +28,13 @@ namespace dataloading {
 using TransferId = AsyncTransferer::TransferId;
 
 struct AsyncTransferer::Event {
+  #ifdef DGL_USE_CUDA
   cudaEvent_t id;
 
   ~Event() {
     CUDA_CALL(cudaEventDestroy(id));
   }
+  #endif
 };
 
 AsyncTransferer::AsyncTransferer(
@@ -63,12 +68,16 @@ TransferId AsyncTransferer::StartTransfer(
   t.dst = NDArray::Empty(shape, dtype, dst_ctx);
 
   if (stream_) {
+    #ifdef DGL_USE_CUDA
     // get tensor information
     t.event.reset(new Event);
     CUDA_CALL(cudaEventCreate(&t.event->id));
     t.dst.CopyFrom(t.src, stream_);
 
     CUDA_CALL(cudaEventRecord(t.event->id, static_cast<cudaStream_t>(stream_)));
+    #else
+    LOG(FATAL) << "GPU support not compiled.";
+    #endif
   } else {
     // copy synchronously since we don't have the notion of streams on the CPU
     t.event.reset(nullptr);
@@ -88,8 +97,10 @@ NDArray AsyncTransferer::Wait(
   transfers_.erase(iter);
 
   if (t.event) {
+    #ifdef DGL_USE_CUDA
     // wait for it
     CUDA_CALL(cudaEventSynchronize(t.event->id));
+    #endif
   }
 
   return t.dst;
