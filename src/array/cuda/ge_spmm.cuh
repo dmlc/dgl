@@ -33,7 +33,6 @@ __global__ void GESpMMSumKernel(
     const Idx* __restrict__ indices,
     const int64_t num_rows, const int64_t num_cols,
     const int64_t feat_len) {
-  /*
   extern __shared__ char smem[];
   Idx* col = nullptr;
   DType* val = nullptr;
@@ -49,10 +48,6 @@ __global__ void GESpMMSumKernel(
   } else {
     col = (Idx*) smem;
   }
-*/
-  __shared__ Idx col[8 * 32];
-  //__shared__ DType val[BinaryOp::use_rhs ? 8 * 32 : 1];
-  DType *val = nullptr;
 
   int ty = blockIdx.y * blockDim.y + threadIdx.y;  // iterate over destination nodes
   const Idx stride_y = blockDim.y * gridDim.y;
@@ -69,7 +64,7 @@ __global__ void GESpMMSumKernel(
     Idx argu_0 = 0, arge_0 = 0,
         argu_1 = 0, arge_1 = 0;
 
-    if (blockIdx.x < gridDim.x) {
+    if (blockIdx.x != gridDim.x - 1) {
       for (int left = low; left < high; left += 32) {
         if (left + tx < high) {
           col[sm_offset + tx] = indices[left + tx]; 
@@ -77,24 +72,21 @@ __global__ void GESpMMSumKernel(
             val[sm_offset + tx] = efeat[left + tx];
         }
 
-#pragma unroll
-        for (int i = 0; i < 32; ++i) {
+        for (int i = 0; i < 32 && left + i < high; ++i) {
           const Idx eid = left + i; 
-          if (eid < high) {
-            const Idx cid = col[sm_offset + i];
-            const Idx offset = feat_len * cid + fid;
-            if (BinaryOp::use_rhs) {
-              const DType weight = val[sm_offset + i];
-              ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                BinaryOp::Call(ufeat + offset, &weight), cid, eid);
-              ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                BinaryOp::Call(ufeat + offset + 32, &weight), cid, eid);
-            } else {
-              ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                ufeat[offset], fid, eid);
-              ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                ufeat[offset + 32], cid, eid);
-            }
+          const Idx cid = col[sm_offset + i];
+          const Idx offset = feat_len * cid + fid;
+          if (BinaryOp::use_rhs) {
+            const DType weight = val[sm_offset + i];
+            ReduceOp::Call(&accum_0, &argu_0, &arge_0,
+              BinaryOp::Call(ufeat + offset, &weight), cid, eid);
+            ReduceOp::Call(&accum_1, &argu_1, &arge_1,
+              BinaryOp::Call(ufeat + offset + 32, &weight), cid, eid);
+          } else {
+            ReduceOp::Call(&accum_0, &argu_0, &arge_0,
+              ufeat[offset], fid, eid);
+            ReduceOp::Call(&accum_1, &argu_1, &arge_1,
+              ufeat[offset + 32], cid, eid);
           }
         }
 
@@ -120,28 +112,25 @@ __global__ void GESpMMSumKernel(
             val[sm_offset + tx] = efeat[left + tx];
         }
 
-#pragma unroll
-        for (int i = 0; i < 32; ++i) {
+        for (int i = 0; i < 32 && left + i < high; ++i) {
           const Idx eid = left + i; 
-          if (eid < high) {
-            const Idx cid = col[sm_offset + i];
-            const Idx offset = feat_len * cid + fid;
-            if (BinaryOp::use_rhs) {
-              const DType weight = val[sm_offset + i];
-              if (left_inbound)
-                ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                  BinaryOp::Call(ufeat + offset, &weight), cid, eid);
-              if (right_inbound)
-                ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                  BinaryOp::Call(ufeat + offset + 32, &weight), cid, eid);
-            } else {
-              if (left_inbound)
-                ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                  ufeat[offset], fid, eid);
-              if (right_inbound)
-                ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                  ufeat[offset + 32], cid, eid);
-            }
+          const Idx cid = col[sm_offset + i];
+          const Idx offset = feat_len * cid + fid;
+          if (BinaryOp::use_rhs) {
+            const DType weight = val[sm_offset + i];
+            if (left_inbound)
+              ReduceOp::Call(&accum_0, &argu_0, &arge_0,
+                BinaryOp::Call(ufeat + offset, &weight), cid, eid);
+            if (right_inbound)
+              ReduceOp::Call(&accum_1, &argu_1, &arge_1,
+                BinaryOp::Call(ufeat + offset + 32, &weight), cid, eid);
+          } else {
+            if (left_inbound)
+              ReduceOp::Call(&accum_0, &argu_0, &arge_0,
+                ufeat[offset], fid, eid);
+            if (right_inbound)
+              ReduceOp::Call(&accum_1, &argu_1, &arge_1,
+                ufeat[offset + 32], cid, eid);
           }
         }
 
@@ -192,7 +181,7 @@ void GESpMMCsr(
   const int sh_mem_size = 8 * 32 * sizeof(Idx) + (BinaryOp::use_rhs ? 8 * 32 * sizeof(DType) : 0);
 
   CUDA_KERNEL_CALL((GESpMMSumKernel<Idx, DType, BinaryOp, ReduceOp>),
-      nblks, nthrs, 0, thr_entry->stream,
+      nblks, nthrs, sh_mem_size, thr_entry->stream,
       ufeat_data, efeat_data, out_data, argu_data, arge_data,
       indptr, indices,
       csr.num_rows, csr.num_cols,
