@@ -33,9 +33,21 @@ __global__ void GESpMMSumKernel(
     const Idx* __restrict__ indices,
     int64_t num_rows, int64_t num_cols,
     int64_t feat_len) {
-  extern __shared__ __align__(sizeof(Idx)) char smem[];
-  Idx* col = (Idx*)smem;
-  DType* val = (DType*)&col[blockDim.y * blockDim.x];  // TODO(zihao): need to handle alignment.
+  extern __shared__ char smem[];
+  Idx* col = nullptr;
+  DType* val = nullptr;
+  if (BinaryOp::use_rhs) {  // use edge feature.
+    if (sizeof(Idx) >= sizeof(DType)) {
+      // handle alignment issue: https://forums.developer.nvidia.com/t/dynamic-shared-memory-allocation/21671/3
+      col = (Idx*) smem;
+      val = (DType*) &col[blockDim.y * blockDim.x];
+    } else {
+      val = (DType*) smem;
+      col = (Idx*) &val[blockDim.y * blockDim.x];
+    }
+  } else {
+    col = (Idx*) smem;
+  }
 
   int ty = blockIdx.y * blockDim.y + threadIdx.y;  // iterate over destination nodes
   const Idx stride_y = blockDim.y * gridDim.y;
@@ -60,8 +72,6 @@ __global__ void GESpMMSumKernel(
             val[sm_offset + tx] = efeat[left + tx];
         }
 
-        __syncwarp();
-
 #pragma unroll
         for (int i = 0; i < 32; ++i) {
           const Idx eid = left + i; 
@@ -82,8 +92,6 @@ __global__ void GESpMMSumKernel(
             }
           }
         }
-
-        __syncwarp();
       } 
 
       out[feat_len * rid + cid] = accum_0;
