@@ -97,11 +97,9 @@ element will be the destination node feature.
 
 In mini-batch training, the computing is applied on a subgraph sampled
 based on a bunch of destination nodes. The subgraph is called as
-``block`` in DGL. After message passing, only those destination nodes
-will be updated since they have the same neighborhood as the one they
-have in the original full graph. In the block creation phase,
+``block`` in DGL. In the block creation phase,
 ``dst nodes`` are in the front of the node list. One can find the
-``feat_dst`` by the index ``[0:g.number_of_dst_nodes()]``.
+``feat_dst`` by the index ``[0:g.number_dst_nodes()]``.
 
 After determining ``feat_src`` and ``feat_dst``, the computing for the
 above three graph types are the same.
@@ -122,7 +120,7 @@ Message passing and reducing
                 elif self._aggre_type == 'gcn':
                     check_eq_shape(feat)
                     graph.srcdata['h'] = feat_src
-                    graph.dstdata['h'] = feat_dst     # same as above if homogeneous
+                    graph.dstdata['h'] = feat_dst
                     graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'neigh'))
                     # divide in_degrees
                     degs = graph.in_degrees().to(feat_dst)

@@ -76,7 +76,7 @@ HeteroGraphConv的实现逻辑
 输入 ``g`` 可以是异构图或来自异构图的子图区块。和普通的NN模块一样，``forward()`` 函数需要分别处理不同的输入图类型。
 
 每个关系都被表示为1个 ``canonical_etype``，即 ``(stype, etype, dtype)``。使用 ``canonical_etype`` 作为键，
-二部图 ``rel_graph`` 可被提取出来。对于二部图，输入特征将被组织为元组 ``(src_inputs[stype], dst_inputs[dtype])``。
+二分图 ``rel_graph`` 可被提取出来。对于二部图，输入特征将被组织为元组 ``(src_inputs[stype], dst_inputs[dtype])``。
 然后调用每个关系的NN模块，并保存输出。为了避免不必要的调用，将跳过没有边或没有其源类型的节点的关系。
 
 .. code::

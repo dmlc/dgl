@@ -58,7 +58,7 @@ SAGEConv的数学公式如下：
 
     def expand_as_pair(input_, g=None):
         if isinstance(input_, tuple):
-            # 二部图的情况
+            # 二分图的情况
             return input_
         elif g is not None and g.is_block:
             # 子图块的情况
@@ -73,14 +73,13 @@ SAGEConv的数学公式如下：
             # 同构图的情况
             return input_, input_
 
-对于同构全图训练，源节点和目标节点相同。它们都是图中的所有节点。
+对于同构图上的全图训练，源节点和目标节点相同，它们都是图中的所有节点。
 
-在异构图的情况下，图可以分为几个二部图，每种关系对应一个。关系表示为 ``(src_type, edge_type, dst_dtype)``。
-当输入特征 ``feat`` 是1个元组时，图将会被视为二部图。元组中的第1个元素为源节点特征，第2个元素为目标节点特征。
+在异构图的情况下，图可以分为几个二分图，每种关系对应一个。关系表示为 ``(src_type, edge_type, dst_dtype)``。
+当输入特征 ``feat`` 是1个元组时，图将会被视为二分图。元组中的第1个元素为源节点特征，第2个元素为目标节点特征。
 
 在小批次训练中，计算应用于给定的一堆目标节点所采样的子图。子图在DGL中称为区块(``block``)。
-消息传递后，由于那些目标节点拥有和初始完整图中相同的邻居，因此这些目标节点会被更新。
-在区块创建的阶段，``dst nodes`` 位于节点列表的最前面。通过索引 ``[0:g.number_of_dst_nodes()]`` 可以找到 ``feat_dst``。
+在区块创建的阶段，``dst nodes`` 位于节点列表的最前面。通过索引 ``[0:g.number_dst_nodes()]`` 可以找到 ``feat_dst``。
 
 确定 ``feat_src`` 和 ``feat_dst`` 之后，以上3种图类型的计算方法是相同的。
 
@@ -100,7 +99,7 @@ SAGEConv的数学公式如下：
                 elif self._aggre_type == 'gcn':
                     check_eq_shape(feat)
                     graph.srcdata['h'] = feat_src
-                    graph.dstdata['h'] = feat_dst     # 在同构图的情况下，源特征和目标特征相同
+                    graph.dstdata['h'] = feat_dst
                     graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'neigh'))
                     # 除以入度
                     degs = graph.in_degrees().to(feat_dst)
@@ -119,7 +118,7 @@ SAGEConv的数学公式如下：
                     rst = self.fc_self(h_self) + self.fc_neigh(h_neigh)
 
 上面的代码执行了消息传递和聚合的计算。这部分代码会因模块而异。请注意，代码中的所有消息传递均使用  :meth:`~dgl.DGLGraph.update_all` API和
-``built-in`` 的消息/聚合函数来实现，以充分利用 :ref:`guide_cn-message-passing-efficient` 里所介绍的性能优化。
+DGL内置的消息/聚合函数来实现，以充分利用 :ref:`guide_cn-message-passing-efficient` 里所介绍的性能优化。
 
 聚合后，更新特征作为输出
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -134,5 +133,5 @@ SAGEConv的数学公式如下：
                     rst = self.norm(rst)
                 return rst
 
-``forward()`` 函数的最后一部分是在 ``reduce function`` 后更新特征。
+``forward()`` 函数的最后一部分是在完成消息聚合后更新节点的特征。
 常见的更新操作是根据构造函数中设置的选项来应用激活函数和进行归一化。
