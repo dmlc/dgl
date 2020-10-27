@@ -6,7 +6,7 @@
 :ref:`(English Version) <guide-nn-forward>`
 
 在NN模块中， ``forward()`` 函数执行了实际的消息传递和计算。与通常以张量为参数的PyTorch NN模块相比，
-DGL NN模块额外增加了1个参数 :class:`dgl.DGLGraph`。``forward()`` 函数的内容一般可以分为3个部分：
+DGL NN模块额外增加了1个参数 :class:`dgl.DGLGraph`。``forward()`` 函数的内容一般可以分为3项操作：
 
 -  图检验和图类型规范。
 
@@ -44,7 +44,7 @@ SAGEConv的数学公式如下：
 .. math::
 
     h_{dst}^{(l+1)} = \sigma \left(W \cdot \mathrm{concat}
-           (h_{dst}^{l}, h_{\mathcal{N}(dst)}^{l+1} + b) \right)
+           (h_{dst}^{l}, h_{\mathcal{N}(dst)}^{l+1}) + b \right)
 
 .. math::
 

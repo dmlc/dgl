@@ -54,7 +54,7 @@ The math formulas for SAGEConv are:
 .. math::
 
     h_{dst}^{(l+1)} = \sigma \left(W \cdot \mathrm{concat}
-           (h_{dst}^{l}, h_{\mathcal{N}(dst)}^{l+1} + b) \right)
+           (h_{dst}^{l}, h_{\mathcal{N}(dst)}^{l+1}) + b \right)
 
 .. math::
 
