@@ -5,6 +5,7 @@
  */
 #include <dgl/array.h>
 #include "./spmm.cuh"
+#include "./ge_spmm.cuh"
 #include "./functor.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 
@@ -238,6 +239,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
              NDArray efeat,
              NDArray out,
              std::vector<NDArray> out_aux) {
+/*
   if (reduce == "sum") {
     if (sizeof(IdType) == 4 && op == "copy_lhs") {
       int64_t x_length = 1;
@@ -267,6 +269,32 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
             bcast, csr, ufeat, efeat, out, NullArray(), NullArray());
       });
     }
+*/
+  if (op == "copy_lhs" || efeat.NumElements() == csr.indices->shape[0]) {  // scalar/non edge feature.
+    int64_t feat_len = bcast.out_len;
+    if (reduce == "sum") {
+      SWITCH_OP(op, Op, {
+        cuda::GESpMMCsr<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
+          csr, ufeat, efeat, out, NullArray(), NullArray(), feat_len);
+      });
+    } else if (reduce == "max") {
+      SWITCH_OP(op, Op, {
+        cuda::GESpMMCsr<IdType, DType, Op, cuda::reduce::Max<IdType, DType> >(
+          csr, ufeat, efeat, out, out_aux[0], out_aux[1]);
+      });
+    } else if (reduce == "min") {
+      SWITCH_OP(op, Op, {
+        cuda::GESpMMCsr<IdType, DType, Op, cuda::reduce::Min<IdType, DType> >(
+          csr, ufeat, efeat, out, out_aux[0], out_aux[1]);
+      });
+    } else {
+      LOG(FATAL) << "Not implemented";
+    }
+  } else if (reduce == "sum") {
+    SWITCH_OP(op, Op, {
+      cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
+          bcast, csr, ufeat, efeat, out, NullArray(), NullArray());
+    });
   } else if (reduce == "max") {
     SWITCH_OP(op, Op, {
       cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Max<IdType, DType> >(
