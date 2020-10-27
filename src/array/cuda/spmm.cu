@@ -280,12 +280,12 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
     } else if (reduce == "max") {
       SWITCH_OP(op, Op, {
         cuda::GESpMMCsr<IdType, DType, Op, cuda::reduce::Max<IdType, DType> >(
-          csr, ufeat, efeat, out, out_aux[0], out_aux[1]);
+          csr, ufeat, efeat, out, out_aux[0], out_aux[1], feat_len);
       });
     } else if (reduce == "min") {
       SWITCH_OP(op, Op, {
         cuda::GESpMMCsr<IdType, DType, Op, cuda::reduce::Min<IdType, DType> >(
-          csr, ufeat, efeat, out, out_aux[0], out_aux[1]);
+          csr, ufeat, efeat, out, out_aux[0], out_aux[1], feat_len);
       });
     } else {
       LOG(FATAL) << "Not implemented";

@@ -27,17 +27,18 @@ __global__ void GESpMMSumKernel(
     const DType* __restrict__ ufeat,
     const DType* __restrict__ efeat,
     DType* __restrict__ out,
+    Idx* __restrict__ arg_u,
+    Idx* __restrict__ arg_e,
     const Idx* __restrict__ indptr,
     const Idx* __restrict__ indices,
     int64_t num_rows, int64_t num_cols,
     int64_t feat_len) {
-  extern __shared__ DType array[];
-  Idx* col = (Idx*)array;
-  DType* val = array + 32 * sizeof(Idx);
+  extern __shared__ __align__(sizeof(Idx)) char smem[];
+  Idx* col = (Idx*)smem;
+  DType* val = (DType*)&col[blockDim.y * blockDim.x];  // TODO(zihao): need to handle alignment.
 
   int ty = blockIdx.y * blockDim.y + threadIdx.y;  // iterate over destination nodes
-  const Idx stride_x = blockDim.x * gridDim.x * 64,
-            stride_y = blockDim.y * gridDim.y;
+  const Idx stride_y = blockDim.y * gridDim.y;
   const Idx sm_offset = 32 * threadIdx.y;
 
   while (ty < num_rows) {
@@ -46,22 +47,25 @@ __global__ void GESpMMSumKernel(
     const Idx tx = threadIdx.x;
     int cid = (blockIdx.x * 64) + tx;  // iterate over feature dimension
 
-    if (cid < feat_dim) {
+    if (cid < feat_len) {
       DType accum_0 = ReduceOp::zero,
             accum_1 = ReduceOp::zero;
       Idx argu_0 = 0, arge_0 = 0,
           argu_1 = 0, arge_1 = 0;
 
       for (int left = low; left < high; left += 32) {
-        col[sm_offset + tx] = indices[low + tx]; 
-	      if (BinaryOp::use_rhs)
-	        val[sm_offset + tx] = efeat[low + tx];
+        if (left + tx < high) {
+          col[sm_offset + tx] = indices[left + tx]; 
+          if (BinaryOp::use_rhs)
+            val[sm_offset + tx] = efeat[left + tx];
+        }
 
         __syncwarp();
 
 #pragma unroll
         for (int i = 0; i < 32; ++i) {
-          if (left + i < high) {
+          const Idx eid = left + i; 
+          if (eid < high) {
             const Idx offset = feat_len * col[sm_offset + i] + cid;
             if (BinaryOp::use_rhs) {
               const DType weight = val[sm_offset + i];
@@ -85,7 +89,7 @@ __global__ void GESpMMSumKernel(
       out[feat_len * rid + cid] = accum_0;
       if (ReduceOp::require_arg && BinaryOp::use_lhs)
         arg_u[feat_len * rid + cid] = argu_0;
-      if (ReduceOp::require_arg && BinaryOp::rhs_rhs)
+      if (ReduceOp::require_arg && BinaryOp::use_rhs)
         arg_e[feat_len * rid + cid] = arge_0;
 
       if (cid + 32 < feat_len) {
@@ -125,10 +129,10 @@ void GESpMMCsr(
   const dim3 nthrs(ntx, nty);
   const int sh_mem_size = 8 * 32 * sizeof(Idx) + (BinaryOp::use_rhs ? 8 * 32 * sizeof(DType) : 0);
   CUDA_KERNEL_CALL((GESpMMSumKernel<Idx, DType, BinaryOp, ReduceOp>),
-      nblks, nthrs, sh_mem_size, th_entry->stream,
+      nblks, nthrs, sh_mem_size, thr_entry->stream,
       ufeat_data, efeat_data, out_data, argu_data, arge_data,
       indptr, indices,
-      csr.num_row, csr.num_cols,
+      csr.num_rows, csr.num_cols,
       feat_len);
 }
 
