@@ -19,6 +19,6 @@ def test_constructing_nn():
         y = gn(g, x)
         return y.sum()
 
-    d_loss_d_x = jax.jacfwd(loss_fn)(optimizer.target)
+    d_loss_d_x = jax.grad(loss_fn)(optimizer.target)
 
     print(d_loss_d_x)

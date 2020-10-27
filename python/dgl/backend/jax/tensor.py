@@ -77,6 +77,10 @@ class SparseMatrix2D(SparseMatrix):
         return cls(jnp.where(nz), x[nz], x.shape)
 
     @property
+    def nnz(self):
+        return self.data.shape[0]
+
+    @property
     def dtype(self):
         return self.data.dtype
 
