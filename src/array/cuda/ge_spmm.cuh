@@ -31,8 +31,9 @@ __global__ void GESpMMSumKernel(
     Idx* __restrict__ arg_e,
     const Idx* __restrict__ indptr,
     const Idx* __restrict__ indices,
-    int64_t num_rows, int64_t num_cols,
-    int64_t feat_len) {
+    const int64_t num_rows, const int64_t num_cols,
+    const int64_t feat_len) {
+  /*
   extern __shared__ char smem[];
   Idx* col = nullptr;
   DType* val = nullptr;
@@ -48,6 +49,10 @@ __global__ void GESpMMSumKernel(
   } else {
     col = (Idx*) smem;
   }
+*/
+  __shared__ Idx col[8 * 32];
+  //__shared__ DType val[BinaryOp::use_rhs ? 8 * 32 : 1];
+  DType *val = nullptr;
 
   int ty = blockIdx.y * blockDim.y + threadIdx.y;  // iterate over destination nodes
   const Idx stride_y = blockDim.y * gridDim.y;
@@ -57,14 +62,14 @@ __global__ void GESpMMSumKernel(
     const Idx rid = ty;
     const Idx low = indptr[ty], high = indptr[ty + 1];
     const Idx tx = threadIdx.x;
-    int cid = (blockIdx.x * 64) + tx;  // iterate over feature dimension
+    int fid = (blockIdx.x * 64) + tx;  // iterate over feature dimension
 
-    if (cid < feat_len) {
-      DType accum_0 = ReduceOp::zero,
-            accum_1 = ReduceOp::zero;
-      Idx argu_0 = 0, arge_0 = 0,
-          argu_1 = 0, arge_1 = 0;
+    DType accum_0 = ReduceOp::zero,
+          accum_1 = ReduceOp::zero;
+    Idx argu_0 = 0, arge_0 = 0,
+        argu_1 = 0, arge_1 = 0;
 
+    if (blockIdx.x < gridDim.x) {
       for (int left = low; left < high; left += 32) {
         if (left + tx < high) {
           col[sm_offset + tx] = indices[left + tx]; 
@@ -76,36 +81,85 @@ __global__ void GESpMMSumKernel(
         for (int i = 0; i < 32; ++i) {
           const Idx eid = left + i; 
           if (eid < high) {
-            const Idx offset = feat_len * col[sm_offset + i] + cid;
+            const Idx cid = col[sm_offset + i];
+            const Idx offset = feat_len * cid + fid;
             if (BinaryOp::use_rhs) {
               const DType weight = val[sm_offset + i];
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
                 BinaryOp::Call(ufeat + offset, &weight), cid, eid);
-              if (cid + 32 < feat_len)
-                accum_1 += BinaryOp::Call(ufeat + offset + 32, &weight);
+              ReduceOp::Call(&accum_1, &argu_1, &arge_1,
+                BinaryOp::Call(ufeat + offset + 32, &weight), cid, eid);
             } else {
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                ufeat[offset], cid, eid);
-              if (cid + 32 < feat_len)
+                ufeat[offset], fid, eid);
+              ReduceOp::Call(&accum_1, &argu_1, &arge_1,
+                ufeat[offset + 32], cid, eid);
+            }
+          }
+        }
+
+        out[feat_len * rid + fid] = accum_0;
+        if (ReduceOp::require_arg && BinaryOp::use_lhs)
+          arg_u[feat_len * rid + fid] = argu_0;
+        if (ReduceOp::require_arg && BinaryOp::use_rhs)
+          arg_e[feat_len * rid + fid] = arge_0;
+
+        out[feat_len * rid + fid + 32] = accum_1;
+        if (ReduceOp::require_arg && BinaryOp::use_rhs)
+          arg_u[feat_len * rid + fid + 32] = argu_1;
+        if (ReduceOp::require_arg && BinaryOp::use_rhs)
+          arg_e[feat_len * rid + fid + 32] = arge_1; 
+      }
+    } else {
+      bool left_inbound = fid < feat_len,
+           right_inbound = fid + 32 < feat_len;
+      for (int left = low; left < high; left += 32) {
+        if (left + tx < high) {
+          col[sm_offset + tx] = indices[left + tx]; 
+          if (BinaryOp::use_rhs)
+            val[sm_offset + tx] = efeat[left + tx];
+        }
+
+#pragma unroll
+        for (int i = 0; i < 32; ++i) {
+          const Idx eid = left + i; 
+          if (eid < high) {
+            const Idx cid = col[sm_offset + i];
+            const Idx offset = feat_len * cid + fid;
+            if (BinaryOp::use_rhs) {
+              const DType weight = val[sm_offset + i];
+              if (left_inbound)
+                ReduceOp::Call(&accum_0, &argu_0, &arge_0,
+                  BinaryOp::Call(ufeat + offset, &weight), cid, eid);
+              if (right_inbound)
+                ReduceOp::Call(&accum_1, &argu_1, &arge_1,
+                  BinaryOp::Call(ufeat + offset + 32, &weight), cid, eid);
+            } else {
+              if (left_inbound)
+                ReduceOp::Call(&accum_0, &argu_0, &arge_0,
+                  ufeat[offset], fid, eid);
+              if (right_inbound)
                 ReduceOp::Call(&accum_1, &argu_1, &arge_1,
                   ufeat[offset + 32], cid, eid);
             }
           }
         }
-      } 
 
-      out[feat_len * rid + cid] = accum_0;
-      if (ReduceOp::require_arg && BinaryOp::use_lhs)
-        arg_u[feat_len * rid + cid] = argu_0;
-      if (ReduceOp::require_arg && BinaryOp::use_rhs)
-        arg_e[feat_len * rid + cid] = arge_0;
+        if (left_inbound) {
+          out[feat_len * rid + fid] = accum_0;
+          if (ReduceOp::require_arg && BinaryOp::use_lhs)
+            arg_u[feat_len * rid + fid] = argu_0;
+          if (ReduceOp::require_arg && BinaryOp::use_rhs)
+            arg_e[feat_len * rid + fid] = arge_0;
+        }
 
-      if (cid + 32 < feat_len) {
-        out[feat_len * rid + cid + 32] = accum_1;
-        if (ReduceOp::require_arg && BinaryOp::use_rhs)
-          arg_e[feat_len * rid + cid + 32] = argu_1;
-        if (ReduceOp::require_arg && BinaryOp::use_rhs)
-          arg_e[feat_len * rid + cid + 32] = arge_1; 
+        if (right_inbound) {
+          out[feat_len * rid + fid + 32] = accum_1;
+          if (ReduceOp::require_arg && BinaryOp::use_rhs)
+            arg_u[feat_len * rid + fid + 32] = argu_1;
+          if (ReduceOp::require_arg && BinaryOp::use_rhs)
+            arg_e[feat_len * rid + fid + 32] = arge_1; 
+        }
       }
     }
     ty += stride_y;
@@ -136,8 +190,9 @@ void GESpMMCsr(
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
   const int sh_mem_size = 8 * 32 * sizeof(Idx) + (BinaryOp::use_rhs ? 8 * 32 * sizeof(DType) : 0);
+
   CUDA_KERNEL_CALL((GESpMMSumKernel<Idx, DType, BinaryOp, ReduceOp>),
-      nblks, nthrs, sh_mem_size, thr_entry->stream,
+      nblks, nthrs, 0, thr_entry->stream,
       ufeat_data, efeat_data, out_data, argu_data, arge_data,
       indptr, indices,
       csr.num_rows, csr.num_cols,
