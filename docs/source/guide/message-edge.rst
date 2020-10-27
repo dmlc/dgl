@@ -3,6 +3,8 @@
 2.4 Apply Edge Weight In Message Passing
 ----------------------------------------
 
+:ref:`(中文版) <guide_cn-message-passing-edge>`
+
 A commonly seen practice in GNN modeling is to apply edge weight on the
 message before message aggregation, for examples, in
 `GAT <https://arxiv.org/pdf/1710.10903.pdf>`__ and some `GCN
