@@ -8,6 +8,33 @@ from functools import partial
 __all__ = ['gspmm', 'gsddmm', 'edge_softmax']
 
 
+# =============================================================================
+# REGISTER JAX PRIMITIVES
+# =============================================================================
+from ...graph_index import GraphIndex
+_flatten_GraphIndex = lambda x: x.__getstate__()
+def _unflatten_GraphIndex(*state):
+    x = GraphIndex()
+    x.__setstate__(*state)
+    return x
+
+jax.tree_util.register_pytree_node(
+    GraphIndex,
+    _flatten_GraphIndex,
+    _unflatten_GraphIndex,
+)
+
+from ...heterograph_index import HeteroGraphIndex
+_flatten_HeteroGraphIndex = lambda x: x.__getstate__()
+def _unflatten_HeteroGraphIndex(*state):
+    x = HeteroGraphIndex()
+    x.__setstate__(*state)
+    return x
+
+# =============================================================================
+# MODULE FUNCTIONS
+# =============================================================================
+
 def _reduce_grad(grad, shape):
     """Reduce gradient on the broadcast dimension
     If there is broadcast in forward pass, gradients need to be reduced on
@@ -128,6 +155,7 @@ def _jax_gspmm_only_e(Y, Z, dst_idxs, src_idxs, _op, _reduce_op):
 
     return Z
 
+@partial(jax.jit, static_argnums=(0, 1, 2))
 def _jax_gspmm(gidx, op, reduce_op, X, Y):
     # out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
     # return out
@@ -153,15 +181,7 @@ def _jax_gspmm(gidx, op, reduce_op, X, Y):
         infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
     dtype = X.dtype if use_u else Y.dtype
 
-    try:
-        if use_u:
-            ctx = X.device_buffer.device()
-        elif use_e:
-            ctx = Y.device_buffer.device()
-    except:
-        ctx = jax.devices('cpu')[0]
-
-    a, _ = gidx.adjacency_matrix(0, False, ctx)
+    a, _ = gidx.adjacency_matrix(0, False, jax.devices('cpu')[0])
     dst_idxs, src_idxs = a.index
 
     _reduce_op = "add" if reduce_op == "mean" or reduce_op == "sum" else reduce_op
@@ -186,6 +206,7 @@ def _jax_gspmm(gidx, op, reduce_op, X, Y):
 
     return _jax_gspmm_u_and_e(X, Y, Z, dst_idxs, src_idxs, _op, _reduce_op)
 
+@partial(jax.jit, static_argnums=(0, 1, 4, 5))
 def _jax_gsddmm(gidx, op, X, Y, lhs_target, rhs_target):
     # out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
     # return out
@@ -205,12 +226,7 @@ def _jax_gsddmm(gidx, op, X, Y, lhs_target, rhs_target):
             Y = jnp.expand_dims(Y, -1)
             expand_rhs = True
 
-    if use_lhs:
-        ctx = X.device_buffer.device()
-    elif use_rhs:
-        ctx = Y.device_buffer.device()
-
-    a, _ = gidx.adjacency_matrix(0, False, ctx)
+    a, _ = gidx.adjacency_matrix(0, False, jax.devices('cpu')[0])
     dst_idxs, src_idxs = a.index
     edge_idxs = jnp.arange(dst_idxs.shape[0])
     idxs_mapping = {
