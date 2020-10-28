@@ -49,30 +49,29 @@ __global__ void GESpMMSumKernel(
     col = (Idx*) smem;
   }
 
-  int ty = blockIdx.y * blockDim.y + threadIdx.y;  // iterate over destination nodes
-  const Idx stride_y = blockDim.y * gridDim.y;
+  Idx ty = blockIdx.x * blockDim.y + threadIdx.y;  // iterate over destination nodes
+  const Idx tx = threadIdx.x;
   const Idx sm_offset = 32 * threadIdx.y;
 
-  while (ty < num_rows) {
-    const Idx rid = ty;
-    const Idx low = indptr[ty], high = indptr[ty + 1];
-    const Idx tx = threadIdx.x;
-    int fid = (blockIdx.x * 64) + tx;  // iterate over feature dimension
+  const Idx rid = ty;
+  if (rid < num_rows) {
+    const Idx low = indptr[rid], high = indptr[rid + 1];
+    Idx fid = (blockIdx.y * 64) + tx;  // iterate over feature dimension
 
     DType accum_0 = ReduceOp::zero,
           accum_1 = ReduceOp::zero;
     Idx argu_0 = 0, arge_0 = 0,
         argu_1 = 0, arge_1 = 0;
 
-    if (blockIdx.x != gridDim.x - 1) {
-      for (int left = low; left < high; left += 32) {
+    if (blockIdx.y != gridDim.y - 1) {
+      for (Idx left = low; left < high; left += 32) {
         if (left + tx < high) {
           col[sm_offset + tx] = indices[left + tx]; 
           if (BinaryOp::use_rhs)
             val[sm_offset + tx] = efeat[left + tx];
         }
 
-        for (int i = 0; i < 32 && left + i < high; ++i) {
+        for (Idx i = 0; i < 32 && left + i < high; ++i) {
           const Idx eid = left + i; 
           const Idx cid = col[sm_offset + i];
           const Idx offset = feat_len * cid + fid;
@@ -151,7 +150,6 @@ __global__ void GESpMMSumKernel(
         }
       }
     }
-    ty += stride_y;
   }
 }
 
@@ -174,11 +172,11 @@ void GESpMMCsr(
   
   const int ntx = 32;
   const int nty = 8;
-  const int nbx = (feat_len + (ntx * 2) - 1) / (ntx * 2);
-  const int nby = FindNumBlocks<'y'>((csr.num_rows + nty - 1) / nty);
+  const int nby = (feat_len + (ntx * 2) - 1) / (ntx * 2);
+  const int nbx = FindNumBlocks<'x'>((csr.num_rows + nty - 1) / nty);
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
-  const int sh_mem_size = 8 * 32 * sizeof(Idx) + (BinaryOp::use_rhs ? 8 * 32 * sizeof(DType) : 0);
+  const int sh_mem_size = 32 * 8 * sizeof(Idx) + (BinaryOp::use_rhs ? 32 * 8 * sizeof(DType) : 0);
 
   CUDA_KERNEL_CALL((GESpMMSumKernel<Idx, DType, BinaryOp, ReduceOp>),
       nblks, nthrs, sh_mem_size, thr_entry->stream,
