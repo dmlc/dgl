@@ -33,31 +33,12 @@ __global__ void GESpMMSumKernel(
     const Idx* __restrict__ indices,
     const int64_t num_rows, const int64_t num_cols,
     const int64_t feat_len) {
-  extern __shared__ char smem[];
-  Idx* col = nullptr;
-  DType* val = nullptr;
-  if (BinaryOp::use_rhs) {  // use edge feature.
-    if (sizeof(Idx) >= sizeof(DType)) {
-      // handle alignment issue: https://forums.developer.nvidia.com/t/dynamic-shared-memory-allocation/21671/3
-      col = (Idx*) smem;
-      val = (DType*) &col[blockDim.y * blockDim.x];
-    } else {
-      val = (DType*) smem;
-      col = (Idx*) &val[blockDim.y * blockDim.x];
-    }
-  } else {
-    col = (Idx*) smem;
-  }
-
-  Idx ty = blockIdx.x * blockDim.y + threadIdx.y;  // iterate over destination nodes
+  const Idx rid = blockIdx.x * blockDim.y + threadIdx.y;
   const Idx tx = threadIdx.x;
-  const Idx sm_offset = 32 * threadIdx.y;
 
-  const Idx rid = ty;
   if (rid < num_rows) {
-    const Idx low = indptr[rid], high = indptr[rid + 1];
+    const Idx low = __ldg(indptr + rid), high = __ldg(indptr + rid + 1);
     Idx fid = (blockIdx.y * 64) + tx;  // iterate over feature dimension
-
     DType accum_0 = ReduceOp::zero,
           accum_1 = ReduceOp::zero;
     Idx argu_0 = 0, arge_0 = 0,
@@ -65,18 +46,12 @@ __global__ void GESpMMSumKernel(
 
     if (blockIdx.y != gridDim.y - 1) {
       for (Idx left = low; left < high; left += 32) {
-        if (left + tx < high) {
-          col[sm_offset + tx] = indices[left + tx]; 
-          if (BinaryOp::use_rhs)
-            val[sm_offset + tx] = efeat[left + tx];
-        }
-
         for (Idx i = 0; i < 32 && left + i < high; ++i) {
           const Idx eid = left + i; 
-          const Idx cid = col[sm_offset + i];
+          const Idx cid = __ldg(indices + eid);
           const Idx offset = feat_len * cid + fid;
           if (BinaryOp::use_rhs) {
-            const DType weight = val[sm_offset + i];
+            const DType weight = __ldg(efeat + eid);
             ReduceOp::Call(&accum_0, &argu_0, &arge_0,
               BinaryOp::Call(ufeat + offset, &weight), cid, eid);
             ReduceOp::Call(&accum_1, &argu_1, &arge_1,
@@ -105,18 +80,12 @@ __global__ void GESpMMSumKernel(
       bool left_inbound = fid < feat_len,
            right_inbound = fid + 32 < feat_len;
       for (int left = low; left < high; left += 32) {
-        if (left + tx < high) {
-          col[sm_offset + tx] = indices[left + tx]; 
-          if (BinaryOp::use_rhs)
-            val[sm_offset + tx] = efeat[left + tx];
-        }
-
         for (int i = 0; i < 32 && left + i < high; ++i) {
           const Idx eid = left + i; 
-          const Idx cid = col[sm_offset + i];
+          const Idx cid = __ldg(indices + eid); 
           const Idx offset = feat_len * cid + fid;
           if (BinaryOp::use_rhs) {
-            const DType weight = val[sm_offset + i];
+            const DType weight = __ldg(efeat + eid);
             if (left_inbound)
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
                 BinaryOp::Call(ufeat + offset, &weight), cid, eid);
@@ -171,12 +140,12 @@ void GESpMMCsr(
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   
   const int ntx = 32;
-  const int nty = 8;
+  const int nty = 16;
   const int nby = (feat_len + (ntx * 2) - 1) / (ntx * 2);
-  const int nbx = FindNumBlocks<'x'>((csr.num_rows + nty - 1) / nty);
+  const int nbx = (csr.num_rows + nty - 1) / nty;
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
-  const int sh_mem_size = 32 * 8 * sizeof(Idx) + (BinaryOp::use_rhs ? 32 * 8 * sizeof(DType) : 0);
+  const int sh_mem_size = 0;
 
   CUDA_KERNEL_CALL((GESpMMSumKernel<Idx, DType, BinaryOp, ReduceOp>),
       nblks, nthrs, sh_mem_size, thr_entry->stream,

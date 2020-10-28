@@ -239,8 +239,9 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
              NDArray efeat,
              NDArray out,
              std::vector<NDArray> out_aux) {
-/*
-  if (reduce == "sum") {
+  int64_t feat_len = bcast.out_len;
+  bool is_scalar_efeat = efeat.NumElements() == csr.indices->shape[0];
+  if (reduce == "sum" && feat_len <= 128) {  // cusparse
     if (sizeof(IdType) == 4 && op == "copy_lhs") {
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i)
@@ -251,7 +252,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
           nullptr,
           static_cast<DType*>(out->data),
           x_length);
-    } else if (sizeof(IdType) == 4 && op == "mul" && efeat.NumElements() == csr.indices->shape[0]) {
+    } else if (sizeof(IdType) == 4 && op == "mul" && is_scalar_efeat) {
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i)
         x_length *= ufeat->shape[i];
@@ -263,34 +264,33 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
           static_cast<DType*>(efeat->data),
           static_cast<DType*>(out->data),
           x_length);
-    } else {
-      SWITCH_OP(op, Op, {
-        cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
-            bcast, csr, ufeat, efeat, out, NullArray(), NullArray());
-      });
     }
-*/
-  if (op == "copy_lhs" || efeat.NumElements() == csr.indices->shape[0]) {  // scalar/non edge feature.
-    int64_t feat_len = bcast.out_len;
+    return ;
+  }
+
+  if ((op == "copy_lhs" || is_scalar_efeat) && feat_len > 128) {  // ge-spmm
     if (reduce == "sum") {
+      if (op != "copy_lhs" && IsNullArray(csr.data))
+        efeat = IndexSelect(efeat, csr.data);
       SWITCH_OP(op, Op, {
         cuda::GESpMMCsr<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
           csr, ufeat, efeat, out, NullArray(), NullArray(), feat_len);
       });
-    } else if (reduce == "max") {
+    } else if (reduce == "max" && IsNullArray(csr.data)) {
       SWITCH_OP(op, Op, {
         cuda::GESpMMCsr<IdType, DType, Op, cuda::reduce::Max<IdType, DType> >(
           csr, ufeat, efeat, out, out_aux[0], out_aux[1], feat_len);
       });
-    } else if (reduce == "min") {
+    } else if (reduce == "min" && IsNullArray(csr.data)) {
       SWITCH_OP(op, Op, {
         cuda::GESpMMCsr<IdType, DType, Op, cuda::reduce::Min<IdType, DType> >(
           csr, ufeat, efeat, out, out_aux[0], out_aux[1], feat_len);
       });
-    } else {
-      LOG(FATAL) << "Not implemented";
     }
-  } else if (reduce == "sum") {
+    return ;
+  }
+
+  if (reduce == "sum") {  // general kernel
     SWITCH_OP(op, Op, {
       cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
           bcast, csr, ufeat, efeat, out, NullArray(), NullArray());
