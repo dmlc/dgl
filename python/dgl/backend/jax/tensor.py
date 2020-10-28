@@ -109,7 +109,7 @@ class SparseMatrix2D(SparseMatrix):
 
         return jax.ops.segment_sum(prod, rows, num_segments)
 
-    # @jax.jit
+    @jax.jit
     def __matmul__(self, x):
         if not self.ndim == 2:
             raise NotImplementedError
@@ -130,6 +130,18 @@ class SparseMatrix2D(SparseMatrix):
             return False
         else:
             return self.to_dense() == x.to_dense()
+
+def _flatten_SparseMatrix2D(x):
+    return x.index, x.data, x.shape
+
+def _unflatten_SparseMatrix2D(index, data, shape):
+    return SparseMatrix2D(index=index, data=data, shape=shape)
+
+jax.tree_util.register_pytree_node(
+    SparseMatrix2D,
+    _flatten_SparseMatrix2D,
+    _unflatten_SparseMatrix2D
+)
 
 def get_preferred_sparse_format():
     return "coo"
@@ -317,7 +329,8 @@ def ones(shape, dtype, ctx):
     # TODO: no device here
     return jnp.ones(shape, dtype=dtype,) + 0 # eval lazy
 
-def uniform(shape, dtype, ctx, low, high):
+@jax.jit
+def uniform(shape, dtype, *, low, high):
     key = jax.random.PRNGKey(2666)
     return jax.random.uniform(
         key=key,
@@ -327,7 +340,8 @@ def uniform(shape, dtype, ctx, low, high):
         dtype=dtype,
     )
 
-def randint(shape, dtype, ctx, low, high):
+@jax.jit
+def randint(shape, dtype, *, low, high):
     key = jax.random.PRNGKey(2666)
     return jax.random.randint(
         key=key,
@@ -337,6 +351,7 @@ def randint(shape, dtype, ctx, low, high):
         dtype=dtype,
     )
 
+@jax.jit
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, jnp.ndarray):
@@ -359,6 +374,7 @@ def pad_packed_tensor(input, lengths, value, l_min=None):
     index = jnp.asarray(index)
     return scatter_row(x, index, input).reshape((batch_size, max_len, *old_shape[1:]))
 
+@jax.jit
 def pack_padded_tensor(input, lengths):
     batch_size, max_len = input.shape[:2]
     device = input.device
@@ -368,6 +384,7 @@ def pack_padded_tensor(input, lengths):
     index = tensor(index).to(device)
     return gather_row(input.view(batch_size * max_len, -1), index)
 
+@jax.jit
 def boolean_mask(input, mask):
     if 'bool' not in str(mask.dtype):
         mask = jnp.asarray(mask, dtype=jnp.bool_)
@@ -416,6 +433,7 @@ def sort_1d(input):
 def arange(start, stop, dtype=jnp.int64):
     return jnp.arange(start, stop, dtype=dtype)
 
+@jax.jit
 def rand_shuffle(arr):
     key = jax.random.PRNGKey(2666)
     idx = jnp.random.permuataion(
