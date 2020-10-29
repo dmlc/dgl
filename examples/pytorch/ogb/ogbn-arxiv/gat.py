@@ -6,6 +6,7 @@ import math
 import time
 
 import numpy as np
+import torch
 import torch as th
 import torch.nn.functional as F
 import torch.optim as optim
@@ -15,43 +16,69 @@ from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 
 from models import GAT
 
-device = None
-in_feats, n_classes = None, None
 epsilon = 1 - math.log(2)
+device = None
+
+dataset = "ogbn-arxiv"
+n_node_feats, n_classes = 0, 0
+
+
+def load_data(dataset):
+    global n_node_feats, n_classes
+
+    data = DglNodePropPredDataset(name=dataset)
+    evaluator = Evaluator(name=dataset)
+
+    splitted_idx = data.get_idx_split()
+    train_idx, val_idx, test_idx = splitted_idx["train"], splitted_idx["valid"], splitted_idx["test"]
+    graph, labels = data[0]
+
+    n_node_feats = graph.ndata["feat"].shape[1]
+    n_classes = (labels.max() + 1).item()
+
+    return graph, labels, train_idx, val_idx, test_idx, evaluator
+
+
+def preprocess(graph):
+    global n_node_feats
+
+    # add reverse edges
+    srcs, dsts = graph.all_edges()
+    graph.add_edges(dsts, srcs)
+
+    # add self-loop
+    print(f"Total edges before adding self-loop {graph.number_of_edges()}")
+    graph = graph.remove_self_loop().add_self_loop()
+    print(f"Total edges after adding self-loop {graph.number_of_edges()}")
+
+    return graph
 
 
 def gen_model(args):
-    norm = "both" if args.use_norm else "none"
-
-    if args.use_labels:
-        model = GAT(
-            in_feats + n_classes,
-            n_classes,
-            n_hidden=args.n_hidden,
-            n_layers=args.n_layers,
-            n_heads=args.n_heads,
-            activation=F.relu,
-            dropout=args.dropout,
-            attn_drop=args.attn_drop,
-            norm=norm,
-        )
+    if args.use_norm:
+        n_node_feats_ = n_node_feats + n_classes
     else:
-        model = GAT(
-            in_feats,
-            n_classes,
-            n_hidden=args.n_hidden,
-            n_layers=args.n_layers,
-            n_heads=args.n_heads,
-            activation=F.relu,
-            dropout=args.dropout,
-            attn_drop=args.attn_drop,
-            norm=norm,
-        )
+        n_node_feats_ = n_node_feats
+
+    model = GAT(
+        n_node_feats_,
+        n_classes,
+        n_hidden=args.n_hidden,
+        n_layers=args.n_layers,
+        n_heads=args.n_heads,
+        activation=F.relu,
+        dropout=args.dropout,
+        input_drop=args.input_drop,
+        attn_drop=args.attn_drop,
+        edge_drop=args.edge_drop,
+        use_attn_dst=not args.no_attn_dst,
+        use_symmetric_norm=args.use_norm,
+    )
 
     return model
 
 
-def cross_entropy(x, labels):
+def custom_loss_function(x, labels):
     y = F.cross_entropy(x, labels[:, 0], reduction="none")
     y = th.log(epsilon + y) - math.log(epsilon)
     return th.mean(y)
@@ -73,7 +100,7 @@ def adjust_learning_rate(optimizer, lr, epoch):
             param_group["lr"] = lr * epoch / 50
 
 
-def train(model, graph, labels, train_idx, optimizer, use_labels):
+def train(model, graph, labels, train_idx, val_idx, test_idx, optimizer, use_labels, n_label_iters):
     model.train()
 
     feat = graph.ndata["feat"]
@@ -94,7 +121,14 @@ def train(model, graph, labels, train_idx, optimizer, use_labels):
 
     optimizer.zero_grad()
     pred = model(graph, feat)
-    loss = cross_entropy(pred[train_pred_idx], labels[train_pred_idx])
+
+    if n_label_iters > 0:
+        unlabel_idx = torch.cat([train_pred_idx, val_idx, test_idx])
+        for _ in range(n_label_iters):
+            feat[unlabel_idx, -n_classes:] = F.softmax(pred[unlabel_idx].detach(), dim=-1)
+            pred = model(graph, feat)
+
+    loss = custom_loss_function(pred[train_pred_idx], labels[train_pred_idx])
     loss.backward()
     optimizer.step()
 
@@ -102,7 +136,7 @@ def train(model, graph, labels, train_idx, optimizer, use_labels):
 
 
 @th.no_grad()
-def evaluate(model, graph, labels, train_idx, val_idx, test_idx, use_labels, evaluator):
+def evaluate(model, graph, labels, train_idx, val_idx, test_idx, use_labels, n_label_iters, evaluator):
     model.eval()
 
     feat = graph.ndata["feat"]
@@ -111,9 +145,16 @@ def evaluate(model, graph, labels, train_idx, val_idx, test_idx, use_labels, eva
         feat = add_labels(feat, labels, train_idx)
 
     pred = model(graph, feat)
-    train_loss = cross_entropy(pred[train_idx], labels[train_idx])
-    val_loss = cross_entropy(pred[val_idx], labels[val_idx])
-    test_loss = cross_entropy(pred[test_idx], labels[test_idx])
+
+    if n_label_iters > 0:
+        unlabel_idx = torch.cat([val_idx, test_idx])
+        for _ in range(n_label_iters):
+            feat[unlabel_idx, -n_classes:] = F.softmax(pred[unlabel_idx], dim=-1)
+            pred = model(graph, feat)
+
+    train_loss = custom_loss_function(pred[train_idx], labels[train_idx])
+    val_loss = custom_loss_function(pred[val_idx], labels[val_idx])
+    test_loss = custom_loss_function(pred[test_idx], labels[test_idx])
 
     return (
         compute_acc(pred[train_idx], labels[train_idx], evaluator),
@@ -144,11 +185,13 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
         adjust_learning_rate(optimizer, args.lr, epoch)
 
-        loss, pred = train(model, graph, labels, train_idx, optimizer, args.use_labels)
+        loss, pred = train(
+            model, graph, labels, train_idx, val_idx, test_idx, optimizer, args.use_labels, args.n_label_iters,
+        )
         acc = compute_acc(pred[train_idx], labels[train_idx], evaluator)
 
         train_acc, val_acc, test_acc, train_loss, val_loss, test_loss = evaluate(
-            model, graph, labels, train_idx, val_idx, test_idx, args.use_labels, evaluator
+            model, graph, labels, train_idx, val_idx, test_idx, args.use_labels, args.n_label_iters, evaluator
         )
 
         toc = time.time()
@@ -183,7 +226,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         ax.set_yticks(np.linspace(0, 1.0, 101))
         ax.tick_params(labeltop=True, labelright=True)
         for y, label in zip([accs, train_accs, val_accs, test_accs], ["acc", "train acc", "val acc", "test acc"]):
-            plt.plot(range(args.n_epochs), y, label=label)
+            plt.plot(range(args.n_epochs), y, label=label, linewidth=1)
         ax.xaxis.set_major_locator(MultipleLocator(100))
         ax.xaxis.set_minor_locator(AutoMinorLocator(1))
         ax.yaxis.set_major_locator(MultipleLocator(0.01))
@@ -201,7 +244,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         for y, label in zip(
             [losses, train_losses, val_losses, test_losses], ["loss", "train loss", "val loss", "test loss"]
         ):
-            plt.plot(range(args.n_epochs), y, label=label)
+            plt.plot(range(args.n_epochs), y, label=label, linewidth=1)
         ax.xaxis.set_major_locator(MultipleLocator(100))
         ax.xaxis.set_minor_locator(AutoMinorLocator(1))
         ax.yaxis.set_major_locator(MultipleLocator(0.1))
@@ -217,12 +260,12 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
 def count_parameters(args):
     model = gen_model(args)
-    print([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
+    # print([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
     return sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
 
 
 def main():
-    global device, in_feats, n_classes, epsilon
+    global device, n_node_feats, n_classes, epsilon
 
     argparser = argparse.ArgumentParser("GAT on OGBN-Arxiv", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argparser.add_argument("--cpu", action="store_true", help="CPU mode. This option overrides --gpu.")
@@ -232,17 +275,24 @@ def main():
     argparser.add_argument(
         "--use-labels", action="store_true", help="Use labels in the training set as input features."
     )
+    argparser.add_argument("--n-label-iters", type=int, help="number of label iterations", default=0)
+    argparser.add_argument("--no-attn-dst", action="store_true", help="Don't use attn_dst.")
     argparser.add_argument("--use-norm", action="store_true", help="Use symmetrically normalized adjacency matrix.")
     argparser.add_argument("--lr", type=float, help="learning rate", default=0.002)
     argparser.add_argument("--n-layers", type=int, help="number of layers", default=3)
     argparser.add_argument("--n-heads", type=int, help="number of heads", default=3)
-    argparser.add_argument("--n-hidden", type=int, help="number of hidden units", default=256)
+    argparser.add_argument("--n-hidden", type=int, help="number of hidden units", default=250)
     argparser.add_argument("--dropout", type=float, help="dropout rate", default=0.75)
-    argparser.add_argument("--attn_drop", type=float, help="attention dropout rate", default=0.05)
+    argparser.add_argument("--input-drop", type=float, help="attention dropout rate", default=0.1)
+    argparser.add_argument("--attn-drop", type=float, help="attention dropout rate", default=0.0)
+    argparser.add_argument("--edge-drop", type=float, help="attention dropout rate", default=0.0)
     argparser.add_argument("--wd", type=float, help="weight decay", default=0)
     argparser.add_argument("--log-every", type=int, help="log every LOG_EVERY epochs", default=20)
     argparser.add_argument("--plot-curves", help="plot learning curves", action="store_true")
     args = argparser.parse_args()
+
+    if not args.use_labels and args.n_label_iters > 0:
+        raise ValueError("'--use-labels' must be enabled when n_label_iters > 0")
 
     if args.cpu:
         device = th.device("cpu")
@@ -250,24 +300,8 @@ def main():
         device = th.device("cuda:%d" % args.gpu)
 
     # load data
-    data = DglNodePropPredDataset(name="ogbn-arxiv")
-    evaluator = Evaluator(name="ogbn-arxiv")
-
-    splitted_idx = data.get_idx_split()
-    train_idx, val_idx, test_idx = splitted_idx["train"], splitted_idx["valid"], splitted_idx["test"]
-    graph, labels = data[0]
-
-    # add reverse edges
-    srcs, dsts = graph.all_edges()
-    graph.add_edges(dsts, srcs)
-
-    # add self-loop
-    print(f"Total edges before adding self-loop {graph.number_of_edges()}")
-    graph = graph.remove_self_loop().add_self_loop()
-    print(f"Total edges after adding self-loop {graph.number_of_edges()}")
-
-    in_feats = graph.ndata["feat"].shape[1]
-    n_classes = (labels.max() + 1).item()
+    graph, labels, train_idx, val_idx, test_idx, evaluator = load_data(dataset)
+    graph = preprocess(graph)
     graph.create_formats_()
 
     train_idx = train_idx.to(device)
@@ -280,11 +314,12 @@ def main():
     val_accs = []
     test_accs = []
 
-    for i in range(1, args.n_runs + 1):
-        val_acc, test_acc = run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, i)
+    for n_running in range(1, args.n_runs + 1):
+        val_acc, test_acc = run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         val_accs.append(val_acc)
         test_accs.append(test_acc)
 
+    print(args)
     print(f"Runned {args.n_runs} times")
     print("Val Accs:", val_accs)
     print("Test Accs:", test_accs)
@@ -297,9 +332,18 @@ if __name__ == "__main__":
     main()
 
 
+# Namespace(attn_drop=0.0, cpu=False, dropout=0.75, edge_drop=0.1, gpu=0, input_drop=0.1, log_every=20, lr=0.002, n_epochs=2000, n_heads=3, n_hidden=250, n_label_iters=0, n_layers=3, n_runs=10, no_attn_dst=True, plot_curves=True, use_labels=True, use_norm=True, wd=0)
 # Runned 10 times
-# Val Accs: [0.7505956575724018, 0.7489177489177489, 0.7502600758414711, 0.7498573777643545, 0.75079700661096, 0.7504278667069365, 0.7505285412262156, 0.7512332628611699, 0.7503271921876573, 0.750729890264774]
-# Test Accs: [0.7374853404110857, 0.7357982017570932, 0.7359216509268975, 0.736826944838796, 0.7385140834927885, 0.7370944180400387, 0.7358187766187272, 0.7365183219142851, 0.7343168117194412, 0.7371767174865749]
-# Average val accuracy: 0.750367461995369 ± 0.0005934770264509258
-# Average test accuracy: 0.7365471267205728 ± 0.0010945826389317434
-# Number of params: 1628440
+# Val Accs: [0.7492868888217725, 0.7524413570925199, 0.7505620993993087, 0.7500251686298198, 0.7501929594952851, 0.7513003792073559, 0.7516695191113796, 0.7505285412262156, 0.7504949830531226, 0.7515017282459143]
+# Test Accs: [0.7366829208073575, 0.7384112091846182, 0.7368886694236981, 0.7345019854741477, 0.7373001666563792, 0.7362508487130424, 0.7352221056313396, 0.736477172191017, 0.7380614365368393, 0.7362919984363105]
+# Average val accuracy: 0.7508003624282694 ± 0.0008760483047616948
+# Average test accuracy: 0.736608851305475 ± 0.0011192876013651112
+# Number of params: 1441580
+
+# Namespace(attn_drop=0.0, cpu=False, dropout=0.75, edge_drop=0.3, gpu=0, input_drop=0.25, log_every=20, lr=0.002, n_epochs=2000, n_heads=3, n_hidden=250, n_label_iters=1, n_layers=3, n_runs=10, no_attn_dst=True, plot_curves=True, use_labels=True, use_norm=True, wd=0)
+# Runned 10 times
+# Val Accs: [0.7515352864190074, 0.7520386590154032, 0.7520722171884963, 0.7516359609382866, 0.7518373099768448, 0.7525755897848921, 0.7515352864190074, 0.7514681700728212, 0.7516359609382866, 0.7512668210342629]
+# Test Accs: [0.7390078801720058, 0.7404686953480237, 0.7382671851531798, 0.7395222517128572, 0.7409007674423389, 0.7402629467316832, 0.7408390428574367, 0.7404275456247557, 0.7412093903668497, 0.7384112091846182]
+# Average val accuracy: 0.7517601261787308 ± 0.00036144816411993807
+# Average test accuracy: 0.7399316914593749 ± 0.0010070948165678253
+# Number of params: 1441580

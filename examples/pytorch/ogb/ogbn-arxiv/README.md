@@ -12,10 +12,16 @@ python3 gcn.py --use-linear --use-labels
 
 ### GAT
 
-For the best score, run `gat.py` with `use-norm` and `--use-labels` enabled and you should directly see the result.
+For the score of `GAT(norm. adj.)+labels`, run the flowwing command and you should directly see the result.
 
 ```bash
-python3 gat.py --use-norm --use-labels
+python3 gat.py --use-norm --use-labels --no-attn-dst --edge-drop=0.1 --input-drop=0.1 gat.py
+```
+
+For the score of `GAT(norm. adj.)+label reuse`, run the flowwing command and you should directly see the result.
+
+```bash
+python3 gat.py --use-norm --use-labels --no-attn-dst --edge-drop=0.3 --input-drop=0.25 gat.py
 ```
 
 ## Usage & Options
@@ -77,10 +83,11 @@ optional arguments:
 
 Here are the results over 10 runs.
 
-|                        |     Val acc     |    Test acc     | #Parameters |
-|:----------------------:|:---------------:|:---------------:|:-----------:|
-|          GCN           | 0.7361 ± 0.0009 | 0.7246 ± 0.0021 |   109,608   |
-|       GCN+linear       | 0.7397 ± 0.0010 | 0.7270 ± 0.0016 |   218,152   |
-|       GCN+labels       | 0.7399 ± 0.0008 | 0.7259 ± 0.0006 |   119,848   |
-|   GCN+linear+labels    | 0.7442 ± 0.0012 | 0.7306 ± 0.0024 |   238,632   |
-| GAT(norm. adj.)+labels | 0.7504 ± 0.0006 | 0.7365 ± 0.0011 |  1,628,440  |
+|                             |     Val acc     |    Test acc     | #Parameters |
+|:---------------------------:|:---------------:|:---------------:|:-----------:|
+|             GCN             | 0.7361 ± 0.0009 | 0.7246 ± 0.0021 |   109,608   |
+|         GCN+linear          | 0.7397 ± 0.0010 | 0.7270 ± 0.0016 |   218,152   |
+|         GCN+labels          | 0.7399 ± 0.0008 | 0.7259 ± 0.0006 |   119,848   |
+|      GCN+linear+labels      | 0.7442 ± 0.0012 | 0.7306 ± 0.0024 |   238,632   |
+|   GAT(norm. adj.)+labels    | 0.7508 ± 0.0009 | 0.7366 ± 0.0011 |  1,441,580  |
+| GAT(norm. adj.)+label reuse | 0.7518 ± 0.0004 | 0.7399 ± 0.0010 |  1,441,580  |
