@@ -47,7 +47,7 @@ __global__ void GESpMMKernel(
 
     if (blockIdx.y != gridDim.y - 1) {
       for (Idx left = low; left < high; left += 32) {
-        if (left + 32 < high) {
+        if (left + 32 <= high) {
 #pragma unroll
           for (Idx i = 0; i < 32; ++i) {
             const Idx eid = left + i; 
@@ -70,7 +70,7 @@ __global__ void GESpMMKernel(
             const Idx eid = left + i; 
             const Idx cid = __ldg(indices + eid);
             const Idx offset = feat_len * cid + fid;
-            if (BinaryOp == CopyLhs) {
+            if (BinaryOp::use_rhs) {
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
                 BinaryOp::Call(ufeat + offset, efeat + eid), cid, eid);
               ReduceOp::Call(&accum_1, &argu_1, &arge_1,
@@ -85,7 +85,7 @@ __global__ void GESpMMKernel(
         }
 
         out[feat_len * rid + fid] = accum_0;
-        if (ReduceOp::require_arg && BinaryOp::use_lhs)
+        if (ReduceOp::require_arg && BinaryOp::use_rhs)
           arg_u[feat_len * rid + fid] = argu_0;
         if (ReduceOp::require_arg && BinaryOp::use_rhs)
           arg_e[feat_len * rid + fid] = arge_0;
@@ -100,13 +100,13 @@ __global__ void GESpMMKernel(
       bool left_inbound = fid < feat_len,
            right_inbound = fid + 32 < feat_len;
       for (int left = low; left < high; left += 32) {
-        if (left + 32 < high) {
+        if (left + 32 <= high) {
 #pragma unroll
           for (int i = 0; i < 32; ++i) {
             const Idx eid = left + i; 
             const Idx cid = __ldg(indices + eid); 
             const Idx offset = feat_len * cid + fid;
-            if (BinaryOp == CopyLhs) {
+            if (BinaryOp::use_rhs) {
               if (left_inbound)
                 ReduceOp::Call(&accum_0, &argu_0, &arge_0,
                   BinaryOp::Call(ufeat + offset, efeat + eid), cid, eid);
@@ -127,7 +127,7 @@ __global__ void GESpMMKernel(
             const Idx eid = left + i; 
             const Idx cid = __ldg(indices + eid); 
             const Idx offset = feat_len * cid + fid;
-            if (BinaryOp == CopyLhs) {
+            if (BinaryOp::use_rhs) {
               if (left_inbound)
                 ReduceOp::Call(&accum_0, &argu_0, &arge_0,
                   BinaryOp::Call(ufeat + offset, efeat + eid), cid, eid);
@@ -147,7 +147,7 @@ __global__ void GESpMMKernel(
 
         if (left_inbound) {
           out[feat_len * rid + fid] = accum_0;
-          if (ReduceOp::require_arg && BinaryOp::use_lhs)
+          if (ReduceOp::require_arg && BinaryOp::use_rhs)
             arg_u[feat_len * rid + fid] = argu_0;
           if (ReduceOp::require_arg && BinaryOp::use_rhs)
             arg_e[feat_len * rid + fid] = arge_0;
