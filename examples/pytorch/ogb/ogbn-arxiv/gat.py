@@ -120,19 +120,19 @@ def train(model, graph, labels, train_idx, val_idx, test_idx, optimizer, use_lab
         train_pred_idx = train_idx[mask]
 
     optimizer.zero_grad()
-    pred = model(graph, feat).detach()
+    pred = model(graph, feat)
 
     if n_label_iters > 0:
         unlabel_idx = torch.cat([train_pred_idx, val_idx, test_idx])
         for _ in range(n_label_iters):
-            feat[unlabel_idx, -n_classes:] = F.softmax(pred[unlabel_idx], dim=-1)
-            pred = model(graph, feat).detach()
+            feat[unlabel_idx, -n_classes:] = F.softmax(pred[unlabel_idx].detach(), dim=-1)
+            pred = model(graph, feat)
 
     loss = custom_loss_function(pred[train_pred_idx], labels[train_pred_idx])
     loss.backward()
     optimizer.step()
 
-    return loss.item(), pred
+    return loss.item(), pred.detach()
 
 
 @th.no_grad()
