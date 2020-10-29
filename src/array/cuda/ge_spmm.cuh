@@ -54,11 +54,10 @@ __global__ void GESpMMKernel(
             const Idx cid = __ldg(indices + eid);
             const Idx offset = feat_len * cid + fid;
             if (BinaryOp::use_rhs) {
-              const DType weight = efeat[eid];
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                BinaryOp::Call(ufeat + offset, &weight), cid, eid);
+                BinaryOp::Call(ufeat + offset, efeat + eid), cid, eid);
               ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                BinaryOp::Call(ufeat + offset + 32, &weight), cid, eid);
+                BinaryOp::Call(ufeat + offset + 32, efeat + eid), cid, eid);
             } else {
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
                 ufeat[offset], fid, eid);
@@ -72,11 +71,10 @@ __global__ void GESpMMKernel(
             const Idx cid = __ldg(indices + eid);
             const Idx offset = feat_len * cid + fid;
             if (BinaryOp::use_rhs) {
-              const DType weight = efeat[eid];
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                BinaryOp::Call(ufeat + offset, &weight), cid, eid);
+                BinaryOp::Call(ufeat + offset, efeat + eid), cid, eid);
               ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                BinaryOp::Call(ufeat + offset + 32, &weight), cid, eid);
+                BinaryOp::Call(ufeat + offset + 32, efeat + eid), cid, eid);
             } else {
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
                 ufeat[offset], fid, eid);
@@ -108,12 +106,11 @@ __global__ void GESpMMKernel(
             const Idx cid = __ldg(indices + eid); 
             const Idx offset = feat_len * cid + fid;
             if (BinaryOp::use_rhs) {
-              const DType weight = efeat[eid];
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                BinaryOp::Call(ufeat + offset, &weight), cid, eid);
+                BinaryOp::Call(ufeat + offset, efeat + eid), cid, eid);
               if (right_inbound)
                 ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                  BinaryOp::Call(ufeat + offset + 32, &weight), cid, eid);
+                  BinaryOp::Call(ufeat + offset + 32, efeat + eid), cid, eid);
             } else {
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
                 ufeat[offset], fid, eid);
@@ -128,12 +125,11 @@ __global__ void GESpMMKernel(
             const Idx cid = __ldg(indices + eid); 
             const Idx offset = feat_len * cid + fid;
             if (BinaryOp::use_rhs) {
-              const DType weight = efeat[eid];
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                BinaryOp::Call(ufeat + offset, &weight), cid, eid);
+                BinaryOp::Call(ufeat + offset, efeat + eid), cid, eid);
               if (right_inbound)
                 ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                  BinaryOp::Call(ufeat + offset + 32, &weight), cid, eid);
+                  BinaryOp::Call(ufeat + offset + 32, efeat + eid), cid, eid);
             } else {
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
                 ufeat[offset], fid, eid);
