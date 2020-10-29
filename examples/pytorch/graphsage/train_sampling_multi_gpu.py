@@ -195,7 +195,7 @@ def run(proc_id, n_gpus, args, devices, data):
                 iter_tput.append(len(seeds) * n_gpus / (time.time() - tic_step))
             if step % args.log_every == 0 and proc_id == 0:
                 acc = compute_acc(batch_pred, batch_labels)
-                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB'.format(
+                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB'.format(
                     epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), th.cuda.max_memory_allocated() / 1000000))
 
         if n_gpus > 1:
