@@ -176,7 +176,7 @@ macro(dgl_cuda_compile objlist_variable)
 
   endforeach()
   if(UNIX OR APPLE)
-    list(APPEND CUDA_NVCC_FLAGS -Xcompiler -fPIC)
+    list(APPEND CUDA_NVCC_FLAGS -Xcompiler -fPIC --std=c++14)
   endif()
 
   if(APPLE)
