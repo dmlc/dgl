@@ -241,7 +241,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
              std::vector<NDArray> out_aux) {
   int64_t feat_len = bcast.out_len;
   bool is_scalar_efeat = efeat.NumElements() == csr.indices->shape[0];
-  if (reduce == "sum" && feat_len <= 128) {  // cusparse
+  if (reduce == "sum" && feat_len <= 64) {  // cusparse
     if (sizeof(IdType) == 4 && op == "copy_lhs") {
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i)
@@ -268,9 +268,9 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
     return ;
   }
 
-  if ((op == "copy_lhs" || is_scalar_efeat) && feat_len > 128) {  // ge-spmm
+  if ((op == "copy_lhs" || is_scalar_efeat) && feat_len > 64) {  // ge-spmm
     if (reduce == "sum") {
-      if (op != "copy_lhs" && !IsNullArray(csr.data))
+      if (op != "copy_lhs" && !IsNullArray(csr.data))  // reorder edge data
         efeat = IndexSelect(efeat, csr.data);
       SWITCH_OP(op, Op, {
         cuda::GESpMMCsr<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
