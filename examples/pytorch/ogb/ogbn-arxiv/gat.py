@@ -120,19 +120,19 @@ def train(model, graph, labels, train_idx, val_idx, test_idx, optimizer, use_lab
         train_pred_idx = train_idx[mask]
 
     optimizer.zero_grad()
-    pred = model(graph, feat)
+    pred = model(graph, feat).detach()
 
     if n_label_iters > 0:
         unlabel_idx = torch.cat([train_pred_idx, val_idx, test_idx])
         for _ in range(n_label_iters):
-            feat[unlabel_idx, -n_classes:] = F.softmax(pred[unlabel_idx].detach(), dim=-1)
-            pred = model(graph, feat)
+            feat[unlabel_idx, -n_classes:] = F.softmax(pred[unlabel_idx], dim=-1)
+            pred = model(graph, feat).detach()
 
     loss = custom_loss_function(pred[train_pred_idx], labels[train_pred_idx])
     loss.backward()
     optimizer.step()
 
-    return loss, pred
+    return loss.item(), pred
 
 
 @th.no_grad()
@@ -205,14 +205,14 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         if epoch % args.log_every == 0:
             print(f"Run: {n_running}/{args.n_runs}, Epoch: {epoch}/{args.n_epochs}")
             print(
-                f"Loss: {loss.item():.4f}, Acc: {acc:.4f}\n"
+                f"Loss: {loss:.4f}, Acc: {acc:.4f}\n"
                 f"Train/Val/Test loss: {train_loss:.4f}/{val_loss:.4f}/{test_loss:.4f}\n"
                 f"Train/Val/Test/Best val/Best test acc: {train_acc:.4f}/{val_acc:.4f}/{test_acc:.4f}/{best_val_acc:.4f}/{best_test_acc:.4f}"
             )
 
         for l, e in zip(
             [accs, train_accs, val_accs, test_accs, losses, train_losses, val_losses, test_losses],
-            [acc, train_acc, val_acc, test_acc, loss.item(), train_loss, val_loss, test_loss],
+            [acc, train_acc, val_acc, test_acc, loss, train_loss, val_loss, test_loss],
         ):
             l.append(e)
 
@@ -305,10 +305,10 @@ def main():
     graph.create_formats_()
 
     graph = graph.to(device)
+    labels = labels.to(device)
     train_idx = train_idx.to(device)
     val_idx = val_idx.to(device)
     test_idx = test_idx.to(device)
-    labels = labels.to(device)
 
     # run
     val_accs = []
