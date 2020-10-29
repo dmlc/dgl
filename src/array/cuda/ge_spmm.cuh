@@ -24,13 +24,11 @@ namespace cuda {
  *       The grid dimension x and y are reordered for better performance.
  */
 template <typename Idx, typename DType,
-          typename BinaryOp, typename ReduceOp>
+          typename BinaryOp>
 __global__ void GESpMMKernel(
     const DType* __restrict__ ufeat,
     const DType* __restrict__ efeat,
     DType* __restrict__ out,
-    Idx* __restrict__ arg_u,
-    Idx* __restrict__ arg_e,
     const Idx* __restrict__ indptr,
     const Idx* __restrict__ indices,
     const int64_t num_rows, const int64_t num_cols,
@@ -40,10 +38,8 @@ __global__ void GESpMMKernel(
 
   if (rid < num_rows && fid < feat_len) {
     const Idx low = __ldg(indptr + rid), high = __ldg(indptr + rid + 1);
-    DType accum_0 = ReduceOp::zero,
-          accum_1 = ReduceOp::zero;
-    Idx argu_0 = 0, arge_0 = 0,
-        argu_1 = 0, arge_1 = 0;
+    DType accum_0 = 0.,
+          accum_1 = 0.;
 
     if (blockIdx.y != gridDim.y - 1) {
       for (Idx left = low; left < high; left += 32) {
@@ -54,15 +50,11 @@ __global__ void GESpMMKernel(
             const Idx cid = __ldg(indices + eid);
             const Idx offset = feat_len * cid + fid;
             if (BinaryOp::use_rhs) {
-              ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                BinaryOp::Call(ufeat + offset, efeat + eid), cid, eid);
-              ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                BinaryOp::Call(ufeat + offset + 32, efeat + eid), cid, eid);
+              accum_0 += BinaryOp::Call(ufeat + offset, efeat + eid);
+              accum_1 += BinaryOp::Call(ufeat + offset + 32, efeat + eid);
             } else {
-              ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                ufeat[offset], cid, eid);
-              ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                ufeat[offset + 32], cid, eid);
+              accum_0 += ufeat[offset];
+              accum_1 += ufeat[offset + 32];
             }
           }
         } else {
@@ -71,30 +63,17 @@ __global__ void GESpMMKernel(
             const Idx cid = __ldg(indices + eid);
             const Idx offset = feat_len * cid + fid;
             if (BinaryOp::use_rhs) {
-              ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                BinaryOp::Call(ufeat + offset, efeat + eid), cid, eid);
-              ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                BinaryOp::Call(ufeat + offset + 32, efeat + eid), cid, eid);
+              accum_0 += BinaryOp::Call(ufeat + offset, efeat + eid);
+              accum_1 += BinaryOp::Call(ufeat + offset + 32, efeat + eid);
             } else {
-              ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                ufeat[offset], cid, eid);
-              ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                ufeat[offset + 32], cid, eid);
+              accum_0 += ufeat[offset];
+              accum_1 += ufeat[offset + 32];
             }
           }
         }
 
         out[feat_len * rid + fid] = accum_0;
-        if (ReduceOp::require_arg && BinaryOp::use_rhs)
-          arg_u[feat_len * rid + fid] = argu_0;
-        if (ReduceOp::require_arg && BinaryOp::use_rhs)
-          arg_e[feat_len * rid + fid] = arge_0;
-
         out[feat_len * rid + fid + 32] = accum_1;
-        if (ReduceOp::require_arg && BinaryOp::use_rhs)
-          arg_u[feat_len * rid + fid + 32] = argu_1;
-        if (ReduceOp::require_arg && BinaryOp::use_rhs)
-          arg_e[feat_len * rid + fid + 32] = arge_1; 
       }
     } else {
       bool right_inbound = fid + 32 < feat_len;
@@ -106,17 +85,11 @@ __global__ void GESpMMKernel(
             const Idx cid = __ldg(indices + eid); 
             const Idx offset = feat_len * cid + fid;
             if (BinaryOp::use_rhs) {
-              ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                BinaryOp::Call(ufeat + offset, efeat + eid), cid, eid);
-              if (right_inbound)
-                ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                  BinaryOp::Call(ufeat + offset + 32, efeat + eid), cid, eid);
+              accum_0 += BinaryOp::Call(ufeat + offset, efeat + eid);
+              accum_1 += BinaryOp::Call(ufeat + offset + 32, efeat + eid);
             } else {
-              ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                ufeat[offset], cid, eid);
-              if (right_inbound)
-                ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                  ufeat[offset + 32], cid, eid);
+              accum_0 += ufeat[offset];
+              accum_1 += ufeat[offset + 32];
             }
           }
         } else {
@@ -125,34 +98,18 @@ __global__ void GESpMMKernel(
             const Idx cid = __ldg(indices + eid); 
             const Idx offset = feat_len * cid + fid;
             if (BinaryOp::use_rhs) {
-              ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                BinaryOp::Call(ufeat + offset, efeat + eid), cid, eid);
-              if (right_inbound)
-                ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                  BinaryOp::Call(ufeat + offset + 32, efeat + eid), cid, eid);
+              accum_0 += BinaryOp::Call(ufeat + offset, efeat + eid);
+              accum_1 += BinaryOp::Call(ufeat + offset + 32, efeat + eid);
             } else {
-              ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                ufeat[offset], cid, eid);
-              if (right_inbound)
-                ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                  ufeat[offset + 32], cid, eid);
+              accum_0 += ufeat[offset];
+              accum_1 += ufeat[offset + 32];
             }
           }
         }
 
         out[feat_len * rid + fid] = accum_0;
-        if (ReduceOp::require_arg && BinaryOp::use_rhs)
-          arg_u[feat_len * rid + fid] = argu_0;
-        if (ReduceOp::require_arg && BinaryOp::use_rhs)
-          arg_e[feat_len * rid + fid] = arge_0;
-
-        if (right_inbound) {
+        if (right_inbound)
           out[feat_len * rid + fid + 32] = accum_1;
-          if (ReduceOp::require_arg && BinaryOp::use_rhs)
-            arg_u[feat_len * rid + fid + 32] = argu_1;
-          if (ReduceOp::require_arg && BinaryOp::use_rhs)
-            arg_e[feat_len * rid + fid + 32] = arge_1; 
-        }
       }
     }
   }
@@ -163,15 +120,12 @@ template <typename Idx, typename DType,
 void GESpMMCsr(
     const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat,
-    NDArray out, NDArray argu, NDArray arge,
-    int64_t feat_len) {
+    NDArray out, int64_t feat_len) {
   const Idx *indptr = csr.indptr.Ptr<Idx>();
   const Idx *indices = csr.indices.Ptr<Idx>();
   const DType *ufeat_data = ufeat.Ptr<DType>();
   const DType *efeat_data = efeat.Ptr<DType>();
   DType *out_data = out.Ptr<DType>();
-  Idx *argu_data = argu.Ptr<Idx>();
-  Idx *arge_data = arge.Ptr<Idx>();
 
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   
@@ -185,7 +139,7 @@ void GESpMMCsr(
 
   CUDA_KERNEL_CALL((GESpMMKernel<Idx, DType, BinaryOp, ReduceOp>),
       nblks, nthrs, sh_mem_size, thr_entry->stream,
-      ufeat_data, efeat_data, out_data, argu_data, arge_data,
+      ufeat_data, efeat_data, out_data,
       indptr, indices,
       csr.num_rows, csr.num_cols,
       feat_len);
