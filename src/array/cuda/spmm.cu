@@ -241,19 +241,17 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
              std::vector<NDArray> out_aux) {
   int64_t feat_len = bcast.out_len;
   bool is_scalar_efeat = efeat.NumElements() == csr.indices->shape[0];
+  bool use_efeat = op != "copy_lhs";
 
-  if ((op == "copy_lhs" || is_scalar_efeat) && feat_len > 64) {  // ge-spmm
-    if (op != "copy_lhs" && !IsNullArray(csr.data))  // reorder edge data
-      efeat = IndexSelect(efeat, csr.data);
-    SWITCH_OP(op, Op, {
-      cuda::GESpMMCsr<IdType, DType, Op>(
-        csr, ufeat, efeat, out, feat_len);
-    });
-    return ;
-  }
-
-  if (reduce == "sum") {  // cusparse
-    if (sizeof(IdType) == 4 && op == "copy_lhs") {
+  if (reduce == "sum") {
+    if ((!use_efeat || is_scalar_efeat) && feat_len > 64) {  // ge-spmm
+      if (use_efeat && !IsNullArray(csr.data))  // reorder edge data
+        efeat = IndexSelect(efeat, csr.data);
+      SWITCH_OP(op, Op, {
+        cuda::GESpMMCsr<IdType, DType, Op>(
+          csr, ufeat, efeat, out, feat_len);
+      });
+    } else if (sizeof(IdType) == 4 && op == "copy_lhs") {  // cusparse
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i)
         x_length *= ufeat->shape[i];
@@ -263,7 +261,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
           nullptr,
           static_cast<DType*>(out->data),
           x_length);
-    } else if (sizeof(IdType) == 4 && op == "mul" && is_scalar_efeat) {
+    } else if (sizeof(IdType) == 4 && op == "mul" && is_scalar_efeat) {  // cusparse
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i)
         x_length *= ufeat->shape[i];
@@ -275,14 +273,12 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
           static_cast<DType*>(efeat->data),
           static_cast<DType*>(out->data),
           x_length);
+    } else {  // general kernel
+      SWITCH_OP(op, Op, {
+        cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
+            bcast, csr, ufeat, efeat, out, NullArray(), NullArray());
+      });
     }
-  }
-
-  if (reduce == "sum") {  // general kernel
-    SWITCH_OP(op, Op, {
-      cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
-          bcast, csr, ufeat, efeat, out, NullArray(), NullArray());
-    });
   } else if (reduce == "max") {
     SWITCH_OP(op, Op, {
       cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Max<IdType, DType> >(
