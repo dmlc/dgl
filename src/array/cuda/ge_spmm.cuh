@@ -35,8 +35,8 @@ __global__ void GESpMMKernel(
     const Idx* __restrict__ indices,
     const int64_t num_rows, const int64_t num_cols,
     const int64_t feat_len) {
-  const Idx rid = blockIdx.y * blockDim.y + threadIdx.y;  // over vertices dimension
-  const Idx fid = (blockIdx.x * 64) + threadIdx.x;        // over feature dimension
+  const Idx rid = blockIdx.x * blockDim.y + threadIdx.y;  // over vertices dimension
+  const Idx fid = (blockIdx.y * 64) + threadIdx.x;        // over feature dimension
 
   if (rid < num_rows && fid < feat_len) {
     const Idx low = __ldg(indptr + rid), high = __ldg(indptr + rid + 1);
@@ -45,7 +45,7 @@ __global__ void GESpMMKernel(
     Idx argu_0 = 0, arge_0 = 0,
         argu_1 = 0, arge_1 = 0;
 
-    if (blockIdx.x != gridDim.x - 1) {
+    if (blockIdx.y != gridDim.y - 1) {
       for (Idx left = low; left < high; left += 32) {
         if (left + 32 < high) {
 #pragma unroll
@@ -177,8 +177,8 @@ void GESpMMCsr(
   
   const int ntx = 32;
   const int nty = 32;
-  const int nbx = (feat_len + (ntx * 2) - 1) / (ntx * 2);
-  const int nby = (csr.num_rows + nty - 1) / nty;
+  const int nby = (feat_len + (ntx * 2) - 1) / (ntx * 2);
+  const int nbx = (csr.num_rows + nty - 1) / nty;
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
   const int sh_mem_size = 0;
