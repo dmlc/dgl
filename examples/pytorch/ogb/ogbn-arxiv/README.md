@@ -29,7 +29,6 @@ python3 gat.py --use-norm --use-labels --n-label-iters=1 --no-attn-dst --edge-dr
 ### GCN
 
 ```
-Using backend: pytorch
 usage: GCN on OGBN-Arxiv [-h] [--cpu] [--gpu GPU] [--n-runs N_RUNS] [--n-epochs N_EPOCHS] [--use-labels] [--use-linear] [--lr LR] [--n-layers N_LAYERS] [--n-hidden N_HIDDEN]
                          [--dropout DROPOUT] [--wd WD] [--log-every LOG_EVERY] [--plot-curves]
 
@@ -54,9 +53,9 @@ optional arguments:
 ### GAT
 
 ```
-Using backend: pytorch
-usage: GAT on OGBN-Arxiv [-h] [--cpu] [--gpu GPU] [--n-runs N_RUNS] [--n-epochs N_EPOCHS] [--use-labels] [--use-norm] [--lr LR] [--n-layers N_LAYERS] [--n-heads N_HEADS]
-                         [--n-hidden N_HIDDEN] [--dropout DROPOUT] [--attn_drop ATTN_DROP] [--wd WD] [--log-every LOG_EVERY] [--plot-curves]
+usage: GAT on OGBN-Arxiv [-h] [--cpu] [--gpu GPU] [--n-runs N_RUNS] [--n-epochs N_EPOCHS] [--use-labels] [--n-label-iters N_LABEL_ITERS] [--no-attn-dst]
+                         [--use-norm] [--lr LR] [--n-layers N_LAYERS] [--n-heads N_HEADS] [--n-hidden N_HIDDEN] [--dropout DROPOUT] [--input-drop INPUT_DROP]
+                         [--attn-drop ATTN_DROP] [--edge-drop EDGE_DROP] [--wd WD] [--log-every LOG_EVERY] [--plot-curves]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -65,14 +64,21 @@ optional arguments:
   --n-runs N_RUNS       running times (default: 10)
   --n-epochs N_EPOCHS   number of epochs (default: 2000)
   --use-labels          Use labels in the training set as input features. (default: False)
+  --n-label-iters N_LABEL_ITERS
+                        number of label iterations (default: 0)
+  --no-attn-dst         Don't use attn_dst. (default: False)
   --use-norm            Use symmetrically normalized adjacency matrix. (default: False)
   --lr LR               learning rate (default: 0.002)
   --n-layers N_LAYERS   number of layers (default: 3)
   --n-heads N_HEADS     number of heads (default: 3)
-  --n-hidden N_HIDDEN   number of hidden units (default: 256)
+  --n-hidden N_HIDDEN   number of hidden units (default: 250)
   --dropout DROPOUT     dropout rate (default: 0.75)
-  --attn_drop ATTN_DROP
-                        attention dropout rate (default: 0.05)
+  --input-drop INPUT_DROP
+                        input drop rate (default: 0.1)
+  --attn-drop ATTN_DROP
+                        attention dropout rate (default: 0.0)
+  --edge-drop EDGE_DROP
+                        edge drop rate (default: 0.0)
   --wd WD               weight decay (default: 0)
   --log-every LOG_EVERY
                         log every LOG_EVERY epochs (default: 20)
