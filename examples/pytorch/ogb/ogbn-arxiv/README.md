@@ -89,7 +89,7 @@ optional arguments:
 
 Here are the results over 10 runs.
 
-|                             |     Val acc     |    Test acc     | #Parameters |
+|           Method            | Validation acc  |    Test acc     | #Parameters |
 |:---------------------------:|:---------------:|:---------------:|:-----------:|
 |             GCN             | 0.7361 ± 0.0009 | 0.7246 ± 0.0021 |   109,608   |
 |         GCN+linear          | 0.7397 ± 0.0010 | 0.7270 ± 0.0016 |   218,152   |

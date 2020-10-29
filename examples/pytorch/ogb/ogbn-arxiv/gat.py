@@ -304,11 +304,11 @@ def main():
     graph = preprocess(graph)
     graph.create_formats_()
 
+    graph = graph.to(device)
     train_idx = train_idx.to(device)
     val_idx = val_idx.to(device)
     test_idx = test_idx.to(device)
     labels = labels.to(device)
-    graph = graph.to(device)
 
     # run
     val_accs = []
