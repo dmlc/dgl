@@ -21,7 +21,7 @@ python3 gat.py --use-norm --use-labels --no-attn-dst --edge-drop=0.1 --input-dro
 For the score of `GAT(norm. adj.)+label reuse`, run the flowwing command and you should directly see the result.
 
 ```bash
-python3 gat.py --use-norm --use-labels --no-attn-dst --edge-drop=0.3 --input-drop=0.25 gat.py
+python3 gat.py --use-norm --use-labels --n-label-iters=1 --no-attn-dst --edge-drop=0.3 --input-drop=0.25 gat.py
 ```
 
 ## Usage & Options
