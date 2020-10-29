@@ -252,6 +252,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
           nullptr,
           static_cast<DType*>(out->data),
           x_length);
+      return ;
     } else if (sizeof(IdType) == 4 && op == "mul" && is_scalar_efeat) {
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i)
@@ -264,8 +265,8 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
           static_cast<DType*>(efeat->data),
           static_cast<DType*>(out->data),
           x_length);
+      return ;
     }
-    return ;
   }
 
   if ((op == "copy_lhs" || is_scalar_efeat) && feat_len > 64) {  // ge-spmm
@@ -276,18 +277,20 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
         cuda::GESpMMCsr<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
           csr, ufeat, efeat, out, NullArray(), NullArray(), feat_len);
       });
+      return ;
     } else if (reduce == "max" && IsNullArray(csr.data)) {
       SWITCH_OP(op, Op, {
         cuda::GESpMMCsr<IdType, DType, Op, cuda::reduce::Max<IdType, DType> >(
           csr, ufeat, efeat, out, out_aux[0], out_aux[1], feat_len);
       });
+      return ;
     } else if (reduce == "min" && IsNullArray(csr.data)) {
       SWITCH_OP(op, Op, {
         cuda::GESpMMCsr<IdType, DType, Op, cuda::reduce::Min<IdType, DType> >(
           csr, ufeat, efeat, out, out_aux[0], out_aux[1], feat_len);
       });
+      return ;
     }
-    return ;
   }
 
   if (reduce == "sum") {  // general kernel

@@ -55,9 +55,9 @@ __global__ void GESpMMKernel(
             const Idx offset = feat_len * cid + fid;
             if (BinaryOp::use_rhs) {
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                BinaryOp::Call(BinaryOp::use_lhs ? ufeat + offset : nullptr, efeat + eid), cid, eid);
+                BinaryOp::Call(ufeat + offset, efeat + eid), cid, eid);
               ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                BinaryOp::Call(BinaryOp::use_lhs ? ufeat + offset + 32 : nullptr, efeat + eid), cid, eid);
+                BinaryOp::Call(ufeat + offset + 32, efeat + eid), cid, eid);
             } else {
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
                 ufeat[offset], cid, eid);
@@ -72,9 +72,9 @@ __global__ void GESpMMKernel(
             const Idx offset = feat_len * cid + fid;
             if (BinaryOp::use_rhs) {
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                BinaryOp::Call(BinaryOp::use_lhs ? ufeat + offset : nullptr, efeat + eid), cid, eid);
+                BinaryOp::Call(ufeat + offset, efeat + eid), cid, eid);
               ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                BinaryOp::Call(BinaryOp::use_lhs ? ufeat + offset + 32 : nullptr, efeat + eid), cid, eid);
+                BinaryOp::Call(ufeat + offset + 32, efeat + eid), cid, eid);
             } else {
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
                 ufeat[offset], cid, eid);
@@ -107,10 +107,10 @@ __global__ void GESpMMKernel(
             const Idx offset = feat_len * cid + fid;
             if (BinaryOp::use_rhs) {
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                BinaryOp::Call(BinaryOp::use_lhs ? ufeat + offset : nullptr, efeat + eid), cid, eid);
+                BinaryOp::Call(ufeat + offset, efeat + eid), cid, eid);
               if (right_inbound)
                 ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                  BinaryOp::Call(BinaryOp::use_lhs ? ufeat + offset + 32 : nullptr, efeat + eid), cid, eid);
+                  BinaryOp::Call(ufeat + offset + 32, efeat + eid), cid, eid);
             } else {
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
                 ufeat[offset], cid, eid);
@@ -126,10 +126,10 @@ __global__ void GESpMMKernel(
             const Idx offset = feat_len * cid + fid;
             if (BinaryOp::use_rhs) {
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
-                BinaryOp::Call(BinaryOp::use_lhs ? ufeat + offset : nullptr, efeat + eid), cid, eid);
+                BinaryOp::Call(ufeat + offset, efeat + eid), cid, eid);
               if (right_inbound)
                 ReduceOp::Call(&accum_1, &argu_1, &arge_1,
-                  BinaryOp::Call(BinaryOp::use_lhs ? ufeat + offset + 32 : nullptr, efeat + eid), cid, eid);
+                  BinaryOp::Call(ufeat + offset + 32, efeat + eid), cid, eid);
             } else {
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
                 ufeat[offset], cid, eid);
