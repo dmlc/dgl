@@ -270,7 +270,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
 
   if ((op == "copy_lhs" || is_scalar_efeat) && feat_len > 128) {  // ge-spmm
     if (reduce == "sum") {
-      if (op != "copy_lhs" && IsNullArray(csr.data))
+      if (op != "copy_lhs" && !IsNullArray(csr.data))
         efeat = IndexSelect(efeat, csr.data);
       SWITCH_OP(op, Op, {
         cuda::GESpMMCsr<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
