@@ -53,7 +53,7 @@ __global__ void GESpMMKernel(
             const Idx eid = left + i; 
             const Idx cid = __ldg(indices + eid);
             const Idx offset = feat_len * cid + fid;
-            if (BinaryOp == CopyLhs) {
+            if (BinaryOp::use_rhs) {
               ReduceOp::Call(&accum_0, &argu_0, &arge_0,
                 BinaryOp::Call(ufeat + offset, efeat + eid), cid, eid);
               ReduceOp::Call(&accum_1, &argu_1, &arge_1,
