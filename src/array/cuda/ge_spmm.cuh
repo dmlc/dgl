@@ -116,7 +116,7 @@ __global__ void GESpMMKernel(
 }
 
 template <typename Idx, typename DType,
-          typename BinaryOp, typename ReduceOp>
+          typename BinaryOp>
 void GESpMMCsr(
     const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat,
@@ -137,7 +137,7 @@ void GESpMMCsr(
   const dim3 nthrs(ntx, nty);
   const int sh_mem_size = 0;
 
-  CUDA_KERNEL_CALL((GESpMMKernel<Idx, DType, BinaryOp, ReduceOp>),
+  CUDA_KERNEL_CALL((GESpMMKernel<Idx, DType, BinaryOp>),
       nblks, nthrs, sh_mem_size, thr_entry->stream,
       ufeat_data, efeat_data, out_data,
       indptr, indices,
