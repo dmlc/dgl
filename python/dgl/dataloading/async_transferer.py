@@ -46,13 +46,12 @@ class AsyncTransferer(object):
         ----------
         device : Device or context object.
             The context in which the second stream will be created. Must be a
-            GPU context.
+            GPU context for the copy to be asynchronous.
         """
         if isinstance(device, ndarray.DGLContext):
             ctx = device
         else:
             ctx = utils.to_dgl_context(device)
-        print("ctx = {}".format(ctx))
         self._handle = _CAPI_DGLAsyncTransfererCreate(ctx)
 
     def async_copy(self, tensor, device):
