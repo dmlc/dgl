@@ -246,6 +246,8 @@ macro(dgl_config_cuda out_variable)
   set(NVCC_FLAGS_EXTRA "${NVCC_FLAGS_EXTRA} --expt-extended-lambda")
   # suppress deprecated warning in moderngpu
   set(NVCC_FLAGS_EXTRA "${NVCC_FLAGS_EXTRA} -Wno-deprecated-declarations")
+  # for compile with c++14
+  set(NVCC_FLAGS_EXTRA "${NVCC_FLAGS_EXTRA} --expt-extended-lambda --std=c++14")
   message(STATUS "NVCC extra flags: ${NVCC_FLAGS_EXTRA}")
   set(CUDA_NVCC_FLAGS  "${CUDA_NVCC_FLAGS} ${NVCC_FLAGS_EXTRA}")
   list(APPEND CMAKE_CUDA_FLAGS "${NVCC_FLAGS_EXTRA}")
