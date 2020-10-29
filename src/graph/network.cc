@@ -5,20 +5,22 @@
  */
 #include "./network.h"
 
-#include <stdlib.h>
-
+#include <dgl/immutable_graph.h>
+#include <dgl/network/common.h>
+#include <dgl/network/communicator.h>
+#include <dgl/network/msg_queue.h>
+#include <dgl/network/fabric/fabric_communicator.h>
+#include <dgl/network/fabric/fabric_endpoint.h>
+#include <dgl/nodeflow.h>
+#include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/ndarray.h>
-#include <dgl/packed_func_ext.h>
-#include <dgl/immutable_graph.h>
-#include <dgl/nodeflow.h>
+#include <stdlib.h>
 
 #include <unordered_map>
+#include "dmlc/thread_local.h"
 
-#include "../rpc/network/communicator.h"
-#include "../rpc/network/socket_communicator.h"
-#include "../rpc/network/msg_queue.h"
-#include "../rpc/network/common.h"
+#include <dgl/network/socket_communicator.h>
 
 using dgl::network::StringPrintf;
 using namespace dgl::runtime;
@@ -206,6 +208,11 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
     network::Sender* sender = nullptr;
     if (type == "socket") {
       sender = new network::SocketSender(msg_queue_size);
+    }else if (type.rfind("fabric", 0) == 0){
+      // auto endpoint = std::make_shared<network::FabricEndpoint>("tcp");
+      FabricEndpoint* endpoint = dmlc::ThreadLocalStore<network::FabricEndpoint>::Get();
+      endpoint->Init("tcp");
+      sender = new network::FabricSender(msg_queue_size, endpoint);
     } else {
       LOG(FATAL) << "Unknown communicator type: " << type;
     }
@@ -220,7 +227,12 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
     network::Receiver* receiver = nullptr;
     if (type == "socket") {
       receiver = new network::SocketReceiver(msg_queue_size);
-    } else {
+    } else if (type.rfind("fabric", 0) == 0){
+      // auto endpoint = std::make_shared<network::FabricEndpoint>("tcp");
+      FabricEndpoint* endpoint = dmlc::ThreadLocalStore<network::FabricEndpoint>::Get();
+      endpoint->Init("tcp");
+      receiver = new network::FabricReceiver(msg_queue_size, endpoint);
+    }else {
       LOG(FATAL) << "Unknown communicator type: " << type;
     }
     CommunicatorHandle chandle = static_cast<CommunicatorHandle>(receiver);
@@ -251,6 +263,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderAddReceiver")
     std::string addr;
     if (sender->Type() == "socket") {
       addr = StringPrintf("socket://%s:%d", ip.c_str(), port);
+    }if (sender->Type().rfind("fabric", 0) == 0){
+      addr = StringPrintf("socket://%s:%d", ip.c_str(), port);
     } else {
       LOG(FATAL) << "Unknown communicator type: " << sender->Type();
     }
@@ -274,7 +288,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverWait")
     int num_sender = args[3];
     network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
     std::string addr;
-    if (receiver->Type() == "socket") {
+    if ((receiver->Type() == "socket") or
+        (receiver->Type().rfind("fabric", 0) == 0)) {
       addr = StringPrintf("socket://%s:%d", ip.c_str(), port);
     } else {
       LOG(FATAL) << "Unknown communicator type: " << receiver->Type();

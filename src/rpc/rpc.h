@@ -6,18 +6,20 @@
 #ifndef DGL_RPC_RPC_H_
 #define DGL_RPC_RPC_H_
 
-#include <dgl/runtime/object.h>
+#include <dgl/network/common.h>
+#include <dgl/network/communicator.h>
+#include <dgl/network/msg_queue.h>
+#include <dgl/network/socket_communicator.h>
 #include <dgl/runtime/ndarray.h>
+#include <dgl/runtime/object.h>
 #include <dgl/zerocopy_serializer.h>
 #include <dmlc/thread_local.h>
+
 #include <cstdint>
 #include <memory>
-#include <vector>
 #include <string>
-#include "./network/communicator.h"
-#include "./network/socket_communicator.h"
-#include "./network/msg_queue.h"
-#include "./network/common.h"
+#include <vector>
+
 #include "./server_state.h"
 
 namespace dgl {

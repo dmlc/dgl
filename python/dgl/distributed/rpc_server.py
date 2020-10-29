@@ -6,7 +6,7 @@ from . import rpc
 from .constants import MAX_QUEUE_SIZE
 
 def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
-    max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
+                 max_queue_size=MAX_QUEUE_SIZE, net_type='fabric'):
     """Start DGL server, which will be shared with all the rpc services.
 
     This is a blocking function -- it returns only when the server shutdown.
@@ -37,7 +37,7 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
     assert num_servers > 0, 'num_servers (%d) must be a positive number.' % num_servers
     assert num_clients >= 0, 'num_client (%d) cannot be a negative number.' % num_client
     assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % queue_size
-    assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'' % net_type
+    # assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'' % net_type
     # HandleCtrlC Register for handling Ctrl+C event
     rpc.register_ctrl_c()
     # Register some basic services

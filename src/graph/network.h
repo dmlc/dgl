@@ -6,15 +6,15 @@
 #ifndef DGL_GRAPH_NETWORK_H_
 #define DGL_GRAPH_NETWORK_H_
 
-#include <dmlc/logging.h>
+#include <dgl/network/msg_queue.h>
 #include <dgl/runtime/ndarray.h>
-
+#include <dmlc/logging.h>
 #include <string.h>
-#include <vector>
+
 #include <string>
+#include <vector>
 
 #include "../c_api_common.h"
-#include "../rpc/network/msg_queue.h"
 
 using dgl::runtime::NDArray;
 

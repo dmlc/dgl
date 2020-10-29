@@ -97,7 +97,7 @@ def get_local_usable_addr():
     return ip_addr + ':' + str(port)
 
 
-def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
+def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net_type='fabric'):
     """Connect this client to server.
 
     Parameters
@@ -119,7 +119,7 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net
     """
     assert num_servers > 0, 'num_servers (%d) must be a positive number.' % num_servers
     assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % max_queue_size
-    assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'.' % net_type
+    # assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'.' % net_type
     # Register some basic service
     rpc.register_service(rpc.CLIENT_REGISTER,
                          rpc.ClientRegisterRequest,

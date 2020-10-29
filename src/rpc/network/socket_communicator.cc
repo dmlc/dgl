@@ -3,14 +3,14 @@
  * \file communicator.cc
  * \brief SocketCommunicator for DGL distributed training.
  */
+#include <dgl/network/socket_communicator.h>
 #include <dmlc/logging.h>
-
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
+
 #include <memory>
 
-#include "socket_communicator.h"
 #include "../../c_api_common.h"
 
 #ifdef _WIN32

@@ -3,19 +3,18 @@
  * \file socket_communicator_test.cc
  * \brief Test SocketCommunicator
  */
+#include <dgl/network/msg_queue.h>
+#include <dgl/network/socket_communicator.h>
 #include <gtest/gtest.h>
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+#include <fstream>
+#include <streambuf>
 #include <string>
 #include <thread>
 #include <vector>
-#include <fstream>
-#include <streambuf>
-
-#include <stdlib.h>
-#include <time.h>
-
-#include "../src/rpc/network/msg_queue.h"
-#include "../src/rpc/network/socket_communicator.h"
 
 using std::string;
 

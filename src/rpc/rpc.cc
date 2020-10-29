@@ -10,11 +10,13 @@
 #include <unistd.h>
 #endif
 
-#include <dgl/runtime/container.h>
-#include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
+#include <dgl/network/fabric/fabric_communicator.h>
+#include <dgl/packed_func_ext.h>
 #include <dgl/random.h>
+#include <dgl/runtime/container.h>
 #include <dgl/zerocopy_serializer.h>
+
 #include "../c_api_common.h"
 
 using dgl::network::StringPrintf;
@@ -87,6 +89,13 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
   std::string type = args[1];
   if (type.compare("socket") == 0) {
     RPCContext::ThreadLocal()->sender = std::make_shared<network::SocketSender>(msg_queue_size);
+  } else if (type.rfind("fabric", 0) == 0) {
+    // auto endpoint = std::make_shared<network::FabricEndpoint>("tcp");
+    network::FabricEndpoint* endpoint =
+      dmlc::ThreadLocalStore<network::FabricEndpoint>::Get();
+    endpoint->Init("tcp");
+    RPCContext::ThreadLocal()->sender =
+      std::make_shared<network::FabricSender>(msg_queue_size, endpoint);
   } else {
     LOG(FATAL) << "Unknown communicator type for rpc receiver: " << type;
   }
@@ -98,6 +107,13 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
   std::string type = args[1];
   if (type.compare("socket") == 0) {
     RPCContext::ThreadLocal()->receiver = std::make_shared<network::SocketReceiver>(msg_queue_size);
+  } else if (type.rfind("fabric", 0) == 0) {
+    // auto endpoint = std::make_shared<network::FabricEndpoint>("tcp");
+    network::FabricEndpoint* endpoint =
+      dmlc::ThreadLocalStore<network::FabricEndpoint>::Get();
+    endpoint->Init("tcp");
+    RPCContext::ThreadLocal()->receiver =
+      std::make_shared<network::FabricReceiver>(msg_queue_size, endpoint);
   } else {
     LOG(FATAL) << "Unknown communicator type for rpc sender: " << type;
   }
@@ -119,7 +135,8 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCReceiverWait")
   int port = args[1];
   int num_sender = args[2];
   std::string addr;
-  if (RPCContext::ThreadLocal()->receiver->Type() == "socket") {
+  if ((RPCContext::ThreadLocal()->receiver->Type() == "socket") or
+      (RPCContext::ThreadLocal()->receiver->Type().rfind("fabric", 0)) == 0) {
     addr = StringPrintf("socket://%s:%d", ip.c_str(), port);
   } else {
     LOG(FATAL) << "Unknown communicator type: " << RPCContext::ThreadLocal()->receiver->Type();
@@ -135,7 +152,8 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCAddReceiver")
   int port = args[1];
   int recv_id = args[2];
   std::string addr;
-  if (RPCContext::ThreadLocal()->sender->Type() == "socket") {
+  if ((RPCContext::ThreadLocal()->receiver->Type() == "socket") or
+      (RPCContext::ThreadLocal()->receiver->Type().rfind("fabric", 0)) == 0) {
     addr = StringPrintf("socket://%s:%d", ip.c_str(), port);
   } else {
     LOG(FATAL) << "Unknown communicator type: " << RPCContext::ThreadLocal()->sender->Type();

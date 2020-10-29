@@ -4,8 +4,7 @@
  * \brief This file provide basic facilities for string
  * to make programming convenient.
  */
-#include "common.h"
-
+#include <dgl/network/common.h>
 #include <stdarg.h>
 #include <stdio.h>
 

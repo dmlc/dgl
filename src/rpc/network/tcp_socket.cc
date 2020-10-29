@@ -3,8 +3,7 @@
  * \file tcp_socket.cc
  * \brief TCP socket for DGL distributed training.
  */
-#include "tcp_socket.h"
-
+#include <dgl/network/tcp_socket.h>
 #include <dmlc/logging.h>
 
 #ifndef _WIN32

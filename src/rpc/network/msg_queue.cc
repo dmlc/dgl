@@ -3,10 +3,10 @@
  * \file msg_queue.cc
  * \brief Message queue for DGL distributed training.
  */
+#include <dgl/network/msg_queue.h>
 #include <dmlc/logging.h>
-#include <cstring>
 
-#include "msg_queue.h"
+#include <cstring>
 
 namespace dgl {
 namespace network {

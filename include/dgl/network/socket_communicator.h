@@ -6,22 +6,23 @@
 #ifndef DGL_RPC_NETWORK_SOCKET_COMMUNICATOR_H_
 #define DGL_RPC_NETWORK_SOCKET_COMMUNICATOR_H_
 
-#include <thread>
-#include <vector>
-#include <string>
-#include <unordered_map>
-#include <memory>
+#include <dgl/network/common.h>
+#include <dgl/network/communicator.h>
+#include <dgl/network/msg_queue.h>
+#include <dgl/network/tcp_socket.h>
 
-#include "communicator.h"
-#include "msg_queue.h"
-#include "tcp_socket.h"
-#include "common.h"
+#include <memory>
+#include <string>
+#include <thread>
+#include <unordered_map>
+#include <vector>
 
 namespace dgl {
 namespace network {
 
-static constexpr int kMaxTryCount = 1024;    // maximal connection: 1024
-static constexpr int kTimeOut = 10 * 60;     // 10 minutes (in seconds) for socket timeout
+static constexpr int kMaxTryCount = 1024;  // maximal connection: 1024
+static constexpr int kTimeOut =
+  10 * 60;  // 10 minutes (in seconds) for socket timeout
 static constexpr int kMaxConnection = 1024;  // maximal connection: 1024
 
 /*!
@@ -41,7 +42,7 @@ class SocketSender : public Sender {
  public:
   /*!
    * \brief Sender constructor
-   * \param queue_size size of message queue 
+   * \param queue_size size of message queue
    */
   explicit SocketSender(int64_t queue_size) : Sender(queue_size) {}
 
@@ -63,17 +64,16 @@ class SocketSender : public Sender {
   bool Connect();
 
   /*!
-   * \brief Send data to specified Receiver. Actually pushing message to message queue.
-   * \param msg data message
-   * \param recv_id receiver's ID
-   * \return Status code
+   * \brief Send data to specified Receiver. Actually pushing message to message
+   * queue. \param msg data message \param recv_id receiver's ID \return Status
+   * code
    *
-   * (1) The send is non-blocking. There is no guarantee that the message has been 
-   *     physically sent out when the function returns.
-   * (2) The communicator will assume the responsibility of the given message.
-   * (3) The API is multi-thread safe.
-   * (4) Messages sent to the same receiver are guaranteed to be received in the same order. 
-   *     There is no guarantee for messages sent to different receivers.
+   * (1) The send is non-blocking. There is no guarantee that the message has
+   * been physically sent out when the function returns. (2) The communicator
+   * will assume the responsibility of the given message. (3) The API is
+   * multi-thread safe. (4) Messages sent to the same receiver are guaranteed to
+   * be received in the same order. There is no guarantee for messages sent to
+   * different receivers.
    */
   STATUS Send(Message msg, int recv_id);
 
@@ -89,32 +89,37 @@ class SocketSender : public Sender {
    */
   inline std::string Type() const { return std::string("socket"); }
 
+  size_t NumServer() { return receiver_addrs_.size(); };
+
  private:
   /*!
    * \brief socket for each connection of receiver
-   */ 
-  std::unordered_map<int /* receiver ID */, std::shared_ptr<TCPSocket>> sockets_;
+   */
+  std::unordered_map<int /* receiver ID */, std::shared_ptr<TCPSocket>>
+    sockets_;
 
   /*!
    * \brief receivers' address
-   */ 
+   */
   std::unordered_map<int /* receiver ID */, IPAddr> receiver_addrs_;
 
   /*!
    * \brief message queue for each socket connection
-   */ 
-  std::unordered_map<int /* receiver ID */, std::shared_ptr<MessageQueue>> msg_queue_;
+   */
+  std::unordered_map<int /* receiver ID */, std::shared_ptr<MessageQueue>>
+    msg_queue_;
 
   /*!
    * \brief Independent thread for each socket connection
-   */ 
-  std::unordered_map<int /* receiver ID */, std::shared_ptr<std::thread>> threads_;
+   */
+  std::unordered_map<int /* receiver ID */, std::shared_ptr<std::thread>>
+    threads_;
 
   /*!
    * \brief Send-loop for each socket in per-thread
    * \param socket TCPSocket for current connection
    * \param queue message_queue for current connection
-   * 
+   *
    * Note that, the SendLoop will finish its loop-job and exit thread
    * when the main thread invokes Signal() API on the message queue.
    */
@@ -150,23 +155,24 @@ class SocketReceiver : public Receiver {
    * \param send_id which sender current msg comes from
    * \return Status code
    *
-   * (1) The Recv() API is blocking, which will not 
+   * (1) The Recv() API is blocking, which will not
    *     return until getting data from message queue.
    * (2) The Recv() API is thread-safe.
-   * (3) Memory allocated by communicator but will not own it after the function returns.
+   * (3) Memory allocated by communicator but will not own it after the function
+   * returns.
    */
   STATUS Recv(Message* msg, int* send_id);
 
   /*!
-   * \brief Recv data from a specified Sender. Actually removing data from msg_queue.
-   * \param msg pointer of data message
-   * \param send_id sender's ID
+   * \brief Recv data from a specified Sender. Actually removing data from
+   * msg_queue. \param msg pointer of data message \param send_id sender's ID
    * \return Status code
    *
-   * (1) The RecvFrom() API is blocking, which will not 
+   * (1) The RecvFrom() API is blocking, which will not
    *     return until getting data from message queue.
    * (2) The RecvFrom() API is thread-safe.
-   * (3) Memory allocated by communicator but will not own it after the function returns.
+   * (3) Memory allocated by communicator but will not own it after the function
+   * returns.
    */
   STATUS RecvFrom(Message* msg, int send_id);
 
@@ -190,23 +196,28 @@ class SocketReceiver : public Receiver {
 
   /*!
    * \brief server socket for listening connections
-   */ 
+   */
   TCPSocket* server_socket_;
 
   /*!
    * \brief socket for each client connections
-   */ 
-  std::unordered_map<int /* Sender (virutal) ID */, std::shared_ptr<TCPSocket>> sockets_;
+   */
+  std::unordered_map<int /* Sender (virutal) ID */, std::shared_ptr<TCPSocket>>
+    sockets_;
 
   /*!
    * \brief Message queue for each socket connection
-   */ 
-  std::unordered_map<int /* Sender (virtual) ID */, std::shared_ptr<MessageQueue>> msg_queue_;
+   */
+  std::unordered_map<int /* Sender (virtual) ID */,
+                     std::shared_ptr<MessageQueue>>
+    msg_queue_;
 
   /*!
    * \brief Independent thead for each socket connection
-   */ 
-  std::unordered_map<int /* Sender (virtual) ID */, std::shared_ptr<std::thread>> threads_;
+   */
+  std::unordered_map<int /* Sender (virtual) ID */,
+                     std::shared_ptr<std::thread>>
+    threads_;
 
   /*!
    * \brief Recv-loop for each socket in per-thread
@@ -215,7 +226,7 @@ class SocketReceiver : public Receiver {
    *
    * Note that, the RecvLoop will finish its loop-job and exit thread
    * when the main thread invokes Signal() API on the message queue.
-   */ 
+   */
   static void RecvLoop(TCPSocket* socket, MessageQueue* queue);
 };
 
