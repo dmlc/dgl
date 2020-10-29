@@ -254,7 +254,6 @@ class GAT(nn.Module):
 
         self.convs = nn.ModuleList()
         self.norms = nn.ModuleList()
-        self.biases = nn.ModuleList()
 
         for i in range(n_layers):
             in_hidden = n_heads * n_hidden if i > 0 else in_feats
