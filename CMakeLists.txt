@@ -27,10 +27,12 @@ dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
 dgl_option(USE_S3 "Build with S3 support" OFF)
-dgl_option(USE_HDFS "Build with HDFS support" OFF) # Set env HADOOP_HDFS_HOME if needed
+dgl_option(USE_HDFS "Build with HDFS support" ON) # Set env HADOOP_HDFS_HOME if needed
+dgl_option(USE_FABRIC "Build with libfabric support" ON)
 
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
 if (NOT MSVC)
+  # set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g3 -ggdb -fsanitize=address -fno-omit-frame-pointer")
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g3 -ggdb")
 endif(NOT MSVC)
 
@@ -124,6 +126,16 @@ file(GLOB_RECURSE DGL_SRC_1
   src/rpc/*.cc
 )
 
+if(USE_FABRIC)
+  set(LIBFABRIC_PREFIX "/opt/amazon/efa/")
+  find_library(LIBFABRIC_LIBRARY NAMES fabric HINTS ${LIBFABRIC_PREFIX}/lib)
+  find_path(LIBFABRIC_INCLUDE_DIR rdma/fabric.h HINTS ${LIBFABRIC_PREFIX}/include)
+  include_directories(${LIBFABRIC_INCLUDE_DIR}) # manual include libfabric
+  message(STATUS "Build with libfabric")
+else(USE_FABRIC)
+file(REMOVE_RECURSE DGL_SRC_1 src/rpc/network/fabric/*.cc)
+endif(USE_FABRIC)
+
 list(APPEND DGL_SRC ${DGL_SRC_1})
 
 # Configure cuda
@@ -160,7 +172,7 @@ if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
   add_definitions(-DPARALLEL_ALGORITHMS)
 endif(LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
 
-target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
+target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS} ${LIBFABRIC_LIBRARY})
 
 # Installation rules
 install(TARGETS dgl DESTINATION lib${LIB_SUFFIX})

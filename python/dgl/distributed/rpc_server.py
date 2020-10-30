@@ -66,13 +66,14 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
     # accept new sender's connection
     print("Wait connections ...")
     rpc.receiver_wait(ip_addr, port, num_clients)
-    print("%d clients connected!" % num_clients)
+    print("%d clients connected!" % num_clients, flush=True)
     rpc.set_num_client(num_clients)
     # Recv all the client's IP and assign ID to clients
     addr_list = []
     client_namebook = {}
     for _ in range(num_clients):
         req, _ = rpc.recv_request()
+        print("recv request", flush=True)
         addr_list.append(req.ip_addr)
     addr_list.sort()
     for client_id, addr in enumerate(addr_list):

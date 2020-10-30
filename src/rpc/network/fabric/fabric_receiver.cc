@@ -6,20 +6,40 @@ namespace dgl {
 namespace network {
 
 bool FabricReceiver::Wait(const char* addr, int num_sender) {
+  num_sender_ = num_sender;
+  {
+    LOG(INFO) << "Before socket wait";
+    LOG(INFO) << "ADDR:" << addr;
+  }
   socket_receiver->Wait(addr, num_sender);
+  {
+    LOG(INFO) << "After socket wait";
+    // LOG(INFO) << "ADDR:" << addr;
+  }
   for (size_t i = 0; i < num_sender; i++) {
     Message msg;
     int send_id = 0;
+
+    { LOG(INFO) << "Before socket Recv"; }
     socket_receiver->Recv(&msg, &send_id);
-    socket_receiver->RecvFrom(&msg, send_id);
+    { LOG(INFO) << send_id; }
+    { LOG(INFO) << "After socket Recv"; }
+    // socket_receiver->RecvFrom(&msg, send_id);
+    // { LOG(INFO) << "After socket Recv from"; }
     FabricAddrInfo* addr = reinterpret_cast<FabricAddrInfo*>(msg.data);
     addr_map[i] = fep->AddPeerAddr(&addr->addr);
+
     receiver_id_ = addr->id;
+    { LOG(INFO) << "MY id:" << receiver_id_; }
     // msg->deallocator(msg);
   }
-  socket_receiver.reset();  // Finalize socket communicator
+  // socket_receiver.reset();  // Finalize socket communicator
   for (auto kv : addr_map) {
     FabricAddrInfo info = {.id = receiver_id_, .addr = fep->fabric_ctx->addr};
+    {
+      LOG(INFO) << "#####FabInfo\n";
+      LOG(INFO) << info.id << "::" << info.addr.name;
+    }
     fep->Send(&info, sizeof(FabricAddrInfo), kAddrMsg, kv.second,
               true);  // Send back server address
   }
@@ -27,7 +47,7 @@ bool FabricReceiver::Wait(const char* addr, int num_sender) {
   for (int i = 0; i < num_sender_; ++i) {
     msg_queue_[i] = std::make_shared<MessageQueue>(queue_size_, addr_map.size());
   }
-
+  should_stop_polling_ = false;
   for (auto kv : addr_map) {
     threads_[kv.first] =
       std::make_shared<std::thread>(&FabricReceiver::RecvLoop, this);
@@ -96,7 +116,9 @@ STATUS FabricReceiver::RecvFrom(Message* msg, int send_id) {
 void FabricReceiver::HandleCompletionEvent(
   const struct fi_cq_tagged_entry& cq_entry, const fi_addr_t& source_addr) {
   uint64_t tag = cq_entry.tag;
+  // { LOG(INFO) << "Completion event"; }
   if (tag == kSizeMsg) {
+    // LOG(INFO) << "recv size";
     CHECK(cq_entry.len == sizeof(int64_t)) << "Invalid size message";
     int64_t data_size = *(int64_t*)cq_entry.buf;
     free(cq_entry.buf);
@@ -107,10 +129,12 @@ void FabricReceiver::HandleCompletionEvent(
       LOG(FATAL) << "Cannot allocate enough memory for message, "
                  << "(message size: " << data_size << ")";
     }
+    // LOG(INFO) << "Issue recv data event";
     fep->Recv(buffer, data_size, kDataMsg, source_addr);
     // fep->Recv()
   } else if (tag == kDataMsg) {
     Message msg;
+    // LOG(INFO) << "recv data";
     msg.data = reinterpret_cast<char*>(cq_entry.buf);
     msg.size = cq_entry.len;
     msg.deallocator = DefaultMessageDeleter;
@@ -124,14 +148,16 @@ void FabricReceiver::HandleCompletionEvent(
 void FabricReceiver::RecvLoop() {
   // CHECK_NOTNULL(socket);
   // CHECK_NOTNULL(queue);
+  { LOG(INFO) << "Launch Recv Loop"; }
   for (auto kv : addr_map) {
     int64_t* size_buffer = new int64_t;  // can be optimized with buffer pool
-    fep->Recv(size_buffer, sizeof(int64_t), kSizeMsg, kv.second);
+    fep->Recv(size_buffer, sizeof(int64_t), kSizeMsg, FI_ADDR_UNSPEC);
   }
 
   struct fi_cq_tagged_entry cq_entries[kMaxConcurrentWorkRequest];
   fi_addr_t source_addrs[kMaxConcurrentWorkRequest];
-  while (!should_stop_polling_.load()) {
+  // while (!should_stop_polling_.load()) {
+  while (true) {
     // If main thread had finished its job
     // if (queue->EmptyAndNoMoreAdd()) {
     //   return;  // exit loop thread

@@ -48,7 +48,7 @@ def _create_receiver(net_type, msg_queue_size=2*1024*1024*1024):
     msg_queue_size : int
         message queue size (2GB by default)
     """
-    assert net_type in ('socket', 'mpi'), 'Unknown network type.'
+    # assert net_type in ('socket', 'mpi'), 'Unknown network type.'
     return _CAPI_DGLReceiverCreate(net_type, msg_queue_size)
 
 

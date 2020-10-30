@@ -139,7 +139,8 @@ class KVServer(object):
     net_type : str
         networking type, e.g., 'socket' (default) or 'mpi' (do not support yet).
     """
-    def __init__(self, server_id, server_namebook, num_client, queue_size=20*1024*1024*1024, net_type='socket'):
+
+    def __init__(self, server_id, server_namebook, num_client, queue_size=20*1024*1024*1024, net_type='fabric'):
         assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
         assert len(server_namebook) > 0, 'server_namebook cannot be empty.'
         assert num_client >= 0, 'num_client (%d) cannot be a negative number.' % num_client
