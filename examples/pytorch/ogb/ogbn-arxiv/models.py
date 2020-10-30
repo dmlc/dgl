@@ -181,7 +181,7 @@ class GATConv(nn.Module):
                 norm = torch.pow(degs, -0.5)
                 shp = norm.shape + (1,) * (feat_src.dim() - 1)
                 norm = torch.reshape(norm, shp)
-                feat_src.mul_(norm)
+                feat_src = feat_src * norm
 
             # NOTE: GAT paper uses "first concatenation then linear projection"
             # to compute attention scores, while ours is "first projection then
@@ -222,12 +222,12 @@ class GATConv(nn.Module):
                 norm = torch.pow(degs, 0.5)
                 shp = norm.shape + (1,) * (feat_dst.dim() - 1)
                 norm = torch.reshape(norm, shp)
-                rst.mul_(norm)
+                rst = rst * norm
 
             # residual
             if self.res_fc is not None:
                 resval = self.res_fc(h_dst).view(h_dst.shape[0], -1, self._out_feats)
-                rst.add_(resval)
+                rst = rst + resval
 
             # activation
             if self._activation is not None:
@@ -286,7 +286,7 @@ class GAT(nn.Module):
 
         self.bias_last = ElementWiseLinear(n_classes, weight=False, bias=True, inplace=True)
 
-        self.input_drop = nn.Dropout(input_drop, inplace=True)
+        self.input_drop = nn.Dropout(input_drop)
         self.dropout = nn.Dropout(dropout)
         self.activation = activation
 
