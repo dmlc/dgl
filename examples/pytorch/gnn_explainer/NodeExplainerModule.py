@@ -49,25 +49,28 @@ class NodeExplainerModule(nn.Module):
         self.node_feat_mask = self.create_node_feat_mask(self.node_feat_dim)
 
 
-    def create_edge_mask(self, num_nodes, init_strategy='normal', const=1.):
+    def create_edge_mask(self, num_edges, init_strategy='normal', const=1.):
         """
         Based on the number of nodes in the computational graph, create a learnable mask of edges.
 
+        To adopt to DGL, change this mask from N*N adjacency matrix to the No. of edges
+
         Parameters
         ----------
-        num_nodes: Integer N, specify the number of nodes.
+        num_edges: Integer N, specify the number of edges.
         init_strategy: String, specify the parameter initializati　on method
         const: Float, a value for constant initialization
 
         Returns
         -------
-        mask and mask bias: Tensor, all in shape of N * N
+        mask and mask bias: Tensor, all in shape of N*1
+
         """
-        mask = nn.Parameter(num_nodes, num_nodes, dtype=th.float)
+        mask = nn.Parameter(th.Tensor(num_edges, 1), dtype=th.float)
 
         if init_strategy == 'normal':
             std = nn.init.calculate_gain("relu") * th.sqrt(
-                2.0 / (num_nodes + num_nodes)
+                1.0 / num_edges
             )
             with th.no_grad():
                 mask.normal_(1.0, std)
@@ -75,7 +78,7 @@ class NodeExplainerModule(nn.Module):
             nn.init.constant_(mask, const)
 
         if self.args.mask_bias:
-            mask_bias = nn.Parameter(num_nodes, num_nodes, dtype=th.float)
+            mask_bias = nn.Parameter(th.Tensor(num_edges, 1), dtype=th.float)
             nn.init.constant_(mask_bias, 0.0)
         else:
             mask_bias = None
@@ -139,6 +142,7 @@ class NodeExplainerModule(nn.Module):
 
         # Step 1: Mask node feature with the inner feature mask
         new_n_feats = n_feats * self.node_feat_mask.sigmoid()
+        self.edge_mask = self.edge_mask.sigmoid()
 
         # Step 2:
         new_logits = self.model(graph, new_n_feats, self.edge_mask)
