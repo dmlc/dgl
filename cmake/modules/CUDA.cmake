@@ -237,6 +237,7 @@ macro(dgl_config_cuda out_variable)
     src/kernel/cuda/*.cu
     src/runtime/cuda/*.cc
     src/geometry/cuda/*.cu
+    src/graph/transform/cuda/*.cu
   )
 
   # NVCC flags
