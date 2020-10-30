@@ -9,7 +9,7 @@ from dgl.utils import expand_as_pair
 
 
 class ElementWiseLinear(nn.Module):
-    def __init__(self, size, weight=True, bias=True):
+    def __init__(self, size, weight=True, bias=True, inplace=False):
         super().__init__()
         if weight:
             self.weight = nn.Parameter(torch.Tensor(size))
@@ -19,20 +19,27 @@ class ElementWiseLinear(nn.Module):
             self.bias = nn.Parameter(torch.Tensor(size))
         else:
             self.bias = None
+        self.inplace = inplace
 
         self.reset_parameters()
 
     def reset_parameters(self):
-        if self.weight:
+        if self.weight is not None:
             nn.init.ones_(self.weight)
-        if self.bias:
+        if self.bias is not None:
             nn.init.zeros_(self.bias)
 
     def forward(self, x):
-        if self.weight:
-            x = x * self.weight
-        if self.bias:
-            x = x + self.bias
+        if self.inplace:
+            if self.weight is not None:
+                x.mul_(self.weight)
+            if self.bias is not None:
+                x.add_(self.bias)
+        else:
+            if self.weight is not None:
+                x = x * self.weight
+            if self.bias is not None:
+                x = x + self.bias
         return x
 
 
@@ -174,7 +181,7 @@ class GATConv(nn.Module):
                 norm = torch.pow(degs, -0.5)
                 shp = norm.shape + (1,) * (feat_src.dim() - 1)
                 norm = torch.reshape(norm, shp)
-                feat_src = feat_src * norm
+                feat_src.mul_(norm)
 
             # NOTE: GAT paper uses "first concatenation then linear projection"
             # to compute attention scores, while ours is "first projection then
@@ -215,12 +222,12 @@ class GATConv(nn.Module):
                 norm = torch.pow(degs, 0.5)
                 shp = norm.shape + (1,) * (feat_dst.dim() - 1)
                 norm = torch.reshape(norm, shp)
-                rst = rst * norm
+                rst.mul_(norm)
 
             # residual
             if self.res_fc is not None:
                 resval = self.res_fc(h_dst).view(h_dst.shape[0], -1, self._out_feats)
-                rst = rst + resval
+                rst.add_(resval)
 
             # activation
             if self._activation is not None:
@@ -277,9 +284,9 @@ class GAT(nn.Module):
             if i < n_layers - 1:
                 self.norms.append(nn.BatchNorm1d(out_channels * out_hidden))
 
-        self.bias_last = ElementWiseLinear(n_classes, weight=False, bias=True)
+        self.bias_last = ElementWiseLinear(n_classes, weight=False, bias=True, inplace=True)
 
-        self.input_drop = nn.Dropout(input_drop)
+        self.input_drop = nn.Dropout(input_drop, inplace=True)
         self.dropout = nn.Dropout(dropout)
         self.activation = activation
 
@@ -295,7 +302,7 @@ class GAT(nn.Module):
             if i < self.n_layers - 1:
                 h = h.flatten(1)
                 h = self.norms[i](h)
-                h = self.activation(h)
+                h = self.activation(h, inplace=True)
                 h = self.dropout(h)
 
         h = h.mean(1)
