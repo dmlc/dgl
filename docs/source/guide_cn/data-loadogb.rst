@@ -1,9 +1,9 @@
-.. _guide-data-pipeline-loadogb:
+.. _guide_cn-data-pipeline-loadogb:
 
-4.5 Loading OGB datasets using ``ogb`` package
+4.5 使用ogb包导入OGB数据集
 ----------------------------------------------
 
-:ref:`(中文版) <guide_cn-data-pipeline-loadogb>`
+:ref:`(English Version) <guide-data-pipeline-loadogb>`
 
 `Open Graph Benchmark (OGB) <https://ogb.stanford.edu/docs/home/>`__ is
 a collection of benchmark datasets. The official OGB package
@@ -11,7 +11,13 @@ a collection of benchmark datasets. The official OGB package
 downloading and processing OGB datasets into :class:`dgl.data.DGLGraph` objects. The section
 introduce their basic usage here.
 
+`Open Graph Benchmark (OGB) <https://ogb.stanford.edu/docs/home/>`__ 是一个基准数据集的集合。
+官方的 `ogb <https://github.com/snap-stanford/ogb>`__ 包提供了用于下载和处理OGB数据集到
+:class:`dgl.data.DGLGraph` 对象的API。本节介绍一下它们的基本用法。
+
 First install ogb package using pip:
+
+首先使用pip安装ogb包：
 
 .. code:: 
 
@@ -20,9 +26,12 @@ First install ogb package using pip:
 The following code shows how to load datasets for *Graph Property
 Prediction* tasks.
 
+以下代码显示了如何为图属性预测任务加载数据集。
+
 .. code:: 
 
     # Load Graph Property Prediction datasets in OGB
+    # 载入OGB的Graph Property Prediction数据集
     import dgl
     import torch
     from ogb.graphproppred import DglGraphPropPredDataset
@@ -31,6 +40,7 @@ Prediction* tasks.
     
     def _collate_fn(batch):
         # batch is a list of tuple (graph, label)
+        # 小批次是一个元组(graph, label)列表
         graphs = [e[0] for e in batch]
         g = dgl.batch(graphs)
         labels = [e[1] for e in batch]
@@ -38,6 +48,7 @@ Prediction* tasks.
         return g, labels
     
     # load dataset
+    # 载入数据集
     dataset = DglGraphPropPredDataset(name='ogbg-molhiv')
     split_idx = dataset.get_idx_split()
     # dataloader
@@ -48,26 +59,33 @@ Prediction* tasks.
 Loading *Node Property Prediction* datasets is similar, but note that
 there is only one graph object in this kind of dataset.
 
+加载 *Node Property Prediction* 数据集类似，但要注意这种数据集只有一个图对象。
+
 .. code:: 
 
     # Load Node Property Prediction datasets in OGB
+    # 载入OGB的Node Property Prediction数据集
     from ogb.nodeproppred import DglNodePropPredDataset
     
     dataset = DglNodePropPredDataset(name='ogbn-proteins')
     split_idx = dataset.get_idx_split()
     
     # there is only one graph in Node Property Prediction datasets
+    # 在Node Property Prediction数据集里只有一个图
     g, labels = dataset[0]
     # get split labels
+    # 获取划分分标签
     train_label = dataset.labels[split_idx['train']]
     valid_label = dataset.labels[split_idx['valid']]
     test_label = dataset.labels[split_idx['test']]
 
 *Link Property Prediction* datasets also contain one graph per dataset:
 
+*Link Property Prediction* 数据集的每个数据也只包括一个图
 .. code:: 
 
     # Load Link Property Prediction datasets in OGB
+    # 载入OGB的Link Property Prediction数据集
     from ogb.linkproppred import DglLinkPropPredDataset
     
     dataset = DglLinkPropPredDataset(name='ogbl-ppa')
