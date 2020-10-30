@@ -9,6 +9,8 @@
 
 #include "cuda_runtime.h"
 
+#include <dgl/runtime/device_api.h>
+
 namespace dgl {
 namespace transform {
 
@@ -300,10 +302,37 @@ class DeviceNodeMapMaker
     }
 
     DeviceNodeMapMaker(
-        const IdType numNodes) :
-        m_maxNumNodes(round_up(numNodes,8)), // make sure its aligned
-        m_workspaceSizeBytes(requiredPrefixSumBytes(m_maxNumNodes) + sizeof(IdType)*(m_maxNumNodes+1))
+        HeteroGraphPtr graph,
+        const std::vector<IdArray>& rhs_nodes,
+        const std::vector<EdgeArray>& edge_arrays,
+        const bool include_rhs_in_lhs) :
+        m_numNodesPerType(num_etypes*2, 0),
+        m_maxNumNodes(0),
+        m_workspaceSizeBytes(0)
     {
+      const int64_t num_ntypes = rhs_nodes.size();
+      const int64_t num_etypes = edge_arrays.size();
+
+      // count rhs nodes
+      for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+        m_numNodesPerType[ntype] += rhs_nodes[ntype]->Shape[0];
+
+        if (include_rhs_in_lhs) {
+          m_numNodesPerType[ntype+num_ntypes] += rhs_nodes[ntype]->Shape[0];
+        }
+      }
+
+      // count non-unique lhs nodes
+      for (int64_t etype = 0; etype < num_etypes; ++etype) {
+        const auto src_dst_types = graph->GetEndpointTypes(etype);
+        const dgl_type_t srctype = src_dst_types.first;
+        m_numNodesPerType[srctype+num_ntypes] += edge_arrays[etype].src->Shape[0];
+      }
+
+      m_maxNumNodes = *std::max_element(m_numNodesPerType.begin(),
+          m_numNodesPerType.end());
+
+      m_workspaceSizeBytes = requiredPrefixSumBytes(m_maxNumNodes) + sizeof(IdType)*(m_maxNumNodes+1)
     }
 
     size_t requiredWorkspaceBytes() const
@@ -450,6 +479,7 @@ void copy_source_and_dest_nodes_to_device(
       const IdType num_source_nodes = edge_arrays[etype].src.NumElements();
       check_space(totalNumNodes, num_source_nodes, total_nodes);
       totalNumNodes += num_source_nodes;
+
       // add to lhs side
       node_counts[srctype] += num_source_nodes;
       nodes[srctype].emplace_back(
@@ -526,9 +556,8 @@ void count_nodes(
 
 template<typename IdType>
 void map_edges(
-    ToBlockMemory<IdType>& memory,
-    DeviceNodeSet<IdType>* const rhs_nodes,
-    DeviceEdgeSet<IdType> * const edge_sets,
+    std::vector<IdArray>& rhs_nodes,
+    std::vector<EdgeArray>& edges,
     std::vector<IdType*> const edge_ptrs,
     const DeviceNodeMap<IdType>& node_map,
     cudaStream_t stream)
@@ -655,7 +684,7 @@ ToBlockInternal(
     bool include_rhs_in_lhs)
 {
 
-  const auto& ctx = graph->ctx;
+  const auto& ctx = graph->Context();
   auto device = runtime::DeviceAPI::Get(ctx);
 
   CHECK_EQ(ctx.device_type, kDLGPU);
@@ -681,24 +710,11 @@ ToBlockInternal(
     }
   }
 
-  // build src and dst lookup tables. If src and dst are to be merged, we will
-  // use a single set of node types, otherwise, we will duplicate the node
-  // types, with the first half being dst, and the second half being srce
-  std::vector<IdArray> nodeSets;
-
-  int64_t totalSourceNodes;
-  int64_t totalDestNodes;
-  int64_t maxNodes;
-  count_nodes(graph, rhs_nodes, edge_arrays, include_rhs_in_lhs,
-      &totalSourceNodes, &totalDestNodes, &maxNodes);
-
-  // first we need to get all of the nodes up to the GPU. We will use a unified
-  // buffer with src in first half, and dst in seconds half
-  const size_t total_nodes = totalDestNodes+totalSourceNodes;
-
   // create a map maker, with everything it needs to know 
-  DeviceNodeMapMaker<IdType> maker(rhs_nodes, edge_arrays, include_rhs_in_lhs);
+  DeviceNodeMapMaker<IdType> maker(
+      graph, rhs_nodes, edge_arrays, include_rhs_in_lhs);
 
+  // allocate space for map creation process
   const size_t scratch_size = maker.requiredWorkspaceBytes();
   void * const scratch_device = device->AllocWorkspace(ctx, scratch_size);
  
@@ -712,13 +728,13 @@ ToBlockInternal(
   }
   std::vector<IdType*> edge_ptrs_device(num_etypes);
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
-    edge_ptrs_device[etype] = pinned_memory->dsts_device() + edge_ptr_prefix[etype];
+    edge_ptrs_device[etype] = dsts_device->Ptr<IdType>() + edge_ptr_prefix[etype];
   }
 
+  // allocate space for node maps
   const size_t node_map_space_size = DeviceNodeMap<IdType>::getStorageSize(
       maxNodes,
       num_ntypes);
-
   void * const node_map_space = device->AllocWorkspace(ctx, node_map_space_size);
 
   DeviceNodeMap<IdType> node_maps(
@@ -728,8 +744,7 @@ ToBlockInternal(
       num_ntypes);
 
   // populate the mappings
-  maker.make(nodes_device, &node_maps, pinned_memory, scratch_device,
-      scratch_size, stream);
+  maker.make(nodes_device, &node_maps, scratch_device, scratch_size, stream);
 
   // start copy for number of nodes per type 
   int64_t * num_nodes_per_type;
@@ -740,7 +755,7 @@ ToBlockInternal(
 
 
   // map node numberings from global to local, and build pointer for CSR
-  map_edges(*pinned_memory, &rhs_nodes_device, &edges_device, edge_ptrs_device, node_maps, stream);
+  map_edges(&rhs_nodes_device, &edges_device, edge_ptrs_device, node_maps, stream);
 
   const std::vector<int64_t> num_nodes_per_type = ?;
 
@@ -796,7 +811,7 @@ ToBlockInternal(
 
 
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
-CUDABlocker::ToBlock(
+CudaToBlock(
     HeteroGraphPtr graph,
     const std::vector<IdArray> &rhs_nodes,
     bool include_rhs_in_lhs) {
