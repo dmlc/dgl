@@ -284,7 +284,7 @@ class GAT(nn.Module):
             if i < n_layers - 1:
                 self.norms.append(nn.BatchNorm1d(out_channels * out_hidden))
 
-        self.bias_last = ElementWiseLinear(n_classes, weight=False, bias=True, inplace=True)
+        self.bias_last = ElementWiseLinear(n_classes, weight=False, bias=True)
 
         self.input_drop = nn.Dropout(input_drop)
         self.dropout = nn.Dropout(dropout)
@@ -302,7 +302,7 @@ class GAT(nn.Module):
             if i < self.n_layers - 1:
                 h = h.flatten(1)
                 h = self.norms[i](h)
-                h = self.activation(h, inplace=True)
+                h = self.activation(h)
                 h = self.dropout(h)
 
         h = h.mean(1)
