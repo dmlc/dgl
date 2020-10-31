@@ -56,6 +56,11 @@ Async Copying to/from GPUs
 Data can be copied from the CPU to the GPU, or from the GPU to the CPU,
 while the GPU is being used for
 computation, using the :class:`AsyncTransferer`.
+For the transfer to be fully asynchronous, the context the
+:class:`AsyncTranserer`
+is created with must be a GPU context, and the input tensor must be in 
+pinned memory.
+
 
 .. autoclass:: AsyncTransferer
     :members: __init__, async_copy
