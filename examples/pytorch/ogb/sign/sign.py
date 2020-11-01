@@ -224,22 +224,25 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SIGN")
     parser.add_argument("--num-epochs", type=int, default=1000)
-    parser.add_argument("--num-hidden", type=int, default=256)
-    parser.add_argument("--R", type=int, default=3,
+    parser.add_argument("--num-hidden", type=int, default=512)
+    parser.add_argument("--R", type=int, default=5,
                         help="number of hops")
-    parser.add_argument("--lr", type=float, default=0.003)
-    parser.add_argument("--dataset", type=str, default="amazon")
-    parser.add_argument("--dropout", type=float, default=0.5)
+    parser.add_argument("--lr", type=float, default=0.001)
+    parser.add_argument("--dataset", type=str, default="ogbn-mag")
+    parser.add_argument("--dropout", type=float, default=0.5,
+                        help="dropout on activation")
     parser.add_argument("--gpu", type=int, default=0)
     parser.add_argument("--weight-decay", type=float, default=0)
-    parser.add_argument("--eval-every", type=int, default=50)
+    parser.add_argument("--eval-every", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=50000)
     parser.add_argument("--eval-batch-size", type=int, default=100000,
                         help="evaluation batch size")
     parser.add_argument("--ff-layer", type=int, default=2,
                         help="number of feed-forward layers")
-    parser.add_argument("--input-dropout", type=float, default=0)
-    parser.add_argument("--num-runs", type=int, default=1)
+    parser.add_argument("--input-dropout", type=float, default=0,
+                        help="dropout on input features")
+    parser.add_argument("--num-runs", type=int, default=10,
+                        help="number of times to repeat the experiment")
     args = parser.parse_args()
 
     print(args)

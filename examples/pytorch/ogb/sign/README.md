@@ -14,17 +14,26 @@ How to Rrun
 -------------
 ### ogbn-products
 ```python
-python3 sign.py --dataset ogbn-products --eval-ev 10 --R 5 --input-d 0.3 --num-h 512 --dr 0.4 --lr 0.001 --batch-size 50000 --num-runs 10
+python3 sign.py --dataset ogbn-products --eval-ev 10 --R 5 --input-d 0.3 --num-h 512 \
+    --dr 0.4 --lr 0.001 --batch-size 50000 --num-runs 10
 ```
 
 ### ogbn-arxiv
 ```python
-python3 sign.py --dataset ogbn-arxiv --eval-ev 10 --R 5 --input-d 0.1 --num-h 512 --dr 0.5 --lr 0.001 --eval-b 100000 --num-runs 10
+python3 sign.py --dataset ogbn-arxiv --eval-ev 10 --R 5 --input-d 0.1 --num-h 512 \
+    --dr 0.5 --lr 0.001 --eval-b 100000 --num-runs 10
 ```
 
 ### ogbn-mag
+ogbn-mag is a heterogeneous graph and the task is to predict publishing venue
+of papers. Since SIGN model is designed for homogeneous graph, we simply ignore
+heterogeneous information (i.e. node and edge types) and treat the graph as a
+homogeneous one. For node types that don't have input feature, we featurize them
+with the average of their neighbors' features.
+
 ```python
-python3 sign.py --dataset ogbn-mag --eval-ev 10 --R 5 --input-d 0 --num-h 512 --dr 0.5 --lr 0.001 --batch-size 50000 --num-runs 10
+python3 sign.py --dataset ogbn-mag --eval-ev 10 --R 5 --input-d 0 --num-h 512 \
+    --dr 0.5 --lr 0.001 --batch-size 50000 --num-runs 10
 ```
 
 
