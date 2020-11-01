@@ -261,14 +261,14 @@ def path(start, width, role_start=0):
 
 
 def build_graph(
-    width_basis,
-    basis_type,
-    list_shapes,
-    start=0,
-    rdm_basis_plugins=False,
-    add_random_edges=0,
-    m=5,
-):
+            width_basis,
+            basis_type,
+            list_shapes,
+            start=0,
+            rdm_basis_plugins=False,
+            add_random_edges=0,
+            m=5,
+        ):
     """This function creates a basis (scale-free, path, or cycle)
     and attaches elements of the type in the list randomly along the basis.
     Possibility to add random edges afterwards.

@@ -6,15 +6,14 @@
 import os
 
 from matplotlib import pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from matplotlib.figure import Figure
-import matplotlib.colors as colors
+import numpy as np
+import networkx as nx
 
 # Set matplotlib backend to file writing
 plt.switch_backend("agg")
 
-from .synthetic_structsim import *
-from .featgen import *
+from synthetic_structsim import *
+from featgen import *
 
 
 def perturb(graph_list, p):
