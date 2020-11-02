@@ -10,7 +10,7 @@ Dependencies
 - ogb 1.2.3
 
 
-How to Rrun
+How to run
 -------------
 ### ogbn-products
 ```python
