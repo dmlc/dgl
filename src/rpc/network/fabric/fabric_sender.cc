@@ -58,9 +58,8 @@ bool FabricSender::Connect() {
   Message msg;
   for (int64_t i = 0; i < receiver_addrs_.size(); i++) {
     FabricAddrInfo info = {.id = i, .addr = fep->fabric_ctx->addr};
-    msg.size = sizeof(info);
-    msg.data = reinterpret_cast<char*>(&info);
-    socket_sender->Send(msg, i);
+    ctrl_ep->Send(&info, sizeof(FabricAddrInfo), kAddrMsg, )
+      socket_sender->Send(msg, i);
   }
   struct FabricAddrInfo addrs[socket_sender->NumServer()];
   for (size_t i = 0; i < socket_sender->NumServer(); i++) {
