@@ -6,8 +6,31 @@ namespace dgl {
 namespace network {
 
 void FabricSender::AddReceiver(const char* addr, int recv_id) {
-  socket_sender->AddReceiver(addr, recv_id);
-  LOG(INFO) << "ADDRECEIVER:" << recv_id << ":" << addr;
+  CHECK_NOTNULL(addr);
+  if (recv_id < 0) {
+    LOG(FATAL) << "recv_id cannot be a negative number.";
+  }
+  std::vector<std::string> substring;
+  std::vector<std::string> ip_and_port;
+  SplitStringUsing(addr, "//", &substring);
+  // Check address format
+  if (substring[0] != "socket:" || substring.size() != 2) {
+    LOG(FATAL) << "Incorrect address format:" << addr
+               << " Please provide right address format, "
+               << "e.g, 'socket://127.0.0.1:50051'. ";
+  }
+  // Get IP and port
+  SplitStringUsing(substring[1], ":", &ip_and_port);
+  if (ip_and_port.size() != 2) {
+    LOG(FATAL) << "Incorrect address format:" << addr
+               << " Please provide right address format, "
+               << "e.g, 'socket://127.0.0.1:50051'. ";
+  }
+  LOG(INFO) << "Add receiver";
+  IPAddr address;
+  address.ip = ip_and_port[0];
+  address.port = std::stoi(ip_and_port[1]);
+  receiver_addrs_[recv_id] = address;
   msg_queue_[recv_id] =  std::make_shared<MessageQueue>(queue_size_);
 }
 
@@ -29,17 +52,11 @@ void FabricSender::Finalize() {
   for (auto& thread : threads_) {
     thread.second->join();
   }
-  // Clear all sockets
-  for (auto& socket : sockets_) {
-    socket.second->Close();
-  }
 }
+
 bool FabricSender::Connect() {
-  { LOG(INFO) << "Before connect"; }
-  CHECK(socket_sender->Connect()) << "Fail to connect";
-  { LOG(INFO) << "After connect"; }
   Message msg;
-  for (int64_t i = 0; i < socket_sender->NumServer(); i++) {
+  for (int64_t i = 0; i < receiver_addrs_.size(); i++) {
     FabricAddrInfo info = {.id = i, .addr = fep->fabric_ctx->addr};
     msg.size = sizeof(info);
     msg.data = reinterpret_cast<char*>(&info);

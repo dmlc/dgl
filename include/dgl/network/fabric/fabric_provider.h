@@ -11,7 +11,7 @@ namespace network {
 
 class FabricProvider {
  public:
-  FabricProvider(std::string prov_name) {
+  FabricProvider(std::string prov_name) : prov_name(prov_name) {
     UniqueFabricPtr<struct fi_info> hints(fi_allocinfo());
     hints->ep_attr->type = FI_EP_RDM;  // Reliable Datagram
     hints->caps = FI_TAGGED | FI_MSG | FI_DIRECTED_RECV;
@@ -34,16 +34,17 @@ class FabricProvider {
 
     CHECK_NE(ret, -FI_ENODATA) << "Could not find any optimal provider";
     check_err(ret, "fi_getinfo failed");
-    struct fi_info *providers = info.get();
-    int i = 0;
-    while (providers) {
-      // LOG(INFO) << "Found a fabric provider [" << i << "] "
-      //           << providers->fabric_attr->prov_name << ":"
-      //           << fi_tostr(&providers->addr_format, FI_TYPE_ADDR_FORMAT);
-      i++;
-      providers = providers->next;
-    }
+    // struct fi_info *providers = info.get();
+    // int i = 0;
+    // while (providers) {
+    // LOG(INFO) << "Found a fabric provider [" << i << "] "
+    //           << providers->fabric_attr->prov_name << ":"
+    //           << fi_tostr(&providers->addr_format, FI_TYPE_ADDR_FORMAT);
+    //   i++;
+    //   providers = providers->next;
+    // }
   }
+  std::string prov_name;
 
   UniqueFabricPtr<fi_info> info;
 };

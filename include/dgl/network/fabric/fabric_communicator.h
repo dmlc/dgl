@@ -19,10 +19,17 @@
 #include <unordered_map>
 #include <vector>
 
+#include "dmlc/thread_local.h"
+
 namespace dgl {
 namespace network {
 
 enum FabricMsgTag { kSizeMsg, kDataMsg, kAddrMsg };
+
+std::string getEnvVar(std::string const& key) {
+  char* val = getenv(key.c_str());
+  return val == NULL ? std::string("") : std::string(val);
+}
 
 struct FabricAddrInfo {
   int64_t id;
@@ -40,10 +47,12 @@ class FabricSender : public Sender {
    * \brief Sender constructor
    * \param queue_size size of message queue
    */
-  explicit FabricSender(int64_t queue_size, FabricEndpoint* fep)
+  explicit FabricSender(int64_t queue_size)
       : Sender(queue_size),
-        socket_sender(new SocketSender(queue_size)),
-        fep(fep) {}
+        fep(dmlc::ThreadLocalStore<FabricEndpoint>::Get()) {
+          std::string net_type = getEnvVar("DGL_NETTYPE");
+          fep->Init(net_type);
+        }
 
   /*!
    * \brief Add receiver's address and ID to the sender's namebook
@@ -86,22 +95,23 @@ class FabricSender : public Sender {
   /*!
    * \brief Communicator type: 'socket'
    */
-  inline std::string Type() const { return std::string("socket"); }
+  inline std::string Type() const {
+    return std::string("fabric:") +
+           fep->fabric_provider->prov_name;
+  }
 
  private:
-  std::unique_ptr<SocketSender> socket_sender;
+  std::unique_ptr<FabricEndpoint> ctrl_ep;
 
+  // fep uses global singleton from ThreadLocalStore
   FabricEndpoint* fep;
-  /*!
-   * \brief socket for each connection of receiver
-   */
-  std::unordered_map<int /* receiver ID */, std::shared_ptr<TCPSocket>>
-    sockets_;
 
   /*!
    * \brief receivers' address
    */
   std::unordered_map<int /* receiver ID */, IPAddr> receiver_addrs_;
+
+  std::unordered_map<int /* Sender (virutal) ID */, fi_addr_t> addr_map;
 
   /*!
    * \brief message queue for each socket connection
@@ -124,8 +134,6 @@ class FabricSender : public Sender {
    * when the main thread invokes Signal() API on the message queue.
    */
   void SendLoop(fi_addr_t peer_addr, MessageQueue* queue);
-
-  std::unordered_map<int /* Sender (virutal) ID */, fi_addr_t> addr_map;
 };
 
 /*!
@@ -139,10 +147,12 @@ class FabricReceiver : public Receiver {
    * \brief Receiver constructor
    * \param queue_size size of message queue.
    */
-  explicit FabricReceiver(int64_t queue_size, FabricEndpoint* fep)
+  explicit FabricReceiver(int64_t queue_size)
       : Receiver(queue_size),
-        socket_receiver(new SocketReceiver(queue_size)),
-        fep(fep) {}
+        fep(dmlc::ThreadLocalStore<FabricEndpoint>::Get()) {
+          std::string net_type = getEnvVar("DGL_NETTYPE");
+          fep->Init(net_type);
+        }
 
   /*!
    * \brief Wait for all the Senders to connect
@@ -198,7 +208,7 @@ class FabricReceiver : public Receiver {
    */
   inline std::string Type() const {
     return std::string("fabric:") +
-           fep->fabric_provider->info->fabric_attr->prov_name;
+           fep->fabric_provider->prov_name;
   }
   /*!
    * \brief Recv-loop for each socket in per-thread
@@ -213,7 +223,7 @@ class FabricReceiver : public Receiver {
  private:
   std::atomic<bool> should_stop_polling_;
 
-  std::unique_ptr<SocketReceiver> socket_receiver;
+  std::unique_ptr<FabricEndpoint> ctrl_ep;
 
   FabricEndpoint* fep;
 

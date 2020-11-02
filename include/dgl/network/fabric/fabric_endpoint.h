@@ -33,9 +33,14 @@ struct FullFabricAddr {
 class FabricEndpoint {
  public:
   FabricEndpoint() {}
+
   void Init(std::string prov_name) {
     if (!fabric_provider) {
-      fabric_provider = std::make_shared<FabricProvider>("shm");
+      if (prov_name.length() == 0) {
+        prov_name = "tcp";
+      }
+      fabric_provider =
+        std::make_shared<FabricProvider>(prov_name);  // TODO(AZ)
       fabric_ctx =
         std::unique_ptr<FabricContext>(new FabricContext(fabric_provider));
       CHECK(fabric_ctx != nullptr);
@@ -54,8 +59,8 @@ class FabricEndpoint {
     int ret =
       fi_av_insert(fabric_ctx->av.get(), addr->name, 1, &peer_addr, 0, nullptr);
 
-    // CHECK_EQ(ret, 1) << "Call to fi_av_insert() failed. Return Code: " << ret
-    //                  << ". ERROR: " << fi_strerror(-ret);
+    CHECK_EQ(ret, 1) << "Call to fi_av_insert() failed. Return Code: " << ret
+                     << ". ERROR: " << fi_strerror(-ret);
 
     // fi_av_straddr: human readable name
     FabricAddr readable_addr;
@@ -63,7 +68,7 @@ class FabricEndpoint {
                   &readable_addr.len);
     std::string readable_peer_addr =
       std::string(readable_addr.name, readable_addr.len);
-    // LOG(INFO) << "Readable peer addr: " << readable_peer_addr;
+    LOG(INFO) << "Readable peer addr: " << readable_peer_addr;
     FullFabricAddr full_fi_addr = {
       .faddr = *addr, .readable_addr = readable_peer_addr, .fiaddr = peer_addr};
     client_ep.push_back(std::move(full_fi_addr));
@@ -72,9 +77,10 @@ class FabricEndpoint {
 
   void Send(const void *buffer, size_t size, uint64_t tag, fi_addr_t peer_addr,
             bool sync = false) {
+    // LOG(INFO) << "ep send" << sync;
     while (true) {
-      int ret = fi_send(fabric_ctx->ep.get(), buffer, size, nullptr, peer_addr,
-                        nullptr);
+      int ret = fi_tsend(fabric_ctx->ep.get(), buffer, size, nullptr, peer_addr,
+                         tag, nullptr);
       if (ret == -FI_EAGAIN) {
         // LOG(WARNING) << "fi_tsend: FI_EAGAIN";
       } else if (ret < 0) {
@@ -83,7 +89,7 @@ class FabricEndpoint {
         break;
       }
     }
-    if (sync) WaitCQ(1, fabric_ctx->txcq.get());
+    if (sync) WaitCQ(fabric_ctx->txcq.get());
 
     // while (true) {
     //   int ret = fi_cq_read(fabric_ctx->cq.get(), &comp, 1);
@@ -93,6 +99,7 @@ class FabricEndpoint {
 
   void Recv(void *buffer, size_t size, uint64_t tag, fi_addr_t peer_addr,
             bool sync = false) {
+    // { LOG(INFO) << "ep recv" << sync; }
     while (true) {
       int ret = fi_trecv(fabric_ctx->ep.get(), buffer, size, nullptr, peer_addr,
                          tag, 0, nullptr);
@@ -105,7 +112,12 @@ class FabricEndpoint {
       }
       break;
     }
-    if (sync) WaitCQ(1, fabric_ctx->rxcq.get());
+
+    // { LOG(INFO) << "issue recv event done" << sync; }
+    if (sync) {
+      // { LOG(INFO) << "DEBUG SYNC BRANCH"; }
+      WaitCQ(fabric_ctx->rxcq.get());
+    }
     // while (true) {
     //   int ret = fi_cq_read(fabric_ctx->cq.get(), &comp, 1);
     //   // check_err(ret, "cq read");
@@ -114,13 +126,13 @@ class FabricEndpoint {
     // }
   }
 
-  void WaitCQ(int64_t count, struct fid_cq *cq) {
-    CHECK_EQ(count, 1) << "Only 1 is tested";
+  void WaitCQ(struct fid_cq *cq) {
     struct fi_cq_tagged_entry cq_entries;
     while (true) {
-      int ret = fi_cq_read(cq, &cq_entries, count);
+      int ret = fi_cq_read(cq, &cq_entries, 1);
+      // { LOG(INFO) << "RRRRet" << ret; }
       if (ret == -FI_EAGAIN) {
-        return;
+        continue;
       } else if (ret == -FI_EAVAIL) {
         HandleCQError(cq);
       } else if (ret < 0) {
