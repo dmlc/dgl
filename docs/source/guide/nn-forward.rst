@@ -52,11 +52,11 @@ The math formulas for SAGEConv are:
 .. math::
 
     h_{dst}^{(l+1)} = \sigma \left(W \cdot \mathrm{concat}
-           (h_{dst}^{l}, h_{\mathcal{N}(dst)}^{l+1} + b) \right)
+           (h_{dst}^{l}, h_{\mathcal{N}(dst)}^{l+1}) + b \right)
 
 .. math::
 
-    h_{dst}^{(l+1)} = \mathrm{norm}(h_{dst}^{l})
+    h_{dst}^{(l+1)} = \mathrm{norm}(h_{dst}^{l+1})
 
 One needs to specify the source node feature ``feat_src`` and destination
 node feature ``feat_dst`` according to the graph type.
