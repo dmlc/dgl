@@ -93,6 +93,7 @@ void FabricSender::SendLoop(fi_addr_t peer_addr, MessageQueue* queue) {
     // TODO(AZ): How to finalize queue
     if (code == QUEUE_CLOSE) {
       // msg->size = 0;  // send an end-signal to receiver
+      delete msg_ptr;
       exit = true;
     }
     fep->Send(&msg_ptr->size, sizeof(msg_ptr->size), kSizeMsg, peer_addr);

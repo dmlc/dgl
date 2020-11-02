@@ -35,6 +35,7 @@ bool FabricReceiver::Wait(const char* addr, int num_sender) {
     threads_[kv.first] =
       std::make_shared<std::thread>(&FabricReceiver::RecvLoop, this);
   }
+  ctrl_ep.reset();
   return true;
 };
 
