@@ -90,11 +90,8 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
   if (type.compare("socket") == 0) {
     RPCContext::ThreadLocal()->sender = std::make_shared<network::SocketSender>(msg_queue_size);
   } else if (type.rfind("fabric", 0) == 0) {
-    // auto endpoint = std::make_shared<network::FabricEndpoint>("tcp");
-    network::FabricEndpoint* endpoint = new network::FabricEndpoint();
-    endpoint->Init("tcp");
     RPCContext::ThreadLocal()->sender =
-      std::make_shared<network::FabricSender>(msg_queue_size, endpoint);
+      std::make_shared<network::FabricSender>(msg_queue_size);
   } else {
     LOG(FATAL) << "Unknown communicator type for rpc receiver: " << type;
   }
@@ -107,13 +104,8 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
   if (type.compare("socket") == 0) {
     RPCContext::ThreadLocal()->receiver = std::make_shared<network::SocketReceiver>(msg_queue_size);
   } else if (type.rfind("fabric", 0) == 0) {
-    // auto endpoint = std::make_shared<network::FabricEndpoint>("tcp");
-    // network::FabricEndpoint* endpoint =
-    //   dmlc::ThreadLocalStore<network::FabricEndpoint>::Get();
-    network::FabricEndpoint* endpoint = new network::FabricEndpoint();
-    endpoint->Init("tcp");
     RPCContext::ThreadLocal()->receiver =
-      std::make_shared<network::FabricReceiver>(msg_queue_size, endpoint);
+      std::make_shared<network::FabricReceiver>(msg_queue_size);
   } else {
     LOG(FATAL) << "Unknown communicator type for rpc sender: " << type;
   }

@@ -12,6 +12,7 @@
 #include <rdma/fi_endpoint.h>
 #include <rdma/fi_eq.h>
 #include <rdma/fi_tagged.h>
+#include <unistd.h>
 
 #include <chrono>
 #include <memory>
@@ -54,6 +55,11 @@ class FabricEndpoint {
     CHECK(fabric_ctx != nullptr);
   }
 
+  static FabricEndpoint *CreateTcpEndpoint(const char *addr) {
+    return new FabricEndpoint(
+      std::shared_ptr<FabricProvider>(FabricProvider::CreateTcpProvider(addr)));
+  }
+
   fi_addr_t AddPeerAddr(FabricAddr *addr) {
     fi_addr_t peer_addr;
     int ret =
@@ -76,13 +82,17 @@ class FabricEndpoint {
   };
 
   void Send(const void *buffer, size_t size, uint64_t tag, fi_addr_t peer_addr,
-            bool sync = false) {
+            bool sync = false, void *context = nullptr) {
     // LOG(INFO) << "ep send" << sync;
     while (true) {
       int ret = fi_tsend(fabric_ctx->ep.get(), buffer, size, nullptr, peer_addr,
-                         tag, nullptr);
+                         tag, context);
       if (ret == -FI_EAGAIN) {
-        // LOG(WARNING) << "fi_tsend: FI_EAGAIN";
+        continue;
+      } else if (ret < 0) {
+        LOG(INFO) << fi_strerror(-ret) << ". Retrying in 5 seconds";
+        sleep(5);
+        continue;
       } else if (ret < 0) {
         check_err(ret, "Unable to do fi_send message");
       } else {

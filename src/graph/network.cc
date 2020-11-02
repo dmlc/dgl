@@ -209,10 +209,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
     if (type == "socket") {
       sender = new network::SocketSender(msg_queue_size);
     }else if (type.rfind("fabric", 0) == 0){
-      // auto endpoint = std::make_shared<network::FabricEndpoint>("tcp");
-      FabricEndpoint* endpoint = dmlc::ThreadLocalStore<network::FabricEndpoint>::Get();
-      endpoint->Init("tcp");
-      sender = new network::FabricSender(msg_queue_size, endpoint);
+      sender = new network::FabricSender(msg_queue_size);
     } else {
       LOG(FATAL) << "Unknown communicator type: " << type;
     }
@@ -228,10 +225,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
     if (type == "socket") {
       receiver = new network::SocketReceiver(msg_queue_size);
     } else if (type.rfind("fabric", 0) == 0){
-      // auto endpoint = std::make_shared<network::FabricEndpoint>("tcp");
-      FabricEndpoint* endpoint = dmlc::ThreadLocalStore<network::FabricEndpoint>::Get();
-      endpoint->Init("tcp");
-      receiver = new network::FabricReceiver(msg_queue_size, endpoint);
+      receiver = new network::FabricReceiver(msg_queue_size);
     }else {
       LOG(FATAL) << "Unknown communicator type: " << type;
     }

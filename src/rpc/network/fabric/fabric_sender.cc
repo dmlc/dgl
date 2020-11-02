@@ -1,37 +1,26 @@
 #include <dgl/network/fabric/fabric_communicator.h>
 #include <dgl/network/fabric/fabric_utils.h>
+#include <netinet/in.h>
 #include <unistd.h>
 
 namespace dgl {
 namespace network {
 
 void FabricSender::AddReceiver(const char* addr, int recv_id) {
-  CHECK_NOTNULL(addr);
-  if (recv_id < 0) {
-    LOG(FATAL) << "recv_id cannot be a negative number.";
-  }
-  std::vector<std::string> substring;
-  std::vector<std::string> ip_and_port;
+  struct sockaddr_in sin = {};
+  FabricAddr fabric_addr;
+  sin.sin_family = AF_INET;
+  std::vector<std::string> substring, hostport;
   SplitStringUsing(addr, "//", &substring);
-  // Check address format
-  if (substring[0] != "socket:" || substring.size() != 2) {
-    LOG(FATAL) << "Incorrect address format:" << addr
-               << " Please provide right address format, "
-               << "e.g, 'socket://127.0.0.1:50051'. ";
-  }
-  // Get IP and port
-  SplitStringUsing(substring[1], ":", &ip_and_port);
-  if (ip_and_port.size() != 2) {
-    LOG(FATAL) << "Incorrect address format:" << addr
-               << " Please provide right address format, "
-               << "e.g, 'socket://127.0.0.1:50051'. ";
-  }
-  LOG(INFO) << "Add receiver";
-  IPAddr address;
-  address.ip = ip_and_port[0];
-  address.port = std::stoi(ip_and_port[1]);
-  receiver_addrs_[recv_id] = address;
-  msg_queue_[recv_id] =  std::make_shared<MessageQueue>(queue_size_);
+  SplitStringUsing(substring[1], ":", &hostport);
+  // sin.sin_addr = hostport[0];
+  CHECK(inet_pton(AF_INET, hostport[0].c_str(), &sin.sin_addr)>0) << "Invalid ip";
+  sin.sin_port = htons(stoi(hostport[1]));
+  
+  fabric_addr.CopyFrom(&sin, sizeof(sin));
+  peer_fi_addr[recv_id]=ctrl_ep->AddPeerAddr(&fabric_addr);
+  // ctrl_ep->ctrl_peer_addr[recv_id] = address;
+  msg_queue_[recv_id] = std::make_shared<MessageQueue>(queue_size_);
 }
 
 void FabricSender::Finalize() {
@@ -56,31 +45,32 @@ void FabricSender::Finalize() {
 
 bool FabricSender::Connect() {
   Message msg;
-  for (int64_t i = 0; i < receiver_addrs_.size(); i++) {
-    FabricAddrInfo info = {.id = i, .addr = fep->fabric_ctx->addr};
-    ctrl_ep->Send(&info, sizeof(FabricAddrInfo), kAddrMsg, )
-      socket_sender->Send(msg, i);
-  }
-  struct FabricAddrInfo addrs[socket_sender->NumServer()];
-  for (size_t i = 0; i < socket_sender->NumServer(); i++) {
-    fep->Recv(&addrs[i], sizeof(FabricAddrInfo), kAddrMsg, FI_ADDR_UNSPEC,
-              true);
-  };
-  for (size_t i = 0; i < socket_sender->NumServer(); i++) {
-    LOG(INFO) << "ID" << addrs[i].id;
-    LOG(INFO) << "ADDR ID" << addrs[i].addr.name;
-    LOG(INFO) << "ADDR ID" << addrs[i].addr.len;
-    addr_map[addrs[i].id] = fep->AddPeerAddr(&addrs[i].addr);
-  }
-  
+  size_t num_peer = peer_fi_addr.size();
+  for (int64_t i = 0; i < num_peer; i++) {
+    FabricAddrInfo ctrl_info = {.id = i, .addr = ctrl_ep->fabric_ctx->addr};
+    ctrl_ep->Send(&ctrl_info, sizeof(FabricAddrInfo), kAddrMsg, ctrl_peer_fi_addr[i],
+                  true);
 
-  for (auto kv : addr_map) {
-    LOG(INFO) << msg_queue_[kv.first].get();
-    LOG(INFO) << kv.second;
-    LOG(INFO) << kv.first;
+    FabricAddrInfo fep_info = {.id = i, .addr = fep->fabric_ctx->addr};
+    ctrl_ep->Send(&fep_info, sizeof(FabricAddrInfo), kAddrMsg, ctrl_peer_fi_addr[i],
+                  true);
+  }
+  struct FabricAddrInfo addrs[num_peer];
+  for (size_t i = 0; i < num_peer; i++) {
+    ctrl_ep->Recv(&addrs[i], sizeof(FabricAddrInfo), kAddrMsg, FI_ADDR_UNSPEC,
+                  true);
+    peer_fi_addr[addrs[i].id] = fep->AddPeerAddr(&addrs[i].addr);
+  };
+
+  for (auto kv : peer_fi_addr) {
+    // LOG(INFO) << msg_queue_[kv.first].get();
+    // LOG(INFO) << kv ) << kv.first;
+            
     threads_[kv.first] = std::make_shared<std::thread>(
       &FabricSender::SendLoop, this, kv.second, msg_queue_[kv.first].get());
   }
+
+  ctrl_ep.reset();
   return true;
 }
 
@@ -94,23 +84,52 @@ STATUS FabricSender::Send(Message msg, int recv_id) {
 }
 
 void FabricSender::SendLoop(fi_addr_t peer_addr, MessageQueue* queue) {
-  //   CHECK_NOTNULL(socket);
-  // CHECK_NOTNULL(queue);
+  CHECK_NOTNULL(queue);
   bool exit = false;
+  {LOG(INFO) << "Start sendloop";}
   while (!exit) {
-    Message msg;
-    STATUS code = queue->Remove(&msg);
+    Message* msg_ptr = new Message();
+    STATUS code = queue->Remove(msg_ptr);
+    // TODO(AZ): How to finalize queue
     if (code == QUEUE_CLOSE) {
-      msg.size = 0;  // send an end-signal to receiver
+      // msg->size = 0;  // send an end-signal to receiver
       exit = true;
     }
-    // LOG(INFO) << "send size";
-    // LOG(INFO) << "send peer" << peer_addr;
-    fep->Send(&msg.size, sizeof(msg.size), kSizeMsg, peer_addr);
+    fep->Send(&msg_ptr->size, sizeof(msg_ptr->size), kSizeMsg, peer_addr);
     // LOG(INFO) << "send data";
-    fep->Send(msg.data, msg.size, kDataMsg, peer_addr);
+    fep->Send(msg_ptr->data, msg_ptr->size, kDataMsg, peer_addr, false,
+              msg_ptr);
     // LOG(INFO) << "send data done";
   }
 }
+
+void FabricSender::PollCompletionQueue(struct fi_cq_tagged_entry* cq_entries) {
+  int ret = fi_cq_read(fep->fabric_ctx->txcq.get(), cq_entries,
+                       kMaxConcurrentWorkRequest);
+  if (ret == -FI_EAGAIN) {
+    return;
+  } else if (ret == -FI_EAVAIL) {
+    HandleCQError(fep->fabric_ctx->rxcq.get());
+  } else if (ret < 0) {
+    check_err(ret, "fi_cq_read failed");
+  } else {
+    CHECK_NE(ret, 0) << "at least one completion event is expected";
+    for (int i = 0; i < ret; ++i) {
+      const auto& cq_entry = cq_entries[i];
+      HandleCompletionEvent(cq_entry);
+    }
+  }
+};
+
+void FabricSender::HandleCompletionEvent(
+  const struct fi_cq_tagged_entry& cq_entry) {
+  if ((cq_entry.op_context) and (cq_entry.tag == kDataMsg)) {
+    Message* msg_ptr = reinterpret_cast<Message*>(cq_entry.op_context);
+    if (msg_ptr->deallocator != nullptr) {
+      msg_ptr->deallocator(msg_ptr);
+    }
+  }
+};
+
 }  // namespace network
 }  // namespace dgl

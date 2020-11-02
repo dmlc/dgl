@@ -26,7 +26,7 @@ namespace network {
 
 enum FabricMsgTag { kSizeMsg, kDataMsg, kAddrMsg };
 
-std::string getEnvVar(std::string const& key) {
+inline std::string getEnvVar(std::string const& key) {
   char* val = getenv(key.c_str());
   return val == NULL ? std::string("") : std::string(val);
 }
@@ -52,6 +52,8 @@ class FabricSender : public Sender {
         fep(dmlc::ThreadLocalStore<FabricEndpoint>::Get()) {
           std::string net_type = getEnvVar("DGL_NETTYPE");
           fep->Init(net_type);
+          ctrl_ep = std::unique_ptr<FabricEndpoint>(
+            FabricEndpoint::CreateTcpEndpoint(nullptr));
         }
 
   /*!
@@ -109,9 +111,10 @@ class FabricSender : public Sender {
   /*!
    * \brief receivers' address
    */
-  std::unordered_map<int /* receiver ID */, IPAddr> receiver_addrs_;
+  std::unordered_map<int /* receiver ID */, IPAddr> ctrl_peer_addr;
 
-  std::unordered_map<int /* Sender (virutal) ID */, fi_addr_t> addr_map;
+  std::unordered_map<int /* Sender (virutal) ID */, fi_addr_t> peer_fi_addr,
+    ctrl_peer_fi_addr;
 
   /*!
    * \brief message queue for each socket connection
@@ -134,6 +137,10 @@ class FabricSender : public Sender {
    * when the main thread invokes Signal() API on the message queue.
    */
   void SendLoop(fi_addr_t peer_addr, MessageQueue* queue);
+
+  void PollCompletionQueue(struct fi_cq_tagged_entry* cq_entries);
+
+  void HandleCompletionEvent(const struct fi_cq_tagged_entry& cq_entry);
 };
 
 /*!
@@ -236,7 +243,8 @@ class FabricReceiver : public Receiver {
   /*!
    * \brief socket for each client connections
    */
-  std::unordered_map<int /* Sender (virutal) ID */, fi_addr_t> addr_map;
+  std::unordered_map<int /* Sender (virutal) ID */, fi_addr_t> peer_fi_addr,
+    ctrl_peer_fi_addr;
 
   /*!
    * \brief Message queue for each socket connection
