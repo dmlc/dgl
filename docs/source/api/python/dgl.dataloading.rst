@@ -48,3 +48,17 @@ to generate negative edges.
 
 .. autoclass:: Uniform
     :members: __call__
+
+Async Copying to/from GPUs
+--------------------------
+.. currentmodule:: dgl.dataloading
+
+Data can be copied from the CPU to the GPU, or from the GPU to the CPU,
+while the GPU is being used for
+computation, using the :class:`AsyncTransferer`.
+
+.. autoclass:: AsyncTransferer
+    :members: __init__, async_copy
+
+.. autoclass:: async_transferer.Transfer
+    :members: wait
