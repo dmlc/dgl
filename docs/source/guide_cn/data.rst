@@ -11,7 +11,7 @@ recommends processing graph data into a :class:`dgl.data.DGLDataset` subclass, a
 pipeline provides simple and clean solution for loading, processing and
 saving graph data.
 
-DGL在 :ref:`apidata` 里实现了很多常用的图数据集。它们遵循了以下类定义的标准管道： :class:`dgl.data.DGLDataset`。
+DGL在 :ref:`apidata` 里实现了很多常用的图数据集。它们遵循了由 :class:`dgl.data.DGLDataset` 类定义的标准管道。
 DGL推荐用户将图数据处理为 :class:`dgl.data.DGLDataset` 的子类。该类为导入，处理和保存图数据提供了简单而干净的解决方案。
 本章介绍了如何为用户自己的图数据创建一个DGL数据集。以下内容说明了管道的工作方式，并展示了如何实现管道的每个组件。
 
