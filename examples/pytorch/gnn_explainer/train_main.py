@@ -4,6 +4,7 @@
 # The training codes of the dummy model
 
 
+import os
 import argparse
 import dgl
 
@@ -38,11 +39,11 @@ def main(args):
     feat_dim = 10
     print(num_classes)
 
-    # in this experiment fix dimensions of input, hidden, and output layers
-    dummy_model = dummy_gnn_model(feat_dim, 40, num_classes)
-
     # set up feature of nodes to all 1
     n_feats = th.randn(graph.number_of_nodes(), feat_dim)
+
+    # in this experiment fix dimensions of input, hidden, and output layers
+    dummy_model = dummy_gnn_model(feat_dim, 40, num_classes)
 
     # define loss funciton and optimizer
     loss_fn = nn.CrossEntropyLoss()
@@ -61,16 +62,17 @@ def main(args):
         loss.backward()
         optim.step()
 
-        print('Acc: {:.4f}; Loss: {:.6f}'.format(pred, loss.item()))
-
-    print(logits[3])
+        print('In Epoch: {:03d}; Acc: {:.4f}; Loss: {:.6f}'.format(epoch, pred, loss.item()))
 
     # save model
+    model_stat_dict = dummy_model.state_dict()
+    model_path = os.path.join('./', 'dummy_model_4_{}.pth'.format(args.dataset))
+    th.save(model_stat_dict, model_path)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Dummy model training')
-    parser.add_argument('--dataset', type=str, default='syn1', help='dataset used for training the model')
+    parser.add_argument('--dataset', type=str, default='syn2', help='dataset used for training the model')
 
     args = parser.parse_args()
     print(args)

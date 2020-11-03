@@ -31,21 +31,19 @@ class NodeExplainerModule(nn.Module):
 
     def __init__(self,
                  model,
-                 num_nodes,
+                 num_edges,
                  node_feat_dim,
                  activation='sigmoid',
-                 agg_fn='sum',
-                 verbos=False):
+                 agg_fn='sum'):
         super(NodeExplainerModule, self).__init__()
         self.model = model
-        self.num_nodes = num_nodes
+        self.num_edges = num_edges
         self.node_feat_dim = node_feat_dim
         self.activation = activation
         self.agg_fn=agg_fn
-        self.verbose = verbos
 
         # Initialize parameters on masks
-        self.edge_mask, self.edge_mask_bias = self.create_edge_mask(self.num_nodes)
+        self.edge_mask, self.edge_mask_bias = self.create_edge_mask(self.num_edges)
         self.node_feat_mask = self.create_node_feat_mask(self.node_feat_dim)
 
 
