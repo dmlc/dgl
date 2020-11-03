@@ -38,7 +38,21 @@ class Transfer(object):
 
 class AsyncTransferer(object):
     """ Class for initiating asynchronous copies to/from the GPU on a second
-    GPU stream. """
+    GPU stream.
+
+    To initiate a transfer to a GPU:
+
+    >>> tensor_cpu = torch.ones(100000).pin_memory()
+    >>> transferer = dgl.dataloading.AsyncTransferer(torch.device(0))
+    >>> future = transferer.async_copy(tensor_cpu, torch.device(0))
+
+    And then to wait for the transfer to finish and get a copy of the tensor on
+    the GPU.
+
+    >>> tensor_gpu = future.wait()
+
+
+    """
     def __init__(self, device):
         """ Create a new AsyncTransferer object.
 
@@ -55,7 +69,12 @@ class AsyncTransferer(object):
         self._handle = _CAPI_DGLAsyncTransfererCreate(ctx)
 
     def async_copy(self, tensor, device):
-        """ Initiate an asynchronous copy on the internal stream.
+        """ Initiate an asynchronous copy on the internal stream. For this call
+        to be asynchronous, the context the AsyncTranserer is created with must
+        be a GPU context, and the input tensor must be in pinned memory.
+
+        Currently, transfers from the GPU to the CPU, and CPU to CPU, will
+        be synchronous.
 
         Parameters
         ----------
