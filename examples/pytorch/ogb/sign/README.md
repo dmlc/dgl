@@ -6,7 +6,8 @@ Paper: [https://arxiv.org/abs/2004.11198](https://arxiv.org/abs/2004.11198)
 Dependencies
 ------------
 - pytorch 1.5
-- dgl 0.5 (tested with 0.6a201020 nightly build)
+- dgl 0.5 nightly build
+    - `pip install --pre dgl`
 - ogb 1.2.3
 
 
