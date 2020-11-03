@@ -141,6 +141,8 @@ def copy_to(input, ctx, **kwargs):
     return input.as_in_context(ctx)
 
 def sum(input, dim, keepdims=False):
+    if len(input) == 0:
+        return nd.array([0.], dtype=input.dtype, ctx=input.context)
     return nd.sum(input, axis=dim, keepdims=keepdims)
 
 def reduce_sum(input):
@@ -353,11 +355,11 @@ def sort_1d(input):
     idx = nd.cast(idx, dtype='int64')
     return val, idx
 
-def arange(start, stop, dtype=np.int64):
+def arange(start, stop, dtype=np.int64, ctx=None):
     if start >= stop:
-        return nd.array([], dtype=dtype)
+        return nd.array([], dtype=dtype, ctx=ctx)
     else:
-        return nd.arange(start, stop, dtype=dtype)
+        return nd.arange(start, stop, dtype=dtype, ctx=ctx)
 
 def rand_shuffle(arr):
     return mx.nd.random.shuffle(arr)

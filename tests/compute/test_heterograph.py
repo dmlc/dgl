@@ -365,6 +365,40 @@ def test_query(idtype):
     # test repr
     print(g)
 
+@parametrize_dtype
+def test_empty_query(idtype):
+    g = dgl.graph(([1, 2, 3], [0, 4, 5]), idtype=idtype, device=F.ctx())
+    g.add_nodes(0)
+    g.add_edges([], [])
+    g.remove_edges([])
+    g.remove_nodes([])
+    assert F.shape(g.has_nodes([])) == (0,)
+    assert F.shape(g.has_edges_between([], [])) == (0,)
+    g.edge_ids([], [])
+    g.edge_ids([], [], return_uv=True)
+    g.find_edges([])
+
+    assert F.shape(g.in_edges([], form='eid')) == (0,)
+    u, v = g.in_edges([], form='uv')
+    assert F.shape(u) == (0,)
+    assert F.shape(v) == (0,)
+    u, v, e = g.in_edges([], form='all')
+    assert F.shape(u) == (0,)
+    assert F.shape(v) == (0,)
+    assert F.shape(e) == (0,)
+
+    assert F.shape(g.out_edges([], form='eid')) == (0,)
+    u, v = g.out_edges([], form='uv')
+    assert F.shape(u) == (0,)
+    assert F.shape(v) == (0,)
+    u, v, e = g.out_edges([], form='all')
+    assert F.shape(u) == (0,)
+    assert F.shape(v) == (0,)
+    assert F.shape(e) == (0,)
+
+    assert F.shape(g.in_degrees([])) == (0,)
+    assert F.shape(g.out_degrees([])) == (0,)
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU does not have COO impl.")
 def _test_hypersparse():
     N1 = 1 << 50        # should crash if allocated a CSR
@@ -1261,6 +1295,8 @@ def test_subgraph(idtype):
 def test_apply(idtype):
     def node_udf(nodes):
         return {'h': nodes.data['h'] * 2}
+    def node_udf2(nodes):
+        return {'h': F.sum(nodes.data['h'], dim=1, keepdims=True)}
     def edge_udf(edges):
         return {'h': edges.data['h'] * 2 + edges.src['h']}
 
@@ -1279,6 +1315,11 @@ def test_apply(idtype):
 
     g['plays'].apply_edges(edge_udf)
     assert F.array_equal(g['plays'].edata['h'], F.ones((4, 5)) * 12)
+
+    # Test the case that feature size changes
+    g.nodes['user'].data['h'] = F.ones((3, 5))
+    g.apply_nodes(node_udf2, ntype='user')
+    assert F.array_equal(g.nodes['user'].data['h'], F.ones((3, 1)) * 5)
 
     # test fail case
     # fail due to multiple types
@@ -1694,6 +1735,13 @@ def test_bipartite(idtype):
         ('A', 'AA', 'A'): ([0, 1], [0, 1])
     }, idtype=idtype, device=F.ctx())
     assert not g3.is_unibipartite
+
+    g4 = dgl.heterograph({
+        ('A', 'AB', 'B'): ([0, 0, 1], [1, 2, 5]),
+        ('C', 'CA', 'A'): ([1, 0], [0, 0])
+    }, idtype=idtype, device=F.ctx())
+
+    assert not g4.is_unibipartite
 
 @parametrize_dtype
 def test_dtype_cast(idtype):
@@ -2460,6 +2508,7 @@ if __name__ == '__main__':
     #test_remove_edges(F.int32)
     #test_remove_nodes(F.int32)
     #test_clone(F.int32)
-    test_frame(F.int32)
-    test_frame_device(F.int32)
+    #test_frame(F.int32)
+    #test_frame_device(F.int32)
+    #test_empty_query(F.int32)
     pass

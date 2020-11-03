@@ -1,6 +1,6 @@
-"""Dataset for Graph Isomorphism Network(GIN)
-(chen jun): Used for compacted graph kernel dataset in GIN
-Data sets include:
+"""Datasets used in How Powerful Are Graph Neural Networks?
+(chen jun)
+Datasets include:
 MUTAG, COLLAB, IMDBBINARY, IMDBMULTI, NCI1, PROTEINS, PTC, REDDITBINARY, REDDITMULTI5K
 https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip
 """
@@ -17,11 +17,13 @@ from ..convert import graph as dgl_graph
 
 
 class GINDataset(DGLBuiltinDataset):
-    """Datasets for Graph Isomorphism Network (GIN)
-    Adapted from `<https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip>`_.
-
-    The dataset contains the compact format of popular graph kernel datasets.
-    For more graph kernel datasets, see :class:`TUDataset`.
+    """Dataset Class for `How Powerful Are Graph Neural Networks? <https://arxiv.org/abs/1810.00826>`_.
+    
+    This is adapted from `<https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip>`_.
+    
+    The class provides an interface for nine datasets used in the paper along with the paper-specific
+    settings. The datasets are ``'MUTAG'``, ``'COLLAB'``, ``'IMDBBINARY'``, ``'IMDBMULTI'``,
+    ``'NCI1'``, ``'PROTEINS'``, ``'PTC'``, ``'REDDITBINARY'``, ``'REDDITMULTI5K'``.
 
     Parameters
     ---------

@@ -325,6 +325,6 @@ if __name__ == '__main__':
     #test_topology('int32')
     #test_batching_batched('int32')
     #test_batched_features('int32')
-    #test_empty_relation('int32')
+    # test_empty_relation('int64')
     #test_to_device('int32')
     pass
