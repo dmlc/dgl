@@ -97,7 +97,7 @@ def get_local_usable_addr():
     return ip_addr + ':' + str(port)
 
 
-def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net_type='fabric'):
+def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net_type=rpc.DEFAULT_NET_TYPE):
     """Connect this client to server.
 
     Parameters
@@ -119,7 +119,7 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net
     """
     assert num_servers > 0, 'num_servers (%d) must be a positive number.' % num_servers
     assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % max_queue_size
-    # assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'.' % net_type
+    assert rpc.is_valid_net_type(net_type)
     # Register some basic service
     rpc.register_service(rpc.CLIENT_REGISTER,
                          rpc.ClientRegisterRequest,
@@ -164,7 +164,6 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net
     # Register client on server
     register_req = rpc.ClientRegisterRequest(ip_addr)
     for server_id in range(num_servers):
-        print("Send request")
         rpc.send_request(server_id, register_req)
     # wait server connect back
     rpc.receiver_wait(client_ip, client_port, num_servers)

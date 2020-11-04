@@ -42,7 +42,7 @@ def _init_rpc(ip_config, num_servers, max_queue_size, net_type, role, num_thread
         raise e
 
 def initialize(ip_config, num_servers=1, num_workers=0,
-               max_queue_size=MAX_QUEUE_SIZE, net_type='socket',
+               max_queue_size=MAX_QUEUE_SIZE, net_type=rpc.DEFAULT_NET_TYPE,
                num_worker_threads=1):
     """Initialize DGL's distributed module
 

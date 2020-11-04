@@ -4,25 +4,36 @@ import abc
 import pickle
 import random
 import numpy as np
+import os
 
 from .._ffi.object import register_object, ObjectBase
 from .._ffi.function import _init_api
 from ..base import DGLError
 from .. import backend as F
 
-__all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
-'create_sender', 'create_receiver', 'finalize_sender', 'finalize_receiver', \
-'receiver_wait', 'add_receiver_addr', 'sender_connect', 'read_ip_config', \
-'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
-'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call', \
-'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', \
-'get_num_client', 'set_num_client', 'client_barrier', 'copy_data_to_shared_memory']
+__all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service',
+           'create_sender', 'create_receiver', 'finalize_sender', 'finalize_receiver',
+           'receiver_wait', 'add_receiver_addr', 'sender_connect', 'read_ip_config',
+           'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id',
+           'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call',
+           'send_request_to_machine', 'remote_call_to_machine', 'fast_pull',
+           'get_num_client', 'set_num_client', 'client_barrier',
+           'copy_data_to_shared_memory', 'is_valid_net_type']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
 RESPONSE_CLASS_TO_SERVICE_ID = {}
 SERVICE_ID_TO_PROPERTY = {}
 
 DEFUALT_PORT = 30050
+DEFAULT_NET_TYPE = os.getenv("DGL_NET_TYPE", "socket")
+
+
+def is_valid_net_type(net_type):
+    assert isinstance(net_type, str)
+    if (net_type == 'socket') or (net_type.startswith("fabric:")):
+        return True
+    else:
+        raise Exception("Unsupported net type {}".format(net_type))
 
 def read_ip_config(filename, num_servers):
     """Read network configuration information of server from file.

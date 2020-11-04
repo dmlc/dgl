@@ -26,10 +26,7 @@ namespace network {
 
 enum FabricMsgTag { kSizeMsg, kDataMsg, kAddrMsg };
 
-inline std::string getEnvVar(std::string const& key) {
-  char* val = getenv(key.c_str());
-  return val == NULL ? std::string("") : std::string(val);
-}
+const std::string handshake_msg = "ready";
 
 struct FabricAddrInfo {
   int64_t id;
@@ -47,14 +44,12 @@ class FabricSender : public Sender {
    * \brief Sender constructor
    * \param queue_size size of message queue
    */
-  explicit FabricSender(int64_t queue_size)
-      : Sender(queue_size),
-        fep(dmlc::ThreadLocalStore<FabricEndpoint>::Get()) {
-          std::string net_type = getEnvVar("DGL_NETTYPE");
-          fep->Init(net_type);
-          ctrl_ep = std::unique_ptr<FabricEndpoint>(
-            FabricEndpoint::CreateTcpEndpoint(nullptr));
-        }
+  explicit FabricSender(int64_t queue_size, std::string net_type)
+      : Sender(queue_size), fep(FabricEndpoint::GetEndpoint()) {
+    fep->Init(net_type);
+    ctrl_ep = std::unique_ptr<FabricEndpoint>(
+      FabricEndpoint::CreateCtrlEndpoint(nullptr));
+  }
 
   /*!
    * \brief Add receiver's address and ID to the sender's namebook
@@ -101,12 +96,13 @@ class FabricSender : public Sender {
     return std::string("fabric:") +
            fep->fabric_provider->prov_name;
   }
+  // ~FabricSender() override { Finalize(); }
 
  private:
   std::unique_ptr<FabricEndpoint> ctrl_ep;
 
   // fep uses global singleton from ThreadLocalStore
-  FabricEndpoint* fep;
+  std::shared_ptr<FabricEndpoint> fep;
 
   /*!
    * \brief receivers' address
@@ -154,12 +150,10 @@ class FabricReceiver : public Receiver {
    * \brief Receiver constructor
    * \param queue_size size of message queue.
    */
-  explicit FabricReceiver(int64_t queue_size)
-      : Receiver(queue_size),
-        fep(dmlc::ThreadLocalStore<FabricEndpoint>::Get()) {
-          std::string net_type = getEnvVar("DGL_NETTYPE");
-          fep->Init(net_type);
-        }
+  explicit FabricReceiver(int64_t queue_size, std::string net_type)
+      : Receiver(queue_size), fep(FabricEndpoint::GetEndpoint()) {
+    fep->Init(net_type);
+  }
 
   /*!
    * \brief Wait for all the Senders to connect
@@ -169,7 +163,7 @@ class FabricReceiver : public Receiver {
    *
    * Wait() is not thread-safe and only one thread can invoke this API.
    */
-  bool Wait(const char* addr, int num_sender);
+  bool Wait(const char* addr, int num_sender) override;
 
   /*!
    * \brief Recv data from Sender. Actually removing data from msg_queue.
@@ -183,7 +177,7 @@ class FabricReceiver : public Receiver {
    * (3) Memory allocated by communicator but will not own it after the function
    * returns.
    */
-  STATUS Recv(Message* msg, int* send_id);
+  STATUS Recv(Message* msg, int* send_id) override;
 
   /*!
    * \brief Recv data from a specified Sender. Actually removing data from
@@ -196,24 +190,24 @@ class FabricReceiver : public Receiver {
    * (3) Memory allocated by communicator but will not own it after the function
    * returns.
    */
-  STATUS RecvFrom(Message* msg, int send_id);
+  STATUS RecvFrom(Message* msg, int send_id) override;
 
   /*!
    * \brief Finalize SocketReceiver
    *
    * Finalize() is not thread-safe and only one thread can invoke this API.
    */
-  void Finalize();
+  void Finalize() override;
 
-  void PollCompletionQueue(struct fi_cq_tagged_entry* cq_entries,
+  bool PollCompletionQueue(struct fi_cq_tagged_entry* cq_entries,
                            fi_addr_t* source_addrs);
 
-  void HandleCompletionEvent(const struct fi_cq_tagged_entry& cq_entry,
+  bool HandleCompletionEvent(const struct fi_cq_tagged_entry& cq_entry,
                              const fi_addr_t& source_addrs);
   /*!
    * \brief Communicator type: 'socket'
    */
-  inline std::string Type() const {
+  inline std::string Type() const override {
     return std::string("fabric:") +
            fep->fabric_provider->prov_name;
   }
@@ -225,14 +219,14 @@ class FabricReceiver : public Receiver {
    * Note that, the RecvLoop will finish its loop-job and exit thread
    * when the main thread invokes Signal() API on the message queue.
    */
-  void RecvLoop();
+  void RecvLoop(MessageQueue* queue);
 
  private:
   std::atomic<bool> should_stop_polling_;
 
   std::unique_ptr<FabricEndpoint> ctrl_ep;
 
-  FabricEndpoint* fep;
+  std::shared_ptr<FabricEndpoint> fep;
 
   int receiver_id_;
   /*!

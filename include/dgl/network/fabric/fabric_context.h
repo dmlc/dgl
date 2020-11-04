@@ -104,9 +104,9 @@ class FabricContext {
 
     // fi_av_straddr: human readable name
     fi_av_straddr(av.get(), addr.name, readable_addr.name, &readable_addr.len);
-    LOG(INFO) << "Endpoint created: " << addr.DebugStr()
-              << " readable endpoint = "
-              << std::string(readable_addr.name, readable_addr.len);
+    // LOG(INFO) << "Endpoint created: " << addr.DebugStr()
+    //           << " readable endpoint = "
+    // << std::string(readable_addr.name, readable_addr.len);
   }
 };
 

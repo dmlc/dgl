@@ -47,7 +47,6 @@ void SocketSender::AddReceiver(const char* addr, int recv_id) {
                << " Please provide right address format, "
                << "e.g, 'socket://127.0.0.1:50051'. ";
   }
-  LOG(INFO) << "Add receiver";
   IPAddr address;
   address.ip = ip_and_port[0];
   address.port = std::stoi(ip_and_port[1]);

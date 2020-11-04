@@ -63,6 +63,11 @@ bool FabricSender::Connect() {
   };
 
   for (auto kv : peer_fi_addr) {
+    char msg[32] = {};
+    fep->Recv(msg, handshake_msg.size(), kAddrMsg, kv.second, true);
+  }
+
+  for (auto kv : peer_fi_addr) {
     // LOG(INFO) << msg_queue_[kv.first].get();
     // LOG(INFO) << kv ) << kv.first;
             
@@ -86,21 +91,21 @@ STATUS FabricSender::Send(Message msg, int recv_id) {
 void FabricSender::SendLoop(fi_addr_t peer_addr, MessageQueue* queue) {
   CHECK_NOTNULL(queue);
   bool exit = false;
-  {LOG(INFO) << "Start sendloop";}
+  struct fi_cq_tagged_entry cq_entries[kMaxConcurrentWorkRequest];
   while (!exit) {
     Message* msg_ptr = new Message();
     STATUS code = queue->Remove(msg_ptr);
     // TODO(AZ): How to finalize queue
     if (code == QUEUE_CLOSE) {
-      // msg->size = 0;  // send an end-signal to receiver
+      int64_t* exit_code = new int64_t(0);
+      fep->Send(exit_code, sizeof(msg_ptr->size), kSizeMsg, peer_addr);
       delete msg_ptr;
       exit = true;
     }
     fep->Send(&msg_ptr->size, sizeof(msg_ptr->size), kSizeMsg, peer_addr);
-    // LOG(INFO) << "send data";
     fep->Send(msg_ptr->data, msg_ptr->size, kDataMsg, peer_addr, false,
               msg_ptr);
-    // LOG(INFO) << "send data done";
+    PollCompletionQueue(cq_entries);
   }
 }
 

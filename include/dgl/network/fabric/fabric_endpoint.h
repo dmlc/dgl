@@ -55,7 +55,7 @@ class FabricEndpoint {
     CHECK(fabric_ctx != nullptr);
   }
 
-  static FabricEndpoint *CreateTcpEndpoint(const char *addr) {
+  static FabricEndpoint *CreateCtrlEndpoint(const char *addr) {
     return new FabricEndpoint(
       std::shared_ptr<FabricProvider>(FabricProvider::CreateTcpProvider(addr)));
   }
@@ -74,10 +74,10 @@ class FabricEndpoint {
                   &readable_addr.len);
     std::string readable_peer_addr =
       std::string(readable_addr.name, readable_addr.len);
-    LOG(INFO) << "Readable peer addr: " << readable_peer_addr;
+    // LOG(INFO) << "Readable peer addr: " << readable_peer_addr;
     FullFabricAddr full_fi_addr = {
       .faddr = *addr, .readable_addr = readable_peer_addr, .fiaddr = peer_addr};
-    client_ep.push_back(std::move(full_fi_addr));
+    client_ep.push_back(full_fi_addr);
     return peer_addr;
   };
 
@@ -151,6 +151,10 @@ class FabricEndpoint {
         break;
       }
     }
+  }
+  static std::shared_ptr<FabricEndpoint> GetEndpoint() {
+    static std::shared_ptr<FabricEndpoint> global_ep(new FabricEndpoint());
+    return global_ep;
   }
 
   // the name of the peer endpoint

@@ -44,45 +44,45 @@ struct FabricDeleter {
 template <typename T>
 using UniqueFabricPtr = std::unique_ptr<T, FabricDeleter>;
 
-static int ofi_str_to_sin(const char* str, struct sockaddr_in* sin,
-                          size_t* len) {
-  // ;
-  char ip[64];
-  int ret;
+// static int ofi_str_to_sin(const char* str, struct sockaddr_in* sin,
+//                           size_t* len) {
+//   // ;
+//   char ip[64];
+//   int ret;
 
-  *len = sizeof(*sin);
-  sin = reinterpret_cast<struct sockaddr_in*>(calloc(1, *len));
-  if (!sin) return -FI_ENOMEM;
+//   *len = sizeof(*sin);
+//   sin = reinterpret_cast<struct sockaddr_in*>(calloc(1, *len));
+//   if (!sin) return -FI_ENOMEM;
 
-  sin->sin_family = AF_INET;
-  ret = sscanf(str, "%*[^:]://:%" SCNu16, &sin->sin_port);
-  if (ret == 1) goto match_port;
+//   sin->sin_family = AF_INET;
+//   ret = sscanf(str, "%*[^:]://:%" SCNu16, &sin->sin_port);
+//   if (ret == 1) goto match_port;
 
-  ret = sscanf(str, "%*[^:]://%64[^:]:%" SCNu16, ip, &sin->sin_port);
-  if (ret == 2) goto match_ip;
+//   ret = sscanf(str, "%*[^:]://%64[^:]:%" SCNu16, ip, &sin->sin_port);
+//   if (ret == 2) goto match_ip;
 
-  ret = sscanf(str, "%*[^:]://%64[^:/]", ip);
-  if (ret == 1) goto match_ip;
+//   ret = sscanf(str, "%*[^:]://%64[^:/]", ip);
+//   if (ret == 1) goto match_ip;
 
-  LOG(ERROR) << "Malformed FI_ADDR_STR: " << str;
-err:
-  // free(sin);
-  LOG(ERROR) << "ERR: " << str;
-  return -FI_EINVAL;
+//   LOG(ERROR) << "Malformed FI_ADDR_STR: " << str;
+// err:
+//   // free(sin);
+//   LOG(ERROR) << "ERR: " << str;
+//   return -FI_EINVAL;
 
-match_ip:
-  ip[sizeof(ip) - 1] = '\0';
-  ret = inet_pton(AF_INET, ip, &sin->sin_addr);
-  if (ret != 1) {
-    LOG(ERROR) << "Unable to convert IPv4 address: " << ip;
-    goto err;
-  }
+// match_ip:
+//   ip[sizeof(ip) - 1] = '\0';
+//   ret = inet_pton(AF_INET, ip, &sin->sin_addr);
+//   if (ret != 1) {
+//     LOG(ERROR) << "Unable to convert IPv4 address: " << ip;
+//     goto err;
+//   }
 
-match_port:
-  sin->sin_port = htons(sin->sin_port);
-  // *addr = sin;
-  return 0;
-}
+// match_port:
+//   sin->sin_port = htons(sin->sin_port);
+//   // *addr = sin;
+//   return 0;
+// }
 
 struct FabricAddr {
   // endpoint name

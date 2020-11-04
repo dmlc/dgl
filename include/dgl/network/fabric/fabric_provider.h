@@ -40,6 +40,10 @@ class FabricProvider {
 
     CHECK_NE(ret, -FI_ENODATA) << "Could not find any optimal provider";
     check_err(ret, "fi_getinfo failed");
+
+    LOG(INFO) << "Found a fabric provider [" << 0 << "] "
+              << info->fabric_attr->prov_name << ":"
+              << fi_tostr(&info->addr_format, FI_TYPE_ADDR_FORMAT);
     // struct fi_info *providers = info.get();
     // int i = 0;
     // while (providers) {
@@ -63,10 +67,7 @@ class FabricProvider {
     hints->tx_attr->msg_order = FI_ORDER_SAS;
     hints->rx_attr->msg_order = FI_ORDER_SAS;
     // hints->domain_attr->av_type = FI_AV_TABLE;
-    // char *prov = new char("tcp");
     hints->fabric_attr->prov_name = strdup("udp");
-
-    struct sockaddr_in *sdr = new struct sockaddr_in();
 
     struct fi_info *info_;
     int ret = -1;
@@ -74,8 +75,6 @@ class FabricProvider {
       std::vector<std::string> substring, hostport;
       SplitStringUsing(addr, "//", &substring);
       SplitStringUsing(substring[1], ":", &hostport);
-      // ofi_str_to_sin(addr, sdr, &hints->src_addrlen);
-      // hints->src_addr = &sdr;
       ret = fi_getinfo(FABRIC_VERSION, hostport[0].c_str(), hostport[1].c_str(),
                        FI_SOURCE, hints.get(), &info_);
     } else {
@@ -85,7 +84,7 @@ class FabricProvider {
 
     // fi_getinfo
     FabricProvider *provider = new FabricProvider();
-    // provider->prov_name = "tcp";
+    provider->prov_name = "udp";
     provider->info.reset(info_);
 
     CHECK_NE(ret, -FI_ENODATA) << "Could not find any optimal provider";
