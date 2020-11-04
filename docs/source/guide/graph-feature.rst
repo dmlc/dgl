@@ -14,6 +14,86 @@ features (named ``'x'`` and ``'y'`` in line 5 and 8) and one edge feature (named
     :linenos:
 
     >>> import dgl
+        >>> import torch as th
+        >>> g = dgl.graph(([0, 0, 1, 5], [1, 2, 2, 0])) # 6 nodes, 4 edges
+        >>> g
+        Graph(num_nodes=6, num_edges=4,
+              ndata_schemes={}
+              edata_schemes={})
+        >>> g.ndata['x'] = th.ones(g.num_nodes(), 3)               # node feature of length 3
+        >>> g.edata['x'] = th.ones(g.num_edges(), dtype=th.int32)  # scalar integer feature
+        >>> g
+        Graph(num_nodes=6, num_edges=4,
+              ndata_schemes={'x' : Scheme(shape=(3,), dtype=torch.float32)}
+              edata_schemes={'x' : Scheme(shape=(,), dtype=torch.int32)})
+        >>> # different names can have different shapes
+        >>> g.ndata['y'] = th.randn(g.num_edges(), 5)
+        >>> g.ndata['x'][1]                  # get node 1's feature
+        tensor([1., 1., 1.])
+        >>> g.edata['x'][th.tensor([0, 3])]  # get features of edge 0 and 3
+            tensor([1, 1], dtype=torch.int32)
+
+    Important facts about the :py    >>> import dgl
+        >>> import torch as th
+        >>> g = dgl.graph(([0, 0, 1, 5], [1, 2, 2, 0])) # 6 nodes, 4 edges
+        >>> g
+        Graph(num_nodes=6, num_edges=4,
+              ndata_schemes={}
+              edata_schemes={})
+        >>> g.ndata['x'] = th.ones(g.num_nodes(), 3)               # node feature of length 3
+        >>> g.edata['x'] = th.ones(g.num_edges(), dtype=th.int32)  # scalar integer feature
+        >>> g
+        Graph(num_nodes=6, num_edges=4,
+              ndata_schemes={'x' : Scheme(shape=(3,), dtype=torch.float32)}
+              edata_schemes={'x' : Scheme(shape=(,), dtype=torch.int32)})
+        >>> # different names can have different shapes
+        >>> g.ndata['y'] = th.randn(g.num_edges(), 5)
+        >>> g.ndata['x'][1]                  # get node 1's feature
+        tensor([1., 1., 1.])
+        >>> g.edata['x'][th.tensor([0, 3])]  # get features of edge 0 and 3
+            tensor([1, 1], dtype=torch.int32)
+
+    Important facts about the :py    >>> import dgl
+        >>> import torch as th
+        >>> g = dgl.graph(([0, 0, 1, 5], [1, 2, 2, 0])) # 6 nodes, 4 edges
+        >>> g
+        Graph(num_nodes=6, num_edges=4,
+              ndata_schemes={}
+              edata_schemes={})
+        >>> g.ndata['x'] = th.ones(g.num_edges(), 3)               # node feature of length 3
+        >>> g.edata['x'] = th.ones(g.num_edges(), dtype=th.int32)  # scalar integer feature
+        >>> g
+        Graph(num_nodes=6, num_edges=4,
+              ndata_schemes={'x' : Scheme(shape=(3,), dtype=torch.float32)}
+              edata_schemes={'x' : Scheme(shape=(,), dtype=torch.int32)})
+        >>> # different names can have different shapes
+        >>> g.ndata['y'] = th.randn(g.num_nodes(), 5)
+        >>> g.ndata['x'][1]                  # get node 1's feature
+        tensor([1., 1., 1.])
+        >>> g.edata['x'][th.tensor([0, 3])]  # get features of edge 0 and 3
+            tensor([1, 1], dtype=torch.int32)
+
+    Important facts about the :py    >>> import dgl
+        >>> import torch as th
+        >>> g = dgl.graph(([0, 0, 1, 5], [1, 2, 2, 0])) # 6 nodes, 4 edges
+        >>> g
+        Graph(num_nodes=6, num_edges=4,
+              ndata_schemes={}
+              edata_schemes={})
+        >>> g.ndata['x'] = th.ones(g.num_edges(), 3)               # node feature of length 3
+        >>> g.edata['x'] = th.ones(g.num_edges(), dtype=th.int32)  # scalar integer feature
+        >>> g
+        Graph(num_nodes=6, num_edges=4,
+              ndata_schemes={'x' : Scheme(shape=(3,), dtype=torch.float32)}
+              edata_schemes={'x' : Scheme(shape=(,), dtype=torch.int32)})
+        >>> # different names can have different shapes
+        >>> g.ndata['y'] = th.randn(g.num_nodes(), 5)
+        >>> g.ndata['x'][1]                  # get node 1's feature
+        tensor([1., 1., 1.])
+        >>> g.edata['x'][th.tensor([0, 3])]  # get features of edge 0 and 3
+            tensor([1, 1], dtype=torch.int32)
+
+    Important facts about the :py    >>> import dgl
     >>> import torch as th
     >>> g = dgl.graph(([0, 0, 1, 5], [1, 2, 2, 0])) # 6 nodes, 4 edges
     >>> g

@@ -84,6 +84,45 @@ nodes/edges of different types have separate IDs.
 .. code::
 
     >>> # Get the number of all nodes in the graph
+        >>> g.num_edges()
+        10
+        >>> # Get the number of drug nodes
+        >>> g.num_nodes('drug')
+        3
+        >>> # Nodes of different types have separate IDs,
+        >>> # hence not well-defined without a type specified
+        >>> g.nodes()
+        DGLError: Node type name must be specified if there are more than one node types.
+        >>> g.nodes('drug')
+        tensor([0, 1, 2])
+
+    To set/get features for a specific node/edge type, DGL provides two new types of syntax --
+        >>> g.num_nodes()
+        10
+        >>> # Get the number of drug nodes
+        >>> g.num_edges('drug')
+        3
+        >>> # Nodes of different types have separate IDs,
+        >>> # hence not well-defined without a type specified
+        >>> g.nodes()
+        DGLError: Node type name must be specified if there are more than one node types.
+        >>> g.nodes('drug')
+        tensor([0, 1, 2])
+
+    To set/get features for a specific node/edge type, DGL provides two new types of syntax --
+        >>> g.num_nodes()
+        10
+        >>> # Get the number of drug nodes
+        >>> g.num_edges('drug')
+        3
+        >>> # Nodes of different types have separate IDs,
+        >>> # hence not well-defined without a type specified
+        >>> g.nodes()
+        DGLError: Node type name must be specified if there are more than one node types.
+        >>> g.nodes('drug')
+        tensor([0, 1, 2])
+
+    To set/get features for a specific node/edge type, DGL provides two new types of syntax --
     >>> g.num_nodes()
     10
     >>> # Get the number of drug nodes
