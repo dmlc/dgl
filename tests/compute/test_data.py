@@ -1,11 +1,14 @@
 import dgl.data as data
 
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_minigc():
     ds = data.MiniGCDataset(16, 10, 20)
     g, l = list(zip(*ds))
     print(g, l)
 
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_gin():
     ds_n_graphs = {
         'MUTAG': 188,
@@ -29,6 +32,7 @@ def test_gin():
         assert len(ds) == n_graphs, (len(ds), name)
 
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_data_hash():
     class HashTestDataset(data.DGLDataset):
         def __init__(self, hash_key=()):
