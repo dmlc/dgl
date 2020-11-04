@@ -45,7 +45,7 @@ Important facts about the :py:attr:`~dgl.DGLGraph.ndata`/:py:attr:`~dgl.DGLGraph
   nodes/edges in the graph.
 - Features of the same name must have the same dimensionality and data type.
 - The feature tensor is in row-major layout -- each row-slice stores the feature of one
-  node or edge (e.g., see lines 10-11 in the above example).
+  node or edge (e.g., see lines 16-19 in the above example).
 
 For weighted graphs, one can store the weights as an edge feature as below.
 
