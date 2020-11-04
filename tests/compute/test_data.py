@@ -1,4 +1,6 @@
 import dgl.data as data
+import unittest
+import backend as F
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
