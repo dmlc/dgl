@@ -248,7 +248,8 @@ class GINDataset(DGLBuiltinDataset):
                 nlabel_set = nlabel_set.union(
                     set([F.as_scalar(nl) for nl in g.ndata['label']]))
             nlabel_set = list(nlabel_set)
-            if len(nlabel_set) == np.max(nlabel_set) + 1 and np.min(nlabel_set) == 0:
+            is_label_valid = all([label in self.nlabel_dict for label in nlabel_set])
+            if is_label_valid and len(nlabel_set) == np.max(nlabel_set) + 1 and np.min(nlabel_set) == 0:
                 # Note this is different from the author's implementation. In weihua916's implementation,
                 # the labels are relabeled anyway. But here we didn't relabel it if the labels are contiguous
                 # to make it consistent with the original dataset

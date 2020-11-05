@@ -56,6 +56,10 @@ def tensor(data, dtype=None):
         return nd.array(data, dtype=dtype)
 
 def as_scalar(data):
+    if data.size != 1:
+        raise ValueError("The current array is not a scalar")
+    if data.shape != (1,):
+        data = data.expand_dims(axis=0)
     return data.asscalar()
 
 def get_preferred_sparse_format():
