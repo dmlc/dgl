@@ -11,11 +11,7 @@
 .. figure:: https://data.dgl.ai/asset/image/userguide_data_flow.png
     :align: center
 
-    在类DGLDataset中定义的图数据输入管道的流程图。
-
-To process a graph dataset located in a remote server or local disk, one can
-define a class, say ``MyDataset``, inheriting from :class:`dgl.data.DGLDataset`. The
-template of ``MyDataset`` is as follows.
+    在类DGLDataset中定义的图数据处理管道的流程图。
 
 为了处理位于远程服务器或本地磁盘上的图数据集，在下面的例子中我们定义了一个类，称为 ``MyDataset``,
 它继承自 :class:`dgl.data.DGLDataset`。
