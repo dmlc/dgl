@@ -12,7 +12,7 @@ DGL推荐用户将图数据处理为 :class:`dgl.data.DGLDataset` 的子类。�
 本章路线图
 -----------
 
-这一章介绍了如何定制化DGL的数据集。解释了数据管道是如何运作的，并介绍了每个部分是如何实现的。
+这一章介绍了如何定制化DGL的数据集。解释了数据管道是如何运作的，并介绍了数据管道的每个部分的实现方式。
 
 * :ref:`guide_cn-data-pipeline-dataset`
 * :ref:`guide_cn-data-pipeline-download`
