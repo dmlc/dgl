@@ -2,8 +2,10 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import random
 import time
 
+import dgl
 import dgl.function as fn
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,10 +19,22 @@ from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 from torch import nn
 
 from models import GAT
+from utils import BatchSampler, DataLoaderWrapper
 
 device = None
 dataset = "ogbn-proteins"
 n_node_feats, n_edge_feats, n_classes = 0, 8, 112
+
+
+def seed(seed=0):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    dgl.random.seed(seed)
 
 
 def load_data(dataset):
@@ -37,19 +51,17 @@ def load_data(dataset):
 
 def preprocess(graph, labels):
     global n_node_feats
-    # The sum of the weights of adjacent edges is used as the node feature.
-    graph.update_all(fn.copy_e("feat", "feat_copy"), fn.sum("feat_copy", "feat"))
 
+    # The sum of the weights of adjacent edges is used as node features.
+    graph.update_all(fn.copy_e("feat", "feat_copy"), fn.sum("feat_copy", "feat"))
     n_node_feats = graph.ndata["feat"].shape[-1]
 
     return graph, labels
 
 
 def gen_model(args):
-    n_node_feats_ = n_node_feats
-
     model = GAT(
-        n_node_feats_,
+        n_node_feats,
         n_edge_feats,
         n_classes,
         n_layers=args.n_layers,
@@ -58,26 +70,16 @@ def gen_model(args):
         edge_emb=16,
         activation=F.relu,
         dropout=args.dropout,
-        attn_dropout=args.attn_dropout,
+        input_drop=args.input_drop,
+        attn_drop=args.attn_drop,
+        edge_drop=args.edge_drop,
+        use_attn_dst=not args.no_attn_dst,
     )
 
     return model
 
 
-def compute_score(pred, labels, evaluator):
-    return evaluator.eval({"y_pred": pred, "y_true": labels})["rocauc"]
-
-
-def train(args, model, graph, _labels, train_idx, criterion, optimizer, _evaluator):
-    n_blocks = 10
-    batch_size = (len(train_idx) + n_blocks - 1) // n_blocks
-    # batch_size = len(train_idx)
-    sampler = MultiLayerNeighborSampler([15 for _ in range(args.n_layers)])
-    # sampler = MultiLayerFullNeighborSampler(args.n_layers)
-    dataloader = NodeDataLoader(
-        graph.cpu(), train_idx.cpu(), sampler, batch_size=batch_size, shuffle=True, drop_last=False, num_workers=2
-    )
-
+def train(_args, model, dataloader, _labels, _train_idx, criterion, optimizer, _evaluator):
     model.train()
 
     loss_sum, total = 0, 0
@@ -96,38 +98,28 @@ def train(args, model, graph, _labels, train_idx, criterion, optimizer, _evaluat
         loss_sum += loss.item() * count
         total += count
 
-        del loss, pred
+        torch.cuda.empty_cache()
 
     return loss_sum / total
 
 
 @torch.no_grad()
-def evaluate(args, model, graph, labels, train_idx, val_idx, test_idx, criterion, evaluator):
-    sampler = MultiLayerNeighborSampler([63 for _ in range(args.n_layers)])
-    # sampler = MultiLayerFullNeighborSampler(args.n_layers)
-    dataloader = NodeDataLoader(
-        graph.cpu(),
-        torch.cat([train_idx.cpu(), val_idx.cpu(), test_idx.cpu()]),
-        sampler,
-        batch_size=32768,
-        shuffle=False,
-        drop_last=False,
-        num_workers=2,
-    )
-
+def evaluate(_args, model, dataloader, labels, train_idx, val_idx, test_idx, criterion, evaluator):
     model.eval()
 
     preds = torch.zeros(labels.shape).to(device)
 
+    # Due to the limitation of memory capacity, we calculate the average of logits 'eval_times' times.
     eval_times = 1
 
-    # Due to the limitation of memory capacity, we calculate the average of logits 'eval_times' times.
     for _ in range(eval_times):
         for _input_nodes, output_nodes, subgraphs in dataloader:
             subgraphs = [b.to(device) for b in subgraphs]
 
             pred = model(subgraphs)
-            preds[output_nodes] += pred.detach()
+            preds[output_nodes] += pred
+
+            torch.cuda.empty_cache()
 
     preds /= eval_times
 
@@ -136,9 +128,9 @@ def evaluate(args, model, graph, labels, train_idx, val_idx, test_idx, criterion
     test_loss = criterion(preds[test_idx], labels[test_idx].float()).item()
 
     return (
-        compute_score(preds[train_idx], labels[train_idx], evaluator),
-        compute_score(preds[val_idx], labels[val_idx], evaluator),
-        compute_score(preds[test_idx], labels[test_idx], evaluator),
+        evaluator(preds[train_idx], labels[train_idx]),
+        evaluator(preds[val_idx], labels[val_idx]),
+        evaluator(preds[test_idx], labels[test_idx]),
         train_loss,
         val_loss,
         test_loss,
@@ -146,6 +138,34 @@ def evaluate(args, model, graph, labels, train_idx, val_idx, test_idx, criterion
 
 
 def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running):
+    evaluator_wrapper = lambda pred, labels: evaluator.eval({"y_pred": pred, "y_true": labels})["rocauc"]
+
+    train_batch_size = (len(train_idx) + 9) // 10
+    # batch_size = len(train_idx)
+    train_sampler = MultiLayerNeighborSampler([16 for _ in range(args.n_layers)])
+    # sampler = MultiLayerFullNeighborSampler(args.n_layers)
+    train_dataloader = DataLoaderWrapper(
+        NodeDataLoader(
+            graph.cpu(),
+            train_idx.cpu(),
+            train_sampler,
+            batch_sampler=BatchSampler(len(train_idx), batch_size=train_batch_size),
+            num_workers=4,
+        )
+    )
+
+    eval_sampler = MultiLayerNeighborSampler([60 for _ in range(args.n_layers)])
+    # sampler = MultiLayerFullNeighborSampler(args.n_layers)
+    eval_dataloader = DataLoaderWrapper(
+        NodeDataLoader(
+            graph.cpu(),
+            torch.cat([train_idx.cpu(), val_idx.cpu(), test_idx.cpu()]),
+            eval_sampler,
+            batch_sampler=BatchSampler(graph.number_of_nodes(), batch_size=32768),
+            num_workers=4,
+        )
+    )
+
     criterion = nn.BCEWithLogitsLoss()
 
     model = gen_model(args).to(device)
@@ -162,14 +182,14 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
     for epoch in range(1, args.n_epochs + 1):
         tic = time.time()
 
-        loss = train(args, model, graph, labels, train_idx, criterion, optimizer, evaluator)
+        loss = train(args, model, train_dataloader, labels, train_idx, criterion, optimizer, evaluator_wrapper)
 
         toc = time.time()
         total_time += toc - tic
 
-        if epoch % args.eval_every == 0 or epoch % args.log_every == 0:
+        if epoch == args.n_epochs or epoch % args.eval_every == 0 or epoch % args.log_every == 0:
             train_score, val_score, test_score, train_loss, val_loss, test_loss = evaluate(
-                args, model, graph, labels, train_idx, val_idx, test_idx, criterion, evaluator
+                args, model, eval_dataloader, labels, train_idx, val_idx, test_idx, criterion, evaluator_wrapper
             )
 
             if val_score > best_val_score:
@@ -177,7 +197,9 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
                 final_test_score = test_score
 
             if epoch % args.log_every == 0:
-                print(f"Run: {n_running}/{args.n_runs}, Epoch: {epoch}/{args.n_epochs}")
+                print(
+                    f"Run: {n_running}/{args.n_runs}, Epoch: {epoch}/{args.n_epochs}, Average epoch time: {total_time / epoch:.2f}s"
+                )
                 print(
                     f"Loss: {loss:.4f}\n"
                     f"Train/Val/Test loss: {train_loss:.4f}/{val_loss:.4f}/{test_loss:.4f}\n"
@@ -193,7 +215,8 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         lr_scheduler.step(val_score)
 
     print("*" * 50)
-    print(f"Average epoch time: {total_time / args.n_epochs}, Test score: {final_test_score}")
+    print(f"Best val score: {best_val_score:.4f}, Final test score: {final_test_score}")
+    print("*" * 50)
 
     if args.plot_curves:
         fig = plt.figure(figsize=(24, 24))
@@ -245,14 +268,18 @@ def main():
     argparser = argparse.ArgumentParser("GAT on OGBN-Proteins", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argparser.add_argument("--cpu", action="store_true", help="CPU mode. This option overrides '--gpu'.")
     argparser.add_argument("--gpu", type=int, default=0, help="GPU device ID.")
-    argparser.add_argument("--n-runs", type=int, default=6)
+    argparser.add_argument("--seed", type=int, help="seed", default=0)
+    argparser.add_argument("--n-runs", type=int, default=10)
     argparser.add_argument("--n-epochs", type=int, default=1200)
-    argparser.add_argument("--n-heads", type=int, default=15)
+    argparser.add_argument("--no-attn-dst", action="store_true", help="Don't use attn_dst.")
+    argparser.add_argument("--n-heads", type=int, default=6)
     argparser.add_argument("--lr", type=float, default=0.01)
     argparser.add_argument("--n-layers", type=int, default=6)
-    argparser.add_argument("--n-hidden", type=int, default=32)
-    argparser.add_argument("--dropout", type=float, default=0.3)
-    argparser.add_argument("--attn-dropout", type=float, default=0.1)
+    argparser.add_argument("--n-hidden", type=int, default=80)
+    argparser.add_argument("--dropout", type=float, default=0.25)
+    argparser.add_argument("--input-drop", type=float, help="input drop rate", default=0.1)
+    argparser.add_argument("--attn-drop", type=float, help="attention dropout rate", default=0.0)
+    argparser.add_argument("--edge-drop", type=float, help="edge drop rate", default=0.1)
     argparser.add_argument("--wd", type=float, default=0)
     argparser.add_argument("--eval-every", type=int, default=5)
     argparser.add_argument("--log-every", type=int, default=5)
@@ -262,7 +289,9 @@ def main():
     if args.cpu:
         device = torch.device("cpu")
     else:
-        device = torch.device("cuda:%d" % args.gpu)
+        device = torch.device(f"cuda:{args.gpu}")
+
+    seed(args.seed)
 
     graph, labels, train_idx, val_idx, test_idx, evaluator = load_data(dataset)
     graph, labels = preprocess(graph, labels)
@@ -293,20 +322,10 @@ def main():
 if __name__ == "__main__":
     main()
 
-# Average epoch time: 25.529962027311324, Test score: 0.8653145275750485
-# Namespace(attn_dropout=0.1, cpu=False, dropout=0.3, eval_every=5, gpu=0, log_every=5, lr=0.01, n_epochs=1000, n_heads=15, n_hidden=32, n_layers=6, n_runs=6, plot_curves=True, wd=0)
-# Runned 6 times
-# Val scores: [0.9158038128041037, 0.9152629032809712, 0.9156345294978633, 0.9150481914782242, 0.9157425464460424, 0.9161184010407541]
-# Test scores: [0.8677984231764927, 0.8641230174511977, 0.8659541569395243, 0.8657108194912686, 0.8626434354220878, 0.8653145275750485]
-# Average val score: 0.9156017307579932 ± 0.0003535298061971046
-# Average test score: 0.8652573966759366 ± 0.0015953451242433543
-# Number of params: 2436304
-
-# Average epoch time: 25.627150499622026, Test score: 0.8645282897120268
-# Namespace(attn_dropout=0.1, cpu=False, dropout=0.3, eval_every=5, gpu=0, log_every=5, lr=0.01, n_epochs=1200, n_heads=15, n_hidden=32, n_layers=6, n_runs=6, plot_curves=True, wd=0)
-# Runned 6 times
-# Val scores: [0.9160934481239426, 0.9154423466083738, 0.9164203656218792, 0.916688827518927, 0.9170246800652017, 0.9160127508532699]
-# Test scores: [0.8675282938770733, 0.866573316395541, 0.8669931192520849, 0.8673913226417784, 0.8657328707151425, 0.8645282897120268]
-# Average val score: 0.9162804031319323 ± 0.0005081464332659773
-# Average test score: 0.8664578687656078 ± 0.0010460931120063052
-# Number of params: 2436304
+# Namespace(attn_drop=0.0, cpu=False, dropout=0.25, edge_drop=0.1, eval_every=5, gpu=3, input_drop=0.1, log_every=5, lr=0.01, n_epochs=1200, n_heads=6, n_hidden=80, n_layers=6, n_runs=10, no_attn_dst=False, plot_curves=True, seed=0, wd=0)
+# Runned 10 times
+# Val scores: [0.9191360923559534, 0.9190902739433363, 0.91955548684813, 0.91938196250152, 0.9188466895131054, 0.9197077629866909, 0.9197391599757976, 0.9195898788031738, 0.9193022233033481, 0.9193399302341642]
+# Test scores: [0.8667826604519867, 0.8687609429765975, 0.8672772211837847, 0.8681650855671987, 0.8699117519793396, 0.8690210391385448, 0.8728497958960492, 0.8685245877500837, 0.864323193259458, 0.8668325831720998]
+# Average val score: 0.9193689460465219 ± 0.0002730491100383192
+# Average test score: 0.8682448861375143 ± 0.0021303924285955614
+# Number of params: 2475232
