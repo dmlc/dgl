@@ -39,7 +39,7 @@ python3 gat.py
 
 Here are the results over 10 runs.
 
-|     | Validation ROC-AUC |  Test ROC-AUC   | #Parameters |
-|:---:|:------------------:|:---------------:|:-----------:|
-| GAT |  0.9194 ± 0.0003   | 0.8682 ± 0.0021 |  2,475,232  |
+| Method | Validation ROC-AUC |  Test ROC-AUC   | #Parameters |
+|:------:|:------------------:|:---------------:|:-----------:|
+|  GAT   |  0.9194 ± 0.0003   | 0.8682 ± 0.0021 |  2,475,232  |
 
