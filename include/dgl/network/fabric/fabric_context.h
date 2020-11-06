@@ -101,12 +101,15 @@ class FabricContext {
     // fi_getname: get endpoint name
     ret = fi_getname((fid_t)ep.get(), addr.name, &addr.len);
     check_err(ret, "Call to fi_getname() failed");
+    LOG(INFO) << "Endpoint created raw: " << std::string(addr.name, addr.len)
+              << " readable endpoint = "
+              << std::string(readable_addr.name, readable_addr.len);
 
     // fi_av_straddr: human readable name
     fi_av_straddr(av.get(), addr.name, readable_addr.name, &readable_addr.len);
-    // LOG(INFO) << "Endpoint created: " << addr.DebugStr()
-    //           << " readable endpoint = "
-    // << std::string(readable_addr.name, readable_addr.len);
+    LOG(INFO) << "Endpoint created: " << addr.DebugStr()
+              << " readable endpoint = "
+              << std::string(readable_addr.name, readable_addr.len);
   }
 };
 

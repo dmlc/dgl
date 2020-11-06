@@ -45,6 +45,9 @@ class FabricEndpoint {
       fabric_ctx =
         std::unique_ptr<FabricContext>(new FabricContext(fabric_provider));
       CHECK(fabric_ctx != nullptr);
+    } else {
+      CHECK_EQ(this->fabric_provider->prov_name, prov_name)
+        << "Inconsistent FabricEndpoint initialization";
     }
   }
 
@@ -74,7 +77,7 @@ class FabricEndpoint {
                   &readable_addr.len);
     std::string readable_peer_addr =
       std::string(readable_addr.name, readable_addr.len);
-    // LOG(INFO) << "Readable peer addr: " << readable_peer_addr;
+    LOG(INFO) << "Readable peer addr: " << readable_peer_addr;
     FullFabricAddr full_fi_addr = {
       .faddr = *addr, .readable_addr = readable_peer_addr, .fiaddr = peer_addr};
     client_ep.push_back(full_fi_addr);
@@ -108,11 +111,11 @@ class FabricEndpoint {
   }
 
   void Recv(void *buffer, size_t size, uint64_t tag, fi_addr_t peer_addr,
-            bool sync = false) {
+            bool sync = false, uint64_t ignore = 0) {
     // { LOG(INFO) << "ep recv" << sync; }
     while (true) {
       int ret = fi_trecv(fabric_ctx->ep.get(), buffer, size, nullptr, peer_addr,
-                         tag, 0, nullptr);
+                         tag, ignore, nullptr);
       if (ret == -FI_EAGAIN) {
         // no resources
         LOG(WARNING) << "fi_recv: FI_EAGAIN";

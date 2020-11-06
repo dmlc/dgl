@@ -28,7 +28,7 @@
 namespace dgl {
 namespace network {
 
-static const int FABRIC_VERSION = FI_VERSION(1, 8);
+static const int FABRIC_VERSION = FI_VERSION(1, 10);
 
 struct FabricDeleter {
   void operator()(fi_info* info) { fi_freeinfo(info); }

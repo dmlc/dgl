@@ -7,20 +7,20 @@ namespace dgl {
 namespace network {
 
 void FabricSender::AddReceiver(const char* addr, int recv_id) {
+  LOG(INFO) << "Add Receiver: " << addr;
   struct sockaddr_in sin = {};
-  FabricAddr fabric_addr;
+  FabricAddr ctrl_fi_addr;
   sin.sin_family = AF_INET;
   std::vector<std::string> substring, hostport;
   SplitStringUsing(addr, "//", &substring);
   SplitStringUsing(substring[1], ":", &hostport);
-  // sin.sin_addr = hostport[0];
-  CHECK(inet_pton(AF_INET, hostport[0].c_str(), &sin.sin_addr)>0) << "Invalid ip";
+  CHECK(inet_pton(AF_INET, hostport[0].c_str(), &sin.sin_addr) > 0)
+    << "Invalid ip";
   sin.sin_port = htons(stoi(hostport[1]));
-  
-  fabric_addr.CopyFrom(&sin, sizeof(sin));
-  peer_fi_addr[recv_id]=ctrl_ep->AddPeerAddr(&fabric_addr);
+
+  ctrl_fi_addr.CopyFrom(&sin, sizeof(sin));
+  ctrl_peer_fi_addr[recv_id] = ctrl_ep->AddPeerAddr(&ctrl_fi_addr);
   // ctrl_ep->ctrl_peer_addr[recv_id] = address;
-  msg_queue_[recv_id] = std::make_shared<MessageQueue>(queue_size_);
 }
 
 void FabricSender::Finalize() {
@@ -30,52 +30,52 @@ void FabricSender::Finalize() {
     while (mq.second->Empty() == false) {
 #ifdef _WIN32
       // just loop
-#else   // !_WIN32
+      //
+#else  // !_WIN32
       usleep(1000);
 #endif  // _WIN32
     }
     int ID = mq.first;
     mq.second->SignalFinished(ID);
   }
+  poll_thread->join();
   // Block main thread until all socket-threads finish their jobs
-  for (auto& thread : threads_) {
-    thread.second->join();
-  }
+  // for (auto& thread : threads_) {
+  //   thread.second->join();
+  // }
 }
 
 bool FabricSender::Connect() {
-  Message msg;
-  size_t num_peer = peer_fi_addr.size();
-  for (int64_t i = 0; i < num_peer; i++) {
-    FabricAddrInfo ctrl_info = {.id = i, .addr = ctrl_ep->fabric_ctx->addr};
-    ctrl_ep->Send(&ctrl_info, sizeof(FabricAddrInfo), kAddrMsg, ctrl_peer_fi_addr[i],
+  size_t num_peer = ctrl_peer_fi_addr.size();
+
+  sender_id = -1;
+  struct FabricAddrInfo addrs;
+  for (auto& kv : ctrl_peer_fi_addr) {
+    // Send local control info to remote
+    FabricAddrInfo ctrl_info = {.sender_id = -1,
+                                .receiver_id = kv.first,
+                                .addr = ctrl_ep->fabric_ctx->addr};
+    ctrl_ep->Send(&ctrl_info, sizeof(FabricAddrInfo), kAddrMsg, kv.second,
                   true);
-
-    FabricAddrInfo fep_info = {.id = i, .addr = fep->fabric_ctx->addr};
-    ctrl_ep->Send(&fep_info, sizeof(FabricAddrInfo), kAddrMsg, ctrl_peer_fi_addr[i],
+    FabricAddrInfo fep_info = {
+      .sender_id = -1, .receiver_id = kv.first, .addr = fep->fabric_ctx->addr};
+    ctrl_ep->Send(&fep_info, sizeof(FabricAddrInfo), kAddrMsg, kv.second, true);
+    ctrl_ep->Recv(&addrs, sizeof(FabricAddrInfo), kAddrMsg, FI_ADDR_UNSPEC,
                   true);
-  }
-  struct FabricAddrInfo addrs[num_peer];
-  for (size_t i = 0; i < num_peer; i++) {
-    ctrl_ep->Recv(&addrs[i], sizeof(FabricAddrInfo), kAddrMsg, FI_ADDR_UNSPEC,
-                  true);
-    peer_fi_addr[addrs[i].id] = fep->AddPeerAddr(&addrs[i].addr);
-  };
+    // CHECK(addrs.receiver_id)
+    peer_fi_addr[kv.first] = fep->AddPeerAddr(&addrs.addr);
+    sender_id = addrs.sender_id;
+    msg_queue_[kv.first] = std::make_shared<MessageQueue>(queue_size_);
 
-  for (auto kv : peer_fi_addr) {
-    char msg[32] = {};
-    fep->Recv(msg, handshake_msg.size(), kAddrMsg, kv.second, true);
+    fep->Recv(handshake_buffer, handshake_msg.length(), kIgnoreMsg,
+              FI_ADDR_UNSPEC);
+    fep->Send(handshake_msg.c_str(), handshake_msg.length(), kIgnoreMsg,
+              peer_fi_addr[kv.first]);
   }
+  LOG(INFO) << "Finish Initialization";
 
-  for (auto kv : peer_fi_addr) {
-    // LOG(INFO) << msg_queue_[kv.first].get();
-    // LOG(INFO) << kv ) << kv.first;
-            
-    threads_[kv.first] = std::make_shared<std::thread>(
-      &FabricSender::SendLoop, this, kv.second, msg_queue_[kv.first].get());
-  }
-
-  ctrl_ep.reset();
+  poll_thread = std::make_shared<std::thread>(&FabricSender::SendLoop, this);
+  // ctrl_ep.reset();
   return true;
 }
 
@@ -84,27 +84,38 @@ STATUS FabricSender::Send(Message msg, int recv_id) {
   CHECK_GT(msg.size, 0);
   CHECK_GE(recv_id, 0);
   // Add data message to message queue
+  // LOG(INFO) << "Queue addr:" << msg_queue_[recv_id].get();
   STATUS code = msg_queue_[recv_id]->Add(msg);
   return code;
 }
 
-void FabricSender::SendLoop(fi_addr_t peer_addr, MessageQueue* queue) {
-  CHECK_NOTNULL(queue);
+void FabricSender::SendLoop() {
+  // sleep(10);
+  // { LOG(INFO) << "Start sendloop"; }
   bool exit = false;
   struct fi_cq_tagged_entry cq_entries[kMaxConcurrentWorkRequest];
   while (!exit) {
-    Message* msg_ptr = new Message();
-    STATUS code = queue->Remove(msg_ptr);
-    // TODO(AZ): How to finalize queue
-    if (code == QUEUE_CLOSE) {
-      int64_t* exit_code = new int64_t(0);
-      fep->Send(exit_code, sizeof(msg_ptr->size), kSizeMsg, peer_addr);
-      delete msg_ptr;
-      exit = true;
+    for (auto& kv : msg_queue_) {
+      Message* msg_ptr = new Message();
+      STATUS code = kv.second->Remove(msg_ptr);
+      // TODO(AZ): How to finalize queue
+      if (code == QUEUE_EMPTY) {
+        continue;
+      } else if (code == QUEUE_CLOSE) {
+        int64_t* exit_code = new int64_t(0);
+        fep->Send(exit_code, sizeof(msg_ptr->size), kSizeMsg | sender_id,
+                  peer_fi_addr[kv.first]);
+        // LOG(INFO) << "Send exit code to:" << kv.first;
+        delete msg_ptr;
+        exit = true;
+      } else if (code == REMOVE_SUCCESS) {
+        // LOG(INFO) << "Send msgs size:" << msg_ptr->size;
+        fep->Send(&msg_ptr->size, sizeof(msg_ptr->size), kSizeMsg | sender_id,
+                  peer_fi_addr[kv.first]);
+        fep->Send(msg_ptr->data, msg_ptr->size, kDataMsg | sender_id,
+                  peer_fi_addr[kv.first], false, msg_ptr);
+      }
     }
-    fep->Send(&msg_ptr->size, sizeof(msg_ptr->size), kSizeMsg, peer_addr);
-    fep->Send(msg_ptr->data, msg_ptr->size, kDataMsg, peer_addr, false,
-              msg_ptr);
     PollCompletionQueue(cq_entries);
   }
 }
@@ -129,7 +140,7 @@ void FabricSender::PollCompletionQueue(struct fi_cq_tagged_entry* cq_entries) {
 
 void FabricSender::HandleCompletionEvent(
   const struct fi_cq_tagged_entry& cq_entry) {
-  if ((cq_entry.op_context) and (cq_entry.tag == kDataMsg)) {
+  if ((cq_entry.op_context) and ((cq_entry.tag & IdMask) == kDataMsg)) {
     Message* msg_ptr = reinterpret_cast<Message*>(cq_entry.op_context);
     if (msg_ptr->deallocator != nullptr) {
       msg_ptr->deallocator(msg_ptr);
