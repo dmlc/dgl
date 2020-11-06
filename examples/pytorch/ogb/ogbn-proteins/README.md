@@ -37,7 +37,7 @@ python3 gat.py
 
 ### Results
 
-Here are the results over 6 runs.
+Here are the results over 10 runs.
 
 |     | Validation ROC-AUC |  Test ROC-AUC   | #Parameters |
 |:---:|:------------------:|:---------------:|:-----------:|
