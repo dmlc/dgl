@@ -53,7 +53,7 @@ Async Copying to/from GPUs
 --------------------------
 .. currentmodule:: dgl.dataloading
 
-Data can be copied from the CPU to the GPU, or from the GPU to the CPU,
+Data can be copied from the CPU to the GPU
 while the GPU is being used for
 computation, using the :class:`AsyncTransferer`.
 For the transfer to be fully asynchronous, the context the

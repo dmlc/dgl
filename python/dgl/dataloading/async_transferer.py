@@ -1,6 +1,5 @@
-""" API for transferring data to/from the GPU over second stream.A """
+"""API for transferring data to the GPU over second stream."""
 
-import dgl
 from .. import backend as F
 from .. import ndarray
 from .. import utils
@@ -37,7 +36,7 @@ class Transfer(object):
 
 
 class AsyncTransferer(object):
-    """ Class for initiating asynchronous copies to/from the GPU on a second
+    """ Class for initiating asynchronous copies to the GPU on a second
     GPU stream.
 
     To initiate a transfer to a GPU:
