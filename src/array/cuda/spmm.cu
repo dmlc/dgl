@@ -5,6 +5,7 @@
  */
 #include <dgl/array.h>
 #include "./spmm.cuh"
+#include "./ge_spmm.cuh"
 #include "./functor.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 
@@ -238,8 +239,19 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
              NDArray efeat,
              NDArray out,
              std::vector<NDArray> out_aux) {
+  int64_t feat_len = bcast.out_len;
+  bool is_scalar_efeat = efeat.NumElements() == csr.indices->shape[0];
+  bool use_efeat = op != "copy_lhs";
+
   if (reduce == "sum") {
-    if (sizeof(IdType) == 4 && op == "copy_lhs") {
+    if ((!use_efeat || is_scalar_efeat) && feat_len > 64) {  // ge-spmm
+      if (use_efeat && !IsNullArray(csr.data))  // reorder edge data
+        efeat = IndexSelect(efeat, csr.data);
+      SWITCH_OP(op, Op, {
+        cuda::GESpMMCsr<IdType, DType, Op>(
+          csr, ufeat, efeat, out, feat_len);
+      });
+    } else if (sizeof(IdType) == 4 && op == "copy_lhs") {  // cusparse
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i)
         x_length *= ufeat->shape[i];
@@ -249,7 +261,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
           nullptr,
           static_cast<DType*>(out->data),
           x_length);
-    } else if (sizeof(IdType) == 4 && op == "mul" && efeat.NumElements() == csr.indices->shape[0]) {
+    } else if (sizeof(IdType) == 4 && op == "mul" && is_scalar_efeat) {  // cusparse
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i)
         x_length *= ufeat->shape[i];
@@ -261,7 +273,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
           static_cast<DType*>(efeat->data),
           static_cast<DType*>(out->data),
           x_length);
-    } else {
+    } else {  // general kernel
       SWITCH_OP(op, Op, {
         cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
             bcast, csr, ufeat, efeat, out, NullArray(), NullArray());
