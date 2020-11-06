@@ -224,7 +224,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
     """
     @property
     def graph(self):
-        deprecate_property('dataset.graph', 'dataset.g')
+        deprecate_property('dataset.graph', 'dataset[0]')
         return self._graph
 
     @property

@@ -1,6 +1,6 @@
-"""Dataset for Graph Isomorphism Network(GIN)
-(chen jun): Used for compacted graph kernel dataset in GIN
-Data sets include:
+"""Datasets used in How Powerful Are Graph Neural Networks?
+(chen jun)
+Datasets include:
 MUTAG, COLLAB, IMDBBINARY, IMDBMULTI, NCI1, PROTEINS, PTC, REDDITBINARY, REDDITMULTI5K
 https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip
 """
@@ -17,11 +17,13 @@ from ..convert import graph as dgl_graph
 
 
 class GINDataset(DGLBuiltinDataset):
-    """Datasets for Graph Isomorphism Network (GIN)
-    Adapted from `<https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip>`_.
-
-    The dataset contains the compact format of popular graph kernel datasets.
-    For more graph kernel datasets, see :class:`TUDataset`.
+    """Dataset Class for `How Powerful Are Graph Neural Networks? <https://arxiv.org/abs/1810.00826>`_.
+    
+    This is adapted from `<https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip>`_.
+    
+    The class provides an interface for nine datasets used in the paper along with the paper-specific
+    settings. The datasets are ``'MUTAG'``, ``'COLLAB'``, ``'IMDBBINARY'``, ``'IMDBMULTI'``,
+    ``'NCI1'``, ``'PROTEINS'``, ``'PTC'``, ``'REDDITBINARY'``, ``'REDDITMULTI5K'``.
 
     Parameters
     ---------
@@ -246,7 +248,8 @@ class GINDataset(DGLBuiltinDataset):
                 nlabel_set = nlabel_set.union(
                     set([F.as_scalar(nl) for nl in g.ndata['label']]))
             nlabel_set = list(nlabel_set)
-            if len(nlabel_set) == np.max(nlabel_set) + 1 and np.min(nlabel_set) == 0:
+            is_label_valid = all([label in self.nlabel_dict for label in nlabel_set])
+            if is_label_valid and len(nlabel_set) == np.max(nlabel_set) + 1 and np.min(nlabel_set) == 0:
                 # Note this is different from the author's implementation. In weihua916's implementation,
                 # the labels are relabeled anyway. But here we didn't relabel it if the labels are contiguous
                 # to make it consistent with the original dataset

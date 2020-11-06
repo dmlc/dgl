@@ -11,8 +11,7 @@ DGL works with the following operating systems:
 * macOS X
 * Windows 10
 
-DGL requires Python version 3.5 or later. Python 3.4 or earlier is not
-tested.
+DGL requires Python version 3.6 or later.
 
 DGL supports multiple tensor libraries as backends, e.g., PyTorch, MXNet. For requirements on backends and how to select one, see :ref:`backends`.
 
@@ -25,8 +24,8 @@ Install from conda
 If ``conda`` is not yet installed, get either `miniconda <https://conda.io/miniconda.html>`_ or
 the full `anaconda <https://www.anaconda.com/download/>`_.
 
-With ``conda`` installed, you will want install DGL into Python 3.5 ``conda`` environment.
-Run `conda create -n dgl python=3.5` to create the environment.
+With ``conda`` installed, you will want install DGL into Python 3.6 ``conda`` environment.
+Run `conda create -n dgl python=3.6` to create the environment.
 Activate the environment by running `source activate dgl`.
 After the ``conda`` environment is activated, run one of the following commands.
 

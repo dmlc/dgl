@@ -146,7 +146,7 @@ above.
         positive_graph = positive_graph.to(torch.device('cuda'))
         negative_graph = negative_graph.to(torch.device('cuda'))
         input_features = blocks[0].srcdata['features']
-        pos_score, neg_score = model(positive_graph, blocks, input_features)
+        pos_score, neg_score = model(positive_graph, negative_graph, blocks, input_features)
         loss = compute_loss(pos_score, neg_score)
         opt.zero_grad()
         loss.backward()
@@ -166,7 +166,7 @@ classification/regression.
 .. code:: python
 
     class StochasticTwoLayerRGCN(nn.Module):
-        def __init__(self, in_feat, hidden_feat, out_feat):
+        def __init__(self, in_feat, hidden_feat, out_feat, rel_names):
             super().__init__()
             self.conv1 = dglnn.HeteroGraphConv({
                     rel : dglnn.GraphConv(in_feat, hidden_feat, norm='right')
@@ -196,6 +196,20 @@ over the edge types for :meth:`dgl.DGLHeteroGraph.apply_edges`.
                     edge_subgraph.apply_edges(
                         dgl.function.u_dot_v('x', 'x', 'score'), etype=etype)
                 return edge_subgraph.edata['score']
+
+    class Model(nn.Module):
+        def __init__(self, in_features, hidden_features, out_features, num_classes,
+                     etypes):
+            super().__init__()
+            self.rgcn = StochasticTwoLayerRGCN(
+                in_features, hidden_features, out_features, etypes)
+            self.pred = ScorePredictor()
+
+        def forward(self, positive_graph, negative_graph, blocks, x):
+            x = self.rgcn(blocks, x)
+            pos_score = self.pred(positive_graph, x)
+            neg_score = self.pred(negative_graph, x)
+            return pos_score, neg_score
 
 Data loader definition is also very similar to that of edge
 classification/regression. The only difference is that you need to give
@@ -252,7 +266,7 @@ dictionaries of node types and predictions here.
 
 .. code:: python
 
-    model = Model(in_features, hidden_features, out_features, num_classes)
+    model = Model(in_features, hidden_features, out_features, num_classes, etypes)
     model = model.cuda()
     opt = torch.optim.Adam(model.parameters())
     
@@ -261,9 +275,8 @@ dictionaries of node types and predictions here.
         positive_graph = positive_graph.to(torch.device('cuda'))
         negative_graph = negative_graph.to(torch.device('cuda'))
         input_features = blocks[0].srcdata['features']
-        edge_labels = edge_subgraph.edata['labels']
-        edge_predictions = model(edge_subgraph, blocks, input_features)
-        loss = compute_loss(edge_labels, edge_predictions)
+        pos_score, neg_score = model(positive_graph, negative_graph, blocks, input_features)
+        loss = compute_loss(pos_score, neg_score)
         opt.zero_grad()
         loss.backward()
         opt.step()

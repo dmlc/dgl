@@ -1295,6 +1295,8 @@ def test_subgraph(idtype):
 def test_apply(idtype):
     def node_udf(nodes):
         return {'h': nodes.data['h'] * 2}
+    def node_udf2(nodes):
+        return {'h': F.sum(nodes.data['h'], dim=1, keepdims=True)}
     def edge_udf(edges):
         return {'h': edges.data['h'] * 2 + edges.src['h']}
 
@@ -1313,6 +1315,11 @@ def test_apply(idtype):
 
     g['plays'].apply_edges(edge_udf)
     assert F.array_equal(g['plays'].edata['h'], F.ones((4, 5)) * 12)
+
+    # Test the case that feature size changes
+    g.nodes['user'].data['h'] = F.ones((3, 5))
+    g.apply_nodes(node_udf2, ntype='user')
+    assert F.array_equal(g.nodes['user'].data['h'], F.ones((3, 1)) * 5)
 
     # test fail case
     # fail due to multiple types
@@ -1728,6 +1735,13 @@ def test_bipartite(idtype):
         ('A', 'AA', 'A'): ([0, 1], [0, 1])
     }, idtype=idtype, device=F.ctx())
     assert not g3.is_unibipartite
+
+    g4 = dgl.heterograph({
+        ('A', 'AB', 'B'): ([0, 0, 1], [1, 2, 5]),
+        ('C', 'CA', 'A'): ([1, 0], [0, 0])
+    }, idtype=idtype, device=F.ctx())
+
+    assert not g4.is_unibipartite
 
 @parametrize_dtype
 def test_dtype_cast(idtype):

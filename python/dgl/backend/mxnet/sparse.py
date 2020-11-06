@@ -25,7 +25,10 @@ def _scatter_nd(index, src, n_rows):
         offsets.append(
             (stride * offset_i).reshape((1,) * i + (di,) + (1,) * (ndim - 1 - i)))
         stride *= di
-    new_idx = index * stride + sum(offsets)
+    if ndim > 1:
+        new_idx = index * stride + sum(offsets)
+    else:
+        new_idx = index 
     src = src.reshape(-1)
     new_idx = new_idx.reshape(-1)
     rst = np.zeros((stride * n_rows,), dtype=src.dtype)
@@ -48,7 +51,10 @@ def _gather_nd(index, src):
         offsets.append(
             (stride * offset_i).reshape((1,) * i + (di,) + (1,) * (ndim - 1 - i)))
         stride *= di
-    new_idx = index * stride + copy_to(sum(offsets), ctx)
+    if ndim > 1:
+        new_idx = index * stride + copy_to(sum(offsets), ctx)
+    else:
+        new_idx = index
     src = src.reshape(-1)
     new_idx = new_idx.reshape(-1)
     rst = nd.take(src, new_idx).reshape(shp)
