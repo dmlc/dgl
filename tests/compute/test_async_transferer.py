@@ -4,6 +4,8 @@ import backend as F
 
 from dgl.dataloading import AsyncTransferer
 
+@unittest.skipIf(F._default_context_str == 'cpu',
+                 reason="CPU transfer not allowed")
 def test_async_transferer_to_other():
     cpu_ones = F.ones([100,75,25], dtype=F.int32, ctx=F.cpu())
     tran = AsyncTransferer(F.ctx())
