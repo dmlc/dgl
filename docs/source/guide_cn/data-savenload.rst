@@ -5,7 +5,7 @@
 
 :ref:`(English Version) <guide-data-pipeline-savenload>`
 
-DGL建议用户实现保存和加载数据的函数，以将处理后的数据缓存在本地磁盘中。
+DGL建议用户实现保存和加载数据的函数，将处理后的数据缓存在本地磁盘中。
 这样在多数情况下可以帮用户节省大量的数据处理时间。DGL提供了4个函数让任务变得简单。
 
 -  :func:`dgl.save_graphs` 和 :func:`dgl.load_graphs`: 保存DGLGraph对象和标签到本地磁盘和从本地磁盘读取数据。
@@ -42,9 +42,4 @@ DGL建议用户实现保存和加载数据的函数，以将处理后的数据�
         return os.path.exists(graph_path) and os.path.exists(info_path)
 
 请注意：有些情况下不适合保存处理过的数据。例如，在内置数据集 :class:`~dgl.data.GDELTDataset` 中，
-处理过的数据比较大，所以在 ``__getitem__(idx)`` 中处理每个数据实例是更有效的方法。
-
-.. code::
-
-    print(split_edge['valid'].keys())
-    print(split_edge['test'].keys())
+处理过的数据比较大。所以这个时候，在 ``__getitem__(idx)`` 中处理每个数据实例是更高效的方法。

@@ -60,7 +60,7 @@
     valid_label = dataset.labels[split_idx['valid']]
     test_label = dataset.labels[split_idx['test']]
 
-*Link Property Prediction* 数据集的每个数据也只包括一个图
+*Link Property Prediction* 数据集的每个数据也只包括一个图。
 
 .. code::
 

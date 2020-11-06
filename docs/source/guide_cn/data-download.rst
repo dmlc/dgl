@@ -9,7 +9,7 @@
 如果用户想在任何地方运行代码而又不想自己下载数据并将其移动到正确的目录中，则可以通过实现函数 ``download()`` 来自动完成。
 
 如果数据集是一个zip文件，请让 ``MyDataset`` 继承 :class:`dgl.data.DGLBuiltinDataset` 类。该类可以处理zip文件的解压缩。
-或者请参考 :class:`~dgl.data.QM7bDataset` 里的 ``download()`` 的实现：
+不然的话，用户需要实现 ``download()``，具体可以参考 :class:`~dgl.data.QM7bDataset` 类：
 
 .. code:: 
 

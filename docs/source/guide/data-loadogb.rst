@@ -63,7 +63,7 @@ there is only one graph object in this kind of dataset.
     valid_label = dataset.labels[split_idx['valid']]
     test_label = dataset.labels[split_idx['test']]
 
-*Link Property Prediction* datasets also contain one graph per dataset:
+*Link Property Prediction* datasets also contain one graph per dataset.
 
 .. code:: 
 
