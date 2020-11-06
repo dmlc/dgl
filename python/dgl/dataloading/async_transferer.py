@@ -1,6 +1,6 @@
 """ API for transferring data to/from the GPU over second stream.A """
 
-
+import dgl
 from .. import backend as F
 from .. import ndarray
 from .. import utils
@@ -73,8 +73,7 @@ class AsyncTransferer(object):
         to be asynchronous, the context the AsyncTranserer is created with must
         be a GPU context, and the input tensor must be in pinned memory.
 
-        Currently, transfers from the GPU to the CPU, and CPU to CPU, will
-        be synchronous.
+        Currently, only transfers to the GPU are supported.
 
         Parameters
         ----------
@@ -93,6 +92,9 @@ class AsyncTransferer(object):
             ctx = device
         else:
             ctx = utils.to_dgl_context(device)
+
+        if ctx.device_type != ndarray.DGLContext.STR2MASK["gpu"]:
+            raise ValueError("'device' must be a GPU device.")
 
         tensor = F.zerocopy_to_dgl_ndarray(tensor)
 

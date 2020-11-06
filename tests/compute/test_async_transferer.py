@@ -16,12 +16,16 @@ def test_async_transferer_to_other():
 def test_async_transferer_from_other():
     other_ones = F.ones([100,75,25], dtype=F.int32, ctx=F.ctx())
     tran = AsyncTransferer(F.ctx())
-    t = tran.async_copy(other_ones, F.cpu())
-    cpu_ones = t.wait()
-
-    assert F.context(cpu_ones) == F.cpu()
-    assert F.array_equal(F.copy_to(other_ones, ctx=F.cpu()), cpu_ones)
-
+    
+    try:
+        t = tran.async_copy(other_ones, F.cpu())
+    except ValueError:
+        # correctly threw an error
+        pass
+    else:
+        # should have thrown an error
+        assert False
+        
 if __name__ == '__main__':
     test_async_transferer_to_other()
     test_async_transferer_from_other()
