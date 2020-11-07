@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file dgl/runtime/tensordispatch.h
+ * \file array/tensordispatch.h
  * \brief This file defines the dispatcher of tensor operators to framework-specific
  *  implementations.
  *
@@ -29,11 +29,11 @@
  *  implementation in dgl::aten namespace.
  */
 
-#ifndef DGL_RUNTIME_TENSORDISPATCH_H_
-#define DGL_RUNTIME_TENSORDISPATCH_H_
+#ifndef DGL_ARRAY_TENSORDISPATCH_H_
+#define DGL_ARRAY_TENSORDISPATCH_H_
 
 namespace dgl {
-namespace runtime {
+namespace aten {
 
 class TensorDispatcher {
  public:
@@ -45,24 +45,18 @@ class TensorDispatcher {
   // Allocate a tensor.
   // Calls the framework-specific tensor allocator (e.g. torch::empty) if possible.
   NDArray Empty(std::vector<int64_t> shape, DLDataType dtype, DLContext ctx) const;
-  static constexpr int kEmpty = 0;
-
-  // Clones a tensor.
-  // Calls the framework-specific copy function (e.g. torch::clone) if possible.
-  NDArray Clone(NDArray arr) const;
-  static constexpr int kClone = 1;
 
  private:
   TensorDispatcher();
 
-  const char *names_[] = {
-    "TensorDispatcher__empty",
-    "TensorDispatcher__clone"
+  static constexpr const char *names_[] = {
+    "TensorDispatcher__empty"
   };
-  void *entrypoints_[sizeof(names_) / sizeof(names_[0])];
+  static constexpr int num_entries_ = sizeof(names_) / sizeof(names_[0]);
+  void *entrypoints_[num_entries_] = {nullptr};
 };
 
-};  // namespace runtime
+};  // namespace aten
 };  // namespace dgl
 
 #endif  // DGL_RUNTIME_TENSORDISPATCH_H_
