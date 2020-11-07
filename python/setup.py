@@ -94,8 +94,15 @@ if wheel_include_libs:
     with open("MANIFEST.in", "w") as fo:
         for path in LIBS:
             shutil.copy(path, os.path.join(CURRENT_DIR, 'dgl'))
-            _, libname = os.path.split(path)
+            dir_, libname = os.path.split(path)
             fo.write("include dgl/%s\n" % libname)
+
+            # TODO: better tensor adapter installation
+            os.makedirs(os.path.join(CURRENT_DIR, 'dgl', 'tensoradapter', 'torch'), True)
+            shutil.copy(
+                os.path.join(dir_, 'tensoradapter/torch/libtensoradapter_torch.so'),
+                os.path.join(CURRENT_DIR, 'dgl'))
+        fo.write("include dgl/tensoradapter/torch/libtensoradapter_torch.so")
     setup_kwargs = {
         "include_package_data": True
     }
@@ -104,9 +111,13 @@ if wheel_include_libs:
 # Conda build also includes the binary library
 if include_libs:
     rpath = [os.path.relpath(path, CURRENT_DIR) for path in LIBS]
+    rpath_ta = [
+        os.path.dirname(os.path.relpath(path, CURRENT_DIR)) +
+        '/tensoradapter/torch/libtensoradapter_torch.so'
+        for path in LIBS]
     setup_kwargs = {
         "include_package_data": True,
-        "data_files": [('dgl', rpath)]
+        "data_files": [('dgl', rpath), ('dgl/tensoradapter/torch', rpath_ta)]
     }
 
 setup(
@@ -141,3 +152,4 @@ if wheel_include_libs:
     for path in LIBS:
         _, libname = os.path.split(path)
         os.remove("dgl/%s" % libname)
+    os.remove("dgl/tensoradapter/torch/libtensoradapter_torch.so")

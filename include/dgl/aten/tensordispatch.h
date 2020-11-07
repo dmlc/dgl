@@ -52,12 +52,17 @@ class TensorDispatcher {
   inline NDArray Empty(std::vector<int64_t> shape, DLDataType dtype, DLContext ctx) const {
     auto entry = entrypoints_[Op::kEmpty];
 
+    /*
     if (!entrypoints_[Op::kEmpty]) {
       return NDArray::Empty(shape, dtype, ctx);
     } else {
       auto result = TA_DISPATCH(tensoradapter::TAempty, entry, shape, dtype, ctx);
       return NDArray::FromDLPack(result);
     }
+    */
+    CHECK(entrypoints_[Op::kEmpty]) << "torch allocator not found";
+    auto result = TA_DISPATCH(tensoradapter::TAempty, entry, shape, dtype, ctx);
+    return NDArray::FromDLPack(result);
   }
 
   inline NDArray Clone(NDArray array) const {
@@ -85,9 +90,9 @@ class TensorDispatcher {
   TensorDispatcher();
 
   static constexpr const char *names_[] = {
-    "empty",
-    "clone",
-    "copy_to"
+    "TAempty",
+    "TAclone",
+    "TAcopyto"
   };
 
   class Op {

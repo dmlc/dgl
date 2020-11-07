@@ -10,6 +10,7 @@
 #include <dgl/runtime/module.h>
 #include <dgl/runtime/registry.h>
 #include <dgl/runtime/device_api.h>
+#include <dgl/runtime/env.h>
 #include <array>
 #include <algorithm>
 #include <string>
@@ -376,6 +377,16 @@ int DGLCbArgToReturn(DGLValue* value, int code) {
   rv.MoveToCHost(value, &tcode);
   CHECK_EQ(tcode, code);
   API_END();
+}
+
+void DGLSetLibraryPath(const char *path_cstr) {
+  //std::cout << "setting library path " << path_cstr << std::endl;
+  Env::Global()->libpath = std::string(path_cstr);
+}
+
+void DGLSetBackend(const char *backend_cstr) {
+  //std::cout << "setting backend path " << backend_cstr << std::endl;
+  Env::Global()->backend = std::string(backend_cstr);
 }
 
 // set device api

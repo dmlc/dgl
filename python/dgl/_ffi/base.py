@@ -32,6 +32,7 @@ def _load_lib():
     """Load libary by searching possible path."""
     lib_path = libinfo.find_lib_path()
     lib = ctypes.CDLL(lib_path[0], ctypes.RTLD_GLOBAL)
+    lib.DGLSetLibraryPath(lib_path[0].encode('utf-8'))
     # DMatrix functions
     lib.DGLGetLastError.restype = ctypes.c_char_p
     return lib, os.path.basename(lib_path[0])
@@ -109,3 +110,9 @@ def decorate(func, fwrapped):
     """
     import decorator
     return decorator.decorate(func, fwrapped)
+
+
+def set_backend(backend):
+    """Tell the DGL C library which backend it is using.
+    """
+    _LIB.DGLSetBackend(backend.encode('utf-8'))

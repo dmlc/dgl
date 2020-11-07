@@ -139,7 +139,7 @@ class RandomEngine {
   template <typename IdxType, typename FloatType>
   IdArray Choice(IdxType num, FloatArray prob, bool replace = true) {
     const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};
-    IdArray ret = aten::Empty({num}, dtype, prob->ctx);
+    IdArray ret = IdArray::Empty({num}, dtype, prob->ctx);
     Choice<IdxType, FloatType>(num, prob, static_cast<IdxType*>(ret->data), replace);
     return ret;
   }
@@ -173,7 +173,7 @@ class RandomEngine {
   IdArray UniformChoice(IdxType num, IdxType population, bool replace = true) {
     const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};
     // TODO(minjie): only CPU implementation right now
-    IdArray ret = aten::Empty({num}, dtype, DLContext{kDLCPU, 0});
+    IdArray ret = IdArray::Empty({num}, dtype, DLContext{kDLCPU, 0});
     UniformChoice<IdxType>(num, population, static_cast<IdxType*>(ret->data), replace);
     return ret;
   }

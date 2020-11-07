@@ -10,6 +10,7 @@
 #include <dgl/runtime/device_api.h>
 #include <dgl/runtime/shared_mem.h>
 #include <dgl/zerocopy_serializer.h>
+#include <dgl/aten/tensordispatch.h>
 #include "runtime_base.h"
 
 // deleter for arrays used by DLPack exporter
@@ -17,6 +18,8 @@ extern "C" void NDArrayDLPackDeleter(DLManagedTensor* tensor);
 
 namespace dgl {
 namespace runtime {
+
+using aten::TensorDispatcher;
 
 inline void VerifyDataType(DLDataType dtype) {
   CHECK_GE(dtype.lanes, 1);
@@ -200,6 +203,13 @@ NDArray NDArray::EmptyShared(const std::string &name,
 NDArray NDArray::Empty(std::vector<int64_t> shape,
                        DLDataType dtype,
                        DLContext ctx) {
+  // TODO: temporarily dropping in.  Later on we should remove this
+  // to support MXNet or Tensorflow.
+  if (getenv("USE_TORCH_ALLOC") != nullptr) {
+    //std::cout << "Using torch allocator" << std::endl;
+    return TensorDispatcher::Global()->Empty(shape, dtype, ctx);
+  }
+
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);

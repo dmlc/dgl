@@ -8,6 +8,8 @@ import importlib
 from . import backend
 from .set_default_backend import set_default_backend
 
+from .._ffi.base import set_backend
+
 _enabled_apis = set()
 
 
@@ -20,6 +22,7 @@ def _gen_missing_api(api, mod_name):
 
 def load_backend(mod_name):
     print('Using backend: %s' % mod_name, file=sys.stderr)
+    set_backend(mod_name)
     mod = importlib.import_module('.%s' % mod_name, __name__)
     thismod = sys.modules[__name__]
     for api in backend.__dict__.keys():

@@ -183,7 +183,7 @@ class IterAdapter {
  *     // List<NDArray> list2;     // fails
  *     List<Value> list;           // works
  *     list.push_back(Value(MakeValue(1)));  // works
- *     list.push_back(Value(MakeValue(aten::Empty(shape, dtype, ctx))));  // works
+ *     list.push_back(Value(MakeValue(NDArray::Empty(shape, dtype, ctx))));  // works
  * </code>
  */
 template<typename T,
@@ -398,7 +398,7 @@ class List : public ObjectRef {
  *     // Map<std::string, NDArray> map2;     // fails
  *     Map<std::string, Value> map;           // works
  *     map.Set("key1", Value(MakeValue(1)));  // works
- *     map.Set("key2", Value(MakeValue(aten::Empty(shape, dtype, ctx))));  // works
+ *     map.Set("key2", Value(MakeValue(NDArray::Empty(shape, dtype, ctx))));  // works
  * </code>
  */
 template<typename K,
