@@ -116,8 +116,8 @@ struct CSRMatrix {
     if (ctx == indptr->ctx)
       return *this;
     return CSRMatrix(num_rows, num_cols,
-                     indptr.CopyTo(ctx), indices.CopyTo(ctx),
-                     aten::IsNullArray(data)? data : data.CopyTo(ctx),
+                     aten::CopyTo(indptr, ctx), aten::CopyTo(indices, ctx),
+                     aten::IsNullArray(data)? data : aten::CopyTo(data, ctx),
                      sorted);
   }
 };

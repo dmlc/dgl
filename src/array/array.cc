@@ -23,12 +23,6 @@ IdArray NewIdArray(int64_t length, DLContext ctx, uint8_t nbits) {
   return IdArray::Empty({length}, DLDataType{kDLInt, nbits, 1}, ctx);
 }
 
-IdArray Clone(IdArray arr) {
-  IdArray ret = NewIdArray(arr->shape[0], arr->ctx, arr->dtype.bits);
-  ret.CopyFrom(arr);
-  return ret;
-}
-
 IdArray Range(int64_t low, int64_t high, uint8_t nbits, DLContext ctx) {
   IdArray ret;
   ATEN_XPU_SWITCH_CUDA(ctx.device_type, XPU, "Range", {

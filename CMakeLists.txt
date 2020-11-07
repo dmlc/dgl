@@ -60,9 +60,10 @@ include_directories("third_party/minigun/minigun")
 include_directories("third_party/minigun/third_party/moderngpu/src")
 include_directories("third_party/phmap/")
 include_directories("third_party/xbyak/")
+include_directories("tensoradapter/include")
 
 # initial variables
-set(DGL_LINKER_LIBS "")
+set(DGL_LINKER_LIBS "dl")
 if(MSVC OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 set(DGL_RUNTIME_LINKER_LIBS "")
 else(MSVC OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
@@ -154,6 +155,9 @@ if(USE_CUDA)
 else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})
 endif(USE_CUDA)
+
+# Tensor adapter
+add_subdirectory("tensoradapter")
 
 # For serialization
 if (USE_HDFS)

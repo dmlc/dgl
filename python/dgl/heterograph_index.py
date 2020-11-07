@@ -1194,4 +1194,7 @@ class HeteroPickleStates(ObjectBase):
             self.__init_handle_by_constructor__(
                 _CAPI_DGLCreateHeteroPickleStatesOld, metagraph, num_nodes_per_type, adjs)
 
+def test():
+    return _CAPI_Test()
+
 _init_api("dgl.heterograph_index")

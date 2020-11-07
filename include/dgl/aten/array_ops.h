@@ -15,6 +15,7 @@
 #include <tuple>
 #include <string>
 #include "./types.h"
+#include "./tensordispatch.h"
 
 namespace dgl {
 namespace aten {
@@ -23,10 +24,15 @@ namespace aten {
 // ID array
 //////////////////////////////////////////////////////////////////////
 
+/*! \return An empty array of given size */
+inline NDArray Empty(std::vector<int64_t> shape, DLDataType dtype, DLContext ctx) {
+  return TensorDispatcher::Global()->Empty(shape, dtype, ctx);
+}
+
 /*! \return A special array to represent null. */
 inline NDArray NullArray(const DLDataType& dtype = DLDataType{kDLInt, 64, 1},
                          const DLContext& ctx = DLContext{kDLCPU, 0}) {
-  return NDArray::Empty({0}, dtype, ctx);
+  return Empty({0}, dtype, ctx);
 }
 
 /*!
@@ -80,7 +86,14 @@ IdArray Range(int64_t low, int64_t high, uint8_t nbits, DLContext ctx);
 IdArray Full(int64_t val, int64_t length, uint8_t nbits, DLContext ctx);
 
 /*! \brief Create a deep copy of the given array */
-IdArray Clone(IdArray arr);
+inline NDArray Clone(NDArray arr) {
+  return TensorDispatcher::Global()->Clone(arr);
+}
+
+/*! \brief Copy a tensor to a given context */
+inline NDArray CopyTo(NDArray arr, DLContext ctx) {
+  return TensorDispatcher::Global()->CopyTo(arr, ctx);
+}
 
 /*! \brief Convert the idarray to the given bit width */
 IdArray AsNumBits(IdArray arr, uint8_t bits);
@@ -336,7 +349,7 @@ IdArray VecToIdArray(const std::vector<T>& vec,
   } else {
     LOG(FATAL) << "Only int32 or int64 is supported.";
   }
-  return ret.CopyTo(ctx);
+  return CopyTo(ret, ctx);
 }
 
 }  // namespace aten

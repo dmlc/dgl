@@ -14,4 +14,5 @@
 #include "./aten/spmat.h"
 #include "./aten/csr.h"
 #include "./aten/coo.h"
+#include "./aten/tensordispatch.h"
 #endif  // DGL_ARRAY_H_

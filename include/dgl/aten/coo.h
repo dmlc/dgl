@@ -124,8 +124,8 @@ struct COOMatrix {
     if (ctx == row->ctx)
       return *this;
     return COOMatrix(num_rows, num_cols,
-                     row.CopyTo(ctx), col.CopyTo(ctx),
-                     aten::IsNullArray(data)? data : data.CopyTo(ctx),
+                     aten::CopyTo(row, ctx), aten::CopyTo(col, ctx),
+                     aten::IsNullArray(data)? data : aten::CopyTo(data, ctx),
                      row_sorted, col_sorted);
   }
 };

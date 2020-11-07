@@ -29,8 +29,13 @@
  *  implementation in dgl::aten namespace.
  */
 
-#ifndef DGL_ARRAY_TENSORDISPATCH_H_
-#define DGL_ARRAY_TENSORDISPATCH_H_
+#ifndef DGL_ATEN_TENSORDISPATCH_H_
+#define DGL_ATEN_TENSORDISPATCH_H_
+
+#include <dlpack/dlpack.h>
+#include <tensoradapter.h>
+#include <vector>
+#include "./types.h"
 
 namespace dgl {
 namespace aten {
@@ -44,14 +49,54 @@ class TensorDispatcher {
 
   // Allocate a tensor.
   // Calls the framework-specific tensor allocator (e.g. torch::empty) if possible.
-  NDArray Empty(std::vector<int64_t> shape, DLDataType dtype, DLContext ctx) const;
+  inline NDArray Empty(std::vector<int64_t> shape, DLDataType dtype, DLContext ctx) const {
+    auto entry = entrypoints_[Op::kEmpty];
+
+    if (!entrypoints_[Op::kEmpty]) {
+      return NDArray::Empty(shape, dtype, ctx);
+    } else {
+      auto result = TA_DISPATCH(tensoradapter::TAempty, entry, shape, dtype, ctx);
+      return NDArray::FromDLPack(result);
+    }
+  }
+
+  inline NDArray Clone(NDArray array) const {
+    auto entry = entrypoints_[Op::kClone];
+
+    if (!entrypoints_[Op::kClone]) {
+      return array.Clone();
+    } else {
+      return NDArray::FromDLPack(TA_DISPATCH(tensoradapter::TAclone, entry, array.ToDLPack()));
+    }
+  }
+
+  inline NDArray CopyTo(NDArray array, DLContext ctx) const {
+    auto entry = entrypoints_[Op::kCopyTo];
+
+    if (!entrypoints_[Op::kCopyTo]) {
+      return array.CopyTo(ctx);
+    } else {
+      auto tensor = array.ToDLPack();
+      return NDArray::FromDLPack(TA_DISPATCH(tensoradapter::TAcopyto, entry, tensor, ctx));
+    }
+  }
 
  private:
   TensorDispatcher();
 
   static constexpr const char *names_[] = {
-    "TensorDispatcher__empty"
+    "empty",
+    "clone",
+    "copy_to"
   };
+
+  class Op {
+   public:
+    static constexpr int kEmpty = 0;
+    static constexpr int kClone = 1;
+    static constexpr int kCopyTo = 2;
+  };
+
   static constexpr int num_entries_ = sizeof(names_) / sizeof(names_[0]);
   void *entrypoints_[num_entries_] = {nullptr};
 };
