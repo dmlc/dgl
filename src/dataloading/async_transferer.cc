@@ -65,7 +65,7 @@ TransferId AsyncTransferer::StartTransfer(
 
   DLDataType dtype = src->dtype;
   std::vector<int64_t> shape(src->shape, src->shape+src->ndim);
-  t.dst = NDArray::Empty(shape, dtype, dst_ctx);
+  t.dst = NDArray::EmptyRaw(shape, dtype, dst_ctx);
 
   if (stream_) {
     #ifdef DGL_USE_CUDA
