@@ -8,13 +8,6 @@ from .role import get_role
 from .. import utils
 from .. import backend as F
 
-def _get_data_name(name, part_policy):
-    ''' This is to get the name of data in the kvstore.
-
-    KVStore doesn't understand node data or edge data. We'll use a prefix to distinguish them.
-    '''
-    return part_policy + ':' + name
-
 def _default_init_data(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
 
@@ -147,7 +140,9 @@ class DistTensor:
             # Thus, all of them should have the same Ids.
             name = 'anonymous-' + get_role() + '-' + str(DIST_TENSOR_ID)
             DIST_TENSOR_ID += 1
-        self._name = _get_data_name(name, part_policy.policy_str)
+        assert isinstance(name, str), 'name {} is type {}'.format(name, type(name))
+        data_name = part_policy.get_data_name(name)
+        self._name = str(data_name)
         self._persistent = persistent
         if self._name not in exist_names:
             self.kvstore.init_data(self._name, shape, dtype, part_policy, init_func)

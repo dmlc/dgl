@@ -6,7 +6,7 @@ from ._ffi.function import _init_api
 from .heterograph import DGLHeteroGraph
 from . import backend as F
 from . import utils
-from .base import EID, NID
+from .base import EID, NID, NTYPE, ETYPE
 
 __all__ = ["metis_partition", "metis_partition_assignment",
            "partition_graph_with_halo"]
@@ -46,6 +46,57 @@ def reorder_nodes(g, new_node_ids):
 def _get_halo_heterosubgraph_inner_node(halo_subg):
     return _CAPI_GetHaloSubgraphInnerNodes_Hetero(halo_subg)
 
+def reshuffle_graph(g, node_part=None):
+    '''Reshuffle node ids and edge Ids of a graph.
+
+    We need to reshuffle them so that all nodes/edges of the same type have contiguous Ids.
+    In the case that a graph is partitioned, all nodes/edges in a partition should
+    get contiguous Ids; within a partition, all nodes/edges of the same type have contigous Ids.
+    '''
+    # In this case, we don't need to reshuffle node Ids and edge Ids.
+    if node_part is None and NTYPE not in g.ndata and ETYPE not in g.edata:
+        return g, None
+
+    start = time.time()
+    if node_part is not None:
+        node_part = utils.toindex(node_part)
+        node_part = node_part.tousertensor()
+    if NTYPE in g.ndata:
+        is_hetero = len(F.unique(g.ndata[NTYPE])) > 1
+    else:
+        is_hetero = False
+    if is_hetero:
+        num_node_types = F.max(g.ndata[NTYPE], 0) + 1
+        if node_part is not None:
+            sorted_part, new2old_map = F.sort_1d(node_part * num_node_types + g.ndata[NTYPE])
+        else:
+            sorted_part, new2old_map = F.sort_1d(g.ndata[NTYPE])
+        sorted_part = sorted_part // num_node_types
+    elif node_part is not None:
+        sorted_part, new2old_map = F.sort_1d(node_part)
+    else:
+        g.ndata['orig_id'] = g.ndata[NID]
+        g.edata['orig_id'] = g.edata[EID]
+        return g, None
+
+    new_node_ids = np.zeros((g.number_of_nodes(),), dtype=np.int64)
+    new_node_ids[F.asnumpy(new2old_map)] = np.arange(0, g.number_of_nodes())
+    # If the input graph is homogneous, we only need to create an empty array, so that
+    # _CAPI_DGLReassignEdges_Hetero knows how to handle it.
+    etype = g.edata[ETYPE] if ETYPE in g.edata else F.zeros((0), F.dtype(sorted_part), F.cpu())
+    g = reorder_nodes(g, new_node_ids)
+    node_part = utils.toindex(sorted_part)
+    # We reassign edges in in-CSR. In this way, after partitioning, we can ensure
+    # that all edges in a partition are in the contiguous Id space.
+    etype_idx = utils.toindex(etype)
+    orig_eids = _CAPI_DGLReassignEdges_Hetero(g._graph, etype_idx.todgltensor(),
+                                              node_part.todgltensor(), True)
+    orig_eids = utils.toindex(orig_eids)
+    orig_eids = orig_eids.tousertensor()
+    g.edata['orig_id'] = orig_eids
+
+    print('Reshuffle nodes and edges: {:.3f} seconds'.format(time.time() - start))
+    return g, node_part.tousertensor()
 
 def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     '''Partition a graph.
@@ -80,25 +131,12 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
         The key is the partition Id and the value is the DGLGraph of the partition.
     '''
     assert len(node_part) == g.number_of_nodes()
-    node_part = utils.toindex(node_part)
     if reshuffle:
-        start = time.time()
-        node_part = node_part.tousertensor()
-        sorted_part, new2old_map = F.sort_1d(node_part)
-        new_node_ids = np.zeros((g.number_of_nodes(),), dtype=np.int64)
-        new_node_ids[F.asnumpy(new2old_map)] = np.arange(
-            0, g.number_of_nodes())
-        g = reorder_nodes(g, new_node_ids)
-        node_part = utils.toindex(sorted_part)
-        # We reassign edges in in-CSR. In this way, after partitioning, we can ensure
-        # that all edges in a partition are in the contiguous Id space.
-        orig_eids = _CAPI_DGLReassignEdges_Hetero(g._graph, True)
-        orig_eids = utils.toindex(orig_eids)
-        orig_eids = orig_eids.tousertensor()
+        g, node_part = reshuffle_graph(g, node_part)
         orig_nids = g.ndata['orig_id']
-        print('Reshuffle nodes and edges: {:.3f} seconds'.format(
-            time.time() - start))
+        orig_eids = g.edata['orig_id']
 
+    node_part = utils.toindex(node_part)
     start = time.time()
     subgs = _CAPI_DGLPartitionWithHalo_Hetero(
         g._graph, node_part.todgltensor(), extra_cached_hops)
@@ -288,6 +326,63 @@ def metis_partition(g, k, extra_cached_hops=0, reshuffle=False,
 
     # Then we split the original graph into parts based on the METIS partitioning results.
     return partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle)
+
+class IdMap:
+    '''This maps node/edge Ids in the homogeneous form to per-type form.
+
+    It stores the Id ranges for each partition and for each type. The Ids are in
+    the homogeneous form (i.e., all nodes of different types have unique Ids). For each type,
+    all Ids in a partition fall in a contiguous range. The Id ranges are stored in
+    a matrix, where each row has two elements to represent the beginning and the end of
+    the range.
+
+    This class computes the homogeneous Ids to per-type Ids and their types.
+
+    Parameters
+    ----------
+    id_ranges : dict of tensors.
+        The Id ranges of each partition for each type.
+    '''
+    def __init__(self, id_ranges):
+        self.num_parts = list(id_ranges.values())[0].shape[0]
+        self.num_types = len(id_ranges)
+        ranges = np.zeros((self.num_parts * self.num_types, 2), dtype=np.int64)
+        typed_map = []
+        id_ranges = list(id_ranges.values())
+        id_ranges.sort(key=lambda a: a[0, 0])
+        for i, id_range in enumerate(id_ranges):
+            ranges[i::self.num_types] = id_range
+            map1 = np.cumsum(id_range[:, 1] - id_range[:, 0])
+            typed_map.append(map1)
+
+        assert np.all(np.diff(ranges[:, 0]) >= 0)
+        assert np.all(np.diff(ranges[:, 1]) >= 0)
+        self.range_start = utils.toindex(ranges[:, 0])
+        self.range_end = utils.toindex(ranges[:, 1] - 1)
+        self.typed_map = utils.toindex(np.concatenate(typed_map))
+
+    def __call__(self, ids):
+        '''Map Ids in the homogeneous form to per-type Ids and types.
+
+        Parameters
+        ----------
+        ids : 1D tensor
+            The homogeneous Id.
+
+        Returns
+        -------
+            type_ids, per_type_ids
+        '''
+        if self.num_types == 0:
+            return F.zeros((len(ids),), F.dtype(ids), F.cpu()), ids
+        ids = utils.toindex(ids)
+        ret = _CAPI_DGLHeteroMapIds(ids.todgltensor(),
+                                    self.range_start.todgltensor(),
+                                    self.range_end.todgltensor(),
+                                    self.typed_map.todgltensor(),
+                                    self.num_parts, self.num_types)
+        ret = utils.toindex(ret).tousertensor()
+        return ret[:len(ids)], ret[len(ids):]
 
 
 _init_api("dgl.partition")

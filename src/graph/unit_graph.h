@@ -276,6 +276,12 @@ class UnitGraph : public BaseHeteroGraph {
    */
   std::tuple<UnitGraphPtr, IdArray, IdArray>ToSimple() const;
 
+  void InvalidateCSR();
+
+  void InvalidateCSC();
+
+  void InvalidateCOO();
+
  private:
   friend class Serializer;
   friend class HeteroGraph;

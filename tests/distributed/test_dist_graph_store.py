@@ -69,8 +69,8 @@ def rand_init(shape, dtype):
 def run_client(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
     time.sleep(5)
     dgl.distributed.initialize("kv_ip_config.txt", server_count)
-    gpb, graph_name = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
-                                          part_id, None)
+    gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
+                                                part_id, None)
     g = DistGraph(graph_name, gpb=gpb)
     check_dist_graph(g, num_clients, num_nodes, num_edges)
 
@@ -289,19 +289,19 @@ def test_split():
 
     for i in range(num_parts):
         set_roles(num_parts)
-        part_g, node_feats, edge_feats, gpb, _ = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
+        part_g, node_feats, edge_feats, gpb, _, _, _ = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
         local_nids = F.nonzero_1d(part_g.ndata['inner_node'])
         local_nids = F.gather_row(part_g.ndata[dgl.NID], local_nids)
         nodes1 = np.intersect1d(selected_nodes, F.asnumpy(local_nids))
-        nodes2 = node_split(node_mask, gpb, i, force_even=False)
+        nodes2 = node_split(node_mask, gpb, rank=i, force_even=False)
         assert np.all(np.sort(nodes1) == np.sort(F.asnumpy(nodes2)))
         local_nids = F.asnumpy(local_nids)
         for n in nodes1:
             assert n in local_nids
 
         set_roles(num_parts * 2)
-        nodes3 = node_split(node_mask, gpb, i * 2, force_even=False)
-        nodes4 = node_split(node_mask, gpb, i * 2 + 1, force_even=False)
+        nodes3 = node_split(node_mask, gpb, rank=i * 2, force_even=False)
+        nodes4 = node_split(node_mask, gpb, rank=i * 2 + 1, force_even=False)
         nodes5 = F.cat([nodes3, nodes4], 0)
         assert np.all(np.sort(nodes1) == np.sort(F.asnumpy(nodes5)))
 
@@ -309,15 +309,15 @@ def test_split():
         local_eids = F.nonzero_1d(part_g.edata['inner_edge'])
         local_eids = F.gather_row(part_g.edata[dgl.EID], local_eids)
         edges1 = np.intersect1d(selected_edges, F.asnumpy(local_eids))
-        edges2 = edge_split(edge_mask, gpb, i, force_even=False)
+        edges2 = edge_split(edge_mask, gpb, rank=i, force_even=False)
         assert np.all(np.sort(edges1) == np.sort(F.asnumpy(edges2)))
         local_eids = F.asnumpy(local_eids)
         for e in edges1:
             assert e in local_eids
 
         set_roles(num_parts * 2)
-        edges3 = edge_split(edge_mask, gpb, i * 2, force_even=False)
-        edges4 = edge_split(edge_mask, gpb, i * 2 + 1, force_even=False)
+        edges3 = edge_split(edge_mask, gpb, rank=i * 2, force_even=False)
+        edges4 = edge_split(edge_mask, gpb, rank=i * 2 + 1, force_even=False)
         edges5 = F.cat([edges3, edges4], 0)
         assert np.all(np.sort(edges1) == np.sort(F.asnumpy(edges5)))
 
@@ -348,18 +348,18 @@ def test_split_even():
 
     for i in range(num_parts):
         set_roles(num_parts)
-        part_g, node_feats, edge_feats, gpb, _ = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
+        part_g, node_feats, edge_feats, gpb, _, _, _ = load_partition('/tmp/dist_graph/dist_graph_test.json', i)
         local_nids = F.nonzero_1d(part_g.ndata['inner_node'])
         local_nids = F.gather_row(part_g.ndata[dgl.NID], local_nids)
-        nodes = node_split(node_mask, gpb, i, force_even=True)
+        nodes = node_split(node_mask, gpb, rank=i, force_even=True)
         all_nodes1.append(nodes)
         subset = np.intersect1d(F.asnumpy(nodes), F.asnumpy(local_nids))
         print('part {} get {} nodes and {} are in the partition'.format(i, len(nodes), len(subset)))
 
         set_roles(num_parts * 2)
-        nodes1 = node_split(node_mask, gpb, i * 2, force_even=True)
-        nodes2 = node_split(node_mask, gpb, i * 2 + 1, force_even=True)
-        nodes3 = F.cat([nodes1, nodes2], 0)
+        nodes1 = node_split(node_mask, gpb, rank=i * 2, force_even=True)
+        nodes2 = node_split(node_mask, gpb, rank=i * 2 + 1, force_even=True)
+        nodes3, _ = F.sort_1d(F.cat([nodes1, nodes2], 0))
         all_nodes2.append(nodes3)
         subset = np.intersect1d(F.asnumpy(nodes), F.asnumpy(nodes3))
         print('intersection has', len(subset))
@@ -367,15 +367,15 @@ def test_split_even():
         set_roles(num_parts)
         local_eids = F.nonzero_1d(part_g.edata['inner_edge'])
         local_eids = F.gather_row(part_g.edata[dgl.EID], local_eids)
-        edges = edge_split(edge_mask, gpb, i, force_even=True)
+        edges = edge_split(edge_mask, gpb, rank=i, force_even=True)
         all_edges1.append(edges)
         subset = np.intersect1d(F.asnumpy(edges), F.asnumpy(local_eids))
         print('part {} get {} edges and {} are in the partition'.format(i, len(edges), len(subset)))
 
         set_roles(num_parts * 2)
-        edges1 = edge_split(edge_mask, gpb, i * 2, force_even=True)
-        edges2 = edge_split(edge_mask, gpb, i * 2 + 1, force_even=True)
-        edges3 = F.cat([edges1, edges2], 0)
+        edges1 = edge_split(edge_mask, gpb, rank=i * 2, force_even=True)
+        edges2 = edge_split(edge_mask, gpb, rank=i * 2 + 1, force_even=True)
+        edges3, _ = F.sort_1d(F.cat([edges1, edges2], 0))
         all_edges2.append(edges3)
         subset = np.intersect1d(F.asnumpy(edges), F.asnumpy(edges3))
         print('intersection has', len(subset))
