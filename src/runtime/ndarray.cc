@@ -59,6 +59,20 @@ struct NDArray::Internal {
     }
     delete ptr;
   }
+  static void RawDeleter(NDArray::Container* ptr) {
+    using dgl::runtime::NDArray;
+    if (ptr->manager_ctx != nullptr) {
+      static_cast<NDArray::Container*>(ptr->manager_ctx)->DecRef();
+#ifndef _WIN32
+    } else if (ptr->mem) {
+      ptr->mem = nullptr;
+#endif  // _WIN32
+    } else if (ptr->dl_tensor.data != nullptr) {
+      dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeRawDataSpace(
+          ptr->dl_tensor.ctx, ptr->dl_tensor.data);
+    }
+    delete ptr;
+  }
   // Deleter for NDArray converted from DLPack
   // This is used from data which is passed from external DLPack(DLManagedTensor)
   // that are not allocated inside of DGL.
@@ -75,11 +89,16 @@ struct NDArray::Internal {
   // but does not allocate space for the data.
   static NDArray Create(std::vector<int64_t> shape,
                         DLDataType dtype,
-                        DLContext ctx) {
+                        DLContext ctx,
+                        bool use_raw_alloc = false) {
     VerifyDataType(dtype);
     // critical zone
     NDArray::Container* data = new NDArray::Container();
-    data->deleter = DefaultDeleter;
+    if (use_raw_alloc) {
+      data->deleter = RawDeleter;
+    } else {
+      data->deleter = DefaultDeleter;
+    }
     NDArray ret(data);
     ret.data_ = data;
     // RAII now in effect
@@ -208,6 +227,19 @@ NDArray NDArray::Empty(std::vector<int64_t> shape,
     ret.data_->dl_tensor.data =
         DeviceAPI::Get(ret->ctx)->AllocDataSpace(
             ret->ctx, size, alignment, ret->dtype);
+  return ret;
+}
+
+NDArray NDArray::EmptyRaw(std::vector<int64_t> shape,
+                       DLDataType dtype,
+                       DLContext ctx) {
+  NDArray ret = Internal::Create(shape, dtype, ctx, true);
+  // setup memory content
+  size_t size = GetDataSize(ret.data_->dl_tensor);
+  size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
+  ret.data_->dl_tensor.data =
+      DeviceAPI::Get(ret->ctx)->AllocRawDataSpace(
+          ret->ctx, size, alignment, ret->dtype);
   return ret;
 }
 

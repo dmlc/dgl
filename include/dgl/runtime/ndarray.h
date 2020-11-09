@@ -217,6 +217,16 @@ class NDArray {
                                      DLContext ctx,
                                      bool is_create);
   /*!
+   * \brief Create an empty NDArray using raw memory allocations.
+   * \param shape The shape of the new array.
+   * \param dtype The data type of the new array.
+   * \param ctx The context of the Array.
+   * \return The created Array
+   */
+  DGL_DLL static NDArray EmptyRaw(std::vector<int64_t> shape,
+                               DLDataType dtype,
+                               DLContext ctx);
+  /*!
    * \brief Get the size of the array in the number of bytes.
    */
   size_t GetSize() const;
