@@ -8,7 +8,7 @@ endif()
 ###### Borrowed from MSHADOW project
 
 include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag("-std=c++11"   SUPPORT_CXX11)
+check_cxx_compiler_flag("-std=c++14"   SUPPORT_CXX14)
 
 set(dgl_known_gpu_archs "35 50 60 70")
 
@@ -176,7 +176,7 @@ macro(dgl_cuda_compile objlist_variable)
 
   endforeach()
   if(UNIX OR APPLE)
-    list(APPEND CUDA_NVCC_FLAGS -Xcompiler -fPIC)
+    list(APPEND CUDA_NVCC_FLAGS -Xcompiler -fPIC --std=c++14)
   endif()
 
   if(APPLE)
@@ -246,6 +246,8 @@ macro(dgl_config_cuda out_variable)
   set(NVCC_FLAGS_EXTRA "${NVCC_FLAGS_EXTRA} --expt-extended-lambda")
   # suppress deprecated warning in moderngpu
   set(NVCC_FLAGS_EXTRA "${NVCC_FLAGS_EXTRA} -Wno-deprecated-declarations")
+  # for compile with c++14
+  set(NVCC_FLAGS_EXTRA "${NVCC_FLAGS_EXTRA} --expt-extended-lambda --std=c++14")
   message(STATUS "NVCC extra flags: ${NVCC_FLAGS_EXTRA}")
   set(CUDA_NVCC_FLAGS  "${CUDA_NVCC_FLAGS} ${NVCC_FLAGS_EXTRA}")
   list(APPEND CMAKE_CUDA_FLAGS "${NVCC_FLAGS_EXTRA}")
