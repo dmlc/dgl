@@ -38,4 +38,7 @@ python3 -m pytest -v --junitxml=pytest_backend.xml tests/$DGLBACKEND || fail "ba
 export OMP_NUM_THREADS=1
 if [ $2 != "gpu" ]; then
     python3 -m pytest -v --junitxml=pytest_distributed.xml tests/distributed || fail "distributed"
+else
+    # test GPU workspace allocations
+    DGL_USE_CUDA_MEMORY_POOL=1 python3 -m pytest -v --junitxml=pytest_workspace.xml tests/compute/test_basics.py || fail "basic-gpu-workspace"
 fi
