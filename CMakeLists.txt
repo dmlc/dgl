@@ -93,6 +93,7 @@ else(MSVC)
   check_cxx_compiler_flag("-std=c++14"    SUPPORT_CXX11)
   set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
   set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++14 ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--warn-common ${CMAKE_SHARED_LINKER_FLAGS}")
 endif(MSVC)
 
 if(USE_OPENMP)
