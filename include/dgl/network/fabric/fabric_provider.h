@@ -92,9 +92,9 @@ class FabricProvider {
     provider->prov_name = "udp";
     provider->info.reset(info_);
 
-    LOG(INFO) << "CTRL NIC Name " << provider->info->nic->device_attr->name;
     CHECK_NE(ret, -FI_ENODATA) << "Could not find any optimal provider";
     check_err(ret, "fi_getinfo failed");
+    LOG(INFO) << "CTRL NIC Name " << provider->info->nic->device_attr->name;
     return provider;
   }
   std::string prov_name;
