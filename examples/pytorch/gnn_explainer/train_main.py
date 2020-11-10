@@ -12,6 +12,7 @@ import torch as th
 import torch.nn as nn
 
 from dgl.data import AIFBDataset
+from dgl import save_graphs, load_graphs
 from models import dummy_gnn_model
 from gengraph import gen_syn1, gen_syn2, gen_syn3, gen_syn4, gen_syn5
 
@@ -21,21 +22,24 @@ def main(args):
     if args.dataset == 'aifb':
         dataset = AIFBDataset()
     elif args.dataset == 'syn1':
-        g, role_ids, name = gen_syn1()
+        g, labels, name = gen_syn1(nb_shapes=8, width_basis=30)
     elif args.dataset == 'syn2':
-        g, role_ids, name = gen_syn2()
+        g, labels, name = gen_syn2()
     elif args.dataset == 'syn3':
-        g, role_ids, name = gen_syn3()
+        g, labels, name = gen_syn3()
     elif args.dataset == 'syn4':
-        g, role_ids, name = gen_syn4()
+        g, labels, name = gen_syn4()
     elif args.dataset == 'syn5':
-        g, role_ids, name = gen_syn5()
+        g, labels, name = gen_syn5()
     else:
         raise ValueError()
 
     graph = dgl.from_networkx(g)
 
-    num_classes = max(role_ids) + 1
+    # save graph for later use
+    save_graphs(filename='./syn1.bin', g_list=[graph])
+
+    num_classes = max(labels) + 1
     feat_dim = 10
     print(num_classes)
 
@@ -55,8 +59,8 @@ def main(args):
         dummy_model.train()
 
         logits = dummy_model(graph, n_feats)
-        loss = loss_fn(logits, th.tensor(role_ids, dtype=th.long))
-        pred = th.sum(logits.argmax(dim=1) == th.tensor(role_ids, dtype=th.long)).item() / len(role_ids)
+        loss = loss_fn(logits, th.tensor(labels, dtype=th.long))
+        pred = th.sum(logits.argmax(dim=1) == th.tensor(labels, dtype=th.long)).item() / len(labels)
 
         optim.zero_grad()
         loss.backward()
@@ -72,7 +76,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Dummy model training')
-    parser.add_argument('--dataset', type=str, default='syn2', help='dataset used for training the model')
+    parser.add_argument('--dataset', type=str, default='syn4', help='dataset used for training the model')
 
     args = parser.parse_args()
     print(args)

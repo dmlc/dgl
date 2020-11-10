@@ -4,7 +4,7 @@
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl
+import math
 
 
 class NodeExplainerModule(nn.Module):
@@ -20,11 +20,10 @@ class NodeExplainerModule(nn.Module):
 
     # Class inner variables
     loss_coef = {
-        "g_size": 0.005,
+        "g_size": 0.05,
         "feat_size": 1.0,
         "g_ent": 1.0,
-        "feat_ent": 0.1,
-        "lap": 0.0
+        "feat_ent": 0.1
     }
 
     # Variables of results for calling
@@ -34,13 +33,15 @@ class NodeExplainerModule(nn.Module):
                  num_edges,
                  node_feat_dim,
                  activation='sigmoid',
-                 agg_fn='sum'):
+                 agg_fn='sum',
+                 mask_bias=False):
         super(NodeExplainerModule, self).__init__()
         self.model = model
         self.num_edges = num_edges
         self.node_feat_dim = node_feat_dim
         self.activation = activation
         self.agg_fn=agg_fn
+        self.mask_bias = mask_bias
 
         # Initialize parameters on masks
         self.edge_mask, self.edge_mask_bias = self.create_edge_mask(self.num_edges)
@@ -64,10 +65,10 @@ class NodeExplainerModule(nn.Module):
         mask and mask bias: Tensor, all in shape of N*1
 
         """
-        mask = nn.Parameter(th.Tensor(num_edges, 1), dtype=th.float)
+        mask = nn.Parameter(th.Tensor(num_edges, 1))
 
         if init_strategy == 'normal':
-            std = nn.init.calculate_gain("relu") * th.sqrt(
+            std = nn.init.calculate_gain("relu") * math.sqrt(
                 1.0 / num_edges
             )
             with th.no_grad():
@@ -75,8 +76,8 @@ class NodeExplainerModule(nn.Module):
         elif init_strategy == "const":
             nn.init.constant_(mask, const)
 
-        if self.args.mask_bias:
-            mask_bias = nn.Parameter(th.Tensor(num_edges, 1), dtype=th.float)
+        if self.mask_bias:
+            mask_bias = nn.Parameter(th.Tensor(num_edges, 1))
             nn.init.constant_(mask_bias, 0.0)
         else:
             mask_bias = None
@@ -84,7 +85,7 @@ class NodeExplainerModule(nn.Module):
         return mask, mask_bias
 
 
-    def creat_node_feat_mask(self, node_feat_dim, init_strategy="normal"):
+    def create_node_feat_mask(self, node_feat_dim, init_strategy="normal"):
         """
         Based on the dimensions of node feature in the computational graph, create a learnable mask of features.
 
@@ -97,7 +98,7 @@ class NodeExplainerModule(nn.Module):
         -------
         mask: Tensor, in shape of N
         """
-        mask = nn.Parameter(node_feat_dim, dtype=th.float)
+        mask = nn.Parameter(th.Tensor(node_feat_dim))
 
         if init_strategy == "normal":
             std = 0.1
@@ -136,14 +137,14 @@ class NodeExplainerModule(nn.Module):
 
         """
         # Extract related features
-        num_nodes = graph.num_of_nodes()
+        # num_nodes = graph.num_of_nodes()
 
         # Step 1: Mask node feature with the inner feature mask
         new_n_feats = n_feats * self.node_feat_mask.sigmoid()
-        self.edge_mask = self.edge_mask.sigmoid()
+        edge_mask = self.edge_mask.sigmoid()
 
         # Step 2:
-        new_logits = self.model(graph, new_n_feats, self.edge_mask)
+        new_logits = self.model(graph, new_n_feats, edge_mask)
 
         return new_logits
 
@@ -179,12 +180,12 @@ class NodeExplainerModule(nn.Module):
 
         """
         # 1. prediction loss
-        log_logit = th.log_softmax(pred_logits)
+        log_logit = - F.log_softmax(pred_logits, dim=-1)
         pred_loss = th.sum(log_logit * pred_label)
 
         # 2. edge mask loss
         if self.activation == 'sigmoid':
-            edge_mask = F.sigmoid(self.edge_mask)
+            edge_mask = th.sigmoid(self.edge_mask)
         elif self.activation == 'relu':
             edge_mask = F.relu(self.edge_mask)
         else:
@@ -200,7 +201,7 @@ class NodeExplainerModule(nn.Module):
 
         # 4. node feature mask loss
         if self.activation == 'sigmoid':
-            node_feat_mask = F.sigmoid(self.node_feat_mask)
+            node_feat_mask = th.sigmoid(self.node_feat_mask)
         elif self.activation == 'relu':
             node_feat_mask = F.relu(self.node_feat_mask)
         else:

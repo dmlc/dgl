@@ -9,12 +9,14 @@ import os
 import dgl
 
 import torch as th
+import torch.nn as nn
+import torch.nn.functional as F
 from dgl.data import AIFBDataset
 from dgl.sampling import sample_neighbors
 from models import dummy_gnn_model
 from gengraph import gen_syn1, gen_syn2, gen_syn3, gen_syn4, gen_syn5
 from NodeExplainerModule import NodeExplainerModule
-
+from utils_graph import extract_subgraph, visualize_sub_graph
 
 
 def main(args):
@@ -29,15 +31,16 @@ def main(args):
     if dataset == 'aifb':
         dataset = AIFBDataset()
     elif dataset == 'syn1':
-        g, role_ids, name = gen_syn1()
+        # g, labels, name = gen_syn1(nb_shapes=8, width_basis=30)
+        g, labels, name = gen_syn1()
     elif dataset == 'syn2':
-        g, role_ids, name = gen_syn2()
+        g, labels, name = gen_syn2()
     elif dataset == 'syn3':
-        g, role_ids, name = gen_syn3()
+        g, labels, name = gen_syn3()
     elif dataset == 'syn4':
-        g, role_ids, name = gen_syn4()
+        g, labels, name = gen_syn4()
     elif dataset == 'syn5':
-        g, role_ids, name = gen_syn5()
+        g, labels, name = gen_syn5()
     else:
         raise ValueError()
 
@@ -45,7 +48,7 @@ def main(args):
     graph = dgl.from_networkx(g)
     graph = dgl.to_bidirected(graph)
 
-    num_classes = max(role_ids) + 1
+    num_classes = max(labels) + 1
     feat_dim = 10
 
     # feed saved stat dictionary into a model
@@ -53,24 +56,53 @@ def main(args):
     dummy_model.load_state_dict(model_stat_dict)
 
     # set a node to be explained and extract its subgraph
+    # For the test purpose, chose a node with label 1, which specifies the two nodes in the middle of a house
+    l_1 = [i for i, e in enumerate(labels) if e==1]
+    print(l_1)
+
     # here for test purpose, just pick the first one
-    n_idx = th.tensor(690)
+    n_idx = th.tensor([l_1[-1]])
 
-    one_hop_subg = sample_neighbors(graph, n_idx, -1)
-    print(one_hop_subg.edges())
+    sub_graph, new_n_idx = extract_subgraph(graph, n_idx)
+    print(new_n_idx)
+    src = sub_graph.edges()[0]
+    dst = sub_graph.edges()[1]
 
-    one_hop_nodes = one_hop_subg.ndata[dgl.NID]
-    two_hop_subg = dgl.node_subgraph(graph, one_hop_nodes)
-    print(two_hop_subg)
-
-    num_edges = two_hop_subg.number_of_edges()
+    num_edges = sub_graph.number_of_edges()
+    n_feats = th.randn(sub_graph.number_of_nodes(), feat_dim)
 
     # create an explainer
     explainer = NodeExplainerModule(model=dummy_model,
                                     num_edges=num_edges,
                                     node_feat_dim=feat_dim)
 
-    #
+    # define optimizer
+    optim = th.optim.Adam(explainer.parameters(), lr=0.01)
+
+    # train the explainer for a given node
+    dummy_model.eval()
+    model_logits = dummy_model(sub_graph, n_feats)
+    model_predict = F.one_hot(th.argmax(model_logits, dim=-1), num_classes)
+
+    for epoch in range(500):
+        explainer.train()
+        exp_logits = explainer(sub_graph, n_idx[0], n_feats)
+        loss = explainer._loss(exp_logits[new_n_idx], model_predict[new_n_idx])
+
+        optim.zero_grad()
+        loss.backward()
+        optim.step()
+
+        # print("In epoch: {:03d}, Loss: {:.6f}, Pred: {}".format(epoch, loss.item(), model_predict[new_n_idx]))
+
+    # visualize the importance of edges
+    edge_weights = explainer.edge_mask.sigmoid().detach()
+
+    total_t = th.cat([th.stack([src,dst], dim=-1), edge_weights], dim=-1)
+    print(total_t)
+
+    # draw_sub_graph(sub_graph)
+    visualize_sub_graph(sub_graph, edge_weights.numpy())
 
 
 if __name__ == '__main__':
@@ -78,6 +110,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_path', type=str, default='./dummy_model_4_syn1.pth',
                         help='The path of saved model to be explained.')
     # parser.add_argument('--dataset', type=str, default='aifb', help='dataset used for training the model')
+
 
     args = parser.parse_args()
     print(args)
