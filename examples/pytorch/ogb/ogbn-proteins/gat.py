@@ -267,7 +267,7 @@ def main():
 
     argparser = argparse.ArgumentParser("GAT on OGBN-Proteins", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argparser.add_argument("--cpu", action="store_true", help="CPU mode. This option overrides '--gpu'.")
-    argparser.add_argument("--gpu", type=int, default=0, help="GPU device ID.")
+    argparser.add_argument("--gpu", type=int, default=0, help="GPU device ID")
     argparser.add_argument("--seed", type=int, default=0, help="random seed")
     argparser.add_argument("--n-runs", type=int, default=10, help="running times")
     argparser.add_argument("--n-epochs", type=int, default=1200, help="number of epochs")
