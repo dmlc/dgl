@@ -46,6 +46,8 @@ def load_data(dataset):
     graph, labels = data[0]
     graph.ndata["labels"] = labels
 
+    graph.create_formats_()
+
     return graph, labels, train_idx, val_idx, test_idx, evaluator
 
 
@@ -215,7 +217,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         lr_scheduler.step(val_score)
 
     print("*" * 50)
-    print(f"Best val score: {best_val_score:.4f}, Final test score: {final_test_score}")
+    print(f"Best val score: {best_val_score}, Final test score: {final_test_score}")
     print("*" * 50)
 
     if args.plot_curves:
@@ -295,7 +297,6 @@ def main():
 
     graph, labels, train_idx, val_idx, test_idx, evaluator = load_data(dataset)
     graph, labels = preprocess(graph, labels)
-    graph.create_formats_()
 
     graph = graph.to(device)
     labels = labels.to(device)
