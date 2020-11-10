@@ -288,7 +288,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
 def main(args, devices):
     # load reddit data
-    data = RedditDataset(self_loop=True)
+    data = RedditDataset(self_loop=False)
     n_classes = data.num_classes
     g = data[0]
     features = g.ndata['feat']
