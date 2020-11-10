@@ -9,8 +9,8 @@ and transforming graphs.
 # This initializes Winsock and performs cleanup at termination as required
 import socket
 
-# Need to ensure that the backend framework is imported before load dgl libs,
-# otherwise weird cuda problem happens
+# Need to ensure that the backend framework is imported before load dgl libs.
+# Otherwise DGL will crash with errors like `munmap_chunk(): invalid pointer`.
 from .backend import load_backend, backend_name
 
 from . import function
@@ -24,7 +24,10 @@ from . import ops
 
 from ._ffi.runtime_ctypes import TypeCode
 from ._ffi.function import register_func, get_global_func, list_global_func_names, extract_ext_funcs
-from ._ffi.base import DGLError, __version__
+from ._ffi.base import DGLError, __version__, set_backend as _set_backend
+# Tell DGL library which backend it will use.
+# Note that this must be called *after* importing backend.
+_set_backend(backend_name)
 
 from .base import ALL, NTYPE, NID, ETYPE, EID
 from .readout import *
