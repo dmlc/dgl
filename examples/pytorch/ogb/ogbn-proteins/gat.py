@@ -305,7 +305,7 @@ def main():
 
     val_scores, test_scores = [], []
 
-    for i in range(args.n_runs):
+    for i in range(1, args.n_runs + 1):
         val_score, test_score = run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, i)
         val_scores.append(val_score)
         test_scores.append(test_score)
