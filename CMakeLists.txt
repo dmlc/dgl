@@ -46,8 +46,8 @@ if(USE_CUDA)
     #   is fixed by https://github.com/NVIDIA/cub/commit/9143e47e048641aa0e6ddfd645bcd54ff1059939
     #   in 11.1.
     message(STATUS "Detected CUDA of version ${CUDA_VERSION}. Use external CUB/Thrust library.")
-    include_directories(BEFORE SYSTEM "${CMAKE_SOURCE_DIR}/third_party/thrust")
-    include_directories(BEFORE SYSTEM "${CMAKE_SOURCE_DIR}/third_party/cub")
+    cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust")
+    cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cub")
   endif()
 endif(USE_CUDA)
 
@@ -58,7 +58,6 @@ include_directories("third_party/METIS/include/")
 include_directories("third_party/dmlc-core/include")
 include_directories("third_party/minigun/minigun")
 include_directories("third_party/minigun/third_party/moderngpu/src")
-include_directories("third_party/cub/")
 include_directories("third_party/phmap/")
 
 # initial variables
