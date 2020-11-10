@@ -47,7 +47,6 @@ class FabricProvider {
               << fi_tostr(&info->addr_format, FI_TYPE_ADDR_FORMAT);
 
     LOG(INFO) << "Domain Name" << info->domain_attr->name;
-    LOG(INFO) << "NIC Name " << info->nic->device_attr->name;
     // struct fi_info *providers = info.get();
     // int i = 0;
     // while (providers) {
@@ -71,7 +70,7 @@ class FabricProvider {
     hints->tx_attr->msg_order = FI_ORDER_SAS;
     hints->rx_attr->msg_order = FI_ORDER_SAS;
     hints->domain_attr->av_type = FI_AV_TABLE;
-    hints->nic->link_attr->network_type = strdup("Ethernet");
+    // hints->nic->link_attr->network_type = strdup("Ethernet");
     hints->fabric_attr->prov_name = strdup("udp");
 
     struct fi_info *info_;
@@ -94,7 +93,12 @@ class FabricProvider {
 
     CHECK_NE(ret, -FI_ENODATA) << "Could not find any optimal provider";
     check_err(ret, "fi_getinfo failed");
-    LOG(INFO) << "CTRL NIC Name " << provider->info->nic->device_attr->name;
+    LOG(INFO) << "CTRL Domain Name" << provider->info->domain_attr->name;
+    // LOG(INFO) << "CTRL NIC Name " << provider->info->nic->device_attr->name;
+    // LOG(INFO) << "NIC1 Name" << info_->nic;
+    // LOG(INFO) << "NIC2 Name" << info_->nic->device_attr;
+    // LOG(INFO) << "NIC Name " << info_->nic->device_attr->name;
+    // LOG(INFO) << "CTRL NIC Name " << provider->info->nic->device_attr->name;
     return provider;
   }
   std::string prov_name;
