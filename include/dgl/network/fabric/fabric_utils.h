@@ -31,14 +31,30 @@ namespace network {
 static const int FABRIC_VERSION = FI_VERSION(1, 10);
 
 struct FabricDeleter {
-  void operator()(fi_info* info) { fi_freeinfo(info); }
-  void operator()(fid* fid) { fi_close(fid); }
-  void operator()(fid_domain* fid) { fi_close((fid_t)fid); }
-  void operator()(fid_fabric* fid) { fi_close((fid_t)fid); }
-  void operator()(fid_cq* fid) { fi_close((fid_t)fid); }
-  void operator()(fid_av* fid) { fi_close((fid_t)fid); }
-  void operator()(fid_ep* fid) { fi_close((fid_t)fid); }
-  void operator()(fid_eq* fid) { fi_close((fid_t)fid); }
+  void operator()(fi_info* info) {
+    if (info) fi_freeinfo(info);
+  }
+  void operator()(fid* fid) {
+    if (fid) fi_close(fid);
+  }
+  void operator()(fid_domain* fid) {
+    if (fid) fi_close((fid_t)fid);
+  }
+  void operator()(fid_fabric* fid) {
+    if (fid) fi_close((fid_t)fid);
+  }
+  void operator()(fid_cq* fid) {
+    if (fid) fi_close((fid_t)fid);
+  }
+  void operator()(fid_av* fid) {
+    if (fid) fi_close((fid_t)fid);
+  }
+  void operator()(fid_ep* fid) {
+    if (fid) fi_close((fid_t)fid);
+  }
+  void operator()(fid_eq* fid) {
+    if (fid) fi_close((fid_t)fid);
+  }
 };
 
 template <typename T>

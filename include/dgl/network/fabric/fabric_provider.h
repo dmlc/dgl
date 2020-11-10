@@ -26,6 +26,8 @@ class FabricProvider {
     hints->rx_attr->msg_order = FI_ORDER_SAS;
     hints->domain_attr->control_progress = FI_PROGRESS_MANUAL;
     hints->domain_attr->data_progress = FI_PROGRESS_MANUAL;
+    // hints->domain_attr->caps = FI_LOCAL_COMM | FI_REMOTE_COMM;
+    // strdup
     if (prov_name != "shm") {
       // hints->mode = FI_CONTEXT;
     }
@@ -37,13 +39,15 @@ class FabricProvider {
     int ret =
       fi_getinfo(FABRIC_VERSION, nullptr, nullptr, 0, hints.get(), &info_);
     info.reset(info_);
-
     CHECK_NE(ret, -FI_ENODATA) << "Could not find any optimal provider";
     check_err(ret, "fi_getinfo failed");
 
     LOG(INFO) << "Found a fabric provider [" << 0 << "] "
               << info->fabric_attr->prov_name << ":"
               << fi_tostr(&info->addr_format, FI_TYPE_ADDR_FORMAT);
+
+    LOG(INFO) << "Domain Name" << info->domain_attr->name;
+    LOG(INFO) << "NIC Name " << info->nic->device_attr->name;
     // struct fi_info *providers = info.get();
     // int i = 0;
     // while (providers) {

@@ -24,7 +24,7 @@ bool FabricReceiver::Wait(const char* addr, int num_sender) {
     FabricAddrInfo info = {.sender_id = static_cast<int>(i),
                            .receiver_id = receiver_id_,
                            .addr = fep->fabric_ctx->addr};
-    ctrl_ep->Send(&info, sizeof(FabricAddrInfo), kAddrMsg, peer_fi_addr[i],
+    ctrl_ep->Send(&info, sizeof(FabricAddrInfo), kAddrMsg, ctrl_peer_fi_addr[i],
                   true);  // Send back server address
     msg_queue_[i] = std::make_shared<MessageQueue>(queue_size_);
     LOG(INFO) << "New peer fi addr" << peer_fi_addr[i] << "  id: " << i;
@@ -47,6 +47,12 @@ bool FabricReceiver::Wait(const char* addr, int num_sender) {
   //  / }
   //   ll_thread = d::make_s rl_ep.reset();
   poll_thread = std::make_shared<std::thread>(&FabricReceiver::RecvLoop, this);
+
+  // FabricAddrInfo fep_info;
+  // for (auto& kv : ctrl_peer_fi_addr) {
+  //   ctrl_ep->Send(&fep_info, sizeof(FabricAddrInfo), kAddrMsg, kv.second,
+  //   true);
+  // }
   return true;
 }
 

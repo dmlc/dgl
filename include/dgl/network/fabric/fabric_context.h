@@ -51,6 +51,7 @@ class FabricContext {
     // fi_domain: create domain
     struct fid_domain *domain_;
     ret = fi_domain(fabric.get(), info, &domain_, nullptr);
+    // LOG(INFO) << domain_->
     check_err(ret, "Couldn't open a fabric access domain");
     domain.reset(domain_);
 
@@ -70,10 +71,11 @@ class FabricContext {
     // fi_cq_open: open completion queue
     struct fid_cq *rxcq_, *txcq_;
     cq_attr.format = FI_CQ_FORMAT_TAGGED;
+    cq_attr.size = fabric_provider->info->rx_attr->size;
     ret = fi_cq_open(domain.get(), &cq_attr, &rxcq_, nullptr);
     rxcq.reset(rxcq_);
     check_err(ret, "Couldn't open CQ");
-
+    cq_attr.size = fabric_provider->info->tx_attr->size;
     ret = fi_cq_open(domain.get(), &cq_attr, &txcq_, nullptr);
     txcq.reset(txcq_);
     check_err(ret, "Couldn't open CQ");
@@ -87,12 +89,12 @@ class FabricContext {
     // fi_ep_bind: bind CQ and AV to the endpoint
     ret = fi_ep_bind(ep.get(), (fid_t)rxcq.get(), FI_RECV);
     check_err(ret, "Couldn't bind EP-RXCQ");
-    ret = fi_ep_bind(ep.get(), (fid_t)txcq.get(), FI_SEND);
+    ret = fi_ep_bind(ep.get(), (fid_t)txcq.get(), FI_TRANSMIT);
     check_err(ret, "Couldn't bind EP-TXCQ");
     ret = fi_ep_bind(ep.get(), (fid_t)av.get(), 0);
     check_err(ret, "Couldn't bind EP-AV");
-    ret = fi_ep_bind(ep.get(), (fid_t)eq.get(), 0);
-    check_err(ret, "Couldn't bind EP-EQ");
+    // ret = fi_ep_bind(ep.get(), (fid_t)eq.get(), 0);
+    // check_err(ret, "Couldn't bind EP-EQ");
 
     // fi_enable: enable endpoint for communication
     ret = fi_enable(ep.get());
