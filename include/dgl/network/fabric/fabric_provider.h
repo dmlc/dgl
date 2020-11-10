@@ -71,6 +71,7 @@ class FabricProvider {
     hints->tx_attr->msg_order = FI_ORDER_SAS;
     hints->rx_attr->msg_order = FI_ORDER_SAS;
     hints->domain_attr->av_type = FI_AV_TABLE;
+    hints->nic->link_attr->network_type = strdup("Ethernet");
     hints->fabric_attr->prov_name = strdup("udp");
 
     struct fi_info *info_;
@@ -91,6 +92,7 @@ class FabricProvider {
     provider->prov_name = "udp";
     provider->info.reset(info_);
 
+    LOG(INFO) << "CTRL NIC Name " << provider->info->nic->device_attr->name;
     CHECK_NE(ret, -FI_ENODATA) << "Could not find any optimal provider";
     check_err(ret, "fi_getinfo failed");
     return provider;
