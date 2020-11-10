@@ -1,4 +1,6 @@
-# Sample-based GAT on OGB Products
+# DGL examples for ogbn-products
+
+## Sample-based GAT
 
 Requires DGL 0.4.3post2 or later versions.
 
@@ -6,7 +8,7 @@ Run `main.py` and you should directly see the result.
 
 Accuracy over 5 runs: 0.7863197 ± 0.00072568655
 
-# DGL examples for ogbn-products
+## GAT (another implementation)
 
 Requires DGL 0.5 or later versions.
 
@@ -27,6 +29,7 @@ python3 gat.py --estimation-mode
 
 Here are the results over 10 runs.
 
-| Method | Validation Accuracy |  Test Accuracy  | #Parameters |
-|:------:|:-------------------:|:---------------:|:-----------:|
-|  GAT   |   0.9327 ± 0.0003   | 0.8126 ± 0.0018 |  1,065,127  |
+|    Method     | Validation Accuracy |  Test Accuracy  | #Parameters |
+|:-------------:|:-------------------:|:---------------:|:-----------:|
+| GAT (main.py) |          /          | 0.7863 ± 0.0007 |      /      |
+| GAT (gat.py)  |   0.9327 ± 0.0003   | 0.8126 ± 0.0018 |  1,065,127  |
