@@ -10,6 +10,9 @@
 #include "cuda_runtime.h"
 
 #include <dgl/runtime/device_api.h>
+#include <dgl/immutable_graph.h>
+
+using namespace dgl::aten;
 
 namespace dgl {
 namespace transform {
@@ -27,65 +30,99 @@ struct Mapping {
 };
 
 
+template<typename IdType, int BLOCK_SIZE, IdType TILE_SIZE>
+__device__ void map_vertex_ids(
+    IdType * const global,
+    const IdType num_vertices,
+    const Mapping<IdType> * const mappings,
+    const IdType hash_size)
+{
+  assert(BLOCK_SIZE == blockDim.x);
+
+  const IdType tile_start = TILE_SIZE*blockIdx.x;
+  const IdType tile_end = min(TILE_SIZE*(blockIdx.x+1), num_vertices);
+
+  for (IdType idx = threadIdx.x+tile_start; idx < tile_end; idx+=BLOCK_SIZE) {
+    const Mapping<IdType>& mapping = *search_hashmap(global[idx], mappings, 
+        hash_size);
+    global[idx] = mapping.local;
+  }
+}
+
+
+template<typename IdType, int BLOCK_SIZE, IdType TILE_SIZE>
+__global__ void map_edge_ids(
+    IdType * const global_srcs_device,
+    IdType * const global_dsts_device,
+    const IdType num_edges,
+    const Mapping<IdType> * const src_mapping,
+    const IdType src_hash_size,
+    const Mapping<IdType> * const dst_mapping,
+    const IdType dst_hash_size)
+{
+  assert(BLOCK_SIZE == blockDim.x);
+
+  if (blockIdx.y == 0) {
+    map_vertex_ids<IdType, BLOCK_SIZE, TILE_SIZE>(
+        global_srcs_device,
+        num_edges,
+        src_mapping,
+        src_hash_size);
+  } else {
+    map_vertex_ids<IdType, BLOCK_SIZE, TILE_SIZE>(
+        global_dsts_device,
+        num_edges,
+        dst_mapping,
+        dst_hash_size);
+  }
+}
+
+
+
+
 template<typename IdType>
 class DeviceNodeMap
 {
   public:
     constexpr static const int HASH_SCALING = 2;
 
-    static size_t getStorageSize(
-        const size_t num_nodes,
-        const size_t num_ntypes)
-    {
-      const size_t total_ntypes = num_ntypes*2;
-
-      const size_t hash_size = getHashSize(num_nodes);
-
-      const size_t hash_bytes_per_type = hash_size*sizeof(Mapping<IdType>);
-      const size_t total_hash_bytes = hash_bytes_per_type*total_ntypes;
-
-      const size_t value_bytes_per_type = num_nodes*sizeof(IdType);
-      const size_t total_value_bytes = value_bytes_per_type*total_ntypes;
-
-      const size_t count_bytes_per_type = sizeof(IdType); 
-      const size_t total_count_bytes = count_bytes_per_type*total_ntypes;
-
-      return total_hash_bytes + total_value_bytes + total_count_bytes;
-    }
-
     DeviceNodeMap(
-        void * const workspace,
-        const size_t workspace_size,
-        const size_t max_num_nodes,
+        const std::vector<int64_t>& num_nodes,
         const int64_t num_ntypes) :
-      m_num_types(num_ntypes*2),
-      m_rhs_offset(num_ntypes),
+      m_num_types(num_nodes.size()),
+      m_rhs_offset(m_num_types/2),
       m_masks(m_num_types),
       m_hash_prefix(m_num_types+1, 0),
-      m_values_prefix(m_num_types+1, 0),
       m_hash_tables(nullptr),
-      m_values(nullptr),
+      m_values(num_types),
       m_num_nodes_ptr(nullptr) // configure in constructor
     {
-      const size_t required_space = getStorageSize(max_num_nodes, num_ntypes);
-      if (workspace_size < required_space) {
-        throw std::runtime_error("Invalid GPU memory for DeviceNodeMap: " +
-            std::to_string(workspace_size) + " / " +
-            std::to_string(required_space));
-      }
-
-      const size_t hash_size = getHashSize(max_num_nodes);
-
-      for (size_t i = 0; i < m_num_types; ++i) {
+      for (int64_t i = 0; i < m_num_types; ++i) {
+        const size_t hash_size = getHashSize(num_nodes[i]);
         m_masks[i] = hash_size -1;
         m_hash_prefix[i+1] = m_hash_prefix[i] + hash_size;
-        m_values_prefix[i+1] = m_values_prefix[i] + max_num_nodes;
       }
 
       // configure workspace
-      m_hash_tables = static_cast<Mapping<IdType>*>(workspace);
-      m_values = reinterpret_cast<IdType*>(m_hash_tables+m_hash_prefix.back());
-      m_num_nodes_ptr = m_values + m_values_prefix.back();
+      m_hash_tables = device->AllocWorkspace(m_hash_prefix.back()*sizeof(Mapping<IdType>));
+      m_num_nodes_ptr = device->AllocWorkspace(m_num_types*sizeof(IdType));
+
+      for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+        m_values[ntype] = NewIdArray(num_nodes[ntype], ctx, sizeof(IdType)*8);
+      }
+    }
+
+    std::vector<IdArray> get_unique_lhs_nodes(
+        int64_t * const num_nodes_per_type)
+    {
+      std::vector<IdArray> lhs;
+      lhs.reserve(m_rhs_offset);
+      for (int64_t ntype = 0; ntype < m_rhs_offset; ++ntype) {
+        lhs.emplace_back(m_values[ntype].CreateView(
+            std::vector<int64_t>{num_nodes_per_type[ntype]}, m_values[ntype]->dtype, 0));
+      }
+
+      return lhs;
     }
 
     IdType * num_nodes_ptrs()
@@ -236,24 +273,6 @@ class DeviceNodeMap
       return m_num_nodes_ptr+m_rhs_offset+ntype;
     }
 
-    void sources_to_host(
-        std::vector<IdArray>* const lhs_nodes,
-        cudaStream_t stream)
-    {
-      std::vector<IdType> numNodesHost(size());
-      node_counts_to_host(numNodesHost.data(), numNodesHost.size(), stream); 
-
-      // sync so we can read the node counts
-      checked_sync(stream);
-
-      for (size_t i = 0; i < m_rhs_offset; ++i) {
-        (*lhs_nodes)[i] = NewIdArray(numNodesHost[i], DLContext{kDLCPU, 0}, sizeof(IdType)*8);
-        checked_d2h_copy( (*lhs_nodes)[i].Ptr<IdType>(), this->lhs_nodes(i),
-            numNodesHost[i], stream);
-      }
-      checked_sync(stream);
-    }
-
     size_t size() const
     {
       return m_masks.size();
@@ -302,37 +321,14 @@ class DeviceNodeMapMaker
     }
 
     DeviceNodeMapMaker(
-        HeteroGraphPtr graph,
-        const std::vector<IdArray>& rhs_nodes,
-        const std::vector<EdgeArray>& edge_arrays,
-        const bool include_rhs_in_lhs) :
-        m_numNodesPerType(num_etypes*2, 0),
+        const std::vector<int64_t> maxNodesPerType) :
         m_maxNumNodes(0),
         m_workspaceSizeBytes(0)
     {
-      const int64_t num_ntypes = rhs_nodes.size();
-      const int64_t num_etypes = edge_arrays.size();
+      m_maxNumNodes = *std::max_element(maxNodesPerType.begin(),
+          maxNodesPerType.end());
 
-      // count rhs nodes
-      for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
-        m_numNodesPerType[ntype] += rhs_nodes[ntype]->Shape[0];
-
-        if (include_rhs_in_lhs) {
-          m_numNodesPerType[ntype+num_ntypes] += rhs_nodes[ntype]->Shape[0];
-        }
-      }
-
-      // count non-unique lhs nodes
-      for (int64_t etype = 0; etype < num_etypes; ++etype) {
-        const auto src_dst_types = graph->GetEndpointTypes(etype);
-        const dgl_type_t srctype = src_dst_types.first;
-        m_numNodesPerType[srctype+num_ntypes] += edge_arrays[etype].src->Shape[0];
-      }
-
-      m_maxNumNodes = *std::max_element(m_numNodesPerType.begin(),
-          m_numNodesPerType.end());
-
-      m_workspaceSizeBytes = requiredPrefixSumBytes(m_maxNumNodes) + sizeof(IdType)*(m_maxNumNodes+1)
+      m_workspaceSizeBytes = requiredPrefixSumBytes(m_maxNumNodes) + sizeof(IdType)*(m_maxNumNodes+1);
     }
 
     size_t requiredWorkspaceBytes() const
@@ -351,10 +347,11 @@ class DeviceNodeMapMaker
     * @param stream The stream to operate on.
     */
     void make(
-        const IdArray& nodes,
+        const std::vector<IdArray>& lhs_nodes,
+        const std::vector<IdArray>& rhs_nodes,
         DeviceNodeMap<IdType> * const node_maps,
-        IdArray * const prefix_lhs_device,
-        IdArray * const lhs_device,
+        IdArray& prefix_lhs_device,
+        IdArray& lhs_device,
         void * const workspace,
         const size_t workspaceSize,
         cudaStream_t stream)
@@ -372,27 +369,31 @@ class DeviceNodeMapMaker
       IdType * const node_prefix = reinterpret_cast<IdType*>(static_cast<uint8_t*>(prefix_sum_space) +
           prefix_sum_bytes);
 
-      checked_memset(prefix_lhs_device->Ptr<IdType>(), 0, 1, stream);
+      checked_memset(prefix_lhs_device.Ptr<IdType>(), 0, 1, stream);
+
+      const int64_t num_ntypes = lhs_nodes.size() + rhs_nodes.size();
 
       // launch kernel to build hash table
       for (size_t i = 0; i < nodes.numTypes(); ++i) {
-        if (nodes[i].size() > 0) {
+        const IdArray& nodes = i < lhs_nodes.size() ? lhs_nodes[i] : rhs_nodes[i-lhs_nodes.size()];
+
+        if (nodes->shape[0] > 0) {
           checked_memset(node_maps->hash_table(i), -1, node_maps->hash_size(i),
               stream);
 
-          const dim3 grid(round_up_div(nodes[i].size(), BLOCK_SIZE));
+          const dim3 grid(round_up_div(nodes->shape[0], BLOCK_SIZE));
           const dim3 block(BLOCK_SIZE);
 
           generate_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
-              nodes[i].nodes(),
-              nodes[i].size(),
+              nodes.Ptr<IdType>(),
+              nodes->shape[0],
               node_maps->hash_size(i),
               node_maps->hash_table(i));
           check_last_error();
 
           count_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
-              nodes[i].nodes(),
-              nodes[i].size(),
+              nodes.Ptr<IdType>()(),
+              nodes->shape[0],
               node_maps->hash_size(i),
               node_maps->hash_table(i),
               node_prefix);
@@ -406,18 +407,18 @@ class DeviceNodeMapMaker
               grid.x+1, stream));
 
           compact_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
-              nodes[i].nodes(),
-              nodes[i].size(),
+              nodes.Ptr<IdType>()(),
+              nodes->shape[0],
               node_maps->hash_size(i),
               node_maps->hash_table(i),
               node_prefix,
-              lhs_device->Ptr<IdType>(),
-              prefix_lhs_device->Ptr<IdType>+i);
+              lhs_device.Ptr<IdType>(),
+              prefix_lhs_device.Ptr<IdType>+i);
           check_last_error();
         } else {
           checked_d2d_copy(
-            prefix_lhs_device->Ptr<IdType>()+i+1,
-            prefix_lhs_device->Ptr<IdType>()+i,
+            prefix_lhs_device.Ptr<IdType>()+i+1,
+            prefix_lhs_device.Ptr<IdType>()+i,
             1, stream);
         }
       }
@@ -483,7 +484,7 @@ void copy_source_and_dest_nodes_to_device(
       // add to lhs side
       node_counts[srctype] += num_source_nodes;
       nodes[srctype].emplace_back(
-          srcs_device[etype]->Ptr<IdType>(),
+          srcs_device[etype].Ptr<IdType>(),
           num_source_nodes);
     }
   }
@@ -556,9 +557,7 @@ void count_nodes(
 
 template<typename IdType>
 void map_edges(
-    std::vector<IdArray>& rhs_nodes,
     std::vector<EdgeArray>& edges,
-    std::vector<IdType*> const edge_ptrs,
     const DeviceNodeMap<IdType>& node_map,
     cudaStream_t stream)
 {
@@ -572,87 +571,9 @@ void map_edges(
       const int src_type = edges.src_type();
       const int dst_type = edges.dst_type();
 
-      DeviceNodes<IdType>& rhs = (*rhs_nodes)[dst_type];
-
       const dim3 grid(round_up_div(edges.size(), TILE_SIZE));
       const dim3 block(BLOCK_SIZE);
 
-      const IdType num_rhs_nodes = rhs.size();
-
-      // reduce the dsts to an ind_ptr, by taking the maximum index+1 per set
-      // of contiguous values i, and saving it ind_ptr[i+1].
-      cub::CountingInputIterator<IdType> itr(1);
-      cub::Max maxOp;
-
-      IdType * unique_values = memory.get_typed_memory(
-          ToBlockMemory<IdType>::UNIQUE_DST_NODES, edges.size()+1);
-      IdType * temp_edge_ptr = memory.get_typed_memory(
-          ToBlockMemory<IdType>::TEMP_EDGE_PTR, num_rhs_nodes+1);
-      checked_memset(temp_edge_ptr, 0, 1, stream);
-
-      size_t storage_bytes = 0;
-      cub::DeviceReduce::ReduceByKey(
-          nullptr,
-          storage_bytes,
-          edges.dests(),
-          unique_values,
-          itr,
-          temp_edge_ptr+1,
-          unique_values+edges.size(),
-          maxOp,
-          edges.size(),
-          stream);
-
-      void * storage = memory.get_memory(
-          ToBlockMemory<IdType>::SCRATCH, storage_bytes);
-      cub::DeviceReduce::ReduceByKey(
-          storage,
-          storage_bytes,
-          edges.dests(),
-          unique_values,
-          itr,
-          temp_edge_ptr+1,
-          unique_values+edges.size(),
-          maxOp,
-          edges.size(),
-          stream);
-
-      // map the unique_values to local numbers
-      map_rhs_nodes<IdType, BLOCK_SIZE, TILE_SIZE><<<
-        dim3(round_up_div(num_rhs_nodes, TILE_SIZE),2),
-        BLOCK_SIZE,
-        0,
-        stream>>>(
-        unique_values,
-        unique_values+edges.size(),
-        rhs.nodes(),
-        num_rhs_nodes,
-        node_map.lhs_hash_table(dst_type),
-        node_map.lhs_hash_size(dst_type));
-
-      // the next challenge, is for dsts which have no sources,
-      // and need to be included in our ind_ptr array
-
-      // so we have the subset of dst nodes with edges `unique_values`,
-      // and the full set of dst nodes `rhs_nodes`, the
-      // ind_ptr for the `unique_values` nodes, and a mapping of nodes to local
-      // ids
-
-      // Agl 1:
-      // per dst node: 
-      //  binary search the unique values
-      //  saving the lower bound to the dst node index--nodes with edges
-      //  will find themselves, and nodes without will find the preceding
-      //  value
-      remap_dsts_ptr<IdType, BLOCK_SIZE><<<
-          round_up_div(num_rhs_nodes, BLOCK_SIZE), BLOCK_SIZE, 0, stream>>>(
-        temp_edge_ptr,
-        unique_values,
-        rhs.nodes(),
-        edge_ptrs[edges.etype()],
-        unique_values+edges.size(),
-        num_rhs_nodes
-      );
 
       // map the srcs
       map_edge_ids<IdType, BLOCK_SIZE, TILE_SIZE><<<
@@ -683,7 +604,7 @@ ToBlockInternal(
     const std::vector<IdArray> &rhs_nodes,
     bool include_rhs_in_lhs)
 {
-
+  cudaStream_t stream = 0;
   const auto& ctx = graph->Context();
   auto device = runtime::DeviceAPI::Get(ctx);
 
@@ -709,42 +630,69 @@ ToBlockInternal(
       edge_arrays[etype] = graph->Edges(etype);
     }
   }
+  
+  // count lhs and rhs nodes
+  std::vector<int64_t> maxNodesPerType(num_ntypes*2, 0);
+  for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+    maxNodesPerType[ntype] += rhs_nodes[ntype]->shape[0];
 
-  // create a map maker, with everything it needs to know 
-  DeviceNodeMapMaker<IdType> maker(
-      graph, rhs_nodes, edge_arrays, include_rhs_in_lhs);
-
-  // allocate space for map creation process
-  const size_t scratch_size = maker.requiredWorkspaceBytes();
-  void * const scratch_device = device->AllocWorkspace(ctx, scratch_size);
- 
-  // setup prefix sum
-  std::vector<size_t> edge_ptr_prefix(num_etypes+1,0);
+    if (include_rhs_in_lhs) {
+      maxNodesPerType[ntype+num_ntypes] += rhs_nodes[ntype]->shape[0];
+    }
+  }
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
     const auto src_dst_types = graph->GetEndpointTypes(etype);
-    const dgl_type_t dsttype = src_dst_types.second;
-    const IdType num_nodes = rhs_nodes[dsttype].NumElements();
-    edge_ptr_prefix[etype+1] = edge_ptr_prefix[etype] + num_nodes;
+    const dgl_type_t srctype = src_dst_types.first;
+    maxNodesPerType[srctype+num_ntypes] += edge_arrays[etype].src->shape[0];
   }
-  std::vector<IdType*> edge_ptrs_device(num_etypes);
+
+  // gather lhs_nodes
+  std::vector<int64_t> src_node_offsets(num_ntypes, 0);
+  std::vector<IdArray> src_nodes(num_ntypes);
+  for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+    src_nodes[ntype] = NewIdArray(maxNodesPerType[ntype], ctx,
+        sizeof(IdType)*8);
+    if (include_rhs_in_lhs) {
+      // place rhs nodes first
+      device->CopyDataFromTo(rhs_nodes[ntype].Ptr<IdType>(), 0,
+          src_nodes[ntype].Ptr<IdType>(), src_node_offsets[ntype],
+          sizeof(IdType)*rhs_nodes[ntype]->shape[0],
+          rhs_nodes[ntype]->ctx, src_nodes[ntype]->ctx, 
+          rhs_nodes[ntype]->dtype,
+          stream);
+      src_node_offsets[ntype] += sizeof(IdType)*rhs_nodes[ntype]->shape[0];
+    }
+  }
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
-    edge_ptrs_device[etype] = dsts_device->Ptr<IdType>() + edge_ptr_prefix[etype];
+    const auto src_dst_types = graph->GetEndpointTypes(etype);
+    const dgl_type_t srctype = src_dst_types.first;
+
+    device->CopyDataFromTo(
+        edge_arrays[etype].src.Ptr<IdType>(), 0,
+        src_nodes[srctype].Ptr<IdType>(),
+        src_node_offsets[srctype],
+        sizeof(IdType)*edge_arrays[etype].src->shape[0],
+        rhs_nodes[srctype]->ctx,
+        src_nodes[srctype]->ctx, 
+        rhs_nodes[srctype]->dtype,
+        stream);
+
+    src_node_offsets[srctype] += sizeof(IdType)*edge_arrays[etype].src->shape[0];
   }
 
-  // allocate space for node maps
-  const size_t node_map_space_size = DeviceNodeMap<IdType>::getStorageSize(
-      maxNodes,
-      num_ntypes);
-  void * const node_map_space = device->AllocWorkspace(ctx, node_map_space_size);
+  // allocate space for map creation process
+  DeviceNodeMapMaker<IdType> maker(maxNodesPerType);
+  const size_t scratch_size = maker.requiredWorkspaceBytes();
+  void * const scratch_device = device->AllocWorkspace(ctx, scratch_size);
 
-  DeviceNodeMap<IdType> node_maps(
-      node_map_space,
-      node_map_space_size,
-      maxNodes,
-      num_ntypes);
+  DeviceNodeMap<IdType> node_maps(maxNodesPerType);
+
 
   // populate the mappings
-  maker.make(nodes_device, &node_maps, scratch_device, scratch_size, stream);
+  maker.make(
+      src_nodes,
+      rhs_nodes,
+      &node_maps, scratch_device, scratch_size, stream);
 
   // start copy for number of nodes per type 
   int64_t * num_nodes_per_type;
@@ -755,9 +703,10 @@ ToBlockInternal(
 
 
   // map node numberings from global to local, and build pointer for CSR
-  map_edges(&rhs_nodes_device, &edges_device, edge_ptrs_device, node_maps, stream);
+  map_edges(edge_arrays, node_maps, stream);
 
-  const std::vector<int64_t> num_nodes_per_type = ?;
+  std::vector<IdArray> lhs_nodes = node_maps.get_unique_lhs_nodes(
+      num_nodes_per_type);
 
   std::vector<IdArray> induced_edges;
   induced_edges.reserve(num_etypes);
@@ -789,18 +738,18 @@ ToBlockInternal(
           2, lhs_nodes[srctype].NumElements(), rhs_nodes[dsttype].NumElements(),
           aten::NullArray(), aten::NullArray()));
     } else {
-      rel_graphs.push_back(CreateFromCSC(
+      rel_graphs.push_back(CreateFromCOO(
           2,
           rhs_nodes[dsttype].NumElements(),
           lhs_nodes[srctype].NumElements(),
-          edge_ptrs[etype],
           edge_arrays[etype].src,
-          edge_arrays[etype].id));
+          edge_arrays[etype].dst));
     }
   }
 
   const HeteroGraphPtr new_graph = CreateHeteroGraph(
-      new_meta_graph, rel_graphs, num_nodes_per_type);
+      new_meta_graph, rel_graphs, std::vector<int64_t>(
+      num_nodes_per_type, num_nodes_per_type+num_ntypes));
 
   // return the new graph, the new src nodes, and new edges
   return std::make_tuple(new_graph, lhs_nodes, induced_edges);
