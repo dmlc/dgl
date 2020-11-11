@@ -72,6 +72,7 @@ class FabricProvider {
     hints->domain_attr->av_type = FI_AV_TABLE;
     // hints->nic->link_attr->network_type = strdup("Ethernet");
     hints->fabric_attr->prov_name = strdup("udp");
+    hints->domain_attr->caps = FI_LOCAL_COMM | FI_REMOTE_COMM;
 
     struct fi_info *info_;
     int ret = -1;
