@@ -13,27 +13,28 @@ bool FabricReceiver::Wait(const char* addr, int num_sender) {
     std::unique_ptr<FabricEndpoint>(FabricEndpoint::CreateCtrlEndpoint(addr));
   for (size_t i = 0; i < num_sender; i++) {
     FabricAddrInfo addr;
-    ctrl_ep->Recv(&addr, sizeof(FabricAddrInfo), kAddrMsg, FI_ADDR_UNSPEC,
+    ctrl_ep->Recv(&addr, sizeof(FabricAddrInfo), kCtrlAddrMsg, FI_ADDR_UNSPEC,
                   true);
     ctrl_peer_fi_addr[i] = ctrl_ep->AddPeerAddr(&addr.addr);
     receiver_id_ = addr.receiver_id;
-    ctrl_ep->Recv(&addr, sizeof(FabricAddrInfo), kAddrMsg, ctrl_peer_fi_addr[i],
-                  true);
+    ctrl_ep->Recv(&addr, sizeof(FabricAddrInfo), kFiAddrMsg,
+                  ctrl_peer_fi_addr[i], true);
     peer_fi_addr[i] = fep->AddPeerAddr(&addr.addr);
-    fi_to_id[peer_fi_addr[i]] = i;
+    // fi_to_id[peer_fi_addr[i]] = i;
     FabricAddrInfo info = {.sender_id = static_cast<int>(i),
                            .receiver_id = receiver_id_,
                            .addr = fep->fabric_ctx->addr};
-    ctrl_ep->Send(&info, sizeof(FabricAddrInfo), kAddrMsg, ctrl_peer_fi_addr[i],
+    ctrl_ep->Send(&info, sizeof(FabricAddrInfo), kFiAddrMsg,
+                  ctrl_peer_fi_addr[i],
                   true);  // Send back server address
     msg_queue_[i] = std::make_shared<MessageQueue>(queue_size_);
-    LOG(INFO) << "New peer fi addr" << peer_fi_addr[i] << "  id: " << i;
+    // LOG(INFO) << "New peer fi addr" << peer_fi_addr[i] << "  id: " << i;
     fep->Send(handshake_msg.c_str(), handshake_msg.length(), kIgnoreMsg,
               peer_fi_addr[i]);
     fep->Recv(handshake_buffer, handshake_msg.length(), kIgnoreMsg,
-    FI_ADDR_UNSPEC);
+              FI_ADDR_UNSPEC);
   }
-  LOG(INFO) << "Finish Initialization";
+  // LOG(INFO) << "Finish Initialization";
   // socket_receiver.reset();  // Finalize socket communicator
   // for (auto& kv : ctrl_peer_fi_addr) {
   // }
@@ -165,24 +166,24 @@ bool FabricReceiver::HandleCompletionEvent(
     fep->Recv(buffer, data_size, kDataMsg | (cq_entry.tag & IdMask),
               FI_ADDR_UNSPEC, false);
   } else if (tag == kDataMsg) {
-    // LOG(INFO) << "Receive Data";
     Message msg;
     msg.data = reinterpret_cast<char*>(cq_entry.buf);
     msg.size = cq_entry.len;
     msg.deallocator = DefaultMessageDeleter;
-    // LOG(INFO) << "Push to queue: " << source_addr;
     msg_queue_.at((cq_entry.tag & IdMask))->Add(msg);
     int64_t* size_buffer = new int64_t;  // can be optimized with buffer pool
     fep->Recv(size_buffer, sizeof(int64_t), kSizeMsg, FI_ADDR_UNSPEC, false,
               0xFFFF);  // can use FI_ADDR_UNSPEC flag
   } else {
-    LOG(INFO) << "Invalid tag";
+    if (tag != kIgnoreMsg) {
+      LOG(INFO) << "Invalid tag";
+    }
   }
   return true;
 }
 
 void FabricReceiver::RecvLoop() {
-  LOG(INFO) << "Start recv loop";
+  // LOG(INFO) << "Start recv loop";
   for (size_t i = 0; i < peer_fi_addr.size(); i++) {
     int64_t* size_buffer = new int64_t;  // can be optimized with buffer pool
     fep->Recv(size_buffer, sizeof(int64_t), kSizeMsg, FI_ADDR_UNSPEC, false,

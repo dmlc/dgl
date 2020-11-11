@@ -7,7 +7,7 @@ namespace dgl {
 namespace network {
 
 void FabricSender::AddReceiver(const char* addr, int recv_id) {
-  LOG(INFO) << "Add Receiver: " << addr;
+  // LOG(INFO) << "Add Receiver: " << addr;
   struct sockaddr_in sin = {};
   FabricAddr ctrl_fi_addr;
   sin.sin_family = AF_INET;
@@ -46,7 +46,7 @@ void FabricSender::Finalize() {
 }
 
 bool FabricSender::Connect() {
-  size_t num_peer = ctrl_peer_fi_addr.size();
+  // size_t num_peer = ctrl_peer_fi_addr.size();
 
   sender_id = -1;
   struct FabricAddrInfo addrs;
@@ -55,12 +55,13 @@ bool FabricSender::Connect() {
     FabricAddrInfo ctrl_info = {.sender_id = -1,
                                 .receiver_id = kv.first,
                                 .addr = ctrl_ep->fabric_ctx->addr};
-    ctrl_ep->Send(&ctrl_info, sizeof(FabricAddrInfo), kAddrMsg, kv.second,
+    ctrl_ep->Send(&ctrl_info, sizeof(FabricAddrInfo), kCtrlAddrMsg, kv.second,
                   true);
     FabricAddrInfo fep_info = {
       .sender_id = -1, .receiver_id = kv.first, .addr = fep->fabric_ctx->addr};
-    ctrl_ep->Send(&fep_info, sizeof(FabricAddrInfo), kAddrMsg, kv.second, true);
-    ctrl_ep->Recv(&addrs, sizeof(FabricAddrInfo), kAddrMsg, FI_ADDR_UNSPEC,
+    ctrl_ep->Send(&fep_info, sizeof(FabricAddrInfo), kFiAddrMsg, kv.second,
+                  true);
+    ctrl_ep->Recv(&addrs, sizeof(FabricAddrInfo), kFiAddrMsg, FI_ADDR_UNSPEC,
                   true);
     // CHECK(addrs.receiver_id)
     peer_fi_addr[kv.first] = fep->AddPeerAddr(&addrs.addr);
@@ -72,7 +73,6 @@ bool FabricSender::Connect() {
     fep->Send(handshake_msg.c_str(), handshake_msg.length(), kIgnoreMsg,
               peer_fi_addr[kv.first]);
   }
-  LOG(INFO) << "Finish Initialization";
 
   poll_thread = std::make_shared<std::thread>(&FabricSender::SendLoop, this);
   // ctrl_ep.reset();
@@ -84,20 +84,17 @@ STATUS FabricSender::Send(Message msg, int recv_id) {
   CHECK_GT(msg.size, 0);
   CHECK_GE(recv_id, 0);
   // Add data message to message queue
-  // LOG(INFO) << "Queue addr:" << msg_queue_[recv_id].get();
   STATUS code = msg_queue_[recv_id]->Add(msg);
   return code;
 }
 
 void FabricSender::SendLoop() {
-  // sleep(10);
-  // { LOG(INFO) << "Start sendloop"; }
   bool exit = false;
   struct fi_cq_tagged_entry cq_entries[kMaxConcurrentWorkRequest];
   while (!exit) {
     for (auto& kv : msg_queue_) {
       Message* msg_ptr = new Message();
-      STATUS code = kv.second->Remove(msg_ptr);
+      STATUS code = kv.second->Remove(msg_ptr, false);
       // TODO(AZ): How to finalize queue
       if (code == QUEUE_EMPTY) {
         continue;
@@ -105,11 +102,9 @@ void FabricSender::SendLoop() {
         int64_t* exit_code = new int64_t(0);
         fep->Send(exit_code, sizeof(msg_ptr->size), kSizeMsg | sender_id,
                   peer_fi_addr[kv.first]);
-        // LOG(INFO) << "Send exit code to:" << kv.first;
         delete msg_ptr;
         exit = true;
       } else if (code == REMOVE_SUCCESS) {
-        // LOG(INFO) << "Send msgs size:" << msg_ptr->size;
         fep->Send(&msg_ptr->size, sizeof(msg_ptr->size), kSizeMsg | sender_id,
                   peer_fi_addr[kv.first]);
         fep->Send(msg_ptr->data, msg_ptr->size, kDataMsg | sender_id,
