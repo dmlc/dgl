@@ -77,7 +77,7 @@ class FabricEndpoint {
                   &readable_addr.len);
     std::string readable_peer_addr =
       std::string(readable_addr.name, readable_addr.len);
-    LOG(INFO) << "Readable peer addr: " << readable_peer_addr;
+    // LOG(INFO) << "Readable peer addr: " << readable_peer_addr;
     FullFabricAddr full_fi_addr = {
       .faddr = *addr, .readable_addr = readable_peer_addr, .fiaddr = peer_addr};
     client_ep.push_back(full_fi_addr);

@@ -27,14 +27,9 @@ class FabricProvider {
     hints->domain_attr->control_progress = FI_PROGRESS_MANUAL;
     hints->domain_attr->data_progress = FI_PROGRESS_MANUAL;
     hints->domain_attr->caps = FI_LOCAL_COMM | FI_REMOTE_COMM;
-    // strdup
-    if (prov_name != "shm") {
-      // hints->mode = FI_CONTEXT;
-    }
     hints->domain_attr->av_type = FI_AV_TABLE;
     hints->fabric_attr->prov_name = strdup(prov_name.c_str());
 
-    // fi_getinfo
     struct fi_info *info_;
     int ret =
       fi_getinfo(FABRIC_VERSION, nullptr, nullptr, 0, hints.get(), &info_);
@@ -46,7 +41,7 @@ class FabricProvider {
               << info->fabric_attr->prov_name << ":"
               << fi_tostr(&info->addr_format, FI_TYPE_ADDR_FORMAT);
 
-    LOG(INFO) << "Domain Name" << info->domain_attr->name;
+    // LOG(INFO) << "Domain Name" << info->domain_attr->name;
     // struct fi_info *providers = info.get();
     // int i = 0;
     // while (providers) {
@@ -94,7 +89,7 @@ class FabricProvider {
 
     CHECK_NE(ret, -FI_ENODATA) << "Could not find any optimal provider";
     check_err(ret, "fi_getinfo failed");
-    LOG(INFO) << "CTRL Domain Name" << provider->info->domain_attr->name;
+    // LOG(INFO) << "CTRL Domain Name" << provider->info->domain_attr->name;
     // LOG(INFO) << "CTRL NIC Name " << provider->info->nic->device_attr->name;
     // LOG(INFO) << "NIC1 Name" << info_->nic;
     // LOG(INFO) << "NIC2 Name" << info_->nic->device_attr;

@@ -27,8 +27,9 @@ namespace network {
 enum FabricMsgTag : uint64_t {
   kSizeMsg = 0x0000000000010000,
   kDataMsg = 0x0000000000020000,
-  kAddrMsg = 0x0000000000030000,
-  kIgnoreMsg = 0x0000000000040000,
+  kCtrlAddrMsg = 0x0000000000030000,
+  kFiAddrMsg = 0x0000000000040000,
+  kIgnoreMsg = 0x0000000000050000,
 };
 
 static const std::string handshake_msg = "ready";
@@ -132,7 +133,7 @@ class FabricSender : public Sender {
   std::unordered_map<int /* receiver ID */, std::shared_ptr<MessageQueue>>
     msg_queue_;
 
-  std::unordered_map<int /* Sender (virutal) ID */, fi_addr_t> fi_to_id;
+  // std::unordered_map<int /* Sender (virutal) ID */, fi_addr_t> fi_to_id;
 
   /*!
    * \brief Independent thread for each socket connection
@@ -255,7 +256,7 @@ class FabricReceiver : public Receiver {
   std::unordered_map<int /* Sender (virutal) ID */, fi_addr_t> peer_fi_addr,
     ctrl_peer_fi_addr;
 
-  std::unordered_map<int /* Sender (virutal) ID */, fi_addr_t> fi_to_id;
+  // std::unordered_map<int /* Sender (virutal) ID */, fi_addr_t> fi_to_id;
 
   /*!
    * \brief Message queue for each socket connection
