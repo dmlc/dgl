@@ -16,13 +16,14 @@
 
 namespace dgl {
 namespace transform {
-
+namespace cuda {
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
 CudaToBlock(
     HeteroGraphPtr graph,
     const std::vector<IdArray>& rhs_nodes,
     const bool include_rhs_in_lhs);
 
+}  // namespace cuda
 }  // namespace transform
 }  // namespace dgl
 

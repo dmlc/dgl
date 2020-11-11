@@ -17,6 +17,7 @@ using namespace dgl::aten;
 
 namespace dgl {
 namespace transform {
+namespace cuda {
 
 namespace
 {
@@ -988,5 +989,6 @@ CudaToBlock(
 }
 
 
+}  // namespace cuda
 }  // namespace transform
 }  // namespace dgl

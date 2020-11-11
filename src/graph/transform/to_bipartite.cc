@@ -16,6 +16,7 @@
 // TODO(BarclayII): currently ToBlock depend on IdHashMap<IdType> implementation which
 // only works on CPU.  Should fix later to make it device agnostic.
 #include "../../array/cpu/array_utils.h"
+#include "cuda/cuda_to_block.h"
 
 namespace dgl {
 
@@ -127,8 +128,18 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBlock")
     HeteroGraphPtr new_graph;
     std::vector<IdArray> lhs_nodes;
     std::vector<IdArray> induced_edges;
-    std::tie(new_graph, lhs_nodes, induced_edges) = ToBlock(
-        graph_ref.sptr(), rhs_nodes, include_rhs_in_lhs);
+
+    if (graph_ref->Context().device_type == kDLGPU) {
+#ifdef DGL_USE_CUDA
+      std::tie(new_graph, lhs_nodes, induced_edges) = cuda::CudaToBlock(
+          graph_ref.sptr(), rhs_nodes, include_rhs_in_lhs);
+#else
+      CHECK(false) << "GPU support not enabled.";
+#endif
+    } else {
+      std::tie(new_graph, lhs_nodes, induced_edges) = ToBlock(
+          graph_ref.sptr(), rhs_nodes, include_rhs_in_lhs);
+    }
 
     List<Value> lhs_nodes_ref;
     for (IdArray &array : lhs_nodes)
