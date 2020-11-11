@@ -7,7 +7,6 @@ namespace dgl {
 namespace network {
 
 void FabricSender::AddReceiver(const char* addr, int recv_id) {
-  // LOG(INFO) << "Add Receiver: " << addr;
   struct sockaddr_in sin = {};
   FabricAddr ctrl_fi_addr;
   sin.sin_family = AF_INET;
@@ -17,10 +16,8 @@ void FabricSender::AddReceiver(const char* addr, int recv_id) {
   CHECK(inet_pton(AF_INET, hostport[0].c_str(), &sin.sin_addr) > 0)
     << "Invalid ip";
   sin.sin_port = htons(stoi(hostport[1]));
-
   ctrl_fi_addr.CopyFrom(&sin, sizeof(sin));
   ctrl_peer_fi_addr[recv_id] = ctrl_ep->AddPeerAddr(&ctrl_fi_addr);
-  // ctrl_ep->ctrl_peer_addr[recv_id] = address;
 }
 
 void FabricSender::Finalize() {
@@ -39,15 +36,9 @@ void FabricSender::Finalize() {
     mq.second->SignalFinished(ID);
   }
   poll_thread->join();
-  // Block main thread until all socket-threads finish their jobs
-  // for (auto& thread : threads_) {
-  //   thread.second->join();
-  // }
 }
 
 bool FabricSender::Connect() {
-  // size_t num_peer = ctrl_peer_fi_addr.size();
-
   sender_id = -1;
   struct FabricAddrInfo addrs;
   for (auto& kv : ctrl_peer_fi_addr) {
@@ -63,19 +54,12 @@ bool FabricSender::Connect() {
                   true);
     ctrl_ep->Recv(&addrs, sizeof(FabricAddrInfo), kFiAddrMsg, FI_ADDR_UNSPEC,
                   true);
-    // CHECK(addrs.receiver_id)
     peer_fi_addr[kv.first] = fep->AddPeerAddr(&addrs.addr);
     sender_id = addrs.sender_id;
     msg_queue_[kv.first] = std::make_shared<MessageQueue>(queue_size_);
-
-    fep->Recv(handshake_buffer, handshake_msg.length(), kIgnoreMsg,
-              FI_ADDR_UNSPEC);
-    fep->Send(handshake_msg.c_str(), handshake_msg.length(), kIgnoreMsg,
-              peer_fi_addr[kv.first]);
   }
 
   poll_thread = std::make_shared<std::thread>(&FabricSender::SendLoop, this);
-  // ctrl_ep.reset();
   return true;
 }
 
@@ -95,20 +79,19 @@ void FabricSender::SendLoop() {
     for (auto& kv : msg_queue_) {
       Message* msg_ptr = new Message();
       STATUS code = kv.second->Remove(msg_ptr, false);
-      // TODO(AZ): How to finalize queue
       if (code == QUEUE_EMPTY) {
         continue;
+      } else if (code == REMOVE_SUCCESS) {
+        fep->Send(&msg_ptr->size, sizeof(msg_ptr->size), kSizeMsg | sender_id,
+                  peer_fi_addr[kv.first]);
+        fep->Send(msg_ptr->data, msg_ptr->size, kDataMsg | sender_id,
+                  peer_fi_addr[kv.first], false, msg_ptr);
       } else if (code == QUEUE_CLOSE) {
         int64_t* exit_code = new int64_t(0);
         fep->Send(exit_code, sizeof(msg_ptr->size), kSizeMsg | sender_id,
                   peer_fi_addr[kv.first]);
         delete msg_ptr;
         exit = true;
-      } else if (code == REMOVE_SUCCESS) {
-        fep->Send(&msg_ptr->size, sizeof(msg_ptr->size), kSizeMsg | sender_id,
-                  peer_fi_addr[kv.first]);
-        fep->Send(msg_ptr->data, msg_ptr->size, kDataMsg | sender_id,
-                  peer_fi_addr[kv.first], false, msg_ptr);
       }
     }
     PollCompletionQueue(cq_entries);

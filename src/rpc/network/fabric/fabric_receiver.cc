@@ -28,32 +28,9 @@ bool FabricReceiver::Wait(const char* addr, int num_sender) {
                   ctrl_peer_fi_addr[i],
                   true);  // Send back server address
     msg_queue_[i] = std::make_shared<MessageQueue>(queue_size_);
-    // LOG(INFO) << "New peer fi addr" << peer_fi_addr[i] << "  id: " << i;
-    fep->Send(handshake_msg.c_str(), handshake_msg.length(), kIgnoreMsg,
-              peer_fi_addr[i]);
-    fep->Recv(handshake_buffer, handshake_msg.length(), kIgnoreMsg,
-              FI_ADDR_UNSPEC);
   }
-  // LOG(INFO) << "Finish Initialization";
-  // socket_receiver.reset();  // Finalize socket communicator
-  // for (auto& kv : ctrl_peer_fi_addr) {
-  // }
-
-  // for (int i = 0; i < num_sender_; ++i) {
-  //   LOG(INFO) << "Init Queue: " << peer_fi_addr[i];
-  //  }
-  //  / for (auto& kv : peer_fi_addr) {
-  // //   fep->Send(handshake_msg.c_str(), handshake_msg.size(), kAddrMsg,
-  //      kv.second);
-  //  / }
-  //   ll_thread = d::make_s rl_ep.reset();
   poll_thread = std::make_shared<std::thread>(&FabricReceiver::RecvLoop, this);
 
-  // FabricAddrInfo fep_info;
-  // for (auto& kv : ctrl_peer_fi_addr) {
-  //   ctrl_ep->Send(&fep_info, sizeof(FabricAddrInfo), kAddrMsg, kv.second,
-  //   true);
-  // }
   return true;
 }
 
@@ -63,10 +40,6 @@ STATUS FabricReceiver::Recv(Message* msg, int* send_id) {
     for (auto& mq : msg_queue_) {
       *send_id = mq.first;
       // We use non-block remove here
-      // {LOG(INFO) <<"RECV queue: "<< peer_fi_addr.at(*send_id);}
-      // CHECK(peer_fi_addr.find(*send_id) != peer_fi_addr.end()) << *send_id;
-      // CHECK(msg_queue_.find(peer_fi_addr.at(*send_id)) != msg_queue_.end())
-      // << peer_fi_addr.at(*send_id);
       STATUS code = msg_queue_[*send_id]->Remove(msg, false);
       if (code == QUEUE_EMPTY) {
         continue;  // jump to the next queue
@@ -91,11 +64,12 @@ void HandleCQError(struct fid_cq* cq) {
   }
 }
 
-bool FabricReceiver::PollCompletionQueue(struct fi_cq_tagged_entry* cq_entries,
-                                         fi_addr_t* source_addrs) {
+bool FabricReceiver::PollCompletionQueue(
+  struct fi_cq_tagged_entry* cq_entries) {
   // *source_addrs = 1;
   // fi_addr_t source_addrs2 = 999;
-  int ret = fi_cq_read(fep->fabric_ctx->rxcq.get(), cq_entries, 1);
+  int ret = fi_cq_read(fep->fabric_ctx->rxcq.get(), cq_entries,
+                       kMaxConcurrentWorkRequest);
   // int ret = fi_cq_read(fep->fabric_ctx->rxcq.get(), cq_entries, 1);
 
   // if (ret > 0) {
@@ -110,21 +84,8 @@ bool FabricReceiver::PollCompletionQueue(struct fi_cq_tagged_entry* cq_entries,
     check_err(ret, "fi_cq_read failed");
   } else {
     CHECK_NE(ret, 0) << "at least one completion event is expected";
-    // LOG(INFO) << ret << " Events received from: " << source_addrs2;
     for (int i = 0; i < ret; ++i) {
-      // const auto& cq_entry = cq_entries[i];
-      // const auto& source_addr = source_addrs[i];
-      // CHECK_NE(source_addr, FI_ADDR_NOTAVAIL);
-
-      // FabricAddr readable_addr, addr;
-      // fi_av_lookup(fep->fabric_ctx->av.get(), source_addrs2, addr.name,
-      //         false,     &addr.len);
-      // fi_av_straddr(fep->fabric_ctx->av.get(), addr.name, readable_addr.name,
-      //               &readable_addr.len);
-      // std::string readable_peer_addr =
-      //   std::string(readable_addr.name, readable_addr.len);
-      // { LOG(INFO) << "Recv From readable: " << readable_peer_addr; }
-      if (!HandleCompletionEvent(cq_entries[i], 0)) {
+      if (!HandleCompletionEvent(cq_entries[i])) {
         keep_polling = false;
       };
     }
@@ -141,19 +102,14 @@ STATUS FabricReceiver::RecvFrom(Message* msg, int send_id) {
 }
 
 bool FabricReceiver::HandleCompletionEvent(
-  const struct fi_cq_tagged_entry& cq_entry, const fi_addr_t& source_addr) {
+  const struct fi_cq_tagged_entry& cq_entry) {
   uint64_t tag = cq_entry.tag & MsgTagMask;
-  // { LOG(INFO) << "Completion event"; }
   if (tag == kSizeMsg) {
-    // LOG(INFO) << "recv size";
     CHECK(cq_entry.len == sizeof(int64_t)) << "Invalid size message";
     int64_t data_size = *(int64_t*)cq_entry.buf;
-
-    // LOG(INFO) << "Receive Size: " << data_size << ". From "
-    //           << (cq_entry.tag & IdMask);
-    // free(cq_entry.buf);
+    free(cq_entry.buf);  // Free size buffer
     char* buffer = nullptr;
-    if (data_size == 0) {
+    if (data_size == 0) {  // Indicate receiver should exit
       return false;
     }
     try {
@@ -162,7 +118,7 @@ bool FabricReceiver::HandleCompletionEvent(
       LOG(FATAL) << "Cannot allocate enough memory for message, "
                  << "(message size: " << data_size << ")";
     }
-    // fep->Recv(buffer, data_size, kDataMsg, source_addr);
+    // Receive from specific sender
     fep->Recv(buffer, data_size, kDataMsg | (cq_entry.tag & IdMask),
               FI_ADDR_UNSPEC, false);
   } else if (tag == kDataMsg) {
@@ -183,17 +139,17 @@ bool FabricReceiver::HandleCompletionEvent(
 }
 
 void FabricReceiver::RecvLoop() {
-  // LOG(INFO) << "Start recv loop";
   for (size_t i = 0; i < peer_fi_addr.size(); i++) {
-    int64_t* size_buffer = new int64_t;  // can be optimized with buffer pool
+    // can be optimized with buffer pool
+    // Will be freed in HandleCompletionEvent
+    int64_t* size_buffer = new int64_t;
+    // Issue recv events
     fep->Recv(size_buffer, sizeof(int64_t), kSizeMsg, FI_ADDR_UNSPEC, false,
               0xFFFF);
   }
 
   struct fi_cq_tagged_entry cq_entries[kMaxConcurrentWorkRequest];
-  fi_addr_t source_addrs[kMaxConcurrentWorkRequest];
   int finished_count = 0;
-  // while (!should_stop_polling_.load()) {
   while (finished_count != num_sender_) {
     // If main thread had finished its job
     for (auto& kv : msg_queue_) {
@@ -201,7 +157,7 @@ void FabricReceiver::RecvLoop() {
         return;  // exit loop thread
       }
     }
-    if (!PollCompletionQueue(cq_entries, source_addrs)) {
+    if (!PollCompletionQueue(cq_entries)) {
       finished_count++;
     };
   }
@@ -224,15 +180,6 @@ void FabricReceiver::Finalize() {
   }
   // Block main thread until all socket-threads finish their jobs
   poll_thread->join();
-  // for (auto& thread : threads_) {
-  //   thread.second->join();
-  // }
-  // // Clear all sockets
-  // for (auto& socket : sockets_) {
-  //   socket.second->Close();
-  // }
-  // server_socket_->Close();
-  // delete server_socket_;
 }
 }  // namespace network
 }  // namespace dgl

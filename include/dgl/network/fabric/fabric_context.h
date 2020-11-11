@@ -23,14 +23,10 @@ class FabricContext {
   UniqueFabricPtr<struct fid_av> av;
   // the endpoint
   UniqueFabricPtr<struct fid_ep> ep;
-  // the event queue
-  UniqueFabricPtr<struct fid_eq> eq;
   // endpoint name
   struct FabricAddr addr;
   // readable endpoint name
   struct FabricAddr readable_addr;
-  // maximum tag
-  uint64_t max_tag;
 
   std::shared_ptr<FabricProvider> fabric_provider;
 
@@ -40,7 +36,6 @@ class FabricContext {
     struct fi_info *info = fprovider->info.get();
     struct fi_cq_attr cq_attr = {};
     struct fi_av_attr av_attr = {};
-    struct fi_eq_attr eq_attr = {};
 
     // fi_fabric: create fabric
     struct fid_fabric *fabric_;
@@ -61,12 +56,6 @@ class FabricContext {
     ret = fi_av_open(domain.get(), &av_attr, &av_, nullptr);
     av.reset(av_);
     check_err(ret, "Couldn't open AV");
-
-    // fi_eq_open: open event queue
-    struct fid_eq *eq_;
-    ret = fi_eq_open(fabric.get(), &eq_attr, &eq_, nullptr);
-    check_err(ret, "Couldn't open an event queue");
-    eq.reset(eq_);
 
     // fi_cq_open: open completion queue
     struct fid_cq *rxcq_, *txcq_;
@@ -93,8 +82,6 @@ class FabricContext {
     check_err(ret, "Couldn't bind EP-TXCQ");
     ret = fi_ep_bind(ep.get(), (fid_t)av.get(), 0);
     check_err(ret, "Couldn't bind EP-AV");
-    // ret = fi_ep_bind(ep.get(), (fid_t)eq.get(), 0);
-    // check_err(ret, "Couldn't bind EP-EQ");
 
     // fi_enable: enable endpoint for communication
     ret = fi_enable(ep.get());
@@ -103,15 +90,8 @@ class FabricContext {
     // fi_getname: get endpoint name
     ret = fi_getname((fid_t)ep.get(), addr.name, &addr.len);
     check_err(ret, "Call to fi_getname() failed");
-    // LOG(INFO) << "Endpoint created raw: " << std::string(addr.name, addr.len)
-    //           << " readable endpoint = "
-    //           << std::string(readable_addr.name, readable_addr.len);
-
-    // fi_av_straddr: human readable name
+    // set readable address name
     fi_av_straddr(av.get(), addr.name, readable_addr.name, &readable_addr.len);
-    // LOG(INFO) << "Endpoint created: " << addr.DebugStr()
-    //           << " readable endpoint = "
-    //           << std::string(readable_addr.name, readable_addr.len);
   }
 };
 

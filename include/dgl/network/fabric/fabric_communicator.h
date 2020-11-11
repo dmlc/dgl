@@ -32,8 +32,8 @@ enum FabricMsgTag : uint64_t {
   kIgnoreMsg = 0x0000000000050000,
 };
 
-static const std::string handshake_msg = "ready";
-static char handshake_buffer[16] = "ready";
+// static const std::string handshake_msg = "ready";
+// static char handshake_buffer[16] = "ready";
 
 static const uint64_t MsgTagMask = 0x00000000FFFF0000;
 static const uint64_t IdMask = 0x000000000000FFFF;
@@ -133,14 +133,6 @@ class FabricSender : public Sender {
   std::unordered_map<int /* receiver ID */, std::shared_ptr<MessageQueue>>
     msg_queue_;
 
-  // std::unordered_map<int /* Sender (virutal) ID */, fi_addr_t> fi_to_id;
-
-  /*!
-   * \brief Independent thread for each socket connection
-   */
-  // std::unordered_map<int /* receiver ID */, std::shared_ptr<std::thread>>
-  //   threads_;
-
   /*!
    * \brief Send-loop for each socket in per-thread
    * \param socket TCPSocket for current connection
@@ -216,17 +208,18 @@ class FabricReceiver : public Receiver {
    */
   void Finalize() override;
 
-  bool PollCompletionQueue(struct fi_cq_tagged_entry* cq_entries,
-                           fi_addr_t* source_addrs);
-
-  bool HandleCompletionEvent(const struct fi_cq_tagged_entry& cq_entry,
-                             const fi_addr_t& source_addrs);
   /*!
-   * \brief Communicator type: 'socket'
+   * \brief Communicator type: 'fabric:efa'
    */
   inline std::string Type() const override {
     return std::string("fabric:") + fep->fabric_provider->prov_name;
   }
+
+ private:
+  bool PollCompletionQueue(struct fi_cq_tagged_entry* cq_entries);
+
+  bool HandleCompletionEvent(const struct fi_cq_tagged_entry& cq_entry);
+
   /*!
    * \brief Recv-loop for each socket in per-thread
    * \param socket client socket
@@ -237,7 +230,6 @@ class FabricReceiver : public Receiver {
    */
   void RecvLoop();
 
- private:
   std::atomic<bool> should_stop_polling_;
 
   std::unique_ptr<FabricEndpoint> ctrl_ep;
@@ -266,12 +258,6 @@ class FabricReceiver : public Receiver {
     msg_queue_;
 
   std::shared_ptr<std::thread> poll_thread;
-  /*!
-   * \brief Independent thead for each socket connection
-   */
-  // std::unordered_map<int /* Sender (virtual) ID */,
-  //                    std::shared_ptr<std::thread>>
-  //   threads_;
 };
 
 }  // namespace network

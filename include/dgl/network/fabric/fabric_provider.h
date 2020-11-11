@@ -11,8 +11,6 @@
 namespace dgl {
 namespace network {
 
-// struct sock_in ConvertToSockIn(const char *addr) {}
-
 class FabricProvider {
  public:
   FabricProvider() {}
@@ -38,8 +36,7 @@ class FabricProvider {
     check_err(ret, "fi_getinfo failed");
 
     LOG(INFO) << "Found a fabric provider [" << 0 << "] "
-              << info->fabric_attr->prov_name << ":"
-              << fi_tostr(&info->addr_format, FI_TYPE_ADDR_FORMAT);
+              << info->fabric_attr->prov_name << ":" << info->domain_attr->name;
 
     // LOG(INFO) << "Domain Name" << info->domain_attr->name;
     // struct fi_info *providers = info.get();
@@ -65,7 +62,6 @@ class FabricProvider {
     hints->tx_attr->msg_order = FI_ORDER_SAS;
     hints->rx_attr->msg_order = FI_ORDER_SAS;
     hints->domain_attr->av_type = FI_AV_TABLE;
-    // hints->nic->link_attr->network_type = strdup("Ethernet");
     hints->fabric_attr->prov_name = strdup("udp");
     hints->domain_attr->caps = FI_LOCAL_COMM | FI_REMOTE_COMM;
 
@@ -89,12 +85,10 @@ class FabricProvider {
 
     CHECK_NE(ret, -FI_ENODATA) << "Could not find any optimal provider";
     check_err(ret, "fi_getinfo failed");
-    // LOG(INFO) << "CTRL Domain Name" << provider->info->domain_attr->name;
-    // LOG(INFO) << "CTRL NIC Name " << provider->info->nic->device_attr->name;
-    // LOG(INFO) << "NIC1 Name" << info_->nic;
-    // LOG(INFO) << "NIC2 Name" << info_->nic->device_attr;
-    // LOG(INFO) << "NIC Name " << info_->nic->device_attr->name;
-    // LOG(INFO) << "CTRL NIC Name " << provider->info->nic->device_attr->name;
+
+    // LOG(INFO) << "Found a fabric provider [" << 0 << "] "
+    //           << provider->info->fabric_attr->prov_name << ":"
+    //           << provider->info->domain_attr->name;
     return provider;
   }
   std::string prov_name;
