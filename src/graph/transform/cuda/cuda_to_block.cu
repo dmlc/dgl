@@ -7,11 +7,12 @@
 
 #include "cuda_to_block.h"
 
-#include "cuda_runtime.h"
-#include <cub/cub.cuh>
-
 #include <dgl/runtime/device_api.h>
 #include <dgl/immutable_graph.h>
+#include <cuda_runtime.h>
+#include <cub/cub.cuh>
+#include <utility>
+#include <algorithm>
 
 #include "../../../runtime/cuda/cuda_common.h"
 #include "../../heterograph.h"
@@ -22,8 +23,7 @@ namespace dgl {
 namespace transform {
 namespace cuda {
 
-namespace
-{
+namespace {
 
 // helper types
 
@@ -35,21 +35,20 @@ struct Mapping {
 };
 
 template<typename IdType>
-struct EmptyKey
-{
+struct EmptyKey {
   constexpr static const IdType value = static_cast<IdType>(-1);
 };
 
 inline __device__ int64_t atomicCAS(
     int64_t * const address,
     const int64_t compare,
-    const int64_t val)
-{
-  using Type = unsigned long long int;
+    const int64_t val) {
+  // match the type of "::atomicCAS", so ignore lint warning
+  using Type = unsigned long long int; // NOLINT
 
   static_assert(sizeof(Type) == sizeof(*address), "Type width must match");
 
-  return ::atomicCAS((Type*)address,
+  return ::atomicCAS(reinterpret_cast<Type*>(address),
                    static_cast<Type>(compare),
                    static_cast<Type>(val));
 }
@@ -57,13 +56,13 @@ inline __device__ int64_t atomicCAS(
 inline __device__ int32_t atomicCAS(
     int32_t * const address,
     const int32_t compare,
-    const int32_t val)
-{
-  using Type = int;
+    const int32_t val) {
+  // match the type of "::atomicCAS", so ignore lint warning
+  using Type = int; // NOLINT
 
   static_assert(sizeof(Type) == sizeof(*address), "Type width must match");
 
-  return ::atomicCAS((Type*)address,
+  return ::atomicCAS(reinterpret_cast<Type*>(address),
                    static_cast<Type>(compare),
                    static_cast<Type>(val));
 }
@@ -71,29 +70,25 @@ inline __device__ int32_t atomicCAS(
 
 
 template<typename IdType>
-struct BlockPrefixCallbackOp
-{
-    IdType m_running_total;
+struct BlockPrefixCallbackOp {
+  IdType m_running_total;
 
-    __device__ BlockPrefixCallbackOp(
-        const IdType running_total) :
-      m_running_total(running_total)
-    {
-    }
+  __device__ BlockPrefixCallbackOp(
+      const IdType running_total) :
+    m_running_total(running_total) {
+  }
 
-    __device__ IdType operator()(const IdType block_aggregate)
-    {
-        const IdType old_prefix = m_running_total;
-        m_running_total += block_aggregate;
-        return old_prefix;
-    }
+  __device__ IdType operator()(const IdType block_aggregate) {
+      const IdType old_prefix = m_running_total;
+      m_running_total += block_aggregate;
+      return old_prefix;
+  }
 };
 
 template<typename IdType>
 inline __device__ IdType hash(
     const IdType mask,
-    const IdType id)
-{
+    const IdType id) {
   return id & mask;
 }
 
@@ -103,14 +98,14 @@ inline __device__ bool attempt_insert_at(
     const size_t pos,
     const IdType id,
     const size_t index,
-    Mapping<IdType> * const table)
-{
+    Mapping<IdType> * const table) {
   const IdType key = atomicCAS(&table[pos].key, EmptyKey<IdType>::value, id);
   if (key == EmptyKey<IdType>::value || key == id) {
     // we either set a match key, or found a matching key, so then place the
-    // minimum index in position
-    atomicMin(reinterpret_cast<unsigned long long*>(&table[pos].index),
-        static_cast<unsigned long long>(index));
+    // minimum index in position. Match the type of atomicMin, so ignore
+    // linting
+    atomicMin(reinterpret_cast<unsigned long long*>(&table[pos].index), // NOLINT
+        static_cast<unsigned long long>(index)); // NOLINT
     return true;
   } else {
     // we need to search elsewhere
@@ -123,8 +118,7 @@ inline __device__ size_t insert_hashmap(
     const IdType id,
     const size_t index,
     Mapping<IdType> * const table,
-    const size_t table_size)
-{
+    const size_t table_size) {
   size_t pos = id % table_size;
 
   // linearly scan for an empty slot or matching entry
@@ -141,8 +135,7 @@ template<typename IdType>
 inline __device__ IdType search_hashmap_for_pos(
     const IdType id,
     const Mapping<IdType> * const table,
-    const IdType table_size)
-{
+    const IdType table_size) {
   IdType pos = id % table_size;
 
   // linearly scan for matching entry
@@ -161,8 +154,7 @@ template<typename IdType>
 inline __device__ const Mapping<IdType> * search_hashmap(
     const IdType id,
     const Mapping<IdType> * const table,
-    const IdType table_size)
-{
+    const IdType table_size) {
   const IdType pos = search_hashmap_for_pos(id, table, table_size);
 
   return table+pos;
@@ -172,8 +164,7 @@ template<typename IdType>
 inline __device__ Mapping<IdType> * search_hashmap(
     const IdType id,
     Mapping<IdType> * const table,
-    const IdType table_size)
-{
+    const IdType table_size) {
   const IdType pos = search_hashmap_for_pos(id, table, table_size);
 
   return table+pos;
@@ -199,8 +190,7 @@ __global__ void generate_hashmap_duplicates(
     const IdType * const nodes,
     const int64_t num_nodes,
     const size_t hash_size,
-    Mapping<IdType> * const mappings)
-{
+    Mapping<IdType> * const mappings) {
   assert(BLOCK_SIZE == blockDim.x);
 
   const size_t block_start = TILE_SIZE*blockIdx.x;
@@ -231,8 +221,7 @@ __global__ void generate_hashmap_unique(
     const IdType * const nodes,
     const int64_t num_nodes,
     const size_t hash_size,
-    Mapping<IdType> * const mappings)
-{
+    Mapping<IdType> * const mappings) {
   assert(BLOCK_SIZE == blockDim.x);
 
   const size_t block_start = TILE_SIZE*blockIdx.x;
@@ -269,8 +258,7 @@ __global__ void count_hashmap(
     const size_t num_nodes,
     const IdType hash_size,
     const Mapping<IdType> * const pairs,
-    IdType * const num_unique_nodes)
-{
+    IdType * const num_unique_nodes) {
   assert(BLOCK_SIZE == blockDim.x);
 
   using BlockReduce = typename cub::BlockReduce<IdType, BLOCK_SIZE>;
@@ -312,8 +300,7 @@ __global__ void compact_hashmap(
     Mapping<IdType> * const mappings,
     const IdType * const num_nodes_prefix,
     IdType * const global_nodes,
-    int64_t * const global_node_count)
-{
+    int64_t * const global_node_count) {
   assert(BLOCK_SIZE == blockDim.x);
 
   using FlagType = uint16_t;
@@ -323,11 +310,11 @@ __global__ void compact_hashmap(
 
   __shared__ typename BlockScan::TempStorage temp_space;
 
-	BlockPrefixCallbackOp<IdType> prefix_op(num_nodes_prefix[blockIdx.x]);
+  BlockPrefixCallbackOp<IdType> prefix_op(num_nodes_prefix[blockIdx.x]);
 
   // count successful placements
   for (size_t i = 0; i < VALS_PER_THREAD; ++i) {
-		const size_t index = threadIdx.x + i*BLOCK_SIZE + blockIdx.x*TILE_SIZE;
+    const size_t index = threadIdx.x + i*BLOCK_SIZE + blockIdx.x*TILE_SIZE;
 
     IdType flag;
     Mapping<IdType>* kv;
@@ -342,8 +329,8 @@ __global__ void compact_hashmap(
       kv = nullptr;
     }
 
-		BlockScan(temp_space).ExclusiveSum(flag, flag, prefix_op);
-		__syncthreads();
+    BlockScan(temp_space).ExclusiveSum(flag, flag, prefix_op);
+    __syncthreads();
 
     if (kv) {
       kv->local = flag;
@@ -362,15 +349,14 @@ __device__ void map_vertex_ids(
     IdType * const new_global,
     const IdType num_vertices,
     const Mapping<IdType> * const mappings,
-    const IdType hash_size)
-{
+    const IdType hash_size) {
   assert(BLOCK_SIZE == blockDim.x);
 
   const IdType tile_start = TILE_SIZE*blockIdx.x;
   const IdType tile_end = min(TILE_SIZE*(blockIdx.x+1), num_vertices);
 
   for (IdType idx = threadIdx.x+tile_start; idx < tile_end; idx+=BLOCK_SIZE) {
-    const Mapping<IdType>& mapping = *search_hashmap(global[idx], mappings, 
+    const Mapping<IdType>& mapping = *search_hashmap(global[idx], mappings,
         hash_size);
     new_global[idx] = mapping.local;
   }
@@ -387,8 +373,7 @@ __global__ void map_edge_ids(
     const Mapping<IdType> * const src_mapping,
     const IdType src_hash_size,
     const Mapping<IdType> * const dst_mapping,
-    const IdType dst_hash_size)
-{
+    const IdType dst_hash_size) {
   assert(BLOCK_SIZE == blockDim.x);
   assert(2 == gridDim.y);
 
@@ -413,322 +398,294 @@ __global__ void map_edge_ids(
 template<typename IdType>
 inline size_t round_up_div(
     const IdType num,
-    const size_t divisor)
-{
+    const size_t divisor) {
   return static_cast<IdType>(num/divisor) + (num % divisor == 0 ? 0 : 1);
 }
 
 template<typename IdType>
 inline IdType round_up(
     const IdType num,
-    const size_t unit)
-{
+    const size_t unit) {
   return round_up_div(num, unit)*unit;
 }
 
 
 template<typename IdType>
-class DeviceNodeMap
-{
-  public:
-    constexpr static const int HASH_SCALING = 2;
+class DeviceNodeMap {
+ public:
+  constexpr static const int HASH_SCALING = 2;
 
-    DeviceNodeMap(
-        const std::vector<int64_t>& num_nodes,
-        DGLContext ctx,
-        cudaStream_t stream) :
-      m_num_types(num_nodes.size()),
-      m_rhs_offset(m_num_types/2),
-      m_masks(m_num_types),
-      m_hash_prefix(m_num_types+1, 0),
-      m_hash_tables(nullptr),
-      m_num_nodes_ptr(nullptr) // configure in constructor
-    {
-      auto device = runtime::DeviceAPI::Get(ctx);
+  DeviceNodeMap(
+      const std::vector<int64_t>& num_nodes,
+      DGLContext ctx,
+      cudaStream_t stream) :
+    m_num_types(num_nodes.size()),
+    m_rhs_offset(m_num_types/2),
+    m_masks(m_num_types),
+    m_hash_prefix(m_num_types+1, 0),
+    m_hash_tables(nullptr),
+    m_num_nodes_ptr(nullptr) {
+    auto device = runtime::DeviceAPI::Get(ctx);
 
-      for (int64_t i = 0; i < m_num_types; ++i) {
-        const size_t hash_size = getHashSize(num_nodes[i]);
-        m_masks[i] = hash_size -1;
-        m_hash_prefix[i+1] = m_hash_prefix[i] + hash_size;
-      }
-
-      // configure workspace
-      m_hash_tables = static_cast<Mapping<IdType>*>(device->AllocWorkspace(ctx,
-          m_hash_prefix.back()*sizeof(*m_hash_tables)));
-      m_num_nodes_ptr = static_cast<IdType*>(device->AllocWorkspace(ctx,
-          m_num_types*sizeof(*m_num_nodes_ptr)));
-
-      CUDA_CALL(cudaMemsetAsync(
-        m_hash_tables,
-        -1,
-        m_hash_prefix.back()*sizeof(*m_hash_tables),
-        stream));
+    for (int64_t i = 0; i < m_num_types; ++i) {
+      const size_t hash_size = getHashSize(num_nodes[i]);
+      m_masks[i] = hash_size -1;
+      m_hash_prefix[i+1] = m_hash_prefix[i] + hash_size;
     }
 
-    IdType * num_nodes_ptrs()
-    {
-      return m_num_nodes_ptr;
-    }
+    // configure workspace
+    m_hash_tables = static_cast<Mapping<IdType>*>(device->AllocWorkspace(ctx,
+        m_hash_prefix.back()*sizeof(*m_hash_tables)));
+    m_num_nodes_ptr = static_cast<IdType*>(device->AllocWorkspace(ctx,
+        m_num_types*sizeof(*m_num_nodes_ptr)));
 
-    IdType * num_nodes_ptr(
-        const size_t index) 
-    {
-      return m_num_nodes_ptr + index;
-    }
+    CUDA_CALL(cudaMemsetAsync(
+      m_hash_tables,
+      -1,
+      m_hash_prefix.back()*sizeof(*m_hash_tables),
+      stream));
+  }
 
-    Mapping<IdType> * hash_table(
-        const size_t index)
-    {
-      return m_hash_tables + m_hash_prefix[index];
-    }
+  IdType * num_nodes_ptrs() {
+    return m_num_nodes_ptr;
+  }
 
-    const Mapping<IdType> * hash_table(
-        const size_t index) const
-    {
-      return m_hash_tables + m_hash_prefix[index];
-    }
+  IdType * num_nodes_ptr(
+      const size_t index) {
+    return m_num_nodes_ptr + index;
+  }
 
-    IdType hash_mask(
-        const size_t index) const
-    {
-      return m_masks[index];
-    }
+  Mapping<IdType> * hash_table(
+      const size_t index) {
+    return m_hash_tables + m_hash_prefix[index];
+  }
 
-    IdType hash_size(
-        const size_t index) const
-    {
-      return m_hash_prefix[index+1]-m_hash_prefix[index];
-    }
+  const Mapping<IdType> * hash_table(
+      const size_t index) const {
+    return m_hash_tables + m_hash_prefix[index];
+  }
 
-    Mapping<IdType> * lhs_hash_table(
-        const size_t index)
-    {
-      return hash_table(index);
-    }
+  IdType hash_mask(
+      const size_t index) const {
+    return m_masks[index];
+  }
 
-    Mapping<IdType> * rhs_hash_table(
-        const size_t index)
-    {
-      return hash_table(index+m_rhs_offset);
-    }
+  IdType hash_size(
+      const size_t index) const {
+    return m_hash_prefix[index+1]-m_hash_prefix[index];
+  }
 
-    const Mapping<IdType> * lhs_hash_table(
-        const size_t index) const
-    {
-      return hash_table(index);
-    }
+  Mapping<IdType> * lhs_hash_table(
+      const size_t index) {
+    return hash_table(index);
+  }
 
-    const Mapping<IdType> * rhs_hash_table(
-        const size_t index) const
-    {
-      return hash_table(index+m_rhs_offset);
-    }
+  Mapping<IdType> * rhs_hash_table(
+      const size_t index) {
+    return hash_table(index+m_rhs_offset);
+  }
 
-    IdType lhs_hash_mask(
-        const size_t index) const
-    {
-      return hash_mask(index);
-    }
+  const Mapping<IdType> * lhs_hash_table(
+      const size_t index) const {
+    return hash_table(index);
+  }
 
-    IdType rhs_hash_mask(
-        const size_t index) const
-    {
-      return hash_mask(m_rhs_offset+index);
-    }
+  const Mapping<IdType> * rhs_hash_table(
+      const size_t index) const {
+    return hash_table(index+m_rhs_offset);
+  }
 
-    IdType lhs_hash_size(
-        const size_t index) const
-    {
-      return hash_size(index);
-    }
+  IdType lhs_hash_mask(const size_t index) const {
+    return hash_mask(index);
+  }
 
-    IdType rhs_hash_size(
-        const size_t index) const
-    {
-      return hash_size(m_rhs_offset+index);
-    }
+  IdType rhs_hash_mask(
+      const size_t index) const {
+    return hash_mask(m_rhs_offset+index);
+  }
 
-    const IdType * lhs_num_nodes_ptr(
-        const int64_t ntype) const
-    {
-      return m_num_nodes_ptr+ntype;
-    }
+  IdType lhs_hash_size(
+      const size_t index) const {
+    return hash_size(index);
+  }
 
-    const IdType * rhs_num_nodes_ptr(
-        const int64_t ntype) const
-    {
-      return m_num_nodes_ptr+m_rhs_offset+ntype;
-    }
+  IdType rhs_hash_size(
+      const size_t index) const {
+    return hash_size(m_rhs_offset+index);
+  }
 
-    size_t size() const
-    {
-      return m_masks.size();
-    }
+  const IdType * lhs_num_nodes_ptr(
+      const int64_t ntype) const {
+    return m_num_nodes_ptr+ntype;
+  }
 
-  private:
-    size_t m_num_types;
-    size_t m_rhs_offset;
-    std::vector<int> m_masks;
-    std::vector<size_t> m_hash_prefix;
-    Mapping<IdType> * m_hash_tables;
-    IdType * m_num_nodes_ptr;
+  const IdType * rhs_num_nodes_ptr(
+      const int64_t ntype) const {
+    return m_num_nodes_ptr+m_rhs_offset+ntype;
+  }
 
-    static size_t getHashSize(const size_t num_nodes)
-    {
-      const size_t num_bits = static_cast<size_t>(std::ceil(std::log2(static_cast<double>(num_nodes))));
-      const size_t next_pow2 = 1ull << num_bits;
+  size_t size() const {
+    return m_masks.size();
+  }
 
-      // make sure how hash size is not a power of 2
-      const size_t hash_size = (next_pow2 << HASH_SCALING)-1;
+ private:
+  size_t m_num_types;
+  size_t m_rhs_offset;
+  std::vector<int> m_masks;
+  std::vector<size_t> m_hash_prefix;
+  Mapping<IdType> * m_hash_tables;
+  IdType * m_num_nodes_ptr;
 
-      return hash_size;
-    }
+  static size_t getHashSize(const size_t num_nodes) {
+    const size_t num_bits = static_cast<size_t>(
+        std::ceil(std::log2(static_cast<double>(num_nodes))));
+    const size_t next_pow2 = 1ull << num_bits;
+
+    // make sure how hash size is not a power of 2
+    const size_t hash_size = (next_pow2 << HASH_SCALING)-1;
+
+    return hash_size;
+  }
 };
 
 template<typename IdType>
-class DeviceNodeMapMaker
-{
-  public:
-    constexpr static const int BLOCK_SIZE = 256;
-    constexpr static const size_t TILE_SIZE = 1024;
+class DeviceNodeMapMaker {
+ public:
+  constexpr static const int BLOCK_SIZE = 256;
+  constexpr static const size_t TILE_SIZE = 1024;
 
-    static size_t requiredPrefixSumBytes(
-        const size_t max_num)
-    {
-      size_t prefix_sum_bytes;
-      CUDA_CALL(cub::DeviceScan::ExclusiveSum(
-            nullptr,
+  static size_t requiredPrefixSumBytes(
+      const size_t max_num) {
+    size_t prefix_sum_bytes;
+    CUDA_CALL(cub::DeviceScan::ExclusiveSum(
+          nullptr,
+          prefix_sum_bytes,
+          static_cast<IdType*>(nullptr),
+          static_cast<IdType*>(nullptr),
+          round_up(max_num, BLOCK_SIZE)));
+    return round_up(prefix_sum_bytes, 8);
+  }
+
+  DeviceNodeMapMaker(
+      const std::vector<int64_t> maxNodesPerType) :
+      m_maxNumNodes(0),
+      m_workspaceSizeBytes(0) {
+    m_maxNumNodes = *std::max_element(maxNodesPerType.begin(),
+        maxNodesPerType.end());
+
+    m_workspaceSizeBytes = requiredPrefixSumBytes(m_maxNumNodes) +
+        sizeof(IdType)*(m_maxNumNodes+1);
+  }
+
+  size_t requiredWorkspaceBytes() const {
+    return m_workspaceSizeBytes;
+  }
+
+  /**
+  * @brief This function builds node maps for each node type, preserving the
+  * order of the input nodes.
+  *
+  * @param nodes The set of input nodes.
+  * @param nodes_maps The constructed node maps.
+  * @param workspace The scratch space to use.
+  * @param workspaceSize The size of the scratch space.
+  * @param stream The stream to operate on.
+  */
+  void make(
+      const std::vector<IdArray>& lhs_nodes,
+      const std::vector<IdArray>& rhs_nodes,
+      DeviceNodeMap<IdType> * const node_maps,
+      int64_t * const count_lhs_device,
+      std::vector<IdArray>* const lhs_device,
+      void * const workspace,
+      const size_t workspaceSize,
+      cudaStream_t stream) {
+    if (workspaceSize < requiredWorkspaceBytes()) {
+      throw std::runtime_error("Not enough space for sorting: " +
+          std::to_string(workspaceSize) + " / " +
+          std::to_string(requiredWorkspaceBytes()));
+    }
+
+    void * const prefix_sum_space = workspace;
+    size_t prefix_sum_bytes = requiredPrefixSumBytes(
+        m_maxNumNodes);
+
+    IdType * const node_prefix = reinterpret_cast<IdType*>(
+        static_cast<uint8_t*>(prefix_sum_space) + prefix_sum_bytes);
+
+    const int64_t num_ntypes = lhs_nodes.size() + rhs_nodes.size();
+
+    CUDA_CALL(cudaMemsetAsync(
+      count_lhs_device,
+      0,
+      num_ntypes*sizeof(*count_lhs_device),
+      stream));
+
+    // possibly dublicate lhs nodes
+    for (int64_t ntype = 0; ntype < lhs_nodes.size(); ++ntype) {
+      const IdArray& nodes = lhs_nodes[ntype];
+      if (nodes->shape[0] > 0) {
+        CHECK_EQ(nodes->ctx.device_type, kDLGPU);
+
+        const dim3 grid(round_up_div(nodes->shape[0], BLOCK_SIZE));
+        const dim3 block(BLOCK_SIZE);
+
+        generate_hashmap_duplicates<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
+            nodes.Ptr<IdType>(),
+            nodes->shape[0],
+            node_maps->lhs_hash_size(ntype),
+            node_maps->lhs_hash_table(ntype));
+        CUDA_CALL(cudaGetLastError());
+
+        count_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
+            nodes.Ptr<IdType>(),
+            nodes->shape[0],
+            node_maps->lhs_hash_size(ntype),
+            node_maps->lhs_hash_table(ntype),
+            node_prefix);
+        CUDA_CALL(cudaGetLastError());
+
+        CUDA_CALL(cub::DeviceScan::ExclusiveSum(
+            prefix_sum_space,
             prefix_sum_bytes,
-            static_cast<IdType*>(nullptr),
-            static_cast<IdType*>(nullptr),
-            round_up(max_num, BLOCK_SIZE)));
-      return round_up(prefix_sum_bytes, 8);
-    }
+            node_prefix,
+            node_prefix,
+            grid.x+1, stream));
 
-    DeviceNodeMapMaker(
-        const std::vector<int64_t> maxNodesPerType) :
-        m_maxNumNodes(0),
-        m_workspaceSizeBytes(0)
-    {
-      m_maxNumNodes = *std::max_element(maxNodesPerType.begin(),
-          maxNodesPerType.end());
-
-      m_workspaceSizeBytes = requiredPrefixSumBytes(m_maxNumNodes) + sizeof(IdType)*(m_maxNumNodes+1);
-    }
-
-    size_t requiredWorkspaceBytes() const
-    {
-      return m_workspaceSizeBytes;
-    }
-
-    /**
-    * @brief This function builds node maps for each node type, preserving the
-    * order of the input nodes.
-    *
-    * @param nodes The set of input nodes.
-    * @param nodes_maps The constructed node maps.
-    * @param workspace The scratch space to use.
-    * @param workspaceSize The size of the scratch space.
-    * @param stream The stream to operate on.
-    */
-    void make(
-        const std::vector<IdArray>& lhs_nodes,
-        const std::vector<IdArray>& rhs_nodes,
-        DeviceNodeMap<IdType> * const node_maps,
-        int64_t * const count_lhs_device,
-        std::vector<IdArray>& lhs_device,
-        void * const workspace,
-        const size_t workspaceSize,
-        cudaStream_t stream)
-    {
-      if (workspaceSize < requiredWorkspaceBytes()) {
-        throw std::runtime_error("Not enough space for sorting: " +
-            std::to_string(workspaceSize) + " / " +
-            std::to_string(requiredWorkspaceBytes()));
-      }
-
-      void * const prefix_sum_space = workspace;
-      size_t prefix_sum_bytes = requiredPrefixSumBytes(
-          m_maxNumNodes);
-
-      IdType * const node_prefix = reinterpret_cast<IdType*>(static_cast<uint8_t*>(prefix_sum_space) +
-          prefix_sum_bytes);
-
-      const int64_t num_ntypes = lhs_nodes.size() + rhs_nodes.size();
-
-      CUDA_CALL(cudaMemsetAsync(
-        count_lhs_device,
-        0,
-        num_ntypes*sizeof(*count_lhs_device),
-        stream));
-
-      // possibly dublicate lhs nodes 
-      for (int64_t ntype = 0; ntype < lhs_nodes.size(); ++ntype) {
-        const IdArray& nodes = lhs_nodes[ntype];
-        if (nodes->shape[0] > 0) {
-
-          CHECK_EQ(nodes->ctx.device_type, kDLGPU);
-
-          const dim3 grid(round_up_div(nodes->shape[0], BLOCK_SIZE));
-          const dim3 block(BLOCK_SIZE);
-
-          generate_hashmap_duplicates<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
-              nodes.Ptr<IdType>(),
-              nodes->shape[0],
-              node_maps->lhs_hash_size(ntype),
-              node_maps->lhs_hash_table(ntype));
-          CUDA_CALL(cudaGetLastError());
-
-          count_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
-              nodes.Ptr<IdType>(),
-              nodes->shape[0],
-              node_maps->lhs_hash_size(ntype),
-              node_maps->lhs_hash_table(ntype),
-              node_prefix);
-          CUDA_CALL(cudaGetLastError());
-
-          CUDA_CALL(cub::DeviceScan::ExclusiveSum(
-              prefix_sum_space,
-              prefix_sum_bytes,
-              node_prefix,
-              node_prefix,
-              grid.x+1, stream));
-
-          compact_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
-              nodes.Ptr<IdType>(),
-              nodes->shape[0],
-              node_maps->lhs_hash_size(ntype),
-              node_maps->lhs_hash_table(ntype),
-              node_prefix,
-              lhs_device[ntype].Ptr<IdType>(),
-              count_lhs_device+ntype);
-          CUDA_CALL(cudaGetLastError());
-        }
-      }
-
-      // unique rhs nodes
-      for (int64_t ntype = 0; ntype < rhs_nodes.size(); ++ntype) {
-        const IdArray& nodes = rhs_nodes[ntype];
-        if (nodes->shape[0] > 0) {
-          CHECK_EQ(nodes->ctx.device_type, kDLGPU);
-
-          const dim3 grid(round_up_div(nodes->shape[0], BLOCK_SIZE));
-          const dim3 block(BLOCK_SIZE);
-
-          generate_hashmap_unique<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
-              nodes.Ptr<IdType>(),
-              nodes->shape[0],
-              node_maps->rhs_hash_size(ntype),
-              node_maps->rhs_hash_table(ntype));
-          CUDA_CALL(cudaGetLastError());
-        }
+        compact_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
+            nodes.Ptr<IdType>(),
+            nodes->shape[0],
+            node_maps->lhs_hash_size(ntype),
+            node_maps->lhs_hash_table(ntype),
+            node_prefix,
+            (*lhs_device)[ntype].Ptr<IdType>(),
+            count_lhs_device+ntype);
+        CUDA_CALL(cudaGetLastError());
       }
     }
 
-  private:
+    // unique rhs nodes
+    for (int64_t ntype = 0; ntype < rhs_nodes.size(); ++ntype) {
+      const IdArray& nodes = rhs_nodes[ntype];
+      if (nodes->shape[0] > 0) {
+        CHECK_EQ(nodes->ctx.device_type, kDLGPU);
+
+        const dim3 grid(round_up_div(nodes->shape[0], BLOCK_SIZE));
+        const dim3 block(BLOCK_SIZE);
+
+        generate_hashmap_unique<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
+            nodes.Ptr<IdType>(),
+            nodes->shape[0],
+            node_maps->rhs_hash_size(ntype),
+            node_maps->rhs_hash_table(ntype));
+        CUDA_CALL(cudaGetLastError());
+      }
+    }
+  }
+
+ private:
   IdType m_maxNumNodes;
   size_t m_workspaceSizeBytes;
-
 };
 
 template<typename IdType>
@@ -737,8 +694,7 @@ map_edges(
     HeteroGraphPtr graph,
     const std::vector<EdgeArray>& edge_sets,
     const DeviceNodeMap<IdType>& node_map,
-    cudaStream_t stream)
-{
+    cudaStream_t stream) {
   constexpr const int BLOCK_SIZE = 128;
   constexpr const size_t TILE_SIZE = 1024;
 
@@ -749,8 +705,8 @@ map_edges(
   std::vector<IdArray> new_rhs;
   new_rhs.reserve(edge_sets.size());
 
-  // TODO: modify to be a single kernel launch
-
+  // The next peformance optimization here, is to perform mapping of all edge
+  // types in a single kernel launch.
   for (int64_t etype = 0; etype < edge_sets.size(); ++etype) {
     const EdgeArray& edges = edge_sets[etype];
     if (edges.id.defined()) {
@@ -781,7 +737,7 @@ map_edges(
         node_map.lhs_hash_size(src_type),
         node_map.rhs_hash_table(dst_type),
         node_map.rhs_hash_size(dst_type));
-      CUDA_CALL(cudaGetLastError()); 
+      CUDA_CALL(cudaGetLastError());
     } else {
       new_lhs.emplace_back(aten::NullArray());
       new_rhs.emplace_back(aten::NullArray());
@@ -793,14 +749,12 @@ map_edges(
 }
 
 
-
 template<typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
 ToBlockInternal(
     HeteroGraphPtr graph,
     const std::vector<IdArray> &rhs_nodes,
-    bool include_rhs_in_lhs)
-{
+    const bool include_rhs_in_lhs) {
   cudaStream_t stream = 0;
   const auto& ctx = graph->Context();
   auto device = runtime::DeviceAPI::Get(ctx);
@@ -827,7 +781,7 @@ ToBlockInternal(
       edge_arrays[etype] = graph->Edges(etype);
     }
   }
-  
+
   // count lhs and rhs nodes
   std::vector<int64_t> maxNodesPerType(num_ntypes*2, 0);
   for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
@@ -856,7 +810,7 @@ ToBlockInternal(
       device->CopyDataFromTo(rhs_nodes[ntype].Ptr<IdType>(), 0,
           src_nodes[ntype].Ptr<IdType>(), src_node_offsets[ntype],
           sizeof(IdType)*rhs_nodes[ntype]->shape[0],
-          rhs_nodes[ntype]->ctx, src_nodes[ntype]->ctx, 
+          rhs_nodes[ntype]->ctx, src_nodes[ntype]->ctx,
           rhs_nodes[ntype]->dtype,
           stream);
       src_node_offsets[ntype] += sizeof(IdType)*rhs_nodes[ntype]->shape[0];
@@ -872,7 +826,7 @@ ToBlockInternal(
           src_node_offsets[srctype],
           sizeof(IdType)*edge_arrays[etype].src->shape[0],
           rhs_nodes[srctype]->ctx,
-          src_nodes[srctype]->ctx, 
+          src_nodes[srctype]->ctx,
           rhs_nodes[srctype]->dtype,
           stream);
 
@@ -907,7 +861,7 @@ ToBlockInternal(
       rhs_nodes,
       &node_maps,
       count_lhs_device,
-      lhs_nodes,
+      &lhs_nodes,
       scratch_device,
       scratch_size,
       stream);
@@ -985,9 +939,7 @@ ToBlockInternal(
   // return the new graph, the new src nodes, and new edges
   return std::make_tuple(new_graph, lhs_nodes, induced_edges);
 }
-
-}
-
+}  // namespace
 
 
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
@@ -995,7 +947,6 @@ CudaToBlock(
     HeteroGraphPtr graph,
     const std::vector<IdArray> &rhs_nodes,
     bool include_rhs_in_lhs) {
-
   std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>> ret;
   ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
     ret = ToBlockInternal<IdType>(graph, rhs_nodes, include_rhs_in_lhs);

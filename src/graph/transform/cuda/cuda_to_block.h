@@ -6,13 +6,13 @@
  */
 
 
-#ifndef DGL_GRAPH_TRANSFORM_CUDA_TO_BLOCK_H_
-#define DGL_GRAPH_TRANSFORM_CUDA_TO_BLOCK_H_
+#ifndef DGL_GRAPH_TRANSFORM_CUDA_CUDA_TO_BLOCK_H_
+#define DGL_GRAPH_TRANSFORM_CUDA_CUDA_TO_BLOCK_H_
 
-#include <vector>
-#include <tuple>
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
+#include <vector>
+#include <tuple>
 
 namespace dgl {
 namespace transform {
@@ -27,5 +27,4 @@ CudaToBlock(
 }  // namespace transform
 }  // namespace dgl
 
-#endif  // DGL_GRAPH_TRANSFORM_CUDA_TO_BLOCK_H_
-
+#endif  // DGL_GRAPH_TRANSFORM_CUDA_CUDA_TO_BLOCK_H_

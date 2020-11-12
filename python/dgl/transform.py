@@ -1730,7 +1730,8 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
         dst_nodes = {g.ntypes[0]: dst_nodes}
 
     dst_node_ids = [
-        utils.toindex(dst_nodes.get(ntype, []), g._idtype_str).tousertensor(ctx=F.to_backend_ctx(g._graph.ctx))
+        utils.toindex(dst_nodes.get(ntype, []), g._idtype_str).tousertensor(
+            ctx=F.to_backend_ctx(g._graph.ctx))
         for ntype in g.ntypes]
     dst_node_ids_nd = [F.to_dgl_nd(nodes) for nodes in dst_node_ids]
 
