@@ -77,7 +77,6 @@ class FabricEndpoint {
                   &readable_addr.len);
     std::string readable_peer_addr =
       std::string(readable_addr.name, readable_addr.len);
-    // LOG(INFO) << "Readable peer addr: " << readable_peer_addr;
     FullFabricAddr full_fi_addr = {
       .faddr = *addr, .readable_addr = readable_peer_addr, .fiaddr = peer_addr};
     client_ep.push_back(full_fi_addr);
@@ -86,7 +85,6 @@ class FabricEndpoint {
 
   void Send(const void *buffer, size_t size, uint64_t tag, fi_addr_t peer_addr,
             bool sync = false, void *context = nullptr) {
-    // LOG(INFO) << "ep send" << sync;
     while (true) {
       int ret = fi_tsend(fabric_ctx->ep.get(), buffer, size, nullptr, peer_addr,
                          tag, context);
@@ -103,11 +101,6 @@ class FabricEndpoint {
       }
     }
     if (sync) WaitCQ(fabric_ctx->txcq.get());
-
-    // while (true) {
-    //   int ret = fi_cq_read(fabric_ctx->cq.get(), &comp, 1);
-    //   if (ret == 1) break;
-    // }
   }
 
   void Recv(void *buffer, size_t size, uint64_t tag, fi_addr_t peer_addr,
@@ -126,24 +119,13 @@ class FabricEndpoint {
       break;
     }
 
-    // { LOG(INFO) << "issue recv event done" << sync; }
-    if (sync) {
-      // { LOG(INFO) << "DEBUG SYNC BRANCH"; }
-      WaitCQ(fabric_ctx->rxcq.get());
-    }
-    // while (true) {
-    //   int ret = fi_cq_read(fabric_ctx->cq.get(), &comp, 1);
-    //   // check_err(ret, "cq read");
-    //   // if (comp.len > 0) break;
-    //   if (ret == 1) break;
-    // }
+    if (sync) WaitCQ(fabric_ctx->rxcq.get());
   }
 
   void WaitCQ(struct fid_cq *cq) {
     struct fi_cq_tagged_entry cq_entries;
     while (true) {
       int ret = fi_cq_read(cq, &cq_entries, 1);
-      // { LOG(INFO) << "RRRRet" << ret; }
       if (ret == -FI_EAGAIN) {
         continue;
       } else if (ret == -FI_EAVAIL) {

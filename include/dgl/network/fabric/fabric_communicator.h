@@ -110,7 +110,7 @@ class FabricSender : public Sender {
   // ~FabricSender() override { Finalize(); }
 
  private:
-  uint64_t sender_id;
+  int64_t sender_id;
 
   std::shared_ptr<std::thread> poll_thread;
 
@@ -132,6 +132,8 @@ class FabricSender : public Sender {
    */
   std::unordered_map<int /* receiver ID */, std::shared_ptr<MessageQueue>>
     msg_queue_;
+  
+  struct fi_cq_tagged_entry cq_entries[kMaxConcurrentWorkRequest];
 
   /*!
    * \brief Send-loop for each socket in per-thread
@@ -143,7 +145,7 @@ class FabricSender : public Sender {
    */
   void SendLoop();
 
-  void PollCompletionQueue(struct fi_cq_tagged_entry* cq_entries);
+  ssize_t PollCompletionQueue(struct fi_cq_tagged_entry* cq_entries);
 
   void HandleCompletionEvent(const struct fi_cq_tagged_entry& cq_entry);
 };
@@ -235,6 +237,11 @@ class FabricReceiver : public Receiver {
   std::unique_ptr<FabricEndpoint> ctrl_ep;
 
   std::shared_ptr<FabricEndpoint> fep;
+  struct fi_cq_tagged_entry cq_entries[kMaxConcurrentWorkRequest];
+
+  std::unordered_map<int /* Sender (virtual) ID */,
+                     std::shared_ptr<std::queue<Message>>>
+    msg_queue_;
 
   int receiver_id_;
   /*!
@@ -253,9 +260,9 @@ class FabricReceiver : public Receiver {
   /*!
    * \brief Message queue for each socket connection
    */
-  std::unordered_map<int /* Sender (virtual) ID */,
-                     std::shared_ptr<MessageQueue>>
-    msg_queue_;
+  // std::unordered_map<int /* Sender (virtual) ID */,
+  //                    std::shared_ptr<MessageQueue>>
+  //   msg_queue_;
 
   std::shared_ptr<std::thread> poll_thread;
 };

@@ -22,20 +22,20 @@ void FabricSender::AddReceiver(const char* addr, int recv_id) {
 
 void FabricSender::Finalize() {
   // Send a signal to tell the msg_queue to finish its job
-  for (auto& mq : msg_queue_) {
-    // wait until queue is empty
-    while (mq.second->Empty() == false) {
-#ifdef _WIN32
-      // just loop
-      //
-#else  // !_WIN32
-      usleep(1000);
-#endif  // _WIN32
-    }
-    int ID = mq.first;
-    mq.second->SignalFinished(ID);
-  }
-  poll_thread->join();
+//   for (auto& mq : msg_queue_) {
+//     // wait until queue is empty
+//     while (mq.second->Empty() == false) {
+// #ifdef _WIN32
+//       // just loop
+//       //
+// #else  // !_WIN32
+//       usleep(1000);
+// #endif  // _WIN32
+//     }
+  //   int ID = mq.first;
+  //   mq.second->SignalFinished(ID);
+  // }
+  // poll_thread->join();
 }
 
 bool FabricSender::Connect() {
@@ -56,10 +56,11 @@ bool FabricSender::Connect() {
                   true);
     peer_fi_addr[kv.first] = fep->AddPeerAddr(&addrs.addr);
     sender_id = addrs.sender_id;
-    msg_queue_[kv.first] = std::make_shared<MessageQueue>(queue_size_);
+    // msg_queue_[kv.first] = std::make_shared<MessageQueue>(queue_size_);
   }
+  // sleep(5);
 
-  poll_thread = std::make_shared<std::thread>(&FabricSender::SendLoop, this);
+  // poll_thread = std::make_shared<std::thread>(&FabricSender::SendLoop, this);
   return true;
 }
 
@@ -68,41 +69,52 @@ STATUS FabricSender::Send(Message msg, int recv_id) {
   CHECK_GT(msg.size, 0);
   CHECK_GE(recv_id, 0);
   // Add data message to message queue
-  STATUS code = msg_queue_[recv_id]->Add(msg);
-  return code;
+  // STATUS code = msg_queue_[recv_id]->Add(msg);
+  Message* msg2 = new Message();
+  *msg2 = msg;
+  fep->Send(&msg.size, sizeof(msg.size), kSizeMsg | sender_id,
+            peer_fi_addr.at(recv_id));
+  fep->Send(msg.data, msg.size, kDataMsg | sender_id,
+            peer_fi_addr.at(recv_id), false, msg2);
+  // int count = 0;
+  // while (count<2){
+  //   ssize_t ret = PollCompletionQueue(cq_entries);
+  //   if (ret>0) count+=ret;
+  // }
+  return ADD_SUCCESS;
 }
 
-void FabricSender::SendLoop() {
-  bool exit = false;
-  struct fi_cq_tagged_entry cq_entries[kMaxConcurrentWorkRequest];
-  while (!exit) {
-    for (auto& kv : msg_queue_) {
-      Message* msg_ptr = new Message();
-      STATUS code = kv.second->Remove(msg_ptr, false);
-      if (code == QUEUE_EMPTY) {
-        continue;
-      } else if (code == REMOVE_SUCCESS) {
-        fep->Send(&msg_ptr->size, sizeof(msg_ptr->size), kSizeMsg | sender_id,
-                  peer_fi_addr[kv.first]);
-        fep->Send(msg_ptr->data, msg_ptr->size, kDataMsg | sender_id,
-                  peer_fi_addr[kv.first], false, msg_ptr);
-      } else if (code == QUEUE_CLOSE) {
-        int64_t* exit_code = new int64_t(0);
-        fep->Send(exit_code, sizeof(msg_ptr->size), kSizeMsg | sender_id,
-                  peer_fi_addr[kv.first]);
-        delete msg_ptr;
-        exit = true;
-      }
-    }
-    PollCompletionQueue(cq_entries);
-  }
-}
+// void FabricSender::SendLoop() {
+//   bool exit = false;
+//   struct fi_cq_tagged_entry cq_entries[kMaxConcurrentWorkRequest];
+//   while (!exit) {
+//     for (auto& kv : msg_queue_) {
+//       Message* msg_ptr = new Message();
+//       STATUS code = kv.second->Remove(msg_ptr, false);
+//       if (code == QUEUE_EMPTY) {
+//         continue;
+//       } else if (code == REMOVE_SUCCESS) {
+//         fep->Send(&msg_ptr->size, sizeof(msg_ptr->size), kSizeMsg | sender_id,
+//                   peer_fi_addr[kv.first]);
+//         fep->Send(msg_ptr->data, msg_ptr->size, kDataMsg | sender_id,
+//                   peer_fi_addr[kv.first], false, msg_ptr);
+//       } else if (code == QUEUE_CLOSE) {
+//         int64_t* exit_code = new int64_t(0);
+//         fep->Send(exit_code, sizeof(msg_ptr->size), kSizeMsg | sender_id,
+//                   peer_fi_addr[kv.first]);
+//         delete msg_ptr;
+//         exit = true;
+//       }
+//     }
+//     PollCompletionQueue(cq_entries);
+//   }
+// }
 
-void FabricSender::PollCompletionQueue(struct fi_cq_tagged_entry* cq_entries) {
-  int ret = fi_cq_read(fep->fabric_ctx->txcq.get(), cq_entries,
+ssize_t FabricSender::PollCompletionQueue(struct fi_cq_tagged_entry* cq_entries) {
+  ssize_t ret = fi_cq_read(fep->fabric_ctx->txcq.get(), cq_entries,
                        kMaxConcurrentWorkRequest);
   if (ret == -FI_EAGAIN) {
-    return;
+    return -FI_EAGAIN;
   } else if (ret == -FI_EAVAIL) {
     HandleCQError(fep->fabric_ctx->rxcq.get());
   } else if (ret < 0) {
@@ -114,6 +126,7 @@ void FabricSender::PollCompletionQueue(struct fi_cq_tagged_entry* cq_entries) {
       HandleCompletionEvent(cq_entry);
     }
   }
+  return ret;
 };
 
 void FabricSender::HandleCompletionEvent(
@@ -123,6 +136,7 @@ void FabricSender::HandleCompletionEvent(
     if (msg_ptr->deallocator != nullptr) {
       msg_ptr->deallocator(msg_ptr);
     }
+    delete msg_ptr;
   }
 };
 
