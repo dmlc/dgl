@@ -25,8 +25,6 @@ namespace cuda {
 
 namespace {
 
-// helper types
-
 template<typename IdType>
 struct Mapping {
   IdType key;
@@ -34,10 +32,12 @@ struct Mapping {
   int64_t index;
 };
 
+
 template<typename IdType>
 struct EmptyKey {
   constexpr static const IdType value = static_cast<IdType>(-1);
 };
+
 
 inline __device__ int64_t atomicCAS(
     int64_t * const address,
@@ -53,6 +53,7 @@ inline __device__ int64_t atomicCAS(
                    static_cast<Type>(val));
 }
 
+
 inline __device__ int32_t atomicCAS(
     int32_t * const address,
     const int32_t compare,
@@ -66,7 +67,6 @@ inline __device__ int32_t atomicCAS(
                    static_cast<Type>(compare),
                    static_cast<Type>(val));
 }
-
 
 
 template<typename IdType>
@@ -84,6 +84,7 @@ struct BlockPrefixCallbackOp {
       return old_prefix;
   }
 };
+
 
 template<typename IdType>
 inline __device__ IdType hash(
@@ -113,6 +114,7 @@ inline __device__ bool attempt_insert_at(
   }
 }
 
+
 template<typename IdType>
 inline __device__ size_t insert_hashmap(
     const IdType id,
@@ -130,6 +132,7 @@ inline __device__ size_t insert_hashmap(
 
   return pos;
 }
+
 
 template<typename IdType>
 inline __device__ IdType search_hashmap_for_pos(
@@ -150,6 +153,7 @@ inline __device__ IdType search_hashmap_for_pos(
   return pos;
 }
 
+
 template<typename IdType>
 inline __device__ const Mapping<IdType> * search_hashmap(
     const IdType id,
@@ -160,6 +164,7 @@ inline __device__ const Mapping<IdType> * search_hashmap(
   return table+pos;
 }
 
+
 template<typename IdType>
 inline __device__ Mapping<IdType> * search_hashmap(
     const IdType id,
@@ -169,8 +174,6 @@ inline __device__ Mapping<IdType> * search_hashmap(
 
   return table+pos;
 }
-
-
 
 
 /**
@@ -203,6 +206,7 @@ __global__ void generate_hashmap_duplicates(
     }
   }
 }
+
 
 /**
 * @brief This generates a hash map where the keys are the global node numbers,
@@ -238,6 +242,7 @@ __global__ void generate_hashmap_unique(
     }
   }
 }
+
 
 /**
 * @brief This counts the number of nodes inserted per thread block.
@@ -292,6 +297,21 @@ __global__ void count_hashmap(
 }
 
 
+/**
+* @brief Update the local numbering of elements in the hashmap.
+*
+* @tparam IdType The type of id.
+* @tparam BLOCK_SIZE The size of the thread blocks.
+* @tparam TILE_SIZE The number of elements each thread block works on.
+* @param nodes The set of non-unique nodes to update from.
+* @param num_nodes The number of non-unique nodes.
+* @param hash_size The size of the hash table.
+* @param mappings The hash table.
+* @param num_nodes_prefix The number of unique nodes preceding each thread
+* block.
+* @param global_nodes The set of unique nodes (output).
+* @param global_node_count The number of unique nodes (output).
+*/
 template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void compact_hashmap(
     const IdType * const nodes,
@@ -402,6 +422,7 @@ inline size_t round_up_div(
   return static_cast<IdType>(num/divisor) + (num % divisor == 0 ? 0 : 1);
 }
 
+
 template<typename IdType>
 inline IdType round_up(
     const IdType num,
@@ -424,7 +445,7 @@ class DeviceNodeMap {
     m_masks(m_num_types),
     m_hash_prefix(m_num_types+1, 0),
     m_hash_tables(nullptr),
-    m_num_nodes_ptr(nullptr) {
+    m_ctx(ctx) {
     auto device = runtime::DeviceAPI::Get(ctx);
 
     for (int64_t i = 0; i < m_num_types; ++i) {
@@ -436,8 +457,6 @@ class DeviceNodeMap {
     // configure workspace
     m_hash_tables = static_cast<Mapping<IdType>*>(device->AllocWorkspace(ctx,
         m_hash_prefix.back()*sizeof(*m_hash_tables)));
-    m_num_nodes_ptr = static_cast<IdType*>(device->AllocWorkspace(ctx,
-        m_num_types*sizeof(*m_num_nodes_ptr)));
 
     CUDA_CALL(cudaMemsetAsync(
       m_hash_tables,
@@ -446,13 +465,9 @@ class DeviceNodeMap {
       stream));
   }
 
-  IdType * num_nodes_ptrs() {
-    return m_num_nodes_ptr;
-  }
-
-  IdType * num_nodes_ptr(
-      const size_t index) {
-    return m_num_nodes_ptr + index;
+  ~DeviceNodeMap() {
+    auto device = runtime::DeviceAPI::Get(m_ctx);
+    device->FreeWorkspace(m_ctx, m_hash_tables);
   }
 
   Mapping<IdType> * hash_table(
@@ -463,11 +478,6 @@ class DeviceNodeMap {
   const Mapping<IdType> * hash_table(
       const size_t index) const {
     return m_hash_tables + m_hash_prefix[index];
-  }
-
-  IdType hash_mask(
-      const size_t index) const {
-    return m_masks[index];
   }
 
   IdType hash_size(
@@ -495,15 +505,6 @@ class DeviceNodeMap {
     return hash_table(index+m_rhs_offset);
   }
 
-  IdType lhs_hash_mask(const size_t index) const {
-    return hash_mask(index);
-  }
-
-  IdType rhs_hash_mask(
-      const size_t index) const {
-    return hash_mask(m_rhs_offset+index);
-  }
-
   IdType lhs_hash_size(
       const size_t index) const {
     return hash_size(index);
@@ -512,16 +513,6 @@ class DeviceNodeMap {
   IdType rhs_hash_size(
       const size_t index) const {
     return hash_size(m_rhs_offset+index);
-  }
-
-  const IdType * lhs_num_nodes_ptr(
-      const int64_t ntype) const {
-    return m_num_nodes_ptr+ntype;
-  }
-
-  const IdType * rhs_num_nodes_ptr(
-      const int64_t ntype) const {
-    return m_num_nodes_ptr+m_rhs_offset+ntype;
   }
 
   size_t size() const {
@@ -534,7 +525,7 @@ class DeviceNodeMap {
   std::vector<int> m_masks;
   std::vector<size_t> m_hash_prefix;
   Mapping<IdType> * m_hash_tables;
-  IdType * m_num_nodes_ptr;
+  DGLContext m_ctx;
 
   static size_t getHashSize(const size_t num_nodes) {
     const size_t num_bits = static_cast<size_t>(
@@ -865,6 +856,7 @@ ToBlockInternal(
       scratch_device,
       scratch_size,
       stream);
+  device->FreeWorkspace(ctx, scratch_device);
 
   // map node numberings from global to local, and build pointer for CSR
   std::vector<IdArray> new_lhs;
