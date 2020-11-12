@@ -138,15 +138,14 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         toc = time.time()
         total_time += toc - tic
 
-        # if val_acc > best_val_acc:
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             best_val_acc = val_acc
             best_test_acc = test_acc
 
         if epoch % args.log_every == 0:
-            print(f"Epoch: {epoch}/{args.n_epochs}")
             print(
+                f"Run: {n_running}/{args.n_runs}, Epoch: {epoch}/{args.n_epochs}, Average epoch time: {total_time / epoch:.2f}\n"
                 f"Loss: {loss.item():.4f}, Acc: {acc:.4f}\n"
                 f"Train/Val/Test loss: {train_loss:.4f}/{val_loss:.4f}/{test_loss:.4f}\n"
                 f"Train/Val/Test/Best val/Best test acc: {train_acc:.4f}/{val_acc:.4f}/{test_acc:.4f}/{best_val_acc:.4f}/{best_test_acc:.4f}"
@@ -159,7 +158,8 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
             l.append(e)
 
     print("*" * 50)
-    print(f"Average epoch time: {total_time / args.n_epochs}, Test acc: {best_test_acc}")
+    print(f"Best val acc: {best_val_acc}, Final test acc: {final_test_acc}")
+    print("*" * 50)
 
     if args.plot_curves:
         fig = plt.figure(figsize=(24, 24))
@@ -211,19 +211,19 @@ def main():
     argparser = argparse.ArgumentParser("GCN on OGBN-Arxiv", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argparser.add_argument("--cpu", action="store_true", help="CPU mode. This option overrides --gpu.")
     argparser.add_argument("--gpu", type=int, default=0, help="GPU device ID.")
-    argparser.add_argument("--n-runs", type=int, help="running times", default=10)
-    argparser.add_argument("--n-epochs", type=int, help="number of epochs", default=1000)
+    argparser.add_argument("--n-runs", type=int, default=10, help="running times")
+    argparser.add_argument("--n-epochs", type=int, default=1000, help="number of epochs")
     argparser.add_argument(
         "--use-labels", action="store_true", help="Use labels in the training set as input features."
     )
     argparser.add_argument("--use-linear", action="store_true", help="Use linear layer.")
-    argparser.add_argument("--lr", type=float, help="learning rate", default=0.005)
-    argparser.add_argument("--n-layers", type=int, help="number of layers", default=3)
-    argparser.add_argument("--n-hidden", type=int, help="number of hidden units", default=256)
-    argparser.add_argument("--dropout", type=float, help="dropout rate", default=0.5)
-    argparser.add_argument("--wd", type=float, help="weight decay", default=0)
-    argparser.add_argument("--log-every", type=int, help="log every LOG_EVERY epochs", default=20)
-    argparser.add_argument("--plot-curves", help="plot learning curves", action="store_true")
+    argparser.add_argument("--lr", type=float, default=0.005, help="learning rate")
+    argparser.add_argument("--n-layers", type=int, default=3, help="number of layers")
+    argparser.add_argument("--n-hidden", type=int, default=256, help="number of hidden units")
+    argparser.add_argument("--dropout", type=float, default=0.5, help="dropout rate")
+    argparser.add_argument("--wd", type=float, default=0, help="weight decay")
+    argparser.add_argument("--log-every", type=int, default=20, help="log every LOG_EVERY epochs")
+    argparser.add_argument("--plot-curves", action="store_true", help="plot learning curves")
     args = argparser.parse_args()
 
     if args.cpu:
