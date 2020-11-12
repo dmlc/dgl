@@ -1604,7 +1604,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     Parameters
     ----------
     graph : DGLGraph
-        The graph.  Must be on CPU.
+        The graph.
     dst_nodes : Tensor or dict[str, Tensor], optional
         The list of output nodes.
 
@@ -1715,8 +1715,6 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     --------
     create_block
     """
-    assert g.device == F.cpu(), 'the graph must be on CPU'
-
     if dst_nodes is None:
         # Find all nodes that appeared as destinations
         dst_nodes = defaultdict(list)
@@ -1732,9 +1730,13 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
         dst_nodes = {g.ntypes[0]: dst_nodes}
 
     dst_node_ids = [
-        utils.toindex(dst_nodes.get(ntype, []), g._idtype_str).tousertensor()
+        utils.toindex(dst_nodes.get(ntype, []), g._idtype_str).tousertensor(ctx=F.to_backend_ctx(g._graph.ctx))
         for ntype in g.ntypes]
     dst_node_ids_nd = [F.to_dgl_nd(nodes) for nodes in dst_node_ids]
+
+    for d in dst_node_ids_nd:
+        if g._graph.ctx != d.ctx:
+            raise ValueError('g and dst_nodes need to have the same context.')
 
     new_graph_index, src_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(
         g._graph, dst_node_ids_nd, include_dst_in_src)

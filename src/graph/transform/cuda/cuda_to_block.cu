@@ -13,6 +13,8 @@
 #include <dgl/runtime/device_api.h>
 #include <dgl/immutable_graph.h>
 
+#include "../../heterograph.h"
+
 using namespace dgl::aten;
 
 namespace dgl {
@@ -97,7 +99,7 @@ inline __device__ IdType hash(
 
 template<typename IdType>
 inline __device__ bool attempt_insert_at(
-    const IdType pos,
+    const size_t pos,
     const IdType id,
     const size_t index,
     Mapping<IdType> * const table)
@@ -120,9 +122,9 @@ inline __device__ void insert_hashmap(
     const IdType id,
     const size_t index,
     Mapping<IdType> * const table,
-    const IdType table_size)
+    const size_t table_size)
 {
-  IdType pos = id % table_size;
+  size_t pos = id % table_size;
 
   // linearly scan for an empty slot or matching entry
   IdType delta = 1;
@@ -192,8 +194,8 @@ inline __device__ Mapping<IdType> * search_hashmap(
 template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void generate_hashmap(
     const IdType * const nodes,
-    const size_t num_nodes,
-    const IdType hash_size,
+    const int64_t num_nodes,
+    const size_t hash_size,
     Mapping<IdType> * const mappings)
 {
   assert(BLOCK_SIZE == blockDim.x);
@@ -306,18 +308,23 @@ __global__ void compact_hashmap(
 
     if (kv) {
       kv->local = flag;
-      global_nodes[flag] = nodes[index];
+      if (global_nodes) {
+        global_nodes[flag] = nodes[index];
+      }
     }
   }
 
   if (threadIdx.x == 0 && blockIdx.x == 0) {
-    *global_node_count = num_nodes_prefix[gridDim.x];
+    if (global_node_count) {
+      *global_node_count = num_nodes_prefix[gridDim.x];
+    }
   }
 }
 
 template<typename IdType, int BLOCK_SIZE, IdType TILE_SIZE>
 __device__ void map_vertex_ids(
-    IdType * const global,
+    const IdType * const global,
+    IdType * const new_global,
     const IdType num_vertices,
     const Mapping<IdType> * const mappings,
     const IdType hash_size)
@@ -330,15 +337,17 @@ __device__ void map_vertex_ids(
   for (IdType idx = threadIdx.x+tile_start; idx < tile_end; idx+=BLOCK_SIZE) {
     const Mapping<IdType>& mapping = *search_hashmap(global[idx], mappings, 
         hash_size);
-    global[idx] = mapping.local;
+    new_global[idx] = mapping.local;
   }
 }
 
 
 template<typename IdType, int BLOCK_SIZE, IdType TILE_SIZE>
 __global__ void map_edge_ids(
-    IdType * const global_srcs_device,
-    IdType * const global_dsts_device,
+    const IdType * const global_srcs_device,
+    IdType * const new_global_srcs_device,
+    const IdType * const global_dsts_device,
+    IdType * const new_global_dsts_device,
     const IdType num_edges,
     const Mapping<IdType> * const src_mapping,
     const IdType src_hash_size,
@@ -346,16 +355,19 @@ __global__ void map_edge_ids(
     const IdType dst_hash_size)
 {
   assert(BLOCK_SIZE == blockDim.x);
+  assert(2 == gridDim.y);
 
   if (blockIdx.y == 0) {
     map_vertex_ids<IdType, BLOCK_SIZE, TILE_SIZE>(
         global_srcs_device,
+        new_global_srcs_device,
         num_edges,
         src_mapping,
         src_hash_size);
   } else {
     map_vertex_ids<IdType, BLOCK_SIZE, TILE_SIZE>(
         global_dsts_device,
+        new_global_dsts_device,
         num_edges,
         dst_mapping,
         dst_hash_size);
@@ -683,6 +695,8 @@ class DeviceNodeMapMaker
         const IdArray& nodes = i < lhs_nodes.size() ? lhs_nodes[i] : rhs_nodes[i-lhs_nodes.size()];
 
         if (nodes->shape[0] > 0) {
+          CHECK_EQ(nodes->ctx.device_type, kDLGPU);
+
           checked_memset(node_maps->hash_table(i), -1, node_maps->hash_size(i),
               stream);
 
@@ -717,8 +731,8 @@ class DeviceNodeMapMaker
               node_maps->hash_size(i),
               node_maps->hash_table(i),
               node_prefix,
-              lhs_device[i].Ptr<IdType>(),
-              count_lhs_device+i);
+              i < lhs_device.size() ? lhs_device[i].Ptr<IdType>() : nullptr,
+              i < lhs_device.size() ? count_lhs_device+i : nullptr);
           check_last_error();
         } else {
           checked_memset(
@@ -737,26 +751,38 @@ class DeviceNodeMapMaker
 };
 
 template<typename IdType>
-void map_edges(
+std::tuple<std::vector<IdArray>, std::vector<IdArray>>
+map_edges(
     HeteroGraphPtr graph,
-    std::vector<EdgeArray>& edge_sets,
+    const std::vector<EdgeArray>& edge_sets,
     const DeviceNodeMap<IdType>& node_map,
     cudaStream_t stream)
 {
   constexpr const int BLOCK_SIZE = 128;
   constexpr const size_t TILE_SIZE = 1024;
 
+  const auto& ctx = graph->Context();
+
+  std::vector<IdArray> new_lhs;
+  new_lhs.reserve(edge_sets.size());
+  std::vector<IdArray> new_rhs;
+  new_rhs.reserve(edge_sets.size());
+
   // TODO: modify to be a single kernel launch
 
   for (int64_t etype = 0; etype < edge_sets.size(); ++etype) {
-    EdgeArray& edges = edge_sets[etype];
-    if (!aten::IsNullArray(edges.src)) {
+    const EdgeArray& edges = edge_sets[etype];
+    if (edges.id.defined()) {
       const int64_t num_edges = edges.src->shape[0];
+
+      new_lhs.emplace_back(NewIdArray(num_edges, ctx, sizeof(IdType)*8));
+      new_rhs.emplace_back(NewIdArray(num_edges, ctx, sizeof(IdType)*8));
+
       const auto src_dst_types = graph->GetEndpointTypes(etype);
       const int src_type = src_dst_types.first;
       const int dst_type = src_dst_types.second;
 
-      const dim3 grid(round_up_div(num_edges, TILE_SIZE));
+      const dim3 grid(round_up_div(num_edges, TILE_SIZE), 2);
       const dim3 block(BLOCK_SIZE);
 
       // map the srcs
@@ -766,7 +792,9 @@ void map_edges(
         0,
         stream>>>(
         edges.src.Ptr<IdType>(),
+        new_lhs.back().Ptr<IdType>(),
         edges.dst.Ptr<IdType>(),
+        new_rhs.back().Ptr<IdType>(),
         num_edges,
         node_map.lhs_hash_table(src_type),
         node_map.lhs_hash_size(src_type),
@@ -778,8 +806,14 @@ void map_edges(
         throw std::runtime_error("Error launching kernel: " + std::to_string(err)
         + " : '" + std::string(cudaGetErrorString(err)) + "'.");
       }
+    } else {
+      new_lhs.emplace_back(aten::NullArray());
+      new_rhs.emplace_back(aten::NullArray());
     }
   }
+
+  return std::tuple<std::vector<IdArray>, std::vector<IdArray>>(
+      std::move(new_lhs), std::move(new_rhs));
 }
 
 
@@ -821,16 +855,18 @@ ToBlockInternal(
   // count lhs and rhs nodes
   std::vector<int64_t> maxNodesPerType(num_ntypes*2, 0);
   for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
-    maxNodesPerType[ntype] += rhs_nodes[ntype]->shape[0];
+    maxNodesPerType[ntype+num_ntypes] += rhs_nodes[ntype]->shape[0];
 
     if (include_rhs_in_lhs) {
-      maxNodesPerType[ntype+num_ntypes] += rhs_nodes[ntype]->shape[0];
+      maxNodesPerType[ntype] += rhs_nodes[ntype]->shape[0];
     }
   }
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
     const auto src_dst_types = graph->GetEndpointTypes(etype);
     const dgl_type_t srctype = src_dst_types.first;
-    maxNodesPerType[srctype+num_ntypes] += edge_arrays[etype].src->shape[0];
+    if (edge_arrays[etype].src.defined()) {
+      maxNodesPerType[srctype] += edge_arrays[etype].src->shape[0];
+    }
   }
 
   // gather lhs_nodes
@@ -853,18 +889,19 @@ ToBlockInternal(
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
     const auto src_dst_types = graph->GetEndpointTypes(etype);
     const dgl_type_t srctype = src_dst_types.first;
+    if (edge_arrays[etype].src.defined()) {
+      device->CopyDataFromTo(
+          edge_arrays[etype].src.Ptr<IdType>(), 0,
+          src_nodes[srctype].Ptr<IdType>(),
+          src_node_offsets[srctype],
+          sizeof(IdType)*edge_arrays[etype].src->shape[0],
+          rhs_nodes[srctype]->ctx,
+          src_nodes[srctype]->ctx, 
+          rhs_nodes[srctype]->dtype,
+          stream);
 
-    device->CopyDataFromTo(
-        edge_arrays[etype].src.Ptr<IdType>(), 0,
-        src_nodes[srctype].Ptr<IdType>(),
-        src_node_offsets[srctype],
-        sizeof(IdType)*edge_arrays[etype].src->shape[0],
-        rhs_nodes[srctype]->ctx,
-        src_nodes[srctype]->ctx, 
-        rhs_nodes[srctype]->dtype,
-        stream);
-
-    src_node_offsets[srctype] += sizeof(IdType)*edge_arrays[etype].src->shape[0];
+      src_node_offsets[srctype] += sizeof(IdType)*edge_arrays[etype].src->shape[0];
+    }
   }
 
   // allocate space for map creation process
@@ -903,17 +940,17 @@ ToBlockInternal(
   cudaEventCreate(&event);
 
   // start copy for number of nodes per type 
-  int64_t * num_nodes_per_type;
-  cudaMallocHost(&num_nodes_per_type, sizeof(*num_nodes_per_type)*num_ntypes*2);
-  cudaMemcpyAsync(num_nodes_per_type,
-      count_lhs_device, sizeof(*num_nodes_per_type)*num_ntypes*2,
+  int64_t * num_nodes_per_type_pinned;
+  cudaMallocHost(&num_nodes_per_type_pinned, sizeof(*num_nodes_per_type_pinned)*num_ntypes);
+  cudaMemcpyAsync(num_nodes_per_type_pinned,
+      count_lhs_device, sizeof(*num_nodes_per_type_pinned)*num_ntypes,
       cudaMemcpyDeviceToHost,
       stream);
-
   cudaEventRecord(event, stream);
-
   // map node numberings from global to local, and build pointer for CSR
-  map_edges(graph, edge_arrays, node_maps, stream);
+  std::vector<IdArray> new_lhs;
+  std::vector<IdArray> new_rhs;
+  std::tie(new_lhs, new_rhs) = map_edges(graph, edge_arrays, node_maps, stream);
 
   std::vector<IdArray> induced_edges;
   induced_edges.reserve(num_etypes);
@@ -921,7 +958,8 @@ ToBlockInternal(
     if (edge_arrays[etype].id.defined()) {
       induced_edges.push_back(edge_arrays[etype].id);
     } else {
-      induced_edges.push_back(aten::NullArray());
+      induced_edges.push_back(
+            aten::NullArray(DLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx));
     }
   }
 
@@ -932,9 +970,22 @@ ToBlockInternal(
   const auto new_meta_graph = ImmutableGraph::CreateFromCOO(
       num_ntypes * 2, etypes.src, new_dst);
 
+  std::vector<int64_t> num_nodes_per_type(num_ntypes*2);
+
+  // populate RHS nodes from what we already know
+  for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+    num_nodes_per_type[num_ntypes+ntype] = rhs_nodes[ntype]->shape[0];
+  }
+
   // wait for the node counts to finish transferring
   cudaEventSynchronize(event);
   device->FreeWorkspace(ctx, count_lhs_device);
+
+  // copy in lhs node counts
+  for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+    num_nodes_per_type[ntype] = num_nodes_per_type_pinned[ntype]; 
+  }
+  cudaFreeHost(num_nodes_per_type_pinned);
 
   // resize lhs nodes
   for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
@@ -948,24 +999,24 @@ ToBlockInternal(
     const dgl_type_t srctype = src_dst_types.first;
     const dgl_type_t dsttype = src_dst_types.second;
 
-    if (rhs_nodes[dsttype].NumElements() == 0) {
+    if (rhs_nodes[dsttype]->shape[0] == 0) {
       // No rhs nodes are given for this edge type. Create an empty graph.
       rel_graphs.push_back(CreateFromCOO(
-          2, lhs_nodes[srctype].NumElements(), rhs_nodes[dsttype].NumElements(),
-          aten::NullArray(), aten::NullArray()));
+          2, lhs_nodes[srctype]->shape[0], rhs_nodes[dsttype]->shape[0],
+          aten::NullArray(DLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx),
+          aten::NullArray(DLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx)));
     } else {
       rel_graphs.push_back(CreateFromCOO(
           2,
-          rhs_nodes[dsttype].NumElements(),
-          lhs_nodes[srctype].NumElements(),
-          edge_arrays[etype].src,
-          edge_arrays[etype].dst));
+          lhs_nodes[srctype]->shape[0],
+          rhs_nodes[dsttype]->shape[0],
+          new_lhs[etype],
+          new_rhs[etype]));
     }
   }
 
   const HeteroGraphPtr new_graph = CreateHeteroGraph(
-      new_meta_graph, rel_graphs, std::vector<int64_t>(
-      num_nodes_per_type, num_nodes_per_type+num_ntypes));
+      new_meta_graph, rel_graphs, num_nodes_per_type);
 
   // return the new graph, the new src nodes, and new edges
   return std::make_tuple(new_graph, lhs_nodes, induced_edges);
