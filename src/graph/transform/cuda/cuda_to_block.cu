@@ -13,6 +13,7 @@
 #include <dgl/runtime/device_api.h>
 #include <dgl/immutable_graph.h>
 
+#include "../../../runtime/cuda/cuda_common.h"
 #include "../../heterograph.h"
 
 using namespace dgl::aten;
@@ -391,87 +392,6 @@ inline IdType round_up(
   return round_up_div(num, unit)*unit;
 }
 
-template<typename T>
-void checked_memset(
-  T * const ptr,
-  const int val,
-  const size_t num,
-  cudaStream_t stream)
-{
-  cudaError_t err = cudaMemsetAsync(ptr, val, num*sizeof(T), stream);
-  if (err != cudaSuccess) {
-    throw std::runtime_error("Failed to execute memset: " + std::to_string(err)
-    + " : " + std::string(cudaGetErrorString(err)));
-  }
-}
-
-template<typename T>
-void checked_d2d_copy(
-  T * const dst_device,
-  const T * const src_device,
-  const size_t num,
-  cudaStream_t stream)
-{
-  cudaError_t err = cudaMemcpyAsync(dst_device, src_device,
-      sizeof(*dst_device)*num, cudaMemcpyDeviceToDevice, stream);
-  if (err != cudaSuccess) {
-    throw std::runtime_error("Failed to launch d2d memcpy: " + std::to_string(err)
-    + " : " + std::string(cudaGetErrorString(err)));
-  }
-}
-
-template<typename T>
-void checked_h2d_copy(
-  T * const dst_device,
-  const T * const src_host,
-  const size_t num,
-  cudaStream_t stream)
-{
-  cudaError_t err = cudaMemcpyAsync(dst_device, src_host,
-      sizeof(*dst_device)*num, cudaMemcpyHostToDevice, stream);
-  if (err != cudaSuccess) {
-    throw std::runtime_error("Failed to launch h2d memcpy: " + std::to_string(err)
-    + " : " + std::string(cudaGetErrorString(err)));
-  }
-}
-
-template<typename T>
-void checked_d2h_copy(
-  T * const dst_host,
-  const T * const src_device,
-  const size_t num,
-  cudaStream_t stream)
-{
-  cudaError_t err = cudaMemcpyAsync(dst_host, src_device,
-      sizeof(*dst_host)*num, cudaMemcpyDeviceToHost, stream);
-  if (err != cudaSuccess) {
-    throw std::runtime_error("Failed to launch d2h memcpy: " + std::to_string(err)
-    + " : " + std::string(cudaGetErrorString(err)));
-  }
-}
-
-
-
-void check_cub_call(
-    const cudaError_t err)
-{
-  if (err != cudaSuccess) {
-    throw std::runtime_error("Error running cub: " + std::to_string(err)
-        + " : '" + std::string(cudaGetErrorString(err)) + "'.");
-  }
-}
-
-void check_last_error()
-{
-  cudaError_t err = cudaGetLastError();
-  if (err != cudaSuccess) {
-    throw std::runtime_error("Failed to launch kernel: "
-    + std::to_string(err) + " : " +
-    std::string(cudaGetErrorString(err)));
-  }
-}
-
-
 
 template<typename IdType>
 class DeviceNodeMap
@@ -481,7 +401,8 @@ class DeviceNodeMap
 
     DeviceNodeMap(
         const std::vector<int64_t>& num_nodes,
-        DGLContext ctx) :
+        DGLContext ctx,
+        cudaStream_t stream) :
       m_num_types(num_nodes.size()),
       m_rhs_offset(m_num_types/2),
       m_masks(m_num_types),
@@ -502,6 +423,12 @@ class DeviceNodeMap
           m_hash_prefix.back()*sizeof(*m_hash_tables)));
       m_num_nodes_ptr = static_cast<IdType*>(device->AllocWorkspace(ctx,
           m_num_types*sizeof(*m_num_nodes_ptr)));
+
+      CUDA_CALL(cudaMemsetAsync(
+        m_hash_tables,
+        -1,
+        m_hash_prefix.back()*sizeof(*m_hash_tables),
+        stream));
     }
 
     IdType * num_nodes_ptrs()
@@ -623,7 +550,7 @@ class DeviceNodeMapMaker
         const size_t max_num)
     {
       size_t prefix_sum_bytes;
-      check_cub_call(cub::DeviceScan::ExclusiveSum(
+      CUDA_CALL(cub::DeviceScan::ExclusiveSum(
             nullptr,
             prefix_sum_bytes,
             static_cast<IdType*>(nullptr),
@@ -683,12 +610,11 @@ class DeviceNodeMapMaker
 
       const int64_t num_ntypes = lhs_nodes.size() + rhs_nodes.size();
 
-      checked_memset(
+      CUDA_CALL(cudaMemsetAsync(
         count_lhs_device,
         0,
         num_ntypes*sizeof(*count_lhs_device),
-        stream);
-
+        stream));
 
       // launch kernel to build hash table
       for (int64_t i = 0; i < num_ntypes; ++i) {
@@ -696,9 +622,6 @@ class DeviceNodeMapMaker
 
         if (nodes->shape[0] > 0) {
           CHECK_EQ(nodes->ctx.device_type, kDLGPU);
-
-          checked_memset(node_maps->hash_table(i), -1, node_maps->hash_size(i),
-              stream);
 
           const dim3 grid(round_up_div(nodes->shape[0], BLOCK_SIZE));
           const dim3 block(BLOCK_SIZE);
@@ -708,7 +631,7 @@ class DeviceNodeMapMaker
               nodes->shape[0],
               node_maps->hash_size(i),
               node_maps->hash_table(i));
-          check_last_error();
+          CUDA_CALL(cudaGetLastError());
 
           count_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
               nodes.Ptr<IdType>(),
@@ -716,9 +639,9 @@ class DeviceNodeMapMaker
               node_maps->hash_size(i),
               node_maps->hash_table(i),
               node_prefix);
-          check_last_error();
+          CUDA_CALL(cudaGetLastError());
 
-          check_cub_call(cub::DeviceScan::ExclusiveSum(
+          CUDA_CALL(cub::DeviceScan::ExclusiveSum(
               prefix_sum_space,
               prefix_sum_bytes,
               node_prefix,
@@ -733,13 +656,7 @@ class DeviceNodeMapMaker
               node_prefix,
               i < lhs_device.size() ? lhs_device[i].Ptr<IdType>() : nullptr,
               i < lhs_device.size() ? count_lhs_device+i : nullptr);
-          check_last_error();
-        } else {
-          checked_memset(
-            count_lhs_device+i,
-            0,
-            sizeof(*count_lhs_device),
-            stream);
+          CUDA_CALL(cudaGetLastError());
         }
       }
     }
@@ -800,12 +717,7 @@ map_edges(
         node_map.lhs_hash_size(src_type),
         node_map.rhs_hash_table(dst_type),
         node_map.rhs_hash_size(dst_type));
-
-      cudaError_t err = cudaGetLastError();
-      if (err != cudaSuccess) {
-        throw std::runtime_error("Error launching kernel: " + std::to_string(err)
-        + " : '" + std::string(cudaGetErrorString(err)) + "'.");
-      }
+      CUDA_CALL(cudaGetLastError()); 
     } else {
       new_lhs.emplace_back(aten::NullArray());
       new_rhs.emplace_back(aten::NullArray());
@@ -909,7 +821,7 @@ ToBlockInternal(
   const size_t scratch_size = maker.requiredWorkspaceBytes();
   void * const scratch_device = device->AllocWorkspace(ctx, scratch_size);
 
-  DeviceNodeMap<IdType> node_maps(maxNodesPerType, ctx);
+  DeviceNodeMap<IdType> node_maps(maxNodesPerType, ctx, stream);
 
   int64_t total_lhs = 0;
   for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
