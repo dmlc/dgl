@@ -46,8 +46,8 @@ if(USE_CUDA)
     #   is fixed by https://github.com/NVIDIA/cub/commit/9143e47e048641aa0e6ddfd645bcd54ff1059939
     #   in 11.1.
     message(STATUS "Detected CUDA of version ${CUDA_VERSION}. Use external CUB/Thrust library.")
-    cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust")
-    cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cub")
+    list(INSERT CUDA_INCLUDE_DIRS 0 "${CMAKE_SOURCE_DIR}/third_party/thrust")
+    list(INSERT CUDA_INCLUDE_DIRS 0 "${CMAKE_SOURCE_DIR}/third_party/cub")
   endif()
 endif(USE_CUDA)
 
@@ -92,7 +92,6 @@ else(MSVC)
   check_cxx_compiler_flag("-std=c++14"    SUPPORT_CXX14)
   set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
   set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++14 ${CMAKE_CXX_FLAGS}")
-  set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--warn-common ${CMAKE_SHARED_LINKER_FLAGS}")
 endif(MSVC)
 
 if(USE_OPENMP)
