@@ -102,9 +102,9 @@ __global__ void SDDMMCooTreeReduceKernel(
     const DType* rhsoff = rhs + Selector<RhsTarget>::Call(src, eid, dst) * rhs_len;
     DType* outoff = out + eid * out_len;
     int tx = threadIdx.x;  // tx < 32
-    for (int i = 0; i < out_len; ++i) {
-      const Idx lhs_add = UseBcast ? lhs_off[i] : i;
-      const Idx rhs_add = UseBcast ? rhs_off[i] : i;
+    for (int i = blockIdx.y; i < out_len; i += gridDim.y) {  // over output feature dimension
+      const Idx lhs_add = UseBcast ? __ldg(lhs_off + i) : i;
+      const Idx rhs_add = UseBcast ? __ldg(rhs_off + i) : i;
       DType val = 0.;
       for (int j = tx; j < reduce_size; j += 32)
         val += lhsoff[lhs_add * reduce_size + j] * rhsoff[rhs_add * reduce_size + j];
@@ -223,9 +223,10 @@ void SDDMMCoo(
 
   if (std::is_same<Op, binary::Dot<DType> >::value && reduce_dim >= 32) {
     const int ntx = 32;  // on feature dimension
-    const int nty = 32;  // on graph dimension
+    const int nty = 8;   // on out dimension
     const int nbx = (nnz + nty - 1) / nty;
-    const dim3 nblks(nbx, 1);
+    const int nby = FindNumBlocks<'y'>(len);
+    const dim3 nblks(nbx, nby);
     const dim3 nthrs(ntx, nty);
     BCAST_IDX_CTX_SWITCH(bcast, use_idx, out->ctx, lhs_off, rhs_off, {
       CUDA_KERNEL_CALL((SDDMMCooTreeReduceKernel<Idx, DType, UseBcast, UseIdx, LhsTarget, RhsTarget>),
