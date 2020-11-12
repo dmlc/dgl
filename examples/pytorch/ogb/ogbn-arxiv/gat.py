@@ -3,11 +3,12 @@
 
 import argparse
 import math
+import random
 import time
 
+import dgl
 import numpy as np
 import torch
-import torch as th
 import torch.nn.functional as F
 import torch.optim as optim
 from matplotlib import pyplot as plt
@@ -21,6 +22,17 @@ device = None
 
 dataset = "ogbn-arxiv"
 n_node_feats, n_classes = 0, 0
+
+
+def seed(seed=0):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    dgl.random.seed(seed)
 
 
 def load_data(dataset):
@@ -55,7 +67,7 @@ def preprocess(graph):
 
 
 def gen_model(args):
-    if args.use_norm:
+    if args.use_labels:
         n_node_feats_ = n_node_feats + n_classes
     else:
         n_node_feats_ = n_node_feats
@@ -80,18 +92,14 @@ def gen_model(args):
 
 def custom_loss_function(x, labels):
     y = F.cross_entropy(x, labels[:, 0], reduction="none")
-    y = th.log(epsilon + y) - math.log(epsilon)
-    return th.mean(y)
-
-
-def compute_acc(pred, labels, evaluator):
-    return evaluator.eval({"y_pred": pred.argmax(dim=-1, keepdim=True), "y_true": labels})["acc"]
+    y = torch.log(epsilon + y) - math.log(epsilon)
+    return torch.mean(y)
 
 
 def add_labels(feat, labels, idx):
-    onehot = th.zeros([feat.shape[0], n_classes]).to(device)
+    onehot = torch.zeros([feat.shape[0], n_classes], device=device)
     onehot[idx, labels[idx, 0]] = 1
-    return th.cat([feat, onehot], dim=-1)
+    return torch.cat([feat, onehot], dim=-1)
 
 
 def adjust_learning_rate(optimizer, lr, epoch):
@@ -100,55 +108,55 @@ def adjust_learning_rate(optimizer, lr, epoch):
             param_group["lr"] = lr * epoch / 50
 
 
-def train(model, graph, labels, train_idx, val_idx, test_idx, optimizer, use_labels, n_label_iters):
+def train(args, model, graph, labels, train_idx, val_idx, test_idx, optimizer, evaluator):
     model.train()
 
     feat = graph.ndata["feat"]
 
-    if use_labels:
-        mask_rate = 0.5
-        mask = th.rand(train_idx.shape) < mask_rate
+    if args.use_labels:
+        mask = torch.rand(train_idx.shape) < args.mask_rate
 
         train_labels_idx = train_idx[mask]
         train_pred_idx = train_idx[~mask]
 
         feat = add_labels(feat, labels, train_labels_idx)
     else:
-        mask_rate = 0.5
-        mask = th.rand(train_idx.shape) < mask_rate
+        mask = torch.rand(train_idx.shape) < args.mask_rate
 
         train_pred_idx = train_idx[mask]
 
     optimizer.zero_grad()
     pred = model(graph, feat)
 
-    if n_label_iters > 0:
+    if args.n_label_iters > 0:
         unlabel_idx = torch.cat([train_pred_idx, val_idx, test_idx])
-        for _ in range(n_label_iters):
-            feat[unlabel_idx, -n_classes:] = F.softmax(pred[unlabel_idx].detach(), dim=-1)
+        for _ in range(args.n_label_iters):
+            pred = pred.detach()
+            torch.cuda.empty_cache()
+            feat[unlabel_idx, -n_classes:] = F.softmax(pred[unlabel_idx], dim=-1)
             pred = model(graph, feat)
 
     loss = custom_loss_function(pred[train_pred_idx], labels[train_pred_idx])
     loss.backward()
     optimizer.step()
 
-    return loss.item(), pred.detach()
+    return evaluator(pred[train_idx], labels[train_idx]), loss.item()
 
 
-@th.no_grad()
-def evaluate(model, graph, labels, train_idx, val_idx, test_idx, use_labels, n_label_iters, evaluator):
+@torch.no_grad()
+def evaluate(args, model, graph, labels, train_idx, val_idx, test_idx, evaluator):
     model.eval()
 
     feat = graph.ndata["feat"]
 
-    if use_labels:
+    if args.use_labels:
         feat = add_labels(feat, labels, train_idx)
 
     pred = model(graph, feat)
 
-    if n_label_iters > 0:
+    if args.n_label_iters > 0:
         unlabel_idx = torch.cat([val_idx, test_idx])
-        for _ in range(n_label_iters):
+        for _ in range(args.n_label_iters):
             feat[unlabel_idx, -n_classes:] = F.softmax(pred[unlabel_idx], dim=-1)
             pred = model(graph, feat)
 
@@ -157,9 +165,9 @@ def evaluate(model, graph, labels, train_idx, val_idx, test_idx, use_labels, n_l
     test_loss = custom_loss_function(pred[test_idx], labels[test_idx])
 
     return (
-        compute_acc(pred[train_idx], labels[train_idx], evaluator),
-        compute_acc(pred[val_idx], labels[val_idx], evaluator),
-        compute_acc(pred[test_idx], labels[test_idx], evaluator),
+        evaluator(pred[train_idx], labels[train_idx]),
+        evaluator(pred[val_idx], labels[val_idx]),
+        evaluator(pred[test_idx], labels[test_idx]),
         train_loss,
         val_loss,
         test_loss,
@@ -167,6 +175,10 @@ def evaluate(model, graph, labels, train_idx, val_idx, test_idx, use_labels, n_l
 
 
 def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running):
+    evaluator_wrapper = lambda pred, labels: evaluator.eval(
+        {"y_pred": pred.argmax(dim=-1, keepdim=True), "y_true": labels}
+    )["acc"]
+
     # define model and optimizer
     model = gen_model(args)
     model = model.to(device)
@@ -175,7 +187,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
     # training loop
     total_time = 0
-    best_val_acc, best_test_acc, best_val_loss = 0, 0, float("inf")
+    best_val_acc, final_test_acc, best_val_loss = 0, 0, float("inf")
 
     accs, train_accs, val_accs, test_accs = [], [], [], []
     losses, train_losses, val_losses, test_losses = [], [], [], []
@@ -185,13 +197,10 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
         adjust_learning_rate(optimizer, args.lr, epoch)
 
-        loss, pred = train(
-            model, graph, labels, train_idx, val_idx, test_idx, optimizer, args.use_labels, args.n_label_iters,
-        )
-        acc = compute_acc(pred[train_idx], labels[train_idx], evaluator)
+        acc, loss = train(args, model, graph, labels, train_idx, val_idx, test_idx, optimizer, evaluator_wrapper)
 
         train_acc, val_acc, test_acc, train_loss, val_loss, test_loss = evaluate(
-            model, graph, labels, train_idx, val_idx, test_idx, args.use_labels, args.n_label_iters, evaluator
+            args, model, graph, labels, train_idx, val_idx, test_idx, evaluator_wrapper
         )
 
         toc = time.time()
@@ -200,14 +209,16 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             best_val_acc = val_acc
-            best_test_acc = test_acc
+            final_test_acc = test_acc
 
-        if epoch % args.log_every == 0:
-            print(f"Run: {n_running}/{args.n_runs}, Epoch: {epoch}/{args.n_epochs}")
+        if epoch == args.n_epochs or epoch % args.log_every == 0:
+            print(
+                f"Run: {n_running}/{args.n_runs}, Epoch: {epoch}/{args.n_epochs}, Average epoch time: {total_time / epoch}"
+            )
             print(
                 f"Loss: {loss:.4f}, Acc: {acc:.4f}\n"
                 f"Train/Val/Test loss: {train_loss:.4f}/{val_loss:.4f}/{test_loss:.4f}\n"
-                f"Train/Val/Test/Best val/Best test acc: {train_acc:.4f}/{val_acc:.4f}/{test_acc:.4f}/{best_val_acc:.4f}/{best_test_acc:.4f}"
+                f"Train/Val/Test/Best val/Final test acc: {train_acc:.4f}/{val_acc:.4f}/{test_acc:.4f}/{best_val_acc:.4f}/{final_test_acc:.4f}"
             )
 
         for l, e in zip(
@@ -216,8 +227,8 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         ):
             l.append(e)
 
+    print(f"Best val acc: {best_val_acc}, Final test acc: {final_test_acc}")
     print("*" * 50)
-    print(f"Average epoch time: {total_time / args.n_epochs}, Test acc: {best_test_acc}")
 
     if args.plot_curves:
         fig = plt.figure(figsize=(24, 24))
@@ -255,12 +266,11 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         plt.tight_layout()
         plt.savefig(f"gat_loss_{n_running}.png")
 
-    return best_val_acc, best_test_acc
+    return best_val_acc, final_test_acc
 
 
 def count_parameters(args):
     model = gen_model(args)
-    # print([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
     return sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
 
 
@@ -270,36 +280,38 @@ def main():
     argparser = argparse.ArgumentParser("GAT on OGBN-Arxiv", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argparser.add_argument("--cpu", action="store_true", help="CPU mode. This option overrides --gpu.")
     argparser.add_argument("--gpu", type=int, default=0, help="GPU device ID.")
-    argparser.add_argument("--n-runs", type=int, help="running times", default=10)
-    argparser.add_argument("--n-epochs", type=int, help="number of epochs", default=2000)
+    argparser.add_argument("--seed", type=int, default=0, help="seed")
+    argparser.add_argument("--n-runs", type=int, default=10, help="running times")
+    argparser.add_argument("--n-epochs", type=int, default=2000, help="number of epochs")
     argparser.add_argument(
         "--use-labels", action="store_true", help="Use labels in the training set as input features."
     )
-    argparser.add_argument("--n-label-iters", type=int, help="number of label iterations", default=0)
+    argparser.add_argument("--n-label-iters", type=int, default=0, help="number of label iterations")
+    argparser.add_argument("--mask-rate", type=float, default=0.5, help="mask rate")
     argparser.add_argument("--no-attn-dst", action="store_true", help="Don't use attn_dst.")
     argparser.add_argument("--use-norm", action="store_true", help="Use symmetrically normalized adjacency matrix.")
-    argparser.add_argument("--lr", type=float, help="learning rate", default=0.002)
-    argparser.add_argument("--n-layers", type=int, help="number of layers", default=3)
-    argparser.add_argument("--n-heads", type=int, help="number of heads", default=3)
-    argparser.add_argument("--n-hidden", type=int, help="number of hidden units", default=250)
-    argparser.add_argument("--dropout", type=float, help="dropout rate", default=0.75)
-    argparser.add_argument("--input-drop", type=float, help="input drop rate", default=0.1)
-    argparser.add_argument("--attn-drop", type=float, help="attention dropout rate", default=0.0)
-    argparser.add_argument("--edge-drop", type=float, help="edge drop rate", default=0.0)
-    argparser.add_argument("--wd", type=float, help="weight decay", default=0)
-    argparser.add_argument("--log-every", type=int, help="log every LOG_EVERY epochs", default=20)
-    argparser.add_argument("--plot-curves", help="plot learning curves", action="store_true")
+    argparser.add_argument("--lr", type=float, default=0.002, help="learning rate")
+    argparser.add_argument("--n-layers", type=int, default=3, help="number of layers")
+    argparser.add_argument("--n-heads", type=int, default=3, help="number of heads")
+    argparser.add_argument("--n-hidden", type=int, default=250, help="number of hidden units")
+    argparser.add_argument("--dropout", type=float, default=0.75, help="dropout rate")
+    argparser.add_argument("--input-drop", type=float, default=0.1, help="input drop rate")
+    argparser.add_argument("--attn-drop", type=float, default=0.0, help="attention drop rate")
+    argparser.add_argument("--edge-drop", type=float, default=0.0, help="edge drop rate")
+    argparser.add_argument("--wd", type=float, default=0, help="weight decay")
+    argparser.add_argument("--log-every", type=int, default=20, help="log every LOG_EVERY epochs")
+    argparser.add_argument("--plot-curves", action="store_true", help="plot learning curves")
     args = argparser.parse_args()
 
     if not args.use_labels and args.n_label_iters > 0:
         raise ValueError("'--use-labels' must be enabled when n_label_iters > 0")
 
     if args.cpu:
-        device = th.device("cpu")
+        device = torch.device("cpu")
     else:
-        device = th.device("cuda:%d" % args.gpu)
+        device = torch.device(f"cuda:{args.gpu}")
 
-    # load data
+    # load data & preprocess
     graph, labels, train_idx, val_idx, test_idx, evaluator = load_data(dataset)
     graph = preprocess(graph)
     graph.create_formats_()
@@ -311,11 +323,11 @@ def main():
     test_idx = test_idx.to(device)
 
     # run
-    val_accs = []
-    test_accs = []
+    val_accs, test_accs = [], []
 
-    for n_running in range(1, args.n_runs + 1):
-        val_acc, test_acc = run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
+    for i in range(args.n_runs):
+        seed(args.seed + i)
+        val_acc, test_acc = run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, i + 1)
         val_accs.append(val_acc)
         test_accs.append(test_acc)
 
@@ -341,9 +353,9 @@ if __name__ == "__main__":
 # Number of params: 1441580
 
 # Namespace(attn_drop=0.0, cpu=False, dropout=0.75, edge_drop=0.3, gpu=0, input_drop=0.25, log_every=20, lr=0.002, n_epochs=2000, n_heads=3, n_hidden=250, n_label_iters=1, n_layers=3, n_runs=10, no_attn_dst=True, plot_curves=True, use_labels=True, use_norm=True, wd=0)
-# Runned 10 times
-# Val Accs: [0.7515352864190074, 0.7520386590154032, 0.7520722171884963, 0.7516359609382866, 0.7518373099768448, 0.7525755897848921, 0.7515352864190074, 0.7514681700728212, 0.7516359609382866, 0.7512668210342629]
-# Test Accs: [0.7390078801720058, 0.7404686953480237, 0.7382671851531798, 0.7395222517128572, 0.7409007674423389, 0.7402629467316832, 0.7408390428574367, 0.7404275456247557, 0.7412093903668497, 0.7384112091846182]
-# Average val accuracy: 0.7517601261787308 ± 0.00036144816411993807
-# Average test accuracy: 0.7399316914593749 ± 0.0010070948165678253
+# Runned 20 times
+# Val Accs: [0.7529782878620088, 0.7521393335346823, 0.7521728917077755, 0.7504949830531226, 0.7518037518037518, 0.7518373099768448, 0.7516359609382866, 0.7511325883418907, 0.7509312393033323, 0.7515017282459143, 0.7511325883418907, 0.7514346118997282, 0.7509312393033323, 0.7521393335346823, 0.7528776133427296, 0.7522735662270545, 0.7504949830531226, 0.7522735662270545, 0.7511661465149837, 0.7501258431490989]
+# Test Accs: [0.7390901796185421, 0.7398720243606361, 0.7394605271279551, 0.7384523589078863, 0.7388638561405675, 0.7397280003291978, 0.7414151389831903, 0.7376499393041582, 0.7399748986688065, 0.7400366232537087, 0.7392547785116145, 0.7388844310022015, 0.7374853404110857, 0.7384317840462523, 0.7418677859391396, 0.737937987367035, 0.7381643108450096, 0.7399543238071724, 0.7377322387506944, 0.7385758080776906]
+# Average val accuracy: 0.7515738783180644 ± 0.0007617982474634186
+# Average test accuracy: 0.7391416167726272 ± 0.0011522198067958794
 # Number of params: 1441580

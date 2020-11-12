@@ -87,7 +87,7 @@ optional arguments:
 
 ## Results
 
-Here are the results over 10 runs.
+Here are the results over at least 10 runs.
 
 |           Method            | Validation Accuracy |  Test Accuracy  | #Parameters |
 |:---------------------------:|:-------------------:|:---------------:|:-----------:|
@@ -96,4 +96,4 @@ Here are the results over 10 runs.
 |         GCN+labels          |   0.7399 ± 0.0008   | 0.7259 ± 0.0006 |   119,848   |
 |      GCN+linear+labels      |   0.7442 ± 0.0012   | 0.7306 ± 0.0024 |   238,632   |
 |   GAT(norm. adj.)+labels    |   0.7508 ± 0.0009   | 0.7366 ± 0.0011 |  1,441,580  |
-| GAT(norm. adj.)+label reuse |   0.7518 ± 0.0004   | 0.7399 ± 0.0010 |  1,441,580  |
+| GAT(norm. adj.)+label reuse |   0.7516 ± 0.0008   | 0.7391 ± 0.0012 |  1,441,580  |
