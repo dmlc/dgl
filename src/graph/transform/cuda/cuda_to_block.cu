@@ -119,7 +119,7 @@ inline __device__ bool attempt_insert_at(
 }
 
 template<typename IdType>
-inline __device__ void insert_hashmap(
+inline __device__ size_t insert_hashmap(
     const IdType id,
     const size_t index,
     Mapping<IdType> * const table,
@@ -133,6 +133,8 @@ inline __device__ void insert_hashmap(
     pos = (pos+delta) % table_size;
     delta +=1;
   }
+
+  return pos;
 }
 
 template<typename IdType>
@@ -182,18 +184,18 @@ inline __device__ Mapping<IdType> * search_hashmap(
 
 /**
 * @brief This generates a hash map where the keys are the global node numbers,
-* and the values are indexes.
+* and the values are indexes, and inputs may have duplciates.
 *
 * @tparam IdType The type of of id.
 * @tparam BLOCK_SIZE The size of the thread block.
 * @tparam TILE_SIZE The number of entries each thread block will process.
-* @param nodes The nodes ot insert.
+* @param nodes The nodes to insert.
 * @param num_nodes The number of nodes to insert.
 * @param hash_size The size of the hash table.
 * @param pairs The hash table.
 */
 template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
-__global__ void generate_hashmap(
+__global__ void generate_hashmap_duplicates(
     const IdType * const nodes,
     const int64_t num_nodes,
     const size_t hash_size,
@@ -208,6 +210,42 @@ __global__ void generate_hashmap(
   for (size_t index = threadIdx.x + block_start; index < block_end; index += BLOCK_SIZE) {
     if (index < num_nodes) {
       insert_hashmap(nodes[index], index, mappings, hash_size);
+    }
+  }
+}
+
+/**
+* @brief This generates a hash map where the keys are the global node numbers,
+* and the values are indexes, and all inputs are unique.
+*
+* @tparam IdType The type of of id.
+* @tparam BLOCK_SIZE The size of the thread block.
+* @tparam TILE_SIZE The number of entries each thread block will process.
+* @param nodes The unique nodes to insert.
+* @param num_nodes The number of nodes to insert.
+* @param hash_size The size of the hash table.
+* @param pairs The hash table.
+*/
+template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
+__global__ void generate_hashmap_unique(
+    const IdType * const nodes,
+    const int64_t num_nodes,
+    const size_t hash_size,
+    Mapping<IdType> * const mappings)
+{
+  assert(BLOCK_SIZE == blockDim.x);
+
+  const size_t block_start = TILE_SIZE*blockIdx.x;
+  const size_t block_end = TILE_SIZE*(blockIdx.x+1);
+
+  #pragma unroll
+  for (size_t index = threadIdx.x + block_start; index < block_end; index += BLOCK_SIZE) {
+    if (index < num_nodes) {
+      const size_t pos = insert_hashmap(nodes[index], index, mappings, hash_size);
+
+      // since we are only inserting unique nodes, we know their local id
+      // will be equal to their index
+      mappings[pos].local = static_cast<IdType>(index);
     }
   }
 }
@@ -309,16 +347,12 @@ __global__ void compact_hashmap(
 
     if (kv) {
       kv->local = flag;
-      if (global_nodes) {
-        global_nodes[flag] = nodes[index];
-      }
+      global_nodes[flag] = nodes[index];
     }
   }
 
   if (threadIdx.x == 0 && blockIdx.x == 0) {
-    if (global_node_count) {
-      *global_node_count = num_nodes_prefix[gridDim.x];
-    }
+    *global_node_count = num_nodes_prefix[gridDim.x];
   }
 }
 
@@ -464,6 +498,18 @@ class DeviceNodeMap
         const size_t index) const
     {
       return m_hash_prefix[index+1]-m_hash_prefix[index];
+    }
+
+    Mapping<IdType> * lhs_hash_table(
+        const size_t index)
+    {
+      return hash_table(index);
+    }
+
+    Mapping<IdType> * rhs_hash_table(
+        const size_t index)
+    {
+      return hash_table(index+m_rhs_offset);
     }
 
     const Mapping<IdType> * lhs_hash_table(
@@ -616,28 +662,28 @@ class DeviceNodeMapMaker
         num_ntypes*sizeof(*count_lhs_device),
         stream));
 
-      // launch kernel to build hash table
-      for (int64_t i = 0; i < num_ntypes; ++i) {
-        const IdArray& nodes = i < lhs_nodes.size() ? lhs_nodes[i] : rhs_nodes[i-lhs_nodes.size()];
-
+      // possibly dublicate lhs nodes 
+      for (int64_t ntype = 0; ntype < lhs_nodes.size(); ++ntype) {
+        const IdArray& nodes = lhs_nodes[ntype];
         if (nodes->shape[0] > 0) {
+
           CHECK_EQ(nodes->ctx.device_type, kDLGPU);
 
           const dim3 grid(round_up_div(nodes->shape[0], BLOCK_SIZE));
           const dim3 block(BLOCK_SIZE);
 
-          generate_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
+          generate_hashmap_duplicates<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
               nodes.Ptr<IdType>(),
               nodes->shape[0],
-              node_maps->hash_size(i),
-              node_maps->hash_table(i));
+              node_maps->lhs_hash_size(ntype),
+              node_maps->lhs_hash_table(ntype));
           CUDA_CALL(cudaGetLastError());
 
           count_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
               nodes.Ptr<IdType>(),
               nodes->shape[0],
-              node_maps->hash_size(i),
-              node_maps->hash_table(i),
+              node_maps->lhs_hash_size(ntype),
+              node_maps->lhs_hash_table(ntype),
               node_prefix);
           CUDA_CALL(cudaGetLastError());
 
@@ -651,11 +697,29 @@ class DeviceNodeMapMaker
           compact_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
               nodes.Ptr<IdType>(),
               nodes->shape[0],
-              node_maps->hash_size(i),
-              node_maps->hash_table(i),
+              node_maps->lhs_hash_size(ntype),
+              node_maps->lhs_hash_table(ntype),
               node_prefix,
-              i < lhs_device.size() ? lhs_device[i].Ptr<IdType>() : nullptr,
-              i < lhs_device.size() ? count_lhs_device+i : nullptr);
+              lhs_device[ntype].Ptr<IdType>(),
+              count_lhs_device+ntype);
+          CUDA_CALL(cudaGetLastError());
+        }
+      }
+
+      // unique rhs nodes
+      for (int64_t ntype = 0; ntype < rhs_nodes.size(); ++ntype) {
+        const IdArray& nodes = rhs_nodes[ntype];
+        if (nodes->shape[0] > 0) {
+          CHECK_EQ(nodes->ctx.device_type, kDLGPU);
+
+          const dim3 grid(round_up_div(nodes->shape[0], BLOCK_SIZE));
+          const dim3 block(BLOCK_SIZE);
+
+          generate_hashmap_unique<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
+              nodes.Ptr<IdType>(),
+              nodes->shape[0],
+              node_maps->rhs_hash_size(ntype),
+              node_maps->rhs_hash_table(ntype));
           CUDA_CALL(cudaGetLastError());
         }
       }
