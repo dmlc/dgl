@@ -92,6 +92,7 @@ def gen_model(args):
         input_drop=args.input_drop,
         attn_drop=args.attn_dropout,
         edge_drop=args.edge_drop,
+        use_attn_dst=not args.use_attn_dst,
         allow_zero_in_degree=True,
         residual=False,
     )
@@ -270,7 +271,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         toc = time.time()
         total_time += toc - tic
 
-        if epoch % args.eval_every == 0 or epoch % args.log_every == 0:
+        if epoch == args.n_epochs or epoch % args.eval_every == 0 or epoch % args.log_every == 0:
             train_score, val_score, test_score, train_loss, val_loss, test_loss = evaluate(
                 args,
                 model,
@@ -289,11 +290,9 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
                 if args.estimation_mode:
                     best_model_state_dict = {k: v.to("cpu") for k, v in model.state_dict().items()}
 
-            if epoch % args.log_every == 0:
+            if epoch == args.n_epochs or epoch % args.log_every == 0:
                 print(
-                    f"Run: {n_running}/{args.n_runs}, Epoch: {epoch}/{args.n_epochs}, Average epoch time: {total_time / epoch}"
-                )
-                print(
+                    f"Run: {n_running}/{args.n_runs}, Epoch: {epoch}/{args.n_epochs}, Average epoch time: {total_time / epoch:.2s}\n"
                     f"Loss: {loss:.4f}, Score: {score:.4f}\n"
                     f"Train/Val/Test loss: {train_loss:.4f}/{val_loss:.4f}/{test_loss:.4f}\n"
                     f"Train/Val/Test/Best val/Final test score: {train_score:.4f}/{val_score:.4f}/{test_score:.4f}/{best_val_score:.4f}/{final_test_score:.4f}"
@@ -323,7 +322,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         )[2]
 
     print("*" * 50)
-    print(f"Average epoch time: {total_time / args.n_epochs}, Final test score: {final_test_score}")
+    print(f"Best val score: {best_val_score}, Final test score: {final_test_score}")
     print("*" * 50)
 
     if args.plot_curves:
@@ -377,12 +376,13 @@ def main():
     argparser.add_argument("--cpu", action="store_true", help="CPU mode. This option overrides '--gpu'.")
     argparser.add_argument("--gpu", type=int, default=0, help="GPU device ID")
     argparser.add_argument("--seed", type=int, default=0, help="seed")
-    argparser.add_argument("--n-runs", type=int, default=10)
-    argparser.add_argument("--n-epochs", type=int, default=250)
+    argparser.add_argument("--n-runs", type=int, default=10, help="running times")
+    argparser.add_argument("--n-epochs", type=int, default=250, help="number of epochs")
     argparser.add_argument(
         "--use-labels", action="store_true", help="Use labels in the training set as input features."
     )
     argparser.add_argument("--n-label-iters", type=int, default=0, help="number of label iterations")
+    argparser.add_argument("--no-attn-dst", action="store_true", help="Don't use attn_dst.")
     argparser.add_argument("--mask-rate", type=float, default=0.5, help="mask rate")
     argparser.add_argument("--n-heads", type=int, default=4, help="number of heads")
     argparser.add_argument("--lr", type=float, default=0.01, help="learning rate")
@@ -406,20 +406,17 @@ def main():
     else:
         device = torch.device("cuda:%d" % args.gpu)
 
-    seed(args.seed)
-
+    # load data & preprocess
     graph, labels, train_idx, val_idx, test_idx, evaluator = load_data(dataset)
     graph, labels = preprocess(graph, labels, train_idx)
 
-    # graph = graph.to(device)
-    labels = labels.to(device)
-    train_idx = train_idx.to(device)
-    val_idx = val_idx.to(device)
-    test_idx = test_idx.to(device)
+    labels, train_idx, val_idx, test_idx = map(lambda x: x.to(device), (labels, train_idx, val_idx, test_idx))
 
+    # run
     val_scores, test_scores = [], []
 
     for i in range(1, args.n_runs + 1):
+        seed(args.seed + i)
         val_score, test_score = run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, i)
         val_scores.append(val_score)
         test_scores.append(test_score)
@@ -434,17 +431,25 @@ def main():
 
     if args.estimation_mode:
         print(
-            "WARNING: Estimation mode is enabled. The final test score is accurate, but is not accurate during training time."
+            "WARNING: Estimation mode is enabled. The final test score is accurate, but not accurate during training time."
         )
 
 
 if __name__ == "__main__":
     main()
 
-# Namespace(attn_dropout=0.0, cpu=False, dropout=0.5, edge_drop=0.1, estimation_mode=True, eval_every=2, gpu=1, input_drop=0.1, log_every=2, lr=0.01, mask_rate=0.5, n_epochs=250, n_heads=4, n_hidden=120, n_label_iters=0, n_layers=3, n_runs=10, plot_curves=True, seed=0, use_labels=False, wd=0)
+# Namespace(attn_dropout=0.0, cpu=False, dropout=0.5, edge_drop=0.1, estimation_mode=True, eval_every=2, gpu=1, input_drop=0.1, log_every=2, lr=0.01, mask_rate=0.5, n_epochs=250, n_heads=4, n_hidden=120, n_label_iters=0, n_layers=3, n_runs=10, no_attn_dst=False, plot_curves=True, seed=0, use_labels=False, wd=0)
 # Runned 10 times
 # Val scores: [0.9326348447473489, 0.9330163008926073, 0.9327619967957684, 0.932355110240826, 0.9330163008926073, 0.9327365663860845, 0.9329145792538718, 0.9322788190117742, 0.9321516669633548, 0.9329908704829235]
 # Test scores: [0.8147550191112792, 0.8115680737936217, 0.8128332725586069, 0.8134062268564646, 0.8118784993477448, 0.8145462613150566, 0.8151228304665284, 0.8115274066904614, 0.8108545920615103, 0.8094583548530088]
 # Average val score: 0.9326857055667167 ± 0.00030580001557474636
 # Average test score: 0.8125950537054282 ± 0.001765025824381352
 # Number of params: 1065127
+
+# Namespace(attn_dropout=0.0, cpu=False, dropout=0.5, edge_drop=0.1, estimation_mode=True, eval_every=2, gpu=0, input_drop=0.1, log_every=2, lr=0.01, mask_rate=0.5, n_epochs=250, n_heads=4, n_hidden=120, n_label_iters=0, n_layers=3, n_runs=5, no_attn_dst=True, plot_curves=True, seed=0, use_labels=False, wd=0)
+# Runned 10 times
+# Val scores: [0.9332451745797625, 0.9330417313022913, 0.9328128576151362, 0.9323296798311421, 0.9324568318795616, 0.9327874272054523, 0.9327619967957684, 0.9328128576151362, 0.9322025277827226, 0.9329400096635557]
+# Test scores: [0.8103399272781824, 0.8115870517750965, 0.8107294277551171, 0.8115771109276573, 0.8130244079434601, 0.8094628734200265, 0.8105681149125815, 0.809217063374258, 0.8108085026779287, 0.8151549122923549]
+# Average val score: 0.932739109427053 ± 0.0003061065079170266
+# Average test score: 0.8112469392356664 ± 0.0016644261188834386
+# Number of params: 1060887

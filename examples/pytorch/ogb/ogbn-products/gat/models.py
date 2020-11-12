@@ -1,12 +1,10 @@
 # update time: 2020.11.02 17:33
-import dgl.function as fn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl import function as fn
 from dgl.ops import edge_softmax
 from dgl.utils import expand_as_pair
-from torch.utils.checkpoint import checkpoint
 
 
 class GATConv(nn.Module):
