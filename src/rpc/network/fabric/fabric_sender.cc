@@ -76,11 +76,11 @@ STATUS FabricSender::Send(Message msg, int recv_id) {
             peer_fi_addr.at(recv_id));
   fep->Send(msg.data, msg.size, kDataMsg | sender_id,
             peer_fi_addr.at(recv_id), false, msg2);
-  // int count = 0;
-  // while (count<2){
-  //   ssize_t ret = PollCompletionQueue(cq_entries);
-  //   if (ret>0) count+=ret;
-  // }
+  int count = 0;
+  while (count<2){
+    ssize_t ret = PollCompletionQueue(cq_entries);
+    if (ret>0) count+=ret;
+  }
   return ADD_SUCCESS;
 }
 
