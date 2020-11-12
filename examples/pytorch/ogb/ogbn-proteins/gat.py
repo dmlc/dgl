@@ -267,7 +267,9 @@ def count_parameters(args):
 def main():
     global device
 
-    argparser = argparse.ArgumentParser("GAT on OGBN-Proteins", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    argparser = argparse.ArgumentParser(
+        "GAT implementation on ogbn-proteins", formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
     argparser.add_argument("--cpu", action="store_true", help="CPU mode. This option overrides '--gpu'.")
     argparser.add_argument("--gpu", type=int, default=0, help="GPU device ID")
     argparser.add_argument("--seed", type=int, default=0, help="random seed")

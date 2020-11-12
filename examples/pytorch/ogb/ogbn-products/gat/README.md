@@ -31,5 +31,5 @@ Here are the results over 10 runs.
 
 |    Method     | Validation Accuracy |  Test Accuracy  | #Parameters |
 |:-------------:|:-------------------:|:---------------:|:-----------:|
-| GAT (main.py) |          /          | 0.7863 ± 0.0007 |      /      |
+| GAT (main.py) |         N/A         | 0.7863 ± 0.0007 |     N/A     |
 | GAT (gat.py)  |   0.9327 ± 0.0003   | 0.8126 ± 0.0018 |  1,065,127  |
