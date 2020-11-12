@@ -46,8 +46,6 @@ def load_data(dataset):
     graph, labels = data[0]
     graph.ndata["labels"] = labels
 
-    graph.create_formats_()
-
     return graph, labels, train_idx, val_idx, test_idx, evaluator
 
 
@@ -57,6 +55,8 @@ def preprocess(graph, labels):
     # The sum of the weights of adjacent edges is used as node features.
     graph.update_all(fn.copy_e("feat", "feat_copy"), fn.sum("feat_copy", "feat"))
     n_node_feats = graph.ndata["feat"].shape[-1]
+
+    graph.create_formats_()
 
     return graph, labels
 
@@ -295,15 +295,13 @@ def main():
 
     seed(args.seed)
 
+    # load data & preprocess
     graph, labels, train_idx, val_idx, test_idx, evaluator = load_data(dataset)
     graph, labels = preprocess(graph, labels)
 
-    graph = graph.to(device)
-    labels = labels.to(device)
-    train_idx = train_idx.to(device)
-    val_idx = val_idx.to(device)
-    test_idx = test_idx.to(device)
+    labels, train_idx, val_idx, test_idx = map(lambda x: x.to(device), (labels, train_idx, val_idx, test_idx))
 
+    # run
     val_scores, test_scores = [], []
 
     for i in range(1, args.n_runs + 1):
