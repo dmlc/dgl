@@ -1632,6 +1632,9 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     DGLError
         If :attr:`dst_nodes` is specified but it is not a superset of all the nodes that
         have at least one inbound edge.
+    ValueError
+        If :attr:`dst_nodes` is not None, and :attr:`g` and :attr:`dst_nodes`
+        are not in the same context.
 
     Notes
     -----
