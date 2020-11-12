@@ -18,6 +18,7 @@ from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 from models import GAT
 
 epsilon = 1 - math.log(2)
+
 device = None
 
 dataset = "ogbn-arxiv"
@@ -62,6 +63,8 @@ def preprocess(graph):
     print(f"Total edges before adding self-loop {graph.number_of_edges()}")
     graph = graph.remove_self_loop().add_self_loop()
     print(f"Total edges after adding self-loop {graph.number_of_edges()}")
+
+    graph.create_formats_()
 
     return graph
 
@@ -180,9 +183,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
     )["acc"]
 
     # define model and optimizer
-    model = gen_model(args)
-    model = model.to(device)
-
+    model = gen_model(args).to(device)
     optimizer = optim.RMSprop(model.parameters(), lr=args.lr, weight_decay=args.wd)
 
     # training loop
@@ -213,9 +214,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
         if epoch == args.n_epochs or epoch % args.log_every == 0:
             print(
-                f"Run: {n_running}/{args.n_runs}, Epoch: {epoch}/{args.n_epochs}, Average epoch time: {total_time / epoch}"
-            )
-            print(
+                f"Run: {n_running}/{args.n_runs}, Epoch: {epoch}/{args.n_epochs}, Average epoch time: {total_time / epoch:.2f}\n"
                 f"Loss: {loss:.4f}, Acc: {acc:.4f}\n"
                 f"Train/Val/Test loss: {train_loss:.4f}/{val_loss:.4f}/{test_loss:.4f}\n"
                 f"Train/Val/Test/Best val/Final test acc: {train_acc:.4f}/{val_acc:.4f}/{test_acc:.4f}/{best_val_acc:.4f}/{final_test_acc:.4f}"
@@ -227,9 +226,11 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         ):
             l.append(e)
 
+    print("*" * 50)
     print(f"Best val acc: {best_val_acc}, Final test acc: {final_test_acc}")
     print("*" * 50)
 
+    # plot learning curves
     if args.plot_curves:
         fig = plt.figure(figsize=(24, 24))
         ax = fig.gca()
@@ -277,7 +278,9 @@ def count_parameters(args):
 def main():
     global device, n_node_feats, n_classes, epsilon
 
-    argparser = argparse.ArgumentParser("GAT on OGBN-Arxiv", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    argparser = argparse.ArgumentParser(
+        "GAT example on OGBN-Arxiv", formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
     argparser.add_argument("--cpu", action="store_true", help="CPU mode. This option overrides --gpu.")
     argparser.add_argument("--gpu", type=int, default=0, help="GPU device ID.")
     argparser.add_argument("--seed", type=int, default=0, help="seed")
@@ -314,13 +317,10 @@ def main():
     # load data & preprocess
     graph, labels, train_idx, val_idx, test_idx, evaluator = load_data(dataset)
     graph = preprocess(graph)
-    graph.create_formats_()
 
-    graph = graph.to(device)
-    labels = labels.to(device)
-    train_idx = train_idx.to(device)
-    val_idx = val_idx.to(device)
-    test_idx = test_idx.to(device)
+    graph, labels, train_idx, val_idx, test_idx = map(
+        lambda x: x.to(device), (graph, labels, train_idx, val_idx, test_idx)
+    )
 
     # run
     val_accs, test_accs = [], []
