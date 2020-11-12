@@ -936,17 +936,6 @@ ToBlockInternal(
       scratch_size,
       stream);
 
-  cudaEvent_t event;
-  cudaEventCreate(&event);
-
-  // start copy for number of nodes per type 
-  int64_t * num_nodes_per_type_pinned;
-  cudaMallocHost(&num_nodes_per_type_pinned, sizeof(*num_nodes_per_type_pinned)*num_ntypes);
-  cudaMemcpyAsync(num_nodes_per_type_pinned,
-      count_lhs_device, sizeof(*num_nodes_per_type_pinned)*num_ntypes,
-      cudaMemcpyDeviceToHost,
-      stream);
-  cudaEventRecord(event, stream);
   // map node numberings from global to local, and build pointer for CSR
   std::vector<IdArray> new_lhs;
   std::vector<IdArray> new_rhs;
@@ -970,22 +959,22 @@ ToBlockInternal(
   const auto new_meta_graph = ImmutableGraph::CreateFromCOO(
       num_ntypes * 2, etypes.src, new_dst);
 
-  std::vector<int64_t> num_nodes_per_type(num_ntypes*2);
+  // allocate vector for graph relations while GPU is busy
+  std::vector<HeteroGraphPtr> rel_graphs;
+  rel_graphs.reserve(num_etypes);
 
+  std::vector<int64_t> num_nodes_per_type(num_ntypes*2);
   // populate RHS nodes from what we already know
   for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
     num_nodes_per_type[num_ntypes+ntype] = rhs_nodes[ntype]->shape[0];
   }
+  cudaMemcpyAsync(num_nodes_per_type.data(),
+      count_lhs_device, sizeof(*num_nodes_per_type.data())*num_ntypes,
+      cudaMemcpyDeviceToHost,
+      stream);
 
   // wait for the node counts to finish transferring
-  cudaEventSynchronize(event);
   device->FreeWorkspace(ctx, count_lhs_device);
-
-  // copy in lhs node counts
-  for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
-    num_nodes_per_type[ntype] = num_nodes_per_type_pinned[ntype]; 
-  }
-  cudaFreeHost(num_nodes_per_type_pinned);
 
   // resize lhs nodes
   for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
@@ -993,7 +982,6 @@ ToBlockInternal(
   }
 
   // build the heterograph
-  std::vector<HeteroGraphPtr> rel_graphs;
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
     const auto src_dst_types = graph->GetEndpointTypes(etype);
     const dgl_type_t srctype = src_dst_types.first;
@@ -1015,7 +1003,7 @@ ToBlockInternal(
     }
   }
 
-  const HeteroGraphPtr new_graph = CreateHeteroGraph(
+  HeteroGraphPtr new_graph = CreateHeteroGraph(
       new_meta_graph, rel_graphs, num_nodes_per_type);
 
   // return the new graph, the new src nodes, and new edges
