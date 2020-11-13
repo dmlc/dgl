@@ -168,7 +168,7 @@ class Column(object):
         Tensor
             The feature data
         """
-        return F.gather_row(self.data, rwoids)
+        return F.gather_row(self.data, rowids)
 
     def __setitem__(self, rowids, feats):
         """Update the feature data given the index.
@@ -183,7 +183,7 @@ class Column(object):
         feats : Tensor
             New features.
         """
-        self.update(idx, feats)
+        self.update(rowids, feats)
 
     def update(self, rowids, feats):
         """Update the feature data given the index.
