@@ -89,14 +89,6 @@ struct BlockPrefixCallbackOp {
 
 
 template<typename IdType>
-inline __device__ IdType hash(
-    const IdType mask,
-    const IdType id) {
-  return id & mask;
-}
-
-
-template<typename IdType>
 inline __device__ bool attempt_insert_at(
     const size_t pos,
     const IdType id,
@@ -175,6 +167,26 @@ inline __device__ Mapping<IdType> * search_hashmap(
   const IdType pos = search_hashmap_for_pos(id, table, table_size);
 
   return table+pos;
+}
+
+
+template<typename IdType, int BLOCK_SIZE, IdType TILE_SIZE>
+__device__ void map_vertex_ids(
+    const IdType * const global,
+    IdType * const new_global,
+    const IdType num_vertices,
+    const Mapping<IdType> * const mappings,
+    const IdType hash_size) {
+  assert(BLOCK_SIZE == blockDim.x);
+
+  const IdType tile_start = TILE_SIZE*blockIdx.x;
+  const IdType tile_end = min(TILE_SIZE*(blockIdx.x+1), num_vertices);
+
+  for (IdType idx = threadIdx.x+tile_start; idx < tile_end; idx+=BLOCK_SIZE) {
+    const Mapping<IdType>& mapping = *search_hashmap(global[idx], mappings,
+        hash_size);
+    new_global[idx] = mapping.local;
+  }
 }
 
 
@@ -299,26 +311,6 @@ __global__ void count_hashmap(
 }
 
 
-template<typename IdType, int BLOCK_SIZE, IdType TILE_SIZE>
-__device__ void map_vertex_ids(
-    const IdType * const global,
-    IdType * const new_global,
-    const IdType num_vertices,
-    const Mapping<IdType> * const mappings,
-    const IdType hash_size) {
-  assert(BLOCK_SIZE == blockDim.x);
-
-  const IdType tile_start = TILE_SIZE*blockIdx.x;
-  const IdType tile_end = min(TILE_SIZE*(blockIdx.x+1), num_vertices);
-
-  for (IdType idx = threadIdx.x+tile_start; idx < tile_end; idx+=BLOCK_SIZE) {
-    const Mapping<IdType>& mapping = *search_hashmap(global[idx], mappings,
-        hash_size);
-    new_global[idx] = mapping.local;
-  }
-}
-
-
 /**
 * @brief Update the local numbering of elements in the hashmap.
 *
@@ -346,19 +338,21 @@ __global__ void compact_hashmap(
   assert(BLOCK_SIZE == blockDim.x);
 
   using FlagType = uint16_t;
-  using BlockScan = typename cub::BlockScan<IdType, BLOCK_SIZE>;
+  using BlockScan = typename cub::BlockScan<FlagType, BLOCK_SIZE>;
 
-  constexpr const size_t VALS_PER_THREAD = TILE_SIZE / BLOCK_SIZE;
+  constexpr const int32_t VALS_PER_THREAD = TILE_SIZE / BLOCK_SIZE;
 
   __shared__ typename BlockScan::TempStorage temp_space;
 
-  BlockPrefixCallbackOp<IdType> prefix_op(num_nodes_prefix[blockIdx.x]);
+  const IdType offset = num_nodes_prefix[blockIdx.x];
+
+  BlockPrefixCallbackOp<FlagType> prefix_op(0);
 
   // count successful placements
-  for (size_t i = 0; i < VALS_PER_THREAD; ++i) {
-    const size_t index = threadIdx.x + i*BLOCK_SIZE + blockIdx.x*TILE_SIZE;
+  for (int32_t i = 0; i < VALS_PER_THREAD; ++i) {
+    const IdType index = threadIdx.x + i*BLOCK_SIZE + blockIdx.x*TILE_SIZE;
 
-    IdType flag;
+    FlagType flag;
     Mapping<IdType>* kv;
     if (index < num_nodes) {
       kv = search_hashmap(nodes[index], mappings, hash_size);
@@ -375,8 +369,9 @@ __global__ void compact_hashmap(
     __syncthreads();
 
     if (kv) {
-      kv->local = flag;
-      global_nodes[flag] = nodes[index];
+      const IdType pos = offset+flag;
+      kv->local = pos;
+      global_nodes[pos] = nodes[index];
     }
   }
 
