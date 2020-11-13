@@ -253,8 +253,9 @@ macro(dgl_config_cuda out_variable)
   list(APPEND CMAKE_CUDA_FLAGS "${NVCC_FLAGS_EXTRA}")
 
   list(APPEND DGL_LINKER_LIBS
-    ${CUDA_CUDA_LIBRARY} ${CUDA_CUDART_LIBRARY}
-    ${CUDA_CUBLAS_LIBRARIES} ${CUDA_cusparse_LIBRARY})
+    ${CUDA_CUDART_LIBRARY}
+    ${CUDA_CUBLAS_LIBRARIES}
+    ${CUDA_cusparse_LIBRARY})
 
   set(${out_variable} ${DGL_CUDA_SRC})
 endmacro()
