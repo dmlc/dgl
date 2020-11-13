@@ -271,7 +271,7 @@ def run(proc_id, n_gpus, args, devices, data):
             iter_t.append(t - d_step)
             if step % args.log_every == 0:
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                print('[{}]Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f}|{:.4f} | Load {:.4f}| train {:.4f} | GPU {:.1f} MiB'.format(
+                print('[{}]Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f}|{:.4f} | Load {:.4f}| train {:.4f} | GPU {:.1f} MB'.format(
                     proc_id, epoch, step, loss.item(), np.mean(iter_pos[3:]), np.mean(iter_neg[3:]), np.mean(iter_d[3:]), np.mean(iter_t[3:]), gpu_mem_alloc))
             tic_step = time.time()
 
@@ -288,7 +288,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
 def main(args, devices):
     # load reddit data
-    data = RedditDataset(self_loop=True)
+    data = RedditDataset(self_loop=False)
     n_classes = data.num_classes
     g = data[0]
     features = g.ndata['feat']

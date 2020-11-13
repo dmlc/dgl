@@ -150,7 +150,7 @@ __global__ void SpMMCsrKernel(
   const Idx* __restrict__ indptr,
   const Idx* __restrict__ indices,
   const Idx* __restrict__ edge_map,
-  int64_t num_rows, int64_t num_cols, int64_t nnz,
+  int64_t num_rows, int64_t num_cols,
   const int64_t* __restrict__ ubcast_off,
   const int64_t* __restrict__ ebcast_off,
   int64_t ufeat_len, int64_t efeat_len, int64_t out_len) {
@@ -306,7 +306,7 @@ void SpMMCsr(
         nblks, nthrs, 0, thr_entry->stream,
         ufeat_data, efeat_data, out_data, argu_data, arge_data,
         indptr, indices, edge_map,
-        csr.num_rows, csr.num_cols, efeat->shape[0],
+        csr.num_rows, csr.num_cols,
         ubcast_off, ebcast_off,
         lhs_len, rhs_len, len)
   });

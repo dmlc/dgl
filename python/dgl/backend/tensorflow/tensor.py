@@ -421,8 +421,10 @@ def sort_1d(input):
     return tf.sort(input), tf.cast(tf.argsort(input), dtype=tf.int64)
 
 
-def arange(start, stop, dtype=tf.int64):
-    with tf.device("/cpu:0"):
+def arange(start, stop, dtype=tf.int64, ctx=None):
+    if not ctx:
+        ctx = "/cpu:0"
+    with tf.device(ctx):
         t = tf.range(start, stop, dtype=dtype)
     return t
 
@@ -444,10 +446,13 @@ def zerocopy_from_numpy(np_array):
 
 
 def zerocopy_to_dgl_ndarray(data):
-    if data.dtype == tf.int32 and device_type(data.device) == 'gpu':
-        # NOTE: TF doesn't keep int32 tensors on GPU due to legacy issues with
-        #   shape inference. Convert it to uint32 and cast it back afterwards.
-        data = tf.cast(data, tf.uint32)
+    if device_type(data.device) == 'gpu' and data.dtype in (tf.int32, tf.int64):
+        # NOTE: TF doesn't keep signed tensors on GPU due to legacy issues with
+        #   shape inference. Convert it to unsigned and cast it back afterwards.
+        if data.dtype == tf.int32:
+            data = tf.cast(data, tf.uint32)
+        elif data.dtype == tf.int64:
+            data = tf.cast(data, tf.uint64)
         return nd.cast_to_signed(nd.from_dlpack(zerocopy_to_dlpack(data)))
     else:
         return nd.from_dlpack(zerocopy_to_dlpack(data))

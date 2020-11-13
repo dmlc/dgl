@@ -27,7 +27,7 @@ class KnowledgeGraphDataset(DGLBuiltinDataset):
     -----------
     name: str
         Name can be 'FB15k-237', 'FB15k' or 'wn18'.
-    reverse: boo
+    reverse: bool
         Whether add reverse edges. Default: True.
     raw_dir : str
         Raw file directory to download/contains the input data directory.

@@ -38,6 +38,17 @@ if(USE_CUDA)
   message(STATUS "Build with CUDA support")
   project(dgl C CXX)
   include(cmake/modules/CUDA.cmake)
+  if ((CUDA_VERSION_MAJOR LESS 11) OR
+      ((CUDA_VERSION_MAJOR EQUAL 11) AND (CUDA_VERSION_MINOR EQUAL 0)))
+    # For cuda<11, use external CUB/Thrust library because CUB is not part of CUDA.
+    # For cuda==11.0, use external CUB/Thrust library because there is a bug in the
+    #   official CUB library which causes invalid device ordinal error for DGL. The bug
+    #   is fixed by https://github.com/NVIDIA/cub/commit/9143e47e048641aa0e6ddfd645bcd54ff1059939
+    #   in 11.1.
+    message(STATUS "Detected CUDA of version ${CUDA_VERSION}. Use external CUB/Thrust library.")
+    list(INSERT CUDA_INCLUDE_DIRS 0 "${CMAKE_SOURCE_DIR}/third_party/thrust")
+    list(INSERT CUDA_INCLUDE_DIRS 0 "${CMAKE_SOURCE_DIR}/third_party/cub")
+  endif()
 endif(USE_CUDA)
 
 # include directories
@@ -47,7 +58,6 @@ include_directories("third_party/METIS/include/")
 include_directories("third_party/dmlc-core/include")
 include_directories("third_party/minigun/minigun")
 include_directories("third_party/minigun/third_party/moderngpu/src")
-include_directories("third_party/cub/")
 include_directories("third_party/phmap/")
 
 # initial variables
@@ -79,9 +89,9 @@ if(MSVC)
   endif()
 else(MSVC)
   include(CheckCXXCompilerFlag)
-  check_cxx_compiler_flag("-std=c++11"    SUPPORT_CXX11)
+  check_cxx_compiler_flag("-std=c++14"    SUPPORT_CXX14)
   set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
-  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++11 ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++14 ${CMAKE_CXX_FLAGS}")
 endif(MSVC)
 
 if(USE_OPENMP)
@@ -115,6 +125,7 @@ file(GLOB DGL_SRC
   src/runtime/*.cc
   src/geometry/*.cc
   src/geometry/cpu/*.cc
+  src/dataloading/*.cc
 )
 
 file(GLOB_RECURSE DGL_SRC_1

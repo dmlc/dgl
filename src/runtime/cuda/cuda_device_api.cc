@@ -138,7 +138,8 @@ class CUDADeviceAPI final : public DeviceAPI {
   DGLStreamHandle CreateStream(DGLContext ctx) {
     CUDA_CALL(cudaSetDevice(ctx.device_id));
     cudaStream_t retval;
-    CUDA_CALL(cudaStreamCreate(&retval));
+    // make sure the legacy default stream won't block on this stream
+    CUDA_CALL(cudaStreamCreateWithFlags(&retval, cudaStreamNonBlocking));
     return static_cast<DGLStreamHandle>(retval);
   }
 
