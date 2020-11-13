@@ -878,11 +878,6 @@ ToBlockInternal(
       stream);
   device->FreeWorkspace(ctx, scratch_device);
 
-  // map node numberings from global to local, and build pointer for CSR
-  std::vector<IdArray> new_lhs;
-  std::vector<IdArray> new_rhs;
-  std::tie(new_lhs, new_rhs) = MapEdges(graph, edge_arrays, node_maps, stream);
-
   std::vector<IdArray> induced_edges;
   induced_edges.reserve(num_etypes);
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
@@ -910,13 +905,23 @@ ToBlockInternal(
   for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
     num_nodes_per_type[num_ntypes+ntype] = rhs_nodes[ntype]->shape[0];
   }
-  cudaMemcpyAsync(num_nodes_per_type.data(),
-      count_lhs_device, sizeof(*num_nodes_per_type.data())*num_ntypes,
-      cudaMemcpyDeviceToHost,
+  device->CopyDataFromTo(
+      count_lhs_device, 0,
+      num_nodes_per_type.data(), 0,
+      sizeof(*num_nodes_per_type.data())*num_ntypes,
+      ctx,
+      DGLContext{kDLCPU, 0},
+      DGLType{kDLInt, 64, 1},
       stream);
+  device->StreamSync(ctx, stream);
 
   // wait for the node counts to finish transferring
   device->FreeWorkspace(ctx, count_lhs_device);
+
+  // map node numberings from global to local, and build pointer for CSR
+  std::vector<IdArray> new_lhs;
+  std::vector<IdArray> new_rhs;
+  std::tie(new_lhs, new_rhs) = MapEdges(graph, edge_arrays, node_maps, stream);
 
   // resize lhs nodes
   for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
