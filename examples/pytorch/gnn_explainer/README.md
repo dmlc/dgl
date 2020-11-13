@@ -19,9 +19,10 @@ This command trains a GNN model and save it to the "dummy_model_4_syn1.pth" file
 
 **Second**, explain the trained model with the same data
 ``` python
-python explain_main.py --model_path dummy_model_4_syn1.pth
+python explain_main.py --model_path dummy_model_4_syn1.pth --target_class 1
 ```
-Replace the model_path argument value to the model you saved in the above training process.
+Replace the model_path argument value to the model you saved in the above training process, and the target class you want
+to explain. The code will pick the first node in the specified class to explain.
 
 ### Notice
 Because DGL does not support masked adjacency matrix as an input for the forward function of a module.

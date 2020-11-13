@@ -57,14 +57,16 @@ def main(args):
 
     # set a node to be explained and extract its subgraph
     # For the test purpose, chose a node with label 1, which specifies the two nodes in the middle of a house
-    l_1 = [i for i, e in enumerate(labels) if e==1]
+    l_1 = [i for i, e in enumerate(labels) if e==args.target_class]
     print(l_1)
 
     # here for test purpose, just pick the first one
-    n_idx = th.tensor([l_1[-1]])
+    n_idx = th.tensor([l_1[0]])
 
-    sub_graph, new_n_idx = extract_subgraph(graph, n_idx)
-    print(new_n_idx)
+    # extract the computation graph of target node and use it for explainability
+    sub_graph, ori_n_idxes, new_n_idx = extract_subgraph(graph, n_idx)
+    print(n_idx)
+
     src = sub_graph.edges()[0]
     dst = sub_graph.edges()[1]
 
@@ -84,7 +86,7 @@ def main(args):
     model_logits = dummy_model(sub_graph, n_feats)
     model_predict = F.one_hot(th.argmax(model_logits, dim=-1), num_classes)
 
-    for epoch in range(500):
+    for epoch in range(200):
         explainer.train()
         exp_logits = explainer(sub_graph, n_idx[0], n_feats)
         loss = explainer._loss(exp_logits[new_n_idx], model_predict[new_n_idx])
@@ -102,15 +104,16 @@ def main(args):
     print(total_t)
 
     # draw_sub_graph(sub_graph)
-    visualize_sub_graph(sub_graph, edge_weights.numpy())
+    visualize_sub_graph(sub_graph, edge_weights.numpy(), ori_n_idxes, n_idx)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Demo of GNN explainer in DGL')
     parser.add_argument('--model_path', type=str, default='./dummy_model_4_syn1.pth',
                         help='The path of saved model to be explained.')
-    # parser.add_argument('--dataset', type=str, default='aifb', help='dataset used for training the model')
-
+    parser.add_argument('--target_class', type=int, default='1',
+                        help='The class to be explained. In the synthetic 1 dataset, Valid option is from 0 to 4'
+                             'Will choose the first node in this class to explain')
 
     args = parser.parse_args()
     print(args)
