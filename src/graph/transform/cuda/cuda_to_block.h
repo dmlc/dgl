@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file graph/transform/cuda_to_block.cu
+ * \file graph/transform/cuda_to_block.h
  * \brief Functions to convert a set of edges into a graph block with local
  * ids.
  */
