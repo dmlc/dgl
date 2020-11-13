@@ -17,6 +17,19 @@
 namespace dgl {
 namespace transform {
 namespace cuda {
+
+/**
+ * @brief Generate a subgraph with locally numbered vertices, from the given
+ * edge set.
+ *
+ * @param graph The set of edges to construct the subgraph from.
+ * @param rhs_nodes The unique set of destination vertices.
+ * @param include_rhs_in_lhs Whether or not to include the `rhs_nodes` in the
+ * set of source vertices for purposes of local numbering.
+ *
+ * @return The subgraph, the unique set of source nodes, and the mapping of
+ * subgraph edges to global edges.
+ */
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
 CudaToBlock(
     HeteroGraphPtr graph,

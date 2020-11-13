@@ -39,6 +39,8 @@ struct EmptyKey {
 };
 
 
+// GPU Code ///////////////////////////////////////////////////////////////////
+
 inline __device__ int64_t atomicCAS(
     int64_t * const address,
     const int64_t compare,
@@ -297,6 +299,26 @@ __global__ void count_hashmap(
 }
 
 
+template<typename IdType, int BLOCK_SIZE, IdType TILE_SIZE>
+__device__ void map_vertex_ids(
+    const IdType * const global,
+    IdType * const new_global,
+    const IdType num_vertices,
+    const Mapping<IdType> * const mappings,
+    const IdType hash_size) {
+  assert(BLOCK_SIZE == blockDim.x);
+
+  const IdType tile_start = TILE_SIZE*blockIdx.x;
+  const IdType tile_end = min(TILE_SIZE*(blockIdx.x+1), num_vertices);
+
+  for (IdType idx = threadIdx.x+tile_start; idx < tile_end; idx+=BLOCK_SIZE) {
+    const Mapping<IdType>& mapping = *search_hashmap(global[idx], mappings,
+        hash_size);
+    new_global[idx] = mapping.local;
+  }
+}
+
+
 /**
 * @brief Update the local numbering of elements in the hashmap.
 *
@@ -363,26 +385,22 @@ __global__ void compact_hashmap(
   }
 }
 
-template<typename IdType, int BLOCK_SIZE, IdType TILE_SIZE>
-__device__ void map_vertex_ids(
-    const IdType * const global,
-    IdType * const new_global,
-    const IdType num_vertices,
-    const Mapping<IdType> * const mappings,
-    const IdType hash_size) {
-  assert(BLOCK_SIZE == blockDim.x);
-
-  const IdType tile_start = TILE_SIZE*blockIdx.x;
-  const IdType tile_end = min(TILE_SIZE*(blockIdx.x+1), num_vertices);
-
-  for (IdType idx = threadIdx.x+tile_start; idx < tile_end; idx+=BLOCK_SIZE) {
-    const Mapping<IdType>& mapping = *search_hashmap(global[idx], mappings,
-        hash_size);
-    new_global[idx] = mapping.local;
-  }
-}
-
-
+/**
+* @brief Generate mapped edge endpoint ids.
+*
+* @tparam IdType The type of id.
+* @tparam BLOCK_SIZE The size of each thread block.
+* @tparam TILE_SIZE The number of edges to process per thread block.
+* @param global_srcs_device The source ids to map.
+* @param new_global_srcs_device The mapped source ids (output).
+* @param global_dsts_device The destination ids to map.
+* @param new_global_dsts_device The mapped destination ids (output).
+* @param num_edges The number of edges to map.
+* @param src_mapping The mapping of sources ids.
+* @param src_hash_size The the size of source id hash table/mapping.
+* @param dst_mapping The mapping of destination ids.
+* @param dst_hash_size The the size of destination id hash table/mapping.
+*/
 template<typename IdType, int BLOCK_SIZE, IdType TILE_SIZE>
 __global__ void map_edge_ids(
     const IdType * const global_srcs_device,
@@ -414,6 +432,7 @@ __global__ void map_edge_ids(
   }
 }
 
+// CPU Code ///////////////////////////////////////////////////////////////////
 
 template<typename IdType>
 inline size_t RoundUpDiv(
