@@ -41,14 +41,10 @@ macro(find_cuda use_cuda)
         ${CUDA_TOOLKIT_ROOT_DIR}/lib/x64
         ${CUDA_TOOLKIT_ROOT_DIR}/lib/Win32)
     else(MSVC)
-      # The CI seems to have trouble locating the CUDA library so I'm manually doing that.
-      find_library(_CUDA_CUDA_LIBRARY cuda
+      find_library(CUDA_CUDA_LIBRARY cuda
         PATHS ${CUDA_TOOLKIT_ROOT_DIR}
-        PATH_SUFFIXES lib lib64 targets/x86_64-linux/lib targets/x86_64-linux/lib/stubs lib64/stubs
+        PATH_SUFFIXES lib lib64 targets/x86_64-linux/lib
         NO_DEFAULT_PATH)
-      if(_CUDA_CUDA_LIBRARY)
-        set(CUDA_CUDA_LIBRARY ${_CUDA_CUDA_LIBRARY})
-      endif()
       find_library(CUDA_CUBLAS_LIBRARY cublas
         ${CUDA_TOOLKIT_ROOT_DIR}/lib64
         ${CUDA_TOOLKIT_ROOT_DIR}/lib)

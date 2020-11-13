@@ -139,6 +139,7 @@ pipeline {
             docker {
               label "linux-c52x-node"
               image "dgllib/dgl-ci-gpu:conda"
+              args "--runtime nvidia"
               args "-u root"
               alwaysPull true
             }
