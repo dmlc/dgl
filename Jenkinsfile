@@ -30,6 +30,7 @@ def unpack_lib(name, libs) {
 def build_dgl_linux(dev) {
   init_git()
   sh "bash tests/scripts/build_dgl.sh ${dev}"
+  sh "ls -lh /usr/lib/x86_64-linux-gnu/"
   pack_lib("dgl-${dev}-linux", dgl_linux_libs)
 }
 
