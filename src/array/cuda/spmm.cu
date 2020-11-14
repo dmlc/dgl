@@ -244,7 +244,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
   bool use_efeat = op != "copy_lhs";
 
   if (reduce == "sum") {
-    if (feat_len > 64) {  // ge-spmm
+    if (feat_len > 64 && sizeof(DType) * bcast.rhs_len <= 1536) {  // ge-spmm
       SWITCH_OP(op, Op, {
         cuda::GESpMMCsr<IdType, DType, Op>(
             bcast, csr, ufeat, efeat, out);

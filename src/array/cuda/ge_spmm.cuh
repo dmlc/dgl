@@ -40,30 +40,44 @@ __global__ void GESpMMKernel(
     const int64_t ufeat_len,
     const int64_t efeat_len,
     const int64_t feat_len) {
-  const Idx rid = blockIdx.x * blockDim.y + threadIdx.y;  // over vertices dimension
-  const Idx fid = (blockIdx.y * 64) + threadIdx.x;        // over feature dimension
-  if (rid < num_rows && fid < feat_len) {
-    const Idx u_fid_0 = UseBcast ? ubcast_off[fid] : fid;
-    const Idx u_fid_1 = UseBcast ? (fid + 32 < feat_len ? ubcast_off[fid + 32] : 0) : fid + 32;
-    const Idx e_fid_0 = IsScalar ? 0 : (UseBcast ? ebcast_off[fid] : fid);
-    const Idx e_fid_1 = IsScalar ? 0 : (UseBcast ? (fid + 32 < feat_len ? ebcast_off[fid + 32] : 0) : fid + 32);
+  extern __shared__ char smem[];
+  DType *weight = (DType *)smem;
+  const Idx ty = threadIdx.y, tx = threadIdx.x;
+  const Idx rid = blockIdx.x * blockDim.y + ty;  // over vertices dimension
+  const Idx fid = (blockIdx.y * 64) + tx;        // over feature dimension
+
+  if (rid < num_rows) {
+    const Idx u_fid_0 = UseBcast ? (fid < feat_len ? __ldg(ubcast_off + fid) : 0) : fid;
+    const Idx u_fid_1 = UseBcast ? (fid + 32 < feat_len ? __ldg(ubcast_off + fid + 32) : 0) : fid + 32;
+    const Idx e_fid_0 = IsScalar ? 0 : (UseBcast ? (fid < feat_len ? __ldg(ebcast_off + fid) : 0) : fid);
+    const Idx e_fid_1 = IsScalar ? 0 : (UseBcast ? (fid + 32 < feat_len ? __ldg(ebcast_off + fid + 32) : 0) : fid + 32);
     const Idx low = __ldg(indptr + rid), high = __ldg(indptr + rid + 1);
-    DType accum_0 = 0.,
-          accum_1 = 0.;
+    DType accum_0 = 0., accum_1 = 0.;
 
     for (Idx left = low; left < high; left += 32) {
+      // copy edge weight to shared memory
+      for (Idx i = 0; i < efeat_len; ++i) {
+        const Idx eid = left + tx;
+        if (eid < high) {
+          const Idx real_eid = UseIdx ? __ldg(edge_map + eid) : eid;
+          weight[ty * (32 * efeat_len) + tx * efeat_len + i] =\
+            efeat[real_eid * efeat_len + i];
+        }
+      }
+      // NOTE(zihao): no need to sync thread here.
+
       if (left + 32 <= high) {
 #pragma unroll
         for (Idx i = 0; i < 32; ++i) {
           const Idx eid = left + i;
           const Idx cid = __ldg(indices + eid);
           const Idx offset_u = ufeat_len * cid;
-          const Idx offset_e = efeat_len * (UseIdx ? __ldg(edge_map + eid) : eid);
+          const Idx offset_e = ty * 32 * efeat_len + i * efeat_len;
           if (BinaryOp::use_rhs) {
             accum_0 += BinaryOp::Call(ufeat + offset_u + u_fid_0,
-                                      efeat + offset_e + e_fid_0);
+                                      weight + offset_e + e_fid_0);
             accum_1 += BinaryOp::Call(ufeat + offset_u + u_fid_1,
-                                      efeat + offset_e + e_fid_1);
+                                      weight + offset_e + e_fid_1);
           } else {
             accum_0 += ufeat[offset_u + u_fid_0];
             accum_1 += ufeat[offset_u + u_fid_1];
@@ -74,12 +88,12 @@ __global__ void GESpMMKernel(
           const Idx eid = left + i;
           const Idx cid = __ldg(indices + eid);
           const Idx offset_u = ufeat_len * cid;
-          const Idx offset_e = efeat_len * (UseIdx ? __ldg(edge_map + eid) : eid);
+          const Idx offset_e = ty * 32 * efeat_len + i * efeat_len;
           if (BinaryOp::use_rhs) {
             accum_0 += BinaryOp::Call(ufeat + offset_u + u_fid_0,
-                                      efeat + offset_e + e_fid_0);
+                                      weight + offset_e + e_fid_0);
             accum_1 += BinaryOp::Call(ufeat + offset_u + u_fid_1,
-                                      efeat + offset_e + e_fid_1);
+                                      weight + offset_e + e_fid_1);
           } else {
             accum_0 += ufeat[offset_u + u_fid_0];
             accum_1 += ufeat[offset_u + u_fid_1];
@@ -87,7 +101,8 @@ __global__ void GESpMMKernel(
         }
       }
 
-      out[feat_len * rid + fid] = accum_0;
+      if (fid < feat_len)
+        out[feat_len * rid + fid] = accum_0;
       if (fid + 32 < feat_len)
         out[feat_len * rid + fid + 32] = accum_1;
     }
@@ -157,12 +172,12 @@ void GESpMMCsr(
           rhs_len = bcast.rhs_len;
 
   const int ntx = 32;
-  const int nty = 32;
+  const int nty = std::max<int>(32, 1536 / (rhs_len * sizeof(DType)));
   const int nby = (feat_len + (ntx * 2) - 1) / (ntx * 2);
   const int nbx = (csr.num_rows + nty - 1) / nty;
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
-  const int sh_mem_size = 0;
+  const int sh_mem_size = ntx * nty * rhs_len * sizeof(DType);
   const bool use_idx = !IsNullArray(csr.data),
              use_bcast = bcast.use_bcast,
              is_scalar = rhs_len == 1;
