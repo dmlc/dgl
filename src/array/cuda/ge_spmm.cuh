@@ -42,98 +42,54 @@ __global__ void GESpMMKernel(
     const int64_t feat_len) {
   const Idx rid = blockIdx.x * blockDim.y + threadIdx.y;  // over vertices dimension
   const Idx fid = (blockIdx.y * 64) + threadIdx.x;        // over feature dimension
-  const Idx u_fid_0 = UseBcast ? ubcast_off[fid] : fid;
-  const Idx u_fid_1 = UseBcast ? (fid + 32 < feat_len ? ubcast_off[fid + 32] : 0) : fid + 32;
-  const Idx e_fid_0 = IsScalar ? 0 : (UseBcast ? ebcast_off[fid] : fid);
-  const Idx e_fid_1 = IsScalar ? 0 : (UseBcast ? (fid + 32 < feat_len ? ebcast_off[fid + 32] : 0) : fid + 32);
-
   if (rid < num_rows && fid < feat_len) {
+    const Idx u_fid_0 = UseBcast ? ubcast_off[fid] : fid;
+    const Idx u_fid_1 = UseBcast ? (fid + 32 < feat_len ? ubcast_off[fid + 32] : 0) : fid + 32;
+    const Idx e_fid_0 = IsScalar ? 0 : (UseBcast ? ebcast_off[fid] : fid);
+    const Idx e_fid_1 = IsScalar ? 0 : (UseBcast ? (fid + 32 < feat_len ? ebcast_off[fid + 32] : 0) : fid + 32);
     const Idx low = __ldg(indptr + rid), high = __ldg(indptr + rid + 1);
     DType accum_0 = 0.,
           accum_1 = 0.;
 
-    if (blockIdx.y != gridDim.y - 1) {
-      for (Idx left = low; left < high; left += 32) {
-        if (left + 32 <= high) {
+    for (Idx left = low; left < high; left += 32) {
+      if (left + 32 <= high) {
 #pragma unroll
-          for (Idx i = 0; i < 32; ++i) {
-            const Idx eid = left + i;
-            const Idx cid = __ldg(indices + eid);
-            const Idx offset_u = ufeat_len * cid;
-            const Idx offset_e = efeat_len * (UseIdx ? __ldg(edge_map + eid) : eid);
-            if (BinaryOp::use_rhs) {
-              accum_0 += BinaryOp::Call(ufeat + offset_u + u_fid_0,
-                                        efeat + offset_e + e_fid_0);
-              accum_1 += BinaryOp::Call(ufeat + offset_u + u_fid_1,
-                                        efeat + offset_e + e_fid_1);
-            } else {
-              accum_0 += ufeat[offset_u + u_fid_0];
-              accum_1 += ufeat[offset_u + u_fid_1];
-            }
-          }
-        } else {
-          for (Idx i = 0; left + i < high; ++i) {
-            const Idx eid = left + i;
-            const Idx cid = __ldg(indices + eid);
-            const Idx offset_u = ufeat_len * cid;
-            const Idx offset_e = efeat_len * (UseIdx ? __ldg(edge_map + eid) : eid);
-            if (BinaryOp::use_rhs) {
-              accum_0 += BinaryOp::Call(ufeat + offset_u + u_fid_0,
-                                        efeat + offset_e + e_fid_0);
-              accum_1 += BinaryOp::Call(ufeat + offset_u + u_fid_1,
-                                        efeat + offset_e + e_fid_1);
-            } else {
-              accum_0 += ufeat[offset_u + u_fid_0];
-              accum_1 += ufeat[offset_u + u_fid_1];
-            }
+        for (Idx i = 0; i < 32; ++i) {
+          const Idx eid = left + i;
+          const Idx cid = __ldg(indices + eid);
+          const Idx offset_u = ufeat_len * cid;
+          const Idx offset_e = efeat_len * (UseIdx ? __ldg(edge_map + eid) : eid);
+          if (BinaryOp::use_rhs) {
+            accum_0 += BinaryOp::Call(ufeat + offset_u + u_fid_0,
+                                      efeat + offset_e + e_fid_0);
+            accum_1 += BinaryOp::Call(ufeat + offset_u + u_fid_1,
+                                      efeat + offset_e + e_fid_1);
+          } else {
+            accum_0 += ufeat[offset_u + u_fid_0];
+            accum_1 += ufeat[offset_u + u_fid_1];
           }
         }
+      } else {
+        for (Idx i = 0; left + i < high; ++i) {
+          const Idx eid = left + i;
+          const Idx cid = __ldg(indices + eid);
+          const Idx offset_u = ufeat_len * cid;
+          const Idx offset_e = efeat_len * (UseIdx ? __ldg(edge_map + eid) : eid);
+          if (BinaryOp::use_rhs) {
+            accum_0 += BinaryOp::Call(ufeat + offset_u + u_fid_0,
+                                      efeat + offset_e + e_fid_0);
+            accum_1 += BinaryOp::Call(ufeat + offset_u + u_fid_1,
+                                      efeat + offset_e + e_fid_1);
+          } else {
+            accum_0 += ufeat[offset_u + u_fid_0];
+            accum_1 += ufeat[offset_u + u_fid_1];
+          }
+        }
+      }
 
-        out[feat_len * rid + fid] = accum_0;
+      out[feat_len * rid + fid] = accum_0;
+      if (fid + 32 < feat_len)
         out[feat_len * rid + fid + 32] = accum_1;
-      }
-    } else {
-      bool right_inbound = fid + 32 < feat_len;
-      for (int left = low; left < high; left += 32) {
-        if (left + 32 <= high) {
-#pragma unroll
-          for (int i = 0; i < 32; ++i) {
-            const Idx eid = left + i;
-            const Idx cid = __ldg(indices + eid);
-            const Idx offset_u = ufeat_len * cid;
-            const Idx offset_e = efeat_len * (UseIdx ? __ldg(edge_map + eid) : eid);
-            if (BinaryOp::use_rhs) {
-              accum_0 += BinaryOp::Call(ufeat + offset_u + u_fid_0,
-                                        efeat + offset_e + e_fid_0);
-              accum_1 += BinaryOp::Call(ufeat + offset_u + u_fid_1,
-                                        efeat + offset_e + e_fid_1);
-            } else {
-              accum_0 += ufeat[offset_u + u_fid_0];
-              accum_1 += ufeat[offset_u + u_fid_1];
-            }
-          }
-        } else {
-          for (int i = 0; i + left < high; ++i) {
-            const Idx eid = left + i;
-            const Idx cid = __ldg(indices + eid);
-            const Idx offset_u = ufeat_len * cid;
-            const Idx offset_e = efeat_len * (UseIdx ? __ldg(edge_map + eid) : eid);
-            if (BinaryOp::use_rhs) {
-              accum_0 += BinaryOp::Call(ufeat + offset_u + u_fid_0,
-                                        efeat + offset_e + e_fid_0);
-              accum_1 += BinaryOp::Call(ufeat + offset_u + u_fid_1,
-                                        efeat + offset_e + e_fid_1);
-            } else {
-              accum_0 += ufeat[offset_u + u_fid_0];
-              accum_1 += ufeat[offset_u + u_fid_1];
-            }
-          }
-        }
-
-        out[feat_len * rid + fid] = accum_0;
-        if (right_inbound)
-          out[feat_len * rid + fid + 32] = accum_1;
-      }
     }
   }
 }
