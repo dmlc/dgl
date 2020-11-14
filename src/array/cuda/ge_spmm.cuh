@@ -172,7 +172,7 @@ void GESpMMCsr(
           rhs_len = bcast.rhs_len;
 
   const int ntx = 32;
-  const int nty = std::max<int>(32, 1536 / (rhs_len * sizeof(DType)));
+  const int nty = std::min<int>(32, 128 / (rhs_len * sizeof(DType)));
   const int nby = (feat_len + (ntx * 2) - 1) / (ntx * 2);
   const int nbx = (csr.num_rows + nty - 1) / nty;
   const dim3 nblks(nbx, nby);
@@ -181,6 +181,8 @@ void GESpMMCsr(
   const bool use_idx = !IsNullArray(csr.data),
              use_bcast = bcast.use_bcast,
              is_scalar = rhs_len == 1;
+
+//  LOG(INFO) << ntx << " " << nty << " " << sh_mem_size;
 
   if (use_bcast) {
     const DLContext ctx = ufeat->ctx;
