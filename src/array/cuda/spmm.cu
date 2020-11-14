@@ -244,12 +244,10 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
   bool use_efeat = op != "copy_lhs";
 
   if (reduce == "sum") {
-    if ((!use_efeat || is_scalar_efeat) && feat_len > 64) {  // ge-spmm
-      if (use_efeat && !IsNullArray(csr.data))  // reorder edge data
-        efeat = IndexSelect(efeat, csr.data);
+    if (feat_len > 64) {  // ge-spmm
       SWITCH_OP(op, Op, {
         cuda::GESpMMCsr<IdType, DType, Op>(
-          csr, ufeat, efeat, out, feat_len);
+            bcast, csr, ufeat, efeat, out);
       });
     } else if (sizeof(IdType) == 4 && op == "copy_lhs") {  // cusparse
       int64_t x_length = 1;
