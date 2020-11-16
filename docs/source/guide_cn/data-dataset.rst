@@ -13,7 +13,7 @@
 
     在类DGLDataset中定义的图数据处理管道的流程图。
 
-为了处理位于远程服务器或本地磁盘上的图数据集，在下面的例子中我们定义了一个类，称为 ``MyDataset``,
+为了处理位于远程服务器或本地磁盘上的图数据集，下面的例子中定义了一个类，称为 ``MyDataset``,
 它继承自 :class:`dgl.data.DGLDataset`。
 
 .. code::
@@ -30,7 +30,7 @@
         raw_dir : str
             指定下载数据的存储目录或已下载数据的存储目录。默认: ~/.dgl/
         save_dir : str
-            处理完成的数据集的保存目录。默认：raw_dir
+            处理完成的数据集的保存目录。默认：raw_dir指定的值
         force_reload : bool
             是否重新导入数据集。默认：False
         verbose : bool

@@ -182,7 +182,8 @@ DGL建议使用节点掩码来指定数据集的划分。
 请注意，这里 ``__getitem__(idx)`` 和 ``__len__()`` 的实现也发生了变化，
 这是因为节点分类任务通常只用一个图。掩码在PyTorch和TensorFlow中是bool张量，在MXNet中是float张量。
 
-下面中使用 :class:`dgl.data.CiteseerGraphDataset` 的子类 ``CitationGraphDataset`` 来演示如何使用用于节点分类的数据集：
+下面中使用 :class:`dgl.data.CitationGraphDataset` 的子类 :class:`dgl.data.CiteseerGraphDataset`
+来演示如何使用用于节点分类的数据集：
 
 .. code:: 
 
