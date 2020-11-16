@@ -185,7 +185,7 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
 
 @thread_wrapped_func
 def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
-    dev_id = devices[proc_id]
+    dev_id = devices[proc_id] if devices[proc_id] != 'cpu' else -1
     g, node_feats, num_of_ntype, num_classes, num_rels, target_idx, \
         train_idx, val_idx, test_idx, labels = dataset
     if split is not None:
