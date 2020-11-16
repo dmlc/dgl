@@ -66,13 +66,13 @@ DGL建议让 ``__getitem__(idx)`` 返回如上面代码所示的元组 ``(图，
 以获得 ``self._load_graph()`` 和 ``__getitem__`` 的详细信息。
 
 用户还可以向类添加属性以指示一些有用的数据集信息。在 :class:`~dgl.data.QM7bDataset` 中，
-用户可以添加属性 ``num_labels`` 来指示此多任务数据集中的预测类别总数：
+用户可以添加属性 ``num_labels`` 来指示此多任务数据集中的预测任务总数：
 
 .. code::
 
     @property
     def num_labels(self):
-        """每个图的标签数，即预测类别数。"""
+        """每个图的标签数，即预测任务数。"""
         return 14
 
 在编写完这些代码之后，用户可以按如下所示的方式来使用 :class:`~dgl.data.QM7bDataset`：
