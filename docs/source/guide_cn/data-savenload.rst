@@ -9,8 +9,7 @@ DGL建议用户实现保存和加载数据的函数，将处理后的数据缓�
 这样在多数情况下可以帮用户节省大量的数据处理时间。DGL提供了4个函数让任务变得简单。
 
 -  :func:`dgl.save_graphs` 和 :func:`dgl.load_graphs`: 保存DGLGraph对象和标签到本地磁盘和从本地磁盘读取它们。
--  :func:`dgl.data.utils.save_info` 和 :func:`dgl.data.utils.load_info`: 将数据集的有用信息(python dict对象)
-保存到本地磁盘和从本地磁盘读取它们。
+-  :func:`dgl.data.utils.save_info` 和 :func:`dgl.data.utils.load_info`: 将数据集的有用信息(python dict对象)保存到本地磁盘和从本地磁盘读取它们。
 
 下面的示例显示了如何保存和读取图和数据集信息的列表。
 
