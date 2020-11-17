@@ -2,6 +2,7 @@
 # pylint: disable= no-member, arguments-differ, invalid-name
 import torch as th
 from torch import nn
+from torch.cuda import nvtx
 
 from .... import function as fn
 from .. import utils
@@ -137,6 +138,11 @@ class RelGraphConv(nn.Module):
         self.low_mem = low_mem
         self.layer_norm = layer_norm
 
+        # cached parameters for low mem version
+        self._etypes = None
+        self._loc_per_etype = None
+        self._weights_per_type = None
+
         if regularizer == "basis":
             # add basis weights
             self.weight = nn.Parameter(th.Tensor(self.num_bases, self.in_feat, self.out_feat))
@@ -187,6 +193,7 @@ class RelGraphConv(nn.Module):
 
     def basis_message_func(self, edges):
         """Message function for basis regularizer"""
+        nvtx.range_push("generate_weight")
         if self.num_bases < self.num_rels:
             # generate all weights from bases
             weight = self.weight.view(self.num_bases,
@@ -195,22 +202,45 @@ class RelGraphConv(nn.Module):
                 self.num_rels, self.in_feat, self.out_feat)
         else:
             weight = self.weight
+        nvtx.range_pop()
 
         # calculate msg @ W_r before put msg into edge
         # if src is th.int64 we expect it is an index select
         if edges.src['h'].dtype != th.int64 and self.low_mem:
-            etypes = th.unique(edges.data['type'])
+            nvtx.range_push("low_mem_forward")
+            if self._etypes is None:
+                # cache variables on first pass
+                self._etypes = th.unique(edges.data['type']).cpu()
+
+            self._loc = [th.nonzero(edges.data['type'] == etype) for etype in self._etypes]
+            self._srcs = [edges.src['h'][loc] for loc in self._loc]
+
+            nvtx.range_push("allocate_empty")
             msg = th.empty((edges.src['h'].shape[0], self.out_feat),
                            device=edges.src['h'].device)
-            for etype in etypes:
-                loc = edges.data['type'] == etype
+            nvtx.range_pop()
+            for i, etype in enumerate(self._etypes):
+                nvtx.range_push("select_loc")
+                loc = self._loc[i]
+                nvtx.range_pop()
+                nvtx.range_push("select_weight")
                 w = weight[etype]
-                src = edges.src['h'][loc]
+                nvtx.range_pop()
+                nvtx.range_push("select_src")
+                src = self._srcs[i]
+                nvtx.range_pop()
+                nvtx.range_push("matmul_src_w")
                 sub_msg = th.matmul(src, w)
+                nvtx.range_pop()
+                nvtx.range_push("save_msg_index")
                 msg[loc] = sub_msg
+                nvtx.range_pop()
+            nvtx.range_pop()
         else:
             # put W_r into edges then do msg @ W_r
+            nvtx.range_push("bmm_maybe_select")
             msg = utils.bmm_maybe_select(edges.src['h'], weight, edges.data['type'])
+            nvtx.range_pop()
 
         if 'norm' in edges.data:
             msg = msg * edges.data['norm']

@@ -22,6 +22,8 @@ import dgl
 from dgl import DGLGraph
 from functools import partial
 
+from torch.cuda import nvtx
+
 from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from model import RelGraphEmbedLayer
 from dgl.nn import RelGraphConv
@@ -107,7 +109,9 @@ class EntityClassify(nn.Module):
         h = feats
         for layer, block in zip(self.layers, blocks):
             block = block.to(self.device)
+            nvtx.range_push("layer_forward")
             h = layer(block, h, block.edata['etype'], block.edata['norm'])
+            nvtx.range_pop()
         return h
 
 class NeighborSampler:
@@ -305,21 +309,34 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
         for i, sample_data in enumerate(loader):
             seeds, blocks = sample_data
             t0 = time.time()
+            nvtx.range_push("embed_forward")
             feats = embed_layer(blocks[0].srcdata[dgl.NID],
                                 blocks[0].srcdata[dgl.NTYPE],
                                 blocks[0].srcdata['type_id'],
                                 node_feats)
+            nvtx.range_pop()
             logits = model(blocks, feats)
-            loss = F.cross_entropy(logits, labels[seeds])
+            nvtx.range_push("slice_labels")
+            s_labels = labels[seeds]
+            nvtx.range_pop()
+            nvtx.range_push("cross_entropy_loss")
+            loss = F.cross_entropy(logits, s_labels)
+            nvtx.range_pop()
             t1 = time.time()
+            nvtx.range_push("optimizer.zero_grad")
             optimizer.zero_grad()
             if args.sparse_embedding:
                 emb_optimizer.zero_grad()
+            nvtx.range_pop()
 
+            nvtx.range_push("loss.backward")
             loss.backward()
+            nvtx.range_pop()
+            nvtx.range_push("optimizer.step")
             optimizer.step()
             if args.sparse_embedding:
                 emb_optimizer.step()
+            nvtx.range_pop()
             t2 = time.time()
 
             forward_time.append(t1 - t0)
@@ -328,6 +345,8 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
             if i % 100 and proc_id == 0:
                 print("Train Accuracy: {:.4f} | Train Loss: {:.4f}".
                     format(train_acc, loss.item()))
+            if i >= 10:
+                return
         print("Epoch {:05d}:{:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".
             format(epoch, i, forward_time[-1], backward_time[-1]))
 
