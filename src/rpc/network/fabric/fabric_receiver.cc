@@ -128,8 +128,8 @@ bool FabricReceiver::HandleCompletionEvent(
     msg.deallocator = DefaultMessageDeleter;
     msg_queue_.at((cq_entry.tag & IdMask))->Add(msg);
     int64_t* size_buffer = new int64_t;  // can be optimized with buffer pool
-    fep->Recv(size_buffer, sizeof(int64_t), kSizeMsg, FI_ADDR_UNSPEC, false,
-              0xFFFF);  // can use FI_ADDR_UNSPEC flag
+    fep->Recv(size_buffer, sizeof(int64_t), kSizeMsg | (cq_entry.tag & IdMask),
+              FI_ADDR_UNSPEC, false);  // can use FI_ADDR_UNSPEC flag
   } else {
     if (tag != kIgnoreMsg) {
       LOG(INFO) << "Invalid tag";
@@ -139,13 +139,13 @@ bool FabricReceiver::HandleCompletionEvent(
 }
 
 void FabricReceiver::RecvLoop() {
-  for (size_t i = 0; i < peer_fi_addr.size(); i++) {
+  for (auto& kv : peer_fi_addr) {
     // can be optimized with buffer pool
     // Will be freed in HandleCompletionEvent
     int64_t* size_buffer = new int64_t;
     // Issue recv events
-    fep->Recv(size_buffer, sizeof(int64_t), kSizeMsg, FI_ADDR_UNSPEC, false,
-              0xFFFF);
+    fep->Recv(size_buffer, sizeof(int64_t), kSizeMsg | kv.first,
+              FI_ADDR_UNSPEC);
   }
 
   struct fi_cq_tagged_entry cq_entries[kMaxConcurrentWorkRequest];
