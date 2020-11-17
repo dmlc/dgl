@@ -244,7 +244,9 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
   bool use_efeat = op != "copy_lhs";
 
   if (reduce == "sum") {
-    if (feat_len > 64 && sizeof(DType) * bcast.rhs_len <= 128) {  // ge-spmm
+    if ((!use_efeat || is_scalar_efeat) && feat_len > 64) {  // ge-spmm
+      if (use_efeat && !IsNullArray(csr.data))  // reorder edge data
+        efeat = IndexSelect(efeat, csr.data);
       SWITCH_OP(op, Op, {
         cuda::GESpMMCsr<IdType, DType, Op>(
             bcast, csr, ufeat, efeat, out);
