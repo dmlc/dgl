@@ -59,6 +59,7 @@ include_directories("third_party/dmlc-core/include")
 include_directories("third_party/minigun/minigun")
 include_directories("third_party/minigun/third_party/moderngpu/src")
 include_directories("third_party/phmap/")
+include_directories("third_party/xbyak/")
 
 # initial variables
 set(DGL_LINKER_LIBS "")
