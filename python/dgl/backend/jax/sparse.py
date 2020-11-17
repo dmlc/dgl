@@ -14,38 +14,38 @@ __all__ = ['gspmm', 'gsddmm', 'edge_softmax']
 from ... import utils as dgl_utils
 from ... import heterograph_index
 from ...heterograph_index import HeteroGraphIndex
-
-def _flatten_HeteroGraphIndex(gidx):
-    adj, _ = gidx.adjacency_matrix(
-        etype=0,
-        transpose=False,
-        ctx=jax.devices('cpu')[0],
-    )
-
-    srctype, dsttype = gidx.metagraph.find_edge(0)
-    num_src = gidx.number_of_nodes(srctype)
-    num_dst = gidx.number_of_nodes(dsttype)
-
-    idx = adj.index
-
-    u = idx[0, :]
-    v = idx[1, :]
-    return ((u, v, num_src, num_dst), None)
-
-def _unflatten_HeteroGraphIndex(_, children):
-    u, v, num_src, num_dst = children
-    if u is None or v is None:
-        return None
-
-    return heterograph_index.create_unitgraph_from_coo(
-        1, num_src, num_dst, u, v, ["coo"],
-    )
-
-jax.tree_util.register_pytree_node(
-    HeteroGraphIndex,
-    _flatten_HeteroGraphIndex,
-    _unflatten_HeteroGraphIndex,
-)
+#
+# def _flatten_HeteroGraphIndex(gidx):
+#     adj, _ = gidx.adjacency_matrix(
+#         etype=0,
+#         transpose=False,
+#         ctx=jax.devices('cpu')[0],
+#     )
+#
+#     srctype, dsttype = gidx.metagraph.find_edge(0)
+#     num_src = gidx.number_of_nodes(srctype)
+#     num_dst = gidx.number_of_nodes(dsttype)
+#
+#     idx = adj.index
+#
+#     u = idx[0, :]
+#     v = idx[1, :]
+#     return ((u, v, num_src, num_dst), None)
+#
+# def _unflatten_HeteroGraphIndex(_, children):
+#     u, v, num_src, num_dst = children
+#     if u is None or v is None:
+#         return None
+#
+#     return heterograph_index.create_unitgraph_from_coo(
+#         1, num_src, num_dst, u, v, ["coo"],
+#     )
+#
+# jax.tree_util.register_pytree_node(
+#     HeteroGraphIndex,
+#     _flatten_HeteroGraphIndex,
+#     _unflatten_HeteroGraphIndex,
+# )
 
 # =============================================================================
 # MODULE FUNCTIONS
