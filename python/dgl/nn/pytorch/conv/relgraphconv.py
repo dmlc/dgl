@@ -140,8 +140,6 @@ class RelGraphConv(nn.Module):
 
         # cached parameters for low mem version
         self._etypes = None
-        self._loc_per_etype = None
-        self._weights_per_type = None
 
         if regularizer == "basis":
             # add basis weights
@@ -207,34 +205,35 @@ class RelGraphConv(nn.Module):
         # calculate msg @ W_r before put msg into edge
         # if src is th.int64 we expect it is an index select
         if edges.src['h'].dtype != th.int64 and self.low_mem:
+            device = edges.src['h'].device
             nvtx.range_push("low_mem_forward")
             if self._etypes is None:
                 # cache variables on first pass
-                self._etypes = th.unique(edges.data['type']).cpu()
-
-            self._loc = [th.nonzero(edges.data['type'] == etype) for etype in self._etypes]
-            self._srcs = [edges.src['h'][loc] for loc in self._loc]
+                self._etypes = th.arange(weight.shape[0], device=th.device('cpu')) #th.unique(edges.data['type']).cpu()
 
             nvtx.range_push("allocate_empty")
             msg = th.empty((edges.src['h'].shape[0], self.out_feat),
-                           device=edges.src['h'].device)
+                           device=device)
             nvtx.range_pop()
-            for i, etype in enumerate(self._etypes):
-                nvtx.range_push("select_loc")
-                loc = self._loc[i]
-                nvtx.range_pop()
-                nvtx.range_push("select_weight")
-                w = weight[etype]
-                nvtx.range_pop()
-                nvtx.range_push("select_src")
-                src = self._srcs[i]
-                nvtx.range_pop()
-                nvtx.range_push("matmul_src_w")
-                sub_msg = th.matmul(src, w)
-                nvtx.range_pop()
-                nvtx.range_push("save_msg_index")
-                msg[loc] = sub_msg
-                nvtx.range_pop()
+            nvtx.range_push("build_locs")
+            locs = [th.nonzero(edges.data['type'] == etype) for etype in self._etypes]
+            nvtx.range_pop()
+
+            for etype in self._etypes:
+                loc = locs[etype]
+                if loc.shape[0] > 0:
+                    nvtx.range_push("select_weight")
+                    w = weight[etype]
+                    nvtx.range_pop()
+                    nvtx.range_push("select_src")
+                    src = edges.src['h'][loc]
+                    nvtx.range_pop()
+                    nvtx.range_push("matmul_src_w")
+                    sub_msg = th.matmul(src, w)
+                    nvtx.range_pop()
+                    nvtx.range_push("save_msg_index")
+                    msg[loc] = sub_msg
+                    nvtx.range_pop()
             nvtx.range_pop()
         else:
             # put W_r into edges then do msg @ W_r
