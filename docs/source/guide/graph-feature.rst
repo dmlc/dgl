@@ -27,7 +27,7 @@ features (named ``'x'`` and ``'y'`` in line 5 and 8) and one edge feature (named
           ndata_schemes={'x' : Scheme(shape=(3,), dtype=torch.float32)}
           edata_schemes={'x' : Scheme(shape=(,), dtype=torch.int32)})
     >>> # different names can have different shapes
-    >>> g.ndata['y'] = th.randn(g.num_nodes(), 5)
+    >>> g.ndata['y'] = th.randn(g.num_edges(), 5)
     >>> g.ndata['x'][1]                  # get node 1's feature
     tensor([1., 1., 1.])
     >>> g.edata['x'][th.tensor([0, 3])]  # get features of edge 0 and 3
@@ -60,5 +60,6 @@ For weighted graphs, one can store the weights as an edge feature as below.
     Graph(num_nodes=4, num_edges=4,
           ndata_schemes={}
           edata_schemes={'w' : Scheme(shape=(,), dtype=torch.float32)})
+
 
 See APIs: :py:attr:`~dgl.DGLGraph.ndata`, :py:attr:`~dgl.DGLGraph.edata`.

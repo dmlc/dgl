@@ -84,7 +84,7 @@ nodes/edges of different types have separate IDs.
 .. code::
 
     >>> # Get the number of all nodes in the graph
-    >>> g.num_nodes()
+    >>> g.num_edges()
     10
     >>> # Get the number of drug nodes
     >>> g.num_nodes('drug')
