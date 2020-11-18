@@ -38,6 +38,17 @@ if(USE_CUDA)
   message(STATUS "Build with CUDA support")
   project(dgl C CXX)
   include(cmake/modules/CUDA.cmake)
+  if ((CUDA_VERSION_MAJOR LESS 11) OR
+      ((CUDA_VERSION_MAJOR EQUAL 11) AND (CUDA_VERSION_MINOR EQUAL 0)))
+    # For cuda<11, use external CUB/Thrust library because CUB is not part of CUDA.
+    # For cuda==11.0, use external CUB/Thrust library because there is a bug in the
+    #   official CUB library which causes invalid device ordinal error for DGL. The bug
+    #   is fixed by https://github.com/NVIDIA/cub/commit/9143e47e048641aa0e6ddfd645bcd54ff1059939
+    #   in 11.1.
+    message(STATUS "Detected CUDA of version ${CUDA_VERSION}. Use external CUB/Thrust library.")
+    cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust")
+    cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cub")
+  endif()
 endif(USE_CUDA)
 
 # include directories
@@ -47,8 +58,8 @@ include_directories("third_party/METIS/include/")
 include_directories("third_party/dmlc-core/include")
 include_directories("third_party/minigun/minigun")
 include_directories("third_party/minigun/third_party/moderngpu/src")
-include_directories("third_party/cub/")
 include_directories("third_party/phmap/")
+include_directories("third_party/xbyak/")
 
 # initial variables
 set(DGL_LINKER_LIBS "")
@@ -81,7 +92,10 @@ else(MSVC)
   include(CheckCXXCompilerFlag)
   check_cxx_compiler_flag("-std=c++11"    SUPPORT_CXX11)
   set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
+  # We still use c++11 flag in CPU build because gcc5.4 (our default compiler) is
+  # not fully compatible with c++14 feature.
   set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++11 ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--warn-common ${CMAKE_SHARED_LINKER_FLAGS}")
 endif(MSVC)
 
 if(USE_OPENMP)
