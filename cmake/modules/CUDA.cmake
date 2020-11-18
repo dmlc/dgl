@@ -239,18 +239,30 @@ macro(dgl_config_cuda out_variable)
     src/geometry/cuda/*.cu
   )
 
+  # NVCC flags
+  # Manually set everything
+  set(CUDA_PROPAGATE_HOST_FLAGS OFF)
+
+  # 0. Add host flags
+  message(STATUS "${CMAKE_CXX_FLAGS}")
+  string(REGEX REPLACE "[ \t\n\r]" "," CXX_HOST_FLAGS "${CMAKE_CXX_FLAGS}")
+  list(APPEND CUDA_NVCC_FLAGS "-Xcompiler ,${CXX_HOST_FLAGS}")
+
+  # 1. Add arch flags
   dgl_select_nvcc_arch_flags(NVCC_FLAGS_ARCH)
-  string(REPLACE ";" " " NVCC_FLAGS_ARCH "${NVCC_FLAGS_ARCH}")
-  set(NVCC_FLAGS_EXTRA ${NVCC_FLAGS_ARCH})
-  # for lambda support in moderngpu
-  set(NVCC_FLAGS_EXTRA "${NVCC_FLAGS_EXTRA} --expt-extended-lambda")
-  # suppress deprecated warning in moderngpu
-  set(NVCC_FLAGS_EXTRA "${NVCC_FLAGS_EXTRA} -Wno-deprecated-declarations")
-  # for compile with c++14
-  set(NVCC_FLAGS_EXTRA "${NVCC_FLAGS_EXTRA} --expt-extended-lambda --std=c++14")
-  message(STATUS "NVCC extra flags: ${NVCC_FLAGS_EXTRA}")
-  set(CUDA_NVCC_FLAGS  "${CUDA_NVCC_FLAGS} ${NVCC_FLAGS_EXTRA}")
-  list(APPEND CMAKE_CUDA_FLAGS "${NVCC_FLAGS_EXTRA}")
+  list(APPEND CUDA_NVCC_FLAGS ${NVCC_FLAGS_ARCH})
+
+  # 2. flags in third_party/moderngpu
+  list(APPEND CUDA_NVCC_FLAGS "--expt-extended-lambda;-Wno-deprecated-declarations")
+
+
+  # 3. CUDA 11 requires c++14 by default
+  include(CheckCXXCompilerFlag)
+  check_cxx_compiler_flag("-std=c++14"    SUPPORT_CXX14)
+  string(REPLACE "-std=c++11" "" CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}")
+  list(APPEND CUDA_NVCC_FLAGS "--std=c++14")
+
+  message(STATUS "CUDA flags: ${CUDA_NVCC_FLAGS}")
 
   list(APPEND DGL_LINKER_LIBS
     ${CUDA_CUDART_LIBRARY}

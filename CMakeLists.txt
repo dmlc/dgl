@@ -59,6 +59,7 @@ include_directories("third_party/dmlc-core/include")
 include_directories("third_party/minigun/minigun")
 include_directories("third_party/minigun/third_party/moderngpu/src")
 include_directories("third_party/phmap/")
+include_directories("third_party/xbyak/")
 
 # initial variables
 set(DGL_LINKER_LIBS "")
@@ -89,9 +90,11 @@ if(MSVC)
   endif()
 else(MSVC)
   include(CheckCXXCompilerFlag)
-  check_cxx_compiler_flag("-std=c++14"    SUPPORT_CXX14)
+  check_cxx_compiler_flag("-std=c++11"    SUPPORT_CXX11)
   set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
-  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++14 ${CMAKE_CXX_FLAGS}")
+  # We still use c++11 flag in CPU build because gcc5.4 (our default compiler) is
+  # not fully compatible with c++14 feature.
+  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++11 ${CMAKE_CXX_FLAGS}")
   set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--warn-common ${CMAKE_SHARED_LINKER_FLAGS}")
 endif(MSVC)
 
