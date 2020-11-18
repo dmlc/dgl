@@ -8,8 +8,8 @@
 如果用户的数据集已经在本地磁盘中，请确保它被存放在目录 ``raw_dir`` 中。
 如果用户想在任何地方运行代码而又不想自己下载数据并将其移动到正确的目录中，则可以通过实现函数 ``download()`` 来自动完成。
 
-如果数据集是一个zip文件，请让 ``MyDataset`` 继承 :class:`dgl.data.DGLBuiltinDataset` 类。该类可以处理zip文件的解压缩。
-不然的话，用户需要实现 ``download()``，具体可以参考 :class:`~dgl.data.QM7bDataset` 类：
+如果数据集是一个zip文件，可以直接继承 :class:`dgl.data.DGLBuiltinDataset` 类。后者支持解压缩zip文件。
+否则用户需要自己实现 ``download()``，具体可以参考 :class:`~dgl.data.QM7bDataset` 类：
 
 .. code:: 
 

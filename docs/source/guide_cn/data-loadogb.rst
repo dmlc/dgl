@@ -5,7 +5,7 @@
 
 :ref:`(English Version) <guide-data-pipeline-loadogb>`
 
-`Open Graph Benchmark (OGB) <https://ogb.stanford.edu/docs/home/>`__ 是一个基准数据集的集合。
+`Open Graph Benchmark (OGB) <https://ogb.stanford.edu/docs/home/>`__ 是一个图深度学习的基准数据集。
 官方的 `ogb <https://github.com/snap-stanford/ogb>`__ 包提供了用于下载和处理OGB数据集到
 :class:`dgl.data.DGLGraph` 对象的API。本节会介绍它们的基本用法。
 

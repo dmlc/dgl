@@ -8,7 +8,7 @@
 在NN模块中， ``forward()`` 函数执行了实际的消息传递和计算。与通常以张量为参数的PyTorch NN模块相比，
 DGL NN模块额外增加了1个参数 :class:`dgl.DGLGraph`。``forward()`` 函数的内容一般可以分为3项操作：
 
--  图检验和图类型规范。
+-  检测输入图对象是否符合规范。
 
 -  消息传递和聚合。
 
@@ -16,7 +16,7 @@ DGL NN模块额外增加了1个参数 :class:`dgl.DGLGraph`。``forward()`` 函�
 
 下文展示了SAGEConv示例中的 ``forward()`` 函数。
 
-图检验和图类型规范
+输入图对象的规范检测
 ~~~~~~~~~~~~~~~~~~~~~
 
 .. code::
@@ -26,9 +26,10 @@ DGL NN模块额外增加了1个参数 :class:`dgl.DGLGraph`。``forward()`` 函�
                 # 指定图类型，然后根据图类型扩展输入特征
                 feat_src, feat_dst = expand_as_pair(feat, graph)
 
-``forward()`` 函数需要处理输入的许多极端情况，这些情况可能导致计算和消息传递中的值无效。在 :class:`~dgl.nn.pytorch.conv.GraphConv` 等conv模块中，
-一个典型的检验任务是检查输入图中是否有入度为0的节点。当1个节点入度为0时， ``mailbox`` 将为空，并且聚合函数的输出值全为0，
-这可能会导致模型性能出现不易被发现的退化。但是，在 :class:`~dgl.nn.pytorch.conv.SAGEConv` 模块中，被聚合的表征将会与节点的初始特征连接起来，
+``forward()`` 函数需要处理输入的许多极端情况，这些情况可能导致计算和消息传递中的值无效。
+比如在 :class:`~dgl.nn.pytorch.conv.GraphConv` 等conv模块中，DGL会检查输入图中是否有入度为0的节点。
+当1个节点入度为0时， ``mailbox`` 将为空，并且聚合函数的输出值全为0，
+这可能会导致模型性能不佳。但是，在 :class:`~dgl.nn.pytorch.conv.SAGEConv` 模块中，被聚合的特征将会与节点的初始特征拼接起来，
 ``forward()`` 函数的输出不会全为0。在这种情况下，无需进行此类检验。
 
 DGL NN模块可在不同类型的图输入中重复使用，包括：同构图、异构图（:ref:`guide_cn-graph-heterogeneous`）和子图区块（:ref:`guide-minibatch`）。
@@ -79,7 +80,7 @@ SAGEConv的数学公式如下：
 当输入特征 ``feat`` 是1个元组时，图将会被视为二分图。元组中的第1个元素为源节点特征，第2个元素为目标节点特征。
 
 在小批次训练中，计算应用于给定的一堆目标节点所采样的子图。子图在DGL中称为区块(``block``)。
-在区块创建的阶段，``dst nodes`` 位于节点列表的最前面。通过索引 ``[0:g.number_dst_nodes()]`` 可以找到 ``feat_dst``。
+在区块创建的阶段，``dst nodes`` 位于节点列表的最前面。通过索引 ``[0:g.number_of_dst_nodes()]`` 可以找到 ``feat_dst``。
 
 确定 ``feat_src`` 和 ``feat_dst`` 之后，以上3种图类型的计算方法是相同的。
 

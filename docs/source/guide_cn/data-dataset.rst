@@ -6,12 +6,12 @@
 :ref:`(English Version) <guide-data-pipeline-dataset>`
 
 :class:`~dgl.data.DGLDataset` 是处理、导入和保存 :ref:`apidata` 中定义的图数据集的基类。
-它实现了用于处理图数据的基本管道。下面的流程图展示了管道的工作方式。
+它实现了用于处理图数据的基本模版。下面的流程图展示了这个模版的工作方式。
 
 .. figure:: https://data.dgl.ai/asset/image/userguide_data_flow.png
     :align: center
 
-    在类DGLDataset中定义的图数据处理管道的流程图。
+    在类DGLDataset中定义的图数据处理模版的流程图。
 
 为了处理位于远程服务器或本地磁盘上的图数据集，下面的例子中定义了一个类，称为 ``MyDataset``,
 它继承自 :class:`dgl.data.DGLDataset`。
@@ -86,4 +86,4 @@
 用户可以存储有关数据集的图、特征、标签、掩码，以及诸如类别数、标签数等基本信息。
 诸如采样、划分或特征归一化等操作建议在 :class:`~dgl.data.DGLDataset` 子类之外完成。
 
-本章的后续部分展示了在管道中实现这些函数的最佳实践。
+本章的后续部分展示了实现这些函数的最佳实践。

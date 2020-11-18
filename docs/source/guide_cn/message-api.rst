@@ -5,12 +5,12 @@
 
 :ref:`(English Version) <guide-message-passing-api>`
 
-在DGL中，**消息函数** 接受一个参数 ``edges``，它是一个 :class:`~dgl.udf.EdgeBatch` 的实例。
-在消息传递时，DGL在内部生成以表示一批边。 ``edges`` 有 ``src``、 ``dst`` 和 ``data`` 共3个成员属性，
+在DGL中，**消息函数** 接受一个参数 ``edges``，这是一个 :class:`~dgl.udf.EdgeBatch` 的实例，
+在消息传递时，它被DGL在内部生成以表示一批边。 ``edges`` 有 ``src``、 ``dst`` 和 ``data`` 共3个成员属性，
 分别用于访问源节点、目标节点和边的特征。
 
-**聚合函数** 接受一个参数 ``nodes``，它是一个 :class:`~dgl.udf.NodeBatch` 的实例。
-在消息传递时，DGL在内部生成以表示一批节点。 ``nodes`` 的成员属性 ``mailbox`` 可以用来访问节点收到的消息。
+**聚合函数** 接受一个参数 ``nodes``，这是一个 :class:`~dgl.udf.NodeBatch` 的实例，
+在消息传递时，它被DGL在内部生成以表示一批节点。 ``nodes`` 的成员属性 ``mailbox`` 可以用来访问节点收到的消息。
 一些最常见的聚合操作包括 ``sum``、``max``、``min`` 等。
 
 **更新函数** 接受一个如上所述的参数 ``nodes``。此函数对 ``聚合函数`` 的聚合结果进行操作，

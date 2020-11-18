@@ -99,7 +99,7 @@ In mini-batch training, the computing is applied on a subgraph sampled
 based on a bunch of destination nodes. The subgraph is called as
 ``block`` in DGL. In the block creation phase,
 ``dst nodes`` are in the front of the node list. One can find the
-``feat_dst`` by the index ``[0:g.number_dst_nodes()]``.
+``feat_dst`` by the index ``[0:g.number_of_dst_nodes()]``.
 
 After determining ``feat_src`` and ``feat_dst``, the computing for the
 above three graph types are the same.
