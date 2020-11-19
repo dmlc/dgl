@@ -3,6 +3,8 @@
 4.3 Process data
 ----------------
 
+:ref:`(中文版) <guide_cn-data-pipeline-process>`
+
 One can implement the data processing code in function ``process()``, and it
 assumes that the raw data is located in ``self.raw_dir`` already. There
 are typically three types of tasks in machine learning on graphs: graph

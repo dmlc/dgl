@@ -3,6 +3,8 @@
 4.1 DGLDataset class
 --------------------
 
+:ref:`(中文版) <guide_cn-data-pipeline-dataset>`
+
 :class:`~dgl.data.DGLDataset` is the base class for processing, loading and saving
 graph datasets defined in :ref:`apidata`. It implements the basic pipeline
 for processing graph data. The following flow chart shows how the

@@ -3,6 +3,8 @@
 2.2 Writing Efficient Message Passing Code
 ------------------------------------------
 
+:ref:`(中文版) <guide_cn-message-passing-efficient>`
+
 DGL optimizes memory consumption and computing speed for message
 passing. The optimization includes:
 

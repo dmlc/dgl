@@ -3,6 +3,8 @@
 3.2 DGL NN Module Forward Function
 ----------------------------------
 
+:ref:`(中文版) <guide_cn-nn-forward>`
+
 In NN module, ``forward()`` function does the actual message passing and
 computation. Compared with PyTorch’s NN module which usually takes
 tensors as the parameters, DGL NN module takes an additional parameter
@@ -60,7 +62,7 @@ The math formulas for SAGEConv are:
 
 One needs to specify the source node feature ``feat_src`` and destination
 node feature ``feat_dst`` according to the graph type.
-:meth:``~dgl.utils.expand_as_pair`` is a function that specifies the graph
+:meth:`~dgl.utils.expand_as_pair` is a function that specifies the graph
 type and expand ``feat`` into ``feat_src`` and ``feat_dst``.
 The detail of this function is shown below.
 
@@ -95,9 +97,7 @@ element will be the destination node feature.
 
 In mini-batch training, the computing is applied on a subgraph sampled
 based on a bunch of destination nodes. The subgraph is called as
-``block`` in DGL. After message passing, only those destination nodes
-will be updated since they have the same neighborhood as the one they
-have in the original full graph. In the block creation phase,
+``block`` in DGL. In the block creation phase,
 ``dst nodes`` are in the front of the node list. One can find the
 ``feat_dst`` by the index ``[0:g.number_of_dst_nodes()]``.
 
@@ -120,7 +120,7 @@ Message passing and reducing
                 elif self._aggre_type == 'gcn':
                     check_eq_shape(feat)
                     graph.srcdata['h'] = feat_src
-                    graph.dstdata['h'] = feat_dst     # same as above if homogeneous
+                    graph.dstdata['h'] = feat_dst
                     graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'neigh'))
                     # divide in_degrees
                     degs = graph.in_degrees().to(feat_dst)

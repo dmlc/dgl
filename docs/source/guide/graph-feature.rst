@@ -61,4 +61,5 @@ For weighted graphs, one can store the weights as an edge feature as below.
           ndata_schemes={}
           edata_schemes={'w' : Scheme(shape=(,), dtype=torch.float32)})
 
+
 See APIs: :py:attr:`~dgl.DGLGraph.ndata`, :py:attr:`~dgl.DGLGraph.edata`.
