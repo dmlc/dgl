@@ -43,6 +43,8 @@ DGL支持内置的聚合函数 ``sum``、 ``max``、 ``min`` 和 ``mean`` 操作
     def reduce_func(nodes):
          return {'h': torch.sum(nodes.mailbox['m'], dim=1)}
 
+关于用户定义函数的进阶用法，参见 :ref:`apiudf`。
+
 在DGL中，也可以在不涉及消息传递的情况下，通过 :meth:`~dgl.DGLGraph.apply_edges` 单独调用逐边计算。
 :meth:`~dgl.DGLGraph.apply_edges` 的参数是一个消息函数。并且在默认情况下，这个接口将更新所有的边。例如：
 
