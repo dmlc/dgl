@@ -20,17 +20,179 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 import dgl
 from dgl import DGLGraph
+import dgl.function as fn
 from functools import partial
 
 from torch.cuda import nvtx
 
 from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from model import RelGraphEmbedLayer
-from dgl.nn import RelGraphConv
+#from dgl.nn import RelGraphConv
 from utils import thread_wrapped_func
 import tqdm 
 
 from ogb.nodeproppred import DglNodePropPredDataset
+
+
+class RelGraphConvLowMem(nn.Module):
+    def __init__(self,
+                 in_feat,
+                 out_feat,
+                 num_rels,
+                 regularizer="basis",
+                 num_bases=None,
+                 bias=True,
+                 activation=None,
+                 self_loop=True,
+                 low_mem=False,
+                 dropout=0.0,
+                 layer_norm=False):
+        super(RelGraphConvLowMem, self).__init__()
+        self.in_feat = in_feat
+        self.out_feat = out_feat
+        self.num_rels = num_rels
+        self.regularizer = regularizer
+        self.num_bases = num_bases
+        if self.num_bases is None or self.num_bases > self.num_rels or self.num_bases <= 0:
+            self.num_bases = self.num_rels
+        self.bias = bias
+        self.activation = activation
+        self.self_loop = self_loop
+        self.low_mem = low_mem
+        self.layer_norm = layer_norm
+
+        assert low_mem
+        assert regularizer == "basis"
+
+        # cached parameters for low mem version
+        self._etypes = None
+
+        if regularizer == "basis":
+            # add basis weights
+            self.weight = nn.Parameter(th.Tensor(self.num_bases, self.in_feat, self.out_feat))
+            if self.num_bases < self.num_rels:
+                # linear combination coefficients
+                self.w_comp = nn.Parameter(th.Tensor(self.num_rels, self.num_bases))
+            nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+            if self.num_bases < self.num_rels:
+                nn.init.xavier_uniform_(self.w_comp,
+                                        gain=nn.init.calculate_gain('relu'))
+            # message func
+            self.message_func = self.basis_message_func
+        elif regularizer == "bdd":
+            if in_feat % self.num_bases != 0 or out_feat % self.num_bases != 0:
+                raise ValueError(
+                    'Feature size must be a multiplier of num_bases (%d).'
+                    % self.num_bases
+                )
+            # add block diagonal weights
+            self.submat_in = in_feat // self.num_bases
+            self.submat_out = out_feat // self.num_bases
+
+            # assuming in_feat and out_feat are both divisible by num_bases
+            self.weight = nn.Parameter(th.Tensor(
+                self.num_rels, self.num_bases * self.submat_in * self.submat_out))
+            nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+            # message func
+            self.message_func = self.bdd_message_func
+        else:
+            raise ValueError("Regularizer must be either 'basis' or 'bdd'")
+
+        # bias
+        if self.bias:
+            self.h_bias = nn.Parameter(th.Tensor(out_feat))
+            nn.init.zeros_(self.h_bias)
+
+        # layer norm
+        if self.layer_norm:
+            self.layer_norm_weight = nn.LayerNorm(out_feat, elementwise_affine=True)
+
+        # weight for self loop
+        if self.self_loop:
+            self.loop_weight = nn.Parameter(th.Tensor(in_feat, out_feat))
+            nn.init.xavier_uniform_(self.loop_weight,
+                                    gain=nn.init.calculate_gain('relu'))
+
+        self.dropout = nn.Dropout(dropout)
+
+    def basis_message_func(self, edges):
+        """Message function for basis regularizer"""
+        nvtx.range_push("generate_weight")
+        if self.num_bases < self.num_rels:
+            # generate all weights from bases
+            weight = self.weight.view(self.num_bases,
+                                      self.in_feat * self.out_feat)
+            weight = th.matmul(self.w_comp, weight).view(
+                self.num_rels, self.in_feat, self.out_feat)
+        else:
+            weight = self.weight
+        nvtx.range_pop()
+
+        # calculate msg @ W_r before put msg into edge
+        # if src is th.int64 we expect it is an index select
+        device = edges.src['h'].device
+        nvtx.range_push("low_mem_forward")
+
+        nvtx.range_push("split")
+        h = th.split(edges.src['h'], self.section)
+        nvtx.range_pop()
+
+        msg = []
+        for etype in range(self.num_rels):
+            if h[etype].shape[0] == 0:
+                continue
+            nvtx.range_push("select_weight")
+            w = weight[etype]
+            nvtx.range_pop()
+
+            nvtx.range_push("matmul_src_w")
+            sub_msg = th.matmul(h[etype], w)
+            nvtx.range_pop()
+
+            msg.append(sub_msg)
+
+        nvtx.range_push("concat")
+        msg = th.cat(msg)
+        nvtx.range_pop()
+
+        nvtx.range_pop()  # layer forward
+
+        if 'norm' in edges.data:
+            msg = msg * edges.data['norm']
+        return {'msg': msg}
+
+    def forward(self, g, feat, etypes, norm, section):
+        with g.local_scope():
+            g.srcdata['h'] = feat
+            g.edata['type'] = etypes
+            if norm is not None:
+                g.edata['norm'] = norm
+            if self.self_loop:
+                loop_message = matmul_maybe_select(feat[:g.number_of_dst_nodes()], self.loop_weight)
+            # message passing
+            self.section = section
+            g.update_all(self.message_func, fn.sum(msg='msg', out='h'))
+            self.section = None
+            # apply bias and activation
+            node_repr = g.dstdata['h']
+            if self.layer_norm:
+                node_repr = self.layer_norm_weight(node_repr)
+            if self.bias:
+                node_repr = node_repr + self.h_bias
+            if self.self_loop:
+                node_repr = node_repr + loop_message
+            if self.activation:
+                node_repr = self.activation(node_repr)
+            node_repr = self.dropout(node_repr)
+            return node_repr
+
+
+def matmul_maybe_select(A, B):
+    if A.dtype == th.int64 and len(A.shape) == 1:
+        return B.index_select(0, A)
+    else:
+        return th.matmul(A, B)
+
 
 class EntityClassify(nn.Module):
     """ Entity classification class for RGCN
@@ -85,22 +247,24 @@ class EntityClassify(nn.Module):
 
         self.layers = nn.ModuleList()
         # i2h
-        self.layers.append(RelGraphConv(
+        self.layers.append(RelGraphConvLowMem(
             self.h_dim, self.h_dim, self.num_rels, "basis",
             self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
             low_mem=self.low_mem, dropout=self.dropout, layer_norm = layer_norm))
         # h2h
         for idx in range(self.num_hidden_layers):
-            self.layers.append(RelGraphConv(
+            self.layers.append(RelGraphConvLowMem(
                 self.h_dim, self.h_dim, self.num_rels, "basis",
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
                 low_mem=self.low_mem, dropout=self.dropout, layer_norm = layer_norm))
         # h2o
-        self.layers.append(RelGraphConv(
+        self.layers.append(RelGraphConvLowMem(
             self.h_dim, self.out_dim, self.num_rels, "basis",
             self.num_bases, activation=None,
             self_loop=self.use_self_loop,
             low_mem=self.low_mem, layer_norm = layer_norm))
+
+        self.relids = th.arange(num_rels).to(self.device)
 
     def forward(self, blocks, feats, norm=None):
         if blocks is None:
@@ -108,11 +272,34 @@ class EntityClassify(nn.Module):
             blocks = [self.g] * len(self.layers)
         h = feats
         for layer, block in zip(self.layers, blocks):
-            block = block.to(self.device)
+            block, section = sort_block_by_etype(block.to(self.device), self.relids)
             nvtx.range_push("layer_forward")
-            h = layer(block, h, block.edata['etype'], block.edata['norm'])
+            h = layer(block, h, block.edata['etype'], block.edata['norm'], section)
             nvtx.range_pop()
         return h
+
+def sort_block_by_etype(block, relids):
+    # Return a block with edges sorted by etype and also the number of edges
+    # in each type.
+    etype = block.edata['etype']
+    nvtx.range_push("sort")
+    sorted_etype, index = th.sort(etype)
+    nvtx.range_pop()
+
+    nvtx.range_push("edge_subgraph")
+    newblock = dgl.edge_subgraph(block, index, preserve_nodes=True)
+    nvtx.range_pop()
+
+    nvtx.range_push("sorted_search")
+    pos = th.searchsorted(sorted_etype, relids)
+    nvtx.range_pop()
+
+    nvtx.range_push("compute section")
+    num = th.tensor([len(etype)]).to(etype.device)
+    section = list(th.cat([pos[1:], num]) - pos)
+    nvtx.range_pop()
+
+    return newblock, section
 
 class NeighborSampler:
     """Neighbor sampler
