@@ -3,6 +3,8 @@
 Chapter 2: Message Passing
 ==========================
 
+:ref:`(中文版) <guide_cn-message-passing>`
+
 Message Passing Paradigm
 ------------------------
 
