@@ -58,6 +58,8 @@ to the Reduce UDF that sums up the message ``m``:
     def reduce_func(nodes):
          return {'h': torch.sum(nodes.mailbox['m'], dim=1)}
 
+For advanced usage of UDF, see :ref:`apiudf`.
+
 It is also possible to invoke only edge-wise computation by :meth:`~dgl.DGLGraph.apply_edges`
 without invoking message passing. :meth:`~dgl.DGLGraph.apply_edges` takes a message function
 for parameter and by default updates the features of all edges. For example:
