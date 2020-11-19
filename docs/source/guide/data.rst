@@ -3,6 +3,8 @@
 Chapter 4: Graph Data Pipeline
 ==============================
 
+:ref:`(中文版) <guide_cn-data-pipeline>`
+
 DGL implements many commonly used graph datasets in :ref:`apidata`. They
 follow a standard pipeline defined in class :class:`dgl.data.DGLDataset`. DGL highly
 recommends processing graph data into a :class:`dgl.data.DGLDataset` subclass, as the

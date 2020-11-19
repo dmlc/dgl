@@ -3,6 +3,8 @@
 2.3 Apply Message Passing On Part Of The Graph
 ----------------------------------------------
 
+:ref:`(中文版) <guide_cn-message-passing-part>`
+
 If one only wants to update part of the nodes in the graph, the practice
 is to create a subgraph by providing the IDs for the nodes to
 include in the update, then call :meth:`~dgl.DGLGraph.update_all` on the
