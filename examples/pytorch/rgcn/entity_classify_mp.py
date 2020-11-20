@@ -477,9 +477,9 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                 dense_params += list(embed_layer.embeds.parameters())
         optimizer = th.optim.Adam(dense_params, lr=args.lr, weight_decay=args.l2norm)
         if  n_gpus > 1:
-            emb_optimizer = th.optim.SparseAdam(embed_layer.module.node_embeds.parameters(), lr=args.lr)
+            emb_optimizer = th.optim.SparseAdam(list(embed_layer.module.node_embeds.parameters()), lr=args.lr)
         else:
-            emb_optimizer = th.optim.SparseAdam(embed_layer.node_embeds.parameters(), lr=args.lr)
+            emb_optimizer = th.optim.SparseAdam(list(embed_layer.node_embeds.parameters()), lr=args.lr)
     else:
         all_params = list(model.parameters()) + list(embed_layer.parameters())
         optimizer = th.optim.Adam(all_params, lr=args.lr, weight_decay=args.l2norm)
@@ -516,9 +516,12 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                 emb_optimizer.zero_grad()
             nvtx.range_pop()
 
+            t0 = time.time()
             nvtx.range_push("loss.backward")
             loss.backward()
             nvtx.range_pop()
+            t1 = time.time()
+            print('backward time:', (t1 - t0))
             nvtx.range_push("optimizer.step")
             optimizer.step()
             if args.sparse_embedding:

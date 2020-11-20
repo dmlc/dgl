@@ -117,6 +117,10 @@ class RelGraphEmbedLayer(nn.Module):
         tensor
             embeddings as the input of the next layer
         """
+        return self.node_embeds(node_ids).to(self.dev_id)
+
+        '''
+        # old logic
         tsd_ids = node_ids.to(self.node_embeds.weight.device)
         embeds = th.empty(node_ids.shape[0], self.embed_size, device=self.dev_id)
         for ntype in range(self.num_of_ntype):
@@ -128,3 +132,4 @@ class RelGraphEmbedLayer(nn.Module):
                 embeds[loc] = self.node_embeds(tsd_ids[loc]).to(self.dev_id)
 
         return embeds
+        '''
