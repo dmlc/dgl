@@ -6,6 +6,8 @@
 #ifndef DGL_ARRAY_CUDA_FUNCTOR_CUH_
 #define DGL_ARRAY_CUDA_FUNCTOR_CUH_
 
+#include "./atomic.cuh"
+
 namespace dgl {
 namespace aten {
 namespace cuda {

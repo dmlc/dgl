@@ -18,11 +18,11 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
              NDArray efeat,
              NDArray out,
              std::vector<NDArray> out_aux) {
-  if (reduce == "sum") {
+  if (op == "sum") {
     SWITCH_OP(op, Op, {
       cpu::SpMMSumCsr<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
     });
-  } else if (reduce == "max" || reduce == "min") {
+  } else if (op == "max" || op == "min") {
     SWITCH_OP(op, Op, {
       if (reduce == "max")
         cpu::SpMMCmpCsr<IdType, DType, Op, cpu::op::Max<DType>>(
@@ -32,7 +32,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
             bcast, csr, ufeat, efeat, out, out_aux[0], out_aux[1]);
     });
   } else {
-    LOG(FATAL) << "Unsupported SpMM reducer: " << reduce;
+    LOG(FATAL) << "Unsupported SpMM reducer: " << op;
   }
 }
 

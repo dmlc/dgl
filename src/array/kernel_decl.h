@@ -66,6 +66,24 @@ void SDDMMCoo(const std::string& op,
               int lhs_target,
               int rhs_target);
 
+/*!
+ * \brief Segment reduce.
+ */
+template <int XPU, typename IdType, typename DType>
+void SegmentReduce(const std::string& op,
+                   NDArray feat,
+                   NDArray offsets,
+                   NDArray out,
+                   NDArray arg);
+
+/*
+ * \brief
+ */
+template <int XPU, typename IdType, typename DType>
+void SegmentBcast(NDArray feat,
+                  NDArray offsets,
+                  NDArray out);
+
 }  // namespace aten
 }  // namespace dgl
 
