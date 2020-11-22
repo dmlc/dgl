@@ -76,13 +76,13 @@ void SegmentReduce(const std::string& op,
                    NDArray out,
                    NDArray arg);
 
-/*
- * \brief
+/*!
+ * \brief Backward function of segment cmp.
  */
 template <int XPU, typename IdType, typename DType>
-void SegmentBcast(NDArray feat,
-                  NDArray offsets,
-                  NDArray out);
+void BackwardSegmentCmp(NDArray feat,
+                        NDArray arg,
+                        NDArray out);
 
 }  // namespace aten
 }  // namespace dgl

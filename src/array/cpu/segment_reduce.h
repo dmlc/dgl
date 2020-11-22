@@ -58,20 +58,19 @@ void SegmentCmp(NDArray feat, NDArray offsets,
 }
 
 template <typename IdType, typename DType>
-void SegmentBcast(NDArray feat, NDArray offsets, NDArray out) {
-  int n = out->shape[0];
+void BackwardSegmentCmp(NDArray feat, NDArray arg, NDArray out) {
+  int n = feat->shape[0];
   int dim = 1;
   for (int i = 1; i < out->ndim; ++i)
     dim *= out->shape[i];
   const DType* feat_data = feat.Ptr<DType>();
-  const IdType* offsets_data = offsets.Ptr<IdType>();
+  const IdType* arg_data = arg.Ptr<IdType>();
   DType* out_data = out.Ptr<DType>();
 #pragma omp parallel for
   for (int i = 0; i < n; ++i) {
-    for (IdType j = offsets_data[i]; j < offsets_data[i + 1]; ++j) {
-      for (int k = 0; k < dim; ++k) {
-        out_data[j * dim + k] = feat_data[i * dim + k];
-      }
+    for (int k = 0; k < dim; ++k) {
+#pragma omp atomic
+      out_data[arg_data[i * dim + k] * dim + k] += feat_data[i * dim + k];
     }
   }
 }

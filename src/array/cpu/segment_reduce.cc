@@ -33,13 +33,13 @@ void SegmentReduce(
   }
 }
 
-/*! \brief Segment broadcast operator. */
+/*! \brief Backward function of segment cmp.*/
 template <int XPU, typename IdType, typename DType>
-void SegmentBcast(
+void BackwardSegmentCmp(
     NDArray feat,
-    NDArray offsets,
+    NDArray arg,
     NDArray out) {
-  cpu::SegmentBcast<IdType, DType>(feat, offsets, out);
+  cpu::BackwardSegmentCmp<IdType, DType>(feat, arg, out);
 }
 
 template void SegmentReduce<kDLCPU, int32_t, float>(
@@ -66,21 +66,21 @@ template void SegmentReduce<kDLCPU, int64_t, double>(
     NDArray offsets,
     NDArray out,
     NDArray arg);
-template void SegmentBcast<kDLCPU, int32_t, float>(
+template void BackwardSegmentCmp<kDLCPU, int32_t, float>(
     NDArray feat,
-    NDArray offsets,
+    NDArray arg,
     NDArray out);
-template void SegmentBcast<kDLCPU, int64_t, float>(
+template void BackwardSegmentCmp<kDLCPU, int64_t, float>(
     NDArray feat,
-    NDArray offsets,
+    NDArray arg,
     NDArray out);
-template void SegmentBcast<kDLCPU, int32_t, double>(
+template void BackwardSegmentCmp<kDLCPU, int32_t, double>(
     NDArray feat,
-    NDArray offsets,
+    NDArray arg,
     NDArray out);
-template void SegmentBcast<kDLCPU, int64_t, double>(
+template void BackwardSegmentCmp<kDLCPU, int64_t, double>(
     NDArray feat,
-    NDArray offsets,
+    NDArray arg,
     NDArray out);
 
 } // namespace aten

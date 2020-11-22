@@ -34,10 +34,10 @@ void SegmentReduce(const std::string& op,
 }
 
 template <int XPU, typename IdType, typename DType>
-void SegmentBcast(NDArray feat,
-                  NDArray offsets,
-                  NDArray out) {
-  cuda::SegmentBcast<IdType, DType>(feat, offsets, out);
+void BackwardSegmentCmp(NDArray feat,
+                        NDArray arg,
+                        NDArray out) {
+  cuda::BackwardSegmentCmp<IdType, DType>(feat, arg, out);
 }
 
 template void SegmentReduce<kDLGPU, int32_t, float>(
@@ -64,21 +64,21 @@ template void SegmentReduce<kDLGPU, int64_t, double>(
     NDArray offsets,
     NDArray out,
     NDArray arg);
-template void SegmentBcast<kDLGPU, int32_t, float>(
+template void BackwardSegmentCmp<kDLGPU, int32_t, float>(
     NDArray feat,
-    NDArray offsets,
+    NDArray arg,
     NDArray out);
-template void SegmentBcast<kDLGPU, int64_t, float>(
+template void BackwardSegmentCmp<kDLGPU, int64_t, float>(
     NDArray feat,
-    NDArray offsets,
+    NDArray arg,
     NDArray out);
-template void SegmentBcast<kDLGPU, int32_t, double>(
+template void BackwardSegmentCmp<kDLGPU, int32_t, double>(
     NDArray feat,
-    NDArray offsets,
+    NDArray arg,
     NDArray out);
-template void SegmentBcast<kDLGPU, int64_t, double>(
+template void BackwardSegmentCmp<kDLGPU, int64_t, double>(
     NDArray feat,
-    NDArray offsets,
+    NDArray arg,
     NDArray out);
 
 }  // namespace aten

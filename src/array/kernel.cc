@@ -140,14 +140,12 @@ void SegmentReduceDispatch(const std::string& op,
   });
 }
 
-/*! \brief Segment broadcast dispatch function. */
-void SegmentBcastDispatch(NDArray feat,
-                          NDArray offsets,
-                          NDArray out) {
-  ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "SegmentBcast", {
-    ATEN_ID_TYPE_SWITCH(offsets->dtype, IdType, {
+/*! \brief Backward segment cmp dispatch function.*/
+void BackwardSegmentCmpDispatch(NDArray feat, NDArray arg, NDArray out) {
+  ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "BackwardSegmentCmp", {
+    ATEN_ID_TYPE_SWITCH(arg->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH(feat->dtype, DType, "Feature data", {
-        SegmentBcast<XPU, IdType, DType>(feat, offsets, out);
+        BackwardSegmentCmp<XPU, IdType, DType>(feat, arg, out);
       });
     });
   });
@@ -214,15 +212,15 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSegmentReduce")
     SegmentReduceDispatch(op, feat, offsets, out, arg);
   });
 
-DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSegmentBcast")
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelBwdSegmentCmp")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     NDArray feat = args[0];
-    NDArray offsets = args[1];
+    NDArray arg = args[1];
     NDArray out = args[2];
-    CheckCtx(feat->ctx, {feat, offsets, out}, {"feat", "offsets", "out"});
-    CheckContiguous({feat, offsets, out}, {"feat", "offsets", "out"});
-    SegmentBcastDispatch(feat, offsets, out);
-  });
+    CheckCtx(feat->ctx, {feat, arg, out}, {"feat", "arg", "out"});
+    CheckContiguous({feat, arg, out}, {"feat", "arg", "out"});
+    BackwardSegmentCmpDispatch(feat, arg, out);
+});
 
 }  // namespace aten
 }  // namespace dgl

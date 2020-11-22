@@ -268,17 +268,4 @@ def _segment_reduce(op, feat, offsets):
     return out, arg
 
 
-def _segment_bcast(feat, offsets):
-    m = F.as_scalar(offsets[-1])
-    out_shp = (m,) + F.shape(feat)[1:]
-    ctx = F.context(feat)
-    dtype = F.dtype(feat)
-    idtype = F.dtype(offsets)
-    out = F.zeros(out_shp, dtype, ctx)
-    _CAPI_DGLKernelSegmentBcast(to_dgl_nd(feat),
-                                to_dgl_nd(offsets),
-                                to_dgl_nd_for_write(out))
-    return out
-
-
 _init_api("dgl.sparse")
