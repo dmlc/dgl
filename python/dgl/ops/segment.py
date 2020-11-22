@@ -2,7 +2,6 @@
 
 from ..base import DGLError
 from .. import backend as F
-from .. import function as fn
 
 
 def segment_reduce(seglen, value, reducer='sum'):
@@ -40,7 +39,6 @@ def segment_reduce(seglen, value, reducer='sum'):
             [5., 5., 5.],
             [4., 4., 4.]])
     """
-    ctx = F.context(seglen)
     offsets = F.cumsum(
         F.cat([F.zeros((1,), F.dtype(seglen), F.context(seglen)), seglen], 0), 0)
     if reducer == 'mean':
@@ -49,11 +47,13 @@ def segment_reduce(seglen, value, reducer='sum'):
         z = F.astype(F.clamp(seglen, 1, len(value)), F.dtype(rst))
         z_shape = (rst_shape[0],) + (1,) * (len(rst_shape) - 1)
         return rst / F.reshape(z, z_shape)
-    else:
+    elif reducer in ['min', 'sum', 'max']:
         rst = F.segment_reduce(reducer, value, offsets)
         if reducer in ['min', 'max']:
             rst = F.replace_inf_with_zero(rst)
         return rst
+    else:
+        raise DGLError("reducer {} not recognized.".format(reducer))
 
 
 def segment_softmax(seglen, value):

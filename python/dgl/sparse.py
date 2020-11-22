@@ -272,7 +272,6 @@ def _bwd_segment_cmp(feat, arg, m):
     out_shp = (m,) + F.shape(feat)[1:]
     ctx = F.context(feat)
     dtype = F.dtype(feat)
-    idtype = F.dtype(arg)
     out = F.zeros(out_shp, dtype, ctx)
     _CAPI_DGLKernelBwdSegmentCmp(to_dgl_nd(feat),
                                  to_dgl_nd(arg),
