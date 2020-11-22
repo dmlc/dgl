@@ -2,8 +2,6 @@
 
 from ..base import DGLError
 from .. import backend as F
-from .. import convert
-from .. import function as fn
 
 
 def segment_reduce(seglen, value, reducer='sum'):
@@ -41,20 +39,21 @@ def segment_reduce(seglen, value, reducer='sum'):
             [5., 5., 5.],
             [4., 4., 4.]])
     """
-    ctx = F.context(seglen)
-    # TODO(minjie): a more efficient implementation is to create a graph
-    #   directly from a CSR structure.
-    u = F.copy_to(F.arange(0, F.shape(value)[0], F.int32), ctx)
-    v = F.repeat(F.copy_to(F.arange(0, len(seglen), F.int32), ctx),
-                 seglen, dim=0)
-    if len(u) != len(v):
-        raise DGLError("Invalid seglen array:", seglen,
-                       ". Its summation must be equal to value.shape[0].")
-    num_nodes = {'_U': len(u), '_V': len(seglen)}
-    g = convert.heterograph({('_U', '_E', '_V'): (u, v)}, num_nodes_dict=num_nodes)
-    g.srcdata['h'] = value
-    g.update_all(fn.copy_u('h', 'm'), getattr(fn, reducer)('m', 'h'))
-    return g.dstdata['h']
+    offsets = F.cumsum(
+        F.cat([F.zeros((1,), F.dtype(seglen), F.context(seglen)), seglen], 0), 0)
+    if reducer == 'mean':
+        rst = F.segment_reduce('sum', value, offsets)
+        rst_shape = F.shape(rst)
+        z = F.astype(F.clamp(seglen, 1, len(value)), F.dtype(rst))
+        z_shape = (rst_shape[0],) + (1,) * (len(rst_shape) - 1)
+        return rst / F.reshape(z, z_shape)
+    elif reducer in ['min', 'sum', 'max']:
+        rst = F.segment_reduce(reducer, value, offsets)
+        if reducer in ['min', 'max']:
+            rst = F.replace_inf_with_zero(rst)
+        return rst
+    else:
+        raise DGLError("reducer {} not recognized.".format(reducer))
 
 
 def segment_softmax(seglen, value):

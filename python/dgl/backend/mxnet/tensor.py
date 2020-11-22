@@ -152,6 +152,9 @@ def sum(input, dim, keepdims=False):
 def reduce_sum(input):
     return input.sum()
 
+def cumsum(input, dim):
+    return nd.cumsum(input, axis=dim)
+
 def mean(input, dim):
     return nd.mean(input, axis=dim)
 

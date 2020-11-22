@@ -6,6 +6,8 @@
 #ifndef DGL_ARRAY_CUDA_FUNCTOR_CUH_
 #define DGL_ARRAY_CUDA_FUNCTOR_CUH_
 
+#include "./atomic.cuh"
+
 namespace dgl {
 namespace aten {
 namespace cuda {
@@ -133,6 +135,15 @@ struct Sum {
       cuda::AtomicAdd(out_buf, val);
     }
   }
+  static __device__ __forceinline__ void Call(
+      DType *out_buf, Idx *arg_buf,
+      DType val, Idx id) {
+    if (!atomic) {
+      *out_buf += val;
+    } else {
+      cuda::AtomicAdd(out_buf, val);
+    }
+  }
   static __device__ __forceinline__ void CallArg(Idx fid,
     Idx *arg_u_buf, Idx *arg_e_buf,
     DType val, DType val_ref, Idx uid, Idx eid) {}
@@ -156,6 +167,18 @@ struct Max {
         *out_buf = val;
         *arg_u_buf = uid;
         *arg_e_buf = eid;
+      }
+    } else {
+      cuda::AtomicMax(out_buf, val);
+    }
+  }
+  static __device__ __forceinline__ void Call(
+      DType *out_buf, Idx *arg_buf,
+      DType val, Idx id) {
+    if (!atomic) {
+      if (*out_buf < val) {
+        *out_buf = val;
+        *arg_buf = id;
       }
     } else {
       cuda::AtomicMax(out_buf, val);
@@ -193,6 +216,18 @@ struct Min {
         *out_buf = val;
         *arg_u_buf = uid;
         *arg_e_buf = eid;
+      }
+    } else {
+      cuda::AtomicMin(out_buf, val);
+    }
+  }
+  static __device__ __forceinline__ void Call(
+      DType *out_buf, Idx *arg_buf,
+      DType val, Idx id) {
+    if (!atomic) {
+      if (*out_buf > val) {
+        *out_buf = val;
+        *arg_buf = id;
       }
     } else {
       cuda::AtomicMin(out_buf, val);
