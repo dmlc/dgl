@@ -4,9 +4,9 @@
  * \brief Segment reduce C APIs and definitions.
  */
 #include "./segment_reduce.h"
+#include <dgl/array.h>
 #include <string>
 #include "./spmm_binary_ops.h"
-#include <dgl/array.h>
 
 namespace dgl {
 namespace aten {
