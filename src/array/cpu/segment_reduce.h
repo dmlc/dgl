@@ -81,5 +81,4 @@ void BackwardSegmentCmp(NDArray feat, NDArray arg, NDArray out) {
 }  // namespace aten
 }  // namespace dgl
 
-#endif
-
+#endif  // DGL_ARRAY_CPU_SEGMENT_REDUCE_H_

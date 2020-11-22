@@ -4,9 +4,9 @@
  * \brief Segment reduce C APIs and definitions.
  */
 #include "./segment_reduce.h"
+#include <string>
 #include "./spmm_binary_ops.h"
 #include <dgl/array.h>
-#include <string>
 
 namespace dgl {
 namespace aten {
@@ -83,5 +83,5 @@ template void BackwardSegmentCmp<kDLCPU, int64_t, double>(
     NDArray arg,
     NDArray out);
 
-} // namespace aten
+}  // namespace aten
 }  // namespace dgl
