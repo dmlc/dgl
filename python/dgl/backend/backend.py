@@ -1509,6 +1509,27 @@ def edge_softmax(gidx, logits, eids, norm_by):
     pass
 
 def segment_reduce(op, x, offsets):
+    """Segment reduction operator.
+
+    It aggregates the value tensor along the first dimension by segments.
+    The first argument ``seglen`` stores the length of each segment. Its
+    summation must be equal to the first dimension of the ``value`` tensor.
+    Zero-length segments are allowed.
+
+    Parameters
+    ----------
+    op : str
+        Aggregation method. Can be 'sum', 'max', 'min'.
+    seglen : Tensor
+        Segment lengths.
+    value : Tensor
+        Value to aggregate.
+
+    Returns
+    -------
+    Tensor
+        Aggregated tensor of shape ``(len(seglen), value.shape[1:])``.
+    """
     pass
 
 

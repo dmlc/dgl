@@ -249,6 +249,33 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
 
 
 def _segment_reduce(op, feat, offsets):
+    r"""Segment reduction operator.
+
+    It aggregates the value tensor along the first dimension by segments.
+    The first argument ``seglen`` stores the length of each segment. Its
+    summation must be equal to the first dimension of the ``value`` tensor.
+    Zero-length segments are allowed.
+
+    Parameters
+    ----------
+    op : str
+        Aggregation method. Can be 'sum', 'max', 'min'.
+    seglen : Tensor
+        Segment lengths.
+    value : Tensor
+        Value to aggregate.
+
+    Returns
+    -------
+    tuple(Tensor)
+        The first tensor correspond to aggregated tensor of shape
+        ``(len(seglen), value.shape[1:])``, and the second tensor records
+        the argmin/max at each position for computing gradients.
+
+    Notes
+    -----
+    This function does not handle gradients.
+    """
     n = F.shape(offsets)[0] - 1
     out_shp = (n,) + F.shape(feat)[1:]
     ctx = F.context(feat)
@@ -269,6 +296,25 @@ def _segment_reduce(op, feat, offsets):
 
 
 def _bwd_segment_cmp(feat, arg, m):
+    r""" Backward phase of segment reduction (for 'min'/'max' reduction).
+
+    It computes the gradient of input feature given output gradient of
+    the segment reduction result.
+
+    Parameters
+    ----------
+    feat : Tensor
+        The output gradient
+    arg : Tensor
+        The ArgMin/Max tensor produced by segment_reduce op.
+    m : int
+        The length of input gradients' first dimension.
+
+    Returns
+    -------
+    Tensor
+        The input gradient.
+    """
     out_shp = (m,) + F.shape(feat)[1:]
     ctx = F.context(feat)
     dtype = F.dtype(feat)
