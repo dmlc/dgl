@@ -235,7 +235,6 @@ class SegmentReduce(th.autograd.Function):
     @staticmethod
     def forward(ctx, op, x, offsets):
         y, arg = _segment_reduce(op, x, offsets)
-        print(arg)
         ctx.save_for_backward(arg, offsets)
         ctx.backward_cache = op
         return y
