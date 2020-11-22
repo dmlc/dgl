@@ -43,6 +43,7 @@ void SegmentCmp(NDArray feat, NDArray offsets,
   DType *out_data = out.Ptr<DType>();
   IdType *arg_data = arg.Ptr<IdType>();
   std::fill(out_data, out_data + out.NumElements(), Cmp::zero);
+  std::fill(arg_data, arg_data + arg.NumElements(), -1);
 #pragma omp parallel for
   for (int i = 0; i < n; ++i) {
     for (IdType j = offsets_data[i]; j < offsets_data[i + 1]; ++j) {
@@ -69,7 +70,9 @@ void BackwardSegmentCmp(NDArray feat, NDArray arg, NDArray out) {
 #pragma omp parallel for
   for (int i = 0; i < n; ++i) {
     for (int k = 0; k < dim; ++k) {
-      out_data[arg_data[i * dim + k] * dim + k] = feat_data[i * dim + k];
+      int write_row = arg_data[i * dim + k];
+      if (write_row >= 0)
+        out_data[write_row * dim + k] = feat_data[i * dim + k];
     }
   }
 }

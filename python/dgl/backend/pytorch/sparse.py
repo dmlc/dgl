@@ -235,6 +235,7 @@ class SegmentReduce(th.autograd.Function):
     @staticmethod
     def forward(ctx, op, x, offsets):
         y, arg = _segment_reduce(op, x, offsets)
+        print(arg)
         ctx.save_for_backward(arg, offsets)
         ctx.backward_cache = op
         return y
@@ -245,8 +246,10 @@ class SegmentReduce(th.autograd.Function):
         arg, offsets = ctx.saved_tensors
         m = offsets[-1].item()
         if op == 'sum':
-            indices = th.zeros((m,), device=offsets.device, dtype=offsets.dtype)
-            indices[offsets[:-1]] = 1
+            offsets = offsets[1:-1]
+            indices = th.zeros(
+                (m,), device=offsets.device, dtype=offsets.dtype)
+            indices.scatter_add_(0, offsets, th.ones_like(offsets))
             indices = th.cumsum(indices, -1)
             dx = dy[indices]
         else:

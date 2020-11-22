@@ -2,7 +2,6 @@
 
 from ..base import DGLError
 from .. import backend as F
-from .. import convert
 from .. import function as fn
 
 
@@ -47,12 +46,14 @@ def segment_reduce(seglen, value, reducer='sum'):
     if reducer == 'mean':
         rst = F.segment_reduce('sum', value, offsets)
         rst_shape = F.shape(rst)
-        z = F.astype(F.clamp(seglen, 1, len(value)), F.dtype(rst)) 
+        z = F.astype(F.clamp(seglen, 1, len(value)), F.dtype(rst))
         z_shape = (rst_shape[0],) + (1,) * (len(rst_shape) - 1)
-        return rst / F.reshape(z, z_shape) 
+        return rst / F.reshape(z, z_shape)
     else:
-        return F.segment_reduce(reducer, value, offsets)
-    
+        rst = F.segment_reduce(reducer, value, offsets)
+        if reducer in ['min', 'max']:
+            rst = F.replace_inf_with_zero(rst)
+        return rst
 
 
 def segment_softmax(seglen, value):

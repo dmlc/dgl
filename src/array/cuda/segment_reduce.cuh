@@ -30,7 +30,7 @@ __global__ void SegmentReduceKernel(
   int col = blockIdx.y * blockDim.x + threadIdx.x;
   if (col < dim) {
     DType local_accum = ReduceOp::zero;
-    IdType local_arg = 0;
+    IdType local_arg = -1;
     for (IdType i = offsets[row]; i < offsets[row + 1]; ++i) {
       ReduceOp::Call(&local_accum, &local_arg, feat[i * dim + col], i);
     }
@@ -50,7 +50,10 @@ __global__ void BackwardSegmentCmpKernel(
   int row = blockIdx.x;
   int col = blockIdx.y * blockDim.x + threadIdx.x;
   if (col < dim) {
-    out[arg[row * dim + col] * dim + col] = feat[row * dim + col]);
+    int write_row = arg[row * dim + col];
+    if (write_row >= 0) {
+      out[write_row * dim + col] = feat[row * dim + col];
+    }
   }
 }
 
@@ -93,7 +96,7 @@ void BackwardSegmentCmp(
   DType *out_data = out.Ptr<DType>();
 
   auto *thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  int64_t n = out->shape[0];
+  int64_t n = feat->shape[0];
   int64_t dim = 1;
   for (int i = 1; i < out->ndim; ++i)
     dim *= out->shape[i];
