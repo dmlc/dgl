@@ -25,7 +25,18 @@ __global__ void SegmentReduceKernel(
     const DType* feat, const IdType* offsets,
     DType* out, IdType* arg,
     int64_t n, int64_t dim){
-  // TODO(zihao)
+  int row = blockIdx.x;
+  int col = blockIdx.y * blockDim.x + threadIdx.x;
+  if (col < dim) {
+    DType local_accum = ReduceOp::zero;
+    IdType local_arg = 0;
+    for (IdType i = offsets[row]; i < offsets[row + 1]; ++i) {
+      ReduceOp::Call(&local_accum, &local_arg, feat[i * dim + col], i);
+    }
+    out[row * dim + col] = local_accum;
+    if (ReduceOp::require_arg)
+      arg[row * dim + col] = local_arg;
+  }
 }
 
 /*!
@@ -55,9 +66,10 @@ void SegmentReduce(
   int64_t dim = 1;
   for (int i = 1; i < out->ndim; ++i)
     dim *= out->shape[i];
-  const int nbx = 1;
-  const int nby = 1;
-  const int ntx = 1;
+
+  const int nbx = n;
+  const int ntx = FindNumThreads(dim);
+  const int nby = (dim + ntx - 1) / ntx;
   const int nty = 1;
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);

@@ -202,7 +202,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMM")
     SDDMM(op, graph.sptr(), lhs, rhs, out, lhs_target, rhs_target);
   });
 
-DGL_REGISTER_GLOBAL("sparse._CAPI_DGLSegmentReduce")
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSegmentReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const std::string op = args[0];
     NDArray feat = args[1];
@@ -214,7 +214,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLSegmentReduce")
     SegmentReduceDispatch(op, feat, offsets, out, arg);
   });
 
-DGL_REGISTER_GLOBAL("sparse._CAPI_DGLSegmentBcast")
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSegmentBcast")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     NDArray feat = args[0];
     NDArray offsets = args[1];

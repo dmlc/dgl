@@ -248,4 +248,37 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     return out
 
 
+def _segment_reduce(op, feat, offsets):
+    n = F.shape(offsets)[0] - 1
+    out_shp = (n,) + F.shape(feat)[1:]
+    ctx = F.context(feat)
+    dtype = F.dtype(feat)
+    idtype = F.dtype(offsets)
+    out = F.zeros(out_shp, dtype, ctx)
+    arg = None
+    if op in ['min', 'max']:
+        arg = F.zeros(out_shp, idtype, ctx)
+    arg_nd = to_dgl_nd_for_write(arg)
+    _CAPI_DGLKernelSegmentReduce(op,
+                                 to_dgl_nd(feat),
+                                 to_dgl_nd(offsets),
+                                 to_dgl_nd_for_write(out),
+                                 arg_nd)
+    arg = None if arg is None else F.zerocopy_from_dgl_ndarray(arg_nd)
+    return out, arg
+
+
+def _segment_bcast(feat, offsets):
+    m = F.as_scalar(offsets[-1])
+    out_shp = (m,) + F.shape(feat)[1:]
+    ctx = F.context(feat)
+    dtype = F.dtype(feat)
+    idtype = F.dtype(offsets)
+    out = F.zeros(out_shp, dtype, ctx)
+    _CAPI_DGLKernelSegmentBcast(to_dgl_nd(feat),
+                                to_dgl_nd(offsets),
+                                to_dgl_nd_for_write(out))
+    return out
+
+
 _init_api("dgl.sparse")
