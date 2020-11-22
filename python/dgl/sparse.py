@@ -248,4 +248,81 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     return out
 
 
+def _segment_reduce(op, feat, offsets):
+    r"""Segment reduction operator.
+
+    It aggregates the value tensor along the first dimension by segments.
+    The first argument ``seglen`` stores the length of each segment. Its
+    summation must be equal to the first dimension of the ``value`` tensor.
+    Zero-length segments are allowed.
+
+    Parameters
+    ----------
+    op : str
+        Aggregation method. Can be 'sum', 'max', 'min'.
+    seglen : Tensor
+        Segment lengths.
+    value : Tensor
+        Value to aggregate.
+
+    Returns
+    -------
+    tuple(Tensor)
+        The first tensor correspond to aggregated tensor of shape
+        ``(len(seglen), value.shape[1:])``, and the second tensor records
+        the argmin/max at each position for computing gradients.
+
+    Notes
+    -----
+    This function does not handle gradients.
+    """
+    n = F.shape(offsets)[0] - 1
+    out_shp = (n,) + F.shape(feat)[1:]
+    ctx = F.context(feat)
+    dtype = F.dtype(feat)
+    idtype = F.dtype(offsets)
+    out = F.zeros(out_shp, dtype, ctx)
+    arg = None
+    if op in ['min', 'max']:
+        arg = F.zeros(out_shp, idtype, ctx)
+    arg_nd = to_dgl_nd_for_write(arg)
+    _CAPI_DGLKernelSegmentReduce(op,
+                                 to_dgl_nd(feat),
+                                 to_dgl_nd(offsets),
+                                 to_dgl_nd_for_write(out),
+                                 arg_nd)
+    arg = None if arg is None else F.zerocopy_from_dgl_ndarray(arg_nd)
+    return out, arg
+
+
+def _bwd_segment_cmp(feat, arg, m):
+    r""" Backward phase of segment reduction (for 'min'/'max' reduction).
+
+    It computes the gradient of input feature given output gradient of
+    the segment reduction result.
+
+    Parameters
+    ----------
+    feat : Tensor
+        The output gradient
+    arg : Tensor
+        The ArgMin/Max tensor produced by segment_reduce op.
+    m : int
+        The length of input gradients' first dimension.
+
+    Returns
+    -------
+    Tensor
+        The input gradient.
+    """
+    out_shp = (m,) + F.shape(feat)[1:]
+    ctx = F.context(feat)
+    dtype = F.dtype(feat)
+    out = F.zeros(out_shp, dtype, ctx)
+    _CAPI_DGLKernelBwdSegmentCmp(to_dgl_nd(feat),
+                                 to_dgl_nd(arg),
+                                 to_dgl_nd_for_write(out))
+    return out
+
+
 _init_api("dgl.sparse")
