@@ -268,4 +268,16 @@ def _segment_reduce(op, feat, offsets):
     return out, arg
 
 
+def _bwd_segment_cmp(feat, arg, m):
+    out_shp = (m,) + F.shape(feat)[1:]
+    ctx = F.context(feat)
+    dtype = F.dtype(feat)
+    idtype = F.dtype(arg)
+    out = F.zeros(out_shp, dtype, ctx)
+    _CAPI_DGLKernelBwdSegmentCmp(to_dgl_nd(feat),
+                                 to_dgl_nd(arg),
+                                 to_dgl_nd_for_write(out))
+    return out
+
+
 _init_api("dgl.sparse")

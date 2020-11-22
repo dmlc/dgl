@@ -47,9 +47,9 @@ void SegmentCmp(NDArray feat, NDArray offsets,
   for (int i = 0; i < n; ++i) {
     for (IdType j = offsets_data[i]; j < offsets_data[i + 1]; ++j) {
       for (int k = 0; k < dim; ++k) {
-        const DType val = feat_data[i * dim + k];
-        if (Cmp::Call(out_data[j * dim + k], val)) {
-          out_data[i * dim + k] = feat_data[j * dim + k];
+        const DType val = feat_data[j * dim + k];
+        if (Cmp::Call(out_data[i * dim + k], val)) {
+          out_data[i * dim + k] = val;
           arg_data[i * dim + k] = j;
         }
       }
@@ -69,8 +69,7 @@ void BackwardSegmentCmp(NDArray feat, NDArray arg, NDArray out) {
 #pragma omp parallel for
   for (int i = 0; i < n; ++i) {
     for (int k = 0; k < dim; ++k) {
-#pragma omp atomic
-      out_data[arg_data[i * dim + k] * dim + k] += feat_data[i * dim + k];
+      out_data[arg_data[i * dim + k] * dim + k] = feat_data[i * dim + k];
     }
   }
 }

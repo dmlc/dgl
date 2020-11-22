@@ -50,9 +50,7 @@ __global__ void BackwardSegmentCmpKernel(
   int row = blockIdx.x;
   int col = blockIdx.y * blockDim.x + threadIdx.x;
   if (col < dim) {
-    cuda::AtomicAdd(
-        out + arg[row * dim + col] * dim + col,
-        feat[row * dim + col]);
+    out[arg[row * dim + col] * dim + col] = feat[row * dim + col]);
   }
 }
 

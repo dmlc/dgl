@@ -75,7 +75,8 @@ graphs = [
 ]
 
 spmm_shapes = [
-    ((1, 2, 1, 3, 1), (4, 1, 3, 1, 1)),
+#    ((8, 128), (8, 1)),
+#    ((1, 2, 1, 3, 1), (4, 1, 3, 1, 1)),
     ((3, 3), (1, 3)),
     ((1,), (3,)),
     ((3,), (1,)),
@@ -255,5 +256,9 @@ def test_edge_softmax(g, norm_by, shp, idtype):
         assert F.allclose(F.grad(e2), grad_edata)
         print('backward passed')
 
+@parametrize_dtype
+def test_segment_reduce(idtype):
+    pass
+
 if __name__ == '__main__':
-    test_spmm(F.int32, graphs[0], spmm_shapes[5], 'copy_lhs', 'sum')
+    test_spmm(F.int32, graphs[0], spmm_shapes[0], 'mul', 'sum')
