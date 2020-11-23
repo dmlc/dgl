@@ -24,17 +24,25 @@ aten::CSRMatrix CSR1(DLContext ctx = CTX) {
 
 template <typename IDX>
 aten::CSRMatrix CSR2(DLContext ctx = CTX) {
-  // has duplicate entries
-  // [[0, 1, 2, 0, 0],
+  // has duplicate entries and the columns are not sorted
+  // [[0, 1, 1, 1, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
-  //  [0, 0, 0, 0, 0]]
-  // data: [0, 2, 5, 3, 1, 4]
+  //  [0, 0, 0, 0, 0],
+  //  [1, 1, 1, 0, 0],
+  //  [0, 0, 0, 1, 0]],
+  //  [0, 0, 0, 0, 0]],
+  //  [1, 1, 1, 1, 0]],
+  //  [0, 1, 0, 0, 1]],
+  // data: [0, 2, 5, 3, 1, 4, 6, 8, 7, 9]
   return aten::CSRMatrix(
-      4, 5,
-      aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 6, 6}), sizeof(IDX)*8, ctx),
-      aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX)*8, ctx),
-      aten::VecToIdArray(std::vector<IDX>({0, 2, 5, 3, 1, 4}), sizeof(IDX)*8, ctx),
+      9, 6,
+      aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 6, 6, 9, 10, 10, 15, 17}),
+          sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(std::vector<IDX>({3, 2, 1, 0, 2, 3, 1, 2, 0, 3, 
+          1, 2,  1,  3,  0, 5,  1}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(std::vector<IDX>({0, 2, 5, 3, 1, 4, 6, 8, 7, 9, 13,
+         10, 11, 14, 12, 16, 15}), sizeof(IDX)*8, ctx),
       false);
 }
 
@@ -115,7 +123,7 @@ aten::COOMatrix COO3(DLContext ctx) {
 }  // namespace
 
 template <typename IDX>
-void _TestCSRIsNonZero(DLContext ctx) {
+void _TestCSRIsNonZero1(DLContext ctx) {
   auto csr = CSR1<IDX>(ctx);
   ASSERT_TRUE(aten::CSRIsNonZero(csr, 0, 1));
   ASSERT_FALSE(aten::CSRIsNonZero(csr, 0, 0));
@@ -125,6 +133,20 @@ void _TestCSRIsNonZero(DLContext ctx) {
   IdArray tx = aten::VecToIdArray(std::vector<IDX>({0, 0, 1, 0}), sizeof(IDX)*8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 }
+
+template <typename IDX>
+void _TestCSRIsNonZero2(DLContext ctx) {
+  auto csr = CSR1<IDX>(ctx);
+  ASSERT_TRUE(aten::CSRIsNonZero(csr, 0, 1));
+  ASSERT_FALSE(aten::CSRIsNonZero(csr, 0, 0));
+  IdArray r = aten::VecToIdArray(std::vector<IDX>({0, 0, 0, 0, 0, }), sizeof(IDX)*8, ctx);
+  IdArray c = aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 3, 4, }), sizeof(IDX)*8, ctx);
+  IdArray x = aten::CSRIsNonZero(csr, r, c);
+  IdArray tx = aten::VecToIdArray(std::vector<IDX>({0, 1, 1, 1, 0}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
+}
+
+
 
 TEST(SpmatTest, TestCSRIsNonZero) {
   _TestCSRIsNonZero<int32_t>(CPU);
