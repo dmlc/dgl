@@ -190,23 +190,33 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     if ndata is not None:
         for ntype in ntypes:
             feat_dicts = [g.nodes[ntype].data for g in graphs if g.number_of_nodes(ntype) > 0]
-            ret_feat = _batch_feat_dicts(feat_dicts, ndata, 'nodes["{}"].data'.format(ntype))
+            # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently we allow
+            # empty graphs to have no features during batching.
+            schemas = [g.node_attr_schemes(ntype) for g in graphs if g.number_of_nodes(ntype) > 0]
+            ret_feat = _batch_feat_dicts(
+                schemas, feat_dicts, ndata, 'nodes["{}"].data'.format(ntype))
             retg.nodes[ntype].data.update(ret_feat)
 
     # Batch edge feature
     if edata is not None:
         for etype in relations:
             feat_dicts = [g.edges[etype].data for g in graphs if g.number_of_edges(etype) > 0]
-            ret_feat = _batch_feat_dicts(feat_dicts, edata, 'edges[{}].data'.format(etype))
+            # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently we allow
+            # empty graphs to have no features during batching.
+            schemas = [g.edge_attr_schemes(etype) for g in graphs if g.number_of_edges(etype) > 0]
+            ret_feat = _batch_feat_dicts(
+                schemas, feat_dicts, edata, 'edges[{}].data'.format(etype))
             retg.edges[etype].data.update(ret_feat)
 
     return retg
 
-def _batch_feat_dicts(feat_dicts, keys, feat_dict_name):
+def _batch_feat_dicts(schemas, feat_dicts, keys, feat_dict_name):
     """Internal function to batch feature dictionaries.
 
     Parameters
     ----------
+    schemas : list[dict[str, Scheme]]
+        List of dictionaries of each feature name and schema for each graph.
     feat_dicts : list[dict[str, Tensor]]
         Feature dictionary list.
     keys : list[str]
@@ -223,11 +233,10 @@ def _batch_feat_dicts(feat_dicts, keys, feat_dict_name):
         return {}
     # sanity checks
     if is_all(keys):
-        utils.check_all_same_keys(feat_dicts, feat_dict_name)
-        keys = feat_dicts[0].keys()
+        utils.check_all_same_schema(schemas, feat_dict_name)
+        keys = schemas[0].keys()
     else:
-        utils.check_all_have_keys(feat_dicts, keys, feat_dict_name)
-    utils.check_all_same_schema(feat_dicts, keys, feat_dict_name)
+        utils.check_all_same_schema_for_keys(schemas, keys, feat_dict_name)
     # concat features
     ret_feat = {k : F.cat([fd[k] for fd in feat_dicts], 0) for k in keys}
     return ret_feat
