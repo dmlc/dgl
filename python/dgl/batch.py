@@ -195,8 +195,8 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
             for g in graphs:
                 if g._graph.number_of_nodes(ntype_id) > 0:
                     frames.append(g._node_frames[ntype_id])
-            # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently we allow
-            # empty graphs to have no features during batching.
+            # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently
+            # we allow empty graphs to have no features during batching.
             ret_feat = _batch_feat_dicts(frames, ndata, 'nodes["{}"].data'.format(ntype))
             retg.nodes[ntype].data.update(ret_feat)
 
@@ -207,8 +207,8 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
             for g in graphs:
                 if g._graph.number_of_edges(etype_id) > 0:
                     frames.append(g._edge_frames[etype_id])
-            # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently we allow
-            # empty graphs to have no features during batching.
+            # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently
+            # we allow empty graphs to have no features during batching.
             ret_feat = _batch_feat_dicts(frames, edata, 'edges[{}].data'.format(etype))
             retg.edges[etype].data.update(ret_feat)
 
