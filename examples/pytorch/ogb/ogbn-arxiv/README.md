@@ -24,6 +24,13 @@ For the score of `GAT(norm. adj.)+label reuse`, run the following command and yo
 python3 gat.py --use-norm --use-labels --n-label-iters=1 --no-attn-dst --edge-drop=0.3 --input-drop=0.25
 ```
 
+For the score of `GAT(norm. adj.)+label reuse+C&S`, run the following command and you should directly see the result.
+
+```bash
+python3 gat.py --use-norm --use-labels --n-label-iters=1 --no-attn-dst --edge-drop=0.3 --input-drop=0.25 --save-pred
+python3 correct_and_smooth.py --use-norm
+```
+
 ## Usage & Options
 
 ### GCN
@@ -89,11 +96,12 @@ optional arguments:
 
 Here are the results over at least 10 runs.
 
-|           Method            | Validation Accuracy |  Test Accuracy  | #Parameters |
-|:---------------------------:|:-------------------:|:---------------:|:-----------:|
-|             GCN             |   0.7361 ± 0.0009   | 0.7246 ± 0.0021 |   109,608   |
-|         GCN+linear          |   0.7397 ± 0.0010   | 0.7270 ± 0.0016 |   218,152   |
-|         GCN+labels          |   0.7399 ± 0.0008   | 0.7259 ± 0.0006 |   119,848   |
-|      GCN+linear+labels      |   0.7442 ± 0.0012   | 0.7306 ± 0.0024 |   238,632   |
-|   GAT(norm. adj.)+labels    |   0.7508 ± 0.0009   | 0.7366 ± 0.0011 |  1,441,580  |
-| GAT(norm. adj.)+label reuse |   0.7516 ± 0.0008   | 0.7391 ± 0.0012 |  1,441,580  |
+|             Method              | Validation Accuracy |  Test Accuracy  | #Parameters |
+|:-------------------------------:|:-------------------:|:---------------:|:-----------:|
+|               GCN               |   0.7361 ± 0.0009   | 0.7246 ± 0.0021 |   109,608   |
+|           GCN+linear            |   0.7397 ± 0.0010   | 0.7270 ± 0.0016 |   218,152   |
+|           GCN+labels            |   0.7399 ± 0.0008   | 0.7259 ± 0.0006 |   119,848   |
+|        GCN+linear+labels        |   0.7442 ± 0.0012   | 0.7306 ± 0.0024 |   238,632   |
+|     GAT(norm. adj.)+labels      |   0.7508 ± 0.0009   | 0.7366 ± 0.0011 |  1,441,580  |
+|   GAT(norm. adj.)+label reuse   |   0.7516 ± 0.0008   | 0.7391 ± 0.0012 |  1,441,580  |
+| GAT(norm. adj.)+label reuse+C&S |   0.7519 ± 0.0008   | 0.7395 ± 0.0012 |  1,441,580  |

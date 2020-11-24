@@ -3,6 +3,7 @@
 
 import argparse
 import math
+import os
 import random
 import time
 
@@ -55,9 +56,10 @@ def load_data(dataset):
 def preprocess(graph):
     global n_node_feats
 
-    # add reverse edges
-    srcs, dsts = graph.all_edges()
-    graph.add_edges(dsts, srcs)
+    # make bidirected
+    feat = graph.ndata["feat"]
+    graph = dgl.to_bidirected(graph)
+    graph.ndata["feat"] = feat
 
     # add self-loop
     print(f"Total edges before adding self-loop {graph.number_of_edges()}")
@@ -174,6 +176,7 @@ def evaluate(args, model, graph, labels, train_idx, val_idx, test_idx, evaluator
         train_loss,
         val_loss,
         test_loss,
+        pred,
     )
 
 
@@ -189,6 +192,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
     # training loop
     total_time = 0
     best_val_acc, final_test_acc, best_val_loss = 0, 0, float("inf")
+    final_pred = None
 
     accs, train_accs, val_accs, test_accs = [], [], [], []
     losses, train_losses, val_losses, test_losses = [], [], [], []
@@ -200,7 +204,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
         acc, loss = train(args, model, graph, labels, train_idx, val_idx, test_idx, optimizer, evaluator_wrapper)
 
-        train_acc, val_acc, test_acc, train_loss, val_loss, test_loss = evaluate(
+        train_acc, val_acc, test_acc, train_loss, val_loss, test_loss, pred = evaluate(
             args, model, graph, labels, train_idx, val_idx, test_idx, evaluator_wrapper
         )
 
@@ -211,6 +215,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
             best_val_loss = val_loss
             best_val_acc = val_acc
             final_test_acc = test_acc
+            final_pred = pred
 
         if epoch == args.n_epochs or epoch % args.log_every == 0:
             print(
@@ -267,12 +272,16 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         plt.tight_layout()
         plt.savefig(f"gat_loss_{n_running}.png")
 
+    if args.save_pred:
+        os.makedirs("./output", exist_ok=True)
+        torch.save(F.softmax(final_pred, dim=1), f"./output/{n_running}.pt")
+
     return best_val_acc, final_test_acc
 
 
 def count_parameters(args):
     model = gen_model(args)
-    return sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
+    return sum([p.numel() for p in model.parameters() if p.requires_grad])
 
 
 def main():
@@ -304,6 +313,7 @@ def main():
     argparser.add_argument("--wd", type=float, default=0, help="weight decay")
     argparser.add_argument("--log-every", type=int, default=20, help="log every LOG_EVERY epochs")
     argparser.add_argument("--plot-curves", action="store_true", help="plot learning curves")
+    argparser.add_argument("--save-pred", action="store_true", help="save final predictions")
     args = argparser.parse_args()
 
     if not args.use_labels and args.n_label_iters > 0:
