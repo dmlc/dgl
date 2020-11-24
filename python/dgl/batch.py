@@ -191,10 +191,9 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     # Batch node feature
     if ndata is not None:
         for ntype_id, ntype in zip(ntype_ids, ntypes):
-            frames = []
-            for g in graphs:
-                if g._graph.number_of_nodes(ntype_id) > 0:
-                    frames.append(g._node_frames[ntype_id])
+            frames = [
+                g._node_frames[ntype_id] for g in graphs
+                if g._graph.number_of_nodes(ntype_id) > 0]
             # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently
             # we allow empty graphs to have no features during batching.
             ret_feat = _batch_feat_dicts(frames, ndata, 'nodes["{}"].data'.format(ntype))
@@ -203,10 +202,9 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     # Batch edge feature
     if edata is not None:
         for etype_id, etype in zip(relation_ids, relations):
-            frames = []
-            for g in graphs:
-                if g._graph.number_of_edges(etype_id) > 0:
-                    frames.append(g._edge_frames[etype_id])
+            frames = [
+                g._edge_frames[etype_id] for g in graphs
+                if g._graph.number_of_edges(etype_id) > 0]
             # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently
             # we allow empty graphs to have no features during batching.
             ret_feat = _batch_feat_dicts(frames, edata, 'edges[{}].data'.format(etype))
@@ -219,7 +217,7 @@ def _batch_feat_dicts(frames, keys, feat_dict_name):
 
     Parameters
     ----------
-    frames : list[dict[str, Tensor]]
+    frames : list[Frame]
         List of frames
     keys : list[str]
         Feature keys. Can be '__ALL__', meaning batching all features.
