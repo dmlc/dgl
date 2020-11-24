@@ -146,8 +146,6 @@ void _TestCSRIsNonZero2(DLContext ctx) {
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 }
 
-
-
 TEST(SpmatTest, TestCSRIsNonZero) {
   _TestCSRIsNonZero<int32_t>(CPU);
   _TestCSRIsNonZero<int64_t>(CPU);
