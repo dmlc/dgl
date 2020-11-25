@@ -2,7 +2,7 @@
 #include <tvm/runtime/packed_func.h>
 #include <tvm/runtime/registry.h>
 #include <sstream>
-#include <stdio.h>
+
 #include "featgraph.h"
 
 namespace dgl {
@@ -14,10 +14,12 @@ namespace featgraph {
                           DLManagedTensor* lhs, DLManagedTensor* rhs, 
                           DLManagedTensor* out) {
     std::stringstream ss;
-    ss << "SDDMMTreeReduction_int" << row->dl_tensor.dtype.bits;
-    ss << "_float" << lhs->dl_tensor.dtype.bits;
+    ss << "SDDMMTreeReduction_int" << (int) (row->dl_tensor).dtype.bits;
+    ss << "_float" << (int) (lhs->dl_tensor).dtype.bits;
+    std::string f_name = ss.str();
     tvm::runtime::PackedFunc f = featgraph.GetFunction(ss.str());
-    f(row, col, lhs, rhs, out);
+    if (f != nullptr)
+      f(row, col, lhs, rhs, out);
   }
 }
 }
