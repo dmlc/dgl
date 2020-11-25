@@ -51,16 +51,6 @@ if(USE_CUDA)
   endif()
 endif(USE_CUDA)
 
-# include directories
-include_directories("include")
-include_directories("third_party/dlpack/include")
-include_directories("third_party/METIS/include/")
-include_directories("third_party/dmlc-core/include")
-include_directories("third_party/minigun/minigun")
-include_directories("third_party/minigun/third_party/moderngpu/src")
-include_directories("third_party/phmap/")
-include_directories("third_party/xbyak/")
-
 # initial variables
 set(DGL_LINKER_LIBS "")
 if(MSVC OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
@@ -153,6 +143,17 @@ else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})
 endif(USE_CUDA)
 
+# include directories
+target_include_directories(dgl PRIVATE "include")
+target_include_directories(dgl PRIVATE "third_party/dlpack/include")
+include_directories("third_party/METIS/include/")
+target_include_directories(dgl PRIVATE "third_party/dmlc-core/include")
+target_include_directories(dgl PRIVATE "third_party/minigun/minigun")
+target_include_directories(dgl PRIVATE "third_party/minigun/third_party/moderngpu/src")
+target_include_directories(dgl PRIVATE "third_party/phmap/")
+target_include_directories(dgl PRIVATE "third_party/xbyak/")
+target_include_directories(dgl PRIVATE "cmake/tvm/")
+
 # For serialization
 if (USE_HDFS)
   option(DMLC_HDFS_SHARED "dgl has to build with dynamic hdfs library" ON)
@@ -169,6 +170,10 @@ if(NOT MSVC)
   add_subdirectory("third_party/METIS/libmetis/")
   list(APPEND DGL_LINKER_LIBS metis)
 endif(NOT MSVC)
+
+# Compile TVM Runtime
+add_subdirectory("cmake/tvm/")
+list(APPEND DGL_LINKER_LIBS tvm_runtime)
 
 # support PARALLEL_ALGORITHMS
 if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
