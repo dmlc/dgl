@@ -4,6 +4,8 @@
 第5章：训练图神经网络
 =====================================================
 
+:ref:`(English Version) <guide-training>`
+
 概览
 --------
 
@@ -13,7 +15,7 @@ classification for small graph(s), by message passing methods introduced
 in :ref:`guide-message-passing` and neural network modules introduced in
 :ref:`guide-nn`.
 
-本章通过使用 :ref:`guide_cn-message-passing` 中介绍的消息传递方法和 :ref:`guide-nn` 中介绍的神经网络模块，
+本章通过使用 :ref:`guide_cn-message-passing` 中介绍的消息传递方法和 :ref:`guide_cn-nn` 中介绍的神经网络模块，
 讲解了如何对小规模的图进行节点分类、边分类、链接预测和图分类的图神经网络的训练。
 
 This chapter assumes that your graph as well as all of its node and edge
@@ -27,7 +29,7 @@ compatible ``DGLDataset`` as is described in :ref:`guide-data-pipeline`, you can
 get the graph for a single-graph dataset with something like
 
 本章后续的内容均假设用户已经准备好了图和节点及边的特征。如果用户希望使用DGL提供的数据集或其他兼容
- ``DGLDataset`` （如 :ref:`guide_cn-data-pipeline` 所述）的数据，
+``DGLDataset`` （如 :ref:`guide_cn-data-pipeline` 所述）的数据，
 可以使用类似以下代码的方法获取单个图数据集的图数据。
 
 .. code:: python
@@ -40,7 +42,7 @@ get the graph for a single-graph dataset with something like
 
 Note: In this chapter we will use PyTorch as backend.
 
-Note: 本章代码使用PyTorch作为DGL的后端框架。
+注意: 本章代码使用PyTorch作为DGL的后端框架。
 
 .. _guide-training-heterogeneous-graph-example:
 

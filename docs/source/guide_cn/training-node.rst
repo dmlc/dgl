@@ -1,9 +1,9 @@
-.. _guide-training-node-classification:
+.. _guide_cn-training-node-classification:
 
-5.1 Node Classification/Regression
+5.1 节点分类/回归
 --------------------------------------------------
 
-:ref:`(中文版) <guide_cn-training-node-classification>`
+:ref:`(English Version) <guide-training-node-classification>`
 
 One of the most popular and widely adopted tasks for graph neural
 networks is node classification, where each node in the
@@ -11,6 +11,10 @@ training/validation/test set is assigned a ground truth category from a
 set of predefined categories. Node regression is similar, where each
 node in the training/validation/test set is assigned a ground truth
 number.
+
+对于图神经网络来说，最受欢迎和广泛采用的任务之一是节点分类，
+其中训练/验证/测试集中的每个节点都从一组预定义的类别中分配一个正确标注的类别。
+节点回归也是类似的，其中训练/验证/测试集中的每个节点都被分配了一个正确标注的数字。
 
 Overview
 ~~~~~~~~
