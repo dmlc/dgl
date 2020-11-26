@@ -86,20 +86,27 @@ tasks such as
 :ref:`guide_cn-training-graph-classification`.
 
 
-
 For a complete list of built-in graph convolution modules, please refer
 to :ref:`apinn`.
+
+关于DGL内置图卷积模块的完整列表，读者可以参考 :ref:`apinn`。
 
 For more details in how DGL
 neural network modules work and how to write a custom neural network
 module with message passing please refer to the example in :ref:`guide-nn`.
 
+有关DGL神经网络模块如何工作，以及如何编写一个自定义的带有消息传递的GNN模块的更多细节，请参考 :ref:`guide_cn-nn` 中的例子。
+
 Training loop
+
+训练循环
 ~~~~~~~~~~~~~
 
 Training on the full graph simply involves a forward propagation of the
 model defined above, and computing the loss by comparing the prediction
 against ground truth labels on the training nodes.
+
+全图上的训练只需要对上面定义的模型进行正向传播，并通过在训练节点上比较预测和真实标签来计算损失。
 
 This section uses a DGL built-in dataset
 :class:`dgl.data.CiteseerGraphDataset` to
@@ -107,6 +114,10 @@ show a training loop. The node features
 and labels are stored on its graph instance, and the
 training-validation-test split are also stored on the graph as boolean
 masks. This is similar to what you have seen in :ref:`guide-data-pipeline`.
+
+本节使用DGL内置的数据集 :class:`dgl.data.CiteseerGraphDataset` 来展示一个训练循环。
+节点特征和标签存储在其图实例上，训练-验证-测试的分割也以布尔掩码的形式存储在图上。这与在
+:ref:`guide_cn-data-pipeline` 中的做法类似。
 
 .. code:: python
 
@@ -119,6 +130,8 @@ masks. This is similar to what you have seen in :ref:`guide-data-pipeline`.
     n_labels = int(node_labels.max().item() + 1)
 
 The following is an example of evaluating your model by accuracy.
+
+下面是一个通过使用准确性来评估模型的例子。
 
 .. code:: python
 
@@ -133,6 +146,8 @@ The following is an example of evaluating your model by accuracy.
             return correct.item() * 1.0 / len(labels)
 
 You can then write our training loop as follows.
+
+用户可以按如下方式实现训练循环。
 
 .. code:: python
 
@@ -163,9 +178,15 @@ You could see the corresponding model implementation is in the
 dropout probabilities, and customizable aggregation functions and
 nonlinearities.
 
-.. _guide-training-rgcn-node-classification:
+`GraphSAGE <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/train_full.py>`__
+提供了一个端到端的同构图节点分类的例子。可以在 ``GraphSAGE`` 类中看到对应的模型实现。
+这个模型具有可调节的层数、dropout概率，以及可定制的聚合函数和非线性函数。
+
+.. _guide_cn-training-rgcn-node-classification:
 
 Heterogeneous graph
+
+异构图上的训练循环
 ~~~~~~~~~~~~~~~~~~~
 
 If your graph is heterogeneous, you may want to gather message from
@@ -175,10 +196,16 @@ to perform message passing
 on all edge types, then combining different graph convolution modules
 for each edge type.
 
+如果图是异构的，用户可能希望沿着所有边类型从邻居那里收集消息。
+用户可以使用模块 :class:`dgl.nn.pytorch.HeteroGraphConv` (也可以在DGL的MXNet和Tensorflow包中使用)在所有边类型上执行消息传递，
+然后为每个边类型组合不同的图卷积模块。
+
 The following code will define a heterogeneous graph convolution module
 that first performs a separate graph convolution on each edge type, then
 sums the message aggregations on each edge type as the final result for
 all node types.
+
+下面的代码将定义一个异构图卷积模块，首先对每个边类型进行单独的图卷积，然后将每个边类型上的消息聚合结果相加，作为所有节点类型的最终结果。
 
 .. code:: python
 
@@ -207,8 +234,13 @@ all node types.
 feature tensors as input, and returns another dictionary of node types
 and node features.
 
+``dgl.nn.HeteroGraphConv`` 接收一个节点类型和节点特征张量的字典作为输入，并返回另一个节点类型和节点特征的字典。
+
 So given that we have the user and item features in the
 :ref:`heterogeneous graph example <guide-training-heterogeneous-graph-example>`.
+
+如下面代码所示，在 :ref:`heterogeneous graph example <guide-training-heterogeneous-graph-example>`
+的例子中已经有了用户和项目的特征。
 
 .. code:: python
 
@@ -219,6 +251,8 @@ So given that we have the user and item features in the
     train_mask = hetero_graph.nodes['user'].data['train_mask']
 
 One can simply perform a forward propagation as follows:
+
+用户可以简单地进行如下的正向传播：
 
 .. code:: python
 
@@ -232,6 +266,9 @@ now you have a dictionary of node representations from which you compute
 the predictions. For instance, if you are only predicting the ``user``
 nodes, you can just extract the ``user`` node embeddings from the
 returned dictionary:
+
+异构图上的训练循环和同构图的训练循环是一样的，只是现在用户有一个节点表示的字典以计算预测。
+例如，如果只预测 ``user`` 节点，用户可以只从返回的字典中提取 ``user`` 的节点嵌入。
 
 .. code:: python
 
@@ -258,5 +295,11 @@ DGL provides an end-to-end example of
 for node classification. You can see the definition of heterogeneous
 graph convolution in ``RelGraphConvLayer`` in the `model implementation
 file <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn-hetero/model.py>`__.
+
+DGL提供了一个用于节点分类的RGCN的端到端的例子
+`RGCN <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn-hetero/entity_classify.py>`__
+。用户可以在 `模型实现文件
+<https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn-hetero/model.py>`__
+中查看异构图卷积 ``RelGraphConvLayer`` 的定义。
 
 
