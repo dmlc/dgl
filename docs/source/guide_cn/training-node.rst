@@ -17,6 +17,8 @@ number.
 节点回归也是类似的，其中训练/验证/测试集中的每个节点都被分配了一个正确标注的数字。
 
 Overview
+
+概述
 ~~~~~~~~
 
 To classify nodes, graph neural network performs message passing
@@ -25,7 +27,12 @@ features, but also its neighboring node and edge features. Message
 passing can be repeated multiple rounds to incorporate information from
 larger range of neighborhood.
 
+为了对节点进行分类，图神经网络执行了 :ref:`guide-message-passing` 中讨论的消息传递来利用节点自身的特征和其邻节点及边的特征。
+消息传递可以重复多轮，以纳入更大范围的邻居信息。
+
 Writing neural network model
+
+编写神经网络模型
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 DGL provides a few built-in graph convolution modules that can perform
@@ -33,13 +40,21 @@ one round of message passing. In this guide, we choose
 :class:`dgl.nn.pytorch.SAGEConv` (also available in MXNet and Tensorflow),
 the graph convolution module for GraphSAGE.
 
+DGL提供了一些内置的图卷积模块，可以进行一轮消息传递。
+本指南中选择 :class:`dgl.nn.pytorch.SAGEConv` (在DGL的MXNet和Tensorflow包中也有)，
+它是GraphSAGE中使用的图卷积模块。
+
 Usually for deep learning models on graphs we need a multi-layer graph
 neural network, where we do multiple rounds of message passing. This can
 be achieved by stacking graph convolution modules as follows.
 
+通常对于图上的深度学习模型，需要一个多层图神经网络，并在这个网络中要进行多轮的信息传递。
+这可以通过堆叠图卷积模块来实现，具体如下。
+
 .. code:: python
 
     # Contruct a two-layer GNN model
+    # 构建一个2层的GNN模型
     import dgl.nn as dglnn
     import torch.nn as nn
     import torch.nn.functional as F
@@ -64,6 +79,13 @@ tasks such as
 :ref:`guide-training-edge-classification`,
 :ref:`guide-training-link-prediction`, or
 :ref:`guide-training-graph-classification`.
+
+请注意，这个模型不仅可以做节点分类，还可以为其他下游任务获取隐藏节点表示，如：
+:ref:`guide_cn-training-edge-classification`,
+:ref:`guide_cn-training-link-prediction`, or
+:ref:`guide_cn-training-graph-classification`.
+
+
 
 For a complete list of built-in graph convolution modules, please refer
 to :ref:`apinn`.

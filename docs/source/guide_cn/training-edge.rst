@@ -3,7 +3,7 @@
 5.2 Edge Classification/Regression
 ---------------------------------------------
 
-:ref:`(中文版) <guide_cn-training-edge-classification>`
+:ref:`(English Version) <guide-training-edge-classification>`
 
 Sometimes you wish to predict the attributes on the edges of the graph,
 or even whether an edge exists or not between two given nodes. In that

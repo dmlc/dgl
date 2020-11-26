@@ -3,7 +3,7 @@
 5.3 Link Prediction
 ---------------------------
 
-:ref:`(中文版) <guide_cn-training-link-prediction>`
+:ref:`(English Version) <guide-training-link-prediction>`
 
 In some other settings you may want to predict whether an edge exists
 between two given nodes or not. Such model is called a *link prediction*

@@ -6,7 +6,7 @@
 
 :ref:`(English Version) <guide-training>`
 
-概览
+概述
 --------
 
 This chapter discusses how to train a graph neural network for node

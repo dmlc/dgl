@@ -3,7 +3,7 @@
 5.4 Graph Classification
 ----------------------------------
 
-:ref:`(中文版) <guide_cn-training-graph-classification>`
+:ref:`(English Version) <guide-training-graph-classification>`
 
 Instead of a big single graph, sometimes one might have the data in the
 form of multiple graphs, for example a list of different types of
