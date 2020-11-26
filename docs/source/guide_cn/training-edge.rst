@@ -1,4 +1,4 @@
-.. _guide-training-edge-classification:
+.. _guide_cn-training-edge-classification:
 
 5.2 Edge Classification/Regression
 ---------------------------------------------

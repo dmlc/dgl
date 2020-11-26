@@ -1,4 +1,4 @@
-.. _guide-training-link-prediction:
+.. _guide_cn-training-link-prediction:
 
 5.3 Link Prediction
 ---------------------------

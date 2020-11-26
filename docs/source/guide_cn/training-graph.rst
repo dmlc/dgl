@@ -1,4 +1,4 @@
-.. _guide-training-graph-classification:
+.. _guide_cn-training-graph-classification:
 
 5.4 Graph Classification
 ----------------------------------
