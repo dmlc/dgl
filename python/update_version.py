@@ -11,7 +11,7 @@ import re
 # current version
 # We use the version of the incoming release for code
 # that is under development
-__version__ = "0.5.2"
+__version__ = "0.5.3"
 print(__version__)
 
 # Implementations
