@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import os
 import random
 import time
 
@@ -49,12 +50,16 @@ def load_data(dataset):
     return graph, labels, train_idx, val_idx, test_idx, evaluator
 
 
-def preprocess(graph, labels):
+def preprocess(graph, labels, train_idx):
     global n_node_feats
 
     # The sum of the weights of adjacent edges is used as node features.
     graph.update_all(fn.copy_e("feat", "feat_copy"), fn.sum("feat_copy", "feat"))
     n_node_feats = graph.ndata["feat"].shape[-1]
+
+    # Only the labels in the training set are used as features, while others are filled with zeros.
+    graph.ndata["train_labels_onehot"] = torch.zeros(graph.number_of_nodes(), n_classes)
+    graph.ndata["train_labels_onehot"][train_idx, labels[train_idx, 0]] = 1
 
     graph.create_formats_()
 
@@ -62,8 +67,13 @@ def preprocess(graph, labels):
 
 
 def gen_model(args):
+    if args.use_labels:
+        n_node_feats_ = n_node_feats + n_classes
+    else:
+        n_node_feats_ = n_node_feats
+
     model = GAT(
-        n_node_feats,
+        n_node_feats_,
         n_edge_feats,
         n_classes,
         n_layers=args.n_layers,
@@ -81,22 +91,37 @@ def gen_model(args):
     return model
 
 
-def train(_args, model, dataloader, _labels, _train_idx, criterion, optimizer, _evaluator):
+def add_labels(graph, idx):
+    feat = graph.srcdata["feat"]
+    train_labels_onehot = torch.zeros([feat.shape[0], n_classes], device=device)
+    train_labels_onehot[idx] = graph.srcdata["train_labels_onehot"][idx]
+    graph.srcdata["feat"] = torch.cat([feat, train_labels_onehot], dim=-1)
+
+
+def train(args, model, dataloader, _labels, _train_idx, criterion, optimizer, _evaluator):
     model.train()
 
     loss_sum, total = 0, 0
 
-    for _input_nodes, output_nodes, subgraphs in dataloader:
+    for input_nodes, output_nodes, subgraphs in dataloader:
         subgraphs = [b.to(device) for b in subgraphs]
-        new_train_idx = list(range(len(output_nodes)))
+        new_train_idx = torch.arange(len(output_nodes))
+
+        if args.use_labels:
+            train_labels_idx = torch.arange(len(output_nodes), len(input_nodes))
+            train_pred_idx = new_train_idx
+
+            add_labels(subgraphs[0], train_labels_idx)
+        else:
+            train_pred_idx = new_train_idx
 
         pred = model(subgraphs)
-        loss = criterion(pred[new_train_idx], subgraphs[-1].dstdata["labels"][new_train_idx].float())
+        loss = criterion(pred[train_pred_idx], subgraphs[-1].dstdata["labels"][train_pred_idx].float())
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        count = len(new_train_idx)
+        count = len(train_pred_idx)
         loss_sum += loss.item() * count
         total += count
 
@@ -106,7 +131,7 @@ def train(_args, model, dataloader, _labels, _train_idx, criterion, optimizer, _
 
 
 @torch.no_grad()
-def evaluate(_args, model, dataloader, labels, train_idx, val_idx, test_idx, criterion, evaluator):
+def evaluate(args, model, dataloader, labels, train_idx, val_idx, test_idx, criterion, evaluator):
     model.eval()
 
     preds = torch.zeros(labels.shape).to(device)
@@ -115,8 +140,12 @@ def evaluate(_args, model, dataloader, labels, train_idx, val_idx, test_idx, cri
     eval_times = 1
 
     for _ in range(eval_times):
-        for _input_nodes, output_nodes, subgraphs in dataloader:
+        for input_nodes, output_nodes, subgraphs in dataloader:
             subgraphs = [b.to(device) for b in subgraphs]
+            new_train_idx = list(range(len(input_nodes)))
+
+            if args.use_labels:
+                add_labels(subgraphs[0], new_train_idx)
 
             pred = model(subgraphs)
             preds[output_nodes] += pred
@@ -136,6 +165,7 @@ def evaluate(_args, model, dataloader, labels, train_idx, val_idx, test_idx, cri
         train_loss,
         val_loss,
         test_loss,
+        preds,
     )
 
 
@@ -180,6 +210,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
     train_scores, val_scores, test_scores = [], [], []
     losses, train_losses, val_losses, test_losses = [], [], [], []
+    final_pred = None
 
     for epoch in range(1, args.n_epochs + 1):
         tic = time.time()
@@ -190,13 +221,14 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         total_time += toc - tic
 
         if epoch == args.n_epochs or epoch % args.eval_every == 0 or epoch % args.log_every == 0:
-            train_score, val_score, test_score, train_loss, val_loss, test_loss = evaluate(
+            train_score, val_score, test_score, train_loss, val_loss, test_loss, pred = evaluate(
                 args, model, eval_dataloader, labels, train_idx, val_idx, test_idx, criterion, evaluator_wrapper
             )
 
             if val_score > best_val_score:
                 best_val_score = val_score
                 final_test_score = test_score
+                final_pred = pred
 
             if epoch % args.log_every == 0:
                 print(
@@ -256,6 +288,10 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         plt.tight_layout()
         plt.savefig(f"gat_loss_{n_running}.png")
 
+    if args.save_pred:
+        os.makedirs("./output", exist_ok=True)
+        torch.save(F.softmax(final_pred, dim=1), f"./output/{n_running}.pt")
+
     return best_val_score, final_test_score
 
 
@@ -275,6 +311,9 @@ def main():
     argparser.add_argument("--seed", type=int, default=0, help="random seed")
     argparser.add_argument("--n-runs", type=int, default=10, help="running times")
     argparser.add_argument("--n-epochs", type=int, default=1200, help="number of epochs")
+    argparser.add_argument(
+        "--use-labels", action="store_true", help="Use labels in the training set as input features."
+    )
     argparser.add_argument("--no-attn-dst", action="store_true", help="Don't use attn_dst.")
     argparser.add_argument("--n-heads", type=int, default=6, help="number of heads")
     argparser.add_argument("--lr", type=float, default=0.01, help="learning rate")
@@ -288,6 +327,7 @@ def main():
     argparser.add_argument("--eval-every", type=int, default=5, help="evaluate every EVAL_EVERY epochs")
     argparser.add_argument("--log-every", type=int, default=5, help="log every LOG_EVERY epochs")
     argparser.add_argument("--plot-curves", action="store_true", help="plot learning curves")
+    argparser.add_argument("--save-pred", action="store_true", help="save final predictions")
     args = argparser.parse_args()
 
     if args.cpu:
@@ -295,19 +335,18 @@ def main():
     else:
         device = torch.device(f"cuda:{args.gpu}")
 
-    seed(args.seed)
-
     # load data & preprocess
     graph, labels, train_idx, val_idx, test_idx, evaluator = load_data(dataset)
-    graph, labels = preprocess(graph, labels)
+    graph, labels = preprocess(graph, labels, train_idx)
 
     labels, train_idx, val_idx, test_idx = map(lambda x: x.to(device), (labels, train_idx, val_idx, test_idx))
 
     # run
     val_scores, test_scores = [], []
 
-    for i in range(1, args.n_runs + 1):
-        val_score, test_score = run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, i)
+    for i in range(args.n_runs):
+        seed(args.seed + i)
+        val_score, test_score = run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, i + 1)
         val_scores.append(val_score)
         test_scores.append(test_score)
 
@@ -338,3 +377,19 @@ if __name__ == "__main__":
 # Average val score: 0.9192215693889567 ± 0.0007273194066010714
 # Average test score: 0.8677150498435523 ± 0.0014733512146035438
 # Number of params: 2460352
+
+# Namespace(attn_drop=0.0, cpu=False, dropout=0.25, edge_drop=0.1, eval_every=5, gpu=2, input_drop=0.1, log_every=5, lr=0.01, n_epochs=1200, n_heads=6, n_hidden=80, n_layers=6, n_runs=10, no_attn_dst=False, plot_curves=True, save_pred=True, seed=0, use_labels=True, wd=0)
+# Runned 10 times
+# Val scores: [0.9193633060213451, 0.9203779746344914, 0.9195503776044667, 0.9204148252631666, 0.9197779087259136, 0.9197003603681911, 0.9195532731827772, 0.922506395625185, 0.919422123176764, 0.9199306234551046]
+# Test scores: [0.870916533260643, 0.8700907586514337, 0.8709149989849309, 0.8703713415321251, 0.8692511011576054, 0.8697195043658038, 0.8703150627771118, 0.8713241547443762, 0.8705168321417875, 0.8704109119325667]
+# Average val score: 0.9200597168057406 ± 0.0008857917602566399
+# Average test score: 0.8703831199548384 ± 0.0005730375838682381
+# Number of params: 2484192
+
+# Namespace(attn_drop=0.0, cpu=False, dropout=0.25, edge_drop=0.1, eval_every=5, gpu=3, input_drop=0.1, log_every=5, lr=0.01, mask_rate=0.5, n_epochs=1200, n_heads=6, n_hidden=80, n_layers=6, n_runs=10, no_attn_dst=True, plot_curves=True, save_pred=True, seed=0, use_labels=True, wd=0)
+# Runned 10 times
+# Val scores: [0.9201914811111254, 0.9192274705491178, 0.919879421956308, 0.9196867019385541, 0.9183223561502032, 0.9183705549340395, 0.9218517411140457, 0.9201241253883999, 0.9188730796076038, 0.9201345948410253]
+# Test scores: [0.8711975317887513, 0.8668941041310539, 0.8677566735523206, 0.8691143485031099, 0.8705658833997728, 0.8715691068027097, 0.8691939716278808, 0.8675799123628813, 0.8689518849798558, 0.8677289586466419]
+# Average val score: 0.9196661527590424 ± 0.000991646077118204
+# Average test score: 0.8690552375794978 ± 0.0015335189388864584
+# Number of params: 2469312
