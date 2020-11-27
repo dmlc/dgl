@@ -44,7 +44,7 @@ Note: In this chapter we will use PyTorch as backend.
 
 注意: 本章代码使用PyTorch作为DGL的后端框架。
 
-.. _guide-training-heterogeneous-graph-example:
+.. _guide_cn-training-heterogeneous-graph-example:
 
 Heterogeneous Graphs
 

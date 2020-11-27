@@ -105,12 +105,12 @@ where :math:`h_g` is the representation of :math:`g`, :math:`\mathcal{V}` is
 the set of nodes in :math:`g`, :math:`h_v` is the feature of node :math:`v`.
 
 其中，:math:`h_g` 是图 :math:`g` 的表征， :math:`\mathcal{V}` 是图 :math:`g` 中节点的集合，
- :math:`h_v` 是节点 :math:`v` 的特征。
+:math:`h_v` 是节点 :math:`v` 的特征。
 
 DGL provides built-in support for common readout operations. For example,
 :func:`dgl.readout_nodes` implements the above readout operation.
 
-DGL内置了常见的图读出函数。例如 :func:`dgl.readout_nodes` 实现了上述的读出计算。
+DGL内置了常见的图读出函数，例如 :func:`dgl.readout_nodes` 就实现了上述的读出计算。
 
 Once :math:`h_g` is available, one can pass it through an MLP layer for
 classification output.

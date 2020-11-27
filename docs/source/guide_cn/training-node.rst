@@ -27,7 +27,7 @@ features, but also its neighboring node and edge features. Message
 passing can be repeated multiple rounds to incorporate information from
 larger range of neighborhood.
 
-为了对节点进行分类，图神经网络执行了 :ref:`guide-message-passing` 中讨论的消息传递来利用节点自身的特征和其邻节点及边的特征。
+为了对节点进行分类，图神经网络执行了 :ref:`guide_cn-message-passing` 中讨论的消息传递来利用节点自身的特征和其邻节点及边的特征。
 消息传递可以重复多轮，以纳入更大范围的邻居信息。
 
 Writing neural network model
@@ -76,14 +76,14 @@ be achieved by stacking graph convolution modules as follows.
 Note that you can use the model above for not only node classification,
 but also obtaining hidden node representations for other downstream
 tasks such as
-:ref:`guide-training-edge-classification`,
-:ref:`guide-training-link-prediction`, or
-:ref:`guide-training-graph-classification`.
-
-请注意，这个模型不仅可以做节点分类，还可以为其他下游任务获取隐藏节点表示，如：
 :ref:`guide_cn-training-edge-classification`,
 :ref:`guide_cn-training-link-prediction`, or
 :ref:`guide_cn-training-graph-classification`.
+
+请注意，这个模型不仅可以做节点分类，还可以为其他下游任务获取隐藏节点表示，如：
+:ref:`guide_cn-training-edge-classification`、
+:ref:`guide_cn-training-link-prediction`、和
+:ref:`guide_cn-training-graph-classification`。
 
 
 For a complete list of built-in graph convolution modules, please refer
@@ -239,8 +239,8 @@ and node features.
 So given that we have the user and item features in the
 :ref:`heterogeneous graph example <guide-training-heterogeneous-graph-example>`.
 
-如下面代码所示，在 :ref:`heterogeneous graph example <guide-training-heterogeneous-graph-example>`
-的例子中已经有了用户和项目的特征。
+本章的的异构图样例数据 :ref:`heterogeneous graph example <guide_cn-training-heterogeneous-graph-example>`
+中已经有了用户和项目的特征，用户可用如下代码获取。
 
 .. code:: python
 
@@ -252,7 +252,7 @@ So given that we have the user and item features in the
 
 One can simply perform a forward propagation as follows:
 
-用户可以简单地进行如下的正向传播：
+然后，用户可以简单地进行如下的正向传播：
 
 .. code:: python
 
@@ -298,7 +298,7 @@ file <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn-hetero/model
 
 DGL提供了一个用于节点分类的RGCN的端到端的例子
 `RGCN <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn-hetero/entity_classify.py>`__
-。用户可以在 `模型实现文件
+。用户可以在 `RGCN模型实现文件
 <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn-hetero/model.py>`__
 中查看异构图卷积 ``RelGraphConvLayer`` 的定义。
 

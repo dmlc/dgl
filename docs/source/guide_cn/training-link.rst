@@ -66,7 +66,7 @@ feedback <https://arxiv.org/ftp/arxiv/papers/1205/1205.2618.pdf>`__ or
 estimation <http://proceedings.mlr.press/v9/gutmann10a/gutmann10a.pdf>`__
 is.
 
-如果用户了解`implicit feedback <https://arxiv.org/ftp/arxiv/papers/1205/1205.2618.pdf>`__ 和
+如果用户熟悉 `implicit feedback <https://arxiv.org/ftp/arxiv/papers/1205/1205.2618.pdf>`__ 和
 `noise-contrastive estimation <http://proceedings.mlr.press/v9/gutmann10a/gutmann10a.pdf>`__ ，
 可能会发现这些想法都很类似。
 

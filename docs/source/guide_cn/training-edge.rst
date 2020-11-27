@@ -285,8 +285,8 @@ For instance, given the
 your task is given an edge connecting a user and an item, to predict whether
 the user would ``click`` or ``dislike`` an item.
 
-例如，给定 :ref:`heterogeneous graph example <guide-training-heterogeneous-graph-example>`
-所述的异构图，用户的任务是给定一条连接user和item的边，预测 ``user`` 和 ``item``
+例如，根据 :ref:`本章的异构图样例数据 <guide_cn-training-heterogeneous-graph-example>`，
+用户的任务是给定一条连接user和item的边，预测 ``user`` 和 ``item``
 之间的连接边类型是 ``click`` 还是 ``dislike``。
 
 This is a simplified version of rating prediction, which is common in
@@ -299,7 +299,7 @@ representations. For instance, you can still use the
 :ref:`RGCN defined previously <guide-training-rgcn-node-classification>`
 for this purpose.
 
-用户可以使用一个异构图卷积网络来获取节点表示。例如，用户仍然可以将 :ref:`前述的RGCN <guide_cn-training-rgcn-node-classification>`
+用户可以使用一个异构图卷积网络来获取节点表示。例如，用户仍然可以将 :ref:`节点分类的RGCN模型 <guide_cn-training-rgcn-node-classification>`
 用于此目的。
 
 To predict the type of an edge, you can simply repurpose the
@@ -414,7 +414,7 @@ is called ``GCMCLayer``. The edge type predictor module is called
 ``BiDecoder``. Both of them are more complicated than the setting
 described here.
 
-DGL提供了`Graph Convolutional Matrix
+DGL提供了 `Graph Convolutional Matrix
 Completion <https://github.com/dmlc/dgl/tree/master/examples/pytorch/gcmc>`__
 作为打分预测的示例，它是为了预测异构图中已经存在的边的边类型任务准备的。
 `模型实现文件中 <https://github.com/dmlc/dgl/tree/master/examples/pytorch/gcmc>`__
