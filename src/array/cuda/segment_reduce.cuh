@@ -19,6 +19,8 @@ namespace cuda {
 
 /*!
  * \brief CUDA kernel of segment reduce.
+ * \note each blockthread is responsible for aggregation on a row
+ *       in the result tensor.
  */
 template <typename IdType, typename DType,
           typename ReduceOp>
@@ -41,7 +43,9 @@ __global__ void SegmentReduceKernel(
 }
 
 /*!
- * \brief CUDA kernel of segment reduce.
+ * \brief CUDA kernel of backward phase in segment min/max.
+ * \note each blockthread is responsible for writing a row in the
+ *       result gradient tensor by lookup the ArgMin/Max for index information.
  */
 template <typename IdType, typename DType>
 __global__ void BackwardSegmentCmpKernel(
@@ -57,6 +61,13 @@ __global__ void BackwardSegmentCmpKernel(
   }
 }
 
+/*!
+ * \brief CUDA implementation of forward phase of Segment Reduce.
+ * \param feat The input tensor.
+ * \param offsets The offsets tensor.
+ * \param out The output tensor.
+ * \param arg An auxiliary tensor storing ArgMax/Min information,
+ */
 template <typename IdType, typename DType, typename ReduceOp>
 void SegmentReduce(
     NDArray feat,
@@ -80,12 +91,19 @@ void SegmentReduce(
   const int nty = 1;
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
+  // TODO(zihao): try cub's DeviceSegmentedReduce and compare the performance.
   CUDA_KERNEL_CALL((SegmentReduceKernel<IdType, DType, ReduceOp>),
       nblks, nthrs, 0, thr_entry->stream,
       feat_data, offsets_data, out_data, arg_data,
       n, dim);
 }
 
+/*!
+ * \brief CUDA implementation of backward phase of Segment Reduce with Min/Max reducer.
+ * \param feat The input tensor.
+ * \param arg The ArgMin/Max information, used for indexing.
+ * \param out The output tensor.
+ */
 template <typename IdType, typename DType>
 void BackwardSegmentCmp(
     NDArray feat,

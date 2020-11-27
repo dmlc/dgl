@@ -1512,23 +1512,27 @@ def segment_reduce(op, x, offsets):
     """Segment reduction operator.
 
     It aggregates the value tensor along the first dimension by segments.
-    The first argument ``seglen`` stores the length of each segment. Its
-    summation must be equal to the first dimension of the ``value`` tensor.
-    Zero-length segments are allowed.
+    The argument ``offsets`` specifies the start offset of each segment (and
+    the upper bound of the last segment). Zero-length segments are allowed.
+
+    .. math::
+      y_i = \Phi_{j=\mathrm{offsets}_i}^{\mathrm{offsets}_{i+1}-1} x_j
+
+    where :math:`\Phi` is the reduce operator.
 
     Parameters
     ----------
     op : str
-        Aggregation method. Can be 'sum', 'max', 'min'.
-    seglen : Tensor
-        Segment lengths.
-    value : Tensor
+        Aggregation method. Can be ``sum``, ``max``, ``min``.
+    x : Tensor
         Value to aggregate.
+    offsets : Tensor
+        The start offsets of segments.
 
     Returns
     -------
     Tensor
-        Aggregated tensor of shape ``(len(seglen), value.shape[1:])``.
+        Aggregated tensor of shape ``(len(offsets) - 1, value.shape[1:])``.
     """
     pass
 
