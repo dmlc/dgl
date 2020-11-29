@@ -24,13 +24,13 @@ import dgl.function as fn
 from functools import partial
 
 from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
-from model import RelGraphEmbedLayer
-from dgl.nn import RelGraphConv
+from model import RelGraphEmbedLayer, RelGraphConvLowMem
 from utils import thread_wrapped_func
 import tqdm 
 import sklearn.metrics as skm
 
 from ogb.nodeproppred import DglNodePropPredDataset
+
 
 class EntityClassify(nn.Module):
     """ Entity classification class for RGCN
@@ -85,22 +85,24 @@ class EntityClassify(nn.Module):
 
         self.layers = nn.ModuleList()
         # i2h
-        self.layers.append(RelGraphConv(
+        self.layers.append(RelGraphConvLowMem(
             self.h_dim, self.h_dim, self.num_rels, "basis",
             self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
             low_mem=self.low_mem, dropout=self.dropout, layer_norm = layer_norm))
         # h2h
         for idx in range(self.num_hidden_layers):
-            self.layers.append(RelGraphConv(
+            self.layers.append(RelGraphConvLowMem(
                 self.h_dim, self.h_dim, self.num_rels, "basis",
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
                 low_mem=self.low_mem, dropout=self.dropout, layer_norm = layer_norm))
         # h2o
-        self.layers.append(RelGraphConv(
+        self.layers.append(RelGraphConvLowMem(
             self.h_dim, self.out_dim, self.num_rels, "basis",
             self.num_bases, activation=None,
             self_loop=self.use_self_loop,
             low_mem=self.low_mem, layer_norm = layer_norm))
+
+        self.relids = th.arange(num_rels).to(self.device)
 
     def forward(self, blocks, feats, norm=None):
         if blocks is None:
@@ -108,9 +110,24 @@ class EntityClassify(nn.Module):
             blocks = [self.g] * len(self.layers)
         h = feats
         for layer, block in zip(self.layers, blocks):
-            block = block.to(self.device)
-            h = layer(block, h, block.edata['etype'], block.edata['norm'])
+            block, section = sort_block_by_etype(block.to(self.device), self.relids)
+            h = layer(block, h, block.edata['etype'], block.edata['norm'], section)
         return h
+
+def sort_block_by_etype(block, relids):
+    # Return a block with edges sorted by etype and also the number of edges
+    # in each type.
+    etype = block.edata['etype']
+    sorted_etype, index = th.sort(etype)
+
+    newblock = dgl.edge_subgraph(block, index, preserve_nodes=True)
+
+    pos = th.searchsorted(sorted_etype, relids)
+
+    num = th.tensor([len(etype)]).to(etype.device)
+    section = list(th.cat([pos[1:], num]) - pos)
+
+    return newblock, section
 
 class NeighborSampler:
     """Neighbor sampler
@@ -300,17 +317,15 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                 dense_params += list(embed_layer.embeds.parameters())
         optimizer = th.optim.Adam(dense_params, lr=args.lr, weight_decay=args.l2norm)
         if  n_gpus > 1:
-            emb_optimizer = th.optim.SparseAdam(embed_layer.module.node_embeds.parameters(), lr=args.lr)
+            emb_optimizer = th.optim.SparseAdam(list(embed_layer.module.node_embeds.parameters()), lr=args.lr)
         else:
-            emb_optimizer = th.optim.SparseAdam(embed_layer.node_embeds.parameters(), lr=args.lr)
+            emb_optimizer = th.optim.SparseAdam(list(embed_layer.node_embeds.parameters()), lr=args.lr)
     else:
         all_params = list(model.parameters()) + list(embed_layer.parameters())
         optimizer = th.optim.Adam(all_params, lr=args.lr, weight_decay=args.l2norm)
 
     # training loop
     print("start training...")
-    forward_time = []
-    backward_time = []
 
     for epoch in range(args.n_epochs):
         model.train()
@@ -337,11 +352,13 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
             if args.sparse_embedding:
                 emb_optimizer.zero_grad()
 
+            t2 = time.time()
             loss.backward()
+            t3 = time.time()
             optimizer.step()
             if args.sparse_embedding:
                 emb_optimizer.step()
-            t3 = time.time()
+            t4 = time.time()
 
             data_copy_time.append(t1 - t0)
             forward_time.append(t2 - t1)
