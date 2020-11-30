@@ -49,7 +49,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from dgl import DGLGraph
 
-gcn_msg = fn.copy_src(src='h', out='m')
+gcn_msg = fn.copy_u(src='h', out='m')
 gcn_reduce = fn.sum(msg='m', out='h')
 
 ###############################################################################
