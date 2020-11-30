@@ -5,55 +5,29 @@
 
 :ref:`(English Version) <guide-training-node-classification>`
 
-One of the most popular and widely adopted tasks for graph neural
-networks is node classification, where each node in the
-training/validation/test set is assigned a ground truth category from a
-set of predefined categories. Node regression is similar, where each
-node in the training/validation/test set is assigned a ground truth
-number.
-
-对于图神经网络来说，最受欢迎和广泛采用的任务之一是节点分类，
-其中训练/验证/测试集中的每个节点都从一组预定义的类别中分配一个正确标注的类别。
-节点回归也是类似的，其中训练/验证/测试集中的每个节点都被分配了一个正确标注的数字。
-
-Overview
+对于图神经网络来说，最常见和被广泛使用的任务之一就是节点分类。
+图数据中的训练、验证和测试集中的每个节点都具有从一组预定义的类别中分配的一个类别，即正确的标注。
+节点回归任务也类似，训练、验证和测试集中的每个节点都被标注了一个正确的数字。
 
 概述
 ~~~~~~~~
 
-To classify nodes, graph neural network performs message passing
-discussed in :ref:`guide-message-passing` to utilize the node’s own
-features, but also its neighboring node and edge features. Message
-passing can be repeated multiple rounds to incorporate information from
-larger range of neighborhood.
-
-为了对节点进行分类，图神经网络执行了 :ref:`guide_cn-message-passing` 中讨论的消息传递来利用节点自身的特征和其邻节点及边的特征。
-消息传递可以重复多轮，以纳入更大范围的邻居信息。
-
-Writing neural network model
+为了对节点进行分类，图神经网络执行了 :ref:`guide_cn-message-passing`
+中介绍的消息传递机制，利用节点自身的特征和其邻节点及边的特征来计算节点的隐藏表示。
+消息传递可以重复多轮，以利用更大范围的邻居信息。
 
 编写神经网络模型
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-DGL provides a few built-in graph convolution modules that can perform
-one round of message passing. In this guide, we choose
-:class:`dgl.nn.pytorch.SAGEConv` (also available in MXNet and Tensorflow),
-the graph convolution module for GraphSAGE.
+DGL提供了一些内置的图卷积模块，可以完成一轮消息传递计算。
+本章中选择 :class:`dgl.nn.pytorch.SAGEConv` 作为演示的样例代码(在DGL的MXNet和Tensorflow包中也有)，
+它是GraphSAGE模型中使用的图卷积模块。
 
-DGL提供了一些内置的图卷积模块，可以进行一轮消息传递。
-本指南中选择 :class:`dgl.nn.pytorch.SAGEConv` (在DGL的MXNet和Tensorflow包中也有)，
-它是GraphSAGE中使用的图卷积模块。
-
-Usually for deep learning models on graphs we need a multi-layer graph
-neural network, where we do multiple rounds of message passing. This can
-be achieved by stacking graph convolution modules as follows.
-
-通常对于图上的深度学习模型，需要一个多层图神经网络，并在这个网络中要进行多轮的信息传递。
-这可以通过堆叠图卷积模块来实现，具体如下。
+对于图上的深度学习模型，通常需要一个多层的图神经网络，并在这个网络中要进行多轮的信息传递。
+可以通过堆叠图卷积模块来实现这种网络架构，具体如下所示。
 
 .. code:: python
 
-    # Contruct a two-layer GNN model
     # 构建一个2层的GNN模型
     import dgl.nn as dglnn
     import torch.nn as nn
@@ -67,56 +41,28 @@ be achieved by stacking graph convolution modules as follows.
                 in_feats=hid_feats, out_feats=out_feats, aggregator_type='mean')
       
         def forward(self, graph, inputs):
-            # inputs are features of nodes
+            # 输入是节点的特征
             h = self.conv1(graph, inputs)
             h = F.relu(h)
             h = self.conv2(graph, h)
             return h
-
-Note that you can use the model above for not only node classification,
-but also obtaining hidden node representations for other downstream
-tasks such as
-:ref:`guide_cn-training-edge-classification`,
-:ref:`guide_cn-training-link-prediction`, or
-:ref:`guide_cn-training-graph-classification`.
 
 请注意，这个模型不仅可以做节点分类，还可以为其他下游任务获取隐藏节点表示，如：
 :ref:`guide_cn-training-edge-classification`、
 :ref:`guide_cn-training-link-prediction`、和
 :ref:`guide_cn-training-graph-classification`。
 
-
-For a complete list of built-in graph convolution modules, please refer
-to :ref:`apinn`.
-
 关于DGL内置图卷积模块的完整列表，读者可以参考 :ref:`apinn`。
 
-For more details in how DGL
-neural network modules work and how to write a custom neural network
-module with message passing please refer to the example in :ref:`guide-nn`.
-
 有关DGL神经网络模块如何工作，以及如何编写一个自定义的带有消息传递的GNN模块的更多细节，请参考 :ref:`guide_cn-nn` 中的例子。
-
-Training loop
 
 训练循环
 ~~~~~~~~~~~~~
 
-Training on the full graph simply involves a forward propagation of the
-model defined above, and computing the loss by comparing the prediction
-against ground truth labels on the training nodes.
-
-全图上的训练只需要对上面定义的模型进行正向传播，并通过在训练节点上比较预测和真实标签来计算损失。
-
-This section uses a DGL built-in dataset
-:class:`dgl.data.CiteseerGraphDataset` to
-show a training loop. The node features
-and labels are stored on its graph instance, and the
-training-validation-test split are also stored on the graph as boolean
-masks. This is similar to what you have seen in :ref:`guide-data-pipeline`.
+全图(使用所有的节点和边的特征)上的训练只需要使用上面定义的模型进行前向传播计算，并通过在训练节点上比较预测和真实标签来计算损失，从而完成后向传播。
 
 本节使用DGL内置的数据集 :class:`dgl.data.CiteseerGraphDataset` 来展示一个训练循环。
-节点特征和标签存储在其图实例上，训练-验证-测试的分割也以布尔掩码的形式存储在图上。这与在
+节点特征和标签存储在其图上，训练、验证和测试的分割也以布尔掩码的形式存储在图上。这与在
 :ref:`guide_cn-data-pipeline` 中的做法类似。
 
 .. code:: python
@@ -129,9 +75,7 @@ masks. This is similar to what you have seen in :ref:`guide-data-pipeline`.
     n_features = node_features.shape[1]
     n_labels = int(node_labels.max().item() + 1)
 
-The following is an example of evaluating your model by accuracy.
-
-下面是一个通过使用准确性来评估模型的例子。
+下面是通过使用准确性来评估模型的一个例子。
 
 .. code:: python
 
@@ -145,8 +89,6 @@ The following is an example of evaluating your model by accuracy.
             correct = torch.sum(indices == labels)
             return correct.item() * 1.0 / len(labels)
 
-You can then write our training loop as follows.
-
 用户可以按如下方式实现训练循环。
 
 .. code:: python
@@ -156,56 +98,42 @@ You can then write our training loop as follows.
     
     for epoch in range(10):
         model.train()
-        # forward propagation by using all nodes
+        # 使用所有节点(全图)进行前向传播计算
         logits = model(graph, node_features)
-        # compute loss
+        # 计算损失值
         loss = F.cross_entropy(logits[train_mask], node_labels[train_mask])
-        # compute validation accuracy
+        # 计算验证集的准确度
         acc = evaluate(model, graph, node_features, node_labels, valid_mask)
-        # backward propagation
+        # 进行反向传播计算
         opt.zero_grad()
         loss.backward()
         opt.step()
         print(loss.item())
     
-        # Save model if necessary.  Omitted in this example.
+        # 如果需要的话，保存训练好的模型。本例中省略。
 
 
-`GraphSAGE <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/train_full.py>`__
-provides an end-to-end homogeneous graph node classification example.
-You could see the corresponding model implementation is in the
-``GraphSAGE`` class in the example with adjustable number of layers,
-dropout probabilities, and customizable aggregation functions and
-nonlinearities.
-
-`GraphSAGE <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/train_full.py>`__
-提供了一个端到端的同构图节点分类的例子。可以在 ``GraphSAGE`` 类中看到对应的模型实现。
+`DGL的GraphSAGE样例 <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/train_full.py>`__
+提供了一个端到端的同构图节点分类的例子。用户可以在 ``GraphSAGE`` 类中看到模型实现的细节。
 这个模型具有可调节的层数、dropout概率，以及可定制的聚合函数和非线性函数。
 
 .. _guide_cn-training-rgcn-node-classification:
 
-Heterogeneous graph
-
 异构图上的训练循环
 ~~~~~~~~~~~~~~~~~~~
 
-If your graph is heterogeneous, you may want to gather message from
-neighbors along all edge types. You can use the module
-:class:`dgl.nn.pytorch.HeteroGraphConv` (also available in MXNet and Tensorflow)
-to perform message passing
-on all edge types, then combining different graph convolution modules
-for each edge type.
-
 如果图是异构的，用户可能希望沿着所有边类型从邻居那里收集消息。
-用户可以使用模块 :class:`dgl.nn.pytorch.HeteroGraphConv` (也可以在DGL的MXNet和Tensorflow包中使用)在所有边类型上执行消息传递，
-然后为每个边类型组合不同的图卷积模块。
+用户可以使用 :class:`dgl.nn.pytorch.HeteroGraphConv`
+模块(也可以在DGL的MXNet和Tensorflow包中使用)在所有边类型上执行消息传递，
+然后为每种边类型组合不同的图卷积模块。
 
 The following code will define a heterogeneous graph convolution module
 that first performs a separate graph convolution on each edge type, then
 sums the message aggregations on each edge type as the final result for
 all node types.
 
-下面的代码将定义一个异构图卷积模块，首先对每个边类型进行单独的图卷积，然后将每个边类型上的消息聚合结果相加，作为所有节点类型的最终结果。
+下面的代码定义了一个异构图卷积模块。模块首先对每种边类型进行单独的图卷积计算，然后将每种边类型上的消息聚合结果再相加，
+并作为所有节点类型的最终结果。
 
 .. code:: python
 
@@ -224,23 +152,17 @@ all node types.
                 for rel in rel_names}, aggregate='sum')
       
         def forward(self, graph, inputs):
-            # inputs are features of nodes
+            # 输入是节点的特征
             h = self.conv1(graph, inputs)
             h = {k: F.relu(v) for k, v in h.items()}
             h = self.conv2(graph, h)
             return h
 
-``dgl.nn.HeteroGraphConv`` takes in a dictionary of node types and node
-feature tensors as input, and returns another dictionary of node types
-and node features.
 
 ``dgl.nn.HeteroGraphConv`` 接收一个节点类型和节点特征张量的字典作为输入，并返回另一个节点类型和节点特征的字典。
 
-So given that we have the user and item features in the
-:ref:`heterogeneous graph example <guide-training-heterogeneous-graph-example>`.
-
 本章的的异构图样例数据 :ref:`heterogeneous graph example <guide_cn-training-heterogeneous-graph-example>`
-中已经有了用户和项目的特征，用户可用如下代码获取。
+中已经有了 ``user`` 和 ``item`` 的特征，用户可用如下代码获取。
 
 .. code:: python
 
@@ -250,9 +172,7 @@ So given that we have the user and item features in the
     labels = hetero_graph.nodes['user'].data['label']
     train_mask = hetero_graph.nodes['user'].data['train_mask']
 
-One can simply perform a forward propagation as follows:
-
-然后，用户可以简单地进行如下的正向传播：
+然后，用户可以简单地按如下形式进行前向传播计算：
 
 .. code:: python
 
@@ -261,14 +181,8 @@ One can simply perform a forward propagation as follows:
     h_user = h_dict['user']
     h_item = h_dict['item']
 
-Training loop is the same as the one for homogeneous graph, except that
-now you have a dictionary of node representations from which you compute
-the predictions. For instance, if you are only predicting the ``user``
-nodes, you can just extract the ``user`` node embeddings from the
-returned dictionary:
-
-异构图上的训练循环和同构图的训练循环是一样的，只是现在用户有一个节点表示的字典以计算预测。
-例如，如果只预测 ``user`` 节点，用户可以只从返回的字典中提取 ``user`` 的节点嵌入。
+异构图上的训练循环和同构图的训练循环是一样的，只是这里使用了一个包括节点表示的字典来计算预测值。
+例如，如果只预测 ``user`` 节点的类别，用户可以从返回的字典中提取 ``user`` 的节点嵌入。
 
 .. code:: python
 
@@ -276,30 +190,23 @@ returned dictionary:
     
     for epoch in range(5):
         model.train()
-        # forward propagation by using all nodes and extracting the user embeddings
+        # 使用所有的节点和它们的 ``user`` 嵌入进行前向传播计算
         logits = model(hetero_graph, node_features)['user']
-        # compute loss
+        # 计算损失值
         loss = F.cross_entropy(logits[train_mask], labels[train_mask])
-        # Compute validation accuracy.  Omitted in this example.
-        # backward propagation
+        # 计算验证集的准确度。在本例中省略。
+        # 进行反向传播计算
         opt.zero_grad()
         loss.backward()
         opt.step()
         print(loss.item())
     
-        # Save model if necessary.  Omitted in the example.
-
-
-DGL provides an end-to-end example of
-`RGCN <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn-hetero/entity_classify.py>`__
-for node classification. You can see the definition of heterogeneous
-graph convolution in ``RelGraphConvLayer`` in the `model implementation
-file <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn-hetero/model.py>`__.
+        # 如果需要的话，保存训练好的模型。本例中省略。
 
 DGL提供了一个用于节点分类的RGCN的端到端的例子
 `RGCN <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn-hetero/entity_classify.py>`__
 。用户可以在 `RGCN模型实现文件
 <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn-hetero/model.py>`__
-中查看异构图卷积 ``RelGraphConvLayer`` 的定义。
+中查看异构图卷积 ``RelGraphConvLayer`` 的具体定义。
 
 

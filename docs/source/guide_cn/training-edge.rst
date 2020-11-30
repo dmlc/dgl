@@ -5,53 +5,31 @@
 
 :ref:`(English Version) <guide-training-edge-classification>`
 
-Sometimes you wish to predict the attributes on the edges of the graph,
-or even whether an edge exists or not between two given nodes. In that
-case, you would like to have an *edge classification/regression* model.
+有时用户希望预测图中边的属性值，甚至要预测给定的两个节点之间是否存在边。这种情况下，用户需要构建一个边分类/回归的模型。
 
-有时用户希望预测图中边上的属性值，甚至要预测给定的两个节点之间是否有边。这种情况下，用户需要构建一个边分类/回归模型。
-
-Here we generate a random graph for edge prediction as a demonstration.
-
-以下代码生成了一个随机图用于演示边分类/回归。
+以下代码生成了一个随机图以用于演示边分类/回归。
 
 .. code:: ipython3
 
     src = np.random.randint(0, 100, 500)
     dst = np.random.randint(0, 100, 500)
-    # make it symmetric
     # 建立对称的边
     edge_pred_graph = dgl.graph((np.concatenate([src, dst]), np.concatenate([dst, src])))
-    # synthetic node and edge features, as well as edge labels
     # 建立点和边特征，以及边的标签
     edge_pred_graph.ndata['feature'] = torch.randn(100, 10)
     edge_pred_graph.edata['feature'] = torch.randn(1000, 10)
     edge_pred_graph.edata['label'] = torch.randn(1000)
-    # synthetic train-validation-test splits
-    # 训练集-验证集-测试集划分
+    # 进行训练、验证和测试集划分
     edge_pred_graph.edata['train_mask'] = torch.zeros(1000, dtype=torch.bool).bernoulli(0.6)
-
-Overview
 
 概述
 ~~~~~~~~
 
-From the previous section you have learned how to do node classification
-with a multilayer GNN. The same technique can be applied for computing a
-hidden representation of any node. The prediction on edges can then be
-derived from the representation of their incident nodes.
+上一节介绍了如何使用多层GNN进行节点分类。同样的方法也可以被用于计算任何节点的隐藏表示。
+并从边的两个端点的表示，通过计算得出对是否存在边的预测。
 
-上一节介绍了如何使用多层GNN进行节点分类。同样的方法可被用于计算任何节点的隐藏表示。
-然后就可以从边的两个端点的表示计算得出对边的预测。
-
-The most common case of computing the prediction on an edge is to
-express it as a parameterized function of the representation of its
-incident nodes, and optionally the features on the edge itself.
-
-在一条边上计算预测值最常见的情况是将预测表示为一个参数化函数，函数的参数是边的两个端点的表示。
+对一条边计算预测值最常见的情况是将预测表示为一个参数化函数，函数的参数是边的两个端点的表示，
 参数还可以包括边自身的特征。
-
-Model Implementation Difference from Node Classification
 
 与节点分类在模型实现上的差别
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
