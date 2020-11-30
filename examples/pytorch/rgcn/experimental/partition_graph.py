@@ -50,7 +50,7 @@ def load_ogb(dataset, global_norm):
             if ntype == category:
                 category_id = i
 
-        g = dgl.to_homo(hg)
+        g = dgl.to_homogeneous(hg, edata=['norm'])
         if global_norm:
             u, v, eid = g.all_edges(form='all')
             _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)

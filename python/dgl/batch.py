@@ -1,11 +1,13 @@
 """Utilities for batching/unbatching graphs."""
 from collections.abc import Mapping
-from collections import defaultdict
 
 from . import backend as F
 from .base import ALL, is_all, DGLError, dgl_warning
+from .heterograph_index import disjoint_union
+from .heterograph import DGLHeteroGraph
 from . import convert
 from . import utils
+
 
 __all__ = ['batch', 'unbatch', 'batch_hetero', 'unbatch_hetero']
 
@@ -156,74 +158,67 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
         dgl_warning('Arguments edge_attrs has been deprecated. Please use'
                     ' edata instead.')
         edata = edge_attrs
-    if not (is_all(ndata) or isinstance(ndata, list)):
+    if not (is_all(ndata) or isinstance(ndata, list) or ndata is None):
         raise DGLError('Invalid argument ndata: must be a string list but got {}.'.format(
             type(ndata)))
-    if not (is_all(edata) or isinstance(edata, list)):
+    if not (is_all(edata) or isinstance(edata, list) or edata is None):
         raise DGLError('Invalid argument edata: must be a string list but got {}.'.format(
             type(edata)))
     if any(g.is_block for g in graphs):
         raise DGLError("Batching a block is not supported.")
 
-    utils.check_all_same_device(graphs, 'graphs')
-    utils.check_all_same_idtype(graphs, 'graphs')
-    relations = graphs[0].canonical_etypes
-    ntypes = graphs[0].ntypes
-    idtype = graphs[0].idtype
-    device = graphs[0].device
+    relations = list(sorted(graphs[0].canonical_etypes))
+    relation_ids = [graphs[0].get_etype_id(r) for r in relations]
+    ntypes = list(sorted(graphs[0].ntypes))
+    ntype_ids = [graphs[0].get_ntype_id(n) for n in ntypes]
+    etypes = [etype for _, etype, _ in relations]
 
-    # Batch graph structure for each relation graph
-    edge_dict = defaultdict(list)
-    num_nodes_dict = defaultdict(int)
-    for g in graphs:
-        for rel in relations:
-            srctype, etype, dsttype = rel
-            u, v = g.edges(order='eid', etype=rel)
-            src = u + num_nodes_dict[srctype]
-            dst = v + num_nodes_dict[dsttype]
-            edge_dict[rel].append((src, dst))
-        for ntype in ntypes:
-            num_nodes_dict[ntype] += g.number_of_nodes(ntype)
-    for rel in relations:
-        src, dst = zip(*edge_dict[rel])
-        edge_dict[rel] = (F.cat(src, 0), F.cat(dst, 0))
-    retg = convert.heterograph(edge_dict, num_nodes_dict, idtype=idtype, device=device)
+    gidx = disjoint_union(graphs[0]._graph.metagraph, [g._graph for g in graphs])
+    retg = DGLHeteroGraph(gidx, ntypes, etypes)
 
     # Compute batch num nodes
     bnn = {}
-    for ntype in graphs[0].ntypes:
+    for ntype in ntypes:
         bnn[ntype] = F.cat([g.batch_num_nodes(ntype) for g in graphs], 0)
     retg.set_batch_num_nodes(bnn)
 
     # Compute batch num edges
     bne = {}
-    for etype in graphs[0].canonical_etypes:
+    for etype in relations:
         bne[etype] = F.cat([g.batch_num_edges(etype) for g in graphs], 0)
     retg.set_batch_num_edges(bne)
 
     # Batch node feature
     if ndata is not None:
-        for ntype in graphs[0].ntypes:
-            feat_dicts = [g.nodes[ntype].data for g in graphs if g.number_of_nodes(ntype) > 0]
-            ret_feat = _batch_feat_dicts(feat_dicts, ndata, 'nodes["{}"].data'.format(ntype))
+        for ntype_id, ntype in zip(ntype_ids, ntypes):
+            frames = [
+                g._node_frames[ntype_id] for g in graphs
+                if g._graph.number_of_nodes(ntype_id) > 0]
+            # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently
+            # we allow empty graphs to have no features during batching.
+            ret_feat = _batch_feat_dicts(frames, ndata, 'nodes["{}"].data'.format(ntype))
             retg.nodes[ntype].data.update(ret_feat)
 
     # Batch edge feature
     if edata is not None:
-        for etype in graphs[0].canonical_etypes:
-            feat_dicts = [g.edges[etype].data for g in graphs if g.number_of_edges(etype) > 0]
-            ret_feat = _batch_feat_dicts(feat_dicts, edata, 'edges[{}].data'.format(etype))
+        for etype_id, etype in zip(relation_ids, relations):
+            frames = [
+                g._edge_frames[etype_id] for g in graphs
+                if g._graph.number_of_edges(etype_id) > 0]
+            # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently
+            # we allow empty graphs to have no features during batching.
+            ret_feat = _batch_feat_dicts(frames, edata, 'edges[{}].data'.format(etype))
             retg.edges[etype].data.update(ret_feat)
 
     return retg
 
-def _batch_feat_dicts(feat_dicts, keys, feat_dict_name):
+def _batch_feat_dicts(frames, keys, feat_dict_name):
     """Internal function to batch feature dictionaries.
 
     Parameters
     ----------
-    feat_dicts : list[dict[str, Tensor]]
-        Feature dictionary list.
+    frames : list[Frame]
+        List of frames
     keys : list[str]
         Feature keys. Can be '__ALL__', meaning batching all features.
     feat_dict_name : str
@@ -234,17 +229,17 @@ def _batch_feat_dicts(feat_dicts, keys, feat_dict_name):
     dict[str, Tensor]
         New feature dict.
     """
-    if len(feat_dicts) == 0:
+    if len(frames) == 0:
         return {}
+    schemas = [frame.schemes for frame in frames]
     # sanity checks
     if is_all(keys):
-        utils.check_all_same_keys(feat_dicts, feat_dict_name)
-        keys = feat_dicts[0].keys()
+        utils.check_all_same_schema(schemas, feat_dict_name)
+        keys = schemas[0].keys()
     else:
-        utils.check_all_have_keys(feat_dicts, keys, feat_dict_name)
-    utils.check_all_same_schema(feat_dicts, keys, feat_dict_name)
+        utils.check_all_same_schema_for_keys(schemas, keys, feat_dict_name)
     # concat features
-    ret_feat = {k : F.cat([fd[k] for fd in feat_dicts], 0) for k in keys}
+    ret_feat = {k : F.cat([fd[k] for fd in frames], 0) for k in keys}
     return ret_feat
 
 def unbatch(g, node_split=None, edge_split=None):

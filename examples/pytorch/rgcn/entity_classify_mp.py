@@ -86,19 +86,19 @@ class EntityClassify(nn.Module):
         self.layers.append(RelGraphConv(
             self.h_dim, self.h_dim, self.num_rels, "basis",
             self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-            low_mem=self.low_mem, dropout=self.dropout))
+            low_mem=self.low_mem, dropout=self.dropout, layer_norm = layer_norm))
         # h2h
         for idx in range(self.num_hidden_layers):
             self.layers.append(RelGraphConv(
                 self.h_dim, self.h_dim, self.num_rels, "basis",
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-                low_mem=self.low_mem, dropout=self.dropout))
+                low_mem=self.low_mem, dropout=self.dropout, layer_norm = layer_norm))
         # h2o
         self.layers.append(RelGraphConv(
             self.h_dim, self.out_dim, self.num_rels, "basis",
             self.num_bases, activation=None,
             self_loop=self.use_self_loop,
-            low_mem=self.low_mem))
+            low_mem=self.low_mem, layer_norm = layer_norm))
 
     def forward(self, blocks, feats, norm=None):
         if blocks is None:
@@ -152,12 +152,10 @@ class NeighborSampler:
             else:
                 frontier = dgl.sampling.sample_neighbors(self.g, cur, fanout)
             etypes = self.g.edata[dgl.ETYPE][frontier.edata[dgl.EID]]
-            norm = self.g.edata['norm'][frontier.edata[dgl.EID]]
             block = dgl.to_block(frontier, cur)
             block.srcdata[dgl.NTYPE] = self.g.ndata[dgl.NTYPE][block.srcdata[dgl.NID]]
-            block.srcdata['type_id'] =self.g.ndata[dgl.NID][block.srcdata[dgl.NID]]
+            block.srcdata['type_id'] = self.g.ndata[dgl.NID][block.srcdata[dgl.NID]]
             block.edata['etype'] = etypes
-            block.edata['norm'] = norm
             cur = block.srcdata[dgl.NID]
             blocks.insert(0, block)
         return seeds, blocks
@@ -187,7 +185,7 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
 
 @thread_wrapped_func
 def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
-    dev_id = devices[proc_id]
+    dev_id = devices[proc_id] if devices[proc_id] != 'cpu' else -1
     g, node_feats, num_of_ntype, num_classes, num_rels, target_idx, \
         train_idx, val_idx, test_idx, labels = dataset
     if split is not None:
@@ -506,6 +504,9 @@ def main(args, devices):
     train_idx.share_memory_()
     val_idx.share_memory_()
     test_idx.share_memory_()
+    # Create csr/coo/csc formats before launching training processes with multi-gpu.
+    # This avoids creating certain formats in each sub-process, which saves momory and CPU.
+    g.create_formats_()
 
     n_gpus = len(devices)
     # cpu

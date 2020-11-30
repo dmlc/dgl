@@ -137,12 +137,18 @@ bool NDArray::IsContiguous() const {
   CHECK(data_ != nullptr);
   if (data_->dl_tensor.strides == nullptr)
     return true;
-  for (int i = 0; i < data_->dl_tensor.ndim - 1; ++i) {
-    if (data_->dl_tensor.strides[i] !=
-        data_->dl_tensor.shape[i+1] * data_->dl_tensor.strides[i+1])
-      return false;
+
+  // See https://github.com/dmlc/dgl/issues/2118 and PyTorch's compute_contiguous() implementation
+  int64_t z = 1;
+  for (int64_t i = data_->dl_tensor.ndim - 1; i >= 0; --i) {
+    if (data_->dl_tensor.shape[i] != 1) {
+      if (data_->dl_tensor.strides[i] == z)
+        z *= data_->dl_tensor.shape[i];
+      else
+        return false;
+    }
   }
-  return data_->dl_tensor.strides[data_->dl_tensor.ndim - 1] == 1;
+  return true;
 }
 
 NDArray NDArray::CreateView(std::vector<int64_t> shape,
@@ -198,9 +204,10 @@ NDArray NDArray::Empty(std::vector<int64_t> shape,
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
   size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
-  ret.data_->dl_tensor.data =
-      DeviceAPI::Get(ret->ctx)->AllocDataSpace(
-          ret->ctx, size, alignment, ret->dtype);
+  if (size > 0)
+    ret.data_->dl_tensor.data =
+        DeviceAPI::Get(ret->ctx)->AllocDataSpace(
+            ret->ctx, size, alignment, ret->dtype);
   return ret;
 }
 

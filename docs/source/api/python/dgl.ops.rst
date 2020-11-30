@@ -15,7 +15,7 @@ It *fuses* two steps into one kernel.
 
 1. Computes messages by add/sub/mul/div source node and edge features,
    or copy node features to edges.
-2. Aggregate the messages by sum/max/min as the features on destination nodes.
+2. Aggregate the messages by sum/max/min/mean as the features on destination nodes.
 
 Our implementation supports tensors on CPU/GPU in PyTorch/MXNet/Tensorflow
 as input. All operators are equipped with autograd (computing the input gradients
@@ -100,12 +100,18 @@ graph.
     u_sub_e_min
     u_mul_e_min
     u_div_e_min
+    u_add_e_mean
+    u_sub_e_mean
+    u_mul_e_mean
+    u_div_e_mean
     copy_u_sum
     copy_e_sum
     copy_u_max
     copy_e_max
     copy_u_min
     copy_e_min 
+    copy_u_mean
+    copy_e_mean
 
 GSDDMM functions
 ----------------
@@ -233,7 +239,7 @@ Like GSpMM, GSDDMM operators support both homogeneous and bipartite graph.
 Edge Softmax module
 -------------------
 
-We also provide framework agnostic edge softmax module which was frequently used in
+DGL also provide framework agnostic edge softmax module which was frequently used in
 GNN-like structures, e.g. 
 `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`_,
 `Transformer <https://papers.nips.cc/paper/7181-attention-is-all-you-need.pdf>`_,
@@ -243,6 +249,16 @@ GNN-like structures, e.g.
     :toctree: ../../generated/
 
     edge_softmax
+
+Segment Reduce Module
+---------------------
+
+DGL provide operators to reduce value tensor along the first dimension by segments.
+
+.. autosummary::
+   :toctree: ../../generated/
+
+   segment_reduce
 
 Relation with Message Passing APIs
 ----------------------------------

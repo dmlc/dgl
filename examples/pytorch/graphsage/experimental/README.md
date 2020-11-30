@@ -1,6 +1,13 @@
 ## Distributed training
 
-This is an example of training GraphSage in a distributed fashion. To train GraphSage, it has five steps:
+This is an example of training GraphSage in a distributed fashion. Before training, please install some python libs by pip:
+
+```bash
+sudo pip3 install ogb
+sudo pip3 install pyinstrument
+```
+
+To train GraphSage, it has five steps:
 
 ### Step 0: set IP configuration file.
 
@@ -78,11 +85,26 @@ To run unsupervised training:
 python3 ~/dgl/tools/launch.py \
 --workspace ~/graphsage/ \
 --num_trainers 1 \
+--num_samplers 4 \
 --num_servers 1 \
 --part_config ogb-product/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 dgl_code/train_dist_unsupervised.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 3 --batch_size 1000"
+"python3 dgl_code/train_dist_unsupervised.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 3 --batch_size 1000 --num_workers 4"
 ```
+
+By default, this code will run on CPU. If you have GPU support, you can just add a `--num_gpus` argument in user command:
+
+```bash
+python3 ~/dgl/tools/launch.py \
+--workspace ~/graphsage/ \
+--num_trainers 4 \
+--num_samplers 4 \
+--num_servers 1 \
+--part_config ogb-product/ogb-product.json \
+--ip_config ip_config.txt \
+"python3 dgl_code/train_dist.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 30 --batch_size 1000 --num_workers 4 --num_gpus 4"
+```
+
 
 ## Distributed code runs in the standalone mode
 

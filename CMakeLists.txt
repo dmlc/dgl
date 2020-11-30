@@ -26,6 +26,8 @@ dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
+dgl_option(USE_S3 "Build with S3 support" OFF)
+dgl_option(USE_HDFS "Build with HDFS support" OFF) # Set env HADOOP_HDFS_HOME if needed
 
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
 if (NOT MSVC)
@@ -36,6 +38,17 @@ if(USE_CUDA)
   message(STATUS "Build with CUDA support")
   project(dgl C CXX)
   include(cmake/modules/CUDA.cmake)
+  if ((CUDA_VERSION_MAJOR LESS 11) OR
+      ((CUDA_VERSION_MAJOR EQUAL 11) AND (CUDA_VERSION_MINOR EQUAL 0)))
+    # For cuda<11, use external CUB/Thrust library because CUB is not part of CUDA.
+    # For cuda==11.0, use external CUB/Thrust library because there is a bug in the
+    #   official CUB library which causes invalid device ordinal error for DGL. The bug
+    #   is fixed by https://github.com/NVIDIA/cub/commit/9143e47e048641aa0e6ddfd645bcd54ff1059939
+    #   in 11.1.
+    message(STATUS "Detected CUDA of version ${CUDA_VERSION}. Use external CUB/Thrust library.")
+    cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust")
+    cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cub")
+  endif()
 endif(USE_CUDA)
 
 # include directories
@@ -45,8 +58,8 @@ include_directories("third_party/METIS/include/")
 include_directories("third_party/dmlc-core/include")
 include_directories("third_party/minigun/minigun")
 include_directories("third_party/minigun/third_party/moderngpu/src")
-include_directories("third_party/cub/")
 include_directories("third_party/phmap/")
+include_directories("third_party/xbyak/")
 
 # initial variables
 set(DGL_LINKER_LIBS "")
@@ -79,7 +92,12 @@ else(MSVC)
   include(CheckCXXCompilerFlag)
   check_cxx_compiler_flag("-std=c++11"    SUPPORT_CXX11)
   set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
+  # We still use c++11 flag in CPU build because gcc5.4 (our default compiler) is
+  # not fully compatible with c++14 feature.
   set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++11 ${CMAKE_CXX_FLAGS}")
+  if(NOT APPLE)
+    set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--warn-common ${CMAKE_SHARED_LINKER_FLAGS}")
+  endif(NOT APPLE)
 endif(MSVC)
 
 if(USE_OPENMP)
@@ -113,6 +131,7 @@ file(GLOB DGL_SRC
   src/runtime/*.cc
   src/geometry/*.cc
   src/geometry/cpu/*.cc
+  src/dataloading/*.cc
 )
 
 file(GLOB_RECURSE DGL_SRC_1
@@ -137,10 +156,10 @@ else(USE_CUDA)
 endif(USE_CUDA)
 
 # For serialization
+if (USE_HDFS)
+  option(DMLC_HDFS_SHARED "dgl has to build with dynamic hdfs library" ON)
+endif()
 add_subdirectory("third_party/dmlc-core")
-# dmlc-core options for support S3/HDFS
-add_definitions(-DUSE_S3=OFF)
-add_definitions(-DUSE_HDFS=OFF)
 list(APPEND DGL_LINKER_LIBS dmlc)
 set(GOOGLE_TEST 0) # Turn off dmlc-core test
 

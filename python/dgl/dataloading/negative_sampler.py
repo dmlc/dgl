@@ -48,7 +48,7 @@ class Uniform(_BaseNegativeSampler):
     Examples
     --------
     >>> g = dgl.graph(([0, 1, 2], [1, 2, 3]))
-    >>> neg_sampler = dgl.sampling.negative_sampler.Uniform(2)
+    >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(2)
     >>> neg_sampler(g, [0, 1])
     (tensor([0, 0, 1, 1]), tensor([1, 0, 2, 3]))
     """

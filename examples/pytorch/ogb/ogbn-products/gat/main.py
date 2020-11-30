@@ -184,7 +184,7 @@ def run(args, device, data):
             if step % args.log_every == 0:
                 acc = compute_acc(batch_pred, batch_labels)
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB'.format(
+                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB'.format(
                     epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc))
 
         toc = time.time()
@@ -230,7 +230,7 @@ if __name__ == '__main__':
     else:
         device = th.device('cpu')
 
-    # load reddit data
+    # load data
     data = DglNodePropPredDataset(name='ogbn-products')
     splitted_idx = data.get_idx_split()
     train_idx, val_idx, test_idx = splitted_idx['train'], splitted_idx['valid'], splitted_idx['test']
@@ -243,7 +243,10 @@ if __name__ == '__main__':
 
     in_feats = graph.ndata['feat'].shape[1]
     n_classes = (labels.max() + 1).item()
-    graph.create_format_()
+
+    # Create csr/coo/csc formats before launching sampling processes
+    # This avoids creating certain formats in each data loader process, which saves momory and CPU.
+    graph.create_formats_()
     # Pack data
     data = train_idx, val_idx, test_idx, in_feats, labels, n_classes, graph, args.head
 

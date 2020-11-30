@@ -50,18 +50,20 @@ class ChebConv(layers.Layer):
     >>> import numpy as np
     >>> import tensorflow as tf
     >>> from dgl.nn import ChebConv
-    >>
-    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
-    >>> feat = tf.ones(6, 10)
-    >>> conv = ChebConv(10, 2, 2)
-    >>> res = conv(g, feat)
-    >>> res
-    tensor([[ 0.6163, -0.1809],
+    >>>
+    >>> with tf.device("CPU:0"):
+    >>>     g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>>     feat = tf.ones((6, 10))
+    >>>     conv = ChebConv(10, 2, 2)
+    >>>     res = conv(g, feat)
+    >>>     res
+    <tf.Tensor: shape=(6, 2), dtype=float32, numpy=
+    array([[ 0.6163, -0.1809],
             [ 0.6163, -0.1809],
             [ 0.6163, -0.1809],
             [ 0.9698, -1.5053],
             [ 0.3664,  0.7556],
-            [-0.2370,  3.0164]])
+            [-0.2370,  3.0164]], dtype=float32)>
     """
 
     def __init__(self,

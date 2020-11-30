@@ -3,31 +3,34 @@
 1.3 Node and Edge Features
 --------------------------
 
+:ref:`(中文版)<guide_cn-graph-feature>`
+
 The nodes and edges of a :class:`~dgl.DGLGraph` can have several user-defined named features for
 storing graph-specific properties of the nodes and edges. These features can be accessed
 via the :py:attr:`~dgl.DGLGraph.ndata` and :py:attr:`~dgl.DGLGraph.edata` interface. For example, the following code creates two node
-features (named ``'x'`` and ``'y'`` in lines 5 and 9) and one edge feature (named ``'x'`` in line 6).
+features (named ``'x'`` and ``'y'`` in line 8 and 15) and one edge feature (named ``'x'`` in line 9).
 
-.. code::
+.. code-block:: python
+    :linenos:
 
-    01. >>> import dgl
-    02. >>> import torch as th
-    03. >>> g = dgl.graph(([0, 0, 1, 5], [1, 2, 2, 0])) # 6 nodes, 4 edges
-    04. >>> g
-        Graph(num_nodes=6, num_edges=4,
-              ndata_schemes={}
-              edata_schemes={})
-    05. >>> g.ndata['x'] = th.ones(g.num_nodes(), 3)               # node feature of length 3
-    06. >>> g.edata['x'] = th.ones(g.num_edges(), dtype=th.int32)  # scalar integer feature
-    07. >>> g
-        Graph(num_nodes=6, num_edges=4,
-              ndata_schemes={'x' : Scheme(shape=(3,), dtype=torch.float32)}
-              edata_schemes={'x' : Scheme(shape=(,), dtype=torch.int32)})
-    08. >>> # different names can have different shapes
-    09. >>> g.ndata['y'] = th.randn(g.num_nodes(), 5)
-    10. >>> g.ndata['x'][1]                  # get node 1's feature
-        tensor([1., 1., 1.])
-    11. >>> g.edata['x'][th.tensor([0, 3])]  # get features of edge 0 and 3
+    >>> import dgl
+    >>> import torch as th
+    >>> g = dgl.graph(([0, 0, 1, 5], [1, 2, 2, 0])) # 6 nodes, 4 edges
+    >>> g
+    Graph(num_nodes=6, num_edges=4,
+          ndata_schemes={}
+          edata_schemes={})
+    >>> g.ndata['x'] = th.ones(g.num_nodes(), 3)               # node feature of length 3
+    >>> g.edata['x'] = th.ones(g.num_edges(), dtype=th.int32)  # scalar integer feature
+    >>> g
+    Graph(num_nodes=6, num_edges=4,
+          ndata_schemes={'x' : Scheme(shape=(3,), dtype=torch.float32)}
+          edata_schemes={'x' : Scheme(shape=(,), dtype=torch.int32)})
+    >>> # different names can have different shapes
+    >>> g.ndata['y'] = th.randn(g.num_nodes(), 5)
+    >>> g.ndata['x'][1]                  # get node 1's feature
+    tensor([1., 1., 1.])
+    >>> g.edata['x'][th.tensor([0, 3])]  # get features of edge 0 and 3
         tensor([1, 1], dtype=torch.int32)
 
 Important facts about the :py:attr:`~dgl.DGLGraph.ndata`/:py:attr:`~dgl.DGLGraph.edata` interface:
@@ -42,11 +45,11 @@ Important facts about the :py:attr:`~dgl.DGLGraph.ndata`/:py:attr:`~dgl.DGLGraph
   nodes/edges in the graph.
 - Features of the same name must have the same dimensionality and data type.
 - The feature tensor is in row-major layout -- each row-slice stores the feature of one
-  node or edge (e.g., see lines 10-11 in the above example).
+  node or edge (e.g., see lines 16 and 18 in the above example).
 
 For weighted graphs, one can store the weights as an edge feature as below.
 
-.. code::
+.. code-block:: python
 
     >>> # edges 0->1, 0->2, 0->3, 1->3
     >>> edges = th.tensor([0, 0, 0, 1]), th.tensor([1, 2, 3, 3])
@@ -57,5 +60,6 @@ For weighted graphs, one can store the weights as an edge feature as below.
     Graph(num_nodes=4, num_edges=4,
           ndata_schemes={}
           edata_schemes={'w' : Scheme(shape=(,), dtype=torch.float32)})
+
 
 See APIs: :py:attr:`~dgl.DGLGraph.ndata`, :py:attr:`~dgl.DGLGraph.edata`.

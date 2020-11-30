@@ -28,7 +28,7 @@ class NNConv(nn.Module):
     ----------
     in_feats : int
         Input feature size; i.e, the number of dimensions of :math:`h_j^{(l)}`.
-        NN can be applied on homogeneous graph and unidirectional
+        NNConv can be applied on homogeneous graph and unidirectional
         `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`__.
         If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
@@ -151,8 +151,9 @@ class NNConv(nn.Module):
             is the number of nodes of the graph and :math:`D_{in}` is the
             input feature size.
         efeat : torch.Tensor
-            The edge feature of shape :math:`(N, *)`, should fit the input
-            shape requirement of ``edge_func``.
+            The edge feature of shape :math:`(E, *)`, which should fit the input
+            shape requirement of ``edge_func``. :math:`E` is the number of edges
+            of the graph.
 
         Returns
         -------
