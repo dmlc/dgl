@@ -95,7 +95,9 @@ else(MSVC)
   # We still use c++11 flag in CPU build because gcc5.4 (our default compiler) is
   # not fully compatible with c++14 feature.
   set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++11 ${CMAKE_CXX_FLAGS}")
-  set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--warn-common ${CMAKE_SHARED_LINKER_FLAGS}")
+  if(NOT APPLE)
+    set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--warn-common ${CMAKE_SHARED_LINKER_FLAGS}")
+  endif(NOT APPLE)
 endif(MSVC)
 
 if(USE_OPENMP)

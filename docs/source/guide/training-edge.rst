@@ -3,8 +3,7 @@
 5.2 Edge Classification/Regression
 ---------------------------------------------
 
-Sometimes you wish to predict the attributes on the edges of the graph,
-or even whether an edge exists or not between two given nodes. In that
+Sometimes you wish to predict the attributes on the edges of the graph. In that
 case, you would like to have an *edge classification/regression* model.
 
 Here we generate a random graph for edge prediction as a demonstration.

@@ -1,7 +1,7 @@
 .. _guide_cn-graph:
 
 第1章：图
-========
+=============
 
 :ref:`(English Version)<guide-graph>`
 
@@ -11,7 +11,7 @@ DGL通过其核心数据结构  :class:`~dgl.DGLGraph` 提供了一个以图为�
 
 
 本章路线图
---------
+--------------
 
 本章首先简要介绍了图的定义（见1.1节），然后介绍了一些 :class:`~dgl.DGLGraph` 相关的核心概念：
 

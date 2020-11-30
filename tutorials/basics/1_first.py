@@ -64,7 +64,7 @@ def build_karate_club_graph():
     u = np.concatenate([src, dst])
     v = np.concatenate([dst, src])
     # Construct a DGLGraph
-    return dgl.DGLGraph((u, v))
+    return dgl.graph((u, v))
 
 ###############################################################################
 # Print out the number of nodes and edges in our newly constructed graph:
