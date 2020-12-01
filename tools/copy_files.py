@@ -41,6 +41,8 @@ def main():
             res = line.strip().split(' ')
             ip = res[0]
             hosts.append(ip)
+            
+    f.close()
     
     # We need to update the partition config file so that the paths are relative to
     # the workspace in the remote machines.
@@ -67,10 +69,15 @@ def main():
             part_files['edge_feats'] = '{}/part{}/edge_feat.dgl'.format(args.rel_data_path, part_id)
             part_files['node_feats'] = '{}/part{}/node_feat.dgl'.format(args.rel_data_path, part_id)
             part_files['part_graph'] = '{}/part{}/graph.dgl'.format(args.rel_data_path, part_id)
+            
+    conf_f.close()
+    
     tmp_part_config = '/tmp/{}.json'.format(graph_name)
     with open(tmp_part_config, 'w') as outfile:
         json.dump(tmp_part_metadata, outfile, sort_keys=True, indent=4)
-
+        
+    outfile.close()
+    
     # Copy ip config.
     for part_id, ip in enumerate(hosts):
         remote_path = '{}/{}'.format(args.workspace, args.rel_data_path)
