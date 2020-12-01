@@ -158,7 +158,13 @@ that shows an example of link prediction on homogeneous graphs.
 
 For heterogeneous graphs
 ~~~~~~~~~~~~~~~~~~~~~~~~
+At first, you need to generate the eid dict with your own heterogeneous graphs, then apply it to the dataloader :
 
+.. code:: python
+    e_id = dict()
+    for i in hetero_graph.etypes :
+        e_id[i] = hetero_graph.edges(etype=i, form ='eid')
+    
 The models computing the node representations on heterogeneous graphs
 can also be used for computing incident node representations for edge
 classification/regression.
@@ -235,22 +241,23 @@ source-destination array pairs. An example is given as follows:
 
 .. code:: python
 
-    class NegativeSampler(object):
-        def __init__(self, g, k):
-            # caches the probability distribution
-            self.weights = {
-                etype: g.in_degrees(etype=etype).float() ** 0.75
-                for etype in g.canonical_etypes}
-            self.k = k
-    
-        def __call__(self, g, eids_dict):
-            result_dict = {}
-            for etype, eids in eids_dict.items():
-                src, _ = g.find_edges(eids, etype=etype)
-                src = src.repeat_interleave(self.k)
-                dst = self.weights.multinomial(len(src), replacement=True)
-                result_dict[etype] = (src, dst)
-            return result_dict
+   class NegativeSampler(object):
+    def __init__(self, g, k):
+        # caches the probability distribution
+        self.weights = {
+            etype: g.in_degrees(etype=etype).float() ** 0.75
+            for _, etype, _ in g.canonical_etypes
+        }
+        self.k = k
+
+    def __call__(self, g, eids_dict):
+        result_dict = {}
+        for etype, eids in eids_dict.items():
+            src, _ = g.find_edges(eids, etype=etype)
+            src = src.repeat_interleave(self.k)
+            dst = self.weights[etype].multinomial(len(src), replacement=True)
+            result_dict[etype] = (src, dst)
+        return result_dict
     
     dataloader = dgl.dataloading.EdgeDataLoader(
         g, train_eid_dict, sampler,
