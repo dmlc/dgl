@@ -205,7 +205,7 @@
 用于此目的。
 
 要预测一条边的类型，用户可以简单地更换上述提到的 ``HeteroDotProductPredictor`` 的用途。
- ``HeteroDotProductPredictor`` 的输入是一个将所要预测的边类型(如 ``click`` 和 ``dislike``)合并了成一种边的图，
+``HeteroDotProductPredictor`` 的输入是一个将所要预测的边类型(如 ``click`` 和 ``dislike``)合并了成一种边的图，
 并为每条边计算出每种边类型的可能得分。
 
 下面的例子使用一个拥有 ``user`` 和 ``item`` 两种节点类型和一种边类型的图。
@@ -276,17 +276,6 @@
         loss.backward()
         opt.step()
         print(loss.item())
-
-
-DGL provides `Graph Convolutional Matrix
-Completion <https://github.com/dmlc/dgl/tree/master/examples/pytorch/gcmc>`__
-as an example of rating prediction, which is formulated by predicting
-the type of an existing edge on a heterogeneous graph. The node
-representation module in the `model implementation
-file <https://github.com/dmlc/dgl/tree/master/examples/pytorch/gcmc>`__
-is called ``GCMCLayer``. The edge type predictor module is called
-``BiDecoder``. Both of them are more complicated than the setting
-described here.
 
 DGL提供了 `Graph Convolutional Matrix
 Completion <https://github.com/dmlc/dgl/tree/master/examples/pytorch/gcmc>`__

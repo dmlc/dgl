@@ -5,7 +5,7 @@
 
 :ref:`(English Version) <guide-training-link-prediction>`
 
-在某些场景中，用户可能希望预测给定节点之间是否存在边，这样的模型称作**链接预测**模型。
+在某些场景中，用户可能希望预测给定节点之间是否存在边，这样的模型称作 **链接预测** 模型。
 
 概述
 ~~~~~~~~
@@ -23,7 +23,7 @@
 训练一个链接预测模型涉及到比对两个相连接节点之间的得分与任意一对节点之间的得分的差异。
 例如，给定一条连接 :math:`u` 和 :math:`v` 的边，一个好的模型希望 :math:`u` 和 :math:`v` 之间的得分要高于
 :math:`u` 和从一个任意的噪声分布 :math:`v′∼Pn(v)` 中所采样的节点 :math:`v′` 之间的得分。
-这样的方法称作*负采样*。
+这样的方法称作 *负采样*。
 
 许多损失函数都可以实现上述目标，包括但不限于。
 
@@ -42,7 +42,8 @@
 与边分类模型的实现区别
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-计算 :math:`u` 和 :math:`v` 之间分数的神经网络模型与上述 :ref:`<guide_cn-training-edge-classification>` 中所述的边回归模型相同。
+计算 :math:`u` 和 :math:`v` 之间分数的神经网络模型与 :ref:`guide_cn-training-edge-classification`
+中所述的边回归模型相同。
 
 下面是使用点积计算边得分的例子。
 
@@ -125,7 +126,7 @@
 用户可以很容易地将其拓展为对多种边类型上进行预测。
 
 例如，为某一种边类型，用户可以重复使用
-:ref:`<guide_cn-training-edge-classification-heterogeneous-graph>`
+:ref:`guide_cn-training-edge-classification-heterogeneous-graph`
 里的 ``HeteroDotProductPredictor`` 来计算节点间存在连接可能性的得分。
 
 .. code:: python

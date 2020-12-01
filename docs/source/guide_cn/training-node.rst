@@ -49,7 +49,7 @@ DGL提供了一些内置的图卷积模块，可以完成一轮消息传递计�
 
 请注意，这个模型不仅可以做节点分类，还可以为其他下游任务获取隐藏节点表示，如：
 :ref:`guide_cn-training-edge-classification`、
-:ref:`guide_cn-training-link-prediction`、和
+:ref:`guide_cn-training-link-prediction` 和
 :ref:`guide_cn-training-graph-classification`。
 
 关于DGL内置图卷积模块的完整列表，读者可以参考 :ref:`apinn`。
@@ -127,11 +127,6 @@ DGL提供了一些内置的图卷积模块，可以完成一轮消息传递计�
 模块(也可以在DGL的MXNet和Tensorflow包中使用)在所有边类型上执行消息传递，
 然后为每种边类型组合不同的图卷积模块。
 
-The following code will define a heterogeneous graph convolution module
-that first performs a separate graph convolution on each edge type, then
-sums the message aggregations on each edge type as the final result for
-all node types.
-
 下面的代码定义了一个异构图卷积模块。模块首先对每种边类型进行单独的图卷积计算，然后将每种边类型上的消息聚合结果再相加，
 并作为所有节点类型的最终结果。
 
@@ -161,7 +156,7 @@ all node types.
 
 ``dgl.nn.HeteroGraphConv`` 接收一个节点类型和节点特征张量的字典作为输入，并返回另一个节点类型和节点特征的字典。
 
-本章的的异构图样例数据 :ref:`heterogeneous graph example <guide_cn-training-heterogeneous-graph-example>`
+本章的的 :ref:`<guide_cn-training-heterogeneous-graph-example>`
 中已经有了 ``user`` 和 ``item`` 的特征，用户可用如下代码获取。
 
 .. code:: python
@@ -190,7 +185,7 @@ all node types.
     
     for epoch in range(5):
         model.train()
-        # 使用所有的节点和它们的 ``user`` 嵌入进行前向传播计算
+        # 使用所有的节点和它们的user嵌入进行前向传播计算
         logits = model(hetero_graph, node_features)['user']
         # 计算损失值
         loss = F.cross_entropy(logits[train_mask], labels[train_mask])

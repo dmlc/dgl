@@ -62,19 +62,11 @@ DGL内置了常见的图读出函数，例如 :func:`dgl.readout_nodes` 就实�
 编写神经网络模型
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The input to the model is the batched graph with node and edge features.
-
 模型的输入是带节点和边特征的批次化图。需要注意的是批次化图中的节点和边属性没有批次大小对应的维度。
 模型中应特别注意以下几点。
 
-Computation on a Batched Graph
-
 批次化图上的计算
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-First, different graphs in a batch are entirely separated, i.e. no edges
-between any two graphs. With this nice property, all message passing
-functions still have the same results.
 
 首先，一个批次中不同的图是完全分开的，即任意两个图之间没有边连接。
 根据这个良好的性质，所有消息传递函数(的计算)仍然具有相同的结果。
@@ -242,7 +234,6 @@ DGL实现了一个整图分类的样例：
             h = self.rgcn(g, h)
             with g.local_scope():
                 g.ndata['h'] = h
-                # Calculate graph representation by average readout.
                 # 通过平均读出值来计算单图的表征
                 hg = 0
                 for ntype in g.ntypes:

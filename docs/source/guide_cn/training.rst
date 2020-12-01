@@ -76,7 +76,7 @@
     hetero_graph.nodes['item'].data['feature'] = torch.randn(n_items, n_hetero_features)
     hetero_graph.nodes['user'].data['label'] = torch.randint(0, n_user_classes, (n_users,))
     hetero_graph.edges['click'].data['label'] = torch.randint(1, n_max_clicks, (n_clicks,)).float()
-    # 在 ``user`` 类型的节点和 ``click`` 类型的边上随机生成训练集的掩码
+    # 在user类型的节点和click类型的边上随机生成训练集的掩码
     hetero_graph.nodes['user'].data['train_mask'] = torch.zeros(n_users, dtype=torch.bool).bernoulli(0.6)
     hetero_graph.edges['click'].data['train_mask'] = torch.zeros(n_clicks, dtype=torch.bool).bernoulli(0.6)
 
