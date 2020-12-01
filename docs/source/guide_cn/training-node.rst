@@ -156,7 +156,7 @@ DGL提供了一些内置的图卷积模块，可以完成一轮消息传递计�
 
 ``dgl.nn.HeteroGraphConv`` 接收一个节点类型和节点特征张量的字典作为输入，并返回另一个节点类型和节点特征的字典。
 
-本章的的 :ref:`<guide_cn-training-heterogeneous-graph-example>`
+本章的的 :ref:`guide_cn-training-heterogeneous-graph-example`
 中已经有了 ``user`` 和 ``item`` 的特征，用户可用如下代码获取。
 
 .. code:: python
