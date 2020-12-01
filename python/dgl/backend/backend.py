@@ -370,6 +370,23 @@ def reduce_sum(input):
     """
     pass
 
+def cumsum(input, dim):
+    """Return the cumulative sum of the elements along a given axis.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+    dim : int
+        The cumulative dimension.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor.
+    """
+    pass
+
 def mean(input, dim):
     """Reduce average the input tensor along the given dim.
 
@@ -1489,6 +1506,35 @@ def edge_softmax(gidx, logits, eids, norm_by):
     Tensor
         Softmax value
     """
+    pass
+
+def segment_reduce(op, x, offsets):
+    """Segment reduction operator.
+
+    It aggregates the value tensor along the first dimension by segments.
+    The argument ``offsets`` specifies the start offset of each segment (and
+    the upper bound of the last segment). Zero-length segments are allowed.
+
+    .. math::
+      y_i = \Phi_{j=\mathrm{offsets}_i}^{\mathrm{offsets}_{i+1}-1} x_j
+
+    where :math:`\Phi` is the reduce operator.
+
+    Parameters
+    ----------
+    op : str
+        Aggregation method. Can be ``sum``, ``max``, ``min``.
+    x : Tensor
+        Value to aggregate.
+    offsets : Tensor
+        The start offsets of segments.
+
+    Returns
+    -------
+    Tensor
+        Aggregated tensor of shape ``(len(offsets) - 1, value.shape[1:])``.
+    """
+    pass
 
 
 ###############################################################################
