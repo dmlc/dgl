@@ -12,8 +12,8 @@ For the training script, DGL provides distributed APIs that are similar to the o
 mini-batch training. This makes distributed training require only small code modifications
 from mini-batch training on a single machine. Below shows an example of training GraphSage
 in a distributed fashion. The only code modifications are located on line 4-7:
-1) initialize DGL's distributed module, 2) create a distributed graph objec
-t, and 3) split the training set and calculate the nodes for the local process.
+1) initialize DGL's distributed module, 2) create a distributed graph object, and 
+3) split the training set and calculate the nodes for the local process.
 The rest of the code, including sampler creation, model definition, training loops
 are the same as :ref:`mini-batch training <guide-minibatch>`.
 

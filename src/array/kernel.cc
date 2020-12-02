@@ -125,6 +125,32 @@ void SDDMM(const std::string& op,
   });
 }
 
+/*! \brief Segment reduce dispatch function. */
+void SegmentReduceDispatch(const std::string& op,
+                           NDArray feat,
+                           NDArray offsets,
+                           NDArray out,
+                           NDArray arg) {
+  ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "SegmentReduce", {
+    ATEN_ID_TYPE_SWITCH(offsets->dtype, IdType, {
+      ATEN_FLOAT_TYPE_SWITCH(feat->dtype, DType, "Feature data", {
+          SegmentReduce<XPU, IdType, DType>(op, feat, offsets, out, arg);
+      });
+    });
+  });
+}
+
+/*! \brief Backward segment cmp dispatch function.*/
+void BackwardSegmentCmpDispatch(NDArray feat, NDArray arg, NDArray out) {
+  ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "BackwardSegmentCmp", {
+    ATEN_ID_TYPE_SWITCH(arg->dtype, IdType, {
+      ATEN_FLOAT_TYPE_SWITCH(feat->dtype, DType, "Feature data", {
+        BackwardSegmentCmp<XPU, IdType, DType>(feat, arg, out);
+      });
+    });
+  });
+}
+
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef graph = args[0];
@@ -173,6 +199,28 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMM")
         {"U_data", "E_data", "V_data"});
     SDDMM(op, graph.sptr(), lhs, rhs, out, lhs_target, rhs_target);
   });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSegmentReduce")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const std::string op = args[0];
+    NDArray feat = args[1];
+    NDArray offsets = args[2];
+    NDArray out = args[3];
+    NDArray arg = args[4];
+    CheckCtx(feat->ctx, {feat, offsets, out}, {"feat", "offsets", "out"});
+    CheckContiguous({feat, offsets, out}, {"feat", "offsets", "out"});
+    SegmentReduceDispatch(op, feat, offsets, out, arg);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelBwdSegmentCmp")
+.set_body([](DGLArgs args, DGLRetValue *rv) {
+    NDArray feat = args[0];
+    NDArray arg = args[1];
+    NDArray out = args[2];
+    CheckCtx(feat->ctx, {feat, arg, out}, {"feat", "arg", "out"});
+    CheckContiguous({feat, arg, out}, {"feat", "arg", "out"});
+    BackwardSegmentCmpDispatch(feat, arg, out);
+});
 
 }  // namespace aten
 }  // namespace dgl

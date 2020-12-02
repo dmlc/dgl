@@ -341,6 +341,7 @@ CSRMatrix COOToCSR(COOMatrix coo) {
   } else {
     // compute indptr
     IdType* Bp = static_cast<IdType*>(ret_indptr->data);
+    *(Bp++) = 0;
     std::fill(Bp, Bp + N, 0);
     for (int64_t i = 0; i < NNZ; ++i) {
       Bp[row_data[i]]++;
@@ -352,7 +353,6 @@ CSRMatrix COOToCSR(COOMatrix coo) {
       Bp[i] = cumsum;
       cumsum += temp;
     }
-    Bp[N] = NNZ;
 
     // compute indices and data
     ret_indices = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
@@ -365,13 +365,6 @@ CSRMatrix COOToCSR(COOMatrix coo) {
       Bi[Bp[r]] = col_data[i];
       Bx[Bp[r]] = data? data[i] : i;
       Bp[r]++;
-    }
-
-    // correct the indptr
-    for (int64_t i = 0, last = 0; i <= N; ++i) {
-      IdType temp = Bp[i];
-      Bp[i] = last;
-      last = temp;
     }
   }
 

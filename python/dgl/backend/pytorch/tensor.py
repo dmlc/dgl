@@ -120,6 +120,9 @@ def sum(input, dim, keepdims=False):
 def reduce_sum(input):
     return input.sum()
 
+def cumsum(input, dim):
+    return th.cumsum(input, dim=dim)
+
 def mean(input, dim):
     return th.mean(input, dim=dim)
 

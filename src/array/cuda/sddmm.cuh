@@ -146,7 +146,7 @@ __device__ __forceinline__ Idx BinarySearchSrc(const Idx *array, Idx length, Idx
  *       is responsible for the computation on different edges. Threadblocks
  *       on the x-axis are responsible for the computation on different positions
  *       in feature dimension.
- *       To efficiently find the source node idx and destination node index of an 
+ *       To efficiently find the source node idx and destination node index of an
  *       given edge on Csr format, it uses binary search (time complexity O(log N)).
  */
 template <typename Idx, typename DType, typename BinaryOp,
@@ -239,7 +239,7 @@ void SDDMMCoo(
           coo.num_rows, coo.num_cols, nnz, reduce_dim,
           lhs_off, rhs_off,
           lhs_len, rhs_len, len);
-    });        
+    });
   } else {
     const int ntx = FindNumThreads(len);
     const int nty = CUDA_MAX_NUM_THREADS / ntx;

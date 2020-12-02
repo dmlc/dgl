@@ -1,8 +1,8 @@
 import torch as th
 from ...base import is_all, ALL
-from ...sparse import _gspmm, _gsddmm
+from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp
 
-__all__ = ['gspmm', 'gsddmm', 'edge_softmax']
+__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce']
 
 
 def _reduce_grad(grad, shape):
@@ -231,6 +231,31 @@ class EdgeSoftmax(th.autograd.Function):
         return None, grad_score, None, None
 
 
+class SegmentReduce(th.autograd.Function):
+    @staticmethod
+    def forward(ctx, op, x, offsets):
+        y, arg = _segment_reduce(op, x, offsets)
+        ctx.save_for_backward(arg, offsets)
+        ctx.backward_cache = op
+        return y
+
+    @staticmethod
+    def backward(ctx, dy):
+        op = ctx.backward_cache
+        arg, offsets = ctx.saved_tensors
+        m = offsets[-1].item()
+        if op == 'sum':
+            offsets = offsets[1:-1]
+            indices = th.zeros(
+                (m,), device=offsets.device, dtype=offsets.dtype)
+            indices.scatter_add_(0, offsets, th.ones_like(offsets))
+            indices = th.cumsum(indices, -1)
+            dx = dy[indices]
+        else:
+            dx = _bwd_segment_cmp(dy, arg, m)
+        return None, dx, None
+
+
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     return GSpMM.apply(gidx, op, reduce_op, lhs_data, rhs_data)
 
@@ -241,3 +266,7 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
 
 def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
     return EdgeSoftmax.apply(gidx, logits, eids, norm_by)
+
+
+def segment_reduce(op, x, offsets):
+    return SegmentReduce.apply(op, x, offsets)
