@@ -314,9 +314,10 @@ IdArray NonZero(NDArray array);
  * is always in int64.
  *
  * \param array Input array.
+ * \param num_bits The number of bits used by the range of values in the array.
  * \return A pair of arrays: sorted values and sorted index to the original position.
  */
-std::pair<IdArray, IdArray> Sort(IdArray array);
+std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits = 0);
 
 /*!
  * \brief Return a string that prints out some debug information.

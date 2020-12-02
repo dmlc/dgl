@@ -5,6 +5,7 @@
  */
 #include <dgl/array.h>
 #include "../../runtime/cuda/cuda_common.h"
+#include "../../c_api_common.h"
 #include "./utils.h"
 
 namespace dgl {
@@ -16,107 +17,95 @@ namespace impl {
 
 ///////////////////////////// COOSort_ /////////////////////////////
 
+template <typename IdType>
+__global__ void _COOMergeEdgesKernel(
+    const IdType* const row, const IdType* const col,
+    const int64_t nnz, const int row_bits, IdType * const key) {
+
+  int64_t tx = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+
+  if (tx < nnz) {
+    key[tx] = row[tx] | (col[tx] << row_bits);
+  }
+}
+
+template <typename IdType>
+__global__ void _COOSeparateEdgesKernel(
+    const IdType* const key, const int64_t nnz, const int row_bits,
+    IdType * const row, IdType * const col) {
+
+  int64_t tx = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+
+  if (tx < nnz) {
+    const IdType k = key[tx];
+    row[tx] = k & ((1<<row_bits)-1);
+    col[tx] = k >> row_bits;
+  }
+}
+
+
+
+template<typename T>
+int _NumberOfBits(const T& val)
+{
+  if (val == 0) {
+    return 0;
+  }
+
+  int bits = 1;
+  while (bits < sizeof(T)*8 && (1 << (bits-1)) < val) {
+    ++bits;
+  }
+
+  cHECK(((1<<bits)-1 & val) == val);
+
+  return bits;
+}
+    
 template <DLDeviceType XPU, typename IdType>
 void COOSort_(COOMatrix* coo, bool sort_column) {
-  LOG(FATAL) << "Unreachable codes";
-}
-
-template <>
-void COOSort_<kDLGPU, int32_t>(COOMatrix* coo, bool sort_column) {
-  // TODO(minjie): Current implementation is based on cusparse which only supports
-  //   int32_t. To support int64_t, we could use the Radix sort algorithm provided
-  //   by CUB.
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  auto device = runtime::DeviceAPI::Get(coo->row->ctx);
-  // allocate cusparse handle if needed
-  if (!thr_entry->cusparse_handle) {
-    CUSPARSE_CALL(cusparseCreate(&(thr_entry->cusparse_handle)));
-  }
-  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
+  const int row_bits = _NumberOfBits(coo->num_rows);
 
-
-  NDArray row = coo->row;
-  NDArray col = coo->col;
-  if (!aten::COOHasData(*coo))
-    coo->data = aten::Range(0, row->shape[0], row->dtype.bits, row->ctx);
-  NDArray data = coo->data;
-  int32_t* row_ptr = static_cast<int32_t*>(row->data);
-  int32_t* col_ptr = static_cast<int32_t*>(col->data);
-  int32_t* data_ptr = static_cast<int32_t*>(data->data);
-
-  // sort row
-  size_t workspace_size = 0;
-  CUSPARSE_CALL(cusparseXcoosort_bufferSizeExt(
-      thr_entry->cusparse_handle,
-      coo->num_rows, coo->num_cols,
-      row->shape[0],
-      row_ptr,
-      col_ptr,
-      &workspace_size));
-  void* workspace = device->AllocWorkspace(row->ctx, workspace_size);
-  CUSPARSE_CALL(cusparseXcoosortByRow(
-      thr_entry->cusparse_handle,
-      coo->num_rows, coo->num_cols,
-      row->shape[0],
-      row_ptr,
-      col_ptr,
-      data_ptr,
-      workspace));
-  device->FreeWorkspace(row->ctx, workspace);
-
+  const int64_t nnz = coo->row->shape[0];
   if (sort_column) {
-    // First create a row indptr array and then call csrsort
-    int32_t* indptr = static_cast<int32_t*>(
-        device->AllocWorkspace(row->ctx, (coo->num_rows + 1) * sizeof(int32_t)));
-    CUSPARSE_CALL(cusparseXcoo2csr(
-          thr_entry->cusparse_handle,
-          row_ptr,
-          row->shape[0],
-          coo->num_rows,
-          indptr,
-          CUSPARSE_INDEX_BASE_ZERO));
-    CUSPARSE_CALL(cusparseXcsrsort_bufferSizeExt(
-          thr_entry->cusparse_handle,
-          coo->num_rows,
-          coo->num_cols,
-          row->shape[0],
-          indptr,
-          col_ptr,
-          &workspace_size));
-    void* workspace = device->AllocWorkspace(row->ctx, workspace_size);
-    cusparseMatDescr_t descr;
-    CUSPARSE_CALL(cusparseCreateMatDescr(&descr));
-    CUSPARSE_CALL(cusparseXcsrsort(
-          thr_entry->cusparse_handle,
-          coo->num_rows,
-          coo->num_cols,
-          row->shape[0],
-          descr,
-          indptr,
-          col_ptr,
-          data_ptr,
-          workspace));
-    CUSPARSE_CALL(cusparseDestroyMatDescr(descr));
-    device->FreeWorkspace(row->ctx, workspace);
-    device->FreeWorkspace(row->ctx, indptr);
+    const int col_bits = _NumberOfBits(coo->num_cols);
+    const int num_bits = row_bits + col_bits;
+
+    const int nt = 256;
+    const int nb = (nnz+nt-1)/nt;
+    CHECK(static_cast<int64_t>(nb)*nt >= nnz);
+
+    IdArray pos = aten::NewIdArray(nnz, coo->row->ctx, coo->row->dtype.bits);
+
+    CUDA_KERNEL_CALL(_COOMergeEdgesKernel, nb, nt, 0, thr_entry->stream,
+        coo->row.Ptr<IdType>(), coo->col.Ptr<IdType>(), 
+        nnz, row_bits, pos.Ptr<IdType>());
+
+    const auto& sorted = Sort(pos, num_bits);
+
+    CUDA_KERNEL_CALL(_COOSeparateEdgesKernel, nb, nt, 0, thr_entry->stream,
+        pos.Ptr<IdType>(), nnz, row_bits,
+        coo->row.Ptr<IdType>(), coo->col.Ptr<IdType>());
+
+    if (aten::COOHasData(*coo))
+      coo->data = IndexSelect(coo->data, sorted.second);
+    else
+      coo->data = AsNumBits(sorted.second, coo->row->dtype.bits);
+    coo->row_sorted = coo->col_sorted = true;
+  } else {
+    const int num_bits = row_bits;
+
+    const auto& sorted = Sort(coo->row, num_bits);
+
+    coo->col = IndexSelect(coo->col, sorted.second);
+
+    if (aten::COOHasData(*coo))
+      coo->data = IndexSelect(coo->data, sorted.second);
+    else
+      coo->data = AsNumBits(sorted.second, coo->row->dtype.bits);
+    coo->row_sorted = true;
   }
-
-  coo->row_sorted = true;
-  coo->col_sorted = sort_column;
-}
-
-template <>
-void COOSort_<kDLGPU, int64_t>(COOMatrix* coo, bool sort_column) {
-  // Always sort the COO to be both row and column sorted.
-  IdArray pos = coo->row * coo->num_cols + coo->col;
-  const auto& sorted = Sort(pos);
-  coo->row = sorted.first / coo->num_cols;
-  coo->col = sorted.first % coo->num_cols;
-  if (aten::COOHasData(*coo))
-    coo->data = IndexSelect(coo->data, sorted.second);
-  else
-    coo->data = AsNumBits(sorted.second, coo->row->dtype.bits);
-  coo->row_sorted = coo->col_sorted = true;
 }
 
 template void COOSort_<kDLGPU, int32_t>(COOMatrix* coo, bool sort_column);
