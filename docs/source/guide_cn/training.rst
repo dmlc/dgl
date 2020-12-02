@@ -83,7 +83,7 @@
 本章路线图
 ------------
 
-本章共有四节，每节对应一种类型的图学习任务。
+本章共有四节，每节对应一种图学习任务。
 
 * :ref:`guide_cn-training-node-classification`
 * :ref:`guide_cn-training-edge-classification`
