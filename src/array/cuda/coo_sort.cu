@@ -39,15 +39,14 @@ __global__ void _COOSeparateEdgesKernel(
   if (tx < nnz) {
     const IdType k = key[tx];
     row[tx] = k >> col_bits;
-    col[tx] = k & ((1<<col_bits)-1);
+    col[tx] = k & ((1 << col_bits) - 1);
   }
 }
 
 
 
 template<typename T>
-int _NumberOfBits(const T& val)
-{
+int _NumberOfBits(const T& val) {
   if (val == 0) {
     return 0;
   }
@@ -57,11 +56,12 @@ int _NumberOfBits(const T& val)
     ++bits;
   }
 
-  CHECK(((1<<bits)-1 & val) == val);
+  CHECK_EQ(((1 << bits) - 1) & val, val);
+  CHECK_EQ((val >> bits), 0);
 
   return bits;
 }
-    
+
 template <DLDeviceType XPU, typename IdType>
 void COOSort_(COOMatrix* coo, bool sort_column) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
@@ -79,7 +79,7 @@ void COOSort_(COOMatrix* coo, bool sort_column) {
     IdArray pos = aten::NewIdArray(nnz, coo->row->ctx, coo->row->dtype.bits);
 
     CUDA_KERNEL_CALL(_COOMergeEdgesKernel, nb, nt, 0, thr_entry->stream,
-        coo->row.Ptr<IdType>(), coo->col.Ptr<IdType>(), 
+        coo->row.Ptr<IdType>(), coo->col.Ptr<IdType>(),
         nnz, col_bits, pos.Ptr<IdType>());
 
     const auto& sorted = Sort(pos, num_bits);
