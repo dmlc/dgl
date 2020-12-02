@@ -275,7 +275,7 @@ def message_passing(g, mfunc, rfunc, afunc):
         Results from the message passing computation.
     """
     if (is_builtin(mfunc) and is_builtin(rfunc) and
-          getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name), None) is not None):
+        getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name), None) is not None):
         # invoke fused message passing
         ndata = invoke_gspmm(g, mfunc, rfunc)
     else:
