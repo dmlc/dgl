@@ -20,26 +20,26 @@ namespace impl {
 template <typename IdType>
 __global__ void _COOMergeEdgesKernel(
     const IdType* const row, const IdType* const col,
-    const int64_t nnz, const int row_bits, IdType * const key) {
+    const int64_t nnz, const int col_bits, IdType * const key) {
 
   int64_t tx = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
 
   if (tx < nnz) {
-    key[tx] = row[tx] | (col[tx] << row_bits);
+    key[tx] = row[tx] << col_bits | col[tx];
   }
 }
 
 template <typename IdType>
 __global__ void _COOSeparateEdgesKernel(
-    const IdType* const key, const int64_t nnz, const int row_bits,
+    const IdType* const key, const int64_t nnz, const int col_bits,
     IdType * const row, IdType * const col) {
 
   int64_t tx = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
 
   if (tx < nnz) {
     const IdType k = key[tx];
-    row[tx] = k & ((1<<row_bits)-1);
-    col[tx] = k >> row_bits;
+    row[tx] = k >> col_bits;
+    col[tx] = k & ((1<<col_bits)-1);
   }
 }
 
@@ -57,7 +57,7 @@ int _NumberOfBits(const T& val)
     ++bits;
   }
 
-  cHECK(((1<<bits)-1 & val) == val);
+  CHECK(((1<<bits)-1 & val) == val);
 
   return bits;
 }
@@ -80,12 +80,12 @@ void COOSort_(COOMatrix* coo, bool sort_column) {
 
     CUDA_KERNEL_CALL(_COOMergeEdgesKernel, nb, nt, 0, thr_entry->stream,
         coo->row.Ptr<IdType>(), coo->col.Ptr<IdType>(), 
-        nnz, row_bits, pos.Ptr<IdType>());
+        nnz, col_bits, pos.Ptr<IdType>());
 
     const auto& sorted = Sort(pos, num_bits);
 
     CUDA_KERNEL_CALL(_COOSeparateEdgesKernel, nb, nt, 0, thr_entry->stream,
-        pos.Ptr<IdType>(), nnz, row_bits,
+        sorted.first.Ptr<IdType>(), nnz, col_bits,
         coo->row.Ptr<IdType>(), coo->col.Ptr<IdType>());
 
     if (aten::COOHasData(*coo))
@@ -98,6 +98,7 @@ void COOSort_(COOMatrix* coo, bool sort_column) {
 
     const auto& sorted = Sort(coo->row, num_bits);
 
+    coo->row = sorted.first;
     coo->col = IndexSelect(coo->col, sorted.second);
 
     if (aten::COOHasData(*coo))
