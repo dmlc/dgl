@@ -274,10 +274,7 @@ def message_passing(g, mfunc, rfunc, afunc):
     dict[str, Tensor]
         Results from the message passing computation.
     """
-    if g.number_of_edges() == 0:
-        # No message passing is triggered.
-        ndata = {}
-    elif (is_builtin(mfunc) and is_builtin(rfunc) and
+    if (is_builtin(mfunc) and is_builtin(rfunc) and
           getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name), None) is not None):
         # invoke fused message passing
         ndata = invoke_gspmm(g, mfunc, rfunc)
