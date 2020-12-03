@@ -11,7 +11,7 @@
 ~~~~~~~~
 
 基于GNN的链接预测模型的基本思想是通过使用所需预测的节点对
-:math:`u`, :math:`v`的节点表示`:math:`\boldsymbol{h}_u^{(L)}` 和
+:math:`u`, :math:`v` 的节点表示 `:math:`\boldsymbol{h}_u^{(L)}` 和
 :math:`\boldsymbol{h}_v^{(L)}`，计算它们之间存在链接可能性的得分 :math:`y_{u,v}`。
 其中  :math:`\boldsymbol{h}_u^{(L)}` 和  :math:`\boldsymbol{h}_v^{(L)}` 由多层GNN计算得出。
 
