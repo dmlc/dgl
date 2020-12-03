@@ -12,7 +12,7 @@ pip install asv numpy
 conda activate base
 cat asv.conf.json
 asv machine --yes
-asv run --no-pull --verbose
+asv run --verbose
 asv publish
 
 popd
