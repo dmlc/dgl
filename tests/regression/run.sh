@@ -10,8 +10,9 @@ pip install --upgrade pip
 pip install asv numpy
 
 conda activate base
+cat asv.conf.json
 asv machine --yes
-asv run --config asv.conf.json
+asv run --no-pull --verbose
 asv publish
 
 popd

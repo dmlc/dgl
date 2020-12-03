@@ -9,9 +9,10 @@ fi
 
 mkdir -p /tmp/asv_env  # for cached build
 
-docker run --name dgl-reg          \
-           --rm --runtime=nvidia   \
-           -v /tmp/asv_env:/asv/env  \
+docker run --name dgl-reg                   \
+           --rm --runtime=nvidia            \
+           -v $HOME/git-repo/dgl:/root/dgl  \
+           -v /tmp/asv_env:/asv/env         \
            --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
 docker cp ./run.sh dgl-reg:/root/run.sh
 docker exec dgl-reg bash /root/run.sh
