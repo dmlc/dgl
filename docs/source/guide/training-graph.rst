@@ -191,9 +191,6 @@ graphs in mini-batches.
         drop_last=False,
         shuffle=True)
 
-Loop
-^^^^
-
 Training loop then simply involves iterating over the dataloader and
 updating the model.
 

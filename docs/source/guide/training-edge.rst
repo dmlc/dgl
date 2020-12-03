@@ -41,7 +41,7 @@ Model Implementation Difference from Node Classification
 Assuming that you compute the node representation with the model from
 the previous section, you only need to write another component that
 computes the edge prediction with the
-:meth:`~dgl.DGLHeteroGraph.apply_edges` method.
+:meth:`~dgl.DGLGraph.apply_edges` method.
 
 For instance, if you would like to compute a score for each edge for
 edge regression, the following code computes the dot product of incident

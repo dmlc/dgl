@@ -7,13 +7,13 @@
 
 有时用户希望预测图中边的属性值，甚至要预测给定的两个节点之间是否存在边。这种情况下，用户需要构建一个边分类/回归的模型。
 
-以下代码生成了一个随机图以用于演示边分类/回归。
+以下代码生成了一个随机图用于演示边分类/回归。
 
 .. code:: ipython3
 
     src = np.random.randint(0, 100, 500)
     dst = np.random.randint(0, 100, 500)
-    # 建立对称的边
+    # 同时建立反向边
     edge_pred_graph = dgl.graph((np.concatenate([src, dst]), np.concatenate([dst, src])))
     # 建立点和边特征，以及边的标签
     edge_pred_graph.ndata['feature'] = torch.randn(100, 10)
@@ -28,14 +28,14 @@
 上一节介绍了如何使用多层GNN进行节点分类。同样的方法也可以被用于计算任何节点的隐藏表示。
 并从边的两个端点的表示，通过计算得出对是否存在边的预测。
 
-对一条边计算预测值最常见的情况是将预测表示为一个参数化函数，函数的参数是边的两个端点的表示，
-参数还可以包括边自身的特征。
+对一条边计算预测值最常见的情况是将预测表示为一个函数，函数的输入为两个端点的表示，
+输入还可以包括边自身的特征。
 
 与节点分类在模型实现上的差别
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 如果用户使用上一节中的模型计算了节点的表示，那么用户只需要再编写一个用
-:meth:`~dgl.DGLHeteroGraph.apply_edges` 方法计算边预测的组件即可进行边分类/回归任务。
+:meth:`~dgl.DGLGraph.apply_edges` 方法计算边预测的组件即可进行边分类/回归任务。
 
 例如，对于边回归任务，如果用户想为每条边计算一个分数，可按下面的代码对每一条边计算它的两端节点隐藏表示的点积来作为分数。
 
@@ -50,8 +50,8 @@
                 graph.apply_edges(fn.u_dot_v('h', 'h', 'score'))
                 return graph.edata['score']
 
-用户也可以写一个对每条边通过MLP(多层感知机)预测一个向量的预测函数。
-这样的向量可以在下游任务中使用。例如，作为一个未经过归一化的类别的分布。
+用户也可以使用MLP(多层感知机)对每条边生成一个向量表示(例如，作为一个未经过归一化的类别的分布)，
+并在下游任务中使用。
 
 .. code:: python
 
@@ -73,13 +73,13 @@
                 graph.apply_edges(self.apply_edges)
                 return graph.edata['score']
 
-训练循环
+模型的训练
 ~~~~~~~~~~~~~
 
-给定计算节点表示的模型和边的预测模型后，用户可以轻松地编写在所有边上进行预测的全图训练代码。
+给定计算节点和边上表示的模型后，用户可以轻松地编写在所有边上进行预测的全图训练代码。
 
-以下代码用上 :ref:`guide_cn-message-passing` 中定义的 ``SAGE`` 作为节点表示计算模型，
-上面定义的 ``DotPredictor`` 作为边预测模型。
+以下代码用了 :ref:`guide_cn-message-passing` 中定义的 ``SAGE`` 作为节点表示计算模型以及前一小节中定义的
+``DotPredictor`` 作为边预测模型。
 
 .. code:: python
 
@@ -92,7 +92,7 @@
             h = self.sage(g, x)
             return self.pred(g, h)
 
-在这个例子中，布尔型的掩码区分了训练、验证、测试用的边集合。该例子里省略了训练早停和模型保存部分的代码。
+在训练模型时可以使用布尔掩码区分训练、验证和测试数据集。。该例子里省略了训练早停和模型保存部分的代码。
 
 .. code:: python
 
@@ -111,13 +111,12 @@
 
 .. _guide_cn-training-edge-classification-heterogeneous-graph:
 
-异构图上的训练循环
-~~~~~~~~~~~~~~~~~~~
+异构图上的边预测模型的训练
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-在异构图上进行边预测和在同构图上进行边预测没有太大区别。如果想在某一种边类型上进行边分类任务，
-用户只需要计算所有节点类型的节点表示，然后通过 :meth:`~dgl.DGLHeteroGraph.apply_edges` 方法在这种边类型上预测即可。
-
-例如，为了在异构图的某种类型边上进行 ``DotProductPredictor`` 计算，用户只需要在 ``apply_edges`` 方法中指定边类型即可。
+例如想在某一特定类型的边上进行分类任务，用户只需要计算所有节点类型的节点表示，
+然后同样通过调用 :meth:`~dgl.DGLHeteroGraph.apply_edges` 方法计算预测值即可。
+唯一的区别是在调用``apply_edges``时需要指定边的类型。
 
 .. code:: python
 
@@ -151,7 +150,7 @@
                 graph.apply_edges(self.apply_edges, etype=etype)
                 return graph.edges[etype].data['score']
 
-在某种类型的边上为每一条边预测的端到端模型如下所示：
+在某种类型的边上为每一条边预测的端到端模型的定义如下所示：
 
 .. code:: python
 
@@ -176,7 +175,7 @@
     node_features = {'user': user_feats, 'item': item_feats}
 
 
-训练的循环部分就和同构图的循环基本一致。例如，如果用户想预测边类型为 ``click`` 的边的标签，只需要按下例编写代码。
+训练部分和同构图的训练基本一致。例如，如果用户想预测边类型为 ``click`` 的边的标签，只需要按下例编写代码。
 
 .. code:: python
 
@@ -193,23 +192,20 @@
 在异构图中预测已有边的类型
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-有时候用户可能想预测图中已经存在的边属于哪个边类型。
-
-例如，根据 :ref:`本章的异构图样例数据 <guide_cn-training-heterogeneous-graph-example>`，
+预测图中已经存在的边属于哪个类型是一个非常常见的任务类型。例如，根据
+:ref:`本章的异构图样例数据 <guide_cn-training-heterogeneous-graph-example>`，
 用户的任务是给定一条连接 ``user`` 节点和 ``item`` 节点的边，预测它的类型是 ``click`` 还是 ``dislike``。
-
 这个例子是评分预测的一个简化版本，在推荐场景中很常见。
 
-为了进行边类型预测，用户可以使用一个异构图卷积网络来获取节点表示。例如，用户仍然可以将
+边类型预测的第一步仍然是计算节点表示。可以通过类似
 :ref:`节点分类的RGCN模型 <guide_cn-training-rgcn-node-classification>`
-用于此目的。
-
-要预测一条边的类型，用户可以简单地更换上述提到的 ``HeteroDotProductPredictor`` 的用途。
-``HeteroDotProductPredictor`` 的输入是一个将所要预测的边类型(如 ``click`` 和 ``dislike``)合并了成一种边的图，
-并为每条边计算出每种边类型的可能得分。
-
-下面的例子使用一个拥有 ``user`` 和 ``item`` 两种节点类型和一种边类型的图。
-该边类型是通过合并所有从 ``user`` 到 ``item`` 的边类型(如 ``like`` 和 ``dislike``)得到。
+这一章中提到的图卷积网络获得。第二步是计算边上的预测值。
+在这里可以复用上述提到的 ``HeteroDotProductPredictor``。
+这里需要注意的是输入的图数据不能包含边的类型信息，
+因此需要将所要预测的边类型(如 ``click`` 和 ``dislike``)合并了成一种边的图，
+并为每条边计算出每种边类型的可能得分。下面的例子使用一个拥有 ``user``
+和 ``item`` 两种节点类型和一种边类型的图。该边类型是通过合并所有从 ``user``
+到 ``item`` 的边类型(如 ``like`` 和 ``dislike``)得到。
 用户可以很方便地用关系切片的方式创建这个图。
 
 .. code:: python
@@ -259,7 +255,7 @@
             h = self.sage(g, x)
             return self.pred(dec_graph, h)
 
-训练的循环部分如下所示：
+训练部分如下所示：
 
 .. code:: python
 
@@ -277,9 +273,9 @@
         opt.step()
         print(loss.item())
 
-DGL提供了 `Graph Convolutional Matrix
+读者可以进一步参考`Graph Convolutional Matrix
 Completion <https://github.com/dmlc/dgl/tree/master/examples/pytorch/gcmc>`__
-作为评分预测的示例，它是为了预测异构图中已经存在的边的边类型任务准备的。
+这一示例来了解如何预测异构图中的边类型。
 `模型实现文件中 <https://github.com/dmlc/dgl/tree/master/examples/pytorch/gcmc>`__
-的节点表示模块称作 ``GCMCLayer``。边类型预测模块称作 ``BiDecoder``。这两个模块都比上述的示例代码要复杂一些。
-
+的节点表示模块称作 ``GCMCLayer``。边类型预测模块称作 ``BiDecoder``。
+虽然这两个模块都比上述的示例代码要复杂，但其基本思想和本章描述的流程是一致的。

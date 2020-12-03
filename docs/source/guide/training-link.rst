@@ -6,8 +6,8 @@
 :ref:`(中文版) <guide_cn-training-link-prediction>`
 
 In some other settings you may want to predict whether an edge exists
-between two given nodes or not. Such model is called a *link prediction*
-model.
+between two given nodes or not. Such task is called a *link prediction*
+task.
 
 Overview
 ~~~~~~~~
@@ -49,9 +49,6 @@ feedback <https://arxiv.org/ftp/arxiv/papers/1205/1205.2618.pdf>`__ or
 `noise-contrastive
 estimation <http://proceedings.mlr.press/v9/gutmann10a/gutmann10a.pdf>`__
 is.
-
-Model Implementation Difference from Edge Classification
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The neural network model to compute the score between :math:`u` and
 :math:`v` is identical to the edge regression model described
