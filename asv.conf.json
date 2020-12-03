@@ -5,7 +5,7 @@
     // The name of the project being benchmarked
     "project": "dgl",
     // The project's homepage
-    "project_url": "https://github.com/dmlc/dgl",
+    "project_url": "https://www.dgl.ai",
     // The URL or local path of the source code repository for the
     // project being benchmarked
     "repo": ".",
@@ -23,7 +23,7 @@
         "/bin/bash {build_dir}/tests/regression/build_dgl_asv.sh"
     ],
     "uninstall_command": [
-        "return-code=any python -mpip uninstall -y dgl"
+        "return-code=any python -m pip uninstall -y dgl"
     ],
     // "build_command": [
     //     "python setup.py build",

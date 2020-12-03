@@ -1,4 +1,6 @@
-mkdir build
+#!/bin/bash
+
+mkdir -p build
 
 CMAKE_VARS="-DUSE_CUDA=ON"
 

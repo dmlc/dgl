@@ -1,23 +1,20 @@
 #!/bin/bash
 
-set -x
-
-if [ $# -ne 3 ]; then
-    REPO=dmlc
-    BRANCH=master
-    MACHINE=reg-machine
+if [ $# -ne 1 ]; then
+    echo "publish.sh <machine_name>"
+    exit 1
 else
-    REPO=$1
-    BRANCH=$2
-    MACHINE=$3
+    MACHINE=$1
 fi
 
-mkdir -p asv_data
+mkdir -p /tmp/asv_env  # for cached build
 
-docker run --name dgl-reg \
-           --rm --runtime=nvidia \
-           -v asv_data:/asv \
+docker run --name dgl-reg          \
+           --rm --runtime=nvidia   \
+           -v /tmp/asv_env:/asv/env  \
            --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
 docker cp ./run.sh dgl-reg:/root/run.sh
-docker exec dgl-reg bash /root/run.sh $REPO $BRANCH
+docker exec dgl-reg bash /root/run.sh
+docker cp dgl-reg:/asv/results asv_data/
+docker cp dgl-reg:/asv/html asv_data/
 docker stop dgl-reg
