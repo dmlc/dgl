@@ -116,7 +116,7 @@
 
 例如想在某一特定类型的边上进行分类任务，用户只需要计算所有节点类型的节点表示，
 然后同样通过调用 :meth:`~dgl.DGLHeteroGraph.apply_edges` 方法计算预测值即可。
-唯一的区别是在调用``apply_edges``时需要指定边的类型。
+唯一的区别是在调用 ``apply_edges`` 时需要指定边的类型。
 
 .. code:: python
 
@@ -273,7 +273,8 @@
         opt.step()
         print(loss.item())
 
-读者可以进一步参考`Graph Convolutional Matrix
+读者可以进一步参考
+`Graph Convolutional Matrix
 Completion <https://github.com/dmlc/dgl/tree/master/examples/pytorch/gcmc>`__
 这一示例来了解如何预测异构图中的边类型。
 `模型实现文件中 <https://github.com/dmlc/dgl/tree/master/examples/pytorch/gcmc>`__
