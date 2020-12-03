@@ -46,18 +46,18 @@ __global__ void _COOSeparateEdgesKernel(
 
 
 template<typename T>
-int _NumberOfBits(const T& val) {
-  if (val == 0) {
+int _NumberOfBits(const T& range) {
+  if (range == 0) {
     return 0;
   }
 
   int bits = 1;
-  while (bits < sizeof(T)*8 && (1 << (bits-1)) < val) {
+  while (bits < sizeof(T)*8 && (1 << bits) < range) {
     ++bits;
   }
 
-  CHECK_EQ(((1 << bits) - 1) & val, val);
-  CHECK_EQ((val >> bits), 0);
+  CHECK_EQ((range-1) >> bits, 0);
+  CHECK_NE((range-1) >> bits-1, 0);
 
   return bits;
 }
