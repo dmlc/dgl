@@ -31,7 +31,7 @@
     // ],
     // List of branches to benchmark. If not provided, defaults to "master"
     // (for git) or "default" (for mercurial).
-    "branches": ["master"], // for git
+    "branches": ["regression"], // for git
     // "branches": ["default"],    // for mercurial
     // The DVCS being used.  If not set, it will be automatically
     // determined from "repo" by looking at the protocol in the URL
@@ -104,7 +104,7 @@
     // ],
     // The directory (relative to the current directory) that benchmarks are
     // stored in.  If not provided, defaults to "benchmarks"
-    "benchmark_dir": "tests/regression",
+    "benchmark_dir": "tests/regression/benchmarks",
     // The directory (relative to the current directory) to cache the Python
     // environments in.  If not provided, defaults to "env"
     "env_dir": "/asv/env",

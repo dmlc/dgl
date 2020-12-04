@@ -2,7 +2,7 @@
 
 set -e
 
-python -m pip install numpy pandas
+python -m pip install numpy pandas pytest
 
 . /opt/conda/etc/profile.d/conda.sh
 
@@ -14,6 +14,5 @@ do
   pip uninstall -y dgl
   python3 setup.py install
   popd
-  #python3 -m pip install -r tests/regression/requirement.txt
 done
 conda deactivate
