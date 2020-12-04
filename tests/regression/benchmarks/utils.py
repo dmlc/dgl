@@ -3,7 +3,9 @@ import shutil, zipfile
 import requests
 import numpy as np
 import pandas
+import pytest
 import dgl
+import torch
 
 def _download(url, path, filename):
     fn = os.path.join(path, filename)
@@ -46,3 +48,38 @@ def process_data(name):
 
 def get_bench_device():
     return os.environ.get('DGL_BENCH_DEVICE', 'cpu')
+
+def setup_track_time():
+    pass
+
+def setup_track_acc():
+    # fix random seed
+    np.random.seed(42)
+    torch.random.manual_seed(42)
+
+TRACK_UNITS = {
+    'time' : 's',
+    'acc' : '',
+}
+
+TRACK_SETUP = {
+    'time' : setup_track_time,
+    'acc' : setup_track_acc,
+}
+
+def parametrize(param_name, params):
+    def _wrapper(func):
+        func = pytest.mark.parametrize(param_name, params)(func)
+        if getattr(func, 'params', None) is None:
+            func.params = []
+        func.params.append(params)
+        return func
+    return _wrapper
+
+def benchmark(track_type):
+    assert track_type in ['time', 'acc']
+    def _wrapper(func):
+        func.unit = TRACK_UNITS[track_type]
+        func.setup = TRACK_SETUP[track_type]
+        return func
+    return _wrapper

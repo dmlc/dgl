@@ -47,10 +47,12 @@ class GAT(nn.Module):
         logits = self.gat_layers[-1](g, h).mean(1)
         return logits
 
-@pytest.mark.parametrize('data,num_epochs', [('cora', 200), ('pubmed', 200)])
-def run(data, num_epochs):
+@utils.benchmark('time')
+@utils.parametrize('data', ['cora', 'pubmed'])
+def track_time(data):
     data = utils.process_data(data)
     device = utils.get_bench_device()
+    num_epochs = 200
 
     g = data[0].to(device)
 
@@ -89,7 +91,7 @@ def run(data, num_epochs):
 
     # timing
     t0 = time.time()
-    for epoch in range(200):
+    for epoch in range(num_epochs):
         logits = model(g, features)
         loss = loss_fcn(logits[train_mask], labels[train_mask])
         optimizer.zero_grad()
@@ -98,11 +100,3 @@ def run(data, num_epochs):
     t1 = time.time()
 
     return t1 - t0
-
-if __name__ == '__main__':
-    import numpy as np
-    np.random.seed(42)
-    torch.random.manual_seed(42)
-    data = dgl.data.CoraGraphDataset()
-    device = 'cuda:0'
-    print(run(data, device, 200))

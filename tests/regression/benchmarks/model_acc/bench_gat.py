@@ -56,8 +56,9 @@ def evaluate(model, g, features, labels, mask):
         correct = torch.sum(indices == labels)
         return correct.item() * 1.0 / len(labels)
 
-@pytest.mark.parametrize('data', ['cora', 'pubmed'])
-def run(data):
+@utils.benchmark('acc')
+@utils.parametrize('data', ['cora', 'pubmed'])
+def track_acc(data):
     data = utils.process_data(data)
     device = utils.get_bench_device()
 
@@ -96,9 +97,3 @@ def run(data):
 
     acc = evaluate(model, g, features, labels, test_mask)
     return acc
-
-if __name__ == '__main__':
-    import numpy as np
-    np.random.seed(42)
-    torch.random.manual_seed(42)
-    print(run('cora'))
