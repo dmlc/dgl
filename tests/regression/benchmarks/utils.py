@@ -35,3 +35,14 @@ def get_graph(name):
     else:
         print(name + " doesn't exist")
         return None
+
+def process_data(name):
+    if name == 'cora':
+        return dgl.data.CoraGraphDataset()
+    elif name == 'pubmed':
+        return dgl.data.PubmedGraphDataset()
+    else:
+        raise ValueError('Invalid dataset name:', name)
+
+def get_bench_device():
+    return os.environ.get('DGL_BENCH_DEVICE', 'cpu')

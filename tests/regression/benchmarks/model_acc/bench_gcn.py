@@ -1,38 +1,37 @@
+import pytest
 import dgl
-from dgl.nn.pytorch import SAGEConv
+from dgl.nn.pytorch import GraphConv
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class GraphSAGE(nn.Module):
+from .. import utils
+
+class GCN(nn.Module):
     def __init__(self,
                  in_feats,
                  n_hidden,
                  n_classes,
                  n_layers,
                  activation,
-                 dropout,
-                 aggregator_type):
-        super(GraphSAGE, self).__init__()
+                 dropout):
+        super(GCN, self).__init__()
         self.layers = nn.ModuleList()
-        self.dropout = nn.Dropout(dropout)
-        self.activation = activation
-
         # input layer
-        self.layers.append(SAGEConv(in_feats, n_hidden, aggregator_type))
+        self.layers.append(GraphConv(in_feats, n_hidden, activation=activation))
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.append(SAGEConv(n_hidden, n_hidden, aggregator_type))
+            self.layers.append(GraphConv(n_hidden, n_hidden, activation=activation))
         # output layer
-        self.layers.append(SAGEConv(n_hidden, n_classes, aggregator_type)) # activation None
+        self.layers.append(GraphConv(n_hidden, n_classes))
+        self.dropout = nn.Dropout(p=dropout)
 
-    def forward(self, graph, inputs):
-        h = self.dropout(inputs)
-        for l, layer in enumerate(self.layers):
-            h = layer(graph, h)
-            if l != len(self.layers) - 1:
-                h = self.activation(h)
+    def forward(self, g, features):
+        h = features
+        for i, layer in enumerate(self.layers):
+            if i != 0:
                 h = self.dropout(h)
+            h = layer(g, h)
         return h
 
 def evaluate(model, g, features, labels, mask):
@@ -45,8 +44,12 @@ def evaluate(model, g, features, labels, mask):
         correct = torch.sum(indices == labels)
         return correct.item() * 1.0 / len(labels)
 
-def run(data, device):
-    g = data[0].to(device)
+@pytest.mark.parametrize('data', ['cora', 'pubmed'])
+def run(data):
+    data = utils.process_data(data)
+    device = utils.get_bench_device()
+
+    g = data[0].to(device).int()
 
     features = g.ndata['feat']
     labels = g.ndata['label']
@@ -60,8 +63,14 @@ def run(data, device):
     g = dgl.remove_self_loop(g)
     g = dgl.add_self_loop(g)
 
-    # create model
-    model = GraphSAGE(in_feats, 16, n_classes, 1, F.relu, 0.5, 'gcn')
+    # normalization
+    degs = g.in_degrees().float()
+    norm = torch.pow(degs, -0.5)
+    norm[torch.isinf(norm)] = 0
+    g.ndata['norm'] = norm.unsqueeze(1)
+
+    # create GCN model
+    model = GCN(in_feats, 16, n_classes, 1, F.relu, 0.5)
     loss_fcn = torch.nn.CrossEntropyLoss()
 
     model = model.to(device)
