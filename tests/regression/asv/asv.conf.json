@@ -8,7 +8,7 @@
     "project_url": "https://www.dgl.ai",
     // The URL or local path of the source code repository for the
     // project being benchmarked
-    "repo": ".",
+    "repo": "https://github.com/jermainewang/dgl.git",
     // The Python project's subdirectory in your repo.  If missing or
     // the empty string, the project is assumed to be located at the root
     // of the repository.
@@ -17,10 +17,10 @@
     // uninstalling the project. See asv.conf.json documentation.
     //
     "install_command": [
-        "/bin/bash {build_dir}/tests/regression/install_dgl_asv.sh"
+        "/bin/bash {conf_dir}/install_dgl_asv.sh"
     ],
     "build_command": [
-        "/bin/bash {build_dir}/tests/regression/build_dgl_asv.sh"
+        "/bin/bash {conf_dir}/build_dgl_asv.sh"
     ],
     "uninstall_command": [
         "return-code=any python -m pip uninstall -y dgl"
@@ -32,12 +32,11 @@
     // List of branches to benchmark. If not provided, defaults to "master"
     // (for git) or "default" (for mercurial).
     "branches": ["regression"], // for git
-    // "branches": ["default"],    // for mercurial
     // The DVCS being used.  If not set, it will be automatically
     // determined from "repo" by looking at the protocol in the URL
     // (if remote), or by looking for special directories, such as
     // ".git" (if local).
-    // "dvcs": "git",
+    "dvcs": "git",
     // The tool to use to create environments.  May be "conda",
     // "virtualenv" or other value depending on the plugins in use.
     // If missing or the empty string, the tool will be automatically
