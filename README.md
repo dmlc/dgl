@@ -204,6 +204,11 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Learning Robust Node Representations on Graphs**](https://arxiv.org/pdf/2008.11416.pdf), *Xu Chen, Ya Zhang, Ivor Tsang, and Yuangang Pan*
 
+1. [**Recurrent Event Network: Autoregressive Structure Inference over Temporal Knowledge Graphs**](https://arxiv.org/abs/1904.05530), *Woojeong Jin, Meng Qu, Xisen Jin, Xiang Ren*
+
+1. [**Graph Neural Ordinary Differential Equations
+**](https://arxiv.org/abs/1911.07532), *Michael Poli, Stefano Massaroli, Junyoung Park, Atsushi Yamashita, Hajime Asama, Jinkyoo Park*
+
 </details>
 
 ## Installation
