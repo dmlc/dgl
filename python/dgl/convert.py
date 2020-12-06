@@ -259,6 +259,8 @@ def heterograph(data_dict,
        formats and chooses the most efficient one depending on the computation invoked.
        If memory usage becomes an issue in the case of large graphs, use
        :func:`dgl.DGLGraph.formats` to restrict the allowed formats.
+    4. DGL internally decides a deterministic order for the same set of node types and canonical
+       edge types, which does not necessarily follow the order in :attr:`data_dict`.
 
     Examples
     --------
