@@ -173,7 +173,7 @@ endif(NOT MSVC)
 
 # Compile TVM Runtime
 add_subdirectory("cmake/tvm/")
-list(APPEND DGL_LINKER_LIBS tvm_runtime)
+list(APPEND DGL_LINKER_LIBS featgraph)
 
 # support PARALLEL_ALGORITHMS
 if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)

@@ -8,7 +8,7 @@
 namespace dgl {
 namespace featgraph {
 
-  static tvm::runtime::Module featgraph = tvm::runtime::Module::LoadFromFile("build/libfeatgraph.so");
+  static tvm::runtime::Module featgraph = tvm::runtime::Module::LoadFromFile("build/libfeatgraph_kernels.so");
 
   void SDDMMTreeReduction(DLManagedTensor* row, DLManagedTensor* col, 
                           DLManagedTensor* lhs, DLManagedTensor* rhs, 
@@ -17,7 +17,7 @@ namespace featgraph {
     ss << "SDDMMTreeReduction_int" << (int) (row->dl_tensor).dtype.bits;
     ss << "_float" << (int) (lhs->dl_tensor).dtype.bits;
     std::string f_name = ss.str();
-    tvm::runtime::PackedFunc f = featgraph.GetFunction(ss.str());
+    tvm::runtime::PackedFunc f = featgraph.GetFunction(f_name);
     if (f != nullptr)
       f(row, col, lhs, rhs, out);
   }

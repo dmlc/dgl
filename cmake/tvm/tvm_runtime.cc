@@ -56,7 +56,7 @@
 // If you use Module::Load, use dso_module
 // For system packed library, use system_lib_module
 #include <../src/runtime/dso_library.cc>
-// #include "../../src/runtime/system_library.cc"
+// #include <../src/runtime/system_library.cc>
 
 // Graph runtime
 // #include "../../src/runtime/graph/graph_runtime.cc"
