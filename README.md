@@ -206,8 +206,7 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Recurrent Event Network: Autoregressive Structure Inference over Temporal Knowledge Graphs**](https://arxiv.org/abs/1904.05530), *Woojeong Jin, Meng Qu, Xisen Jin, Xiang Ren*
 
-1. [**Graph Neural Ordinary Differential Equations
-**](https://arxiv.org/abs/1911.07532), *Michael Poli, Stefano Massaroli, Junyoung Park, Atsushi Yamashita, Hajime Asama, Jinkyoo Park*
+1. [**Graph Neural Ordinary Differential Equations**](https://arxiv.org/abs/1911.07532), *Michael Poli, Stefano Massaroli, Junyoung Park, Atsushi Yamashita, Hajime Asama, Jinkyoo Park*
 
 </details>
 
