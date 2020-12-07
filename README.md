@@ -208,6 +208,8 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Graph Neural Ordinary Differential Equations**](https://arxiv.org/abs/1911.07532), *Michael Poli, Stefano Massaroli, Junyoung Park, Atsushi Yamashita, Hajime Asama, Jinkyoo Park*
 
+1. [**FusedMM: A Unified SDDMM-SpMM Kernel for Graph Embedding and Graph Neural Networks**](https://arxiv.org/pdf/2011.06391.pdf), *Md. Khaledur Rahman, Majedul Haque Sujon, , Ariful Azad*
+
 </details>
 
 ## Installation
