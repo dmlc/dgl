@@ -52,7 +52,9 @@ components corresponding to the original small graphs.
 
    Batched Graph
 
-One can call :func:`dgl.batch` on a list of graphs as in the following example:
+The following example calls :func:`dgl.batch` on a list of graphs.
+A batched graph is a single graph, while it also carries information
+about the list.
 
 .. code:: python
 
