@@ -210,6 +210,14 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**FusedMM: A Unified SDDMM-SpMM Kernel for Graph Embedding and Graph Neural Networks**](https://arxiv.org/pdf/2011.06391.pdf), *Md. Khaledur Rahman, Majedul Haque Sujon, , Ariful Azad*
 
+1. [**Graphein - a Python Library for Geometric Deep Learning and Network Analysis on Protein Structures**](https://www.biorxiv.org/content/10.1101/2020.07.15.204701v1), *Arian R. Jamasb, Pietro Lió, Tom L. Blundell*
+
+1. [**Graph Policy Gradients for Large Scale Robot Control**](https://arxiv.org/abs/1907.03822), *Arbaaz Khan, Ekaterina Tolstaya, Alejandro Ribeiro, Vijay Kumar*
+
+1. [**Heterogeneous Molecular Graph Neural Networks for Predicting Molecule Properties**](https://arxiv.org/abs/2009.12710), *Zeren Shui, George Karypis*
+
+1. [**Could Graph Neural Networks Learn Better Molecular Representation for Drug Discovery? A Comparison Study of Descriptor-based and Graph-based Models**](https://assets.researchsquare.com/files/rs-81439/v1_stamped.pdf), *Dejun Jiang, Zhenxing Wu, Chang-Yu Hsieh, Guangyong Chen, Ben Liao, Zhe Wang, Chao Shen, Dongsheng Cao, Jian Wu, Tingjun Hou*
+
 </details>
 
 ## Installation
