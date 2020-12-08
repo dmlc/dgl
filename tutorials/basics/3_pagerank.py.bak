@@ -96,8 +96,6 @@ def pagerank_reduce_func(nodes):
 #
 # .. image:: https://i.imgur.com/kIMiuFb.png
 #
-# Register the message function and reduce function, which will be called
-# later by DGL.
 
 ###############################################################################
 # The algorithm is straightforward. Here is the code for one
