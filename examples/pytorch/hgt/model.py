@@ -28,14 +28,14 @@ class HGTLayer(nn.Module):
         self.d_k           = out_dim // n_heads
         self.sqrt_dk       = math.sqrt(self.d_k)
         self.att           = None
-        
+
         self.k_linears   = nn.ModuleList()
         self.q_linears   = nn.ModuleList()
         self.v_linears   = nn.ModuleList()
         self.a_linears   = nn.ModuleList()
         self.norms       = nn.ModuleList()
         self.use_norm    = use_norm
-        
+
         for t in range(self.num_types):
             self.k_linears.append(nn.Linear(in_dim,   out_dim))
             self.q_linears.append(nn.Linear(in_dim,   out_dim))
@@ -43,16 +43,16 @@ class HGTLayer(nn.Module):
             self.a_linears.append(nn.Linear(out_dim,  out_dim))
             if use_norm:
                 self.norms.append(nn.LayerNorm(out_dim))
-            
+
         self.relation_pri   = nn.Parameter(torch.ones(self.num_relations, self.n_heads))
         self.relation_att   = nn.Parameter(torch.Tensor(self.num_relations, n_heads, self.d_k, self.d_k))
         self.relation_msg   = nn.Parameter(torch.Tensor(self.num_relations, n_heads, self.d_k, self.d_k))
         self.skip           = nn.Parameter(torch.ones(self.num_types))
         self.drop           = nn.Dropout(dropout)
-        
+
         nn.init.xavier_uniform_(self.relation_att)
         nn.init.xavier_uniform_(self.relation_msg)
-        
+
     def forward(self, G, h):
         with G.local_scope():
             node_dict, edge_dict = self.node_dict, self.edge_dict
@@ -60,9 +60,9 @@ class HGTLayer(nn.Module):
                 sub_graph = G[srctype, etype, dsttype]
 
                 k_linear = self.k_linears[node_dict[srctype]]
-                v_linear = self.v_linears[node_dict[srctype]] 
+                v_linear = self.v_linears[node_dict[srctype]]
                 q_linear = self.q_linears[node_dict[dsttype]]
-                
+
                 k = k_linear(h[srctype]).view(-1, self.n_heads, self.d_k)
                 v = v_linear(h[srctype]).view(-1, self.n_heads, self.d_k)
                 q = q_linear(h[dsttype]).view(-1, self.n_heads, self.d_k)
@@ -73,8 +73,8 @@ class HGTLayer(nn.Module):
                 relation_pri = self.relation_pri[e_id]
                 relation_msg = self.relation_msg[e_id]
 
-                k = (k.transpose(0, 1) @ relation_att).transpose(0, 1)
-                v = (v.transpose(0, 1) @ relation_msg).transpose(0, 1)
+                k = torch.einsum("bij,ijk->bik", k, realtion_att)
+                v = torch.einsum("bij,ijk->bik", k, relation_msg)
 
                 sub_graph.srcdata['k'] = k
                 sub_graph.dstdata['q'] = q
@@ -105,7 +105,7 @@ class HGTLayer(nn.Module):
                 else:
                     new_h[ntype] = trans_out
             return new_h
-                
+
 class HGT(nn.Module):
     def __init__(self, G, node_dict, edge_dict, n_inp, n_hid, n_out, n_layers, n_heads, use_norm = True):
         super(HGT, self).__init__()
@@ -159,8 +159,8 @@ class HeteroRGCNLayer(nn.Module):
         G.multi_update_all(funcs, 'sum')
         # return the updated node feature dictionary
         return {ntype : G.nodes[ntype].data['h'] for ntype in G.ntypes}
-    
-    
+
+
 class HeteroRGCN(nn.Module):
     def __init__(self, G, in_size, hidden_size, out_size):
         super(HeteroRGCN, self).__init__()
