@@ -3,6 +3,8 @@
 4.2 Download raw data (optional)
 --------------------------------
 
+:ref:`(中文版) <guide_cn-data-pipeline-download>`
+
 If a dataset is already in local disk, make sure it’s in directory
 ``raw_dir``. If one wants to run the code anywhere without bothering to
 download and move data to the right directory, one can do it

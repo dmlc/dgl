@@ -78,7 +78,7 @@ class RelGraphEmbedLayer(nn.Module):
                  sparse_emb=False,
                  embed_name='embed'):
         super(RelGraphEmbedLayer, self).__init__()
-        self.dev_id = dev_id
+        self.dev_id = th.device(dev_id if dev_id >= 0 else 'cpu')
         self.embed_size = embed_size
         self.embed_name = embed_name
         self.num_nodes = num_nodes

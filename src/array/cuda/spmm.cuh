@@ -19,7 +19,7 @@ using namespace cuda;
 namespace aten {
 namespace cuda {
 
-/*! 
+/*!
  * \brief CUDA Kernel of filling the vector started from ptr of size length
  *        with val.
  * \note internal use only.
@@ -134,7 +134,7 @@ __global__ void ArgSpMMCooKernel(
 /*!
  * \brief CUDA kernel of g-SpMM on Coo format.
  * \note it uses node parallel strategy, different threadblocks (on y-axis)
- *       is responsible for the computation on different destination nodes. 
+ *       is responsible for the computation on different destination nodes.
  *       Threadblocks on the x-axis are responsible for the computation on
  *       different positions in feature dimension.
  */
@@ -150,7 +150,7 @@ __global__ void SpMMCsrKernel(
   const Idx* __restrict__ indptr,
   const Idx* __restrict__ indices,
   const Idx* __restrict__ edge_map,
-  int64_t num_rows, int64_t num_cols, int64_t nnz,
+  int64_t num_rows, int64_t num_cols,
   const int64_t* __restrict__ ubcast_off,
   const int64_t* __restrict__ ebcast_off,
   int64_t ufeat_len, int64_t efeat_len, int64_t out_len) {
@@ -191,10 +191,10 @@ __global__ void SpMMCsrKernel(
  * \param ufeat The feature on source nodes.
  * \param efeat The feature on edges.
  * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes, which refers the source node indices 
+ * \param argu Arg-Min/Max on source nodes, which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \param arge Arg-Min/Max on edges. which refers the source node indices 
+ * \param arge Arg-Min/Max on edges. which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
  */
@@ -263,10 +263,10 @@ void SpMMCoo(
  * \param ufeat The feature on source nodes.
  * \param efeat The feature on edges.
  * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes, which refers the source node indices 
+ * \param argu Arg-Min/Max on source nodes, which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \param arge Arg-Min/Max on edges. which refers the source node indices 
+ * \param arge Arg-Min/Max on edges. which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
  */
@@ -306,7 +306,7 @@ void SpMMCsr(
         nblks, nthrs, 0, thr_entry->stream,
         ufeat_data, efeat_data, out_data, argu_data, arge_data,
         indptr, indices, edge_map,
-        csr.num_rows, csr.num_cols, efeat->shape[0],
+        csr.num_rows, csr.num_cols,
         ubcast_off, ebcast_off,
         lhs_len, rhs_len, len)
   });

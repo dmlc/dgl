@@ -1,10 +1,10 @@
 import tensorflow as tf
 import numpy as np
-from .tensor import tensor, copy_to, context
+from .tensor import tensor, copy_to, context, asnumpy, zerocopy_from_numpy
 from ...base import is_all, ALL
-from ...sparse import _gspmm, _gsddmm
+from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp
 
-__all__ = ['gspmm', 'gsddmm', 'edge_softmax']
+__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce']
 
 
 def _scatter_nd(index, src, n_rows):

@@ -3,6 +3,8 @@
 3.1 DGL NN Module Construction Function
 ---------------------------------------
 
+:ref:`(中文版) <guide_cn-nn-construction>`
+
 The construction function performs the following steps:
 
 1. Set options.

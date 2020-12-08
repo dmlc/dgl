@@ -184,7 +184,7 @@ if __name__ == '__main__':
     parser.add_argument("--n-epochs", type=int, default=200,
                         help="number of training epochs")
     parser.add_argument("--log-every", type=int, default=100,
-                        help="number of training epochs")
+                        help="the frequency to save model")
     parser.add_argument("--batch-size", type=int, default=20,
                         help="batch size")
     parser.add_argument("--psize", type=int, default=1500,
@@ -202,7 +202,7 @@ if __name__ == '__main__':
     parser.add_argument("--self-loop", action='store_true',
                         help="graph self-loop (default=False)")
     parser.add_argument("--use-pp", action='store_true',
-                        help="whether to use percomputation")
+                        help="whether to use precomputation")
     parser.add_argument("--normalize", action='store_true',
                         help="whether to use normalized feature")
     parser.add_argument("--use-val", action='store_true',

@@ -20,3 +20,9 @@
 [submodule "third_party/phmap"]
 	path = third_party/phmap
 	url = https://github.com/greg7mdp/parallel-hashmap.git
+[submodule "third_party/thrust"]
+	path = third_party/thrust
+	url = https://github.com/NVIDIA/thrust.git
+[submodule "third_party/xbyak"]
+	path = third_party/xbyak
+	url = https://github.com/herumi/xbyak

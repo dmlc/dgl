@@ -114,16 +114,16 @@ class CitationGraphDataset(DGLBuiltinDataset):
         idx_train = range(len(y))
         idx_val = range(len(y), len(y)+500)
 
-        train_mask = _sample_mask(idx_train, labels.shape[0])
-        val_mask = _sample_mask(idx_val, labels.shape[0])
-        test_mask = _sample_mask(idx_test, labels.shape[0])
+        train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
+        val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0]))
+        test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
 
         self._graph = graph
         g = from_networkx(graph)
 
-        g.ndata['train_mask'] = generate_mask_tensor(train_mask)
-        g.ndata['val_mask'] = generate_mask_tensor(val_mask)
-        g.ndata['test_mask'] = generate_mask_tensor(test_mask)
+        g.ndata['train_mask'] = train_mask
+        g.ndata['val_mask'] = val_mask
+        g.ndata['test_mask'] = test_mask
         g.ndata['label'] = F.tensor(labels)
         g.ndata['feat'] = F.tensor(_preprocess_features(features), dtype=F.data_type_dict['float32'])
         self._num_classes = onehot_labels.shape[1]
@@ -224,7 +224,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
     """
     @property
     def graph(self):
-        deprecate_property('dataset.graph', 'dataset.g')
+        deprecate_property('dataset.graph', 'dataset[0]')
         return self._graph
 
     @property

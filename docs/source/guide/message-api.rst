@@ -3,6 +3,8 @@
 2.1 Built-in Functions and Message Passing APIs
 -----------------------------------------------
 
+:ref:`(中文版) <guide_cn-message-passing-api>`
+
 In DGL, **message function** takes a single argument ``edges``,
 which is an :class:`~dgl.udf.EdgeBatch` instance. During message passing,
 DGL generates it internally to represent a batch of edges. It has three
@@ -55,6 +57,8 @@ to the Reduce UDF that sums up the message ``m``:
     import torch
     def reduce_func(nodes):
          return {'h': torch.sum(nodes.mailbox['m'], dim=1)}
+
+For advanced usage of UDF, see :ref:`apiudf`.
 
 It is also possible to invoke only edge-wise computation by :meth:`~dgl.DGLGraph.apply_edges`
 without invoking message passing. :meth:`~dgl.DGLGraph.apply_edges` takes a message function

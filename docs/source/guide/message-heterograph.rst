@@ -3,6 +3,8 @@
 2.5 Message Passing on Heterogeneous Graph
 ------------------------------------------
 
+:ref:`(中文版) <guide_cn-message-passing-heterograph>`
+
 Heterogeneous graphs (:ref:`guide-graph-heterogeneous`), or
 heterographs for short, are graphs that contain different types of nodes
 and edges. The different types of nodes and edges tend to have different
