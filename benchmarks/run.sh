@@ -2,6 +2,8 @@
 
 set -e
 
+ROOT=/asv/dgl
+
 . /opt/conda/etc/profile.d/conda.sh
 
 # only bench pytorch backend
@@ -12,7 +14,7 @@ pip install asv numpy pandas pytest
 pip uninstall -y dgl
 
 # build
-pushd /root/dgl
+pushd $ROOT
 rm -rf build
 mkdir -p build
 CMAKE_VARS="-DUSE_CUDA=ON"
@@ -24,14 +26,14 @@ popd
 popd
 
 # install
-pushd /root/dgl/python
+pushd $ROOT/python
 rm -rf build *.egg-info dist
 pip uninstall -y dgl
 python3 setup.py install
 popd
 
 # benchmark
-pushd /root/dgl/benchmarks
+pushd $ROOT/benchmarks
 cat asv.conf.json
 ls -lh
 asv machine --yes
