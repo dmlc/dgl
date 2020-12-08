@@ -74,7 +74,7 @@ class HGTLayer(nn.Module):
                 relation_msg = self.relation_msg[e_id]
 
                 k = torch.einsum("bij,ijk->bik", k, realtion_att)
-                v = torch.einsum("bij,ijk->bik", k, relation_msg)
+                v = torch.einsum("bij,ijk->bik", v, relation_msg)
 
                 sub_graph.srcdata['k'] = k
                 sub_graph.dstdata['q'] = q
