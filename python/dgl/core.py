@@ -20,7 +20,7 @@ def invoke_node_udf(graph, nid, ntype, func, *, ndata=None, orig_nid=None):
     ----------
     graph : DGLGraph
         The input graph.
-    eid : Tensor
+    nid : Tensor
         The IDs of the nodes to invoke UDF on.
     ntype : str
         Node type.
