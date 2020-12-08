@@ -1,7 +1,7 @@
 import dgl
 from dgl import distributed as dgl_distributed
 import argparse, time
-from utils import get_graph
+from .utils import get_graph
 
 parser = argparse.ArgumentParser(description='partition')
 parser.add_argument("--dataset", type=str, default='livejournal',

@@ -2,12 +2,12 @@
 
 set -e
 
-python -m pip install numpy pandas pytest
-
 . /opt/conda/etc/profile.d/conda.sh
 
-# only use pytorch
+# only bench pytorch backend
 conda activate "pytorch-ci"
+python -m pip install numpy pandas pytest
+
 pushd python
 rm -rf build *.egg-info dist
 pip uninstall -y dgl

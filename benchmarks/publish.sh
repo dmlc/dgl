@@ -11,10 +11,7 @@ mkdir -p /tmp/asv_env  # for cached build
 
 docker run --name dgl-reg                   \
            --rm --runtime=nvidia            \
-           -v /tmp/asv_env:/asv/env         \
            --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
-docker cp asv dgl-reg:/root/
-docker exec dgl-reg bash /root/asv/run.sh
-docker cp dgl-reg:/asv/results asv/
-docker cp dgl-reg:/asv/html asv/
+docker cp .. dgl-reg:/root/
+docker exec dgl-reg bash /root/dgl/benchmarks/run.sh
 docker stop dgl-reg

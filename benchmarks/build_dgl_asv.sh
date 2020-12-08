@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echo "I AM in $PWD"
+
 mkdir -p build
 
 CMAKE_VARS="-DUSE_CUDA=ON"
