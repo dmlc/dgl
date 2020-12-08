@@ -70,8 +70,8 @@
         src, dst = graph.edges()
     
         neg_src = src.repeat_interleave(k)
-        neg_dst = torch.randint(0, graph.number_of_nodes(), (len(src) * k,))
-        return dgl.graph((neg_src, neg_dst), num_nodes=graph.number_of_nodes())
+        neg_dst = torch.randint(0, graph.num_nodes(), (len(src) * k,))
+        return dgl.graph((neg_src, neg_dst), num_nodes=graph.num_nodes())
 
 预测边得分的模型和边分类/回归模型中的预测边得分模型相同。
 
@@ -93,7 +93,7 @@
     def compute_loss(pos_score, neg_score):
         # 间隔损失
         n_edges = pos_score.shape[0]
-        return (1 - neg_score.view(n_edges, -1) + pos_score.unsqueeze(1)).clamp(min=0).mean()
+        return (1 - pos_score.unsqueeze(1) + neg_score.view(n_edges, -1)).clamp(min=0).mean()
     
     node_features = graph.ndata['feat']
     n_features = node_features.shape[1]
@@ -145,12 +145,12 @@
         utype, _, vtype = etype
         src, dst = graph.edges(etype=etype)
         neg_src = src.repeat_interleave(k)
-        neg_dst = torch.randint(0, graph.number_of_nodes(vtype), (len(src) * k,))
+        neg_dst = torch.randint(0, graph.num_nodes(vtype), (len(src) * k,))
         return dgl.heterograph(
             {etype: (neg_src, neg_dst)},
-            num_nodes_dict={ntype: graph.number_of_nodes(ntype) for ntype in graph.ntypes})
+            num_nodes_dict={ntype: graph.num_nodes(ntype) for ntype in graph.ntypes})
 
-该模型与异构图上边分类的模型有些不同，因为用户需要指定在哪种边类型上进行连接预测。
+该模型与异构图上边分类的模型有些不同，因为用户需要指定在哪种边类型上进行链接预测。
 
 .. code:: python
 
@@ -170,7 +170,7 @@
     def compute_loss(pos_score, neg_score):
         # 间隔损失
         n_edges = pos_score.shape[0]
-        return (1 - neg_score.view(n_edges, -1) + pos_score.unsqueeze(1)).clamp(min=0).mean()
+        return (1 - pos_score.unsqueeze(1) + neg_score.view(n_edges, -1)).clamp(min=0).mean()
     
     k = 5
     model = Model(10, 20, 5, hetero_graph.etypes)

@@ -20,7 +20,7 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 DGL提供了一些内置的图卷积模块，可以完成一轮消息传递计算。
-本章中选择 :class:`dgl.nn.pytorch.SAGEConv` 作为演示的样例代码(在DGL的MXNet和Tensorflow包中也有)，
+本章中选择 :class:`dgl.nn.pytorch.SAGEConv` 作为演示的样例代码(针对MXNet和PyTorch后端也有对应的模块)，
 它是GraphSAGE模型中使用的图卷积模块。
 
 对于图上的深度学习模型，通常需要一个多层的图神经网络，并在这个网络中要进行多轮的信息传递。
@@ -35,6 +35,7 @@ DGL提供了一些内置的图卷积模块，可以完成一轮消息传递计�
     class SAGE(nn.Module):
         def __init__(self, in_feats, hid_feats, out_feats):
             super().__init__()
+            # 实例化SAGEConve，in_feats是输入特征的维度，out_feats是输出特征的维度，aggregator_type是聚合函数的类型
             self.conv1 = dglnn.SAGEConv(
                 in_feats=in_feats, out_feats=hid_feats, aggregator_type='mean')
             self.conv2 = dglnn.SAGEConv(
@@ -61,7 +62,7 @@ DGL提供了一些内置的图卷积模块，可以完成一轮消息传递计�
 
 全图(使用所有的节点和边的特征)上的训练只需要使用上面定义的模型进行前向传播计算，并通过在训练节点上比较预测和真实标签来计算损失，从而完成后向传播。
 
-本节使用DGL内置的数据集 :class:`dgl.data.CiteseerGraphDataset` 来展示一个训练循环。
+本节使用DGL内置的数据集 :class:`dgl.data.CiteseerGraphDataset` 来展示模型的训练。
 节点特征和标签存储在其图上，训练、验证和测试的分割也以布尔掩码的形式存储在图上。这与在
 :ref:`guide_cn-data-pipeline` 中的做法类似。
 
@@ -89,7 +90,7 @@ DGL提供了一些内置的图卷积模块，可以完成一轮消息传递计�
             correct = torch.sum(indices == labels)
             return correct.item() * 1.0 / len(labels)
 
-用户可以按如下方式实现训练循环。
+用户可以按如下方式实现模型的训练。
 
 .. code:: python
 
@@ -124,8 +125,8 @@ DGL提供了一些内置的图卷积模块，可以完成一轮消息传递计�
 
 如果图是异构的，用户可能希望沿着所有边类型从邻居那里收集消息。
 用户可以使用 :class:`dgl.nn.pytorch.HeteroGraphConv`
-模块(也可以在DGL的MXNet和Tensorflow包中使用)在所有边类型上执行消息传递，
-然后为每种边类型组合不同的图卷积模块。
+模块(针对MXNet和PyTorch后端也有对应的模块)在所有边类型上执行消息传递，
+并为每种边类型使用一种图卷积模块。
 
 下面的代码定义了一个异构图卷积模块。模块首先对每种边类型进行单独的图卷积计算，然后将每种边类型上的消息聚合结果再相加，
 并作为所有节点类型的最终结果。
@@ -138,7 +139,7 @@ DGL提供了一些内置的图卷积模块，可以完成一轮消息传递计�
     class RGCN(nn.Module):
         def __init__(self, in_feats, hid_feats, out_feats, rel_names):
             super().__init__()
-            
+            # 实例化HeteroGraphConv，in_feats是输入特征的维度，out_feats是输出特征的维度，aggregate是聚合函数的类型
             self.conv1 = dglnn.HeteroGraphConv({
                 rel: dglnn.GraphConv(in_feats, hid_feats)
                 for rel in rel_names}, aggregate='sum')
@@ -147,7 +148,7 @@ DGL提供了一些内置的图卷积模块，可以完成一轮消息传递计�
                 for rel in rel_names}, aggregate='sum')
       
         def forward(self, graph, inputs):
-            # 输入是节点的特征
+            # 输入是节点的特征字典
             h = self.conv1(graph, inputs)
             h = {k: F.relu(v) for k, v in h.items()}
             h = self.conv2(graph, h)
@@ -176,7 +177,7 @@ DGL提供了一些内置的图卷积模块，可以完成一轮消息传递计�
     h_user = h_dict['user']
     h_item = h_dict['item']
 
-异构图上的训练循环和同构图的训练循环是一样的，只是这里使用了一个包括节点表示的字典来计算预测值。
+异构图上模型的训练和同构图的训练是一样的，只是这里使用了一个包括节点表示的字典来计算预测值。
 例如，如果只预测 ``user`` 节点的类别，用户可以从返回的字典中提取 ``user`` 的节点嵌入。
 
 .. code:: python
@@ -185,7 +186,7 @@ DGL提供了一些内置的图卷积模块，可以完成一轮消息传递计�
     
     for epoch in range(5):
         model.train()
-        # 使用所有的节点和它们的user嵌入进行前向传播计算
+        # 使用所有节点的特征进行前向传播计算，并提取输出的user节点嵌入
         logits = model(hetero_graph, node_features)['user']
         # 计算损失值
         loss = F.cross_entropy(logits[train_mask], labels[train_mask])
