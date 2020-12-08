@@ -15,37 +15,37 @@ from ... import utils as dgl_utils
 from ... import heterograph_index
 from ...heterograph_index import HeteroGraphIndex
 #
-# def _flatten_HeteroGraphIndex(gidx):
-#     adj, _ = gidx.adjacency_matrix(
-#         etype=0,
-#         transpose=False,
-#         ctx=jax.devices('cpu')[0],
-#     )
-#
-#     srctype, dsttype = gidx.metagraph.find_edge(0)
-#     num_src = gidx.number_of_nodes(srctype)
-#     num_dst = gidx.number_of_nodes(dsttype)
-#
-#     idx = adj.index
-#
-#     u = idx[0, :]
-#     v = idx[1, :]
-#     return ((u, v, num_src, num_dst), None)
-#
-# def _unflatten_HeteroGraphIndex(_, children):
-#     u, v, num_src, num_dst = children
-#     if u is None or v is None:
-#         return None
-#
-#     return heterograph_index.create_unitgraph_from_coo(
-#         1, num_src, num_dst, u, v, ["coo"],
-#     )
-#
-# jax.tree_util.register_pytree_node(
-#     HeteroGraphIndex,
-#     _flatten_HeteroGraphIndex,
-#     _unflatten_HeteroGraphIndex,
-# )
+def _flatten_HeteroGraphIndex(gidx):
+    adj, _ = gidx.adjacency_matrix(
+        etype=0,
+        transpose=False,
+        ctx=jax.devices('cpu')[0],
+    )
+
+    srctype, dsttype = gidx.metagraph.find_edge(0)
+    num_src = gidx.number_of_nodes(srctype)
+    num_dst = gidx.number_of_nodes(dsttype)
+
+    idx = adj.index
+
+    u = idx[0, :]
+    v = idx[1, :]
+    return ((u, v, num_src, num_dst), None)
+
+def _unflatten_HeteroGraphIndex(_, children):
+    u, v, num_src, num_dst = children
+    if u is None or v is None:
+        return None
+
+    return heterograph_index.create_unitgraph_from_coo(
+        1, num_src, num_dst, u, v, ["coo"],
+    )
+
+jax.tree_util.register_pytree_node(
+    HeteroGraphIndex,
+    _flatten_HeteroGraphIndex,
+    _unflatten_HeteroGraphIndex,
+)
 
 # =============================================================================
 # MODULE FUNCTIONS
@@ -196,7 +196,7 @@ OPS = {
 #
 #     return Z
 
-# @partial(jax.jit, static_argnums=(5, 6))
+@partial(jax.jit, static_argnums=(5, 6))
 def _jax_gspmm_u_and_e(X, Y, Z, dst_idxs, src_idxs, _op, _reduce_op):
     edge_idxs = jnp.arange(dst_idxs.shape[0])
     _X = X[src_idxs]
@@ -206,14 +206,14 @@ def _jax_gspmm_u_and_e(X, Y, Z, dst_idxs, src_idxs, _op, _reduce_op):
 
     return Z
 
-# @partial(jax.jit, static_argnums=(4, 5))
+@partial(jax.jit, static_argnums=(4, 5))
 def _jax_gspmm_only_u(X, Z, dst_idxs, src_idxs, _op, _reduce_op):
     _X = X[src_idxs]
     _Z = _op(_X, None)
     Z = _reduce_op(Z, dst_idxs, _Z)
     return Z
 
-# @partial(jax.jit, static_argnums=(4, 5))
+@partial(jax.jit, static_argnums=(4, 5))
 def _jax_gspmm_only_e(Y, Z, dst_idxs, src_idxs, _op, _reduce_op):
     edge_idxs = jnp.arange(dst_idxs.shape[0])
     _Y = Y[edge_idxs]
@@ -324,202 +324,100 @@ def _jax_gsddmm(gidx, op, X, Y, lhs_target, rhs_target):
 # ==============================
 # IMPLMENTATION USING CUSTOM VJP
 # ==============================
-# @partial(jax.custom_vjp, nondiff_argnums=(0, 1, 2))
-# def _dgl_gspmm(gidx, op, reduce_op, X, Y):
-#     out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
-#     return out
-#
-# # def _dgl_gspmm_vjp_forward(gidx, op, reduce_op, X, Y):
-# #     out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
-# #     res = gidx, op, reduce_op, X, Y, argX, argY
-# #     return out, res
-#
-# def _dgl_gspmm_vjp_backward(res, dZ):
-#     gidx, op, reduce_op, X, Y, argX, argY = res
-#
-#     if op != 'copy_rhs':
-#         g_rev = gidx.reverse()
-#         if reduce_op == 'sum':
-#             if op in ['mul', 'div']:
-#                 dX = gspmm(g_rev, 'mul', 'sum', dZ, _muldiv(op, Y))
-#             elif op in ['add', 'sub']:
-#                 dX = gspmm(g_rev, 'copy_lhs', 'sum', dZ, Y)
-#             elif op == 'copy_lhs':
-#                 dX = gspmm(g_rev, 'copy_lhs', 'sum', dZ, None)
-#         else:  # max/min
-#             dX = jnp.zeros((X.shape[0],) + dZ.shape[1:],
-#                           dtype=X.dtype, device=X.device)
-#             if op in ['mul', 'div']:
-#                 grad = _muldiv(op, _expand(Y, dZ.shape[1:]).gather(
-#                     0, argY.long())) * dZ
-#                 dX.scatter_add_(0, argX.long(), grad)
-#             elif op in ['add', 'sub', 'copy_lhs']:
-#                 dX.scatter_add_(0, argX.long(), dZ)
-#         dX = _reduce_grad(dX, X.shape)
-#     else:  # X has not gradient
-#         dX = None
-#     if op != 'copy_lhs':
-#         if reduce_op == 'sum':
-#             if op == 'mul' and _need_reduce_last_dim(X, Y):
-#                 dY = gsddmm(gidx, 'dot', X, dZ)
-#             elif op in ['mul', 'div']:
-#                 dY = gsddmm(gidx, 'mul', X, dZ)
-#                 if op == 'div':
-#                     dY = -dY / (Y ** 2)
-#             elif op in ['add', 'sub', 'copy_rhs']:
-#                 dY = gsddmm(gidx, 'copy_rhs', X, _addsub(op, dZ))
-#         else:  # max/min
-#             dY = jnp.zeros((Y.shape[0],) + dZ.shape[1:],
-#                           dtype=Y.dtype, device=Y.device)
-#             if op in ['mul',  'div']:
-#                 grad = _expand(X, dZ.shape[1:]).gather(
-#                     0, argX.long()) * dZ
-#                 dY.scatter_add_(0, argY.long(), grad)
-#                 if op == 'div':
-#                     dY = -dY / (Y ** 2)
-#             elif op in ['add', 'sub', 'copy_rhs']:
-#                 dY.scatter_add_(0, argY.long(), _addsub(op, dZ))
-#         dY = _reduce_grad(dY, Y.shape)
-#     else:  # Y has no gradient
-#         dY = None
-#     return dX, dY
-#
-#
-# def _dgl_gspmm_vjp_foward_and_backward(gidx, op, reduce_op, X, Y):
-#     out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
-#
-#     def grad(dZ):
-#         if op != 'copy_rhs':
-#             g_rev = gidx.reverse()
-#             if reduce_op == 'sum':
-#                 if op in ['mul', 'div']:
-#                     dX = gspmm(g_rev, 'mul', 'sum', dZ, _muldiv(op, Y))
-#                 elif op in ['add', 'sub']:
-#                     dX = gspmm(g_rev, 'copy_lhs', 'sum', dZ, Y)
-#                 elif op == 'copy_lhs':
-#                     dX = gspmm(g_rev, 'copy_lhs', 'sum', dZ, None)
-#             else:  # max/min
-#                 dX = jnp.zeros((X.shape[0],) + dZ.shape[1:],
-#                               dtype=X.dtype, device=X.device)
-#                 if op in ['mul', 'div']:
-#                     grad = _muldiv(op, _expand(Y, dZ.shape[1:]).gather(
-#                         0, argY.long())) * dZ
-#                     dX.scatter_add_(0, argX.long(), grad)
-#                 elif op in ['add', 'sub', 'copy_lhs']:
-#                     dX.scatter_add_(0, argX.long(), dZ)
-#             dX = _reduce_grad(dX, X.shape)
-#         else:  # X has not gradient
-#             dX = None
-#         if op != 'copy_lhs':
-#             if reduce_op == 'sum':
-#                 if op == 'mul' and _need_reduce_last_dim(X, Y):
-#                     dY = gsddmm(gidx, 'dot', X, dZ)
-#                 elif op in ['mul', 'div']:
-#                     dY = gsddmm(gidx, 'mul', X, dZ)
-#                     if op == 'div':
-#                         dY = -dY / (Y ** 2)
-#                 elif op in ['add', 'sub', 'copy_rhs']:
-#                     dY = gsddmm(gidx, 'copy_rhs', X, _addsub(op, dZ))
-#             else:  # max/min
-#                 dY = jnp.zeros((Y.shape[0],) + dZ.shape[1:],
-#                               dtype=Y.dtype, device=Y.device)
-#                 if op in ['mul',  'div']:
-#                     grad = _expand(X, dZ.shape[1:]).gather(
-#                         0, argX.long()) * dZ
-#                     dY.scatter_add_(0, argY.long(), grad)
-#                     if op == 'div':
-#                         dY = -dY / (Y ** 2)
-#                 elif op in ['add', 'sub', 'copy_rhs']:
-#                     dY.scatter_add_(0, argY.long(), _addsub(op, dZ))
-#             dY = _reduce_grad(dY, Y.shape)
-#         else:  # Y has no gradient
-#             dY = None
-#         return dX, dY
-#
-#     return out, grad
-#
-# # @partial(jax.custom_vjp, nondiff_argnums=(0, 1, 4, 5))
-# def _dgl_gsddmm(gidx, op, X, Y, lhs_target, rhs_target):
-#     out, _ = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
-#     return out
-#
-# # @partial(jax.jit, static_argnums=(0, 1, 4, 5))
-# # def _dgl_gsddmm_vjp_forward(gidx, op, X, Y, lhs_target, rhs_target):
-# #     out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
-# #     res = gidx, op, X, Y, lhs_target, rhs_target
-# #     return out, res
-#
-# # @partial(jax.jit, static_argnums=(0,))
-# def _dgl_gsddmm_vjp_backward(res, dZ):
-#     gidx, op, X, Y, lhs_target, rhs_target = res
-#     if op != 'copy_rhs':
-#         if lhs_target in ['u', 'v']:
-#             _gidx = gidx if lhs_target == 'v' else gidx.reverse()
-#             if op in ['add', 'sub', 'copy_lhs']:
-#                 dX = _gspmm_primitive(_gidx, 'copy_rhs', 'sum', None, dZ)
-#             else:  # mul, div, dot
-#                 if rhs_target == lhs_target:
-#                     dX = _gspmm_primitive(_gidx, 'copy_rhs', 'sum', None, dZ) * _muldiv(op, Y)
-#                 elif rhs_target == 'e':
-#                     dX = _gspmm_primitive(_gidx, 'copy_rhs', 'sum', None, dZ * _muldiv(op, Y))
-#                 else:  # rhs_target = !lhs_target
-#                     dX = _gspmm_primitive(_gidx, 'mul', 'sum', _muldiv(op, Y), dZ)
-#         else:  # lhs_target == 'e'
-#             if op in ['add', 'sub', 'copy_lhs']:
-#                 dX = dZ
-#             else:  # mul, div, dot
-#                 dX = gsddmm(gidx, 'mul', dZ, _muldiv(op, Y), 'e', rhs_target)
-#         dX = _reduce_grad(dX, X.shape)
-#     else:
-#         dX = None
-#     if op != 'copy_lhs':
-#         if rhs_target in ['u', 'v']:
-#             _gidx = gidx if rhs_target == 'v' else gidx.reverse()
-#             if op in ['add', 'sub', 'copy_rhs']:
-#                 dY = _gspmm_primitive(_gidx, 'copy_rhs', 'sum', None, _addsub(op, dZ))
-#             else:  # mul, div, dot
-#                 if lhs_target == rhs_target:
-#                     dY = _gspmm_primitive(_gidx, 'copy_rhs', 'sum', None, dZ) * X
-#                 elif lhs_target == 'e':
-#                     dY = _gspmm_primitive(_gidx, 'copy_rhs', 'sum', None, dZ * X)
-#                 else:  # rhs_target = !lhs_target
-#                     dY = _gspmm_primitive(_gidx, 'mul', 'sum', X, dZ)
-#                 if op == 'div':
-#                     dY = -dY / (Y ** 2)
-#         else:
-#             if op in ['add', 'sub', 'copy_rhs']:
-#                 dY = _addsub(op, dZ)
-#             else:  # mul, div, dot
-#                 dY = gsddmm(gidx, 'mul', dZ, X, 'e', lhs_target)
-#                 if op == 'div':
-#                     dY = -dY / (Y ** 2)
-#         dY = _reduce_grad(dY, Y.shape)
-#     else:
-#         dY = None
-#     return dX, dY
-#
-# # ==============================
-# # IMPLMENTATION USING PRIMITIVES
-# # ==============================
-# def _gspmm_abstract_eval(gidx, op, reduce_op, X, Y):
-#     use_u = op != 'copy_rhs'
-#     use_e = op != 'copy_lhs'
-#
-#     u_shp = X.shape if use_u else (0,)
-#     e_shp = Y.shape if use_e else (0,)
-#
-#     if X.ndim == 1 and use_u == True:
-#         u_shp.append(1)
-#
-#     if Y.ndim == 1 and use_e == True:
-#         e_shp.append(1)
-#
-#     _, dsttype = gidx.metagraph.find_edge(0)
-#     v_shp = (gidx.number_of_nodes(dsttype), ) +\
-#         infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
-#     dtype = X.dtype if use_u else Y.dtype
-#     return jax.abstract_arrays.ShapedArray(v_shp, dtype)
-#
+def _dgl_gspmm(gidx, op, reduce_op, X, Y):
+    out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
+    return out
+
+def _dgl_gspmm_and_jvp(primals, tangents):
+    gidx, op, reduce_op, X, Y = primals
+    gidx_dot, opt_dpt, reduce_op_dot, X_dot, Y_dot = tangents
+
+    out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
+
+    if op != 'copy_rhs':
+        g_rev = gidx.reverse()
+        if reduce_op == 'sum':
+            if op in ['mul', 'div']:
+                dX = gspmm(g_rev, 'mul', 'sum', X_dot, _muldiv(op, Y))
+            elif op in ['add', 'sub']:
+                dX = gspmm(g_rev, 'copy_lhs', 'sum', X_dot, Y)
+            elif op == 'copy_lhs':
+                dX = gspmm(g_rev, 'copy_lhs', 'sum', X_dot, None)
+        else:  # max/min
+            dX = jnp.zeros((X.shape[0],) + X_dot.shape[1:],
+                          dtype=X.dtype, device=X.device)
+            if op in ['mul', 'div']:
+                grad = _muldiv(op, _expand(Y, X_dot.shape[1:]).gather(
+                    0, argY.long())) * X_dot
+                dX.scatter_add_(0, argX.long(), grad)
+            elif op in ['add', 'sub', 'copy_lhs']:
+                dX.scatter_add_(0, argX.long(), X_dot)
+        dX = _reduce_grad(dX, X.shape)
+    else:  # X has not gradient
+        dX = jnp.zeros_like(X)
+
+    if op != 'copy_lhs':
+        if reduce_op == 'sum':
+            if op == 'mul' and _need_reduce_last_dim(X, Y):
+                dY = gsddmm(gidx, 'dot', X, Y_dot)
+            elif op in ['mul', 'div']:
+                dY = gsddmm(gidx, 'mul', X, Y_dot)
+                if op == 'div':
+                    dY = -dY / (Y ** 2)
+            elif op in ['add', 'sub', 'copy_rhs']:
+                dY = gsddmm(gidx, 'copy_rhs', X, _addsub(op, Y_dot))
+        else:  # max/min
+            dY = jnp.zeros((Y.shape[0],) + Y_dot.shape[1:],
+                          dtype=Y.dtype, device=Y.device)
+            if op in ['mul',  'div']:
+                grad = _expand(X, dZ.shape[1:]).gather(
+                    0, argX.long()) * Y_dot
+                dY.scatter_add_(0, argY.long(), grad)
+                if op == 'div':
+                    dY = -dY / (Y ** 2)
+            elif op in ['add', 'sub', 'copy_rhs']:
+                dY.scatter_add_(0, argY.long(), _addsub(op, Y_dot))
+        dY = _reduce_grad(dY, Y.shape)
+    else:  # Y has no gradient
+        dY = jnp.zeros_like(Y)
+
+    return out, dX + dY
+
+# @partial(jax.custom_vjp, nondiff_argnums=(0, 1, 4, 5))
+def _dgl_gsddmm(gidx, op, X, Y, lhs_target, rhs_target):
+    out, _ = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
+    return out
+
+# @partial(jax.jit, static_argnums=(0, 1, 4, 5))
+# def _dgl_gsddmm_vjp_forward(gidx, op, X, Y, lhs_target, rhs_target):
+#     out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
+#     res = gidx, op, X, Y, lhs_target, rhs_target
+#     return out, res
+
+# @partial(jax.jit, static_argnums=(0,))
+
+# ==============================
+# IMPLMENTATION USING PRIMITIVES
+# ==============================
+def _gspmm_abstract_eval(gidx, op, reduce_op, X, Y):
+    use_u = op != 'copy_rhs'
+    use_e = op != 'copy_lhs'
+
+    u_shp = X.shape if use_u else (0,)
+    e_shp = Y.shape if use_e else (0,)
+
+    if X.ndim == 1 and use_u == True:
+        u_shp.append(1)
+
+    if Y.ndim == 1 and use_e == True:
+        e_shp.append(1)
+
+    _, dsttype = gidx.metagraph.find_edge(0)
+    v_shp = (gidx.number_of_nodes(dsttype), ) +\
+        infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
+    dtype = X.dtype if use_u else Y.dtype
+    return jax.abstract_arrays.ShapedArray(v_shp, dtype)
+
 # def _gsddmm_abstract_eval(gidx, op, X, Y, lhs_target, rhs_target):
 #     use_lhs = op != 'copy_rhs'
 #     use_rhs = op != 'copy_lhs'
@@ -557,22 +455,24 @@ def _jax_gsddmm(gidx, op, X, Y, lhs_target, rhs_target):
 #         v_shp.append(1)
 #
 #     return jax.abstract_arrays.ShapedArray(v_shp, dtype)
-#
 
-# from jax.interpreters import ad
-# _gspmm_primitive = jax.core.Primitive("gspmm")
-# _gspmm_primitive_call = lambda *args, **kwargs: _gspmm_primitive.bind(
-#     *args, **kwargs,
-# )
-# _gspmm_primitive.def_impl(_dgl_gspmm)
-# _gspmm_primitive.def_abstract_eval(_gspmm_abstract_eval)
-# ad.defvjp_all(_gspmm_primitive, _dgl_gspmm_vjp_foward_and_backward)
+from jax.interpreters import ad
+_gspmm_primitive = jax.core.Primitive("gspmm")
+_gspmm_primitive_call = lambda *args, **kwargs: _gspmm_primitive.bind(
+    *args, **kwargs,
+)
+
+_gspmm_primitive.def_impl(_dgl_gspmm)
+_gspmm_primitive.def_abstract_eval(_gspmm_abstract_eval)
+ad.primitive_jvps[_gspmm_primitive] = _dgl_gspmm_and_jvp
 # gspmm = _gspmm_primitive_call
 
-def gspmm(*args, **kwargs):
-    return _jax_gspmm(*args, **kwargs)
-    # return _dgl_gspmm(*args, **kwargs)
+gspmm = _jax_gspmm
 
+# def gspmm(*args, **kwargs):
+#     return _jax_gspmm(*args, **kwargs)
+#     # return _dgl_gspmm(*args, **kwargs)
+#
 def gsddmm(*args, **kwargs):
     return _jax_gsddmm(*args, **kwargs)
     # return _dgl_gsddmm(*args, **kwargs)
