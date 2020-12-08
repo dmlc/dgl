@@ -8,7 +8,7 @@
 The nodes and edges of a :class:`~dgl.DGLGraph` can have several user-defined named features for
 storing graph-specific properties of the nodes and edges. These features can be accessed
 via the :py:attr:`~dgl.DGLGraph.ndata` and :py:attr:`~dgl.DGLGraph.edata` interface. For example, the following code creates two node
-features (named ``'x'`` and ``'y'`` in line 5 and 8) and one edge feature (named ``'x'`` in line 6).
+features (named ``'x'`` and ``'y'`` in line 8 and 15) and one edge feature (named ``'x'`` in line 9).
 
 .. code-block:: python
     :linenos:
@@ -45,7 +45,7 @@ Important facts about the :py:attr:`~dgl.DGLGraph.ndata`/:py:attr:`~dgl.DGLGraph
   nodes/edges in the graph.
 - Features of the same name must have the same dimensionality and data type.
 - The feature tensor is in row-major layout -- each row-slice stores the feature of one
-  node or edge (e.g., see lines 10-11 in the above example).
+  node or edge (e.g., see lines 16 and 18 in the above example).
 
 For weighted graphs, one can store the weights as an edge feature as below.
 
@@ -60,5 +60,6 @@ For weighted graphs, one can store the weights as an edge feature as below.
     Graph(num_nodes=4, num_edges=4,
           ndata_schemes={}
           edata_schemes={'w' : Scheme(shape=(,), dtype=torch.float32)})
+
 
 See APIs: :py:attr:`~dgl.DGLGraph.ndata`, :py:attr:`~dgl.DGLGraph.edata`.

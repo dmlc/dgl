@@ -3,6 +3,8 @@
 4.4 Save and load data
 ----------------------
 
+:ref:`(中文版) <guide_cn-data-pipeline-savenload>`
+
 DGL recommends implementing saving and loading functions to cache the
 processed data in local disk. This saves a lot of data processing time
 in most cases. DGL provides four functions to make things simple:
@@ -45,8 +47,3 @@ Note that there are cases not suitable to save processed data. For
 example, in the builtin dataset :class:`~dgl.data.GDELTDataset`,
 the processed data is quite large, so it’s more effective to process
 each data example in ``__getitem__(idx)``.
-
-.. code::
-
-    print(split_edge['valid'].keys())
-    print(split_edge['test'].keys())

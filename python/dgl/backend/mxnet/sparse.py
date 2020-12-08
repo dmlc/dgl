@@ -1,11 +1,11 @@
 import mxnet as mx
 import numpy as np
 from mxnet import nd
-from ...sparse import _gspmm, _gsddmm
+from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp
 from ...base import dgl_warning, is_all, ALL
 from .tensor import asnumpy, copy_to, zerocopy_from_numpy, context, to_backend_ctx
 
-__all__ = ['gspmm', 'gsddmm', 'edge_softmax']
+__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce']
 
 
 def _scatter_nd(index, src, n_rows):
@@ -28,7 +28,7 @@ def _scatter_nd(index, src, n_rows):
     if ndim > 1:
         new_idx = index * stride + sum(offsets)
     else:
-        new_idx = index 
+        new_idx = index
     src = src.reshape(-1)
     new_idx = new_idx.reshape(-1)
     rst = np.zeros((stride * n_rows,), dtype=src.dtype)
@@ -328,3 +328,35 @@ class EdgeSoftmax(mx.autograd.Function):
 def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
     softmax_op = EdgeSoftmax(gidx, eids, norm_by)
     return softmax_op(logits)
+
+
+class SegmentReduce(mx.autograd.Function):
+    def __init__(self, op, offsets):
+        super(SegmentReduce, self).__init__()
+        self.op = op
+        self.offsets = offsets
+
+    def forward(self, x):
+        y, arg = _segment_reduce(self.op, x, self.offsets)
+        self.save_for_backward(arg)
+        return y
+
+    def backward(self, dy):
+        arg, = self.saved_tensors
+        offsets = self.offsets
+        m = offsets[-1].asscalar()
+        if self.op == 'sum':
+            offsets_np = asnumpy(offsets[1:-1])
+            indices_np = np.zeros((m,), dtype=offsets_np.dtype)
+            np.add.at(indices_np, offsets_np, np.ones_like(offsets_np))
+            indices_np = np.cumsum(indices_np, -1)
+            indices = zerocopy_from_numpy(indices_np)
+            dx = dy[indices]
+        else:
+            dx = _bwd_segment_cmp(dy, arg, m)
+        return dx
+
+
+def segment_reduce(op, x, offsets):
+    segment_reduce_op = SegmentReduce(op, offsets)
+    return segment_reduce_op(x)

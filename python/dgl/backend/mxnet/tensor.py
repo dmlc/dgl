@@ -56,6 +56,10 @@ def tensor(data, dtype=None):
         return nd.array(data, dtype=dtype)
 
 def as_scalar(data):
+    if data.size != 1:
+        raise ValueError("The current array is not a scalar")
+    if data.shape != (1,):
+        data = data.expand_dims(axis=0)
     return data.asscalar()
 
 def get_preferred_sparse_format():
@@ -147,6 +151,9 @@ def sum(input, dim, keepdims=False):
 
 def reduce_sum(input):
     return input.sum()
+
+def cumsum(input, dim):
+    return nd.cumsum(input, axis=dim)
 
 def mean(input, dim):
     return nd.mean(input, axis=dim)
@@ -355,11 +362,11 @@ def sort_1d(input):
     idx = nd.cast(idx, dtype='int64')
     return val, idx
 
-def arange(start, stop, dtype=np.int64):
+def arange(start, stop, dtype=np.int64, ctx=None):
     if start >= stop:
-        return nd.array([], dtype=dtype)
+        return nd.array([], dtype=dtype, ctx=ctx)
     else:
-        return nd.arange(start, stop, dtype=dtype)
+        return nd.arange(start, stop, dtype=dtype, ctx=ctx)
 
 def rand_shuffle(arr):
     return mx.nd.random.shuffle(arr)

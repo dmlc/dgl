@@ -222,26 +222,6 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
 template IdArray Relabel_<kDLCPU, int32_t>(const std::vector<IdArray>& arrays);
 template IdArray Relabel_<kDLCPU, int64_t>(const std::vector<IdArray>& arrays);
 
-
-///////////////////////////// NonZero /////////////////////////////
-
-template <DLDeviceType XPU, typename IdType>
-IdArray NonZero(BoolArray bool_arr) {
-  const IdType* bool_data = static_cast<IdType*>(bool_arr->data);
-  CHECK(bool_arr->ndim == 1) << "NonZero only supports 1D array";
-  std::vector<IdType> nonzero_indices;
-  for (int64_t i = 0; i < bool_arr->shape[0]; i++) {
-    if ((bool_data[i]) != 0) {
-      nonzero_indices.push_back(i);
-    }
-  }
-  return VecToIdArray(nonzero_indices, sizeof(IdType) * 8);
-}
-
-// TODO(Allen): Implement GPU version
-template IdArray NonZero<kDLCPU, int32_t>(BoolArray bool_arr);
-template IdArray NonZero<kDLCPU, int64_t>(BoolArray bool_arr);
-
 }  // namespace impl
 }  // namespace aten
 }  // namespace dgl

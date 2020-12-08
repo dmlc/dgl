@@ -1,4 +1,6 @@
-# Deep Graph Library (DGL)
+<p align="center">
+  <img src="http://data.dgl.ai/asset/logo.jpg" height="200">
+</p>
 
 [![PyPi Latest Release](https://img.shields.io/pypi/v/dgl.svg)](https://pypi.org/project/dgl/)
 [![Conda Latest Release](https://anaconda.org/dglteam/dgl/badges/version.svg)](https://anaconda.org/dglteam/dgl)
@@ -163,6 +165,64 @@ Overall there are 30+ models implemented by using DGL:
 
 We are currently in Beta stage.  More features and improvements are coming.
 
+## Awesome Papers Using DGL
+
+1. [**Benchmarking Graph Neural Networks**](https://arxiv.org/pdf/2003.00982.pdf), *Vijay Prakash Dwivedi, Chaitanya K. Joshi, Thomas Laurent, Yoshua Bengio, Xavier Bresson*
+
+1. [**Open Graph Benchmarks: Datasets for Machine Learning on Graphs**](https://arxiv.org/pdf/2005.00687.pdf), NeurIPS'20, *Weihua Hu, Matthias Fey, Marinka Zitnik, Yuxiao Dong, Hongyu Ren, Bowen Liu, Michele Catasta, Jure Leskovec*
+
+1. [**DropEdge: Towards Deep Graph Convolutional Networks on Node Classification**](https://openreview.net/pdf?id=Hkx1qkrKPr), ICLR'20, *Yu Rong, Wenbing Huang, Tingyang Xu, Junzhou Huan*
+
+1. [**Discourse-Aware Neural Extractive Text Summarization**](https://www.aclweb.org/anthology/2020.acl-main.451/), ACL'20, *Jiacheng Xu, Zhe Gan, Yu Cheng, Jingjing Liu*
+
+1. [**GCC: Graph Contrastive Coding for Graph Neural Network Pre-Training**](https://dl.acm.org/doi/pdf/10.1145/3394486.3403168?casa_token=EClsH2Vc4DcAAAAA:LIB8cbtr6yTDbYuv4cTLwTIYeDq5Y2dhj_ktcWdKpzdPLGeiuL0o8GlcN4QIOnpsAnmGeGVZ), KDD'20, *Jiezhong Qiu, Qibin Chen, Yuxiao Dong, Jing Zhang, Hongxia Yang, Ming Ding, Kuansan Wang, Jie Tang*
+
+1. [**DGL-KE: Training Knowledge Graph Embeddings at Scale**](https://arxiv.org/pdf/2004.08532), SIGIR'20, *Da Zheng, Xiang Song, Chao Ma, Zeyuan Tan, Zihao Ye, Jin Dong, Hao Xiong, Zheng Zhang, George Karypis*
+
+1. [**Improving Graph Neural Network Expressivity via Subgraph Isomorphism Counting**](https://arxiv.org/pdf/2006.09252.pdf), *Giorgos Bouritsas, Fabrizio Frasca, Stefanos Zafeiriou, Michael M. Bronstein*
+
+1. [**INT: An Inequality Benchmark for Evaluating Generalization in Theorem Proving**](https://arxiv.org/pdf/2007.02924.pdf), *Yuhuai Wu, Albert Q. Jiang, Jimmy Ba, Roger Grosse*
+
+1. [**Finding Patient Zero: Learning Contagion Source with Graph Neural Networks**](https://arxiv.org/pdf/2006.11913.pdf), *Chintan Shah, Nima Dehmamy, Nicola Perra, Matteo Chinazzi, Albert-László Barabási, Alessandro Vespignani, Rose Yu*
+
+1. [**FeatGraph: A Flexible and Efficient Backend for Graph Neural Network Systems**](https://arxiv.org/pdf/2008.11359.pdf), SC'20, *Yuwei Hu, Zihao Ye, Minjie Wang, Jiali Yu, Da Zheng, Mu Li, Zheng Zhang, Zhiru Zhang, Yida Wang*
+
+
+<details><summary>more</summary>
+
+11. [**BP-Transformer: Modelling Long-Range Context via Binary Partitioning.**](https://arxiv.org/pdf/1911.04070.pdf), *Zihao Ye, Qipeng Guo, Quan Gan, Xipeng Qiu, Zheng Zhang*
+
+12. [**OptiMol: Optimization of Binding Affinities in Chemical Space for Drug Discovery**](https://www.biorxiv.org/content/biorxiv/early/2020/06/16/2020.05.23.112201.full.pdf), *Jacques Boitreaud,Vincent Mallet, Carlos Oliver, Jérôme Waldispühl*
+
+1. [**JAKET: Joint Pre-training of Knowledge Graph and Language Understanding**](https://arxiv.org/pdf/2010.00796.pdf), *Donghan Yu, Chenguang Zhu, Yiming Yang, Michael Zeng*
+
+1. [**Architectural Implications of Graph Neural Networks**](https://arxiv.org/pdf/2009.00804.pdf), *Zhihui Zhang, Jingwen Leng, Lingxiao Ma, Youshan Miao, Chao Li, Minyi Guo*
+
+1. [**Combining Reinforcement Learning and Constraint Programming for Combinatorial Optimization**](https://arxiv.org/pdf/2006.01610.pdf), *Quentin Cappart, Thierry Moisan, Louis-Martin Rousseau1, Isabeau Prémont-Schwarz, and Andre Cire*
+
+1. [**Sparse Graph Attention Networks**](https://arxiv.org/abs/1912.00552), *Yang Ye, Shihao Ji*
+
+1. [**On Self-Distilling Graph Neural Network**](https://arxiv.org/pdf/2011.02255.pdf), *Yuzhao Chen, Yatao Bian, Xi Xiao, Yu Rong, Tingyang Xu, Junzhou Huang*
+
+1. [**Learning Robust Node Representations on Graphs**](https://arxiv.org/pdf/2008.11416.pdf), *Xu Chen, Ya Zhang, Ivor Tsang, and Yuangang Pan*
+
+1. [**Recurrent Event Network: Autoregressive Structure Inference over Temporal Knowledge Graphs**](https://arxiv.org/abs/1904.05530), *Woojeong Jin, Meng Qu, Xisen Jin, Xiang Ren*
+
+1. [**Graph Neural Ordinary Differential Equations**](https://arxiv.org/abs/1911.07532), *Michael Poli, Stefano Massaroli, Junyoung Park, Atsushi Yamashita, Hajime Asama, Jinkyoo Park*
+
+1. [**FusedMM: A Unified SDDMM-SpMM Kernel for Graph Embedding and Graph Neural Networks**](https://arxiv.org/pdf/2011.06391.pdf), *Md. Khaledur Rahman, Majedul Haque Sujon, , Ariful Azad*
+
+1. [**Graphein - a Python Library for Geometric Deep Learning and Network Analysis on Protein Structures**](https://www.biorxiv.org/content/10.1101/2020.07.15.204701v1), *Arian R. Jamasb, Pietro Lió, Tom L. Blundell*
+
+1. [**Graph Policy Gradients for Large Scale Robot Control**](https://arxiv.org/abs/1907.03822), *Arbaaz Khan, Ekaterina Tolstaya, Alejandro Ribeiro, Vijay Kumar*
+
+1. [**Heterogeneous Molecular Graph Neural Networks for Predicting Molecule Properties**](https://arxiv.org/abs/2009.12710), *Zeren Shui, George Karypis*
+
+1. [**Could Graph Neural Networks Learn Better Molecular Representation for Drug Discovery? A Comparison Study of Descriptor-based and Graph-based Models**](https://assets.researchsquare.com/files/rs-81439/v1_stamped.pdf), *Dejun Jiang, Zhenxing Wu, Chang-Yu Hsieh, Guangyong Chen, Ben Liao, Zhe Wang, Chao Shen, Dongsheng Cao, Jian Wu, Tingjun Hou*
+
+1. [**Principal Neighbourhood Aggregation for Graph Nets**](https://arxiv.org/abs/2004.05718), *Gabriele Corso, Luca Cavalleri, Dominique Beaini, Pietro Liò, Petar Veličković*
+
+</details>
 
 ## Installation
 
@@ -186,6 +246,7 @@ conda install -c dglteam dgl-cuda9.2   # CUDA 9.2
 conda install -c dglteam dgl-cuda10.0  # CUDA 10.0
 conda install -c dglteam dgl-cuda10.1  # CUDA 10.1
 conda install -c dglteam dgl-cuda10.2  # CUDA 10.2
+conda install -c dglteam dgl-cuda11.0  # CUDA 11.0
 ```
 
 ### Using pip
@@ -199,6 +260,7 @@ conda install -c dglteam dgl-cuda10.2  # CUDA 10.2
 | CUDA 10.0 | `pip install --pre dgl-cu100` | `pip install dgl-cu100` |
 | CUDA 10.1 | `pip install --pre dgl-cu101` | `pip install dgl-cu101` |
 | CUDA 10.2 | `pip install --pre dgl-cu102` | `pip install dgl-cu102` |
+| CUDA 11.0 | `pip install --pre dgl-cu110` | `pip install dgl-cu110` |
 
 ### Built from source code
 

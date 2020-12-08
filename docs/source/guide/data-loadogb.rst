@@ -3,6 +3,8 @@
 4.5 Loading OGB datasets using ``ogb`` package
 ----------------------------------------------
 
+:ref:`(中文版) <guide_cn-data-pipeline-loadogb>`
+
 `Open Graph Benchmark (OGB) <https://ogb.stanford.edu/docs/home/>`__ is
 a collection of benchmark datasets. The official OGB package
 `ogb <https://github.com/snap-stanford/ogb>`__ provides APIs for
@@ -61,7 +63,7 @@ there is only one graph object in this kind of dataset.
     valid_label = dataset.labels[split_idx['valid']]
     test_label = dataset.labels[split_idx['test']]
 
-*Link Property Prediction* datasets also contain one graph per dataset:
+*Link Property Prediction* datasets also contain one graph per dataset.
 
 .. code:: 
 
