@@ -318,7 +318,6 @@ If you use DGL in a scientific publication, we would appreciate citations to the
 
 DGL is developed and maintained by [NYU, NYU Shanghai, AWS Shanghai AI Lab, and AWS MXNet Science Team](https://www.dgl.ai/pages/about.html).
 
-
 ## License
 
 DGL uses Apache License 2.0.
