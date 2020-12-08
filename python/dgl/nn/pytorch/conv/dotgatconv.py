@@ -114,7 +114,7 @@ class DotGatConv(nn.Module):
         else:
             self.fc = nn.Linear(self._in_src_feats, self._out_feats, bias=False)
 
-    def forward(self, graph, feat):
+    def forward(self, graph, feat, get_attention=False):
         r"""
 
         Description
@@ -130,12 +130,17 @@ class DotGatConv(nn.Module):
             :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
             If a pair of torch.Tensor is given, the pair must contain two tensors of shape
             :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
+        get_attention : bool, optional
+            Whether to return the attention values. Default to False.
 
         Returns
         -------
         torch.Tensor
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}` is size
             of output feature.
+        torch.Tensor, optional
+            The attention values of shape :math:`(E, 1)`, where :math:`E` is the number of
+            edges. This is returned only when :attr:`get_attention` is ``True``.
 
         Raises
         ------
@@ -187,4 +192,7 @@ class DotGatConv(nn.Module):
         # output results to the destination nodes
         rst = graph.dstdata['agg_u']
 
-        return rst
+        if get_attention:
+            return rst, graph.edata['sa']
+        else:
+            return rst

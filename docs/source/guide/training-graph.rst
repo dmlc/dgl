@@ -52,6 +52,32 @@ components corresponding to the original small graphs.
 
    Batched Graph
 
+The following example calls :func:`dgl.batch` on a list of graphs.
+A batched graph is a single graph, while it also carries information
+about the list.
+
+.. code:: python
+
+    import dgl
+    import torch as th
+
+    g1 = dgl.graph((th.tensor([0, 1, 2]), th.tensor([1, 2, 3])))
+    g2 = dgl.graph((th.tensor([0, 0, 0, 1]), th.tensor([0, 1, 2, 0])))
+
+    bg = dgl.batch([g1, g2])
+    bg
+    # Graph(num_nodes=7, num_edges=7,
+    #       ndata_schemes={}
+    #       edata_schemes={})
+    bg.batch_size
+    # 2
+    bg.batch_num_nodes()
+    # tensor([4, 3])
+    bg.batch_num_edges()
+    # tensor([3, 4])
+    bg.edges()
+    # (tensor([0, 1, 2, 4, 4, 4, 5], tensor([1, 2, 3, 4, 5, 6, 4]))
+
 Graph Readout
 ^^^^^^^^^^^^^
 
