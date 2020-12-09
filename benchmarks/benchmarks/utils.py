@@ -58,7 +58,7 @@ def setup_track_acc(*args, **kwargs):
 
 TRACK_UNITS = {
     'time' : 's',
-    'acc' : '',
+    'acc' : '%',
 }
 
 TRACK_SETUP = {
@@ -71,6 +71,9 @@ def parametrize(param_name, params):
         if getattr(func, 'params', None) is None:
             func.params = []
         func.params.append(params)
+        if getattr(func, 'param_names', None) is None:
+            func.param_names = []
+        func.param_names.append(param_name)
         return func
     return _wrapper
 

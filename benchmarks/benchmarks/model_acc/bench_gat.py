@@ -53,7 +53,7 @@ def evaluate(model, g, features, labels, mask):
         labels = labels[mask]
         _, indices = torch.max(logits, dim=1)
         correct = torch.sum(indices == labels)
-        return correct.item() * 1.0 / len(labels)
+        return correct.item() * 1.0 / len(labels) * 100
 
 @utils.benchmark('acc')
 @utils.parametrize('data', ['cora', 'pubmed'])

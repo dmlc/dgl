@@ -34,7 +34,11 @@ bash publish.sh dev-machine cuda:0
 ```
 
 The script will output two folders `results` and `html`. The `html` folder contains the
-generated website hosting all the benchmark results.
+generated static web pages. View it by
+
+```bash
+asv preview
+```
 
 
 Adding a new benchmark suite

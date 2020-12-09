@@ -8,13 +8,15 @@ else
     exit 1
 fi
 
-mkdir -p /tmp/asv_env  # for cached build
+WS_ROOT=/asv/dgl
 
 docker run --name dgl-reg                   \
            --rm --runtime=nvidia            \
-           -v $PWD/..:/asv/dgl              \
            --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
-docker exec dgl-reg bash /asv/dgl/benchmarks/run.sh $DEVICE
-docker cp dgl-reg:/tmp/asv/results results
-docker cp dgl-reg:/tmp/asv/html html
+docker exec dgl-reg mkdir -p $WS_ROOT
+docker cp ../.git dgl-reg:$WS_ROOT
+docker cp . dgl-reg:$WS_ROOT/benchmarks/
+docker exec dgl-reg bash $WS_ROOT/benchmarks/run.sh $DEVICE
+docker cp dgl-reg:$WS_ROOT/benchmarks/results results
+docker cp dgl-reg:$WS_ROOT/benchmarks/html html
 docker stop dgl-reg
