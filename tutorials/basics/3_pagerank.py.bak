@@ -96,12 +96,6 @@ def pagerank_reduce_func(nodes):
 #
 # .. image:: https://i.imgur.com/kIMiuFb.png
 #
-# Register the message function and reduce function, which will be called
-# later by DGL.
-
-g.register_message_func(pagerank_message_func)
-g.register_reduce_func(pagerank_reduce_func)
-
 
 ###############################################################################
 # The algorithm is straightforward. Here is the code for one
@@ -110,10 +104,10 @@ g.register_reduce_func(pagerank_reduce_func)
 def pagerank_naive(g):
     # Phase #1: send out messages along all edges.
     for u, v in zip(*g.edges()):
-        g.send((u, v))
+        g.send((u, v), pagerank_message_func)
     # Phase #2: receive messages to compute new PageRank values.
     for v in g.nodes():
-        g.recv(v)
+        g.recv(v, pagerank_reduce_func)
 
 
 ###############################################################################
@@ -125,8 +119,8 @@ def pagerank_naive(g):
 # on multiple nodes and edges at one time.
 
 def pagerank_batch(g):
-    g.send(g.edges())
-    g.recv(g.nodes())
+    g.send(g.edges(), pagerank_message_func)
+    g.recv(g.nodes(), pagerank_reduce_func)
 
 
 ###############################################################################
