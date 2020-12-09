@@ -48,8 +48,9 @@ IdArray BinaryElewise(IdArray lhs, IdArray rhs) {
   const IdType* lhs_data = static_cast<IdType*>(lhs->data);
   const IdType* rhs_data = static_cast<IdType*>(rhs->data);
   IdType* ret_data = static_cast<IdType*>(ret->data);
-  // TODO(minjie): we should split the loop into segments for better cache locality.
-#pragma omp parallel for
+  // TODO(BarclayII): this usually incurs lots of overhead in thread spawning, scheduling,
+  // etc., especially since the workload is very light.
+//#pragma omp parallel for
   for (int64_t i = 0; i < lhs->shape[0]; ++i) {
     ret_data[i] = Op::Call(lhs_data[i], rhs_data[i]);
   }
@@ -84,8 +85,9 @@ IdArray BinaryElewise(IdArray lhs, IdType rhs) {
   IdArray ret = NewIdArray(lhs->shape[0], lhs->ctx, lhs->dtype.bits);
   const IdType* lhs_data = static_cast<IdType*>(lhs->data);
   IdType* ret_data = static_cast<IdType*>(ret->data);
-  // TODO(minjie): we should split the loop into segments for better cache locality.
-#pragma omp parallel for
+  // TODO(BarclayII): this usually incurs lots of overhead in thread spawning, scheduling,
+  // etc., especially since the workload is very light.
+//#pragma omp parallel for
   for (int64_t i = 0; i < lhs->shape[0]; ++i) {
     ret_data[i] = Op::Call(lhs_data[i], rhs);
   }
@@ -120,8 +122,9 @@ IdArray BinaryElewise(IdType lhs, IdArray rhs) {
   IdArray ret = NewIdArray(rhs->shape[0], rhs->ctx, rhs->dtype.bits);
   const IdType* rhs_data = static_cast<IdType*>(rhs->data);
   IdType* ret_data = static_cast<IdType*>(ret->data);
-  // TODO(minjie): we should split the loop into segments for better cache locality.
-#pragma omp parallel for
+  // TODO(BarclayII): this usually incurs lots of overhead in thread spawning, scheduling,
+  // etc., especially since the workload is very light.
+//#pragma omp parallel for
   for (int64_t i = 0; i < rhs->shape[0]; ++i) {
     ret_data[i] = Op::Call(lhs, rhs_data[i]);
   }
@@ -156,8 +159,9 @@ IdArray UnaryElewise(IdArray lhs) {
   IdArray ret = NewIdArray(lhs->shape[0], lhs->ctx, lhs->dtype.bits);
   const IdType* lhs_data = static_cast<IdType*>(lhs->data);
   IdType* ret_data = static_cast<IdType*>(ret->data);
-  // TODO(minjie): we should split the loop into segments for better cache locality.
-#pragma omp parallel for
+  // TODO(BarclayII): this usually incurs lots of overhead in thread spawning, scheduling,
+  // etc., especially since the workload is very light.
+//#pragma omp parallel for
   for (int64_t i = 0; i < lhs->shape[0]; ++i) {
     ret_data[i] = Op::Call(lhs_data[i]);
   }
