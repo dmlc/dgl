@@ -7,7 +7,7 @@
 
 A heterogeneous graph can have nodes and edges of different types. Nodes/Edges of
 different types have independent ID space and feature storage. For example in the figure below, the
-user and game node IDs both start from zero and the they have different features.
+user and game node IDs both start from zero and they have different features.
 
 .. figure:: https://data.dgl.ai/asset/image/user_guide_graphch_2.png
 
