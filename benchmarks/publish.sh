@@ -15,4 +15,6 @@ docker run --name dgl-reg                   \
            -v $PWD/..:/asv/dgl              \
            --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
 docker exec dgl-reg bash /asv/dgl/benchmarks/run.sh $DEVICE
+docker cp dgl-reg:/tmp/asv/results results
+docker cp dgl-reg:/tmp/asv/html html
 docker stop dgl-reg

@@ -11,12 +11,13 @@ ROOT=/asv/dgl
 conda activate "pytorch-ci"
 
 pip install --upgrade pip
-pip install asv numpy pandas pytest
+pip install asv numpy pandas
 pip uninstall -y dgl
 
 # build
-BUILD_DIR=$ROOT/build
+BUILD_DIR=/tmp/dgl-build$RANDOM
 CMAKE_VARS="-DUSE_CUDA=ON"
+export DGL_LIBRARY_PATH=$BUILD_DIR
 mkdir -p $BUILD_DIR
 pushd $BUILD_DIR
 cmake $CMAKE_VARS $ROOT
@@ -28,6 +29,7 @@ pushd $ROOT/python
 rm -rf build *.egg-info dist
 pip uninstall -y dgl
 python3 setup.py install
+rm -rf build *.egg-info dist
 popd
 
 # benchmark
