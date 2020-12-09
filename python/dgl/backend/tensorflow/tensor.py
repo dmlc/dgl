@@ -175,6 +175,12 @@ def reduce_sum(input):
     return tf.reduce_sum(input)
 
 
+def cumsum(input, dim):
+    if input.dtype == tf.bool:
+        input = tf.cast(input, tf.int32)
+    return tf.cumsum(input, axis=dim)
+
+
 def mean(input, dim):
     return tf.reduce_mean(input, axis=dim)
 

@@ -1,4 +1,4 @@
-from dgl.ops import gspmm, gsddmm, edge_softmax
+from dgl.ops import gspmm, gsddmm, edge_softmax, segment_reduce
 from test_utils.graph_cases import get_cases
 from utils import parametrize_dtype
 import dgl
@@ -255,5 +255,34 @@ def test_edge_softmax(g, norm_by, shp, idtype):
         assert F.allclose(F.grad(e2), grad_edata)
         print('backward passed')
 
+@pytest.mark.parametrize('reducer', ['sum', 'max', 'min', 'mean'])
+def test_segment_reduce(reducer):
+    ctx = F.ctx()
+    value = F.tensor(np.random.rand(10, 5))
+    v1 = F.attach_grad(F.clone(value))
+    v2 = F.attach_grad(F.clone(value))
+    seglen = F.tensor([2, 3, 0, 4, 1])
+    u = F.copy_to(F.arange(0, F.shape(value)[0], F.int32), ctx)
+    v = F.repeat(F.copy_to(F.arange(0, len(seglen), F.int32), ctx),
+                 seglen, dim=0)
+
+    num_nodes = {'_U': len(u), '_V': len(seglen)}
+    g = dgl.convert.heterograph({('_U', '_E', '_V'): (u, v)}, num_nodes_dict=num_nodes)
+    with F.record_grad():
+        rst1 = gspmm(g, 'copy_lhs', reducer, v1, None)
+        F.backward(F.reduce_sum(rst1))
+        grad1 = F.grad(v1)
+
+    with F.record_grad():
+        rst2 = segment_reduce(seglen, v2, reducer=reducer)
+        F.backward(F.reduce_sum(rst2))
+        assert F.allclose(rst1, rst2)
+        print('forward passed')
+
+        grad2 = F.grad(v2)
+        assert F.allclose(grad1, grad2)
+        print('backward passed')
+
+
 if __name__ == '__main__':
-    test_spmm(F.int32, graphs[0], spmm_shapes[5], 'copy_lhs', 'sum')
+    test_spmm(F.int32, graphs[0], spmm_shapes[0], 'mul', 'sum')
