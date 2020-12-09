@@ -1,4 +1,3 @@
-import pytest
 import dgl
 from dgl.nn.pytorch import GATConv
 import torch

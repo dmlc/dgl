@@ -3,7 +3,6 @@ import shutil, zipfile
 import requests
 import numpy as np
 import pandas
-import pytest
 import dgl
 import torch
 
@@ -69,7 +68,6 @@ TRACK_SETUP = {
 
 def parametrize(param_name, params):
     def _wrapper(func):
-        func = pytest.mark.parametrize(param_name, params)(func)
         if getattr(func, 'params', None) is None:
             func.params = []
         func.params.append(params)

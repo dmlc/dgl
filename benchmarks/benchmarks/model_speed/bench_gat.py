@@ -1,4 +1,3 @@
-import pytest
 import time
 import dgl
 from dgl.nn.pytorch import GATConv
