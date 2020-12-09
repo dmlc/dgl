@@ -143,7 +143,7 @@ builtin dataset `CitationGraphDataset <https://docs.dgl.ai/en/0.5.x/_modules/dgl
 .. code:: 
 
     from dgl.data import DGLBuiltinDataset
-    from dgl.data.utils import _get_dgl_url, generate_mask_tensor
+    from dgl.data.utils import _get_dgl_url
     
     class CitationGraphDataset(DGLBuiltinDataset):
         _urls = {
@@ -170,9 +170,9 @@ builtin dataset `CitationGraphDataset <https://docs.dgl.ai/en/0.5.x/_modules/dgl
             # build graph
             g = dgl.graph(graph)
             # splitting masks
-            g.ndata['train_mask'] = generate_mask_tensor(train_mask)
-            g.ndata['val_mask'] = generate_mask_tensor(val_mask)
-            g.ndata['test_mask'] = generate_mask_tensor(test_mask)
+            g.ndata['train_mask'] = train_mask
+            g.ndata['val_mask'] = val_mask
+            g.ndata['test_mask'] = test_mask
             # node labels
             g.ndata['label'] = torch.tensor(labels)
             # node features
