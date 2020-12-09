@@ -2,6 +2,7 @@
 
 set -e
 
+DEVICE=$1
 ROOT=/asv/dgl
 
 . /opt/conda/etc/profile.d/conda.sh
@@ -14,15 +15,12 @@ pip install asv numpy pandas pytest
 pip uninstall -y dgl
 
 # build
-pushd $ROOT
-rm -rf build
-mkdir -p build
+BUILD_DIR=$ROOT/build
 CMAKE_VARS="-DUSE_CUDA=ON"
-rm -rf _download
-pushd build
-cmake $CMAKE_VARS ..
+mkdir -p $BUILD_DIR
+pushd $BUILD_DIR
+cmake $CMAKE_VARS $ROOT
 make -j
-popd
 popd
 
 # install
@@ -33,10 +31,11 @@ python3 setup.py install
 popd
 
 # benchmark
+export DGL_BENCH_DEVICE=$DEVICE
 pushd $ROOT/benchmarks
 cat asv.conf.json
 ls -lh
 asv machine --yes
-asv run --python=existing --verbose
+asv run -e --python=same --verbose
 asv publish
 popd
