@@ -228,6 +228,8 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Collective Multi-type Entity Alignment Between Knowledge Graphs**](https://dl.acm.org/doi/abs/10.1145/3366423.3380289), *Qi Zhu, Hao Wei, Bunyamin Sisman, Da Zheng, Christos Faloutsos, Xin Luna Dong, Jiawei Han*
 
+1. [**Graph Representation Forecasting of Patient's Medical Conditions: towards A Digital Twin**](https://arxiv.org/abs/2009.08299), *Pietro Barbiero, Ramon Viñas Torné, Pietro Lió*
+
 </details>
 
 ## Installation
@@ -315,7 +317,6 @@ If you use DGL in a scientific publication, we would appreciate citations to the
 ## The Team
 
 DGL is developed and maintained by [NYU, NYU Shanghai, AWS Shanghai AI Lab, and AWS MXNet Science Team](https://www.dgl.ai/pages/about.html).
-
 
 ## License
 

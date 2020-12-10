@@ -3,6 +3,8 @@
 5.4 Graph Classification
 ----------------------------------
 
+:ref:`(中文版) <guide_cn-training-graph-classification>`
+
 Instead of a big single graph, sometimes one might have the data in the
 form of multiple graphs, for example a list of different types of
 communities of people. By characterizing the friendship among people in
@@ -214,9 +216,6 @@ graphs in mini-batches.
         collate_fn=collate,
         drop_last=False,
         shuffle=True)
-
-Loop
-^^^^
 
 Training loop then simply involves iterating over the dataloader and
 updating the model.

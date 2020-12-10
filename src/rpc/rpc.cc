@@ -380,7 +380,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   int group_count = args[3];
   int client_id = args[4];
   int service_id = args[5];
-  int msg_seq = args[6];
+  int64_t msg_seq = args[6];
   std::string pickle_data = args[7];
   NDArray ID = args[8];
   NDArray part_id = args[9];
