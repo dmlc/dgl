@@ -47,7 +47,7 @@
      - 怀文
      - 张怀文/Huaiwen Zhang
      - https://github.com/huaiwen
-   * - :ref:`guide_cn-message-passing`
+   * - :ref:`guide_cn-message-passing`,
      - Brook
      - 黄崟/Brook Huang
      - https://github.com/brookhuang16211
@@ -63,7 +63,11 @@
      - Zhiyu
      - 陈知雨/Zhiyu Chen
      - https://www.zhiyuchen.com
-   * - :ref:`guide_cn-nn`, :ref:`guide_cn-nn-construction`
+   * - :ref:`guide_cn-nn`
+     - Zhiyu
+     - 陈知雨/Zhiyu Chen
+     - https://www.zhiyuchen.com
+   * - :ref:`guide_cn-nn-construction`
      - Zhiyu
      - 陈知雨/Zhiyu Chen
      - https://www.zhiyuchen.com
@@ -71,11 +75,11 @@
      - 栩栩的夏天
      -
      -
-   * - :ref:`guide_cn-data-pipeline`, :ref:`guide_cn-data-pipeline-dataset`
+   * - :ref:`guide_cn-data-pipeline`
      - 吴紫薇
      - 吴紫薇/ Maggie Wu
      - https://github.com/hhhiddleston
-   * - :ref:`guide_cn-data-pipeline-download`, :ref:`guide_cn-data-pipeline-process`
+   * - :ref:`guide_cn-data-pipeline-dataset`, :ref:`guide_cn-data-pipeline-download`, :ref:`guide_cn-data-pipeline-process`
      - 吴紫薇
      - 吴紫薇/ Maggie Wu
      - https://github.com/hhhiddleston
@@ -83,7 +87,11 @@
      - 王建民-DrugAI
      - 王建民/DrugAI
      - https://github.com/AspirinCode
-   * - :ref:`guide_cn-training`, :ref:`guide_cn-training-node-classification`,
+   * - :ref:`guide_cn-training`
+     - 王建民-DrugAI
+     - 王建民/DrugAI
+     - https://github.com/AspirinCode
+   * - :ref:`guide_cn-training-node-classification`,
      - 王建民-DrugAI
      - 王建民/DrugAI
      - https://github.com/AspirinCode
