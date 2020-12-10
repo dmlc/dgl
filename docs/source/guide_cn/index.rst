@@ -19,8 +19,8 @@
 
 特此致谢下述贡献者：
 
-.. list-table:: Title
-   :widths: 25 25 50
+.. list-table:: 贡献者列表
+   :widths: 50 25 25 50
    :header-rows: 1
 
    * - 章节
