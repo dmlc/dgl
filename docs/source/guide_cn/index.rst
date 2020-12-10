@@ -19,7 +19,7 @@
 
 特此致谢下述贡献者：
 
-.. list-table:: 贡献者列表
+.. list-table::
    :widths: 50 25 25 50
    :header-rows: 1
 
@@ -27,12 +27,23 @@
      - 译者
      - 个人姓名/昵称
      - 个人链接
+   * - :ref:`guide_cn-graph`
+     - 怀文
+     - 张怀文/Huaiwen Zhang
+     - https://github.com/huaiwen
    * - :ref:`guide_cn-graph-basic`, :ref:`guide_cn-graph-feature`
      - 枫轺
      - 沈成 / mlsoar
      - https://github.com/mlsoar
+   * - :ref:`guide_cn-graph-graphs-nodes-edges`
+     - 塔目农民
+     - 张建 / zhjwy9343
+     - https://github.com/zhjwy9343
    * - :ref:`guide_cn-graph-external`
      - 枫轺
      - 沈成 / mlsoar
      - https://github.com/mlsoar
-
+   * - :ref:`guide_cn-graph-heterogeneous`
+     - 怀文
+     - 张怀文/Huaiwen Zhang
+     - https://github.com/huaiwen
