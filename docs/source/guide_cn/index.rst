@@ -55,8 +55,11 @@
      - Brook
      - 黄崟/Brook Huang
      - https://github.com/brookhuang16211
-   * - :ref:`guide_cn-message-passing-efficient`, :ref:`guide_cn-message-passing-part`,
-       :ref:`guide_cn-message-passing-edge`, :ref:`guide_cn-message-passing-heterograph`
+   * - :ref:`guide_cn-message-passing-efficient`, :ref:`guide_cn-message-passing-part`
+     - Zhiyu
+     - 陈知雨/Zhiyu Chen
+     - https://www.zhiyuchen.com
+   * - :ref:`guide_cn-message-passing-edge`, :ref:`guide_cn-message-passing-heterograph`
      - Zhiyu
      - 陈知雨/Zhiyu Chen
      - https://www.zhiyuchen.com
@@ -64,16 +67,19 @@
      - Zhiyu
      - 陈知雨/Zhiyu Chen
      - https://www.zhiyuchen.com
-   * - :ref:`guide_cn-forward`, :ref:`guide_cn-nn-heterograph`
+   * - :ref:`guide_cn-nn-forward`, :ref:`guide_cn-nn-heterograph`
      - 栩栩的夏天
      -
      -
-   * - :ref:`guide_cn-data-pipeline`, :ref:`guide_cn-data-pipeline-dataset`,
-       :ref:`guide_cn-data-pipeline-download`, :ref:`guide_cn-data-pipeline-process`
+   * - :ref:`guide_cn-data-pipeline`, :ref:`guide_cn-data-pipeline-dataset`
      - 吴紫薇
      - 吴紫薇/ Maggie Wu
      - https://github.com/hhhiddleston
-   * - :ref:`guide_cn-data-savenload`, :ref:`guide_cn-data-pipeline-loadogb`,
+   * - :ref:`guide_cn-data-pipeline-download`, :ref:`guide_cn-data-pipeline-process`
+     - 吴紫薇
+     - 吴紫薇/ Maggie Wu
+     - https://github.com/hhhiddleston
+   * - :ref:`guide_cn-data-pipeline-savenload`, :ref:`guide_cn-data-pipeline-loadogb`,
      - 王建民-DrugAI
      - 王建民/DrugAI
      - https://github.com/AspirinCode
