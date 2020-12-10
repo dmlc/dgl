@@ -49,7 +49,7 @@ SAGEConv的数学公式如下：
 
 .. math::
 
-    h_{dst}^{(l+1)} = \mathrm{norm}(h_{dst}^{l})
+    h_{dst}^{(l+1)} = \mathrm{norm}(h_{dst}^{l+1})
 
 源节点特征 ``feat_src`` 和目标节点特征 ``feat_dst`` 需要根据图类型被指定。
 用于指定图类型并将 ``feat`` 扩展为 ``feat_src`` 和 ``feat_dst`` 的函数是 :meth:`~dgl.utils.expand_as_pair`。

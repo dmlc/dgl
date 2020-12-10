@@ -36,6 +36,7 @@ Getting Started
 * :doc:`Installation<install/index>`.
 * :doc:`Quickstart tutorial<tutorials/basics/1_first>` for absolute beginners.
 * :doc:`User guide<guide/index>`.
+* :doc:`用户指南(User guide)中文版<guide_cn/index>`.
 * :doc:`API reference manual<api/python/index>`.
 * :doc:`End-to-end model tutorials<tutorials/models/index>` for learning DGL by popular models on graphs.
 
