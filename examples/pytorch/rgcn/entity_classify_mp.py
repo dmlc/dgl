@@ -593,7 +593,7 @@ def main(args, devices):
     n_gpus = len(devices)
     # cpu
     if devices[0] == -1:
-        run(0, 0, args, ['cpu'],
+        run(0, 0, args, [-1],
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
              train_idx, val_idx, test_idx, labels), None, None)
     # gpu
