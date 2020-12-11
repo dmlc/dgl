@@ -49,7 +49,9 @@ def get_bench_device():
     return os.environ.get('DGL_BENCH_DEVICE', 'cpu')
 
 def setup_track_time(*args, **kwargs):
-    pass
+    # fix random seed
+    np.random.seed(42)
+    torch.random.manual_seed(42)
 
 def setup_track_acc(*args, **kwargs):
     # fix random seed
