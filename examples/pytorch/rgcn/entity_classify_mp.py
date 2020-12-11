@@ -20,6 +20,7 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 import dgl
 from dgl import DGLGraph
+import dgl.function as fn
 from functools import partial
 
 from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
@@ -316,6 +317,9 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
         embed_layer.train()
 
         losses = []
+        data_copy_time = []
+        forward_time = []
+        backward_time = []
         for i, sample_data in enumerate(loader):
             seeds, blocks = sample_data
             t0 = time.time()
@@ -446,6 +450,16 @@ def load_mag(args):
 def load_oag(args):
     dataset = dgl.load_graphs(args.dataset)[0]
     hg = dataset[0]
+
+    # Construct author embeddings by averaging over their papers' embeddings.
+    hg.multi_update_all(
+        {'rev_AP_write_first': (fn.copy_src('emb', 'm'), fn.sum('m', 'h')),
+         'rev_AP_write_last': (fn.copy_src('emb', 'm'), fn.sum('m', 'h')),
+         'rev_AP_write_other': (fn.copy_src('emb', 'm'), fn.sum('m', 'h')),},
+        'sum')
+    cnts = hg.in_degrees(etype='rev_AP_write_first') + hg.in_degrees(etype='rev_AP_write_last') + hg.in_degrees(etype='rev_AP_write_other')
+    cnts = cnts.reshape(-1, 1)
+    hg.nodes['author'].data['emb'] = hg.nodes['author'].data['h'] / cnts
 
     # Construct node features.
     # TODO(zhengda) we need to construct the node features for author nodes.
