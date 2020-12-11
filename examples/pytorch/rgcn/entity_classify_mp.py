@@ -463,16 +463,19 @@ def load_oag(args):
 
     # Construct node features.
     # TODO(zhengda) we need to construct the node features for author nodes.
+    ntypes = []
     if args.node_feats:
         node_feats = []
         for ntype in hg.ntypes:
-            if 'emb' in hg.nodes[ntype].data:
+            if ntype != 'field' and 'emb' in hg.nodes[ntype].data:
                 feat = hg.nodes[ntype].data.pop('emb')
                 node_feats.append(feat.share_memory_())
+                ntypes.append(ntype)
             else:
                 node_feats.append(None)
     else:
         node_feats = [None] * len(hg.ntypes)
+    print('nodes with features:', ntypes)
 
     # Construct labels of paper nodes
     ss, dd = hg.edges(etype=('field', 'rev_PF_in_L1', 'paper'))
@@ -510,6 +513,15 @@ def load_oag(args):
     assert np.all(paper_labels[train_idx].sum(1).numpy() > 0)
     assert np.all(paper_labels[val_idx].sum(1).numpy() > 0)
     assert np.all(paper_labels[test_idx].sum(1).numpy() > 0)
+
+    # Remove field nodes from the graph.
+    etypes = []
+    for etype in hg.canonical_etypes:
+        if etype[0] != 'field' and etype[2] != 'field':
+            etypes.append(etype)
+    hg = dgl.edge_type_subgraph(hg, etypes)
+    print(hg.canonical_etypes)
+
     category = 'paper'
     return hg, node_feats, paper_labels, train_idx, val_idx, test_idx, category, paper_labels.shape[1]
 
