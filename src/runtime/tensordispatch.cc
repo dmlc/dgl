@@ -8,7 +8,7 @@
 #include <dgl/runtime/registry.h>
 #include <dgl/runtime/env.h>
 #include <dgl/packed_func_ext.h>
-#ifdef WIN32
+#if defined(WIN32) || defined(_WIN32)
 #include <windows.h>
 #else   // !WIN32
 #include <dlfcn.h>
@@ -23,7 +23,7 @@ namespace {
 /*!
  * \brief Get the absolute path of the tensor adapter library to be loaded.
  */
-#if defined(WIN32)
+#if defined(WIN32) || defined(_WIN32)
 #define PATH_PYTORCH  "\\tensoradapter\\pytorch\\tensoradapter_pytorch.dll"
 #elif defined(APPLE)
 #define PATH_PYTORCH  "/tensoradapter/pytorch/libtensoradapter_pytorch.dylib"
@@ -44,7 +44,7 @@ std::string getpath() {
 
 constexpr const char *TensorDispatcher::names_[];
 
-#ifdef WIN32
+#if defined(WIN32) || defined(_WIN32)
 TensorDispatcher::TensorDispatcher() {
   std::string path = getpath();
   if (path == "")

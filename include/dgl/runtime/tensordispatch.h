@@ -34,7 +34,7 @@
 
 #include <dlpack/dlpack.h>
 #include <tensoradapter.h>
-#ifdef WIN32
+#if defined(WIN32) || defined(_WIN32)
 #include <windows.h>
 #endif  // WIN32
 #include <vector>
@@ -94,7 +94,7 @@ class TensorDispatcher {
   void* entrypoints_[num_entries_] = {nullptr};
 
   bool available_ = false;
-#ifdef WIN32
+#if defined(WIN32) || defined(_WIN32)
   HINSTANCE handle_;
 #else   // !WIN32
   void* handle_;

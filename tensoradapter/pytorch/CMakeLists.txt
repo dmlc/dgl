@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(tensoradapter_pytorch C CXX)
 
 execute_process(
-  COMMAND python -c "import torch;print(torch.utils.cmake_prefix_path)"
+  COMMAND python ${CMAKE_CURRENT_SOURCE_DIR}/find_cmake.py
   OUTPUT_VARIABLE TORCH_PREFIX
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 set(Torch_DIR "${TORCH_PREFIX}/Torch")

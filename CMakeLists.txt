@@ -63,7 +63,10 @@ include_directories("third_party/xbyak/")
 include_directories("tensoradapter/include")
 
 # initial variables
+if(NOT MSVC)
 set(DGL_LINKER_LIBS "dl")
+endif(NOT MSVC)
+
 if(MSVC OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 set(DGL_RUNTIME_LINKER_LIBS "")
 else(MSVC OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")

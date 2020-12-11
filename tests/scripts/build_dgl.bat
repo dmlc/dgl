@@ -17,6 +17,7 @@ cmake -DCMAKE_CXX_FLAGS="/DDGL_EXPORTS" -DUSE_OPENMP=ON -DBUILD_TORCH=ON -Dgtest
 msbuild dgl.sln /m /nr:false || EXIT /B 1
 COPY Release\dgl.dll .
 COPY Release\runUnitTests.exe .
+COPY tensoradapter\pytorch\Release\tensoradapter_pytorch.dll tensoradapter\pytorch
 POPD
 
 PUSHD python
