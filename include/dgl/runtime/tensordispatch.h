@@ -34,79 +34,74 @@
 
 #include <dlpack/dlpack.h>
 #include <tensoradapter.h>
+#ifdef WIN32
+#include <windows.h>
+#endif  // WIN32
 #include <vector>
-#include "./types.h"
+#include "ndarray.h"
 
 namespace dgl {
-namespace aten {
+namespace runtime {
 
+/*!
+ * \brief Dispatcher that delegates the function calls to framework-specific C++ APIs.
+ */
 class TensorDispatcher {
  public:
+  /*! \brief Get the singleton instance. */
   static TensorDispatcher* Global() {
     static TensorDispatcher inst;
     return &inst;
   }
 
-  // Allocate a tensor.
-  // Calls the framework-specific tensor allocator (e.g. torch::empty) if possible.
+  /*! \brief Whether an adapter library is available */
+  inline bool IsAvailable() {
+    return available_;
+  }
+
+  /*! \brief Allocate an empty tensor */
   inline NDArray Empty(std::vector<int64_t> shape, DLDataType dtype, DLContext ctx) const {
     auto entry = entrypoints_[Op::kEmpty];
-
-    /*
-    if (!entrypoints_[Op::kEmpty]) {
-      return NDArray::Empty(shape, dtype, ctx);
-    } else {
-      auto result = TA_DISPATCH(tensoradapter::TAempty, entry, shape, dtype, ctx);
-      return NDArray::FromDLPack(result);
-    }
-    */
-    CHECK(entrypoints_[Op::kEmpty]) << "torch allocator not found";
     auto result = TA_DISPATCH(tensoradapter::TAempty, entry, shape, dtype, ctx);
     return NDArray::FromDLPack(result);
   }
 
-  inline NDArray Clone(NDArray array) const {
-    auto entry = entrypoints_[Op::kClone];
-
-    if (!entrypoints_[Op::kClone]) {
-      return array.Clone();
-    } else {
-      return NDArray::FromDLPack(TA_DISPATCH(tensoradapter::TAclone, entry, array.ToDLPack()));
-    }
-  }
-
-  inline NDArray CopyTo(NDArray array, DLContext ctx) const {
-    auto entry = entrypoints_[Op::kCopyTo];
-
-    if (!entrypoints_[Op::kCopyTo]) {
-      return array.CopyTo(ctx);
-    } else {
-      auto tensor = array.ToDLPack();
-      return NDArray::FromDLPack(TA_DISPATCH(tensoradapter::TAcopyto, entry, tensor, ctx));
-    }
-  }
-
  private:
+  /*! \brief ctor */
   TensorDispatcher();
+  /*! \brief dtor */
+  ~TensorDispatcher();
 
+  /*!
+   * \brief List of symbols in the adapter library.
+   *
+   * Must match the functions in tensoradapter/include/tensoradapter.h.
+   */
   static constexpr const char *names_[] = {
     "TAempty",
-    "TAclone",
-    "TAcopyto"
   };
 
+  /*! \brief Index of each function to the symbol list */
   class Op {
    public:
     static constexpr int kEmpty = 0;
-    static constexpr int kClone = 1;
-    static constexpr int kCopyTo = 2;
   };
 
+  /*! \brief Number of functions */
   static constexpr int num_entries_ = sizeof(names_) / sizeof(names_[0]);
-  void *entrypoints_[num_entries_] = {nullptr};
+
+  /*! \brief Entrypoints of each function */
+  void* entrypoints_[num_entries_] = {nullptr};
+
+  bool available_ = false;
+#ifdef WIN32
+  HINSTANCE handle_;
+#else   // !WIN32
+  void* handle_;
+#endif  // WIN32
 };
 
-};  // namespace aten
+};  // namespace runtime
 };  // namespace dgl
 
 #endif  // DGL_RUNTIME_TENSORDISPATCH_H_

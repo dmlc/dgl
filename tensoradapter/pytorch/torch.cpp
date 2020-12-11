@@ -1,7 +1,14 @@
+/*!
+ *  Copyright (c) 2020 by Contributors
+ * \file torch/torch.cpp
+ * \brief Implementation of PyTorch adapter library.
+ */
+
 #include <tensoradapter.h>
 #include <torch/torch.h>
 #include <ATen/DLConvertor.h>
 #include <vector>
+#include <iostream>
 
 static at::Device get_device(DLContext ctx) {
   switch (ctx.device_type) {
@@ -28,16 +35,9 @@ DLManagedTensor* TAempty(
     .layout(torch::kStrided)
     .device(get_device(ctx))
     .dtype(at::toScalarType(dtype));
+  std::cout << "AAA" << std::endl;
   torch::Tensor tensor = torch::empty(shape, options);
   return at::toDLPack(tensor);
-}
-
-DLManagedTensor* TAclone(const DLManagedTensor* tensor) {
-  return at::toDLPack(at::fromDLPack(tensor).clone());
-}
-
-DLManagedTensor* TAcopyto(const DLManagedTensor* tensor, DLContext ctx) {
-  return at::toDLPack(at::fromDLPack(tensor).to(get_device(ctx)));
 }
 
 };

@@ -7,7 +7,7 @@ if [ $# -ne 1 ]; then
     exit -1
 fi
 
-CMAKE_VARS="-DBUILD_CPP_TEST=ON -DUSE_OPENMP=ON"
+CMAKE_VARS="-DBUILD_CPP_TEST=ON -DUSE_OPENMP=ON -DBUILD_TORCH=ON"
 
 if [ "$1" == "gpu" ]; then
     CMAKE_VARS="-DUSE_CUDA=ON $CMAKE_VARS"

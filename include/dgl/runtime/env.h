@@ -14,8 +14,8 @@ struct Env {
 
   /*! \brief which backend DGL is using (pytorch, mxnet, tensorflow) */
   std::string backend;
-  /*! \brief the path to the DGL C library */
-  std::string libpath;
+  /*! \brief the directory containing the DGL C library */
+  std::string dir;
 };
 
 #endif  // DGL_RUNTIME_ENV_H_

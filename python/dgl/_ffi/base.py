@@ -32,10 +32,11 @@ def _load_lib():
     """Load libary by searching possible path."""
     lib_path = libinfo.find_lib_path()
     lib = ctypes.CDLL(lib_path[0])
-    lib.DGLSetLibraryPath(lib_path[0].encode('utf-8'))
+    dirname = os.path.dirname(lib_path[0])
+    lib.DGLSetLibraryDir(dirname.encode('utf-8'))
     # DMatrix functions
     lib.DGLGetLastError.restype = ctypes.c_char_p
-    return lib, os.path.basename(lib_path[0])
+    return lib, dirname
 
 # version number
 __version__ = libinfo.__version__

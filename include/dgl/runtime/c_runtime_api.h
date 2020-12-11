@@ -541,12 +541,12 @@ DGL_DLL int DGLStreamStreamSynchronize(int device_type,
                                        DGLStreamHandle dst);
 
 /*!
- * \brief Sets the library path
+ * \brief Sets the library directory.
  */
-DGL_DLL void DGLSetLibraryPath(const char *path_cstr);
+DGL_DLL void DGLSetLibraryDir(const char *path_cstr);
 
 /*!
- * \brief Sets the backend
+ * \brief Sets the backend.
  */
 DGL_DLL void DGLSetBackend(const char *backend_cstr);
 

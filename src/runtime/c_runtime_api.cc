@@ -379,13 +379,11 @@ int DGLCbArgToReturn(DGLValue* value, int code) {
   API_END();
 }
 
-void DGLSetLibraryPath(const char *path_cstr) {
-  //std::cout << "setting library path " << path_cstr << std::endl;
-  Env::Global()->libpath = std::string(path_cstr);
+void DGLSetLibraryDir(const char *path_cstr) {
+  Env::Global()->dir = std::string(path_cstr);
 }
 
 void DGLSetBackend(const char *backend_cstr) {
-  //std::cout << "setting backend path " << backend_cstr << std::endl;
   Env::Global()->backend = std::string(backend_cstr);
 }
 
