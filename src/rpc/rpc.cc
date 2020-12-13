@@ -15,6 +15,7 @@
 #include <dgl/array.h>
 #include <dgl/random.h>
 #include <dgl/zerocopy_serializer.h>
+#include "../runtime/resource_manager.h"
 #include "../c_api_common.h"
 
 using dgl::network::StringPrintf;
@@ -326,6 +327,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetTensors")
  */
 void CtrlCHandler(int s) {
   LOG(INFO) << "\nUser pressed Ctrl+C, Exiting";
+  CleanupResources();
   exit(1);
 }
 
@@ -337,6 +339,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCHandleCtrlC")
   sigemptyset(&sigIntHandler.sa_mask);
   sigIntHandler.sa_flags = 0;
   sigaction(SIGINT, &sigIntHandler, nullptr);
+  sigaction(SIGTERM, &sigIntHandler, nullptr);
 });
 #endif
 

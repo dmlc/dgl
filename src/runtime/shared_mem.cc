@@ -13,8 +13,24 @@
 #include <dmlc/logging.h>
 #include <dgl/runtime/shared_mem.h>
 
+#include "resource_manager.h"
+
 namespace dgl {
 namespace runtime {
+
+class SharedMemoryResource: public Resource {
+  std::string name;
+
+ public:
+  SharedMemoryResource(const std::string &name) {
+    this->name = name;
+  }
+
+  void Destroy() {
+    LOG(INFO) << "remove " << name << " for shared memory";
+    shm_unlink(name.c_str());
+  }
+};
 
 SharedMemory::SharedMemory(const std::string &name) {
 #ifndef _WIN32
@@ -35,6 +51,8 @@ SharedMemory::~SharedMemory() {
   if (own) {
     LOG(INFO) << "remove " << name << " for shared memory";
     shm_unlink(name.c_str());
+    // The resource has been deleted. We don't need to keep track of it any more.
+    DeleteResource(name);
   }
 #else
   LOG(FATAL) << "Shared memory is not supported on Windows.";
@@ -48,6 +66,8 @@ void *SharedMemory::CreateNew(size_t size) {
   int flag = O_RDWR|O_CREAT;
   fd = shm_open(name.c_str(), flag, S_IRUSR | S_IWUSR);
   CHECK_NE(fd, -1) << "fail to open " << name << ": " << strerror(errno);
+  // Shared memory cannot be deleted if the process exits abnormally.
+  AddResource(name, std::shared_ptr<Resource>(new SharedMemoryResource(name)));
   auto res = ftruncate(fd, size);
   CHECK_NE(res, -1)
       << "Failed to truncate the file. " << strerror(errno);
