@@ -18,7 +18,7 @@
 namespace dgl {
 namespace runtime {
 
-#ifdef _WIN32
+#ifndef _WIN32
 /*
  * Shared memory is a resource that cannot be cleaned up if the process doesn't
  * exit normally. We'll manage the resource with ResourceManager.
