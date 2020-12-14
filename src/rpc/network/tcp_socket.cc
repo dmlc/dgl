@@ -30,11 +30,13 @@ TCPSocket::TCPSocket() {
   if (socket_ < 0) {
     LOG(FATAL) << "Can't create new socket. Errno=" << errno;
   }
+#ifndef _WIN32
   // This is to make sure the same port can be reused right after the socket is closed.
   int enable = 1;
   if (setsockopt(socket_, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
     LOG(WARNING) << "cannot make the socket reusable. Errno=" << errno;
   }
+#endif  // _WIN32
 }
 
 TCPSocket::~TCPSocket() {
