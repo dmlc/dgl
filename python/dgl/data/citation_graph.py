@@ -171,13 +171,15 @@ class CitationGraphDataset(DGLBuiltinDataset):
         graphs, _ = load_graphs(str(graph_path))
 
         info = load_info(str(info_path))
-        self._g = graphs[0]
+        graph = graphs[0]
+        self._g = graph
+        # for compatability
         graph = graph.clone()
-        graph.pop('train_mask')
-        graph.pop('val_mask')
-        graph.pop('test_mask')
-        graph.pop('feat')
-        graph.pop('label')
+        graph.ndata.pop('train_mask')
+        graph.ndata.pop('val_mask')
+        graph.ndata.pop('test_mask')
+        graph.ndata.pop('feat')
+        graph.ndata.pop('label')
         graph = to_networkx(graph)
         self._graph = nx.DiGraph(graph)
 
@@ -328,7 +330,7 @@ class CoraGraphDataset(CitationGraphDataset):
     - Number of Classes: 7
     - Label split:
 
-        - Train: 140 
+        - Train: 140
         - Valid: 500
         - Test: 1000
 
