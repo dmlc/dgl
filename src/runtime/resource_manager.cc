@@ -4,11 +4,11 @@
  * \brief Manage the resources.
  */
 
-#include <utility>
+#include "resource_manager.h"
 
 #include <dmlc/logging.h>
 
-#include "resource_manager.h"
+#include <utility>
 
 namespace dgl {
 namespace runtime {
