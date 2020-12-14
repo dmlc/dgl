@@ -4,6 +4,8 @@
  * \brief Manage the resources.
  */
 
+#include <utility>
+
 #include <dmlc/logging.h>
 
 #include "resource_manager.h"

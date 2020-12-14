@@ -18,11 +18,15 @@
 namespace dgl {
 namespace runtime {
 
+/*
+ * Shared memory is a resource that cannot be cleaned up if the process doesn't
+ * exit normally. We'll manage the resource with ResourceManager.
+ */
 class SharedMemoryResource: public Resource {
   std::string name;
 
  public:
-  SharedMemoryResource(const std::string &name) {
+  explicit SharedMemoryResource(const std::string &name) {
     this->name = name;
   }
 
