@@ -18,6 +18,7 @@
 namespace dgl {
 namespace runtime {
 
+#ifdef _WIN32
 /*
  * Shared memory is a resource that cannot be cleaned up if the process doesn't
  * exit normally. We'll manage the resource with ResourceManager.
@@ -35,6 +36,7 @@ class SharedMemoryResource: public Resource {
     shm_unlink(name.c_str());
   }
 };
+#endif  // _WIN32
 
 SharedMemory::SharedMemory(const std::string &name) {
 #ifndef _WIN32
