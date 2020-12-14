@@ -67,6 +67,7 @@ The benchmark folder is organized as follows:
 |-- publish.sh             # script for running benchmarks in docker
 |-- README.md              # this readme
 |-- run.sh                 # script for calling asv in docker
+|-- ...                    # other aux files
 ```
 
 To add a new benchmark, pick a suitable benchmark type and create a python script under
@@ -99,3 +100,18 @@ def track_time(l, u):
 * Check out `model_acc/bench_gcn.py` and `model_speed/bench_sage.py`.
 * ASV's [official guide on writing benchmarks](https://asv.readthedocs.io/en/stable/writing_benchmarks.html)
   is also very helpful.
+
+
+Tips
+----
+* Feed flags `-e --verbose` to `asv run` to print out stderr and more information. Use `--bench` flag
+  to run specific benchmarks.
+* When running benchmarks locally (e.g., with `--python=same`), ASV will not write results to disk
+  so `asv publish` will not generate plots.
+* When running benchmarks in docker, ASV will pull the codes from remote and build them in conda
+  environment. The repository to pull is determined by `origin`, so it works with forked repository.
+  The branches are configured in `asv.conf.json`. If you wish to test the impact of your local source
+  code changes on performance in docker, remember to before running `publish.sh`:
+    - Commit your local changes and push it to remote `origin`.
+    - Add the corresponding branch to `asv.conf.json`.
+* Try make your benchmarks compatible with all the versions being tested.

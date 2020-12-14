@@ -16,6 +16,6 @@ export DGL_BENCH_DEVICE=$DEVICE
 pushd $ROOT/benchmarks
 cat asv.conf.json
 asv machine --yes
-asv run -e --verbose
+asv run
 asv publish
 popd

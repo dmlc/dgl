@@ -16,7 +16,8 @@ docker run --name dgl-reg                   \
 docker exec dgl-reg mkdir -p $WS_ROOT
 docker cp ../.git dgl-reg:$WS_ROOT
 docker cp . dgl-reg:$WS_ROOT/benchmarks/
+docker cp torch_gpu_pip.txt dgl-reg:/asv
 docker exec dgl-reg bash $WS_ROOT/benchmarks/run.sh $DEVICE
-docker cp dgl-reg:$WS_ROOT/benchmarks/results results
-docker cp dgl-reg:$WS_ROOT/benchmarks/html html
+docker cp dgl-reg:$WS_ROOT/benchmarks/results .
+docker cp dgl-reg:$WS_ROOT/benchmarks/html .
 docker stop dgl-reg
