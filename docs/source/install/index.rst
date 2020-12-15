@@ -19,55 +19,7 @@ Starting at version 0.3, DGL is separated into CPU and CUDA builds.  The builds 
 same Python package name. If you install DGL with a CUDA 9 build after you install the
 CPU build, then the CPU build is overwritten.
 
-Install from conda
-----------------------
-If ``conda`` is not yet installed, get either `miniconda <https://conda.io/miniconda.html>`_ or
-the full `anaconda <https://www.anaconda.com/download/>`_.
-
-With ``conda`` installed, you will want install DGL into Python 3.6 ``conda`` environment.
-Run `conda create -n dgl python=3.6` to create the environment.
-Activate the environment by running `source activate dgl`.
-After the ``conda`` environment is activated, run one of the following commands.
-
-.. code:: bash
-
-   conda install -c dglteam dgl              # For CPU Build
-   conda install -c dglteam dgl-cuda9.0      # For CUDA 9.0 Build
-   conda install -c dglteam dgl-cuda10.0     # For CUDA 10.0 Build
-   conda install -c dglteam dgl-cuda10.1     # For CUDA 10.1 Build
-   conda install -c dglteam dgl-cuda10.2     # For CUDA 10.2 Build
-
-
-Install from pip
-----------------
-For CPU builds, run the following command to install with ``pip``.
-
-.. code:: bash
-
-   pip install dgl
-
-For CUDA builds, run one of the following commands and specify the CUDA version.
-
-.. code:: bash
-
-   pip install dgl           # For CPU Build
-   pip install dgl-cu90      # For CUDA 9.0 Build
-   pip install dgl-cu92      # For CUDA 9.2 Build
-   pip install dgl-cu100     # For CUDA 10.0 Build
-   pip install dgl-cu101     # For CUDA 10.1 Build
-   pip install dgl-cu102     # For CUDA 10.2 Build
-
-For the most current nightly build from master branch, run one of the following commands.
-
-.. code:: bash
-
-   pip install --pre dgl           # For CPU Build
-   pip install --pre dgl-cu90      # For CUDA 9.0 Build
-   pip install --pre dgl-cu92      # For CUDA 9.2 Build
-   pip install --pre dgl-cu100     # For CUDA 10.0 Build
-   pip install --pre dgl-cu101     # For CUDA 10.1 Build
-   pip install --pre dgl-cu102     # For CUDA 10.2 Build
-
+For installation from Conda or Pip, check out the `Get Started page <https://www.dgl.ai/pages/start.html>`_.
 
 .. _install-from-source:
 
