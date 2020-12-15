@@ -7,7 +7,7 @@ def init_git() {
 pipeline {
     agent any
     stages {
-        stage('Lint Check') {
+        stage('Regression Test') {
             agent {
                 label 'linux-c52x-node'
             }
