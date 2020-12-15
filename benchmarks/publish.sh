@@ -12,7 +12,7 @@ WS_ROOT=/asv/dgl
 
 docker pull dgllib/dgl-ci-gpu:conda
 
-if [DEVICE == "cpu"]; then
+if [[ $DEVICE == "cpu" ]]; then
     docker run --name dgl-reg \
         --rm \
         --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
