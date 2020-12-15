@@ -1,19 +1,15 @@
 #!/usr/bin/env groovy
 def init_git() {
-//   sh "rm -rf *"
-//   checkout scm
-  sh "git submodule update --recursive --init"
+    //   sh "rm -rf *"
+    //   checkout scm
+    sh 'git submodule update --recursive --init'
 }
 pipeline {
     agent any
     stages {
         stage('Lint Check') {
             agent {
-                docker {
-                    label 'linux-c52x-node'
-                    image 'dgllib/dgl-ci-cpu:conda'
-                    alwaysPull true
-                }
+                label 'linux-c52x-node'
             }
 
             environment {
