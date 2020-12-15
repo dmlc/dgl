@@ -7,6 +7,7 @@ def instance_type = sh (
 echo "instance type: ${instance_type}"
 
 pipeline {
+  agent any
   stages {
 
   }
