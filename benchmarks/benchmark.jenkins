@@ -22,7 +22,8 @@ pipeline {
             steps {
                 // init_git()
                 echo "instance type: ${env.INSTANCE_TYPE}"
-                sh 'bash tests/scripts/task_lint.sh'
+                echo "pwd: ${WORKSPACE}"
+                // sh 'bash tests/scripts/task_lint.sh'
             }
         }
     }
