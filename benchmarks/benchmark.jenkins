@@ -1,5 +1,9 @@
 #!/usr/bin/env groovy
-
+def init_git() {
+//   sh "rm -rf *"
+//   checkout scm
+  sh "git submodule update --recursive --init"
+}
 pipeline {
     agent any
     stages {
@@ -19,8 +23,10 @@ pipeline {
                 ).trim()
             }
             steps {
-                // init_git()
-                sh "bash publish.sh ${env.INSTANCE_TYPE} cpu"
+                init_git()
+                dir('benchmarks') {
+                    sh "bash publish.sh ${env.INSTANCE_TYPE} cpu"
+                }
                 echo "instance type: ${env.INSTANCE_TYPE}"
                 echo "pwd: ${WORKSPACE}"
             // sh 'bash tests/scripts/task_lint.sh'
