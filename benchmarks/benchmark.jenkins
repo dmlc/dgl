@@ -8,7 +8,7 @@ pipeline {
             agent {
                 docker {
                     label 'linux-c52x-node'
-                    image 'dgllib/dgl-ci-lint'
+                    image 'dgllib/dgl-ci-cpu:conda'
                     alwaysPull true
                 }
             }
