@@ -19,7 +19,10 @@ Starting at version 0.3, DGL is separated into CPU and CUDA builds.  The builds 
 same Python package name. If you install DGL with a CUDA 9 build after you install the
 CPU build, then the CPU build is overwritten.
 
-For installation from Conda or Pip, check out the `Get Started page <https://www.dgl.ai/pages/start.html>`_.
+Install from Conda or Pip
+-------------------------
+
+Check out the `Get Started page <https://www.dgl.ai/pages/start.html>`_.
 
 .. _install-from-source:
 
