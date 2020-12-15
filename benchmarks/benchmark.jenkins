@@ -14,15 +14,14 @@ pipeline {
             }
 
             environment {
-                COMMITS_ON_MASTER = sh (
+                INSTANCE_TYPE = sh (
                     script: 'curl -s http://169.254.169.254/latest/meta-data/instance-type',
                     returnStdout: true
                 ).trim()
             }
             steps {
                 // init_git()
-                echo "instance type: ${instance_type}"
-                echo "instance type: ${instance_type}"
+                echo "instance type: ${env.INSTANCE_TYPE}"
                 sh 'bash tests/scripts/task_lint.sh'
             }
         }
