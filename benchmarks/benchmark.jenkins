@@ -12,12 +12,15 @@ pipeline {
                     alwaysPull true
                 }
             }
-            steps {
-                // init_git()
+
+            environment {
                 instance_type = sh (
                     script: 'curl -s http://169.254.169.254/latest/meta-data/instance-type',
                     returnStdout: true
                 ).trim()
+            }
+            steps {
+                // init_git()
                 echo "instance type: ${instance_type}"
                 echo "instance type: ${instance_type}"
                 sh 'bash tests/scripts/task_lint.sh'
