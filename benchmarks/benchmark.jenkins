@@ -1,6 +1,5 @@
 #!/usr/bin/env groovy
 
-
 pipeline {
     agent any
     stages {
@@ -21,9 +20,10 @@ pipeline {
             }
             steps {
                 // init_git()
+                sh "bash publish.sh ${env.INSTANCE_TYPE} cpu"
                 echo "instance type: ${env.INSTANCE_TYPE}"
                 echo "pwd: ${WORKSPACE}"
-                // sh 'bash tests/scripts/task_lint.sh'
+            // sh 'bash tests/scripts/task_lint.sh'
             }
         }
     }
