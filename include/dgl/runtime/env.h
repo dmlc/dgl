@@ -11,11 +11,8 @@ struct Env {
     static Env inst;
     return &inst;
   }
-
-  /*! \brief which backend DGL is using (pytorch, mxnet, tensorflow) */
-  std::string backend;
-  /*! \brief the directory containing the DGL C library */
-  std::string dir;
+  /*! \brief the path to the tensoradapter library */
+  std::string ta_path;
 };
 
 #endif  // DGL_RUNTIME_ENV_H_

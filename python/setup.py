@@ -35,15 +35,20 @@ def get_lib_path():
 
     return libs, version
 
-def get_ta_lib_names():
+def get_ta_lib_pattern():
     if sys.platform.startswith('linux'):
-        ta_lib_format = 'libtensoradapter_%s.so'
+        ta_lib_pattern = 'libtensoradapter_*.so'
     elif sys.platform.startswith('darwin'):
-        ta_lib_format = 'libtensoradapter_%s.dylib'
+        ta_lib_pattern = 'libtensoradapter_*.dylib'
     elif sys.platform.startswith('win'):
-        ta_lib_format = 'tensoradapter_%s.dll'
-    backends = ['pytorch']
-    return backends, [ta_lib_format % backend for backend in backends]
+        ta_lib_pattern = 'tensoradapter_*.dll'
+    else:
+        raise NotImplementedError('Unsupported system: %s' % sys.platform)
+    return ta_lib_pattern
+
+LIBS, VERSION = get_lib_path()
+BACKENDS = ['pytorch']
+TA_LIB_PATTERN = get_ta_lib_pattern()
 
 def cleanup():
     # Wheel cleanup
@@ -58,18 +63,17 @@ def cleanup():
             os.remove(os.path.join("dgl", libname))
         except:
             pass
-    for backend, ta_name in zip(BACKENDS, TA_NAMES):
-        try:
-            os.remove(os.path.join("dgl", "tensoradapter", backend, ta_name))
-        except:
-            pass
-
-LIBS, VERSION = get_lib_path()
-BACKENDS, TA_NAMES = get_ta_lib_names()
+    for backend in BACKENDS:
+        for ta_path in glob.glob(
+            os.path.join(CURRENT_DIR, "dgl", "tensoradapter", backend, TA_LIB_PATTERN)):
+            try:
+                os.remove(ta_path)
+            except:
+                pass
 
 def config_cython():
     """Try to configure cython and return cython configuration"""
-    if os.name == 'nt':
+    if sys.platform.startswith('win'):
         print("WARNING: Cython is not supported on Windows, will compile without cython module")
         return []
     sys_cflags = sysconfig.get_config_var("CFLAGS")
@@ -128,13 +132,16 @@ if wheel_include_libs:
             shutil.copy(path, os.path.join(CURRENT_DIR, 'dgl'))
             dir_, libname = os.path.split(path)
             fo.write("include dgl/%s\n" % libname)
-        for backend, ta_name in zip(BACKENDS, TA_NAMES):
-            # TODO: better tensor adapter installation
-            os.makedirs(os.path.join(CURRENT_DIR, 'dgl', 'tensoradapter', backend), exist_ok=True)
-            shutil.copy(
-                os.path.join(dir_, 'tensoradapter', backend, ta_name),
-                os.path.join(CURRENT_DIR, 'dgl', 'tensoradapter', backend))
-            fo.write("include dgl/tensoradapter/%s/%s" % (backend, ta_name))
+
+        for backend in BACKENDS:
+            for ta_path in glob.glob(os.path.join(dir_, "tensoradapter", backend, TA_LIB_PATTERN)):
+                ta_name = os.path.basename(ta_path)
+                os.makedirs(os.path.join(CURRENT_DIR, 'dgl', 'tensoradapter', backend), exist_ok=True)
+                shutil.copy(
+                    os.path.join(dir_, 'tensoradapter', backend, ta_name),
+                    os.path.join(CURRENT_DIR, 'dgl', 'tensoradapter', backend))
+                fo.write("include dgl/tensoradapter/%s/%s" % (backend, ta_name))
+
     setup_kwargs = {
         "include_package_data": True
     }
@@ -145,12 +152,12 @@ if include_libs:
     rpath = [os.path.relpath(path, CURRENT_DIR) for path in LIBS]
     data_files = [('dgl', rpath)]
     for path in LIBS:
-        for backend, ta_name in zip(BACKENDS, TA_NAMES):
+        for backend in BACKENDS:
             data_files.append((
                 'dgl/tensoradapter/%s' % backend,
-                [os.path.join(
+                glob.glob(os.path.join(
                     os.path.dirname(os.path.relpath(path, CURRENT_DIR)),
-                    'tensoradapter', backend, ta_name)]))
+                    'tensoradapter', backend, TA_LIB_PATTERN))))
     setup_kwargs = {
         "include_package_data": True,
         "data_files": data_files

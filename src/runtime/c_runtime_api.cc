@@ -379,12 +379,8 @@ int DGLCbArgToReturn(DGLValue* value, int code) {
   API_END();
 }
 
-void DGLSetLibraryDir(const char *path_cstr) {
-  Env::Global()->dir = std::string(path_cstr);
-}
-
-void DGLSetBackend(const char *backend_cstr) {
-  Env::Global()->backend = std::string(backend_cstr);
+void DGLSetTAPath(const char *path_cstr) {
+  Env::Global()->ta_path = std::string(path_cstr);
 }
 
 // set device api

@@ -18,66 +18,36 @@
 namespace dgl {
 namespace runtime {
 
-namespace {
-
-/*!
- * \brief Get the absolute path of the tensor adapter library to be loaded.
- */
-#if defined(WIN32) || defined(_WIN32)
-#define PATH_PYTORCH  "\\tensoradapter\\pytorch\\tensoradapter_pytorch.dll"
-#elif defined(APPLE)
-#define PATH_PYTORCH  "/tensoradapter/pytorch/libtensoradapter_pytorch.dylib"
-#else
-#define PATH_PYTORCH  "/tensoradapter/pytorch/libtensoradapter_pytorch.so"
-#endif
-std::string getpath() {
-  const std::string& backend = Env::Global()->backend;
-  const std::string& dir = Env::Global()->dir;
-
-  if (backend == "pytorch")
-    return dir + PATH_PYTORCH;
-  else
-    return "";
-}
-
-};
-
 constexpr const char *TensorDispatcher::names_[];
 
-#if defined(WIN32) || defined(_WIN32)
 TensorDispatcher::TensorDispatcher() {
-  std::string path = getpath();
-  if (path == "")
-    return;
-
-  handle_ = LoadLibrary(path.c_str());
-  CHECK(handle_) << "Win32 error: " << GetLastError();    // TODO(BarclayII): Get error string
-  for (int i = 0; i < num_entries_; ++i)
-    entrypoints_[i] = reinterpret_cast<void*>(GetProcAddress(handle_, names_[i]));
-  available_ = true;
-}
-
-TensorDispatcher::~TensorDispatcher() {
-  FreeLibrary(handle_);
-}
-#else   // !WIN32
-TensorDispatcher::TensorDispatcher() {
-  std::string path = getpath();
+  const std::string& path = Env::Global()->ta_path;
   if (path == "")
     // does not have dispatcher library; all operators fall back to DGL's implementation
     return;
 
+#if defined(WIN32) || defined(_WIN32)
+  handle_ = LoadLibrary(path.c_str());
+  CHECK(handle_) << "Win32 error: " << GetLastError();    // TODO(BarclayII): Get error string
+  for (int i = 0; i < num_entries_; ++i)
+    entrypoints_[i] = reinterpret_cast<void*>(GetProcAddress(handle_, names_[i]));
+#else   // !WIN32
   handle_ = dlopen(path.c_str(), RTLD_LAZY);
   CHECK(handle_) << dlerror();
   for (int i = 0; i < num_entries_; ++i)
     entrypoints_[i] = dlsym(handle_, names_[i]);
+#endif  // WIN32
+
   available_ = true;
 }
 
 TensorDispatcher::~TensorDispatcher() {
+#if defined(WIN32) || defined(_WIN32)
+  FreeLibrary(handle_);
+#else   // !WIN32
   dlclose(handle_);
-}
 #endif  // WIN32
+}
 
 };  // namespace aten
 };  // namespace dgl

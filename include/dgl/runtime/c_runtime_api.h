@@ -541,14 +541,9 @@ DGL_DLL int DGLStreamStreamSynchronize(int device_type,
                                        DGLStreamHandle dst);
 
 /*!
- * \brief Sets the library directory.
+ * \brief Sets the path to the tensoradapter library
  */
-DGL_DLL void DGLSetLibraryDir(const char *path_cstr);
-
-/*!
- * \brief Sets the backend.
- */
-DGL_DLL void DGLSetBackend(const char *backend_cstr);
+DGL_DLL void DGLSetTAPath(const char *path_cstr);
 
 /*!
  * \brief Bug report macro.
