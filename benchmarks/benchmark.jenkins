@@ -1,7 +1,13 @@
 #!/usr/bin/env groovy
 
+def instance_type = sh (
+    script: 'curl -s http://169.254.169.254/latest/meta-data/instance-type',
+    returnStdout: true
+).trim()
+echo "instance type: ${instance_type}"
+
 pipeline {
   stages {
-      
+
   }
 }
