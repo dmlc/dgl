@@ -21,6 +21,7 @@ pipeline {
             steps {
                 init_git()
                 dir('benchmarks') {
+                    sh "python replace_branch.py --branch ${BRANCH_NAME}"
                     sh "bash publish.sh ${env.INSTANCE_TYPE} cpu"
                 }
                 echo "instance type: ${env.INSTANCE_TYPE}"
