@@ -14,7 +14,7 @@ pipeline {
             }
             steps {
                 // init_git()
-                def instance_type = sh (
+                instance_type = sh (
                     script: 'curl -s http://169.254.169.254/latest/meta-data/instance-type',
                     returnStdout: true
                 ).trim()
