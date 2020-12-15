@@ -7,8 +7,21 @@ def instance_type = sh (
 echo "instance type: ${instance_type}"
 
 pipeline {
-  agent any
-  stages {
-
-  }
+    agent any
+    stages {
+        stage('Lint Check') {
+            agent {
+                docker {
+                    label 'linux-c52x-node'
+                    image 'dgllib/dgl-ci-lint'
+                    alwaysPull true
+                }
+            }
+            steps {
+                // init_git()
+                echo "instance type: ${instance_type}"
+                sh 'bash tests/scripts/task_lint.sh'
+            }
+        }
+    }
 }
