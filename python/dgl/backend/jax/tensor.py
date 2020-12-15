@@ -66,6 +66,9 @@ class SparseMatrix2D(SparseMatrix):
         self.data = jnp.asarray(data)
         self._shape = shape
 
+    def __hash__(self):
+        return hash((self.index, self.data, self.shape))
+
     def to_dense(self):
         dense = jnp.zeros(self.shape, self.dtype)
         return dense.at[tuple(self.index)].add(self.data)
@@ -166,6 +169,11 @@ def sparse_matrix(data, index, shape, force_format=False):
 
 def sparse_matrix_indices(spmat):
     return ('coo', spmat.index)
+
+
+def cumsum(input, dim):
+    return jnp.cumsum(input, axis=dim)
+
 
 def is_tensor(obj):
     return isinstance(obj, jnp.ndarray) and hasattr(obj, 'device_buffer')
@@ -430,7 +438,7 @@ def sort_1d(input):
     idxs = jnp.argsort(input)
     return input[idxs], idxs
 
-def arange(start, stop, dtype=jnp.int64):
+def arange(start, stop, dtype=jnp.int64, ctx=None):
     return jnp.arange(start, stop, dtype=dtype)
 
 @jax.jit

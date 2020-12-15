@@ -638,7 +638,7 @@ def test_send_multigraph(idtype):
     g.send_and_recv([0, 2, 3], message_func=_message_a, reduce_func=_reduce)
     new_repr = g.ndata['a']
     assert F.allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
-    assert F.allclose(new_repr[[0, 2]], F.zeros((2, 5)))
+    assert F.allclose(new_repr[F.tensor([0, 2])], F.zeros((2, 5)))
 
 @parametrize_dtype
 def test_issue_1088(idtype):
