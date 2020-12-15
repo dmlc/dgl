@@ -10,9 +10,18 @@ fi
 
 WS_ROOT=/asv/dgl
 
-docker run --name dgl-reg                   \
-           --rm --runtime=nvidia            \
-           --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
+docker pull dgllib/dgl-ci-gpu:conda
+
+if [DEVICE == "cpu"]; then
+    docker run --name dgl-reg \
+        --rm \
+        --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
+else
+    docker run --name dgl-reg \
+        --rm --runtime=nvidia \
+        --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
+fi
+
 docker exec dgl-reg mkdir -p $WS_ROOT
 docker cp ../.git dgl-reg:$WS_ROOT
 docker cp . dgl-reg:$WS_ROOT/benchmarks/
