@@ -17,6 +17,8 @@ DGL is an easy-to-use, high performance and scalable Python package for deep lea
   <b>Figure</b>: DGL Overall Architecture
 </p>
 
+**For a full list of official DGL examples, see [here](examples).**
+
 ## <img src="http://data.dgl.ai/asset/image/new.png" width="30">DGL News
 **09/05/2020**: We invite you to participate in the survey [here](https://forms.gle/Ej3jHCocACmb49Gp8) to make DGL better fit for your needs.  Thanks!
 
