@@ -1,10 +1,8 @@
-# DGL Implementation of MixHop
+# DGL Implementations of MixHop
 
 This DGL example implements the GNN model proposed in the paper [MixHop: Higher-Order Graph Convolution Architectures via Sparsified Neighborhood Mixing](https://arxiv.org/abs/1905.00067). For the original implementation, see [here](https://github.com/samihaija/mixhop).
 
-## Example implementor
-
-This example was implemented by [xnuohz](https://github.com/xnuohz) during his intern at the AWS Shanghai AI Lab.
+Contributor: [xnuohz](https://github.com/xnuohz)
 
 ### Requirements
 The codebase is implemented in Python 3.6. For version requirement of packages, see below.
@@ -19,7 +17,7 @@ torch 1.7.0
 
 ### The graph datasets used in this example
 
-The DGL's built-in Cora, Pubmed and Citeseer GraphDataset. Dataset summary:
+The DGL's built-in Cora, Pubmed and Citeseer datasets. Dataset summary:
 
 | Dataset | Nodes | Edges | Feats | Classes | # Train Nodes | # Val Nodes | # Test Nodes |
 | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
