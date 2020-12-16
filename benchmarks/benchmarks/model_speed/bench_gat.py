@@ -62,7 +62,7 @@ def track_time(data):
     test_mask = g.ndata['test_mask']
 
     in_feats = features.shape[1]
-    n_classes = data.num_labels
+    n_classes = data.num_classes
 
     g = dgl.remove_self_loop(g)
     g = dgl.add_self_loop(g)
@@ -98,4 +98,4 @@ def track_time(data):
         optimizer.step()
     t1 = time.time()
 
-    return t1 - t0
+    return (t1 - t0) / num_epochs

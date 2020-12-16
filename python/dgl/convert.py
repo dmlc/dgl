@@ -1,12 +1,13 @@
 """Module for converting graph from/to other object."""
 from collections import defaultdict
+from collections.abc import Mapping
 from scipy.sparse import spmatrix
 import numpy as np
 import networkx as nx
 
 from . import backend as F
 from . import heterograph_index
-from .heterograph import DGLHeteroGraph, combine_frames
+from .heterograph import DGLHeteroGraph, combine_frames, DGLBlock
 from . import graph_index
 from . import utils
 from .base import NTYPE, ETYPE, NID, EID, DGLError, dgl_warning
@@ -17,6 +18,8 @@ __all__ = [
     'hetero_from_relations',
     'hetero_from_shared_memory',
     'heterograph',
+    'create_block',
+    'block_to_graph',
     'to_heterogeneous',
     'to_hetero',
     'to_homogeneous',
@@ -321,7 +324,7 @@ def heterograph(data_dict,
             if num_nodes_dict[dty] < vrange:
                 raise DGLError('The given number of nodes of node type {} must be larger than'
                                ' the max ID in the data, but got {} and {}.'.format(
-                                   sty, num_nodes_dict[dty], vrange - 1))
+                                   dty, num_nodes_dict[dty], vrange - 1))
     # Create the graph
 
     # Sort the ntypes and relation tuples to have a deterministic order for the same set
@@ -353,6 +356,237 @@ def heterograph(data_dict,
     retg = DGLHeteroGraph(hgidx, ntypes, etypes)
 
     return retg.to(device)
+
+def create_block(data_dict, num_src_nodes=None, num_dst_nodes=None, idtype=None, device=None):
+    """Create a :class:`DGLBlock` object.
+
+    Parameters
+    ----------
+    data_dict : graph data
+        The dictionary data for constructing a block. The keys are in the form of
+        string triplets (src_type, edge_type, dst_type), specifying the input node type,
+        edge type, and output node type. The values are graph data in the form of
+        :math:`(U, V)`, where :math:`(U[i], V[i])` forms the edge with ID :math:`i`.
+        The allowed graph data formats are:
+
+        - ``(Tensor, Tensor)``: Each tensor must be a 1D tensor containing node IDs. DGL calls
+          this format "tuple of node-tensors". The tensors should have the same data type,
+          which must be either int32 or int64. They should also have the same device context
+          (see below the descriptions of :attr:`idtype` and :attr:`device`).
+        - ``(iterable[int], iterable[int])``: Similar to the tuple of node-tensors
+          format, but stores node IDs in two sequences (e.g. list, tuple, numpy.ndarray).
+
+        If you would like to create a block with a single input node type, a single output
+        node type, and a single edge type, then you can pass in the graph data directly
+        without wrapping it as a dictionary.
+    num_src_nodes : dict[str, int] or int, optional
+        The number of nodes for each input node type, which is a dictionary mapping a node type
+        :math:`T` to the number of :math:`T`-typed input nodes.
+
+        If not given for a node type :math:`T`, DGL finds the largest ID appearing in *every*
+        graph data whose input node type is :math:`T`, and sets the number of nodes to
+        be that ID plus one. If given and the value is no greater than the largest ID for some
+        input node type, DGL will raise an error. By default, DGL infers the number of nodes for
+        all input node types.
+
+        If you would like to create a block with a single input node type, a single output
+        node type, and a single edge type, then you can pass in an integer to directly
+        represent the number of input nodes.
+    num_dst_nodes : dict[str, int] or int, optional
+        The number of nodes for each output node type, which is a dictionary mapping a node type
+        :math:`T` to the number of :math:`T`-typed output nodes.
+
+        If not given for a node type :math:`T`, DGL finds the largest ID appearing in *every*
+        graph data whose output node type is :math:`T`, and sets the number of nodes to
+        be that ID plus one. If given and the value is no greater than the largest ID for some
+        output node type, DGL will raise an error. By default, DGL infers the number of nodes for
+        all output node types.
+
+        If you would like to create a block with a single output node type, a single output
+        node type, and a single edge type, then you can pass in an integer to directly
+        represent the number of output nodes.
+    idtype : int32 or int64, optional
+        The data type for storing the structure-related graph information such as node and
+        edge IDs. It should be a framework-specific data type object (e.g., ``torch.int32``).
+        If ``None`` (default), DGL infers the ID type from the :attr:`data_dict` argument.
+    device : device context, optional
+        The device of the returned graph, which should be a framework-specific device object
+        (e.g., ``torch.device``). If ``None`` (default), DGL uses the device of the tensors of
+        the :attr:`data` argument. If :attr:`data` is not a tuple of node-tensors, the
+        returned graph is on CPU.  If the specified :attr:`device` differs from that of the
+        provided tensors, it casts the given tensors to the specified device first.
+
+    Returns
+    -------
+    DGLBlock
+        The created block.
+
+    Notes
+    -----
+    1. If the :attr:`idtype` argument is not given then:
+
+       - in the case of the tuple of node-tensor format, DGL uses
+         the data type of the given ID tensors.
+       - in the case of the tuple of sequence format, DGL uses int64.
+
+       Once the graph has been created, you can change the data type by using
+       :func:`dgl.DGLGraph.long` or :func:`dgl.DGLGraph.int`.
+
+       If the specified :attr:`idtype` argument differs from the data type of the provided
+       tensors, it casts the given tensors to the specified data type first.
+    2. The most efficient construction approach is to provide a tuple of node tensors without
+       specifying :attr:`idtype` and :attr:`device`. This is because the returned graph shares
+       the storage with the input node-tensors in this case.
+    3. DGL internally maintains multiple copies of the graph structure in different sparse
+       formats and chooses the most efficient one depending on the computation invoked.
+       If memory usage becomes an issue in the case of large graphs, use
+       :func:`dgl.DGLGraph.formats` to restrict the allowed formats.
+    4. DGL internally decides a deterministic order for the same set of node types and canonical
+       edge types, which does not necessarily follow the order in :attr:`data_dict`.
+
+    Examples
+    --------
+
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> block = dgl.create_block(([0, 1, 2], [1, 2, 3]), num_src_nodes=3, num_dst_nodes=4)
+    >>> block
+    Block(num_src_nodes=3, num_dst_nodes=4, num_edges=3)
+
+    >>> block = dgl.create_block({
+    ...     ('A', 'AB', 'B'): ([1, 2, 3], [2, 1, 0]),
+    ...     ('B', 'BA', 'A'): ([2, 1], [2, 3])},
+    ...     num_src_nodes={'A': 6, 'B': 5},
+    ...     num_dst_nodes={'A': 4, 'B': 3})
+    >>> block
+    Block(num_src_nodes={'A': 6, 'B': 5},
+          num_dst_nodes={'A': 4, 'B': 3},
+          num_edges={('A', 'AB', 'B'): 3, ('B', 'BA', 'A'): 2},
+          metagraph=[('A', 'B', 'AB'), ('B', 'A', 'BA')])
+
+    See also
+    --------
+    to_block
+    """
+    need_infer = num_src_nodes is None and num_dst_nodes is None
+    if not isinstance(data_dict, Mapping):
+        data_dict = {('_N', '_E', '_N'): data_dict}
+
+        if not need_infer:
+            assert isinstance(num_src_nodes, int), \
+                "num_src_nodes must be a pair of integers if data_dict is not a dict"
+            assert isinstance(num_dst_nodes, int), \
+                "num_dst_nodes must be a pair of integers if data_dict is not a dict"
+            num_src_nodes = {'_N': num_src_nodes}
+            num_dst_nodes = {'_N': num_dst_nodes}
+    else:
+        if not need_infer:
+            assert isinstance(num_src_nodes, Mapping), \
+                "num_src_nodes must be a dict if data_dict is a dict"
+            assert isinstance(num_dst_nodes, Mapping), \
+                "num_dst_nodes must be a dict if data_dict is a dict"
+
+    if need_infer:
+        num_src_nodes = defaultdict(int)
+        num_dst_nodes = defaultdict(int)
+
+    # Convert all data to node tensors first
+    node_tensor_dict = {}
+    for (sty, ety, dty), data in data_dict.items():
+        u, v, urange, vrange = utils.graphdata2tensors(data, idtype, bipartite=True)
+        node_tensor_dict[(sty, ety, dty)] = (u, v)
+        if need_infer:
+            num_src_nodes[sty] = max(num_src_nodes[sty], urange)
+            num_dst_nodes[dty] = max(num_dst_nodes[dty], vrange)
+        else:  # sanity check
+            if num_src_nodes[sty] < urange:
+                raise DGLError('The given number of nodes of input node type {} must be larger'
+                               ' than the max ID in the data, but got {} and {}.'.format(
+                                   sty, num_src_nodes[sty], urange - 1))
+            if num_dst_nodes[dty] < vrange:
+                raise DGLError('The given number of nodes of output node type {} must be larger'
+                               ' than the max ID in the data, but got {} and {}.'.format(
+                                   dty, num_dst_nodes[dty], vrange - 1))
+    # Create the graph
+
+    # Sort the ntypes and relation tuples to have a deterministic order for the same set
+    # of type names.
+    srctypes = list(sorted(num_src_nodes.keys()))
+    dsttypes = list(sorted(num_dst_nodes.keys()))
+    relations = list(sorted(node_tensor_dict.keys()))
+
+    num_nodes_per_type = utils.toindex(
+        [num_src_nodes[ntype] for ntype in srctypes] +
+        [num_dst_nodes[ntype] for ntype in dsttypes], "int64")
+    srctype_dict = {ntype: i for i, ntype in enumerate(srctypes)}
+    dsttype_dict = {ntype: i + len(srctypes) for i, ntype in enumerate(dsttypes)}
+
+    meta_edges_src = []
+    meta_edges_dst = []
+    etypes = []
+    rel_graphs = []
+    for srctype, etype, dsttype in relations:
+        meta_edges_src.append(srctype_dict[srctype])
+        meta_edges_dst.append(dsttype_dict[dsttype])
+        etypes.append(etype)
+        src, dst = node_tensor_dict[(srctype, etype, dsttype)]
+        g = create_from_edges(src, dst, 'SRC/' + srctype, etype, 'DST/' + dsttype,
+                              num_src_nodes[srctype], num_dst_nodes[dsttype])
+        rel_graphs.append(g)
+
+    # metagraph is DGLGraph, currently still using int64 as index dtype
+    metagraph = graph_index.from_coo(
+        len(srctypes) + len(dsttypes), meta_edges_src, meta_edges_dst, True)
+    # create graph index
+    hgidx = heterograph_index.create_heterograph_from_relations(
+        metagraph, [rgrh._graph for rgrh in rel_graphs], num_nodes_per_type)
+    retg = DGLBlock(hgidx, (srctypes, dsttypes), etypes)
+
+    return retg.to(device)
+
+def block_to_graph(block):
+    """Convert a :class:`DGLBlock` object to a :class:`DGLGraph`.
+
+    DGL will rename all the input node types by suffixing with ``_src``, and
+    all the output node types by suffixing with ``_dst``.
+
+    Features on the returned graph will be preserved.
+
+    Parameters
+    ----------
+    block : DGLBlock
+        The block.
+
+    Returns
+    -------
+    DGLGraph
+        The graph.
+
+    Examples
+    --------
+    >>> block = dgl.create_block({
+    ...     ('A', 'AB', 'B'): ([1, 2, 3], [2, 1, 0]),
+    ...     ('B', 'BA', 'A'): ([2, 1], [2, 3])})
+    >>> g = dgl.block_to_graph(block)
+    >>> g
+    Graph(num_nodes={'A_src': 4, 'B_src': 3, 'A_dst': 4, 'B_dst': 3},
+          num_edges={('A_src', 'AB', 'B_dst'): 3, ('B_src', 'BA', 'A_dst'): 2},
+          metagraph=[('A_src', 'B_dst', 'AB'), ('B_src', 'A_dst', 'BA')])
+    """
+    new_types = [ntype + '_src' for ntype in block.srctypes] + \
+                [ntype + '_dst' for ntype in block.dsttypes]
+    retg = DGLHeteroGraph(block._graph, new_types, block.etypes)
+
+    for srctype in block.srctypes:
+        retg.nodes[srctype + '_src'].data.update(block.srcnodes[srctype].data)
+    for dsttype in block.dsttypes:
+        retg.nodes[dsttype + '_dst'].data.update(block.dstnodes[dsttype].data)
+    for srctype, etype, dsttype in block.canonical_etypes:
+        retg.edges[srctype + '_src', etype, dsttype + '_dst'].data.update(
+            block.edges[srctype, etype, dsttype].data)
+
+    return retg
 
 def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
                      etype_field=ETYPE, metagraph=None):
@@ -564,16 +798,21 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
     return to_heterogeneous(G, ntypes, etypes, ntype_field=ntype_field,
                             etype_field=etype_field, metagraph=metagraph)
 
-def to_homogeneous(G, ndata=None, edata=None):
+def to_homogeneous(G, ndata=None, edata=None, store_type=True, return_count=False):
     """Convert a heterogeneous graph to a homogeneous graph and return.
 
-    Node and edge types of the input graph are stored as the ``dgl.NTYPE``
-    and ``dgl.ETYPE`` features in the returned graph.
+    By default, the function stores the node and edge types of the input graph as
+    the ``dgl.NTYPE`` and ``dgl.ETYPE`` features in the returned graph.
     Each feature is an integer representing the type id, determined by the
     :meth:`DGLGraph.get_ntype_id` and :meth:`DGLGraph.get_etype_id` methods.
+    One can omit it by specifying ``store_type=False``.
 
-    The function also stores the original node/edge IDs as the ``dgl.NID``
-    and ``dgl.EID`` features in the returned graph.
+    The result graph assigns nodes and edges of the same type with IDs in continuous range
+    (i.e., nodes of the first type have IDs 0 ~ ``G.num_nodes(G.ntypes[0])``; nodes
+    of the second type come after; so on and so forth). Therefore, a more memory-efficient
+    format for type information is an integer list; the i^th corresponds to
+    the number of nodes/edges of the i^th type. One can choose this format by
+    specifying ``return_count=True``.
 
     Parameters
     ----------
@@ -589,11 +828,31 @@ def to_homogeneous(G, ndata=None, edata=None):
         :attr:`edata`, it concatenates ``G.edges[T].data[feat]`` across all edge types ``T``.
         As a result, the feature ``feat`` of all edge types should have the same shape and
         data type. By default, the returned graph will not have any edge features.
+    store_type : bool, optional
+        If True, store type information as the ``dgl.NTYPE`` and ``dgl.ETYPE`` features
+        in the returned graph.
+    return_count : bool, optional
+        If True, return type information as an integer list; the i^th element corresponds to
+        the number of nodes/edges of the i^th type.
 
     Returns
     -------
     DGLGraph
         A homogeneous graph.
+    ntype_count : list[int], optional
+        Number of nodes of each type. Return when ``return_count`` is True.
+    etype_count : list[int], optional
+        Number of edges of each type. Return when ``return_count`` is True.
+
+    Notes
+    -----
+
+    * Calculating type information may introduce noticeable cost. Setting both ``store_type``
+      and ``return_count`` to False can avoid such cost if type information is not needed.
+      Otherwise, DGL recommends to use ``store_type=False`` and ``return_count=True`` due
+      to its memory efficiency.
+    * The ``ntype_count`` and ``etype_count`` lists can help speed up some operations.
+      See :class:`~dgl.nn.pytorch.conv.RelGraphConv` for such an example.
 
     Examples
     --------
@@ -633,18 +892,25 @@ def to_homogeneous(G, ndata=None, edata=None):
     offset_per_ntype = np.insert(np.cumsum(num_nodes_per_ntype), 0, 0)
     srcs = []
     dsts = []
-    etype_ids = []
-    eids = []
-    ntype_ids = []
     nids = []
+    eids = []
+    if store_type:
+        ntype_ids = []
+        etype_ids = []
+    if return_count:
+        ntype_count = []
+        etype_count = []
     total_num_nodes = 0
 
     for ntype_id, ntype in enumerate(G.ntypes):
         num_nodes = G.number_of_nodes(ntype)
         total_num_nodes += num_nodes
-        # Type ID is always in int64
-        ntype_ids.append(F.full_1d(num_nodes, ntype_id, F.int64, F.cpu()))
-        nids.append(F.arange(0, num_nodes, G.idtype))
+        if store_type:
+            # Type ID is always in int64
+            ntype_ids.append(F.full_1d(num_nodes, ntype_id, F.int64, G.device))
+        if return_count:
+            ntype_count.append(num_nodes)
+        nids.append(F.arange(0, num_nodes, G.idtype, G.device))
 
     for etype_id, etype in enumerate(G.canonical_etypes):
         srctype, _, dsttype = etype
@@ -652,9 +918,12 @@ def to_homogeneous(G, ndata=None, edata=None):
         num_edges = len(src)
         srcs.append(src + int(offset_per_ntype[G.get_ntype_id(srctype)]))
         dsts.append(dst + int(offset_per_ntype[G.get_ntype_id(dsttype)]))
-        # Type ID is always in int64
-        etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, F.cpu()))
-        eids.append(F.arange(0, num_edges, G.idtype))
+        if store_type:
+            # Type ID is always in int64
+            etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, G.device))
+        if return_count:
+            etype_count.append(num_edges)
+        eids.append(F.arange(0, num_edges, G.idtype, G.device))
 
     retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)), num_nodes=total_num_nodes,
                  idtype=G.idtype, device=G.device)
@@ -671,13 +940,16 @@ def to_homogeneous(G, ndata=None, edata=None):
     if comb_ef is not None:
         retg.edata.update(comb_ef)
 
-    # assign node type and id mapping field.
-    retg.ndata[NTYPE] = F.copy_to(F.cat(ntype_ids, 0), G.device)
-    retg.ndata[NID] = F.copy_to(F.cat(nids, 0), G.device)
-    retg.edata[ETYPE] = F.copy_to(F.cat(etype_ids, 0), G.device)
-    retg.edata[EID] = F.copy_to(F.cat(eids, 0), G.device)
+    retg.ndata[NID] = F.cat(nids, 0)
+    retg.edata[EID] = F.cat(eids, 0)
+    if store_type:
+        retg.ndata[NTYPE] = F.cat(ntype_ids, 0)
+        retg.edata[ETYPE] = F.cat(etype_ids, 0)
 
-    return retg
+    if return_count:
+        return retg, ntype_count, etype_count
+    else:
+        return retg
 
 def to_homo(G):
     """Convert the given heterogeneous graph to a homogeneous graph.

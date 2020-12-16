@@ -14,8 +14,8 @@ from ...function.base import TargetCode
 from ...base import dgl_warning
 
 if LooseVersion(th.__version__) < LooseVersion("1.5.0"):
-    dgl_warning("Detected an old version of PyTorch. Suggest using torch>=1.5.0 "
-                "for the best experience.")
+    raise Exception("Detected an old version of PyTorch. Please update torch>=1.5.0 "
+                    "for the best experience.")
 
 def data_type_dict():
     return {'float16' : th.float16,
@@ -116,6 +116,9 @@ def copy_to(input, ctx, **kwargs):
 
 def sum(input, dim, keepdims=False):
     return th.sum(input, dim=dim, keepdim=keepdims)
+
+def floor_div(in1, in2):
+    return in1 // in2
 
 def reduce_sum(input):
     return input.sum()
@@ -498,7 +501,7 @@ def _reduce_grad(grad, shape):
     num_to_squeeze = len(grad_shape) - len(in_shape)
     # pad inshape
     in_shape = (1,) * num_to_squeeze + in_shape
-    reduce_idx = th.nonzero(th.tensor(grad_shape) - th.tensor(in_shape))
+    reduce_idx = th.nonzero(th.tensor(grad_shape) - th.tensor(in_shape), as_tuple=False)
     reduce_idx += 1  # skip batch dim
     grad = grad.sum(dim=tuple(reduce_idx), keepdim=True)
     return grad.view(shape)

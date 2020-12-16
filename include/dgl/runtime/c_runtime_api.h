@@ -541,6 +541,11 @@ DGL_DLL int DGLStreamStreamSynchronize(int device_type,
                                        DGLStreamHandle dst);
 
 /*!
+ * \brief Load tensor adapter.
+ */
+DGL_DLL void DGLLoadTensorAdapter(const char *path);
+
+/*!
  * \brief Bug report macro.
  *
  * This serves as a sanity check on system side to make sure the code is correct by

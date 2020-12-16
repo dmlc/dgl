@@ -16,6 +16,11 @@ with "[NN] XXX module".
 import importlib
 import sys
 import os
+
+# [BarclayII] Not sure what's going on with pylint.
+# Possible issue: https://github.com/PyCQA/pylint/issues/2648
+from . import functional        # pylint: disable=import-self
+
 from ..backend import backend_name
 from ..utils import expand_as_pair
 
@@ -25,12 +30,4 @@ def _load_backend(mod_name):
     for api, obj in mod.__dict__.items():
         setattr(thismod, api, obj)
 
-
-LOAD_ALL = os.getenv("DGL_LOADALL", "False")
-
-if LOAD_ALL.lower() != "false":
-    from .mxnet import *
-    from .pytorch import *
-    from .tensorflow import *
-else:
-    _load_backend(backend_name)
+_load_backend(backend_name)

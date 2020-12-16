@@ -6,7 +6,7 @@ import numpy as np
 
 from .... import function as fn
 from ....base import DGLError
-from ....ops import edge_softmax
+from ...functional import edge_softmax
 from ..utils import Identity
 
 # pylint: enable=W0235

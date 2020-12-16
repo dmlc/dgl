@@ -17,6 +17,13 @@ GraphConv
     :members: weight, bias, forward, reset_parameters
     :show-inheritance:
 
+EdgeWeightNorm
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.EdgeWeightNorm
+    :members: forward
+    :show-inheritance:
+
 RelGraphConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -190,6 +197,13 @@ SortPooling
     :members:
     :show-inheritance:
 
+WeightAndSum
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.glob.WeightAndSum
+    :members:
+    :show-inheritance:
+
 GlobalAttentionPooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -254,3 +268,9 @@ SegmentedKNNGraph
     :members:
     :show-inheritance:
 
+NodeEmbedding
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.sparse_emb.NodeEmbedding
+    :members:
+    :show-inheritance:
