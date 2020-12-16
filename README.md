@@ -8,6 +8,7 @@
 
 Documentation ([Latest](https://docs.dgl.ai/en/latest/) | [Stable](https://docs.dgl.ai)) | [DGL at a glance](https://docs.dgl.ai/tutorials/basics/1_first.html#sphx-glr-tutorials-basics-1-first-py) | [Model Tutorials](https://docs.dgl.ai/tutorials/models/index.html) | [Discussion Forum](https://discuss.dgl.ai) | [Slack Channel](https://join.slack.com/t/deep-graph-library/shared_invite/zt-eb4ict1g-xcg3PhZAFAB8p6dtKuP6xQ)
 
+**For a full list of official DGL examples, see [here](examples).**
 
 DGL is an easy-to-use, high performance and scalable Python package for deep learning on graphs. DGL is framework agnostic, meaning if a deep graph model is a component of an end-to-end application, the rest of the logics can be implemented in any major frameworks, such as PyTorch, Apache MXNet or TensorFlow.
 
@@ -16,8 +17,6 @@ DGL is an easy-to-use, high performance and scalable Python package for deep lea
   <br>
   <b>Figure</b>: DGL Overall Architecture
 </p>
-
-**For a full list of official DGL examples, see [here](examples).**
 
 ## <img src="http://data.dgl.ai/asset/image/new.png" width="30">DGL News
 **09/05/2020**: We invite you to participate in the survey [here](https://forms.gle/Ej3jHCocACmb49Gp8) to make DGL better fit for your needs.  Thanks!
