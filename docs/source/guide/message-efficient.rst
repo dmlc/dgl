@@ -6,41 +6,12 @@
 :ref:`(中文版) <guide_cn-message-passing-efficient>`
 
 DGL optimizes memory consumption and computing speed for message
-passing. The optimization includes:
-
--  Merge multiple kernels in a single one: This is achieved by using
-   :meth:`~dgl.DGLGraph.update_all` to call multiple built-in functions
-   at once. (Speed optimization)
-
--  Parallelism on nodes and edges: DGL abstracts edge-wise computation
-   :meth:`~dgl.DGLGraph.apply_edges` as a generalized sampled dense-dense
-   matrix multiplication (**gSDDMM**) operation and parallelizes the computing
-   across edges. Likewise, DGL abstracts node-wise computation
-   :meth:`~dgl.DGLGraph.update_all` as a generalized sparse-dense matrix
-   multiplication (**gSPMM**) operation and parallelizes the computing across
-   nodes. (Speed optimization)
-
--  Avoid unnecessary memory copy from nodes to edges: To generate a
-   message that requires the feature from source and destination node,
-   one option is to copy the source and destination node feature to
-   that edge. For some graphs, the number of edges is much larger than
-   the number of nodes. This copy can be costly. DGL's built-in message
-   functions avoid this memory copy by sampling out the node feature using
-   entry index. (Memory and speed optimization)
-
--  Avoid materializing feature vectors on edges: the complete message
-   passing process includes message generation, message aggregation and
-   node update. In :meth:`~dgl.DGLGraph.update_all` call, message function
-   and reduce function are merged into one kernel if those functions are
-   built-in. There is no message materialization on edges. (Memory
-   optimization)
-
-According to the above, a common practise to leverage those
+passing. A common practise to leverage those
 optimizations is to construct one's own message passing functionality as
 a combination of :meth:`~dgl.DGLGraph.update_all` calls with built-in
 functions as parameters.
 
-For some cases like
+Besides that, considering the number of edges is much larger than the number of nodes for some graphs, avoiding unnecessary memory copy from nodes to edges is beneficial. For some cases like
 :class:`~dgl.nn.pytorch.conv.GATConv`,
 where it is necessary to save message on the edges, one needs to call
 :meth:`~dgl.DGLGraph.apply_edges` with built-in functions. Sometimes the
