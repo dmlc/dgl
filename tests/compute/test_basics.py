@@ -84,6 +84,13 @@ def generate_graph(idtype, grad=False):
     g.edata['w'] = ecol
     g.set_n_initializer(dgl.init.zero_initializer)
     g.set_e_initializer(dgl.init.zero_initializer)
+
+    if dgl.backend.backend_name == "jax":
+        import jax
+        g = g.to(
+            jax.devices()[0],
+        )
+
     return g
 
 def test_compatible():

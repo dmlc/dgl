@@ -221,7 +221,7 @@ def _jax_gspmm_only_e(Y, Z, dst_idxs, src_idxs, _op, _reduce_op):
     Z = _reduce_op(Z, dst_idxs, _Z)
     return Z
 
-@partial(jax.jit, static_argnums=(0, 1, 2))
+# @partial(jax.jit, static_argnums=(0, 1, 2))
 def _jax_gspmm(gidx, op, reduce_op, X, Y):
     # out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
     # return out
@@ -272,7 +272,7 @@ def _jax_gspmm(gidx, op, reduce_op, X, Y):
 
     return _jax_gspmm_u_and_e(X, Y, Z, dst_idxs, src_idxs, _op, _reduce_op)
 
-@partial(jax.jit, static_argnums=(0, 1, 4, 5))
+# @partial(jax.jit, static_argnums=(0, 1, 4, 5))
 def _jax_gsddmm(gidx, op, X, Y, lhs_target, rhs_target):
     # out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
     # return out

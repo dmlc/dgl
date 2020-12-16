@@ -194,7 +194,7 @@ def context(input):
         return jax.devices('cpu')[0]
 
 def device_type(ctx):
-    return ctx.device_kind
+    return ctx.platform
 
 def device_id(ctx):
     return ctx.id
@@ -471,6 +471,18 @@ def zerocopy_to_dgl_ndarray_for_write(input):
     return nd.from_dlpack(jax.dlpack.to_dlpack(jnp.array(input), take_ownership=False))
 
 def zerocopy_from_dgl_ndarray(data):
+    if jax.devices()[0].platform == "gpu":
+        if data.context.device_type == 1:
+            x_cpu = jax.dlpack.from_dlpack(
+                data.to_dlpack(),
+                backend=jax.devices("cpu")[0].client,
+            )
+
+            return jax.device_put(
+                x_cpu,
+                jax.devices()[0],
+            )
+
     return jax.dlpack.from_dlpack(data.to_dlpack())
 
 def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
