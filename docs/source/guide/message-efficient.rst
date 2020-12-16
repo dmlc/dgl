@@ -11,7 +11,7 @@ optimizations is to construct one's own message passing functionality as
 a combination of :meth:`~dgl.DGLGraph.update_all` calls with built-in
 functions as parameters.
 
-Besides that, considering the number of edges is much larger than the number of nodes for some graphs, avoiding unnecessary memory copy from nodes to edges is beneficial. For some cases like
+Besides that, considering that the number of edges is much larger than the number of nodes for some graphs, avoiding unnecessary memory copy from nodes to edges is beneficial. For some cases like
 :class:`~dgl.nn.pytorch.conv.GATConv`,
 where it is necessary to save message on the edges, one needs to call
 :meth:`~dgl.DGLGraph.apply_edges` with built-in functions. Sometimes the
