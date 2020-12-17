@@ -693,6 +693,12 @@ def _get_subgraph_batch_info(keys, induced_indices_arr, batch_num_objs):
         The induced node/edge index tensor for all node/edge types.
     batch_num_objs : Tensor 
         Number of nodes/edges for each graph in the original batch.
+
+    Returns
+    -------
+    Mapping[str, Tensor]
+        A dictionary mapping all node/edge type keys to the ``batch_num_objs``
+        array of corresponding graph. 
     """
     bucket_offset = F.unsqueeze(F.cumsum(batch_num_objs, 0), -1)  # (num_bkts, 1)
     ret = {}
@@ -700,9 +706,14 @@ def _get_subgraph_batch_info(keys, induced_indices_arr, batch_num_objs):
         # NOTE(Zihao): this implementation is not efficient and we can replace it with
         # binary search in the future.
         induced_indices = F.unsqueeze(induced_indices, 0)  # (1, num_nodes)
-        new_batch_num_objs_offset = F.sum((induced_indices < bucket_offset), 1)  # (num_bkts,)
-        new_batch_num_objs_offset[1:] -= new_batch_num_objs_offset[:-1]
-        ret[key] = new_batch_num_objs_offset
+        new_offset = F.sum((induced_indices < bucket_offset), 1)  # (num_bkts,)
+        # start_offset = [0] + [new_offset[i] - new_offset[i-1] for i in range(1, n_bkts)]
+        start_offset = F.cat([
+            F.zeros((1,), F.dtype(bucket_offset), F.context(bucket_offset)),
+            new_offset[:-1]
+        ], 0)
+        new_batch_num_objs = new_offset - start_offset
+        ret[key] = new_batch_num_objs
     return ret
 
 
