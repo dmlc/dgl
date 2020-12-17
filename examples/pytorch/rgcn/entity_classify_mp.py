@@ -287,7 +287,9 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
 
     multilabel = len(labels.shape) > 1
     if multilabel:
-        loss_func = nn.BCEWithLogitsLoss()
+        ps = labels[train_idx].sum(0).float()
+        pw = (labels[train_idx].shape[0] - ps) / ps
+        loss_func = nn.BCEWithLogitsLoss(pos_weight=pw)
     else:
         loss_func = nn.CrossEntropyLoss()
     loss_func.to(th.device(dev_id if dev_id >= 0 else 'cpu'))
