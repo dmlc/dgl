@@ -13,10 +13,10 @@
 #include <memory>
 #include "spmm_binary_ops.h"
 #if !defined(_WIN32)
-#ifdef WITH_AVX
+#ifdef USE_AVX
 #include "intel/cpu_support.h"
-#endif
-#endif
+#endif  // USE_AVX
+#endif  // _WIN32
 namespace dgl {
 namespace aten {
 namespace cpu {
@@ -43,7 +43,7 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
   int64_t dim = bcast.out_len, lhs_dim = bcast.lhs_len, rhs_dim = bcast.rhs_len;
   DType* O = out.Ptr<DType>();
 #if !defined(_WIN32)
-#ifdef WITH_AVX
+#ifdef USE_AVX
   typedef dgl::ElemWiseAddUpdate<Op> ElemWiseUpd;
   /* Prepare an assembler kernel */
   static std::unique_ptr<ElemWiseUpd> asm_kernel_ptr(
@@ -65,8 +65,8 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
       }
     }
   } else {
-#endif
-#endif
+#endif  // USE_AVX
+#endif  // _WIN32
 
 #pragma omp parallel for
     for (IdType rid = 0; rid < csr.num_rows; ++rid) {
@@ -88,10 +88,10 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
       }
     }
 #if !defined(_WIN32)
-#ifdef WITH_AVX
+#ifdef USE_AVX
   }
-#endif
-#endif
+#endif  // USE_AVX
+#endif  // _WIN32
 }
 
 /*!

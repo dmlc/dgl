@@ -110,7 +110,7 @@ if(USE_OPENMP)
 endif(USE_OPENMP)
 
 if(USE_AVX)
-  add_compile_definitions(WITH_AVX)
+  add_compile_definitions(USE_AVX)
 endif(USE_AVX)
 
 # To compile METIS correct for DGL.
