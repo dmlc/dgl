@@ -24,6 +24,7 @@ endif()
 # Alernatively, use cmake -DOPTION=VALUE through command-line.
 dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
+dgl_option(USE_AVX "Build with AVX optimization" OFF)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
 dgl_option(USE_S3 "Build with S3 support" OFF)
@@ -107,6 +108,10 @@ if(USE_OPENMP)
     set(CMAKE_CXX_FLAGS "${OpenMP_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
   endif(OPENMP_FOUND)
 endif(USE_OPENMP)
+
+if(USE_AVX)
+  add_compile_definitions(WITH_AVX)
+endif(USE_AVX)
 
 # To compile METIS correct for DGL.
 if(MSVC)
