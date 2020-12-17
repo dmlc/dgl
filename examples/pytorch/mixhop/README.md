@@ -19,7 +19,7 @@ torch 1.7.0
 
 The DGL's built-in Cora, Pubmed and Citeseer datasets. Dataset summary:
 
-| Dataset | Nodes | Edges | Feats | Classes | # Train Nodes | # Val Nodes | # Test Nodes |
+| Dataset | #Nodes | #Edges | #Feats | #Classes | #Train Nodes | #Val Nodes | #Test Nodes |
 | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
 | Citeseer | 3,327 | 9,228 | 3,703 | 6 | 120 | 500 | 1000 |
 | Cora | 2,708 | 10,556 | 1,433 | 7 | 140 | 500 | 1000 |
@@ -54,7 +54,7 @@ The DGL's built-in Cora, Pubmed and Citeseer datasets. Dataset summary:
 --num-layers       int     Number of GNN layers.               Default is 4.
 --input-dropout    float   Dropout applied at input layer.     Default is 0.7.
 --layer-dropout    float   Dropout applied at hidden layers.   Default is 0.9.
---p                list    Powers list of adjacency matrix.    Default is [0, 1, 2].
+--p                list    List of powers of adjacency matrix. Default is [0, 1, 2].
 ```
 
 ###### Examples
@@ -62,30 +62,30 @@ The DGL's built-in Cora, Pubmed and Citeseer datasets. Dataset summary:
 The following commands learn a neural network and predict on the test set.
 Training a MixHop model on the default dataset.
 ```bash
-$ python main.py
+python main.py
 ```
 Train a model for 200 epochs and perform an early stop if the validation accuracy stops getting improved for 10 epochs.
 ```bash
-$ python main.py --epochs 200 --early-stopping 10
+python main.py --epochs 200 --early-stopping 10
 ```
 Train a model with a different learning rate and regularization coefficient.
 ```bash
-$ python main.py --lr 0.001 --lamb 0.1
+python main.py --lr 0.001 --lamb 0.1
 ```
 Train a model with different model hyperparameters.
 ```bash
-$ python main.py --num-layers 6 --p 2 4 6
+python main.py --num-layers 6 --p 2 4 6
 ```
 Train a model which follows the original hyperparameters on different datasets.
 ```bash
 # Cora:
-$ python main.py --gpu 0 --dataset Cora --lr 1 --input-dropout 0.6 --lamb 5e-3 --hid-dim 100 --num-layers 3 --seed 9
+python main.py --gpu 0 --dataset Cora --lr 1 --input-dropout 0.6 --lamb 5e-3 --hid-dim 100 --num-layers 3 --seed 9
 
 # Citeseer:
-$ python main.py --gpu 0 --dataset Citeseer --lr 0.25 --input-dropout 0.5 --lamb 5e-3 --hid-dim 60 --num-layers 3 --seed 6
+python main.py --gpu 0 --dataset Citeseer --lr 0.25 --input-dropout 0.5 --lamb 5e-3 --hid-dim 60 --num-layers 3 --seed 6
 
 # Pubmed:
-$ python main.py --gpu 0 --dataset Pubmed --lr 0.5 --input-dropout 0.7 --lamb 5e-3 --hid-dim 60 --num-layers 3 --seed 6
+python main.py --gpu 0 --dataset Pubmed --lr 0.5 --input-dropout 0.7 --lamb 5e-3 --hid-dim 60 --num-layers 3 --seed 6
 ```
 
 ### Performance
