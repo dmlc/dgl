@@ -42,6 +42,14 @@ def process_data(name):
         return dgl.data.CoraGraphDataset()
     elif name == 'pubmed':
         return dgl.data.PubmedGraphDataset()
+    elif name == 'aifb':
+        return dgl.data.AIFBDataset()
+    elif name == 'mutag':
+        return dgl.data.MUTAGDataset()
+    elif name == 'bgs':
+        return dgl.data.BGSDataset()
+    elif name == 'am':
+        return dgl.data.AMDataset()
     else:
         raise ValueError('Invalid dataset name:', name)
 
@@ -84,5 +92,6 @@ def benchmark(track_type):
     def _wrapper(func):
         func.unit = TRACK_UNITS[track_type]
         func.setup = TRACK_SETUP[track_type]
+        func.timeout = 1800   # 30 mins
         return func
     return _wrapper
