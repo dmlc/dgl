@@ -286,7 +286,10 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                            layer_norm=args.layer_norm)
 
     multilabel = len(labels.shape) > 1
-    loss_func = nn.BCEWithLogitsLoss() if multilabel else nn.CrossEntropyLoss()
+    if multilabel:
+        loss_func = nn.BCEWithLogitsLoss()
+    else:
+        loss_func = nn.CrossEntropyLoss()
     loss_func.to(th.device(dev_id if dev_id >= 0 else 'cpu'))
 
     if dev_id >= 0 and n_gpus == 1:
@@ -478,22 +481,6 @@ def load_oag(args):
     cnts = cnts.reshape(-1, 1)
     hg.nodes['author'].data['emb'] = hg.nodes['author'].data['h'] / cnts
 
-    # Construct node features.
-    # TODO(zhengda) we need to construct the node features for author nodes.
-    ntypes = []
-    if args.node_feats:
-        node_feats = []
-        for ntype in hg.ntypes:
-            if ntype != 'field' and 'emb' in hg.nodes[ntype].data:
-                feat = hg.nodes[ntype].data.pop('emb')
-                node_feats.append(feat.share_memory_())
-                ntypes.append(ntype)
-            else:
-                node_feats.append(None)
-    else:
-        node_feats = [None] * len(hg.ntypes)
-    print('nodes with features:', ntypes)
-
     # Construct labels of paper nodes
     ss, dd = hg.edges(etype=('field', 'rev_PF_in_L1', 'paper'))
     ssu_, ssu = th.unique(ss, return_inverse=True)
@@ -538,6 +525,24 @@ def load_oag(args):
             etypes.append(etype)
     hg = dgl.edge_type_subgraph(hg, etypes)
     print(hg.canonical_etypes)
+
+    # Construct node features.
+    # TODO(zhengda) we need to construct the node features for author nodes.
+    ntypes = []
+    if args.node_feats:
+        node_feats = []
+        for ntype in hg.ntypes:
+            print(ntype)
+            if ntype != 'field' and 'emb' in hg.nodes[ntype].data:
+                feat = hg.nodes[ntype].data.pop('emb')
+                node_feats.append(feat.share_memory_())
+                ntypes.append(ntype)
+            else:
+                node_feats.append(None)
+    else:
+        node_feats = [None] * len(hg.ntypes)
+    print('nodes with features:', ntypes)
+    print(node_feats)
 
     category = 'paper'
     return hg, node_feats, paper_labels, train_idx, val_idx, test_idx, category, paper_labels.shape[1]
@@ -586,7 +591,6 @@ def main(args, devices):
         hg, node_feats, labels, train_idx, val_idx, test_idx, category, num_classes = load_oag(args)
     else:
         hg, node_feats, labels, train_idx, val_idx, test_idx, category, num_classes = load_others(args)
-
 
     # calculate norm for each edge type and store in edge
     if args.global_norm is False:
