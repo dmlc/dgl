@@ -113,6 +113,11 @@ def node_subgraph(graph, nodes):
     Graph(num_nodes={'user': 2, 'game': 0},
           num_edges={('user', 'plays', 'game'): 0, ('user', 'follows', 'user'): 2},
           metagraph=[('user', 'game'), ('user', 'user')])
+    
+    Notes
+    -----
+    This function preserves the batch information of the original graph, this is
+    to say, the ``node_subgraph`` of a batched graph is still a batched graph.
 
     See Also
     --------
@@ -260,6 +265,11 @@ def edge_subgraph(graph, edges, preserve_nodes=False):
           num_edges={('user', 'plays', 'game'): 1, ('user', 'follows', 'user'): 2},
           metagraph=[('user', 'game'), ('user', 'user')])
 
+    Notes
+    -----
+    This function preserves the batch information of the original graph, this is
+    to say, the ``edge_subgraph`` of a batched graph is still a batched graph.
+
     See Also
     --------
     node_subgraph
@@ -284,7 +294,13 @@ def edge_subgraph(graph, edges, preserve_nodes=False):
         induced_edges.append(_process_edges(cetype, eids))
     sgi = graph._graph.edge_subgraph(induced_edges, preserve_nodes)
     induced_nodes = sgi.induced_nodes
-    return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges)
+    sg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges)
+    if graph.batch_size > 1:
+        sg.set_batch_num_nodes(
+            _get_subgraph_batch_info(graph.ntypes, induced_nodes, graph.batch_num_nodes()))
+        sg.set_batch_num_edges(
+            _get_subgraph_batch_info(graph.canonical_etypes, induced_edges, graph.batch_num_edges()))
+    return sg
 
 DGLHeteroGraph.edge_subgraph = utils.alias_func(edge_subgraph)
 
