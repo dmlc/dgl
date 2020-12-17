@@ -707,7 +707,7 @@ def _get_subgraph_batch_info(keys, induced_indices_arr, batch_num_objs):
         # binary search in the future.
         induced_indices = F.unsqueeze(induced_indices, 0)  # (1, num_nodes)
         new_offset = F.sum((induced_indices < bucket_offset), 1)  # (num_bkts,)
-        # start_offset = [0] + [new_offset[i] - new_offset[i-1] for i in range(1, n_bkts)]
+        # start_offset = [0] + [new_offset[i-1] for i in range(1, n_bkts)]
         start_offset = F.cat([
             F.zeros((1,), F.dtype(bucket_offset), F.context(bucket_offset)),
             new_offset[:-1]
