@@ -35,7 +35,6 @@ DLManagedTensor* TAempty(
     .layout(torch::kStrided)
     .device(get_device(ctx))
     .dtype(at::toScalarType(dtype));
-  std::cout << "AAA" << std::endl;
   torch::Tensor tensor = torch::empty(shape, options);
   return at::toDLPack(tensor);
 }
