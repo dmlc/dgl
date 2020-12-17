@@ -235,17 +235,17 @@ class RelGraphEmbedLayer(nn.Module):
             embeddings as the input of the next layer
         """
         tsd_ids = node_ids.to(self.node_embeds.weight.device)
-        idx = th.empty(node_ids.shape[0], dtype=th.int64, device=self.dev_id)
+        idx = th.empty(node_ids.shape[0], dtype=th.int64, device=self.device)
         embeds = []
         num_nodes = 0
         for ntype in range(self.num_of_ntype):
             if features[ntype] is not None:
                 loc = node_tids == ntype
-                embeds.append(features[ntype][type_ids[loc]].to(self.dev_id) @ self.embeds[str(ntype)].to(self.dev_id))
+                embeds.append(features[ntype][type_ids[loc]].to(self.device) @ self.embeds[str(ntype)].to(self.device))
             else:
                 loc = node_tids == ntype
-                embeds.append(self.node_embeds(tsd_ids[loc]).to(self.dev_id))
-            idx[loc] = th.arange(len(embeds[-1]), device=self.dev_id) + num_nodes
+                embeds.append(self.node_embeds(tsd_ids[loc]).to(self.device))
+            idx[loc] = th.arange(len(embeds[-1]), device=self.device) + num_nodes
             num_nodes += len(embeds[-1])
         embeds = th.cat(embeds)
         return embeds[idx]
