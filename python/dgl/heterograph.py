@@ -1257,7 +1257,16 @@ class DGLHeteroGraph(object):
         return self._batch_num_nodes[ntype]
 
     def set_batch_num_nodes(self, val):
-        """TBD"""
+        """Manually set the number of nodes for each graph in the batch with the specified node
+        type.
+
+        Parameters
+        ----------
+        val : Tensor or Mapping[str, Tensor]
+            The dictionary storing number of nodes for each graph in the batch for all node types.
+            If the graph has only one node type, ``val`` can also be a single array indicating the
+            number of nodes per graph in the batch.
+        """
         if not isinstance(val, Mapping):
             if len(self.ntypes) != 1:
                 raise DGLError('Must provide a dictionary when there are multiple node types.')
@@ -1326,7 +1335,16 @@ class DGLHeteroGraph(object):
         return self._batch_num_edges[etype]
 
     def set_batch_num_edges(self, val):
-        """TBD"""
+        """Manually set the number of edges for each graph in the batch with the specified edge
+        type.
+
+        Parameters
+        ----------
+        val : Tensor or Mapping[str, Tensor]
+            The dictionary storing number of edges for each graph in the batch for all edge types.
+            If the graph has only one edge type, ``val`` can also be a single array indicating the
+            number of edges per graph in the batch.
+        """
         if not isinstance(val, Mapping):
             if len(self.etypes) != 1:
                 raise DGLError('Must provide a dictionary when there are multiple edge types.')
