@@ -47,7 +47,7 @@ function(add_pytorch_target CONDA_ENV)
 endfunction()
 
 if(TORCH_CONDA_ENVS)
-  foreach(CONDA_ENV ${CONDA_ENVS})
+  foreach(CONDA_ENV ${TORCH_CONDA_ENVS})
     add_pytorch_target(${CONDA_ENV})
   endforeach(CONDA_ENV)
 else()
