@@ -169,34 +169,41 @@ install the Python binding for DGL.
 Windows
 ```````
 
-The Windows source build is tested with CMake and MinGW/GCC.  We highly recommend
-using CMake and GCC from `conda installations <https://conda.io/miniconda.html>`_.  To
-get started, run the following:
-
-.. code:: bash
-
-   conda install cmake m2w64-gcc m2w64-make
-
-Build the shared library and install the Python binding.
-
-.. code::
-
-   md build
-   cd build
-   cmake -DCMAKE_CXX_FLAGS="-DDMLC_LOG_STACK_TRACE=0 -DDGL_EXPORTS" -DCMAKE_MAKE_PROGRAM=mingw32-make .. -G "MSYS Makefiles"
-   mingw32-make
-   cd ..\python
-   python setup.py install
-
-You can also build DGL with MSBuild.  With `MS Build Tools <https://go.microsoft.com/fwlink/?linkid=840931>`_
+You can build DGL with MSBuild.  With `MS Build Tools <https://go.microsoft.com/fwlink/?linkid=840931>`_
 and `CMake on Windows <https://cmake.org/download/>`_ installed, run the following
 in VS2017 x64 Native tools command prompt.
 
-.. code::
+- CPU only build
+  .. code::
 
-   MD build
-   CD build
-   cmake -DCMAKE_CXX_FLAGS="/DDGL_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release" .. -G "Visual Studio 15 2017 Win64"
-   msbuild dgl.sln
-   cd ..\python
-   python setup.py install
+     MD build
+     CD build
+     cmake -DCMAKE_CXX_FLAGS="/DDGL_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release" -DDMLC_FORCE_SHARED_CRT=ON .. -G "Visual Studio 16 2019"
+     msbuild dgl.sln /m
+     COPY Release\dgl.dll .
+     CD ..\python
+     python setup.py install
+- CUDA build
+  .. code::
+
+     MD build
+     CD build
+     cmake -DCMAKE_CXX_FLAGS="/DDGL_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release" -DDMLC_FORCE_SHARED_CRT=ON -DUSE_CUDA=ON .. -G "Visual Studio 16 2019"
+     msbuild dgl.sln /m
+     COPY Release\dgl.dll .
+     CD ..\python
+     python setup.py install
+
+Optional Flags
+``````````````
+
+- If you are using PyTorch, you need to add ``-DBUILD_TORCH=ON`` flag in CMake
+  to build PyTorch plugins for further performance optimization.  This applies for Linux,
+  Windows, and Mac.
+
+  - On Windows, you need to additionally copy the PyTorch plugins from Release directory
+    to its parent directory before running ``python setup.py install``:
+
+    .. code::
+
+       COPY tensoradapter\pytorch\Release\*.dll tensoradapter\pytorch

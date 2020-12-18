@@ -71,5 +71,5 @@ TensorDispatcher::~TensorDispatcher() {
 #endif  // WIN32
 }
 
-};  // namespace aten
+};  // namespace runtime
 };  // namespace dgl

@@ -201,8 +201,6 @@ NDArray NDArray::EmptyShared(const std::string &name,
 NDArray NDArray::Empty(std::vector<int64_t> shape,
                        DLDataType dtype,
                        DLContext ctx) {
-  // TODO: temporarily dropping in.  Later on we should remove this
-  // to support MXNet or Tensorflow.
   TensorDispatcher* td = TensorDispatcher::Global();
   if (td->IsAvailable())
     return td->Empty(shape, dtype, ctx);

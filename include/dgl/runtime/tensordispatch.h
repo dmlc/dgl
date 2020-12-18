@@ -29,8 +29,8 @@
  *  implementation in dgl::aten namespace.
  */
 
-#ifndef DGL_ATEN_TENSORDISPATCH_H_
-#define DGL_ATEN_TENSORDISPATCH_H_
+#ifndef DGL_RUNTIME_TENSORDISPATCH_H_
+#define DGL_RUNTIME_TENSORDISPATCH_H_
 
 #include <dlpack/dlpack.h>
 #include <tensoradapter.h>
@@ -59,7 +59,11 @@ class TensorDispatcher {
     return available_;
   }
 
-  /*! \brief Allocate an empty tensor */
+  /*!
+   * \brief Allocate an empty tensor.
+   *
+   * Used in NDArray::Empty().
+   */
   inline NDArray Empty(std::vector<int64_t> shape, DLDataType dtype, DLContext ctx) const {
     auto entry = entrypoints_[Op::kEmpty];
     auto result = TA_DISPATCH(tensoradapter::TAempty, entry, shape, dtype, ctx);

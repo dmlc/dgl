@@ -1,3 +1,9 @@
+/*!
+ *  Copyright (c) 2017 by Contributors
+ * \file dgl/runtime/env.h
+ * \brief Structure for holding DGL global environment variables
+ */
+
 #ifndef DGL_RUNTIME_ENV_H_
 #define DGL_RUNTIME_ENV_H_
 
