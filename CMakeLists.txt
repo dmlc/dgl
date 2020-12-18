@@ -188,8 +188,7 @@ target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 if(MSVC)
   add_custom_command(
     TARGET dgl POST_BUILD COMMAND
-    cmd.exe /c "COPY /Y Release\\dgl.dll ."
-    VERBATIM)
+    cmd.exe /c "COPY /Y Release\\dgl.dll .")
 endif(MSVC)
 
 # Installation rules

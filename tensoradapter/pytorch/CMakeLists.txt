@@ -41,9 +41,11 @@ function(add_pytorch_target CONDA_ENV)
   set_property(TARGET ${TORCH_TARGET_NAME} PROPERTY CXX_STANDARD 14)
   message(STATUS "Configured target ${TORCH_TARGET_NAME}")
 
-  add_custom_command(
-    TARGET ${TORCH_TARGET_NAME} POST_BUILD COMMAND
-    cmd.exe /c "COPY /Y Release\\${TORCH_TARGET_NAME}.dll .")
+  if(MSVC)
+    add_custom_command(
+      TARGET ${TORCH_TARGET_NAME} POST_BUILD COMMAND
+      cmd.exe /c "COPY /Y Release\\${TORCH_TARGET_NAME}.dll .")
+  endif(MSVC)
 endfunction()
 
 if(TORCH_CONDA_ENVS)
