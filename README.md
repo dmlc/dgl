@@ -230,6 +230,20 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Graph Representation Forecasting of Patient's Medical Conditions: towards A Digital Twin**](https://arxiv.org/abs/2009.08299), *Pietro Barbiero, Ramon Viñas Torné, Pietro Lió*
 
+1. [**Relational Graph Learning on Visual and Kinematics Embeddings for Accurate Gesture Recognition in Robotic Surgery**](https://arxiv.org/abs/2011.01619), *Yong-Hao Long, Jie-Ying Wu, Bo Lu, Yue-Ming Jin, Mathias Unberath, Yun-Hui Liu, Pheng-Ann Heng and Qi Dou*
+
+1. [**Dark Reciprocal-Rank: Boosting Graph-Convolutional Self-Localization Network via Teacher-to-student Knowledge Transfer**](https://arxiv.org/abs/2011.00402), *Takeda Koji, Tanaka Kanji*
+
+1. [**Graph InfoClust: Leveraging Cluster-Level Node Information For Unsupervised Graph Representation Learning**](https://arxiv.org/abs/2009.06946), *Costas Mavromatis, George Karypis*
+
+1. [**GraphSeam: Supervised Graph Learning Framework for Semantic UV Mapping**](https://arxiv.org/abs/2011.13748), *Fatemeh Teimury, Bruno Roy, Juan Sebastian Casallas, David macdonald, Mark Coates*
+
+1. [**Comprehensive Study on Molecular Supervised Learning with Graph Neural Networks**](https://pubs.acs.org/doi/10.1021/acs.jcim.0c00416), *Doyeong Hwang, Soojung Yang, Yongchan Kwon, Kyung Hoon Lee, Grace Lee, Hanseok Jo, Seyeol Yoon, and Seongok Ryu*
+
+1. [**A graph auto-encoder model for miRNA-disease associations prediction**](https://academic.oup.com/bib/advance-article-abstract/doi/10.1093/bib/bbaa240/5929824?redirectedFrom=fulltext), *Zhengwei Li, Jiashu Li, Ru Nie, Zhu-Hong You, Wenzheng Bao*
+
+1. [**Graph convolutional regression of cardiac depolarization from sparse endocardial maps**](https://arxiv.org/abs/2009.14068), *Felix Meister, Tiziano Passerini, Chloé Audigier, Èric Lluch, Viorel Mihalef, Hiroshi Ashikaga, Andreas Maier, Henry Halperin, Tommaso Mansi*
+
 </details>
 
 ## Installation
