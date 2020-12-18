@@ -7,7 +7,12 @@ if [ $# -ne 1 ]; then
     exit -1
 fi
 
-CMAKE_VARS="-DBUILD_CPP_TEST=ON -DUSE_OPENMP=ON -DBUILD_TORCH=ON -DTORCH_CONDA_ENVS=pytorch-ci"
+# This is a semicolon-separated list of conda environments containing PyTorch.
+# The value here is for CI.  Replace it with your own environment or uncomment
+# this whole statement for default.
+TORCH_CONDA_ENVS=pytorch-ci
+
+CMAKE_VARS="-DBUILD_CPP_TEST=ON -DUSE_OPENMP=ON -DBUILD_TORCH=ON -DTORCH_CONDA_ENVS=$TORCH_CONDA_ENVS"
 
 if [ "$1" == "gpu" ]; then
     CMAKE_VARS="-DUSE_CUDA=ON $CMAKE_VARS"
