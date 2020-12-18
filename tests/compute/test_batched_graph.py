@@ -206,6 +206,49 @@ def test_batch_no_edge(idtype):
     g3.add_nodes(1)  # no edges
     g = dgl.batch([g1, g3, g2]) # should not throw an error
 
+@parametrize_dtype
+def test_sub_batch_graph(idtype):
+    ctx = F.ctx()
+    g1 = dgl.rand_graph(15, 30).astype(idtype).to(ctx)
+    g2 = dgl.rand_graph(14, 31).astype(idtype).to(ctx)
+    g3 = dgl.rand_graph(13, 32).astype(idtype).to(ctx)
+    g4 = dgl.rand_graph(10, 32).astype(idtype).to(ctx)
+    bg = dgl.batch([g1, g2, g3, g4])
+
+    # test node subgraph
+    indices1 = F.tensor([3, 4, 5, 6, 7], dtype=idtype)
+    indices2 = F.tensor([2, 4, 6, 8], dtype=idtype)
+    indices3 = F.tensor([0, 3, 6, 9], dtype=idtype)
+    indices4 = F.tensor([0, 4, 8], dtype=idtype)
+    indices = F.cat([indices1, indices2 + 15, indices3 + 29, indices4 + 42], 0)
+    subg1 = g1.subgraph(indices1)
+    subg2 = g2.subgraph(indices2)
+    subg3 = g3.subgraph(indices3)
+    subg4 = g4.subgraph(indices4)
+    subg = bg.subgraph(indices)
+    batch_num_nodes = F.cat([_g.batch_num_nodes() for _g in [subg1, subg2, subg3, subg4]], 0)
+    batch_num_edges = F.cat([_g.batch_num_edges() for _g in [subg1, subg2, subg3, subg4]], 0)
+    assert F.allclose(batch_num_nodes, subg.batch_num_nodes())
+    assert F.allclose(batch_num_edges, subg.batch_num_edges())
+
+    # test edge subgraph
+    """
+    indices1 = F.arange(10, 20, idtype)
+    indices2 = F.arange(10, 20, idtype)
+    indices3 = F.arange(10, 20, idtype)
+    indices4 = F.arange(10, 20, idtype)
+    indices = F.cat([indices1, indices2 + 30, indices3 + , indices4 + 42], 0)
+    subg1 = g1.subgraph(indices1)
+    subg2 = g2.subgraph(indices2)
+    subg3 = g3.subgraph(indices3)
+    subg4 = g4.subgraph(indices4)
+    subg = bg.subgraph(indices)
+    batch_num_nodes = F.cat([_g.batch_num_nodes() for _g in [subg1, subg2, subg3, subg4]], 0)
+    batch_num_edges = F.cat([_g.batch_num_edges() for _g in [subg1, subg2, subg3, subg4]], 0)
+    assert F.allclose(batch_num_nodes, subg.batch_num_nodes())
+    assert F.allclose(batch_num_edges, subg.batch_num_edges())
+    """
+
 if __name__ == '__main__':
     test_batch_unbatch()
     test_batch_unbatch1()
