@@ -10,7 +10,6 @@ def collate_fn(batch):
     transform ndata to tensor (in gpu is available)
     """
     graphs, labels = map(list, zip(*batch))
-    #cuda = torch.cuda.is_available()
 
     # batch graphs and cast to PyTorch tensor
     for graph in graphs:

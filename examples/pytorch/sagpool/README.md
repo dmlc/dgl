@@ -48,6 +48,13 @@ Mutagenicity
 
 How to run example files
 --------------------------------
+The valid dataset names (you can find a full list [here](https://chrsmrrs.github.io/datasets/docs/datasets/)):
+- 'DD' for D&D
+- 'PROTEINS' for PROTEINS
+- 'NCI1' for NCI1
+- 'NCI109' for NCI109
+- 'Mutagenicity' for Mutagenicity
+
 In the sagpool folder, run
 
 ```bash
