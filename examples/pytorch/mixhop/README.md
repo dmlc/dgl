@@ -87,6 +87,6 @@ python main.py --gpu 0 --dataset Pubmed --lr 0.5 --input-dropout 0.7 --lamb 5e-3
 
 | Dataset | Cora | Pubmed | Citeseer |
 | :-: | :-: | :-: | :-: |
-| Accuracy(original paper) | 0.818 | 0.800 | 0.714 |
-| Accuracy(TF) | 0.610(0.156) | 0.746(0.065) | 0.700(0.017) |
+| Accuracy(MixHop: default architecture in Table 1) | 0.818 | 0.800 | 0.714 |
+| Accuracy(official code) | 0.610(0.156) | 0.746(0.065) | 0.700(0.017) |
 | Accuracy(DGL) | 0.801(0.005) | 0.780(0.005) | 0.692(0.005) |

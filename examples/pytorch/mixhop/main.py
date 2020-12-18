@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding:utf-8 -*-
 """ The main file to train a MixHop model using a full graph """
 
 import argparse
