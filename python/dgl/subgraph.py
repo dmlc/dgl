@@ -113,7 +113,7 @@ def node_subgraph(graph, nodes):
     Graph(num_nodes={'user': 2, 'game': 0},
           num_edges={('user', 'plays', 'game'): 0, ('user', 'follows', 'user'): 2},
           metagraph=[('user', 'game'), ('user', 'user')])
-    
+
     Notes
     -----
     This function preserves the batch information of the original graph, this is
@@ -142,13 +142,15 @@ def node_subgraph(graph, nodes):
         induced_nodes.append(_process_nodes(ntype, nids))
     sgi = graph._graph.node_subgraph(induced_nodes)
     induced_edges = sgi.induced_edges
-    sg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges)
+    subg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges)
     if graph.batch_size > 1:
-        sg.set_batch_num_nodes(
+        subg.set_batch_num_nodes(
             _get_subgraph_batch_info(graph.ntypes, induced_nodes, graph.batch_num_nodes()))
-        sg.set_batch_num_edges(
-            _get_subgraph_batch_info(graph.canonical_etypes, induced_edges, graph.batch_num_edges()))
-    return sg
+        subg.set_batch_num_edges(
+            _get_subgraph_batch_info(graph.canonical_etypes,
+                                     induced_edges,
+                                     graph.batch_num_edges()))
+    return subg
 
 DGLHeteroGraph.subgraph = utils.alias_func(node_subgraph)
 
@@ -294,13 +296,15 @@ def edge_subgraph(graph, edges, preserve_nodes=False):
         induced_edges.append(_process_edges(cetype, eids))
     sgi = graph._graph.edge_subgraph(induced_edges, preserve_nodes)
     induced_nodes = sgi.induced_nodes
-    sg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges)
+    subg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges)
     if graph.batch_size > 1:
-        sg.set_batch_num_nodes(
+        subg.set_batch_num_nodes(
             _get_subgraph_batch_info(graph.ntypes, induced_nodes, graph.batch_num_nodes()))
-        sg.set_batch_num_edges(
-            _get_subgraph_batch_info(graph.canonical_etypes, induced_edges, graph.batch_num_edges()))
-    return sg
+        subg.set_batch_num_edges(
+            _get_subgraph_batch_info(graph.canonical_etypes,    
+                                     induced_edges,
+                                     graph.batch_num_edges()))
+    return subg
 
 DGLHeteroGraph.edge_subgraph = utils.alias_func(edge_subgraph)
 
@@ -691,14 +695,14 @@ def _get_subgraph_batch_info(keys, induced_indices_arr, batch_num_objs):
         The node/edge type keys.
     induced_indices_arr : List[Tensor]
         The induced node/edge index tensor for all node/edge types.
-    batch_num_objs : Tensor 
+    batch_num_objs : Tensor
         Number of nodes/edges for each graph in the original batch.
 
     Returns
     -------
     Mapping[str, Tensor]
         A dictionary mapping all node/edge type keys to the ``batch_num_objs``
-        array of corresponding graph. 
+        array of corresponding graph.
     """
     bucket_offset = F.unsqueeze(F.cumsum(batch_num_objs, 0), -1)  # (num_bkts, 1)
     ret = {}
