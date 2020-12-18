@@ -46,7 +46,7 @@ function(add_pytorch_target CONDA_ENV)
     cmd.exe /c "COPY /Y Release\\${TORCH_TARGET_NAME}.dll .")
 endfunction()
 
-if(CONDA_ENVS)
+if(TORCH_CONDA_ENVS)
   foreach(CONDA_ENV ${CONDA_ENVS})
     add_pytorch_target(${CONDA_ENV})
   endforeach(CONDA_ENV)
