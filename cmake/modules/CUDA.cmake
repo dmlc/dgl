@@ -246,7 +246,7 @@ macro(dgl_config_cuda out_variable)
   # 0. Add host flags
   message(STATUS "${CMAKE_CXX_FLAGS}")
   string(REGEX REPLACE "[ \t\n\r]" "," CXX_HOST_FLAGS "${CMAKE_CXX_FLAGS}")
-  if(NOT USE_MSVC_MT)
+  if(MSVC AND NOT USE_MSVC_MT)
     string(CONCAT CXX_HOST_FLAGS ${CXX_HOST_FLAGS} ",/MD")
   endif()
   list(APPEND CUDA_NVCC_FLAGS "-Xcompiler ,${CXX_HOST_FLAGS}")
