@@ -1,24 +1,17 @@
 cmake_minimum_required(VERSION 3.5)
 project(tensoradapter_pytorch C CXX)
 
-function(add_pytorch_target CONDA_ENV)
-  # Find PyTorch cmake files and PyTorch versions within CONDA_ENV (or the current environment
-  # if CONDA_ENV is empty).
-  if(NOT MSVC)
-    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/find_cmake_ver.sh FIND_CMAKE_VER_SH)
-    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/find_cmake.py FIND_CMAKE_PY)
-    execute_process(
-      COMMAND bash ${FIND_CMAKE_VER_SH} ${FIND_CMAKE_PY} ${CONDA_ENV}
-      OUTPUT_VARIABLE TORCH_PREFIX_VER
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-  else()
-    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/find_cmake_ver.bat FIND_CMAKE_VER_SH)
-    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/find_cmake.py FIND_CMAKE_PY)
-    execute_process(
-      COMMAND "${FIND_CMAKE_VER_SH}" ${FIND_CMAKE_PY} ${CONDA_ENV}
-      OUTPUT_VARIABLE TORCH_PREFIX_VER
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
+function(add_pytorch_target PYTHON_INTERP)
+  # Find PyTorch cmake files and PyTorch versions with the python interpreter $PYTHON_INTERP
+  # (or "python" if empty)
+  file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/find_cmake.py FIND_CMAKE_PY)
+  if(NOT PYTHON_INTERP)
+    set(PYTHON_INTERP python)
   endif()
+  execute_process(
+    COMMAND ${PYTHON_INTERP} ${FIND_CMAKE_PY}
+    OUTPUT_VARIABLE TORCH_PREFIX_VER
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
   list(GET TORCH_PREFIX_VER 0 TORCH_PREFIX)
   list(GET TORCH_PREFIX_VER 1 TORCH_VER)
   if(CONDA_ENV)
@@ -48,10 +41,10 @@ function(add_pytorch_target CONDA_ENV)
   endif(MSVC)
 endfunction()
 
-if(TORCH_CONDA_ENVS)
-  foreach(CONDA_ENV ${TORCH_CONDA_ENVS})
-    add_pytorch_target(${CONDA_ENV})
-  endforeach(CONDA_ENV)
+if(TORCH_PYTHON_INTERP)
+  foreach(PYTHON_INTERP ${TORCH_CONDA_ENVS})
+    add_pytorch_target(${PYTHON_INTERP})
+  endforeach(PYTHON_INTERP)
 else()
   add_pytorch_target("")
 endif()
