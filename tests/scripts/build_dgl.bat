@@ -15,9 +15,9 @@ PUSHD build
 CALL "C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
 cmake -DCMAKE_CXX_FLAGS="/DDGL_EXPORTS" -DUSE_OPENMP=ON -DBUILD_TORCH=ON -Dgtest_force_shared_crt=ON -DDMLC_FORCE_SHARED_CRT=ON -DBUILD_CPP_TEST=1 -DCMAKE_CONFIGURATION_TYPES="Release" .. -G "Visual Studio 17 2019" || EXIT /B 1
 msbuild dgl.sln /m /nr:false || EXIT /B 1
-COPY Release\dgl.dll .
-COPY Release\runUnitTests.exe .
-COPY tensoradapter\pytorch\Release\tensoradapter_pytorch*.dll tensoradapter\pytorch
+COPY /Y Release\dgl.dll .
+COPY /Y Release\runUnitTests.exe .
+COPY /Y tensoradapter\pytorch\Release\tensoradapter_pytorch*.dll tensoradapter\pytorch
 POPD
 
 PUSHD python
