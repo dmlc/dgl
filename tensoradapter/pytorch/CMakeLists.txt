@@ -8,6 +8,7 @@ function(add_pytorch_target PYTHON_INTERP)
   if(NOT PYTHON_INTERP)
     set(PYTHON_INTERP python)
   endif()
+  message(STATUS "Using Python interpreter: ${PYTHON_INTERP}")
   execute_process(
     COMMAND ${PYTHON_INTERP} ${FIND_CMAKE_PY}
     OUTPUT_VARIABLE TORCH_PREFIX_VER
