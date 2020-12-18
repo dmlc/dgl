@@ -301,7 +301,7 @@ def edge_subgraph(graph, edges, preserve_nodes=False):
         subg.set_batch_num_nodes(
             _get_subgraph_batch_info(graph.ntypes, induced_nodes, graph.batch_num_nodes()))
         subg.set_batch_num_edges(
-            _get_subgraph_batch_info(graph.canonical_etypes,    
+            _get_subgraph_batch_info(graph.canonical_etypes,
                                      induced_edges,
                                      graph.batch_num_edges()))
     return subg
