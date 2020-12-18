@@ -27,11 +27,6 @@ The DGL's built-in Cora, Pubmed and Citeseer datasets. Dataset summary:
 
 ### Usage
 
-###### Seed options
-```
---seed             int     Random seed.                        Default is -1.
-```
-
 ###### Dataset options
 ```
 --dataset          str     The graph dataset name.             Default is 'Cora'.
@@ -79,13 +74,13 @@ python main.py --num-layers 6 --p 2 4 6
 Train a model which follows the original hyperparameters on different datasets.
 ```bash
 # Cora:
-python main.py --gpu 0 --dataset Cora --lr 1 --input-dropout 0.6 --lamb 5e-3 --hid-dim 100 --num-layers 3 --seed 9
+python main.py --gpu 0 --dataset Cora --lr 1 --input-dropout 0.6 --lamb 5e-3 --hid-dim 100 --num-layers 3
 
 # Citeseer:
-python main.py --gpu 0 --dataset Citeseer --lr 0.25 --input-dropout 0.5 --lamb 5e-3 --hid-dim 60 --num-layers 3 --seed 6
+python main.py --gpu 0 --dataset Citeseer --lr 0.25 --input-dropout 0.5 --lamb 5e-3 --hid-dim 60 --num-layers 3
 
 # Pubmed:
-python main.py --gpu 0 --dataset Pubmed --lr 0.5 --input-dropout 0.7 --lamb 5e-3 --hid-dim 60 --num-layers 3 --seed 6
+python main.py --gpu 0 --dataset Pubmed --lr 0.5 --input-dropout 0.7 --lamb 5e-3 --hid-dim 60 --num-layers 3
 ```
 
 ### Performance

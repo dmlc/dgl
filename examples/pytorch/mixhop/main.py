@@ -155,18 +155,7 @@ class MixHop(nn.Module):
 
         return feats
 
-def setup_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-
 def main(args):
-    # Step 0: set random seed
-    if args.seed >= 0:
-        setup_seed(args.seed)
-
     # Step 1: Prepare graph data and retrieve train/validation/test index ============================= #
     # Load from DGL dataset
     if args.dataset == 'Cora':
@@ -281,8 +270,6 @@ if __name__ == "__main__":
     """
     parser = argparse.ArgumentParser(description='MixHop GCN')
 
-    # random seed
-    parser.add_argument('--seed', type=int, default=-1, help='Random seed.')
     # data source params
     parser.add_argument('--dataset', type=str, default='Cora', help='Name of dataset.')
     # cuda params
