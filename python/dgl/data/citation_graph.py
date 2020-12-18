@@ -114,16 +114,16 @@ class CitationGraphDataset(DGLBuiltinDataset):
         idx_train = range(len(y))
         idx_val = range(len(y), len(y)+500)
 
-        train_mask = _sample_mask(idx_train, labels.shape[0])
-        val_mask = _sample_mask(idx_val, labels.shape[0])
-        test_mask = _sample_mask(idx_test, labels.shape[0])
+        train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
+        val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0]))
+        test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
 
         self._graph = graph
         g = from_networkx(graph)
 
-        g.ndata['train_mask'] = generate_mask_tensor(train_mask)
-        g.ndata['val_mask'] = generate_mask_tensor(val_mask)
-        g.ndata['test_mask'] = generate_mask_tensor(test_mask)
+        g.ndata['train_mask'] = train_mask
+        g.ndata['val_mask'] = val_mask
+        g.ndata['test_mask'] = test_mask
         g.ndata['label'] = F.tensor(labels)
         g.ndata['feat'] = F.tensor(_preprocess_features(features), dtype=F.data_type_dict['float32'])
         self._num_classes = onehot_labels.shape[1]
@@ -171,13 +171,15 @@ class CitationGraphDataset(DGLBuiltinDataset):
         graphs, _ = load_graphs(str(graph_path))
 
         info = load_info(str(info_path))
-        self._g = graphs[0]
+        graph = graphs[0]
+        self._g = graph
+        # for compatability
         graph = graph.clone()
-        graph.pop('train_mask')
-        graph.pop('val_mask')
-        graph.pop('test_mask')
-        graph.pop('feat')
-        graph.pop('label')
+        graph.ndata.pop('train_mask')
+        graph.ndata.pop('val_mask')
+        graph.ndata.pop('test_mask')
+        graph.ndata.pop('feat')
+        graph.ndata.pop('label')
         graph = to_networkx(graph)
         self._graph = nx.DiGraph(graph)
 
@@ -328,7 +330,7 @@ class CoraGraphDataset(CitationGraphDataset):
     - Number of Classes: 7
     - Label split:
 
-        - Train: 140 
+        - Train: 140
         - Valid: 500
         - Test: 1000
 
