@@ -152,10 +152,3 @@ Optional Flags
 - If you are using PyTorch, you need to add ``-DBUILD_TORCH=ON`` flag in CMake
   to build PyTorch plugins for further performance optimization.  This applies for Linux,
   Windows, and Mac.
-
-  - On Windows, you need to additionally copy the PyTorch plugins from Release directory
-    to its parent directory before running ``python setup.py install``:
-
-    .. code::
-
-       COPY tensoradapter\pytorch\Release\*.dll tensoradapter\pytorch
