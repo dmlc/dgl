@@ -64,11 +64,13 @@ TensorDispatcher::TensorDispatcher() {
 }
 
 TensorDispatcher::~TensorDispatcher() {
+  if (handle_) {
 #if defined(WIN32) || defined(_WIN32)
-  FreeLibrary(handle_);
+    FreeLibrary(handle_);
 #else   // !WIN32
-  dlclose(handle_);
+    dlclose(handle_);
 #endif  // WIN32
+  }
 }
 
 };  // namespace runtime
