@@ -1,6 +1,6 @@
 .. _guide-minibatch-inference:
 
-6.6 Exact Offline Inference on Large Graphs
+6.6 超大图上的精准离线推断
 ------------------------------------------------------
 
 :ref:`(English Version) <guide-minibatch-inference>`

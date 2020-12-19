@@ -1,6 +1,6 @@
 .. _guide_cn-minibatch-edge-classification-sampler:
 
-6.2 Training GNN for Edge Classification with Neighborhood Sampling
+6.2 针对边分类使用邻居采样方法训练GNN的模型
 ----------------------------------------------------------------------
 
 :ref:`(English Version) <guide-minibatch-edge-classification-sampler>`

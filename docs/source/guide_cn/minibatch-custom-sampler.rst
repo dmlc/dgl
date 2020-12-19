@@ -1,9 +1,9 @@
 .. _guide_cn-minibatch-customizing-neighborhood-sampler:
 
-6.4 Customizing Neighborhood Sampler
+6.4 定制用户自己的邻居采样方法
 ----------------------------------------------
 
-:ref:`(English Version) <guide-minibatch-edge-classification-sampler>`
+:ref:`(English Version) <guide-minibatch-customizing-neighborhood-sampler>`
 
 Although DGL provides some neighborhood sampling strategies, sometimes
 users would want to write their own sampling strategy. This section

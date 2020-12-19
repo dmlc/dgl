@@ -1,6 +1,6 @@
 .. _guide_cn-minibatch-link-classification-sampler:
 
-6.3 Training GNN for Link Prediction with Neighborhood Sampling
+6.3 针对边预测使用邻居采样方法训练GNN的模型
 --------------------------------------------------------------------
 
 :ref:`(English Version) <guide-minibatch-link-classification-sampler>`
