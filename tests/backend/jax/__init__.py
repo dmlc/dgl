@@ -4,7 +4,10 @@ import jax
 from jax import numpy as jnp
 
 def cuda():
-    return jax.devices("gpu")[0]
+    try:
+        return jax.devices("gpu")[0]
+    except:
+        return None
 
 def is_cuda_available():
     from jax.lib import xla_bridge

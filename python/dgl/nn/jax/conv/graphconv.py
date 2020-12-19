@@ -3,13 +3,12 @@
 
 import jax
 from jax import numpy as jnp
-from flax import nn
+from flax import linen as nn
 
 from .... import function as fn
 from ....base import DGLError
 from ....utils import expand_as_pair
 
-# pylint: disable=W0235
 class GraphConv(nn.Module):
     r"""
 
@@ -79,12 +78,13 @@ class GraphConv(nn.Module):
     --------
     >>> import dgl
     >>> import numpy as np
+    >>> import torch as th
     >>> from dgl.nn import GraphConv
 
     >>> # Case 1: Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> g = dgl.add_self_loop(g)
-    >>> feat = jnp.ones(6, 10)
+    >>> feat = th.ones(6, 10)
     >>> conv = GraphConv(10, 2, norm='both', weight=True, bias=True)
     >>> res = conv(g, feat)
     >>> print(res)
@@ -110,9 +110,8 @@ class GraphConv(nn.Module):
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
     >>> g = dgl.bipartite((u, v))
-    >>> key = jax.random.PRNGKey(2666)
-    >>> u_fea = jax.random.normal(key=key, shape=(2, 5))
-    >>> v_fea = jax.random.normal(key=key, shape=(4, 5))
+    >>> u_fea = th.rand(2, 5)
+    >>> v_fea = th.rand(4, 5)
     >>> conv = GraphConv(5, 2, norm='both', weight=True, bias=True)
     >>> res = conv(g, (u_fea, v_fea))
     >>> res
@@ -122,10 +121,48 @@ class GraphConv(nn.Module):
             [-0.2994,  0.6106]], grad_fn=<AddBackward0>)
     """
 
-    def apply(
-            self,
-            graph, feat, in_feats, out_feats, norm="both",
-        ):
+    in_feats: int
+    out_feats: int
+    norm: str = "both"
+    allow_zero_in_degree: bool = False
+    weight: bool = True
+    bias: bool = True
+    activation = None
+
+    def setup(self):
+        if self.weight:
+            self._weight = self.param(
+                "_weight",
+                nn.initializers.xavier_uniform(),
+                (self.in_feats, self.out_feats,)
+            )
+        else:
+            self._weight = None
+
+        if self.bias:
+            self._bias = self.param(
+                "_bias",
+                nn.initializers.zeros,
+                (self.out_feats, ),
+            )
+        else:
+            self._bias = None
+
+    def set_allow_zero_in_degree(self, set_value):
+        r"""
+
+        Description
+        -----------
+        Set allow_zero_in_degree flag.
+
+        Parameters
+        ----------
+        set_value : bool
+            The value to be set to the flag.
+        """
+        self.allow_zero_in_degree = set_value
+
+    def __call__(self, graph, feat, weight=None):
         r"""
 
         Description
@@ -172,24 +209,42 @@ class GraphConv(nn.Module):
         * Weight shape: :math:`(\text{in_feats}, \text{out_feats})`.
         """
         with graph.local_scope():
+            if not self.allow_zero_in_degree:
+                if (graph.in_degrees() == 0).any():
+                    raise DGLError('There are 0-in-degree nodes in the graph, '
+                                   'output for those nodes will be invalid. '
+                                   'This is harmful for some applications, '
+                                   'causing silent performance regression. '
+                                   'Adding self-loop on the input graph by '
+                                   'calling `g = dgl.add_self_loop(g)` will resolve '
+                                   'the issue. Setting ``allow_zero_in_degree`` '
+                                   'to be `True` when constructing this module will '
+                                   'suppress the check and let the code run.')
 
             # (BarclayII) For RGCN on heterogeneous graphs we need to support GCN on bipartite.
             feat_src, feat_dst = expand_as_pair(feat, graph)
-            if norm == 'both':
+            if self.norm == 'both':
                 degs = jnp.clip(
-                    graph.out_degrees().astype(jnp.float32),
+                    graph.out_degrees() * 1.0,
                     a_min=1.0,
                 )
-
-                norm = jnp.power(degs, -0.5)
+                norm = degs ** -0.5
                 shp = norm.shape + (1,) * (feat_src.ndim - 1)
                 norm = jnp.reshape(norm, shp)
                 feat_src = feat_src * norm
 
-            if in_feats > out_feats:
-                # mult W first to reduce the feature size for aggregation.
+            if weight is not None:
+                if self._weight is not None:
+                    raise DGLError('External weight is provided while at the same time the'
+                                   ' module has defined its own weight parameter. Please'
+                                   ' create the module with flag weight=False.')
+            else:
+                weight = self._weight
 
-                feat_src = nn.Dense(feat_src, out_feats)
+            if self.in_feats > self.out_feats:
+                # mult W first to reduce the feature size for aggregation.
+                if weight is not None:
+                    feat_src = feat_src @ weight
                 graph.srcdata['h'] = feat_src
                 graph.update_all(fn.copy_src(src='h', out='m'),
                                  fn.sum(msg='m', out='h'))
@@ -200,19 +255,36 @@ class GraphConv(nn.Module):
                 graph.update_all(fn.copy_src(src='h', out='m'),
                                  fn.sum(msg='m', out='h'))
                 rst = graph.dstdata['h']
-                rst = nn.Dense(rst, out_feats)
+                if weight is not None:
+                    rst = rst @ weight
 
-            if norm != 'none':
+            if self.norm != 'none':
                 degs = jnp.clip(
-                    graph.out_degrees().astype(jnp.float32),
+                    graph.out_degrees() * 1.0,
                     a_min=1.0,
                 )
-                if norm == 'both':
-                    norm = jnp.power(degs, -0.5)
+                if self.norm == 'both':
+                    norm = degs ** -0.5
                 else:
                     norm = 1.0 / degs
                 shp = norm.shape + (1,) * (feat_dst.ndim - 1)
                 norm = jnp.reshape(norm, shp)
                 rst = rst * norm
 
+            if self._bias is not None:
+                rst = rst + self._bias
+
+            if self.activation is not None:
+                rst = self._activation(rst)
+
             return rst
+
+    def extra_repr(self):
+        """Set the extra representation of the module,
+        which will come into effect when printing the model.
+        """
+        summary = 'in={_in_feats}, out={_out_feats}'
+        summary += ', normalization={_norm}'
+        if '_activation' in self.__dict__:
+            summary += ', activation={_activation}'
+        return summary.format(**self.__dict__)

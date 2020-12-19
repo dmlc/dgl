@@ -112,7 +112,7 @@ class SparseMatrix2D(SparseMatrix):
 
         return jax.ops.segment_sum(prod, rows, num_segments)
 
-    @jax.jit
+    @partial(jax.jit, static_argnums=(0, ))
     def __matmul__(self, x):
         if not self.ndim == 2:
             raise NotImplementedError
@@ -135,10 +135,10 @@ class SparseMatrix2D(SparseMatrix):
             return self.to_dense() == x.to_dense()
 
 def _flatten_SparseMatrix2D(x):
-    return x.index, x.data, x.shape
+    return ((x.index, x.data, x.shape), None)
 
-def _unflatten_SparseMatrix2D(index, data, shape):
-    return SparseMatrix2D(index=index, data=data, shape=shape)
+def _unflatten_SparseMatrix2D(aux_data, children):
+    return SparseMatrix2D(*children)
 
 jax.tree_util.register_pytree_node(
     SparseMatrix2D,
@@ -337,7 +337,6 @@ def ones(shape, dtype, ctx):
     # TODO: no device here
     return jnp.ones(shape, dtype=dtype,) + 0 # eval lazy
 
-@jax.jit
 def uniform(shape, dtype, *, low, high):
     key = jax.random.PRNGKey(2666)
     return jax.random.uniform(
@@ -348,7 +347,6 @@ def uniform(shape, dtype, *, low, high):
         dtype=dtype,
     )
 
-@jax.jit
 def randint(shape, dtype, *, low, high):
     key = jax.random.PRNGKey(2666)
     return jax.random.randint(
