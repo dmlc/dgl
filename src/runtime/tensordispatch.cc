@@ -29,33 +29,15 @@ TensorDispatcher::TensorDispatcher() {
 #if defined(WIN32) || defined(_WIN32)
   handle_ = LoadLibrary(path.c_str());
 
-  if (!handle_) {
-    // TODO(BarclayII): maybe wrap this up as a function?
-    char message[256];
-    int err = GetLastError();
-    memset(message, 0, sizeof(message));
-    FormatMessage(
-        FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-        nullptr,
-        err,
-        MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
-        message,
-        256,
-        nullptr);
-    LOG(INFO) << "No tensoradapter library found, falling back to DGL internal: "
-      << message << "(Error code: " << err << ")";
+  if (!handle_)
     return;
-  }
 
   for (int i = 0; i < num_entries_; ++i)
     entrypoints_[i] = reinterpret_cast<void*>(GetProcAddress(handle_, names_[i]));
 #else   // !WIN32
   handle_ = dlopen(path.c_str(), RTLD_LAZY);
-  if (!handle_) {
-    LOG(INFO) << "No tensoradapter library found, falling back to DGL internal: "
-      << dlerror();
+  if (!handle_)
     return;
-  }
   for (int i = 0; i < num_entries_; ++i)
     entrypoints_[i] = dlsym(handle_, names_[i]);
 #endif  // WIN32
