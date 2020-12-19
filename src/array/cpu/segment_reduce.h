@@ -12,6 +12,12 @@ namespace dgl {
 namespace aten {
 namespace cpu {
 
+/*!
+ * \brief CPU kernel of segment sum.
+ * \param feat The input tensor.
+ * \param offsets The offset tensor storing the ranges of segments.
+ * \param out The output tensor.
+ */
 template <typename IdType, typename DType>
 void SegmentSum(NDArray feat, NDArray offsets, NDArray out) {
   int n = out->shape[0];
@@ -31,6 +37,14 @@ void SegmentSum(NDArray feat, NDArray offsets, NDArray out) {
   }
 }
 
+/*!
+ * \brief CPU kernel of segment min/max.
+ * \param feat The input tensor.
+ * \param offsets The offset tensor storing the ranges of segments.
+ * \param out The output tensor.
+ * \param arg An auxiliary tensor storing the argmin/max information
+ *        used in backward phase.
+ */
 template <typename IdType, typename DType, typename Cmp>
 void SegmentCmp(NDArray feat, NDArray offsets,
                 NDArray out, NDArray arg) {
@@ -58,6 +72,12 @@ void SegmentCmp(NDArray feat, NDArray offsets,
   }
 }
 
+/*!
+ * \brief CPU kernel of backward phase of segment min/max.
+ * \param feat The input tensor.
+ * \param arg The argmin/argmax tensor.
+ * \param out The output tensor.
+ */
 template <typename IdType, typename DType>
 void BackwardSegmentCmp(NDArray feat, NDArray arg, NDArray out) {
   int n = feat->shape[0];

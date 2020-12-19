@@ -69,8 +69,6 @@ def segment_softmax(seglen, value):
         Segment lengths.
     value : Tensor
         Value to aggregate.
-    reducer : str, optional
-        Aggregation method. Can be 'sum', 'max', 'min', 'mean'.
 
     Returns
     -------

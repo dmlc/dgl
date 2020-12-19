@@ -24,6 +24,7 @@ endif()
 # Alernatively, use cmake -DOPTION=VALUE through command-line.
 dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
+dgl_option(USE_AVX "Build with AVX optimization" OFF)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
 dgl_option(USE_S3 "Build with S3 support" OFF)
@@ -85,7 +86,9 @@ else(MSVC)
   # We still use c++11 flag in CPU build because gcc5.4 (our default compiler) is
   # not fully compatible with c++14 feature.
   set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++11 ${CMAKE_CXX_FLAGS}")
-  set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--warn-common ${CMAKE_SHARED_LINKER_FLAGS}")
+  if(NOT APPLE)
+    set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--warn-common ${CMAKE_SHARED_LINKER_FLAGS}")
+  endif(NOT APPLE)
 endif(MSVC)
 
 if(USE_OPENMP)
@@ -95,6 +98,10 @@ if(USE_OPENMP)
     set(CMAKE_CXX_FLAGS "${OpenMP_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
   endif(OPENMP_FOUND)
 endif(USE_OPENMP)
+
+if(USE_AVX)
+  add_compile_definitions(USE_AVX)
+endif(USE_AVX)
 
 # To compile METIS correct for DGL.
 if(MSVC)
