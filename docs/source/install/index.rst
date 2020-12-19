@@ -132,7 +132,6 @@ in VS2019 x64 Native tools command prompt.
      CD build
      cmake -DCMAKE_CXX_FLAGS="/DDGL_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release" -DDMLC_FORCE_SHARED_CRT=ON .. -G "Visual Studio 16 2019"
      msbuild dgl.sln /m
-     COPY Release\dgl.dll .
      CD ..\python
      python setup.py install
 - CUDA build
@@ -142,7 +141,6 @@ in VS2019 x64 Native tools command prompt.
      CD build
      cmake -DCMAKE_CXX_FLAGS="/DDGL_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release" -DDMLC_FORCE_SHARED_CRT=ON -DUSE_CUDA=ON .. -G "Visual Studio 16 2019"
      msbuild dgl.sln /m
-     COPY Release\dgl.dll .
      CD ..\python
      python setup.py install
 
