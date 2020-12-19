@@ -1,4 +1,4 @@
-.. _guide-minibatch-inference:
+.. _guide_cn-minibatch-inference:
 
 6.6 超大图上的精准离线推断
 ------------------------------------------------------
