@@ -308,7 +308,7 @@ to see the complete code. The following code uses a subclass of ``KnowledgeGraph
     
     # get training mask
     train_mask = graph.edata['train_mask']
-    train_idx = torch.nonzero(train_mask).squeeze()
+    train_idx = torch.nonzero(train_mask, as_tuple=False).squeeze()
     src, dst = graph.edges(train_idx)
     # get edge types in training set
     rel = graph.edata['etype'][train_idx]
