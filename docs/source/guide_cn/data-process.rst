@@ -126,7 +126,7 @@ DGL建议使用节点掩码来指定数据集的划分。
 .. code::
 
     from dgl.data import DGLBuiltinDataset
-    from dgl.data.utils import _get_dgl_url, generate_mask_tensor
+    from dgl.data.utils import _get_dgl_url
     
     class CitationGraphDataset(DGLBuiltinDataset):
         _urls = {
@@ -154,9 +154,9 @@ DGL建议使用节点掩码来指定数据集的划分。
             g = dgl.graph(graph)
 
             # 划分掩码
-            g.ndata['train_mask'] = generate_mask_tensor(train_mask)
-            g.ndata['val_mask'] = generate_mask_tensor(val_mask)
-            g.ndata['test_mask'] = generate_mask_tensor(test_mask)
+            g.ndata['train_mask'] = train_mask
+            g.ndata['val_mask'] = val_mask
+            g.ndata['test_mask'] = test_mask
 
             # 节点的标签
             g.ndata['label'] = torch.tensor(labels)

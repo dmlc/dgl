@@ -13,7 +13,7 @@ from model import *
 import argparse
 
 torch.manual_seed(0)
-data_url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/ACM.mat'
+data_url = 'https://data.dgl.ai/dataset/ACM.mat'
 data_file_path = '/tmp/ACM.mat'
 
 urllib.request.urlretrieve(data_url, data_file_path)

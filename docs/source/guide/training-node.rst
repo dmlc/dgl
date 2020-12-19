@@ -3,6 +3,8 @@
 5.1 Node Classification/Regression
 --------------------------------------------------
 
+:ref:`(中文版) <guide_cn-training-node-classification>`
+
 One of the most popular and widely adopted tasks for graph neural
 networks is node classification, where each node in the
 training/validation/test set is assigned a ground truth category from a
