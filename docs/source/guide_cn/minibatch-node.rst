@@ -98,10 +98,7 @@ DGL提供了几个邻居采样类，这些类会生成需计算的节点在每�
 
 上面的DGL ``GraphConv`` 模块接受的一个参数是数据加载器生成的 ``块`` 中的一个元素。
 
-用户可以查阅 :ref:`The API reference of each NN module <apinn>` 来查看DGL的内置模型模块是否支持接受 ``块`` 作为参数。
-
-If you wish to use your own message passing module, please refer to
-:ref:`guide-minibatch-custom-gnn-module`.
+用户可以查阅 :ref:`NN模块的API参考 <apinn>` 来查看DGL的内置模型模块是否支持接受 ``块`` 作为参数。
 
 如果希望使用自定义的消息传递模块，用户可以参考
 :ref:`guide_cn-minibatch-custom-gnn-module`
@@ -145,19 +142,13 @@ If you wish to use your own message passing module, please refer to
         opt.step()
 
 DGL提供了一个端到端的随机批次训练示例
-`GraphSAGE的实现 <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/train_sampling.py>`__.
+`GraphSAGE的实现 <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/train_sampling.py>`__。
 
 
 异构图上模型的训练
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 在异构图上训练图神经网络进行节点分类的方法也是类似的。
-
-For instance, we have previously seen
-:ref:`how to train a 2-layer RGCN on full graph <guide-training-rgcn-node-classification>`.
-The code for RGCN implementation on minibatch training looks very
-similar to that (with self-loops, non-linearity and basis decomposition
-removed for simplicity):
 
 例如，在
 :ref:`guide_cn-training-rgcn-node-classification`
@@ -198,10 +189,6 @@ DGL提供的一些采样方法也支持异构图。例如，用户仍然可以�
         drop_last=False,
         num_workers=4)
 
-The training loop is almost the same as that of homogeneous graphs,
-except for the implementation of ``compute_loss`` that will take in two
-dictionaries of node types and predictions here.
-
 模型的训练与同构图几乎相同。不同之处在于， ``compute_loss`` 的实现将在此处包含两个字典：节点类型和预测结果。
 
 .. code:: python
@@ -219,9 +206,6 @@ dictionaries of node types and predictions here.
         opt.zero_grad()
         loss.backward()
         opt.step()
-
-DGL provides an end-to-end stochastic training example `RGCN
-implementation <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn-hetero/entity_classify_mb.py>`__.
 
 DGL提供了端到端随机批次训练的
 `RGCN的实现 <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn-hetero/entity_classify_mb.py>`__。

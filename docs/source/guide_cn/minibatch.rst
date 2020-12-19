@@ -35,11 +35,6 @@ DGL实现了一些邻居节点采样的方法和使用邻居节点采样训练�
 * :ref:`guide_cn-minibatch-edge-classification-sampler`
 * :ref:`guide_cn-minibatch-link-classification-sampler`
 
-The remaining sections cover more advanced topics, suitable for those who
-wish to develop new sampling algorithms, new GNN modules compatible with
-mini-batch training and understand how evaluation and inference can be
-conducted in mini-batches.
-
 本章余下的小节介绍了更多的高级主题，面向那些想要开发新的采样算法、
 想要实现与小批次训练兼容的图神经网络模块，以及想要了解如何在小批次数据上进行评估和推理模型的用户。
 
