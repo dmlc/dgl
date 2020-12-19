@@ -1,9 +1,9 @@
-.. _guide-minibatch-edge-classification-sampler:
+.. _guide_cn-minibatch-edge-classification-sampler:
 
 6.2 Training GNN for Edge Classification with Neighborhood Sampling
 ----------------------------------------------------------------------
 
-:ref:`(中文版) <guide_cn-minibatch-edge-classification-sampler>`
+:ref:`(English Version) <guide-minibatch-edge-classification-sampler>`
 
 Training for edge classification/regression is somewhat similar to that
 of node classification/regression with several notable differences.

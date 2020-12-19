@@ -1,9 +1,9 @@
-.. _guide-minibatch-link-classification-sampler:
+.. _guide_cn-minibatch-link-classification-sampler:
 
 6.3 Training GNN for Link Prediction with Neighborhood Sampling
 --------------------------------------------------------------------
 
-:ref:`(中文版) <guide_cn-minibatch-link-classification-sampler>`
+:ref:`(English Version) <guide-minibatch-link-classification-sampler>`
 
 Define a neighborhood sampler and data loader with negative sampling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

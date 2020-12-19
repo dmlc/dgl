@@ -3,7 +3,7 @@
 6.6 Exact Offline Inference on Large Graphs
 ------------------------------------------------------
 
-:ref:`(中文版) <guide_cn-minibatch-inference>`
+:ref:`(English Version) <guide-minibatch-inference>`
 
 Both subgraph sampling and neighborhood sampling are to reduce the
 memory and time consumption for training GNNs with GPUs. When performing
