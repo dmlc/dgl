@@ -3,9 +3,11 @@
 5.3 Link Prediction
 ---------------------------
 
+:ref:`(中文版) <guide_cn-training-link-prediction>`
+
 In some other settings you may want to predict whether an edge exists
-between two given nodes or not. Such model is called a *link prediction*
-model.
+between two given nodes or not. Such task is called a *link prediction*
+task.
 
 Overview
 ~~~~~~~~
@@ -48,9 +50,6 @@ feedback <https://arxiv.org/ftp/arxiv/papers/1205/1205.2618.pdf>`__ or
 estimation <http://proceedings.mlr.press/v9/gutmann10a/gutmann10a.pdf>`__
 is.
 
-Model Implementation Difference from Edge Classification
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The neural network model to compute the score between :math:`u` and
 :math:`v` is identical to the edge regression model described
 :ref:`above <guide-training-edge-classification>`.
@@ -86,8 +85,8 @@ distribution.
         src, dst = graph.edges()
     
         neg_src = src.repeat_interleave(k)
-        neg_dst = torch.randint(0, graph.number_of_nodes(), (len(src) * k,))
-        return dgl.graph((neg_src, neg_dst), num_nodes=graph.number_of_nodes())
+        neg_dst = torch.randint(0, graph.num_nodes(), (len(src) * k,))
+        return dgl.graph((neg_src, neg_dst), num_nodes=graph.num_nodes())
 
 The model that predicts edge scores is the same as that of edge
 classification/regression.
@@ -111,7 +110,7 @@ computes loss.
     def compute_loss(pos_score, neg_score):
         # Margin loss
         n_edges = pos_score.shape[0]
-        return (1 - neg_score.view(n_edges, -1) + pos_score.unsqueeze(1)).clamp(min=0).mean()
+        return (1 - pos_score.unsqueeze(1) + neg_score.view(n_edges, -1)).clamp(min=0).mean()
     
     node_features = graph.ndata['feat']
     n_features = node_features.shape[1]
@@ -169,10 +168,10 @@ edge type you are performing link prediction on as well.
         utype, _, vtype = etype
         src, dst = graph.edges(etype=etype)
         neg_src = src.repeat_interleave(k)
-        neg_dst = torch.randint(0, graph.number_of_nodes(vtype), (len(src) * k,))
+        neg_dst = torch.randint(0, graph.num_nodes(vtype), (len(src) * k,))
         return dgl.heterograph(
             {etype: (neg_src, neg_dst)},
-            num_nodes_dict={ntype: graph.number_of_nodes(ntype) for ntype in graph.ntypes})
+            num_nodes_dict={ntype: graph.num_nodes(ntype) for ntype in graph.ntypes})
 
 The model is a bit different from that in edge classification on
 heterogeneous graphs since you need to specify edge type where you
@@ -196,7 +195,7 @@ The training loop is similar to that of homogeneous graphs.
     def compute_loss(pos_score, neg_score):
         # Margin loss
         n_edges = pos_score.shape[0]
-        return (1 - neg_score.view(n_edges, -1) + pos_score.unsqueeze(1)).clamp(min=0).mean()
+        return (1 - pos_score.unsqueeze(1) + neg_score.view(n_edges, -1)).clamp(min=0).mean()
     
     k = 5
     model = Model(10, 20, 5, hetero_graph.etypes)
