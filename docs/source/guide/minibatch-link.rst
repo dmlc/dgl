@@ -259,6 +259,7 @@ Then you can give the dataloader a dictionary of edge types and edge IDs as well
 sampler.  For instance, the following iterates over all edges of the heterogeneous graph.
 
 .. code:: python
+
     train_eid_dict = {
         g.edges(etype=etype, form='eid')
         for etype in g.etypes}

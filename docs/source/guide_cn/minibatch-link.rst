@@ -237,6 +237,7 @@ DGL提供了在同构图上做链路预测的一个示例：
 随后，需要向数据载入器提供边类型和对应边ID的字典，以及负采样器。例如，下面代码对异构图上的所有的边进行了迭代。
 
 .. code:: python
+
     train_eid_dict = {
         g.edges(etype=etype, form='eid')
         for etype in g.etypes}
