@@ -37,20 +37,19 @@ class SumPooling(nn.Module):
     >>> import torch as th
     >>> from dgl.nn.pytorch.glob import SumPooling
     >>>
-    >>> g1 = dgl.DGLGraph()
-    >>> g1.add_nodes(2)
-    >>> g1_node_feats = th.ones(2,5)
+    >>> g1 = dgl.rand_graph(10, 20)  # g1 is a random graph with 10 nodes and 20 edges
+    >>> g1_node_feats = th.ones(10, 16)  # feature size is 16
     >>>
-    >>> g2 = dgl.DGLGraph()
-    >>> g2.add_nodes(3)
-    >>> g2_node_feats = th.ones(3,5)
+    >>> g2 = dgl.rand_graph(20, 50)  # g2 is a random graph with 20 nodes and 50 edges
+    >>> g2_node_feats = th.ones(20, 16)  # feature size is 16
     >>>
-    >>> sumpool = SumPooling()
+    >>> sumpool = SumPooling()  # create a sum pooling layer
 
     Case 1: Input a single graph
 
     >>> sumpool(g1, g1_node_feats)
-        tensor([[2., 2., 2., 2., 2.]])
+        tensor([[10., 10., 10., 10., 10., 10., 10., 10., 10., 10., 10., 10., 10., 10.,
+                 10., 10.]])
 
     Case 2: Input a batch of graphs
 
@@ -60,8 +59,10 @@ class SumPooling(nn.Module):
     >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
     >>>
     >>> sumpool(batch_g, batch_f)
-        tensor([[2., 2., 2., 2., 2.],
-                [3., 3., 3., 3., 3.]])
+        tensor([[10., 10., 10., 10., 10., 10., 10., 10., 10., 10., 10., 10., 10., 10.,
+                 10., 10.],
+                [20., 20., 20., 20., 20., 20., 20., 20., 20., 20., 20., 20., 20., 20.,
+                 20., 20.]])
     """
     def __init__(self):
         super(SumPooling, self).__init__()
@@ -115,20 +116,18 @@ class AvgPooling(nn.Module):
     >>> import torch as th
     >>> from dgl.nn.pytorch.glob import AvgPooling
     >>>
-    >>> g1 = dgl.DGLGraph()
-    >>> g1.add_nodes(2)
-    >>> g1_node_feats = th.ones(2,5)
+    >>> g1 = dgl.rand_graph(10, 20)  # g1 is a random graph with 10 nodes and 20 edges
+    >>> g1_node_feats = th.ones(10, 16)  # feature size is 16
     >>>
-    >>> g2 = dgl.DGLGraph()
-    >>> g2.add_nodes(3)
-    >>> g2_node_feats = th.ones(3,5)
+    >>> g2 = dgl.rand_graph(20, 50)  # g2 is a random graph with 20 nodes and 50 edges
+    >>> g2_node_feats = th.ones(20, 16)  # feature size is 16
     >>>
-    >>> avgpool = AvgPooling()
+    >>> avgpool = AvgPooling()  # create an average pooling layer
 
     Case 1: Input single graph
 
     >>> avgpool(g1, g1_node_feats)
-        tensor([[1., 1., 1., 1., 1.]])
+        tensor([[1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]])
 
     Case 2: Input a batch of graphs
 
@@ -138,8 +137,8 @@ class AvgPooling(nn.Module):
     >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
     >>>
     >>> avgpool(batch_g, batch_f)
-        tensor([[1., 1., 1., 1., 1.],
-                [1., 1., 1., 1., 1.]])
+        tensor([[1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+                [1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]])
     """
     def __init__(self):
         super(AvgPooling, self).__init__()
@@ -193,20 +192,18 @@ class MaxPooling(nn.Module):
     >>> import torch as th
     >>> from dgl.nn.pytorch.glob import MaxPooling
     >>>
-    >>> g1 = dgl.DGLGraph()
-    >>> g1.add_nodes(2)
-    >>> g1_node_feats = th.ones(2,5)
+    >>> g1 = dgl.rand_graph(10, 20)  # g1 is a random graph with 10 nodes and 20 edges
+    >>> g1_node_feats = th.ones(10, 16)  # feature size is 16
     >>>
-    >>> g2 = dgl.DGLGraph()
-    >>> g2.add_nodes(3)
-    >>> g2_node_feats = th.ones(3,5)
+    >>> g2 = dgl.rand_graph(20, 50)  # g2 is a random graph with 20 nodes and 50 edges
+    >>> g2_node_feats = th.ones(20, 16)  # feature size is 16
     >>>
-    >>> maxpool = MaxPooling()
+    >>> maxpool = MaxPooling()  # create a max pooling layer
 
     Case 1: Input a single graph
 
     >>> maxpool(g1, g1_node_feats)
-        tensor([[1., 1., 1., 1., 1.]])
+        tensor([[1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]])
 
     Case 2: Input a batch of graphs
 
@@ -216,8 +213,8 @@ class MaxPooling(nn.Module):
     >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
     >>>
     >>> maxpool(batch_g, batch_f)
-        tensor([[1., 1., 1., 1., 1.],
-                [1., 1., 1., 1., 1.]])
+        tensor([[1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+                [1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]])
     """
     def __init__(self):
         super(MaxPooling, self).__init__()
@@ -271,20 +268,19 @@ class SortPooling(nn.Module):
     >>> import torch as th
     >>> from dgl.nn.pytorch.glob import SortPooling
     >>>
-    >>> g1 = dgl.DGLGraph()
-    >>> g1.add_nodes(2)
-    >>> g1_node_feats = th.ones(2,5)
+    >>> g1 = dgl.rand_graph(10, 20)  # g1 is a random graph with 10 nodes and 20 edges
+    >>> g1_node_feats = th.ones(10, 16)  # feature size is 16
     >>>
-    >>> g2 = dgl.DGLGraph()
-    >>> g2.add_nodes(3)
-    >>> g2_node_feats = th.ones(3,5)
+    >>> g2 = dgl.rand_graph(20, 50)  # g2 is a random graph with 20 nodes and 50 edges
+    >>> g2_node_feats = th.ones(20, 16)  # feature size is 16
     >>>
-    >>> sortpool = SortPooling(k=2)
+    >>> sortpool = SortPooling(k=2)  # create a sort pooling layer
 
     Case 1: Input a single graph
 
     >>> sortpool(g1, g1_node_feats)
-        tensor([[1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]])
+        tensor([[1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
+                 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]])
 
     Case 2: Input a batch of graphs
 
@@ -294,8 +290,10 @@ class SortPooling(nn.Module):
     >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
     >>>
     >>> sortpool(batch_g, batch_f)
-        tensor([[1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
-                [1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]])
+        tensor([[1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
+                 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+                [1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
+                 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]])
     """
     def __init__(self, k):
         super(SortPooling, self).__init__()
@@ -349,6 +347,50 @@ class GlobalAttentionPooling(nn.Module):
     feat_nn : torch.nn.Module, optional
         A neural network applied to each feature before combining them with attention
         scores.
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn.pytorch.glob import GlobalAttentionPooling
+    >>>
+    >>> g1 = dgl.rand_graph(10, 20)  # g1 is a random graph with 10 nodes and 20 edges
+    >>> g1_node_feats = th.ones(10, 16)  # feature dimension is 16
+    >>>
+    >>> g2 = dgl.rand_graph(20, 50)  # g2 is a random graph with 20 nodes and 50 edges
+    >>> g2_node_feats = th.ones(20, 16)
+    >>>
+    >>> gate_nn = th.nn.Linear(16, 1)  # the gate layer that maps node feature to scalar
+    >>> gap = GlobalAttentionPooling(gate_nn)  # create a Global Attention Pooling layer
+
+    Case 1: Input a single graph
+
+    >>> gap(g1, g1_node_feats)
+        tensor([[1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000,
+                 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000]],
+               grad_fn=<SegmentReduceBackward>)
+
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats], 0)
+    >>>
+    >>> gap(batch_g, batch_f)
+        tensor([[1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000,
+                 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000],
+                [1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000,
+                 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000]],
+               grad_fn=<SegmentReduceBackward>)
+
+    Notes
+    -----
+    See our `GGNN example <https://github.com/dmlc/dgl/tree/master/examples/pytorch/ggnn>`
+    on how to use GatedGraphConv and GlobalAttentionPooling layer to build a Graph Neural
+    Networks that can solve Soduku.
     """
     def __init__(self, gate_nn, feat_nn=None):
         super(GlobalAttentionPooling, self).__init__()
@@ -416,6 +458,56 @@ class Set2Set(nn.Module):
         The number of iterations.
     n_layers : int
         The number of recurrent layers.
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn.pytorch.glob import Set2Set
+    >>>
+    >>> g1 = dgl.rand_graph(10, 20)  # g1 is a random graph with 10 nodes and 20 edges
+    >>> g1_node_feats = th.ones(10, 16)  # feature size is 16
+    >>>
+    >>> g2 = dgl.rand_graph(20, 50)  # g2 is a random graph with 20 nodes and 50 edges
+    >>> g2_node_feats = th.ones(20, 16)  # feature size is 16
+    >>>
+    >>> s2s = Set2Set(16, 2, 1)  # create a Set2Set layer(n_iters=2, n_layers=1)
+
+    Case 1: Input a single graph
+
+    >>> s2s(g1, g1_node_feats)
+        tensor([[ 0.0162, -0.0080, -0.0864, -0.0488,  0.0408,  0.1140, -0.1426, -0.0379,
+                 -0.1094,  0.2622,  0.1352,  0.0011,  0.1970, -0.1837, -0.0377, -0.0360,
+                  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,
+                  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000]],
+               grad_fn=<CatBackward>)
+
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats], 0)
+    >>>
+    >>> s2s(batch_g, batch_f)
+        tensor([[ 0.0162, -0.0080, -0.0864, -0.0488,  0.0408,  0.1140, -0.1426, -0.0379,
+                 -0.1094,  0.2622,  0.1352,  0.0011,  0.1970, -0.1837, -0.0377, -0.0360,
+                  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,
+                  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000],
+                [ 0.0162, -0.0080, -0.0864, -0.0488,  0.0408,  0.1140, -0.1426, -0.0379,
+                 -0.1094,  0.2622,  0.1352,  0.0011,  0.1970, -0.1837, -0.0377, -0.0360,
+                  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,
+                  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000]],
+               grad_fn=<CatBackward>)
+
+    Notes
+    -----
+    Set2Set is widely used in molecular property predictions, see
+    `dgl-lifesci's MPNN example <https://github.com/awslabs/dgl-lifesci/blob/\
+ecd95c905479ec048097777039cf9a19cfdcf223/python/dgllife/model/model_zoo/mpnn_predictor.py>`
+    on how to use DGL's Set2Set layer in graph property prediction applications.
     """
     def __init__(self, input_dim, n_iters, n_layers):
         super(Set2Set, self).__init__()
@@ -477,7 +569,27 @@ class Set2Set(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    r"""Multi-Head Attention block, used in Transformer, Set Transformer and so on."""
+    r"""Multi-Head Attention block, used in Transformer, Set Transformer and so on.
+
+    Parameters
+    ----------
+    d_model : int
+        The feature size (input and output) in Multi-Head Attention layer.
+    num_heads : int
+        The number of heads.
+    d_head : int
+        The hidden size per head.
+    d_ff : int
+        The inner hidden size in the Feed-Forward Neural Network. 
+    dropouth : float
+        The dropout rate of each sublayer.
+    dropouta : float
+        The dropout rate of attention heads.
+
+    Notes
+    -----
+    This module was used in SetTransformer layer.
+    """
     def __init__(self, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(MultiHeadAttention, self).__init__()
         self.d_model = d_model
@@ -566,7 +678,27 @@ class MultiHeadAttention(nn.Module):
 
 
 class SetAttentionBlock(nn.Module):
-    r"""SAB block mentioned in Set-Transformer paper."""
+    r"""SAB block introduced in Set-Transformer paper.
+
+    Parameters
+    ----------
+    d_model : int
+        The feature size (input and output) in Multi-Head Attention layer.
+    num_heads : int
+        The number of heads.
+    d_head : int
+        The hidden size per head.
+    d_ff : int
+        The inner hidden size in the Feed-Forward Neural Network. 
+    dropouth : float
+        The dropout rate of each sublayer.
+    dropouta : float
+        The dropout rate of attention heads.
+
+    Notes
+    -----
+    This module was used in SetTransformer layer.
+    """
     def __init__(self, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(SetAttentionBlock, self).__init__()
         self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff,
@@ -587,7 +719,27 @@ class SetAttentionBlock(nn.Module):
 
 
 class InducedSetAttentionBlock(nn.Module):
-    r"""ISAB block mentioned in Set-Transformer paper."""
+    r"""ISAB block introduced in Set-Transformer paper.
+
+    Parameters
+    ----------
+    d_model : int
+        The feature size (input and output) in Multi-Head Attention layer.
+    num_heads : int
+        The number of heads.
+    d_head : int
+        The hidden size per head.
+    d_ff : int
+        The inner hidden size in the Feed-Forward Neural Network. 
+    dropouth : float
+        The dropout rate of each sublayer.
+    dropouta : float
+        The dropout rate of attention heads.
+
+    Notes
+    -----
+    This module was used in SetTransformer layer.
+    """
     def __init__(self, m, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(InducedSetAttentionBlock, self).__init__()
         self.m = m
@@ -634,7 +786,27 @@ class InducedSetAttentionBlock(nn.Module):
 
 
 class PMALayer(nn.Module):
-    r"""Pooling by Multihead Attention, used in the Decoder Module of Set Transformer."""
+    r"""Pooling by Multihead Attention, used as the Decoder Module in Set Transformer.
+
+    Parameters
+    ----------
+    d_model : int
+        The feature size (input and output) in Multi-Head Attention layer.
+    num_heads : int
+        The number of heads.
+    d_head : int
+        The hidden size per head.
+    d_ff : int
+        The kernel size in FFN (Positionwise Feed-Forward Network) layer.
+    dropouth : float
+        The dropout rate of each sublayer.
+    dropouta : float
+        The dropout rate of attention heads.
+
+    Notes
+    -----
+    This module was used in SetTransformer layer.
+    """
     def __init__(self, k, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(PMALayer, self).__init__()
         self.k = k
@@ -714,6 +886,125 @@ class SetTransformerEncoder(nn.Module):
         The dropout rate of each sublayer.
     dropouta : float
         The dropout rate of attention heads.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn.pytorch.glob import SetTransformerEncoder
+    >>>
+    >>> g1 = dgl.rand_graph(10, 20)  # g1 is a random graph with 10 nodes and 20 edges
+    >>> g1_node_feats = th.ones(10, 16)  # feature size is 16
+    >>>
+    >>> g2 = dgl.rand_graph(20, 50)  # g2 is a random graph with 20 nodes and 50 edges
+    >>> g2_node_feats = th.ones(20, 16)  # feature size is 16
+    >>>
+    >>> set_trans_enc = SetTransformerEncoder(16, 4, 4, 64)  # create a settrans encoder.
+
+    Case 1: Input a single graph
+
+    >>> set_trans_enc(g1, g1_node_feats)
+        tensor([[ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921]],
+               grad_fn=<NativeLayerNormBackward>)
+
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
+    >>>
+    >>> set_trans_enc(batch_g, batch_f)
+        tensor([[ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921],
+                [ 0.1910, -0.7224, -1.7265,  1.8916,  0.4857,  0.8494, -1.4954, -0.2460,
+                  1.8127, -0.8369, -0.8274,  0.4267, -0.5167,  0.6989,  0.1073, -0.0921]],
+               grad_fn=<NativeLayerNormBackward>)
+
+    See Also
+    --------
+    SetTransformerDecoder
+
+    Notes
+    -----
+    SetTransformerEncoder is not a readout layer, the tensor it returned is nodewise
+    representation instead out graphwise representation, and the SetTransformerDecoder
+    would return a graph readout tensor.
     """
     def __init__(self, d_model, n_heads, d_head, d_ff,
                  n_layers=1, block_type='sab', m=None, dropouth=0., dropouta=0.):
@@ -788,6 +1079,69 @@ class SetTransformerDecoder(nn.Module):
         Dropout rate of each sublayer.
     dropouta : float
         Dropout rate of attention heads.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn.pytorch.glob import SetTransformerDecoder
+    >>>
+    >>> g1 = dgl.rand_graph(10, 20)  # g1 is a random graph with 10 nodes and 20 edges
+    >>> g1_node_feats = th.ones(10, 16)  # feature size is 16
+    >>>
+    >>> g2 = dgl.rand_graph(20, 50)  # g2 is a random graph with 20 nodes and 50 edges
+    >>> g2_node_feats = th.ones(20, 16)  # feature size is 16
+    >>>
+    >>> set_trans_dec = SetTransformerDecoder(16, 4, 4, 64, 1, 5)  # define the layer
+
+    Case 1: Input a single graph
+
+    >>> set_trans_dec(g1, g1_node_feats)
+        tensor([[ 0.4635,  0.0275, -0.2637,  0.7168,  1.7655,  0.7687, -0.0031, -0.0562,
+                  0.8125,  1.3546, -1.1208, -0.0198, -0.6820, -1.7057, -2.0887,  0.0310,
+                  0.7714, -0.6568, -0.3391, -0.3792,  1.3881,  1.0091, -0.1747, -1.5370,
+                  1.3287,  1.7640,  0.6081, -0.4512, -0.5583, -1.3908, -1.2931, -0.0894,
+                  2.0826, -0.3916,  0.9458, -0.0952,  0.6316, -1.0485, -0.1104,  0.1100,
+                  1.6364,  1.0246, -0.2355, -0.9597, -1.2427, -0.4817, -1.5894, -0.2764,
+                  0.9830, -0.2319, -0.3492, -0.7830,  1.4185, -0.1799,  0.2063, -0.7108,
+                  1.1052,  2.3187,  0.5359, -0.2413, -0.5357, -1.3557, -1.4125, -0.7675,
+                 -0.0231, -0.2948, -0.3586,  0.6925,  0.6982,  1.1432, -0.5939, -1.6942,
+                  1.6847,  1.5113, -0.7235,  0.0262, -1.4526, -0.0706, -1.3626,  0.8179]],
+               grad_fn=<ViewBackward>)
+    
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
+    >>>
+    >>> set_trans_dec(batch_g, batch_f)
+        tensor([[ 0.4635,  0.0275, -0.2637,  0.7168,  1.7655,  0.7687, -0.0031, -0.0562,
+                  0.8125,  1.3546, -1.1208, -0.0198, -0.6820, -1.7057, -2.0887,  0.0310,
+                  0.7714, -0.6568, -0.3391, -0.3792,  1.3881,  1.0091, -0.1747, -1.5370,
+                  1.3287,  1.7640,  0.6081, -0.4512, -0.5583, -1.3908, -1.2931, -0.0894,
+                  2.0826, -0.3916,  0.9458, -0.0952,  0.6316, -1.0485, -0.1104,  0.1100,
+                  1.6364,  1.0246, -0.2355, -0.9597, -1.2427, -0.4817, -1.5894, -0.2764,
+                  0.9830, -0.2319, -0.3492, -0.7830,  1.4185, -0.1799,  0.2063, -0.7108,
+                  1.1052,  2.3187,  0.5359, -0.2413, -0.5357, -1.3557, -1.4125, -0.7675,
+                 -0.0231, -0.2948, -0.3586,  0.6925,  0.6982,  1.1432, -0.5939, -1.6942,
+                  1.6847,  1.5113, -0.7235,  0.0262, -1.4526, -0.0706, -1.3626,  0.8179],
+                [ 0.4635,  0.0275, -0.2637,  0.7168,  1.7655,  0.7687, -0.0031, -0.0562,
+                  0.8125,  1.3546, -1.1208, -0.0198, -0.6820, -1.7057, -2.0887,  0.0310,
+                  0.7714, -0.6568, -0.3391, -0.3792,  1.3881,  1.0091, -0.1747, -1.5370,
+                  1.3287,  1.7640,  0.6081, -0.4512, -0.5583, -1.3908, -1.2931, -0.0894,
+                  2.0826, -0.3916,  0.9458, -0.0952,  0.6316, -1.0485, -0.1104,  0.1100,
+                  1.6364,  1.0246, -0.2355, -0.9597, -1.2427, -0.4817, -1.5894, -0.2764,
+                  0.9830, -0.2319, -0.3492, -0.7830,  1.4185, -0.1799,  0.2063, -0.7108,
+                  1.1052,  2.3187,  0.5359, -0.2413, -0.5357, -1.3557, -1.4125, -0.7675,
+                 -0.0231, -0.2948, -0.3586,  0.6925,  0.6982,  1.1432, -0.5939, -1.6942,
+                  1.6847,  1.5113, -0.7235,  0.0262, -1.4526, -0.0706, -1.3626,  0.8179]],
+               grad_fn=<ViewBackward>)
+
+    See Also
+    --------
+    SetTransformerEncoder
     """
     def __init__(self, d_model, num_heads, d_head, d_ff, n_layers, k, dropouth=0., dropouta=0.):
         super(SetTransformerDecoder, self).__init__()
@@ -837,6 +1191,50 @@ class WeightAndSum(nn.Module):
     ----------
     in_feats : int
         Input atom feature size
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn.pytorch.glob import WeightAndSum
+    >>>
+    >>> g1 = dgl.rand_graph(10, 20)  # g1 is a random graph with 10 nodes and 20 edges
+    >>> g1_node_feats = th.ones(10, 16)  # feature size is 16
+    >>>
+    >>> g2 = dgl.rand_graph(20, 50)  # g2 is a random graph with 20 nodes and 50 edges
+    >>> g2_node_feats = th.ones(20, 16)  # feature size is 16
+    >>>
+    >>> weight_and_sum = WeightAndSum(16)  # create a weight and sum layer(in_feats=16)
+
+    Case 1: Input a single graph
+
+    >>> weight_and_sum(g1, g1_node_feats)
+        tensor([[5.1436, 5.1436, 5.1436, 5.1436, 5.1436, 5.1436, 5.1436, 5.1436, 5.1436,
+                 5.1436, 5.1436, 5.1436, 5.1436, 5.1436, 5.1436, 5.1436]],
+               grad_fn=<SegmentReduceBackward>)
+
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
+    >>>
+    >>> sumpool(batch_g, batch_f)
+        tensor([[ 5.1436,  5.1436,  5.1436,  5.1436,  5.1436,  5.1436,  5.1436,  5.1436,
+                  5.1436,  5.1436,  5.1436,  5.1436,  5.1436,  5.1436,  5.1436,  5.1436],
+                [10.2872, 10.2872, 10.2872, 10.2872, 10.2872, 10.2872, 10.2872, 10.2872,
+                 10.2872, 10.2872, 10.2872, 10.2872, 10.2872, 10.2872, 10.2872, 10.2872]],
+               grad_fn=<SegmentReduceBackward>)
+
+    Notes
+    -----
+    WeightAndSum module was commonly used in molecular property prediction networks,
+    see the GCN predictor in `dgl-lifesci's<https://github.com/awslabs/dgl-lifesci/blob/\
+ae0491431804611ba466ff413f69d435789dbfd5/python/dgllife/model/model_zoo/gcn_predictor.py>`
+    to understand how to use WeightAndSum layer to get the graph readout output. 
     """
     def __init__(self, in_feats):
         super(WeightAndSum, self).__init__()
