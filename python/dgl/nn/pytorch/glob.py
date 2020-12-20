@@ -388,7 +388,7 @@ class GlobalAttentionPooling(nn.Module):
 
     Notes
     -----
-    See our `GGNN example <https://github.com/dmlc/dgl/tree/master/examples/pytorch/ggnn>`
+    See our `GGNN example <https://github.com/dmlc/dgl/tree/master/examples/pytorch/ggnn>`_
     on how to use GatedGraphConv and GlobalAttentionPooling layer to build a Graph Neural
     Networks that can solve Soduku.
     """
@@ -505,8 +505,7 @@ class Set2Set(nn.Module):
     Notes
     -----
     Set2Set is widely used in molecular property predictions, see
-    `dgl-lifesci's MPNN example <https://github.com/awslabs/dgl-lifesci/blob/\
-ecd95c905479ec048097777039cf9a19cfdcf223/python/dgllife/model/model_zoo/mpnn_predictor.py>`
+    `dgl-lifesci's MPNN example <https://github.com/awslabs/dgl-lifesci/blob/ecd95c905479ec048097777039cf9a19cfdcf223/python/dgllife/model/model_zoo/mpnn_predictor.py>`_
     on how to use DGL's Set2Set layer in graph property prediction applications.
     """
     def __init__(self, input_dim, n_iters, n_layers):
@@ -1232,8 +1231,7 @@ class WeightAndSum(nn.Module):
     Notes
     -----
     WeightAndSum module was commonly used in molecular property prediction networks,
-    see the GCN predictor in `dgl-lifesci's<https://github.com/awslabs/dgl-lifesci/blob/\
-ae0491431804611ba466ff413f69d435789dbfd5/python/dgllife/model/model_zoo/gcn_predictor.py>`
+    see the GCN predictor in `dgl-lifesci's <https://github.com/awslabs/dgl-lifesci/blob/ae0491431804611ba466ff413f69d435789dbfd5/python/dgllife/model/model_zoo/gcn_predictor.py>`_
     to understand how to use WeightAndSum layer to get the graph readout output. 
     """
     def __init__(self, in_feats):
