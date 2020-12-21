@@ -13,7 +13,7 @@
 #include <dlpack/dlpack.h>
 #include <vector>
 
-#ifdef WIN32
+#if defined(WIN32) || defined(_WIN32)
 #define TA_EXPORTS __declspec(dllexport)
 #else
 #define TA_EXPORTS
@@ -33,20 +33,6 @@ extern "C" {
  */
 TA_EXPORTS DLManagedTensor* TAempty(
     std::vector<int64_t> shape, DLDataType dtype, DLContext ctx);
-
-/*!
- * \brief The macro that calls an entrypoint with the signature of the given function.
- *
- * Use it like:
- *
- * <code>
- *   auto handle = dlopen("tensoradapter_torch.so");
- *   auto entry = dlsym(handle, "TAempty");
- *   auto result = TA_DISPATCH(tensoradapter::TAempty, entry, shape, dtype, ctx);
- * </code>
- */
-#define TA_DISPATCH(func, entry, ...) \
-  ((*reinterpret_cast<decltype(&func)>(entry))(__VA_ARGS__))
 
 }
 

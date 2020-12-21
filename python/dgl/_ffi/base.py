@@ -115,6 +115,13 @@ def decorate(func, fwrapped):
 
 def set_ta_path(backend, version):
     """Tell DGL which tensoradapter library to look for symbols.
+
+    Parameters
+    ----------
+    backend : str
+        The backend (currently ``pytorch``, ``mxnet`` or ``tensorflow``).
+    version : str
+        The version number of the backend.
     """
     version = version.split('+')[0]
     if sys.platform.startswith('linux'):

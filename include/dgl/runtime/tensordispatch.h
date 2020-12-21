@@ -40,6 +40,9 @@
 #include <vector>
 #include "ndarray.h"
 
+/*! \brief Casts a pointer \c entry to a function pointer with signature of \c func */
+#define FUNCCAST(func, entry)   (*reinterpret_cast<decltype(&(func))>(entry))
+
 namespace dgl {
 namespace runtime {
 
@@ -66,7 +69,7 @@ class TensorDispatcher {
    */
   inline NDArray Empty(std::vector<int64_t> shape, DLDataType dtype, DLContext ctx) const {
     auto entry = entrypoints_[Op::kEmpty];
-    auto result = TA_DISPATCH(tensoradapter::TAempty, entry, shape, dtype, ctx);
+    auto result = FUNCCAST(tensoradapter::TAempty, entry)(shape, dtype, ctx);
     return NDArray::FromDLPack(result);
   }
 
