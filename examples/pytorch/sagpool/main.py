@@ -180,7 +180,7 @@ if __name__ == "__main__":
         res.append(acc)
         train_times.append(train_time)
 
-    mean, err_bd = get_stats(res, conf_interval=True)
+    mean, err_bd = get_stats(res)
     print("mean acc: {:.4f}, error bound: {:.4f}".format(mean, err_bd))
 
     out_dict = {"hyper-parameters": vars(args),

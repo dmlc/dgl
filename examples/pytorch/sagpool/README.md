@@ -80,17 +80,17 @@ NOTE: We do not perform grid search or finetune here, so there may be a gap betw
 **The global architecture result**
 | Dataset       | paper result (global)            | ours (global)               |
 | ------------- | -------------------------------- | --------------------------- |
-| D&D           | 76.19 (0.94)                     | 74.12 (2.61)                |
-| PROTEINS      | 70.04 (1.47)                     | 69.46 (3.52)                |
-| NCI1          | 74.18 (1.20)                     | 72.72 (1.77)                |
-| NCI109        | 74.06 (0.78)                     | 71.21 (1.68)                |
-| Mutagenicity  | N/A                              | 74.51 (1.97)                |
+| D&D           | 76.19 (0.94)                     | 74.53 (2.36)                |
+| PROTEINS      | 70.04 (1.47)                     | 70.89 (2.00)                |
+| NCI1          | 74.18 (1.20)                     | 72.94 (1.48)                |
+| NCI109        | 74.06 (0.78)                     | 72.17 (2.16)                |
+| Mutagenicity  | N/A                              | 75.75 (2.49)                |
 
 **The hierarchical architecture result**
 | Dataset       | paper result (hierarchical)      | ours (hierarchical)         |
 | ------------- | -------------------------------- | --------------------------- |
-| D&D           | 76.45 (0.97)                     | 76.47 (4.45)                |
-| PROTEINS      | 71.86 (0.97)                     | 72.41 (1.89)                |
-| NCI1          | 67.45 (1.11)                     | 72.34 (1.69)                |
-| NCI109        | 67.86 (1.41)                     | 69.73 (1.41)                |
-| Mutagenicity  | N/A                              | 74.71 (2.74)                |
+| D&D           | 76.45 (0.97)                     | 75.97 (2.34)                |
+| PROTEINS      | 71.86 (0.97)                     | 70.54 (2.81)                |
+| NCI1          | 67.45 (1.11)                     | 69.17 (2.69)                |
+| NCI109        | 67.86 (1.41)                     | 70.00 (2.13)                |
+| Mutagenicity  | N/A                              | 73.63 (1.88)                |
