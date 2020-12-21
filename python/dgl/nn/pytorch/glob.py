@@ -505,7 +505,9 @@ class Set2Set(nn.Module):
     Notes
     -----
     Set2Set is widely used in molecular property predictions, see
-    `dgl-lifesci's MPNN example <https://github.com/awslabs/dgl-lifesci/blob/ecd95c905479ec048097777039cf9a19cfdcf223/python/dgllife/model/model_zoo/mpnn_predictor.py>`_
+    `dgl-lifesci's MPNN example <https://github.com/awslabs/dgl-lifesci/blob/
+    ecd95c905479ec048097777039cf9a19cfdcf223/python/dgllife/model/model_zoo/
+    mpnn_predictor.py>`__
     on how to use DGL's Set2Set layer in graph property prediction applications.
     """
     def __init__(self, input_dim, n_iters, n_layers):
@@ -579,7 +581,7 @@ class MultiHeadAttention(nn.Module):
     d_head : int
         The hidden size per head.
     d_ff : int
-        The inner hidden size in the Feed-Forward Neural Network. 
+        The inner hidden size in the Feed-Forward Neural Network.
     dropouth : float
         The dropout rate of each sublayer.
     dropouta : float
@@ -688,7 +690,7 @@ class SetAttentionBlock(nn.Module):
     d_head : int
         The hidden size per head.
     d_ff : int
-        The inner hidden size in the Feed-Forward Neural Network. 
+        The inner hidden size in the Feed-Forward Neural Network.
     dropouth : float
         The dropout rate of each sublayer.
     dropouta : float
@@ -729,7 +731,7 @@ class InducedSetAttentionBlock(nn.Module):
     d_head : int
         The hidden size per head.
     d_ff : int
-        The inner hidden size in the Feed-Forward Neural Network. 
+        The inner hidden size in the Feed-Forward Neural Network.
     dropouth : float
         The dropout rate of each sublayer.
     dropouta : float
@@ -1107,7 +1109,7 @@ class SetTransformerDecoder(nn.Module):
                  -0.0231, -0.2948, -0.3586,  0.6925,  0.6982,  1.1432, -0.5939, -1.6942,
                   1.6847,  1.5113, -0.7235,  0.0262, -1.4526, -0.0706, -1.3626,  0.8179]],
                grad_fn=<ViewBackward>)
-    
+
     Case 2: Input a batch of graphs
 
     Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
@@ -1231,8 +1233,10 @@ class WeightAndSum(nn.Module):
     Notes
     -----
     WeightAndSum module was commonly used in molecular property prediction networks,
-    see the GCN predictor in `dgl-lifesci's <https://github.com/awslabs/dgl-lifesci/blob/ae0491431804611ba466ff413f69d435789dbfd5/python/dgllife/model/model_zoo/gcn_predictor.py>`_
-    to understand how to use WeightAndSum layer to get the graph readout output. 
+    see the GCN predictor in `dgl-lifesci <https://github.com/awslabs/dgl-lifesci/blob/
+    ae0491431804611ba466ff413f69d435789dbfd5/python/dgllife/model/model_zoo/
+    gcn_predictor.py>`__
+    to understand how to use WeightAndSum layer to get the graph readout output.
     """
     def __init__(self, in_feats):
         super(WeightAndSum, self).__init__()
