@@ -484,8 +484,6 @@ class MultiHeadAttention(nn.Module):
         self.proj_v = nn.Dense(self.num_heads * self.d_head, use_bias=False)
         self.proj_o = nn.Dense(self.d_model, use_bias = False)
 
-        self.droph = nn.Dropout(self.dropouth)
-        self.dropa = nn.Dropout(self.dropouta)
         self.norm_in = nn.LayerNorm(self.d_model)
         self.norm_inter = nn.LayerNorm(self.d_model)
 

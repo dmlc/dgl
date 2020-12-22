@@ -300,7 +300,7 @@ def test_rgcn():
     r = F.tensor(etype)
     init_params = rgc_bdd.init(jax.random.PRNGKey(0), g, h, r)
     h_new = rgc_bdd.apply(init_params, g, h, r)
-    init_params = rgc_bdd_low.init(jax.random.PRNGKey(0))
+    init_params = rgc_bdd_low.init(jax.random.PRNGKey(0), g, h, r)
     h_new_low = rgc_bdd_low.apply(init_params, g, h, r)
     assert list(h_new.shape) == [100, O]
     assert list(h_new_low.shape) == [100, O]
@@ -326,18 +326,18 @@ def test_rgcn():
     init_params = rgc_bdd.init(jax.random.PRNGKey(0), g, h, r, norm)
     h_new = rgc_bdd.apply(init_params, g, h, r, norm)
     init_params = rgc_bdd_low.init(jax.random.PRNGKey(0), g, h, r, norm)
-    h_new_low = rgc_bdd_low.apply(g, h, r, norm)
+    h_new_low = rgc_bdd_low.apply(init_params, g, h, r, norm)
     assert list(h_new.shape) == [100, O]
     assert list(h_new_low.shape) == [100, O]
 
     # id input
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True)
-    h = F.randint(0, I, (100,))
+    h = F.randint(low=0, high=I, shape=(100,), dtype=jnp.int64)
     r = F.tensor(etype)
     init_params = rgc_basis.init(jax.random.PRNGKey(0), g, h, r)
     h_new = rgc_basis.apply(init_params, g, h, r)
-    init_params = rgc_bdd_low.init(jax.random.PRNGKey(0), g, h, r)
+    init_params = rgc_basis_low.init(jax.random.PRNGKey(0), g, h, r)
     h_new_low = rgc_basis_low.apply(init_params, g, h, r)
     assert list(h_new.shape) == [100, O]
     assert list(h_new_low.shape) == [100, O]
@@ -345,50 +345,53 @@ def test_rgcn():
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 def test_gat_conv(g, idtype):
-    g = g.astype(idtype).to(F.ctx())
-    ctx = F.ctx()
+    g = g.astype(idtype)
     gat = nn.GATConv(5, 2, 4)
     feat = F.randn((g.number_of_nodes(), 5))
-    gat = gat.to(ctx)
-    h = gat(g, feat)
+
+    init_params = gat.init(jax.random.PRNGKey(0), g, feat)
+    h = gat.apply(init_params, g, feat)
     assert h.shape == (g.number_of_nodes(), 4, 2)
-    _, a = gat(g, feat, get_attention=True)
+
+    init_params = gat.init(jax.random.PRNGKey(0), g, feat, get_attention=True)
+    _, a = gat.apply(init_params, g, feat, get_attention=True)
     assert a.shape == (g.number_of_edges(), 4, 1)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
 def test_gat_conv_bi(g, idtype):
-    g = g.astype(idtype).to(F.ctx())
-    ctx = F.ctx()
+    g = g.astype(idtype)
     gat = nn.GATConv(5, 2, 4)
     feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
-    gat = gat.to(ctx)
-    h = gat(g, feat)
+    init_params = gat.init(jax.random.PRNGKey(0), g, feat)
+    h = gat.apply(init_params, g, feat)
     assert h.shape == (g.number_of_dst_nodes(), 4, 2)
-    _, a = gat(g, feat, get_attention=True)
+
+    init_params = gat.init(jax.random.PRNGKey(0), g, feat, get_attention=True)
+    _, a = gat.apply(init_params, g, feat, get_attention=True)
     assert a.shape == (g.number_of_edges(), 4, 1)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
-@pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn', 'lstm'])
+@pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn',])
 def test_sage_conv(idtype, g, aggre_type):
-    g = g.astype(idtype).to(F.ctx())
     sage = nn.SAGEConv(5, 10, aggre_type)
     feat = F.randn((g.number_of_nodes(), 5))
-    sage = sage.to(F.ctx())
-    h = sage(g, feat)
+    init_params = sage.init(jax.random.PRNGKey(0), g, feat)
+    h = sage.apply(init_params, g, feat)
     assert h.shape[-1] == 10
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite']))
-@pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn', 'lstm'])
+@pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn',])
 def test_sage_conv_bi(idtype, g, aggre_type):
-    g = g.astype(idtype).to(F.ctx())
+    g = g.astype(idtype)
     dst_dim = 5 if aggre_type != 'gcn' else 10
     sage = nn.SAGEConv((10, dst_dim), 2, aggre_type)
     feat = (F.randn((g.number_of_src_nodes(), 10)), F.randn((g.number_of_dst_nodes(), dst_dim)))
-    sage = sage.to(F.ctx())
-    h = sage(g, feat)
+
+    init_params = sage.init(jax.random.PRNGKey(0), g, feat)
+    h = sage.apply(init_params, g, feat)
     assert h.shape[-1] == 2
     assert h.shape[0] == g.number_of_dst_nodes()
 
@@ -397,54 +400,56 @@ def test_sage_conv2(idtype):
     # TODO: add test for blocks
     # Test the case for graphs without edges
     g = dgl.heterograph({('_U', '_E', '_V'): ([], [])}, {'_U': 5, '_V': 3})
-    g = g.astype(idtype).to(F.ctx())
-    ctx = F.ctx()
+    g = g.astype(idtype)
     sage = nn.SAGEConv((3, 3), 2, 'gcn')
     feat = (F.randn((5, 3)), F.randn((3, 3)))
-    sage = sage.to(ctx)
-    h = sage(g, (F.copy_to(feat[0], F.ctx()), F.copy_to(feat[1], F.ctx())))
+
+    init_params = sage.init(jax.random.PRNGKey(0), g, (F.copy_to(feat[0], F.ctx()), F.copy_to(feat[1], F.ctx())))
+    h = sage.apply(init_params, g, (F.copy_to(feat[0], F.ctx()), F.copy_to(feat[1], F.ctx())))
     assert h.shape[-1] == 2
     assert h.shape[0] == 3
-    for aggre_type in ['mean', 'pool', 'lstm']:
+
+    for aggre_type in ['mean', 'pool']:
+
         sage = nn.SAGEConv((3, 1), 2, aggre_type)
         feat = (F.randn((5, 3)), F.randn((3, 1)))
-        sage = sage.to(ctx)
-        h = sage(g, feat)
+        init_params = sage.init(jax.random.PRNGKey(0), g, feat)
+        h = sage.apply(init_params, g, feat)
         assert h.shape[-1] == 2
         assert h.shape[0] == 3
-
-@parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
-def test_sgc_conv(g, idtype):
-    ctx = F.ctx()
-    g = g.astype(idtype).to(ctx)
-    # not cached
-    sgc = nn.SGConv(5, 10, 3)
-    feat = F.randn((g.number_of_nodes(), 5))
-    sgc = sgc.to(ctx)
-
-    h = sgc(g, feat)
-    assert h.shape[-1] == 10
-
-    # cached
-    sgc = nn.SGConv(5, 10, 3, True)
-    sgc = sgc.to(ctx)
-    h_0 = sgc(g, feat)
-    h_1 = sgc(g, feat + 1)
-    assert F.allclose(h_0, h_1)
-    assert h_0.shape[-1] == 10
-
-@parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
-def test_appnp_conv(g, idtype):
-    ctx = F.ctx()
-    g = g.astype(idtype).to(ctx)
-    appnp = nn.APPNPConv(10, 0.1)
-    feat = F.randn((g.number_of_nodes(), 5))
-    appnp = appnp.to(ctx)
-
-    h = appnp(g, feat)
-    assert h.shape[-1] == 5
+#
+# @parametrize_dtype
+# @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+# def test_sgc_conv(g, idtype):
+#     ctx = F.ctx()
+#     g = g.astype(idtype).to(ctx)
+#     # not cached
+#     sgc = nn.SGConv(5, 10, 3)
+#     feat = F.randn((g.number_of_nodes(), 5))
+#     sgc = sgc.to(ctx)
+#
+#     h = sgc(g, feat)
+#     assert h.shape[-1] == 10
+#
+#     # cached
+#     sgc = nn.SGConv(5, 10, 3, True)
+#     sgc = sgc.to(ctx)
+#     h_0 = sgc(g, feat)
+#     h_1 = sgc(g, feat + 1)
+#     assert F.allclose(h_0, h_1)
+#     assert h_0.shape[-1] == 10
+#
+# @parametrize_dtype
+# @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+# def test_appnp_conv(g, idtype):
+#     ctx = F.ctx()
+#     g = g.astype(idtype).to(ctx)
+#     appnp = nn.APPNPConv(10, 0.1)
+#     feat = F.randn((g.number_of_nodes(), 5))
+#     appnp = appnp.to(ctx)
+#
+#     h = appnp(g, feat)
+#     assert h.shape[-1] == 5
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))

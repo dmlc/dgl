@@ -1,7 +1,8 @@
 """Torch Module for Relational graph convolution layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
-import torch as th
-from torch import nn
+import jax
+from jax import numpy as jnp
+from flax import linen as nn
 
 from .... import function as fn
 from .. import utils
@@ -86,11 +87,11 @@ class RelGraphConv(nn.Module):
     >>> from dgl.nn import RelGraphConv
     >>>
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
-    >>> feat = th.ones(6, 10)
+    >>> feat = jnp.ones(6, 10)
     >>> conv = RelGraphConv(10, 2, 3, regularizer='basis', num_bases=2)
     >>> conv.weight.shape
     torch.Size([2, 10, 2])
-    >>> etype = th.tensor(np.array([0,1,2,0,1,2]).astype(np.int64))
+    >>> etype = jnp.tensor(np.array([0,1,2,0,1,2]).astype(np.int64))
     >>> res = conv(g, feat, etype)
     >>> res
     tensor([[ 0.3996, -2.3303],
@@ -101,7 +102,7 @@ class RelGraphConv(nn.Module):
             [-0.1309, -1.0000]], grad_fn=<AddBackward0>)
 
     >>> # One-hot input
-    >>> one_hot_feat = th.tensor(np.array([0,1,2,3,4,5]).astype(np.int64))
+    >>> one_hot_feat = jnp.tensor(np.array([0,1,2,3,4,5]).astype(np.int64))
     >>> res = conv(g, one_hot_feat, etype)
     >>> res
     tensor([[ 0.5925,  0.0985],
@@ -111,58 +112,60 @@ class RelGraphConv(nn.Module):
             [ 0.5962,  1.2002],
             [ 0.0365, -0.3532]], grad_fn=<AddBackward0>)
     """
-    def __init__(self,
-                 in_feat,
-                 out_feat,
-                 num_rels,
-                 regularizer="basis",
-                 num_bases=None,
-                 bias=True,
-                 activation=None,
-                 self_loop=True,
-                 low_mem=False,
-                 dropout=0.0,
-                 layer_norm=False):
-        super(RelGraphConv, self).__init__()
-        self.in_feat = in_feat
-        self.out_feat = out_feat
-        self.num_rels = num_rels
-        self.regularizer = regularizer
-        self.num_bases = num_bases
+
+    in_feat: int
+    out_feat: int
+    num_rels: int
+    regularizer: str = "basis"
+    from typing import Union
+    num_bases: Union[int, None] = None
+    bias: bool = True
+    activation: Union[callable, None] = None
+    self_loop: bool = True
+    low_mem: bool = False
+    dropout: float = 0.0
+    layer_norm: bool = False
+
+
+    def setup(self):
         if self.num_bases is None or self.num_bases > self.num_rels or self.num_bases <= 0:
             self.num_bases = self.num_rels
-        self.bias = bias
-        self.activation = activation
-        self.self_loop = self_loop
-        self.low_mem = low_mem
-        self.layer_norm = layer_norm
 
-        if regularizer == "basis":
+        if self.regularizer == "basis":
             # add basis weights
-            self.weight = nn.Parameter(th.Tensor(self.num_bases, self.in_feat, self.out_feat))
+            self.weight = self.param(
+                "weight",
+                nn.initializers.xavier_uniform(),
+                (self.num_bases, self.in_feat, self.out_feat)
+            )
             if self.num_bases < self.num_rels:
                 # linear combination coefficients
-                self.w_comp = nn.Parameter(th.Tensor(self.num_rels, self.num_bases))
-            nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
-            if self.num_bases < self.num_rels:
-                nn.init.xavier_uniform_(self.w_comp,
-                                        gain=nn.init.calculate_gain('relu'))
+                self.w_comp = self.param(
+                    "w_comp",
+                    nn.initializers.xavier_uniform(),
+                    (self.num_rels, self.num_bases)
+                )
+
             # message func
             self.message_func = self.basis_message_func
-        elif regularizer == "bdd":
-            if in_feat % self.num_bases != 0 or out_feat % self.num_bases != 0:
+
+        elif self.regularizer == "bdd":
+            if self.in_feat % self.num_bases != 0 or self.out_feat % self.num_bases != 0:
                 raise ValueError(
                     'Feature size must be a multiplier of num_bases (%d).'
                     % self.num_bases
                 )
             # add block diagonal weights
-            self.submat_in = in_feat // self.num_bases
-            self.submat_out = out_feat // self.num_bases
+            self.submat_in = self.in_feat // self.num_bases
+            self.submat_out = self.out_feat // self.num_bases
 
             # assuming in_feat and out_feat are both divisible by num_bases
-            self.weight = nn.Parameter(th.Tensor(
-                self.num_rels, self.num_bases * self.submat_in * self.submat_out))
-            nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+            self.weight = self.param(
+                "weight",
+                nn.initializers.xavier_uniform(),
+                (self.num_rels, self.num_bases * self.submat_in * self.submat_out),
+            )
+
             # message func
             self.message_func = self.bdd_message_func
         else:
@@ -170,44 +173,55 @@ class RelGraphConv(nn.Module):
 
         # bias
         if self.bias:
-            self.h_bias = nn.Parameter(th.Tensor(out_feat))
-            nn.init.zeros_(self.h_bias)
+            self.h_bias = self.param(
+                "h_bias",
+                nn.initializers.zeros,
+                (self.out_feat,),
+            )
 
         # layer norm
         if self.layer_norm:
-            self.layer_norm_weight = nn.LayerNorm(out_feat, elementwise_affine=True)
+            self.layer_norm_weight = nn.LayerNorm()
 
         # weight for self loop
         if self.self_loop:
-            self.loop_weight = nn.Parameter(th.Tensor(in_feat, out_feat))
-            nn.init.xavier_uniform_(self.loop_weight,
-                                    gain=nn.init.calculate_gain('relu'))
+            self.loop_weight = self.param(
+                "loop_weight",
+                nn.initializers.xavier_uniform(),
+                (self.in_feat, self.out_feat),
+            )
 
-        self.dropout = nn.Dropout(dropout)
+        if self.dropout > 0.0:
+            self._dropout = nn.Dropout(self.dropout)
+        else:
+            self._dropout = lambda x: x
 
     def basis_message_func(self, edges):
         """Message function for basis regularizer"""
         if self.num_bases < self.num_rels:
             # generate all weights from bases
-            weight = self.weight.view(self.num_bases,
-                                      self.in_feat * self.out_feat)
-            weight = th.matmul(self.w_comp, weight).view(
-                self.num_rels, self.in_feat, self.out_feat)
+            weight = self.weight.reshape((self.num_bases,
+                                      self.in_feat * self.out_feat))
+            weight = jnp.matmul(self.w_comp, weight).reshape((
+                self.num_rels, self.in_feat, self.out_feat))
         else:
             weight = self.weight
 
         # calculate msg @ W_r before put msg into edge
-        # if src is th.int64 we expect it is an index select
-        if edges.src['h'].dtype != th.int64 and self.low_mem:
-            etypes = th.unique(edges.data['type'])
-            msg = th.empty((edges.src['h'].shape[0], self.out_feat),
-                           device=edges.src['h'].device)
+        # if src is jnp.int64 we expect it is an index select
+        if edges.src['h'].dtype != jnp.int64 and self.low_mem:
+            etypes = jnp.unique(edges.data['type'])
+            msg = jnp.zeros((edges.src['h'].shape[0], self.out_feat))
             for etype in etypes:
                 loc = edges.data['type'] == etype
                 w = weight[etype]
                 src = edges.src['h'][loc]
-                sub_msg = th.matmul(src, w)
-                msg[loc] = sub_msg
+                sub_msg = jnp.matmul(src, w)
+                msg = jax.ops.index_update(
+                    msg,
+                    loc,
+                    sub_msg
+                )
         else:
             # put W_r into edges then do msg @ W_r
             msg = utils.bmm_maybe_select(edges.src['h'], weight, edges.data['type'])
@@ -218,31 +232,40 @@ class RelGraphConv(nn.Module):
 
     def bdd_message_func(self, edges):
         """Message function for block-diagonal-decomposition regularizer"""
-        if edges.src['h'].dtype == th.int64 and len(edges.src['h'].shape) == 1:
+        if edges.src['h'].dtype == jnp.int64 and len(edges.src['h'].shape) == 1:
             raise TypeError('Block decomposition does not allow integer ID feature.')
 
         # calculate msg @ W_r before put msg into edge
         if self.low_mem:
-            etypes = th.unique(edges.data['type'])
-            msg = th.empty((edges.src['h'].shape[0], self.out_feat),
-                           device=edges.src['h'].device)
+            etypes = jnp.unique(edges.data['type'])
+            msg = jnp.zeros((edges.src['h'].shape[0], self.out_feat))
             for etype in etypes:
                 loc = edges.data['type'] == etype
-                w = self.weight[etype].view(self.num_bases, self.submat_in, self.submat_out)
-                src = edges.src['h'][loc].view(-1, self.num_bases, self.submat_in)
-                sub_msg = th.einsum('abc,bcd->abd', src, w)
-                sub_msg = sub_msg.reshape(-1, self.out_feat)
-                msg[loc] = sub_msg
+                w = self.weight[etype].reshape((self.num_bases, self.submat_in, self.submat_out))
+                src = edges.src['h'][loc].reshape((-1, self.num_bases, self.submat_in))
+                sub_msg = jnp.einsum('abc,bcd->abd', src, w)
+                sub_msg = sub_msg.reshape((-1, self.out_feat))
+                msg = jax.ops.index_update(
+                    msg,
+                    loc,
+                    sub_msg
+                )
         else:
-            weight = self.weight.index_select(0, edges.data['type']).view(
-                -1, self.submat_in, self.submat_out)
-            node = edges.src['h'].view(-1, 1, self.submat_in)
-            msg = th.bmm(node, weight).view(-1, self.out_feat)
+            weight = jnp.take(
+                self.weight,
+                edges.data['type'],
+                0,
+            ).reshape(
+                (-1, self.submat_in, self.submat_out),
+            )
+
+            node = edges.src['h'].reshape((-1, 1, self.submat_in))
+            msg = jax.lax.batch_matmul(node, weight).reshape((-1, self.out_feat))
         if 'norm' in edges.data:
             msg = msg * edges.data['norm']
         return {'msg': msg}
 
-    def forward(self, g, feat, etypes, norm=None):
+    def __call__(self, g, feat, etypes, norm=None):
         """
 
         Description
@@ -278,6 +301,7 @@ class RelGraphConv(nn.Module):
             if self.self_loop:
                 loop_message = utils.matmul_maybe_select(feat[:g.number_of_dst_nodes()],
                                                          self.loop_weight)
+
             # message passing
             g.update_all(self.message_func, fn.sum(msg='msg', out='h'))
             # apply bias and activation
@@ -290,5 +314,5 @@ class RelGraphConv(nn.Module):
                 node_repr = node_repr + loop_message
             if self.activation:
                 node_repr = self.activation(node_repr)
-            node_repr = self.dropout(node_repr)
+            node_repr = self._dropout(node_repr)
             return node_repr
