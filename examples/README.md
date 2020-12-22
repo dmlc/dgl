@@ -263,6 +263,10 @@
     - Example: [[PyTorch]](https://github.com/awslabs/dgl-ke/tree/master/examples), [[PyTorch for custom data]](https://aws-dglke.readthedocs.io/en/latest/commands.html)
     - Tags: knowledge graph embedding
 
+- Abu-El-Haija et al. [MixHop: Higher-Order Graph Convolutional Architectures via Sparsified Neighborhood Mixing](https://arxiv.org/abs/1905.00067).
+    - Example: [[PyTorch]](../examples/pytorch/mixhop)
+    - Tags: node classification
+
 ## 2020
 
 - Hu et al. [Heterogeneous Graph Transformer](https://arxiv.org/abs/2003.01332).
