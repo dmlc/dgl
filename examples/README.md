@@ -278,5 +278,5 @@
     - Tags: node classification, OGB, large-scale, heterogeneous graphs
 
 - Hu et al. [Strategies for Pre-training Graph Neural Networks](https://arxiv.org/abs/1905.12265).
-    - Example: [[Molecule embedding]](https://github.com/awslabs/dgl-lifesci/tree/master/examples/molecule_embeddings)
+    - Example: [[Molecule embedding]](https://github.com/awslabs/dgl-lifesci/tree/master/examples/molecule_embeddings), [[PyTorch for custom data]](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/csv_data_configuration)
     - Tags: molecules, graph classification, unsupervised learning, self-supervised learning, molecular property prediction
