@@ -147,6 +147,7 @@ def main(args):
     disk_size = args.disk_size
     instance = launch_ec2(generate_user_data(
         command, args.ignore_git), instance_type, disk_size)
+    time.sleep(5)
     while (instance.state['Name'] == "running"):
         instance.reload()
         time.sleep(5)
