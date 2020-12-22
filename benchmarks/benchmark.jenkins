@@ -1,11 +1,14 @@
 #!/usr/bin/env groovy
+
+
 def init_git() {
-    //   sh "rm -rf *"
-    //   checkout scm
     sh 'git submodule update --recursive --init'
 }
 pipeline {
     agent any
+    triggers {
+        cron('0 0 * * *')
+    }
     stages {
         stage('Regression Test') {
             agent {
@@ -20,12 +23,12 @@ pipeline {
                 DGL_BENCH_DEVICE = 'cpu'
             }
             steps {
-                init_git()
-                dir('benchmarks') {
-                    sh "python replace_branch.py --branch ${BRANCH_NAME}"
-                    sh "bash publish.sh ${env.INSTANCE_TYPE} cpu"
-                    sh "aws s3 sync results s3://dgl-asv-data/ci/results/"
-                    sh "aws s3 sync html s3://dgl-asv-data/ci/html/"
+                timeout(time: 30, unit: 'MINUTES') {
+                    init_git()
+                    dir('benchmarks') {
+                        sh 'python -m pip install boto3'
+                        sh 'python launch_ec2.py --script-file ec2_script.sh'
+                    }
                 }
                 echo "instance type: ${env.INSTANCE_TYPE}"
                 echo "pwd: ${WORKSPACE}"
