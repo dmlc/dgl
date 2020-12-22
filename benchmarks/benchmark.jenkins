@@ -1,6 +1,5 @@
 #!/usr/bin/env groovy
 
-
 def init_git() {
     sh 'git submodule update --recursive --init'
 }
@@ -12,7 +11,11 @@ pipeline {
     stages {
         stage('Regression Test') {
             agent {
-                label 'master-node'
+                docker {
+                    label 'master-node'
+                    image 'dgllib/dgl-ci-lint'
+                    alwaysPull true
+                }
             }
 
             environment {
@@ -26,8 +29,8 @@ pipeline {
                 timeout(time: 30, unit: 'MINUTES') {
                     init_git()
                     dir('benchmarks') {
-                        sh 'python -m pip install boto3'
-                        sh 'python launch_ec2.py --script-file ec2_script.sh'
+                        sh 'python3 -m pip install boto3'
+                        sh 'python3 launch_ec2.py --script-file ec2_script.sh'
                     }
                 }
                 echo "instance type: ${env.INSTANCE_TYPE}"
