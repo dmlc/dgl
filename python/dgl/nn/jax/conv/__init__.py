@@ -7,4 +7,5 @@ from .tagconv import TAGConv
 from .relgraphconv import RelGraphConv
 from .gatconv import GATConv
 from .sageconv import SAGEConv
-__all__ = ['GraphConv', "TAGConv", "RelGraphConv", "GATConv", "SAGEConv"]
+from .edgeconv import EdgeConv
+__all__ = ['GraphConv', "TAGConv", "RelGraphConv", "GATConv", "SAGEConv", "EdgeConv"]
