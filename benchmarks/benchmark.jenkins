@@ -12,7 +12,7 @@ pipeline {
     stages {
         stage('Regression Test') {
             agent {
-                label 'linux-c52x-node'
+                label 'master-node'
             }
 
             environment {
