@@ -18,13 +18,6 @@ pipeline {
                 }
             }
 
-            environment {
-                INSTANCE_TYPE = sh (
-                    script: 'curl -s http://169.254.169.254/latest/meta-data/instance-type',
-                    returnStdout: true
-                ).trim()
-                DGL_BENCH_DEVICE = 'cpu'
-            }
             steps {
                 timeout(time: 30, unit: 'MINUTES') {
                     init_git()
