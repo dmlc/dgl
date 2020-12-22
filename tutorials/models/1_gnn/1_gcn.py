@@ -49,7 +49,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from dgl import DGLGraph
 
-gcn_msg = fn.copy_src(src='h', out='m')
+gcn_msg = fn.copy_u(u='h', out='m')
 gcn_reduce = fn.sum(msg='m', out='h')
 
 ###############################################################################
@@ -95,15 +95,14 @@ print(net)
 ###############################################################################
 # We load the cora dataset using DGL's built-in data module.
 
-from dgl.data import citation_graph as citegrh
-import networkx as nx
+from dgl.data import CoraGraphDataset
 def load_cora_data():
-    data = citegrh.load_cora()
-    features = th.FloatTensor(data.features)
-    labels = th.LongTensor(data.labels)
-    train_mask = th.BoolTensor(data.train_mask)
-    test_mask = th.BoolTensor(data.test_mask)
-    g = DGLGraph(data.graph)
+    dataset = CoraGraphDataset()
+    g = dataset[0]
+    features = g.ndata['feat']
+    labels = g.ndata['label']
+    train_mask = g.ndata['train_mask']
+    test_mask = g.ndata['test_mask']
     return g, features, labels, train_mask, test_mask
 
 ###############################################################################

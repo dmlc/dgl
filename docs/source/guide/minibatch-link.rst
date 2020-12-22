@@ -158,7 +158,7 @@ that shows an example of link prediction on homogeneous graphs.
 
 For heterogeneous graphs
 ~~~~~~~~~~~~~~~~~~~~~~~~
-
+    
 The models computing the node representations on heterogeneous graphs
 can also be used for computing incident node representations for edge
 classification/regression.
@@ -235,23 +235,32 @@ source-destination array pairs. An example is given as follows:
 
 .. code:: python
 
-    class NegativeSampler(object):
-        def __init__(self, g, k):
-            # caches the probability distribution
-            self.weights = {
-                etype: g.in_degrees(etype=etype).float() ** 0.75
-                for etype in g.canonical_etypes}
-            self.k = k
-    
-        def __call__(self, g, eids_dict):
-            result_dict = {}
-            for etype, eids in eids_dict.items():
-                src, _ = g.find_edges(eids, etype=etype)
-                src = src.repeat_interleave(self.k)
-                dst = self.weights.multinomial(len(src), replacement=True)
-                result_dict[etype] = (src, dst)
-            return result_dict
-    
+   class NegativeSampler(object):
+       def __init__(self, g, k):
+           # caches the probability distribution
+           self.weights = {
+               etype: g.in_degrees(etype=etype).float() ** 0.75
+               for _, etype, _ in g.canonical_etypes
+           }
+           self.k = k
+
+       def __call__(self, g, eids_dict):
+           result_dict = {}
+           for etype, eids in eids_dict.items():
+               src, _ = g.find_edges(eids, etype=etype)
+               src = src.repeat_interleave(self.k)
+               dst = self.weights[etype].multinomial(len(src), replacement=True)
+               result_dict[etype] = (src, dst)
+           return result_dict
+
+Then you can give the dataloader a dictionary of edge types and edge IDs as well as the negative
+sampler.  For instance, the following iterates over all edges of the heterogeneous graph.
+
+.. code:: python
+    train_eid_dict = {
+        g.edges(etype=etype, form='eid')
+        for etype in g.etypes}
+
     dataloader = dgl.dataloading.EdgeDataLoader(
         g, train_eid_dict, sampler,
         negative_sampler=NegativeSampler(g, 5),
