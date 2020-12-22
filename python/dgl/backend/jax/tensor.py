@@ -46,7 +46,7 @@ def tensor(data, dtype=None):
     return data
 
 def as_scalar(data):
-    return data.item()
+    return data.squeeze()
 
 
 class SparseMatrix(abc.ABC):
@@ -112,7 +112,6 @@ class SparseMatrix2D(SparseMatrix):
 
         return jax.ops.segment_sum(prod, rows, num_segments)
 
-    @partial(jax.jit, static_argnums=(0, ))
     def __matmul__(self, x):
         if not self.ndim == 2:
             raise NotImplementedError
@@ -357,7 +356,6 @@ def randint(shape, dtype, *, low, high):
         dtype=dtype,
     )
 
-@jax.jit
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, jnp.ndarray):
@@ -380,15 +378,13 @@ def pad_packed_tensor(input, lengths, value, l_min=None):
     index = jnp.asarray(index)
     return scatter_row(x, index, input).reshape((batch_size, max_len, *old_shape[1:]))
 
-@jax.jit
 def pack_padded_tensor(input, lengths):
     batch_size, max_len = input.shape[:2]
-    device = input.device
     index = []
     for i, l in enumerate(lengths):
         index.extend(range(i * max_len, i * max_len + l))
-    index = tensor(index).to(device)
-    return gather_row(input.view(batch_size * max_len, -1), index)
+    index = tensor(index)
+    return gather_row(input.reshape((batch_size * max_len, -1)), index)
 
 @jax.jit
 def boolean_mask(input, mask):

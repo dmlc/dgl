@@ -3,4 +3,5 @@
 
 
 from .graphconv import GraphConv
-__all__ = ['GraphConv']
+from .tagconv import TAGConv
+__all__ = ['GraphConv', "TAGConv"]

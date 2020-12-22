@@ -127,7 +127,8 @@ class GraphConv(nn.Module):
     allow_zero_in_degree: bool = False
     weight: bool = True
     bias: bool = True
-    activation = None
+    from typing import Union
+    activation: Union[None, callable] = None
 
     def setup(self):
         if self.weight:
@@ -260,15 +261,17 @@ class GraphConv(nn.Module):
 
             if self.norm != 'none':
                 degs = jnp.clip(
-                    graph.out_degrees() * 1.0,
+                    graph.in_degrees() * 1.0,
                     a_min=1.0,
                 )
+
                 if self.norm == 'both':
                     norm = degs ** -0.5
                 else:
                     norm = 1.0 / degs
                 shp = norm.shape + (1,) * (feat_dst.ndim - 1)
                 norm = jnp.reshape(norm, shp)
+
                 rst = rst * norm
 
             if self._bias is not None:

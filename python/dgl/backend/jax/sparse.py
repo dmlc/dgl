@@ -5,7 +5,7 @@ from ...base import is_all, ALL
 from ...sparse import _gspmm, _gsddmm, infer_broadcast_shape
 from functools import partial
 
-__all__ = ['gspmm', 'gsddmm', 'edge_softmax']
+__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce']
 
 
 # =============================================================================
@@ -487,3 +487,35 @@ def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
     score_sum = gspmm(gidx, 'copy_rhs', 'sum', None, score)
     out = gsddmm(gidx, 'div', score, score_sum, 'e', 'v')
     return out
+
+@partial(jax.jit, static_argnums=(0, ))
+def _segment_reduce(op, idxs, x):
+    def f(x, idx):
+        if len(idx) == 0:
+            return jnp.zeros_like(x[0])
+
+        _x = [x[j] for j in idx]
+        _y = op(jnp.stack(_x, axis=0), axis=0)
+        return _y
+
+    return jnp.stack(
+        [f(x, idx) for idx in idxs]
+    )
+
+def segment_reduce(op, x, offsets):
+    # initialize y
+    y = jnp.zeros((len(offsets)-1, ) + x.shape[1:])
+
+    print(y.shape)
+
+    # translate op to callable
+    op = getattr(jnp, op)
+
+    # get a list of indices
+    idxs = [
+        jnp.arange(offsets[i], offsets[i+1])
+        for i in jnp.arange(len(offsets)-1)
+    ]
+
+
+    return _segment_reduce(op, idxs, x)

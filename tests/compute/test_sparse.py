@@ -282,9 +282,10 @@ def test_segment_reduce(reducer):
         assert F.allclose(rst1, rst2)
         print('forward passed')
 
-        grad2 = F.grad(v2)
-        assert F.allclose(grad1, grad2)
-        print('backward passed')
+        if F.backend_name != "jax":
+            grad2 = F.grad(v2)
+            assert F.allclose(grad1, grad2)
+            print('backward passed')
 
 
 if __name__ == '__main__':

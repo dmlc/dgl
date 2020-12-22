@@ -63,16 +63,20 @@ def test_graph_conv0():
 @pytest.mark.parametrize('bias', [True, False])
 def test_graph_conv(idtype, g, norm, weight, bias):
     # Test one tensor input
-    g = g.astype(idtype).to(F.ctx())
+    g = g.astype(idtype)
     conv = nn.GraphConv(5, 2, norm=norm, weight=weight, bias=bias)
     ext_w = F.randn((5, 2))
     nsrc = g.number_of_src_nodes()
     ndst = g.number_of_dst_nodes()
-    h = F.randn((nsrc, 5)).to(F.ctx())
+
+    h = F.randn((nsrc, 5))
+
     if weight:
-        h_out = conv(g, h)
+        init_params = conv.init(jax.random.PRNGKey(0), g, h)
+        h_out = conv.apply(init_params, g, h)
     else:
-        h_out = conv(g, h, weight=ext_w)
+        init_params = conv.init(jax.random.PRNGKey(0), g, h, weight=ext_w)
+        h_out = conv.apply(init_params, g, h, weight=ext_w)
     assert h_out.shape == (ndst, 2)
 
 @parametrize_dtype
@@ -82,28 +86,30 @@ def test_graph_conv(idtype, g, norm, weight, bias):
 @pytest.mark.parametrize('bias', [True, False])
 def test_graph_conv_bi(idtype, g, norm, weight, bias):
     # Test a pair of tensor inputs
-    g = g.astype(idtype).to(F.ctx())
-    conv = nn.GraphConv(5, 2, norm=norm, weight=weight, bias=bias).to(F.ctx())
-    ext_w = F.randn((5, 2)).to(F.ctx())
+    g = g.astype(idtype)
+    conv = nn.GraphConv(5, 2, norm=norm, weight=weight, bias=bias)
+    ext_w = F.randn((5, 2))
     nsrc = g.number_of_src_nodes()
     ndst = g.number_of_dst_nodes()
-    h = F.randn((nsrc, 5)).to(F.ctx())
-    h_dst = F.randn((ndst, 2)).to(F.ctx())
+    h = F.randn((nsrc, 5))
+    h_dst = F.randn((ndst, 2))
     if weight:
-        h_out = conv(g, (h, h_dst))
+        init_params = conv.init(jax.random.PRNGKey(0), g, h)
+        h_out = conv.apply(init_params, g, (h, h_dst))
     else:
-        h_out = conv(g, (h, h_dst), weight=ext_w)
+        init_params = conv.init(jax.random.PRNGKey(0), g, h, weight=ext_w)
+        h_out = conv.apply(init_params, g, (h, h_dst), weight=ext_w)
     assert h_out.shape == (ndst, 2)
 
 def _S2AXWb(A, N, X, W, b):
     X1 = X * N
-    X1 = th.matmul(A, X1.view(X1.shape[0], -1))
+    X1 = A @ X1.reshape(X1.shape[0], -1)
     X1 = X1 * N
     X2 = X1 * N
-    X2 = th.matmul(A, X2.view(X2.shape[0], -1))
+    X2 = A @ X2.reshape(X2.shape[0], -1)
     X2 = X2 * N
-    X = th.cat([X, X1, X2], dim=-1)
-    Y = th.matmul(X, W.rot90())
+    X = jnp.concatenate([X, X1, X2], axis=-1)
+    Y = X @ W
 
     return Y + b
 
@@ -112,35 +118,29 @@ def test_tagconv():
     g = g.to(F.ctx())
     ctx = F.ctx()
     adj = g.adjacency_matrix(transpose=False, ctx=ctx)
-    norm = th.pow(g.in_degrees().float(), -0.5)
+    norm = g.in_degrees().astype(jnp.float32) ** -0.5
 
     conv = nn.TAGConv(5, 2, bias=True)
-    conv = conv.to(ctx)
-    print(conv)
 
     # test#1: basic
     h0 = F.ones((3, 5))
-    h1 = conv(g, h0)
+    init_params = conv.init(jax.random.PRNGKey(0), g, h0)
+    h1 = conv.apply(init_params, g, h0)
+    print(conv)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
-    shp = norm.shape + (1,) * (h0.dim() - 1)
-    norm = th.reshape(norm, shp).to(ctx)
+    shp = norm.shape + (1,) * (h0.ndim - 1)
+    norm = jnp.reshape(norm, shp)
 
-    assert F.allclose(h1, _S2AXWb(adj, norm, h0, conv.lin.weight, conv.lin.bias))
+    assert F.allclose(h1, _S2AXWb(adj, norm, h0, init_params["params"]["lin"]["kernel"], init_params["params"]["lin"]["bias"]))
 
     conv = nn.TAGConv(5, 2)
-    conv = conv.to(ctx)
 
     # test#2: basic
     h0 = F.ones((3, 5))
-    h1 = conv(g, h0)
+    init_params = conv.init(jax.random.PRNGKey(0), g, h0)
+    h1 = conv.apply(init_params, g, h0)
     assert h1.shape[-1] == 2
-
-    # test reset_parameters
-    old_weight = deepcopy(conv.lin.weight.data)
-    conv.reset_parameters()
-    new_weight = conv.lin.weight.data
-    assert not F.allclose(old_weight, new_weight)
 
 def test_set2set():
     ctx = F.ctx()
@@ -148,46 +148,43 @@ def test_set2set():
     g = g.to(F.ctx())
 
     s2s = nn.Set2Set(5, 3, 3) # hidden size 5, 3 iters, 3 layers
-    s2s = s2s.to(ctx)
-    print(s2s)
 
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
-    h1 = s2s(g, h0)
-    assert h1.shape[0] == 1 and h1.shape[1] == 10 and h1.dim() == 2
+    init_params = s2s.init(jax.random.PRNGKey(0), g, h0)
+    h1 = s2s.apply(init_params, g, h0)
+    assert h1.shape[0] == 1 and h1.shape[1] == 10 and h1.ndim == 2
 
     # test#2: batched graph
     g1 = dgl.DGLGraph(nx.path_graph(11)).to(F.ctx())
     g2 = dgl.DGLGraph(nx.path_graph(5)).to(F.ctx())
     bg = dgl.batch([g, g1, g2])
     h0 = F.randn((bg.number_of_nodes(), 5))
-    h1 = s2s(bg, h0)
-    assert h1.shape[0] == 3 and h1.shape[1] == 10 and h1.dim() == 2
+    init_params = s2s.init(jax.random.PRNGKey(0), bg, h0)
+    h1 = s2s.apply(init_params, bg, h0)
+    assert h1.shape[0] == 3 and h1.shape[1] == 10 and h1.ndim == 2
 
 def test_glob_att_pool():
-    ctx = F.ctx()
     g = dgl.DGLGraph(nx.path_graph(10))
-    g = g.to(F.ctx())
 
-    gap = nn.GlobalAttentionPooling(th.nn.Linear(5, 1), th.nn.Linear(5, 10))
-    gap = gap.to(ctx)
+    gap = nn.GlobalAttentionPooling(1, 10)
     print(gap)
 
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
-    h1 = gap(g, h0)
-    assert h1.shape[0] == 1 and h1.shape[1] == 10 and h1.dim() == 2
+    init_params = gap.init(jax.random.PRNGKey(0), g, h0)
+    h1 = gap.apply(init_params, g, h0)
+    assert h1.shape[0] == 1 and h1.shape[1] == 10 and h1.ndim == 2
 
     # test#2: batched graph
     bg = dgl.batch([g, g, g, g])
     h0 = F.randn((bg.number_of_nodes(), 5))
-    h1 = gap(bg, h0)
-    assert h1.shape[0] == 4 and h1.shape[1] == 10 and h1.dim() == 2
+    init_params = gap.init(jax.random.PRNGKey(0), bg, h0)
+    h1 = gap.apply(init_params, bg, h0)
+    assert h1.shape[0] == 4 and h1.shape[1] == 10 and h1.ndim == 2
 
 def test_simple_pool():
-    ctx = F.ctx()
     g = dgl.DGLGraph(nx.path_graph(15))
-    g = g.to(F.ctx())
 
     sum_pool = nn.SumPooling()
     avg_pool = nn.AvgPooling()
@@ -197,10 +194,6 @@ def test_simple_pool():
 
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
-    sum_pool = sum_pool.to(ctx)
-    avg_pool = avg_pool.to(ctx)
-    max_pool = max_pool.to(ctx)
-    sort_pool = sort_pool.to(ctx)
     h1 = sum_pool(g, h0)
     assert F.allclose(F.squeeze(h1, 0), F.sum(h0, 0))
     h1 = avg_pool(g, h0)
@@ -208,14 +201,14 @@ def test_simple_pool():
     h1 = max_pool(g, h0)
     assert F.allclose(F.squeeze(h1, 0), F.max(h0, 0))
     h1 = sort_pool(g, h0)
-    assert h1.shape[0] == 1 and h1.shape[1] == 10 * 5 and h1.dim() == 2
+    assert h1.shape[0] == 1 and h1.shape[1] == 10 * 5 and h1.ndim == 2
 
     # test#2: batched graph
-    g_ = dgl.DGLGraph(nx.path_graph(5)).to(F.ctx())
+    g_ = dgl.DGLGraph(nx.path_graph(5))
     bg = dgl.batch([g, g_, g, g_, g])
     h0 = F.randn((bg.number_of_nodes(), 5))
     h1 = sum_pool(bg, h0)
-    truth = th.stack([F.sum(h0[:15], 0),
+    truth = jnp.stack([F.sum(h0[:15], 0),
                       F.sum(h0[15:20], 0),
                       F.sum(h0[20:35], 0),
                       F.sum(h0[35:40], 0),
@@ -223,7 +216,7 @@ def test_simple_pool():
     assert F.allclose(h1, truth)
 
     h1 = avg_pool(bg, h0)
-    truth = th.stack([F.mean(h0[:15], 0),
+    truth = jnp.stack([F.mean(h0[:15], 0),
                       F.mean(h0[15:20], 0),
                       F.mean(h0[20:35], 0),
                       F.mean(h0[35:40], 0),
@@ -231,7 +224,7 @@ def test_simple_pool():
     assert F.allclose(h1, truth)
 
     h1 = max_pool(bg, h0)
-    truth = th.stack([F.max(h0[:15], 0),
+    truth = jnp.stack([F.max(h0[:15], 0),
                       F.max(h0[15:20], 0),
                       F.max(h0[20:35], 0),
                       F.max(h0[35:40], 0),
@@ -239,7 +232,7 @@ def test_simple_pool():
     assert F.allclose(h1, truth)
 
     h1 = sort_pool(bg, h0)
-    assert h1.shape[0] == 5 and h1.shape[1] == 10 * 5 and h1.dim() == 2
+    assert h1.shape[0] == 5 and h1.shape[1] == 10 * 5 and h1.ndim == 2
 
 def test_set_trans():
     ctx = F.ctx()
@@ -248,38 +241,40 @@ def test_set_trans():
     st_enc_0 = nn.SetTransformerEncoder(50, 5, 10, 100, 2, 'sab')
     st_enc_1 = nn.SetTransformerEncoder(50, 5, 10, 100, 2, 'isab', 3)
     st_dec = nn.SetTransformerDecoder(50, 5, 10, 100, 2, 4)
-    st_enc_0 = st_enc_0.to(ctx)
-    st_enc_1 = st_enc_1.to(ctx)
-    st_dec = st_dec.to(ctx)
     print(st_enc_0, st_enc_1, st_dec)
 
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 50))
-    h1 = st_enc_0(g, h0)
+    init_params = st_enc_0.init(jax.random.PRNGKey(0), g, h0)
+    h1 = st_enc_0.apply(init_params, g, h0)
     assert h1.shape == h0.shape
-    h1 = st_enc_1(g, h0)
+
+    init_params = st_enc_1.init(jax.random.PRNGKey(0), g, h0)
+    h1 = st_enc_1.apply(init_params, g, h0)
     assert h1.shape == h0.shape
-    h2 = st_dec(g, h1)
-    assert h2.shape[0] == 1 and h2.shape[1] == 200 and h2.dim() == 2
+    init_params = st_dec.init(jax.random.PRNGKey(0), g, h1)
+    h2 = st_dec.apply(init_params, g, h1)
+    assert h2.shape[0] == 1 and h2.shape[1] == 200 and h2.ndim == 2
 
     # test#2: batched graph
     g1 = dgl.DGLGraph(nx.path_graph(5))
     g2 = dgl.DGLGraph(nx.path_graph(10))
     bg = dgl.batch([g, g1, g2])
     h0 = F.randn((bg.number_of_nodes(), 50))
-    h1 = st_enc_0(bg, h0)
+    init_params = st_enc_0.init(jax.random.PRNGKey(0), bg, h0)
+    h1 = st_enc_0.apply(init_params, bg, h0)
     assert h1.shape == h0.shape
-    h1 = st_enc_1(bg, h0)
+    init_params = st_enc_1.init(jax.random.PRNGKey(0), bg, h0)
+    h1 = st_enc_1.apply(init_params, bg, h0)
     assert h1.shape == h0.shape
 
-    h2 = st_dec(bg, h1)
-    assert h2.shape[0] == 3 and h2.shape[1] == 200 and h2.dim() == 2
+    init_params = st_dec.init(jax.random.PRNGKey(0), bg, h1)
+    h2 = st_dec.apply(init_params, bg, h1)
+    assert h2.shape[0] == 3 and h2.shape[1] == 200 and h2.ndim == 2
 
 def test_rgcn():
-    ctx = F.ctx()
     etype = []
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
-    g = g.to(F.ctx())
     # 5 etypes
     R = 5
     for i in range(g.number_of_edges()):
@@ -288,72 +283,64 @@ def test_rgcn():
     I = 10
     O = 8
 
-    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
-    rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
-    rgc_basis_low.weight = rgc_basis.weight
-    rgc_basis_low.w_comp = rgc_basis.w_comp
-    rgc_basis_low.loop_weight = rgc_basis.loop_weight
-    h = th.randn((100, I)).to(ctx)
-    r = th.tensor(etype).to(ctx)
-    h_new = rgc_basis(g, h, r)
-    h_new_low = rgc_basis_low(g, h, r)
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
+    rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True)
+    h = F.randn((100, I))
+    r = F.tensor(etype)
+    init_params = rgc_basis.init(jax.random.PRNGKey(0), g, h, r)
+    h_new = rgc_basis.apply(init_params, g, h, r)
+    init_params = rgc_basis_low.init(jax.random.PRNGKey(0), g, h, r)
+    h_new_low = rgc_basis_low.apply(init_params, g, h, r)
     assert list(h_new.shape) == [100, O]
     assert list(h_new_low.shape) == [100, O]
-    assert F.allclose(h_new, h_new_low)
 
-    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B).to(ctx)
-    rgc_bdd_low = nn.RelGraphConv(I, O, R, "bdd", B, low_mem=True).to(ctx)
-    rgc_bdd_low.weight = rgc_bdd.weight
-    rgc_bdd_low.loop_weight = rgc_bdd.loop_weight
-    h = th.randn((100, I)).to(ctx)
-    r = th.tensor(etype).to(ctx)
-    h_new = rgc_bdd(g, h, r)
-    h_new_low = rgc_bdd_low(g, h, r)
+    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B)
+    rgc_bdd_low = nn.RelGraphConv(I, O, R, "bdd", B, low_mem=True)
+    h = F.randn((100, I))
+    r = F.tensor(etype)
+    init_params = rgc_bdd.init(jax.random.PRNGKey(0), g, h, r)
+    h_new = rgc_bdd.apply(init_params, g, h, r)
+    init_params = rgc_bdd_low.init(jax.random.PRNGKey(0))
+    h_new_low = rgc_bdd_low.apply(init_params, g, h, r)
     assert list(h_new.shape) == [100, O]
     assert list(h_new_low.shape) == [100, O]
-    assert F.allclose(h_new, h_new_low)
 
     # with norm
-    norm = th.zeros((g.number_of_edges(), 1)).to(ctx)
+    norm = F.zeros((g.number_of_edges(), 1))
 
-    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
-    rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
-    rgc_basis_low.weight = rgc_basis.weight
-    rgc_basis_low.w_comp = rgc_basis.w_comp
-    rgc_basis_low.loop_weight = rgc_basis.loop_weight
-    h = th.randn((100, I)).to(ctx)
-    r = th.tensor(etype).to(ctx)
-    h_new = rgc_basis(g, h, r, norm)
-    h_new_low = rgc_basis_low(g, h, r, norm)
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
+    rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True)
+    h = F.randn((100, I))
+    r = F.tensor(etype)
+    init_params = rgc_basis.init(jax.random.PRNGKey(0), g, h, r, norm)
+    h_new = rgc_basis.apply(init_params, g, h, r, norm)
+    init_params = rgc_basis_low.init(jax.random.PRNGKey(0), g, h, r, norm)
+    h_new_low = rgc_basis_low.apply(init_params, g, h, r, norm)
     assert list(h_new.shape) == [100, O]
     assert list(h_new_low.shape) == [100, O]
-    assert F.allclose(h_new, h_new_low)
 
-    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B).to(ctx)
-    rgc_bdd_low = nn.RelGraphConv(I, O, R, "bdd", B, low_mem=True).to(ctx)
-    rgc_bdd_low.weight = rgc_bdd.weight
-    rgc_bdd_low.loop_weight = rgc_bdd.loop_weight
-    h = th.randn((100, I)).to(ctx)
-    r = th.tensor(etype).to(ctx)
-    h_new = rgc_bdd(g, h, r, norm)
-    h_new_low = rgc_bdd_low(g, h, r, norm)
+    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B)
+    rgc_bdd_low = nn.RelGraphConv(I, O, R, "bdd", B, low_mem=True)
+    h = F.randn((100, I))
+    r = F.tensor(etype)
+    init_params = rgc_bdd.init(jax.random.PRNGKey(0), g, h, r, norm)
+    h_new = rgc_bdd.apply(init_params, g, h, r, norm)
+    init_params = rgc_bdd_low.init(jax.random.PRNGKey(0), g, h, r, norm)
+    h_new_low = rgc_bdd_low.apply(g, h, r, norm)
     assert list(h_new.shape) == [100, O]
     assert list(h_new_low.shape) == [100, O]
-    assert F.allclose(h_new, h_new_low)
 
     # id input
-    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
-    rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
-    rgc_basis_low.weight = rgc_basis.weight
-    rgc_basis_low.w_comp = rgc_basis.w_comp
-    rgc_basis_low.loop_weight = rgc_basis.loop_weight
-    h = th.randint(0, I, (100,)).to(ctx)
-    r = th.tensor(etype).to(ctx)
-    h_new = rgc_basis(g, h, r)
-    h_new_low = rgc_basis_low(g, h, r)
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
+    rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True)
+    h = F.randint(0, I, (100,))
+    r = F.tensor(etype)
+    init_params = rgc_basis.init(jax.random.PRNGKey(0), g, h, r)
+    h_new = rgc_basis.apply(init_params, g, h, r)
+    init_params = rgc_bdd_low.init(jax.random.PRNGKey(0), g, h, r)
+    h_new_low = rgc_basis_low.apply(init_params, g, h, r)
     assert list(h_new.shape) == [100, O]
     assert list(h_new_low.shape) == [100, O]
-    assert F.allclose(h_new, h_new_low)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
