@@ -151,7 +151,7 @@ def main(args):
     disk_size = args.disk_size
     instance = launch_ec2(generate_user_data(
         command, args.ignore_git), instance_type, disk_size)
-    while (instance.state['Name'] != "stopped"):
+    while (instance.state['Name'] not in ["stopped", "terminated"]):
         instance.reload()
         time.sleep(5)
     print("Finished Running")
