@@ -1,3 +1,4 @@
+import re
 import time
 import boto3
 import argparse
@@ -6,12 +7,11 @@ import textwrap
 import botocore
 
 
-
-def pass_env():
+def pass_env(extra_env_var):
     env = "export INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id) \n" + \
         "export INSTANCE_TYPE=$(curl -s http://169.254.169.254/latest/meta-data/instance-type) \n" +\
         "export DOCKER_LOG_OPT=(--log-driver awslogs --log-opt awslogs-region=us-west-2 --log-opt awslogs-group=/aws/ec2/dgl-ci --log-opt awslogs-stream=$INSTANCE_ID-docker) "
-    for env_name in ['GIT_COMMIT', 'GIT_URL', 'GIT_BRANCH']:
+    for env_name in ['GIT_COMMIT', 'GIT_URL', 'GIT_BRANCH'] + extra_env_var:
         if env_name in os.environ:
             env += "export {env_name}={env};\n".format(
                 env=os.environ[env_name], env_name=env_name)
@@ -34,14 +34,14 @@ def git_init(ignore_git):
     return command
 
 
-def generate_user_data(command, ignore_git):
+def generate_user_data(command, ignore_git, extra_env_var=[]):
     full_command = r"""
                     exec > >(tee /var/log/user-exec.log) 2>&1
                     {set_env}
                     {git_init}
                     {command}
                     sleep 5
-                    """.format(set_env=pass_env(), git_init=git_init(ignore_git), command=command)
+                    """.format(set_env=pass_env(extra_env_var), git_init=git_init(ignore_git), command=command)
     full_command = textwrap.dedent(full_command)
     log_config = r"""
     {
@@ -149,22 +149,25 @@ def main(args):
         raise Exception("Please specify script file or command")
     instance_type = args.instance_type
     disk_size = args.disk_size
+    env_list = [env for env in args.env_vars.split(",") if len(env) > 0]
     instance = launch_ec2(generate_user_data(
-        command, args.ignore_git), instance_type, disk_size)
+        command, args.ignore_git, env_list), instance_type, disk_size)
     while (instance.state['Name'] not in ["stopped", "terminated"]):
         instance.reload()
         time.sleep(5)
     print("Finished Running")
 
 
-parser = argparse.ArgumentParser(description='launch EC2')
+parser = argparse.ArgumentParser(description='launch EC2', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--instance-type", default="c5.2xlarge",
                     help="specify instance type")
 parser.add_argument("--ignore-git", action="store_true",
-                    default=False, help="specify instance type")
+                    default=False, help="whether to skip initialize git repo")
 parser.add_argument("--disk-size", default=150, type=int,
-                    help="specify instance type")
-parser.add_argument("--script-file", help="Bash Script to be run")
+                    help="specify disk size")
+parser.add_argument("--script-file", help="Bash Script to be run", required=True)
+parser.add_argument("--env-vars", default="", help="Extra environment variable to be passed. Split by comma."
+                    " i.e. JENKINS_URL, OMP_NUM_THREAD")
 args = parser.parse_args()
 
 main(args)
