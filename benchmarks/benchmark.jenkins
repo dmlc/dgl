@@ -19,7 +19,7 @@ pipeline {
             }
 
             steps {
-                timeout(time: 30, unit: 'MINUTES') {
+                timeout(time: 720, unit: 'MINUTES') {
                     init_git()
                     dir('benchmarks') {
                         sh 'python3 -m pip install boto3'
