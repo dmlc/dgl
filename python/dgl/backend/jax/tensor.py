@@ -386,7 +386,6 @@ def pack_padded_tensor(input, lengths):
     index = tensor(index)
     return gather_row(input.reshape((batch_size * max_len, -1)), index)
 
-@jax.jit
 def boolean_mask(input, mask):
     if 'bool' not in str(mask.dtype):
         mask = jnp.asarray(mask, dtype=jnp.bool_)

@@ -29,10 +29,16 @@ def prepare_tensor(g, data, name):
     """
     if F.backend_name == "jax":
         import jax
-        data = jax.device_put(
-            data,
-            g.device
-        )
+        from jax import numpy as jnp
+        if isinstance(data, jnp.ndarray) and hasattr(data, 'device_buffer'):
+            if data.device_buffer.device() != g.device:
+
+                data = jax.device_put(
+                    data,
+                    g.device
+                ).astype(
+                    data.dtype
+                )
 
 
     if F.is_tensor(data):
