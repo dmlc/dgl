@@ -42,6 +42,8 @@ def process_data(name):
         return dgl.data.CoraGraphDataset()
     elif name == 'pubmed':
         return dgl.data.PubmedGraphDataset()
+    elif name == 'reddit':
+        return dgl.data.RedditDataset(self_loop=True)
     else:
         raise ValueError('Invalid dataset name:', name)
 
@@ -79,10 +81,11 @@ def parametrize(param_name, params):
         return func
     return _wrapper
 
-def benchmark(track_type):
+def benchmark(track_type, timeout=60):
     assert track_type in ['time', 'acc']
     def _wrapper(func):
         func.unit = TRACK_UNITS[track_type]
         func.setup = TRACK_SETUP[track_type]
+        func.timeout = timeout
         return func
     return _wrapper
