@@ -4,17 +4,10 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
-from torch.utils.data import DataLoader
-import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
-from _thread import start_new_thread
-from functools import wraps
-from dgl.data import RedditDataset
 import tqdm
-import traceback
 from ogb.nodeproppred import DglNodePropPredDataset
 
 class SAGE(nn.Module):
@@ -66,7 +59,6 @@ class SAGE(nn.Module):
         # Therefore, we compute the representation of all nodes layer by layer.  The nodes
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
-        nodes = th.arange(g.number_of_nodes())
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
