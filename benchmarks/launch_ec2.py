@@ -98,7 +98,7 @@ def launch_ec2(userdata, instance_type, disk_size=150):
         "MaxCount": 1,
         "MinCount": 1,
         "UserData": userdata,
-        "KeyName": 'DGL_keypair',
+        "KeyName": 'DGL_CI_Worker',
         "TagSpecifications": [{
             "ResourceType": "instance",
             "Tags": [{
