@@ -110,8 +110,8 @@ class DistDataLoader:
     and [3, 4] is not guaranteed.
     """
 
-    def __init__(self, dataset, batch_size, device='cpu', shuffle=False, collate_fn=None, drop_last=False,
-                 queue_size=None):
+    def __init__(self, dataset, batch_size, device='cpu', shuffle=False, collate_fn=None,
+                 drop_last=False, queue_size=None):
         self.pool, self.num_workers = get_sampler_pool()
         if queue_size is None:
             queue_size = self.num_workers * 4 if self.num_workers > 0 else 4

@@ -220,7 +220,7 @@ class NodeDataLoader:
             self.collator = NodeCollator(g, nids, block_sampler, **collator_kwargs)
             _remove_kwargs_dist(dataloader_kwargs)
             self.dataloader = DistDataLoader(self.collator.dataset,
-                                             device=self.device,
+                                             device=device,
                                              collate_fn=self.collator.collate,
                                              **dataloader_kwargs)
             self.is_distributed = True
