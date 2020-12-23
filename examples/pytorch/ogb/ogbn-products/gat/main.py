@@ -61,12 +61,12 @@ class GAT(nn.Module):
         # Therefore, we compute the representation of all nodes layer by layer.  The nodes
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
-        nodes = th.arange(g.number_of_nodes())
         for l, layer in enumerate(self.layers):
             if l < self.n_layers - 1:
                 y = th.zeros(g.number_of_nodes(), self.n_hidden * num_heads if l != len(self.layers) - 1 else self.n_classes)
             else:
                 y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
+            y = y.to(device)
 
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.NodeDataLoader(
@@ -81,7 +81,7 @@ class GAT(nn.Module):
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0].int().to(device)
 
-                h = x[input_nodes].to(device)
+                h = x[input_nodes]
                 h_dst = h[:block.number_of_dst_nodes()]
                 if l < self.n_layers - 1:
                     h = layer(block, (h, h_dst)).flatten(1) 
@@ -90,7 +90,7 @@ class GAT(nn.Module):
                     h = h.mean(1)
                     h = h.log_softmax(dim=-1)
 
-                y[output_nodes] = h.cpu()
+                y[output_nodes] = h
 
             x = y
         return y
@@ -101,7 +101,7 @@ def compute_acc(pred, labels):
     """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, labels, val_nid, test_nid, num_heads, device):
+def evaluate(model, g, nfeat, labels, val_nid, test_nid, num_heads, device):
     """
     Evaluate the model on the validation set specified by ``val_mask``.
     g : The entire graph.
@@ -113,23 +113,22 @@ def evaluate(model, g, labels, val_nid, test_nid, num_heads, device):
     """
     model.eval()
     with th.no_grad():
-        inputs = g.ndata['feat']
-        pred = model.inference(g, inputs, num_heads, device)
+        pred = model.inference(g, nfeat, num_heads, device)
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid]), compute_acc(pred[test_nid], labels[test_nid]), pred
 
-def load_subtensor(g, labels, seeds, input_nodes, device):
+def load_subtensor(nfeat, labels, seeds, input_nodes):
     """
     Copys features and labels of a set of nodes onto GPU.
     """
-    batch_inputs = g.ndata['feat'][input_nodes].to(device)
-    batch_labels = labels[seeds].to(device)
+    batch_inputs = nfeat[input_nodes]
+    batch_labels = labels[seeds]
     return batch_inputs, batch_labels
 
 #### Entry point
 def run(args, device, data):
     # Unpack data
-    train_nid, val_nid, test_nid, in_feats, labels, n_classes, g, num_heads = data
+    train_nid, val_nid, test_nid, in_feats, labels, n_classes, nfeat, g, num_heads = data
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
@@ -165,7 +164,7 @@ def run(args, device, data):
             blocks = [blk.to(device) for blk in blocks]
 
             # Load the input features as well as output labels
-            batch_inputs, batch_labels = load_subtensor(g, labels, seeds, input_nodes, device)
+            batch_inputs, batch_labels = load_subtensor(nfeat, labels, seeds, input_nodes)
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -186,7 +185,7 @@ def run(args, device, data):
         if epoch >= 5:
             avg += toc - tic
         if epoch % args.eval_every == 0 and epoch != 0:
-            eval_acc, test_acc, pred = evaluate(model, g, labels, val_nid, test_nid, num_heads, device)
+            eval_acc, test_acc, pred = evaluate(model, g, nfeat, labels, val_nid, test_nid, num_heads, device)
             if args.save_pred:
                 np.savetxt(args.save_pred + '%02d' % epoch, pred.argmax(1).cpu().numpy(), '%d')
             print('Eval Acc {:.4f}'.format(eval_acc))
@@ -228,20 +227,21 @@ if __name__ == '__main__':
     splitted_idx = data.get_idx_split()
     train_idx, val_idx, test_idx = splitted_idx['train'], splitted_idx['valid'], splitted_idx['test']
     graph, labels = data[0]
-    labels = labels[:, 0]
+    nfeat = graph.ndata.pop('feat').to(device)
+    labels = labels[:, 0].to(device)
 
     print('Total edges before adding self-loop {}'.format(graph.number_of_edges()))
     graph = graph.remove_self_loop().add_self_loop()
     print('Total edges after adding self-loop {}'.format(graph.number_of_edges()))
 
-    in_feats = graph.ndata['feat'].shape[1]
+    in_feats = nfeat.shape[1]
     n_classes = (labels.max() + 1).item()
 
     # Create csr/coo/csc formats before launching sampling processes
     # This avoids creating certain formats in each data loader process, which saves momory and CPU.
     graph.create_formats_()
     # Pack data
-    data = train_idx, val_idx, test_idx, in_feats, labels, n_classes, graph, args.head
+    data = train_idx, val_idx, test_idx, in_feats, labels, n_classes, nfeat, graph, args.head
 
     # Run 10 times
     test_accs = []
