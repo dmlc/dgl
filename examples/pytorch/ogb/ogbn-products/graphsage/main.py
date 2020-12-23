@@ -82,7 +82,7 @@ class SAGE(nn.Module):
                     h = self.activation(h)
                     h = self.dropout(h)
 
-                y[output_nodes] = h.cpu()
+                y[output_nodes] = h
 
             x = y
         return y
