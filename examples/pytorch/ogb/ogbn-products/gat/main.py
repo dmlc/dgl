@@ -92,7 +92,7 @@ class GAT(nn.Module):
                 y[output_nodes] = h.cpu()
 
             x = y
-        return y
+        return y.to(device)
 
 def compute_acc(pred, labels):
     """
