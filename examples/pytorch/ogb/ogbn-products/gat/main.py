@@ -4,17 +4,10 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
-from torch.utils.data import DataLoader
-import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
-from _thread import start_new_thread
-from functools import wraps
-from dgl.data import RedditDataset
 import tqdm
-import traceback
 from ogb.nodeproppred import DglNodePropPredDataset
 
 
@@ -25,17 +18,18 @@ class GAT(nn.Module):
                  n_classes,
                  n_layers,
                  num_heads,
-                 activation,
-                 dropout):
+                 activation):
         super().__init__()
         self.n_layers = n_layers
         self.n_hidden = n_hidden
         self.n_classes = n_classes
         self.layers = nn.ModuleList()
-        self.layers.append(dglnn.GATConv((in_feats, in_feats), n_hidden, num_heads=num_heads, feat_drop=0., attn_drop=0., activation=activation, negative_slope=0.2))
+        self.layers.append(dglnn.GATConv((in_feats, in_feats), n_hidden, num_heads=num_heads, activation=activation))
         for i in range(1, n_layers - 1):
-            self.layers.append(dglnn.GATConv((n_hidden * num_heads, n_hidden * num_heads), n_hidden, num_heads=num_heads, feat_drop=0., attn_drop=0., activation=activation, negative_slope=0.2))
-        self.layers.append(dglnn.GATConv((n_hidden * num_heads, n_hidden * num_heads), n_classes, num_heads=num_heads, feat_drop=0., attn_drop=0., activation=None, negative_slope=0.2))
+            self.layers.append(dglnn.GATConv((n_hidden * num_heads, n_hidden * num_heads), n_hidden,
+                                             num_heads=num_heads, activation=activation))
+        self.layers.append(dglnn.GATConv((n_hidden * num_heads, n_hidden * num_heads), n_classes,
+                                         num_heads=num_heads, activation=None))
 
     def forward(self, blocks, x):
         h = x
@@ -54,7 +48,7 @@ class GAT(nn.Module):
         h = h.mean(1)
         return h.log_softmax(dim=-1)
 
-    def inference(self, g, x, batch_size, num_heads, device):
+    def inference(self, g, x, num_heads, device):
         """
         Inference with the GAT model on full neighbors (i.e. without neighbor sampling).
         g : the entire graph.
@@ -107,7 +101,7 @@ def compute_acc(pred, labels):
     """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, labels, val_nid, test_nid, batch_size, num_heads, device):
+def evaluate(model, g, labels, val_nid, test_nid, num_heads, device):
     """
     Evaluate the model on the validation set specified by ``val_mask``.
     g : The entire graph.
@@ -120,7 +114,7 @@ def evaluate(model, g, labels, val_nid, test_nid, batch_size, num_heads, device)
     model.eval()
     with th.no_grad():
         inputs = g.ndata['feat']
-        pred = model.inference(g, inputs, batch_size, num_heads, device)
+        pred = model.inference(g, inputs, num_heads, device)
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid]), compute_acc(pred[test_nid], labels[test_nid]), pred
 
@@ -150,7 +144,7 @@ def run(args, device, data):
         num_workers=args.num_workers)
 
     # Define model and optimizer
-    model = GAT(in_feats, args.num_hidden, n_classes, args.num_layers, num_heads, F.relu, args.dropout)
+    model = GAT(in_feats, args.num_hidden, n_classes, args.num_layers, num_heads, F.relu)
     model = model.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)
 
@@ -192,7 +186,7 @@ def run(args, device, data):
         if epoch >= 5:
             avg += toc - tic
         if epoch % args.eval_every == 0 and epoch != 0:
-            eval_acc, test_acc, pred = evaluate(model, g, labels, val_nid, test_nid, args.val_batch_size, num_heads, device)
+            eval_acc, test_acc, pred = evaluate(model, g, labels, val_nid, test_nid, num_heads, device)
             if args.save_pred:
                 np.savetxt(args.save_pred + '%02d' % epoch, pred.argmax(1).cpu().numpy(), '%d')
             print('Eval Acc {:.4f}'.format(eval_acc))
@@ -217,7 +211,6 @@ if __name__ == '__main__':
     argparser.add_argument('--log-every', type=int, default=20)
     argparser.add_argument('--eval-every', type=int, default=1)
     argparser.add_argument('--lr', type=float, default=0.001)
-    argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=8,
         help="Number of sampling processes. Use 0 for no extra process.")
     argparser.add_argument('--save-pred', type=str, default='')
