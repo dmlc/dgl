@@ -167,6 +167,8 @@ def test_gat_conv(g, idtype):
     feat = F.randn((g.number_of_nodes(), 10))
     h = gat(g, feat)
     assert h.shape == (g.number_of_nodes(), 5, 20)
+    _, a = gat(g, feat, True)
+    assert a.shape == (g.number_of_edges(), 5, 1)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
@@ -178,6 +180,8 @@ def test_gat_conv_bi(g, idtype):
     feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
     h = gat(g, feat)
     assert h.shape == (g.number_of_dst_nodes(), 4, 2)
+    _, a = gat(g, feat, True)
+    assert a.shape == (g.number_of_edges(), 4, 1)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))

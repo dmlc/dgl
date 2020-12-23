@@ -1,4 +1,6 @@
-# Deep Graph Library (DGL)
+<p align="center">
+  <img src="http://data.dgl.ai/asset/logo.jpg" height="200">
+</p>
 
 [![PyPi Latest Release](https://img.shields.io/pypi/v/dgl.svg)](https://pypi.org/project/dgl/)
 [![Conda Latest Release](https://anaconda.org/dglteam/dgl/badges/version.svg)](https://anaconda.org/dglteam/dgl)
@@ -163,6 +165,111 @@ Overall there are 30+ models implemented by using DGL:
 
 We are currently in Beta stage.  More features and improvements are coming.
 
+## Awesome Papers Using DGL
+
+1. [**Benchmarking Graph Neural Networks**](https://arxiv.org/pdf/2003.00982.pdf), *Vijay Prakash Dwivedi, Chaitanya K. Joshi, Thomas Laurent, Yoshua Bengio, Xavier Bresson*
+
+1. [**Open Graph Benchmarks: Datasets for Machine Learning on Graphs**](https://arxiv.org/pdf/2005.00687.pdf), NeurIPS'20, *Weihua Hu, Matthias Fey, Marinka Zitnik, Yuxiao Dong, Hongyu Ren, Bowen Liu, Michele Catasta, Jure Leskovec*
+
+1. [**DropEdge: Towards Deep Graph Convolutional Networks on Node Classification**](https://openreview.net/pdf?id=Hkx1qkrKPr), ICLR'20, *Yu Rong, Wenbing Huang, Tingyang Xu, Junzhou Huan*
+
+1. [**Discourse-Aware Neural Extractive Text Summarization**](https://www.aclweb.org/anthology/2020.acl-main.451/), ACL'20, *Jiacheng Xu, Zhe Gan, Yu Cheng, Jingjing Liu*
+
+1. [**GCC: Graph Contrastive Coding for Graph Neural Network Pre-Training**](https://dl.acm.org/doi/pdf/10.1145/3394486.3403168?casa_token=EClsH2Vc4DcAAAAA:LIB8cbtr6yTDbYuv4cTLwTIYeDq5Y2dhj_ktcWdKpzdPLGeiuL0o8GlcN4QIOnpsAnmGeGVZ), KDD'20, *Jiezhong Qiu, Qibin Chen, Yuxiao Dong, Jing Zhang, Hongxia Yang, Ming Ding, Kuansan Wang, Jie Tang*
+
+1. [**DGL-KE: Training Knowledge Graph Embeddings at Scale**](https://arxiv.org/pdf/2004.08532), SIGIR'20, *Da Zheng, Xiang Song, Chao Ma, Zeyuan Tan, Zihao Ye, Jin Dong, Hao Xiong, Zheng Zhang, George Karypis*
+
+1. [**Improving Graph Neural Network Expressivity via Subgraph Isomorphism Counting**](https://arxiv.org/pdf/2006.09252.pdf), *Giorgos Bouritsas, Fabrizio Frasca, Stefanos Zafeiriou, Michael M. Bronstein*
+
+1. [**INT: An Inequality Benchmark for Evaluating Generalization in Theorem Proving**](https://arxiv.org/pdf/2007.02924.pdf), *Yuhuai Wu, Albert Q. Jiang, Jimmy Ba, Roger Grosse*
+
+1. [**Finding Patient Zero: Learning Contagion Source with Graph Neural Networks**](https://arxiv.org/pdf/2006.11913.pdf), *Chintan Shah, Nima Dehmamy, Nicola Perra, Matteo Chinazzi, Albert-László Barabási, Alessandro Vespignani, Rose Yu*
+
+1. [**FeatGraph: A Flexible and Efficient Backend for Graph Neural Network Systems**](https://arxiv.org/pdf/2008.11359.pdf), SC'20, *Yuwei Hu, Zihao Ye, Minjie Wang, Jiali Yu, Da Zheng, Mu Li, Zheng Zhang, Zhiru Zhang, Yida Wang*
+
+
+<details><summary>more</summary>
+
+11. [**BP-Transformer: Modelling Long-Range Context via Binary Partitioning.**](https://arxiv.org/pdf/1911.04070.pdf), *Zihao Ye, Qipeng Guo, Quan Gan, Xipeng Qiu, Zheng Zhang*
+
+12. [**OptiMol: Optimization of Binding Affinities in Chemical Space for Drug Discovery**](https://www.biorxiv.org/content/biorxiv/early/2020/06/16/2020.05.23.112201.full.pdf), *Jacques Boitreaud,Vincent Mallet, Carlos Oliver, Jérôme Waldispühl*
+
+1. [**JAKET: Joint Pre-training of Knowledge Graph and Language Understanding**](https://arxiv.org/pdf/2010.00796.pdf), *Donghan Yu, Chenguang Zhu, Yiming Yang, Michael Zeng*
+
+1. [**Architectural Implications of Graph Neural Networks**](https://arxiv.org/pdf/2009.00804.pdf), *Zhihui Zhang, Jingwen Leng, Lingxiao Ma, Youshan Miao, Chao Li, Minyi Guo*
+
+1. [**Combining Reinforcement Learning and Constraint Programming for Combinatorial Optimization**](https://arxiv.org/pdf/2006.01610.pdf), *Quentin Cappart, Thierry Moisan, Louis-Martin Rousseau1, Isabeau Prémont-Schwarz, and Andre Cire*
+
+1. [**Sparse Graph Attention Networks**](https://arxiv.org/abs/1912.00552), *Yang Ye, Shihao Ji*
+
+1. [**On Self-Distilling Graph Neural Network**](https://arxiv.org/pdf/2011.02255.pdf), *Yuzhao Chen, Yatao Bian, Xi Xiao, Yu Rong, Tingyang Xu, Junzhou Huang*
+
+1. [**Learning Robust Node Representations on Graphs**](https://arxiv.org/pdf/2008.11416.pdf), *Xu Chen, Ya Zhang, Ivor Tsang, and Yuangang Pan*
+
+1. [**Recurrent Event Network: Autoregressive Structure Inference over Temporal Knowledge Graphs**](https://arxiv.org/abs/1904.05530), *Woojeong Jin, Meng Qu, Xisen Jin, Xiang Ren*
+
+1. [**Graph Neural Ordinary Differential Equations**](https://arxiv.org/abs/1911.07532), *Michael Poli, Stefano Massaroli, Junyoung Park, Atsushi Yamashita, Hajime Asama, Jinkyoo Park*
+
+1. [**FusedMM: A Unified SDDMM-SpMM Kernel for Graph Embedding and Graph Neural Networks**](https://arxiv.org/pdf/2011.06391.pdf), *Md. Khaledur Rahman, Majedul Haque Sujon, , Ariful Azad*
+
+1. [**An Efficient Neighborhood-based Interaction Model for Recommendation on Heterogeneous Graph**](https://arxiv.org/pdf/2007.00216.pdf), KDD'20 *Jiarui Jin, Jiarui Qin, Yuchen Fang, Kounianhua Du, Weinan Zhang, Yong Yu, Zheng Zhang, Alexander J. Smola*
+
+1. [**Learning Interaction Models of Structured Neighborhood on Heterogeneous Information Network**](https://arxiv.org/pdf/2011.12683.pdf), *Jiarui Jin, Kounianhua Du, Weinan Zhang, Jiarui Qin, Yuchen Fang, Yong Yu, Zheng Zhang, Alexander J. Smola*
+
+1. [**Graphein - a Python Library for Geometric Deep Learning and Network Analysis on Protein Structures**](https://www.biorxiv.org/content/10.1101/2020.07.15.204701v1), *Arian R. Jamasb, Pietro Lió, Tom L. Blundell*
+
+1. [**Graph Policy Gradients for Large Scale Robot Control**](https://arxiv.org/abs/1907.03822), *Arbaaz Khan, Ekaterina Tolstaya, Alejandro Ribeiro, Vijay Kumar*
+
+1. [**Heterogeneous Molecular Graph Neural Networks for Predicting Molecule Properties**](https://arxiv.org/abs/2009.12710), *Zeren Shui, George Karypis*
+
+1. [**Could Graph Neural Networks Learn Better Molecular Representation for Drug Discovery? A Comparison Study of Descriptor-based and Graph-based Models**](https://assets.researchsquare.com/files/rs-81439/v1_stamped.pdf), *Dejun Jiang, Zhenxing Wu, Chang-Yu Hsieh, Guangyong Chen, Ben Liao, Zhe Wang, Chao Shen, Dongsheng Cao, Jian Wu, Tingjun Hou*
+
+1. [**Principal Neighbourhood Aggregation for Graph Nets**](https://arxiv.org/abs/2004.05718), *Gabriele Corso, Luca Cavalleri, Dominique Beaini, Pietro Liò, Petar Veličković*
+
+1. [**Collective Multi-type Entity Alignment Between Knowledge Graphs**](https://dl.acm.org/doi/abs/10.1145/3366423.3380289), *Qi Zhu, Hao Wei, Bunyamin Sisman, Da Zheng, Christos Faloutsos, Xin Luna Dong, Jiawei Han*
+
+1. [**Graph Representation Forecasting of Patient's Medical Conditions: towards A Digital Twin**](https://arxiv.org/abs/2009.08299), *Pietro Barbiero, Ramon Viñas Torné, Pietro Lió*
+
+1. [**Relational Graph Learning on Visual and Kinematics Embeddings for Accurate Gesture Recognition in Robotic Surgery**](https://arxiv.org/abs/2011.01619), *Yong-Hao Long, Jie-Ying Wu, Bo Lu, Yue-Ming Jin, Mathias Unberath, Yun-Hui Liu, Pheng-Ann Heng and Qi Dou*
+
+1. [**Dark Reciprocal-Rank: Boosting Graph-Convolutional Self-Localization Network via Teacher-to-student Knowledge Transfer**](https://arxiv.org/abs/2011.00402), *Takeda Koji, Tanaka Kanji*
+
+1. [**Graph InfoClust: Leveraging Cluster-Level Node Information For Unsupervised Graph Representation Learning**](https://arxiv.org/abs/2009.06946), *Costas Mavromatis, George Karypis*
+
+1. [**GraphSeam: Supervised Graph Learning Framework for Semantic UV Mapping**](https://arxiv.org/abs/2011.13748), *Fatemeh Teimury, Bruno Roy, Juan Sebastian Casallas, David macdonald, Mark Coates*
+
+1. [**Comprehensive Study on Molecular Supervised Learning with Graph Neural Networks**](https://pubs.acs.org/doi/10.1021/acs.jcim.0c00416), *Doyeong Hwang, Soojung Yang, Yongchan Kwon, Kyung Hoon Lee, Grace Lee, Hanseok Jo, Seyeol Yoon, and Seongok Ryu*
+
+1. [**A graph auto-encoder model for miRNA-disease associations prediction**](https://academic.oup.com/bib/advance-article-abstract/doi/10.1093/bib/bbaa240/5929824?redirectedFrom=fulltext), *Zhengwei Li, Jiashu Li, Ru Nie, Zhu-Hong You, Wenzheng Bao*
+
+1. [**Graph convolutional regression of cardiac depolarization from sparse endocardial maps**](https://arxiv.org/abs/2009.14068), *Felix Meister, Tiziano Passerini, Chloé Audigier, Èric Lluch, Viorel Mihalef, Hiroshi Ashikaga, Andreas Maier, Henry Halperin, Tommaso Mansi*
+
+1. [**AttnIO: Knowledge Graph Exploration with In-and-Out Attention Flow for Knowledge-Grounded Dialogue**](https://www.aclweb.org/anthology/2020.emnlp-main.280/), EMNLP'20, *Jaehun Jung, Bokyung Son, Sungwon Lyu*
+
+1. [**Learning from Non-Binary Constituency Trees via Tensor Decomposition**](https://arxiv.org/abs/2011.00860), COLING'20, *Daniele Castellana, Davide Bacciu*
+
+1. [**Inducing Alignment Structure with Gated Graph Attention Networks for Sentence Matching**](https://arxiv.org/abs/2010.07668), *Peng Cui, Le Hu, Yuanchao Liu*
+
+1. [**Enhancing Extractive Text Summarization with Topic-Aware Graph Neural Networks**](https://arxiv.org/abs/2010.06253), COLING'20, *Peng Cui, Le Hu, Yuanchao Liu*
+
+1. [**Double Graph Based Reasoning for Document-level Relation Extraction**](https://arxiv.org/abs/2009.13752), EMNLP'20, *Shuang Zeng, Runxin Xu, Baobao Chang, Lei Li*
+
+1. [**Systematic Generalization on gSCAN with Language Conditioned Embedding**](https://arxiv.org/abs/2009.05552), AACL-IJCNLP'20, *Tong Gao, Qi Huang, Raymond J. Mooney*
+
+1. [**Automatic selection of clustering algorithms using supervised graph embedding**](https://arxiv.org/pdf/2011.08225.pdf), *Noy Cohen-Shapira, Lior Rokach*
+
+1. [**Improving Learning to Branch via Reinforcement Learning**](https://openreview.net/forum?id=z4D7-PTxTb), *Haoran Sun, Wenbo Chen, Hui Li, Le Song*
+
+1. [**A Practical Guide to Graph Neural Networks**](https://arxiv.org/pdf/2010.05234.pdf), *Issac Ronald Ward, Jack Joyner, Casey Lickfold, Stash Rowe, Yulan Guo, Mohammed Bennamoun*, [code](https://github.com/isolabs/gnn-tutorial)
+
+1. [**APAN: Asynchronous Propagation Attention Network for Real-time Temporal Graph Embedding**](https://arxiv.org/pdf/2011.11545.pdf), SIGMOD'21, *Xuhong Wang, Ding Lyu, Mengjian Li, Yang Xia, Qi Yang, Xinwen Wang, Xinguang Wang, Ping Cui, Yupu Yang, Bowen Sun, Zhenyu Guo, Junkui Li*
+
+1. [**Uncertainty-Matching Graph Neural Networks to Defend Against Poisoning Attacks**](https://arxiv.org/pdf/2009.14455.pdf), *Uday Shankar Shanthamallu, Jayaraman J. Thiagarajan, Andreas Spanias*
+
+1. [**Computing Graph Neural Networks: A Survey from Algorithms to Accelerators**](https://arxiv.org/pdf/2010.00130.pdf), *Sergi Abadal, Akshay Jain, Robert Guirado, Jorge López-Alonso, Eduard Alarcón*
+
+
+</details>
 
 ## Installation
 
@@ -186,6 +293,7 @@ conda install -c dglteam dgl-cuda9.2   # CUDA 9.2
 conda install -c dglteam dgl-cuda10.0  # CUDA 10.0
 conda install -c dglteam dgl-cuda10.1  # CUDA 10.1
 conda install -c dglteam dgl-cuda10.2  # CUDA 10.2
+conda install -c dglteam dgl-cuda11.0  # CUDA 11.0
 ```
 
 ### Using pip
@@ -199,6 +307,7 @@ conda install -c dglteam dgl-cuda10.2  # CUDA 10.2
 | CUDA 10.0 | `pip install --pre dgl-cu100` | `pip install dgl-cu100` |
 | CUDA 10.1 | `pip install --pre dgl-cu101` | `pip install dgl-cu101` |
 | CUDA 10.2 | `pip install --pre dgl-cu102` | `pip install dgl-cu102` |
+| CUDA 11.0 | `pip install --pre dgl-cu110` | `pip install dgl-cu110` |
 
 ### Built from source code
 
@@ -247,7 +356,6 @@ If you use DGL in a scientific publication, we would appreciate citations to the
 ## The Team
 
 DGL is developed and maintained by [NYU, NYU Shanghai, AWS Shanghai AI Lab, and AWS MXNet Science Team](https://www.dgl.ai/pages/about.html).
-
 
 ## License
 

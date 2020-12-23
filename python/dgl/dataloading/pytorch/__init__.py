@@ -236,6 +236,23 @@ class EdgeDataLoader:
     of blocks as computation dependency of the said minibatch for edge classification,
     edge regression, and link prediction.
 
+    For each iteration, the object will yield
+
+    * A tensor of input nodes necessary for computing the representation on edges, or
+      a dictionary of node type names and such tensors.
+
+    * A subgraph that contains only the edges in the minibatch and their incident nodes.
+      Note that the graph has an identical metagraph with the original graph.
+
+    * If a negative sampler is given, another graph that contains the "negative edges",
+      connecting the source and destination nodes yielded from the given negative sampler.
+
+    * A list of blocks necessary for computing the representation of the incident nodes
+      of the edges in the minibatch.
+
+    For more details, please refer to :ref:`guide-minibatch-edge-classification-sampler`
+    and :ref:`guide-minibatch-link-classification-sampler`.
+
     Parameters
     ----------
     g : DGLGraph
@@ -301,8 +318,9 @@ class EdgeDataLoader:
     >>> reverse_eids = torch.cat([torch.arange(E, 2 * E), torch.arange(0, E)])
 
     Note that the sampled edges as well as their reverse edges are removed from
-    computation dependencies of the incident nodes.  This is a common trick to avoid
-    information leakage.
+    computation dependencies of the incident nodes.  That is, the edge will not
+    involve in neighbor sampling and message aggregation.  This is a common trick
+    to avoid information leakage.
 
     >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> dataloader = dgl.dataloading.EdgeDataLoader(

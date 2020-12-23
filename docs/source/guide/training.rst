@@ -1,8 +1,9 @@
 .. _guide-training:
 
-
 Chapter 5: Training Graph Neural Networks
 =====================================================
+
+:ref:`(中文版) <guide_cn-training>`
 
 Overview
 --------
