@@ -39,7 +39,7 @@ def get_graph(name):
 
 class ogb_data(object):
     def __init__(self, g, num_labels):
-        self._g = [g]
+        self._g = g
         self._num_labels = num_labels
 
     @property
@@ -56,6 +56,8 @@ class ogb_data(object):
 def load_ogb_product(name):
     from ogb.nodeproppred import DglNodePropPredDataset
 
+    shutil.copytree('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
+
     print('load', name)
     data = DglNodePropPredDataset(name=name)
     print('finish loading', name)
@@ -63,18 +65,17 @@ def load_ogb_product(name):
     graph, labels = data[0]
     labels = labels[:, 0]
 
-    graph.ndata['features'] = graph.ndata['feat']
-    graph.ndata['labels'] = labels
-    in_feats = graph.ndata['features'].shape[1]
-    num_labels = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
+    graph.ndata['label'] = labels
+    in_feats = graph.ndata['feat'].shape[1]
+    num_labels = len(torch.unique(labels[torch.logical_not(torch.isnan(labels))]))
 
     # Find the node IDs in the training, validation, and test set.
     train_nid, val_nid, test_nid = splitted_idx['train'], splitted_idx['valid'], splitted_idx['test']
-    train_mask = th.zeros((graph.number_of_nodes(),), dtype=th.bool)
+    train_mask = torch.zeros((graph.number_of_nodes(),), dtype=torch.bool)
     train_mask[train_nid] = True
-    val_mask = th.zeros((graph.number_of_nodes(),), dtype=th.bool)
+    val_mask = torch.zeros((graph.number_of_nodes(),), dtype=torch.bool)
     val_mask[val_nid] = True
-    test_mask = th.zeros((graph.number_of_nodes(),), dtype=th.bool)
+    test_mask = torch.zeros((graph.number_of_nodes(),), dtype=torch.bool)
     test_mask[test_nid] = True
     graph.ndata['train_mask'] = train_mask
     graph.ndata['val_mask'] = val_mask
