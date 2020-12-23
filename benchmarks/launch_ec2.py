@@ -78,7 +78,7 @@ def generate_user_data(command, ignore_git, extra_env_var=[]):
     - [ sh, -c, "sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a append-config -m ec2 -s -c file:/tmp/log.json"]
     - [ bash, "/tmp/run.sh" ]
     - "sleep 10"
-    # - [ sh, -c, "sudo shutdown -h now"]
+    - [ sh, -c, "sudo shutdown -h now"]
     """.format(command=full_command.replace("\n", r"\n").replace("\"", r"\""),
                log_config=log_config.replace("\n", r"\n").replace("\"", r"\""))
     print("==================Script Content==================")
@@ -137,7 +137,6 @@ def launch_ec2(userdata, instance_type, disk_size=150):
             print("Not ready yet")
         time.sleep(3)
     print(instance.public_ip_address)
-
     return instance
 
 
