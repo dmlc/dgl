@@ -48,71 +48,6 @@ class SAGE(nn.Module):
                 h = self.dropout(h)
         return h
 
-    def inference(self, g, x, batch_size, device):
-        """
-        Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
-        g : the entire graph.
-        x : the input of entire node set.
-
-        The inference code is written in a fashion that it could handle any number of nodes and
-        layers.
-        """
-        # During inference with sampling, multi-layer blocks are very inefficient because
-        # lots of computations in the first few layers are repeated.
-        # Therefore, we compute the representation of all nodes layer by layer.  The nodes
-        # on each layer are of course splitted in batches.
-        # TODO: can we standardize this?
-        for l, layer in enumerate(self.layers):
-            y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
-
-            sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
-            dataloader = dgl.dataloading.NodeDataLoader(
-                g,
-                th.arange(g.number_of_nodes()),
-                sampler,
-                batch_size=args.batch_size,
-                shuffle=True,
-                drop_last=False,
-                num_workers=args.num_workers)
-
-            for input_nodes, output_nodes, blocks in dataloader:
-                block = blocks[0]
-
-                block = block.int().to(device)
-                h = x[input_nodes].to(device)
-                h = layer(block, h)
-                if l != len(self.layers) - 1:
-                    h = self.activation(h)
-                    h = self.dropout(h)
-
-                y[output_nodes] = h.cpu()
-
-            x = y
-        return y
-
-def compute_acc(pred, labels):
-    """
-    Compute the accuracy of prediction given the labels.
-    """
-    labels = labels.long()
-    return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
-
-def evaluate(model, g, inputs, labels, val_nid, batch_size, device):
-    """
-    Evaluate the model on the validation set specified by ``val_nid``.
-    g : The entire graph.
-    inputs : The features of all the nodes.
-    labels : The labels of all the nodes.
-    val_nid : the node Ids for validation.
-    batch_size : Number of nodes to compute at the same time.
-    device : The GPU device to evaluate on.
-    """
-    model.eval()
-    with th.no_grad():
-        pred = model.inference(g, inputs, batch_size, device)
-    model.train()
-    return compute_acc(pred[val_nid], labels[val_nid])
-
 def load_subtensor(g, seeds, input_nodes, device):
     """
     Copys features and labels of a set of nodes onto GPU.
@@ -121,8 +56,8 @@ def load_subtensor(g, seeds, input_nodes, device):
     batch_labels = g.ndata['labels'][seeds].to(device)
     return batch_inputs, batch_labels
 
-@utils.benchmark('time', 300)
-@utils.parametrize('data', ['reddit'])
+@utils.benchmark('time', 3600)
+@utils.parametrize('data', ['reddit', 'ogbn-products'])
 def track_time(data):
     data = utils.process_data(data)
     device = utils.get_bench_device()

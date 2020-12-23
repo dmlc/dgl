@@ -37,6 +37,51 @@ def get_graph(name):
         print(name + " doesn't exist")
         return None
 
+class ogb_data(object):
+    def __init__(self, g, num_labels):
+        self._g = [g]
+        self._num_labels = num_labels
+
+    @property
+    def num_labels(self):
+        return self._num_labels
+
+    @property
+    def num_classes(self):
+        return self._num_labels
+
+    def __getitem__(self, idx):
+        return self._g
+
+def load_ogb_product(name):
+    from ogb.nodeproppred import DglNodePropPredDataset
+
+    print('load', name)
+    data = DglNodePropPredDataset(name=name)
+    print('finish loading', name)
+    splitted_idx = data.get_idx_split()
+    graph, labels = data[0]
+    labels = labels[:, 0]
+
+    graph.ndata['features'] = graph.ndata['feat']
+    graph.ndata['labels'] = labels
+    in_feats = graph.ndata['features'].shape[1]
+    num_labels = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
+
+    # Find the node IDs in the training, validation, and test set.
+    train_nid, val_nid, test_nid = splitted_idx['train'], splitted_idx['valid'], splitted_idx['test']
+    train_mask = th.zeros((graph.number_of_nodes(),), dtype=th.bool)
+    train_mask[train_nid] = True
+    val_mask = th.zeros((graph.number_of_nodes(),), dtype=th.bool)
+    val_mask[val_nid] = True
+    test_mask = th.zeros((graph.number_of_nodes(),), dtype=th.bool)
+    test_mask[test_nid] = True
+    graph.ndata['train_mask'] = train_mask
+    graph.ndata['val_mask'] = val_mask
+    graph.ndata['test_mask'] = test_mask
+
+    return ogb_data(graph, num_labels)
+
 def process_data(name):
     if name == 'cora':
         return dgl.data.CoraGraphDataset()
@@ -44,6 +89,8 @@ def process_data(name):
         return dgl.data.PubmedGraphDataset()
     elif name == 'reddit':
         return dgl.data.RedditDataset(self_loop=True)
+    elif name == 'ogbn-products':
+        return load_ogb_product('ogbn-products')
     else:
         raise ValueError('Invalid dataset name:', name)
 
