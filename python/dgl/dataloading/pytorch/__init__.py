@@ -137,17 +137,20 @@ class _EdgeCollator(EdgeCollator):
             return input_nodes, pair_graph, neg_pair_graph, blocks
 
 class _NodeDataLoaderIter:
-    def __init__(self, node_dataloader):
+    def __init__(self, device, node_dataloader):
+        self.device = device
         self.node_dataloader = node_dataloader
         self.iter_ = iter(node_dataloader.dataloader)
 
     def __next__(self):
         input_nodes, output_nodes, blocks = next(self.iter_)
         _restore_blocks_storage(blocks, self.node_dataloader.collator.g)
+        blocks = [blc.to(self.device) for blc in blocks]
         return input_nodes, output_nodes, blocks
 
 class _EdgeDataLoaderIter:
-    def __init__(self, edge_dataloader):
+    def __init__(self, device, edge_dataloader):
+        self.device = device
         self.edge_dataloader = edge_dataloader
         self.iter_ = iter(edge_dataloader.dataloader)
 
@@ -156,12 +159,17 @@ class _EdgeDataLoaderIter:
             input_nodes, pair_graph, blocks = next(self.iter_)
             _restore_subgraph_storage(pair_graph, self.edge_dataloader.collator.g)
             _restore_blocks_storage(blocks, self.edge_dataloader.collator.g_sampling)
+            pair_graph = pair_graph.to(self.device)
+            blocks = [blc.to(self.device) for blc in blocks]
             return input_nodes, pair_graph, blocks
         else:
             input_nodes, pair_graph, neg_pair_graph, blocks = next(self.iter_)
             _restore_subgraph_storage(pair_graph, self.edge_dataloader.collator.g)
             _restore_subgraph_storage(neg_pair_graph, self.edge_dataloader.collator.g)
             _restore_blocks_storage(blocks, self.edge_dataloader.collator.g_sampling)
+            pair_graph = pair_graph.to(self.device)
+            neg_pair_graph = neg_pair_graph.to(self.device)
+            blocks = [blc.to(self.device) for blc in blocks]
             return input_nodes, pair_graph, neg_pair_graph, blocks
 
 class NodeDataLoader:
@@ -176,6 +184,9 @@ class NodeDataLoader:
         The node set to compute outputs.
     block_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
+    device : device context, optional
+        The device of the generated blocks in each iteration, which should be a
+        PyTorch device object (e.g., ``torch.device``).
     kwargs : dict
         Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
 
@@ -194,7 +205,7 @@ class NodeDataLoader:
     """
     collator_arglist = inspect.getfullargspec(NodeCollator).args
 
-    def __init__(self, g, nids, block_sampler, **kwargs):
+    def __init__(self, g, nids, block_sampler, device='cpu', **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -209,6 +220,7 @@ class NodeDataLoader:
             self.collator = NodeCollator(g, nids, block_sampler, **collator_kwargs)
             _remove_kwargs_dist(dataloader_kwargs)
             self.dataloader = DistDataLoader(self.collator.dataset,
+                                             device=self.device,
                                              collate_fn=self.collator.collate,
                                              **dataloader_kwargs)
             self.is_distributed = True
@@ -218,6 +230,7 @@ class NodeDataLoader:
                                          collate_fn=self.collator.collate,
                                          **dataloader_kwargs)
             self.is_distributed = False
+        self.device = device
 
     def __iter__(self):
         """Return the iterator of the data loader."""
@@ -225,7 +238,7 @@ class NodeDataLoader:
             # Directly use the iterator of DistDataLoader, which doesn't copy features anyway.
             return iter(self.dataloader)
         else:
-            return _NodeDataLoaderIter(self)
+            return _NodeDataLoaderIter(self.device, self)
 
     def __len__(self):
         """Return the number of batches of the data loader."""
@@ -261,6 +274,9 @@ class EdgeDataLoader:
         The edge set in graph :attr:`g` to compute outputs.
     block_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
+    device : device context, optional
+        The device of the generated blocks and graphs in each iteration, which should be a
+        PyTorch device object (e.g., ``torch.device``).
     g_sampling : DGLGraph, optional
         The graph where neighborhood sampling is performed.
 
@@ -391,7 +407,7 @@ class EdgeDataLoader:
     """
     collator_arglist = inspect.getfullargspec(EdgeCollator).args
 
-    def __init__(self, g, eids, block_sampler, **kwargs):
+    def __init__(self, g, eids, block_sampler, device='cpu', **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -406,10 +422,11 @@ class EdgeDataLoader:
                 + 'Please use DistDataLoader directly.'
         self.dataloader = DataLoader(
             self.collator.dataset, collate_fn=self.collator.collate, **dataloader_kwargs)
+        self.device = device
 
     def __iter__(self):
         """Return the iterator of the data loader."""
-        return _EdgeDataLoaderIter(self)
+        return _EdgeDataLoaderIter(self.device, self)
 
     def __len__(self):
         """Return the number of batches of the data loader."""

@@ -176,6 +176,7 @@ def start_node_dataloader(rank, tmpdir, disable_shared_mem, num_workers):
             dist_graph,
             train_nid,
             sampler,
+            device=F.ctx(),
             batch_size=batch_size,
             shuffle=True,
             drop_last=False,

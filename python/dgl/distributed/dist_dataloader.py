@@ -67,6 +67,9 @@ class DistDataLoader:
         A tensor of node IDs or edge IDs.
     batch_size: int
         The number of samples per batch to load.
+    device : device context, optional
+        The device of the generated blocks in each iteration, which should be a
+        PyTorch device object (e.g., ``torch.device``).
     shuffle: bool, optional
         Set to ``True`` to have the data reshuffled at every epoch (default: ``False``).
     collate_fn: callable, optional
@@ -107,7 +110,7 @@ class DistDataLoader:
     and [3, 4] is not guaranteed.
     """
 
-    def __init__(self, dataset, batch_size, shuffle=False, collate_fn=None, drop_last=False,
+    def __init__(self, dataset, batch_size, device='cpu', shuffle=False, collate_fn=None, drop_last=False,
                  queue_size=None):
         self.pool, self.num_workers = get_sampler_pool()
         if queue_size is None:
@@ -125,6 +128,7 @@ class DistDataLoader:
             self.queue = Queue(maxsize=queue_size)
         self.drop_last = drop_last
         self.recv_idxs = 0
+        self.device = device
         self.shuffle = shuffle
         self.is_closed = False
 
@@ -163,6 +167,7 @@ class DistDataLoader:
             result = self.queue.get(timeout=1800)
             self.recv_idxs += 1
             self.num_pending -= 1
+            result = [blc.to(self.device) for blc in result]
             return result
         else:
             assert self.num_pending == 0
