@@ -78,10 +78,6 @@ def main(args):
         th.cuda.set_device(args.gpu)
         device = 'cuda:%d' % args.gpu
 
-    train_label = labels[train_idx]
-    val_label = labels[val_idx]
-    test_label = labels[test_idx]
-
     # create embeddings
     embed_layer = RelGraphEmbed(g, args.n_hidden)
     node_embed = embed_layer()
