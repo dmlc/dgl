@@ -3,6 +3,8 @@ import boto3
 import argparse
 import os
 import textwrap
+import botocore
+
 
 
 def pass_env():
@@ -26,7 +28,7 @@ def git_init(ignore_git):
         cd ~
         git clone {GIT_URL} git_repo
         cd git_repo
-        git checkout {GIT_COMMIT}
+        git checkout {GIT_BRANCH}
         git submodule update --init --recursive
         """.format(**os.environ)
     return command
@@ -127,8 +129,12 @@ def launch_ec2(userdata, instance_type, disk_size=150):
     instances = ec2.create_instances(**ec2_config)
     instance = instances[0]
     print("Succeed to launch {}".format(instance))
+    time.sleep(3)
     while (instance.public_ip_address is None):
-        instance.reload()
+        try:
+            instance.reload()
+        except botocore.exceptions.ClientError:
+            print("Not ready yet")
         time.sleep(3)
     print(instance.public_ip_address)
 
@@ -139,16 +145,13 @@ def main(args):
     if (args.script_file is not None):
         with open(args.script_file, "r") as f:
             command = f.read()
-    elif (args.command is not None):
-        command = args.command
     else:
         raise Exception("Please specify script file or command")
     instance_type = args.instance_type
     disk_size = args.disk_size
     instance = launch_ec2(generate_user_data(
         command, args.ignore_git), instance_type, disk_size)
-    time.sleep(5)
-    while (instance.state['Name'] == "running"):
+    while (instance.state['Name'] != "stopped"):
         instance.reload()
         time.sleep(5)
     print("Finished Running")
@@ -161,17 +164,7 @@ parser.add_argument("--ignore-git", action="store_true",
                     default=False, help="specify instance type")
 parser.add_argument("--disk-size", default=150, type=int,
                     help="specify instance type")
-group = parser.add_mutually_exclusive_group()
-group.add_argument("--script-file", help="Bash Script to be run")
-group.add_argument("--command", help="command to be run")
+parser.add_argument("--script-file", help="Bash Script to be run")
 args = parser.parse_args()
-
-
-command = r"""
-echo "done!!!!!!!"
-cd ~
-echo $PWD
-"""
-
 
 main(args)

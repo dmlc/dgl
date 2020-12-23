@@ -7,6 +7,7 @@ if [[ ${INSTANCE_TYPE} == g* ]] || [[ ${INSTANCE_TYPE} == p* ]]; then
 else
     DEVICE=cpu
 fi
+aws s3 sync s3://dgl-asv-data/ci/results/ results
 bash publish.sh ${INSTANCE_TYPE} ${DEVICE}
 aws s3 sync results s3://dgl-asv-data/ci/results/
 aws s3 sync html s3://dgl-asv-data/ci/html/ --acl public-read
