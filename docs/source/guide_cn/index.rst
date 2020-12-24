@@ -20,7 +20,7 @@
 特此致谢下述贡献者：
 
 .. list-table::
-   :widths: 50 25 25 50
+   :widths: 25 25 25 50
    :header-rows: 1
 
    * - 章节
@@ -115,11 +115,11 @@
      - ੭ ᐕ)੭*⁾⁾ 蜜糖
      - 莫佳帅子/Molasses
      - https://github.com/sleeplessai
-   * - :ref:`guide_cn-minibatch-link-classification-sampler`,:ref:`guide_cn-minibatch-customizing-neighborhood-sampler`
+   * - :ref:`guide_cn-minibatch-link-classification-sampler`, :ref:`guide_cn-minibatch-customizing-neighborhood-sampler`
      - Kevin-孟凡荣
      - 孟凡荣/kevin-meng
      - https://github.com/kevin-meng
-   * - :ref:`guide_cn-minibatch-custom-gnn-module`,:ref:`guide_cn-minibatch-inference`
+   * - :ref:`guide_cn-minibatch-custom-gnn-module`, :ref:`guide_cn-minibatch-inference`
      - 胡骏
      - 胡骏
      - https://github.com/CrawlScript
