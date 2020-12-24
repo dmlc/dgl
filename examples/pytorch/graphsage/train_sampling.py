@@ -116,13 +116,8 @@ def load_subtensor(nfeat, labels, seeds, input_nodes):
 #### Entry point
 def run(args, device, data):
     # Unpack data
-    n_classes, train_g, val_g, test_g = data
-    train_nfeat = train_g.ndata['features'].to(device)
-    train_labels = train_g.ndata['labels'].to(device)
-    val_nfeat = val_g.ndata['features'].to(device)
-    val_labels = val_g.ndata['labels'].to(device)
-    test_nfeat = test_g.ndata['features'].to(device)
-    test_labels = test_g.ndata['labels'].to(device)
+    n_classes, train_g, val_g, test_g, train_nfeat, train_labels, \
+    val_nfeat, val_labels, test_nfeat, test_labels = data
     in_feats = train_nfeat.shape[1]
     train_nid = th.nonzero(train_g.ndata['train_mask'], as_tuple=True)[0]
     val_nid = th.nonzero(val_g.ndata['val_mask'], as_tuple=True)[0]
@@ -220,8 +215,16 @@ if __name__ == '__main__':
 
     if args.inductive:
         train_g, val_g, test_g = inductive_split(g)
+        train_nfeat = train_g.ndata.pop('features').to(device)
+        val_nfeat = val_g.ndata.pop('features').to(device)
+        test_nfeat = test_g.ndata.pop('features').to(device)
+        train_labels = train_g.ndata.pop('labels').to(device)
+        val_labels = val_g.ndata.pop('labels').to(device)
+        test_labels = test_g.ndata.pop('labels').to(device)
     else:
         train_g = val_g = test_g = g
+        train_nfeat = val_nfeat = test_nfeat = g.ndata.pop('features').to(device)
+        train_labels = val_labels = test_labels = g.ndata.pop('labels').to(device)
 
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
@@ -229,6 +232,7 @@ if __name__ == '__main__':
     val_g.create_formats_()
     test_g.create_formats_()
     # Pack data
-    data = n_classes, train_g, val_g, test_g
+    data = n_classes, train_g, val_g, test_g, train_nfeat, train_labels, \
+           val_nfeat, val_labels, test_nfeat, test_labels
 
     run(args, device, data)

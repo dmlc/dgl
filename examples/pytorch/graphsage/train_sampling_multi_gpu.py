@@ -5,16 +5,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.multiprocessing as mp
-from torch.utils.data import DataLoader
-import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import math
 import argparse
-from dgl.data import RedditDataset
 from torch.nn.parallel import DistributedDataParallel
 import tqdm
-import traceback
 
 from utils import thread_wrapped_func
 from load_graph import load_reddit, inductive_split
@@ -48,7 +44,7 @@ class SAGE(nn.Module):
                 h = self.dropout(h)
         return h
 
-    def inference(self, g, x, batch_size, device):
+    def inference(self, g, x, device):
         """
         Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
         g : the entire graph.
@@ -97,7 +93,7 @@ def compute_acc(pred, labels):
     """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, inputs, labels, val_nid, batch_size, device):
+def evaluate(model, g, inputs, labels, val_nid, device):
     """
     Evaluate the model on the validation set specified by ``val_nid``.
     g : The entire graph.
@@ -109,7 +105,7 @@ def evaluate(model, g, inputs, labels, val_nid, batch_size, device):
     """
     model.eval()
     with th.no_grad():
-        pred = model.inference(g, inputs, batch_size, device)
+        pred = model.inference(g, inputs, device)
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid])
 
@@ -209,14 +205,14 @@ def run(proc_id, n_gpus, args, devices, data):
             if epoch % args.eval_every == 0 and epoch != 0:
                 if n_gpus == 1:
                     eval_acc = evaluate(
-                        model, val_g, val_g.ndata['features'], val_g.ndata['labels'], val_nid, args.batch_size, devices[0])
+                        model, val_g, val_g.ndata['features'], val_g.ndata['labels'], val_nid, devices[0])
                     test_acc = evaluate(
-                        model, test_g, test_g.ndata['features'], test_g.ndata['labels'], test_nid, args.batch_size, devices[0])
+                        model, test_g, test_g.ndata['features'], test_g.ndata['labels'], test_nid, devices[0])
                 else:
                     eval_acc = evaluate(
-                        model.module, val_g, val_g.ndata['features'], val_g.ndata['labels'], val_nid, args.batch_size, devices[0])
+                        model.module, val_g, val_g.ndata['features'], val_g.ndata['labels'], val_nid, devices[0])
                     test_acc = evaluate(
-                        model.module, test_g, test_g.ndata['features'], test_g.ndata['labels'], test_nid, args.batch_size, devices[0])
+                        model.module, test_g, test_g.ndata['features'], test_g.ndata['labels'], test_nid, devices[0])
                 print('Eval Acc {:.4f}'.format(eval_acc))
                 print('Test Acc: {:.4f}'.format(test_acc))
 
