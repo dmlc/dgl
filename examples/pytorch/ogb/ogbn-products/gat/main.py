@@ -38,7 +38,7 @@ class GAT(nn.Module):
             # appropriate nodes on the LHS.
             # Note that the shape of h is (num_nodes_LHS, D) and the shape of h_dst
             # would be (num_nodes_RHS, D)
-            h_dst = h[:block.number_of_dst_nodes()]
+            h_dst = h[:block.num_dst_nodes()]
             # Then we compute the updated representation on the RHS.
             # The shape of h now becomes (num_nodes_RHS, D)
             if l < self.n_layers - 1:
@@ -63,14 +63,14 @@ class GAT(nn.Module):
         # TODO: can we standardize this?
         for l, layer in enumerate(self.layers):
             if l < self.n_layers - 1:
-                y = th.zeros(g.number_of_nodes(), self.n_hidden * num_heads if l != len(self.layers) - 1 else self.n_classes)
+                y = th.zeros(g.num_nodes(), self.n_hidden * num_heads if l != len(self.layers) - 1 else self.n_classes)
             else:
-                y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
+                y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.NodeDataLoader(
                 g,
-                th.arange(g.number_of_nodes()),
+                th.arange(g.num_nodes()),
                 sampler,
                 batch_size=args.batch_size,
                 shuffle=True,
@@ -81,7 +81,7 @@ class GAT(nn.Module):
                 block = blocks[0].int().to(device)
 
                 h = x[input_nodes].to(device)
-                h_dst = h[:block.number_of_dst_nodes()]
+                h_dst = h[:block.num_dst_nodes()]
                 if l < self.n_layers - 1:
                     h = layer(block, (h, h_dst)).flatten(1) 
                 else:
@@ -118,7 +118,7 @@ def evaluate(model, g, nfeat, labels, val_nid, test_nid, num_heads, device):
 
 def load_subtensor(nfeat, labels, seeds, input_nodes):
     """
-    Copys features and labels of a set of nodes onto GPU.
+    Extracts features and labels for a set of nodes.
     """
     batch_inputs = nfeat[input_nodes]
     batch_labels = labels[seeds]
@@ -229,9 +229,9 @@ if __name__ == '__main__':
     nfeat = graph.ndata.pop('feat').to(device)
     labels = labels[:, 0].to(device)
 
-    print('Total edges before adding self-loop {}'.format(graph.number_of_edges()))
+    print('Total edges before adding self-loop {}'.format(graph.num_edges()))
     graph = graph.remove_self_loop().add_self_loop()
-    print('Total edges after adding self-loop {}'.format(graph.number_of_edges()))
+    print('Total edges after adding self-loop {}'.format(graph.num_edges()))
 
     in_feats = nfeat.shape[1]
     n_classes = (labels.max() + 1).item()

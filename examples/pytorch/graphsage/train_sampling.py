@@ -55,12 +55,12 @@ class SAGE(nn.Module):
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
         for l, layer in enumerate(self.layers):
-            y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
+            y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes).to(device)
 
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.NodeDataLoader(
                 g,
-                th.arange(g.number_of_nodes()),
+                th.arange(g.num_nodes()),
                 sampler,
                 batch_size=args.batch_size,
                 shuffle=True,
@@ -71,13 +71,13 @@ class SAGE(nn.Module):
                 block = blocks[0]
 
                 block = block.int().to(device)
-                h = x[input_nodes].to(device)
+                h = x[input_nodes]
                 h = layer(block, h)
                 if l != len(self.layers) - 1:
                     h = self.activation(h)
                     h = self.dropout(h)
 
-                y[output_nodes] = h.cpu()
+                y[output_nodes] = h
 
             x = y
         return y
@@ -89,7 +89,7 @@ def compute_acc(pred, labels):
     labels = labels.long()
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, inputs, labels, val_nid, device):
+def evaluate(model, g, nfeat, labels, val_nid, device):
     """
     Evaluate the model on the validation set specified by ``val_nid``.
     g : The entire graph.
@@ -101,22 +101,29 @@ def evaluate(model, g, inputs, labels, val_nid, device):
     """
     model.eval()
     with th.no_grad():
-        pred = model.inference(g, inputs, device)
+        pred = model.inference(g, nfeat, device)
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid])
 
-def load_subtensor(g, seeds, input_nodes, device):
+def load_subtensor(nfeat, labels, seeds, input_nodes):
     """
     Copys features and labels of a set of nodes onto GPU.
     """
-    batch_inputs = g.ndata['features'][input_nodes].to(device)
-    batch_labels = g.ndata['labels'][seeds].to(device)
+    batch_inputs = nfeat[input_nodes]
+    batch_labels = labels[seeds]
     return batch_inputs, batch_labels
 
 #### Entry point
 def run(args, device, data):
     # Unpack data
-    in_feats, n_classes, train_g, val_g, test_g = data
+    n_classes, train_g, val_g, test_g = data
+    train_nfeat = train_g.ndata['features'].to(device)
+    train_labels = train_g.ndata['labels'].to(device)
+    val_nfeat = val_g.ndata['features'].to(device)
+    val_labels = val_g.ndata['labels'].to(device)
+    test_nfeat = test_g.ndata['features'].to(device)
+    test_labels = test_g.ndata['labels'].to(device)
+    in_feats = train_nfeat.shape[1]
     train_nid = th.nonzero(train_g.ndata['train_mask'], as_tuple=True)[0]
     val_nid = th.nonzero(val_g.ndata['val_mask'], as_tuple=True)[0]
     test_nid = th.nonzero(~(test_g.ndata['train_mask'] | test_g.ndata['val_mask']), as_tuple=True)[0]
@@ -151,10 +158,8 @@ def run(args, device, data):
         tic_step = time.time()
         for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
             # Load the input features as well as output labels
-            #batch_inputs, batch_labels = load_subtensor(train_g, seeds, input_nodes, device)
+            batch_inputs, batch_labels = load_subtensor(train_nfeat, train_labels, seeds, input_nodes)
             blocks = [block.int().to(device) for block in blocks]
-            batch_inputs = blocks[0].srcdata['features']
-            batch_labels = blocks[-1].dstdata['labels']
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -176,9 +181,9 @@ def run(args, device, data):
         if epoch >= 5:
             avg += toc - tic
         if epoch % args.eval_every == 0 and epoch != 0:
-            eval_acc = evaluate(model, val_g, val_g.ndata['features'], val_g.ndata['labels'], val_nid, device)
+            eval_acc = evaluate(model, val_g, val_nfeat, val_labels, val_nid, device)
             print('Eval Acc {:.4f}'.format(eval_acc))
-            test_acc = evaluate(model, test_g, test_g.ndata['features'], test_g.ndata['labels'], test_nid, device)
+            test_acc = evaluate(model, test_g, test_nfeat, test_labels, test_nid, device)
             print('Test Acc: {:.4f}'.format(test_acc))
 
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
@@ -213,8 +218,6 @@ if __name__ == '__main__':
     else:
         raise Exception('unknown dataset')
 
-    in_feats = g.ndata['features'].shape[1]
-
     if args.inductive:
         train_g, val_g, test_g = inductive_split(g)
     else:
@@ -226,6 +229,6 @@ if __name__ == '__main__':
     val_g.create_formats_()
     test_g.create_formats_()
     # Pack data
-    data = in_feats, n_classes, train_g, val_g, test_g
+    data = n_classes, train_g, val_g, test_g
 
     run(args, device, data)

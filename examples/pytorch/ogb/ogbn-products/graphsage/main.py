@@ -37,7 +37,7 @@ class SAGE(nn.Module):
             # appropriate nodes on the LHS.
             # Note that the shape of h is (num_nodes_LHS, D) and the shape of h_dst
             # would be (num_nodes_RHS, D)
-            h_dst = h[:block.number_of_dst_nodes()]
+            h_dst = h[:block.num_dst_nodes()]
             # Then we compute the updated representation on the RHS.
             # The shape of h now becomes (num_nodes_RHS, D)
             h = layer(block, (h, h_dst))
@@ -60,12 +60,12 @@ class SAGE(nn.Module):
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
         for l, layer in enumerate(self.layers):
-            y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes).to(device)
+            y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes).to(device)
 
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.NodeDataLoader(
                 g,
-                th.arange(g.number_of_nodes()),
+                th.arange(g.num_nodes()),
                 sampler,
                 batch_size=args.batch_size,
                 shuffle=True,
@@ -76,7 +76,7 @@ class SAGE(nn.Module):
                 block = blocks[0].int().to(device)
 
                 h = x[input_nodes]
-                h_dst = h[:block.number_of_dst_nodes()]
+                h_dst = h[:block.num_dst_nodes()]
                 h = layer(block, (h, h_dst))
                 if l != len(self.layers) - 1:
                     h = self.activation(h)
@@ -110,7 +110,7 @@ def evaluate(model, g, nfeat, labels, val_nid, test_nid, device):
 
 def load_subtensor(nfeat, labels, seeds, input_nodes):
     """
-    Copys features and labels of a set of nodes onto GPU.
+    Extracts features and labels for a set of nodes.
     """
     batch_inputs = nfeat[input_nodes]
     batch_labels = labels[seeds]
