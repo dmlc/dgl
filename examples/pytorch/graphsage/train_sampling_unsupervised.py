@@ -178,7 +178,7 @@ def run(proc_id, n_gpus, args, devices, data):
     train_mask, val_mask, test_mask, n_classes, g = data
     nfeat = g.ndata.pop('feat').to(device)
     labels = g.ndata.pop('label').to(device)
-    in_feats = nfeat.shape[0]
+    in_feats = nfeat.shape[1]
 
     train_nid = th.LongTensor(np.nonzero(train_mask)).squeeze()
     val_nid = th.LongTensor(np.nonzero(val_mask)).squeeze()
