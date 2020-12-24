@@ -34,13 +34,6 @@ class NegativeSampler(object):
         src = src.repeat_interleave(self.k)
         return src, dst
 
-def load_subtensor(g, input_nodes, device):
-    """
-    Copys features and labels of a set of nodes onto GPU.
-    """
-    batch_inputs = g.ndata['features'][input_nodes].to(device)
-    return batch_inputs
-
 class SAGE(nn.Module):
     def __init__(self,
                  in_feats,
@@ -85,7 +78,7 @@ class SAGE(nn.Module):
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
         for l, layer in enumerate(self.layers):
-            y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
+            y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes).to(device)
 
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.NodeDataLoader(
@@ -100,13 +93,13 @@ class SAGE(nn.Module):
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0].to(device)
 
-                h = x[input_nodes].to(device)
+                h = x[input_nodes]
                 h = layer(block, h)
                 if l != len(self.layers) - 1:
                     h = self.activation(h)
                     h = self.dropout(h)
 
-                y[output_nodes] = h.cpu()
+                y[output_nodes] = h
 
             x = y
         return y
@@ -150,7 +143,7 @@ def compute_acc(emb, labels, train_nids, val_nids, test_nids):
     f1_micro_test = skm.f1_score(test_labels, pred[test_nids], average='micro')
     return f1_micro_eval, f1_micro_test
 
-def evaluate(model, g, inputs, labels, train_nids, val_nids, test_nids, device):
+def evaluate(model, g, nfeat, labels, train_nids, val_nids, test_nids, device):
     """
     Evaluate the model on the validation set specified by ``val_mask``.
     g : The entire graph.
@@ -163,10 +156,10 @@ def evaluate(model, g, inputs, labels, train_nids, val_nids, test_nids, device):
     with th.no_grad():
         # single gpu
         if isinstance(model, SAGE):
-            pred = model.inference(g, inputs, device)
+            pred = model.inference(g, nfeat, device)
         # multi gpu
         else:
-            pred = model.module.inference(g, inputs, device)
+            pred = model.module.inference(g, nfeat, device)
     model.train()
     return compute_acc(pred, labels, train_nids, val_nids, test_nids)
 
@@ -182,7 +175,10 @@ def run(proc_id, n_gpus, args, devices, data):
                                           init_method=dist_init_method,
                                           world_size=world_size,
                                           rank=proc_id)
-    train_mask, val_mask, test_mask, in_feats, labels, n_classes, g = data
+    train_mask, val_mask, test_mask, n_classes, g = data
+    nfeat = g.ndata.pop('feat').to(device)
+    labels = g.ndata.pop('label').to(device)
+    in_feats = nfeat.shape[0]
 
     train_nid = th.LongTensor(np.nonzero(train_mask)).squeeze()
     val_nid = th.LongTensor(np.nonzero(val_mask)).squeeze()
@@ -220,7 +216,6 @@ def run(proc_id, n_gpus, args, devices, data):
     if n_gpus > 1:
         model = DistributedDataParallel(model, device_ids=[device], output_device=device)
     loss_fcn = CrossEntropyLoss()
-    loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     # Training loop
@@ -239,7 +234,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
         tic_step = time.time()
         for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
-            batch_inputs = load_subtensor(g, input_nodes, device)
+            batch_inputs = nfeat[input_nodes]
             d_step = time.time()
 
             pos_graph = pos_graph.to(device)
@@ -266,7 +261,7 @@ def run(proc_id, n_gpus, args, devices, data):
             tic_step = time.time()
 
             if step % args.eval_every == 0 and proc_id == 0:
-                eval_acc, test_acc = evaluate(model, g, g.ndata['features'], labels, train_nid, val_nid, test_nid, device)
+                eval_acc, test_acc = evaluate(model, g, nfeat, labels, train_nid, val_nid, test_nid, device)
                 print('Eval Acc {:.4f} Test Acc {:.4f}'.format(eval_acc, test_acc))
                 if eval_acc > best_eval_acc:
                     best_eval_acc = eval_acc
@@ -288,19 +283,15 @@ def main(args, devices):
     data = RedditDataset(self_loop=False)
     n_classes = data.num_classes
     g = data[0]
-    features = g.ndata['feat']
-    in_feats = features.shape[1]
-    labels = g.ndata['label']
     train_mask = g.ndata['train_mask']
     val_mask = g.ndata['val_mask']
     test_mask = g.ndata['test_mask']
-    g.ndata['features'] = features
 
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
     g.create_formats_()
     # Pack data
-    data = train_mask, val_mask, test_mask, in_feats, labels, n_classes, g
+    data = train_mask, val_mask, test_mask, n_classes, g
 
     n_gpus = len(devices)
     if devices[0] == -1:
