@@ -20,7 +20,7 @@
 特此致谢下述贡献者：
 
 .. list-table::
-   :widths: 25 25 25 50
+   :widths: 20 20 20 20
    :header-rows: 1
 
    * - 章节
