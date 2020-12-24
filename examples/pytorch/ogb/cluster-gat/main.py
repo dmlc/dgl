@@ -161,12 +161,13 @@ def run(args, device, data):
             mask = cluster.ndata['train_mask']
             if mask.sum() == 0:
                 continue
-            feat = cluster.ndata['feat']
-            batch_labels = cluster.ndata['labels']
+            input_nodes = cluster.ndata[dgl.NID]
+            batch_inputs = nfeat[input_nodes]
+            batch_labels = labels[input_nodes]
             tic_step = time.time()
 
             # Compute loss and prediction
-            batch_pred = model(cluster, feat)
+            batch_pred = model(cluster, batch_inputs)
             batch_pred = batch_pred[mask]
             batch_labels = batch_labels[mask]
             loss = nn.functional.nll_loss(batch_pred, batch_labels)
