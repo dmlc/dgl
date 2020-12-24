@@ -91,19 +91,17 @@ class RelGraphEmbedLayer(nn.Module):
         self.embed_name = embed_name
         self.num_nodes = num_nodes
         self.dgl_sparse = dgl_sparse
-        print(input_size)
 
         # create weight embeddings for each node for each relation
         self.embeds = nn.ParameterDict()
         self.node_embeds = {} if dgl_sparse else nn.ModuleDict()
         self.num_of_ntype = num_of_ntype
-        self.idmap = th.empty(num_nodes).long()
 
         for ntype in range(num_of_ntype):
             if isinstance(input_size[ntype], int):
                 if dgl_sparse:
                     self.node_embeds[str(ntype)] = dgl.backend.pytorch.GraphSparseEmbedding(input_size[ntype], embed_size, name=str(ntype),
-                        init_func=initializer, rank=dev_id, world_size=world_size, queues=queues)
+                        device=self.dev_id, init_func=initializer, rank=dev_id, world_size=world_size, queues=queues)
                 else:
                     sparse_emb = th.nn.Embedding(input_size[ntype], embed_size, sparse=True)
                     nn.init.uniform_(sparse_emb.weight, -1.0, 1.0)

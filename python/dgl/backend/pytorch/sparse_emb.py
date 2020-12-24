@@ -23,6 +23,8 @@ class GraphSparseEmbedding:
         the number of nodes or the number of edges.
     embedding_dim : int
         The dimension size of embeddings.
+    device : th.device
+        Target device to manipulate embedding related opations
     name : str
         The name of the embeddings. The name should uniquely identify embeddings in a system.
     init_func : callable, optional
@@ -56,10 +58,11 @@ class GraphSparseEmbedding:
     ...     loss.backward()
     ...     optimizer.step()
     '''
-    def __init__(self, num_embeddings, embedding_dim, name,
+    def __init__(self, num_embeddings, embedding_dim, name, device=th.device('cpu'),
                  init_func=None, rank=-1, world_size=0, queues=None):
         self._rank = rank
         self._world_size = world_size
+        self._device = device
         assert world_size <= 1 or len(queues) == world_size, \
             'Number of queues should be equal to number of GPU processes you have.'
 
@@ -84,10 +87,10 @@ class GraphSparseEmbedding:
         self._queues = queues
 
     def __call__(self, idx):
-        emb = self._tensor[idx]
+        emb = self._tensor[idx].to(self._device)
         if is_recording():
             emb = attach_grad(emb)
-            self._trace.append((idx, emb))
+            self._trace.append((idx.to(self._device, non_blocking=True), emb))
         return emb
 
     @property
@@ -342,18 +345,15 @@ class SparseAdamOptimizer(SparseGradOptimizer):
                 assert self._rank == emb.rank, 'MultiGPU rank for each embedding should be same.'
                 assert self._world_size == emb.world_size, 'MultiGPU world_size for each embedding should be same.'
             if self._rank <= 0:
-                # steps may overflow if steps > 2B
-                state_step = th.zeros((emb.emb_tensor.shape[0],), dtype=th.int)
-                state = emb.emb_tensor.new().resize_((emb.emb_tensor.shape[0], 2, emb.emb_tensor.shape[1])).zero_()
-                #state_mem = emb.emb_tensor.new().resize_(emb.emb_tensor.shape).zero_()
-                #state_power = emb.emb_tensor.new().resize_(emb.emb_tensor.shape).zero_()
+                # may overflow if steps > 2B
+                state_step = th.zeros((emb.emb_tensor.shape[0],), dtype=th.int).zero_()
+                state_mem = emb.emb_tensor.new().resize_(emb.emb_tensor.shape).zero_()
+                state_power = emb.emb_tensor.new().resize_(emb.emb_tensor.shape).zero_()
             if self._rank == 0:
                 state_step.share_memory_()
-                #state_mem.share_memory_()
-                #state_power.share_memory_()
-                state.share_memory_()
-                #state = (state_step, state_mem, state_power)
-                state = (state_step, state)
+                state_mem.share_memory_()
+                state_power.share_memory_()
+                state = (state_step, state_mem, state_power)
                 for i in range(1, self._world_size):
                     # send embs
                     emb.queues[i].put(state)
@@ -382,28 +382,23 @@ class SparseAdamOptimizer(SparseGradOptimizer):
             eps = 1e-8
 
             clr = self._lr
-            #state_step, state_mem, state_power = emb.opt_state
-            state_step, state = emb.opt_state
+            state_step, state_mem, state_power = emb.opt_state
             exec_dev = grad.device
             state_dev = state_step.device
 
             # the update is non-linear so indices must be unique
             grad_indices, inverse = th.unique(idx, return_inverse=True)
+            state_idx = grad_indices.to(state_dev)
+            state_step[state_idx] += 1
+            state_step = state_step[state_idx].to(exec_dev, non_blocking=True)
+            orig_mem = state_mem[state_idx].to(exec_dev, non_blocking=True)
+            orig_power = state_power[state_idx].to(exec_dev, non_blocking=True)
+
             grad_values = th.zeros((grad_indices.shape[0], grad.shape[1]), device=exec_dev)
             grad_values.index_add_(0, inverse, grad)
-            grad_values = grad_values
 
             grad_mem = grad_values
             grad_power = grad_values * grad_values
-
-            state_idx = grad_indices.to(state_dev)
-            state_step[state_idx] += 1
-            state_step = state_step[state_idx].to(exec_dev)
-            orig_state = state[state_idx].to(exec_dev)
-            orig_mem = orig_state[:,0]
-            orig_power = orig_state[:,1]
-            #orig_mem = state_mem[state_idx].to(exec_dev)
-            #orig_power = state_power[state_idx].to(exec_dev)
             update_mem = beta1 * orig_mem + (1-beta1) * grad_mem
             update_power = beta2 * orig_power + (1-beta2) * grad_power
 
@@ -413,8 +408,6 @@ class SparseAdamOptimizer(SparseGradOptimizer):
             update_power_corr = update_power / (1 - beta2).unsqueeze(1)
             std_values = clr * update_mem_corr / (th.sqrt(update_power_corr) + eps)
 
-            update_state = th.stack((update_mem, update_power), dim=1)
-            state[state_idx] = update_state
-            #state_mem[state_idx] = update_mem.to(state_dev)
-            #state_power[state_idx] = update_power.to(state_dev)
+            state_mem[state_idx] = update_mem.to(state_dev)
+            state_power[state_idx] = update_power.to(state_dev)
             emb.emb_tensor[state_idx] -= std_values.to(state_dev)
