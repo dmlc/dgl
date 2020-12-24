@@ -29,8 +29,7 @@ def evaluate(model, loader, node_embed, labels, category, device):
         blocks = [blk.to(device) for blk in blocks]
         seeds = seeds[category]
         emb = extract_embed(node_embed, input_nodes)
-        emb = {k : e.to(device) for k, e in emb.items()}
-        lbl = labels[seeds].to(device)
+        lbl = labels[seeds]
         logits = model(emb, blocks)[category]
         loss = F.cross_entropy(logits, lbl)
         acc = th.sum(logits.argmax(dim=1) == lbl).item()
@@ -40,6 +39,13 @@ def evaluate(model, loader, node_embed, labels, category, device):
     return total_loss / count, total_acc / count
 
 def main(args):
+    # check cuda
+    device = 'cpu'
+    use_cuda = args.gpu >= 0 and th.cuda.is_available()
+    if use_cuda:
+        th.cuda.set_device(args.gpu)
+        device = 'cuda:%d' % args.gpu
+
     # load graph data
     if args.dataset == 'aifb':
         dataset = AIFBDataset()
@@ -59,7 +65,7 @@ def main(args):
     test_mask = g.nodes[category].data.pop('test_mask')
     train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
     test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
-    labels = g.nodes[category].data.pop('labels')
+    labels = g.nodes[category].data.pop('labels').to(device)
 
     # split dataset into train, validate, test
     if args.validation:
@@ -68,15 +74,8 @@ def main(args):
     else:
         val_idx = train_idx
 
-    # check cuda
-    device = 'cpu'
-    use_cuda = args.gpu >= 0 and th.cuda.is_available()
-    if use_cuda:
-        th.cuda.set_device(args.gpu)
-        device = 'cuda:%d' % args.gpu
-
     # create embeddings
-    embed_layer = RelGraphEmbed(g, args.n_hidden)
+    embed_layer = RelGraphEmbed(g, args.n_hidden).to(device)
     node_embed = embed_layer()
     # create model
     model = EntityClassify(g,
