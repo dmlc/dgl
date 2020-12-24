@@ -78,6 +78,7 @@ class GAT(nn.Module):
                 y = th.zeros(g.num_nodes(), self.n_hidden * num_heads if l != len(self.layers) - 1 else self.n_classes)
             else:
                 y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
+            y = y.to(device)
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.NodeDataLoader(
                     g,
@@ -90,7 +91,7 @@ class GAT(nn.Module):
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0].int().to(device)
-                h = x[input_nodes].to(device)
+                h = x[input_nodes]
                 if l < self.n_layers - 1:
                    h = layer(block, h).flatten(1)
                 else:
@@ -98,7 +99,7 @@ class GAT(nn.Module):
                     h = h.mean(1)
                     h = h.log_softmax(dim=-1)
 
-                y[output_nodes] = h.cpu()
+                y[output_nodes] = h
             x = y
         return y
 
@@ -108,7 +109,7 @@ def compute_acc(pred, labels):
     """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, labels, val_nid, test_nid, batch_size, device):
+def evaluate(model, g, nfeat, labels, val_nid, test_nid, batch_size, device):
     """
     Evaluate the model on the validation set specified by ``val_mask``.
     g : The entire graph.
@@ -120,8 +121,7 @@ def evaluate(model, g, labels, val_nid, test_nid, batch_size, device):
     """
     model.eval()
     with th.no_grad():
-        inputs = g.ndata['feat']
-        pred = model.inference(g, inputs, batch_size, device)
+        pred = model.inference(g, nfeat, batch_size, device)
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid]), compute_acc(pred[test_nid], labels[test_nid]), pred
 
@@ -134,7 +134,8 @@ def model_param_summary(model):
 def run(args, device, data):
     # Unpack data
     train_nid, val_nid, test_nid, in_feats, labels, n_classes, g, cluster_iterator = data
-
+    labels = labels.to(device)
+    nfeat = g.ndata.pop('feat').to(device)
 
     # Define model and optimizer
     model = GAT(in_feats, args.num_heads, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
@@ -191,7 +192,7 @@ def run(args, device, data):
             avg += toc - tic
 
         if epoch % args.eval_every == 0 and epoch != 0:
-            eval_acc, test_acc, pred = evaluate(model, g, labels, val_nid, test_nid, args.val_batch_size, device)
+            eval_acc, test_acc, pred = evaluate(model, g, nfeat, labels, val_nid, test_nid, args.val_batch_size, device)
             model = model.to(device)
             if args.save_pred:
                 np.savetxt(args.save_pred + '%02d' % epoch, pred.argmax(1).cpu().numpy(), '%d')
