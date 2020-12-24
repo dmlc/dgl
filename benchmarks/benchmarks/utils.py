@@ -38,9 +38,10 @@ def get_graph(name):
         return None
 
 class ogb_data(object):
-    def __init__(self, g, num_labels):
+    def __init__(self, g, num_labels, predict_category=None):
         self._g = g
         self._num_labels = num_labels
+        self._predict_category = predict_category
 
     @property
     def num_labels(self):
@@ -49,6 +50,10 @@ class ogb_data(object):
     @property
     def num_classes(self):
         return self._num_labels
+
+    @property
+    def predict_category(self):
+        return self._predict_category
 
     def __getitem__(self, idx):
         return self._g
@@ -91,8 +96,9 @@ def load_ogb_mag():
     shutil.copytree('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
 
     print('load', name)
-    data = DglNodePropPredDataset(name=name)
+    dataset = DglNodePropPredDataset(name=name)
     print('finish loading', name)
+    split_idx = dataset.get_idx_split()
     train_idx = split_idx["train"]['paper']
     val_idx = split_idx["valid"]['paper']
     test_idx = split_idx["test"]['paper']
@@ -116,7 +122,7 @@ def load_ogb_mag():
     hg.nodes['paper'].data['test_mask'] = test_mask
 
     num_classes = dataset.num_classes
-    return ogb_data(hg, num_classes)
+    return ogb_data(hg, num_classes, 'paper')
 
 def process_data(name):
     if name == 'cora':
