@@ -157,10 +157,11 @@ def run(args, device, data):
         # blocks.
         tic_start = time.time()
         for step, cluster in enumerate(cluster_iterator):
-            cluster = cluster.int().to(device)
-            mask = cluster.ndata['train_mask']
+            mask = cluster.ndata.pop('train_mask')
             if mask.sum() == 0:
                 continue
+            cluster.edata.pop(dgl.EID)
+            cluster = cluster.int().to(device)
             input_nodes = cluster.ndata[dgl.NID]
             batch_inputs = nfeat[input_nodes]
             batch_labels = labels[input_nodes]
@@ -242,16 +243,9 @@ if __name__ == '__main__':
     print('Total edges after adding self-loop {}'.format(graph.num_edges()))
     num_nodes = train_idx.shape[0] + val_idx.shape[0] + test_idx.shape[0]
     assert num_nodes == graph.num_nodes()
-    graph.ndata['labels'] = labels
     mask = th.zeros(num_nodes, dtype=th.bool)
     mask[train_idx] = True
     graph.ndata['train_mask'] = mask
-    mask = th.zeros(num_nodes, dtype=th.bool)
-    mask[val_idx] = True
-    graph.ndata['valid_mask'] = mask
-    mask = th.zeros(num_nodes, dtype=th.bool)
-    mask[test_idx] = True
-    graph.ndata['test_mask'] = mask
 
     graph.in_degrees(0)
     graph.out_degrees(0)
