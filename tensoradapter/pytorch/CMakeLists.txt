@@ -39,9 +39,3 @@ target_include_directories(
 target_link_libraries(${TORCH_TARGET_NAME} PRIVATE "${TORCH_LIBRARIES}")
 set_property(TARGET ${TORCH_TARGET_NAME} PROPERTY CXX_STANDARD 14)
 message(STATUS "Configured target ${TORCH_TARGET_NAME}")
-
-if(MSVC)
-  add_custom_command(
-    TARGET ${TORCH_TARGET_NAME} POST_BUILD COMMAND
-    cmd.exe /c "COPY /Y Release\\${TORCH_TARGET_NAME}.dll .")
-endif(MSVC)

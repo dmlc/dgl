@@ -201,13 +201,16 @@ endif(MSVC)
 # of the wrong version when I build everything in the same CMake process.  As
 # a result, I'm launching an individual CMake build for every PyTorch version.
 if(BUILD_TORCH)
+  file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
+  file(TO_NATIVE_PATH ${CMAKE_COMMAND} CMAKE_CMD)
   if(MSVC)
     file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/tensoradapter/pytorch/build.bat BUILD_SCRIPT)
     add_custom_target(
       tensoradapter_pytorch
       ${CMAKE_COMMAND} -E env
+      CMAKE_COMMAND=${CMAKE_CMD}
       CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
-      BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+      BINDIR=${BINDIR}
       cmd /e:on /c ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
       DEPENDS ${BUILD_SCRIPT}
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/tensoradapter/pytorch)
@@ -216,6 +219,7 @@ if(BUILD_TORCH)
     add_custom_target(
       tensoradapter_pytorch
       ${CMAKE_COMMAND} -E env
+      CMAKE_COMMAND=${CMAKE_CMD}
       CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
       BINDIR=${CMAKE_CURRENT_BINARY_DIR}
       bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}

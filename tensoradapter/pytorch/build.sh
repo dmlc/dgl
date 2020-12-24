@@ -8,13 +8,13 @@ mkdir -p $BINDIR/tensoradapter/pytorch
 cd build
 
 if [ $# -eq 0 ]; then
-	cmake -DCUDA_TOOLKIT_ROOT_DIR=$CUDA_TOOLKIT_ROOT_DIR ..
+	${CMAKE_COMMAND} -DCUDA_TOOLKIT_ROOT_DIR=$CUDA_TOOLKIT_ROOT_DIR ..
 	make -j
 	cp -v *.so $BINDIR/tensoradapter/pytorch
 else
 	for PYTHON_INTERP in $@; do
 		rm -rf *
-		cmake -DCUDA_TOOLKIT_ROOT_DIR=$CUDA_TOOLKIT_ROOT_DIR -DPYTHON_INTERP=$PYTHON_INTERP ..
+		${CMAKE_COMMAND} -DCUDA_TOOLKIT_ROOT_DIR=$CUDA_TOOLKIT_ROOT_DIR -DPYTHON_INTERP=$PYTHON_INTERP ..
 		make -j
 		cp -v *.so $BINDIR/tensoradapter/pytorch
 	done
