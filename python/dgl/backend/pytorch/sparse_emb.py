@@ -155,7 +155,8 @@ class SparseGradOptimizer(abc.ABC):
             for emb in self._params:
                 num_embeddings = emb.num_embeddings
                 emb_name = emb.name
-                range_size = (num_embeddings + self._world_size - 1) // self._world_size
+                range_size = (num_embeddings + self._world_size - 1) // self._world_size \
+                    if self._world_size > 0 else 0
                 for idx, data in emb._trace:
                     grad = data.grad.data
                     device = grad.device
@@ -164,7 +165,9 @@ class SparseGradOptimizer(abc.ABC):
                         grad_list = []
                         for i in range(self._world_size):
                             start = i * range_size
-                            end = (i + 1) * range_size if (i + 1) * range_size < num_embeddings else num_embeddings
+                            end = (i + 1) * range_size \
+                                if (i + 1) * range_size < num_embeddings \
+                                else num_embeddings
                             if i == 0:
                                 mask = idx < end
                             elif i + 1 == self._world_size:
@@ -360,6 +363,8 @@ class SparseAdamOptimizer(SparseGradOptimizer):
             elif self._rank > 0:
                 # receive
                 state = emb.queues[self._rank].get()
+            else:
+                state = (state_step, state_mem, state_power)
             emb.set_opt_state(state)
 
     def update(self, idx, grad, emb):
