@@ -114,7 +114,8 @@ if(USE_OPENMP)
 endif(USE_OPENMP)
 
 if(USE_AVX)
-  add_compile_definitions(USE_AVX)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_AVX")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_AVX")
 endif(USE_AVX)
 
 # To compile METIS correct for DGL.
