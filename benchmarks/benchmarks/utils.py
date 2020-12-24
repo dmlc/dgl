@@ -53,7 +53,8 @@ class ogb_data(object):
     def __getitem__(self, idx):
         return self._g
 
-def load_ogb_product(name):
+def load_ogb_product():
+    name = 'ogbn-products'
     from ogb.nodeproppred import DglNodePropPredDataset
 
     shutil.copytree('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
@@ -83,6 +84,40 @@ def load_ogb_product(name):
 
     return ogb_data(graph, num_labels)
 
+def load_ogb_mag():
+    name = 'ogbn-mag'
+    from ogb.nodeproppred import DglNodePropPredDataset
+
+    shutil.copytree('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
+
+    print('load', name)
+    data = DglNodePropPredDataset(name=name)
+    print('finish loading', name)
+    train_idx = split_idx["train"]['paper']
+    val_idx = split_idx["valid"]['paper']
+    test_idx = split_idx["test"]['paper']
+    hg_orig, labels = dataset[0]
+    subgs = {}
+    for etype in hg_orig.canonical_etypes:
+        u, v = hg_orig.all_edges(etype=etype)
+        subgs[etype] = (u, v)
+        subgs[(etype[2], 'rev-'+etype[1], etype[0])] = (v, u)
+    hg = dgl.heterograph(subgs)
+    hg.nodes['paper'].data['feat'] = hg_orig.nodes['paper'].data['feat']
+    hg.nodes['paper'].data['label'] = labels['paper'].squeeze()
+    train_mask = torch.zeros((hg.number_of_nodes('paper'),), dtype=torch.bool)
+    train_mask[train_idx] = True
+    val_mask = torch.zeros((hg.number_of_nodes('paper'),), dtype=torch.bool)
+    val_mask[val_idx] = True
+    test_mask = torch.zeros((hg.number_of_nodes('paper'),), dtype=torch.bool)
+    test_mask[test_idx] = True
+    hg.nodes['paper'].data['train_mask'] = train_mask
+    hg.nodes['paper'].data['val_mask'] = val_mask
+    hg.nodes['paper'].data['test_mask'] = test_mask
+
+    num_classes = dataset.num_classes
+    return ogb_data(hg, num_classes)
+
 def process_data(name):
     if name == 'cora':
         return dgl.data.CoraGraphDataset()
@@ -91,7 +126,9 @@ def process_data(name):
     elif name == 'reddit':
         return dgl.data.RedditDataset(self_loop=True)
     elif name == 'ogbn-products':
-        return load_ogb_product('ogbn-products')
+        return load_ogb_product()
+    elif name == 'ogbn-mag':
+        return load_ogb_mag()
     else:
         raise ValueError('Invalid dataset name:', name)
 
