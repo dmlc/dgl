@@ -101,7 +101,7 @@ DGL提供了几个邻居采样类，这些类会生成需计算的节点在每�
 用户可以查阅 :ref:`NN模块的API参考 <apinn>` 来查看DGL的内置模型模块是否支持接受 ``块`` 作为参数。
 
 如果希望使用自定义的消息传递模块，用户可以参考
-:ref:`guide_cn-minibatch-custom-gnn-module`
+:ref:`guide_cn-minibatch-custom-gnn-module`。
 
 模型的训练
 ~~~~~~~~~~~~~
@@ -189,7 +189,7 @@ DGL提供的一些采样方法也支持异构图。例如，用户仍然可以�
         drop_last=False,
         num_workers=4)
 
-模型的训练与同构图几乎相同。不同之处在于， ``compute_loss`` 的实现将在此处包含两个字典：节点类型和预测结果。
+模型的训练与同构图几乎相同。不同之处在于， ``compute_loss`` 的实现会包含两个字典：节点类型和预测结果。
 
 .. code:: python
 

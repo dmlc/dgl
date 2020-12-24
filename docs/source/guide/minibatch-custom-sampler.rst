@@ -53,15 +53,13 @@ green nodes:
 Neighborhood sampling with pencil and paper
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We then consider how multi-layer message passing works for computing the
-output of a single node. In the following text we refer to the nodes
-whose GNN outputs are to be computed as *seed nodes*.
+Let's first defind a DGL graph according to the above image.
 
 .. code:: python
 
     import torch
     import dgl
-    
+
     src = torch.LongTensor(
         [0, 0, 0, 1, 2, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 8, 9, 10,
          1, 2, 3, 3, 3, 4, 5, 5, 6, 5, 8, 6, 8, 9, 8, 11, 11, 10, 11])
@@ -69,8 +67,10 @@ whose GNN outputs are to be computed as *seed nodes*.
         [1, 2, 3, 3, 3, 4, 5, 5, 6, 5, 8, 6, 8, 9, 8, 11, 11, 10, 11,
          0, 0, 0, 1, 2, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 8, 9, 10])
     g = dgl.graph((src, dst))
-    g.ndata['x'] = torch.randn(12, 5)
-    g.ndata['y'] = torch.randn(12, 1)
+
+We then consider how multi-layer message passing works for computing the
+output of a single node. In the following text we refer to the nodes
+whose GNN outputs are to be computed as *seed nodes*.
 
 Finding the message passing dependency
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

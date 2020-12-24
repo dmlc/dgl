@@ -22,7 +22,7 @@
 :class:`~dgl.dataloading.pytorch.EdgeDataLoader` 以小批次的形式对一组边进行迭代，
 从而产生包含边小批次的子图以及供上游模块使用的 ``块``。
 
-例如，以下代码创建了一个PyTorch数据加载器，该PyTorch数据集加载器以批的形式迭代训练边ID的数组
+例如，以下代码创建了一个PyTorch数据加载器，该PyTorch数据加载器以批的形式迭代训练边ID的数组
 ``train_eids``，并将生成的块列表放传输到GPU上。
 
 .. code:: python

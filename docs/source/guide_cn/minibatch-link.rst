@@ -16,9 +16,9 @@
 
 DGL中的
 :class:`~dgl.dataloading.pytorch.EdgeDataLoader`
-还支持生成用于链接预测的负样本。为此，用户需要定义负采样函数。
+还支持生成用于链接预测的负样本。为此，用户需要定义负采样函数。例如，
 :class:`~dgl.dataloading.negative_sampler.Uniform`
-函数是基于均匀分布的采样函数。对于每个边的源节点，它将采样 ``k`` 个负样本的目标节点。
+函数是基于均匀分布的采样函数，它对于每个边的源节点，采样 ``k`` 个负样本的目标节点。
 
 以下数据加载器将为每个边的源节点均匀采样5个负样本的目标节点。
 
@@ -44,7 +44,6 @@ DGL中的
 
     class NegativeSampler(object):
         def __init__(self, g, k):
-            # caches the probability distribution
             # 缓存概率分布
             self.weights = g.in_degrees().float() ** 0.75
             self.k = k
@@ -217,7 +216,6 @@ DGL提供了在同构图上做链路预测的一个示例：
 
    class NegativeSampler(object):
        def __init__(self, g, k):
-           # caches the probability distribution
            # 缓存概率分布
            self.weights = {
                etype: g.in_degrees(etype=etype).float() ** 0.75
@@ -234,7 +232,7 @@ DGL提供了在同构图上做链路预测的一个示例：
                result_dict[etype] = (src, dst)
            return result_dict
 
-随后，需要向数据载入器提供边类型和对应边ID的字典，以及负采样器。例如，下面代码对异构图上的所有的边进行了迭代。
+随后，需要向数据载入器提供边类型和对应边ID的字典，以及负采样器。示例如下所示：
 
 .. code:: python
 
@@ -250,8 +248,8 @@ DGL提供了在同构图上做链路预测的一个示例：
         drop_last=False,
         num_workers=4)
 
-异构图上的随机批次模型训练循与同构图中的训练几乎相同，不同之处在于，
-``compute_loss`` 以边类型字典和预测结果字典作为输入。
+异构图上的随机批次模型训练与同构图中的训练几乎相同，不同之处在于，
+``compute_loss`` 是以边类型字典和预测结果字典作为输入。
 
 .. code:: python
 
