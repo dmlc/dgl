@@ -56,7 +56,7 @@ class ogb_data(object):
 def load_ogb_product(name):
     from ogb.nodeproppred import DglNodePropPredDataset
 
-    shutil.copytree('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
+    os.symlink('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
 
     print('load', name)
     data = DglNodePropPredDataset(name=name)
