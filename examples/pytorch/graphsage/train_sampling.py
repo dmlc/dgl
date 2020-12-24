@@ -96,7 +96,6 @@ def evaluate(model, g, nfeat, labels, val_nid, device):
     inputs : The features of all the nodes.
     labels : The labels of all the nodes.
     val_nid : the node Ids for validation.
-    batch_size : Number of nodes to compute at the same time.
     device : The GPU device to evaluate on.
     """
     model.eval()

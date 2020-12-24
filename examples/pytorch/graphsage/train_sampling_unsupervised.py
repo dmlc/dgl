@@ -5,17 +5,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.multiprocessing as mp
-from torch.utils.data import DataLoader
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
-from _thread import start_new_thread
-from functools import wraps
 from dgl.data import RedditDataset
 from torch.nn.parallel import DistributedDataParallel
 import tqdm
-import traceback
 import sklearn.linear_model as lm
 import sklearn.metrics as skm
 
@@ -74,7 +70,7 @@ class SAGE(nn.Module):
                 h = self.dropout(h)
         return h
 
-    def inference(self, g, x, batch_size, device):
+    def inference(self, g, x, device):
         """
         Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
         g : the entire graph.
@@ -88,7 +84,6 @@ class SAGE(nn.Module):
         # Therefore, we compute the representation of all nodes layer by layer.  The nodes
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
-        nodes = th.arange(g.number_of_nodes())
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
@@ -155,24 +150,23 @@ def compute_acc(emb, labels, train_nids, val_nids, test_nids):
     f1_micro_test = skm.f1_score(test_labels, pred[test_nids], average='micro')
     return f1_micro_eval, f1_micro_test
 
-def evaluate(model, g, inputs, labels, train_nids, val_nids, test_nids, batch_size, device):
+def evaluate(model, g, inputs, labels, train_nids, val_nids, test_nids, device):
     """
     Evaluate the model on the validation set specified by ``val_mask``.
     g : The entire graph.
     inputs : The features of all the nodes.
     labels : The labels of all the nodes.
     val_mask : A 0-1 mask indicating which nodes do we actually compute the accuracy for.
-    batch_size : Number of nodes to compute at the same time.
     device : The GPU device to evaluate on.
     """
     model.eval()
     with th.no_grad():
         # single gpu
         if isinstance(model, SAGE):
-            pred = model.inference(g, inputs, batch_size, device)
+            pred = model.inference(g, inputs, device)
         # multi gpu
         else:
-            pred = model.module.inference(g, inputs, batch_size, device)
+            pred = model.module.inference(g, inputs, device)
     model.train()
     return compute_acc(pred, labels, train_nids, val_nids, test_nids)
 
@@ -193,10 +187,6 @@ def run(proc_id, n_gpus, args, devices, data):
     train_nid = th.LongTensor(np.nonzero(train_mask)).squeeze()
     val_nid = th.LongTensor(np.nonzero(val_mask)).squeeze()
     test_nid = th.LongTensor(np.nonzero(test_mask)).squeeze()
-
-    #train_nid = th.LongTensor(np.nonzero(train_mask)[0])
-    #val_nid = th.LongTensor(np.nonzero(val_mask)[0])
-    #test_nid = th.LongTensor(np.nonzero(test_mask)[0])
 
     # Create PyTorch DataLoader for constructing blocks
     n_edges = g.number_of_edges()
@@ -276,7 +266,7 @@ def run(proc_id, n_gpus, args, devices, data):
             tic_step = time.time()
 
             if step % args.eval_every == 0 and proc_id == 0:
-                eval_acc, test_acc = evaluate(model, g, g.ndata['features'], labels, train_nid, val_nid, test_nid, args.batch_size, device)
+                eval_acc, test_acc = evaluate(model, g, g.ndata['features'], labels, train_nid, val_nid, test_nid, device)
                 print('Eval Acc {:.4f} Test Acc {:.4f}'.format(eval_acc, test_acc))
                 if eval_acc > best_eval_acc:
                     best_eval_acc = eval_acc
