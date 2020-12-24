@@ -10,6 +10,8 @@
 #include <vector>
 #include <iostream>
 
+namespace tensoradapter {
+
 static at::Device get_device(DLContext ctx) {
   switch (ctx.device_type) {
    case kDLCPU:
@@ -40,3 +42,5 @@ DLManagedTensor* TAempty(
 }
 
 };
+
+};  // namespace tensoradapter
