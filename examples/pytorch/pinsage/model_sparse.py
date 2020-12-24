@@ -1,4 +1,4 @@
-import pickle
+import pickle, time
 import argparse
 import numpy as np
 import torch
@@ -85,14 +85,24 @@ def train(dataset, args):
 
     # Model
     model = PinSAGEModel(g, item_ntype, textset, args.hidden_dims, args.num_layers).to(device)
-    item_emb = nn.Embedding(g.number_of_nodes(item_ntype), args.hidden_dims, sparse=True)
+    if args.dgl_sparse:
+        def initializer(emb):
+            emb.uniform_(-1, 1)
+            return emb
+        item_emb = dgl.backend.pytorch.GraphSparseEmbedding(g.number_of_nodes(item_ntype), args.hidden_dims, name='dgl-emb',
+                        device=device, init_func=initializer)
+        opt_emb = dgl.backend.pytorch.SparseAdamOptimizer(params=[item_emb], lr=args.lr)
+    else:
+        item_emb = nn.Embedding(g.number_of_nodes(item_ntype), args.hidden_dims, sparse=True)
+        opt_emb = torch.optim.SparseAdam(list(item_emb.parameters()), lr=args.lr)
     # Optimizer
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
-    opt_emb = torch.optim.SparseAdam(item_emb.parameters(), lr=args.lr)
 
     # For each batch of head-tail-negative triplets...
+    train_time = 0
     for epoch_id in range(args.num_epochs):
         model.train()
+        tstart = time.time()
         for batch_id in tqdm.trange(args.batches_per_epoch):
             pos_graph, neg_graph, blocks = next(dataloader_it)
             # Copy to GPU
@@ -107,6 +117,8 @@ def train(dataset, args):
             loss.backward()
             opt.step()
             opt_emb.step()
+        tend = time.time()
+        train_time += (tend - tstart)
 
         # Evaluate
         model.eval()
@@ -120,7 +132,10 @@ def train(dataset, args):
                 h_item_batches.append(model.get_repr(blocks, item_emb))
             h_item = torch.cat(h_item_batches, 0)
 
-            print(evaluation.evaluate_nn(dataset, h_item, args.k, args.batch_size))
+            print("iter {}: {}".format(
+                epoch_id,
+                evaluation.evaluate_nn(dataset, h_item, args.k, args.batch_size)))
+    print('Train time {}'.format(train_time))
 
 if __name__ == '__main__':
     # Arguments
@@ -133,6 +148,8 @@ if __name__ == '__main__':
     parser.add_argument('--num-layers', type=int, default=2)
     parser.add_argument('--hidden-dims', type=int, default=16)
     parser.add_argument('--batch-size', type=int, default=32)
+    parser.add_argument("--dgl-sparse", default=False, action='store_true',
+            help='Use sparse embedding for node embeddings.')
     parser.add_argument('--device', type=str, default='cpu')        # can also be "cuda:0"
     parser.add_argument('--num-epochs', type=int, default=1)
     parser.add_argument('--batches-per-epoch', type=int, default=20000)
