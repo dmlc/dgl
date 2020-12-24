@@ -7,17 +7,8 @@ import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 import dgl.nn.pytorch as dglnn
 import time
-import traceback
 
 from .. import utils
-
-def inductive_split(g):
-    """Split the graph into training graph, validation graph, and test graph by training
-    and validation masks.  Suitable for inductive models."""
-    train_g = g.subgraph(g.ndata['train_mask'])
-    val_g = g.subgraph(g.ndata['train_mask'] | g.ndata['val_mask'])
-    test_g = g
-    return train_g, val_g, test_g
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -64,15 +55,12 @@ def track_time(data):
     g = data[0]
     g.ndata['features'] = g.ndata['feat']
     g.ndata['labels'] = g.ndata['label']
-    train_g, val_g, test_g = inductive_split(g)
     in_feats = g.ndata['features'].shape[1]
     n_classes = data.num_labels
 
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
-    train_g.create_formats_()
-    val_g.create_formats_()
-    test_g.create_formats_()
+    g.create_formats_()
 
     num_epochs = 20
     num_hidden = 16
@@ -83,15 +71,13 @@ def track_time(data):
     dropout = 0.5
     num_workers = 4
 
-    train_nid = th.nonzero(train_g.ndata['train_mask'], as_tuple=True)[0]
-    val_nid = th.nonzero(val_g.ndata['val_mask'], as_tuple=True)[0]
-    test_nid = th.nonzero(~(test_g.ndata['train_mask'] | test_g.ndata['val_mask']), as_tuple=True)[0]
+    train_nid = th.nonzero(g.ndata['train_mask'], as_tuple=True)[0]
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in fan_out.split(',')])
     dataloader = dgl.dataloading.NodeDataLoader(
-        train_g,
+        g,
         train_nid,
         sampler,
         batch_size=batch_size,
@@ -109,7 +95,7 @@ def track_time(data):
     # dry run one epoch
     for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
         # Load the input features as well as output labels
-        #batch_inputs, batch_labels = load_subtensor(train_g, seeds, input_nodes, device)
+        #batch_inputs, batch_labels = load_subtensor(g, seeds, input_nodes, device)
         blocks = [block.int().to(device) for block in blocks]
         batch_inputs = blocks[0].srcdata['features']
         batch_labels = blocks[-1].dstdata['labels']
@@ -130,7 +116,7 @@ def track_time(data):
         # blocks.
         for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
             # Load the input features as well as output labels
-            #batch_inputs, batch_labels = load_subtensor(train_g, seeds, input_nodes, device)
+            #batch_inputs, batch_labels = load_subtensor(g, seeds, input_nodes, device)
             blocks = [block.int().to(device) for block in blocks]
             batch_inputs = blocks[0].srcdata['features']
             batch_labels = blocks[-1].dstdata['labels']
