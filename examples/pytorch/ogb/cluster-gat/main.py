@@ -5,17 +5,11 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
-import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
-from _thread import start_new_thread
-from functools import wraps
-from dgl.data import RedditDataset
 import tqdm
-import traceback
 from ogb.nodeproppred import DglNodePropPredDataset
 
 from sampler import ClusterIter, subgraph_collate_fn
@@ -79,16 +73,15 @@ class GAT(nn.Module):
         layers.
         """
         num_heads = self.num_heads
-        nodes = th.arange(g.number_of_nodes())
         for l, layer in enumerate(self.layers):
             if l < self.n_layers - 1:
-                y = th.zeros(g.number_of_nodes(), self.n_hidden * num_heads if l != len(self.layers) - 1 else self.n_classes)
+                y = th.zeros(g.num_nodes(), self.n_hidden * num_heads if l != len(self.layers) - 1 else self.n_classes)
             else:
-                y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
+                y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.NodeDataLoader(
                     g,
-                    th.arange(g.number_of_nodes()),
+                    th.arange(g.num_nodes()),
                     sampler,
                     batch_size=batch_size,
                     shuffle=False,
@@ -98,7 +91,6 @@ class GAT(nn.Module):
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0].int().to(device)
                 h = x[input_nodes].to(device)
-                h_dst = h[:block.number_of_dst_nodes()].to(device)
                 if l < self.n_layers - 1:
                    h = layer(block, h).flatten(1)
                 else:
@@ -242,12 +234,12 @@ if __name__ == '__main__':
     train_idx, val_idx, test_idx = splitted_idx['train'], splitted_idx['valid'], splitted_idx['test']
     graph, labels = data[0]
     labels = labels[:, 0]
-    print('Total edges before adding self-loop {}'.format(graph.number_of_edges()))
+    print('Total edges before adding self-loop {}'.format(graph.num_edges()))
     graph = dgl.remove_self_loop(graph)
     graph = dgl.add_self_loop(graph)
-    print('Total edges after adding self-loop {}'.format(graph.number_of_edges()))
+    print('Total edges after adding self-loop {}'.format(graph.num_edges()))
     num_nodes = train_idx.shape[0] + val_idx.shape[0] + test_idx.shape[0]
-    assert num_nodes == graph.number_of_nodes()
+    assert num_nodes == graph.num_nodes()
     graph.ndata['labels'] = labels
     mask = th.zeros(num_nodes, dtype=th.bool)
     mask[train_idx] = True
