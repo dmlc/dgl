@@ -15,9 +15,7 @@ SET TMPDIR=%WORKSPACE%\tmp
 PUSHD build
 cmake -DCMAKE_CXX_FLAGS="/DDGL_EXPORTS" -DUSE_OPENMP=ON -DBUILD_TORCH=ON -Dgtest_force_shared_crt=ON -DDMLC_FORCE_SHARED_CRT=ON -DBUILD_CPP_TEST=1 -DCMAKE_CONFIGURATION_TYPES="Release" .. -G "Visual Studio 16 2019" || EXIT /B 1
 msbuild dgl.sln /m /nr:false || EXIT /B 1
-COPY /Y Release\dgl.dll .
 COPY /Y Release\runUnitTests.exe .
-COPY /Y tensoradapter\pytorch\Release\tensoradapter_pytorch*.dll tensoradapter\pytorch
 POPD
 
 CALL workon %BUILD_TAG%

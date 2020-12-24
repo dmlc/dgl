@@ -165,9 +165,6 @@ else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})
 endif(USE_CUDA)
 
-# Tensor adapter
-add_subdirectory("tensoradapter")
-
 # For serialization
 if (USE_HDFS)
   option(DMLC_HDFS_SHARED "dgl has to build with dynamic hdfs library" ON)
@@ -196,6 +193,37 @@ if(MSVC)
     TARGET dgl POST_BUILD COMMAND
     cmd.exe /c "COPY /Y Release\\dgl.dll .")
 endif(MSVC)
+
+# Tensor adapter libraries
+# Linking against LibTorch involves linking against a bunch of other libraries
+# returned by PyTorch's CMake (e.g. C10 or NVTools).  Because CMake caches
+# the found libraries in find_library(), often times CMake will look into the libraries
+# of the wrong version when I build everything in the same CMake process.  As
+# a result, I'm launching an individual CMake build for every PyTorch version.
+if(BUILD_TORCH)
+  if(MSVC)
+    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/tensoradapter/pytorch/build.bat BUILD_SCRIPT)
+    add_custom_target(
+      tensoradapter_pytorch
+      ${CMAKE_COMMAND} -E env
+      CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+      BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+      cmd /e:on /c ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+      DEPENDS ${BUILD_SCRIPT}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/tensoradapter/pytorch)
+  else(MSVC)
+    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/tensoradapter/pytorch/build.sh BUILD_SCRIPT)
+    add_custom_target(
+      tensoradapter_pytorch
+      ${CMAKE_COMMAND} -E env
+      CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+      BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+      bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+      DEPENDS ${BUILD_SCRIPT}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/tensoradapter/pytorch)
+  endif(MSVC)
+  add_dependencies(dgl tensoradapter_pytorch)
+endif(BUILD_TORCH)
 
 # Installation rules
 install(TARGETS dgl DESTINATION lib${LIB_SUFFIX})
