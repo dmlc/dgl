@@ -216,14 +216,14 @@ def run(proc_id, n_gpus, args, devices, data):
             if epoch % args.eval_every == 0 and epoch != 0:
                 if n_gpus == 1:
                     eval_acc = evaluate(
-                        model, val_g, val_g.ndata['features'], val_g.ndata['labels'], val_nid, devices[0])
+                        model, val_g, val_nfeat, val_labels, val_nid, devices[0])
                     test_acc = evaluate(
-                        model, test_g, test_g.ndata['features'], test_g.ndata['labels'], test_nid, devices[0])
+                        model, test_g, test_nfeat, test_labels, test_nid, devices[0])
                 else:
                     eval_acc = evaluate(
-                        model.module, val_g, val_g.ndata['features'], val_g.ndata['labels'], val_nid, devices[0])
+                        model.module, val_g, val_nfeat, val_labels, val_nid, devices[0])
                     test_acc = evaluate(
-                        model.module, test_g, test_g.ndata['features'], test_g.ndata['labels'], test_nid, devices[0])
+                        model.module, test_g, test_nfeat, test_labels, test_nid, devices[0])
                 print('Eval Acc {:.4f}'.format(eval_acc))
                 print('Test Acc: {:.4f}'.format(test_acc))
 
