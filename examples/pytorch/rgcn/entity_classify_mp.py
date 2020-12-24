@@ -453,8 +453,8 @@ def main(args, devices):
         train_mask = hg.nodes[category].data.pop('train_mask')
         test_mask = hg.nodes[category].data.pop('test_mask')
         labels = hg.nodes[category].data.pop('labels')
-        train_idx = th.nonzero(train_mask).squeeze()
-        test_idx = th.nonzero(test_mask).squeeze()
+        train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
+        test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
         node_feats = [None] * num_of_ntype
 
         # AIFB, MUTAG, BGS and AM datasets do not provide validation set split.
