@@ -1,0 +1,420 @@
+import torch as th
+import abc
+from abc import abstractmethod
+from .tensor import attach_grad, is_recording
+
+class GraphSparseEmbedding:
+    '''Sparse embeddings for graph.
+
+    DGL provides a sparse embedding to support models that require learnable embeddings.
+    DGL's sparse embeddings are mainly used for learning node embeddings of graph models.
+    The sparse embeddings have to be updated by DGL's optimizers instead of
+    the optimizers provided by the deep learning frameworks (e.g., Pytorch).
+
+    To support efficient training on a graph with many nodes, the embeddings support sparse
+    updates. That is, only the embeddings involved in a mini-batch computation are updated.
+    Currently, DGL provides two optimizer: `SparseAdagrad` and `SparseAdam. DGL will provide more
+    optimizers in the future.
+
+    Parameters
+    ----------
+    num_embeddings : int
+        The number of embeddings. Currently, the number of embeddings has to be the same as
+        the number of nodes or the number of edges.
+    embedding_dim : int
+        The dimension size of embeddings.
+    name : str
+        The name of the embeddings. The name should uniquely identify embeddings in a system.
+    init_func : callable, optional
+        The function to create the initial data. If the init function is not provided,
+        the values of the embeddings are initialized to zero.
+    rank : int, optional
+        The rank in multi-gpu process group. -1 means single GPU or CPU training. Default: -1.
+    world_size : int, optional
+        Number of devices used in mutli-gpu training. Default: 0.
+    queues : list of multiprocessing.Queue, optional
+        Used by multi-gpu processes to share embedding tensor. Default: None.
+
+    Examples
+    --------
+    Before launching multiple gpu processes
+
+    >>> queues = [mp.Queue() for _ in range(num_gpus)]
+    >>> def initializer(shape, dtype):
+            arr = th.zeros(shape, dtype=dtype)
+            arr.uniform_(-1, 1)
+            return arr
+
+    In each multiple gpu process
+
+    >>> emb = dgl.backend.F.GraphSparseEmbedding(g.number_of_nodes(), 10, init_func=initializer,
+        rank=rank, world_size=num_gpus, queues=queues)
+    >>> optimizer = dgl.backend.F.SparseAdagrad([emb], lr=0.001)
+    >>> for blocks in dataloader:
+    ...     feats = emb(nids)
+    ...     loss = F.sum(feats + 1, 0)
+    ...     loss.backward()
+    ...     optimizer.step()
+    '''
+    def __init__(self, num_embeddings, embedding_dim, name,
+                 init_func=None, rank=-1, world_size=0, queues=None):
+        self._rank = rank
+        self._world_size = world_size
+        assert world_size <= 1 or len(queues) == world_size, \
+            'Number of queues should be equal to number of GPU processes you have.'
+
+        if rank <= 0:
+            emb = th.zeros((num_embeddings, embedding_dim), dtype=th.float32)
+            if init_func is not None:
+                emb = init_func(emb)
+        if rank == 0:
+            emb.share_memory_()
+            for i in range(1, world_size):
+                # send embs
+                queues[i].put(emb)
+        elif rank > 0:
+            # receive
+            emb = queues[rank].get()
+
+        self._tensor = emb
+        self._num_embeddings = num_embeddings
+        self._name = name
+        self._state = None
+        self._trace = []
+        self._queues = queues
+
+    def __call__(self, idx):
+        emb = self._tensor[idx]
+        if is_recording():
+            emb = attach_grad(emb)
+            self._trace.append((idx, emb))
+        return emb
+
+    @property
+    def rank(self):
+        return self._rank
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def world_size(self):
+        return self._world_size
+
+    @property
+    def num_embeddings(self):
+        return self._num_embeddings
+
+    @property
+    def queues(self):
+        return self._queues
+
+    def set_opt_state(self, state):
+        self._state = state
+
+    @property
+    def opt_state(self):
+        return self._state
+
+    @property
+    def trace(self):
+        return self._trace
+
+    def reset_trace(self):
+        self._trace = []
+
+    @property
+    def emb_tensor(self):
+        return self._tensor
+
+class SparseGradOptimizer(abc.ABC):
+    r''' The abstract sparse optimizer.
+
+    Parameters
+    ----------
+    params : list of GraphSparseEmbedding
+        The list of GraphSparseEmbeddings.
+    lr : float
+        The learning rate.
+    '''
+    def __init__(self, params, lr):
+        self._params = params
+        self._lr = lr
+
+    def step(self):
+        ''' The step function.
+
+        The step function is invoked at the end of every batch to update embeddings
+        '''
+        with th.no_grad():
+            update_embs = {emb.name: ([],[]) for emb in self._params}
+            for emb in self._params:
+                num_embeddings = emb.num_embeddings
+                emb_name = emb.name
+                range_size = (num_embeddings + self._world_size - 1) // self._world_size
+                for idx, data in emb._trace:
+                    grad = data.grad.data
+                    device = grad.device
+                    if self._world_size > 0:
+                        idx_list = []
+                        grad_list = []
+                        for i in range(self._world_size):
+                            start = i * range_size
+                            end = (i + 1) * range_size if (i + 1) * range_size < num_embeddings else num_embeddings
+                            if i == 0:
+                                mask = idx < end
+                            elif i + 1 == self._world_size:
+                                mask = idx >= start
+                            else:
+                                mask = th.logical_and((idx >= start),(idx < end))
+                            idx_i = idx[mask]
+                            grad_i = grad[mask]
+
+                            if i == self._rank:
+                                update_embs[emb_name][0].append(idx_i)
+                                update_embs[emb_name][1].append(grad_i)
+                            else:
+                                emb.queues[i].put((emb_name,
+                                                   idx_i.to(th.device('cpu'), non_blocking=True).share_memory_(),
+                                                   grad_i.to(th.device('cpu'), non_blocking=True).share_memory_()))
+                        for i in range(self._world_size):
+                            if i != self._rank:
+                                ename, idx_i, grad_i = emb.queues[i].get()
+                                update_embs[ename][0].append(idx_i.to(device, non_blocking=True))
+                                update_embs[ename][1].append(grad_i.to(device, non_blocking=True))
+                    else:
+                        update_embs[emb_name][0].append(idx)
+                        update_embs[emb_name][1].append(grad)
+                emb.reset_trace()
+
+            for emb in self._params:
+                emb_name = emb.name
+
+                idx = th.cat(update_embs[emb_name][0], dim=0)
+                grad = th.cat(update_embs[emb_name][1], dim=0)
+                self.update(idx, grad, emb)
+
+            if self._world_size > 1:
+                th.distributed.barrier()
+
+    @abstractmethod
+    def update(self, idx, grad, emb):
+        """ Update embeddings in a sparse manner
+        Sparse embeddings are updated in mini batches. we maintains gradient states for
+        each embedding so they can be updated separately.
+
+        Parameters
+        ----------
+        idx : tensor
+            Index of the embeddings to be updated.
+        grad : tensor
+            Gradient of each embedding.
+        emb : GraphSparseEmbedding
+            Sparse embedding to update.
+        """
+        pass
+
+    def zero_grad(self):
+        """ dummy
+        """
+        pass
+
+class SparseAdagradOptimizer(SparseGradOptimizer):
+    r''' The sparse Adagrad optimizer.
+
+    This optimizer implements a sparse version of Adagrad algorithm for optimizing
+    :func:`dgl.backend.GraphSparseEmbedding`. In each mini-batch, it only updates the embeddings
+    involved in the mini-batch to support efficient training on a graph with many
+    nodes and edges.
+
+    Adagrad maintains a :math:`G_{t,i,j}` for every parameter in the embeddings, where
+    :math:`G_{t,i,j}=G_{t-1,i,j} + g_{t,i,j}^2` and :math:`g_{t,i,j}` is the gradient of
+    the dimension :math:`j` of embedding :math:`i` at step :math:`t`.
+
+    Parameters
+    ----------
+    params : list of GraphSparseEmbedding
+        The list of GraphSparseEmbeddings.
+    lr : float
+        The learning rate.
+    '''
+    def __init__(self, params, lr):
+        super(SparseAdagradOptimizer, self).__init__(params, lr)
+        self._rank = None
+        self._world_size = None
+        # We need to register a state sum for each embedding in the kvstore.
+        for emb in params:
+            assert isinstance(emb, GraphSparseEmbedding), 'SparseAdagradOptimizer only supports GraphSparseEmbedding'
+
+            if self._rank is None:
+                self._rank = emb.rank
+                self._world_size = emb.world_size
+            else:
+                assert self._rank == emb.rank, 'MultiGPU rank for each embedding should be same.'
+                assert self._world_size == emb.world_size, 'MultiGPU world_size for each embedding should be same.'
+            if self._rank <= 0:
+                state = emb.new().resize_(emb.shape).zero_()
+            if self._rank == 0:
+                state.share_memory_()
+                for i in range(1, world_size):
+                    # send embs
+                    emb.queues[i].put(state)
+            elif self._rank > 0:
+                # receive
+                state = emb.queues[self._rank].get()
+            emb.set_opt_state(state)
+
+    def update(self, idx, grad, emb):
+        """ Update embeddings in a sparse manner
+        Sparse embeddings are updated in mini batches. we maintains gradient states for
+        each embedding so they can be updated separately.
+
+        Parameters
+        ----------
+        idx : tensor
+            Index of the embeddings to be updated.
+        grad : tensor
+            Gradient of each embedding.
+        emb : GraphSparseEmbedding
+            Sparse embedding to update.
+        """
+        eps = 1e-6
+        clr = self._lr
+
+        # the update is non-linear so indices must be unique
+        grad_indices, inverse = th.unique(idx, return_inverse=True)
+        grad_values = th.zeros((grad_indices.shape[0], grad.shape[1]), device=grad.device)
+        grad_values.index_add_(0, inverse, grad)
+
+        grad_sum = (grad_values * grad_values)
+        state = emb.opt_state
+        state_dev = state.device
+        state_idx = grad_indices.to(state_dev)
+        grad_state = state[state_idx].to(grad.device)
+        grad_state += grad_sum
+        state[state_idx] = grad_state.to(state_dev)
+
+        std_values = grad_state.add_(eps).sqrt_()
+        tmp = clr * grad_values / std_values
+        emb.emb_tensor[state_idx] -= tmp.to(state_dev)
+
+class SparseAdamOptimizer(SparseGradOptimizer):
+    r''' The sparse Adam optimizer.
+
+    This optimizer implements a sparse version of Adam algorithm for optimizing
+    :func:`dgl.backend.GraphSparseEmbedding`. In each mini-batch, it only updates the embeddings
+    involved in the mini-batch to support efficient training on a graph with many
+    nodes and edges.
+
+    Adam maintains a :math:`Gm_{t,i,j}` and `Gp_{t,i,j}` for every parameter in the embeddings, where
+    :math:`Gm_{t,i,j}=beta1 * Gm_{t-1,i,j} + (1-beta1) * g_{t,i,j}`,
+    :math:`Gp_{t,i,j}=beta2 * Gp_{t-1,i,j} + (1-beta2) * g_{t,i,j}^2`,
+    :math:`g_{t,i,j} = lr * Gm_{t,i,j} / (1 - beta1^t) / \sqrt{Gp_{t,i,j} / (1 - beta2^t)}` and
+    :math:`g_{t,i,j}` is the gradient of the dimension :math:`j` of embedding :math:`i` at step :math:`t`.
+
+    Parameters
+    ----------
+    params : list of GraphSparseEmbedding
+        The list of GraphSparseEmbeddings.
+    lr : float
+        The learning rate.
+    beta1 : float
+        The beta1 of Adam.
+    beta2 : float
+        The beta2 of Adam.
+    '''
+    def __init__(self, params, lr, beta1=0.9, beta2=0.999):
+        super(SparseAdamOptimizer, self).__init__(params, lr)
+        self._lr = lr
+        self._beta1 = beta1
+        self._beta2 = beta2
+        self._rank = None
+        self._world_size = None
+        # We need to register a state sum for each embedding in the kvstore.
+        for emb in params:
+            assert isinstance(emb, GraphSparseEmbedding), 'SparseAdamOptimizer only supports GraphSparseEmbedding'
+
+            if self._rank is None:
+                self._rank = emb.rank
+                self._world_size = emb.world_size
+            else:
+                assert self._rank == emb.rank, 'MultiGPU rank for each embedding should be same.'
+                assert self._world_size == emb.world_size, 'MultiGPU world_size for each embedding should be same.'
+            if self._rank <= 0:
+                # steps may overflow if steps > 2B
+                state_step = th.zeros((emb.emb_tensor.shape[0],), dtype=th.int)
+                state = emb.emb_tensor.new().resize_((emb.emb_tensor.shape[0], 2, emb.emb_tensor.shape[1])).zero_()
+                #state_mem = emb.emb_tensor.new().resize_(emb.emb_tensor.shape).zero_()
+                #state_power = emb.emb_tensor.new().resize_(emb.emb_tensor.shape).zero_()
+            if self._rank == 0:
+                state_step.share_memory_()
+                #state_mem.share_memory_()
+                #state_power.share_memory_()
+                state.share_memory_()
+                #state = (state_step, state_mem, state_power)
+                state = (state_step, state)
+                for i in range(1, self._world_size):
+                    # send embs
+                    emb.queues[i].put(state)
+            elif self._rank > 0:
+                # receive
+                state = emb.queues[self._rank].get()
+            emb.set_opt_state(state)
+
+    def update(self, idx, grad, emb):
+        """ Update embeddings in a sparse manner
+        Sparse embeddings are updated in mini batches. we maintains gradient states for
+        each embedding so they can be updated separately.
+
+        Parameters
+        ----------
+        idx : tensor
+            Index of the embeddings to be updated.
+        grad : tensor
+            Gradient of each embedding.
+        emb : GraphSparseEmbedding
+            Sparse embedding to update.
+        """
+        with th.no_grad():
+            beta1 = self._beta1
+            beta2= self._beta2
+            eps = 1e-8
+
+            clr = self._lr
+            #state_step, state_mem, state_power = emb.opt_state
+            state_step, state = emb.opt_state
+            exec_dev = grad.device
+            state_dev = state_step.device
+
+            # the update is non-linear so indices must be unique
+            grad_indices, inverse = th.unique(idx, return_inverse=True)
+            grad_values = th.zeros((grad_indices.shape[0], grad.shape[1]), device=exec_dev)
+            grad_values.index_add_(0, inverse, grad)
+            grad_values = grad_values
+
+            grad_mem = grad_values
+            grad_power = grad_values * grad_values
+
+            state_idx = grad_indices.to(state_dev)
+            state_step[state_idx] += 1
+            state_step = state_step[state_idx].to(exec_dev)
+            orig_state = state[state_idx].to(exec_dev)
+            orig_mem = orig_state[:,0]
+            orig_power = orig_state[:,1]
+            #orig_mem = state_mem[state_idx].to(exec_dev)
+            #orig_power = state_power[state_idx].to(exec_dev)
+            update_mem = beta1 * orig_mem + (1-beta1) * grad_mem
+            update_power = beta2 * orig_power + (1-beta2) * grad_power
+
+            beta1 = th.pow(beta1, state_step)
+            beta2 = th.pow(beta2, state_step)
+            update_mem_corr = update_mem / (1 - beta1).unsqueeze(1)
+            update_power_corr = update_power / (1 - beta2).unsqueeze(1)
+            std_values = clr * update_mem_corr / (th.sqrt(update_power_corr) + eps)
+
+            update_state = th.stack((update_mem, update_power), dim=1)
+            state[state_idx] = update_state
+            #state_mem[state_idx] = update_mem.to(state_dev)
+            #state_power[state_idx] = update_power.to(state_dev)
+            emb.emb_tensor[state_idx] -= std_values.to(state_dev)

@@ -26,7 +26,7 @@ from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from model import RelGraphEmbedLayer
 from dgl.nn import RelGraphConv
 from utils import thread_wrapped_func
-import tqdm 
+import tqdm
 
 from ogb.nodeproppred import DglNodePropPredDataset
 
@@ -165,7 +165,7 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
     embed_layer.eval()
     eval_logits = []
     eval_seeds = []
- 
+
     with th.no_grad():
         for sample_data in tqdm.tqdm(eval_loader):
             th.cuda.empty_cache()
@@ -179,12 +179,12 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
             eval_seeds.append(seeds.cpu().detach())
     eval_logits = th.cat(eval_logits)
     eval_seeds = th.cat(eval_seeds)
- 
+
     return eval_logits, eval_seeds
 
 
 @thread_wrapped_func
-def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
+def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None, sparse_queues=None):
     dev_id = devices[proc_id] if devices[proc_id] != 'cpu' else -1
     g, node_feats, num_of_ntype, num_classes, num_rels, target_idx, \
         train_idx, val_idx, test_idx, labels = dataset
@@ -204,14 +204,14 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                         num_workers=args.num_workers)
 
     # validation sampler
-    val_sampler = NeighborSampler(g, target_idx, [None] * args.n_layers)
+    val_sampler = NeighborSampler(g, target_idx, fanouts)
     val_loader = DataLoader(dataset=val_idx.numpy(),
-                            batch_size=args.eval_batch_size,
+                            batch_size=args.batch_size,
                             collate_fn=val_sampler.sample_blocks,
                             shuffle=False,
                             num_workers=args.num_workers)
 
-    # validation sampler
+    # test sampler
     test_sampler = NeighborSampler(g, target_idx, [None] * args.n_layers)
     test_loader = DataLoader(dataset=test_idx.numpy(),
                              batch_size=args.eval_batch_size,
@@ -219,15 +219,16 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                              shuffle=False,
                              num_workers=args.num_workers)
 
+    world_size = n_gpus
     if n_gpus > 1:
         dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
             master_ip='127.0.0.1', master_port='12345')
-        world_size = n_gpus
         backend = 'nccl'
 
         # using sparse embedding or usig mix_cpu_gpu model (embedding model can not be stored in GPU)
-        if args.sparse_embedding or args.mix_cpu_gpu:
+        if args.dgl_sparse is False:
             backend = 'gloo'
+        print("backend using {}".format(backend))
         th.distributed.init_process_group(backend=backend,
                                           init_method=dist_init_method,
                                           world_size=world_size,
@@ -235,14 +236,16 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
 
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
-    # 
+    #
     embed_layer = RelGraphEmbedLayer(dev_id,
                                      g.number_of_nodes(),
                                      node_tids,
                                      num_of_ntype,
                                      node_feats,
                                      args.n_hidden,
-                                     sparse_emb=args.sparse_embedding)
+                                     dgl_sparse=args.dgl_sparse,
+                                     world_size=world_size,
+                                     queues=sparse_queues)
 
     # create model
     # all model params are in device.
@@ -262,43 +265,58 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
         th.cuda.set_device(dev_id)
         labels = labels.to(dev_id)
         model.cuda(dev_id)
-        # embedding layer may not fit into GPU, then use mix_cpu_gpu
-        if args.mix_cpu_gpu is False:
+        # with dgl_sparse emb, only node embedding is not in GPU
+        if args.dgl_sparse:
             embed_layer.cuda(dev_id)
 
     if n_gpus > 1:
         labels = labels.to(dev_id)
         model.cuda(dev_id)
-        if args.mix_cpu_gpu:
-            embed_layer = DistributedDataParallel(embed_layer, device_ids=None, output_device=None)
-        else:
-            embed_layer.cuda(dev_id)
-            embed_layer = DistributedDataParallel(embed_layer, device_ids=[dev_id], output_device=dev_id)
         model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
+        if args.dgl_sparse:
+            embed_layer.cuda(dev_id)
+            if len(list(embed_layer.parameters())) > 0:
+                embed_layer = DistributedDataParallel(embed_layer, device_ids=[dev_id], output_device=dev_id)
+        else:
+            if len(list(embed_layer.parameters())) > 0:
+                embed_layer = DistributedDataParallel(embed_layer, device_ids=None, output_device=None)
 
     # optimizer
-    if args.sparse_embedding:
-        dense_params = list(model.parameters())
-        if args.node_feats:
-            if  n_gpus > 1:
-                dense_params += list(embed_layer.module.embeds.parameters())
-            else:
-                dense_params += list(embed_layer.embeds.parameters())
-        optimizer = th.optim.Adam(dense_params, lr=args.lr, weight_decay=args.l2norm)
+    dense_params = list(model.parameters())
+    if args.node_feats:
         if  n_gpus > 1:
-            emb_optimizer = th.optim.SparseAdam(embed_layer.module.node_embeds.parameters(), lr=args.lr)
+            dense_params += list(embed_layer.module.embeds.parameters())
         else:
-            emb_optimizer = th.optim.SparseAdam(embed_layer.node_embeds.parameters(), lr=args.lr)
-    else:
+            dense_params += list(embed_layer.embeds.parameters())
+    optimizer = th.optim.Adam(dense_params, lr=args.lr, weight_decay=args.l2norm)
+
+    if args.dgl_sparse:
         all_params = list(model.parameters()) + list(embed_layer.parameters())
         optimizer = th.optim.Adam(all_params, lr=args.lr, weight_decay=args.l2norm)
+        if n_gpus > 1 and isinstance(embed_layer, DistributedDataParallel):
+            dgl_emb = embed_layer.module.dgl_emb
+        else:
+            dgl_emb = embed_layer.dgl_emb
+        emb_optimizer = dgl.backend.pytorch.SparseAdamOptimizer(params=dgl_emb, lr=args.lr) if len(dgl_emb) > 0 else None
+    else:
+        if n_gpus > 1:
+            embs = list(embed_layer.module.node_embeds.parameters())
+        else:
+            embs = list(embed_layer.node_embeds.parameters())
+        emb_optimizer = th.optim.SparseAdam(embs, lr=args.lr) if len(embs) > 0 else None
 
     # training loop
     print("start training...")
     forward_time = []
     backward_time = []
 
+    train_time = 0
+    validation_time = 0
+    test_time = 0
+    if n_gpus > 1 and n_cpus - args.num_workers > 0:
+        th.set_num_threads(n_cpus-args.num_workers)
     for epoch in range(args.n_epochs):
+        tstart = time.time()
         model.train()
         embed_layer.train()
 
@@ -313,13 +331,13 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
             loss = F.cross_entropy(logits, labels[seeds])
             t1 = time.time()
             optimizer.zero_grad()
-            if args.sparse_embedding:
+            if emb_optimizer is not None:
                 emb_optimizer.zero_grad()
 
             loss.backward()
-            optimizer.step()
-            if args.sparse_embedding:
+            if emb_optimizer is not None:
                 emb_optimizer.step()
+            optimizer.step()
             t2 = time.time()
 
             forward_time.append(t1 - t0)
@@ -329,8 +347,10 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                 print("Train Accuracy: {:.4f} | Train Loss: {:.4f}".
                     format(train_acc, loss.item()))
         print("Epoch {:05d}:{:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".
-            format(epoch, i, forward_time[-1], backward_time[-1]))
-
+            format(epoch, args.n_epochs, forward_time[-1], backward_time[-1]))
+        tend = time.time()
+        train_time += (tend - tstart)
+        vstart = time.time()
         if (queue is not None) or (proc_id == 0):
             val_logits, val_seeds = evaluate(model, embed_layer, val_loader, node_feats)
             if queue is not None:
@@ -355,8 +375,10 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                         format(val_acc, val_loss))
         if n_gpus > 1:
             th.distributed.barrier()
+        vend = time.time()
+        validation_time += (vend - vstart)
 
-    # only process 0 will do the evaluation
+    tstart = time.time()
     if (queue is not None) or (proc_id == 0):
         test_logits, test_seeds = evaluate(model, embed_layer, test_loader, node_feats)
         if queue is not None:
@@ -378,6 +400,8 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
             test_acc = th.sum(test_logits.argmax(dim=1) == labels[test_seeds].cpu()).item() / len(test_seeds)
             print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss))
             print()
+    tend = time.time()
+    test_time += (tend-tstart)
 
     # sync for test
     if n_gpus > 1:
@@ -387,6 +411,8 @@ def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
                                                   np.mean(forward_time[len(forward_time) // 4:])))
     print("{}/{} Mean backward time: {:4f}".format(proc_id, n_gpus,
                                                    np.mean(backward_time[len(backward_time) // 4:])))
+    if proc_id == 0:
+        print("Train {}s, valid {}s, test {}s".format(train_time, validation_time, test_time))
 
 def main(args, devices):
     # load graph data
@@ -431,17 +457,6 @@ def main(args, devices):
         print('Number of valid: {}'.format(len(val_idx)))
         print('Number of test: {}'.format(len(test_idx)))
 
-        if args.node_feats:
-            node_feats = []
-            for ntype in hg.ntypes:
-                if len(hg.nodes[ntype].data) == 0:
-                    node_feats.append(None)
-                else:
-                    assert len(hg.nodes[ntype].data) == 1
-                    feat = hg.nodes[ntype].data.pop('feat')
-                    node_feats.append(feat.share_memory_())
-        else:
-            node_feats = [None] * num_of_ntype
     else:
         # Load from hetero-graph
         hg = dataset[0]
@@ -455,7 +470,6 @@ def main(args, devices):
         labels = hg.nodes[category].data.pop('labels')
         train_idx = th.nonzero(train_mask).squeeze()
         test_idx = th.nonzero(test_mask).squeeze()
-        node_feats = [None] * num_of_ntype
 
         # AIFB, MUTAG, BGS and AM datasets do not provide validation set split.
         # Split train set into train and validation if args.validation is set
@@ -465,6 +479,15 @@ def main(args, devices):
             train_idx = train_idx[len(train_idx) // 5:]
         else:
             val_idx = train_idx
+
+    node_feats = []
+    for ntype in hg.ntypes:
+        if len(hg.nodes[ntype].data) == 0 or args.node_feats is False:
+            node_feats.append(hg.number_of_nodes(ntype))
+        else:
+            assert len(hg.nodes[ntype].data) == 1
+            feat = hg.nodes[ntype].data.pop('feat')
+            node_feats.append(feat.share_memory_())
 
     # calculate norm for each edge type and store in edge
     if args.global_norm is False:
@@ -509,19 +532,21 @@ def main(args, devices):
     g.create_formats_()
 
     n_gpus = len(devices)
+    n_cpus = mp.cpu_count()
     # cpu
     if devices[0] == -1:
-        run(0, 0, args, ['cpu'],
+        run(0, 0, n_cpus, args, ['cpu'],
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-             train_idx, val_idx, test_idx, labels), None, None)
+             train_idx, val_idx, test_idx, labels), None, None, None)
     # gpu
     elif n_gpus == 1:
-        run(0, n_gpus, args, devices,
+        run(0, n_gpus, n_cpus, args, devices,
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-            train_idx, val_idx, test_idx, labels), None, None)
+            train_idx, val_idx, test_idx, labels), None, None, None)
     # multi gpu
     else:
         queue = mp.Queue(n_gpus)
+        sparse_queues = [mp.Queue() for _ in range(n_gpus)]
         procs = []
         num_train_seeds = train_idx.shape[0]
         num_valid_seeds = val_idx.shape[0]
@@ -547,11 +572,11 @@ def main(args, devices):
                                          (proc_id + 1) * tstseeds_per_proc \
                                          if (proc_id + 1) * tstseeds_per_proc < num_test_seeds \
                                          else num_test_seeds]
-            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices,
+            p = mp.Process(target=run, args=(proc_id, n_gpus, n_cpus // n_gpus, args, devices,
                                              (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
                                              train_idx, val_idx, test_idx, labels),
                                              (proc_train_seeds, proc_valid_seeds, proc_test_seeds),
-                                             queue))
+                                             queue, sparse_queues))
             p.start()
             procs.append(p)
         for p in procs:
@@ -595,9 +620,7 @@ def config():
             help="Number of workers for dataloader.")
     parser.add_argument("--low-mem", default=False, action='store_true',
             help="Whether use low mem RelGraphCov")
-    parser.add_argument("--mix-cpu-gpu", default=False, action='store_true',
-            help="Whether store node embeddins in cpu")
-    parser.add_argument("--sparse-embedding", action='store_true',
+    parser.add_argument("--dgl-sparse", default=False, action='store_true',
             help='Use sparse embedding for node embeddings.')
     parser.add_argument('--node-feats', default=False, action='store_true',
             help='Whether use node features')
