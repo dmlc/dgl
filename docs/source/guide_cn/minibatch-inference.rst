@@ -24,7 +24,8 @@
 实现离线推断
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-这里以6.5.1节中提到的两层GCN为例。实现离线推断的方法依然需要使用MultiLayerFullNeighborSampler，
+这里以6.1节中 :ref:`guide_cn-minibatch-node-classification-model`
+提到的两层GCN为例。实现离线推断的方法依然需要使用MultiLayerFullNeighborSampler，
 但它每次只为一层进行采样。注意，这里的离线推断被实现为GNN模块的一个方法，
 这是因为它对一层的计算依赖于消息的聚合和结合。
 

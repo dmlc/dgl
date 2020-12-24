@@ -36,7 +36,8 @@ that for every layer only the first three minibatches are drawn).
 Implementing Offline Inference
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Consider the two-layer GCN we have mentioned in Section 6.5.1. The way
+Consider the two-layer GCN we have mentioned in Section 6.1
+:ref:`guide_cn-minibatch-node-classification-model`. The way
 to implement offline inference still involves using
 :class:`~dgl.dataloading.neighbor.MultiLayerFullNeighborSampler`, but sampling for
 only one layer at a time. Note that offline inference is implemented as

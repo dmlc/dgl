@@ -193,9 +193,7 @@ DGL确保块的输出节点将始终出现在输入节点中。如下代码所�
     output_nodes = block.dstdata[dgl.NID]
     assert torch.equal(input_nodes[:len(output_nodes)], output_nodes)
 
-因此，用户自己构建的边界的输出节点必须包含所有边的目标节点。
-
-例如，考虑以下边界
+因此，用户自己构建的边界的输出节点必须包含所有边的目标节点。例如，考虑以下边界
 
 .. figure:: https://data.dgl.ai/asset/image/guide_6_4_5.png
    :alt: Imgur
@@ -269,7 +267,7 @@ DGL确保块的输出节点将始终出现在输入节点中。如下代码所�
 :meth:`~dgl.dataloading.dataloader.BlockSampler.sample_blocks`
 方法从最后一层开始生成一个块的列表。 ``sample_blocks`` 的默认实现是向后迭代，生成边界，并将其转换为块。
 
-因此，对于邻居采样，**用户仅需要实现 \ :meth:`~dgl.dataloading.dataloader.BlockSampler.sample_frontier`\ 方法**。
+因此，对于邻居采样，**用户仅需要实现**\ :meth:`~dgl.dataloading.dataloader.BlockSampler.sample_frontier`\ **方法**。
 给定GNN层、初始图和要计算表示的节点，该方法负责为它们生成边界。
 
 同时，用户还必须将GNN的层数传递给父类。
@@ -305,7 +303,7 @@ DGL确保块的输出节点将始终出现在输入节点中。如下代码所�
                 frontier = dgl.sampling.sample_neighbors(g, seed_nodes, fanout)
             return frontier
 
-尽管上面的函数可以生成边界，但是任何拥有与初始图相同节点的图都可用作边界。
+虽然上面的函数可以生成边界，但是任何拥有与初始图相同节点的图都可用作边界。
 
 例如，如果要以某种概率将种子节点的入边随机剔除，则可以按照以下方式简单地定义采样器：
 
@@ -332,8 +330,8 @@ DGL确保块的输出节点将始终出现在输入节点中。如下代码所�
         def __len__(self):
             return self.n_layers
 
-在实现自定义采样器后，用户可以创建一个数据加载器，该数据加载器将使用用户自定义的采样器，
-并且它将遍历种子节点生成一系列的块。
+在实现自定义采样器后，用户可以创建一个数据加载器。这个数据加载器使用用户自定义的采样器，
+并且遍历种子节点生成一系列的块。
 
 .. code:: python
 
@@ -363,7 +361,7 @@ DGL确保块的输出节点将始终出现在输入节点中。如下代码所�
 ^^^^^^^^^^^^^^^^^^^^
 
 为异构图生成边界与为同构图生成边界没有什么不同。只要使返回的图具有与初始图相同的节点，
-就可以正常工作。例如，可以重写上面的 ``MultiLayerDropoutSampler`` 以遍历所有边类型，
+就可以正常工作。例如，可以重写上面的 ``MultiLayerDropoutSampler`` 以遍历所有的边类型，
 以便它也可以在异构图上使用。
 
 .. code:: python
