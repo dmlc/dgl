@@ -85,12 +85,12 @@ class SAGE(nn.Module):
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
         for l, layer in enumerate(self.layers):
-            y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
+            y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.NodeDataLoader(
                 g,
-                th.arange(g.number_of_nodes()),
+                th.arange(g.num_nodes()),
                 sampler,
                 batch_size=args.batch_size,
                 shuffle=True,
@@ -189,7 +189,7 @@ def run(proc_id, n_gpus, args, devices, data):
     test_nid = th.LongTensor(np.nonzero(test_mask)).squeeze()
 
     # Create PyTorch DataLoader for constructing blocks
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
     train_seeds = np.arange(n_edges)
     if n_gpus > 0:
         num_per_gpu = (train_seeds.shape[0] + n_gpus -1) // n_gpus
@@ -253,8 +253,8 @@ def run(proc_id, n_gpus, args, devices, data):
             optimizer.step()
 
             t = time.time()
-            pos_edges = pos_graph.number_of_edges()
-            neg_edges = neg_graph.number_of_edges()
+            pos_edges = pos_graph.num_edges()
+            neg_edges = neg_graph.num_edges()
             iter_pos.append(pos_edges / (t - tic_step))
             iter_neg.append(neg_edges / (t - tic_step))
             iter_d.append(d_step - tic_step)
@@ -272,9 +272,16 @@ def run(proc_id, n_gpus, args, devices, data):
                     best_eval_acc = eval_acc
                     best_test_acc = test_acc
                 print('Best Eval Acc {:.4f} Test Acc {:.4f}'.format(best_eval_acc, best_test_acc))
+        toc = time.time()
+        if proc_id == 0:
+            print('Epoch Time(s): {:.4f}'.format(toc - tic))
+        if epoch >= 5:
+            avg += toc - tic
         if n_gpus > 1:
             th.distributed.barrier()
-    print('Avg epoch time: {}'.format(avg / (epoch - 4)))
+
+    if proc_id == 0:
+        print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
 def main(args, devices):
     # load reddit data
