@@ -58,14 +58,13 @@ class SAGE(nn.Module):
         # Therefore, we compute the representation of all nodes layer by layer.  The nodes
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
-        nodes = th.arange(g.number_of_nodes())
         for l, layer in enumerate(self.layers):
-            y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
+            y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes).to(device)
 
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.NodeDataLoader(
                 g,
-                th.arange(g.number_of_nodes()),
+                th.arange(g.num_nodes()),
                 sampler,
                 batch_size=args.batch_size,
                 shuffle=True,
@@ -76,13 +75,13 @@ class SAGE(nn.Module):
                 block = blocks[0]
 
                 block = block.int().to(device)
-                h = x[input_nodes].to(device)
+                h = x[input_nodes]
                 h = layer(block, h)
                 if l != len(self.layers) - 1:
                     h = self.activation(h)
                     h = self.dropout(h)
 
-                y[output_nodes] = h.cpu()
+                y[output_nodes] = h
 
             x = y
         return y
@@ -93,7 +92,7 @@ def compute_acc(pred, labels):
     """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, inputs, labels, val_nid, device):
+def evaluate(model, g, nfeat, labels, val_nid, device):
     """
     Evaluate the model on the validation set specified by ``val_nid``.
     g : The entire graph.
@@ -105,16 +104,16 @@ def evaluate(model, g, inputs, labels, val_nid, device):
     """
     model.eval()
     with th.no_grad():
-        pred = model.inference(g, inputs, device)
+        pred = model.inference(g, nfeat, device)
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid])
 
-def load_subtensor(g, labels, seeds, input_nodes, dev_id):
+def load_subtensor(nfeat, labels, seeds, input_nodes):
     """
-    Copys features and labels of a set of nodes onto GPU.
+    Extracts features and labels for a set of nodes.
     """
-    batch_inputs = g.ndata['features'][input_nodes].to(dev_id)
-    batch_labels = labels[seeds].to(dev_id)
+    batch_inputs = nfeat[input_nodes]
+    batch_labels = labels[seeds]
     return batch_inputs, batch_labels
 
 #### Entry point
@@ -133,7 +132,20 @@ def run(proc_id, n_gpus, args, devices, data):
     th.cuda.set_device(dev_id)
 
     # Unpack data
-    in_feats, n_classes, train_g, val_g, test_g = data
+    n_classes, train_g, val_g, test_g = data
+
+    if args.inductive:
+        train_nfeat = train_g.ndata.pop('features').to(dev_id)
+        val_nfeat = val_g.ndata.pop('features').to(dev_id)
+        test_nfeat = test_g.ndata.pop('features').to(dev_id)
+        train_labels = train_g.ndata.pop('labels').to(dev_id)
+        val_labels = val_g.ndata.pop('labels').to(dev_id)
+        test_labels = test_g.ndata.pop('labels').to(dev_id)
+    else:
+        train_nfeat = val_nfeat = test_nfeat = g.ndata.pop('features').to(dev_id)
+        train_labels = val_labels = test_labels = g.ndata.pop('labels').to(dev_id)
+    in_feats = train_nfeat.shape[1]
+
     train_mask = train_g.ndata['train_mask']
     val_mask = val_g.ndata['val_mask']
     test_mask = ~(test_g.ndata['train_mask'] | test_g.ndata['val_mask'])
@@ -162,7 +174,6 @@ def run(proc_id, n_gpus, args, devices, data):
     if n_gpus > 1:
         model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
     loss_fcn = nn.CrossEntropyLoss()
-    loss_fcn = loss_fcn.to(dev_id)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     # Training loop
@@ -178,7 +189,7 @@ def run(proc_id, n_gpus, args, devices, data):
                 tic_step = time.time()
 
             # Load the input features as well as output labels
-            batch_inputs, batch_labels = load_subtensor(train_g, train_g.ndata['labels'], seeds, input_nodes, dev_id)
+            batch_inputs, batch_labels = load_subtensor(train_nfeat, train_labels, seeds, input_nodes)
             blocks = [block.int().to(dev_id) for block in blocks]
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -247,7 +258,6 @@ if __name__ == '__main__':
     g, n_classes = load_reddit()
     # Construct graph
     g = dgl.as_heterograph(g)
-    in_feats = g.ndata['features'].shape[1]
 
     if args.inductive:
         train_g, val_g, test_g = inductive_split(g)
@@ -260,7 +270,7 @@ if __name__ == '__main__':
     val_g.create_formats_()
     test_g.create_formats_()
     # Pack data
-    data = in_feats, n_classes, train_g, val_g, test_g
+    data = n_classes, train_g, val_g, test_g
 
     if n_gpus == 1:
         run(0, n_gpus, args, devices, data)
