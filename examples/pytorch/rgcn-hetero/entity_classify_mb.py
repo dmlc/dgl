@@ -7,10 +7,7 @@ import itertools
 import numpy as np
 import time
 import torch as th
-import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
-from functools import partial
 
 import dgl
 from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
@@ -139,6 +136,7 @@ def main(args):
 
         if epoch > 3:
             dur.append(time.time() - t0)
+            print("Time: {:.4f}".format(np.average(dur)))
 
         val_loss, val_acc = evaluate(model, val_loader, node_embed, labels, category, device)
         print("Epoch {:05d} | Valid Acc: {:.4f} | Valid loss: {:.4f} | Time: {:.4f}".
