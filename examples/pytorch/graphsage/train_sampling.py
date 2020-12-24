@@ -4,19 +4,12 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
-from torch.utils.data import DataLoader
-import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
-from _thread import start_new_thread
-from functools import wraps
-from dgl.data import RedditDataset
 import tqdm
-import traceback
 
-from load_graph import load_reddit, load_ogb, inductive_split
+from load_graph import load_reddit, inductive_split
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -47,7 +40,7 @@ class SAGE(nn.Module):
                 h = self.dropout(h)
         return h
 
-    def inference(self, g, x, batch_size, device):
+    def inference(self, g, x, device):
         """
         Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
         g : the entire graph.
@@ -96,7 +89,7 @@ def compute_acc(pred, labels):
     labels = labels.long()
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, inputs, labels, val_nid, batch_size, device):
+def evaluate(model, g, inputs, labels, val_nid, device):
     """
     Evaluate the model on the validation set specified by ``val_nid``.
     g : The entire graph.
@@ -108,7 +101,7 @@ def evaluate(model, g, inputs, labels, val_nid, batch_size, device):
     """
     model.eval()
     with th.no_grad():
-        pred = model.inference(g, inputs, batch_size, device)
+        pred = model.inference(g, inputs, device)
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid])
 
@@ -183,9 +176,9 @@ def run(args, device, data):
         if epoch >= 5:
             avg += toc - tic
         if epoch % args.eval_every == 0 and epoch != 0:
-            eval_acc = evaluate(model, val_g, val_g.ndata['features'], val_g.ndata['labels'], val_nid, args.batch_size, device)
+            eval_acc = evaluate(model, val_g, val_g.ndata['features'], val_g.ndata['labels'], val_nid, device)
             print('Eval Acc {:.4f}'.format(eval_acc))
-            test_acc = evaluate(model, test_g, test_g.ndata['features'], test_g.ndata['labels'], test_nid, args.batch_size, device)
+            test_acc = evaluate(model, test_g, test_g.ndata['features'], test_g.ndata['labels'], test_nid, device)
             print('Test Acc: {:.4f}'.format(test_acc))
 
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
@@ -217,8 +210,6 @@ if __name__ == '__main__':
 
     if args.dataset == 'reddit':
         g, n_classes = load_reddit()
-    elif args.dataset == 'ogb-product':
-        g, n_classes = load_ogb('ogbn-products')
     else:
         raise Exception('unknown dataset')
 

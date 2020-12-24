@@ -135,7 +135,6 @@ def main(args):
 
         if epoch > 3:
             dur.append(time.time() - t0)
-            print("Time: {:.4f}".format(np.average(dur)))
 
         val_loss, val_acc = evaluate(model, val_loader, node_embed, labels, category, device)
         print("Epoch {:05d} | Valid Acc: {:.4f} | Valid loss: {:.4f} | Time: {:.4f}".
