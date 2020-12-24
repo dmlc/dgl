@@ -78,7 +78,6 @@ class GAT(nn.Module):
                 y = th.zeros(g.num_nodes(), self.n_hidden * num_heads if l != len(self.layers) - 1 else self.n_classes)
             else:
                 y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
-            y = y.to(device)
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.NodeDataLoader(
                     g,
@@ -91,7 +90,7 @@ class GAT(nn.Module):
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0].int().to(device)
-                h = x[input_nodes]
+                h = x[input_nodes].to(device)
                 if l < self.n_layers - 1:
                    h = layer(block, h).flatten(1)
                 else:
@@ -99,7 +98,7 @@ class GAT(nn.Module):
                     h = h.mean(1)
                     h = h.log_softmax(dim=-1)
 
-                y[output_nodes] = h
+                y[output_nodes] = h.cpu()
             x = y
         return y
 
