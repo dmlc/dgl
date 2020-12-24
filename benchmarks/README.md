@@ -115,4 +115,4 @@ Tips
     - Commit your local changes and push it to remote `origin`.
     - Add the corresponding branch to `asv.conf.json`.
 * Try make your benchmarks compatible with all the versions being tested.
-* For ogbn dataset, put the dataset input /tmp/dataset/
+* For ogbn dataset, put the dataset into /tmp/dataset/
