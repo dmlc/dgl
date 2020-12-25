@@ -18,6 +18,7 @@ import sys
 import os
 from ..backend import backend_name
 from ..utils import expand_as_pair
+from . import functional
 
 def _load_backend(mod_name):
     mod = importlib.import_module('.%s' % mod_name, __name__)
@@ -34,5 +35,3 @@ if LOAD_ALL.lower() != "false":
     from .tensorflow import *
 else:
     _load_backend(backend_name)
-
-from . import functional
