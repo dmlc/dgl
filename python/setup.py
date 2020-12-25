@@ -140,7 +140,7 @@ if wheel_include_libs:
                 shutil.copy(
                     os.path.join(dir_, 'tensoradapter', backend, ta_name),
                     os.path.join(CURRENT_DIR, 'dgl', 'tensoradapter', backend))
-                fo.write("include dgl/tensoradapter/%s/%s" % (backend, ta_name))
+                fo.write("include dgl/tensoradapter/%s/%s\n" % (backend, ta_name))
 
     setup_kwargs = {
         "include_package_data": True
