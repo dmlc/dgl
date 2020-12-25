@@ -4,11 +4,11 @@
 
 | Paper                                                                                    | node classification | link prediction/classification | graph property prediction | sampling | OGB   |
 | ---------------------------------------------------------------------------------------- | ------------------- | ------------------------------ | ------------------------- | -------- | ----- |
-| [Heterogeneous Graph Transformer](#hgt)                                                  | [ x ]               | [ x ]                          |                           |          |       |
-| [Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges](#mwe)  | [ x ]               |                                |                           |          | [ x ] |
-| [SIGN: Scalable Inception Graph Neural Networks](#sign)                                  | [ x ]               |                                |                           |          | [ x ] |
-| [Strategies for Pre-training Graph Neural Networks](#prestrategy)                        |                     |                                | [ x ]                     |          |       |
-| [Predict then Propagate: Graph Neural Networks meet Personalized PageRank](#appnp)       | [ x ]               |                                |                           |          |       |
+| [Heterogeneous Graph Transformer](#hgt)                                                  | - [x]               | - [x]                          |                           |          |       |
+| [Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges](#mwe)  | - [x]               |                                |                           |          | - [x] |
+| [SIGN: Scalable Inception Graph Neural Networks](#sign)                                  | - [x]               |                                |                           |          | - [x] |
+| [Strategies for Pre-training Graph Neural Networks](#prestrategy)                        |                     |                                | - [x]                     |          |       |
+| [Predict then Propagate: Graph Neural Networks meet Personalized PageRank](#appnp)       | - [x]               |                                |                           |          |       |
 
 ## 2020
 
