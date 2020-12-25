@@ -34,3 +34,5 @@ if LOAD_ALL.lower() != "false":
     from .tensorflow import *
 else:
     _load_backend(backend_name)
+
+from . import functional
