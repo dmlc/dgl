@@ -114,7 +114,7 @@ def make_undirected(G):
     return G
 
 def find_connected_nodes(G):
-    nodes = torch.nonzero(G.out_degrees()).squeeze(-1)
+    nodes = torch.nonzero(G.out_degrees(), as_tuple=False).squeeze(-1)
     return nodes
 
 class LineDataset:

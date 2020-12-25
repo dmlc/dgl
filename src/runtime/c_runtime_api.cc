@@ -10,6 +10,7 @@
 #include <dgl/runtime/module.h>
 #include <dgl/runtime/registry.h>
 #include <dgl/runtime/device_api.h>
+#include <dgl/runtime/env.h>
 #include <array>
 #include <algorithm>
 #include <string>
@@ -376,6 +377,10 @@ int DGLCbArgToReturn(DGLValue* value, int code) {
   rv.MoveToCHost(value, &tcode);
   CHECK_EQ(tcode, code);
   API_END();
+}
+
+void DGLSetTAPath(const char *path_cstr) {
+  Env::Global()->ta_path = std::string(path_cstr);
 }
 
 // set device api
