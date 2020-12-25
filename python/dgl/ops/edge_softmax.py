@@ -1,7 +1,7 @@
 """dgl edge_softmax operator module."""
-from ...backend import edge_softmax as edge_softmax_internal
-from ...backend import astype
-from ...base import ALL, is_all
+from ..backend import edge_softmax as edge_softmax_internal
+from ..backend import astype
+from ..base import ALL, is_all
 
 __all__ = ['edge_softmax']
 
@@ -58,7 +58,7 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
     --------
     The following example uses PyTorch backend.
 
-    >>> from dgl.nn.functional import edge_softmax
+    >>> from dgl.ops import edge_softmax
     >>> import dgl
     >>> import torch as th
 
