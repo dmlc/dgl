@@ -2,9 +2,13 @@
 
 ## Overview
 
-| Paper                                   | node classification | link prediction/classification | graph property prediction | sampling | OGB |
-| --------------------------------------- | ------------------- | ------------------------------ | ------------------------- | -------- | --- |
-| [Heterogeneous Graph Transformer](#hgt) | [x]                 | [x]                            |                           |          |     |
+| Paper                                                                                    | node classification | link prediction/classification | graph property prediction | sampling | OGB   |
+| ---------------------------------------------------------------------------------------- | ------------------- | ------------------------------ | ------------------------- | -------- | ----- |
+| [Heterogeneous Graph Transformer](#hgt)                                                  | [ x ]               | [ x ]                          |                           |          |       |
+| [Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges](#mwe)  | [ x ]               |                                |                           |          | [ x ] |
+| [SIGN: Scalable Inception Graph Neural Networks](#sign)                                  | [ x ]               |                                |                           |          | [ x ] |
+| [Strategies for Pre-training Graph Neural Networks](#prestrategy)                        |                     |                                | [ x ]                     |          |       |
+| [Predict then Propagate: Graph Neural Networks meet Personalized PageRank](#appnp)       | [ x ]               |                                |                           |          |       |
 
 ## 2020
 
@@ -12,15 +16,15 @@
     - Example code: [PyTorch](../examples/pytorch/hgt)
     - Tags: dynamic heterogeneous graphs, large-scale, node classification, link prediction
 
-- Chen. Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges. [Paper link](https://cims.nyu.edu/~chenzh/files/GCN_with_edge_weights.pdf).
+- <a name="mwe"></a> Chen. Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges. [Paper link](https://cims.nyu.edu/~chenzh/files/GCN_with_edge_weights.pdf).
     - Example code: [PyTorch on ogbn-proteins](../examples/pytorch/ogb/ogbn-proteins)
     - Tags: node classification, weighted graphs, OGB
 
-- Frasca et al. SIGN: Scalable Inception Graph Neural Networks. [Paper link](https://arxiv.org/abs/2004.11198).
+- <a name="sign"></a> Frasca et al. SIGN: Scalable Inception Graph Neural Networks. [Paper link](https://arxiv.org/abs/2004.11198).
     - Example code: [PyTorch on ogbn-arxiv/products/mag](../examples/pytorch/ogb/sign), [PyTorch](../examples/pytorch/sign)
     - Tags: node classification, OGB, large-scale, heterogeneous graphs
 
-- Hu et al. Strategies for Pre-training Graph Neural Networks. [Paper link](https://arxiv.org/abs/1905.12265).
+- <a name="prestrategy"></a> Hu et al. Strategies for Pre-training Graph Neural Networks. [Paper link](https://arxiv.org/abs/1905.12265).
     - Example code: [Molecule embedding](https://github.com/awslabs/dgl-lifesci/tree/master/examples/molecule_embeddings), [PyTorch for custom data](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/csv_data_configuration)
     - Tags: molecules, graph classification, unsupervised learning, self-supervised learning, molecular property prediction
 
@@ -118,7 +122,7 @@
     
 - Ying et al. Graph Convolutional Neural Networks for Web-Scale Recommender Systems. [Paper link](https://arxiv.org/abs/1806.01973).
     - Example code: [PyTorch](../examples/pytorch/pinsage)
-    - Tags: recommender system, large-scale
+    - Tags: recommender system, large-scale, sampling
 
 - Berg Palm et al. Recurrent Relational Networks. [Paper link](https://arxiv.org/abs/1711.08028).
     - Example code: [PyTorch](../examples/pytorch/rrn)
