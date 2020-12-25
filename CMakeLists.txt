@@ -199,7 +199,7 @@ endif(MSVC)
 # returned by PyTorch's CMake (e.g. C10 or NVTools).  Because CMake caches
 # the found libraries in find_library(), often times CMake will look into the libraries
 # of the wrong version when I build everything in the same CMake process.  As
-# a result, I'm launching an individual CMake build for every PyTorch version.
+# a result, I (BarclayII) am launching an individual CMake build for every PyTorch version.
 if(BUILD_TORCH)
   file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
   file(TO_NATIVE_PATH ${CMAKE_COMMAND} CMAKE_CMD)

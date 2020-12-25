@@ -11,7 +11,7 @@ DGL works with the following operating systems:
 * macOS X
 * Windows 10
 
-DGL requires Python version 3.6 or later.
+DGL requires Python version 3.6, 3.7, 3.8 or 3.9.
 
 DGL supports multiple tensor libraries as backends, e.g., PyTorch, MXNet. For requirements on backends and how to select one, see :ref:`backends`.
 
@@ -147,6 +147,6 @@ in VS2019 x64 Native tools command prompt.
 Optional Flags
 ``````````````
 
-- If you are using PyTorch, you need to add ``-DBUILD_TORCH=ON`` flag in CMake
+- If you are using PyTorch, you can add ``-DBUILD_TORCH=ON`` flag in CMake
   to build PyTorch plugins for further performance optimization.  This applies for Linux,
   Windows, and Mac.
