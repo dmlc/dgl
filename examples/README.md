@@ -2,13 +2,18 @@
 
 ## Overview
 
-| Paper                                                                                    | node classification | link prediction/classification | graph property prediction | sampling | OGB                |
-| ---------------------------------------------------------------------------------------- | ------------------- | ------------------------------ | ------------------------- | -------- | ------------------ |
-| [Heterogeneous Graph Transformer](#hgt)                                                  | :heavy_check_mark:  | :heavy_check_mark:             |                           |          |                    |
-| [Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges](#mwe)  | :heavy_check_mark:  |                                |                           |          | :heavy_check_mark: |
-| [SIGN: Scalable Inception Graph Neural Networks](#sign)                                  | :heavy_check_mark:  |                                |                           |          | :heavy_check_mark: |
-| [Strategies for Pre-training Graph Neural Networks](#prestrategy)                        |                     |                                | :heavy_check_mark:        |          |                    |
-| [Predict then Propagate: Graph Neural Networks meet Personalized PageRank](#appnp)       | :heavy_check_mark:  |                                |                           |          |                    |
+| Paper                                                                                                       | node classification | link prediction/classification | graph property prediction | sampling           | OGB                |
+| ----------------------------------------------------------------------------------------------------------- | ------------------- | ------------------------------ | ------------------------- | ------------------ | ------------------ |
+| [Heterogeneous Graph Transformer](#hgt)                                                                     | :heavy_check_mark:  | :heavy_check_mark:             |                           |                    |                    |
+| [Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges](#mwe)                     | :heavy_check_mark:  |                                |                           |                    | :heavy_check_mark: |
+| [SIGN: Scalable Inception Graph Neural Networks](#sign)                                                     | :heavy_check_mark:  |                                |                           |                    | :heavy_check_mark: |
+| [Strategies for Pre-training Graph Neural Networks](#prestrategy)                                           |                     |                                | :heavy_check_mark:        |                    |                    |
+| [Predict then Propagate: Graph Neural Networks meet Personalized PageRank](#appnp)                          | :heavy_check_mark:  |                                |                           |                    |                    |
+| [Cluster-GCN: An Efficient Algorithm for Training Deep and Large Graph Convolutional Networks](#clustergcn) | :heavy_check_mark:  |                                |                           | :heavy_check_mark: | :heavy_check_mark: |
+| [Deep Graph Infomax](#dgi)                                                                                  | :heavy_check_mark:  |                                |                           |                    |                    |
+| [Hierarchical Graph Representation Learning with Differentiable Pooling](#diffpool)                         |                     |                                | :heavy_check_mark:        |                    |                    |
+| [Representation Learning for Attributed Multiplex Heterogeneous Network](#gatne-t)                          |                     | :heavy_check_mark:             |                           |                    |                    |
+| [How Powerful are Graph Neural Networks?](#gin)                                                             | :heavy_check_mark:  |                                | :heavy_check_mark:        |                    | :heavy_check_mark: |
 
 ## 2020
 
@@ -30,27 +35,27 @@
 
 ## 2019
 
-- Klicpera et al. Predict then Propagate: Graph Neural Networks meet Personalized PageRank. [Paper link](https://arxiv.org/abs/1810.05997).
+- <a name="appnp"></a> Klicpera et al. Predict then Propagate: Graph Neural Networks meet Personalized PageRank. [Paper link](https://arxiv.org/abs/1810.05997).
     - Example code: [PyTorch](../examples/pytorch/appnp), [MXNet](../examples/mxnet/appnp)
     - Tags: node classification
 
-- Chiang et al. Cluster-GCN: An Efficient Algorithm for Training Deep and Large Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1905.07953).
+- <a name="clustergcn"></a> Chiang et al. Cluster-GCN: An Efficient Algorithm for Training Deep and Large Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1905.07953).
     - Example code: [PyTorch](../examples/pytorch/cluster_gcn), [PyTorch-based GraphSAGE variant on OGB](../examples/pytorch/ogb/cluster-sage), [PyTorch-based GAT variant on OGB](../examples/pytorch/ogb/cluster-gat)
     - Tags: graph partition, node classification, large-scale, OGB, sampling
 
-- Veličković et al. Deep Graph Infomax. [Paper link](https://arxiv.org/abs/1809.10341).
+- <a name="dgi"></a> Veličković et al. Deep Graph Infomax. [Paper link](https://arxiv.org/abs/1809.10341).
     - Example code: [PyTorch](../examples/pytorch/dgi), [TensorFlow](../examples/tensorflow/dgi)
-    - Tags: unsupervised learning
+    - Tags: unsupervised learning, node classification
 
-- Ying et al. Hierarchical Graph Representation Learning with Differentiable Pooling. [Paper link](https://arxiv.org/abs/1806.08804).
+- <a name="diffpool"></a> Ying et al. Hierarchical Graph Representation Learning with Differentiable Pooling. [Paper link](https://arxiv.org/abs/1806.08804).
     - Example code: [PyTorch](../examples/pytorch/diffpool)
     - Tags: pooling, graph classification, graph coarsening
 
-- Cen et al. Representation Learning for Attributed Multiplex Heterogeneous Network. [Paper link](https://arxiv.org/abs/1905.01669v2).
+- <a name="gatne-t"></a> Cen et al. Representation Learning for Attributed Multiplex Heterogeneous Network. [Paper link](https://arxiv.org/abs/1905.01669v2).
     - Example code: [PyTorch](../examples/pytorch/GATNE-T)
     - Tags: heterogeneous graphs, link prediction, large-scale
 
-- Xu et al. How Powerful are Graph Neural Networks? [Paper link](https://arxiv.org/abs/1810.00826).
+- <a name="gin"></a> Xu et al. How Powerful are Graph Neural Networks? [Paper link](https://arxiv.org/abs/1810.00826).
     - Example code: [PyTorch on graph classification](../examples/pytorch/gin), [PyTorch on node classification](../examples/pytorch/model_zoo/citation_network), [PyTorch on ogbg-ppa](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/ogbg_ppa), [MXNet](../examples/mxnet/gin)
     - Tags: graph classification, node classification, OGB
 
