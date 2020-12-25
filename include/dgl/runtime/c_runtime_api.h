@@ -541,6 +541,11 @@ DGL_DLL int DGLStreamStreamSynchronize(int device_type,
                                        DGLStreamHandle dst);
 
 /*!
+ * \brief Sets the path to the tensoradapter library
+ */
+DGL_DLL void DGLSetTAPath(const char *path_cstr);
+
+/*!
  * \brief Bug report macro.
  *
  * This serves as a sanity check on system side to make sure the code is correct by
