@@ -1,8 +1,14 @@
 # Official DGL Examples and Modules
 
+## Overview
+
+| Paper                                   | node classification | link prediction/classification | graph property prediction | sampling | OGB |
+| --------------------------------------- | ------------------- | ------------------------------ | ------------------------- | -------- | --- |
+| [Heterogeneous Graph Transformer](#hgt) | [x]                 | [x]                            |                           |          |     |
+
 ## 2020
 
-- Hu et al. Heterogeneous Graph Transformer. [Paper link](https://arxiv.org/abs/2003.01332).
+- <a name="hgt"></a> Hu et al. Heterogeneous Graph Transformer. [Paper link](https://arxiv.org/abs/2003.01332).
     - Example code: [PyTorch](../examples/pytorch/hgt)
     - Tags: dynamic heterogeneous graphs, large-scale, node classification, link prediction
 
@@ -26,7 +32,7 @@
 
 - Chiang et al. Cluster-GCN: An Efficient Algorithm for Training Deep and Large Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1905.07953).
     - Example code: [PyTorch](../examples/pytorch/cluster_gcn), [PyTorch-based GraphSAGE variant on OGB](../examples/pytorch/ogb/cluster-sage), [PyTorch-based GAT variant on OGB](../examples/pytorch/ogb/cluster-gat)
-    - Tags: graph partition, node classification, large-scale, OGB
+    - Tags: graph partition, node classification, large-scale, OGB, sampling
 
 - Veličković et al. Deep Graph Infomax. [Paper link](https://arxiv.org/abs/1809.10341).
     - Example code: [PyTorch](../examples/pytorch/dgi), [TensorFlow](../examples/tensorflow/dgi)
@@ -162,7 +168,7 @@
     
 - Schlichtkrull. Modeling Relational Data with Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1703.06103).
     - Example code: [PyTorch example using homogeneous DGLGraphs](../examples/pytorch/rgcn), [PyTorch](../examples/pytorch/rgcn-hetero), [TensorFlow](../examples/tensorflow/rgcn), [MXNet](../examples/mxnet/rgcn)
-    - Tags: node classification, link prediction, heterogeneous graphs
+    - Tags: node classification, link prediction, heterogeneous graphs, sampling
 
 - Vaswani et al. Attention Is All You Need. [Paper link](https://arxiv.org/abs/1706.03762).
     - Example code: [PyTorch](../examples/pytorch/transformer)
