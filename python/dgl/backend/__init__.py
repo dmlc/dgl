@@ -38,9 +38,9 @@ def load_backend(mod_name):
     else:
         raise NotImplementedError('Unsupported backend: %s' % mod_name)
 
-    from .._ffi.base import set_ta_path # imports DGL C library
+    from .._ffi.base import load_tensor_adapter # imports DGL C library
     version = mod.__version__
-    set_ta_path(mod_name, version)
+    load_tensor_adapter(mod_name, version)
 
     print('Using backend: %s' % mod_name, file=sys.stderr)
     mod = importlib.import_module('.%s' % mod_name, __name__)
