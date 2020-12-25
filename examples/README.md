@@ -2,13 +2,13 @@
 
 ## Overview
 
-| Paper                                                                                    | node classification | link prediction/classification | graph property prediction | sampling | OGB   |
-| ---------------------------------------------------------------------------------------- | ------------------- | ------------------------------ | ------------------------- | -------- | ----- |
-| [Heterogeneous Graph Transformer](#hgt)                                                  | :heavy_check_mark:               | - [x]                          |                           |          |       |
-| [Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges](#mwe)  | - [x]               |                                |                           |          | - [x] |
-| [SIGN: Scalable Inception Graph Neural Networks](#sign)                                  | - [x]               |                                |                           |          | - [x] |
-| [Strategies for Pre-training Graph Neural Networks](#prestrategy)                        |                     |                                | - [x]                     |          |       |
-| [Predict then Propagate: Graph Neural Networks meet Personalized PageRank](#appnp)       | - [x]               |                                |                           |          |       |
+| Paper                                                                                    | node classification | link prediction/classification | graph property prediction | sampling | OGB                |
+| ---------------------------------------------------------------------------------------- | ------------------- | ------------------------------ | ------------------------- | -------- | ------------------ |
+| [Heterogeneous Graph Transformer](#hgt)                                                  | :heavy_check_mark:  | :heavy_check_mark:             |                           |          |                    |
+| [Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges](#mwe)  | :heavy_check_mark:  |                                |                           |          | :heavy_check_mark: |
+| [SIGN: Scalable Inception Graph Neural Networks](#sign)                                  | :heavy_check_mark:  |                                |                           |          | :heavy_check_mark: |
+| [Strategies for Pre-training Graph Neural Networks](#prestrategy)                        |                     |                                | :heavy_check_mark:        |          |                    |
+| [Predict then Propagate: Graph Neural Networks meet Personalized PageRank](#appnp)       | :heavy_check_mark:  |                                |                           |          |                    |
 
 ## 2020
 
