@@ -4,7 +4,7 @@
 
 | Paper                                                                                    | node classification | link prediction/classification | graph property prediction | sampling | OGB   |
 | ---------------------------------------------------------------------------------------- | ------------------- | ------------------------------ | ------------------------- | -------- | ----- |
-| [Heterogeneous Graph Transformer](#hgt)                                                  | - [x]               | - [x]                          |                           |          |       |
+| [Heterogeneous Graph Transformer](#hgt)                                                  | :heavy_check_mark:               | - [x]                          |                           |          |       |
 | [Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges](#mwe)  | - [x]               |                                |                           |          | - [x] |
 | [SIGN: Scalable Inception Graph Neural Networks](#sign)                                  | - [x]               |                                |                           |          | - [x] |
 | [Strategies for Pre-training Graph Neural Networks](#prestrategy)                        |                     |                                | - [x]                     |          |       |
