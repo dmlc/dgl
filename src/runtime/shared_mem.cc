@@ -69,9 +69,9 @@ void *SharedMemory::CreateNew(size_t size) {
 #ifndef _WIN32
   this->own = true;
 
-  // We need to create a shared-memory file. If the file already exists,
-  // we need to report an error.
-  int flag = O_RDWR|O_CREAT|O_EXCL;
+  // We need to create a shared-memory file.
+  // TODO(zhengda) we need to report error if the shared-memory file exists.
+  int flag = O_RDWR|O_CREAT;
   fd = shm_open(name.c_str(), flag, S_IRUSR | S_IWUSR);
   CHECK_NE(fd, -1) << "fail to open " << name << ": " << strerror(errno);
   // Shared memory cannot be deleted if the process exits abnormally.
