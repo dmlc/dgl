@@ -355,6 +355,22 @@ def sum(input, dim, keepdims=False):
     """
     pass
 
+def div_int(in1, in2):
+    """Element-wise integer division
+
+    Parameters
+    ----------
+    in1 : Tensor
+        The input tensor
+    in2 : Tensor or integer
+        The input
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor.
+    """
+
 def reduce_sum(input):
     """Returns the sum of all elements in the input tensor.
 

@@ -117,6 +117,9 @@ def copy_to(input, ctx, **kwargs):
 def sum(input, dim, keepdims=False):
     return th.sum(input, dim=dim, keepdim=keepdims)
 
+def div_int(in1, in2):
+    return in1 // in2
+
 def reduce_sum(input):
     return input.sum()
 

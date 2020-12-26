@@ -149,6 +149,9 @@ def sum(input, dim, keepdims=False):
         return nd.array([0.], dtype=input.dtype, ctx=input.context)
     return nd.sum(input, axis=dim, keepdims=keepdims)
 
+def div_int(in1, in2):
+    return in1 / in2
+
 def reduce_sum(input):
     return input.sum()
 
