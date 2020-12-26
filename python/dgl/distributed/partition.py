@@ -16,13 +16,15 @@ from .graph_partition_book import BasicPartitionBook, RangePartitionBook
 
 def _get_inner_node_mask(graph, ntype_id):
     if NTYPE in graph.ndata:
-        return graph.ndata['inner_node'] * (graph.ndata[NTYPE] == ntype_id) == 1
+        dtype = F.dtype(graph.ndata['inner_node'])
+        return graph.ndata['inner_node'] * F.astype(graph.ndata[NTYPE] == ntype_id, dtype) == 1
     else:
         return graph.ndata['inner_node'] == 1
 
 def _get_inner_edge_mask(graph, etype_id):
     if ETYPE in graph.edata:
-        return graph.edata['inner_edge'] * (graph.edata[ETYPE] == etype_id) == 1
+        dtype = F.dtype(graph.edata['inner_edge'])
+        return graph.edata['inner_edge'] * F.astype(graph.edata[ETYPE] == etype_id, dtype) == 1
     else:
         return graph.edata['inner_edge'] == 1
 
@@ -329,12 +331,12 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             for key in g.ntypes:
                 if key in balance_ntypes:
                     g.nodes[key].data['bal_ntype'] = F.astype(balance_ntypes[key],
-                                                              F.int16) + num_ntypes
+                                                              F.int32) + num_ntypes
                     uniq_ntypes = F.unique(balance_ntypes[key])
-                    assert np.all(uniq_ntypes.numpy() == np.arange(len(uniq_ntypes)))
+                    assert np.all(F.asnumpy(uniq_ntypes) == np.arange(len(uniq_ntypes)))
                     num_ntypes += len(uniq_ntypes)
                 else:
-                    g.nodes[key].data['bal_ntype'] = F.ones((g.number_of_nodes(key),), F.int16,
+                    g.nodes[key].data['bal_ntype'] = F.ones((g.number_of_nodes(key),), F.int32,
                                                             F.cpu()) * num_ntypes
                     num_ntypes += 1
             sim_g = to_homogeneous(g, ndata=['bal_ntype'])
@@ -386,13 +388,13 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             for name in parts:
                 orig_ids = parts[name].ndata['orig_id']
                 ntype = sim_g.ndata[NTYPE][orig_ids]
-                parts[name].ndata[NTYPE] = F.astype(ntype, F.int16)
-                assert np.all(F.asnumpy(ntype == parts[name].ndata[NTYPE]))
+                parts[name].ndata[NTYPE] = F.astype(ntype, F.int32)
+                assert np.all(F.asnumpy(ntype) == F.asnumpy(parts[name].ndata[NTYPE]))
                 # Get the original edge types and original edge Ids.
                 orig_ids = parts[name].edata['orig_id']
                 etype = sim_g.edata[ETYPE][orig_ids]
-                parts[name].edata[ETYPE] = F.astype(etype, F.int16)
-                assert np.all(F.asnumpy(etype == parts[name].edata[ETYPE]))
+                parts[name].edata[ETYPE] = F.astype(etype, F.int32)
+                assert np.all(F.asnumpy(etype) == F.asnumpy(parts[name].edata[ETYPE]))
 
                 # Calculate the global node Ids to per-node Ids mapping.
                 inner_ntype = parts[name].ndata[NTYPE][parts[name].ndata['inner_node'] == 1]
@@ -401,14 +403,15 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     inner_ntype_mask = inner_ntype == g.get_ntype_id(ntype)
                     typed_nids = inner_nids[inner_ntype_mask]
                     # inner node Ids are in a contiguous Id range.
-                    assert np.all(F.asnumpy(typed_nids == F.arange(int(typed_nids[0]),
-                                                                   int(typed_nids[-1]) + 1)))
+                    expected_range = np.arange(int(F.as_scalar(typed_nids[0])),
+                                               int(F.as_scalar(typed_nids[-1])) + 1)
+                    assert np.all(F.asnumpy(typed_nids) == expected_range)
                 # Calculate the global edge Ids to per-edge Ids mapping.
                 inner_etype = parts[name].edata[ETYPE][parts[name].edata['inner_edge'] == 1]
                 inner_eids = parts[name].edata[EID][parts[name].edata['inner_edge'] == 1]
                 for etype in g.etypes:
                     inner_etype_mask = inner_etype == g.get_etype_id(etype)
-                    typed_eids = np.sort(inner_eids[inner_etype_mask].numpy())
+                    typed_eids = np.sort(F.asnumpy(inner_eids[inner_etype_mask]))
                     assert np.all(typed_eids == np.arange(int(typed_eids[0]),
                                                           int(typed_eids[-1]) + 1))
 
@@ -457,7 +460,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     inner_node_mask = _get_inner_node_mask(parts[i], ntype_id)
                     val.append(F.as_scalar(F.sum(F.astype(inner_node_mask, F.int64), 0)))
                     inner_nids = parts[i].ndata[NID][inner_node_mask]
-                    global_node_map_val[ntype].append([int(inner_nids[0]), int(inner_nids[-1]) + 1])
+                    global_node_map_val[ntype].append([int(F.as_scalar(inner_nids[0])),
+                                                       int(F.as_scalar(inner_nids[-1])) + 1])
                 val = np.cumsum(val).tolist()
                 assert val[-1] == g.number_of_nodes(ntype)
                 node_map_val[ntype] = val
@@ -468,7 +472,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                 for i in parts:
                     inner_edge_mask = _get_inner_edge_mask(parts[i], etype_id)
                     val.append(F.as_scalar(F.sum(F.astype(inner_edge_mask, F.int64), 0)))
-                    inner_eids = np.sort(parts[i].edata[EID][inner_edge_mask].numpy())
+                    inner_eids = np.sort(F.asnumpy(parts[i].edata[EID][inner_edge_mask]))
                     global_edge_map_val[etype].append([int(inner_eids[0]), int(inner_eids[-1]) + 1])
                 val = np.cumsum(val).tolist()
                 assert val[-1] == g.number_of_edges(etype)
@@ -531,7 +535,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     # If the input is a heterogeneous graph.
                     local_nodes = sim_g.ndata[NID][local_nodes]
                     print('part {} has {} nodes of type {} and {} are inside the partition'.format(
-                        part_id, F.sum(part.ndata[NTYPE] == ntype_id, 0), ntype, len(local_nodes)))
+                        part_id, F.as_scalar(F.sum(part.ndata[NTYPE] == ntype_id, 0)),
+                        ntype, len(local_nodes)))
                 else:
                     print('part {} has {} nodes and {} are inside the partition'.format(
                         part_id, part.number_of_nodes(), len(local_nodes)))
@@ -551,7 +556,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                 if len(g.etypes) > 1:
                     local_edges = sim_g.edata[EID][local_edges]
                     print('part {} has {} edges of type {} and {} are inside the partition'.format(
-                        part_id, F.sum(part.edata[ETYPE] == etype_id, 0), etype, len(local_edges)))
+                        part_id, F.as_scalar(F.sum(part.edata[ETYPE] == etype_id, 0)),
+                        etype, len(local_edges)))
                 else:
                     print('part {} has {} edges and {} are inside the partition'.format(
                         part_id, part.number_of_edges(), len(local_edges)))

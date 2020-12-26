@@ -71,7 +71,7 @@ def reshuffle_graph(g, node_part=None):
             sorted_part, new2old_map = F.sort_1d(node_part * num_node_types + g.ndata[NTYPE])
         else:
             sorted_part, new2old_map = F.sort_1d(g.ndata[NTYPE])
-        sorted_part = sorted_part // num_node_types
+        sorted_part = F.div_int(sorted_part, num_node_types)
     elif node_part is not None:
         sorted_part, new2old_map = F.sort_1d(node_part)
     else:
@@ -357,8 +357,8 @@ class IdMap:
 
         assert np.all(np.diff(ranges[:, 0]) >= 0)
         assert np.all(np.diff(ranges[:, 1]) >= 0)
-        self.range_start = utils.toindex(ranges[:, 0])
-        self.range_end = utils.toindex(ranges[:, 1] - 1)
+        self.range_start = utils.toindex(np.ascontiguousarray(ranges[:, 0]))
+        self.range_end = utils.toindex(np.ascontiguousarray(ranges[:, 1]) - 1)
         self.typed_map = utils.toindex(np.concatenate(typed_map))
 
     def __call__(self, ids):
