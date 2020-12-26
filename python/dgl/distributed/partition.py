@@ -588,7 +588,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     if name in [NID, 'inner_node']:
                         continue
                     if reshuffle:
-                        node_feats[ntype + '/' + name] = F.gather_row(g.nodes[ntype].data[name], local_nodes)
+                        node_feats[ntype + '/' + name] = F.gather_row(g.nodes[ntype].data[name],
+                                                                      local_nodes)
                     else:
                         node_feats[ntype + '/' + name] = g.nodes[ntype].data[name]
             for etype in g.etypes:
@@ -605,7 +606,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     if name in [EID, 'inner_edge']:
                         continue
                     if reshuffle:
-                        edge_feats[etype + '/' + name] = F.gather_row(g.edges[etype].data[name], local_edges)
+                        edge_feats[etype + '/' + name] = F.gather_row(g.edges[etype].data[name],
+                                                                      local_edges)
                     else:
                         edge_feats[etype + '/' + name] = g.edges[etype].data[name]
         # Some adjustment for heterogeneous graphs.
