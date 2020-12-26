@@ -10,6 +10,7 @@
 #include <dgl/runtime/device_api.h>
 #include <dgl/runtime/shared_mem.h>
 #include <dgl/zerocopy_serializer.h>
+#include <dgl/runtime/tensordispatch.h>
 #include "runtime_base.h"
 
 // deleter for arrays used by DLPack exporter
@@ -200,6 +201,10 @@ NDArray NDArray::EmptyShared(const std::string &name,
 NDArray NDArray::Empty(std::vector<int64_t> shape,
                        DLDataType dtype,
                        DLContext ctx) {
+  TensorDispatcher* td = TensorDispatcher::Global();
+  if (td->IsAvailable())
+    return td->Empty(shape, dtype, ctx);
+
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);

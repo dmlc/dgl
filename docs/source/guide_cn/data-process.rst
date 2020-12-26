@@ -286,7 +286,7 @@ DGL建议使用节点掩码来指定数据集的划分。
     
     # 获取训练集掩码
     train_mask = graph.edata['train_mask']
-    train_idx = torch.nonzero(train_mask).squeeze()
+    train_idx = torch.nonzero(train_mask, as_tuple=False).squeeze()
     src, dst = graph.edges(train_idx)
 
     # 获取训练集中的边类型

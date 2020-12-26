@@ -342,7 +342,7 @@ class FB15k237Dataset(KnowledgeGraphDataset):
             >>> dataset = FB15k237Dataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.edata['train_mask']
-            >>> train_idx = th.nonzero(train_mask).squeeze()
+            >>> train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(train_idx)
             >>> rel = graph.edata['etype'][train_idx]
 
@@ -351,7 +351,7 @@ class FB15k237Dataset(KnowledgeGraphDataset):
             >>> dataset = FB15k237Dataset()
             >>> graph = dataset[0]
             >>> val_mask = graph.edata['val_mask']
-            >>> val_idx = th.nonzero(val_mask).squeeze()
+            >>> val_idx = th.nonzero(val_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(val_idx)
             >>> rel = graph.edata['etype'][val_idx]
 
@@ -360,7 +360,7 @@ class FB15k237Dataset(KnowledgeGraphDataset):
             >>> dataset = FB15k237Dataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.edata['test_mask']
-            >>> test_idx = th.nonzero(test_mask).squeeze()
+            >>> test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(test_idx)
             >>> rel = graph.edata['etype'][test_idx]
 
@@ -476,7 +476,7 @@ class FB15kDataset(KnowledgeGraphDataset):
             >>> dataset = FB15kDataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.edata['train_mask']
-            >>> train_idx = th.nonzero(train_mask).squeeze()
+            >>> train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(train_idx)
             >>> rel = graph.edata['etype'][train_idx]
 
@@ -485,7 +485,7 @@ class FB15kDataset(KnowledgeGraphDataset):
             >>> dataset = FB15kDataset()
             >>> graph = dataset[0]
             >>> val_mask = graph.edata['val_mask']
-            >>> val_idx = th.nonzero(val_mask).squeeze()
+            >>> val_idx = th.nonzero(val_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(val_idx)
             >>> rel = graph.edata['etype'][val_idx]
 
@@ -494,7 +494,7 @@ class FB15kDataset(KnowledgeGraphDataset):
             >>> dataset = FB15kDataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.edata['test_mask']
-            >>> test_idx = th.nonzero(test_mask).squeeze()
+            >>> test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(test_idx)
             >>> rel = graph.edata['etype'][test_idx]
 
@@ -613,7 +613,7 @@ class WN18Dataset(KnowledgeGraphDataset):
             >>> dataset = WN18Dataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.edata['train_mask']
-            >>> train_idx = th.nonzero(train_mask).squeeze()
+            >>> train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(train_idx)
             >>> rel = graph.edata['etype'][train_idx]
 
@@ -622,7 +622,7 @@ class WN18Dataset(KnowledgeGraphDataset):
             >>> dataset = WN18Dataset()
             >>> graph = dataset[0]
             >>> val_mask = graph.edata['val_mask']
-            >>> val_idx = th.nonzero(val_mask).squeeze()
+            >>> val_idx = th.nonzero(val_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(val_idx)
             >>> rel = graph.edata['etype'][val_idx]
 
@@ -631,7 +631,7 @@ class WN18Dataset(KnowledgeGraphDataset):
             >>> dataset = WN18Dataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.edata['test_mask']
-            >>> test_idx = th.nonzero(test_mask).squeeze()
+            >>> test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(test_idx)
             >>> rel = graph.edata['etype'][test_idx]
 
