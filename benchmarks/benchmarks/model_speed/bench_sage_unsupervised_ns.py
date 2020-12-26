@@ -89,8 +89,8 @@ class CrossEntropyLoss(nn.Module):
         loss = F.binary_cross_entropy_with_logits(score, label.float())
         return loss
 
-@utils.benchmark('time', 3600)
-@utils.parametrize('data', ['reddit', 'ogbn-products'])
+@utils.benchmark('time', 72000)
+@utils.parametrize('data', ['reddit'])
 def track_time(data):
     data = utils.process_data(data)
     device = utils.get_bench_device()
@@ -104,17 +104,15 @@ def track_time(data):
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
     g.create_formats_()
 
-    num_epochs = 5
+    num_epochs = 2
     num_hidden = 16
     num_layers = 2
     fan_out = '10,25'
-    batch_size = 1024
+    batch_size = 10000
     lr = 0.003
     dropout = 0.5
-    num_workers = 4
-    num_negs = 4
-
-    train_nid = th.nonzero(g.ndata['train_mask'], as_tuple=True)[0]
+    num_workers = 0
+    num_negs = 2
 
     n_edges = g.number_of_edges()
     train_seeds = np.arange(n_edges)
@@ -141,22 +139,6 @@ def track_time(data):
     loss_fcn = CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
-
-    # dry run one epoch
-    for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
-        # Load the input features as well as output labels
-        #batch_inputs, batch_labels = load_subtensor(g, seeds, input_nodes, device)
-        batch_inputs = load_subtensor(g, input_nodes, device)
-
-        pos_graph = pos_graph.to(device)
-        neg_graph = neg_graph.to(device)
-        blocks = [block.int().to(device) for block in blocks]
-        # Compute loss and prediction
-        batch_pred = model(blocks, batch_inputs)
-        loss = loss_fcn(batch_pred, pos_graph, neg_graph)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
 
     # Training loop
     avg = 0
