@@ -113,8 +113,8 @@ def decorate(func, fwrapped):
     return decorator.decorate(func, fwrapped)
 
 
-def set_ta_path(backend, version):
-    """Tell DGL which tensoradapter library to look for symbols.
+def load_tensor_adapter(backend, version):
+    """Tell DGL to load a tensoradapter library for given backend and version.
 
     Parameters
     ----------
@@ -133,4 +133,4 @@ def set_ta_path(backend, version):
     else:
         raise NotImplementedError('Unsupported system: %s' % sys.platform)
     path = os.path.join(_DIR_NAME, 'tensoradapter', backend, basename)
-    _LIB.DGLSetTAPath(path.encode('utf-8'))
+    _LIB.DGLLoadTensorAdapter(path.encode('utf-8'))
