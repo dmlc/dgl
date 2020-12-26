@@ -403,7 +403,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                                             parts[name].ndata['inner_node'] == 1)
                 for ntype in g.ntypes:
                     inner_ntype_mask = inner_ntype == g.get_ntype_id(ntype)
-                    typed_nids = inner_nids[inner_ntype_mask]
+                    typed_nids = F.boolean_mask(inner_nids, inner_ntype_mask)
                     # inner node Ids are in a contiguous Id range.
                     expected_range = np.arange(int(F.as_scalar(typed_nids[0])),
                                                int(F.as_scalar(typed_nids[-1])) + 1)
@@ -415,7 +415,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                                             parts[name].edata['inner_edge'] == 1)
                 for etype in g.etypes:
                     inner_etype_mask = inner_etype == g.get_etype_id(etype)
-                    typed_eids = np.sort(F.asnumpy(inner_eids[inner_etype_mask]))
+                    typed_eids = np.sort(F.asnumpy(F.boolean_mask(inner_eids, inner_etype_mask)))
                     assert np.all(typed_eids == np.arange(int(typed_eids[0]),
                                                           int(typed_eids[-1]) + 1))
 

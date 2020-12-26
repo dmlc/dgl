@@ -87,14 +87,14 @@ def verify_hetero_graph(g, parts):
         eid_type = F.gather_row(part.edata[dgl.EID], eid)
         for etype in g.etypes:
             etype_id = g.get_etype_id(etype)
-            src1 = orig_src[etype_arr == etype_id]
-            dst1 = orig_dst[etype_arr == etype_id]
-            eid1 = orig_eid[etype_arr == etype_id]
+            src1 = F.boolean_mask(orig_src, etype_arr == etype_id)
+            dst1 = F.boolean_mask(orig_dst, etype_arr == etype_id)
+            eid1 = F.boolean_mask(orig_eid, etype_arr == etype_id)
             exist = g.has_edges_between(src1, dst1, etype=etype)
             assert np.all(F.asnumpy(exist))
             eid2 = g.edge_ids(src1, dst1, etype=etype)
             assert np.all(F.asnumpy(eid1 == eid2))
-            eids[etype].append(eid_type[etype_arr == etype_id])
+            eids[etype].append(F.boolean_mask(eid_type, etype_arr == etype_id))
             # Make sure edge Ids fall into a range.
             inner_edge_mask = _get_inner_edge_mask(part, etype_id)
             inner_eids = np.sort(F.asnumpy(F.boolean_mask(part.edata[dgl.EID], inner_edge_mask)))
@@ -105,7 +105,8 @@ def verify_hetero_graph(g, parts):
             # Make sure inner nodes have Ids fall into a range.
             inner_node_mask = _get_inner_node_mask(part, ntype_id)
             inner_nids = F.boolean_mask(part.ndata[dgl.NID], inner_node_mask)
-            assert np.all(F.asnumpy(inner_nids == F.arange(inner_nids[0], inner_nids[-1] + 1)))
+            assert np.all(F.asnumpy(inner_nids == F.arange(F.as_scalar(inner_nids[0]),
+                                                           F.as_scalar(inner_nids[-1]) + 1)))
             nids[ntype].append(inner_nids)
 
     for ntype in nids:
