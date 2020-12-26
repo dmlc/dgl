@@ -61,9 +61,13 @@ include_directories("third_party/minigun/minigun")
 include_directories("third_party/minigun/third_party/moderngpu/src")
 include_directories("third_party/phmap/")
 include_directories("third_party/xbyak/")
+include_directories("tensoradapter/include")
 
 # initial variables
-set(DGL_LINKER_LIBS "")
+if(NOT MSVC)
+set(DGL_LINKER_LIBS "dl")
+endif(NOT MSVC)
+
 if(MSVC OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 set(DGL_RUNTIME_LINKER_LIBS "")
 else(MSVC OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
@@ -110,7 +114,8 @@ if(USE_OPENMP)
 endif(USE_OPENMP)
 
 if(USE_AVX)
-  add_compile_definitions(USE_AVX)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_AVX")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_AVX")
 endif(USE_AVX)
 
 # To compile METIS correct for DGL.
@@ -183,6 +188,46 @@ if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
 endif(LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
+if(MSVC)
+  add_custom_command(
+    TARGET dgl POST_BUILD COMMAND
+    cmd.exe /c "COPY /Y Release\\dgl.dll .")
+endif(MSVC)
+
+# Tensor adapter libraries
+# Linking against LibTorch involves linking against a bunch of other libraries
+# returned by PyTorch's CMake (e.g. C10 or NVTools).  Because CMake caches
+# the found libraries in find_library(), often times CMake will look into the libraries
+# of the wrong version when I build everything in the same CMake process.  As
+# a result, I (BarclayII) am launching an individual CMake build for every PyTorch version.
+if(BUILD_TORCH)
+  file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
+  file(TO_NATIVE_PATH ${CMAKE_COMMAND} CMAKE_CMD)
+  if(MSVC)
+    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/tensoradapter/pytorch/build.bat BUILD_SCRIPT)
+    add_custom_target(
+      tensoradapter_pytorch
+      ${CMAKE_COMMAND} -E env
+      CMAKE_COMMAND=${CMAKE_CMD}
+      CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+      BINDIR=${BINDIR}
+      cmd /e:on /c ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+      DEPENDS ${BUILD_SCRIPT}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/tensoradapter/pytorch)
+  else(MSVC)
+    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/tensoradapter/pytorch/build.sh BUILD_SCRIPT)
+    add_custom_target(
+      tensoradapter_pytorch
+      ${CMAKE_COMMAND} -E env
+      CMAKE_COMMAND=${CMAKE_CMD}
+      CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+      BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+      bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+      DEPENDS ${BUILD_SCRIPT}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/tensoradapter/pytorch)
+  endif(MSVC)
+  add_dependencies(dgl tensoradapter_pytorch)
+endif(BUILD_TORCH)
 
 # Installation rules
 install(TARGETS dgl DESTINATION lib${LIB_SUFFIX})
