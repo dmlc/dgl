@@ -169,7 +169,7 @@ def sum(input, dim, keepdims=False):
     return tf.reduce_sum(input, axis=dim, keepdims=keepdims)
 
 def div_int(in1, in2):
-    return in1 / in2
+    return astype(in1 / in2, dtype(in1))
 
 def reduce_sum(input):
     if input.dtype == tf.bool:

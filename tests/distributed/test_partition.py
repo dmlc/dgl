@@ -14,13 +14,15 @@ import random
 
 def _get_inner_node_mask(graph, ntype_id):
     if dgl.NTYPE in graph.ndata:
-        return graph.ndata['inner_node'] * (graph.ndata[dgl.NTYPE] == ntype_id) == 1
+        dtype = F.dtype(graph.ndata['inner_node'])
+        return graph.ndata['inner_node'] * F.astype(graph.ndata[dgl.NTYPE] == ntype_id, dtype) == 1
     else:
         return graph.ndata['inner_node'] == 1
 
 def _get_inner_edge_mask(graph, etype_id):
     if dgl.ETYPE in graph.edata:
-        return graph.edata['inner_edge'] * (graph.edata[dgl.ETYPE] == etype_id) == 1
+        dtype = F.dtype(graph.edata['inner_edge'])
+        return graph.edata['inner_edge'] * F.astype(graph.edata[dgl.ETYPE] == etype_id, dtype) == 1
     else:
         return graph.edata['inner_edge'] == 1
 
@@ -78,31 +80,31 @@ def verify_hetero_graph(g, parts):
     eids = {etype:[] for etype in g.etypes}
     for part in parts:
         src, dst, eid = part.edges(form='all')
-        orig_src = part.ndata['orig_id'][src]
-        orig_dst = part.ndata['orig_id'][dst]
-        orig_eid = part.edata['orig_id'][eid]
-        etype_arr = part.edata[dgl.ETYPE][eid]
-        eid_type = part.edata[dgl.EID][eid]
+        orig_src = F.gather_row(part.ndata['orig_id'], src)
+        orig_dst = F.gather_row(part.ndata['orig_id'], dst)
+        orig_eid = F.gather_row(part.edata['orig_id'], eid)
+        etype_arr = F.gather_row(part.edata[dgl.ETYPE], eid)
+        eid_type = F.gather_row(part.edata[dgl.EID], eid)
         for etype in g.etypes:
             etype_id = g.get_etype_id(etype)
             src1 = orig_src[etype_arr == etype_id]
             dst1 = orig_dst[etype_arr == etype_id]
             eid1 = orig_eid[etype_arr == etype_id]
             exist = g.has_edges_between(src1, dst1, etype=etype)
-            assert np.all(exist.detach().numpy())
+            assert np.all(F.asnumpy(exist))
             eid2 = g.edge_ids(src1, dst1, etype=etype)
-            assert np.all((eid1 == eid2).detach().numpy())
+            assert np.all(F.asnumpy(eid1 == eid2))
             eids[etype].append(eid_type[etype_arr == etype_id])
             # Make sure edge Ids fall into a range.
             inner_edge_mask = _get_inner_edge_mask(part, etype_id)
-            inner_eids = np.sort(part.edata[dgl.EID][inner_edge_mask].numpy())
+            inner_eids = np.sort(F.asnumpy(F.boolean_mask(part.edata[dgl.EID], inner_edge_mask)))
             assert np.all(inner_eids == np.arange(inner_eids[0], inner_eids[-1] + 1))
 
         for ntype in g.ntypes:
             ntype_id = g.get_ntype_id(ntype)
             # Make sure inner nodes have Ids fall into a range.
             inner_node_mask = _get_inner_node_mask(part, ntype_id)
-            inner_nids = part.ndata[dgl.NID][inner_node_mask]
+            inner_nids = F.boolean_mask(part.ndata[dgl.NID], inner_node_mask)
             assert np.all(F.asnumpy(inner_nids == F.arange(inner_nids[0], inner_nids[-1] + 1)))
             nids[ntype].append(inner_nids)
 
@@ -123,12 +125,13 @@ def verify_graph_feats(g, part, node_feats):
         for name in g.nodes[ntype].data:
             if name in [dgl.NID, 'inner_node']:
                 continue
-            inner_node_mask = part.ndata['inner_node'] * (part.ndata[dgl.NTYPE] == ntype_id) == 1
-            inner_nids = part.ndata[dgl.NID][inner_node_mask]
+            inner_node_mask = _get_inner_node_mask(part, ntype_id)
+            inner_nids = F.boolean_mask(part.ndata[dgl.NID],inner_node_mask)
             min_nids = F.min(inner_nids, 0)
-            true_feats = g.nodes[ntype].data[name][part.ndata['orig_id'][inner_node_mask]]
-            assert np.all((node_feats[ntype + '/' + name][inner_nids - min_nids] \
-                           == true_feats).detach().numpy())
+            orig_id = F.boolean_mask(part.ndata['orig_id'], inner_node_mask)
+            true_feats = F.gather_row(g.nodes[ntype].data[name], orig_id)
+            ndata = F.gather_row(node_feats[ntype + '/' + name], inner_nids - min_nids)
+            assert np.all(F.asnumpy(ndata == true_feats))
 
 def check_hetero_partition(hg, part_method):
     hg.nodes['n1'].data['labels'] = F.arange(0, hg.number_of_nodes('n1'))
