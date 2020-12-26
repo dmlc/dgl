@@ -366,22 +366,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         parts[0].edata['inner_edge'] = F.ones((sim_g.number_of_edges(),), F.int8, F.cpu())
     elif part_method == 'metis':
         sim_g, balance_ntypes = get_homogeneous(g, balance_ntypes)
-        assert num_trainers_per_machine >= 1
-        if num_trainers_per_machine > 1:
-            # First partition the whole graph to each trainer and save the trainer ids in
-            # the node feature "trainer_id".
-            node_parts = metis_partition_assignment(
-                sim_g, num_parts * num_trainers_per_machine,
-                balance_ntypes=balance_ntypes,
-                balance_edges=balance_edges)
-            g.ndata['trainer_id'] = node_parts
-
-            # And then coalesce the partitions of trainers on the same machine into one
-            # larger partition.
-            node_parts = node_parts // num_trainers_per_machine
-        else:
-            node_parts = metis_partition_assignment(sim_g, num_parts, balance_ntypes=balance_ntypes,
-                                                    balance_edges=balance_edges)
+        node_parts = metis_partition_assignment(sim_g, num_parts, balance_ntypes=balance_ntypes,
+                                                balance_edges=balance_edges)
         parts = partition_graph_with_halo(sim_g, node_parts, num_hops, reshuffle=reshuffle)
     elif part_method == 'random':
         sim_g, _ = get_homogeneous(g, balance_ntypes)
