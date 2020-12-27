@@ -986,10 +986,10 @@ def fast_pull(name, id_tensor, part_id, service_id,
                                       F.zerocopy_to_dgl_ndarray(local_data))
     return F.zerocopy_from_dgl_ndarray(res_tensor)
 
-def register_ctrl_c():
-    """HandleCtrlC Register for handling Ctrl+C event.
+def register_sig_handler():
+    """Register for handling signal event.
     """
-    _CAPI_DGLRPCHandleCtrlC()
+    _CAPI_DGLRPCHandleSignal()
 
 def copy_data_to_shared_memory(dst, source):
     """Copy tensor data to shared-memory tensor
