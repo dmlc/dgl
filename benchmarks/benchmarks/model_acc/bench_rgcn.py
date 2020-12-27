@@ -46,8 +46,7 @@ def evaluate(model, g, feats, edge_type, edge_norm, labels, idx):
 
 @utils.benchmark('acc')
 @utils.parametrize('data', ['aifb', 'mutag'])
-@utils.parametrize('max_epoch', [30, 50])
-def track_acc(data, max_epoch):
+def track_acc(data):
     # args
     if data == 'aifb':
         num_bases = -1
@@ -117,7 +116,7 @@ def track_acc(data, max_epoch):
                                  weight_decay=l2norm)
 
     model.train()
-    for epoch in range(max_epoch):
+    for epoch in range(30):
         logits = model(g, feats, edge_type, edge_norm)
         loss = F.cross_entropy(logits[train_idx], train_labels)
         optimizer.zero_grad()

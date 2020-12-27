@@ -1,6 +1,7 @@
 import os
 import shutil, zipfile
 import requests
+import inspect
 import numpy as np
 import pandas
 import dgl
@@ -37,7 +38,7 @@ def get_graph(name):
         print(name + " doesn't exist")
         return None
 
-class ogb_data(object):
+class OGBDataset(object):
     def __init__(self, g, num_labels):
         self._g = g
         self._num_labels = num_labels
@@ -81,7 +82,7 @@ def load_ogb_product(name):
     graph.ndata['val_mask'] = val_mask
     graph.ndata['test_mask'] = test_mask
 
-    return ogb_data(graph, num_labels)
+    return OGBDataset(graph, num_labels)
 
 def process_data(name):
     if name == 'cora':
@@ -128,12 +129,21 @@ TRACK_SETUP = {
 
 def parametrize(param_name, params):
     def _wrapper(func):
+        sig_params = inspect.signature(func).parameters.keys()
+        num_params = len(sig_params)
         if getattr(func, 'params', None) is None:
-            func.params = []
-        func.params.append(params)
+            func.params = [None] * num_params
         if getattr(func, 'param_names', None) is None:
-            func.param_names = []
-        func.param_names.append(param_name)
+            func.param_names = [None] * num_params
+        found_param = False
+        for i, sig_param in enumerate(sig_params):
+            if sig_param == param_name:
+                func.params[i] = params
+                func.param_names[i] = param_name
+                found_param = True
+                break
+        if not found_param:
+            raise ValueError('Invalid parameter name:', param_name)
         return func
     return _wrapper
 
@@ -142,10 +152,6 @@ def benchmark(track_type, timeout=60):
     def _wrapper(func):
         func.unit = TRACK_UNITS[track_type]
         func.setup = TRACK_SETUP[track_type]
-<<<<<<< HEAD
-        func.timeout = 1800   # 30 mins
-=======
         func.timeout = timeout
->>>>>>> f8b3ebcecc91f367700f611fe83c56041b323613
         return func
     return _wrapper
