@@ -1,9 +1,9 @@
-.. _guide-distributed-apis:
+.. _guide_cn-distributed-apis:
 
-7.2 Distributed APIs
+7.2 分布式的API
 --------------------
 
-:ref:`(中文版) <guide_cn-distributed-apis>`
+:ref:`(English Version) <guide-distributed-apis>`
 
 This section covers the distributed APIs used in the training script. DGL provides three distributed
 data structures and various APIs for initialization, distributed sampling and workload split.

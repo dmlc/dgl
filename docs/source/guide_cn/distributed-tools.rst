@@ -1,9 +1,9 @@
-.. _guide-distributed-tools:
+.. _guide_cn-distributed-tools:
 
-7.3 Tools for launching distributed training/inference
+7.3 运行分布式训练/推断所需的工具
 ------------------------------------------------------
 
-:ref:`(中文版) <guide_cn-distributed-tools>`
+:ref:`(English Version) <guide-distributed-tools>`
 
 DGL provides two scripts to assist in distributed training:
 
