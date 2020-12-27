@@ -795,7 +795,7 @@ class DistGraph:
         ndata_names = []
         for name in names:
             name = parse_hetero_data_name(name)
-            right_type = name.get_type() == ntype if ntype is not None else True
+            right_type = (name.get_type() == ntype) if ntype is not None else True
             if name.is_node() and right_type:
                 ndata_names.append(name)
         return ndata_names
@@ -807,7 +807,7 @@ class DistGraph:
         edata_names = []
         for name in names:
             name = parse_hetero_data_name(name)
-            right_type = name.get_type() == etype if etype is not None else None
+            right_type = (name.get_type() == etype) if etype is not None else True
             if name.is_edge() and right_type:
                 edata_names.append(name)
         return edata_names
