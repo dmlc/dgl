@@ -37,7 +37,7 @@ def get_graph(name):
         print(name + " doesn't exist")
         return None
 
-class ogb_data(object):
+class OGBDataset(object):
     def __init__(self, g, num_labels):
         self._g = g
         self._num_labels = num_labels
@@ -81,7 +81,7 @@ def load_ogb_product(name):
     graph.ndata['val_mask'] = val_mask
     graph.ndata['test_mask'] = test_mask
 
-    return ogb_data(graph, num_labels)
+    return OGBDataset(graph, num_labels)
 
 def process_data(name):
     if name == 'cora':
