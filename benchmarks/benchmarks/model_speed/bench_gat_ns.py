@@ -151,4 +151,4 @@ def track_time(data):
 
     t1 = time.time()
 
-    return t1 - t0
+    return (t1 - t0) / num_epochs
