@@ -491,12 +491,14 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                 ntype_id = g.get_ntype_id(ntype)
                 inner_node_mask = _get_inner_node_mask(parts[0], ntype_id)
                 inner_nids = F.boolean_mask(parts[0].ndata[NID], inner_node_mask)
-                global_node_map_val[ntype] = [[int(inner_nids[0]), int(inner_nids[-1]) + 1]]
+                global_node_map_val[ntype] = [[int(F.as_scalar(inner_nids[0])),
+                                               int(F.as_scalar(inner_nids[-1])) + 1]]
             for etype in g.etypes:
                 etype_id = g.get_etype_id(etype)
                 inner_edge_mask = _get_inner_edge_mask(parts[0], etype_id)
                 inner_eids = F.boolean_mask(parts[0].edata[EID], inner_edge_mask)
-                global_edge_map_val[etype] = [[int(inner_eids[0]), int(inner_eids[-1]) + 1]]
+                global_edge_map_val[etype] = [[int(F.as_scalar(inner_eids[0])),
+                                               int(F.as_scalar(inner_eids[-1])) + 1]]
 
     # Double check that the node Ids in the global Id space are sorted.
     for ntype in global_node_map_val:

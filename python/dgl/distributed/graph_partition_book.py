@@ -77,8 +77,8 @@ def get_shared_mem_partition_book(graph_name, graph_part):
         return None
     is_range_part, part_id, num_parts, node_map, edge_map = _get_shared_mem_metadata(graph_name)
     if is_range_part == 1:
-        node_map = pickle.loads(bytes(node_map.tolist()))
-        edge_map = pickle.loads(bytes(edge_map.tolist()))
+        node_map = pickle.loads(bytes(F.asnumpy(node_map).tolist()))
+        edge_map = pickle.loads(bytes(F.asnumpy(edge_map).tolist()))
         return RangePartitionBook(part_id, num_parts, node_map, edge_map)
     else:
         return BasicPartitionBook(part_id, num_parts, node_map, edge_map, graph_part)
