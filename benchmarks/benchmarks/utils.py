@@ -37,7 +37,7 @@ def get_graph(name):
         print(name + " doesn't exist")
         return None
 
-class ogb_data(object):
+class OGBDataset(object):
     def __init__(self, g, num_labels, predict_category=None):
         self._g = g
         self._num_labels = num_labels
@@ -58,11 +58,11 @@ class ogb_data(object):
     def __getitem__(self, idx):
         return self._g
 
-def load_ogb_product():
+def load_ogb_product(name):
     name = 'ogbn-products'
     from ogb.nodeproppred import DglNodePropPredDataset
 
-    shutil.copytree('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
+    os.symlink('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
 
     print('load', name)
     data = DglNodePropPredDataset(name=name)
@@ -87,13 +87,13 @@ def load_ogb_product():
     graph.ndata['val_mask'] = val_mask
     graph.ndata['test_mask'] = test_mask
 
-    return ogb_data(graph, num_labels)
+    return OGBDataset(graph, num_labels)
 
 def load_ogb_mag():
     name = 'ogbn-mag'
     from ogb.nodeproppred import DglNodePropPredDataset
 
-    shutil.copytree('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
+    os.symlink('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
 
     print('load', name)
     dataset = DglNodePropPredDataset(name=name)
@@ -122,7 +122,7 @@ def load_ogb_mag():
     hg.nodes['paper'].data['test_mask'] = test_mask
 
     num_classes = dataset.num_classes
-    return ogb_data(hg, num_classes, 'paper')
+    return OGBDataset(hg, num_classes, 'paper')
 
 def process_data(name):
     if name == 'cora':

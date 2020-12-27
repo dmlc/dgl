@@ -1,4 +1,5 @@
 import dgl
+import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,9 +7,35 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 import dgl.nn.pytorch as dglnn
+import dgl.function as fn
 import time
+import traceback
 
 from .. import utils
+
+class NegativeSampler(object):
+    def __init__(self, g, k, neg_share=False):
+        self.weights = g.in_degrees().float() ** 0.75
+        self.k = k
+        self.neg_share = neg_share
+
+    def __call__(self, g, eids):
+        src, _ = g.find_edges(eids)
+        n = len(src)
+        if self.neg_share and n % self.k == 0:
+            dst = self.weights.multinomial(n, replacement=True)
+            dst = dst.view(-1, 1, self.k).expand(-1, self.k, -1).flatten()
+        else:
+            dst = self.weights.multinomial(n*self.k, replacement=True)
+        src = src.repeat_interleave(self.k)
+        return src, dst
+
+def load_subtensor(g, input_nodes, device):
+    """
+    Copys features and labels of a set of nodes onto GPU.
+    """
+    batch_inputs = g.ndata['features'][input_nodes].to(device)
+    return batch_inputs
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -39,13 +66,28 @@ class SAGE(nn.Module):
                 h = self.dropout(h)
         return h
 
-def load_subtensor(g, seeds, input_nodes, device):
+def load_subtensor(g, input_nodes, device):
     """
     Copys features and labels of a set of nodes onto GPU.
     """
     batch_inputs = g.ndata['features'][input_nodes].to(device)
-    batch_labels = g.ndata['labels'][seeds].to(device)
-    return batch_inputs, batch_labels
+    return batch_inputs
+
+class CrossEntropyLoss(nn.Module):
+    def forward(self, block_outputs, pos_graph, neg_graph):
+        with pos_graph.local_scope():
+            pos_graph.ndata['h'] = block_outputs
+            pos_graph.apply_edges(fn.u_dot_v('h', 'h', 'score'))
+            pos_score = pos_graph.edata['score']
+        with neg_graph.local_scope():
+            neg_graph.ndata['h'] = block_outputs
+            neg_graph.apply_edges(fn.u_dot_v('h', 'h', 'score'))
+            neg_score = neg_graph.edata['score']
+
+        score = th.cat([pos_score, neg_score])
+        label = th.cat([th.ones_like(pos_score), th.zeros_like(neg_score)]).long()
+        loss = F.binary_cross_entropy_with_logits(score, label.float())
+        return loss
 
 @utils.benchmark('time', 3600)
 @utils.parametrize('data', ['reddit', 'ogbn-products'])
@@ -62,7 +104,7 @@ def track_time(data):
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
     g.create_formats_()
 
-    num_epochs = 20
+    num_epochs = 5
     num_hidden = 16
     num_layers = 2
     fan_out = '10,25'
@@ -70,39 +112,48 @@ def track_time(data):
     lr = 0.003
     dropout = 0.5
     num_workers = 4
+    num_negs = 4
 
     train_nid = th.nonzero(g.ndata['train_mask'], as_tuple=True)[0]
+
+    n_edges = g.number_of_edges()
+    train_seeds = np.arange(n_edges)
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in fan_out.split(',')])
-    dataloader = dgl.dataloading.NodeDataLoader(
-        g,
-        train_nid,
-        sampler,
+    dataloader = dgl.dataloading.EdgeDataLoader(
+        g, train_seeds, sampler, exclude='reverse_id',
+        # For each edge with ID e in Reddit dataset, the reverse edge is e ± |E|/2.
+        reverse_eids=th.cat([
+            th.arange(n_edges // 2, n_edges),
+            th.arange(0, n_edges // 2)]),
+        negative_sampler=NegativeSampler(g, num_negs),
         batch_size=batch_size,
         shuffle=True,
         drop_last=False,
+        pin_memory=True,
         num_workers=num_workers)
 
     # Define model and optimizer
     model = SAGE(in_feats, num_hidden, n_classes, num_layers, F.relu, dropout)
     model = model.to(device)
-    loss_fcn = nn.CrossEntropyLoss()
+    loss_fcn = CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     # dry run one epoch
-    for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
+    for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
         # Load the input features as well as output labels
         #batch_inputs, batch_labels = load_subtensor(g, seeds, input_nodes, device)
-        blocks = [block.int().to(device) for block in blocks]
-        batch_inputs = blocks[0].srcdata['features']
-        batch_labels = blocks[-1].dstdata['labels']
+        batch_inputs = load_subtensor(g, input_nodes, device)
 
+        pos_graph = pos_graph.to(device)
+        neg_graph = neg_graph.to(device)
+        blocks = [block.int().to(device) for block in blocks]
         # Compute loss and prediction
         batch_pred = model(blocks, batch_inputs)
-        loss = loss_fcn(batch_pred, batch_labels)
+        loss = loss_fcn(batch_pred, pos_graph, neg_graph)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -112,18 +163,17 @@ def track_time(data):
     iter_tput = []
     t0 = time.time()
     for epoch in range(num_epochs):
-        # Loop over the dataloader to sample the computation dependency graph as a list of
-        # blocks.
-        for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
+        for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
             # Load the input features as well as output labels
             #batch_inputs, batch_labels = load_subtensor(g, seeds, input_nodes, device)
-            blocks = [block.int().to(device) for block in blocks]
-            batch_inputs = blocks[0].srcdata['features']
-            batch_labels = blocks[-1].dstdata['labels']
+            batch_inputs = load_subtensor(g, input_nodes, device)
 
+            pos_graph = pos_graph.to(device)
+            neg_graph = neg_graph.to(device)
+            blocks = [block.int().to(device) for block in blocks]
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
-            loss = loss_fcn(batch_pred, batch_labels)
+            loss = loss_fcn(batch_pred, pos_graph, neg_graph)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
