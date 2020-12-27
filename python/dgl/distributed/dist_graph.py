@@ -522,7 +522,7 @@ class DistGraph:
         NodeDataView
             The data view in the distributed graph storage.
         """
-        assert len(self.ntypes) == 1
+        assert len(self.ntypes) == 1, "ndata only works for a graph with one node type."
         return self._ndata
 
     @property
@@ -534,7 +534,7 @@ class DistGraph:
         EdgeDataView
             The data view in the distributed graph storage.
         """
-        assert len(self.etypes) == 1
+        assert len(self.etypes) == 1, "edata only works for a graph with one edge type."
         return self._edata
 
     @property
@@ -932,6 +932,8 @@ def node_split(nodes, partition_book=None, ntype='_N', rank=None, force_even=Tru
         A boolean mask vector that indicates input nodes.
     partition_book : GraphPartitionBook
         The graph partition book
+    ntype : str
+        The node type of the input nodes.
     rank : int
         The rank of a process. If not given, the rank of the current process is used.
     force_even : bool
@@ -956,7 +958,7 @@ def node_split(nodes, partition_book=None, ntype='_N', rank=None, force_even=Tru
         local_nids = partition_book.partid2nids(partition_book.partid)
         return _split_local(partition_book, rank, nodes, local_nids)
 
-def edge_split(edges, partition_book=None, rank=None, force_even=True):
+def edge_split(edges, partition_book=None, etype='_E', rank=None, force_even=True):
     ''' Split edges and return a subset for the local rank.
 
     This function splits the input edges based on the partition book and
@@ -983,6 +985,8 @@ def edge_split(edges, partition_book=None, rank=None, force_even=True):
         A boolean mask vector that indicates input edges.
     partition_book : GraphPartitionBook
         The graph partition book
+    etype : str
+        The edge type of the input edges.
     rank : int
         The rank of a process. If not given, the rank of the current process is used.
     force_even : bool
@@ -993,14 +997,11 @@ def edge_split(edges, partition_book=None, rank=None, force_even=True):
     1D-tensor
         The vector of edge Ids that belong to the rank.
     '''
-    num_edges = 0
     if not isinstance(edges, DistTensor):
         assert partition_book is not None, 'Regular tensor requires a partition book.'
     elif partition_book is None:
         partition_book = edges.part_policy.partition_book
-    for part in partition_book.metadata():
-        num_edges += part['num_edges']
-    assert len(edges) == num_edges, \
+    assert len(edges) == partition_book._num_edges(etype), \
             'The length of boolean mask vector should be the number of edges in the graph.'
 
     if force_even:
