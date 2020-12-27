@@ -753,7 +753,7 @@ IdArray MapIds(IdArray ids, IdArray range_starts, IdArray range_ends, IdArray ty
   return ret;
 }
 
-DGL_REGISTER_GLOBAL("partition._CAPI_DGLHeteroMapIds")
+DGL_REGISTER_GLOBAL("id_map._CAPI_DGLHeteroMapIds")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const IdArray ids = args[0];
     const IdArray range_starts = args[1];
