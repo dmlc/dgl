@@ -27,3 +27,4 @@ def sddmm_tree_reduction(idx_type, feat_type):
     sched[out].bind(head_axis, te.thread_axis('blockIdx.y'))
     return tvm.lower(sched, [row, col, ufeat, vfeat, out],
                   name='SDDMMTreeReduction_{}_{}'.format(idx_type, feat_type))
+

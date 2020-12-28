@@ -25,6 +25,7 @@ endif()
 dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(USE_AVX "Build with AVX optimization" ON)
+dgl_option(USE_TVM "Build with TVM kernels" OFF)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
 dgl_option(USE_S3 "Build with S3 support" OFF)
@@ -157,14 +158,12 @@ endif(USE_CUDA)
 # include directories
 target_include_directories(dgl PRIVATE "include")
 target_include_directories(dgl PRIVATE "third_party/dlpack/include")
-include_directories("third_party/METIS/include/")
 target_include_directories(dgl PRIVATE "third_party/dmlc-core/include")
 target_include_directories(dgl PRIVATE "third_party/minigun/minigun")
 target_include_directories(dgl PRIVATE "third_party/minigun/third_party/moderngpu/src")
 target_include_directories(dgl PRIVATE "third_party/phmap/")
 target_include_directories(dgl PRIVATE "third_party/xbyak/")
 target_include_directories(dgl PRIVATE "tensoradapter/include")
-target_include_directories(dgl PRIVATE "cmake/tvm/")
 
 # For serialization
 if (USE_HDFS)
@@ -179,13 +178,16 @@ if(NOT MSVC)
   set(GKLIB_PATH "${CMAKE_SOURCE_DIR}/third_party/METIS/GKlib")
   include(${GKLIB_PATH}/GKlibSystem.cmake)
   include_directories(${GKLIB_PATH})
+  include_directories("third_party/METIS/include/")
   add_subdirectory("third_party/METIS/libmetis/")
   list(APPEND DGL_LINKER_LIBS metis)
 endif(NOT MSVC)
 
-# Compile TVM Runtime
-add_subdirectory("cmake/tvm/")
-list(APPEND DGL_LINKER_LIBS featgraph)
+# Compile TVM Runtime and Featgraph
+if(USE_TVM)
+  add_subdirectory("featgraph/")
+  list(APPEND DGL_LINKER_LIBS featgraph)
+endif(USE_TVM)
 
 # support PARALLEL_ALGORITHMS
 if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)

@@ -1,7 +1,7 @@
 import tvm
 from sddmm_tr import sddmm_tree_reduction
 
-binary_path = '../../build/libfeatgraph_kernels.so'
+binary_path = '../build/libfeatgraph_kernels.so'
 kernels = []
 # SDDMM Tree Reduction
 kernels.append(sddmm_tree_reduction('int32', 'float16'))
