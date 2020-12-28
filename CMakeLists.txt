@@ -53,15 +53,15 @@ if(USE_CUDA)
 endif(USE_CUDA)
 
 # include directories
-include_directories("include")
-include_directories("third_party/dlpack/include")
-include_directories("third_party/METIS/include/")
-include_directories("third_party/dmlc-core/include")
-include_directories("third_party/minigun/minigun")
-include_directories("third_party/minigun/third_party/moderngpu/src")
-include_directories("third_party/phmap/")
-include_directories("third_party/xbyak/")
-include_directories("tensoradapter/include")
+# include_directories("include")
+# include_directories("third_party/dlpack/include")
+# include_directories("third_party/METIS/include/")
+# include_directories("third_party/dmlc-core/include")
+# include_directories("third_party/minigun/minigun")
+# include_directories("third_party/minigun/third_party/moderngpu/src")
+# include_directories("third_party/phmap/")
+# include_directories("third_party/xbyak/")
+# include_directories("tensoradapter/include")
 
 # initial variables
 if(NOT MSVC)
@@ -174,6 +174,7 @@ target_include_directories(dgl PRIVATE "third_party/minigun/minigun")
 target_include_directories(dgl PRIVATE "third_party/minigun/third_party/moderngpu/src")
 target_include_directories(dgl PRIVATE "third_party/phmap/")
 target_include_directories(dgl PRIVATE "third_party/xbyak/")
+target_include_directories(dgl PRIVATE "tensoradapter/include")
 target_include_directories(dgl PRIVATE "cmake/tvm/")
 
 # For serialization
