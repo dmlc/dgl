@@ -35,7 +35,7 @@
 | [Molecular Graph Convolutions: Moving Beyond Fingerprints](#weave)                                                       |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [LINE: Large-scale Information Network Embedding](#line)                                                                 |                     | :heavy_check_mark:               |                           |                    | :heavy_check_mark: |
 | [DeepWalk: Online Learning of Social Representations](#deepwalk)                                                         |                     | :heavy_check_mark:               |                           |                    | :heavy_check_mark: |
-| [Self-Attention Graph Pooling](#sagpool)                                                           |   |                                  |                           |                    |                    |
+| [Self-Attention Graph Pooling](#sagpool)                                                           |   |                                  | :heavy_check_mark:                          |                    |                    |
 |                                                            |   |                                  |                           |                    |                    |
 |                                                            |   |                                  |                           |                    |                    |
 
