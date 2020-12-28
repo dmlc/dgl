@@ -224,36 +224,43 @@ class RelGraphEmbedLayer(nn.Module):
         return embeds
 
 @utils.benchmark('time', 3600)
-@utils.parametrize('data', ['ogbn-mag'])
+@utils.parametrize('data', ['am', 'ogbn-mag'])
 def track_time(data):
-    data = utils.process_data(data)
+    dataset = utils.process_data(data)
     device = utils.get_bench_device()
+
+    if data == 'am':
+        n_bases = 40
+        l2norm = 5e-4
+    elif data == 'ogbn-mag':
+        n_bases = 2
+        l2norm = 0
+    else:
+        raise ValueError()
 
     fanouts = [15,25]
     n_layers = 2
     batch_size = 1024
     n_hidden = 64
-    n_bases = 2
     dropout = 0.5
     use_self_loop = True
     lr = 0.01
-    l2norm = 0
     n_epochs = 5
     low_mem = True
     num_workers = 4
 
-    hg = data[0]
-    category = data.predict_category
-    num_classes = data.num_classes
+    hg = dataset[0]
+    category = dataset.predict_category
+    num_classes = dataset.num_classes
     train_mask = hg.nodes[category].data.pop('train_mask')
     train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
-    labels = hg.nodes[category].data.pop('label').to(device)
+    labels = hg.nodes[category].data.pop('labels').to(device)
     num_of_ntype = len(hg.ntypes)
     num_rels = len(hg.canonical_etypes)
 
     node_feats = []
     for ntype in hg.ntypes:
-        if len(hg.nodes[ntype].data) == 0:
+        if len(hg.nodes[ntype].data) == 0 or 'feat' not in hg.nodes[ntype].data:
             node_feats.append(None)
         else:
             feat = hg.nodes[ntype].data.pop('feat')

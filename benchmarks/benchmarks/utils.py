@@ -111,7 +111,7 @@ def load_ogb_mag():
         subgs[(etype[2], 'rev-'+etype[1], etype[0])] = (v, u)
     hg = dgl.heterograph(subgs)
     hg.nodes['paper'].data['feat'] = hg_orig.nodes['paper'].data['feat']
-    hg.nodes['paper'].data['label'] = labels['paper'].squeeze()
+    hg.nodes['paper'].data['labels'] = labels['paper'].squeeze()
     train_mask = torch.zeros((hg.number_of_nodes('paper'),), dtype=torch.bool)
     train_mask[train_idx] = True
     val_mask = torch.zeros((hg.number_of_nodes('paper'),), dtype=torch.bool)
