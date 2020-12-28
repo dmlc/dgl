@@ -35,6 +35,7 @@
 | [Molecular Graph Convolutions: Moving Beyond Fingerprints](#weave)                                                       |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [LINE: Large-scale Information Network Embedding](#line)                                                                 |                     | :heavy_check_mark:               |                           |                    | :heavy_check_mark: |
 | [DeepWalk: Online Learning of Social Representations](#deepwalk)                                                         |                     | :heavy_check_mark:               |                           |                    | :heavy_check_mark: |
+| [Self-Attention Graph Pooling](#sagpool)                                                           |   |                                  |                           |                    |                    |
 |                                                            |   |                                  |                           |                    |                    |
 |                                                            |   |                                  |                           |                    |                    |
 
@@ -129,6 +130,10 @@
 - <a name="mixhop"></a> Abu-El-Haija et al. MixHop: Higher-Order Graph Convolutional Architectures via Sparsified Neighborhood Mixing. [Paper link](https://arxiv.org/abs/1905.00067).
     - Example code: [PyTorch](../examples/pytorch/mixhop)
     - Tags: node classification
+
+- <a name="sagpool"></a> Lee, Junhyun, et al. Self-Attention Graph Pooling. [Paper link](https://arxiv.org/abs/1904.08082).
+    - Example code: [PyTorch](../examples/pytorch/sagpool)
+    - Tags: graph classification, pooling
 
 ## 2018
 
