@@ -1,6 +1,7 @@
 import os
 import shutil, zipfile
 import requests
+import inspect
 import numpy as np
 import pandas
 import dgl
@@ -88,6 +89,14 @@ def process_data(name):
         return dgl.data.CoraGraphDataset()
     elif name == 'pubmed':
         return dgl.data.PubmedGraphDataset()
+    elif name == 'aifb':
+        return dgl.data.AIFBDataset()
+    elif name == 'mutag':
+        return dgl.data.MUTAGDataset()
+    elif name == 'bgs':
+        return dgl.data.BGSDataset()
+    elif name == 'am':
+        return dgl.data.AMDataset()
     elif name == 'reddit':
         return dgl.data.RedditDataset(self_loop=True)
     elif name == 'ogbn-products':
@@ -119,17 +128,88 @@ TRACK_SETUP = {
 }
 
 def parametrize(param_name, params):
+    """Decorator for benchmarking over a set of parameters.
+
+    Parameters
+    ----------
+    param_name : str
+        Parameter name. Must be one of the arguments of the decorated function.
+    params : list[any]
+        List of values to benchmark for the given parameter name. Recommend
+        to use Python's native object type (e.g., int, str, list[int]) because
+        ASV will display them on the plot.
+
+    Examples
+    --------
+
+    Benchmark function `foo` when argument `x` is equal to 10 or 20.
+
+    .. code::
+        @benchmark('time')
+        @parametrize('x', [10, 20]):
+        def foo(x):
+            pass
+
+    Benchmark function with multiple parametrizations. It will run the function
+    with all possible combinations. The example below generates 6 benchmarks.
+
+    .. code::
+        @benchmark('time')
+        @parametrize('x', [10, 20]):
+        @parametrize('y', [-1, -2, -3]):
+        def foo(x, y):
+            pass
+
+    When using multiple parametrizations, it can have arbitrary order. The example
+    below is the same as the above one.
+
+    .. code::
+        @benchmark('time')
+        @parametrize('y', [-1, -2, -3]):
+        @parametrize('x', [10, 20]):
+        def foo(x, y):
+            pass
+    """
     def _wrapper(func):
+        sig_params = inspect.signature(func).parameters.keys()
+        num_params = len(sig_params)
         if getattr(func, 'params', None) is None:
-            func.params = []
-        func.params.append(params)
+            func.params = [None] * num_params
         if getattr(func, 'param_names', None) is None:
-            func.param_names = []
-        func.param_names.append(param_name)
+            func.param_names = [None] * num_params
+        found_param = False
+        for i, sig_param in enumerate(sig_params):
+            if sig_param == param_name:
+                func.params[i] = params
+                func.param_names[i] = param_name
+                found_param = True
+                break
+        if not found_param:
+            raise ValueError('Invalid parameter name:', param_name)
         return func
     return _wrapper
 
 def benchmark(track_type, timeout=60):
+    """Decorator for indicating the benchmark type.
+
+    Parameters
+    ----------
+    track_type : str
+        Type. Must be either:
+
+            - 'time' : For timing. Unit: second.
+            - 'acc' : For accuracy. Unit: percentage, value between 0 and 100.
+    timeout : int
+        Timeout threshold in second.
+
+    Examples
+    --------
+
+    .. code::
+        @benchmark('time')
+        def foo():
+            pass
+    """
     assert track_type in ['time', 'acc']
     def _wrapper(func):
         func.unit = TRACK_UNITS[track_type]
