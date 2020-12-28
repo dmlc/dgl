@@ -14,9 +14,6 @@ from ogb.nodeproppred import DglNodePropPredDataset
 
 from sampler import ClusterIter, subgraph_collate_fn
 
-#### Neighbor sampler
-
-
 class GAT(nn.Module):
     def __init__(self,
                  in_feats,
@@ -122,7 +119,7 @@ def evaluate(model, g, nfeat, labels, val_nid, test_nid, batch_size, device):
     with th.no_grad():
         pred = model.inference(g, nfeat, batch_size, device)
     model.train()
-    return compute_acc(pred[val_nid], labels[val_nid].cpu()), compute_acc(pred[test_nid], labels[test_nid].cpu()), pred
+    return compute_acc(pred[val_nid], labels[val_nid]), compute_acc(pred[test_nid], labels[test_nid]), pred
 
 def model_param_summary(model):
     """ Count the model parameters """

@@ -59,7 +59,7 @@ class SAGE(nn.Module):
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
         for l, layer in enumerate(self.layers):
-            y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes).to(device)
+            y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.NodeDataLoader(
@@ -75,13 +75,13 @@ class SAGE(nn.Module):
                 block = blocks[0]
 
                 block = block.int().to(device)
-                h = x[input_nodes]
+                h = x[input_nodes].to(device)
                 h = layer(block, h)
                 if l != len(self.layers) - 1:
                     h = self.activation(h)
                     h = self.dropout(h)
 
-                y[output_nodes] = h
+                y[output_nodes] = h.cpu()
 
             x = y
         return y
@@ -107,12 +107,12 @@ def evaluate(model, g, nfeat, labels, val_nid, device):
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid])
 
-def load_subtensor(nfeat, labels, seeds, input_nodes):
+def load_subtensor(nfeat, labels, seeds, input_nodes, dev_id):
     """
-    Extracts features and labels for a set of nodes.
+    Extracts features and labels for a subset of nodes.
     """
-    batch_inputs = nfeat[input_nodes]
-    batch_labels = labels[seeds]
+    batch_inputs = nfeat[input_nodes].to(dev_id)
+    batch_labels = labels[seeds].to(dev_id)
     return batch_inputs, batch_labels
 
 #### Entry point
@@ -134,15 +134,20 @@ def run(proc_id, n_gpus, args, devices, data):
     n_classes, train_g, val_g, test_g = data
 
     if args.inductive:
-        train_nfeat = train_g.ndata.pop('features').to(dev_id)
-        val_nfeat = val_g.ndata.pop('features').to(dev_id)
-        test_nfeat = test_g.ndata.pop('features').to(dev_id)
-        train_labels = train_g.ndata.pop('labels').to(dev_id)
-        val_labels = val_g.ndata.pop('labels').to(dev_id)
-        test_labels = test_g.ndata.pop('labels').to(dev_id)
+        train_nfeat = train_g.ndata.pop('features')
+        val_nfeat = val_g.ndata.pop('features')
+        test_nfeat = test_g.ndata.pop('features')
+        train_labels = train_g.ndata.pop('labels')
+        val_labels = val_g.ndata.pop('labels')
+        test_labels = test_g.ndata.pop('labels')
     else:
-        train_nfeat = val_nfeat = test_nfeat = g.ndata.pop('features').to(dev_id)
-        train_labels = val_labels = test_labels = g.ndata.pop('labels').to(dev_id)
+        train_nfeat = val_nfeat = test_nfeat = g.ndata.pop('features')
+        train_labels = val_labels = test_labels = g.ndata.pop('labels')
+
+    if not args.data_cpu:
+        train_nfeat = train_nfeat.to(dev_id)
+        train_labels = train_labels.to(dev_id)
+
     in_feats = train_nfeat.shape[1]
 
     train_mask = train_g.ndata['train_mask']
@@ -188,7 +193,8 @@ def run(proc_id, n_gpus, args, devices, data):
                 tic_step = time.time()
 
             # Load the input features as well as output labels
-            batch_inputs, batch_labels = load_subtensor(train_nfeat, train_labels, seeds, input_nodes)
+            batch_inputs, batch_labels = load_subtensor(train_nfeat, train_labels,
+                                                        seeds, input_nodes, dev_id)
             blocks = [block.int().to(dev_id) for block in blocks]
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -235,7 +241,7 @@ def run(proc_id, n_gpus, args, devices, data):
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser("multi-gpu training")
     argparser.add_argument('--gpu', type=str, default='0',
-        help="Comma separated list of GPU device IDs.")
+                           help="Comma separated list of GPU device IDs.")
     argparser.add_argument('--num-epochs', type=int, default=20)
     argparser.add_argument('--num-hidden', type=int, default=16)
     argparser.add_argument('--num-layers', type=int, default=2)
@@ -246,9 +252,14 @@ if __name__ == '__main__':
     argparser.add_argument('--lr', type=float, default=0.003)
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=0,
-        help="Number of sampling processes. Use 0 for no extra process.")
+                           help="Number of sampling processes. Use 0 for no extra process.")
     argparser.add_argument('--inductive', action='store_true',
-        help="Inductive learning setting")
+                           help="Inductive learning setting")
+    argparser.add_argument('--data-cpu', action='store_true',
+                           help="By default the script puts all node features and labels "
+                                "on GPU when using it to save time for data copy. This may "
+                                "be undesired if they cannot fit in GPU memory at once. "
+                                "This flag disables that.")
     args = argparser.parse_args()
     
     devices = list(map(int, args.gpu.split(',')))

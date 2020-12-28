@@ -78,7 +78,7 @@ class SAGE(nn.Module):
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
         for l, layer in enumerate(self.layers):
-            y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes).to(device)
+            y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.NodeDataLoader(
@@ -93,13 +93,13 @@ class SAGE(nn.Module):
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0].to(device)
 
-                h = x[input_nodes]
+                h = x[input_nodes].to(device)
                 h = layer(block, h)
                 if l != len(self.layers) - 1:
                     h = self.activation(h)
                     h = self.dropout(h)
 
-                y[output_nodes] = h
+                y[output_nodes] = h.cpu()
 
             x = y
         return y
@@ -176,9 +176,12 @@ def run(proc_id, n_gpus, args, devices, data):
                                           world_size=world_size,
                                           rank=proc_id)
     train_mask, val_mask, test_mask, n_classes, g = data
-    nfeat = g.ndata.pop('feat').to(device)
-    labels = g.ndata.pop('label').to(device)
+    nfeat = g.ndata.pop('feat')
+    labels = g.ndata.pop('label')
     in_feats = nfeat.shape[1]
+
+    if not args.data_cpu:
+        nfeat = nfeat.to(device)
 
     train_nid = th.LongTensor(np.nonzero(train_mask)).squeeze()
     val_nid = th.LongTensor(np.nonzero(val_mask)).squeeze()
@@ -234,7 +237,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
         tic_step = time.time()
         for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
-            batch_inputs = nfeat[input_nodes]
+            batch_inputs = nfeat[input_nodes].to(device)
             d_step = time.time()
 
             pos_graph = pos_graph.to(device)
@@ -312,13 +315,14 @@ def main(args, devices):
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser("multi-gpu training")
     argparser.add_argument("--gpu", type=str, default='0',
-            help="GPU, can be a list of gpus for multi-gpu trianing, e.g., 0,1,2,3; -1 for CPU")
+                           help="GPU, can be a list of gpus for multi-gpu trianing,"
+                                " e.g., 0,1,2,3; -1 for CPU")
     argparser.add_argument('--num-epochs', type=int, default=20)
     argparser.add_argument('--num-hidden', type=int, default=16)
     argparser.add_argument('--num-layers', type=int, default=2)
     argparser.add_argument('--num-negs', type=int, default=1)
     argparser.add_argument('--neg-share', default=False, action='store_true',
-        help="sharing neg nodes for positive nodes")
+                           help="sharing neg nodes for positive nodes")
     argparser.add_argument('--fan-out', type=str, default='10,25')
     argparser.add_argument('--batch-size', type=int, default=10000)
     argparser.add_argument('--log-every', type=int, default=20)
@@ -326,7 +330,12 @@ if __name__ == '__main__':
     argparser.add_argument('--lr', type=float, default=0.003)
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=0,
-        help="Number of sampling processes. Use 0 for no extra process.")
+                           help="Number of sampling processes. Use 0 for no extra process.")
+    argparser.add_argument('--data-cpu', action='store_true',
+                           help="By default the script puts all node features and labels "
+                                "on GPU when using it to save time for data copy. This may "
+                                "be undesired if they cannot fit in GPU memory at once. "
+                                "This flag disables that.")
     args = argparser.parse_args()
 
     devices = list(map(int, args.gpu.split(',')))
