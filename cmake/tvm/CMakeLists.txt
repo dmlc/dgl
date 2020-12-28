@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.5)
+
 set(CMAKE_CXX_FLAGS "-std=c++14 -O2 -fPIC")
 add_library(featgraph SHARED tvm_runtime.cc featgraph.cc)
 target_include_directories(featgraph PRIVATE "../../third_party/tvm/include")
