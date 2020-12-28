@@ -220,6 +220,11 @@ if __name__ == '__main__':
     argparser.add_argument('--wd', type=float, default=0)
     argparser.add_argument('--num_partitions', type=int, default=15000)
     argparser.add_argument('--num-workers', type=int, default=0)
+    argparser.add_argument('--data-cpu', action='store_true',
+                           help="By default the script puts all node features and labels "
+                                "on GPU when using it to save time for data copy. This may "
+                                "be undesired if they cannot fit in GPU memory at once. "
+                                "This flag disables that.")
     args = argparser.parse_args()
 
     if args.gpu >= 0:
@@ -249,7 +254,9 @@ if __name__ == '__main__':
 
     cluster_iter_data = ClusterIter(
             'ogbn-products', graph, args.num_partitions, args.batch_size)
-    cluster_iterator = DataLoader(cluster_iter_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4, collate_fn=partial(subgraph_collate_fn, graph))
+    cluster_iterator = DataLoader(cluster_iter_data, batch_size=args.batch_size, shuffle=True,
+                                  pin_memory=True, num_workers=4,
+                                  collate_fn=partial(subgraph_collate_fn, graph))
 
     in_feats = graph.ndata['feat'].shape[1]
     n_classes = (labels.max() + 1).item()

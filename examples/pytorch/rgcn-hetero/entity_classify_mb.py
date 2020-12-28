@@ -29,7 +29,8 @@ def evaluate(model, loader, node_embed, labels, category, device):
         blocks = [blk.to(device) for blk in blocks]
         seeds = seeds[category]
         emb = extract_embed(node_embed, input_nodes)
-        lbl = labels[seeds]
+        emb = {k: e.to(device) for k, e in emb.items()}
+        lbl = labels[seeds].to(device)
         logits = model(emb, blocks)[category]
         loss = F.cross_entropy(logits, lbl)
         acc = th.sum(logits.argmax(dim=1) == lbl).item()
@@ -65,7 +66,7 @@ def main(args):
     test_mask = g.nodes[category].data.pop('test_mask')
     train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
     test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
-    labels = g.nodes[category].data.pop('labels').to(device)
+    labels = g.nodes[category].data.pop('labels')
 
     # split dataset into train, validate, test
     if args.validation:
@@ -75,7 +76,12 @@ def main(args):
         val_idx = train_idx
 
     # create embeddings
-    embed_layer = RelGraphEmbed(g, args.n_hidden).to(device)
+    embed_layer = RelGraphEmbed(g, args.n_hidden)
+
+    if not args.data_cpu:
+        labels = labels.to(device)
+        embed_layer = embed_layer.to(device)
+
     node_embed = embed_layer()
     # create model
     model = EntityClassify(g,
@@ -179,6 +185,11 @@ if __name__ == '__main__':
             help="Mini-batch size. If -1, use full graph training.")
     parser.add_argument("--fanout", type=int, default=4,
             help="Fan-out of neighbor sampling.")
+    parser.add_argument('--data-cpu', action='store_true',
+            help="By default the script puts all node features and labels "
+                 "on GPU when using it to save time for data copy. This may "
+                 "be undesired if they cannot fit in GPU memory at once. "
+                 "This flag disables that.")
     fp = parser.add_mutually_exclusive_group(required=False)
     fp.add_argument('--validation', dest='validation', action='store_true')
     fp.add_argument('--testing', dest='validation', action='store_false')
