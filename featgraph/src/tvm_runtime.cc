@@ -1,7 +1,7 @@
 /*
  * NOTE(zihao): this file was modified from TVM project:
  * - https://github.com/apache/tvm/blob/9713d675c64ae3075e10be5acadeef1328a44bb5/apps/howto_deploy/tvm_runtime_pack.cc
- *
+ * 
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -40,17 +40,17 @@
  *  You need to remember to change it to point to the right file.
  *
  */
-#include "../third_party/tvm/src/runtime/c_runtime_api.cc"
-#include "../third_party/tvm/src/runtime/cpu_device_api.cc"
-#include "../third_party/tvm/src/runtime/file_utils.cc"
-#include "../third_party/tvm/src/runtime/library_module.cc"
-#include "../third_party/tvm/src/runtime/module.cc"
-#include "../third_party/tvm/src/runtime/ndarray.cc"
-#include "../third_party/tvm/src/runtime/object.cc"
-#include "../third_party/tvm/src/runtime/registry.cc"
-#include "../third_party/tvm/src/runtime/thread_pool.cc"
-#include "../third_party/tvm/src/runtime/threading_backend.cc"
-#include "../third_party/tvm/src/runtime/workspace_pool.cc"
+#include <../src/runtime/c_runtime_api.cc>
+#include <../src/runtime/cpu_device_api.cc>
+#include <../src/runtime/file_utils.cc>
+#include <../src/runtime/library_module.cc>
+#include <../src/runtime/module.cc>
+#include <../src/runtime/ndarray.cc>
+#include <../src/runtime/object.cc>
+#include <../src/runtime/registry.cc>
+#include <../src/runtime/thread_pool.cc>
+#include <../src/runtime/threading_backend.cc>
+#include <../src/runtime/workspace_pool.cc>
 
 // NOTE: all the files after this are optional modules
 // that you can include remove, depending on how much feature you use.
@@ -58,10 +58,31 @@
 // Likely we only need to enable one of the following
 // If you use Module::Load, use dso_module
 // For system packed library, use system_lib_module
-#include "../third_party/tvm/src/runtime/dso_library.cc"
+#include <../src/runtime/dso_library.cc>
+// #include <../src/runtime/system_library.cc>
 
+// Graph runtime
+// #include "../../src/runtime/graph/graph_runtime.cc"
+// #include "../../src/runtime/graph/graph_runtime_factory.cc"
+
+// Uncomment the following lines to enable RPC
+// #include "../../src/runtime/rpc/rpc_session.cc"
+// #include "../../src/runtime/rpc/rpc_event_impl.cc"
+// #include "../../src/runtime/rpc/rpc_server_env.cc"
+
+// These macros enables the device API when uncommented.
 #define TVM_CUDA_RUNTIME 1
+// #define TVM_METAL_RUNTIME 1
+// #define TVM_OPENCL_RUNTIME 1
 
-#include "../third_party/tvm/src/runtime/cuda/cuda_device_api.cc"
-#include "../third_party/tvm/src/runtime/cuda/cuda_module.cc"
+// Uncomment the following lines to enable Metal
+// #include "../../src/runtime/metal/metal_device_api.mm"
+// #include "../../src/runtime/metal/metal_module.mm"
 
+// Uncomment the following lines to enable CUDA
+#include <../src/runtime/cuda/cuda_device_api.cc>
+#include <../src/runtime/cuda/cuda_module.cc>
+
+// Uncomment the following lines to enable OpenCL
+// #include "../../src/runtime/opencl/opencl_device_api.cc"
+// #include "../../src/runtime/opencl/opencl_module.cc"

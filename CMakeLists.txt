@@ -164,6 +164,7 @@ target_include_directories(dgl PRIVATE "third_party/minigun/third_party/moderngp
 target_include_directories(dgl PRIVATE "third_party/phmap/")
 target_include_directories(dgl PRIVATE "third_party/xbyak/")
 target_include_directories(dgl PRIVATE "tensoradapter/include")
+target_include_directories(dgl PRIVATE "featgraph/include")
 
 # For serialization
 if (USE_HDFS)
@@ -187,6 +188,8 @@ endif(NOT MSVC)
 if(USE_TVM)
   add_subdirectory("featgraph/")
   list(APPEND DGL_LINKER_LIBS featgraph)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_TVM")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_TVM")
 endif(USE_TVM)
 
 # support PARALLEL_ALGORITHMS
