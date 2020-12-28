@@ -102,7 +102,7 @@ def evaluate(model, g, nfeat, labels, val_nid, device):
     with th.no_grad():
         pred = model.inference(g, nfeat, device)
     model.train()
-    return compute_acc(pred[val_nid], labels[val_nid])
+    return compute_acc(pred[val_nid], labels[val_nid].to(pred.device))
 
 def load_subtensor(nfeat, labels, seeds, input_nodes, device):
     """
