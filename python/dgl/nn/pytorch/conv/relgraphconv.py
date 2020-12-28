@@ -8,11 +8,7 @@ from .. import utils
 
 
 class RelGraphConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Relational graph convolution layer.
+    r"""Relational graph convolution layer.
 
     Relational graph convolution is introduced in "`Modeling Relational Data with Graph
     Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
@@ -243,12 +239,7 @@ class RelGraphConv(nn.Module):
         return {'msg': msg}
 
     def forward(self, g, feat, etypes, norm=None):
-        """
-
-        Description
-        -----------
-
-        Forward computation
+        """Forward computation.
 
         Parameters
         ----------
@@ -260,8 +251,13 @@ class RelGraphConv(nn.Module):
                 * :math:`(|V|, D)` dense tensor
                 * :math:`(|V|,)` int64 vector, representing the categorical values of each
                   node. It then treat the input feature as an one-hot encoding feature.
-        etypes : torch.Tensor
-            Edge type tensor. Shape: :math:`(|E|,)`
+        etypes : torch.Tensor or list
+            Edge type data. Could be either
+
+                * An :math:`(|E|,)` dense tensor. Each element corresponds to the edge's type ID.
+                * An integer list. The i^th element is the number of edges of the i^th type.
+                  This requires the input graph to store edges sorted by their type IDs.
+                  Using this together with ``low_mem=True`` is usually faster.
         norm : torch.Tensor
             Optional edge normalizer tensor. Shape: :math:`(|E|, 1)`.
 
