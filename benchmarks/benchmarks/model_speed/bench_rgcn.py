@@ -46,9 +46,6 @@ def track_time(data):
     elif data == 'am':
         num_bases = 40
         l2norm = 5e-4
-    elif data == 'mutag':
-        num_bases = 30
-        l2norm = 5e-4
     else:
         raise ValueError()
 

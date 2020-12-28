@@ -128,6 +128,48 @@ TRACK_SETUP = {
 }
 
 def parametrize(param_name, params):
+    """Decorator for benchmarking over a set of parameters.
+
+    Parameters
+    ----------
+    param_name : str
+        Parameter name. Must be one of the arguments of the decorated function.
+    params : list[any]
+        List of values to benchmark for the given parameter name. Recommend
+        to use Python's native object type (e.g., int, str, list[int]) because
+        ASV will display them on the plot.
+
+    Examples
+    --------
+
+    Benchmark function `foo` when argument `x` is equal to 10 or 20.
+
+    .. code::
+        @benchmark('time')
+        @parametrize('x', [10, 20]):
+        def foo(x):
+            pass
+
+    Benchmark function with multiple parametrizations. It will run the function
+    with all possible combinations. The example below generates 6 benchmarks.
+
+    .. code::
+        @benchmark('time')
+        @parametrize('x', [10, 20]):
+        @parametrize('y', [-1, -2, -3]):
+        def foo(x, y):
+            pass
+
+    When using multiple parametrizations, it can have arbitrary order. The example
+    below is the same as the above one.
+
+    .. code::
+        @benchmark('time')
+        @parametrize('y', [-1, -2, -3]):
+        @parametrize('x', [10, 20]):
+        def foo(x, y):
+            pass
+    """
     def _wrapper(func):
         sig_params = inspect.signature(func).parameters.keys()
         num_params = len(sig_params)
@@ -148,6 +190,26 @@ def parametrize(param_name, params):
     return _wrapper
 
 def benchmark(track_type, timeout=60):
+    """Decorator for indicating the benchmark type.
+
+    Parameters
+    ----------
+    track_type : str
+        Type. Must be either:
+
+            - 'time' : For timing. Unit: second.
+            - 'acc' : For accuracy. Unit: percentage, value between 0 and 100.
+    timeout : int
+        Timeout threshold in second.
+
+    Examples
+    --------
+
+    .. code::
+        @benchmark('time')
+        def foo():
+            pass
+    """
     assert track_type in ['time', 'acc']
     def _wrapper(func):
         func.unit = TRACK_UNITS[track_type]
