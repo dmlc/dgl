@@ -58,7 +58,8 @@ def _searchsorted(sorted_sequence, values, num_rels):
 @utils.benchmark('time', 3600)
 @utils.parametrize('data', ['aifb'])
 @utils.parametrize('lowmem', [True, False])
-def track_time(data, lowmem):
+@utils.parametrize('sortgraph', [True, False])
+def track_time(data, lowmem, sortgraph):
     # args
     if data == 'aifb':
         num_bases = -1
@@ -101,7 +102,7 @@ def track_time(data, lowmem):
     num_nodes = g.number_of_nodes()
     edge_type = g.edata[dgl.ETYPE].long()
 
-    if lowmem:
+    if sortgraph:
         # sort graph 
         g, edge_type = sort_graph(g, edge_type, num_rels)
 
