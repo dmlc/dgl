@@ -1,33 +1,48 @@
+/*!
+ *  Copyright (c) 2020 by Contributors
+ * \file featgraph/src/featgraph.cc
+ * \brief FeatGraph kernels.
+ */
 #include <tvm/runtime/module.h>
 #include <tvm/runtime/packed_func.h>
 #include <tvm/runtime/registry.h>
 #include <dmlc/logging.h>
-#include <sstream>
-
 #include <featgraph.h>
 
 namespace dgl {
 namespace featgraph {
 
-/* \brief Singleton that loads the featgraph module.
- */
+/* \brief Singleton that loads the featgraph module. */
 class FeatGraphModule {
 public:
-  tvm::runtime::ModuleNode* mod;
-
   static FeatGraphModule* Global() {
     static FeatGraphModule inst;
     return &inst;
   }
 
   void SetPath(const std::string& path) {
-    mod = const_cast<tvm::runtime::ModuleNode*>(
-      tvm::runtime::Module::LoadFromFile(path).operator->());
+    mod = tvm::runtime::Module::LoadFromFile(path);
+  }
+
+  inline tvm::runtime::ModuleNode* Get() {
+    auto ret = mod.operator->();
+    if (!ret) {
+      LOG(FATAL) << "FeatGraph module have not been loaded. "
+                 << "Please set path of featgraph shared library.";
+    }
+    return ret;
   }
 private:
+  tvm::runtime::Module mod;
   FeatGraphModule() {}
 };
 
+/* Set the path of libfeatgraph_kernels.so */
+void SetFeatGraphModulePath(const std::string& path) {
+  FeatGraphModule::Global()->SetPath(path);
+}
+
+/* Convert DLDataType to string. */
 inline std::string DTypeAsStr(const DLDataType& t) {
   switch(t.code) {
     case 0U: return "int" + std::to_string(t.bits);
@@ -38,6 +53,7 @@ inline std::string DTypeAsStr(const DLDataType& t) {
   }
 }
 
+/* Get operator filename. */
 inline std::string GetOperatorName(
     const std::string& base_name,
     const DLDataType& dtype,
@@ -45,11 +61,10 @@ inline std::string GetOperatorName(
   return base_name + "_" + DTypeAsStr(dtype) + "_" + DTypeAsStr(idtype);
 }
 
-
 void SDDMMTreeReduction(DLManagedTensor* row, DLManagedTensor* col, 
                         DLManagedTensor* lhs, DLManagedTensor* rhs, 
                         DLManagedTensor* out) {
-  tvm::runtime::ModuleNode* mod = FeatGraphModule::Global()->mod;
+  tvm::runtime::ModuleNode* mod = FeatGraphModule::Global()->Get();
   std::string f_name = GetOperatorName("SDDMMTreeReduction",
                                        (row->dl_tensor).dtype,
                                        (lhs->dl_tensor).dtype);

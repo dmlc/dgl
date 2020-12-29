@@ -224,9 +224,15 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelBwdSegmentCmp")
     CheckCtx(feat->ctx, {feat, arg, out}, {"feat", "arg", "out"});
     CheckContiguous({feat, arg, out}, {"feat", "arg", "out"});
     BackwardSegmentCmpDispatch(feat, arg, out);
-});
+  });
 
 #ifdef USE_TVM
+DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SetModulePath")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const std::string path = args[0];
+    dgl::featgraph::SetFeatGraphModulePath(path);
+  });
+
 DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SDDMMTreeReduction")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef graph = args[0];
