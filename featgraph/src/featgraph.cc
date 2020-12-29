@@ -9,7 +9,7 @@ namespace dgl {
 namespace featgraph {
 
 tvm::runtime::Module LoadFeatGraph() {
-  static tvm::runtime::Module mod = tvm::runtime::Module::LoadFromFile("/home/ubuntu/dgl/build/libfeatgraph_kernels.so");
+  static tvm::runtime::Module mod = tvm::runtime::Module::LoadFromFile("../build/libfeatgraph_kernels.so");
   return mod;
 }
 
