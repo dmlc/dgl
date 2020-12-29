@@ -15,30 +15,50 @@ class RGCN(nn.Module):
                  num_rels,
                  num_bases,
                  num_hidden_layers,
-                 dropout):
+                 dropout,
+                 lowmem):
         super(RGCN, self).__init__()
         self.layers = nn.ModuleList()
         # i2h
         self.layers.append(RelGraphConv(num_nodes, n_hidden, num_rels, "basis",
                                         num_bases, activation=F.relu, dropout=dropout,
-                                        low_mem=True))
+                                        low_mem=lowmem))
         # h2h
         for i in range(num_hidden_layers):
             self.layers.append(RelGraphConv(n_hidden, n_hidden, num_rels, "basis",
                                             num_bases, activation=F.relu, dropout=dropout,
-                                            low_mem=True))
+                                            low_mem=lowmem))
         # o2h
         self.layers.append(RelGraphConv(n_hidden, num_classes, num_rels, "basis",
-                                        num_bases, activation=None, low_mem=True))
+                                        num_bases, activation=None, low_mem=lowmem))
 
     def forward(self, g, h, r, norm):
         for layer in self.layers:
             h = layer(g, h, r, norm)
         return h
 
+def sort_graph(g, etypes, num_rels):
+    # Sort the graph based on the etypes
+    sorted_etypes, index = torch.sort(etypes)
+    g = dgl.edge_subgraph(g, index, preserve_nodes=True)
+    # Create a new etypes to be an integer list of number of edges.
+    pos = _searchsorted(sorted_etypes, torch.arange(num_rels, device=g.device), num_rels)
+    num = torch.tensor([len(etypes)], device=g.device)
+    etypes = (torch.cat([pos[1:], num]) - pos).tolist()
+    return g, etypes
+
+def _searchsorted(sorted_sequence, values, num_rels):
+    # searchsorted is introduced to PyTorch in 1.6.0
+    if getattr(torch, 'searchsorted', None):
+        return torch.searchsorted(sorted_sequence, values)
+    else:
+        device = values.device
+        return torch.from_numpy(np.searchsorted(sorted_sequence.numpy(), values.numpy())).to(device)
+
 @utils.benchmark('time', 3600)
 @utils.parametrize('data', ['aifb', 'am'])
-def track_time(data):
+@utils.parametrize('lowmem', ['True', 'False'])
+def track_time(data, lowmem):
     # args
     if data == 'aifb':
         num_bases = -1
@@ -79,8 +99,13 @@ def track_time(data):
 
     g = dgl.to_homogeneous(g, edata=['norm']).to(device)
     num_nodes = g.number_of_nodes()
-    edge_norm = g.edata['norm']
     edge_type = g.edata[dgl.ETYPE].long()
+
+    if lowmem:
+        # sort graph 
+        g, edge_type = sort_graph(g, edge_type, num_rels)
+
+    edge_norm = g.edata['norm']
 
     # find out the target node ids in g
     target_idx = torch.where(g.ndata[dgl.NTYPE] == category_id)[0]
@@ -99,7 +124,8 @@ def track_time(data):
                  num_rels,
                  num_bases,
                  0,
-                 0).to(device)
+                 0,
+                 lowmem).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(),
                                  lr=1e-2,

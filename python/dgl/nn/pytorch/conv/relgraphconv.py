@@ -1,11 +1,14 @@
 """Torch Module for Relational graph convolution layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
+import functools
+import numpy as np
 import torch as th
 from torch import nn
 
 from .... import function as fn
 from .. import utils
-
+from ....base import DGLError
+from .... import edge_subgraph
 
 class RelGraphConv(nn.Module):
     r"""Relational graph convolution layer.
@@ -181,8 +184,22 @@ class RelGraphConv(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
-    def basis_message_func(self, edges):
-        """Message function for basis regularizer"""
+    def basis_message_func(self, edges, etypes):
+        """Message function for basis regularizer.
+        
+        Parameters
+        ----------
+        edges : dgl.EdgeBatch
+            Input to DGL message UDF.
+        etypes : torch.Tensor or list
+            Edge type data. Could be either:
+
+                * An :math:`(|E|,)` dense tensor. Each element corresponds to the edge's type ID.
+                  Preferred format if ``lowmem == False``.
+                * An integer list. The i^th element is the number of edges of the i^th type.
+                  This requires the input graph to store edges sorted by their type IDs.
+                  Preferred format if ``lowmem == True``.
+        """
         if self.num_bases < self.num_rels:
             # generate all weights from bases
             weight = self.weight.view(self.num_bases,
@@ -192,47 +209,70 @@ class RelGraphConv(nn.Module):
         else:
             weight = self.weight
 
-        # calculate msg @ W_r before put msg into edge
-        # if src is th.int64 we expect it is an index select
-        if edges.src['h'].dtype != th.int64 and self.low_mem:
-            etypes = th.unique(edges.data['type'])
-            msg = th.empty((edges.src['h'].shape[0], self.out_feat),
-                           device=edges.src['h'].device)
-            for etype in etypes:
-                loc = edges.data['type'] == etype
-                w = weight[etype]
-                src = edges.src['h'][loc]
-                sub_msg = th.matmul(src, w)
-                msg[loc] = sub_msg
+        h = edges.src['h']
+        device = h.device
+
+        if h.dtype == th.int64 and h.ndim == 1:
+            # Each element is the node's ID. Use index select: weight[etypes, h, :]
+            # The following is a faster version of it.
+            if isinstance(etypes, list):
+                etypes = th.repeat_interleave(th.arange(len(etypes), device=device),
+                                              th.tensor(etypes, device=device))
+            weight = weight.view(-1, weight.shape[2])
+            flatidx = etypes * weight.shape[1] + h
+            msg = weight.index_select(0, flatidx)
+        elif self.low_mem:
+            # A more memory-friendly implementation.
+            # Calculate msg @ W_r before put msg into edge.
+            assert isinstance(etypes, list)
+            h_t = th.split(h, etypes)
+            msg = []
+            for etype in range(self.num_rels):
+                if h_t[etype].shape[0] == 0:
+                   continue
+                msg.append(th.matmul(h_t[etype], weight[etype]))
+            msg = th.cat(msg)
         else:
-            # put W_r into edges then do msg @ W_r
-            msg = utils.bmm_maybe_select(edges.src['h'], weight, edges.data['type'])
+            # Use batched matmult
+            if isinstance(etypes, list):
+                etypes = th.repeat_interleave(th.arange(len(etypes), device=device),
+                                              th.tensor(etypes, device=device))
+            weight = weight.index_select(0, etypes)
+            msg = th.bmm(h.unsqueeze(1), weight).squeeze()
 
         if 'norm' in edges.data:
             msg = msg * edges.data['norm']
         return {'msg': msg}
 
-    def bdd_message_func(self, edges):
+    def bdd_message_func(self, edges, etypes):
         """Message function for block-diagonal-decomposition regularizer"""
-        if edges.src['h'].dtype == th.int64 and len(edges.src['h'].shape) == 1:
+        h = edges.src['h']
+        device = h.device
+
+        if h.dtype == th.int64 and h.ndim == 1:
             raise TypeError('Block decomposition does not allow integer ID feature.')
 
-        # calculate msg @ W_r before put msg into edge
         if self.low_mem:
-            etypes = th.unique(edges.data['type'])
-            msg = th.empty((edges.src['h'].shape[0], self.out_feat),
-                           device=edges.src['h'].device)
-            for etype in etypes:
-                loc = edges.data['type'] == etype
-                w = self.weight[etype].view(self.num_bases, self.submat_in, self.submat_out)
-                src = edges.src['h'][loc].view(-1, self.num_bases, self.submat_in)
-                sub_msg = th.einsum('abc,bcd->abd', src, w)
-                sub_msg = sub_msg.reshape(-1, self.out_feat)
-                msg[loc] = sub_msg
+            # A more memory-friendly implementation.
+            # Calculate msg @ W_r before put msg into edge.
+            assert isinstance(etypes, list)
+            h_t = th.split(h, etypes)
+            msg = []
+            for etype in range(self.num_rels):
+                if h_t[etype].shape[0] == 0:
+                    continue
+                tmp_w = self.weight[etype].view(self.num_bases, self.submat_in, self.submat_out)
+                tmp_h = h_t[etype].view(-1, self.num_bases, self.submat_in)
+                msg.append(th.einsum('abc,bcd->abd', tmp_h, tmp_w).reshape(-1, self.out_feat))
+            msg = th.cat(msg)
         else:
-            weight = self.weight.index_select(0, edges.data['type']).view(
+            # Use batched matmult
+            if isinstance(etypes, list):
+                etypes = th.repeat_interleave(th.arange(len(etypes), device=device),
+                                              th.tensor(etypes, device=device))
+            weight = self.weight.index_select(0, etypes).view(
                 -1, self.submat_in, self.submat_out)
-            node = edges.src['h'].view(-1, 1, self.submat_in)
+            node = h.view(-1, 1, self.submat_in)
             msg = th.bmm(node, weight).view(-1, self.out_feat)
         if 'norm' in edges.data:
             msg = msg * edges.data['norm']
@@ -255,9 +295,10 @@ class RelGraphConv(nn.Module):
             Edge type data. Could be either
 
                 * An :math:`(|E|,)` dense tensor. Each element corresponds to the edge's type ID.
+                  Preferred format if ``lowmem == False``.
                 * An integer list. The i^th element is the number of edges of the i^th type.
                   This requires the input graph to store edges sorted by their type IDs.
-                  Using this together with ``low_mem=True`` is usually faster.
+                  Preferred format if ``lowmem == True``.
         norm : torch.Tensor
             Optional edge normalizer tensor. Shape: :math:`(|E|, 1)`.
 
@@ -266,16 +307,34 @@ class RelGraphConv(nn.Module):
         torch.Tensor
             New node features.
         """
+        if isinstance(etypes, th.Tensor):
+            if len(etypes) != g.num_edges():
+                raise DGLError('"etypes" tensor must have length equal to the number of edges'
+                               ' in the graph. But got {} and {}.'.format(
+                                   len(etypes), g.num_edges()))
+            if self.low_mem and not (feat.dtype == th.int64 and feat.ndim == 1):
+                # Low-mem optimization is not enabled for node ID input. When enabled,
+                # it first sorts the graph based on the edge types (the sorting will not
+                # change the node IDs). It then converts the etypes tensor to an integer
+                # list, where each element is the number of edges of the type.
+                # Sort the graph based on the etypes
+                sorted_etypes, index = th.sort(etypes)
+                g = edge_subgraph(g, index, preserve_nodes=True)
+                # Create a new etypes to be an integer list of number of edges.
+                pos = _searchsorted(sorted_etypes, th.arange(self.num_rels, device=g.device))
+                num = th.tensor([len(etypes)], device=g.device)
+                etypes = (th.cat([pos[1:], num]) - pos).tolist()
+
         with g.local_scope():
             g.srcdata['h'] = feat
-            g.edata['type'] = etypes
             if norm is not None:
                 g.edata['norm'] = norm
             if self.self_loop:
                 loop_message = utils.matmul_maybe_select(feat[:g.number_of_dst_nodes()],
                                                          self.loop_weight)
             # message passing
-            g.update_all(self.message_func, fn.sum(msg='msg', out='h'))
+            g.update_all(functools.partial(self.message_func, etypes=etypes),
+                         fn.sum(msg='msg', out='h'))
             # apply bias and activation
             node_repr = g.dstdata['h']
             if self.layer_norm:
@@ -288,3 +347,11 @@ class RelGraphConv(nn.Module):
                 node_repr = self.activation(node_repr)
             node_repr = self.dropout(node_repr)
             return node_repr
+
+def _searchsorted(sorted_sequence, values):
+    # searchsorted is introduced to PyTorch in 1.6.0
+    if getattr(th, 'searchsorted', None):
+        return th.searchsorted(sorted_sequence, values)
+    else:
+        device = values.device
+        return th.from_numpy(np.searchsorted(sorted_sequence.numpy(), values.numpy())).to(device)
