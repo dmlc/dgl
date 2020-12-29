@@ -9,6 +9,25 @@
 namespace dgl {
 namespace featgraph {
 
+/* \brief Singleton that loads the featgraph module.
+ */
+class FeatGraphModule {
+public:
+  tvm::runtime::ModuleNode* mod;
+
+  static FeatGraphModule* Global() {
+    static FeatGraphModule inst;
+    return &inst;
+  }
+
+  void SetPath(const std::string& path) {
+    mod = const_cast<tvm::runtime::ModuleNode*>(
+      tvm::runtime::Module::LoadFromFile(path).operator->());
+  }
+private:
+  FeatGraphModule() {}
+};
+
 inline std::string DTypeAsStr(const DLDataType& t) {
   switch(t.code) {
     case 0U: return "int" + std::to_string(t.bits);
@@ -23,24 +42,18 @@ inline std::string GetOperatorName(
     const std::string& base_name,
     const DLDataType& dtype,
     const DLDataType& idtype) {
-  return base_name + "_" + DTypeAsStr(dtype) + "_" +DTypeAsStr(idtype);
+  return base_name + "_" + DTypeAsStr(dtype) + "_" + DTypeAsStr(idtype);
 }
 
-/* \brief Load FeatGraph kernels.
- */
-tvm::runtime::Module LoadFeatGraph() {
-  static tvm::runtime::Module mod = tvm::runtime::Module::LoadFromFile("build/libfeatgraph_kernels.so");
-  return mod;
-}
 
 void SDDMMTreeReduction(DLManagedTensor* row, DLManagedTensor* col, 
                         DLManagedTensor* lhs, DLManagedTensor* rhs, 
                         DLManagedTensor* out) {
-  const static tvm::runtime::ModuleNode* mod = LoadFeatGraph().operator->();
+  tvm::runtime::ModuleNode* mod = FeatGraphModule::Global()->mod;
   std::string f_name = GetOperatorName("SDDMMTreeReduction",
                                        (row->dl_tensor).dtype,
                                        (lhs->dl_tensor).dtype);
-  tvm::runtime::PackedFunc f = const_cast<tvm::runtime::ModuleNode*>(mod)->GetFunction(f_name);
+  tvm::runtime::PackedFunc f = mod->GetFunction(f_name);
   if (f != nullptr)
     f(row, col, lhs, rhs, out);
 }
