@@ -16,6 +16,6 @@ export DGL_BENCH_DEVICE=$DEVICE
 pushd $ROOT/benchmarks
 cat asv.conf.json
 asv machine --yes
-asv run --bench=model_speed.bench_rgcn HEAD^1..HEAD
+asv run --bench=model_speed.bench_rgcn
 asv publish
 popd

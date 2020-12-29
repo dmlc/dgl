@@ -1,4 +1,5 @@
 import time
+import numpy as np
 import dgl
 from dgl.nn.pytorch import RelGraphConv
 import torch
