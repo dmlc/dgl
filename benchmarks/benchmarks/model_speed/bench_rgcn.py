@@ -56,8 +56,8 @@ def _searchsorted(sorted_sequence, values, num_rels):
         return torch.from_numpy(np.searchsorted(sorted_sequence.numpy(), values.numpy())).to(device)
 
 @utils.benchmark('time', 3600)
-@utils.parametrize('data', ['aifb', 'am'])
-@utils.parametrize('lowmem', ['True', 'False'])
+@utils.parametrize('data', ['aifb'])
+@utils.parametrize('lowmem', [True, False])
 def track_time(data, lowmem):
     # args
     if data == 'aifb':
