@@ -166,6 +166,7 @@ target_include_directories(dgl PRIVATE "third_party/xbyak/")
 target_include_directories(dgl PRIVATE "tensoradapter/include")
 target_include_directories(dgl PRIVATE "featgraph/include")
 
+
 # For serialization
 if (USE_HDFS)
   option(DMLC_HDFS_SHARED "dgl has to build with dynamic hdfs library" ON)
@@ -248,6 +249,10 @@ if(BUILD_CPP_TEST)
   add_subdirectory(./third_party/googletest)
   enable_testing()
   include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
+  include_directories("include")
+  include_directories("third_party/dlpack/include")
+  include_directories("third_party/xbyak")
+  include_directories("third_party/dmlc-core/include")
   file(GLOB_RECURSE TEST_SRC_FILES ${PROJECT_SOURCE_DIR}/tests/cpp/*.cc)
   add_executable(runUnitTests ${TEST_SRC_FILES})
   target_link_libraries(runUnitTests gtest gtest_main)
