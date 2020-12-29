@@ -186,10 +186,10 @@ endif(NOT MSVC)
 
 # Compile TVM Runtime and Featgraph
 if(USE_TVM)
-  add_subdirectory("featgraph/")
-  list(APPEND DGL_LINKER_LIBS featgraph)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_TVM")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_TVM")
+  add_subdirectory("featgraph/")
+  list(APPEND DGL_LINKER_LIBS featgraph)
 endif(USE_TVM)
 
 # support PARALLEL_ALGORITHMS
