@@ -2,18 +2,20 @@
 
 FeatGraph is an efficient backend for Graph Neural Networks based on TVM.
 
-This folder contains the code for DGL to dynamically linking featgraph kernels compiled with TVM.
+- Original repo: https://github.com/amazon-research/FeatGraph
+- SC2020 Paper: https://www.csl.cornell.edu/~zhiruz/pdfs/featgraph-sc2020.pdf 
 
-Reference: [TVM Tutorial on Deploy TVM Module using C++ API](https://tvm.apache.org/docs/deploy/cpp_deploy.html).
+This folder contains the code for integrating featgraph kernels to DGL.
 
 ## Usage
 
-Export featgraph kernels as a module.
-```bash
-python pack_featgraph.py
-```
-
-Verify correctness:
+After building DGL with `USE_TVM=ON`, you should be able to run:
 ```bash
 python test.py
 ```
+to verify correctness.
+
+## Reference
+
+- [TVM Tutorial on Deploy TVM Module using C++ API](https://tvm.apache.org/docs/deploy/cpp_deploy.html).
+
