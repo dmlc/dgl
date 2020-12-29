@@ -43,7 +43,8 @@ Typically, the initialization APIs should be invoked in the following order:
 the servers (see the section of DistTensor and DistEmbedding for more details), these UDFs have to
 be declared before :func:`~dgl.distributed.initialize`.
 
-**Note**:
+**Note**: 如果训练脚本里包含需要在服务器(细节内容可以在下面的DistTensor和DistEmbedding章节里查看)上调用的用户定义函数(UDF)，
+这些UDF必须在 :func:`~dgl.distributed.initialize` 之前声明。
 
 Distributed graph
 
@@ -58,7 +59,7 @@ of :class:`~dgl.DGLGraph` APIs for data access.
 
 :class:`~dgl.distributed.DistGraph` 是一个Python类，用于访问计算机集群中的图结构和节点/边特征。每台计算机负责一个且只负责一个分区。
 它加载分区数据(包括分区中的图结构，节点数据和边数据)，并使集群中的所有训练器均可访问。
- :class:`~dgl.distributed.DistGraph` 提供了 :class:`~dgl.DGLGraph` API的一小部分以方便数据访问。
+:class:`~dgl.distributed.DistGraph` 提供了 :class:`~dgl.DGLGraph` API的一小部分以方便数据访问。
 
 **Note**: :class:`~dgl.distributed.DistGraph` currently only supports graphs of one node type and one edge type.
 
@@ -116,7 +117,7 @@ to provide the partition configuration file, which contains all information abou
 **Note**: In the current implementation, DGL only allows the creation of a single DistGraph object. The behavior
 of destroying a DistGraph and creating a new one is undefined.
 
-**Note**: 在当前实现中，DGL仅允许创建单个DistGraph对象。 销毁DistGraph并创建一个新DistGraph的行为没有被定义。
+**Note**: 在当前实现中，DGL仅允许创建单个DistGraph对象。销毁DistGraph并创建一个新DistGraph的行为没有被定义。
 
 Access graph structure
 
@@ -308,7 +309,7 @@ and link prediction tasks (e.g., :class:`~dgl.dataloading.pytorch.NodeDataloader
 :class:`~dgl.dataloading.pytorch.EdgeDataloader` ).
 
 DGL提供了两个级别的API，用于对节点和边进行采样以生成小批量(请参阅小批量培训部分)。
-底层API要求用户编写代码以明确定义如何对节点层进行采样(例如，使用  :func:`dgl.sampling.sample_neighbors` )。
+底层API要求用户编写代码以明确定义如何对节点层进行采样(例如，使用 :func:`dgl.sampling.sample_neighbors` )。
 上一层采样API为节点分类和Link Prediction任务实现了一些流行的采样算法（例如
 :class:`~dgl.dataloading.pytorch.NodeDataloader`
 和
@@ -356,7 +357,7 @@ difference is that users need to use :func:`dgl.distributed.sample_neighbors` an
 :class:`~dgl.distributed.DistDataLoader`.
 
 使用底层API时，采样代码类似于单进程采样。唯一的区别是用户需要使用
- :func:`dgl.distributed.sample_neighbors`
+:func:`dgl.distributed.sample_neighbors`
 和
 :class:`~dgl.distributed.DistDataLoader`。
 

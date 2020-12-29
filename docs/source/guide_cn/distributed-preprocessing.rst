@@ -17,7 +17,7 @@ in a format that is easy to load during the training.
 
 DGL要求预处理图数据以进行分布式训练，这包括两个步骤：1)将一张图划分为多张子图，2)为节点/边分配新的ID。
 DGL提供了一个API以执行这两个步骤。该API同时支持随机划分和一个基于
-`Metis <http://glaros.dtc.umn.edu/gkhome/views/metis>`__的划分。Metis划分的好处在于，
+`Metis <http://glaros.dtc.umn.edu/gkhome/views/metis>`__ 的划分。Metis划分的好处在于，
 它可以用最少的边分割生成划分，从而减少了用于分布式训练和推理的网络通信。DGL使用最新版本的Metis，
 并针对真实世界中具有幂律分布的图进行了优化。 在图划分后，API以易于在训练期间加载的格式构造划分结果。
 
@@ -110,4 +110,4 @@ The graph name will be used by :class:`dgl.distributed.DistGraph` to identify a 
 A legal graph name should only contain alphabetic characters and underscores.
 
 **Note**: 传给 :func:`dgl.distributed.partition_graph` 的图名称是一个重要的参数。
- :class:`dgl.distributed.DistGraph` 使用该名称来识别一个分布式的图。一个有效的图名称应该仅包含字母和下划线。
+:class:`dgl.distributed.DistGraph` 使用该名称来识别一个分布式的图。一个有效的图名称应该仅包含字母和下划线。
