@@ -336,7 +336,6 @@ def track_time(data):
 
         for i, sample_data in enumerate(loader):
             seeds, blocks = sample_data
-            t0 = time.time()
             feats = embed_layer(blocks[0].srcdata[dgl.NID],
                                 blocks[0].srcdata[dgl.NTYPE],
                                 blocks[0].srcdata['type_id'],
@@ -358,7 +357,6 @@ def track_time(data):
 
         for i, sample_data in enumerate(loader):
             seeds, blocks = sample_data
-            t0 = time.time()
             feats = embed_layer(blocks[0].srcdata[dgl.NID],
                                 blocks[0].srcdata[dgl.NTYPE],
                                 blocks[0].srcdata['type_id'],
