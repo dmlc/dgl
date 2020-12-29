@@ -354,4 +354,5 @@ def _searchsorted(sorted_sequence, values):
         return th.searchsorted(sorted_sequence, values)
     else:
         device = values.device
-        return th.from_numpy(np.searchsorted(sorted_sequence.numpy(), values.numpy())).to(device)
+        return th.from_numpy(np.searchsorted(sorted_sequence.cpu().numpy(),
+                                             values.cpu().numpy())).to(device)

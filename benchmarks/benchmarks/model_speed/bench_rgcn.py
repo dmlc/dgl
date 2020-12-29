@@ -54,7 +54,8 @@ def _searchsorted(sorted_sequence, values, num_rels):
         return torch.searchsorted(sorted_sequence, values)
     else:
         device = values.device
-        return torch.from_numpy(np.searchsorted(sorted_sequence.numpy(), values.numpy())).to(device)
+        return torch.from_numpy(np.searchsorted(sorted_sequence.cpu().numpy(),
+                                                values.cpu().numpy())).to(device)
 
 @utils.benchmark('time', 3600)
 @utils.parametrize('data', ['aifb'])
