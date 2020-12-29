@@ -28,6 +28,8 @@ def test_node_removal(idtype):
     g.remove_nodes(range(1, 4))
     assert g.number_of_nodes() == 7
     assert F.array_equal(g.ndata['id'], F.tensor([0, 7, 8, 9, 0, 0, 0]))
+    assert dgl.NID not in g.ndata
+    assert dgl.EID not in g.edata
 
 @parametrize_dtype
 def test_multigraph_node_removal(idtype):
@@ -111,6 +113,8 @@ def test_edge_removal(idtype):
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 11
     assert F.array_equal(g.edata['id'], F.tensor([0, 1, 10, 11, 12, 20, 21, 22, 23, 24, 0]))
+    assert dgl.NID not in g.ndata
+    assert dgl.EID not in g.edata
 
 @parametrize_dtype
 def test_node_and_edge_removal(idtype):

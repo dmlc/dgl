@@ -754,7 +754,7 @@ def relabel(x):
                                F.copy_to(F.arange(0, len(unique_x), dtype), ctx))
     return unique_x, old_to_new
 
-def extract_node_subframes(graph, nodes):
+def extract_node_subframes(graph, nodes, store_raw_ids=True):
     """Extract node features of the given nodes from :attr:`graph`
     and return them in frames.
 
@@ -769,8 +769,10 @@ def extract_node_subframes(graph, nodes):
         The graph to extract features from.
     nodes : list[Tensor] or None
         Node IDs. If not None, the list length must be equal to the number of node types
-        in the graph. The returned frames store the node IDs in the ``dgl.NID`` field
-        unless it is None, which means the whole frame is shallow-copied.
+        in the graph. If None, the whole frame is shallow-copied.
+    store_raw_ids : bool
+        If True, the returned frames will store :attr:`nodes` in the ``dgl.NID`` field
+        unless it is None.
 
     Returns
     -------
@@ -783,7 +785,8 @@ def extract_node_subframes(graph, nodes):
         node_frames = []
         for i, ind_nodes in enumerate(nodes):
             subf = graph._node_frames[i].subframe(ind_nodes)
-            subf[NID] = ind_nodes
+            if store_raw_ids:
+                subf[NID] = ind_nodes
             node_frames.append(subf)
     return node_frames
 
@@ -823,7 +826,7 @@ def extract_node_subframes_for_block(graph, srcnodes, dstnodes):
         node_frames.append(subf)
     return node_frames
 
-def extract_edge_subframes(graph, edges):
+def extract_edge_subframes(graph, edges, store_raw_ids=True):
     """Extract edge features of the given edges from :attr:`graph`
     and return them in frames.
 
@@ -838,8 +841,10 @@ def extract_edge_subframes(graph, edges):
         The graph to extract features from.
     edges : list[Tensor] or None
         Edge IDs. If not None, the list length must be equal to the number of edge types
-        in the graph. The returned frames store the edge IDs in the ``dgl.NID`` field
-        unless it is None, which means the whole frame is shallow-copied.
+        in the graph. If None, the whole frame is shallow-copied.
+    store_raw_ids : bool
+        If True, the returned frames will store :attr:`edges` in the ``dgl.EID`` field
+        unless it is None.
 
     Returns
     -------
@@ -852,7 +857,8 @@ def extract_edge_subframes(graph, edges):
         edge_frames = []
         for i, ind_edges in enumerate(edges):
             subf = graph._edge_frames[i].subframe(ind_edges)
-            subf[EID] = ind_edges
+            if store_raw_ids:
+                subf[EID] = ind_edges
             edge_frames.append(subf)
     return edge_frames
 
