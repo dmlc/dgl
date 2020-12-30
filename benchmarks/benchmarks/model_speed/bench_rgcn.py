@@ -58,7 +58,7 @@ def _searchsorted(sorted_sequence, values, num_rels):
                                                 values.cpu().numpy())).to(device)
 
 @utils.benchmark('time', 3600)
-@utils.parametrize('data', ['aifb', 'am'])
+@utils.parametrize('data', ['aifb'])
 @utils.parametrize('lowmem', [True, False])
 @utils.parametrize('sortgraph', [True, False])
 def track_time(data, lowmem, sortgraph):
