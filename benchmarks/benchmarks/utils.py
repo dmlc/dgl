@@ -1,4 +1,4 @@
-import os
+import os, pickle
 import shutil, zipfile
 import requests
 import inspect
@@ -6,6 +6,7 @@ import numpy as np
 import pandas
 import dgl
 import torch
+import torchtext
 
 def _download(url, path, filename):
     fn = os.path.join(path, filename)
@@ -124,8 +125,6 @@ def load_nowplaying_rs():
     item_ntype = dataset['item-type']
     user_to_item_etype = dataset['user-to-item-type']
     timestamp = dataset['timestamp-edge-column']
-
-    device = torch.device(args.device)
 
     # Assign user and movie IDs and use them as features (to learn an individual trainable
     # embedding for each entity)
