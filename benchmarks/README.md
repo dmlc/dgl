@@ -105,7 +105,7 @@ def track_time(l, u):
 Tips
 ----
 * Feed flags `-e --verbose` to `asv run` to print out stderr and more information. Use `--bench` flag
-  to run specific benchmarks.
+  to run specific benchmarks, e.g., `--bench bench_gat`.
 * When running benchmarks locally (e.g., with `--python=same`), ASV will not write results to disk
   so `asv publish` will not generate plots.
 * When running benchmarks in docker, ASV will pull the codes from remote and build them in conda
@@ -115,3 +115,4 @@ Tips
     - Commit your local changes and push it to remote `origin`.
     - Add the corresponding branch to `asv.conf.json`.
 * Try make your benchmarks compatible with all the versions being tested.
+* For ogbn dataset, put the dataset into /tmp/dataset/
