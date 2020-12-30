@@ -523,3 +523,12 @@ class record_grad(object):
 
 def no_grad():
     raise NotImplementedError
+
+def cross(x, y):
+    return jnp.cross(x, y)
+
+def norm(x, dim=-1, keepdims=False):
+    return jnp.linalg.norm(x, axis=dim, keepdim=keepdims)
+
+def arctan2(x, y):
+    return jnp.arctan2(x, y)

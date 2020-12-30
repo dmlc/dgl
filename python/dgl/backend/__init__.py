@@ -23,6 +23,7 @@ def load_backend(mod_name):
     mod = importlib.import_module('.%s' % mod_name, __name__)
     thismod = sys.modules[__name__]
     for api in backend.__dict__.keys():
+        print(api)
         if api.startswith('__'):
             # ignore python builtin attributes
             continue

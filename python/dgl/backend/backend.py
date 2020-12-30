@@ -1599,3 +1599,13 @@ class no_grad(object):
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         pass
+
+
+def cross(x, y):
+    pass
+
+def norm(x, dim=-1, keepdims=False):
+    pass
+
+def arctan2(x, y):
+    pass
