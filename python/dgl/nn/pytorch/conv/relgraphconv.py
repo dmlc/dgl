@@ -186,7 +186,7 @@ class RelGraphConv(nn.Module):
 
     def basis_message_func(self, edges, etypes):
         """Message function for basis regularizer.
-        
+
         Parameters
         ----------
         edges : dgl.EdgeBatch
@@ -229,7 +229,7 @@ class RelGraphConv(nn.Module):
             msg = []
             for etype in range(self.num_rels):
                 if h_t[etype].shape[0] == 0:
-                   continue
+                    continue
                 msg.append(th.matmul(h_t[etype], weight[etype]))
             msg = th.cat(msg)
         else:
