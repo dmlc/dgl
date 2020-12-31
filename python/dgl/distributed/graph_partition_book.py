@@ -422,10 +422,10 @@ class RangePartitionBook(GraphPartitionBook):
         partition id of current partition book
     num_parts : int
         number of total partitions
-    node_map : tensor
-        map global node id to partition id
-    edge_map : tensor
-        map global edge id to partition id
+    node_map : a dict of tensors
+        map global node id to partition id for each node type.
+    edge_map : a dict of tensors
+        map global edge id to partition id for each edge type.
     """
     def __init__(self, part_id, num_parts, node_map, edge_map):
         assert part_id >= 0, 'part_id cannot be a negative number.'
@@ -556,15 +556,17 @@ class RangePartitionBook(GraphPartitionBook):
         """Map per-node-type Ids to global node Ids in the homogeneous format.
         """
         partids = self.nid2partid(ids, ntype)
-        end_diff = self._typed_node_map[ntype][partids] - ids.numpy()
-        return self._typed_nid_range[ntype][:, 1][partids] - end_diff
+        end_diff = self._typed_node_map[ntype][partids] - F.asnumpy(ids)
+        # TODO(zhengda) make everything operate on Pytorch tensors.
+        return F.tensor(self._typed_nid_range[ntype][:, 1][partids] - end_diff)
 
     def map_to_homo_eid(self, ids, etype):
         """Map per-edge-type Ids to global edge Ids in the homoenegeous format.
         """
         partids = self.eid2partid(ids, etype)
-        end_diff = self._typed_edge_map[etype][partids] - ids.numpy()
-        return self._typed_eid_range[etype][:, 1][partids] - end_diff
+        end_diff = self._typed_edge_map[etype][partids] - F.asnumpy(ids)
+        # TODO(zhengda) make everything operate on Pytorch tensors.
+        return F.tensor(self._typed_eid_range[etype][:, 1][partids] - end_diff)
 
     def nid2partid(self, nids, ntype='_N'):
         """From global node IDs to partition IDs
