@@ -619,16 +619,6 @@ class DistGraph:
         '''
         return self._etype_map[etype]
 
-    def map_to_per_ntype(self, nids):
-        '''Map the node Ids to per-type Ids
-        '''
-        return self._gpb.map_to_per_ntype(nids)
-
-    def map_to_per_etype(self, eids):
-        '''Map the edge Ids to per-type Ids
-        '''
-        return self._gpb.map_to_per_etype(eids)
-
     def number_of_nodes(self, ntype='_N'):
         """Alias of :func:`num_nodes`"""
         return self.num_nodes(ntype)
