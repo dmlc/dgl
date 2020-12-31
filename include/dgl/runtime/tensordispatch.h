@@ -48,6 +48,8 @@ namespace runtime {
 
 /*!
  * \brief Dispatcher that delegates the function calls to framework-specific C++ APIs.
+ *
+ * This class is not thread-safe.
  */
 class TensorDispatcher {
  public:
@@ -62,6 +64,9 @@ class TensorDispatcher {
     return available_;
   }
 
+  /*! \brief Load symbols from the given tensor adapter library path */
+  void Load(const char *path_cstr);
+
   /*!
    * \brief Allocate an empty tensor.
    *
@@ -75,7 +80,7 @@ class TensorDispatcher {
 
  private:
   /*! \brief ctor */
-  TensorDispatcher();
+  TensorDispatcher() = default;
   /*! \brief dtor */
   ~TensorDispatcher();
 
@@ -110,5 +115,7 @@ class TensorDispatcher {
 
 };  // namespace runtime
 };  // namespace dgl
+
+#undef FUNCCAST
 
 #endif  // DGL_RUNTIME_TENSORDISPATCH_H_
