@@ -598,7 +598,7 @@ def to_homogeneous(G, ndata=None, edata=None, store_type=True, return_count=Fals
         If True, store type information as the ``dgl.NTYPE`` and ``dgl.ETYPE`` features
         in the returned graph.
     return_count : bool, optional
-        If True, return type information as an integer list; the i^th corresponds to
+        If True, return type information as an integer list; the i^th element corresponds to
         the number of nodes/edges of the i^th type.
 
     Returns
