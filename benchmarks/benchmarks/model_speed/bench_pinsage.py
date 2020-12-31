@@ -378,7 +378,7 @@ def track_time(data):
     num_workers = 0
     hidden_dims = 16
     lr = 3e-5
-    num_epochs = 30
+    num_epochs = 5
     batches_per_epoch = 20000
 
     g = dataset[0]
