@@ -202,11 +202,12 @@ def start_hetero_sample_client(rank, tmpdir, disable_shared_mem):
     try:
         nodes = {'n3': [0, 10, 99, 66, 1024, 2008]}
         sampled_graph = sample_neighbors(dist_graph, nodes, 3)
+        block = dgl.distributed.to_block(sampled_graph, nodes, dist_graph)
     except Exception as e:
         print(e)
-        sampled_graph = None
+        block = None
     dgl.distributed.exit_client()
-    return sampled_graph, gpb
+    return block, gpb
 
 def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
     ip_config = open("rpc_ip_config.txt", "w")
@@ -230,7 +231,7 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
         pserver_list.append(p)
 
     time.sleep(3)
-    sampled_graph, gpb = start_hetero_sample_client(0, tmpdir, num_server > 1)
+    block, gpb = start_hetero_sample_client(0, tmpdir, num_server > 1)
     print("Done sampling")
     for p in pserver_list:
         p.join()
@@ -242,9 +243,11 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
         orig_nid_map[part.ndata[dgl.NID]] = part.ndata['orig_id']
         orig_eid_map[part.edata[dgl.EID]] = part.edata['orig_id']
 
+    src, dst = block.edges()
     # These are global Ids after shuffling.
-    shuffled_src, shuffled_dst = sampled_graph.edges()
-    shuffled_eid = sampled_graph.edata[dgl.EID]
+    shuffled_src = block.srcdata[dgl.NID][src]
+    shuffled_dst = block.dstdata[dgl.NID][dst]
+    shuffled_eid = block.edata[dgl.EID]
     # Get node/edge types.
     etype, _ = gpb.map_to_per_etype(shuffled_eid)
     src_type, _ = gpb.map_to_per_ntype(shuffled_src)
@@ -259,7 +262,6 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
 
     etype_map = {g.get_etype_id(etype):etype for etype in g.etypes}
     etype_to_eptype = {g.get_etype_id(etype):(src_ntype, dst_ntype) for src_ntype, etype, dst_ntype in g.canonical_etypes}
-    assert sampled_graph.number_of_nodes() == g.number_of_nodes()
     for e in np.unique(etype):
         src_t = src_type[etype == e]
         dst_t = dst_type[etype == e]
