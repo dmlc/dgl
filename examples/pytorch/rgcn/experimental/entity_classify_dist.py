@@ -298,19 +298,12 @@ class NeighborSampler:
         seeds = th.LongTensor(np.asarray(seeds))
         cur = seeds
         for fanout in self.fanouts:
-            frontier = self.sample_neighbors(self.g, cur, fanout, replace=False)
-            block = dgl.to_block(frontier, cur)
+            frontier = self.sample_neighbors(self.g, {'paper': cur}, fanout, replace=False)
+            block = dgl.distributed.to_block(frontier, {'paper': cur}, dist_graph=self.g)
             cur = block.srcdata[dgl.NID]
 
-            # These are (homogeneous) edge Ids when all edges are identified with Ids in one Id space.
-            g_eid = frontier.edata[dgl.EID][block.edata[dgl.EID]]
-            # Map the homogeneous edge Ids to their edge type.
-            block.edata[dgl.ETYPE] = self.g.map_to_per_etype(g_eid)[0]
-            # Map the homogeneous node Ids to their node types and per-type Ids.
-            block.srcdata[dgl.NTYPE], block.srcdata[dgl.NID] = self.g.map_to_per_ntype(block.srcdata[dgl.NID])
-            block.dstdata[dgl.NTYPE], block.dstdata[dgl.NID] = self.g.map_to_per_ntype(block.dstdata[dgl.NID])
+            block.edata[dgl.EID] = frontier.edata[dgl.EID]
             blocks.insert(0, block)
-        seeds = self.g.map_to_per_ntype(seeds)[1]
         return seeds, blocks
 
 def run(args, device, data):
@@ -322,7 +315,7 @@ def run(args, device, data):
     sampler = NeighborSampler(g, fanouts, dgl.distributed.sample_neighbors)
     # Create DataLoader for constructing blocks
     dataloader = DistDataLoader(
-        dataset=g._gpb.map_to_homo_nid(train_nid, 'paper'),
+        dataset=train_nid,
         batch_size=args.batch_size,
         collate_fn=sampler.sample_blocks,
         shuffle=True,
@@ -331,7 +324,7 @@ def run(args, device, data):
     valid_sampler = NeighborSampler(g, val_fanouts, dgl.distributed.sample_neighbors)
     # Create DataLoader for constructing blocks
     valid_dataloader = DistDataLoader(
-        dataset=g._gpb.map_to_homo_nid(val_nid, 'paper'),
+        dataset=val_nid,
         batch_size=args.batch_size,
         collate_fn=valid_sampler.sample_blocks,
         shuffle=False,
@@ -340,7 +333,7 @@ def run(args, device, data):
     test_sampler = NeighborSampler(g, [-1] * args.n_layers, dgl.distributed.sample_neighbors)
     # Create DataLoader for constructing blocks
     test_dataloader = DistDataLoader(
-        dataset=g._gpb.map_to_homo_nid(test_nid, 'paper'),
+        dataset=test_nid,
         batch_size=args.batch_size,
         collate_fn=test_sampler.sample_blocks,
         shuffle=False,
