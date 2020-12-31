@@ -244,7 +244,8 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
     sampled_graph = merge_graphs(res_list, g.number_of_nodes())
     return sampled_graph
 
-def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
+def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
+                     output_format='homogeneous'):
     """Sample from the neighbors of the given nodes from a distributed graph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -286,22 +287,51 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
 
         For sampling without replacement, if fanout > the number of neighbors, all the
         neighbors are sampled. If fanout == -1, all neighbors are collected.
+    output_format : str, optional
+        The format of the sampled subgraph. A user can specify the output subgraph to be
+        stored in a homogeneous graph format or in a heterogeneous graph format. The valid
+        values are "homogeneous" and "heterogeneous". This argument is only valid if
+        the input graph is heterogeneous.
 
     Returns
     -------
     DGLGraph
         A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
     """
+    gpb = g.get_partition_book()
     if isinstance(nodes, dict):
-        assert len(nodes) == 1, 'The distributed sampler only supports one node type for now.'
-        nodes = list(nodes.values())[0]
+        homo_nids = []
+        for ntype in nodes:
+            assert ntype in g.ntypes, 'The sampled node type does not exist in the input graph'
+            if F.is_tensor(nodes[ntype]):
+                typed_nodes = nodes[ntype]
+            else:
+                typed_nodes = toindex(nodes[ntype]).tousertensor()
+            homo_nids.append(gpb.map_to_homo_nid(typed_nodes, ntype))
+        nodes = F.cat(homo_nids, 0)
+    else:
+        len(g.ntypes) == 1, 'An input heterogeneous graph requires the input nodes to be a dict.'
     def issue_remote_req(node_ids):
         return SamplingRequest(node_ids, fanout, edge_dir=edge_dir,
                                prob=prob, replace=replace)
     def local_access(local_g, partition_book, local_nids):
         return _sample_neighbors(local_g, partition_book, local_nids,
                                  fanout, edge_dir, prob, replace)
-    return _distributed_access(g, nodes, issue_remote_req, local_access)
+    subg = _distributed_access(g, nodes, issue_remote_req, local_access)
+    if output_format == "heterogeneous" and len(g.etypes) > 1:
+        src, dst = subg.edges()
+        src_per_type_id, _ = gpb.map_to_per_ntype(src)
+        dst_per_type_id, _ = gpb.map_to_per_ntype(dst)
+        eid_per_type_id, eid_type = gpb.map_to_per_etype(subg.edata[dgl.EID])
+        subg_edges = {}
+        for etype in g.canonical_etypes:
+            etype_id = g.get_etype_id(etype[1])
+            edge_idx = eid_type == etype_id
+            subg_edges[etype] = (src_per_type_id[edge_idx], dst_per_type_id[edge_idx],
+                                 eid_per_type_id[edge_idx])
+        num_nodes = {ntype:g.number_of_nodes(ntype) for ntype in g.ntypes}
+        subg = heterograph(subg_edges, num_nodes_dict=num_nodes)
+    return subg
 
 def _distributed_edge_access(g, edges, issue_remote_req, local_access):
     """A routine that fetches local edges from distributed graph.
