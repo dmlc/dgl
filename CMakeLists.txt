@@ -185,8 +185,9 @@ if(NOT MSVC)
 endif(NOT MSVC)
 
 # Compile TVM Runtime and Featgraph
-# NOTE(zihao): we only load the featgrap_runtime library at compile time,
-# the kernel library was loaded at runtime.
+# (NOTE) We compile a dynamic library called featgraph_runtime, which the DGL library links to.
+# Kernels are packed in a separate dynamic library called featgraph_kernels, which DGL
+# will load during runtime.
 if(USE_TVM)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_TVM")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_TVM")

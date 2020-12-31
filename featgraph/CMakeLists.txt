@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(featgraph_runtime C CXX)
+project(featgraph C CXX)
 message(STATUS "Start configuring project ${PROJECT_NAME}")
 
 # Find CUDA
@@ -11,6 +11,7 @@ message(STATUS "${CUDA_INCLUDE_DIRS}")
 add_custom_target(
   featgraph_kernel
   COMMAND python ${CMAKE_CURRENT_SOURCE_DIR}/pack_featgraph.py
+  COMMENT "Creating featgraph kernels..."
 )
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -O2 -fPIC")
