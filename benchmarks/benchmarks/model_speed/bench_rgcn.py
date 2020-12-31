@@ -38,30 +38,11 @@ class RGCN(nn.Module):
             h = layer(g, h, r, norm)
         return h
 
-def sort_graph(g, etypes, num_rels):
-    # Sort the graph based on the etypes
-    sorted_etypes, index = torch.sort(etypes)
-    g = dgl.edge_subgraph(g, index, preserve_nodes=True)
-    # Create a new etypes to be an integer list of number of edges.
-    pos = _searchsorted(sorted_etypes, torch.arange(num_rels, device=g.device), num_rels)
-    num = torch.tensor([len(etypes)], device=g.device)
-    etypes = (torch.cat([pos[1:], num]) - pos).tolist()
-    return g, etypes
-
-def _searchsorted(sorted_sequence, values, num_rels):
-    # searchsorted is introduced to PyTorch in 1.6.0
-    if getattr(torch, 'searchsorted', None):
-        return torch.searchsorted(sorted_sequence, values)
-    else:
-        device = values.device
-        return torch.from_numpy(np.searchsorted(sorted_sequence.cpu().numpy(),
-                                                values.cpu().numpy())).to(device)
-
 @utils.benchmark('time', 3600)
 @utils.parametrize('data', ['aifb'])
 @utils.parametrize('lowmem', [True, False])
-@utils.parametrize('sortgraph', [True, False])
-def track_time(data, lowmem, sortgraph):
+@utils.parametrize('use_type_count', [True, False])
+def track_time(data, lowmem, use_type_count):
     # args
     if data == 'aifb':
         num_bases = -1
@@ -100,14 +81,14 @@ def track_time(data, lowmem, sortgraph):
         if ntype == category:
             category_id = i
 
-    g = dgl.to_homogeneous(g, edata=['norm']).to(device)
+    if use_type_count:
+        g, _, edge_type = dgl.to_homogeneous(g, edata=['norm'], return_count=True)
+        g = g.to(device)
+    else:
+        g = dgl.to_homogeneous(g, edata=['norm']).to(device)
+        edge_type = g.edata.pop(dgl.ETYPE).long()
+
     num_nodes = g.number_of_nodes()
-    edge_type = g.edata[dgl.ETYPE].long()
-
-    if sortgraph:
-        # sort graph 
-        g, edge_type = sort_graph(g, edge_type, num_rels)
-
     edge_norm = g.edata['norm']
 
     # find out the target node ids in g
