@@ -11,7 +11,7 @@ from ..utils import toindex
 from ..transform import to_block as local_to_block
 from .. import backend as F
 
-__all__ = ['sample_neighbors', 'in_subgraph', 'find_edges', 'to_block']
+__all__ = ['sample_neighbors', 'in_subgraph', 'find_edges']
 
 SAMPLING_SERVICE_ID = 6657
 INSUBGRAPH_SERVICE_ID = 6658
@@ -461,55 +461,6 @@ def in_subgraph(g, nodes):
     def local_access(local_g, partition_book, local_nids):
         return _in_subgraph(local_g, partition_book, local_nids)
     return _distributed_access(g, nodes, issue_remote_req, local_access)
-
-def to_block(g, dst_nodes=None, dist_graph=None, include_dst_in_src=True):
-    """Convert a graph into a bipartite-structured *block* for message passing.
-
-    This is designed for distributed training. When the graph is heterogeneuos,
-    a user has to specify the `dist_graph` argument.
-
-    Parameters
-    ----------
-    graph : DGLGraph
-        The graph.  Must be on CPU.
-    dst_nodes : Tensor or dict[str, Tensor], optional
-        The list of output nodes.
-
-        If a tensor is given, the graph must have only one node type.
-
-        If given, it must be a superset of all the nodes that have at least one inbound
-        edge.  An error will be raised otherwise.
-    include_dst_in_src : bool
-        If False, do not include output nodes in input nodes.
-
-        (Default: True)
-
-    Returns
-    -------
-    DGLBlock
-        The new graph describing the block.
-
-        The node IDs induced for each type in both sides would be stored in feature
-        ``dgl.NID``.
-
-        The edge IDs induced for each type would be stored in feature ``dgl.EID``.
-
-    Raises
-    ------
-    DGLError
-        If :attr:`dst_nodes` is specified but it is not a superset of all the nodes that
-        have at least one inbound edge.
-    """
-    block = local_to_block(g, dst_nodes, include_dst_in_src)
-    if isinstance(dst_nodes, dict):
-        assert dist_graph is not None
-        gpb = dist_graph.get_partition_book()
-        # Map the homogeneous edge Ids to their edge type.
-        block.edata[ETYPE], block.edata[EID] = gpb.map_to_per_etype(block.edata[EID])
-        # Map the homogeneous node Ids to their node types and per-type Ids.
-        block.srcdata[NTYPE], block.srcdata[NID] = gpb.map_to_per_ntype(block.srcdata[NID])
-        block.dstdata[NTYPE], block.dstdata[NID] = gpb.map_to_per_ntype(block.dstdata[NID])
-    return block
 
 register_service(SAMPLING_SERVICE_ID, SamplingRequest, SubgraphResponse)
 register_service(EDGES_SERVICE_ID, EdgesRequest, FindEdgeResponse)

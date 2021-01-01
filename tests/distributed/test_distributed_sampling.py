@@ -202,7 +202,9 @@ def start_hetero_sample_client(rank, tmpdir, disable_shared_mem):
     try:
         nodes = {'n3': [0, 10, 99, 66, 1024, 2008]}
         sampled_graph = sample_neighbors(dist_graph, nodes, 3)
-        block = dgl.distributed.to_block(sampled_graph, nodes, dist_graph)
+        nodes = gpb.map_to_homo_nid(nodes['n3'], 'n3')
+        block = dgl.to_block(sampled_graph, nodes)
+        block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
     except Exception as e:
         print(e)
         block = None
