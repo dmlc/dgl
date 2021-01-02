@@ -549,3 +549,6 @@ def norm(x, dim=-1, keepdims=False):
 
 def arctan2(x, y):
     return th.atan2(x, y)
+
+def cos(x):
+    return th.cos(x)

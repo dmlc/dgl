@@ -528,7 +528,10 @@ def cross(x, y):
     return jnp.cross(x, y)
 
 def norm(x, dim=-1, keepdims=False):
-    return jnp.linalg.norm(x, axis=dim, keepdim=keepdims)
+    return jnp.linalg.norm(x, axis=dim, keepdims=keepdims)
 
 def arctan2(x, y):
     return jnp.arctan2(x, y)
+
+def cos(x):
+    return jnp.cos(2)

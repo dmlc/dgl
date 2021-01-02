@@ -1609,3 +1609,6 @@ def norm(x, dim=-1, keepdims=False):
 
 def arctan2(x, y):
     pass
+
+def cos(x):
+    pass
