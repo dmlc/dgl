@@ -5,7 +5,7 @@
 
 :ref:`(English Version) <guide-distributed-apis>`
 
-本节介绍了在训练脚本中使用的分布式计算API。DGL提供了三种分布式数据结构和多种API，用于初始化、分布式采样和工作负载拆分。
+本节介绍了在训练脚本中使用的分布式计算API。DGL提供了三种分布式数据结构和多种API，用于初始化、分布式采样和数据分割。
 对于分布式训练/推断，DGL提供了三种分布式数据结构：用于分布式图的 :class:`~dgl.distributed.DistGraph`、
 用于分布式张量的 :class:`~dgl.distributed.DistTensor` 和用于分布式可学习嵌入的
 :class:`~dgl.distributed.DistEmbedding`。
@@ -70,7 +70,7 @@ DGL分布式模块的初始化
 ^^^^^^^^^^^^^^^^^^^^^^
 
 :class:`~dgl.distributed.DistGraph` 提供了几个API来访问图结构。当前，它们主要被用来提供图信息，例如节点和边的数量。
-DistGraph的主要应用场景是运行采样API以支持小批量训练（请参阅下文里分布式图采样部分）。
+主要应用场景是运行采样API以支持小批量训练(请参阅下文里分布式图采样部分)。
 
 .. code:: python
 
@@ -79,9 +79,9 @@ DistGraph的主要应用场景是运行采样API以支持小批量训练（请�
 访问节点/边数据
 ^^^^^^^^^^^^^^^^^^^^^
 
-与 :class:`~dgl.DGLGraph`一样， :class:`~dgl.distributed.DistGraph` 提供
+与 :class:`~dgl.DGLGraph` 一样， :class:`~dgl.distributed.DistGraph` 也提供了
 ``ndata`` 和 ``edata`` 来访问节点和边中的数据。它们的区别在于
-:class:`~dgl.distributed.DistGraph` 中的 ``ndata`` / ``edata`` 返回 :class:`~dgl.distributed.DistTensor`，
+:class:`~dgl.distributed.DistGraph` 中的 ``ndata`` / ``edata`` 返回的是 :class:`~dgl.distributed.DistTensor`，
 而不是底层框架里的张量。用户还可以将新的 :class:`~dgl.distributed.DistTensor` 分配给
 :class:`~dgl.distributed.DistGraph` 作为节点数据或边数据。
 
@@ -95,9 +95,9 @@ DistGraph的主要应用场景是运行采样API以支持小批量训练（请�
 分布式张量
 ~~~~~~~~~~~~~~~~~
 
-如前所述，在分布式模式下，DGL会划分节点/边特征，并将它们存储在计算机集群中。
-DGL为分布式张量提供了类似于张量的接口，以访问群集中的分区节点/边特征。
-在分布式设置中，DGL仅支持密集节点/边特征。
+如前所述，在分布式模式下，DGL会划分节点和边特征，并将它们存储在计算机集群中。
+DGL为分布式张量提供了类似于张量的接口，以访问群集中的分区节点和边特征。
+在分布式设置中，DGL仅支持密集节点和边特征。
 
 :class:`~dgl.distributed.DistTensor` 管理在多个计算机中被划分和存储的密集张量。
 目前，分布式张量必须与图的节点或边相关联。换句话说，DistTensor中的行数必须与图中的节点数或边数相同。
@@ -119,12 +119,12 @@ DGL为分布式张量提供了类似于张量的接口，以访问群集中的�
 
     g.ndata['feat'] = tensor
 
-**Note**: 节点数据名称和张量名称不必相同。 前者在 :class:`~dgl.distributed.DistGraph` 中标识节点数据(在训练器进程中)，
+**Note**: 节点数据名称和张量名称不必相同。前者在 :class:`~dgl.distributed.DistGraph` 中标识节点数据(在训练器进程中)，
 而后者则标识DGL服务器中的分布式张量。
 
 :class:`~dgl.distributed.DistTensor` 提供了一些功能。它具有与常规张量相同的API，用于访问其元数据，
 例如形状和数据类型。:class:`~dgl.distributed.DistTensor` 支持索引读取和写入，
-但不支持一些计算运算符，例如求总和以及求均值。
+但不支持一些计算运算符，例如求和以及求均值。
 
 .. code:: python
 
@@ -157,7 +157,7 @@ DGL提供 :class:`~dgl.distributed.DistEmbedding` 以支持需要节点嵌入的
 因为嵌入是模型的一部分，所以用户必须将其附加到优化器上以进行小批量训练。当前，
 DGL提供了一个稀疏的Adagrad优化器 :class:`~dgl.distributed.SparseAdagrad` (DGL以后将为稀疏嵌入添加更多的优化器)。
 用户需要从模型中收集所有分布式嵌入，并将它们传递给稀疏优化器。如果模型同时具有节点嵌入和规则的密集模型参数，
-并且用户希望对嵌入执行稀疏更新，则他们需要创建两个优化器，一个用于节点嵌入，另一个用于密集模型参数，如以下代码所示：
+并且用户希望对嵌入执行稀疏更新，则需要创建两个优化器，一个用于节点嵌入，另一个用于密集模型参数，如以下代码所示：
 
 .. code:: python
 
@@ -174,14 +174,14 @@ DGL提供了一个稀疏的Adagrad优化器 :class:`~dgl.distributed.SparseAdagr
 分布式采样
 ~~~~~~~~~~~~~~~~~~~~
 
-DGL提供了两个级别的API，用于对节点和边进行采样以生成小批量(请参阅小批量训练的章节)。
+DGL提供了两个级别的API，用于对节点和边进行采样以生成小批次(请参阅小批次训练的章节)。
 底层API要求用户编写代码以明确定义如何对节点层进行采样(例如，使用 :func:`dgl.sampling.sample_neighbors` )。
-上一层采样API为节点分类和链接预测任务实现了一些流行的采样算法（例如
+高层采样API为节点分类和链接预测任务实现了一些流行的采样算法（例如
 :class:`~dgl.dataloading.pytorch.NodeDataloader`
 和
 :class:`~dgl.dataloading.pytorch.EdgeDataloader` )。
 
-分布式采样模块采用相同的设计，并提供两个级别的采样API。对于底层的采样API，它为
+分布式采样模块遵循相同的设计，也提供两个级别的采样API。对于底层的采样API，它为
 :class:`~dgl.distributed.DistGraph` 上的分布式邻居采样提供了
 :func:`~dgl.distributed.sample_neighbors`。另外，DGL提供了用于分布式采样的分布式数据加载器(
 :class:`~dgl.distributed.DistDataLoader`)。除了用户在创建数据加载器时无法指定工作进程的数量，
@@ -190,14 +190,6 @@ DGL提供了两个级别的API，用于对节点和边进行采样以生成小�
 **Note**: 在 :class:`~dgl.distributed.DistGraph` 上运行 :func:`dgl.distributed.sample_neighbors` 时，
 采样器无法在具有多个工作进程的PyTorch Dataloader中运行。主要原因是PyTorch Dataloader在每个训练周期都会创建新的采样工作进程，
 从而导致多次创建和删除 :class:`~dgl.distributed.DistGraph` 对象。
-
-:class:`~dgl.DGLGraph` 和 :class:`~dgl.distributed.DistGraph` 都可以使用相同的高级采样API(
-:class:`~dgl.dataloading.pytorch.NodeDataloader`
-和
-:class:`~dgl.dataloading.pytorch.EdgeDataloader`)。使用
-:class:`~dgl.dataloading.pytorch.NodeDataloader`
-和
-:class:`~dgl.dataloading.pytorch.EdgeDataloader` 时，分布式采样代码与单进程采样完全相同。
 
 使用底层API时，采样代码类似于单进程采样。唯一的区别是用户需要使用
 :func:`dgl.distributed.sample_neighbors`
@@ -222,7 +214,13 @@ DGL提供了两个级别的API，用于对节点和边进行采样以生成小�
         for batch in dataloader:
             ...
 
-使用高级API时，分布式采样代码与单机采样相同：
+:class:`~dgl.DGLGraph` 和 :class:`~dgl.distributed.DistGraph` 都可以使用相同的高级采样API(
+:class:`~dgl.dataloading.pytorch.NodeDataloader`
+和
+:class:`~dgl.dataloading.pytorch.EdgeDataloader`)。使用
+:class:`~dgl.dataloading.pytorch.NodeDataloader`
+和
+:class:`~dgl.dataloading.pytorch.EdgeDataloader` 时，分布式采样代码与单进程采样完全相同。
 
 .. code:: python
 
@@ -244,8 +242,8 @@ DGL提供了两个级别的API，用于对节点和边进行采样以生成小�
 
 DGL提供了 :func:`~dgl.distributed.node_split` 和 :func:`~dgl.distributed.edge_split`
 函数来在运行时拆分训练、验证和测试集，以进行分布式训练。这两个函数将布尔数组作为输入，对其进行拆分，并向本地训练器返回一部分。
-默认情况下，它们确保所有部分都具有相同数量的节点/边。这对于同步SGD非常重要，
-因为同步SGD会假定每个训练器具有相同数量的小批量。
+默认情况下，它们确保所有部分都具有相同数量的节点和边。这对于同步SGD非常重要，
+因为同步SGD会假定每个训练器具有相同数量的小批次。
 
 下面的示例演示了训练集拆分，并向本地进程返回节点的子集。
 
