@@ -131,3 +131,19 @@
      - 胡骏
      - 胡骏
      - https://github.com/CrawlScript
+   * - :ref:`guide_cn-distributed`
+     - 宋怡然
+     - 宋怡然/Yiran Song
+     - https://github.com/rr-Yiran
+   * - :ref:`guide_cn-distributed-preprocessing`
+     - 宋怡然
+     - 宋怡然/Yiran Song
+     - https://github.com/rr-Yiran
+   * - :ref:`guide_cn-distributed-apis`
+     - 李庆标
+     - 李庆标/Qingbiao Liq
+     - https://github.com/QingbiaoLi
+   * - :ref:`guide_cn-distributed-tools`
+     - 李庆标
+     - 李庆标/Qingbiao Liq
+     - https://github.com/QingbiaoLi
