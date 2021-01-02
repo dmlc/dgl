@@ -113,7 +113,7 @@ install the Python binding for DGL.
 
    mkdir build
    cd build
-   cmake -DUSE_OPENMP=off ..
+   cmake -DUSE_OPENMP=off -DCMAKE_C_FLAGS='-DXBYAK_DONT_USE_MAP_JIT' -DCMAKE_CXX_FLAGS='-DXBYAK_DONT_USE_MAP_JIT' ..
    make -j4
    cd ../python
    python setup.py install
