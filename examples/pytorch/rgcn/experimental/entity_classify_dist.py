@@ -296,13 +296,19 @@ class NeighborSampler:
         norms = []
         ntypes = []
         seeds = th.LongTensor(np.asarray(seeds))
-        cur = seeds
+        gpb = self.g.get_partition_book()
+        cur = gpb.map_to_homo_nid(seeds, 'paper')
         for fanout in self.fanouts:
-            frontier = self.sample_neighbors(self.g, {'paper': cur}, fanout, replace=False)
-            block = dgl.distributed.to_block(frontier, {'paper': cur}, dist_graph=self.g)
+            frontier = self.sample_neighbors(self.g, cur, fanout, replace=False)
+            block = dgl.to_block(frontier, cur)
             cur = block.srcdata[dgl.NID]
 
             block.edata[dgl.EID] = frontier.edata[dgl.EID]
+            # Map the homogeneous edge Ids to their edge type.
+            block.edata[dgl.ETYPE], block.edata[dgl.EID] = gpb.map_to_per_etype(block.edata[dgl.EID])
+            # Map the homogeneous node Ids to their node types and per-type Ids.
+            block.srcdata[dgl.NTYPE], block.srcdata[dgl.NID] = gpb.map_to_per_ntype(block.srcdata[dgl.NID])
+            block.dstdata[dgl.NTYPE], block.dstdata[dgl.NID] = gpb.map_to_per_ntype(block.dstdata[dgl.NID])
             blocks.insert(0, block)
         return seeds, blocks
 
