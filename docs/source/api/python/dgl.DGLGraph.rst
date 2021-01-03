@@ -35,6 +35,8 @@ when the graph is heterogeneous.
     DGLGraph.metagraph
     DGLGraph.to_canonical_etype
 
+.. _apigraph-querying-graph-structure:
+
 Querying graph structure
 ------------------------
 
