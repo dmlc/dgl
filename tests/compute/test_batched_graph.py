@@ -206,56 +206,83 @@ def test_batch_no_edge(idtype):
     g3.add_nodes(1)  # no edges
     g = dgl.batch([g1, g3, g2]) # should not throw an error
 
+def _get_subgraph_batch_info(keys, induced_indices_arr, batch_num_objs):
+    """Internal function to compute batch information for subgraphs.
+    Parameters
+    ----------
+    keys : List[str]
+        The node/edge type keys.
+    induced_indices_arr : List[Tensor]
+        The induced node/edge index tensor for all node/edge types.
+    batch_num_objs : Tensor
+        Number of nodes/edges for each graph in the original batch.
+    Returns
+    -------
+    Mapping[str, Tensor]
+        A dictionary mapping all node/edge type keys to the ``batch_num_objs``
+        array of corresponding graph.
+    """
+    bucket_offset = F.unsqueeze(F.cumsum(batch_num_objs, 0), -1)  # (num_bkts, 1)
+    ret = {}
+    for key, induced_indices in zip(keys, induced_indices_arr):
+        # NOTE(Zihao): this implementation is not efficient and we can replace it with
+        # binary search in the future.
+        induced_indices = F.unsqueeze(induced_indices, 0)  # (1, num_nodes)
+        new_offset = F.sum((induced_indices < bucket_offset), 1)  # (num_bkts,)
+        # start_offset = [0] + [new_offset[i-1] for i in range(1, n_bkts)]
+        start_offset = F.cat([
+            F.zeros((1,), F.dtype(bucket_offset), F.context(bucket_offset)),
+            new_offset[:-1]
+        ], 0)
+        new_batch_num_objs = new_offset - start_offset
+        ret[key] = new_batch_num_objs
+    return ret
+
 @parametrize_dtype
-def test_sub_batch_graph(idtype):
+def test_set_batch_info(idtype):
     ctx = F.ctx()
-    g1 = dgl.rand_graph(15, 30).astype(idtype).to(ctx)
-    g2 = dgl.rand_graph(14, 31).astype(idtype).to(ctx)
-    g3 = dgl.rand_graph(13, 32).astype(idtype).to(ctx)
-    g4 = dgl.rand_graph(10, 32).astype(idtype).to(ctx)
-    bg = dgl.batch([g1, g2, g3, g4])
 
-    # test node subgraph
-    indices1 = F.tensor([3, 4, 5, 6, 7], dtype=idtype)
-    indices2 = F.tensor([2, 4, 6, 8], dtype=idtype)
-    indices3 = F.tensor([0, 3, 6, 9], dtype=idtype)
-    indices4 = F.tensor([0, 4, 8], dtype=idtype)
-    indices = F.cat([indices1, indices2 + 15, indices3 + 29, indices4 + 42], 0)
-    subg1 = g1.subgraph(indices1)
-    subg2 = g2.subgraph(indices2)
-    subg3 = g3.subgraph(indices3)
-    subg4 = g4.subgraph(indices4)
-    subg = bg.subgraph(indices)
-    batch_num_nodes = F.cat([_g.batch_num_nodes() for _g in [subg1, subg2, subg3, subg4]], 0)
-    batch_num_edges = F.cat([_g.batch_num_edges() for _g in [subg1, subg2, subg3, subg4]], 0)
-    assert F.allclose(batch_num_nodes, subg.batch_num_nodes())
-    assert F.allclose(batch_num_edges, subg.batch_num_edges())
+    # test homogeneous node subgraph
+    g1 = dgl.rand_graph(30, 100).astype(idtype).to(F.ctx())
+    g2 = dgl.rand_graph(40, 200).astype(idtype).to(F.ctx())
+    bg = dgl.batch([g1, g2])
+    sg_n = dgl.node_subgraph(bg, list(range(10, 20)) + list(range(50, 60)))
+    induced_nodes = sg_n.ndata['_ID']
+    induced_edges = sg_n.edata['_ID']
+    new_batch_num_nodes = _get_subgraph_batch_info(bg.ntypes, [induced_nodes], bg.batch_num_nodes())
+    new_batch_num_edges = _get_subgraph_batch_info(bg.canonical_etypes, [induced_edges], bg.batch_num_edges())
+    sg_n.set_batch_num_nodes(new_batch_num_nodes)
+    sg_n.set_batch_num_edges(new_batch_num_edges)
+    subg_n1, subg_n2 = dgl.unbatch(sg_n)
+    subg1 = dgl.node_subgraph(g1, list(range(10, 20)))
+    subg2 = dgl.node_subgraph(g2, list(range(20, 30)))
+    assert subg_n1.num_edges() == subg1.num_edges()
+    assert subg_n2.num_edges() == subg2.num_edges()
 
-    # test edge subgraph
-    """
-    indices1 = F.arange(10, 20, idtype)
-    indices2 = F.arange(10, 20, idtype)
-    indices3 = F.arange(10, 20, idtype)
-    indices4 = F.arange(10, 20, idtype)
-    indices = F.cat([indices1, indices2 + 30, indices3 + , indices4 + 42], 0)
-    subg1 = g1.subgraph(indices1)
-    subg2 = g2.subgraph(indices2)
-    subg3 = g3.subgraph(indices3)
-    subg4 = g4.subgraph(indices4)
-    subg = bg.subgraph(indices)
-    batch_num_nodes = F.cat([_g.batch_num_nodes() for _g in [subg1, subg2, subg3, subg4]], 0)
-    batch_num_edges = F.cat([_g.batch_num_edges() for _g in [subg1, subg2, subg3, subg4]], 0)
-    assert F.allclose(batch_num_nodes, subg.batch_num_nodes())
-    assert F.allclose(batch_num_edges, subg.batch_num_edges())
-    """
+    # test homogeneous edge subgraph
+    sg_e = dgl.edge_subgraph(bg, list(range(40, 70)) + list(range(150, 200)), preserve_nodes=True)
+    induced_nodes = sg_e.ndata['_ID']
+    induced_edges = sg_e.edata['_ID']
+    new_batch_num_nodes = _get_subgraph_batch_info(bg.ntypes, [induced_nodes], bg.batch_num_nodes())
+    new_batch_num_edges = _get_subgraph_batch_info(bg.canonical_etypes, [induced_edges], bg.batch_num_edges())
+    sg_e.set_batch_num_nodes(new_batch_num_nodes)
+    sg_e.set_batch_num_edges(new_batch_num_edges)
+    subg_e1, subg_e2 = dgl.unbatch(sg_e)
+    subg1 = dgl.edge_subgraph(g1, list(range(40, 70)), preserve_nodes=True)
+    subg2 = dgl.edge_subgraph(g2, list(range(50, 100)), preserve_nodes=True)
+    assert subg_e1.num_nodes() == subg1.num_nodes()
+    assert subg_e2.num_nodes() == subg2.num_nodes()
+
 
 if __name__ == '__main__':
-    test_batch_unbatch()
-    test_batch_unbatch1()
-    test_batch_unbatch_frame()
+    #test_batch_unbatch()
+    #test_batch_unbatch1()
+    #test_batch_unbatch_frame()
     #test_batch_unbatch2()
     #test_batched_edge_ordering()
     #test_batch_send_then_recv()
     #test_batch_send_and_recv()
     #test_batch_propagate()
     #test_batch_no_edge()
+    test_set_batch_info(F.int32)
+    

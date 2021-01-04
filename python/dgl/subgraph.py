@@ -114,11 +114,6 @@ def node_subgraph(graph, nodes):
           num_edges={('user', 'plays', 'game'): 0, ('user', 'follows', 'user'): 2},
           metagraph=[('user', 'game'), ('user', 'user')])
 
-    Notes
-    -----
-    This function preserves the batch information of the original graph, this is
-    to say, the ``node_subgraph`` of a batched graph is still a batched graph.
-
     See Also
     --------
     edge_subgraph
@@ -142,15 +137,7 @@ def node_subgraph(graph, nodes):
         induced_nodes.append(_process_nodes(ntype, nids))
     sgi = graph._graph.node_subgraph(induced_nodes)
     induced_edges = sgi.induced_edges
-    subg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges)
-    if graph.batch_size > 1:
-        subg.set_batch_num_nodes(
-            _get_subgraph_batch_info(graph.ntypes, induced_nodes, graph.batch_num_nodes()))
-        subg.set_batch_num_edges(
-            _get_subgraph_batch_info(graph.canonical_etypes,
-                                     induced_edges,
-                                     graph.batch_num_edges()))
-    return subg
+    return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges)
 
 DGLHeteroGraph.subgraph = utils.alias_func(node_subgraph)
 
@@ -267,11 +254,6 @@ def edge_subgraph(graph, edges, preserve_nodes=False):
           num_edges={('user', 'plays', 'game'): 1, ('user', 'follows', 'user'): 2},
           metagraph=[('user', 'game'), ('user', 'user')])
 
-    Notes
-    -----
-    This function preserves the batch information of the original graph, this is
-    to say, the ``edge_subgraph`` of a batched graph is still a batched graph.
-
     See Also
     --------
     node_subgraph
@@ -296,15 +278,7 @@ def edge_subgraph(graph, edges, preserve_nodes=False):
         induced_edges.append(_process_edges(cetype, eids))
     sgi = graph._graph.edge_subgraph(induced_edges, preserve_nodes)
     induced_nodes = sgi.induced_nodes
-    subg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges)
-    if graph.batch_size > 1:
-        subg.set_batch_num_nodes(
-            _get_subgraph_batch_info(graph.ntypes, induced_nodes, graph.batch_num_nodes()))
-        subg.set_batch_num_edges(
-            _get_subgraph_batch_info(graph.canonical_etypes,
-                                     induced_edges,
-                                     graph.batch_num_edges()))
-    return subg
+    return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges)
 
 DGLHeteroGraph.edge_subgraph = utils.alias_func(edge_subgraph)
 
@@ -684,41 +658,5 @@ def _create_hetero_subgraph(parent, sgi, induced_nodes, induced_edges):
     hsg = DGLHeteroGraph(sgi.graph, parent.ntypes, parent.etypes)
     utils.set_new_frames(hsg, node_frames=node_frames, edge_frames=edge_frames)
     return hsg
-
-
-def _get_subgraph_batch_info(keys, induced_indices_arr, batch_num_objs):
-    """Internal function to compute batch information for subgraphs.
-
-    Parameters
-    ----------
-    keys : List[str]
-        The node/edge type keys.
-    induced_indices_arr : List[Tensor]
-        The induced node/edge index tensor for all node/edge types.
-    batch_num_objs : Tensor
-        Number of nodes/edges for each graph in the original batch.
-
-    Returns
-    -------
-    Mapping[str, Tensor]
-        A dictionary mapping all node/edge type keys to the ``batch_num_objs``
-        array of corresponding graph.
-    """
-    bucket_offset = F.unsqueeze(F.cumsum(batch_num_objs, 0), -1)  # (num_bkts, 1)
-    ret = {}
-    for key, induced_indices in zip(keys, induced_indices_arr):
-        # NOTE(Zihao): this implementation is not efficient and we can replace it with
-        # binary search in the future.
-        induced_indices = F.unsqueeze(induced_indices, 0)  # (1, num_nodes)
-        new_offset = F.sum((induced_indices < bucket_offset), 1)  # (num_bkts,)
-        # start_offset = [0] + [new_offset[i-1] for i in range(1, n_bkts)]
-        start_offset = F.cat([
-            F.zeros((1,), F.dtype(bucket_offset), F.context(bucket_offset)),
-            new_offset[:-1]
-        ], 0)
-        new_batch_num_objs = new_offset - start_offset
-        ret[key] = new_batch_num_objs
-    return ret
-
 
 _init_api("dgl.subgraph")

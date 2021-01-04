@@ -1266,6 +1266,60 @@ class DGLHeteroGraph(object):
             The dictionary storing number of nodes for each graph in the batch for all node types.
             If the graph has only one node type, ``val`` can also be a single array indicating the
             number of nodes per graph in the batch.
+
+        Notes
+        -----
+        This API is always used together with ``set_batch_num_edges`` to specify batching information
+        of a graph.
+
+        Examples
+        --------
+        
+        The following example uses PyTorch backend. 
+        
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph.
+        >>> g = dgl.graph(([0, 1, 2, 3, 4, 5], [1, 2, 0, 4, 5, 3]))
+
+        Manually set batch information
+        >>> g.set_batch_num_nodes(torch.tensor([3, 3])
+        >>> g.set_batch_num_edges(torch.tensor([3, 3])
+
+        Unbatch the graph.
+        >>> dgl.unbatch(g)
+            [Graph(num_nodes=3, num_edges=3,
+                  ndata_schemes={}
+                  edata_schemes={}), Graph(num_nodes=3, num_edges=3,
+                  ndata_schemes={}
+                  edata_schemes={})]
+       
+        Create a heterogeneous graph.
+
+        >>> hg = dgl.heterograph({
+        ...      ('user', 'plays', 'game') : ([0, 1, 2, 3, 4, 5], [0, 1, 1, 3, 3, 2]),
+        ...      ('developer', 'develops', 'game') : ([0, 1, 2, 3], [1, 0, 3, 2])})
+
+        Manually set batch information.
+
+        >>> hg.set_batch_num_nodes({'user': torch.tensor([3, 3]), 'game': torch.tensor([2, 2]), 'developer': torch.tensor([2, 2])})
+        >>> hg.set_batch_num_edges({('user', 'plays', 'game'): torch.tensor([3, 3]), ('developer', 'develops', 'game'): torch.tensor([2, 2])})
+        
+        Unbatch the graph.
+
+        >>> dgl.unbatch(hg)
+            [Graph(num_nodes={'developer': 2, 'game': 2, 'user': 3},
+                  num_edges={('developer', 'develops', 'game'): 2, ('user', 'plays', 'game'): 3},
+                  metagraph=[('developer', 'game', 'develops'), ('user', 'game', 'plays')]), Graph(num_nodes={'developer': 2, 'game': 2, 'user': 3},
+                  num_edges={('developer', 'develops', 'game'): 2, ('user', 'plays', 'game'): 3},
+                  metagraph=[('developer', 'game', 'develops'), ('user', 'game', 'plays')])]
+
+        See Also
+        --------
+        set_batch_num_edges
+        batch
+        unbatch
         """
         if not isinstance(val, Mapping):
             if len(self.ntypes) != 1:
@@ -1344,6 +1398,60 @@ class DGLHeteroGraph(object):
             The dictionary storing number of edges for each graph in the batch for all edge types.
             If the graph has only one edge type, ``val`` can also be a single array indicating the
             number of edges per graph in the batch.
+
+        Notes
+        -----
+        This API is always used together with ``set_batch_num_nodes`` to specify batching information
+        of a graph.
+
+        Examples
+        --------
+        
+        The following example uses PyTorch backend. 
+        
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph.
+        >>> g = dgl.graph(([0, 1, 2, 3, 4, 5], [1, 2, 0, 4, 5, 3]))
+
+        Manually set batch information
+        >>> g.set_batch_num_nodes(torch.tensor([3, 3])
+        >>> g.set_batch_num_edges(torch.tensor([3, 3])
+
+        Unbatch the graph.
+        >>> dgl.unbatch(g)
+            [Graph(num_nodes=3, num_edges=3,
+                  ndata_schemes={}
+                  edata_schemes={}), Graph(num_nodes=3, num_edges=3,
+                  ndata_schemes={}
+                  edata_schemes={})]
+       
+        Create a heterogeneous graph.
+
+        >>> hg = dgl.heterograph({
+        ...      ('user', 'plays', 'game') : ([0, 1, 2, 3, 4, 5], [0, 1, 1, 3, 3, 2]),
+        ...      ('developer', 'develops', 'game') : ([0, 1, 2, 3], [1, 0, 3, 2])})
+
+        Manually set batch information.
+
+        >>> hg.set_batch_num_nodes({'user': torch.tensor([3, 3]), 'game': torch.tensor([2, 2]), 'developer': torch.tensor([2, 2])})
+        >>> hg.set_batch_num_edges({('user', 'plays', 'game'): torch.tensor([3, 3]), ('developer', 'develops', 'game'): torch.tensor([2, 2])})
+        
+        Unbatch the graph.
+
+        >>> dgl.unbatch(hg)
+            [Graph(num_nodes={'developer': 2, 'game': 2, 'user': 3},
+                  num_edges={('developer', 'develops', 'game'): 2, ('user', 'plays', 'game'): 3},
+                  metagraph=[('developer', 'game', 'develops'), ('user', 'game', 'plays')]), Graph(num_nodes={'developer': 2, 'game': 2, 'user': 3},
+                  num_edges={('developer', 'develops', 'game'): 2, ('user', 'plays', 'game'): 3},
+                  metagraph=[('developer', 'game', 'develops'), ('user', 'game', 'plays')])]
+
+        See Also
+        --------
+        set_batch_num_nodes
+        batch
+        unbatch
         """
         if not isinstance(val, Mapping):
             if len(self.etypes) != 1:
