@@ -1270,7 +1270,9 @@ class DGLHeteroGraph(object):
         Notes
         -----
         This API is always used together with ``set_batch_num_edges`` to specify batching
-        information of a graph.
+        information of a graph, it also do not check the correspondance between the graph structure
+        and batching information and user must guarantee there will be no cross-graph edges in the
+        batch.
 
         Examples
         --------
@@ -1409,8 +1411,10 @@ class DGLHeteroGraph(object):
 
         Notes
         -----
-        This API is always used together with ``set_batch_num_nodes`` to specify batching
-        information of a graph.
+        This API is always used together with ``set_batch_num_edges`` to specify batching
+        information of a graph, it also do not check the correspondance between the graph structure
+        and batching information and user must guarantee there will be no cross-graph edges in the
+        batch.
 
         Examples
         --------
