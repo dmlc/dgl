@@ -22,7 +22,7 @@ def git_init(ignore_git):
     if ignore_git:
         command = ""
     else:
-        assert "GIT_URL" in os.environ and "GIT_COMMIT" in os.environ and "GIT_BRANCH" in os.environ,\
+        assert "GIT_URL" in os.environ and "GIT_BRANCH" in os.environ,\
             "Need to set GIT_URL, GIT_COMMIT and GIT_BRANCH as environment variable"
         command = """
         cd ~
@@ -157,14 +157,16 @@ def main(args):
     print("Finished Running")
 
 
-parser = argparse.ArgumentParser(description='launch EC2', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser = argparse.ArgumentParser(
+    description='launch EC2', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--instance-type", default="c5.2xlarge",
                     help="specify instance type")
 parser.add_argument("--ignore-git", action="store_true",
                     default=False, help="whether to skip initialize git repo")
 parser.add_argument("--disk-size", default=150, type=int,
                     help="specify disk size")
-parser.add_argument("--script-file", help="Bash Script to be run", required=True)
+parser.add_argument(
+    "--script-file", help="Bash Script to be run", required=True)
 parser.add_argument("--env-vars", default="", help="Extra environment variable to be passed. Split by comma."
                     " i.e. JENKINS_URL, OMP_NUM_THREAD")
 args = parser.parse_args()

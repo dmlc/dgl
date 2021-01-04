@@ -17,10 +17,10 @@
     // uninstalling the project. See asv.conf.json documentation.
     //
     "build_command": [
-        "/bin/bash {conf_dir}/build_dgl_asv.sh"
+        "/bin/bash {conf_dir}/scripts/build_dgl_asv.sh"
     ],
     "install_command": [
-        "/bin/bash {conf_dir}/install_dgl_asv.sh"
+        "/bin/bash {conf_dir}/scripts/install_dgl_asv.sh"
     ],
     "uninstall_command": [
         "return-code=any python -m pip uninstall -y dgl"

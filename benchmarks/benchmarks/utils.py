@@ -1,11 +1,13 @@
 import os
-import shutil, zipfile
+import shutil
+import zipfile
 import requests
 import inspect
 import numpy as np
 import pandas
 import dgl
 import torch
+
 
 def _download(url, path, filename):
     fn = os.path.join(path, filename)
@@ -21,15 +23,27 @@ def _download(url, path, filename):
             writer.write(chunk)
     print('Download finished.')
 
+
 def get_livejournal():
     _download('https://snap.stanford.edu/data/soc-LiveJournal1.txt.gz',
-              '/tmp', 'soc-LiveJournal1.txt.gz')
-    df = pandas.read_csv('/tmp/soc-LiveJournal1.txt.gz', sep='\t', skiprows=4, header=None,
+              '/tmp/dataset', 'soc-LiveJournal1.txt.gz')
+    df = pandas.read_csv('/tmp/dataset/soc-LiveJournal1.txt.gz', sep='\t', skiprows=4, header=None,
                          names=['src', 'dst'], compression='gzip')
-    src = np.array(df['src'])
-    dst = np.array(df['dst'])
+    src = df['src'].values
+    dst = df['dst'].values
     print('construct the graph')
-    return dgl.DGLGraph((src, dst), readonly=True)
+    return dgl.graph((src, dst))
+
+def get_filmbaster():    
+    _download('https://snap.stanford.edu/data/bigdata/communities/com-friendster.ungraph.txt.gz',
+              '/tmp/dataset', 'com-friendster.ungraph.txt.gz')
+    df = pandas.read_csv('/tmp/dataset/com-friendster.ungraph.txt.gz', sep='\t', skiprows=4, header=None,
+                         names=['src', 'dst'], compression='gzip')
+    src = df['src'].values
+    dst = df['dst'].values
+    print('construct the graph')
+    return dgl.graph((src, dst))
+
 
 def get_graph(name):
     if name == 'livejournal':
@@ -37,6 +51,7 @@ def get_graph(name):
     else:
         print(name + " doesn't exist")
         return None
+
 
 class OGBDataset(object):
     def __init__(self, g, num_labels):
@@ -54,6 +69,7 @@ class OGBDataset(object):
     def __getitem__(self, idx):
         return self._g
 
+
 def load_ogb_product(name):
     from ogb.nodeproppred import DglNodePropPredDataset
 
@@ -68,7 +84,8 @@ def load_ogb_product(name):
 
     graph.ndata['label'] = labels
     in_feats = graph.ndata['feat'].shape[1]
-    num_labels = len(torch.unique(labels[torch.logical_not(torch.isnan(labels))]))
+    num_labels = len(torch.unique(
+        labels[torch.logical_not(torch.isnan(labels))]))
 
     # Find the node IDs in the training, validation, and test set.
     train_nid, val_nid, test_nid = splitted_idx['train'], splitted_idx['valid'], splitted_idx['test']
@@ -83,6 +100,7 @@ def load_ogb_product(name):
     graph.ndata['test_mask'] = test_mask
 
     return OGBDataset(graph, num_labels)
+
 
 def process_data(name):
     if name == 'cora':
@@ -104,28 +122,33 @@ def process_data(name):
     else:
         raise ValueError('Invalid dataset name:', name)
 
+
 def get_bench_device():
     return os.environ.get('DGL_BENCH_DEVICE', 'cpu')
+
 
 def setup_track_time(*args, **kwargs):
     # fix random seed
     np.random.seed(42)
     torch.random.manual_seed(42)
 
+
 def setup_track_acc(*args, **kwargs):
     # fix random seed
     np.random.seed(42)
     torch.random.manual_seed(42)
 
+
 TRACK_UNITS = {
-    'time' : 's',
-    'acc' : '%',
+    'time': 's',
+    'acc': '%',
 }
 
 TRACK_SETUP = {
-    'time' : setup_track_time,
-    'acc' : setup_track_acc,
+    'time': setup_track_time,
+    'acc': setup_track_acc,
 }
+
 
 def parametrize(param_name, params):
     """Decorator for benchmarking over a set of parameters.
@@ -189,8 +212,14 @@ def parametrize(param_name, params):
         return func
     return _wrapper
 
+
+def num_gpu():
+    return torch.cuda.device_count()
+
+
 def benchmark(track_type, timeout=60):
     """Decorator for indicating the benchmark type.
+       By default, the test will not run on multi-gpu testing
 
     Parameters
     ----------
@@ -215,5 +244,27 @@ def benchmark(track_type, timeout=60):
         func.unit = TRACK_UNITS[track_type]
         func.setup = TRACK_SETUP[track_type]
         func.timeout = timeout
+        if num_gpu() > 1:
+            # skip when multi gpu exists
+            func.benchmark_name = "skip_multigpu_" + func.__name__
+        return func
+    return _wrapper
+
+
+def multi_gpu_test():
+    def _wrapper(func):
+        if hasattr(func, "benchmark_name"):
+            if num_gpu() > 1 and func.benchmark_name.startswith("skip_multigpu_"):
+                func.benchmark_name = func.benchmark_name[len(
+                    "skip_multigpu_"):]
+        return func
+    return _wrapper
+
+
+def run_when(run):
+    def _wrapper(func):
+        if not run:
+            print("Skip {}".format(func.__name__))
+            func.benchmark_name = "skip_" + func.__name__
         return func
     return _wrapper

@@ -7,6 +7,9 @@ set -e
 pip install -r /asv/torch_gpu_pip.txt
 pip install pandas rdflib
 
+# download dataset
+bash benchmarks/scripts/download_dataset.sh
+
 # install
 pushd python
 rm -rf build *.egg-info dist
