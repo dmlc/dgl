@@ -1,4 +1,5 @@
 import dgl
+import numpy as np
 import backend as F
 import unittest
 from test_utils import parametrize_dtype
@@ -222,20 +223,17 @@ def _get_subgraph_batch_info(keys, induced_indices_arr, batch_num_objs):
         A dictionary mapping all node/edge type keys to the ``batch_num_objs``
         array of corresponding graph.
     """
-    bucket_offset = F.copy_to(F.unsqueeze(F.cumsum(batch_num_objs, 0), -1), F.ctx())  # (num_bkts, 1)
+    bucket_offset = np.expand_dims(np.cumsum(F.asnumpy(batch_num_objs), 0), -1)  # (num_bkts, 1)
     ret = {}
     for key, induced_indices in zip(keys, induced_indices_arr):
         # NOTE(Zihao): this implementation is not efficient and we can replace it with
         # binary search in the future.
-        induced_indices = F.unsqueeze(induced_indices, 0)  # (1, num_nodes)
-        new_offset = F.sum((induced_indices < bucket_offset), 1)  # (num_bkts,)
+        induced_indices = np.expand_dims(F.asnumpy(induced_indices), 0)  # (1, num_nodes)
+        new_offset = np.sum((induced_indices < bucket_offset), 1)  # (num_bkts,)
         # start_offset = [0] + [new_offset[i-1] for i in range(1, n_bkts)]
-        start_offset = F.cat([
-            F.zeros((1,), F.dtype(bucket_offset), F.context(bucket_offset)),
-            new_offset[:-1]
-        ], 0)
+        start_offset = np.concatenate([np.zeros((1,)), new_offset[:-1]], 0)
         new_batch_num_objs = new_offset - start_offset
-        ret[key] = new_batch_num_objs
+        ret[key] = F.tensor(new_batch_num_objs, dtype=F.dtype(batch_num_objs))
     return ret
 
 @parametrize_dtype
