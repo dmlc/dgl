@@ -92,56 +92,6 @@ class EntityClassify(nn.Module):
             h = layer(block, h, block.edata['etype'], block.edata['norm'])
         return h
 
-class NeighborSampler:
-    """Neighbor sampler
-    Parameters
-    ----------
-    g : DGLHeterograph
-        Full graph
-    target_idx : tensor
-        The target training node IDs in g
-    fanouts : list of int
-        Fanout of each hop starting from the seed nodes. If a fanout is None,
-        sample full neighbors.
-    """
-    def __init__(self, g, target_idx, fanouts):
-        self.g = g
-        self.target_idx = target_idx
-        self.fanouts = fanouts
-
-    """Do neighbor sample
-    Parameters
-    ----------
-    seeds :
-        Seed nodes
-    Returns
-    -------
-    tensor
-        Seed nodes, also known as target nodes
-    blocks
-        Sampled subgraphs
-    """
-    def sample_blocks(self, seeds):
-        blocks = []
-        etypes = []
-        norms = []
-        ntypes = []
-        seeds = th.tensor(seeds).long()
-        cur = self.target_idx[seeds]
-        for fanout in self.fanouts:
-            if fanout is None or fanout == -1:
-                frontier = dgl.in_subgraph(self.g, cur)
-            else:
-                frontier = dgl.sampling.sample_neighbors(self.g, cur, fanout)
-            etypes = self.g.edata[dgl.ETYPE][frontier.edata[dgl.EID]]
-            block = dgl.to_block(frontier, cur)
-            block.srcdata[dgl.NTYPE] = self.g.ndata[dgl.NTYPE][block.srcdata[dgl.NID]]
-            block.srcdata['type_id'] = self.g.ndata[dgl.NID][block.srcdata[dgl.NID]]
-            block.edata['etype'] = etypes
-            cur = block.srcdata[dgl.NID]
-            blocks.insert(0, block)
-        return seeds, blocks
-
 class RelGraphEmbedLayer(nn.Module):
     r"""Embedding layer for featureless heterograph.
     Parameters
@@ -199,7 +149,7 @@ class RelGraphEmbedLayer(nn.Module):
         ----------
         node_ids : tensor
             node ids to generate embedding for.
-        node_ids : tensor
+        node_tids : tensor
             node type ids
         features : list of features
             list of initial features for nodes belong to different node type.
@@ -238,7 +188,7 @@ def track_time(data):
     else:
         raise ValueError()
 
-    fanouts = [15,25]
+    fanouts = [25,15]
     n_layers = 2
     batch_size = 1024
     n_hidden = 64
@@ -280,6 +230,9 @@ def track_time(data):
     norm = th.ones(eid.shape[0]) / degrees
     norm = norm.unsqueeze(1)
     g.edata['norm'] = norm
+    g.edata['etype'] = g.edata[dgl.ETYPE]
+    g.ndata['type_id'] = g.ndata[dgl.NID]
+    g.ndata['ntype'] = g.ndata[dgl.NTYPE]
 
     node_ids = th.arange(g.number_of_nodes())
     # find out the target node ids
@@ -290,13 +243,11 @@ def track_time(data):
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
     g.create_formats_()
-
-    sampler = NeighborSampler(g, target_idx, fanouts)
-    loader = DataLoader(dataset=train_idx.numpy(),
-                        batch_size=batch_size,
-                        collate_fn=sampler.sample_blocks,
-                        shuffle=True,
-                        num_workers=num_workers)
+    sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
+    collator = dgl.dataloading.NodeIdxCollator(g, target_idx, train_idx, sampler)
+    loader = dgl.dataloading.DataLoader(
+        collator.dataset, collate_fn=collator.collate,
+        batch_size=batch_size, shuffle=True, num_workers=4)
 
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
@@ -335,13 +286,13 @@ def track_time(data):
         embed_layer.train()
 
         for i, sample_data in enumerate(loader):
-            seeds, blocks = sample_data
-            feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                                blocks[0].srcdata[dgl.NTYPE],
+            input_nodes, output_nodes, seed_idx, blocks = sample_data
+            feats = embed_layer(input_nodes,
+                                blocks[0].srcdata['ntype'],
                                 blocks[0].srcdata['type_id'],
                                 node_feats)
             logits = model(blocks, feats)
-            loss = F.cross_entropy(logits, labels[seeds])
+            loss = F.cross_entropy(logits, labels[seed_idx])
             optimizer.zero_grad()
             emb_optimizer.zero_grad()
 
@@ -356,13 +307,13 @@ def track_time(data):
         embed_layer.train()
 
         for i, sample_data in enumerate(loader):
-            seeds, blocks = sample_data
-            feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                                blocks[0].srcdata[dgl.NTYPE],
+            input_nodes, output_nodes, seed_idx, blocks = sample_data
+            feats = embed_layer(input_nodes,
+                                blocks[0].srcdata['ntype'],
                                 blocks[0].srcdata['type_id'],
                                 node_feats)
             logits = model(blocks, feats)
-            loss = F.cross_entropy(logits, labels[seeds])
+            loss = F.cross_entropy(logits, labels[seed_idx])
             optimizer.zero_grad()
             emb_optimizer.zero_grad()
 
