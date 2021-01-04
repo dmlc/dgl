@@ -1,6 +1,4 @@
-import os
 import backend as F
-import networkx as nx
 import numpy as np
 import dgl
 from test_utils import parametrize_dtype

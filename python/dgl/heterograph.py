@@ -602,7 +602,7 @@ class DGLHeteroGraph(object):
             else:
                 edges[c_etype] = self.edges(form='eid', order='eid', etype=c_etype)
 
-        sub_g = self.edge_subgraph(edges, preserve_nodes=True, store_raw_ids=False)
+        sub_g = self.edge_subgraph(edges, preserve_nodes=True, store_ids=False)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
@@ -694,7 +694,7 @@ class DGLHeteroGraph(object):
                 nodes[c_ntype] = self.nodes(c_ntype)
 
         # node_subgraph
-        sub_g = self.subgraph(nodes, store_raw_ids=False)
+        sub_g = self.subgraph(nodes, store_ids=False)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
