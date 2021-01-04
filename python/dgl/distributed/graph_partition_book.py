@@ -434,8 +434,14 @@ class RangePartitionBook(GraphPartitionBook):
         number of total partitions
     node_map : a dict of tensors
         map global node id to partition id for each node type.
+        The key of the dict is the node type and the value is a 2-column matrix.
+        Each row represents the Id range of a partition, the first element is the starting Id
+        and the second element is the ending Id.
     edge_map : a dict of tensors
         map global edge id to partition id for each edge type.
+        The key of the dict is the edge type and the value is a 2-column matrix.
+        Each row represents the Id range of a partition, the first element is the starting Id
+        and the second element is the ending Id.
     ntypes : a dict
         map ntype strings to ntype Ids.
     etypes : a dict

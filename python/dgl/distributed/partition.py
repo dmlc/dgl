@@ -29,11 +29,19 @@ def _get_inner_edge_mask(graph, etype_id):
         return graph.edata['inner_edge'] == 1
 
 def _get_part_ranges(id_ranges):
-    if isinstance(id_ranges, dict):
-        return {key:np.concatenate([np.array(l) for l in id_ranges[key]]).reshape(-1, 2) \
-                for key in id_ranges}
-    else:
-        return np.concatenate([np.array(l) for l in id_range[key]]).reshape(-1, 2)
+    res = {}
+    for key in id_ranges:
+        # Normally, each element has two values that represent the starting Id and the ending Id
+        # of the Id range in a partition.
+        # If not, the data is probably still in the old format, in which only the ending Id is
+        # stored. We need to convert it to the format we expect.
+        if not isinstance(id_ranges[key][0], list):
+            start = 0
+            for i, end in enumerate(id_ranges[key]):
+                id_ranges[key][i] = [start, end]
+                start = end
+        res[key] = np.concatenate([np.array(l) for l in id_ranges[key]]).reshape(-1, 2)
+    return res
 
 def load_partition(part_config, part_id):
     ''' Load data of a partition from the data path.
@@ -133,43 +141,50 @@ def load_partition_book(part_config, part_id, graph=None):
     assert 'num_nodes' in part_metadata, "cannot get the number of nodes of the global graph."
     assert 'num_edges' in part_metadata, "cannot get the number of edges of the global graph."
     assert 'node_map' in part_metadata, "cannot get the node map."
-    assert 'global_node_map' in part_metadata, "cannot get the global node map"
     assert 'edge_map' in part_metadata, "cannot get the edge map."
     assert 'graph_name' in part_metadata, "cannot get the graph name"
-    assert 'ntypes' in part_metadata, 'cannot get node types'
-    assert 'etypes' in part_metadata, 'cannot get edge types'
 
     # If this is a range partitioning, node_map actually stores a list, whose elements
     # indicate the boundary of range partitioning. Otherwise, node_map stores a filename
     # that contains node map in a NumPy array.
-    if isinstance(part_metadata['node_map'], dict):
-        for key in part_metadata['node_map']:
-            is_range_part = isinstance(part_metadata['node_map'][key], list)
-            break
-    else:
-        is_range_part = isinstance(part_metadata['node_map'], list)
-    node_map = part_metadata['node_map'] if is_range_part else np.load(part_metadata['node_map'])
-    edge_map = part_metadata['edge_map'] if is_range_part else np.load(part_metadata['edge_map'])
-    assert isinstance(node_map, list) == isinstance(edge_map, list), \
-            "The node map and edge map need to have the same format"
+    node_map = part_metadata['node_map']
+    edge_map = part_metadata['edge_map']
     if isinstance(node_map, dict):
         for key in node_map:
-            assert key in part_metadata['ntypes'], 'The node type {} is invalid'.format(key)
+            is_range_part = isinstance(node_map[key], list)
+            break
+    elif isinstance(node_map, list):
+        is_range_part = True
+        node_map = {'_N': node_map}
+    else:
+        is_range_part = False
+    if isinstance(edge_map, list):
+        edge_map = {'_E': edge_map}
+
+    ntypes = {'_N': 0}
+    etypes = {'_E': 0}
+    if 'ntypes' in part_metadata:
+        ntypes = part_metadata['ntypes']
+    if 'etypes' in part_metadata:
+        etypes = part_metadata['etypes']
+
+    if isinstance(node_map, dict):
+        for key in node_map:
+            assert key in ntypes, 'The node type {} is invalid'.format(key)
     if isinstance(edge_map, dict):
         for key in edge_map:
-            assert key in part_metadata['etypes'], 'The edge type {} is invalid'.format(key)
+            assert key in etypes, 'The edge type {} is invalid'.format(key)
 
     if is_range_part:
-        node_map = _get_part_ranges(part_metadata['global_node_map'])
-        edge_map = _get_part_ranges(part_metadata['global_edge_map'])
-        return RangePartitionBook(part_id, num_parts, node_map, edge_map,
-                                  part_metadata['ntypes'], part_metadata['etypes']), \
-                part_metadata['graph_name'], part_metadata['ntypes'],      \
-                part_metadata['etypes']
+        node_map = _get_part_ranges(node_map)
+        edge_map = _get_part_ranges(edge_map)
+        return RangePartitionBook(part_id, num_parts, node_map, edge_map, ntypes, etypes), \
+                part_metadata['graph_name'], ntypes, etypes
     else:
+        node_map = np.load(node_map)
+        edge_map = np.load(edge_map)
         return BasicPartitionBook(part_id, num_parts, node_map, edge_map, graph), \
-                part_metadata['graph_name'], part_metadata['ntypes'],             \
-                part_metadata['etypes']
+                part_metadata['graph_name'], ntypes, etypes
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
                     reshuffle=True, balance_ntypes=None, balance_edges=False):
@@ -455,58 +470,52 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         if num_parts > 1:
             node_map_val = {}
             edge_map_val = {}
-            global_node_map_val = {}
-            global_edge_map_val = {}
             for ntype in g.ntypes:
                 ntype_id = g.get_ntype_id(ntype)
                 val = []
-                global_node_map_val[ntype] = []
+                node_map_val[ntype] = []
                 for i in parts:
                     inner_node_mask = _get_inner_node_mask(parts[i], ntype_id)
                     val.append(F.as_scalar(F.sum(F.astype(inner_node_mask, F.int64), 0)))
                     inner_nids = F.boolean_mask(parts[i].ndata[NID], inner_node_mask)
-                    global_node_map_val[ntype].append([int(F.as_scalar(inner_nids[0])),
-                                                       int(F.as_scalar(inner_nids[-1])) + 1])
+                    node_map_val[ntype].append([int(F.as_scalar(inner_nids[0])),
+                                                int(F.as_scalar(inner_nids[-1])) + 1])
                 val = np.cumsum(val).tolist()
                 assert val[-1] == g.number_of_nodes(ntype)
-                node_map_val[ntype] = val
             for etype in g.etypes:
                 etype_id = g.get_etype_id(etype)
                 val = []
-                global_edge_map_val[etype] = []
+                edge_map_val[etype] = []
                 for i in parts:
                     inner_edge_mask = _get_inner_edge_mask(parts[i], etype_id)
                     val.append(F.as_scalar(F.sum(F.astype(inner_edge_mask, F.int64), 0)))
                     inner_eids = np.sort(F.asnumpy(F.boolean_mask(parts[i].edata[EID],
                                                                   inner_edge_mask)))
-                    global_edge_map_val[etype].append([int(inner_eids[0]), int(inner_eids[-1]) + 1])
+                    edge_map_val[etype].append([int(inner_eids[0]), int(inner_eids[-1]) + 1])
                 val = np.cumsum(val).tolist()
                 assert val[-1] == g.number_of_edges(etype)
-                edge_map_val[etype] = val
         else:
-            node_map_val = {ntype:[g.number_of_nodes(ntype)] for ntype in g.ntypes}
-            edge_map_val = {etype:[g.number_of_edges(etype)] for etype in g.etypes}
-            global_node_map_val = {}
-            global_edge_map_val = {}
+            node_map_val = {}
+            edge_map_val = {}
             for ntype in g.ntypes:
                 ntype_id = g.get_ntype_id(ntype)
                 inner_node_mask = _get_inner_node_mask(parts[0], ntype_id)
                 inner_nids = F.boolean_mask(parts[0].ndata[NID], inner_node_mask)
-                global_node_map_val[ntype] = [[int(F.as_scalar(inner_nids[0])),
-                                               int(F.as_scalar(inner_nids[-1])) + 1]]
+                node_map_val[ntype] = [[int(F.as_scalar(inner_nids[0])),
+                                        int(F.as_scalar(inner_nids[-1])) + 1]]
             for etype in g.etypes:
                 etype_id = g.get_etype_id(etype)
                 inner_edge_mask = _get_inner_edge_mask(parts[0], etype_id)
                 inner_eids = F.boolean_mask(parts[0].edata[EID], inner_edge_mask)
-                global_edge_map_val[etype] = [[int(F.as_scalar(inner_eids[0])),
-                                               int(F.as_scalar(inner_eids[-1])) + 1]]
+                edge_map_val[etype] = [[int(F.as_scalar(inner_eids[0])),
+                                        int(F.as_scalar(inner_eids[-1])) + 1]]
 
     # Double check that the node Ids in the global Id space are sorted.
-    for ntype in global_node_map_val:
-        val = np.concatenate([np.array(l) for l in global_node_map_val[ntype]])
+    for ntype in node_map_val:
+        val = np.concatenate([np.array(l) for l in node_map_val[ntype]])
         assert np.all(val[:-1] <= val[1:])
-    for etype in global_edge_map_val:
-        val = np.concatenate([np.array(l) for l in global_edge_map_val[etype]])
+    for etype in edge_map_val:
+        val = np.concatenate([np.array(l) for l in edge_map_val[etype]])
         assert np.all(val[:-1] <= val[1:])
 
     start = time.time()
@@ -520,8 +529,6 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                      'halo_hops': num_hops,
                      'node_map': node_map_val,
                      'edge_map': edge_map_val,
-                     'global_node_map': global_node_map_val,
-                     'global_edge_map': global_edge_map_val,
                      'ntypes': ntypes,
                      'etypes': etypes}
     for part_id in range(num_parts):
