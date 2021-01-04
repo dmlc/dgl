@@ -1414,7 +1414,7 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
- 
+
         The following example uses PyTorch backend.
 
         >>> import dgl
@@ -1450,7 +1450,7 @@ class DGLHeteroGraph(object):
         >>> hg.set_batch_num_edges(
         ...     {('user', 'plays', 'game'): torch.tensor([3, 3]),
         ...     ('developer', 'develops', 'game'): torch.tensor([2, 2])})
- 
+
         Unbatch the graph.
 
         >>> g1, g2 = dgl.unbatch(hg)
