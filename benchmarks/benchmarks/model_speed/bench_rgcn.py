@@ -1,4 +1,5 @@
 import time
+import numpy as np
 import dgl
 from dgl.nn.pytorch import RelGraphConv
 import torch
@@ -15,21 +16,22 @@ class RGCN(nn.Module):
                  num_rels,
                  num_bases,
                  num_hidden_layers,
-                 dropout):
+                 dropout,
+                 lowmem):
         super(RGCN, self).__init__()
         self.layers = nn.ModuleList()
         # i2h
         self.layers.append(RelGraphConv(num_nodes, n_hidden, num_rels, "basis",
                                         num_bases, activation=F.relu, dropout=dropout,
-                                        low_mem=True))
+                                        low_mem=lowmem))
         # h2h
         for i in range(num_hidden_layers):
             self.layers.append(RelGraphConv(n_hidden, n_hidden, num_rels, "basis",
                                             num_bases, activation=F.relu, dropout=dropout,
-                                            low_mem=True))
+                                            low_mem=lowmem))
         # o2h
         self.layers.append(RelGraphConv(n_hidden, num_classes, num_rels, "basis",
-                                        num_bases, activation=None, low_mem=True))
+                                        num_bases, activation=None, low_mem=lowmem))
 
     def forward(self, g, h, r, norm):
         for layer in self.layers:
@@ -37,8 +39,10 @@ class RGCN(nn.Module):
         return h
 
 @utils.benchmark('time', 3600)
-@utils.parametrize('data', ['aifb', 'am'])
-def track_time(data):
+@utils.parametrize('data', ['aifb'])
+@utils.parametrize('lowmem', [True, False])
+@utils.parametrize('use_type_count', [True, False])
+def track_time(data, lowmem, use_type_count):
     # args
     if data == 'aifb':
         num_bases = -1
@@ -77,10 +81,15 @@ def track_time(data):
         if ntype == category:
             category_id = i
 
-    g = dgl.to_homogeneous(g, edata=['norm']).to(device)
+    if use_type_count:
+        g, _, edge_type = dgl.to_homogeneous(g, edata=['norm'], return_count=True)
+        g = g.to(device)
+    else:
+        g = dgl.to_homogeneous(g, edata=['norm']).to(device)
+        edge_type = g.edata.pop(dgl.ETYPE).long()
+
     num_nodes = g.number_of_nodes()
     edge_norm = g.edata['norm']
-    edge_type = g.edata[dgl.ETYPE].long()
 
     # find out the target node ids in g
     target_idx = torch.where(g.ndata[dgl.NTYPE] == category_id)[0]
@@ -99,7 +108,8 @@ def track_time(data):
                  num_rels,
                  num_bases,
                  0,
-                 0).to(device)
+                 0,
+                 lowmem).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(),
                                  lr=1e-2,
