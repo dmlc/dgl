@@ -520,7 +520,7 @@ class DGLHeteroGraph(object):
             self._edge_frames[etid].append(data)
         self._reset_cached_info()
 
-    def remove_edges(self, eids, etype=None):
+    def remove_edges(self, eids, etype=None, store_ids=False):
         r"""Remove multiple edges with the specified edge type
 
         Nodes will not be removed. After removing edges, the rest
@@ -536,6 +536,10 @@ class DGLHeteroGraph(object):
         etype : str or tuple of str, optional
             The type of the edges to remove. Can be omitted if there is
             only one edge type in the graph.
+        store_ids : bool, optional
+            If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata``
+            and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
+            respectively.
 
         Examples
         --------
@@ -602,12 +606,12 @@ class DGLHeteroGraph(object):
             else:
                 edges[c_etype] = self.edges(form='eid', order='eid', etype=c_etype)
 
-        sub_g = self.edge_subgraph(edges, preserve_nodes=True, store_ids=False)
+        sub_g = self.edge_subgraph(edges, preserve_nodes=True, store_ids=store_ids)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
 
-    def remove_nodes(self, nids, ntype=None):
+    def remove_nodes(self, nids, ntype=None, store_ids=False):
         r"""Remove multiple nodes with the specified node type
 
         Edges that connect to the nodes will be removed as well. After removing
@@ -623,6 +627,10 @@ class DGLHeteroGraph(object):
         ntype : str, optional
             The type of the nodes to remove. Can be omitted if there is
             only one node type in the graph.
+        store_ids : bool, optional
+            If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata``
+            and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
+            respectively.
 
         Examples
         --------
@@ -694,7 +702,7 @@ class DGLHeteroGraph(object):
                 nodes[c_ntype] = self.nodes(c_ntype)
 
         # node_subgraph
-        sub_g = self.subgraph(nodes, store_ids=False)
+        sub_g = self.subgraph(nodes, store_ids=store_ids)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
