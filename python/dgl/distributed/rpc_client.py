@@ -133,7 +133,7 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net
     rpc.register_service(rpc.CLIENT_BARRIER,
                          rpc.ClientBarrierRequest,
                          rpc.ClientBarrierResponse)
-    rpc.register_ctrl_c()
+    rpc.register_sig_handler()
     server_namebook = rpc.read_ip_config(ip_config, num_servers)
     num_servers = len(server_namebook)
     rpc.set_num_server(num_servers)
