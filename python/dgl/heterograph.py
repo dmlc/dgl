@@ -1247,7 +1247,7 @@ class DGLHeteroGraph(object):
         if self._batch_num_nodes is None:
             self._batch_num_nodes = {}
             for ty in self.ntypes:
-                bnn = F.copy_to(F.tensor([self.number_of_nodes(ty)], self.idtype), self.device)
+                bnn = F.copy_to(F.tensor([self.number_of_nodes(ty)], F.int64), self.device)
                 self._batch_num_nodes[ty] = bnn
         if ntype is None:
             if len(self.ntypes) != 1:
@@ -1385,7 +1385,7 @@ class DGLHeteroGraph(object):
         if self._batch_num_edges is None:
             self._batch_num_edges = {}
             for ty in self.canonical_etypes:
-                bne = F.copy_to(F.tensor([self.number_of_edges(ty)], self.idtype), self.device)
+                bne = F.copy_to(F.tensor([self.number_of_edges(ty)], F.int64), self.device)
                 self._batch_num_edges[ty] = bne
         if etype is None:
             if len(self.etypes) != 1:

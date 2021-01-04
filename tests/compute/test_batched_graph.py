@@ -242,15 +242,18 @@ def _get_subgraph_batch_info(keys, induced_indices_arr, batch_num_objs):
 def test_set_batch_info(idtype):
     ctx = F.ctx()
 
-    # test homogeneous node subgraph
     g1 = dgl.rand_graph(30, 100).astype(idtype).to(F.ctx())
     g2 = dgl.rand_graph(40, 200).astype(idtype).to(F.ctx())
     bg = dgl.batch([g1, g2])
+    batch_num_nodes = F.astype(bg.batch_num_nodes(), idtype)
+    batch_num_edges = F.astype(bg.batch_num_edges(), idtype)
+    
+    # test homogeneous node subgraph
     sg_n = dgl.node_subgraph(bg, list(range(10, 20)) + list(range(50, 60)))
     induced_nodes = sg_n.ndata['_ID']
     induced_edges = sg_n.edata['_ID']
-    new_batch_num_nodes = _get_subgraph_batch_info(bg.ntypes, [induced_nodes], bg.batch_num_nodes())
-    new_batch_num_edges = _get_subgraph_batch_info(bg.canonical_etypes, [induced_edges], bg.batch_num_edges())
+    new_batch_num_nodes = _get_subgraph_batch_info(bg.ntypes, [induced_nodes], batch_num_nodes)
+    new_batch_num_edges = _get_subgraph_batch_info(bg.canonical_etypes, [induced_edges], batch_num_edges)
     sg_n.set_batch_num_nodes(new_batch_num_nodes)
     sg_n.set_batch_num_edges(new_batch_num_edges)
     subg_n1, subg_n2 = dgl.unbatch(sg_n)
@@ -263,8 +266,8 @@ def test_set_batch_info(idtype):
     sg_e = dgl.edge_subgraph(bg, list(range(40, 70)) + list(range(150, 200)), preserve_nodes=True)
     induced_nodes = sg_e.ndata['_ID']
     induced_edges = sg_e.edata['_ID']
-    new_batch_num_nodes = _get_subgraph_batch_info(bg.ntypes, [induced_nodes], bg.batch_num_nodes())
-    new_batch_num_edges = _get_subgraph_batch_info(bg.canonical_etypes, [induced_edges], bg.batch_num_edges())
+    new_batch_num_nodes = _get_subgraph_batch_info(bg.ntypes, [induced_nodes], batch_num_nodes)
+    new_batch_num_edges = _get_subgraph_batch_info(bg.canonical_etypes, [induced_edges], batch_num_edges)
     sg_e.set_batch_num_nodes(new_batch_num_nodes)
     sg_e.set_batch_num_edges(new_batch_num_edges)
     subg_e1, subg_e2 = dgl.unbatch(sg_e)
