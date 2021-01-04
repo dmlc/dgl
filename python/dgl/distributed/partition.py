@@ -162,7 +162,8 @@ def load_partition_book(part_config, part_id, graph=None):
     if is_range_part:
         node_map = _get_part_ranges(part_metadata['global_node_map'])
         edge_map = _get_part_ranges(part_metadata['global_edge_map'])
-        return RangePartitionBook(part_id, num_parts, node_map, edge_map), \
+        return RangePartitionBook(part_id, num_parts, node_map, edge_map,
+                                  part_metadata['ntypes'], part_metadata['etypes']), \
                 part_metadata['graph_name'], part_metadata['ntypes'],      \
                 part_metadata['etypes']
     else:

@@ -454,11 +454,9 @@ class DistGraph:
             self._num_nodes += int(part_md['num_nodes'])
             self._num_edges += int(part_md['num_edges'])
 
-        # TODO(zhengda) How do we guarantee that the mappings are right?
+        # The node/edge types are stored in the order of type Ids.
         self._ntype_map = {ntype:i for i, ntype in enumerate(self.ntypes)}
-        print('ntype map:', self._ntype_map)
         self._etype_map = {etype:i for i, etype in enumerate(self.etypes)}
-        print('etype map:', self._etype_map)
 
     def _init(self):
         self._client = get_kvstore()

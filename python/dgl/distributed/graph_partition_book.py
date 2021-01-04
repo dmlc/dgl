@@ -75,11 +75,21 @@ def get_shared_mem_partition_book(graph_name, graph_part):
     '''
     if not exist_shared_mem_array(_get_ndata_path(graph_name, 'meta')):
         return None
-    is_range_part, part_id, num_parts, node_map, edge_map = _get_shared_mem_metadata(graph_name)
+    is_range_part, part_id, num_parts, node_map_data, edge_map_data = _get_shared_mem_metadata(graph_name)
     if is_range_part == 1:
-        node_map = pickle.loads(bytes(F.asnumpy(node_map).tolist()))
-        edge_map = pickle.loads(bytes(F.asnumpy(edge_map).tolist()))
-        return RangePartitionBook(part_id, num_parts, node_map, edge_map)
+        # node Id ranges and edge Id ranges are stored in the order of node type Ids and edge type Ids.
+        node_map = {}
+        ntypes = {}
+        for i, (ntype, nid_range) in enumerate(pickle.loads(bytes(F.asnumpy(node_map_data).tolist()))):
+            ntypes[ntype] = i
+            node_map[ntype] = nid_range
+
+        edge_map = {}
+        etypes = {}
+        for i, (etype, eid_range) in enumerate(pickle.loads(bytes(F.asnumpy(edge_map_data).tolist()))):
+            etypes[etype] = i
+            edge_map[etype] = eid_range
+        return RangePartitionBook(part_id, num_parts, node_map, edge_map, ntypes, etypes)
     else:
         return BasicPartitionBook(part_id, num_parts, node_map, edge_map, graph_part)
 
@@ -426,12 +436,26 @@ class RangePartitionBook(GraphPartitionBook):
         map global node id to partition id for each node type.
     edge_map : a dict of tensors
         map global edge id to partition id for each edge type.
+    ntypes : a dict
+        map ntype strings to ntype Ids.
+    etypes : a dict
+        map etype strings to etype Ids.
     """
-    def __init__(self, part_id, num_parts, node_map, edge_map):
+    def __init__(self, part_id, num_parts, node_map, edge_map, ntypes, etypes):
         assert part_id >= 0, 'part_id cannot be a negative number.'
         assert num_parts > 0, 'num_parts must be greater than zero.'
         self._partid = part_id
         self._num_partitions = num_parts
+        self._ntypes = [None] * len(ntypes)
+        self._etypes = [None] * len(etypes)
+        for ntype in ntypes:
+            ntype_id = ntypes[ntype]
+            self._ntypes[ntype_id] = ntype
+        assert all([ntype is not None for ntype in self._ntypes]), "The node types have invalid Ids."
+        for etype in etypes:
+            etype_id = etypes[etype]
+            self._etypes[etype_id] = etype
+        assert all([etype is not None for etype in self._etypes]), "The edge types have invalid Ids."
 
         # This stores the node Id ranges for each node type in each partition.
         # The key is the node type, the value is a NumPy matrix with two columns, in which
@@ -499,10 +523,20 @@ class RangePartitionBook(GraphPartitionBook):
     def shared_memory(self, graph_name):
         """Move data to shared memory.
         """
-        nid_range_pickle = pickle.dumps(self._typed_nid_range)
+        # we need to store the nid ranges and eid ranges of different types in the order defined
+        # by type Ids.
+        nid_range = [None] * len(self.ntypes)
+        for i, ntype in enumerate(self.ntypes):
+            nid_range[i] = (ntype, self._typed_nid_range[ntype])
+        nid_range_pickle = pickle.dumps(nid_range)
         nid_range_pickle = [e for e in nid_range_pickle]
-        eid_range_pickle = pickle.dumps(self._typed_eid_range)
+
+        eid_range = [None] * len(self.etypes)
+        for i, etype in enumerate(self.etypes):
+            eid_range[i] = (etype, self._typed_eid_range[etype])
+        eid_range_pickle = pickle.dumps(eid_range)
         eid_range_pickle = [e for e in eid_range_pickle]
+
         self._meta = _move_metadata_to_shared_mem(graph_name,
                                                   0, # We don't need to provide the number of nodes
                                                   0, # We don't need to provide the number of edges
@@ -663,19 +697,13 @@ class RangePartitionBook(GraphPartitionBook):
     def ntypes(self):
         """Get the list of node types
         """
-        if self._typed_node_map is not None:
-            return list(self._typed_node_map.keys())
-        else:
-            return ['_N']
+        return self._ntypes
 
     @property
     def etypes(self):
         """Get the list of edge types
         """
-        if self._typed_edge_map is not None:
-            return list(self._typed_edge_map.keys())
-        else:
-            return ['_E']
+        return self._etypes
 
 NODE_PART_POLICY = 'node'
 EDGE_PART_POLICY = 'edge'
