@@ -222,7 +222,7 @@ def _get_subgraph_batch_info(keys, induced_indices_arr, batch_num_objs):
         A dictionary mapping all node/edge type keys to the ``batch_num_objs``
         array of corresponding graph.
     """
-    bucket_offset = F.unsqueeze(F.cumsum(batch_num_objs, 0), -1)  # (num_bkts, 1)
+    bucket_offset = F.unsqueeze(F.cumsum(batch_num_objs, 0), -1).to(F.ctx())  # (num_bkts, 1)
     ret = {}
     for key, induced_indices in zip(keys, induced_indices_arr):
         # NOTE(Zihao): this implementation is not efficient and we can replace it with
