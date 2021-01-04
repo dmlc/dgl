@@ -6,7 +6,7 @@ import time
 
 from ogb.nodeproppred import DglNodePropPredDataset
 
-def load_ogb(dataset, global_norm):
+def load_ogb(dataset):
     if dataset == 'ogbn-mag':
         dataset = DglNodePropPredDataset(name=dataset)
         split_idx = dataset.get_idx_split()
@@ -33,30 +33,20 @@ def load_ogb(dataset, global_norm):
         print('Number of valid: {}'.format(len(val_idx)))
         print('Number of test: {}'.format(len(test_idx)))
 
-        # currently we do not support node feature in mag dataset.
         # calculate norm for each edge type and store in edge
-        #if global_norm is False:
-        #    for canonical_etype in hg.canonical_etypes:
-        #        u, v, eid = hg.all_edges(form='all', etype=canonical_etype)
-        #        _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
-        #        degrees = count[inverse_index]
-        #        norm = th.ones(eid.shape[0]) / degrees
-        #        norm = norm.unsqueeze(1)
-        #        hg.edges[canonical_etype].data['norm'] = norm
+        for canonical_etype in hg.canonical_etypes:
+            u, v, eid = hg.all_edges(form='all', etype=canonical_etype)
+            _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
+            degrees = count[inverse_index]
+            norm = th.ones(eid.shape[0]) / degrees
+            norm = norm.unsqueeze(1)
+            hg.edges[canonical_etype].data['norm'] = norm
 
         # get target category id
         category_id = len(hg.ntypes)
         for i, ntype in enumerate(hg.ntypes):
             if ntype == category:
                 category_id = i
-
-        #if global_norm:
-        #    u, v, eid = g.all_edges(form='all')
-        #    _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
-        #    degrees = count[inverse_index]
-        #    norm = th.ones(eid.shape[0]) / degrees
-        #    norm = norm.unsqueeze(1)
-        #    g.edata['norm'] = norm
 
         train_mask = th.zeros((hg.number_of_nodes('paper'),), dtype=th.bool)
         train_mask[train_idx] = True
@@ -87,12 +77,10 @@ if __name__ == '__main__':
                            help='turn the graph into an undirected graph.')
     argparser.add_argument('--balance_edges', action='store_true',
                            help='balance the number of edges in each partition.')
-    argparser.add_argument('--global-norm', default=False, action='store_true',
-                           help='User global norm instead of per node type norm')
     args = argparser.parse_args()
 
     start = time.time()
-    g = load_ogb(args.dataset, args.global_norm)
+    g = load_ogb(args.dataset)
 
     print('load {} takes {:.3f} seconds'.format(args.dataset, time.time() - start))
     print('|V|={}, |E|={}'.format(g.number_of_nodes(), g.number_of_edges()))

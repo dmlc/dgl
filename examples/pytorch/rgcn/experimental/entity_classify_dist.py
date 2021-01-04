@@ -106,8 +106,7 @@ class EntityClassify(nn.Module):
         h = feats
         for layer, block in zip(self.layers, blocks):
             block = block.to(self.device)
-            h = layer(block, h, block.edata[dgl.ETYPE])
-            #h = layer(block, h, block.edata['etype'], block.edata['norm'])
+            h = layer(block, h, block.edata[dgl.ETYPE], block.edata['norm'])
         return h
 
 def init_emb(shape, dtype):
@@ -212,6 +211,22 @@ class DistEmbedLayer(nn.Module):
                 embeds[loc] = self.node_embeds[ntype](node_ids[ntype_ids == ntype_id]).to(self.dev_id)
         return embeds
 
+class GetEdgeData:
+    def __init__(self, g, feat_name, num_feats, dev_id):
+        self.g = g
+        self.feat_name = feat_name
+        self.num_feats = num_feats
+        self.dev_id = dev_id
+        self.etype_id_map = {i:etype for i, etype in enumerate(g.etypes)}
+
+    def __call__(self, edge_ids, etype_ids):
+        data = th.empty(edge_ids.shape[0], self.num_feats, device=self.dev_id)
+        for etype_id in th.unique(etype_ids):
+            etype = self.g.etypes[etype_id]
+            loc = etype_ids == etype_id
+            assert np.all(edge_ids[loc].numpy() < self.g.number_of_edges(etype))
+            data[loc] = self.g.edges[etype].data[self.feat_name][edge_ids[loc]]
+        return data
 
 def compute_acc(results, labels):
     """
@@ -220,7 +235,7 @@ def compute_acc(results, labels):
     labels = labels.long()
     return (results == labels).float().sum() / len(results)
 
-def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, all_val_nid, all_test_nid):
+def evaluate(g, model, embed_layer, get_edata, labels, eval_loader, test_loader, all_val_nid, all_test_nid):
     model.eval()
     embed_layer.eval()
     eval_logits = []
@@ -231,6 +246,8 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, all_val_ni
     with th.no_grad():
         for sample_data in tqdm.tqdm(eval_loader):
             seeds, blocks = sample_data
+            for block in blocks:
+                block.edata['norm'] = get_edata(block.edata[dgl.EID], block.edata[dgl.ETYPE])
             feats = embed_layer(blocks[0].srcdata[dgl.NID], blocks[0].srcdata[dgl.NTYPE])
             logits = model(blocks, feats)
             eval_logits.append(logits.cpu().detach())
@@ -245,6 +262,8 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, all_val_ni
     with th.no_grad():
         for sample_data in tqdm.tqdm(test_loader):
             seeds, blocks = sample_data
+            for block in blocks:
+                block.edata['norm'] = get_edata(block.edata[dgl.EID], block.edata[dgl.ETYPE])
             feats = embed_layer(blocks[0].srcdata[dgl.NID], blocks[0].srcdata[dgl.NTYPE])
             logits = model(blocks, feats)
             test_logits.append(logits.cpu().detach())
@@ -350,6 +369,7 @@ def run(args, device, data):
                                  args.n_hidden,
                                  sparse_emb=args.sparse_embedding,
                                  dgl_sparse_emb=args.dgl_sparse)
+    get_edata = GetEdgeData(g, 'norm', 1, device)
 
     model = EntityClassify(device,
                            args.n_hidden,
@@ -427,6 +447,8 @@ def run(args, device, data):
             sample_time += tic_step - start
             sample_t.append(tic_step - start)
 
+            for block in blocks:
+                block.edata['norm'] = get_edata(block.edata[dgl.EID], block.edata[dgl.ETYPE])
             feats = embed_layer(blocks[0].srcdata[dgl.NID], blocks[0].srcdata[dgl.NTYPE])
             label = labels[seeds]
             copy_time = time.time()
@@ -470,7 +492,7 @@ def run(args, device, data):
 
         start = time.time()
         g.barrier()
-        val_acc, test_acc = evaluate(g, model, embed_layer, labels,
+        val_acc, test_acc = evaluate(g, model, embed_layer, get_edata, labels,
             valid_dataloader, test_dataloader, all_val_nid, all_test_nid)
         if val_acc >= 0:
             print('Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(val_acc, test_acc,
