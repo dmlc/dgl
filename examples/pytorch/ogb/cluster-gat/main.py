@@ -5,23 +5,14 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
-import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
-from _thread import start_new_thread
-from functools import wraps
-from dgl.data import RedditDataset
 import tqdm
-import traceback
 from ogb.nodeproppred import DglNodePropPredDataset
 
 from sampler import ClusterIter, subgraph_collate_fn
-
-#### Neighbor sampler
-
 
 class GAT(nn.Module):
     def __init__(self,
@@ -79,16 +70,15 @@ class GAT(nn.Module):
         layers.
         """
         num_heads = self.num_heads
-        nodes = th.arange(g.number_of_nodes())
         for l, layer in enumerate(self.layers):
             if l < self.n_layers - 1:
-                y = th.zeros(g.number_of_nodes(), self.n_hidden * num_heads if l != len(self.layers) - 1 else self.n_classes)
+                y = th.zeros(g.num_nodes(), self.n_hidden * num_heads if l != len(self.layers) - 1 else self.n_classes)
             else:
-                y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
+                y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.NodeDataLoader(
                     g,
-                    th.arange(g.number_of_nodes()),
+                    th.arange(g.num_nodes()),
                     sampler,
                     batch_size=batch_size,
                     shuffle=False,
@@ -98,7 +88,6 @@ class GAT(nn.Module):
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0].int().to(device)
                 h = x[input_nodes].to(device)
-                h_dst = h[:block.number_of_dst_nodes()].to(device)
                 if l < self.n_layers - 1:
                    h = layer(block, h).flatten(1)
                 else:
@@ -116,7 +105,7 @@ def compute_acc(pred, labels):
     """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, labels, val_nid, test_nid, batch_size, device):
+def evaluate(model, g, nfeat, labels, val_nid, test_nid, batch_size, device):
     """
     Evaluate the model on the validation set specified by ``val_mask``.
     g : The entire graph.
@@ -128,8 +117,7 @@ def evaluate(model, g, labels, val_nid, test_nid, batch_size, device):
     """
     model.eval()
     with th.no_grad():
-        inputs = g.ndata['feat']
-        pred = model.inference(g, inputs, batch_size, device)
+        pred = model.inference(g, nfeat, batch_size, device)
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid]), compute_acc(pred[test_nid], labels[test_nid]), pred
 
@@ -142,7 +130,8 @@ def model_param_summary(model):
 def run(args, device, data):
     # Unpack data
     train_nid, val_nid, test_nid, in_feats, labels, n_classes, g, cluster_iterator = data
-
+    labels = labels.to(device)
+    nfeat = g.ndata.pop('feat').to(device)
 
     # Define model and optimizer
     model = GAT(in_feats, args.num_heads, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
@@ -164,16 +153,18 @@ def run(args, device, data):
         # blocks.
         tic_start = time.time()
         for step, cluster in enumerate(cluster_iterator):
-            cluster = cluster.int().to(device)
-            mask = cluster.ndata['train_mask']
+            mask = cluster.ndata.pop('train_mask')
             if mask.sum() == 0:
                 continue
-            feat = cluster.ndata['feat']
-            batch_labels = cluster.ndata['labels']
+            cluster.edata.pop(dgl.EID)
+            cluster = cluster.int().to(device)
+            input_nodes = cluster.ndata[dgl.NID]
+            batch_inputs = nfeat[input_nodes]
+            batch_labels = labels[input_nodes]
             tic_step = time.time()
 
             # Compute loss and prediction
-            batch_pred = model(cluster, feat)
+            batch_pred = model(cluster, batch_inputs)
             batch_pred = batch_pred[mask]
             batch_labels = batch_labels[mask]
             loss = nn.functional.nll_loss(batch_pred, batch_labels)
@@ -199,7 +190,7 @@ def run(args, device, data):
             avg += toc - tic
 
         if epoch % args.eval_every == 0 and epoch != 0:
-            eval_acc, test_acc, pred = evaluate(model, g, labels, val_nid, test_nid, args.val_batch_size, device)
+            eval_acc, test_acc, pred = evaluate(model, g, nfeat, labels, val_nid, test_nid, args.val_batch_size, device)
             model = model.to(device)
             if args.save_pred:
                 np.savetxt(args.save_pred + '%02d' % epoch, pred.argmax(1).cpu().numpy(), '%d')
@@ -229,6 +220,11 @@ if __name__ == '__main__':
     argparser.add_argument('--wd', type=float, default=0)
     argparser.add_argument('--num_partitions', type=int, default=15000)
     argparser.add_argument('--num-workers', type=int, default=0)
+    argparser.add_argument('--data-cpu', action='store_true',
+                           help="By default the script puts all node features and labels "
+                                "on GPU when using it to save time for data copy. This may "
+                                "be undesired if they cannot fit in GPU memory at once. "
+                                "This flag disables that.")
     args = argparser.parse_args()
 
     if args.gpu >= 0:
@@ -242,22 +238,15 @@ if __name__ == '__main__':
     train_idx, val_idx, test_idx = splitted_idx['train'], splitted_idx['valid'], splitted_idx['test']
     graph, labels = data[0]
     labels = labels[:, 0]
-    print('Total edges before adding self-loop {}'.format(graph.number_of_edges()))
+    print('Total edges before adding self-loop {}'.format(graph.num_edges()))
     graph = dgl.remove_self_loop(graph)
     graph = dgl.add_self_loop(graph)
-    print('Total edges after adding self-loop {}'.format(graph.number_of_edges()))
+    print('Total edges after adding self-loop {}'.format(graph.num_edges()))
     num_nodes = train_idx.shape[0] + val_idx.shape[0] + test_idx.shape[0]
-    assert num_nodes == graph.number_of_nodes()
-    graph.ndata['labels'] = labels
+    assert num_nodes == graph.num_nodes()
     mask = th.zeros(num_nodes, dtype=th.bool)
     mask[train_idx] = True
     graph.ndata['train_mask'] = mask
-    mask = th.zeros(num_nodes, dtype=th.bool)
-    mask[val_idx] = True
-    graph.ndata['valid_mask'] = mask
-    mask = th.zeros(num_nodes, dtype=th.bool)
-    mask[test_idx] = True
-    graph.ndata['test_mask'] = mask
 
     graph.in_degrees(0)
     graph.out_degrees(0)
@@ -265,7 +254,9 @@ if __name__ == '__main__':
 
     cluster_iter_data = ClusterIter(
             'ogbn-products', graph, args.num_partitions, args.batch_size)
-    cluster_iterator = DataLoader(cluster_iter_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4, collate_fn=partial(subgraph_collate_fn, graph))
+    cluster_iterator = DataLoader(cluster_iter_data, batch_size=args.batch_size, shuffle=True,
+                                  pin_memory=True, num_workers=4,
+                                  collate_fn=partial(subgraph_collate_fn, graph))
 
     in_feats = graph.ndata['feat'].shape[1]
     n_classes = (labels.max() + 1).item()
