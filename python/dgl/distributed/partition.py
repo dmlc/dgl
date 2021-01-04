@@ -86,6 +86,22 @@ def load_partition(part_config, part_id):
     node_feats = load_tensors(part_files['node_feats'])
     edge_feats = load_tensors(part_files['edge_feats'])
     graph = load_graphs(part_files['part_graph'])[0][0]
+    # In the old format, the feature name doesn't contain node/edge type.
+    # For compatibility, let's add node/edge types to the feature names.
+    node_feats1 = {}
+    edge_feats1 = {}
+    for name in node_feats:
+        feat = node_feats[name]
+        if name.find('/') == -1:
+            name = '_N/' + name
+        node_feats1[name] = feat
+    for name in edge_feats:
+        feat = edge_feats[name]
+        if name.find('/') == -1:
+            name = '_E/' + name
+        edge_feats1[name] = feat
+    node_feats = node_feats1
+    edge_feats = edge_feats1
 
     assert NID in graph.ndata, "the partition graph should contain node mapping to global node Id"
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
