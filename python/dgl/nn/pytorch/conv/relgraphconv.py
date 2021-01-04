@@ -191,7 +191,7 @@ class RelGraphConv(nn.Module):
         ----------
         edges : dgl.EdgeBatch
             Input to DGL message UDF.
-        etypes : torch.Tensor or list
+        etypes : torch.Tensor or list[int]
             Edge type data. Could be either:
 
                 * An :math:`(|E|,)` dense tensor. Each element corresponds to the edge's type ID.
@@ -245,7 +245,21 @@ class RelGraphConv(nn.Module):
         return {'msg': msg}
 
     def bdd_message_func(self, edges, etypes):
-        """Message function for block-diagonal-decomposition regularizer"""
+        """Message function for block-diagonal-decomposition regularizer.
+
+        Parameters
+        ----------
+        edges : dgl.EdgeBatch
+            Input to DGL message UDF.
+        etypes : torch.Tensor or list[int]
+            Edge type data. Could be either:
+
+                * An :math:`(|E|,)` dense tensor. Each element corresponds to the edge's type ID.
+                  Preferred format if ``lowmem == False``.
+                * An integer list. The i^th element is the number of edges of the i^th type.
+                  This requires the input graph to store edges sorted by their type IDs.
+                  Preferred format if ``lowmem == True``.
+        """
         h = edges.src['h']
         device = h.device
 
@@ -291,7 +305,7 @@ class RelGraphConv(nn.Module):
                 * :math:`(|V|, D)` dense tensor
                 * :math:`(|V|,)` int64 vector, representing the categorical values of each
                   node. It then treat the input feature as an one-hot encoding feature.
-        etypes : torch.Tensor or list
+        etypes : torch.Tensor or list[int]
             Edge type data. Could be either
 
                 * An :math:`(|E|,)` dense tensor. Each element corresponds to the edge's type ID.
@@ -306,6 +320,15 @@ class RelGraphConv(nn.Module):
         -------
         torch.Tensor
             New node features.
+
+        Notes
+        -----
+        Under the ``low_mem`` mode, DGL will sort the graph based on the edge types
+        and compute message passing one type at a time. DGL recommends sorts the
+        graph beforehand (and cache it if possible) and provides the integer list
+        format to the ``etypes`` argument. Use DGL's :func:`~dgl.to_homogeneous` API
+        to get a sorted homogeneous graph from a heterogeneous graph. Pass ``return_count=True``
+        to it to get the ``etypes`` in integer list.
         """
         if isinstance(etypes, th.Tensor):
             if len(etypes) != g.num_edges():
@@ -348,9 +371,11 @@ class RelGraphConv(nn.Module):
             node_repr = self.dropout(node_repr)
             return node_repr
 
+_TORCH_HAS_SEARCHSORTED = getattr(th, 'searchsorted', None)
+
 def _searchsorted(sorted_sequence, values):
     # searchsorted is introduced to PyTorch in 1.6.0
-    if getattr(th, 'searchsorted', None):
+    if _TORCH_HAS_SEARCHSORTED:
         return th.searchsorted(sorted_sequence, values)
     else:
         device = values.device

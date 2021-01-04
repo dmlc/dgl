@@ -605,17 +605,20 @@ def to_homogeneous(G, ndata=None, edata=None, store_type=True, return_count=Fals
     -------
     DGLGraph
         A homogeneous graph.
-    ntype_count : list[int]
-        Number of nodes of each type.
-    etype_count : list[int]
-        Number of edges of each type.
+    ntype_count : list[int], optional
+        Number of nodes of each type. Return when ``return_count`` is True.
+    etype_count : list[int], optional
+        Number of edges of each type. Return when ``return_count`` is True.
 
-    Note
-    ----
-    Calculating type information may introduce noticeable cost. Setting both ``store_type``
-    and ``return_count`` to False can avoid such cost if type information is not needed.
-    Otherwise, DGL recommends to use ``store_type=False`` and ``return_count=True`` due
-    to its memory efficiency.
+    Notes
+    -----
+
+    * Calculating type information may introduce noticeable cost. Setting both ``store_type``
+      and ``return_count`` to False can avoid such cost if type information is not needed.
+      Otherwise, DGL recommends to use ``store_type=False`` and ``return_count=True`` due
+      to its memory efficiency.
+    * The ``ntype_count`` and ``etype_count`` lists can help speed up some operations.
+      See :class:`~dgl.nn.pytorch.conv.RelGraphConv` for such an example.
 
     Examples
     --------
