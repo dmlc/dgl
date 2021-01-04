@@ -137,6 +137,11 @@ above.
 
 .. code:: python
 
+    def compute_loss(pos_score, neg_score):
+        # an example hinge loss
+        n = pos_score.shape[0]
+        return (neg_score.view(n, -1) - pos_score.view(n, -1) + 1).clamp(min=0).mean()
+
     model = Model(in_features, hidden_features, out_features)
     model = model.cuda()
     opt = torch.optim.Adam(model.parameters())
