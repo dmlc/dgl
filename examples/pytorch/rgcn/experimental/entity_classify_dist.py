@@ -345,7 +345,7 @@ def run(args, device, data):
 
     if args.sparse_embedding:
         if args.dgl_sparse:
-            emb_optimizer = dgl.distributed.SparseAdagrad([embed_layer.node_embeds], lr=args.sparse_lr)
+            emb_optimizer = dgl.distributed.SparseAdam([embed_layer.node_embeds], lr=args.sparse_lr)
         else:
             emb_optimizer = th.optim.SparseAdam(embed_layer.module.node_embeds.parameters(), lr=args.sparse_lr)
         optimizer = th.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)
