@@ -118,23 +118,26 @@ def _restore_blocks_storage(blocks, g):
 
 class _NodeCollator(NodeCollator):
     def collate(self, items):
-        input_nodes, output_nodes, blocks = super().collate(items)
-        _pop_blocks_storage(blocks, self.g)
-        return input_nodes, output_nodes, blocks
+        # input_nodes, output_nodes, [items], blocks
+        result = super().collate(items)
+        _pop_blocks_storage(result[-1], self.g)
+        return result
 
 class _EdgeCollator(EdgeCollator):
     def collate(self, items):
         if self.negative_sampler is None:
-            input_nodes, pair_graph, blocks = super().collate(items)
-            _pop_subgraph_storage(pair_graph, self.g)
-            _pop_blocks_storage(blocks, self.g_sampling)
-            return input_nodes, pair_graph, blocks
+            # input_nodes, pair_graph, [items], blocks
+            result = super().collate(items)
+            _pop_subgraph_storage(result[1], self.g)
+            _pop_blocks_storage(result[-1], self.g_sampling)
+            return result
         else:
-            input_nodes, pair_graph, neg_pair_graph, blocks = super().collate(items)
-            _pop_subgraph_storage(pair_graph, self.g)
-            _pop_subgraph_storage(neg_pair_graph, self.g)
-            _pop_blocks_storage(blocks, self.g_sampling)
-            return input_nodes, pair_graph, neg_pair_graph, blocks
+            # input_nodes, pair_graph, neg_pair_graph, [items], blocks
+            result = super().collate(items)
+            _pop_subgraph_storage(result[1], self.g)
+            _pop_subgraph_storage(result[2], self.g)
+            _pop_blocks_storage(result[-1], self.g_sampling)
+            return result
 
 class _NodeDataLoaderIter:
     def __init__(self, node_dataloader):
@@ -142,9 +145,10 @@ class _NodeDataLoaderIter:
         self.iter_ = iter(node_dataloader.dataloader)
 
     def __next__(self):
-        input_nodes, output_nodes, blocks = next(self.iter_)
-        _restore_blocks_storage(blocks, self.node_dataloader.collator.g)
-        return input_nodes, output_nodes, blocks
+        # input_nodes, output_nodes, [items], blocks
+        result = next(self.iter_)
+        _restore_blocks_storage(result[-1], self.node_dataloader.collator.g)
+        return result
 
 class _EdgeDataLoaderIter:
     def __init__(self, edge_dataloader):
@@ -153,16 +157,18 @@ class _EdgeDataLoaderIter:
 
     def __next__(self):
         if self.edge_dataloader.collator.negative_sampler is None:
-            input_nodes, pair_graph, blocks = next(self.iter_)
-            _restore_subgraph_storage(pair_graph, self.edge_dataloader.collator.g)
-            _restore_blocks_storage(blocks, self.edge_dataloader.collator.g_sampling)
-            return input_nodes, pair_graph, blocks
+            # input_nodes, pair_graph, [items], blocks
+            result = next(self.iter_)
+            _restore_subgraph_storage(result[1], self.edge_dataloader.collator.g)
+            _restore_blocks_storage(result[-1], self.edge_dataloader.collator.g_sampling)
+            return result
         else:
-            input_nodes, pair_graph, neg_pair_graph, blocks = next(self.iter_)
-            _restore_subgraph_storage(pair_graph, self.edge_dataloader.collator.g)
-            _restore_subgraph_storage(neg_pair_graph, self.edge_dataloader.collator.g)
-            _restore_blocks_storage(blocks, self.edge_dataloader.collator.g_sampling)
-            return input_nodes, pair_graph, neg_pair_graph, blocks
+            # input_nodes, pair_graph, neg_pair_graph, [items], blocks
+            result = next(self.iter_)
+            _restore_subgraph_storage(result[1], self.edge_dataloader.collator.g)
+            _restore_subgraph_storage(result[2], self.edge_dataloader.collator.g)
+            _restore_blocks_storage(result[-1], self.edge_dataloader.collator.g_sampling)
+            return result
 
 class NodeDataLoader:
     """PyTorch dataloader for batch-iterating over a set of nodes, generating the list
