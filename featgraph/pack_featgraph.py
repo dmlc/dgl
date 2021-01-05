@@ -1,6 +1,6 @@
 """ Export featgraph kernels to a shared library. """
 import tvm
-from sddmm import sddmm_tree_reduction_gpu
+from featgraph import gsddmm
 
 
 def get_sddmm_kernels_gpu(idtypes, dtypes):
@@ -32,9 +32,8 @@ if __name__ == '__main__':
     idtypes = ['int32', 'int64']
     dtypes = ['float16', 'float64', 'float32', 'int32', 'int64']
 
-    kernels += get_sddmm_kernels_gpu(idtypes, dtypes)
+    #kernels += get_sddmm_kernels_gpu(idtypes, dtypes)
 
     # build kernels and export the module to libfeatgraph_kernels.so
     module = tvm.build(kernels, target='cuda', target_host='llvm')
     module.export_library(binary_path)
-
