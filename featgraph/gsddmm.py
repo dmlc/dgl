@@ -3,10 +3,8 @@ import tvm
 from tvm import te
 from tvm import topi
 from tvm.topi.utils import prod, ravel_index, unravel_index
-from tvm.tir import IntImm, Max
+from tvm.tir import IntImm
 from utils import binary_op_map
-
-__all__ = ['gsddmm']
 
 
 class TargetCode:
@@ -71,7 +69,7 @@ def _sddmm_cuda_tree_reduce(sched, out):
 
 
 def gsddmm(binary_op,
-           lhs_code, rhs_code,
+           ndim,
            indice_type, feat_type,
            lhs_target=TargetCode.SRC, rhs_target=TargetCode.DST,
            schedule_type="tree",
@@ -84,12 +82,8 @@ def gsddmm(binary_op,
     binary_op : str
         Type of binary operatiin, could be ``add``, ``sub``, ``mul``,
         ``div`` or ``dot``.
-    lhs_code : str
-        A string with length d (the rank of lhs operand) composed of ``1`` and ``x``
-        that indicates whether each dimension needs broadcasting or not.
-    rhs_code : str
-        A string with length d (the rank of rhs operand) composed of ``1`` and ``x``
-        that indicates whether each dimension needs broadcasting or not.
+    ndim : int
+        Dimentionality.
     indice_type : str
         Type of graph indices, could be ``int32`` or ``int64``.
     feat_type : str
@@ -127,11 +121,9 @@ def gsddmm(binary_op,
         else:
             raise DGLError('Unknown target')
 
-    assert len(lhs_code) == len(rhs_code), "lhs code must have equal length with rhs code"
-    ndim = len(lhs_code)
-    out_feat_shp = [te.var('d{}'.format(i), indice_type) for i in range(ndim)]
-    lhs_feat_shp = [di if ci == 'x' else IntImm(indice_type, 1) for ci, di in zip(lhs_code, out_feat_shp)]
-    rhs_feat_shp = [di if ci == 'x' else IntImm(indice_type, 1) for ci, di in zip(rhs_code, out_feat_shp)]
+    out_feat_shp = [te.var('d_o{}'.format(i), indice_type) for i in range(ndim)]
+    lhs_feat_shp = [te.var('d_l{}'.format(i), indice_type) for i in range(ndim)]
+    rhs_feat_shp = [te.var('d_r{}'.format(i), indice_type) for i in range(ndim)]
     lhs = create_placeholder(lhs_target, tuple(lhs_feat_shp), 'lhs')
     rhs = create_placeholder(rhs_target, tuple(rhs_feat_shp), 'rhs')
 
@@ -169,7 +161,7 @@ def gsddmm(binary_op,
     f_name = '_'.join(str(x) for x in [
         'sddmm', binary_op, ndim,
         indice_type, feat_type,
-        lhs_target, rhs_target, schedule_type])
+        lhs_target, rhs_target, schedule_type, target])
     f_input += [lhs, rhs, out]
 
     # bind autobroadcast buffer

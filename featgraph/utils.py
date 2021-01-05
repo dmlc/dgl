@@ -2,8 +2,6 @@
 from tvm.tir import Select, const
 from tvm import te
 
-__all__ = ["irreducible_ops", "reduce_op_map", "binary_op_map"]
-
 
 def reducible(x, y, ndim):
     x0 = x & 1
