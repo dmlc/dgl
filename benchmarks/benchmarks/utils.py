@@ -27,7 +27,8 @@ def _download(url, path, filename):
 
 
 def get_livejournal():
-    _download('https://snap.stanford.edu/data/soc-LiveJournal1.txt.gz',
+    # Same as https://snap.stanford.edu/data/soc-LiveJournal1.txt.gz
+    _download('https://dgl-asv-data.s3-us-west-2.amazonaws.com/dataset/livejournal/soc-LiveJournal1.txt.gz',
               '/tmp/dataset', 'soc-LiveJournal1.txt.gz')
     df = pandas.read_csv('/tmp/dataset/soc-LiveJournal1.txt.gz', sep='\t', skiprows=4, header=None,
                          names=['src', 'dst'], compression='gzip')
@@ -38,7 +39,8 @@ def get_livejournal():
 
 
 def get_filmbaster():
-    _download('https://snap.stanford.edu/data/bigdata/communities/com-friendster.ungraph.txt.gz',
+    # Same as https://snap.stanford.edu/data/bigdata/communities/com-friendster.ungraph.txt.gz
+    _download('https://dgl-asv-data.s3-us-west-2.amazonaws.com/dataset/friendster/com-friendster.ungraph.txt.gz',
               '/tmp/dataset', 'com-friendster.ungraph.txt.gz')
     df = pandas.read_csv('/tmp/dataset/com-friendster.ungraph.txt.gz', sep='\t', skiprows=4, header=None,
                          names=['src', 'dst'], compression='gzip')

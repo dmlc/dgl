@@ -15,10 +15,12 @@ docker pull dgllib/dgl-ci-gpu:conda
 if [[ $DEVICE == "cpu" ]]; then
     docker run --name dgl-reg \
         --rm \
+        -v /tmp/.dgl/:/tmp/dataset \
         --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
 else
     docker run --name dgl-reg \
         --rm --runtime=nvidia \
+        -v /tmp/.dgl/:/tmp/dataset \
         --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
 fi
 
