@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from collections import defaultdict
 from itertools import product
 
-def _check_neighbor_sampling_dataloader(g, nids, dl, mode):
+def _check_neighbor_sampling_dataloader(g, nids, dl, mode, collator):
     seeds = defaultdict(list)
 
     for item in dl:
@@ -21,7 +21,25 @@ def _check_neighbor_sampling_dataloader(g, nids, dl, mode):
             for ntype in pair_graph.ntypes:
                 assert F.array_equal(pair_graph.nodes[ntype].data[dgl.NID], neg_graph.nodes[ntype].data[dgl.NID])
 
-        # TODO: check if items match output nodes
+        # TODO: check if items match output nodes/edges
+        if mode == 'node':
+            if len(g.ntypes) > 1:
+                for ntype in g.ntypes:
+                    if ntype not in items:
+                        assert len(output_nodes[ntype]) == 0
+                    else:
+                        assert F.array_equal(output_nodes[ntype], F.gather_row(collator.nids[ntype], items[ntype]))
+            else:
+                assert F.array_equal(output_nodes, F.gather_row(collator.nids, items))
+        else:
+            if len(g.etypes) > 1:
+                for etype, eids in collator.eids.items():
+                    if etype not in items:
+                        assert pair_graph.num_edges(etype=etype) == 0
+                    else:
+                        assert F.array_equal(pair_graph.edges[etype].data[dgl.EID], F.gather_row(eids, items[etype]))
+            else:
+                assert F.array_equal(pair_graph.edata[dgl.EID], F.gather_row(collator.eids, items))
 
         if len(g.ntypes) > 1:
             for ntype in g.ntypes:
@@ -188,7 +206,7 @@ def test_neighbor_sampler_dataloader():
     for _g, nid, collator, mode in zip(graphs, nids, collators, modes):
         dl = DataLoader(
             collator.dataset, collate_fn=collator.collate, batch_size=2, shuffle=True, drop_last=False)
-        _check_neighbor_sampling_dataloader(_g, nid, dl, mode)
+        _check_neighbor_sampling_dataloader(_g, nid, dl, mode, collator)
 
 
 if __name__ == '__main__':

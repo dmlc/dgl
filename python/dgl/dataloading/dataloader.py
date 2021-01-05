@@ -323,12 +323,13 @@ class NodeCollator(Collator):
 
         if isinstance(nids, Mapping):
             self.nids = utils.prepare_tensor_dict(g, nids, 'nids')
-            dataset = {k: F.arange(0, len(v), F.dtype(v), F.ctx(v))
+            dataset = {k: F.arange(0, len(v), F.dtype(v), F.context(v))
                        for k, v in self.nids.items()} if return_indices else self.nids
             self._dataset = utils.FlattenedDict(dataset)
         else:
             self.nids = utils.prepare_tensor(g, nids, 'nids')
-            self._dataset = F.arange(0, len(v), F.dtype(v), F.ctx(v)) if return_indices else nids
+            self._dataset = F.arange(0, len(nids), F.dtype(nids), F.context(nids)) \
+                            if return_indices else nids
 
     @property
     def dataset(self):
@@ -581,12 +582,13 @@ class EdgeCollator(Collator):
 
         if isinstance(eids, Mapping):
             self.eids = utils.prepare_tensor_dict(g, eids, 'eids')
-            dataset = {k: F.arange(0, len(v), F.dtype(v), F.ctx(v))
+            dataset = {k: F.arange(0, len(v), F.dtype(v), F.context(v))
                        for k, v in self.eids.items()} if return_indices else self.eids
             self._dataset = utils.FlattenedDict(dataset)
         else:
             self.eids = utils.prepare_tensor(g, eids, 'eids')
-            self._dataset = F.arange(0, len(v), F.dtype(v), F.ctx(v)) if return_indices else eids
+            self._dataset = F.arange(0, len(eids), F.dtype(eids), F.context(eids)) \
+                            if return_indices else eids
 
     @property
     def dataset(self):
