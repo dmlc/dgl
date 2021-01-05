@@ -11,15 +11,17 @@ def _check_neighbor_sampling_dataloader(g, nids, dl, mode):
 
     for item in dl:
         if mode == 'node':
-            input_nodes, output_nodes, blocks = item
+            input_nodes, output_nodes, items, blocks = item
         elif mode == 'edge':
-            input_nodes, pair_graph, blocks = item
+            input_nodes, pair_graph, items, blocks = item
             output_nodes = pair_graph.ndata[dgl.NID]
         elif mode == 'link':
-            input_nodes, pair_graph, neg_graph, blocks = item
+            input_nodes, pair_graph, neg_graph, items, blocks = item
             output_nodes = pair_graph.ndata[dgl.NID]
             for ntype in pair_graph.ntypes:
                 assert F.array_equal(pair_graph.nodes[ntype].data[dgl.NID], neg_graph.nodes[ntype].data[dgl.NID])
+
+        # TODO: check if items match output nodes
 
         if len(g.ntypes) > 1:
             for ntype in g.ntypes:
@@ -28,6 +30,7 @@ def _check_neighbor_sampling_dataloader(g, nids, dl, mode):
         else:
             assert F.array_equal(input_nodes, blocks[0].srcdata[dgl.NID])
             assert F.array_equal(output_nodes, blocks[-1].dstdata[dgl.NID])
+
         prev_dst = {ntype: None for ntype in g.ntypes}
         for block in blocks:
             for canonical_etype in block.canonical_etypes:
@@ -110,31 +113,34 @@ def test_neighbor_sampler_dataloader():
     for seeds, sampler in product(
             [F.tensor([0, 1, 2, 3, 5], dtype=F.int64), F.tensor([4, 5], dtype=F.int64)],
             [g_sampler1, g_sampler2]):
-        collators.append(dgl.dataloading.NodeCollator(g, seeds, sampler))
+        collators.append(dgl.dataloading.NodeCollator(g, seeds, sampler, return_indices=True))
         graphs.append(g)
         nids.append({'user': seeds})
         modes.append('node')
 
-        collators.append(dgl.dataloading.EdgeCollator(g, seeds, sampler))
+        collators.append(dgl.dataloading.EdgeCollator(g, seeds, sampler, return_indices=True))
         graphs.append(g)
         nids.append({'follow': seeds})
         modes.append('edge')
 
         collators.append(dgl.dataloading.EdgeCollator(
-            g, seeds, sampler, exclude='reverse_id', reverse_eids=reverse_eids))
+            g, seeds, sampler, exclude='reverse_id', reverse_eids=reverse_eids,
+            return_indices=True))
         graphs.append(g)
         nids.append({'follow': seeds})
         modes.append('edge')
 
         collators.append(dgl.dataloading.EdgeCollator(
-            g, seeds, sampler, negative_sampler=dgl.dataloading.negative_sampler.Uniform(2)))
+            g, seeds, sampler, negative_sampler=dgl.dataloading.negative_sampler.Uniform(2),
+            return_indices=True))
         graphs.append(g)
         nids.append({'follow': seeds})
         modes.append('link')
 
         collators.append(dgl.dataloading.EdgeCollator(
             g, seeds, sampler, exclude='reverse_id', reverse_eids=reverse_eids,
-            negative_sampler=dgl.dataloading.negative_sampler.Uniform(2)))
+            negative_sampler=dgl.dataloading.negative_sampler.Uniform(2),
+            return_indices=True))
         graphs.append(g)
         nids.append({'follow': seeds})
         modes.append('link')
@@ -143,7 +149,7 @@ def test_neighbor_sampler_dataloader():
             [{'user': F.tensor([0, 1, 3, 5], dtype=F.int64), 'game': F.tensor([0, 1, 2], dtype=F.int64)},
              {'user': F.tensor([4, 5], dtype=F.int64), 'game': F.tensor([0, 1, 2], dtype=F.int64)}],
             [hg_sampler1, hg_sampler2]):
-        collators.append(dgl.dataloading.NodeCollator(hg, seeds, sampler))
+        collators.append(dgl.dataloading.NodeCollator(hg, seeds, sampler, return_indices=True))
         graphs.append(hg)
         nids.append(seeds)
         modes.append('node')
@@ -152,26 +158,29 @@ def test_neighbor_sampler_dataloader():
             [{'follow': F.tensor([0, 1, 3, 5], dtype=F.int64), 'play': F.tensor([1, 3], dtype=F.int64)},
              {'follow': F.tensor([4, 5], dtype=F.int64), 'play': F.tensor([1, 3], dtype=F.int64)}],
             [hg_sampler1, hg_sampler2]):
-        collators.append(dgl.dataloading.EdgeCollator(hg, seeds, sampler))
+        collators.append(dgl.dataloading.EdgeCollator(hg, seeds, sampler, return_indices=True))
         graphs.append(hg)
         nids.append(seeds)
         modes.append('edge')
 
         collators.append(dgl.dataloading.EdgeCollator(
-            hg, seeds, sampler, exclude='reverse_types', reverse_etypes=reverse_etypes))
+            hg, seeds, sampler, exclude='reverse_types', reverse_etypes=reverse_etypes,
+            return_indices=True))
         graphs.append(hg)
         nids.append(seeds)
         modes.append('edge')
 
         collators.append(dgl.dataloading.EdgeCollator(
-            hg, seeds, sampler, negative_sampler=dgl.dataloading.negative_sampler.Uniform(2)))
+            hg, seeds, sampler, negative_sampler=dgl.dataloading.negative_sampler.Uniform(2),
+            return_indices=True))
         graphs.append(hg)
         nids.append(seeds)
         modes.append('link')
 
         collators.append(dgl.dataloading.EdgeCollator(
             hg, seeds, sampler, exclude='reverse_types', reverse_etypes=reverse_etypes,
-            negative_sampler=dgl.dataloading.negative_sampler.Uniform(2)))
+            negative_sampler=dgl.dataloading.negative_sampler.Uniform(2),
+            return_indices=True))
         graphs.append(hg)
         nids.append(seeds)
         modes.append('link')
