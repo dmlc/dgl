@@ -2,7 +2,48 @@
 from tvm.tir import Select, const
 from tvm import te
 
-__all__ = ["reduce_op_map", "binary_op_map"]
+__all__ = ["irreducible_ops", "reduce_op_map", "binary_op_map"]
+
+
+def reducible(x, y, ndim):
+    x0 = x & 1
+    y0 = y & 1
+    if x0 == 1 and y0 == 1:
+        return True
+    x >>= 1
+    y >>= 1
+    for _ in range(ndim - 1):
+        x1 = x & 1
+        y1 = y & 1
+        if x1 == y1 and x0 == y0:
+            return True
+        if x1 == 1 and y1 == 1:
+            return True
+        if x1 == 1 and x0 == 1:
+            return True
+        if y1 == 1 and y0 == 1:
+            return True
+        x0, y0 = x1, y1
+        x >>= 1
+        y >>= 1
+    return False
+
+
+def binary_to_code(b, ndim):
+    rst = ""
+    for _ in range(ndim):
+        rst += "1" if b & 1 else "x"
+        b >>= 1
+    return rst
+
+
+def irreducible_ops(ndim):
+    ret = []
+    for i in range(1 << ndim):
+        for j in range(1 << ndim): 
+            if not reducible(i, j, ndim):
+                ret.append((binary_to_code(i, ndim), binary_to_code(j, ndim)))
+    return ret
 
 
 def max_combine(x, y):
@@ -46,12 +87,10 @@ def min_identity(x, y, z=None):
 argmax = te.comm_reducer(max_combine, max_identity, name='argmax')
 argmin = te.comm_reducer(min_combine, min_identity, name='argmin')
 
-
 reduce_op_map = {
     'max': argmax,
     'min': argmin
 }
-
 
 binary_op_map = {
     'add': lambda x, y: x + y,
@@ -61,3 +100,4 @@ binary_op_map = {
     'copy_lhs' : lambda x, y: x,
     'copy_rhs' : lambda x, y: y,
 }
+
