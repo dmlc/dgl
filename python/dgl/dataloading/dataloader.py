@@ -370,7 +370,7 @@ class NodeCollator(Collator):
 
         return input_nodes, output_nodes, blocks
 
-class NodeIdxCollator(NodeCollator):
+class NodeIdxCollator(Collator):
     """DGL collator to combine nodes and their computation dependencies within a minibatch for
     training node classification or regression on a single graph with neighborhood sampling.
 
@@ -417,6 +417,10 @@ class NodeIdxCollator(NodeCollator):
             self._dataset = utils.FlattenedDict(indices)
         else:
             self._dataset = indices
+
+    @property
+    def dataset(self):
+        return self._dataset
 
     def collate(self, items):
         """Find the list of blocks necessary for computing the representation of given
