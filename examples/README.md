@@ -35,8 +35,8 @@
 | [Molecular Graph Convolutions: Moving Beyond Fingerprints](#weave)                                                       |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [LINE: Large-scale Information Network Embedding](#line)                                                                 |                     | :heavy_check_mark:               |                           |                    | :heavy_check_mark: |
 | [DeepWalk: Online Learning of Social Representations](#deepwalk)                                                         |                     | :heavy_check_mark:               |                           |                    | :heavy_check_mark: |
-|                                                            |   |                                  |                           |                    |                    |
-|                                                            |   |                                  |                           |                    |                    |
+| [Self-Attention Graph Pooling](#sagpool)                                                                                 |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [Convolutional Networks on Graphs for Learning Molecular Fingerprints](#nf)                                              |                     |                                  | :heavy_check_mark:        |                    |                    |
 
 ## 2020
 
@@ -129,6 +129,10 @@
 - <a name="mixhop"></a> Abu-El-Haija et al. MixHop: Higher-Order Graph Convolutional Architectures via Sparsified Neighborhood Mixing. [Paper link](https://arxiv.org/abs/1905.00067).
     - Example code: [PyTorch](../examples/pytorch/mixhop)
     - Tags: node classification
+
+- <a name="sagpool"></a> Lee, Junhyun, et al. Self-Attention Graph Pooling. [Paper link](https://arxiv.org/abs/1904.08082).
+    - Example code: [PyTorch](../examples/pytorch/sagpool)
+    - Tags: graph classification, pooling
 
 ## 2018
 
@@ -261,6 +265,10 @@
 - <a name="distmul"></a> Yang et al. Embedding Entities and Relations for Learning and Inference in Knowledge Bases. [Paper link](https://arxiv.org/abs/1412.6575).
     - Example code: [PyTorch](https://github.com/awslabs/dgl-ke/tree/master/examples), [PyTorch for custom data](https://aws-dglke.readthedocs.io/en/latest/commands.html)
     - Tags: knowledge graph embedding
+
+- <a name="nf"></a> Duvenaud et al. Convolutional Networks on Graphs for Learning Molecular Fingerprints. [Paper link](https://arxiv.org/abs/1509.09292).
+    - Example code: [PyTorch](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/moleculenet), [PyTorch for custom data](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/csv_data_configuration)
+    - Tags: molecules, molecular property prediction
 
 ## 2014
 

@@ -7,37 +7,56 @@ import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 import dgl.nn.pytorch as dglnn
 import time
+import traceback
 
 from .. import utils
 
-class SAGE(nn.Module):
+class GAT(nn.Module):
     def __init__(self,
                  in_feats,
+                 num_heads,
                  n_hidden,
                  n_classes,
                  n_layers,
                  activation,
-                 dropout):
+                 dropout=0.):
         super().__init__()
         self.n_layers = n_layers
         self.n_hidden = n_hidden
         self.n_classes = n_classes
         self.layers = nn.ModuleList()
-        self.layers.append(dglnn.SAGEConv(in_feats, n_hidden, 'mean'))
+        self.num_heads = num_heads
+        self.layers.append(dglnn.GATConv(in_feats,
+                                         n_hidden,
+                                         num_heads=num_heads,
+                                         feat_drop=dropout,
+                                         attn_drop=dropout,
+                                         activation=activation,
+                                         negative_slope=0.2))
         for i in range(1, n_layers - 1):
-            self.layers.append(dglnn.SAGEConv(n_hidden, n_hidden, 'mean'))
-        self.layers.append(dglnn.SAGEConv(n_hidden, n_classes, 'mean'))
-        self.dropout = nn.Dropout(dropout)
-        self.activation = activation
+            self.layers.append(dglnn.GATConv(n_hidden * num_heads,
+                                             n_hidden,
+                                             num_heads=num_heads,
+                                             feat_drop=dropout,
+                                             attn_drop=dropout,
+                                             activation=activation,
+                                             negative_slope=0.2))
+        self.layers.append(dglnn.GATConv(n_hidden * num_heads,
+                                         n_classes,
+                                         num_heads=num_heads,
+                                         feat_drop=dropout,
+                                         attn_drop=dropout,
+                                         activation=None,
+                                         negative_slope=0.2))
 
     def forward(self, blocks, x):
         h = x
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):
             h = layer(block, h)
-            if l != len(self.layers) - 1:
-                h = self.activation(h)
-                h = self.dropout(h)
-        return h
+            if l < len(self.layers) - 1:
+                h = h.flatten(1)
+        h = h.mean(1)
+        return h.log_softmax(dim=-1)
 
 def load_subtensor(g, seeds, input_nodes, device):
     """
@@ -55,6 +74,7 @@ def track_time(data):
     g = data[0]
     g.ndata['features'] = g.ndata['feat']
     g.ndata['labels'] = g.ndata['label']
+    g = g.remove_self_loop().add_self_loop()
     in_feats = g.ndata['features'].shape[1]
     n_classes = data.num_labels
 
@@ -64,6 +84,7 @@ def track_time(data):
 
     num_epochs = 20
     num_hidden = 16
+    num_heads = 8
     num_layers = 2
     fan_out = '10,25'
     batch_size = 1024
@@ -86,7 +107,7 @@ def track_time(data):
         num_workers=num_workers)
 
     # Define model and optimizer
-    model = SAGE(in_feats, num_hidden, n_classes, num_layers, F.relu, dropout)
+    model = GAT(in_feats, num_heads, num_hidden, n_classes, num_layers, F.relu, dropout)
     model = model.to(device)
     loss_fcn = nn.CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
