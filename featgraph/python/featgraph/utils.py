@@ -54,10 +54,10 @@ reduce_op_map = {
 
 
 binary_op_map = {
-    'add': lambda x, y: x+y,
-    'sub': lambda x, y: x-y,
-    'mul': lambda x, y: x*y,
-    'div': lambda x, y: x/y,
+    'add': lambda x, y: x + y,
+    'sub': lambda x, y: x - y,
+    'mul': lambda x, y: x * y,
+    'div': lambda x, y: x / y,
     'copy_lhs' : lambda x, y: x,
     'copy_rhs' : lambda x, y: y,
 }

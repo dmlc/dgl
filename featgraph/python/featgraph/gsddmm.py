@@ -1,49 +1,55 @@
-""" The compute function and schedules for SDDMM kernels written in TVM. """
+""" The compute function and schedules for GSDDMM kernels written in TVM. """
 import tvm
 from tvm import te
 from tvm import topi
-from tvm.tir import IntImm
-from .util import binary_op_map
+from tvm.topi.utils import prod, ravel_index, unravel_index
+from tvm.tir import IntImm, Max
+from utils import binary_op_map
 
 __all__ = ['gsddmm']
 
 
+class TargetCode:
+    SRC = 0
+    DST = 1
+    EDGE = 2
+
+
 def _sddmm_compute(out_shp, binary_op,
-                   lhs, rhs,
-                   lhs_idx, rhs_idx):
+                   lhs, rhs, lhs_idx, rhs_idx):
     reduce_size = lhs.shape[-1] if binary_op == 'dot' else 1
-    feat_len = topi.util.get_const_int(topi.util.prod(out_shp[1:]))
+    feat_len = prod(out_shp[1:])
     feat_len *= reduce_size
-    # assume feat_len is a multiply of num_feat_partitions
-    feat_len_per_partition = feat_len // num_feat_partitions
     if binary_op == 'dot':
         k = te.reduce_axis((0, reduce_size), name='k')
         def dot_edge_func(*args):
             eid = args[0]
-            fid = topi.util.ravel_index(args[1:], out_shp[1:])
+            fid = ravel_index(args[1:], out_shp[1:])
             fid *= reduce_size
-            lval = lhs((lhs_idx(eid),) + args[1: -1] + (k,))
-            rval = rhs((rhs_idx(eid),) + args[1: -1] + (k,))
+            lval = lhs.__getitem__((lhs_idx(eid),) + args[1: -1] + (k,))
+            rval = rhs.__getitem__((rhs_idx(eid),) + args[1: -1] + (k,))
             return te.sum(lval * rval, axis=k)
         out = te.compute(out_shp, dot_edge_func, name='out')
     else:
         def edge_func(*args):
             eid = args[0]
-            fid = topi.util.ravel_index(args[1:], out_shp[1:])
-            lval = lhs((lhs_idx(eid),) + args[1:])
-            rval = rhs((rhs_idx(eid),) + args[1:])
+            fid = ravel_index(args[1:], out_shp[1:])
+            lval = lhs.__getitem__((lhs_idx(eid),) + args[1:])
+            rval = rhs.__getitem__((rhs_idx(eid),) + args[1:])
             return binary_op_map[binary_op](lval, rval)
         out = te.compute(out_shp, edge_func, name='out')
-    return out, reshapes
+    return out
 
 
 def _sddmm_cuda_general(sched, out):
-    out_len = topi.util.get_const_int(topi.util.prod(out.shape[1:]))
+    out_len = prod(out.shape[1:])
     edge_axis = out.op.axis[0]
     feat_axis = sched[out].fuse(*out.op.axis[1:])
-    ntx = tvm.autotvm.task.space.get_pow2s(out_len)[-1]
-    ntx = 1024 if ntx > 1024 else ntx
-    nty = 1024 // ntx
+    #ntx = tvm.autotvm.task.space.get_pow2s(out_len)[-1]
+    #ntx = 1024 if ntx > 1024 else ntx
+    #nty = 1024 // ntx
+    ntx = 32
+    nty = 32
     feat_outer, feat_inner = sched[out].split(feat_axis, factor=ntx)
     edge_outer, edge_inner = sched[out].split(edge_axis, factor=nty)
     sched[out].bind(feat_inner, te.thread_axis('threadIdx.x'))
@@ -64,10 +70,10 @@ def _sddmm_cuda_tree_reduce(sched, out):
     sched[out].bind(edge_outer, te.thread_axis('blockIdx.x'))
 
 
-def gsddmm(binary_op, ndim,
+def gsddmm(binary_op,
+           lhs_code, rhs_code,
            indice_type, feat_type,
            lhs_target=TargetCode.SRC, rhs_target=TargetCode.DST,
-           use_edge_idx=False,
            schedule_type="tree",
            target='cuda'):
     """
@@ -78,8 +84,12 @@ def gsddmm(binary_op, ndim,
     binary_op : str
         Type of binary operatiin, could be ``add``, ``sub``, ``mul``,
         ``div`` or ``dot``.
-    ndim : int
-        The number of feature dimensions.
+    lhs_code : str
+        A string with length d (the rank of lhs operand) composed of ``1`` and ``x``
+        that indicates whether each dimension needs broadcasting or not.
+    rhs_code : str
+        A string with length d (the rank of rhs operand) composed of ``1`` and ``x``
+        that indicates whether each dimension needs broadcasting or not.
     indice_type : str
         Type of graph indices, could be ``int32`` or ``int64``.
     feat_type : str
@@ -89,10 +99,8 @@ def gsddmm(binary_op, ndim,
         Indicates the left-hand-side tensor's target.
     rhs_target : TargetCode
         Indicates the right-hand-side tensor's target.
-    use_edge_idx : bool
-        Indicates whether to use edge index or not.
     schedule_type : str
-        Specifies the schedule type.
+        Specifies the schedule type, could be either ``tree`` or ``general``.
     target : str
         Indicates where kernels are run, i.e. CPU or GPU.
 
@@ -107,7 +115,6 @@ def gsddmm(binary_op, ndim,
     # placeholder for sparse matrix
     adj_row_indices = te.placeholder((nnz,), indice_type, 'adj_row_indices')
     adj_col_indices = te.placeholder((nnz,), indice_type, 'adj_col_indices')
-    edge_indices = te.placeholder((nnz,), indice_type, 'edge_indices')
 
     # placeholder for dense features
     def create_placeholder(target, feat_shp, name):
@@ -120,25 +127,13 @@ def gsddmm(binary_op, ndim,
         else:
             raise DGLError('Unknown target')
 
-    def shfl_edge_feat(feat, name):
-        def _shfl(*args):
-            eid = args[0]
-            return feat((edge_indices[eid],) + args[1:])
-        return te.compute(feat.shape, _shfl, name=name)
-
-    lhs_feat_shp = [te.var('lhs_dim_{}'.format(i), indice_type) for i in range(ndim)]
-    rhs_feat_shp = [te.var('rhs_dim_{}'.format(i), indice_type) for i in range(ndim)]
+    assert len(lhs_code) == len(rhs_code), "lhs code must have equal length with rhs code"
+    ndim = len(lhs_code)
+    out_feat_shp = [te.var('d{}'.format(i), indice_type) for i in range(ndim)]
+    lhs_feat_shp = [di if ci == 'x' else IntImm(indice_type, 1) for ci, di in zip(lhs_code, out_feat_shp)]
+    rhs_feat_shp = [di if ci == 'x' else IntImm(indice_type, 1) for ci, di in zip(rhs_code, out_feat_shp)]
     lhs = create_placeholder(lhs_target, tuple(lhs_feat_shp), 'lhs')
     rhs = create_placeholder(rhs_target, tuple(rhs_feat_shp), 'rhs')
-    if use_idx:
-        if lhs_target == TargetCode.EDGE:
-            lhs_shfl = shfl_edge_feat(lhs, 'lhs_shfl') 
-        else:
-            lhs_shfl = None
-        if rhs_target == TargetCode.EDGE:
-            rhs_shfl = shfl_edge_feat(rhs, 'rhs_shfl')
-        else:
-            rhs_shlf = None
 
     # idx wrapper for corresponding target
     idx_target = {
@@ -148,43 +143,40 @@ def gsddmm(binary_op, ndim,
     }
 
     # compute
-    out = _sddmm_compute((nnz,) + tuple([IntImm(indice_type, s) for s in out_shp]),
-                         binary_op, lhs_shfl if lhs_shfl else lhs, rhs_shfl if rhs_shfl else rhs,
+    out = _sddmm_compute([nnz] + out_feat_shp,
+                         binary_op, lhs, rhs,
                          idx_target[lhs_target], idx_target[rhs_target])
 
     # schedule
     sched = te.create_schedule(out.op)
-    if lhs_shfl:
-        sched[lhs_shfl].compute_inilne()
-    if rhs_shfl:
-        sched[rhs_shfl].compute_inline()
+
     if target == 'cuda':
         # cuda schedule
         if schedule_type == 'tree':
+            assert binary_op == 'dot', "Tree reduction is only applicable to dot product."
             _sddmm_cuda_tree_reduce(sched, out)
-        else:
+        elif schedule_type == 'general':
             _sddmm_cuda_general(sched, out)
+        else:
+            raise KeyError("Schedule type {} not recognized.".format(schedule_type))
     elif target == 'llvm':
         raise NotImplementedError('CPU kernel not implemented yet.')
 
     # prepare input
-    f_input = lhs_shp + rhs_shp
+    f_input = out_feat_shp
     f_input.append(adj_row_indices)
     f_input.append(adj_col_indices)
-    if use_idx:
-        f_input.append(edge_indices)
     f_name = '_'.join(str(x) for x in [
         'sddmm', binary_op, ndim,
-        indice_type, feat_type
-        lhs_target, rhs_target,
-        use_edge_idx, schedule_type])
+        indice_type, feat_type,
+        lhs_target, rhs_target, schedule_type])
     f_input += [lhs, rhs, out]
+
     # bind autobroadcast buffer
     lhs_buffer = tvm.tir.decl_buffer(lhs.shape, lhs.dtype, name='lhs_buf',
                                      buffer_type='auto_broadcast')
     rhs_buffer = tvm.tir.decl_buffer(rhs.shape, rhs.dtype, name='rhs_buf',
                                      buffer_type='auto_broadcast')
-    binds = {}
-    if use_bcast:
-        binds = {lhs:lhs_buffer, rhs:rhs_buffer}
+    binds = {lhs:lhs_buffer, rhs:rhs_buffer}
     return tvm.lower(sched, f_input, name=f_name, binds=binds)
+
