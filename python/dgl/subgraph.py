@@ -258,7 +258,7 @@ def edge_subgraph(graph, edges, preserve_nodes=False):
     --------
     node_subgraph
     """
-    if graph.is_block:
+    if graph.is_block and not preserve_nodes:
         raise DGLError('Extracting subgraph from a block graph is not allowed.')
     if not isinstance(edges, Mapping):
         assert len(graph.canonical_etypes) == 1, \
