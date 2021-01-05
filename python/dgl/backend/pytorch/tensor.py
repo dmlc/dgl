@@ -120,6 +120,9 @@ def sum(input, dim, keepdims=False):
 def reduce_sum(input):
     return input.sum()
 
+def cumsum(input, dim):
+    return th.cumsum(input, dim=dim)
+
 def mean(input, dim):
     return th.mean(input, dim=dim)
 
@@ -286,8 +289,8 @@ def nonzero_1d(input):
 def sort_1d(input):
     return th.sort(input)
 
-def arange(start, stop, dtype=th.int64):
-    return th.arange(start, stop, dtype=dtype)
+def arange(start, stop, dtype=th.int64, ctx=None):
+    return th.arange(start, stop, dtype=dtype, device=ctx)
 
 def rand_shuffle(arr):
     idx = th.randperm(len(arr))
@@ -495,7 +498,7 @@ def _reduce_grad(grad, shape):
     num_to_squeeze = len(grad_shape) - len(in_shape)
     # pad inshape
     in_shape = (1,) * num_to_squeeze + in_shape
-    reduce_idx = th.nonzero(th.tensor(grad_shape) - th.tensor(in_shape))
+    reduce_idx = th.nonzero(th.tensor(grad_shape) - th.tensor(in_shape), as_tuple=False)
     reduce_idx += 1  # skip batch dim
     grad = grad.sum(dim=tuple(reduce_idx), keepdim=True)
     return grad.view(shape)

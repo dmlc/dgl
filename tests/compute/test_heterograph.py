@@ -365,6 +365,40 @@ def test_query(idtype):
     # test repr
     print(g)
 
+@parametrize_dtype
+def test_empty_query(idtype):
+    g = dgl.graph(([1, 2, 3], [0, 4, 5]), idtype=idtype, device=F.ctx())
+    g.add_nodes(0)
+    g.add_edges([], [])
+    g.remove_edges([])
+    g.remove_nodes([])
+    assert F.shape(g.has_nodes([])) == (0,)
+    assert F.shape(g.has_edges_between([], [])) == (0,)
+    g.edge_ids([], [])
+    g.edge_ids([], [], return_uv=True)
+    g.find_edges([])
+
+    assert F.shape(g.in_edges([], form='eid')) == (0,)
+    u, v = g.in_edges([], form='uv')
+    assert F.shape(u) == (0,)
+    assert F.shape(v) == (0,)
+    u, v, e = g.in_edges([], form='all')
+    assert F.shape(u) == (0,)
+    assert F.shape(v) == (0,)
+    assert F.shape(e) == (0,)
+
+    assert F.shape(g.out_edges([], form='eid')) == (0,)
+    u, v = g.out_edges([], form='uv')
+    assert F.shape(u) == (0,)
+    assert F.shape(v) == (0,)
+    u, v, e = g.out_edges([], form='all')
+    assert F.shape(u) == (0,)
+    assert F.shape(v) == (0,)
+    assert F.shape(e) == (0,)
+
+    assert F.shape(g.in_degrees([])) == (0,)
+    assert F.shape(g.out_degrees([])) == (0,)
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU does not have COO impl.")
 def _test_hypersparse():
     N1 = 1 << 50        # should crash if allocated a CSR
@@ -1048,6 +1082,36 @@ def test_convert(idtype):
     assert g.number_of_nodes() == 5
 
 @parametrize_dtype
+def test_to_homo2(idtype):
+    # test the result homogeneous graph has nodes and edges sorted by their types
+    hg = create_test_heterograph(idtype)
+    g = dgl.to_homogeneous(hg)
+    ntypes = F.asnumpy(g.ndata[dgl.NTYPE])
+    etypes = F.asnumpy(g.edata[dgl.ETYPE])
+    p = 0
+    for tid, ntype in enumerate(hg.ntypes):
+        num_nodes = hg.num_nodes(ntype)
+        for i in range(p, p + num_nodes):
+            assert ntypes[i] == tid
+        p += num_nodes
+    p = 0
+    for tid, etype in enumerate(hg.canonical_etypes):
+        num_edges = hg.num_edges(etype)
+        for i in range(p, p + num_edges):
+            assert etypes[i] == tid
+        p += num_edges
+    # test store_type=False
+    g = dgl.to_homogeneous(hg, store_type=False)
+    assert dgl.NTYPE not in g.ndata
+    assert dgl.ETYPE not in g.edata
+    # test return_count=True
+    g, ntype_count, etype_count = dgl.to_homogeneous(hg, return_count=True)
+    for i, count in enumerate(ntype_count):
+        assert count == hg.num_nodes(hg.ntypes[i])
+    for i, count in enumerate(etype_count):
+        assert count == hg.num_edges(hg.canonical_etypes[i])
+
+@parametrize_dtype
 def test_metagraph_reachable(idtype):
     g = create_test_heterograph(idtype)
     x = F.randn((3, 5))
@@ -1261,6 +1325,8 @@ def test_subgraph(idtype):
 def test_apply(idtype):
     def node_udf(nodes):
         return {'h': nodes.data['h'] * 2}
+    def node_udf2(nodes):
+        return {'h': F.sum(nodes.data['h'], dim=1, keepdims=True)}
     def edge_udf(edges):
         return {'h': edges.data['h'] * 2 + edges.src['h']}
 
@@ -1279,6 +1345,11 @@ def test_apply(idtype):
 
     g['plays'].apply_edges(edge_udf)
     assert F.array_equal(g['plays'].edata['h'], F.ones((4, 5)) * 12)
+
+    # Test the case that feature size changes
+    g.nodes['user'].data['h'] = F.ones((3, 5))
+    g.apply_nodes(node_udf2, ntype='user')
+    assert F.array_equal(g.nodes['user'].data['h'], F.ones((3, 1)) * 5)
 
     # test fail case
     # fail due to multiple types
@@ -1694,6 +1765,13 @@ def test_bipartite(idtype):
         ('A', 'AA', 'A'): ([0, 1], [0, 1])
     }, idtype=idtype, device=F.ctx())
     assert not g3.is_unibipartite
+
+    g4 = dgl.heterograph({
+        ('A', 'AB', 'B'): ([0, 0, 1], [1, 2, 5]),
+        ('C', 'CA', 'A'): ([1, 0], [0, 0])
+    }, idtype=idtype, device=F.ctx())
+
+    assert not g4.is_unibipartite
 
 @parametrize_dtype
 def test_dtype_cast(idtype):
@@ -2460,6 +2538,7 @@ if __name__ == '__main__':
     #test_remove_edges(F.int32)
     #test_remove_nodes(F.int32)
     #test_clone(F.int32)
-    test_frame(F.int32)
-    test_frame_device(F.int32)
+    #test_frame(F.int32)
+    #test_frame_device(F.int32)
+    #test_empty_query(F.int32)
     pass

@@ -25,6 +25,16 @@ class StorageMetaData(ObjectBase):
     """
 
 
+def is_local_path(filepath):
+    return not (filepath.startswith("hdfs://") or
+                filepath.startswith("viewfs://") or
+                filepath.startswith("s3://"))
+
+
+def check_local_file_exists(filename):
+    if is_local_path(filename) and not os.path.exists(filename):
+        raise DGLError("File {} does not exist.".format(filename))
+
 @register_object("graph_serialize.GraphData")
 class GraphData(ObjectBase):
     """GraphData Object"""
@@ -108,7 +118,7 @@ def save_graphs(filename, g_list, labels=None):
     load_graphs
     """
     # if it is local file, do some sanity check
-    if not filename.startswith('s3://'):
+    if is_local_path(filename):
         if os.path.isdir(filename):
             raise DGLError("Filename {} is an existing directory.".format(filename))
         f_path = os.path.dirname(filename)
@@ -161,9 +171,7 @@ def load_graphs(filename, idx_list=None):
     save_graphs
     """
     # if it is local file, do some sanity check
-    if not (filename.startswith('s3://') or os.path.exists(filename)):
-        raise DGLError("File {} does not exist.".format(filename))
-
+    check_local_file_exists(filename)
     version = _CAPI_GetFileVersion(filename)
     if version == 1:
         dgl_warning(
@@ -222,7 +230,7 @@ def load_labels(filename):
 
     """
     # if it is local file, do some sanity check
-    assert filename.startswith('s3://') or os.path.exists(filename), "file {} does not exist.".format(filename)
+    check_local_file_exists(filename)
 
     version = _CAPI_GetFileVersion(filename)
     if version == 1:

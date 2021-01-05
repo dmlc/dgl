@@ -40,9 +40,9 @@ class HeteroNodeView(object):
     def __call__(self, ntype=None):
         """Return the nodes."""
         ntid = self._typeid_getter(ntype)
-        return F.copy_to(F.arange(0, self._graph._graph.number_of_nodes(ntid),
-                                  dtype=self._graph.idtype),
-                         self._graph.device)
+        ret = F.arange(0, self._graph._graph.number_of_nodes(ntid),
+                       dtype=self._graph.idtype, ctx=self._graph.device)
+        return ret
 
 class HeteroNodeDataView(MutableMapping):
     """The data view class when G.ndata[ntype] is called."""

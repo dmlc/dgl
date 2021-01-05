@@ -1,8 +1,9 @@
 .. _guide-training:
 
-
 Chapter 5: Training Graph Neural Networks
 =====================================================
+
+:ref:`(中文版) <guide_cn-training>`
 
 Overview
 --------
@@ -30,6 +31,8 @@ get the graph for a single-graph dataset with something like
 
 
 Note: In this chapter we will use PyTorch as backend.
+
+.. _guide-training-heterogeneous-graph-example:
 
 Heterogeneous Graphs
 ~~~~~~~~~~~~~~~~~~~~

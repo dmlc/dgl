@@ -185,7 +185,7 @@ class NodeDataLoader:
     a homogeneous graph where each node takes messages from all neighbors (assume
     the backend is PyTorch):
 
-    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> dataloader = dgl.dataloading.NodeDataLoader(
     ...     g, train_nid, sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
@@ -236,12 +236,29 @@ class EdgeDataLoader:
     of blocks as computation dependency of the said minibatch for edge classification,
     edge regression, and link prediction.
 
+    For each iteration, the object will yield
+
+    * A tensor of input nodes necessary for computing the representation on edges, or
+      a dictionary of node type names and such tensors.
+
+    * A subgraph that contains only the edges in the minibatch and their incident nodes.
+      Note that the graph has an identical metagraph with the original graph.
+
+    * If a negative sampler is given, another graph that contains the "negative edges",
+      connecting the source and destination nodes yielded from the given negative sampler.
+
+    * A list of blocks necessary for computing the representation of the incident nodes
+      of the edges in the minibatch.
+
+    For more details, please refer to :ref:`guide-minibatch-edge-classification-sampler`
+    and :ref:`guide-minibatch-link-classification-sampler`.
+
     Parameters
     ----------
     g : DGLGraph
         The graph.
-    nids : Tensor or dict[ntype, Tensor]
-        The node set to compute outputs.
+    eids : Tensor or dict[etype, Tensor]
+        The edge set in graph :attr:`g` to compute outputs.
     block_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
     g_sampling : DGLGraph, optional
@@ -301,12 +318,13 @@ class EdgeDataLoader:
     >>> reverse_eids = torch.cat([torch.arange(E, 2 * E), torch.arange(0, E)])
 
     Note that the sampled edges as well as their reverse edges are removed from
-    computation dependencies of the incident nodes.  This is a common trick to avoid
-    information leakage.
+    computation dependencies of the incident nodes.  That is, the edge will not
+    involve in neighbor sampling and message aggregation.  This is a common trick
+    to avoid information leakage.
 
-    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> dataloader = dgl.dataloading.EdgeDataLoader(
-    ...     g, train_eid, sampler, exclude='reverse',
+    ...     g, train_eid, sampler, exclude='reverse_id',
     ...     reverse_eids=reverse_eids,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, pair_graph, blocks in dataloader:
@@ -316,10 +334,10 @@ class EdgeDataLoader:
     homogeneous graph where each node takes messages from all neighbors (assume the
     backend is PyTorch), with 5 uniformly chosen negative samples per edge:
 
-    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
     >>> dataloader = dgl.dataloading.EdgeDataLoader(
-    ...     g, train_eid, sampler, exclude='reverse',
+    ...     g, train_eid, sampler, exclude='reverse_id',
     ...     reverse_eids=reverse_eids, negative_sampler=neg_sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
@@ -338,7 +356,7 @@ class EdgeDataLoader:
     To train a 3-layer GNN for edge classification on a set of edges ``train_eid`` with
     type ``click``, you can write
 
-    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> dataloader = dgl.dataloading.EdgeDataLoader(
     ...     g, {'click': train_eid}, sampler, exclude='reverse_types',
     ...     reverse_etypes={'click': 'clicked-by', 'clicked-by': 'click'},
@@ -349,7 +367,7 @@ class EdgeDataLoader:
     To train a 3-layer GNN for link prediction on a set of edges ``train_eid`` with type
     ``click``, you can write
 
-    >>> sampler = dgl.dataloading.NeighborSampler([None, None, None])
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
     >>> dataloader = dgl.dataloading.EdgeDataLoader(
     ...     g, train_eid, sampler, exclude='reverse_types',

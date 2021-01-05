@@ -184,7 +184,7 @@ removed for simplicity):
 .. code:: python
 
     class StochasticTwoLayerRGCN(nn.Module):
-        def __init__(self, in_feat, hidden_feat, out_feat):
+        def __init__(self, in_feat, hidden_feat, out_feat, rel_names):
             super().__init__()
             self.conv1 = dglnn.HeteroGraphConv({
                     rel : dglnn.GraphConv(in_feat, hidden_feat, norm='right')
@@ -224,7 +224,7 @@ dictionaries of node types and predictions here.
 
 .. code:: python
 
-    model = StochasticTwoLayerRGCN(in_features, hidden_features, out_features)
+    model = StochasticTwoLayerRGCN(in_features, hidden_features, out_features, etypes)
     model = model.cuda()
     opt = torch.optim.Adam(model.parameters())
     

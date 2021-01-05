@@ -3,8 +3,9 @@
 5.2 Edge Classification/Regression
 ---------------------------------------------
 
-Sometimes you wish to predict the attributes on the edges of the graph,
-or even whether an edge exists or not between two given nodes. In that
+:ref:`(中文版) <guide_cn-training-edge-classification>`
+
+Sometimes you wish to predict the attributes on the edges of the graph. In that
 case, you would like to have an *edge classification/regression* model.
 
 Here we generate a random graph for edge prediction as a demonstration.
@@ -40,7 +41,7 @@ Model Implementation Difference from Node Classification
 Assuming that you compute the node representation with the model from
 the previous section, you only need to write another component that
 computes the edge prediction with the
-:meth:`~dgl.DGLHeteroGraph.apply_edges` method.
+:meth:`~dgl.DGLGraph.apply_edges` method.
 
 For instance, if you would like to compute a score for each edge for
 edge regression, the following code computes the dot product of incident
@@ -51,7 +52,8 @@ node representations on each edge.
     import dgl.function as fn
     class DotProductPredictor(nn.Module):
         def forward(self, graph, h):
-            # h contains the node representations computed from the GNN above.
+            # h contains the node representations computed from the GNN defined
+            # in the node classification section (Section 5.1).
             with graph.local_scope():
                 graph.ndata['h'] = h
                 graph.apply_edges(fn.u_dot_v('h', 'h', 'score'))
@@ -75,7 +77,8 @@ e.g. as logits of a categorical distribution.
             return {'score': score}
     
         def forward(self, graph, h):
-            # h contains the node representations computed from the GNN above.
+            # h contains the node representations computed from the GNN defined
+            # in the node classification section (Section 5.1).
             with graph.local_scope():
                 graph.ndata['h'] = h
                 graph.apply_edges(self.apply_edges)
@@ -122,6 +125,7 @@ not include early stopping and model saving.
         opt.step()
         print(loss.item())
 
+.. _guide-training-edge-classification-heterogeneous-graph:
 
 Heterogeneous graph
 ~~~~~~~~~~~~~~~~~~~
@@ -141,7 +145,8 @@ heterogeneous graph, you only need to specify the edge type in
     class HeteroDotProductPredictor(nn.Module):
         def forward(self, graph, h, etype):
             # h contains the node representations for each edge type computed from
-            # the GNN above.
+            # the GNN for heterogeneous graphs defined in the node classification
+            # section (Section 5.1).
             with graph.local_scope():
                 graph.ndata['h'] = h   # assigns 'h' of all node types in one shot
                 graph.apply_edges(fn.u_dot_v('h', 'h', 'score'), etype=etype)
@@ -163,7 +168,9 @@ You can similarly write a ``HeteroMLPPredictor``.
             return {'score': score}
     
         def forward(self, graph, h, etype):
-            # h contains the node representations computed from the GNN above.
+            # h contains the node representations for each edge type computed from
+            # the GNN for heterogeneous graphs defined in the node classification
+            # section (Section 5.1).
             with graph.local_scope():
                 graph.ndata['h'] = h   # assigns 'h' of all node types in one shot
                 graph.apply_edges(self.apply_edges, etype=etype)
@@ -217,16 +224,18 @@ Predicting Edge Type of an Existing Edge on a Heterogeneous Graph
 Sometimes you may want to predict which type an existing edge belongs
 to.
 
-For instance, given the heterogeneous graph above, your task is given an
-edge connecting a user and an item, predict whether the user would
-``click`` or ``dislike`` an item.
+For instance, given the
+:ref:`heterogeneous graph example <guide-training-heterogeneous-graph-example>`,
+your task is given an edge connecting a user and an item, to predict whether
+the user would ``click`` or ``dislike`` an item.
 
 This is a simplified version of rating prediction, which is common in
 recommendation literature.
 
 You can use a heterogeneous graph convolution network to obtain the node
-representations. For instance, you can still use the RGCN above for this
-purpose.
+representations. For instance, you can still use the
+:ref:`RGCN defined previously <guide-training-rgcn-node-classification>`
+for this purpose.
 
 To predict the type of an edge, you can simply repurpose the
 ``HeteroDotProductPredictor`` above so that it takes in another graph
@@ -235,13 +244,16 @@ predicted, and emits the score of each type for every edge.
 
 In the example here, you will need a graph that has two node types
 ``user`` and ``item``, and one single edge type that “merges” all the
-edge types from ``user`` and ``item``, i.e. ``like`` and ``dislike``.
-This can be conveniently created using
-:meth:`relation slicing <dgl.DGLHeteroGraph.__getitem__>`.
+edge types from ``user`` and ``item``, i.e. ``click`` and ``dislike``.
+This can be conveniently created using the following syntax:
 
 .. code:: python
 
     dec_graph = hetero_graph['user', :, 'item']
+
+which returns a heterogeneous graphs with node type ``user`` and ``item``,
+as well as a single edge type combining all edge types in between, i.e.
+``click`` and ``dislike``.
 
 Since the statement above also returns the original edge types as a
 feature named ``dgl.ETYPE``, we can use that as labels.
@@ -267,7 +279,8 @@ can write your predictor module as follows.
     
         def forward(self, graph, h):
             # h contains the node representations for each edge type computed from
-            # the GNN above.
+            # the GNN for heterogeneous graphs defined in the node classification
+            # section (Section 5.1).
             with graph.local_scope():
                 graph.ndata['h'] = h   # assigns 'h' of all node types in one shot
                 graph.apply_edges(self.apply_edges)

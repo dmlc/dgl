@@ -63,8 +63,8 @@ def main(args):
     num_classes = dataset.num_classes
     train_mask = hg.nodes[category].data.pop('train_mask')
     test_mask = hg.nodes[category].data.pop('test_mask')
-    train_idx = torch.nonzero(train_mask).squeeze()
-    test_idx = torch.nonzero(test_mask).squeeze()
+    train_idx = torch.nonzero(train_mask, as_tuple=False).squeeze()
+    test_idx = torch.nonzero(test_mask, as_tuple=False).squeeze()
     labels = hg.nodes[category].data.pop('labels')
 
     # split dataset into train, validate, test
