@@ -282,6 +282,25 @@ class Collator(ABC):
         """
         raise NotImplementedError
 
+# TODO(BarclayII): DistGraph.idtype and DistGraph.device are in the code, however
+# the underlying DGLGraph object could be None.  I was unable to figure out how
+# to properly implement those two properties so I'm working around that.  If the
+# graph is a DistGraph, I assume that the dtype and device of the data should
+# be the same as the graph already.
+#
+# After idtype and device get properly implemented, we should remove these two
+# _prepare_* functions.
+
+def _prepare_tensor_dict(g, data, name, is_distributed):
+    if is_distributed:
+        x = F.tensor(next(iter(data.values())))
+        return {k: F.copy_to(F.astype(v, F.dtype(x)), F.context(x)) for k, v in data.items()}
+    else:
+        return utils.prepare_tensor_dict(g, data, name)
+
+def _prepare_tensor(g, data, name, is_distributed):
+    return F.tensor(data) if is_distributed else utils.prepare_tensor(g, data, name)
+
 class NodeCollator(Collator):
     """DGL collator to combine nodes and their computation dependencies within a minibatch for
     training node classification or regression on a single graph with neighborhood sampling.
@@ -322,12 +341,12 @@ class NodeCollator(Collator):
         self.return_indices = return_indices
 
         if isinstance(nids, Mapping):
-            self.nids = utils.prepare_tensor_dict(g, nids, 'nids')
+            self.nids = _prepare_tensor_dict(g, nids, 'nids', self._is_distributed)
             dataset = {k: F.arange(0, len(v), F.dtype(v), F.context(v))
                        for k, v in self.nids.items()} if return_indices else self.nids
             self._dataset = utils.FlattenedDict(dataset)
         else:
-            self.nids = utils.prepare_tensor(g, nids, 'nids')
+            self.nids = _prepare_tensor(g, nids, 'nids', self._is_distributed)
             self._dataset = F.arange(0, len(nids), F.dtype(nids), F.context(nids)) \
                             if return_indices else nids
 
@@ -367,9 +386,9 @@ class NodeCollator(Collator):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-            items = utils.prepare_tensor_dict(self.g, items, 'items')
+            items = _prepare_tensor_dict(self.g, items, 'items', self._is_distributed)
         else:
-            items = utils.prepare_tensor(self.g, items, 'items')
+            items = _prepare_tensor(self.g, items, 'items', self._is_distributed)
 
         if isinstance(items, dict):
             sample_items = {k: F.gather_row(self.nids[k], v) for k, v in items.items()} \
@@ -558,6 +577,7 @@ class EdgeCollator(Collator):
                  reverse_eids=None, reverse_etypes=None, negative_sampler=None,
                  return_indices=False):
         self.g = g
+        self._is_distributed = isinstance(g, DistGraph)
         if not isinstance(eids, Mapping):
             assert len(g.etypes) == 1, \
                 "eids should be a dict of etype and ids for graph with multiple etypes"
@@ -581,12 +601,12 @@ class EdgeCollator(Collator):
         self.negative_sampler = negative_sampler
 
         if isinstance(eids, Mapping):
-            self.eids = utils.prepare_tensor_dict(g, eids, 'eids')
+            self.eids = _prepare_tensor_dict(g, eids, 'eids', self._is_distributed)
             dataset = {k: F.arange(0, len(v), F.dtype(v), F.context(v))
                        for k, v in self.eids.items()} if return_indices else self.eids
             self._dataset = utils.FlattenedDict(dataset)
         else:
-            self.eids = utils.prepare_tensor(g, eids, 'eids')
+            self.eids = _prepare_tensor(g, eids, 'eids', self._is_distributed)
             self._dataset = F.arange(0, len(eids), F.dtype(eids), F.context(eids)) \
                             if return_indices else eids
 
@@ -598,9 +618,9 @@ class EdgeCollator(Collator):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-            items = utils.prepare_tensor_dict(self.g_sampling, items, 'items')
+            items = _prepare_tensor_dict(self.g_sampling, items, 'items', self._is_distributed)
         else:
-            items = utils.prepare_tensor(self.g_sampling, items, 'items')
+            items = _prepare_tensor(self.g_sampling, items, 'items', self._is_distributed)
 
         if isinstance(items, dict):
             sample_items = {k: F.gather_row(self.eids[k], v) for k, v in items.items()} \
@@ -631,9 +651,9 @@ class EdgeCollator(Collator):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-            items = utils.prepare_tensor_dict(self.g_sampling, items, 'items')
+            items = _prepare_tensor_dict(self.g_sampling, items, 'items', self._is_distributed)
         else:
-            items = utils.prepare_tensor(self.g_sampling, items, 'items')
+            items = _prepare_tensor(self.g_sampling, items, 'items', self._is_distributed)
 
         if isinstance(items, dict):
             sample_items = {k: F.gather_row(self.eids[k], v) for k, v in items.items()} \
