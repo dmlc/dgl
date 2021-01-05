@@ -11,8 +11,10 @@
 namespace dgl {
 namespace featgraph {
 
-void SetFeatGraphModulePath(const std::string& path);
+/* \brief Load Featgraph module from given path. */
+void LoadFeatGraphModule(const std::string& path);
 
+/* \brief Call Featgraph's SDDMM kernel. */
 void SDDMMTreeReduction(DLManagedTensor* row, DLManagedTensor* col, 
                         DLManagedTensor* lhs, DLManagedTensor* rhs, 
                         DLManagedTensor* out);

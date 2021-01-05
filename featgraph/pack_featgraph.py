@@ -23,7 +23,6 @@ def get_sddmm_kernels_gpu(idtypes, dtypes):
         for idtype in idtypes:
             ret.append(sddmm_tree_reduction_gpu(idtype, dtype))
 
-    # TODO(zihao): SDDMM Naive Solution
     return ret
 
 

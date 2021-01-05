@@ -227,10 +227,10 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelBwdSegmentCmp")
   });
 
 #ifdef USE_TVM
-DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SetModulePath")
+DGL_REGISTER_GLOBAL("sparse._CAPI_FG_LoadModule")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const std::string path = args[0];
-    dgl::featgraph::SetFeatGraphModulePath(path);
+    dgl::featgraph::LoadFeatGraphModule(path);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SDDMMTreeReduction")

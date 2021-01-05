@@ -20,7 +20,7 @@ public:
     return &inst;
   }
 
-  void SetPath(const std::string& path) {
+  void Load(const std::string& path) {
     mod = tvm::runtime::Module::LoadFromFile(path);
   }
 
@@ -37,12 +37,12 @@ private:
   FeatGraphModule() {}
 };
 
-/* Set the path of libfeatgraph_kernels.so */
-void SetFeatGraphModulePath(const std::string& path) {
-  FeatGraphModule::Global()->SetPath(path);
+/* \brief Load Featgraph module from given path. */
+void LoadFeatGraphModule(const std::string& path) {
+  FeatGraphModule::Global()->Load(path);
 }
 
-/* Convert DLDataType to string. */
+/* \brief Convert DLDataType to string. */
 inline std::string DTypeAsStr(const DLDataType& t) {
   switch(t.code) {
     case 0U: return "int" + std::to_string(t.bits);
@@ -53,7 +53,7 @@ inline std::string DTypeAsStr(const DLDataType& t) {
   }
 }
 
-/* Get operator filename. */
+/* \brief Get operator filename. */
 inline std::string GetOperatorName(
     const std::string& base_name,
     const DLDataType& dtype,
@@ -61,6 +61,7 @@ inline std::string GetOperatorName(
   return base_name + "_" + DTypeAsStr(dtype) + "_" + DTypeAsStr(idtype);
 }
 
+/* \brief Call FeatGraph's SDDMM kernel. */
 void SDDMMTreeReduction(DLManagedTensor* row, DLManagedTensor* col, 
                         DLManagedTensor* lhs, DLManagedTensor* rhs, 
                         DLManagedTensor* out) {
