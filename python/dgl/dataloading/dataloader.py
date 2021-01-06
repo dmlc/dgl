@@ -8,7 +8,7 @@ from .. import transform
 from ..base import NID, EID
 from .. import backend as F
 from .. import utils
-from .. import batch
+from ..batch import batch
 from ..convert import heterograph
 from ..heterograph import DGLHeteroGraph as DGLGraph
 from ..distributed.dist_graph import DistGraph
@@ -726,7 +726,7 @@ class GraphCollator(object):
         if isinstance(elem, DGLGraph):
             batched_graphs = batch(items)
             return batched_graphs
-        elif isinstance(elem, F.Tensor):
+        elif F.is_tensor(elem):
             return F.stack(items, 0)
         elif elem_type.__module__ == 'numpy' and elem_type.__name__ != 'str_' \
                 and elem_type.__name__ != 'string_':

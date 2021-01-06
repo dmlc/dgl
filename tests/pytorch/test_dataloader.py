@@ -184,7 +184,7 @@ def test_neighbor_sampler_dataloader():
 def test_graph_dataloader():
     batch_size = 16
     num_batches = 2
-    minigc_dataset = dgl.data.MiniGCDataset(batch_size * num_batches, 10, 10)
+    minigc_dataset = dgl.data.MiniGCDataset(batch_size * num_batches, 10, 20)
     data_loader = dgl.dataloading.GraphDataLoader(minigc_dataset, batch_size=batch_size, shuffle=True)
     for graph, label in data_loader:
         assert isinstance(graph, dgl.DGLGraph)
