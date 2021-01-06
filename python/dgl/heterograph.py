@@ -520,7 +520,7 @@ class DGLHeteroGraph(object):
             self._edge_frames[etid].append(data)
         self._reset_cached_info()
 
-    def remove_edges(self, eids, etype=None):
+    def remove_edges(self, eids, etype=None, store_ids=False):
         r"""Remove multiple edges with the specified edge type
 
         Nodes will not be removed. After removing edges, the rest
@@ -536,6 +536,10 @@ class DGLHeteroGraph(object):
         etype : str or tuple of str, optional
             The type of the edges to remove. Can be omitted if there is
             only one edge type in the graph.
+        store_ids : bool, optional
+            If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata``
+            and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
+            respectively.
 
         Examples
         --------
@@ -602,12 +606,12 @@ class DGLHeteroGraph(object):
             else:
                 edges[c_etype] = self.edges(form='eid', order='eid', etype=c_etype)
 
-        sub_g = self.edge_subgraph(edges, preserve_nodes=True)
+        sub_g = self.edge_subgraph(edges, preserve_nodes=True, store_ids=store_ids)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
 
-    def remove_nodes(self, nids, ntype=None):
+    def remove_nodes(self, nids, ntype=None, store_ids=False):
         r"""Remove multiple nodes with the specified node type
 
         Edges that connect to the nodes will be removed as well. After removing
@@ -623,6 +627,10 @@ class DGLHeteroGraph(object):
         ntype : str, optional
             The type of the nodes to remove. Can be omitted if there is
             only one node type in the graph.
+        store_ids : bool, optional
+            If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata``
+            and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
+            respectively.
 
         Examples
         --------
@@ -694,7 +702,7 @@ class DGLHeteroGraph(object):
                 nodes[c_ntype] = self.nodes(c_ntype)
 
         # node_subgraph
-        sub_g = self.subgraph(nodes)
+        sub_g = self.subgraph(nodes, store_ids=store_ids)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
@@ -4377,9 +4385,9 @@ class DGLHeteroGraph(object):
         u, v = self.find_edges(eid, etype=etype)
         # call message passing onsubgraph
         g = self if etype is None else self[etype]
-        ndata = core.message_passing(_create_compute_graph(g, u, v, eid),
-                                     message_func, reduce_func, apply_node_func)
-        dstnodes = F.unique(v)
+        compute_graph, _, dstnodes, _ = _create_compute_graph(g, u, v, eid)
+        ndata = core.message_passing(
+            compute_graph, message_func, reduce_func, apply_node_func)
         self._set_n_repr(dtid, dstnodes, ndata)
 
     def pull(self,
@@ -4481,9 +4489,10 @@ class DGLHeteroGraph(object):
         g = self if etype is None else self[etype]
         # call message passing on subgraph
         src, dst, eid = g.in_edges(v, form='all')
-        ndata = core.message_passing(_create_compute_graph(g, src, dst, eid, v),
-                                     message_func, reduce_func, apply_node_func)
-        self._set_n_repr(dtid, v, ndata)
+        compute_graph, _, dstnodes, _ = _create_compute_graph(g, src, dst, eid, v)
+        ndata = core.message_passing(
+            compute_graph, message_func, reduce_func, apply_node_func)
+        self._set_n_repr(dtid, dstnodes, ndata)
 
     def push(self,
              u,
@@ -6052,6 +6061,6 @@ def _create_compute_graph(graph, u, v, eid, recv_nodes=None):
 
     return DGLHeteroGraph(hgidx, ([srctype], [dsttype]), [etype],
                           node_frames=[srcframe, dstframe],
-                          edge_frames=[eframe])
+                          edge_frames=[eframe]), unique_src, unique_dst, eid
 
 _init_api("dgl.heterograph")
