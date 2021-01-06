@@ -161,7 +161,6 @@ class _EdgeDataLoaderIter:
             input_nodes, pair_graph, blocks = next(self.iter_)
             _restore_subgraph_storage(pair_graph, self.edge_dataloader.collator.g)
             _restore_blocks_storage(blocks, self.edge_dataloader.collator.g_sampling)
-            pair_graph = pair_graph.to(self.device)
             input_nodes = input_nodes.to(self.device)
             pair_graph = pair_graph.to(self.device)
             blocks = [blc.to(self.device) for blc in blocks]
@@ -171,8 +170,6 @@ class _EdgeDataLoaderIter:
             _restore_subgraph_storage(pair_graph, self.edge_dataloader.collator.g)
             _restore_subgraph_storage(neg_pair_graph, self.edge_dataloader.collator.g)
             _restore_blocks_storage(blocks, self.edge_dataloader.collator.g_sampling)
-            pair_graph = pair_graph.to(self.device)
-            neg_pair_graph = neg_pair_graph.to(self.device)
             input_nodes = input_nodes.to(self.device)
             pair_graph = pair_graph.to(self.device)
             neg_pair_graph = neg_pair_graph.to(self.device)
