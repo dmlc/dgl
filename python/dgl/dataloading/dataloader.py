@@ -8,6 +8,7 @@ from ..base import NID, EID
 from .. import backend as F
 from .. import utils
 from ..convert import heterograph
+from ..heterograph import DGLHeteroGraph as DGLGraph
 from ..distributed.dist_graph import DistGraph
 
 # pylint: disable=unused-argument
@@ -676,3 +677,50 @@ class EdgeCollator(Collator):
             return self._collate(items)
         else:
             return self._collate_with_negative_sampling(items)
+
+class GraphCollator(object):
+    """DGL collator to combine graphs and their computation dependencies within a minibatch for
+    training graph classification or regression.
+
+    Given a set of graphs and corresponding labels, the collate function will yield
+
+    * A batched graph of input list of graphs.
+
+    * A tensor of grahp labels.
+
+    If the set of graphs has no label, the collate function will yield a batched graph.
+
+    Examples
+    --------
+    """
+    def collate(self, items):
+        """Combines the sampled edges into a minibatch for edge classification, edge
+        regression, and link prediction tasks.
+
+        Parameters
+        ----------
+        items : list[DGLGraph] or list[tuple[DGLGraph, numeric]]
+            Either a list of dgl.graph objects (for unsupervised learning), or a list of tuples
+            with each tuple being a pair of graph and its label (for supervised learning).
+
+        Returns
+        -------
+        Either ``batched_graph``, or ``(batched_graph, labels)`` if graph label is given.
+
+        batched_graph : DGLGraph
+            The batch of DGLGraph objects, as a single graph object.
+
+        labels : Tensor
+            The batched label tensor for the batched graphs.
+        """
+        if isinstance(items[0], tuple):
+            # returns a list of pairs: group them by node types into a dict
+            graphs, labels = zip(*items)
+            batched_graphs = dgl.batch(graphs)
+            labels = F.stack(labels)
+            return batched_graphs, labels
+        elif isinstance(items[0], DGLGraph):
+            batched_graphs = dgl.batch(graphs)
+            return batched_graphs
+        else:
+            raise ValueError('unsupported input type {}'.format(class(items[0])))

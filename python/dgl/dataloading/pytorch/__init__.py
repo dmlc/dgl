@@ -1,7 +1,7 @@
 """DGL PyTorch DataLoaders"""
 import inspect
 from torch.utils.data import DataLoader
-from ..dataloader import NodeCollator, EdgeCollator
+from ..dataloader import NodeCollator, EdgeCollator, GraphCollator
 from ...distributed import DistGraph
 from ...distributed import DistDataLoader
 
@@ -414,3 +414,55 @@ class EdgeDataLoader:
     def __len__(self):
         """Return the number of batches of the data loader."""
         return len(self.dataloader)
+
+class GraphDataLoader:
+    """PyTorch dataloader for batch-iterating over a set of graphs, generating the batched
+    graph and corresponding label tensor (if provided) of the said minibatch.
+
+    Parameters
+    ----------
+    collate : Function, default is None
+        The customized collate function. Will use the default collate
+        function if not given.
+    kwargs : dict
+        Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
+
+    Examples
+    --------
+    To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
+    a homogeneous graph where each node takes messages from all neighbors (assume
+    the backend is PyTorch):
+
+    >>> dataloader = dgl.dataloading.GraphDataLoader(
+    ...     dataset, batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for batched_graph, labels in dataloader:
+    ...     train_on(batched_graph, labels)
+    """
+    collator_arglist = inspect.getfullargspec(GraphCollator).args
+
+    def __init__(self, dataset, collate=None, **kwargs):
+        collator_kwargs = {}
+        dataloader_kwargs = {}
+        for k, v in kwargs.items():
+            if k in self.collator_arglist:
+                collator_kwargs[k] = v
+            else:
+                dataloader_kwargs[k] = v
+
+        if collate is None:
+            self.collate = GraphCollator(**collator_kwargs).collate
+        else:
+            self.collate = collate
+
+        self.dataloader = DataLoader(dataset=dataset,
+                                     collate_fn=self.collate,
+                                     **dataloader_kwargs)
+
+    def __iter__(self):
+        """Return the iterator of the data loader."""
+        return iter(self.dataloader)
+
+    def __len__(self):
+        """Return the number of batches of the data loader."""
+        return len(self.dataloader)
+
