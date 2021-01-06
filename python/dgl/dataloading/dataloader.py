@@ -682,16 +682,12 @@ class EdgeCollator(Collator):
             return self._collate_with_negative_sampling(items)
 
 class GraphCollator(object):
-    """DGL collator to combine graphs and their computation dependencies within a minibatch for
-    training graph classification or regression.
+    """Given a set of graphs as well as their graph-level data, the collate function will batch the
+    graphs into a batched graph, and stack the tensors into a single bigger tensor.  If the
+    example is a container (such as sequences or mapping), the collate function preserves
+    the structure and collates each of the elements recursively.
 
-    Given a set of graphs and corresponding labels, the collate function will yield
-
-    * A batched graph of input list of graphs.
-
-    * A tensor of grahp labels.
-
-    If the set of graphs has no label, the collate function will yield a batched graph.
+    If the set of graphs has no graph-level data, the collate function will yield a batched graph.
 
     Examples
     --------

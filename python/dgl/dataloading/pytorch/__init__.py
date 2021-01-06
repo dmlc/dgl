@@ -429,8 +429,7 @@ class GraphDataLoader:
 
     Examples
     --------
-    To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
-    a homogeneous graph where each node takes messages from all neighbors (assume
+    To train a GNN for graph classification on a set of graphs in ``dataset`` (assume
     the backend is PyTorch):
 
     >>> dataloader = dgl.dataloading.GraphDataLoader(
