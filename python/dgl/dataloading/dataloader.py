@@ -364,7 +364,8 @@ class NodeCollator(Collator):
         ----------
         items : list[int] or list[tuple[str, int]]
             Either a list of node IDs (for homogeneous graphs), or a list of node type-ID
-            pairs (for heterogeneous graphs).
+            pairs (for heterogeneous graphs).  If ``return_indices`` is True, represents
+            the indices to the seed node array(s) instead.
 
         Returns
         -------
@@ -378,7 +379,7 @@ class NodeCollator(Collator):
 
             If the original graph has multiple node types, return a dictionary of
             node type names and node ID tensors.  Otherwise, return a single tensor.
-        items : Tensor or dict[ntype, Tensor], optional
+        indices : Tensor or dict[ntype, Tensor], optional
             The indices of the sampled nodes in the ``nids`` member.
 
             Only returned if ``return_indices`` is True.
@@ -486,7 +487,7 @@ class EdgeCollator(Collator):
         A set of builtin negative samplers are provided in
         :ref:`the negative sampling module <api-dataloading-negative-sampling>`.
     return_eids : bool, default False
-        Whether to additionally return the indices of the input ``nids`` array sampled in the
+        Whether to additionally return the indices of the input ``eids`` array sampled in the
         minibatch.
 
     Examples
@@ -710,6 +711,9 @@ class EdgeCollator(Collator):
         items : list[int] or list[tuple[str, int]]
             Either a list of edge IDs (for homogeneous graphs), or a list of edge type-ID
             pairs (for heterogeneous graphs).
+            
+            If ``return_indices`` is True, represents the indices to the seed node
+            array(s) instead.
 
         Returns
         -------
