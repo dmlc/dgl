@@ -1,4 +1,5 @@
 export INSTANCE_TYPE=$(curl -s http://169.254.169.254/latest/meta-data/instance-type)
+export MOUNT_PATH=/mnt/efs/fs1/
 cd ~/git_repo/benchmarks/scripts
 python replace_branch.py --branch ${GIT_BRANCH}
 DEVICE=cpu

@@ -12,3 +12,4 @@ nltk
 requests[security]
 tqdm
 awscli
+torchtext

@@ -66,8 +66,6 @@ def generate_user_data(command, ignore_git, extra_env_var=[]):
     }
     """
     mount_efs = r"""
-    package_update: true
-    runcmd:
     - apt-get -y install binutils
     - git clone https://github.com/aws/efs-utils
     - cd efs-utils
@@ -84,10 +82,11 @@ def generate_user_data(command, ignore_git, extra_env_var=[]):
     user_data = r"""
     #cloud-config
     disable_root: false
+    package_update: true
     
-    {mount_efs}
 
     runcmd:
+    {mount_efs}
     - [ sh, -c, "wget -q https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb" ]
     - [ sh, -c, "sudo dpkg -i -E ./amazon-cloudwatch-agent.deb"]
     - "echo '{command}' > /tmp/run.sh"

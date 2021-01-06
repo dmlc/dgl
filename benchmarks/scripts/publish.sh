@@ -29,17 +29,22 @@ WS_ROOT=/asv/dgl
 
 docker pull dgllib/dgl-ci-gpu:conda
 
+if [ -z "$MOUNT_PATH"]; then
+    DOCKER_MOUNT_OPT=(-v "${MOUNT_PATH}:/tmp/dataset")
+else
+    DOCKER_MOUNT_OPT=""
+fi
 echo $HOME
 
 if [[ $DEVICE == "cpu" ]]; then
     docker run --name dgl-reg \
         --rm \
-        -v /mnt/efs/fs1/:/tmp/dataset \
+        $DOCKER_MOUNT_OPT \
         --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
 else
     docker run --name dgl-reg \
         --rm --runtime=nvidia \
-        -v /mnt/efs/fs1/:/tmp/dataset \
+        $DOCKER_MOUNT_OPT \
         --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
 fi
 

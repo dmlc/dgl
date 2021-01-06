@@ -8,7 +8,6 @@ import numpy as np
 import pandas
 import dgl
 import torch
-import torchtext
 
 
 def _download(url, path, filename):
@@ -131,6 +130,7 @@ class PinsageDataset:
 
 
 def load_nowplaying_rs():
+    import torchtext
     # follow examples/pytorch/pinsage/README to create nowplaying_rs.pkl
     name = 'nowplaying_rs.pkl'
     dataset_dir = os.path.join(os.getcwd(), 'dataset')
