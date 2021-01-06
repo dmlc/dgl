@@ -658,10 +658,11 @@ def test_degree_bucket_edge_ordering(idtype):
         return {'n': F.sum(nodes.mailbox['eid'], 1)}
     g.update_all(fn.copy_e('eid', 'eid'), reducer)
 
-def test_issue_2484():
+@parametrize_dtype
+def test_issue_2484(idtype):
     import dgl.function as fn
-    g = dgl.graph(([0, 1, 2], [1, 2, 3]))
-    x = F.randn((4,))
+    g = dgl.graph(([0, 1, 2], [1, 2, 3]), idtype=idtype, device=F.ctx())
+    x = F.copy_to(F.randn((4,)), F.ctx())
     g.ndata['x'] = x
     g.pull([2, 1], fn.u_add_v('x', 'x', 'm'), fn.sum('m', 'x'))
     y1 = g.ndata['x']
