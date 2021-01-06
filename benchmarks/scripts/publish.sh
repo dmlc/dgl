@@ -34,7 +34,9 @@ if [ -z "$MOUNT_PATH"]; then
 else
     DOCKER_MOUNT_OPT=""
 fi
+
 echo $HOME
+echo "Mount Point: $DOCKER_MOUNT_OPT"
 
 if [[ $DEVICE == "cpu" ]]; then
     docker run --name dgl-reg \
