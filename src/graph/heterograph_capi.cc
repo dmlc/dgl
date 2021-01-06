@@ -605,7 +605,10 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateFormat")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_format_code_t code = hg->GetRelationGraph(0)->GetAllowedFormats();
-    for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype) {
+#if !defined(DGL_USE_CUDA)
+#pragma omp parallel for
+#endif
+    for (int64_t etype = 0; etype < hg->NumEdgeTypes(); ++etype) {
       auto bg = std::dynamic_pointer_cast<UnitGraph>(hg->GetRelationGraph(etype));
       for (auto format : CodeToSparseFormats(code))
         bg->GetFormat(format);
@@ -653,25 +656,30 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLAsImmutableGraph")
 DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef metagraph = args[0];
-    std::set<int64_t> dst_set;
-    std::set<int64_t> src_set;
+    std::unordered_set<int64_t> dst_set;
+    std::unordered_set<int64_t> src_set;
 
     for (int64_t eid = 0; eid < metagraph->NumEdges(); ++eid) {
       auto edge = metagraph->FindEdge(eid);
       auto src = edge.first;
       auto dst = edge.second;
       dst_set.insert(dst);
-      if (dst_set.count(src))
-        return;
+      src_set.insert(src);
     }
 
     List<Value> srclist, dstlist;
     List<List<Value>> ret_list;
-    for (auto dst : dst_set)
-      dstlist.push_back(Value(MakeValue(dst)));
-    for (int64_t nid = 0 ; nid < metagraph->NumVertices(); ++nid)
-      if (!dst_set.count(nid))
+    for (int64_t nid = 0; nid < metagraph->NumVertices(); ++nid) {
+      auto is_dst = dst_set.count(nid);
+      auto is_src = src_set.count(nid);
+      if (is_dst && is_src)
+        return;
+      else if (is_dst)
+        dstlist.push_back(Value(MakeValue(nid)));
+      else
+        // If a node type is isolated, put it in srctype as defined in the Python docstring.
         srclist.push_back(Value(MakeValue(nid)));
+    }
     ret_list.push_back(srclist);
     ret_list.push_back(dstlist);
     *rv = ret_list;

@@ -185,7 +185,7 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
 
 @thread_wrapped_func
 def run(proc_id, n_gpus, args, devices, dataset, split, queue=None):
-    dev_id = devices[proc_id]
+    dev_id = devices[proc_id] if devices[proc_id] != 'cpu' else -1
     g, node_feats, num_of_ntype, num_classes, num_rels, target_idx, \
         train_idx, val_idx, test_idx, labels = dataset
     if split is not None:
@@ -453,8 +453,8 @@ def main(args, devices):
         train_mask = hg.nodes[category].data.pop('train_mask')
         test_mask = hg.nodes[category].data.pop('test_mask')
         labels = hg.nodes[category].data.pop('labels')
-        train_idx = th.nonzero(train_mask).squeeze()
-        test_idx = th.nonzero(test_mask).squeeze()
+        train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
+        test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
         node_feats = [None] * num_of_ntype
 
         # AIFB, MUTAG, BGS and AM datasets do not provide validation set split.

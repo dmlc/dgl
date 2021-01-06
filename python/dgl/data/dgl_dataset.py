@@ -4,6 +4,7 @@
 from __future__ import absolute_import
 
 import os, sys, hashlib
+import traceback
 import abc
 from .utils import download, extract_archive, get_download_dir, makedirs
 from ..utils import retry_method_with_fix
@@ -87,6 +88,8 @@ class DGLDataset(object):
 
         if save_dir is None:
             self._save_dir = self._raw_dir
+        else:
+            self._save_dir = save_dir
 
         self._load()
 
@@ -168,6 +171,7 @@ class DGLDataset(object):
             except:
                 load_flag = False
                 if self.verbose:
+                    print(traceback.format_exc())
                     print('Loading from cache failed, re-processing.')
 
         if not load_flag:

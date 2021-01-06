@@ -1118,7 +1118,7 @@ def add_edges(g, u, v, data=None, etype=None):
     g.add_edges(u, v, data=data, etype=etype)
     return g
 
-def remove_edges(g, eids, etype=None):
+def remove_edges(g, eids, etype=None, store_ids=False):
     r"""Remove the specified edges and return a new graph.
 
     Also delete the features of the edges. The edges must exist in the graph.
@@ -1137,6 +1137,10 @@ def remove_edges(g, eids, etype=None):
           triplet format in the graph.
 
         Can be omitted if the graph has only one type of edges.
+    store_ids : bool, optional
+        If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata``
+        and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
+        respectively.
 
     Return
     ------
@@ -1181,11 +1185,11 @@ def remove_edges(g, eids, etype=None):
     remove_nodes
     """
     g = g.clone()
-    g.remove_edges(eids, etype=etype)
+    g.remove_edges(eids, etype=etype, store_ids=store_ids)
     return g
 
 
-def remove_nodes(g, nids, ntype=None):
+def remove_nodes(g, nids, ntype=None, store_ids=False):
     r"""Remove the specified nodes and return a new graph.
 
     Also delete the features. Edges that connect from/to the nodes will be
@@ -1199,6 +1203,10 @@ def remove_nodes(g, nids, ntype=None):
     ntype : str, optional
         The type of the nodes to remove. Can be omitted if there is
         only one node type in the graph.
+    store_ids : bool, optional
+        If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata``
+        and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
+        respectively.
 
     Return
     ------
@@ -1249,7 +1257,7 @@ def remove_nodes(g, nids, ntype=None):
     remove_edges
     """
     g = g.clone()
-    g.remove_nodes(nids, ntype=ntype)
+    g.remove_nodes(nids, ntype=ntype, store_ids=store_ids)
     return g
 
 def add_self_loop(g, etype=None):
