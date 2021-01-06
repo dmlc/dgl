@@ -20,7 +20,10 @@ The DGL's built-in CoraGraphDataset. Dataset summary:
 
 How to run example files
 --------------------------------
-In the MVP4ModelExample folder, run
+In the hgat folder, run
+
+**If you want to test architecture in paper please use `hgat.py`, if you want to test the architecture similar to gat in example. use `train.py`**
+
 
 ```python
 python main.py
@@ -29,27 +32,27 @@ python main.py
 If want to use a GPU, run
 
 ```python
-python main.py --gpu 0
+python hgat.py --gpu 0
 ```
 
 If you want to use more Graph Hard Attention Modules
 
 ```python
-python main.py --num_module <your number>
+python hgat.py --num-layers <your number>
 ```
 
 If you want to change the hard attention threshold k
 
 ```python
-python main.py --k <your number>
+python hgat.py --k <your number>
 ```
+
+**Similar Arguments can be passed to `train.py`**
 
 Performance
 -------------------------
-**TODO: Debug the implementation**
-
-**TODO: Compare Cora Performance**
-
-**TODO: Compare Performance in other Node classification ds**
-
-**TODO: Implement Graph Classification Pipeline**
+| Models/Datasets | Cora | Citeseer | Pubmed |
+| :-------------- | :--: | :------: | -----: |
+| GAT in DGL | 81.5% | 70.1% | 77.7% |
+| HardGAT similar to GAT | 81.8% | 70.2% |78.0%|
+| HardGANet in paper | 77.0% | 64.2% | 77.1% |
