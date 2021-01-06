@@ -18,7 +18,10 @@ To run all benchmarks locally, build the project first and then run:
 asv run -n -e --python=same --verbose
 ```
 
-Note that local run will not produce any benchmark results on disk.
+**Due to ASV's restriction, `--python=same` will not write any benchmark results
+to disk. It does not support specifying branches and commits either. They are only
+available under ASV's managed environment.**
+
 To change the device for benchmarking, set the `DGL_BENCH_DEVICE` environment variable.
 Any valid PyTorch device strings are allowed.
 
@@ -26,13 +29,28 @@ Any valid PyTorch device strings are allowed.
 export DGL_BENCH_DEVICE=cuda:0
 ```
 
-DGL runs all benchmarks automatically in docker container. To run all benchmarks in docker,
-use the `publish.sh` script. It accepts two arguments, a name specifying the identity of
-the test machine and a device name.
+To select which benchmark to run, use the `--bench` flag. For example,
 
 ```bash
-bash publish.sh dev-machine cuda:0
+asv run -n -e --python=save --verbose --bench model_acc.bench_gat
 ```
+
+Run in docker locally
+---
+
+DGL runs all benchmarks automatically in docker container. To run bencmarks in docker locally,
+
+* Git commit your locally changes. No need to push to remote repository.
+* To compare commits from different branches. Change the `"branches"` list in `asv.conf.json`.
+  The default is `"HEAD"` which is the last commit of the current branch. For example, to
+  compare your proposed changes with the master branch, set it to be `["HEAD", "master"]`.
+  If your workspace is a forked repository, make sure your local master has synced with
+  the upstream.
+* Use the `publish.sh` script. It accepts two arguments, a name specifying the identity of
+  the test machine and a device name. For example,
+  ```bash
+  bash publish.sh dev-machine cuda:0
+  ```
 
 The script will output two folders `results` and `html`. The `html` folder contains the
 generated static web pages. View it by:
@@ -41,6 +59,8 @@ generated static web pages. View it by:
 asv preview
 ```
 
+Please see `publish.sh` for more information on how it works and how to modify it according
+to your need.
 
 Adding a new benchmark suite
 ---
@@ -104,15 +124,8 @@ def track_time(l, u):
 
 Tips
 ----
-* Feed flags `-e --verbose` to `asv run` to print out stderr and more information. Use `--bench` flag
-  to run specific benchmarks, e.g., `--bench bench_gat`.
+* Feed flags `-e --verbose` to `asv run` to print out stderr and more information.
 * When running benchmarks locally (e.g., with `--python=same`), ASV will not write results to disk
   so `asv publish` will not generate plots.
-* When running benchmarks in docker, ASV will pull the codes from remote and build them in conda
-  environment. The repository to pull is determined by `origin`, so it works with forked repository.
-  The branches are configured in `asv.conf.json`. If you wish to test the impact of your local source
-  code changes on performance in docker, remember to before running `publish.sh`:
-    - Commit your local changes and push it to remote `origin`.
-    - Add the corresponding branch to `asv.conf.json`.
 * Try make your benchmarks compatible with all the versions being tested.
 * For ogbn dataset, put the dataset into /tmp/dataset/
