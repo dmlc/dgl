@@ -2,8 +2,8 @@
 
 from collections.abc import Mapping, Sequence
 from abc import ABC, abstractproperty, abstractmethod
-import numpy as np
 import re
+import numpy as np
 from .. import transform
 from ..base import NID, EID
 from .. import backend as F
@@ -708,14 +708,16 @@ class GraphCollator(object):
 
     #This implementation is based on torch.utils.data._utils.collate.default_collate
     def collate(self, items):
-        """This collate function behaves similarly to ```torch.utils.data._utils.collate.default_collate```.
-        It combines the sampled graphs and corresponding graph-level data into a batched graph and tensors.
+        """This function is similar to ```torch.utils.data._utils.collate.default_collate```.
+        It combines the sampled graphs and corresponding graph-level data
+        into a batched graph and tensors.
 
         Parameters
         ----------
         items : list of data points or tuples
             Elements in the list are expected to have the same length.
-            Each sub-element will be batched as a batched graph, or a batched tensor correspondingly.
+            Each sub-element will be batched as a batched graph, or a
+            batched tensor correspondingly.
 
         Returns
         -------
@@ -750,9 +752,9 @@ class GraphCollator(object):
             return elem_type(*(self.collate(samples) for samples in zip(*items)))
         elif isinstance(elem, Sequence):
             # check to make sure that the elements in batch have consistent size
-            it = iter(items)
-            elem_size = len(next(it))
-            if not all(len(elem) == elem_size for elem in it):
+            item_iter = iter(items)
+            elem_size = len(next(item_iter))
+            if not all(len(elem) == elem_size for elem in item_iter):
                 raise RuntimeError('each element in list of batch should be of equal size')
             transposed = zip(*items)
             return [self.collate(samples) for samples in transposed]
