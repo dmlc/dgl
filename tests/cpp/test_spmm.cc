@@ -1,6 +1,6 @@
 #if !defined(_WIN32)
 #ifdef USE_AVX
-#include <../../src/array/cpu/spmm.h>
+#include <../src/array/cpu/spmm.h>
 #include <dgl/array.h>
 #include <gtest/gtest.h>
 #include <time.h>
