@@ -51,7 +51,8 @@ class BaseRGCN(nn.Module):
         return h
 
 def initializer(emb):
-    emb.uniform_(-1, 1)
+    nn.init.xavier_uniform_(emb)
+    #emb.uniform_(-1, 1)
     return emb
 
 class RelGraphEmbedLayer(nn.Module):
@@ -82,9 +83,8 @@ class RelGraphEmbedLayer(nn.Module):
                  input_size,
                  embed_size,
                  dgl_sparse=False,
-                 world_size=0,
-                 embed_name='embed',
-                 queues=None):
+                 group=None,
+                 embed_name='embed'):
         super(RelGraphEmbedLayer, self).__init__()
         self.dev_id = th.device(dev_id if dev_id >= 0 else 'cpu')
         self.embed_size = embed_size
@@ -100,8 +100,8 @@ class RelGraphEmbedLayer(nn.Module):
         for ntype in range(num_of_ntype):
             if isinstance(input_size[ntype], int):
                 if dgl_sparse:
-                    self.node_embeds[str(ntype)] = dgl.backend.pytorch.GraphSparseEmbedding(input_size[ntype], embed_size, name=str(ntype),
-                        device=self.dev_id, init_func=initializer, rank=dev_id, world_size=world_size, queues=queues)
+                    self.node_embeds[str(ntype)] = dgl.GraphSparseEmbedding(input_size[ntype], embed_size, name=str(ntype),
+                        device=self.dev_id, init_func=initializer, group=group)
                 else:
                     sparse_emb = th.nn.Embedding(input_size[ntype], embed_size, sparse=True)
                     nn.init.uniform_(sparse_emb.weight, -1.0, 1.0)

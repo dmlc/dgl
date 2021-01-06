@@ -235,7 +235,7 @@ def context(input):
 
 def device_type(ctx):
     """Return a str representing device type.
-    
+
     Parameters
     ----------
     ctx : Device context object.
@@ -252,7 +252,7 @@ def device_id(ctx):
 
     For CPU, the index does not matter. For GPU, the index means which GPU
     device on the machine.
-    
+
     Parameters
     ----------
     ctx : Device context object.
@@ -1591,6 +1591,50 @@ class record_grad(object):
 
 class no_grad(object):
     """Context manager that explicitly disables gradient computation"""
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass
+
+class GraphSparseQueues(object):
+    """Queues for sparse embeddings metadata synchronization"""
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass
+
+class GraphSparseEmbedding(object):
+    """Sparse embeddings for graph embedding"""
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass
+
+class SparseAdagradOptimizer(object):
+    """Sparse Adagrad optimizer for GraphSparseEmbeddings"""
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass
+
+class SparseAdamOptimizer(object):
+    """Sparse Adam optimizer for GraphSparseEmbeddings"""
     def __init__(self):
         pass
 

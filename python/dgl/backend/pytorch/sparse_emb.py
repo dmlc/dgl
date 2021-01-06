@@ -1,7 +1,51 @@
 import torch as th
 import abc
 from abc import abstractmethod
-from .tensor import attach_grad, is_recording
+from .tensor import attach_grad, is_recording, data_type_dict, zerocopy_to_dlpack, zerocopy_from_dlpack
+import torch.multiprocessing as mp
+from torch.multiprocessing import Queue
+from datetime import timedelta
+
+from ... import ndarray as nd
+from ..._ffi.ndarray import empty_shared_mem
+
+dtype_dict = data_type_dict()
+dtype_dict = {dtype_dict[key]:key for key in dtype_dict}
+
+_store = None
+
+def _move_data_to_shared_mem_array(arr, name):
+    dlpack = zerocopy_to_dlpack(arr)
+    dgl_tensor = nd.from_dlpack(dlpack)
+    new_arr = empty_shared_mem(name, False, arr.shape, dtype_dict[arr.dtype])
+    dgl_tensor.copyto(new_arr)
+    dlpack = new_arr.to_dlpack()
+    return zerocopy_from_dlpack(dlpack)
+
+def _get_shared_mem_array(name, shape, dtype):
+    new_arr = empty_shared_mem(name, False, shape, dtype_dict[dtype])
+    dlpack = new_arr.to_dlpack()
+    return zerocopy_from_dlpack(dlpack)
+
+def _create_shared_mem_array(name, shape, dtype):
+    new_arr = empty_shared_mem(name, True, shape, dtype_dict[dtype])
+    dlpack = new_arr.to_dlpack()
+    return zerocopy_from_dlpack(dlpack)
+
+class GraphSparseQueues:
+    ''' Queues for sparse embeddings metadata synchronization
+
+    Parameters
+    ----------
+    world_size: int
+        Number of gpu processes
+    '''
+    def __init__(self, world_size):
+        self._queues = [mp.Queue() for _ in range(world_size)]
+
+    @property
+    def queues(self):
+        return self._queues
 
 class GraphSparseEmbedding:
     '''Sparse embeddings for graph.
@@ -30,18 +74,13 @@ class GraphSparseEmbedding:
     init_func : callable, optional
         The function to create the initial data. If the init function is not provided,
         the values of the embeddings are initialized to zero.
-    rank : int, optional
-        The rank in multi-gpu process group. -1 means single GPU or CPU training. Default: -1.
-    world_size : int, optional
-        Number of devices used in mutli-gpu training. Default: 0.
-    queues : list of multiprocessing.Queue, optional
-        Used by multi-gpu processes to share embedding tensor. Default: None.
+    group : str, optional
+        Group name.
 
     Examples
     --------
     Before launching multiple gpu processes
 
-    >>> queues = [mp.Queue() for _ in range(num_gpus)]
     >>> def initializer(shape, dtype):
             arr = th.zeros(shape, dtype=dtype)
             arr.uniform_(-1, 1)
@@ -49,42 +88,53 @@ class GraphSparseEmbedding:
 
     In each multiple gpu process
 
-    >>> emb = dgl.backend.F.GraphSparseEmbedding(g.number_of_nodes(), 10, init_func=initializer,
-        rank=rank, world_size=num_gpus, queues=queues)
-    >>> optimizer = dgl.backend.F.SparseAdagrad([emb], lr=0.001)
+    >>> emb = dgl.GraphSparseEmbedding(g.number_of_nodes(), 10, init_func=initializer,
+        rank=rank, world_size=num_gpus)
+    >>> optimizer = dgl.SparseAdagradOptimizer([emb], lr=0.001)
     >>> for blocks in dataloader:
     ...     feats = emb(nids)
     ...     loss = F.sum(feats + 1, 0)
     ...     loss.backward()
     ...     optimizer.step()
     '''
+
     def __init__(self, num_embeddings, embedding_dim, name, device=th.device('cpu'),
-                 init_func=None, rank=-1, world_size=0, queues=None):
+                 init_func=None, group=None, host_name='127.0.0.1', port=12346):
+        global _store
+        if th.distributed.is_initialized():
+            rank = th.distributed.get_rank() if group is None else th.distributed.get_rank(group)
+            world_size = th.distributed.get_world_size() if group is None else th.distributed.get_world_size(group)
+        else:
+            rank = -1
+            world_size = 0
         self._rank = rank
         self._world_size = world_size
         self._device = device
-        assert world_size <= 1 or len(queues) == world_size, \
-            'Number of queues should be equal to number of GPU processes you have.'
 
         if rank <= 0:
-            emb = th.zeros((num_embeddings, embedding_dim), dtype=th.float32)
+            emb = _create_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
             if init_func is not None:
                 emb = init_func(emb)
         if rank == 0:
-            emb.share_memory_()
+            if world_size > 1:
+                if _store is None:
+                    _store = th.distributed.TCPStore(host_name, port, world_size, True, timedelta(seconds=30))
             for i in range(1, world_size):
                 # send embs
-                queues[i].put(emb)
+                _store.set(name, name)
         elif rank > 0:
             # receive
-            emb = queues[rank].get()
+            if _store is None:
+                _store = th.distributed.TCPStore(host_name, port, world_size, False, timedelta(seconds=30))
+            _store.wait([name])
+            emb = _get_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
 
         self._tensor = emb
         self._num_embeddings = num_embeddings
+        self._embedding_dim = embedding_dim
         self._name = name
         self._state = None
         self._trace = []
-        self._queues = queues
 
     def __call__(self, idx):
         emb = self._tensor[idx].to(self._device)
@@ -101,6 +151,7 @@ class GraphSparseEmbedding:
     def name(self):
         return self._name
 
+
     @property
     def world_size(self):
         return self._world_size
@@ -110,8 +161,8 @@ class GraphSparseEmbedding:
         return self._num_embeddings
 
     @property
-    def queues(self):
-        return self._queues
+    def kvstore(self):
+        return self._store
 
     def set_opt_state(self, state):
         self._state = state
@@ -144,8 +195,10 @@ class SparseGradOptimizer(abc.ABC):
     def __init__(self, params, lr):
         self._params = params
         self._lr = lr
+        self._shared_cache = {}
 
     def step(self):
+        global _store
         ''' The step function.
 
         The step function is invoked at the end of every batch to update embeddings
@@ -160,7 +213,10 @@ class SparseGradOptimizer(abc.ABC):
                 for idx, data in emb._trace:
                     grad = data.grad.data
                     device = grad.device
+
                     if self._world_size > 0:
+                        if emb_name not in self._shared_cache:
+                            self._shared_cache[emb_name] = {}
                         idx_list = []
                         grad_list = []
                         for i in range(self._world_size):
@@ -181,14 +237,34 @@ class SparseGradOptimizer(abc.ABC):
                                 update_embs[emb_name][0].append(idx_i)
                                 update_embs[emb_name][1].append(grad_i)
                             else:
-                                emb.queues[i].put((emb_name,
-                                                   idx_i.to(th.device('cpu'), non_blocking=True).share_memory_(),
-                                                   grad_i.to(th.device('cpu'), non_blocking=True).share_memory_()))
+                                idx_i = idx_i.to(th.device('cpu'), non_blocking=True)
+                                grad_i = grad_i.to(th.device('cpu'), non_blocking=True)
+                                idx_shmem_name = 'idx_{}_{}_{}'.format(emb_name, self._rank, i)
+                                grad_shmem_name = 'grad_{}_{}_{}'.format(emb_name, self._rank, i)
+                                if idx_shmem_name not in self._shared_cache[emb_name] or \
+                                    self._shared_cache[emb_name][idx_shmem_name].shape[0] < idx_i.shape[0]:
+                                    idx_shmem = _create_shared_mem_array(idx_shmem_name,
+                                        (idx_i.shape[0] * 2 + 2,), idx_i.dtype)
+                                    grad_shmem = _create_shared_mem_array(grad_shmem_name,
+                                        (idx_i.shape[0] * 2 + 2, grad_i.shape[1]), grad_i.dtype)
+                                    self._shared_cache[emb_name][idx_shmem_name] = idx_shmem
+                                    self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
+
+                                idx_i = _move_data_to_shared_mem_array(idx_i, idx_shmem_name)
+                                grad_i = _move_data_to_shared_mem_array(grad_i, grad_shmem_name)
+                                _store.set(idx_shmem_name, str(idx_i.shape[0]))
+
+                        idx_dtype = idx.dtype
+                        grad_dtype = grad.dtype
+                        wait_keys = []
                         for i in range(self._world_size):
                             if i != self._rank:
-                                ename, idx_i, grad_i = emb.queues[i].get()
-                                update_embs[ename][0].append(idx_i.to(device, non_blocking=True))
-                                update_embs[ename][1].append(grad_i.to(device, non_blocking=True))
+                                size = _store.get('idx_{}_{}_{}'.format(emb_name, i, self._rank))
+                                _store.delete_key('idx_{}_{}_{}'.format(emb_name, i, self._rank))
+                                idx_i = _get_shared_mem_array('idx_{}_{}_{}'.format(emb_name, i, self._rank), (int(size),), idx_dtype)
+                                grad_i = _get_shared_mem_array('grad_{}_{}_{}'.format(emb_name, i, self._rank), (int(size), grad.shape[1]), grad_dtype)
+                                update_embs[emb_name][0].append(idx_i.to(device, non_blocking=True))
+                                update_embs[emb_name][1].append(grad_i.to(device, non_blocking=True))
                     else:
                         update_embs[emb_name][0].append(idx)
                         update_embs[emb_name][1].append(grad)
@@ -289,9 +365,10 @@ class SparseAdagradOptimizer(SparseGradOptimizer):
         clr = self._lr
 
         # the update is non-linear so indices must be unique
-        grad_indices, inverse = th.unique(idx, return_inverse=True)
+        grad_indices, inverse, cnt = th.unique(idx, return_inverse=True, return_counts=True)
         grad_values = th.zeros((grad_indices.shape[0], grad.shape[1]), device=grad.device)
         grad_values.index_add_(0, inverse, grad)
+        grad_values = grad_values / cnt.unsqueeze(1)
 
         grad_sum = (grad_values * grad_values)
         state = emb.opt_state
@@ -349,22 +426,25 @@ class SparseAdamOptimizer(SparseGradOptimizer):
                 assert self._world_size == emb.world_size, 'MultiGPU world_size for each embedding should be same.'
             if self._rank <= 0:
                 # may overflow if steps > 2B
-                state_step = th.zeros((emb.emb_tensor.shape[0],), dtype=th.int).zero_()
-                state_mem = emb.emb_tensor.new().resize_(emb.emb_tensor.shape).zero_()
-                state_power = emb.emb_tensor.new().resize_(emb.emb_tensor.shape).zero_()
+                emb_name = emb.name
+                state_step = _create_shared_mem_array(emb_name+'_step', (emb.emb_tensor.shape[0],), th.int).zero_()
+                state_mem = _create_shared_mem_array(emb_name+'_mem', emb.emb_tensor.shape, th.float32).zero_()
+                state_power = _create_shared_mem_array(emb_name+'_power', emb.emb_tensor.shape, th.float32).zero_()
             if self._rank == 0:
-                state_step.share_memory_()
-                state_mem.share_memory_()
-                state_power.share_memory_()
                 state = (state_step, state_mem, state_power)
+                emb_name = emb.name
                 for i in range(1, self._world_size):
                     # send embs
-                    emb.queues[i].put(state)
+                    _store.set(emb_name+'_opt', emb_name)
             elif self._rank > 0:
                 # receive
-                state = emb.queues[self._rank].get()
-            else:
-                state = (state_step, state_mem, state_power)
+                emb_name = emb.name
+                _store.wait([emb_name+'_opt'])
+                state_step = _get_shared_mem_array(emb_name+'_step', (emb.emb_tensor.shape[0],), th.int)
+                state_mem = _get_shared_mem_array(emb_name+'_mem', emb.emb_tensor.shape, th.float32)
+                state_power = _get_shared_mem_array(emb_name+'_power', emb.emb_tensor.shape, th.float32)
+
+            state = (state_step, state_mem, state_power)
             emb.set_opt_state(state)
 
     def update(self, idx, grad, emb):
@@ -392,7 +472,7 @@ class SparseAdamOptimizer(SparseGradOptimizer):
             state_dev = state_step.device
 
             # the update is non-linear so indices must be unique
-            grad_indices, inverse = th.unique(idx, return_inverse=True)
+            grad_indices, inverse, cnt = th.unique(idx, return_inverse=True, return_counts=True)
             state_idx = grad_indices.to(state_dev)
             state_step[state_idx] += 1
             state_step = state_step[state_idx].to(exec_dev, non_blocking=True)
@@ -401,6 +481,7 @@ class SparseAdamOptimizer(SparseGradOptimizer):
 
             grad_values = th.zeros((grad_indices.shape[0], grad.shape[1]), device=exec_dev)
             grad_values.index_add_(0, inverse, grad)
+            grad_values = grad_values / cnt.unsqueeze(1)
 
             grad_mem = grad_values
             grad_power = grad_values * grad_values

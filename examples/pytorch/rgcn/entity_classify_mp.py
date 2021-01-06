@@ -110,6 +110,14 @@ class EntityClassify(nn.Module):
             h = layer(block, h, block.edata['etype'], block.edata['norm'])
         return h
 
+def gen_norm(g):
+    _, v, eid = g.all_edges(form='all')
+    _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
+    degrees = count[inverse_index]
+    norm = th.ones(eid.shape[0], device=eid.device) / degrees
+    norm = norm.unsqueeze(1)
+    g.edata['norm'] = norm
+
 class NeighborSampler:
     """Neighbor sampler
     Parameters
@@ -122,10 +130,11 @@ class NeighborSampler:
         Fanout of each hop starting from the seed nodes. If a fanout is None,
         sample full neighbors.
     """
-    def __init__(self, g, target_idx, fanouts):
+    def __init__(self, g, target_idx, fanouts, global_norm=False):
         self.g = g
         self.target_idx = target_idx
         self.fanouts = fanouts
+        self.global_norm = global_norm
 
     """Do neighbor sample
     Parameters
@@ -156,6 +165,8 @@ class NeighborSampler:
             block.srcdata[dgl.NTYPE] = self.g.ndata[dgl.NTYPE][block.srcdata[dgl.NID]]
             block.srcdata['type_id'] = self.g.ndata[dgl.NID][block.srcdata[dgl.NID]]
             block.edata['etype'] = etypes
+            if self.global_norm is False:
+                gen_norm(block)
             cur = block.srcdata[dgl.NID]
             blocks.insert(0, block)
         return seeds, blocks
@@ -243,9 +254,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None, spar
                                      num_of_ntype,
                                      node_feats,
                                      args.n_hidden,
-                                     dgl_sparse=args.dgl_sparse,
-                                     world_size=world_size,
-                                     queues=sparse_queues)
+                                     dgl_sparse=args.dgl_sparse)
 
     # create model
     # all model params are in device.
@@ -297,13 +306,13 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None, spar
             dgl_emb = embed_layer.module.dgl_emb
         else:
             dgl_emb = embed_layer.dgl_emb
-        emb_optimizer = dgl.backend.pytorch.SparseAdamOptimizer(params=dgl_emb, lr=args.lr) if len(dgl_emb) > 0 else None
+        emb_optimizer = dgl.SparseAdamOptimizer(params=dgl_emb, lr=args.sparse_lr) if len(dgl_emb) > 0 else None
     else:
         if n_gpus > 1:
             embs = list(embed_layer.module.node_embeds.parameters())
         else:
             embs = list(embed_layer.node_embeds.parameters())
-        emb_optimizer = th.optim.SparseAdam(embs, lr=args.lr) if len(embs) > 0 else None
+        emb_optimizer = th.optim.SparseAdam(embs, lr=args.sparse_lr) if len(embs) > 0 else None
 
     # training loop
     print("start training...")
@@ -489,34 +498,18 @@ def main(args, devices):
             feat = hg.nodes[ntype].data.pop('feat')
             node_feats.append(feat.share_memory_())
 
-    # calculate norm for each edge type and store in edge
-    if args.global_norm is False:
-        for canonical_etype in hg.canonical_etypes:
-            u, v, eid = hg.all_edges(form='all', etype=canonical_etype)
-            _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
-            degrees = count[inverse_index]
-            norm = th.ones(eid.shape[0]) / degrees
-            norm = norm.unsqueeze(1)
-            hg.edges[canonical_etype].data['norm'] = norm
-
     # get target category id
     category_id = len(hg.ntypes)
     for i, ntype in enumerate(hg.ntypes):
         if ntype == category:
             category_id = i
 
-    g = dgl.to_homogeneous(hg, edata=['norm'])
-    if args.global_norm:
-        u, v, eid = g.all_edges(form='all')
-        _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
-        degrees = count[inverse_index]
-        norm = th.ones(eid.shape[0]) / degrees
-        norm = norm.unsqueeze(1)
-        g.edata['norm'] = norm
-
+    g = dgl.to_homogeneous(hg)
     g.ndata[dgl.NTYPE].share_memory_()
     g.edata[dgl.ETYPE].share_memory_()
-    g.edata['norm'].share_memory_()
+    if args.global_norm:
+        gen_norm(g)
+        g.edata['norm'].share_memory_()
     node_ids = th.arange(g.number_of_nodes())
 
     # find out the target node ids
@@ -546,7 +539,7 @@ def main(args, devices):
     # multi gpu
     else:
         queue = mp.Queue(n_gpus)
-        sparse_queues = [mp.Queue() for _ in range(n_gpus)]
+        sparse_queues = dgl.GraphSparseQueues(n_gpus)
         procs = []
         num_train_seeds = train_idx.shape[0]
         num_valid_seeds = val_idx.shape[0]
@@ -593,6 +586,8 @@ def config():
             help="gpu")
     parser.add_argument("--lr", type=float, default=1e-2,
             help="learning rate")
+    parser.add_argument("--sparse-lr", type=float, default=5e-2,
+            help="sparse embedding learning rate")
     parser.add_argument("--n-bases", type=int, default=-1,
             help="number of filter weight matrices, default: -1 [use all]")
     parser.add_argument("--n-layers", type=int, default=2,
@@ -603,8 +598,6 @@ def config():
             help="dataset to use")
     parser.add_argument("--l2norm", type=float, default=0,
             help="l2 norm coef")
-    parser.add_argument("--relabel", default=False, action='store_true',
-            help="remove untouched nodes and relabel")
     parser.add_argument("--fanout", type=str, default="4, 4",
             help="Fan-out of neighbor sampling.")
     parser.add_argument("--use-self-loop", default=False, action='store_true',
