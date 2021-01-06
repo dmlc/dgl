@@ -181,6 +181,15 @@ def test_neighbor_sampler_dataloader():
             collator.dataset, collate_fn=collator.collate, batch_size=2, shuffle=True, drop_last=False)
         _check_neighbor_sampling_dataloader(_g, nid, dl, mode)
 
+def test_graph_dataloader():
+    batch_size = 16
+    num_batches = 2
+    minigc_dataset = dgl.data.MiniGCDataset(batch_size * num_batches, 10, 10)
+    data_loader = dgl.dataloading.GraphDataLoader(minigc_dataset, batch_size=batch_size, shuffle=True)
+    for graph, label in data_loader:
+        assert isinstance(graph, dgl.DGLGraph)
+        assert F.asnumpy(label).shape[0] == batch_size
 
 if __name__ == '__main__':
     test_neighbor_sampler_dataloader()
+    test_graph_dataloader()
