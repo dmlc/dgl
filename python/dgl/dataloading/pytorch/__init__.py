@@ -465,4 +465,3 @@ class GraphDataLoader:
     def __len__(self):
         """Return the number of batches of the data loader."""
         return len(self.dataloader)
-
