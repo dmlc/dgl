@@ -7,6 +7,7 @@ from .. import transform
 from ..base import NID, EID
 from .. import backend as F
 from .. import utils
+from .. import batch
 from ..convert import heterograph
 from ..heterograph import DGLHeteroGraph as DGLGraph
 from ..distributed.dist_graph import DistGraph
@@ -716,11 +717,11 @@ class GraphCollator(object):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             graphs, labels = zip(*items)
-            batched_graphs = dgl.batch(graphs)
-            labels = F.stack(labels)
+            batched_graphs = batch(graphs)
+            labels = F.tensor(labels)
             return batched_graphs, labels
         elif isinstance(items[0], DGLGraph):
-            batched_graphs = dgl.batch(graphs)
+            batched_graphs = batch(graphs)
             return batched_graphs
         else:
-            raise ValueError('unsupported input type {}'.format(class(items[0])))
+            raise ValueError('unsupported input type {}'.format(str(typeof(items[0]))))
