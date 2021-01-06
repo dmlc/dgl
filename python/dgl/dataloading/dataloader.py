@@ -1,8 +1,9 @@
 """Data loaders"""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from abc import ABC, abstractproperty, abstractmethod
 import numpy as np
+import re
 from .. import transform
 from ..base import NID, EID
 from .. import backend as F
@@ -691,35 +692,69 @@ class GraphCollator(object):
 
     Examples
     --------
+    To train a GNN for graph classification on a set of graphs in ``dataset`` (assume
+    the backend is PyTorch):
+
+    >>> dataloader = dgl.dataloading.GraphDataLoader(
+    ...     dataset, batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for batched_graph, labels in dataloader:
+    ...     train_on(batched_graph, labels)
     """
+    def __init__(self):
+        self.graph_collate_err_msg_format = (
+            "graph_collate: batch must contain DGLGraph, tensors, numpy arrays, "
+            "numbers, dicts or lists; found {}")
+        self.np_str_obj_array_pattern = re.compile(r'[SaUO]')
+
+    #This implementation is based on torch.utils.data._utils.collate.default_collate
     def collate(self, items):
-        """Combines the sampled edges into a minibatch for edge classification, edge
-        regression, and link prediction tasks.
+        """This collate function behaves similarly to ```torch.utils.data._utils.collate.default_collate```.
+        It combines the sampled graphs and corresponding graph-level data into a batched graph and tensors.
 
         Parameters
         ----------
-        items : list[DGLGraph] or list[tuple[DGLGraph, numeric]]
-            Either a list of dgl.graph objects (for unsupervised learning), or a list of tuples
-            with each tuple being a pair of graph and its label (for supervised learning).
+        items : list of data points or tuples
+            Elements in the list are expected to have the same length.
+            Each sub-element will be batched as a batched graph, or a batched tensor correspondingly.
 
         Returns
         -------
-        Either ``batched_graph``, or ``(batched_graph, labels)`` if graph label is given.
-
-        batched_graph : DGLGraph
-            The batch of DGLGraph objects, as a single graph object.
-
-        labels : Tensor
-            The batched label tensor for the batched graphs.
+        A tuple of the batching results.
         """
-        if isinstance(items[0], tuple):
-            # returns a list of pairs: group them by node types into a dict
-            graphs, labels = zip(*items)
-            batched_graphs = batch(graphs)
-            labels = F.tensor(labels)
-            return batched_graphs, labels
-        elif isinstance(items[0], DGLGraph):
-            batched_graphs = batch(graphs)
+        elem = items[0]
+        elem_type = type(elem)
+        if isinstance(elem, DGLGraph):
+            batched_graphs = batch(items)
             return batched_graphs
-        else:
-            raise ValueError('unsupported input type {}'.format(str(typeof(items[0]))))
+        elif isinstance(elem, F.Tensor):
+            return F.stack(items, 0)
+        elif elem_type.__module__ == 'numpy' and elem_type.__name__ != 'str_' \
+                and elem_type.__name__ != 'string_':
+            if elem_type.__name__ == 'ndarray' or elem_type.__name__ == 'memmap':
+                # array of string classes and object
+                if self.np_str_obj_array_pattern.search(elem.dtype.str) is not None:
+                    raise TypeError(self.graph_collate_err_msg_format.format(elem.dtype))
+
+                return self.collate([F.tensor(b) for b in items])
+            elif elem.shape == ():  # scalars
+                return F.tensor(items)
+        elif isinstance(elem, float):
+            return F.tensor(items, dtype=F.float64)
+        elif isinstance(elem, int):
+            return F.tensor(items)
+        elif isinstance(elem, (str, bytes)):
+            return items
+        elif isinstance(elem, Mapping):
+            return {key: self.collate([d[key] for d in items]) for key in elem}
+        elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
+            return elem_type(*(self.collate(samples) for samples in zip(*items)))
+        elif isinstance(elem, Sequence):
+            # check to make sure that the elements in batch have consistent size
+            it = iter(items)
+            elem_size = len(next(it))
+            if not all(len(elem) == elem_size for elem in it):
+                raise RuntimeError('each element in list of batch should be of equal size')
+            transposed = zip(*items)
+            return [self.collate(samples) for samples in transposed]
+
+        raise TypeError(self.graph_collate_err_msg_format.format(elem_type))
