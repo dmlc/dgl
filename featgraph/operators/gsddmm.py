@@ -4,17 +4,14 @@ from tvm import te
 from tvm import topi
 from tvm.topi.utils import prod, ravel_index, unravel_index
 from tvm.tir import IntImm
-from utils import binary_op_map
+from .utils import binary_op_map, TargetCode
 
-
-class TargetCode:
-    SRC = 0
-    DST = 1
-    EDGE = 2
+__all__ = ['gsddmm']
 
 
 def _sddmm_compute(out_shp, binary_op,
-                   lhs, rhs, lhs_idx, rhs_idx):
+                   lhs, rhs, get_lhs, get_rhs):
+    """Define the SDDMM' TVM compute function. """
     reduce_size = lhs.shape[-1] if binary_op == 'dot' else 1
     feat_len = prod(out_shp[1:])
     feat_len *= reduce_size
@@ -22,24 +19,22 @@ def _sddmm_compute(out_shp, binary_op,
         k = te.reduce_axis((0, reduce_size), name='k')
         def dot_edge_func(*args):
             eid = args[0]
-            fid = ravel_index(args[1:], out_shp[1:])
-            fid *= reduce_size
-            lval = lhs.__getitem__((lhs_idx(eid),) + args[1: -1] + (k,))
-            rval = rhs.__getitem__((rhs_idx(eid),) + args[1: -1] + (k,))
+            lval = lhs.__getitem__((get_lhs(eid),) + args[1: -1] + (k,))
+            rval = rhs.__getitem__((get_rhs(eid),) + args[1: -1] + (k,))
             return te.sum(lval * rval, axis=k)
         out = te.compute(out_shp, dot_edge_func, name='out')
     else:
         def edge_func(*args):
             eid = args[0]
-            fid = ravel_index(args[1:], out_shp[1:])
-            lval = lhs.__getitem__((lhs_idx(eid),) + args[1:])
-            rval = rhs.__getitem__((rhs_idx(eid),) + args[1:])
+            lval = lhs.__getitem__((get_lhs(eid),) + args[1:])
+            rval = rhs.__getitem__((get_rhs(eid),) + args[1:])
             return binary_op_map[binary_op](lval, rval)
         out = te.compute(out_shp, edge_func, name='out')
     return out
 
 
 def _sddmm_cuda_general(sched, out):
+    """Define the SDDMM's TVM general schedule. """
     out_len = prod(out.shape[1:])
     edge_axis = out.op.axis[0]
     feat_axis = sched[out].fuse(*out.op.axis[1:])
@@ -57,6 +52,8 @@ def _sddmm_cuda_general(sched, out):
 
 
 def _sddmm_cuda_tree_reduce(sched, out):
+    """Define the SDDMM's TVM tree-reduction schedule. """
+    # TODO(zihao): handle other dimensions.
     edge_axis = out.op.axis[0]
     reduce_axis = out.op.reduce_axis[0]
     # sched[out].bind(reduce_axis, te.thread_axis('threadIdx.x'))
@@ -68,11 +65,17 @@ def _sddmm_cuda_tree_reduce(sched, out):
     sched[out].bind(edge_outer, te.thread_axis('blockIdx.x'))
 
 
+_sddmm_cuda_schedule = {
+    'general': _sddmm_cuda_general,
+    'tree': _sddmm_cuda_tree_reduce
+}
+
+
 def gsddmm(binary_op,
            ndim,
            indice_type, feat_type,
            lhs_target=TargetCode.SRC, rhs_target=TargetCode.DST,
-           schedule_type="tree",
+           schedule_type='tree',
            target='cuda'):
     """
     Compile SDDMM kernel using TVM. 
@@ -128,7 +131,7 @@ def gsddmm(binary_op,
     rhs = create_placeholder(rhs_target, tuple(rhs_feat_shp), 'rhs')
 
     # idx wrapper for corresponding target
-    idx_target = {
+    target_getter = {
         TargetCode.SRC: lambda eid: adj_row_indices[eid],
         TargetCode.EDGE: lambda eid: eid,
         TargetCode.DST: lambda eid: adj_col_indices[eid]
@@ -137,20 +140,13 @@ def gsddmm(binary_op,
     # compute
     out = _sddmm_compute([nnz] + out_feat_shp,
                          binary_op, lhs, rhs,
-                         idx_target[lhs_target], idx_target[rhs_target])
+                         target_getter[lhs_target], target_getter[rhs_target])
 
     # schedule
     sched = te.create_schedule(out.op)
 
     if target == 'cuda':
-        # cuda schedule
-        if schedule_type == 'tree':
-            assert binary_op == 'dot', "Tree reduction is only applicable to dot product."
-            _sddmm_cuda_tree_reduce(sched, out)
-        elif schedule_type == 'general':
-            _sddmm_cuda_general(sched, out)
-        else:
-            raise KeyError("Schedule type {} not recognized.".format(schedule_type))
+        _sddmm_cuda_schedule[schedule_type](sched, out)
     elif target == 'llvm':
         raise NotImplementedError('CPU kernel not implemented yet.')
 
@@ -171,4 +167,3 @@ def gsddmm(binary_op,
                                      buffer_type='auto_broadcast')
     binds = {lhs:lhs_buffer, rhs:rhs_buffer}
     return tvm.lower(sched, f_input, name=f_name, binds=binds)
-
