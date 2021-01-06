@@ -65,10 +65,27 @@ def generate_user_data(command, ignore_git, extra_env_var=[]):
         }
     }
     """
-
+    mount_efs = r"""
+    package_update: true
+    runcmd:
+    - apt-get -y install binutils
+    - git clone https://github.com/aws/efs-utils
+    - cd efs-utils
+    - apt-get -y install nfs-common
+    - ./build-deb.sh
+    - sudo apt-get -y install ./build/amazon-efs-utils*deb
+    - file_system_id_1=fs-dbf2f8de
+    - efs_mount_point_1=/mnt/efs/fs1
+    - mkdir -p "${efs_mount_point_1}"
+    - test -f "/sbin/mount.efs" && printf "\n${file_system_id_1}:/ ${efs_mount_point_1} efs tls,_netdev\n" >> /etc/fstab || printf "\n${file_system_id_1}.efs.us-west-2.amazonaws.com:/ ${efs_mount_point_1} nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,_netdev 0 0\n" >> /etc/fstab
+    - test -f "/sbin/mount.efs" && printf "\n[client-info]\nsource=liw\n" >> /etc/amazon/efs/efs-utils.conf
+    - retryCnt=15; waitTime=30; while true; do mount -a -t efs,nfs4 defaults; if [ $? = 0 ] || [ $retryCnt -lt 1 ]; then echo File system mounted successfully; break; fi; echo File system not available, retrying to mount.; ((retryCnt--)); sleep $waitTime; done;
+    """
     user_data = r"""
     #cloud-config
     disable_root: false
+    
+    {mount_efs}
 
     runcmd:
     - [ sh, -c, "wget -q https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb" ]
@@ -78,9 +95,10 @@ def generate_user_data(command, ignore_git, extra_env_var=[]):
     - [ sh, -c, "sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a append-config -m ec2 -s -c file:/tmp/log.json"]
     - [ bash, "/tmp/run.sh" ]
     - "sleep 10"
-    - [ sh, -c, "sudo shutdown -h now"]
+    # - [ sh, -c, "sudo shutdown -h now"]
     """.format(command=full_command.replace("\n", r"\n").replace("\"", r"\""),
-               log_config=log_config.replace("\n", r"\n").replace("\"", r"\""))
+               log_config=log_config.replace("\n", r"\n").replace("\"", r"\""),
+               mount_efs=mount_efs)
     print("==================Script Content==================")
     print(full_command)
     print("==================Content End=====================")

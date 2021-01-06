@@ -1,5 +1,5 @@
 export INSTANCE_TYPE=$(curl -s http://169.254.169.254/latest/meta-data/instance-type)
-cd ~/git_repo/benchmarks
+cd ~/git_repo/benchmarks/scripts
 python replace_branch.py --branch ${GIT_BRANCH}
 DEVICE=cpu
 if [[ ${INSTANCE_TYPE} == g* ]] || [[ ${INSTANCE_TYPE} == p* ]]; then
@@ -7,7 +7,7 @@ if [[ ${INSTANCE_TYPE} == g* ]] || [[ ${INSTANCE_TYPE} == p* ]]; then
 else
     DEVICE=cpu
 fi
-aws s3 sync s3://dgl-asv-data/ci/results/ results
+aws s3 sync s3://dgl-asv-data/ci/results/ ~/git_repo/benchmarks/results
 bash publish.sh ${INSTANCE_TYPE} ${DEVICE}
-aws s3 sync results s3://dgl-asv-data/ci/results/
-aws s3 sync html s3://dgl-asv-data/ci/html/ --acl public-read
+aws s3 sync ~/git_repo/benchmarks/results s3://dgl-asv-data/ci/results/
+aws s3 sync ~/git_repo/benchmarks/html s3://dgl-asv-data/ci/html/ --acl public-read
