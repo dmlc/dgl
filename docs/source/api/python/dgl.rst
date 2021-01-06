@@ -86,6 +86,8 @@ operators for computing graph-level representation for both single and batched g
 
     batch
     unbatch
+    set_batch_num_nodes
+    set_batch_num_edges
     readout_nodes
     readout_edges
     sum_nodes
