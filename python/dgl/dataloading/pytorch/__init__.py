@@ -137,20 +137,22 @@ class _EdgeCollator(EdgeCollator):
             return input_nodes, pair_graph, neg_pair_graph, blocks
 
 class _NodeDataLoaderIter:
-    def __init__(self, device, node_dataloader):
-        self.device = device
+    def __init__(self, node_dataloader):
+        self.device = node_dataloader.device
         self.node_dataloader = node_dataloader
         self.iter_ = iter(node_dataloader.dataloader)
 
     def __next__(self):
         input_nodes, output_nodes, blocks = next(self.iter_)
         _restore_blocks_storage(blocks, self.node_dataloader.collator.g)
+        input_nodes = input_nodes.to(self.device)
+        output_nodes = output_nodes.to(self.device)
         blocks = [blc.to(self.device) for blc in blocks]
         return input_nodes, output_nodes, blocks
 
 class _EdgeDataLoaderIter:
-    def __init__(self, device, edge_dataloader):
-        self.device = device
+    def __init__(self, edge_dataloader):
+        self.device = edge_dataloader.device
         self.edge_dataloader = edge_dataloader
         self.iter_ = iter(edge_dataloader.dataloader)
 
@@ -160,6 +162,8 @@ class _EdgeDataLoaderIter:
             _restore_subgraph_storage(pair_graph, self.edge_dataloader.collator.g)
             _restore_blocks_storage(blocks, self.edge_dataloader.collator.g_sampling)
             pair_graph = pair_graph.to(self.device)
+            input_nodes = input_nodes.to(self.device)
+            pair_graph = pair_graph.to(self.device)
             blocks = [blc.to(self.device) for blc in blocks]
             return input_nodes, pair_graph, blocks
         else:
@@ -167,6 +171,9 @@ class _EdgeDataLoaderIter:
             _restore_subgraph_storage(pair_graph, self.edge_dataloader.collator.g)
             _restore_subgraph_storage(neg_pair_graph, self.edge_dataloader.collator.g)
             _restore_blocks_storage(blocks, self.edge_dataloader.collator.g_sampling)
+            pair_graph = pair_graph.to(self.device)
+            neg_pair_graph = neg_pair_graph.to(self.device)
+            input_nodes = input_nodes.to(self.device)
             pair_graph = pair_graph.to(self.device)
             neg_pair_graph = neg_pair_graph.to(self.device)
             blocks = [blc.to(self.device) for blc in blocks]
@@ -238,7 +245,7 @@ class NodeDataLoader:
             # Directly use the iterator of DistDataLoader, which doesn't copy features anyway.
             return iter(self.dataloader)
         else:
-            return _NodeDataLoaderIter(self.device, self)
+            return _NodeDataLoaderIter(self)
 
     def __len__(self):
         """Return the number of batches of the data loader."""
@@ -426,7 +433,7 @@ class EdgeDataLoader:
 
     def __iter__(self):
         """Return the iterator of the data loader."""
-        return _EdgeDataLoaderIter(self.device, self)
+        return _EdgeDataLoaderIter(self)
 
     def __len__(self):
         """Return the number of batches of the data loader."""
