@@ -4385,9 +4385,9 @@ class DGLHeteroGraph(object):
         u, v = self.find_edges(eid, etype=etype)
         # call message passing onsubgraph
         g = self if etype is None else self[etype]
-        ndata = core.message_passing(_create_compute_graph(g, u, v, eid),
-                                     message_func, reduce_func, apply_node_func)
-        dstnodes = F.unique(v)
+        compute_graph, _, dstnodes, _ = _create_compute_graph(g, u, v, eid)
+        ndata = core.message_passing(
+            compute_graph, message_func, reduce_func, apply_node_func)
         self._set_n_repr(dtid, dstnodes, ndata)
 
     def pull(self,
@@ -4489,9 +4489,10 @@ class DGLHeteroGraph(object):
         g = self if etype is None else self[etype]
         # call message passing on subgraph
         src, dst, eid = g.in_edges(v, form='all')
-        ndata = core.message_passing(_create_compute_graph(g, src, dst, eid, v),
-                                     message_func, reduce_func, apply_node_func)
-        self._set_n_repr(dtid, v, ndata)
+        compute_graph, _, dstnodes, _ = _create_compute_graph(g, src, dst, eid, v)
+        ndata = core.message_passing(
+            compute_graph, message_func, reduce_func, apply_node_func)
+        self._set_n_repr(dtid, dstnodes, ndata)
 
     def push(self,
              u,
@@ -6060,6 +6061,6 @@ def _create_compute_graph(graph, u, v, eid, recv_nodes=None):
 
     return DGLHeteroGraph(hgidx, ([srctype], [dsttype]), [etype],
                           node_frames=[srcframe, dstframe],
-                          edge_frames=[eframe])
+                          edge_frames=[eframe]), unique_src, unique_dst, eid
 
 _init_api("dgl.heterograph")
