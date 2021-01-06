@@ -22,7 +22,7 @@ To use the neighborhood sampler provided by DGL for edge classification,
 one need to instead combine it with
 :class:`~dgl.dataloading.pytorch.EdgeDataLoader`, which iterates
 over a set of edges in minibatches, yielding the subgraph induced by the
-edge minibatch and ``blocks`` to be consumed by the module above.
+edge minibatch and ``blocks`` to be consumed by the module below.
 
 For example, the following code creates a PyTorch DataLoader that
 iterates over the training edge ID array ``train_eids`` in batches,
