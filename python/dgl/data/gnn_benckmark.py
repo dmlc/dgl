@@ -348,7 +348,7 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
 
     - Nodes: 13,752
     - Edges: 574,418
-    - Number of classes: 5
+    - Number of classes: 10
     - Node feature size: 767
 
     Parameters
@@ -390,7 +390,7 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
         -------
         int
         """
-        return 5
+        return 10
 
 
 class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
@@ -413,7 +413,7 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
 
     - Nodes: 7,650
     - Edges: 287,326
-    - Number of classes: 5
+    - Number of classes: 8
     - Node feature size: 745
 
     Parameters
@@ -455,7 +455,7 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
         -------
         int
         """
-        return 5
+        return 8
 
 
 class CoraFull(CoraFullDataset):

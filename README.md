@@ -4,7 +4,7 @@
 
 [![PyPi Latest Release](https://img.shields.io/pypi/v/dgl.svg)](https://pypi.org/project/dgl/)
 [![Conda Latest Release](https://anaconda.org/dglteam/dgl/badges/version.svg)](https://anaconda.org/dglteam/dgl)
-[![Build Status](http://ci.dgl.ai:80/buildStatus/icon?job=DGL/master)](http://ci.dgl.ai:80/job/DGL/job/master/)
+[![Build Status](https://ci.dgl.ai/buildStatus/icon?job=DGL/master)](https://ci.dgl.ai/job/DGL/job/master/)
 [![Benchmark by ASV](http://img.shields.io/badge/benchmarked%20by-asv-green.svg?style=flat)](https://asv.dgl.ai/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
@@ -268,6 +268,12 @@ We are currently in Beta stage.  More features and improvements are coming.
 1. [**Uncertainty-Matching Graph Neural Networks to Defend Against Poisoning Attacks**](https://arxiv.org/pdf/2009.14455.pdf), *Uday Shankar Shanthamallu, Jayaraman J. Thiagarajan, Andreas Spanias*
 
 1. [**Computing Graph Neural Networks: A Survey from Algorithms to Accelerators**](https://arxiv.org/pdf/2010.00130.pdf), *Sergi Abadal, Akshay Jain, Robert Guirado, Jorge López-Alonso, Eduard Alarcón*
+
+1. [**NHK_STRL at WNUT-2020 Task 2: GATs with Syntactic Dependencies as Edges and CTC-based Loss for Text Classification**](https://www.aclweb.org/anthology/2020.wnut-1.43.pdf), *Yuki Yasuda, Taichi Ishiwatari, Taro Miyazaki, Jun Goto*
+
+1. [**Relation-aware Graph Attention Networks with Relational Position Encodings for Emotion Recognition in Conversations**](https://www.aclweb.org/anthology/2020.emnlp-main.597.pdf), *Taichi Ishiwatari, Yuki Yasuda, Taro Miyazaki, Jun Goto*
+
+1. [**PGM-Explainer: Probabilistic Graphical Model Explanations for Graph Neural Networks**](https://proceedings.neurips.cc/paper/2020/file/8fb134f258b1f7865a6ab2d935a897c9-Paper.pdf), *Minh N. Vu, My T. Thai*
 
 
 </details>

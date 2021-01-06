@@ -229,7 +229,8 @@ class BlockSampler(object):
                     # to the mapping from the new graph to the old frontier.
                     # So we need to test if located_eids is empty, and do the remapping ourselves.
                     if len(located_eids) > 0:
-                        frontier = transform.remove_edges(frontier, located_eids)
+                        frontier = transform.remove_edges(
+                            frontier, located_eids, store_ids=True)
                         frontier.edata[EID] = F.gather_row(parent_eids, frontier.edata[EID])
                 else:
                     # (BarclayII) remove_edges only accepts removing one type of edges,
@@ -237,7 +238,8 @@ class BlockSampler(object):
                     new_eids = parent_eids.copy()
                     for k, v in located_eids.items():
                         if len(v) > 0:
-                            frontier = transform.remove_edges(frontier, v, etype=k)
+                            frontier = transform.remove_edges(
+                                frontier, v, etype=k, store_ids=True)
                             new_eids[k] = F.gather_row(parent_eids[k], frontier.edges[k].data[EID])
                     frontier.edata[EID] = new_eids
 
