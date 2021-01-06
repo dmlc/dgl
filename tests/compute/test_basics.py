@@ -657,3 +657,17 @@ def test_degree_bucket_edge_ordering(idtype):
         assert np.array_equal(eid, np.sort(eid, 1))
         return {'n': F.sum(nodes.mailbox['eid'], 1)}
     g.update_all(fn.copy_e('eid', 'eid'), reducer)
+
+def test_issue_2484():
+    import dgl.function as fn
+    g = dgl.graph(([0, 1, 2], [1, 2, 3]))
+    x = F.randn((4,))
+    g.ndata['x'] = x
+    g.pull([2, 1], fn.u_add_v('x', 'x', 'm'), fn.sum('m', 'x'))
+    y1 = g.ndata['x']
+
+    g.ndata['x'] = x
+    g.pull([1, 2], fn.u_add_v('x', 'x', 'm'), fn.sum('m', 'x'))
+    y2 = g.ndata['x']
+
+    assert F.allclose(y1, y2)
