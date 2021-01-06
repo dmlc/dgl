@@ -136,7 +136,7 @@ def load_nowplaying_rs():
     dataset_dir = os.path.join(os.getcwd(), 'dataset')
     os.symlink('/tmp/dataset/', dataset_dir)
 
-    dataset_path = os.path.join(dataset_dir, name)
+    dataset_path = os.path.join(dataset_dir, "nowplaying_rs", name)
     # Load dataset
     with open(dataset_path, 'rb') as f:
         dataset = pickle.load(f)
