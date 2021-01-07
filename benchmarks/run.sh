@@ -13,7 +13,7 @@ pip install asv
 pip uninstall -y dgl
 
 export DGL_BENCH_DEVICE=$DEVICE
-echo "DGL_REG_CONF=$DGL_REG_CONF"
+echo "DGL_BENCH_DEVICE=$DGL_BENCH_DEVICE"
 pushd $ROOT/benchmarks
 cat asv.conf.json
 asv machine --yes
