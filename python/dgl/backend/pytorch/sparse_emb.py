@@ -14,14 +14,6 @@ dtype_dict = {dtype_dict[key]:key for key in dtype_dict}
 
 _store = None
 
-def _move_data_to_shared_mem_array(arr, name):
-    dlpack = zerocopy_to_dlpack(arr)
-    dgl_tensor = nd.from_dlpack(dlpack)
-    new_arr = empty_shared_mem(name, False, arr.shape, dtype_dict[arr.dtype])
-    dgl_tensor.copyto(new_arr)
-    dlpack = new_arr.to_dlpack()
-    return zerocopy_from_dlpack(dlpack)
-
 def _get_shared_mem_array(name, shape, dtype):
     new_arr = empty_shared_mem(name, False, shape, dtype_dict[dtype])
     dlpack = new_arr.to_dlpack()
@@ -213,6 +205,9 @@ class SparseGradOptimizer(abc.ABC):
                 for idx, data in emb._trace:
                     grad = data.grad.data
                     device = grad.device
+                    idx_dtype = idx.dtype
+                    grad_dtype = grad.dtype
+                    grad_dim = grad.shape[1]
 
                     if self._world_size > 0:
                         if emb_name not in self._shared_cache:
@@ -237,32 +232,39 @@ class SparseGradOptimizer(abc.ABC):
                                 update_embs[emb_name][0].append(idx_i)
                                 update_embs[emb_name][1].append(grad_i)
                             else:
-                                idx_i = idx_i.to(th.device('cpu'), non_blocking=True)
-                                grad_i = grad_i.to(th.device('cpu'), non_blocking=True)
+                                idx_i = idx_i.to(th.device('cpu'))
+                                grad_i = grad_i.to(th.device('cpu'))
                                 idx_shmem_name = 'idx_{}_{}_{}'.format(emb_name, self._rank, i)
                                 grad_shmem_name = 'grad_{}_{}_{}'.format(emb_name, self._rank, i)
                                 if idx_shmem_name not in self._shared_cache[emb_name] or \
                                     self._shared_cache[emb_name][idx_shmem_name].shape[0] < idx_i.shape[0]:
                                     idx_shmem = _create_shared_mem_array(idx_shmem_name,
-                                        (idx_i.shape[0] * 2 + 2,), idx_i.dtype)
+                                        (idx_i.shape[0] * 2 + 2,), idx_dtype)
                                     grad_shmem = _create_shared_mem_array(grad_shmem_name,
-                                        (idx_i.shape[0] * 2 + 2, grad_i.shape[1]), grad_i.dtype)
+                                        (idx_i.shape[0] * 2 + 2, grad_dim), grad_dtype)
                                     self._shared_cache[emb_name][idx_shmem_name] = idx_shmem
                                     self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
 
-                                idx_i = _move_data_to_shared_mem_array(idx_i, idx_shmem_name)
-                                grad_i = _move_data_to_shared_mem_array(grad_i, grad_shmem_name)
+                                self._shared_cache[emb_name][idx_shmem_name][:idx_i.shape[0]] = idx_i
+                                self._shared_cache[emb_name][grad_shmem_name][:idx_i.shape[0]] = grad_i
                                 _store.set(idx_shmem_name, str(idx_i.shape[0]))
 
-                        idx_dtype = idx.dtype
-                        grad_dtype = grad.dtype
                         wait_keys = []
                         for i in range(self._world_size):
                             if i != self._rank:
-                                size = _store.get('idx_{}_{}_{}'.format(emb_name, i, self._rank))
-                                _store.delete_key('idx_{}_{}_{}'.format(emb_name, i, self._rank))
-                                idx_i = _get_shared_mem_array('idx_{}_{}_{}'.format(emb_name, i, self._rank), (int(size),), idx_dtype)
-                                grad_i = _get_shared_mem_array('grad_{}_{}_{}'.format(emb_name, i, self._rank), (int(size), grad.shape[1]), grad_dtype)
+                                idx_shmem_name = 'idx_{}_{}_{}'.format(emb_name, i, self._rank)
+                                grad_shmem_name = 'grad_{}_{}_{}'.format(emb_name, i, self._rank)
+                                size = int(_store.get(idx_shmem_name))
+                                if idx_shmem_name not in self._shared_cache[emb_name] or \
+                                    self._shared_cache[emb_name][idx_shmem_name].shape[0] < size:
+                                    idx_shmem = _get_shared_mem_array(idx_shmem_name,
+                                        (size * 2 + 2,), idx_dtype)
+                                    grad_shmem = _get_shared_mem_array(grad_shmem_name,
+                                        (size * 2 + 2, grad_dim), grad_dtype)
+                                    self._shared_cache[emb_name][idx_shmem_name] = idx_shmem
+                                    self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
+                                idx_i = self._shared_cache[emb_name][idx_shmem_name][:size]
+                                grad_i = self._shared_cache[emb_name][grad_shmem_name][:size]
                                 update_embs[emb_name][0].append(idx_i.to(device, non_blocking=True))
                                 update_embs[emb_name][1].append(grad_i.to(device, non_blocking=True))
                     else:
