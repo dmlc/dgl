@@ -153,7 +153,7 @@ def launch_ec2(userdata, instance_type, disk_size=150):
         except botocore.exceptions.ClientError:
             print("Not ready yet")
         time.sleep(3)
-    print(instance.public_ip_address)
+    print("{}: {}".format(instance.instance_type, instance.public_ip_address))
     return instance
 
 
