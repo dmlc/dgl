@@ -26,8 +26,13 @@ else
 fi
 
 WS_ROOT=/asv/dgl
-
 docker pull dgllib/dgl-ci-gpu:conda
+
+if [ -z "$DGL_REG_CONF"]; then
+    DOCKER_ENV_OPT=""
+else
+    DOCKER_ENV_OPT="-e DGL_REG_CONF:$DGL_REG_CONF"
+fi
 
 if [ -z "$MOUNT_PATH"]; then
     DOCKER_MOUNT_OPT=""
@@ -42,12 +47,14 @@ if [[ $DEVICE == "cpu" ]]; then
     docker run --name dgl-reg \
         --rm \
         $DOCKER_MOUNT_OPT \
+        $DOCKER_ENV_OPT \
         --shm-size="4g" \
         --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
 else
     docker run --name dgl-reg \
         --rm --runtime=nvidia \
         $DOCKER_MOUNT_OPT \
+        $DOCKER_ENV_OPT \
         --shm-size="4g" \
         --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
 fi
