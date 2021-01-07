@@ -71,7 +71,7 @@ python main.py --dataname pubmed --gpu 0 --lam 1.0 --tem 0.2 --order 5 --sample 
 
 ### Performance
 
-| Dataset | Cora | Pubmed | Citeseer |
+| Dataset | Cora | Citeseer | Pubmed |
 | :-: | :-: | :-: | :-: |
 | Accuracy Reported(100 runs) | **85.4(±0.4)** | **75.4(±0.4)** | 82.7(±0.6) |
 | Accuracy DGL(20 runs) | **85.4(±0.4)** | 75.3(±0.3) | **82.9(±0.8)** |
