@@ -50,10 +50,15 @@ def min_identity(x, y, z=None):
 argmax = te.comm_reducer(max_combine, max_identity, name='argmax')
 argmin = te.comm_reducer(min_combine, min_identity, name='argmin')
 
+
+def sum_reducer(x, axis=None):
+    return te.sum(x[0], axis=axis)
+
+
 reduce_op_map = {
     'max': argmax,
     'min': argmin,
-    'sum': te.sum
+    'sum': sum_reducer,
 }
 
 binary_op_map = {

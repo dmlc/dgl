@@ -2,8 +2,8 @@
 import tvm
 from tvm import te
 from tvm import topi
-from tvm.topi.utils import prod, ravel_index, unravel_index
-from tvm.tir import IntImm
+from tvm.tir import IntImm, decl_buffer
+from tvm.topi.utils import prod
 from .utils import binary_op_map, TargetCode
 
 __all__ = ['gsddmm']
@@ -78,7 +78,7 @@ def gsddmm(binary_op,
            schedule_type='tree',
            target='cuda'):
     """
-    Compile SDDMM kernel using TVM. 
+    Compile GSDDMM kernel using TVM. 
 
     Parameters
     ----------
@@ -110,31 +110,31 @@ def gsddmm(binary_op,
     nnz = te.var('nnz', indice_type)
 
     # placeholder for sparse matrix
-    adj_row_indices = te.placeholder((nnz,), indice_type, 'adj_row_indices')
-    adj_col_indices = te.placeholder((nnz,), indice_type, 'adj_col_indices')
+    row = te.placeholder((nnz,), indice_type, 'row')
+    col = te.placeholder((nnz,), indice_type, 'col')
 
     # placeholder for dense features
     def create_placeholder(target, feat_shp, name):
         if target == TargetCode.SRC:
-            return te.placeholder((num_rows,) + feat_shp, feat_type, name)
+            return te.placeholder([num_rows] + feat_shp, feat_type, name)
         elif target == TargetCode.EDGE:
-            return te.placeholder((nnz,) + feat_shp, feat_type, name)
+            return te.placeholder([nnz] + feat_shp, feat_type, name)
         elif target == TargetCode.DST:
-            return te.placeholder((num_cols,) + feat_shp, feat_type, name)
+            return te.placeholder([num_cols] + feat_shp, feat_type, name)
         else:
             raise DGLError('Unknown target')
 
     out_feat_shp = [te.var('d_o{}'.format(i), indice_type) for i in range(ndim)]
     lhs_feat_shp = [te.var('d_l{}'.format(i), indice_type) for i in range(ndim)]
     rhs_feat_shp = [te.var('d_r{}'.format(i), indice_type) for i in range(ndim)]
-    lhs = create_placeholder(lhs_target, tuple(lhs_feat_shp), 'lhs')
-    rhs = create_placeholder(rhs_target, tuple(rhs_feat_shp), 'rhs')
+    lhs = create_placeholder(lhs_target, lhs_feat_shp, 'lhs')
+    rhs = create_placeholder(rhs_target, rhs_feat_shp, 'rhs')
 
     # idx wrapper for corresponding target
     target_getter = {
-        TargetCode.SRC: lambda eid: adj_row_indices[eid],
+        TargetCode.SRC: lambda eid: row[eid],
         TargetCode.EDGE: lambda eid: eid,
-        TargetCode.DST: lambda eid: adj_col_indices[eid]
+        TargetCode.DST: lambda eid: col[eid]
     }
 
     # compute
@@ -148,12 +148,11 @@ def gsddmm(binary_op,
     if target == 'cuda':
         _sddmm_cuda_schedule[schedule_type](sched, out)
     elif target == 'llvm':
-        raise NotImplementedError('CPU kernel not implemented yet.')
+        raise NotImplementedError('CPU schedule not implemented yet.')
 
     # prepare input
-    f_input = out_feat_shp
-    f_input.append(adj_row_indices)
-    f_input.append(adj_col_indices)
+    f_input.append(row)
+    f_input.append(col)
     f_name = '_'.join(str(x) for x in [
         'sddmm', binary_op, ndim,
         indice_type, feat_type,
@@ -161,9 +160,9 @@ def gsddmm(binary_op,
     f_input += [lhs, rhs, out]
 
     # bind autobroadcast buffer
-    lhs_buffer = tvm.tir.decl_buffer(lhs.shape, lhs.dtype, name='lhs_buf',
-                                     buffer_type='auto_broadcast')
-    rhs_buffer = tvm.tir.decl_buffer(rhs.shape, rhs.dtype, name='rhs_buf',
-                                     buffer_type='auto_broadcast')
+    lhs_buffer = decl_buffer(lhs.shape, lhs.dtype, name='lhs_buf',
+                             buffer_type='auto_broadcast')
+    rhs_buffer = decl_buffer(rhs.shape, rhs.dtype, name='rhs_buf',
+                             buffer_type='auto_broadcast')
     binds = {lhs:lhs_buffer, rhs:rhs_buffer}
     return tvm.lower(sched, f_input, name=f_name, binds=binds)
