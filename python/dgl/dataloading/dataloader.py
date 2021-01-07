@@ -364,8 +364,10 @@ class NodeCollator(Collator):
         ----------
         items : list[int] or list[tuple[str, int]]
             Either a list of node IDs (for homogeneous graphs), or a list of node type-ID
-            pairs (for heterogeneous graphs).  If ``return_indices`` is True, represents
-            the indices to the seed node array(s) instead.
+            pairs (for heterogeneous graphs).
+
+            If ``return_indices`` is True, represents the indices to the seed node
+            array(s) instead.
 
         Returns
         -------
@@ -711,8 +713,8 @@ class EdgeCollator(Collator):
         items : list[int] or list[tuple[str, int]]
             Either a list of edge IDs (for homogeneous graphs), or a list of edge type-ID
             pairs (for heterogeneous graphs).
-            
-            If ``return_indices`` is True, represents the indices to the seed node
+
+            If ``return_indices`` is True, represents the indices to the seed edge
             array(s) instead.
 
         Returns
