@@ -304,7 +304,7 @@ class TestFilter:
             else:
                 raise Exception(
                     "Must set both DGL_REG_CONF and INSTANCE_TYPE as env")
-            self.enabled_tests = self.conf[instance_type]
+            self.enabled_tests = self.conf[instance_type]["tests"]
         else:
             import logging
             logging.warning("No regression test conf file specified")

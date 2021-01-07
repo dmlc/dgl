@@ -1,5 +1,6 @@
 import json
 import argparse
+import os
 from .launch_ec2 import launch_ec2, generate_user_data
 
 
@@ -8,10 +9,15 @@ def run_test(conf_name):
     with open(conf_name, "r") as f:
         conf = json.load(f)
     with open("ec2_script.sh", "r") as f:
-            command = f.read()
+        command = f.read()
     for instance_type, tests in conf.items():
+        env_list = []
+        if "env" in conf[instance_type]:
+            for k, v in conf[instance_type]["env"].items():
+                os.environ[k] = v
+                env_list.append(k)
         instances.append(launch_ec2(generate_user_data(
-            command, False, []), instance_type, 150))
+            command, False, env_list), instance_type, 150))
 
 
 parser = argparse.ArgumentParser(

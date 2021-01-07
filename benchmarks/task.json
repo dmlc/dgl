@@ -1,3 +1,18 @@
 {
-    "c5.9xlarge": ["bench_sage."]
+    "c5.9xlarge": {
+        "tests": [
+            "bench_sage."
+        ],
+        "env": {
+            "DEVICE": "gpu"
+        }
+    },
+    "g4dn.2xlarge": {
+        "tests": [
+            "bench_sage."
+        ],
+        "env": {
+            "DEVICE": "gpu"
+        }
+    }
 }
