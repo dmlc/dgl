@@ -708,7 +708,7 @@ class GraphCollator(object):
 
     #This implementation is based on torch.utils.data._utils.collate.default_collate
     def collate(self, items):
-        """This function is similar to ```torch.utils.data._utils.collate.default_collate```.
+        """This function is similar to ``torch.utils.data._utils.collate.default_collate``.
         It combines the sampled graphs and corresponding graph-level data
         into a batched graph and tensors.
 
