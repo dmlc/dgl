@@ -421,7 +421,7 @@ class GraphDataLoader:
 
     Parameters
     ----------
-    collate : Function, default is None
+    collate_fn : Function, default is None
         The customized collate function. Will use the default collate
         function if not given.
     kwargs : dict
@@ -439,7 +439,7 @@ class GraphDataLoader:
     """
     collator_arglist = inspect.getfullargspec(GraphCollator).args
 
-    def __init__(self, dataset, collate=None, **kwargs):
+    def __init__(self, dataset, collate_fn=None, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
