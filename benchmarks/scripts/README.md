@@ -29,6 +29,10 @@ python run_reg_test.py
 ## Details
 The launch script will do the following things:
 - install aws cloudwatch agent to record the running output
-- mount the dataset EFS to /mnt/efs/fs1
+- mount the dataset EFS from /mnt/efs/fs1
 - pass the specified environment variable(GIT_URL, GIT_BRANCH) on the current machine to the remote machine
-- 
+
+### Environment variable
+- `MOUNT_PATH` specify the directory in the host to be mapped into docker, if exists will map the `MOUNT_PATH`(in host) to `/tmp/dataset`(in docker)
+- `INSTANCE_TYPE` specify the current instance type
+- `DGL_REG_CONF` specify the path to `task.json`, which is relative to the repo root. If specified, must specify `INSTANCE_TYPE` also
