@@ -83,7 +83,6 @@ def generate_user_data(command, ignore_git, extra_env_var=[]):
     #cloud-config
     disable_root: false
     package_update: true
-    
 
     runcmd:
     {mount_efs}
