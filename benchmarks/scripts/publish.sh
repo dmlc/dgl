@@ -27,11 +27,10 @@ fi
 
 WS_ROOT=/asv/dgl
 docker pull dgllib/dgl-ci-gpu:conda
-
 if [ -z "$DGL_REG_CONF"]; then
     DOCKER_ENV_OPT=""
 else
-    DOCKER_ENV_OPT="-e DGL_REG_CONF:$DGL_REG_CONF"
+    DOCKER_ENV_OPT="-e DGL_REG_CONF=$DGL_REG_CONF"
 fi
 
 if [ -z "$MOUNT_PATH"]; then
@@ -42,6 +41,7 @@ fi
 
 echo $HOME
 echo "Mount Point: ${DOCKER_MOUNT_OPT}"
+echo "Env opt: ${DOCKER_ENV_OPT}"
 
 if [[ $DEVICE == "cpu" ]]; then
     docker run --name dgl-reg \
