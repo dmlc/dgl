@@ -12,4 +12,5 @@ nltk
 requests[security]
 tqdm
 awscli
-torchtext
+# 0.5.0 is for pytorch 1.5
+torchtext==0.5.0
