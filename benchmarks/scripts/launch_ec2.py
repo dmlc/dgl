@@ -174,18 +174,19 @@ def main(args):
     print("Finished Running")
 
 
-parser = argparse.ArgumentParser(
-    description='launch EC2', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("--instance-type", default="c5.2xlarge",
-                    help="specify instance type")
-parser.add_argument("--ignore-git", action="store_true",
-                    default=False, help="whether to skip initialize git repo")
-parser.add_argument("--disk-size", default=150, type=int,
-                    help="specify disk size")
-parser.add_argument(
-    "--script-file", help="Bash Script to be run", required=True)
-parser.add_argument("--env-vars", default="", help="Extra environment variable to be passed. Split by comma."
-                    " i.e. JENKINS_URL, OMP_NUM_THREAD")
-args = parser.parse_args()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description='launch EC2', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--instance-type", default="c5.2xlarge",
+                        help="specify instance type")
+    parser.add_argument("--ignore-git", action="store_true",
+                        default=False, help="whether to skip initialize git repo")
+    parser.add_argument("--disk-size", default=150, type=int,
+                        help="specify disk size")
+    parser.add_argument(
+        "--script-file", help="Bash Script to be run", required=True)
+    parser.add_argument("--env-vars", default="", help="Extra environment variable to be passed. Split by comma."
+                        " i.e. JENKINS_URL, OMP_NUM_THREAD")
+    args = parser.parse_args()
 
-main(args)
+    main(args)

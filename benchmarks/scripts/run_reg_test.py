@@ -1,7 +1,7 @@
 import json
 import argparse
 import os
-from .launch_ec2 import launch_ec2, generate_user_data
+from launch_ec2 import launch_ec2, generate_user_data
 
 
 def run_test(conf_name):
