@@ -1,3 +1,4 @@
+import json
 import os
 import pickle
 import shutil
@@ -292,6 +293,36 @@ def num_gpu():
     return torch.cuda.device_count()
 
 
+class TestFilter:
+    def __init__(self):
+        self.conf = None
+        if "DGL_REG_CONF" in os.environ:
+            with open(os.environ["DGL_REG_CONF"], "r") as f:
+                self.conf = json.load(f)
+            if "INSTANCE_TYPE" in os.environ:
+                instance_type = os.environ["INSTANCE_TYPE"]
+            else:
+                raise Exception(
+                    "Must set both DGL_REG_CONF and INSTANCE_TYPE as env")
+            self.enabled_tests = self.conf[instance_type]
+        else:
+            import logging
+            logging.warning("No regression test conf file specified")
+
+    def check(self, func):
+        funcfullname = inspect.getmodule(func).__name__ + "." + func.__name__
+        if self.conf is None:
+            return True
+        else:
+            for enabled_testname in self.enabled_tests:
+                if enabled_testname in funcfullname:
+                    return True
+            return False
+
+
+filter = TestFilter()
+
+
 def benchmark(track_type, timeout=60):
     """Decorator for indicating the benchmark type.
        By default, the test will not run on multi-gpu testing
@@ -320,9 +351,9 @@ def benchmark(track_type, timeout=60):
         func.unit = TRACK_UNITS[track_type]
         func.setup = TRACK_SETUP[track_type]
         func.timeout = timeout
-        if num_gpu() > 1:
-            # skip when multi gpu exists
-            func.benchmark_name = "skip_multigpu_" + func.__name__
+        if not filter.check(func):
+            # skip if not enabled
+            func.benchmark_name = "skip_" + func.__name__
         return func
     return _wrapper
 
