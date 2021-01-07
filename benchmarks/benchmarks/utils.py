@@ -200,7 +200,11 @@ def process_data(name):
 
 
 def get_bench_device():
-    return os.environ.get('DGL_BENCH_DEVICE', 'cpu')
+    device = os.environ.get('DGL_BENCH_DEVICE', 'cpu')
+    if device.lower() == "gpu":
+        return "cuda:0"
+    else:
+        return device
 
 
 def setup_track_time(*args, **kwargs):
@@ -287,11 +291,6 @@ def parametrize(param_name, params):
             raise ValueError('Invalid parameter name:', param_name)
         return func
     return _wrapper
-
-
-def num_gpu():
-    return torch.cuda.device_count()
-
 
 class TestFilter:
     def __init__(self):
