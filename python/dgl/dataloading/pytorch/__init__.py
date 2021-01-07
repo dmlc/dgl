@@ -448,10 +448,10 @@ class GraphDataLoader:
             else:
                 dataloader_kwargs[k] = v
 
-        if collate is None:
+        if collate_fn is None:
             self.collate = GraphCollator(**collator_kwargs).collate
         else:
-            self.collate = collate
+            self.collate = collate_fn
 
         self.dataloader = DataLoader(dataset=dataset,
                                      collate_fn=self.collate,
