@@ -4,7 +4,7 @@
             "bench_sage."
         ],
         "env": {
-            "DEVICE": "gpu"
+            "DEVICE": "cpu"
         }
     },
     "g4dn.2xlarge": {
