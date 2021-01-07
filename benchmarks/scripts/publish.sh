@@ -28,9 +28,15 @@ fi
 WS_ROOT=/asv/dgl
 docker pull dgllib/dgl-ci-gpu:conda
 if [ -z "$DGL_REG_CONF"]; then
-    DOCKER_ENV_OPT=""
+    DOCKER_ENV_OPT="$DOCKER_ENV_OPT"
 else
-    DOCKER_ENV_OPT="-e DGL_REG_CONF=$DGL_REG_CONF"
+    DOCKER_ENV_OPT=" -e DGL_REG_CONF=$DGL_REG_CONF $DOCKER_ENV_OPT"
+fi
+
+if [ -z "$INSTANCE_TYPE"]; then
+    DOCKER_ENV_OPT="$DOCKER_ENV_OPT"
+else
+    DOCKER_ENV_OPT=" -e INSTANCE_TYPE=$INSTANCE_TYPE $DOCKER_ENV_OPT"
 fi
 
 if [ -z "$MOUNT_PATH"]; then
@@ -63,7 +69,7 @@ docker exec dgl-reg mkdir -p $WS_ROOT
 docker cp ../../.git dgl-reg:$WS_ROOT
 docker cp ../ dgl-reg:$WS_ROOT/benchmarks/
 docker cp torch_gpu_pip.txt dgl-reg:/asv
-docker exec dgl-reg bash $WS_ROOT/benchmarks/run.sh $DEVICE
+docker exec $DOCKER_ENV_OPT dgl-reg bash $WS_ROOT/benchmarks/run.sh $DEVICE
 docker cp dgl-reg:$WS_ROOT/benchmarks/results ../
 docker cp dgl-reg:$WS_ROOT/benchmarks/html ../
 docker stop dgl-reg

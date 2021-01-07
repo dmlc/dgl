@@ -292,11 +292,15 @@ def parametrize(param_name, params):
         return func
     return _wrapper
 
+
 class TestFilter:
     def __init__(self):
         self.conf = None
         if "DGL_REG_CONF" in os.environ:
-            with open(os.environ["DGL_REG_CONF"], "r") as f:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            path = os.path.join(current_dir, "../../",
+                                os.environ["DGL_REG_CONF"])
+            with open(path, "r") as f:
                 self.conf = json.load(f)
             if "INSTANCE_TYPE" in os.environ:
                 instance_type = os.environ["INSTANCE_TYPE"]
