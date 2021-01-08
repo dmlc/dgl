@@ -378,11 +378,11 @@ std::tuple<HeteroGraphPtr, std::vector<std::string>, std::vector<std::string>>
   return std::make_tuple(ret, ntypes, etypes);
 }
 
-HeteroGraphPtr HeteroGraph::GetGraphInFormat(dgl_format_code_t formats) const {
+HeteroGraphPtr HeteroGraph::GetGraphInFormat(dgl_format_code_t formats, bool store_eid) const {
   std::vector<HeteroGraphPtr> format_rels(NumEdgeTypes());
   for (dgl_type_t etype = 0; etype < NumEdgeTypes(); ++etype) {
     auto relgraph = std::dynamic_pointer_cast<UnitGraph>(GetRelationGraph(etype));
-    format_rels[etype] = relgraph->GetGraphInFormat(formats);
+    format_rels[etype] = relgraph->GetGraphInFormat(formats, store_eid);
   }
   return HeteroGraphPtr(new HeteroGraph(
     meta_graph_, format_rels, NumVerticesPerType()));

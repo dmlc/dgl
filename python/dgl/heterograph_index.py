@@ -864,7 +864,7 @@ class HeteroGraphIndex(ObjectBase):
         rev_order = rev_csr(2)
         return utils.toindex(order, self.dtype), utils.toindex(rev_order, self.dtype)
 
-    def formats(self, formats=None):
+    def formats(self, formats=None, eid=True):
         """Get a graph index with the specified sparse format(s) or query
         for the usage status of sparse formats
 
@@ -878,6 +878,8 @@ class HeteroGraphIndex(ObjectBase):
             * If formats is None, return the usage status of sparse formats
             * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of
             them, specifying the sparse formats to use.
+        eid : bool, optional
+            Whether to store the EID array.
 
         Returns
         -------
@@ -907,7 +909,7 @@ class HeteroGraphIndex(ObjectBase):
         else:
             if isinstance(formats, str):
                 formats = [formats]
-            return _CAPI_DGLHeteroGetFormatGraph(self, formats)
+            return _CAPI_DGLHeteroGetFormatGraph(self, formats, eid)
 
     def create_formats_(self):
         """Create all sparse matrices allowed for the graph."""

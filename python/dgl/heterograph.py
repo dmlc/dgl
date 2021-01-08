@@ -5220,6 +5220,74 @@ class DGLHeteroGraph(object):
         self._node_frames = old_nframes
         self._edge_frames = old_eframes
 
+    def csc_no_eids(self, sort=True):
+        r"""Create an optimized graph stored in CSC format only without the EID array.
+
+        This function returns a graph with low-memory storage.
+
+        Parameters
+        ----------
+        sort : bool
+            If True, the function will sort the edges first by their source
+            node IDs and then break ties by their destination node IDs. It will
+            also reorder the edge features accordingly. If False, the function
+            will assume the edges to be already sorted.
+
+        Returns
+        -------
+        DGLGraph
+            A graph with low-memory storage.
+        raw_eids, optional
+            If :attr:`sort` is ``True``, the function will return ``raw_eids``,
+            where ``raw_eids[i]`` gives the original ID of the i-th edge in the
+            sorted graph.
+        """
+        ret = copy.copy(self)
+
+        # Case1: graph is already sorted
+        if not sort:
+            ret._graph = self._graph.formats(['csc'], eid=False)
+            return ret
+
+        # Case2: sort the graph by srcdst first
+        metagraph = ret._graph.metagraph
+        num_nodes_per_type = []
+        for ntype in ret.ntypes:
+            num_nodes_per_type.append(ret.num_nodes(ntype))
+
+        raw_eids_dict = dict()
+        rel_graphs = []
+        for c_etype in ret.canonical_etypes:
+            src_type, dst_type = c_etype[0], c_etype[2]
+            u, v, raw_eids = ret.edges(form='all', order='srcdst', etype=c_etype)
+            raw_eids_dict[c_etype] = raw_eids
+            hgidx = heterograph_index.create_unitgraph_from_coo(
+                1 if src_type == dst_type else 2,
+                ret.num_nodes(src_type),
+                ret.num_nodes(dst_type),
+                u,
+                v,
+                ['coo', 'csr', 'csc'])
+            rel_graphs.append(hgidx)
+
+        hgidx = heterograph_index.create_heterograph_from_relations(
+            metagraph, rel_graphs, utils.toindex(num_nodes_per_type, "int64"))
+        hgidx = hgidx.formats(['csc'], eid=False)
+
+        ret._graph = hgidx
+
+        # Reorder edge features
+        edges = [raw_eids_dict[c_etype] for c_etype in ret.canonical_etypes]
+        edge_frames = utils.extract_edge_subframes(ret, edges, store_ids=False)
+        utils.set_new_frames(ret, edge_frames=edge_frames)
+
+        if len(ret.canonical_etypes) == 1:
+            raw_eids = raw_eids_dict[ret.canonical_etypes[0]]
+        else:
+            raw_eids = raw_eids_dict
+
+        return ret, raw_eids
+
     def formats(self, formats=None):
         r"""Get a cloned graph with the specified sparse format(s) or query
         for the usage status of sparse formats

@@ -255,7 +255,7 @@ class UnitGraph : public BaseHeteroGraph {
 
   dgl_format_code_t GetAllowedFormats() const override;
 
-  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats) const override;
+  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats, bool store_eid) const override;
 
   /*! \return Load UnitGraph from stream, using CSRMatrix*/
   bool Load(dmlc::Stream* fs);
