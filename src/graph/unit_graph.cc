@@ -451,8 +451,6 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK(aten::IsValidIdArray(indptr));
     CHECK(aten::IsValidIdArray(indices));
     CHECK(aten::IsValidIdArray(edge_ids));
-    CHECK_EQ(indices->shape[0], edge_ids->shape[0])
-      << "indices and edge id arrays should have the same length";
 
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
   }
@@ -1447,7 +1445,7 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats, bool store
     return CreateFromCSC(num_vtypes, GetInCSR(false)->adj(), formats);
   const aten::CSRMatrix& mat = GetInCSR(false)->adj();
   return CreateFromCSC(num_vtypes, mat.num_rows, mat.num_cols,
-                       mat.indptr, mat.indices, nullptr, formats);
+                       mat.indptr, mat.indices, aten::NullArray(), formats);
 }
 
 SparseFormat UnitGraph::SelectFormat(dgl_format_code_t preferred_formats) const {
