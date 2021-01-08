@@ -149,8 +149,6 @@ class Model(nn.Module):
         h = F.relu(h)
         h = self.conv2(g, h)
         return h
-    
-model = Model(g.ndata['feat'].shape[1], 16, dataset.num_classes)
 
 
 ######################################################################
@@ -165,8 +163,8 @@ import dgl.data
 dataset = dgl.data.CoraGraphDataset()
 g = dataset[0]
 
-def train(g, net):
-    optimizer = torch.optim.Adam(net.parameters(), lr=0.01)
+def train(g, model):
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
     all_logits = []
     best_val_acc = 0
     best_test_acc = 0
@@ -178,7 +176,7 @@ def train(g, net):
     test_mask = g.ndata['test_mask']
     for e in range(200):
         # Forward
-        logits = net(g, features)
+        logits = model(g, features)
 
         # Compute prediction
         pred = logits.argmax(1)
@@ -208,6 +206,7 @@ def train(g, net):
             print('In epoch {}, loss: {:.3f}, val acc: {:.3f} (best {:.3f}), test acc: {:.3f} (best {:.3f})'.format(
                 e, loss, val_acc, best_val_acc, test_acc, best_test_acc))
 
+model = Model(g.ndata['feat'].shape[1], 16, dataset.num_classes)
 train(g, model)
 
 
@@ -271,9 +270,9 @@ class WeightedSAGEConv(nn.Module):
 # the model. You can replace it with your own edge weights.
 # 
 
-class Net(nn.Module):
+class Model(nn.Module):
     def __init__(self, in_feats, h_feats, num_classes):
-        super(Net, self).__init__()
+        super(Model, self).__init__()
         self.conv1 = WeightedSAGEConv(in_feats, h_feats)
         self.conv2 = WeightedSAGEConv(h_feats, num_classes)
     
@@ -283,8 +282,8 @@ class Net(nn.Module):
         h = self.conv2(g, h, torch.ones(g.num_edges()).to(g.device))
         return h
     
-net = Net(g.ndata['feat'].shape[1], 16, dataset.num_classes)
-train(g, net)
+model = Model(g.ndata['feat'].shape[1], 16, dataset.num_classes)
+train(g, model)
 
 
 ######################################################################
