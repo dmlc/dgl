@@ -328,7 +328,6 @@ filter = TestFilter()
 
 def benchmark(track_type, timeout=60):
     """Decorator for indicating the benchmark type.
-       By default, the test will not run on multi-gpu testing
 
     Parameters
     ----------
@@ -356,25 +355,6 @@ def benchmark(track_type, timeout=60):
         func.timeout = timeout
         if not filter.check(func):
             # skip if not enabled
-            func.benchmark_name = "skip_" + func.__name__
-        return func
-    return _wrapper
-
-
-def multi_gpu_test():
-    def _wrapper(func):
-        if hasattr(func, "benchmark_name"):
-            if num_gpu() > 1 and func.benchmark_name.startswith("skip_multigpu_"):
-                func.benchmark_name = func.benchmark_name[len(
-                    "skip_multigpu_"):]
-        return func
-    return _wrapper
-
-
-def run_when(run):
-    def _wrapper(func):
-        if not run:
-            print("Skip {}".format(func.__name__))
             func.benchmark_name = "skip_" + func.__name__
         return func
     return _wrapper
