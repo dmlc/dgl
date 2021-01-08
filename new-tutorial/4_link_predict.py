@@ -54,8 +54,8 @@ import scipy.sparse as sp
 # such as mean average precision, and use other negative sampling methods,
 # which are beyond the scope of this tutorial.
 # 
-# Load graph and features
-# -----------------------
+# Loading graph and features
+# --------------------------
 # 
 # Following the :doc:`introduction <1_introduction>`, we first load the
 # Cora dataset.
@@ -68,8 +68,8 @@ g = dataset[0]
 
 
 ######################################################################
-# Prepare training and testing sets
-# ---------------------------------
+# Preparing training and testing sets
+# -----------------------------------
 # 
 # This tutorial randomly picks 10% of the edges for positive examples in
 # the test set, and leave the rest for the training set. It then samples
@@ -122,8 +122,8 @@ train_g = dgl.remove_edges(g, eids[:test_size])
 
 
 ######################################################################
-# Define a GraphSAGE model
-# ------------------------
+# Defining a GraphSAGE model
+# --------------------------
 # 
 # This tutorial builds a model consisting of two
 # `GraphSAGE <https://arxiv.org/abs/1706.02216>`__ layers, each computes

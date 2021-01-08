@@ -52,8 +52,8 @@ print('Number of graph categories:', dataset.gclasses)
 
 
 ######################################################################
-# Define Data Loader
-# ------------------
+# Defining Data Loader
+# --------------------
 # 
 # A graph classification dataset usually contains two types of elements: a
 # set of graphs, and their graph-level labels. Similar to an image

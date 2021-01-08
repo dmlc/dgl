@@ -61,6 +61,7 @@ interactions = pd.read_csv('./interactions.csv')
 interactions.head()
 
 
+######################################################################
 # This tutorial treats the members as nodes and interactions as edges. It
 # takes age as a numeric feature of the nodes, affiliated club as the label
 # of the nodes, and edge weight as a numeric feature of the edges.

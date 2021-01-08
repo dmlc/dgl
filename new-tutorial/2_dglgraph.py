@@ -109,7 +109,7 @@ print(g.edata['a'])
 
 ######################################################################
 # Querying Graph Structures
-# -------------
+# -------------------------
 # 
 # ``DGLGraph`` object provides various methods to query a graph structure.
 # 
