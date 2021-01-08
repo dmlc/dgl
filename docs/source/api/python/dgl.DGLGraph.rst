@@ -166,10 +166,10 @@ Methods for performing message passing, applying functions on node/edge features
     DGLGraph.filter_nodes
     DGLGraph.filter_edges
 
-Querying batch summary
----------------------------------
+Querying and manipulating batch information
+----------------------------------------------
 
-Methods for getting the batching information if the current graph is a batched
+Methods for getting/setting the batching information if the current graph is a batched
 graph generated from :func:`dgl.batch`. They are also widely used in the
 :ref:`api-batch`.
 
@@ -179,6 +179,9 @@ graph generated from :func:`dgl.batch`. They are also widely used in the
     DGLGraph.batch_size
     DGLGraph.batch_num_nodes
     DGLGraph.batch_num_edges
+    DGLGraph.set_batch_num_nodes
+    DGLGraph.set_batch_num_edges
+
 
 Mutating topology
 -----------------
