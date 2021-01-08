@@ -2,15 +2,17 @@
 Write your own GNN module
 =========================
 
-This tutorial assumes that you already know :doc:`the basics of training a
-GNN for node classification <1_introduction>`. However,
-sometimes you would like to invent a new way of aggregating neighbor
-information or a new way of using the aggregation.
+Sometimes, your model goes beyond simply stacking existing GNN modules.
+For example, you would like to invent a new way of aggregating neighbor
+information by considering node importance or edge weights.
 
 By the end of this tutorial you will be able to
 
 -  Understand DGL’s message passing APIs.
 -  Implement GraphSAGE convolution module by your own.
+
+This tutorial assumes that you already know :doc:`the basics of training a
+GNN for node classification <1_introduction>`.
 
 """
 
@@ -18,64 +20,6 @@ import dgl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-
-######################################################################
-# This tutorial assumes that you already know the pipeline of full-graph
-# node classification. If not, please refer to the
-# :doc:`introduction <1_introduction>`.
-# 
-# The following code for data loading and training loop is directly copied
-# from the introduction tutorial.
-# 
-
-import dgl.data
-
-dataset = dgl.data.CoraGraphDataset()
-g = dataset[0]
-
-def train(g, net):
-    optimizer = torch.optim.Adam(net.parameters(), lr=0.01)
-    all_logits = []
-    best_val_acc = 0
-    best_test_acc = 0
-
-    features = g.ndata['feat']
-    labels = g.ndata['label']
-    train_mask = g.ndata['train_mask']
-    val_mask = g.ndata['val_mask']
-    test_mask = g.ndata['test_mask']
-    for e in range(200):
-        # Forward
-        logits = net(g, features)
-
-        # Compute prediction
-        pred = logits.argmax(1)
-
-        # Compute loss
-        # Note that we should only compute the losses of the nodes in the training set,
-        # i.e. with train_mask 1.
-        loss = F.cross_entropy(logits[train_mask], labels[train_mask])
-
-        # Compute accuracy on training/validation/test
-        train_acc = (pred[train_mask] == labels[train_mask]).float().mean()
-        val_acc = (pred[val_mask] == labels[val_mask]).float().mean()
-        test_acc = (pred[test_mask] == labels[test_mask]).float().mean()
-
-        # Save the best validation accuracy and the corresponding test accuracy.
-        if best_val_acc < val_acc:
-            best_val_acc = val_acc
-            best_test_acc = test_acc
-
-        # Backward
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        all_logits.append(logits.detach())
-
-        if e % 5 == 0:
-            print('In epoch {}, loss: {:.3f}, val acc: {:.3f} (best {:.3f}), test acc: {:.3f} (best {:.3f})'.format(
-                e, loss, val_acc, best_val_acc, test_acc, best_test_acc))
 
 
 ######################################################################
@@ -165,8 +109,8 @@ class SAGEConv(nn.Module):
             g.ndata['h'] = h
             # update_all is a message passing API.
             g.update_all(message_func=fn.copy_u('h', 'm'), reduce_func=fn.mean('m', 'h_N'))
-            h_neigh = g.ndata['h_N']
-            h_total = torch.cat([h, h_neigh], dim=1)
+            h_N = g.ndata['h_N']
+            h_total = torch.cat([h, h_N], dim=1)
             return self.linear(h_total)
 
 
@@ -180,7 +124,7 @@ class SAGEConv(nn.Module):
 #   copies the node feature under name ``'h'`` as *messages* sent to
 #   neighbors.
 #
-# * Reduce function ``fn.mean('m', 'h_neigh')`` that averages
+# * Reduce function ``fn.mean('m', 'h_N')`` that averages
 #   all the received messages under name ``'m'`` and saves the result as a
 #   new node feature ``'h_N'``.
 #
@@ -207,6 +151,63 @@ class Model(nn.Module):
         return h
     
 model = Model(g.ndata['feat'].shape[1], 16, dataset.num_classes)
+
+
+######################################################################
+# Training loop
+# ~~~~~~~~~~~~~
+# The following code for data loading and training loop is directly copied
+# from the introduction tutorial.
+# 
+
+import dgl.data
+
+dataset = dgl.data.CoraGraphDataset()
+g = dataset[0]
+
+def train(g, net):
+    optimizer = torch.optim.Adam(net.parameters(), lr=0.01)
+    all_logits = []
+    best_val_acc = 0
+    best_test_acc = 0
+
+    features = g.ndata['feat']
+    labels = g.ndata['label']
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
+    test_mask = g.ndata['test_mask']
+    for e in range(200):
+        # Forward
+        logits = net(g, features)
+
+        # Compute prediction
+        pred = logits.argmax(1)
+
+        # Compute loss
+        # Note that we should only compute the losses of the nodes in the training set,
+        # i.e. with train_mask 1.
+        loss = F.cross_entropy(logits[train_mask], labels[train_mask])
+
+        # Compute accuracy on training/validation/test
+        train_acc = (pred[train_mask] == labels[train_mask]).float().mean()
+        val_acc = (pred[val_mask] == labels[val_mask]).float().mean()
+        test_acc = (pred[test_mask] == labels[test_mask]).float().mean()
+
+        # Save the best validation accuracy and the corresponding test accuracy.
+        if best_val_acc < val_acc:
+            best_val_acc = val_acc
+            best_test_acc = test_acc
+
+        # Backward
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        all_logits.append(logits.detach())
+
+        if e % 5 == 0:
+            print('In epoch {}, loss: {:.3f}, val acc: {:.3f} (best {:.3f}), test acc: {:.3f} (best {:.3f})'.format(
+                e, loss, val_acc, best_val_acc, test_acc, best_test_acc))
+
 train(g, model)
 
 
@@ -258,9 +259,9 @@ class WeightedSAGEConv(nn.Module):
         with g.local_scope():
             g.ndata['h'] = h
             g.edata['w'] = w
-            g.update_all(message_func=fn.u_mul_e('h', 'w', 'm'), reduce_func=fn.mean('m', 'h_neigh'))
-            h_neigh = g.ndata['h_neigh']
-            h_total = torch.cat([h, h_neigh], dim=1)
+            g.update_all(message_func=fn.u_mul_e('h', 'w', 'm'), reduce_func=fn.mean('m', 'h_N'))
+            h_N = g.ndata['h_N']
+            h_total = torch.cat([h, h_N], dim=1)
             return self.linear(h_total)
 
 
@@ -318,7 +319,7 @@ def sum_udf(nodes):
 
 ######################################################################
 # In short, DGL will group the nodes by their in-degrees, and for each
-# group DGL stacks the incoming messages along the second dimension. One
+# group DGL stacks the incoming messages along the second dimension. You 
 # can then perform a reduction along the second dimension to aggregate
 # messages.
 # 

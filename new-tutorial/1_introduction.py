@@ -28,23 +28,30 @@ import torch.nn.functional as F
 ######################################################################
 # Overview of Node Classification with GNN
 # ----------------------------------------
-# 
-# Many proposed methods are *unsupervised* (or *self-supervised* by recent
-# definition), where the model predicts the community labels only by
-# connectivity. Recently, `Kipf et
-# al., <https://arxiv.org/abs/1609.02907>`__ proposed to formulate the
-# community detection problem as a semi-supervised node classification
+#
+# One of the most popular and widely adopted tasks on graph data is node
+# classification, where a model needs to predict the ground truth category
+# of each node. Before graph neural networks, many proposed methods are
+# using either connectivity alone (such as DeepWalk or node2vec), or simple
+# combinations of connectivity and the node's own features.  GNNs, by
+# contrast, offers an opportunity to obtain node representations by
+# combining the connectivity and features of a *local neighborhood*.
+#
+# `Kipf et
+# al., <https://arxiv.org/abs/1609.02907>`__ is an example that formulates
+# the node classification problem as a semi-supervised node classification
 # task. With the help of only a small portion of labeled nodes, a graph
-# neural network (GNN) can accurately predict the community labels of the
+# neural network (GNN) can accurately predict the node category of the
 # others.
 # 
 # This tutorial will show how to build such a GNN for semi-supervised node
-# classification with only a small number of labels on Cora
+# classification with only a small number of labels on the Cora
 # dataset,
 # a citation network with papers as nodes and citations as edges. The task
-# is to predict the category of a given paper. The papers contain word
-# count vectorization as features, normalized so that they sum up to 1, as
-# in Section 5.2 in `the paper <https://arxiv.org/abs/1609.02907>`__.
+# is to predict the category of a given paper. Each paper node contains a
+# word count vector as its features, normalized so that they sum up to one,
+# as described in Section 5.2 of
+# `the paper <https://arxiv.org/abs/1609.02907>`__.
 # 
 # Loading Cora Dataset
 # --------------------
@@ -65,14 +72,21 @@ g = dataset[0]
 
 
 ######################################################################
-# DGL graphs can store node-wise and edge-wise information in ``ndata``
-# and ``edata`` attribute as dictionaries. In the DGL Cora dataset, the
-# graph contains:
+# A DGL graph can store node features and edge features in two
+# dictionary-like attributes called ``ndata`` and ``edata``.
+# In the DGL Cora dataset, the graph contains the following node features:
 # 
-# -  ``train_mask``: Whether the node is in training set.
-# -  ``val_mask``: Whether the node is in validation set.
-# -  ``test_mask``: Whether the node is in test set.
-# -  ``label``: The ground truth node category.
+# - ``train_mask``: A boolean tensor indicating whether the node is in the
+#   training set.
+#
+# - ``val_mask``: A boolean tensor indicating whether the node is in the
+#   validation set.
+#
+# - ``test_mask``: A boolean tensor indicating whether the node is in the
+#   test set.
+#
+# - ``label``: The ground truth node category.
+#
 # -  ``feat``: The node features.
 # 
 
@@ -83,12 +97,12 @@ print(g.edata)
 
 
 ######################################################################
-# Define a Graph Convolutional Network (GCN)
-# ------------------------------------------
+# Defining a Graph Convolutional Network (GCN)
+# --------------------------------------------
 # 
 # This tutorial will build a two-layer `Graph Convolutional Network
-# (GCN) <http://tkipf.github.io/graph-convolutional-networks/>`__. Each of
-# its layer computes new node representations by aggregating neighbor
+# (GCN) <http://tkipf.github.io/graph-convolutional-networks/>`__. Each
+# layer computes new node representations by aggregating neighbor
 # information.
 # 
 # To build a multi-layer GCN you can simply stack ``dgl.nn.GraphConv``
@@ -115,7 +129,7 @@ model = GCN(g.ndata['feat'].shape[1], 16, dataset.num_classes)
 
 ######################################################################
 # DGL provides implementation of many popular neighbor aggregation
-# modules. They all can be invoked easily with one line of code.
+# modules. You can easily invoke them with one line of code.
 # 
 
 
@@ -144,8 +158,7 @@ def train(g, model):
         pred = logits.argmax(1)
 
         # Compute loss
-        # Note that we should only compute the losses of the nodes in the training set,
-        # i.e. with train_mask 1.
+        # Note that you should only compute the losses of the nodes in the training set.
         loss = F.cross_entropy(logits[train_mask], labels[train_mask])
 
         # Compute accuracy on training/validation/test

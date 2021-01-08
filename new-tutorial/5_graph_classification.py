@@ -5,8 +5,8 @@ Training a GNN for Graph Classification
 By the end of this tutorial, you will be able to
 
 -  Load a DGL-provided graph classification dataset.
--  Understand what readout function does.
--  Understand how to deal with a minibatch of graphs.
+-  Understand what *readout* function does.
+-  Understand how to create and use a minibatch of graphs.
 -  Build a GNN-based graph classification model.
 -  Train and evaluate the model on a DGL-provided dataset.
 
@@ -24,7 +24,7 @@ import torch.nn.functional as F
 # 
 # Graph classification or regression requires a model to predict certain
 # graph-level properties of a single graph given its node and edge
-# features. Common cases include molecular property prediction, etc.
+# features.  Molecular property prediction is one particular application.
 # 
 # This tutorial shows how to train a graph classification model for a
 # small dataset from the paper `How Powerful Are Graph Neural
@@ -55,37 +55,22 @@ print('Number of graph categories:', dataset.gclasses)
 # Define Data Loader
 # ------------------
 # 
-# When you train a model for image classification or language modeling,
-# you will use a ``DataLoader`` to iterate over the dataset. In DGL, you
-# can still use the ``DataLoader``. The only thing you need to do is to
-# write a ``collate`` function for the ``DataLoader`` that combines the
-# examples together into a minibatch.
+# A graph classification dataset usually contains two types of elements: a
+# set of graphs, and their graph-level labels. Similar to an image
+# classification task, when the dataset is large enough, we need to train
+# with mini-batches. When you train a model for image classification or
+# language modeling, you will use a ``DataLoader`` to iterate over the
+# dataset. In DGL, you can use the ``GraphDataLoader``.
 # 
-# Combining the examples involves combining the graphs into a single
-# bigger batched graph with ``dgl.batch()``, and concatenating the labels.
-# ``dgl.batch()`` not only combines a list of graphs into a bigger graph
-# with each element as a separate component, but also concatenates the
-# node and edge features of the original graphs.
-# 
-
-from torch.utils.data import DataLoader
-from torch.utils.data.sampler import SubsetRandomSampler
-
-def collate(examples):
-    graphs, labels = zip(*examples)
-    return dgl.batch(graphs), torch.stack(labels)
-
-
-######################################################################
 # You can also use various dataset samplers provided in
-# |torch.utils.data.sampler|_.
-# For example, this tutorial creates a training ``DataLoader`` and test
-# ``DataLoader``, using ``SubsetRandomSampler`` to tell PyTorch to sample
-# from only a subset of the dataset.
-#
-# .. |torch.utils.data.sampler| replace:: ``torch.utils.data.sampler``
-# .. _torch.utils.data.sampler: https://pytorch.org/docs/stable/data.html#data-loading-order-and-sampler
+# ```torch.utils.data.sampler`` <https://pytorch.org/docs/stable/data.html#data-loading-order-and-sampler>`__.
+# For example, this tutorial creates a training ``GraphDataLoader`` and
+# test ``GraphDataLoader``, using ``SubsetRandomSampler`` to tell PyTorch
+# to sample from only a subset of the dataset.
 # 
+
+from dgl.dataloading import GraphDataLoader
+from torch.utils.data.sampler import SubsetRandomSampler
 
 num_examples = len(dataset)
 num_train = int(num_examples * 0.8)
@@ -93,10 +78,10 @@ num_train = int(num_examples * 0.8)
 train_sampler = SubsetRandomSampler(torch.arange(num_train))
 test_sampler = SubsetRandomSampler(torch.arange(num_train, num_examples))
 
-train_dataloader = DataLoader(
-    dataset, sampler=train_sampler, batch_size=5, collate_fn=collate, drop_last=False)
-test_dataloader = DataLoader(
-    dataset, sampler=test_sampler, batch_size=5, collate_fn=collate, drop_last=False)
+train_dataloader = GraphDataLoader(
+    dataset, sampler=train_sampler, batch_size=5, drop_last=False)
+test_dataloader = GraphDataLoader(
+    dataset, sampler=test_sampler, batch_size=5, drop_last=False)
 
 
 ######################################################################
@@ -110,20 +95,22 @@ print(batch)
 
 
 ######################################################################
-# As you defined in the ``collate`` function, the ``DataLoader`` will
-# return two objects for each iteration. Th second element is simply a
-# label vector representing the category of each graph in the minibatch.
-# The first element will be described below.
+# As each element in ``dataset`` has a graph and a label, the
+# ``GraphDataLoader`` will return two objects for each iteration. The
+# first element is the batched graph, and the second element is simply a
+# label vector representing the category of each graph in the mini-batch.
+# Next, we’ll talked about the batched graph.
 # 
-
-
-######################################################################
-# What is a batched graph?
-# ------------------------
+# A Batched Graph in DGL
+# ----------------------
 # 
-# The first element is a batched ``DGLGraph``, which itself is also a
-# ``DGLGraph`` (so you can still treat it as a normal ``DGLGraph`` object
-# as in :doc:`here <2_dglgraph>`). It however contains the information
+# In each mini-batch, the sampled graphs are combined into a single bigger
+# batched graph via ``dgl.batch``. The single bigger batched graph merges
+# all original graphs as separately connected components, with the node
+# and edge features concatenated. This bigger graph is a batched
+# ``DGLGraph``, which itself is also a ``DGLGraph`` instance (so you can
+# still treat it as a normal ``DGLGraph`` object as in
+# `here <2_dglgraph.ipynb>`__). It however contains the information
 # necessary for recovering the original graphs, such as the number of
 # nodes and edges of each graph element.
 # 
@@ -146,10 +133,10 @@ print(graphs)
 # (GCN) <http://tkipf.github.io/graph-convolutional-networks/>`__. Each of
 # its layer computes new node representations by aggregating neighbor
 # information. If you have gone through the
-# :doc:`introduction <1_introduction>`, you will need to notice two
+# :doc:`introduction <1_introduction>`, you will notice two
 # differences:
 # 
-# -  Since you will be predicting a single category for the *entire graph*
+# -  Since the task is to predict a single category for the *entire graph*
 #    instead of for every node, you will need to aggregate the
 #    representations of all the nodes and potentially the edges to form a
 #    graph-level representation. Such process is more commonly referred as
@@ -183,9 +170,9 @@ class GCN(nn.Module):
 # Training Loop
 # -------------
 # 
-# Training loop simply involves iterating over the training set with the
-# ``DataLoader`` you created and computing the gradients, just as you
-# would do for image classification or language modeling.
+# The training loop iterates over the training set with the
+# ``GraphDataLoader`` object and computes the gradients, just like
+# image classification or language modeling.
 # 
 
 # Create the model with given dimensions

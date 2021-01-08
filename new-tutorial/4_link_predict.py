@@ -2,7 +2,7 @@
 Link Prediction using Graph Neural Networks
 ===========================================
 
-In the :doc:`introduction <1_introduction>`, you already learned the
+In the :doc:`introduction <1_introduction>`, you have already learned the
 basic workflow of using GNNs for node classification, i.e. predicting
 the category of a node in a graph. This tutorial will teach you how to
 train a GNN for link prediction, i.e. predicting the existence of an
@@ -109,6 +109,13 @@ test_label = torch.cat([torch.zeros(len(test_pos_u)), torch.ones(len(test_neg_u)
 ######################################################################
 # When training, you will need to remove the edges in the test set from
 # the original graph. You can do this via ``dgl.remove_edges``.
+#
+# .. note::
+#
+#    ``dgl.remove_edges`` works by creating a subgraph from the original
+#    graph, resulting in a copy and therefore could be slow for large
+#    graphs.  If so, you could save the training and test graph to
+#    disk, as you would do for preprocessing.
 # 
 
 train_g = dgl.remove_edges(g, eids[:test_size])
@@ -162,7 +169,7 @@ model = GraphSAGE(train_g.ndata['feat'].shape[1], 16)
 # 
 # .. note::
 # 
-#    This tutorial did not include evaluation on a validation
+#    This tutorial does not include evaluation on a validation
 #    set. In practice you should save and evaluate the best model based on
 #    performance on the validation set.
 # 

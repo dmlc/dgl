@@ -18,8 +18,8 @@ By the end of this tutorial, you will be able to
 # ``DGLDataset`` Object Overview
 # ------------------------------
 # 
-# Your custom graph dataset should subclass the ``dgl.data.DGLDataset``
-# object and implement the following methods:
+# Your custom graph dataset should inherit the ``dgl.data.DGLDataset``
+# class and implement the following methods:
 # 
 # -  ``__getitem__(self, i)``: retrieve the ``i``-th example of the
 #    dataset. An example often contains a single DGL graph, and
@@ -59,7 +59,7 @@ By the end of this tutorial, you will be able to
 # 
 # .. note::
 # 
-#    In practice taking age directly as a numeric feature may
+#    In practice, taking age directly as a numeric feature may
 #    not work well in machine learning; strategies like binning or
 #    normalizing the feature would work better. Here we are directly
 #    taking the values as-is for simplicity.
