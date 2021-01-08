@@ -1445,10 +1445,9 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats, bool store
     return CreateFromCSR(num_vtypes, GetOutCSR(false)->adj(), formats);
   if (store_eid)
     return CreateFromCSC(num_vtypes, GetInCSR(false)->adj(), formats);
-  else
-    const aten::CSRMatrix& mat = GetInCSR(false)->adj();
-    return CreateFromCSC(num_vtypes, mat.num_rows, mat.num_cols,
-                         mat.indptr, mat.indices, nullptr, formats);
+  const aten::CSRMatrix& mat = GetInCSR(false)->adj();
+  return CreateFromCSC(num_vtypes, mat.num_rows, mat.num_cols,
+                       mat.indptr, mat.indices, nullptr, formats);
 }
 
 SparseFormat UnitGraph::SelectFormat(dgl_format_code_t preferred_formats) const {
