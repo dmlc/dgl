@@ -1442,7 +1442,7 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats, bool store
     CHECK(store_eid) << "must store EID array in the case of CSR format";
     return CreateFromCSR(num_vtypes, GetOutCSR(false)->adj(), formats);
   if (formats & csc_code)
-    if store_eid
+    if (store_eid)
       return CreateFromCSC(num_vtypes, GetInCSR(false)->adj(), formats);
     const aten::CSRMatrix& mat = GetInCSR(false)->adj();
     return CreateFromCSC(num_vtypes, mat.num_rows, mat.num_cols,
