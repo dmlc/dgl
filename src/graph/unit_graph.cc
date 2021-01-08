@@ -398,7 +398,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return subg;
   }
 
-  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats) const override {
+  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats, bool store_eid) const override {
     LOG(FATAL) << "Not enabled for COO graph.";
     return nullptr;
   }
@@ -775,7 +775,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return {};
   }
 
-  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats) const override {
+  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats, bool store_eid) const override {
     LOG(FATAL) << "Not enabled for CSR graph.";
     return nullptr;
   }
