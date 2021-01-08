@@ -626,7 +626,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatGraph")
       formats_vec.push_back(ParseSparseFormat(fmt));
     }
     auto hgptr = hg->GetGraphInFormat(
-        SparseFormatsToCode(formats_vec));
+        SparseFormatsToCode(formats_vec), store_eid);
     *rv = HeteroGraphRef(hgptr);
 });
 
