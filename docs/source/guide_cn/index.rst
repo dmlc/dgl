@@ -29,12 +29,15 @@
    * - :ref:`guide_cn-graph`
      - 张怀文/Huaiwen Zhang
      - https://github.com/huaiwen
-   * - :ref:`guide_cn-graph-basic`, :ref:`guide_cn-graph-feature`
+   * - :ref:`guide_cn-graph-basic`
      - 沈成 / mlsoar
      - https://github.com/mlsoar
    * - :ref:`guide_cn-graph-graphs-nodes-edges`
      - 张建 / zhjwy9343
      - https://github.com/zhjwy9343
+   * - :ref:`guide_cn-graph-feature`
+     - 沈成 / mlsoar
+     - https://github.com/mlsoar
    * - :ref:`guide_cn-graph-external`
      - 沈成 / mlsoar
      - https://github.com/mlsoar
@@ -132,8 +135,8 @@
      - 宋怡然/Yiran Song
      - https://github.com/rr-Yiran
    * - :ref:`guide_cn-distributed-apis`
-     - 李庆标/Qingbiao Liq
-     - https://github.com/QingbiaoLi
+     - 李庆标/Qingbiao Li
+     - https://qingbiaoli.github.io/
    * - :ref:`guide_cn-distributed-tools`
-     - 李庆标/Qingbiao Liq
-     - https://github.com/QingbiaoLi
+     - 李庆标/Qingbiao Li
+     - https://qingbiaoli.github.io/

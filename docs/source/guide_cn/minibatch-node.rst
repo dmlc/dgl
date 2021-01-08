@@ -1,6 +1,6 @@
 .. _guide_cn-minibatch-node-classification-sampler:
 
-6.1 针对节点分类使用邻居采样方法训练GNN的模型
+6.1 针对节点分类任务的邻居采样训练方法
 -----------------------------------------------------------------------
 
 :ref:`(English Version) <guide-minibatch-node-classification-sampler>`

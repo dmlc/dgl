@@ -53,7 +53,7 @@ green nodes:
 Neighborhood sampling with pencil and paper
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Let's first defind a DGL graph according to the above image.
+Let's first define a DGL graph according to the above image.
 
 .. code:: python
 
@@ -155,7 +155,6 @@ second GNN layer for node 8.
    :alt: Imgur
 
 
-
 Note that the output nodes also appear in the input nodes. The reason is
 that representations of output nodes from the previous layer are needed
 for feature combination after message passing (i.e. :math:`\phi^{(2)}`).
@@ -207,8 +206,6 @@ output nodes via
    <div class="alert alert-info">
 
 ::
-
-   <b>ID Mappings</b>
 
 The original node IDs of the input nodes and output nodes in the block
 can be found as the feature ``dgl.NID``, and the mapping from the
