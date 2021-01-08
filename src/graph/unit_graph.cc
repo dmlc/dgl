@@ -1420,7 +1420,7 @@ HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
 
 HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats, bool store_eid) const {
   if (formats == all_code)
-    CHECK(store_eid) << "must store EID array in the case of all formats";
+    CHECK(store_eid == true) << "must store EID array in the case of all formats";
     return HeteroGraphPtr(
         // TODO(xiangsx) Make it as graph storage.Clone()
         new UnitGraph(meta_graph_,
@@ -1436,12 +1436,12 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats, bool store
                       formats));
   int64_t num_vtypes = NumVertexTypes();
   if (formats & coo_code)
-    CHECK(store_eid) << "must store EID array in the case of COO format";
+    CHECK(store_eid == true) << "must store EID array in the case of COO format";
     return CreateFromCOO(num_vtypes, GetCOO(false)->adj(), formats);
   if (formats & csr_code)
-    CHECK(store_eid) << "must store EID array in the case of CSR format";
+    CHECK(store_eid == true) << "must store EID array in the case of CSR format";
     return CreateFromCSR(num_vtypes, GetOutCSR(false)->adj(), formats);
-  if (store_eid)
+  if (store_eid == true)
     return CreateFromCSC(num_vtypes, GetInCSR(false)->adj(), formats);
   const aten::CSRMatrix& mat = GetInCSR(false)->adj();
   return CreateFromCSC(num_vtypes, mat.num_rows, mat.num_cols,
