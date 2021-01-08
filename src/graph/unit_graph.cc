@@ -1446,7 +1446,7 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats, bool store
   if (store_eid)
     return CreateFromCSC(num_vtypes, GetInCSR(false)->adj(), formats);
   else
-    const aten::CSRMatrix& mat = GetInCSR(false)->adj()
+    const aten::CSRMatrix& mat = GetInCSR(false)->adj();
     return CreateFromCSC(num_vtypes, mat.num_rows, mat.num_cols,
                          mat.indptr, mat.indices, nullptr, formats);
 }
