@@ -28,27 +28,3 @@ class EarlyStopping:
     def save_checkpoint(self, model):
         '''Saves model when validation loss decrease.'''
         torch.save(model.state_dict(), 'es_checkpoint.pt')
-
-class Zeros(nn.Module):
-    '''
-    Residual Place holder, which returns zeros for non residual case
-    '''
-    def __init__(self):
-        super(Zeros,self).__init__()
-
-    def forward(self,x):
-        return 0
-
-def accuracy(logits, labels):
-    _, indices = torch.max(logits, dim=1)
-    correct = torch.sum(indices == labels)
-    return correct.item() * 1.0 / len(labels)
-
-
-def evaluate(model, features, labels, mask):
-    model.eval()
-    with torch.no_grad():
-        logits = model(features)
-        logits = logits[mask]
-        labels = labels[mask]
-        return accuracy(logits, labels)

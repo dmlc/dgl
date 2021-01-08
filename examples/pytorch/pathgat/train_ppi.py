@@ -16,7 +16,7 @@ import dgl
 import torch.nn.functional as F
 import argparse
 from sklearn.metrics import f1_score
-from hgao import HardGAT
+from gat import GAT
 from dgl.data.ppi import PPIDataset
 from torch.utils.data import DataLoader
 
@@ -63,7 +63,7 @@ def main(args):
     g = g.int().to(device)
     heads = ([args.num_heads] * args.num_layers) + [args.num_out_heads]
     # define the model
-    model = HardGAT(g,
+    model = GAT(g,
                 args.num_layers,
                 num_feats,
                 args.num_hidden,
@@ -73,7 +73,7 @@ def main(args):
                 args.in_drop,
                 args.attn_drop,
                 args.alpha,
-                args.residual,'hgat',8)
+                args.residual)
     # define the optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     model = model.to(device)

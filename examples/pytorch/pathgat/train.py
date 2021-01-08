@@ -18,7 +18,7 @@ import dgl
 from dgl.data import register_data_args
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 
-from hgao import HardGAT
+from gat import GAT
 from utils import EarlyStopping
 
 
@@ -80,7 +80,7 @@ def main(args):
     n_edges = g.number_of_edges()
     # create model
     heads = ([args.num_heads] * args.num_layers) + [args.num_out_heads]
-    model = HardGAT(g,
+    model = GAT(g,
                 args.num_layers,
                 num_feats,
                 args.num_hidden,
@@ -90,9 +90,7 @@ def main(args):
                 args.in_drop,
                 args.attn_drop,
                 args.negative_slope,
-                args.residual,
-                args.model,
-                args.k)
+                args.residual)
     print(model)
     if args.early_stop:
         stopper = EarlyStopping(patience=100)
@@ -165,7 +163,7 @@ if __name__ == '__main__':
                         help="input feature dropout")
     parser.add_argument("--attn-drop", type=float, default=.6,
                         help="attention dropout")
-    parser.add_argument("--lr", type=float, default=0.01,
+    parser.add_argument("--lr", type=float, default=0.005,
                         help="learning rate")
     parser.add_argument('--weight-decay', type=float, default=5e-4,
                         help="weight decay")
@@ -175,10 +173,6 @@ if __name__ == '__main__':
                         help="indicates whether to use early stop or not")
     parser.add_argument('--fastmode', action="store_true", default=False,
                         help="skip re-evaluate the validation set")
-    parser.add_argument('--model',type=str,default='hgat',
-                        help='Attention model selection, HardGAT: hgat;GAT: gat')
-    parser.add_argument('--k',type=int,default=8,
-                        help='top k neighor for attention calculation')
     args = parser.parse_args()
     print(args)
 

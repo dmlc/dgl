@@ -18,41 +18,69 @@ The DGL's built-in CoraGraphDataset. Dataset summary:
 - NumValidationSamples: 500
 - NumTestSamples: 1000
 
+The DGL's build-in CiteseerGraphDataset. Dataset Summary:
+
+- NumNodes: 3327
+- NumEdges: 9228
+- NumFeats: 3703
+- NumClasses: 6
+- NumTrainingSamples: 120
+- NumValidationSamples: 500
+- NumTestSamples: 1000
+
+The DGL's build-in PubmedGraphDataset. Dataset Summary:
+
+- NumNodes: 19717
+- NumEdges: 88651
+- NumFeats: 500
+- NumClasses: 3
+- NumTrainingSamples: 60
+- NumValidationSamples: 500
+- NumTestSamples: 1000
+
 How to run example files
 --------------------------------
-In the hgat folder, run
+In the hgao folder, run
 
-**If you want to test architecture in paper please use `hgat.py`, if you want to test the architecture similar to gat in example. use `train.py`**
+**Please use `train.py`**
 
 
 ```python
-python main.py
+python train.py --dataset=cora
 ```
 
 If want to use a GPU, run
 
 ```python
-python hgat.py --gpu 0
+python train.py --gpu 0 --dataset=citeseer
 ```
 
 If you want to use more Graph Hard Attention Modules
 
 ```python
-python hgat.py --num-layers <your number>
+python train.py --num-layers <your number> --dataset=pubmed
 ```
 
 If you want to change the hard attention threshold k
 
 ```python
-python hgat.py --k <your number>
+python train.py --k <your number> --dataset=cora
 ```
 
-**Similar Arguments can be passed to `train.py`**
+If you want to test with vanillia GAT
+
+```python
+python train.py --model <gat/hgat> --dataset=cora
+```
+
+
 
 Performance
 -------------------------
 | Models/Datasets | Cora | Citeseer | Pubmed |
 | :-------------- | :--: | :------: | -----: |
 | GAT in DGL | 81.5% | 70.1% | 77.7% |
-| HardGAT similar to GAT | 81.8% | 70.2% |78.0%|
-| HardGANet in paper | 77.0% | 64.2% | 77.1% |
+| HardGAT | 81.8% | 70.2% |78.0%|
+
+Notice that HardGAT Simply replace GATConv with hGAO mentioned in paper.
+
