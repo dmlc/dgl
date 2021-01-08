@@ -26,7 +26,7 @@
      \right)
    \end{gathered}
 
-其中， :math:`\rho^{(l)}` 和 :math:`\phi^{(l)}` 分别是可自定义的聚合函数与消息函数，
+其中， :math:`\rho^{(l)}` 和 :math:`\phi^{(l)}` 分别是可自定义的消息函数与聚合函数，
 :math:`\mathcal{N}(v)` 为有向图 :math:`\mathcal{G}` 上的节点 :math:`v` 的前驱节点(或无向图中的邻居)。
 
 以下图为例，假设红色节点为需要更新的目标节点：

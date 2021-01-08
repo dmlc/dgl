@@ -104,9 +104,9 @@ DGL建议让 ``__getitem__(idx)`` 返回如上面代码所示的元组 ``(图，
             # 用户自己的训练代码
             pass
 
-训练整图分类模型的完整指南可以在 :ref:`guide-training-graph-classification` 中找到。
+训练整图分类模型的完整指南可以在 :ref:`guide_cn-training-graph-classification` 中找到。
 
-有关整图分类数据集的更多示例，用户可以参考 :ref:`guide-training-graph-classification`：
+有关整图分类数据集的更多示例，用户可以参考 :ref:`guide_cn-training-graph-classification`：
 
 * :ref:`gindataset`
 
@@ -202,7 +202,7 @@ DGL建议使用节点掩码来指定数据集的划分。
     # 获取标签
     labels = graph.ndata['label']
 
-:ref:`guide-training-node-classification` 提供了训练节点分类模型的完整指南。
+:ref:`guide_cn-training-node-classification` 提供了训练节点分类模型的完整指南。
 
 有关节点分类数据集的更多示例，用户可以参考以下内置数据集：
 
@@ -292,7 +292,7 @@ DGL建议使用节点掩码来指定数据集的划分。
     # 获取训练集中的边类型
     rel = graph.edata['etype'][train_idx]
 
-有关训练链接预测模型的完整指南，请参见 :ref:`guide-training-link-prediction`。
+有关训练链接预测模型的完整指南，请参见 :ref:`guide_cn-training-link-prediction`。
 
 有关链接预测数据集的更多示例，请参考DGL的内置数据集：
 
