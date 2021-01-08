@@ -36,7 +36,7 @@ By the end of this tutorial, you will be able to
 # A node classification dataset often consists of a single graph, as well
 # as its node and edge features.
 # 
-# Here we take a small dataset based on `Zachary’s Karate Club
+# This tutorial takes a small dataset based on `Zachary’s Karate Club
 # network <https://en.wikipedia.org/wiki/Zachary%27s_karate_club>`__. It
 # contains
 #
@@ -45,9 +45,24 @@ By the end of this tutorial, you will be able to
 #
 # * An ``interactions.csv`` file
 #   containing the pair-wise interactions between two club members.
-# 
-# We will treat the members as nodes and interactions as edges. We will
-# take age as a numeric feature of the nodes, affiliated club as the label
+#
+
+import urllib.request
+import pandas as pd
+urllib.request.urlretrieve(
+    'https://data.dgl.ai/tutorial/dataset/members.csv', './members.csv')
+urllib.request.urlretrieve(
+    'https://data.dgl.ai/tutorial/dataset/interactions.csv', './interactions.csv')
+
+members = pd.read_csv('./members.csv')
+members.head()
+
+interactions = pd.read_csv('./interactions.csv')
+interactions.head()
+
+
+# This tutorial treats the members as nodes and interactions as edges. It
+# takes age as a numeric feature of the nodes, affiliated club as the label
 # of the nodes, and edge weight as a numeric feature of the edges.
 # 
 # .. note::
@@ -61,13 +76,12 @@ By the end of this tutorial, you will be able to
 # 
 #    In practice, taking age directly as a numeric feature may
 #    not work well in machine learning; strategies like binning or
-#    normalizing the feature would work better. Here we are directly
-#    taking the values as-is for simplicity.
+#    normalizing the feature would work better. This tutorial directly
+#    takes the values as-is for simplicity.
 # 
 
 import dgl
 from dgl.data import DGLDataset
-import pandas as pd
 import torch
 import os
 
@@ -76,8 +90,8 @@ class KarateClubDataset(DGLDataset):
         super().__init__(name='karate_club')
         
     def process(self):
-        nodes_data = pd.read_csv('data/members.csv')
-        edges_data = pd.read_csv('data/interactions.csv')
+        nodes_data = pd.read_csv('./members.csv')
+        edges_data = pd.read_csv('./interactions.csv')
         node_features = torch.from_numpy(nodes_data['Age'].to_numpy())
         node_labels = torch.from_numpy(nodes_data['Club'].astype('category').cat.codes.to_numpy())
         edge_features = torch.from_numpy(edges_data['Weight'].to_numpy())
@@ -146,8 +160,12 @@ print(graph)
 #    -  ``num_nodes``: the number of nodes in the graph.
 # 
 
-edges = pd.read_csv('data/graph_edges.csv')
-properties = pd.read_csv('data/graph_properties.csv')
+urllib.request.urlretrieve(
+    'https://data.dgl.ai/tutorial/dataset/graph_edges.csv', './graph_edges.csv')
+urllib.request.urlretrieve(
+    'https://data.dgl.ai/tutorial/dataset/graph_properties.csv', './graph_properties.csv')
+edges = pd.read_csv('./graph_edges.csv')
+properties = pd.read_csv('./graph_properties.csv')
 
 edges.head()
 
@@ -158,8 +176,8 @@ class SyntheticDataset(DGLDataset):
         super().__init__(name='synthetic')
         
     def process(self):
-        edges = pd.read_csv('data/graph_edges.csv')
-        properties = pd.read_csv('data/graph_properties.csv')
+        edges = pd.read_csv('./graph_edges.csv')
+        properties = pd.read_csv('./graph_properties.csv')
         self.graphs = []
         self.labels = []
         
@@ -190,7 +208,7 @@ class SyntheticDataset(DGLDataset):
             self.labels.append(label)
             
         # Convert the label list to tensor for saving.
-        self.labels = torch.LongTensor(labels)
+        self.labels = torch.LongTensor(self.labels)
         
     def __getitem__(self, i):
         return self.graphs[i], self.labels[i]
