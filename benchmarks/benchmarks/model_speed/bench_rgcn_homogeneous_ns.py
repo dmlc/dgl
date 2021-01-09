@@ -238,13 +238,14 @@ def track_time(data):
     # find out the target node ids
     node_tids = g.ndata[dgl.NTYPE]
     loc = (node_tids == category_id)
-    target_idx = node_ids[loc]
+    target_nids = node_ids[loc]
+    train_nids = target_nids[train_idx]
 
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
     g.create_formats_()
     sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
-    collator = dgl.dataloading.NodeIdxCollator(g, target_idx, train_idx, sampler)
+    collator = dgl.dataloading.NodeCollator(g, train_nids, sampler, return_indices=True)
     loader = dgl.dataloading.DataLoader(
         collator.dataset, collate_fn=collator.collate,
         batch_size=batch_size, shuffle=True, num_workers=4)
@@ -281,25 +282,6 @@ def track_time(data):
     optimizer = th.optim.Adam(all_params, lr=lr, weight_decay=l2norm)
     emb_optimizer = th.optim.SparseAdam(list(embed_layer.node_embeds.parameters()), lr=lr)
 
-    for epoch in range(1):
-        model.train()
-        embed_layer.train()
-
-        for i, sample_data in enumerate(loader):
-            input_nodes, output_nodes, seed_idx, blocks = sample_data
-            feats = embed_layer(input_nodes,
-                                blocks[0].srcdata['ntype'],
-                                blocks[0].srcdata['type_id'],
-                                node_feats)
-            logits = model(blocks, feats)
-            loss = F.cross_entropy(logits, labels[seed_idx])
-            optimizer.zero_grad()
-            emb_optimizer.zero_grad()
-
-            loss.backward()
-            optimizer.step()
-            emb_optimizer.step()
-
     print("start training...")
     t0 = time.time()
     for epoch in range(n_epochs):
@@ -313,7 +295,7 @@ def track_time(data):
                                 blocks[0].srcdata['type_id'],
                                 node_feats)
             logits = model(blocks, feats)
-            loss = F.cross_entropy(logits, labels[seed_idx])
+            loss = F.cross_entropy(logits, labels[train_idx][seed_idx])
             optimizer.zero_grad()
             emb_optimizer.zero_grad()
 
