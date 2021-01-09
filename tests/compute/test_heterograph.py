@@ -1814,6 +1814,46 @@ def test_format(idtype):
     assert len(g1.formats()['not created']) == 0
 
 @parametrize_dtype
+def test_csc_no_eids(idtype):
+    # single relation, unsorted
+    g = dgl.graph(([0, 1, 1, 0], [1, 1, 0, 2]), idtype=idtype, device=F.ctx())
+    g.edata['h'] = F.astype(F.arange(0, g.num_edges(), ctx=F.ctx()), F.float32)
+    g1, g1_raw_eids = g.csc_no_eids()
+    assert F.array_equal(g1_raw_eids, g.edges(form='eid', order='srcdst'))
+    assert F.array_equal(g1.edata['h'], g1_raw_eids)
+
+    # single relation sorted
+    g = dgl.graph(([0, 0, 1, 1], [1, 2, 0, 1]), idtype=idtype, device=F.ctx())
+    g.edata['h'] = F.astype(F.arange(0, g.num_edges(), ctx=F.ctx()), F.float32)
+    g1 = g.csc_no_eids()
+    assert F.array_equal(g1.edata['h'], g.edges(form='eid', order='srcdst'))
+
+    # multiple relation, unsorted
+    g = dgl.heterograph({
+        ('A', 'r1', 'B'): ([0, 0, 1], [1, 0, 0]),
+        ('A', 'r2', 'C'): ([0, 1, 1, 0], [1, 1, 0, 2])
+        }, idtype=idtype, device=F.ctx())
+    g.edges['r1'].data['h'] = F.astype(F.arange(0, g.num_edges('r1'), ctx=F.ctx()), F.float32)
+    g.edges['r2'].data['h'] = F.astype(F.arange(0, g.num_edges('r2'), ctx=F.ctx()), F.float32)
+    g1, g1_raw_eids = g.csc_no_eids()
+    for cetype in g.canonical_etypes:
+        assert F.array_equal(g1_raw_eids[cetype],
+                             g.edges(form='eid', order='srcdst', type=cetype))
+        assert F.array_equal(g1.edges[cetype].data['h'], g1_raw_eids[cetype])
+
+    # multiple relations, sorted
+    g = dgl.heterograph({
+        ('A', 'r1', 'B'): ([0, 0, 1], [0, 1, 0]),
+        ('A', 'r2', 'C'): ([0, 0, 1, 1], [1, 2, 0, 1])
+        }, idtype=idtype, device=F.ctx())
+    g.edges['r1'].data['h'] = F.astype(F.arange(0, g.num_edges('r1'), ctx=F.ctx()), F.float32)
+    g.edges['r2'].data['h'] = F.astype(F.arange(0, g.num_edges('r2'), ctx=F.ctx()), F.float32)
+    g1 = g.csc_no_eids()
+    for cetype in g.canonical_etypes:
+        assert F.array_equal(g1.edges[cetype].data['h'],
+                             g.edges(form='eid', order='srcdst', type=cetype))
+
+@parametrize_dtype
 def test_edges_order(idtype):
     # (0, 2), (1, 2), (0, 1), (0, 1), (2, 1)
     g = dgl.graph((

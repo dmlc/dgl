@@ -5404,34 +5404,13 @@ class DGLHeteroGraph(object):
             ret._graph = self._graph.formats(['csc'], eid=False)
             return ret
 
-        # Case2: sort the graph by srcdst first
-        metagraph = ret._graph.metagraph
-        num_nodes_per_type = []
-        for ntype in ret.ntypes:
-            num_nodes_per_type.append(ret.num_nodes(ntype))
-
+        # Case2: reorder the edge features for srcdst order
         raw_eids_dict = dict()
-        rel_graphs = []
         for c_etype in ret.canonical_etypes:
-            src_type, dst_type = c_etype[0], c_etype[2]
-            u, v, raw_eids = ret.edges(form='all', order='srcdst', etype=c_etype)
-            raw_eids_dict[c_etype] = raw_eids
-            hgidx = heterograph_index.create_unitgraph_from_coo(
-                1 if src_type == dst_type else 2,
-                ret.num_nodes(src_type),
-                ret.num_nodes(dst_type),
-                u,
-                v,
-                ['coo', 'csr', 'csc'])
-            rel_graphs.append(hgidx)
+            raw_eids_dict[c_etype] = ret.edges(form='eid', order='srcdst', etype=c_etype)
 
-        hgidx = heterograph_index.create_heterograph_from_relations(
-            metagraph, rel_graphs, utils.toindex(num_nodes_per_type, "int64"))
-        hgidx = hgidx.formats(['csc'], eid=False)
+        ret._graph = self._graph.formats(['csc'], eid=False)
 
-        ret._graph = hgidx
-
-        # Reorder edge features
         edges = [raw_eids_dict[c_etype] for c_etype in ret.canonical_etypes]
         edge_frames = utils.extract_edge_subframes(ret, edges, store_ids=False)
         utils.set_new_frames(ret, edge_frames=edge_frames)
