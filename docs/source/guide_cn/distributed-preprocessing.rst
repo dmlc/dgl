@@ -17,7 +17,7 @@ DGL提供了一个API以执行这两个步骤。该API支持随机划分和一�
 默认情况下，为了在分布式训练/推理期间定位节点/边，API将新ID分配给输入图的节点和边。
 分配ID后，该API会相应地打乱所有节点数据和边数据。在训练期间，用户只需使用新的节点和边的ID。
 与此同时，用户仍然可以通过 ``g.ndata['orig_id']`` 和 ``g.edata['orig_id']`` 获取原始ID。
-其中 ``g`` 是 ``DistGraph`` 对象（请参见7.2里的DistGraph小节）。
+其中 ``g`` 是 ``DistGraph`` 对象（详细解释，请参见:ref:`guide-distributed-apis`）。
 
 DGL将图划分结果存储在输出目录中的多个文件中。输出目录里始终包含一个名为xxx.json的JSON文件，其中xxx是提供给划分API的图的名称。
 JSON文件包含所有划分的配置。如果该API没有为节点和边分配新ID，它将生成两个额外的NumPy文件：`node_map.npy` 和 `edge_map.npy`。

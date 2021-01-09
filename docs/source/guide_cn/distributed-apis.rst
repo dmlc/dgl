@@ -1,6 +1,6 @@
 .. _guide_cn-distributed-apis:
 
-7.2 分布式的API
+7.2 分布式计算的API
 --------------------
 
 :ref:`(English Version) <guide-distributed-apis>`
@@ -15,7 +15,7 @@ DGL分布式模块的初始化
 
 :func:`~dgl.distributed.initialize` 可以用于初始化分布式模块。当训练脚本在训练器模式下运行时，
 这个API会与DGL服务器建立连接并创建采样器进程。当脚本在服务器模式下运行时，这个API将运行服务器代码，
-并且永不返回。必须在DGL的任何其他分布式API之前，调用此API。在使用PyTorch时，必须在
+直到训练任务结束。必须在DGL的任何其他分布式API之前，调用此API。在使用PyTorch时，必须在
 ``torch.distributed.init_process_group`` 之前调用 :func:`~dgl.distributed.initialize`。
 通常，初始化API应按以下顺序调用：
 
@@ -43,7 +43,7 @@ DGL分布式模块的初始化
 当用户在Python命令行或Jupyter Notebook中执行训练脚本时，它将以独立模式运行。也就是说，它在单个进程中运行所有计算，
 并且不与任何其他进程通信。因此，独立模式要求输入图仅具有一个分区。此模式主要用于开发和测试
 (例如，在Jupyter Notebook中开发和运行代码)。当用户使用启动脚本执行训练脚本时(请参见启动脚本部分)，
-:class:`~dgl.distributed.DistGraph` 将以分布式模式运行。启动工具在后台启动服务器(包括访问节点/边特征和图采样)，
+:class:`~dgl.distributed.DistGraph` 将以分布式模式运行。启动脚本在后台启动服务器(包括访问节点/边特征和图采样)，
 并将分区数据自动加载到每台计算机中。:class:`~dgl.distributed.DistGraph` 与集群中的服务器连接并通过网络访问它们。
 
 创建DistGraph
@@ -96,8 +96,8 @@ DGL分布式模块的初始化
 ~~~~~~~~~~~~~~~~~
 
 如前所述，在分布式模式下，DGL会划分节点和边特征，并将它们存储在计算机集群中。
-DGL为分布式张量提供了类似于张量的接口，以访问群集中的分区节点和边特征。
-在分布式设置中，DGL仅支持密集节点和边特征。
+DGL为分布式张量提供了类似于单机普通张量的接口，以访问群集中的分区节点和边特征。
+在分布式设置中，DGL仅支持密集节点和边特征，暂不支持稀疏节点和边特征。
 
 :class:`~dgl.distributed.DistTensor` 管理在多个计算机中被划分和存储的密集张量。
 目前，分布式张量必须与图的节点或边相关联。换句话说，DistTensor中的行数必须与图中的节点数或边数相同。
@@ -133,7 +133,7 @@ DGL为分布式张量提供了类似于张量的接口，以访问群集中的�
     g.ndata['feat'][[3, 4, 5]] = data
 
 **Note**: 当前，当一台机器运行多个服务器时，DGL不提供对来自多个训练器的并发写入的保护。
-这可能会导致数据损坏。避免同时写入同一行数据的一种方法是在一个计算机上只运行一个服务器进程。
+这可能会导致数据损坏。
 
 分布式嵌入
 ~~~~~~~~~~~~~~~~~~~~~
@@ -174,7 +174,7 @@ DGL提供了一个稀疏的Adagrad优化器 :class:`~dgl.distributed.SparseAdagr
 分布式采样
 ~~~~~~~~~~~~~~~~~~~~
 
-DGL提供了两个级别的API，用于对节点和边进行采样以生成小批次(请参阅小批次训练的章节)。
+DGL提供了两个级别的API，用于对节点和边进行采样以生成小批次训练数据(请参阅小批次训练的章节)。
 底层API要求用户编写代码以明确定义如何对节点层进行采样(例如，使用 :func:`dgl.sampling.sample_neighbors` )。
 高层采样API为节点分类和链接预测任务实现了一些流行的采样算法（例如
 :class:`~dgl.dataloading.pytorch.NodeDataloader`
