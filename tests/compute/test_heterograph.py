@@ -1834,11 +1834,11 @@ def test_csc_no_eids(idtype):
         ('A', 'r1', 'B'): ([0, 0, 1], [1, 0, 0]),
         ('A', 'r2', 'C'): ([0, 1, 1, 0], [1, 1, 0, 2])
         }, idtype=idtype, device=F.ctx())
-    g.edges['r1'].data['h'] = F.astype(g.edges(form='eid', order='eid', type='r1'), F.float32)
-    g.edges['r2'].data['h'] = F.astype(g.edges(form='eid', order='eid', type='r2'), F.float32)
+    g.edges['r1'].data['h'] = F.astype(g.edges(form='eid', order='eid', etype='r1'), F.float32)
+    g.edges['r2'].data['h'] = F.astype(g.edges(form='eid', order='eid', etype='r2'), F.float32)
     g1, g1_raw_eids = g.csc_no_eids()
     for cetype in g.canonical_etypes:
-        srcdst_eids = g.edges(form='eid', order='srcdst', type=cetype)
+        srcdst_eids = g.edges(form='eid', order='srcdst', etype=cetype)
         assert F.array_equal(g1_raw_eids[cetype], srcdst_eids)
         assert F.array_equal(g1.edges[cetype].data['h'], F.astype(srcdst_eids, F.float32))
 
@@ -1847,11 +1847,11 @@ def test_csc_no_eids(idtype):
         ('A', 'r1', 'B'): ([0, 0, 1], [0, 1, 0]),
         ('A', 'r2', 'C'): ([0, 0, 1, 1], [1, 2, 0, 1])
         }, idtype=idtype, device=F.ctx())
-    g.edges['r1'].data['h'] = F.astype(g.edges(form='eid', order='eid', type='r1'), F.float32)
-    g.edges['r2'].data['h'] = F.astype(g.edges(form='eid', order='eid', type='r2'), F.float32)
+    g.edges['r1'].data['h'] = F.astype(g.edges(form='eid', order='eid', etype='r1'), F.float32)
+    g.edges['r2'].data['h'] = F.astype(g.edges(form='eid', order='eid', etype='r2'), F.float32)
     g1 = g.csc_no_eids(sort=False)
     for cetype in g.canonical_etypes:
-        srcdst_eids = g.edges(form='eid', order='srcdst', type=cetype)
+        srcdst_eids = g.edges(form='eid', order='srcdst', etype=cetype)
         assert F.array_equal(g1.edges[cetype].data['h'], F.astype(srcdst_eids, F.float32))
 
 @parametrize_dtype
