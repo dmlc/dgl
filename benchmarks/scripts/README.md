@@ -1,12 +1,6 @@
 Regression Test Suite
 ========================
 
-## Launch the whole regression test
-This will read the conf from the `benchmarks/task.json`. 
-```bash
-python run_reg_test.py
-```
-
 ### Spec of task.json
 ```json
 # Note the test will be run if the name specified below is a substring of the full test name.
@@ -26,11 +20,6 @@ python run_reg_test.py
 }
 ```
 
-## Details
-The launch script will do the following things:
-- install aws cloudwatch agent to record the running output
-- mount the dataset EFS from /mnt/efs/fs1
-- pass the specified environment variable(GIT_URL, GIT_BRANCH) on the current machine to the remote machine
 
 ### Environment variable
 - `MOUNT_PATH` specify the directory in the host to be mapped into docker, if exists will map the `MOUNT_PATH`(in host) to `/tmp/dataset`(in docker)
