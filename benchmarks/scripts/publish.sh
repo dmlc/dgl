@@ -42,7 +42,7 @@ fi
 if [ -z "$MOUNT_PATH"]; then
     DOCKER_MOUNT_OPT=""
 else
-    DOCKER_MOUNT_OPT="-v ${MOUNT_PATH}:/tmp/dataset"
+    DOCKER_MOUNT_OPT="-v ${MOUNT_PATH}:/tmp/dataset -v ${MOUNT_PATH}/dgl_home/:/root/.dgl/"
 fi
 
 echo $HOME
