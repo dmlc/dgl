@@ -86,7 +86,7 @@ test_dataloader = GraphDataLoader(
 
 
 ######################################################################
-# You can try to iterate over the created ``DataLoader`` and see what it
+# You can try to iterate over the created ``GraphDataLoader`` and see what it
 # gives:
 # 
 
@@ -145,7 +145,7 @@ print(graphs)
 #    graph with ``dgl.mean_nodes()``.
 #
 # -  The input graph to the model will be a batched graph yielded by the
-#    ``DataLoader``. The readout functions provided by DGL can handle
+#    ``GraphDataLoader``. The readout functions provided by DGL can handle
 #    batched graphs so that they will return one representation for each
 #    minibatch element.
 # 
