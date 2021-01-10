@@ -17,6 +17,8 @@ By completing this tutorial, you will be able to
 This tutorial assumes that you have experience in building neural
 networks with PyTorch.
 
+(Time estimate: 13 minutes)
+
 """
 
 import dgl

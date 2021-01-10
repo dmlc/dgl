@@ -10,6 +10,7 @@ By the end of this tutorial, you will be able to
 -  Build a GNN-based graph classification model.
 -  Train and evaluate the model on a DGL-provided dataset.
 
+(Time estimate: 18 minutes)
 """
 
 import dgl
@@ -107,8 +108,8 @@ print(batch)
 # In each mini-batch, the sampled graphs are combined into a single bigger
 # batched graph via ``dgl.batch``. The single bigger batched graph merges
 # all original graphs as separately connected components, with the node
-# and edge features concatenated. This bigger graph is a batched
-# ``DGLGraph``, which itself is also a ``DGLGraph`` instance (so you can
+# and edge features concatenated. This bigger graph is also a ``DGLGraph``
+# instance (so you can
 # still treat it as a normal ``DGLGraph`` object as in
 # `here <2_dglgraph.ipynb>`__). It however contains the information
 # necessary for recovering the original graphs, such as the number of

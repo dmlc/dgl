@@ -14,6 +14,8 @@ By the end of this tutorial you will be able to
 This tutorial assumes that you already know :doc:`the basics of training a
 GNN for node classification <1_introduction>`.
 
+(Time estimate: 10 minutes)
+
 """
 
 import dgl

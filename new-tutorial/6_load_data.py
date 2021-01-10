@@ -11,6 +11,7 @@ By the end of this tutorial, you will be able to
 -  Create your own graph dataset for node classification, link
    prediction, or graph classification.
 
+(Time estimate: 15 minutes)
 """
 
 

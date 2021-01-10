@@ -13,6 +13,7 @@ By the end of this tutorial you will be able to
 -  Build a GNN-based link prediction model.
 -  Train and evaluate the model on a small DGL-provided dataset.
 
+(Time estimate: 20 minutes)
 """
 
 import dgl
@@ -179,7 +180,6 @@ model = GraphSAGE(train_g.ndata['feat'].shape[1], 16)
 optimizer = torch.optim.Adam(itertools.chain(model.parameters()), lr=0.01)
 
 # ----------- 4. training -------------------------------- #
-all_logits = []
 for e in range(100):
     # forward
     logits = model(train_g, train_g.ndata['feat'])
@@ -192,7 +192,6 @@ for e in range(100):
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-    all_logits.append(logits.detach())
     
     if e % 5 == 0:
         print('In epoch {}, loss: {}'.format(e, loss))

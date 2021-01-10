@@ -11,6 +11,8 @@ By the end of this tutorial you will be able to:
 -  Transform a DGL graph into another graph.
 -  Load and save DGL graphs.
 
+(Time estimate: 16 minutes)
+
 """
 
 
