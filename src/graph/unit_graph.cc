@@ -655,7 +655,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
       << " but got \"" << order << "\".";
     auto coo = aten::CSRToCOO(adj_, false);
     if (order == std::string("srcdst")) {
-      // make sure the coo is sorted if an order is requested 
+      // make sure the coo is sorted if an order is requested
       coo = aten::COOSort(coo, true);
     }
     return EdgeArray{coo.row, coo.col, coo.data};
