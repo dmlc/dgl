@@ -74,7 +74,6 @@ def argument():
 
 if __name__ == '__main__':
 
-    # Step 1： Prepare graph data and retrieve train/validation/test index  #
     args = argument()
     print(args)
     if args.dataname == 'cora':
@@ -136,12 +135,6 @@ if __name__ == '__main__':
     loss_best = np.inf
     acc_best = 0
 
-    val_loss_list = []
-    val_acc_list = []
-    
-    loss_min = np.inf
-    acc_max = 0.0
-    
     for epoch in range(args.epochs):
 
         

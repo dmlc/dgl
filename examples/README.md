@@ -43,7 +43,7 @@
 
 - <a name="grand"></a> Feng et al. [Graph Random Neural Network for Semi-Supervised Learning on Graphs]. [Paper link](https://arxiv.org/abs/2005.11079). 
   - Example code: [PyTorch](../examples/pytorch/grand)
-  - Tags: semi-supervised node classification, simplifying graph convolution, data augmentation.
+  - Tags: semi-supervised node classification, simplifying graph convolution, data augmentation
 
 
 ## 2020
