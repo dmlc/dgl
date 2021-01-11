@@ -16,6 +16,7 @@ with "[NN] XXX module".
 import importlib
 import sys
 import os
+from . import functional
 from ..backend import backend_name
 from ..utils import expand_as_pair
 
