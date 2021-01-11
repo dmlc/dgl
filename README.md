@@ -275,6 +275,7 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**PGM-Explainer: Probabilistic Graphical Model Explanations for Graph Neural Networks**](https://proceedings.neurips.cc/paper/2020/file/8fb134f258b1f7865a6ab2d935a897c9-Paper.pdf), *Minh N. Vu, My T. Thai*
 
+1. [**A Generalization of Transformer Networks to Graphs**](https://arxiv.org/pdf/2012.09699.pdf), *Vijay Prakash Dwivedi, Xavier Bresson* 
 
 </details>
 
