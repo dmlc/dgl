@@ -288,6 +288,10 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Systematic Generalization on gSCAN with Language Conditioned Embedding**](https://arxiv.org/abs/2009.05552), AACL-IJCNLP'20, *Tong Gao, Qi Huang, Raymond J. Mooney*
 
+1. [**Discourse-Aware Neural Extractive Text Summarization**](https://www.aclweb.org/anthology/2020.acl-main.451.pdf), ACL'20, *Jiacheng Xu, Zhe Gan, Yu Cheng, Jingjing Liu*
+
+1. [**Learning Robust Node Representations on Graphs**](https://arxiv.org/abs/2008.11416), *Xu Chen, Ya Zhang, Ivor Tsang, Yuangang Pan*
+
 </details>
 
 ## Installation
