@@ -1,4 +1,4 @@
-import os
+import os, pickle
 import shutil, zipfile
 import requests
 import inspect
@@ -6,6 +6,7 @@ import numpy as np
 import pandas
 import dgl
 import torch
+import torchtext
 
 def _download(url, path, filename):
     fn = os.path.join(path, filename)
@@ -39,9 +40,10 @@ def get_graph(name):
         return None
 
 class OGBDataset(object):
-    def __init__(self, g, num_labels):
+    def __init__(self, g, num_labels, predict_category=None):
         self._g = g
         self._num_labels = num_labels
+        self._predict_category = predict_category
 
     @property
     def num_labels(self):
@@ -51,10 +53,15 @@ class OGBDataset(object):
     def num_classes(self):
         return self._num_labels
 
+    @property
+    def predict_category(self):
+        return self._predict_category
+
     def __getitem__(self, idx):
         return self._g
 
-def load_ogb_product(name):
+def load_ogb_product():
+    name = 'ogbn-products'
     from ogb.nodeproppred import DglNodePropPredDataset
 
     os.symlink('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
@@ -84,6 +91,103 @@ def load_ogb_product(name):
 
     return OGBDataset(graph, num_labels)
 
+def load_ogb_mag():
+    name = 'ogbn-mag'
+    from ogb.nodeproppred import DglNodePropPredDataset
+
+    os.symlink('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
+
+    print('load', name)
+    dataset = DglNodePropPredDataset(name=name)
+    print('finish loading', name)
+    split_idx = dataset.get_idx_split()
+    train_idx = split_idx["train"]['paper']
+    val_idx = split_idx["valid"]['paper']
+    test_idx = split_idx["test"]['paper']
+    hg_orig, labels = dataset[0]
+    subgs = {}
+    for etype in hg_orig.canonical_etypes:
+        u, v = hg_orig.all_edges(etype=etype)
+        subgs[etype] = (u, v)
+        subgs[(etype[2], 'rev-'+etype[1], etype[0])] = (v, u)
+    hg = dgl.heterograph(subgs)
+    hg.nodes['paper'].data['feat'] = hg_orig.nodes['paper'].data['feat']
+    hg.nodes['paper'].data['labels'] = labels['paper'].squeeze()
+    train_mask = torch.zeros((hg.number_of_nodes('paper'),), dtype=torch.bool)
+    train_mask[train_idx] = True
+    val_mask = torch.zeros((hg.number_of_nodes('paper'),), dtype=torch.bool)
+    val_mask[val_idx] = True
+    test_mask = torch.zeros((hg.number_of_nodes('paper'),), dtype=torch.bool)
+    test_mask[test_idx] = True
+    hg.nodes['paper'].data['train_mask'] = train_mask
+    hg.nodes['paper'].data['val_mask'] = val_mask
+    hg.nodes['paper'].data['test_mask'] = test_mask
+
+    num_classes = dataset.num_classes
+    return OGBDataset(hg, num_classes, 'paper')
+
+class PinsageDataset:
+    def __init__(self, g, user_ntype, item_ntype, textset):
+        self._g = g
+        self._user_ntype = user_ntype
+        self._item_ntype = item_ntype
+        self._textset = textset
+
+    @property
+    def user_ntype(self):
+        return self._user_ntype
+
+    @property
+    def item_ntype(self):
+        return self._item_ntype
+
+    @property
+    def textset(self):
+        return self._textset
+
+    def __getitem__(self, idx):
+        return self._g
+
+def load_nowplaying_rs():
+    name = 'nowplaying_rs.pkl' # follow examples/pytorch/pinsage/README to create nowplaying_rs.pkl
+    dataset_dir = os.path.join(os.getcwd(), 'dataset')
+    os.symlink('/tmp/dataset/', dataset_dir)
+
+    dataset_path = os.path.join(dataset_dir, name)
+    # Load dataset
+    with open(dataset_path, 'rb') as f:
+        dataset = pickle.load(f)
+
+    g = dataset['train-graph']
+    val_matrix = dataset['val-matrix'].tocsr()
+    test_matrix = dataset['test-matrix'].tocsr()
+    item_texts = dataset['item-texts']
+    user_ntype = dataset['user-type']
+    item_ntype = dataset['item-type']
+    user_to_item_etype = dataset['user-to-item-type']
+    timestamp = dataset['timestamp-edge-column']
+
+    # Assign user and movie IDs and use them as features (to learn an individual trainable
+    # embedding for each entity)
+    g.nodes[user_ntype].data['id'] = torch.arange(g.number_of_nodes(user_ntype))
+    g.nodes[item_ntype].data['id'] = torch.arange(g.number_of_nodes(item_ntype))
+
+    # Prepare torchtext dataset and vocabulary
+    fields = {}
+    examples = []
+    for key, texts in item_texts.items():
+        fields[key] = torchtext.data.Field(include_lengths=True, lower=True, batch_first=True)
+    for i in range(g.number_of_nodes(item_ntype)):
+        example = torchtext.data.Example.fromlist(
+            [item_texts[key][i] for key in item_texts.keys()],
+            [(key, fields[key]) for key in item_texts.keys()])
+        examples.append(example)
+    textset = torchtext.data.Dataset(examples, fields)
+    for key, field in fields.items():
+        field.build_vocab(getattr(textset, key))
+
+    return PinsageDataset(g, user_ntype, item_ntype, textset)
+
 def process_data(name):
     if name == 'cora':
         return dgl.data.CoraGraphDataset()
@@ -100,7 +204,11 @@ def process_data(name):
     elif name == 'reddit':
         return dgl.data.RedditDataset(self_loop=True)
     elif name == 'ogbn-products':
-        return load_ogb_product('ogbn-products')
+        return load_ogb_product()
+    elif name == 'ogbn-mag':
+        return load_ogb_mag()
+    elif name == 'nowplaying_rs':
+        return load_nowplaying_rs()
     else:
         raise ValueError('Invalid dataset name:', name)
 
