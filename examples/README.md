@@ -37,6 +37,7 @@
 | [DeepWalk: Online Learning of Social Representations](#deepwalk)                                                         |                     | :heavy_check_mark:               |                           |                    | :heavy_check_mark: |
 | [Self-Attention Graph Pooling](#sagpool)                                                                                 |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Convolutional Networks on Graphs for Learning Molecular Fingerprints](#nf)                                              |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [Hierarchical Graph Pooling with Structure Learning](#hgp-sl)                                                                                 |                     |                                  | :heavy_check_mark:        |                    |                    |
 
 ## 2020
 
@@ -132,6 +133,10 @@
 
 - <a name="sagpool"></a> Lee, Junhyun, et al. Self-Attention Graph Pooling. [Paper link](https://arxiv.org/abs/1904.08082).
     - Example code: [PyTorch](../examples/pytorch/sagpool)
+    - Tags: graph classification, pooling
+
+- <a name="hgp-sl"></a> Zhang, Zhen, et al. Hierarchical Graph Pooling with Structure Learning. [Paper link](https://arxiv.org/abs/1911.05954).
+    - Example code: [PyTorch](../examples/pytorch/hgp_sl)
     - Tags: graph classification, pooling
 
 ## 2018
