@@ -17,7 +17,6 @@
 #      the host machine.
 #
 
-
 if [ $# -eq 2 ]; then
     MACHINE=$1
     DEVICE=$2
@@ -27,15 +26,51 @@ else
 fi
 
 WS_ROOT=/asv/dgl
+docker pull dgllib/dgl-ci-gpu:conda
+if [ -z "$DGL_REG_CONF"]; then
+    DOCKER_ENV_OPT="$DOCKER_ENV_OPT"
+else
+    DOCKER_ENV_OPT=" -e DGL_REG_CONF=$DGL_REG_CONF $DOCKER_ENV_OPT"
+fi
 
-docker run --name dgl-reg                   \
-           --rm --runtime=nvidia            \
-           --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
+if [ -z "$INSTANCE_TYPE"]; then
+    DOCKER_ENV_OPT="$DOCKER_ENV_OPT"
+else
+    DOCKER_ENV_OPT=" -e INSTANCE_TYPE=$INSTANCE_TYPE $DOCKER_ENV_OPT"
+fi
+
+if [ -z "$MOUNT_PATH"]; then
+    DOCKER_MOUNT_OPT=""
+else
+    DOCKER_MOUNT_OPT="-v ${MOUNT_PATH}:/tmp/dataset -v ${MOUNT_PATH}/dgl_home/:/root/.dgl/"
+fi
+
+echo $HOME
+echo "Mount Point: ${DOCKER_MOUNT_OPT}"
+echo "Env opt: ${DOCKER_ENV_OPT}"
+echo "DEVICE: ${DEVICE}"
+
+if [[ $DEVICE == "cpu" ]]; then
+    docker run --name dgl-reg \
+        --rm \
+        $DOCKER_MOUNT_OPT \
+        $DOCKER_ENV_OPT \
+        --shm-size="4g" \
+        --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
+else
+    docker run --name dgl-reg \
+        --rm --runtime=nvidia \
+        $DOCKER_MOUNT_OPT \
+        $DOCKER_ENV_OPT \
+        --shm-size="4g" \
+        --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
+fi
+
 docker exec dgl-reg mkdir -p $WS_ROOT
-docker cp ../.git dgl-reg:$WS_ROOT
-docker cp . dgl-reg:$WS_ROOT/benchmarks/
+docker cp ../../.git dgl-reg:$WS_ROOT
+docker cp ../ dgl-reg:$WS_ROOT/benchmarks/
 docker cp torch_gpu_pip.txt dgl-reg:/asv
-docker exec dgl-reg bash $WS_ROOT/benchmarks/run.sh $DEVICE
-docker cp dgl-reg:$WS_ROOT/benchmarks/results .
-docker cp dgl-reg:$WS_ROOT/benchmarks/html .
+docker exec $DOCKER_ENV_OPT dgl-reg bash $WS_ROOT/benchmarks/run.sh $DEVICE
+docker cp dgl-reg:$WS_ROOT/benchmarks/results ../
+docker cp dgl-reg:$WS_ROOT/benchmarks/html ../
 docker stop dgl-reg

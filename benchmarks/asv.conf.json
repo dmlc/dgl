@@ -17,17 +17,19 @@
     // uninstalling the project. See asv.conf.json documentation.
     //
     "build_command": [
-        "/bin/bash {conf_dir}/build_dgl_asv.sh"
+        "/bin/bash {conf_dir}/scripts/build_dgl_asv.sh"
     ],
     "install_command": [
-        "/bin/bash {conf_dir}/install_dgl_asv.sh"
+        "/bin/bash {conf_dir}/scripts/install_dgl_asv.sh"
     ],
     "uninstall_command": [
         "return-code=any python -m pip uninstall -y dgl"
     ],
     // List of branches to benchmark. If not provided, defaults to "master"
     // (for git) or "default" (for mercurial).
-    "branches": ["HEAD", "master"], // for git
+    "branches": [
+        "HEAD"
+    ], // for git
     // The DVCS being used.  If not set, it will be automatically
     // determined from "repo" by looking at the protocol in the URL
     // (if remote), or by looking for special directories, such as
