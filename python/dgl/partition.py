@@ -54,7 +54,9 @@ def reshuffle_graph(g, node_part=None):
     get contiguous Ids; within a partition, all nodes/edges of the same type have contigous Ids.
     '''
     # In this case, we don't need to reshuffle node Ids and edge Ids.
-    if node_part is None and NTYPE not in g.ndata and ETYPE not in g.edata:
+    if node_part is None:
+        g.ndata['orig_id'] = F.arange(0, g.number_of_nodes())
+        g.edata['orig_id'] = F.arange(0, g.number_of_edges())
         return g, None
 
     start = time.time()
