@@ -160,7 +160,7 @@ class NodeDataView(MutableMapping):
         # When this is created, the server may already load node data. We need to
         # initialize the node data in advance.
         names = g._get_ndata_names(ntype)
-        self._data = {}
+        self._data = g._ndata_store
         for name in names:
             assert name.is_node()
             policy = PartitionPolicy(name.policy_str, g.get_partition_book())
@@ -207,7 +207,7 @@ class EdgeDataView(MutableMapping):
         # When this is created, the server may already load edge data. We need to
         # initialize the edge data in advance.
         names = g._get_edata_names(etype)
-        self._data = {}
+        self._data = g._edata_store
         for name in names:
             assert name.is_edge()
             policy = PartitionPolicy(name.policy_str, g.get_partition_book())
@@ -451,6 +451,8 @@ class DistGraph:
                 rpc.recv_response()
             self._client.barrier()
 
+        self._ndata_store = {}
+        self._edata_store = {}
         self._ndata = NodeDataView(self)
         self._edata = EdgeDataView(self)
 
@@ -657,11 +659,11 @@ class DistGraph:
             return 0
         return self._etype_map[etype]
 
-    def number_of_nodes(self, ntype='_N'):
+    def number_of_nodes(self, ntype=None):
         """Alias of :func:`num_nodes`"""
         return self.num_nodes(ntype)
 
-    def number_of_edges(self, etype='_E'):
+    def number_of_edges(self, etype=None):
         """Alias of :func:`num_edges`"""
         return self.num_edges(etype)
 
