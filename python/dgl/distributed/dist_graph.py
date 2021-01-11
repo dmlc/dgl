@@ -483,6 +483,8 @@ class DistGraph:
         self.graph_name, self._gpb_input = state
         self._init()
 
+        self._ndata_store = {}
+        self._edata_store = {}
         self._ndata = NodeDataView(self)
         self._edata = EdgeDataView(self)
         self._num_nodes = 0
