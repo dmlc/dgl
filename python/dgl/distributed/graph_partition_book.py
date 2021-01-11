@@ -378,14 +378,16 @@ class BasicPartitionBook(GraphPartitionBook):
         """
         return self._partition_meta_data
 
-    def _num_nodes(self):
+    def _num_nodes(self, ntype='_N'):
         """ The total number of nodes
         """
+        assert ntype == '_N', 'Base partition book only supports homogeneous graph.'
         return len(self._nid2partid)
 
-    def _num_edges(self):
+    def _num_edges(self, etype='_E'):
         """ The total number of edges
         """
+        assert etype == '_E', 'Base partition book only supports homogeneous graph.'
         return len(self._eid2partid)
 
     def map_to_per_ntype(self, ids):
@@ -461,6 +463,18 @@ class BasicPartitionBook(GraphPartitionBook):
         """Get the current partition id
         """
         return self._part_id
+
+    @property
+    def ntypes(self):
+        """Get the list of node types
+        """
+        return ['_N']
+
+    @property
+    def etypes(self):
+        """Get the list of edge types
+        """
+        return ['_E']
 
 
 class RangePartitionBook(GraphPartitionBook):
