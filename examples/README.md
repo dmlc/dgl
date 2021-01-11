@@ -37,6 +37,8 @@
 | [DeepWalk: Online Learning of Social Representations](#deepwalk)                                                         |                     | :heavy_check_mark:               |                           |                    | :heavy_check_mark: |
 | [Self-Attention Graph Pooling](#sagpool)                                                                                 |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Convolutional Networks on Graphs for Learning Molecular Fingerprints](#nf)                                              |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [Graph Representation Learning via Hard and Channel-Wise Attention Networks](#hardgat)
+|:heavy_check_mark                 |                           ｜                   ｜                    |                 |                                      
 
 ## 2020
 
@@ -133,6 +135,10 @@
 - <a name="sagpool"></a> Lee, Junhyun, et al. Self-Attention Graph Pooling. [Paper link](https://arxiv.org/abs/1904.08082).
     - Example code: [PyTorch](../examples/pytorch/sagpool)
     - Tags: graph classification, pooling
+
+- <a name='hardgat'></a> Gao, Hongyang, et al. Graph Representation Learning via Hard and Channel-Wise Attention Networks [Paper link](https://arxiv.org/abs/1907.04652).
+    - Example code: [Pytorch](../exmaples/pytorch/hgat)
+    - Tags: node classification, graph attention
 
 ## 2018
 
