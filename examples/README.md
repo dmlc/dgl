@@ -38,7 +38,7 @@
 | [Self-Attention Graph Pooling](#sagpool)                                                                                 |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Convolutional Networks on Graphs for Learning Molecular Fingerprints](#nf)                                              |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Graph Representation Learning via Hard and Channel-Wise Attention Networks](#hardgat)                                   |
-|:heavy_check_mark                 |                           ｜                   ｜                    |                 |                                      
+|:heavy_check_mark                 |                           ｜                   ｜                    |                                                       
 
 ## 2020
 
