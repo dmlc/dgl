@@ -1,26 +1,3 @@
-import dgl.function as fn
-def GRANDConv(graph, feats, order):
-    
-    with graph.local_scope():
-        
-        degs = graph.in_degrees().float().clamp(min=1)
-        norm = th.pow(degs, -0.5).to(feats.device).unsqueeze(1)
-
-        graph.ndata['norm'] = norm
-        graph.apply_edges(fn.u_mul_v('norm', 'norm', 'weight'))
-
-        x = feats
-        y = 0+feats
-
-        for i in range(order):
-            graph.ndata['h'] = x
-            graph.update_all(fn.u_mul_e('h', 'weight', 'm'), fn.sum('m', 'h'))
-            x = graph.ndata.pop('h')
-            y.add_(x)
-
-    return x
-
-
 import argparse
 import numpy as np
 import torch as th
@@ -32,7 +9,6 @@ import dgl
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 
 from model import GRAND
-from utils import consis_loss
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -61,10 +37,12 @@ def argument():
     parser.add_argument('--order', type=int, default=8, help='Propagation step')
     parser.add_argument('--sample', type=int, default=4, help='Sampling times of dropnode')
     parser.add_argument('--tem', type=float, default=0.5, help='Sharpening temperature')
-    parser.add_argument('--lam', type=float, default=1., help='Lamda')
+    parser.add_argument('--lam', type=float, default=1., help='Coefficient of consistency regularization')
     parser.add_argument('--use_bn', action='store_true', default=False, help='Using Batch Normalization')
 
     args = parser.parse_args()
+    
+    # check cuda
     if args.gpu != -1 and th.cuda.is_available():
         args.device = 'cuda:%s'%args.gpu
     else:
@@ -72,10 +50,26 @@ def argument():
 
     return args
 
+def consis_loss(logps, temp, lam):
+    ps = [th.exp(p) for p in logps]
+    ps = th.stack(ps, dim = 2)
+    
+    avg_p = th.mean(ps, dim = 2)
+    sharp_p = (th.pow(avg_p, 1./temp) / th.sum(th.pow(avg_p, 1./temp), dim=1, keepdim=True)).detach()
+
+    sharp_p = sharp_p.unsqueeze(2)
+    loss = th.mean(th.sum(th.pow(ps - sharp_p, 1./temp), dim = 1, keepdim=True))
+
+    loss = lam * loss
+    return loss
+
 if __name__ == '__main__':
 
+    # Step 1: Prepare graph data and retrieve train/validation/test index ============================= #
+    # Load from DGL dataset
     args = argument()
     print(args)
+
     if args.dataname == 'cora':
         dataset = CoraGraphDataset()
     elif args.dataname == 'citeseer':
@@ -88,13 +82,17 @@ if __name__ == '__main__':
     graph = dgl.add_self_loop(graph)
     device = args.device
 
+    # retrieve the number of classes
     n_classes = dataset.num_classes
 
+    # retrieve labels of ground truth
     labels = graph.ndata.pop('label').to(device).long()
-    feats = graph.ndata.pop('feat').to(device)
     
+    # Extract node features
+    feats = graph.ndata.pop('feat').to(device)
     n_features = feats.shape[-1]
 
+    # retrieve masks for train/validation/test
     train_mask = graph.ndata.pop('train_mask')
     val_mask = graph.ndata.pop('val_mask')
     test_mask = graph.ndata.pop('test_mask')
@@ -103,62 +101,50 @@ if __name__ == '__main__':
     val_idx = th.nonzero(val_mask, as_tuple=False).squeeze().to(device)
     test_idx = th.nonzero(test_mask, as_tuple=False).squeeze().to(device)
 
+    # Step 2: Create model =================================================================== #
     
-    in_dim = n_features
-    hid_dim = args.hid_dim
-    n_class = n_classes
-    K = args.order
-    S = args.sample
-    T = args.tem
-    lam = args.lam
-    batchnorm = args.use_bn
-    
-    node_dropout = args.dropnode_rate
-    input_droprate = args.input_droprate
-    hidden_droprate = args.hidden_droprate
-
-    model = GRAND(in_dim, hid_dim, n_class, S, K,
-                  node_dropout, input_droprate, 
-                  hidden_droprate, batchnorm)
+    model = GRAND(n_features, args.hid_dim, n_classes, args.sample, args.order,
+                  args.dropnode_rate, args.input_droprate, 
+                  args.hidden_droprate, args.use_bn)
 
     
-    model = model.to(device)
-    graph = graph.to(device)
+    model = model.to(args.device)
+    graph = graph.to(args.device)
     
-
+    # Step 3: Create training components ===================================================== #
     loss_fn = nn.NLLLoss()
     opt = optim.Adam(model.parameters(), lr = args.lr, weight_decay = args.weight_decay)
 
-    best_test_acc = 0
-    best_val_acc = 0
-    
     loss_best = np.inf
     acc_best = 0
-
+    
+    # Step 4: training epoches =============================================================== #
     for epoch in range(args.epochs):
 
-        
         ''' Training '''
         model.train()
         
         loss_sup = 0
         logits = model(graph, feats, True)
         
-        K = len(logits)
-        for k in range(K):
+        # calculate supervised loss
+        for k in range(args.sample):
             loss_sup += F.nll_loss(logits[k][train_idx], labels[train_idx])
         
-        loss_sup = loss_sup/K
+        loss_sup = loss_sup/args.sample
+        
+        # calculate consistency loss
         loss_consis = consis_loss(logits, args.tem, args.lam)
         
         loss_train = loss_sup + loss_consis
         acc_train = th.sum(logits[0][train_idx].argmax(dim=1) == labels[train_idx]).item() / len(train_idx)
 
+        # backward
         opt.zero_grad()
         loss_train.backward()
         opt.step()
 
-        ''' Validation '''
+        ''' Validating '''
         model.eval()
         with th.no_grad():
         
@@ -167,9 +153,11 @@ if __name__ == '__main__':
             loss_val = F.nll_loss(val_logits[val_idx], labels[val_idx]) 
             acc_val = th.sum(val_logits[val_idx].argmax(dim=1) == labels[val_idx]).item() / len(val_idx)
 
+            # Print out performance
             print("In epoch {}, Train Acc: {:.4f} | Train Loss: {:.4f} ,Val Acc: {:.4f} | Val Loss: {:.4f}".
               format(epoch, acc_train, loss_train.item(), acc_val, loss_val.item()))
 
+            # set early stopping counter
             if loss_val < loss_best or acc_val > acc_best:
                 if loss_val < loss_best:
                     best_epoch = epoch
