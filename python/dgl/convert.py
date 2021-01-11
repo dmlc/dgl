@@ -564,16 +564,21 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
     return to_heterogeneous(G, ntypes, etypes, ntype_field=ntype_field,
                             etype_field=etype_field, metagraph=metagraph)
 
-def to_homogeneous(G, ndata=None, edata=None):
+def to_homogeneous(G, ndata=None, edata=None, store_type=True, return_count=False):
     """Convert a heterogeneous graph to a homogeneous graph and return.
 
-    Node and edge types of the input graph are stored as the ``dgl.NTYPE``
-    and ``dgl.ETYPE`` features in the returned graph.
+    By default, the function stores the node and edge types of the input graph as
+    the ``dgl.NTYPE`` and ``dgl.ETYPE`` features in the returned graph.
     Each feature is an integer representing the type id, determined by the
     :meth:`DGLGraph.get_ntype_id` and :meth:`DGLGraph.get_etype_id` methods.
+    One can omit it by specifying ``store_type=False``.
 
-    The function also stores the original node/edge IDs as the ``dgl.NID``
-    and ``dgl.EID`` features in the returned graph.
+    The result graph assigns nodes and edges of the same type with IDs in continuous range
+    (i.e., nodes of the first type have IDs 0 ~ ``G.num_nodes(G.ntypes[0])``; nodes
+    of the second type come after; so on and so forth). Therefore, a more memory-efficient
+    format for type information is an integer list; the i^th corresponds to
+    the number of nodes/edges of the i^th type. One can choose this format by
+    specifying ``return_count=True``.
 
     Parameters
     ----------
@@ -589,11 +594,31 @@ def to_homogeneous(G, ndata=None, edata=None):
         :attr:`edata`, it concatenates ``G.edges[T].data[feat]`` across all edge types ``T``.
         As a result, the feature ``feat`` of all edge types should have the same shape and
         data type. By default, the returned graph will not have any edge features.
+    store_type : bool, optional
+        If True, store type information as the ``dgl.NTYPE`` and ``dgl.ETYPE`` features
+        in the returned graph.
+    return_count : bool, optional
+        If True, return type information as an integer list; the i^th element corresponds to
+        the number of nodes/edges of the i^th type.
 
     Returns
     -------
     DGLGraph
         A homogeneous graph.
+    ntype_count : list[int], optional
+        Number of nodes of each type. Return when ``return_count`` is True.
+    etype_count : list[int], optional
+        Number of edges of each type. Return when ``return_count`` is True.
+
+    Notes
+    -----
+
+    * Calculating type information may introduce noticeable cost. Setting both ``store_type``
+      and ``return_count`` to False can avoid such cost if type information is not needed.
+      Otherwise, DGL recommends to use ``store_type=False`` and ``return_count=True`` due
+      to its memory efficiency.
+    * The ``ntype_count`` and ``etype_count`` lists can help speed up some operations.
+      See :class:`~dgl.nn.pytorch.conv.RelGraphConv` for such an example.
 
     Examples
     --------
@@ -633,18 +658,25 @@ def to_homogeneous(G, ndata=None, edata=None):
     offset_per_ntype = np.insert(np.cumsum(num_nodes_per_ntype), 0, 0)
     srcs = []
     dsts = []
-    etype_ids = []
-    eids = []
-    ntype_ids = []
     nids = []
+    eids = []
+    if store_type:
+        ntype_ids = []
+        etype_ids = []
+    if return_count:
+        ntype_count = []
+        etype_count = []
     total_num_nodes = 0
 
     for ntype_id, ntype in enumerate(G.ntypes):
         num_nodes = G.number_of_nodes(ntype)
         total_num_nodes += num_nodes
-        # Type ID is always in int64
-        ntype_ids.append(F.full_1d(num_nodes, ntype_id, F.int64, F.cpu()))
-        nids.append(F.arange(0, num_nodes, G.idtype))
+        if store_type:
+            # Type ID is always in int64
+            ntype_ids.append(F.full_1d(num_nodes, ntype_id, F.int64, G.device))
+        if return_count:
+            ntype_count.append(num_nodes)
+        nids.append(F.arange(0, num_nodes, G.idtype, G.device))
 
     for etype_id, etype in enumerate(G.canonical_etypes):
         srctype, _, dsttype = etype
@@ -652,9 +684,12 @@ def to_homogeneous(G, ndata=None, edata=None):
         num_edges = len(src)
         srcs.append(src + int(offset_per_ntype[G.get_ntype_id(srctype)]))
         dsts.append(dst + int(offset_per_ntype[G.get_ntype_id(dsttype)]))
-        # Type ID is always in int64
-        etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, F.cpu()))
-        eids.append(F.arange(0, num_edges, G.idtype))
+        if store_type:
+            # Type ID is always in int64
+            etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, G.device))
+        if return_count:
+            etype_count.append(num_edges)
+        eids.append(F.arange(0, num_edges, G.idtype, G.device))
 
     retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)), num_nodes=total_num_nodes,
                  idtype=G.idtype, device=G.device)
@@ -671,13 +706,16 @@ def to_homogeneous(G, ndata=None, edata=None):
     if comb_ef is not None:
         retg.edata.update(comb_ef)
 
-    # assign node type and id mapping field.
-    retg.ndata[NTYPE] = F.copy_to(F.cat(ntype_ids, 0), G.device)
-    retg.ndata[NID] = F.copy_to(F.cat(nids, 0), G.device)
-    retg.edata[ETYPE] = F.copy_to(F.cat(etype_ids, 0), G.device)
-    retg.edata[EID] = F.copy_to(F.cat(eids, 0), G.device)
+    retg.ndata[NID] = F.cat(nids, 0)
+    retg.edata[EID] = F.cat(eids, 0)
+    if store_type:
+        retg.ndata[NTYPE] = F.cat(ntype_ids, 0)
+        retg.edata[ETYPE] = F.cat(etype_ids, 0)
 
-    return retg
+    if return_count:
+        return retg, ntype_count, etype_count
+    else:
+        return retg
 
 def to_homo(G):
     """Convert the given heterogeneous graph to a homogeneous graph.
