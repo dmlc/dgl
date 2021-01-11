@@ -358,8 +358,8 @@ class BasicPartitionBook(GraphPartitionBook):
         g2l = F.scatter_row(g2l, global_id, F.arange(0, len(global_id)))
         self._eidg2l[self._part_id] = g2l
         # node size and edge size
-        self._edge_size = len(self.partid2eids(self._part_id, None))
-        self._node_size = len(self.partid2nids(self._part_id, None))
+        self._edge_size = len(self.partid2eids(self._part_id))
+        self._node_size = len(self.partid2nids(self._part_id))
 
     def shared_memory(self, graph_name):
         """Move data to shared memory.
@@ -388,37 +388,69 @@ class BasicPartitionBook(GraphPartitionBook):
         """
         return len(self._eid2partid)
 
-    def nid2partid(self, nids, _):
+    def map_to_per_ntype(self, ids):
+        """Map global homogeneous node Ids to node type Ids.
+        Returns
+            type_ids, per_type_ids
+        """
+        return F.zeros((len(ids),), F.int32, F.cpu()), ids
+
+    def map_to_per_etype(self, ids):
+        """Map global homogeneous edge Ids to edge type Ids.
+        Returns
+            type_ids, per_type_ids
+        """
+        return F.zeros((len(ids),), F.int32, F.cpu()), ids
+
+    def map_to_homo_nid(self, ids, ntype):
+        """Map per-node-type Ids to global node Ids in the homogeneous format.
+        """
+        assert ntype == '_N', 'Base partition book only supports homogeneous graph.'
+        return ids
+
+    def map_to_homo_eid(self, ids, etype):
+        """Map per-edge-type Ids to global edge Ids in the homoenegeous format.
+        """
+        assert etype == '_E', 'Base partition book only supports homogeneous graph.'
+        return ids
+
+    def nid2partid(self, nids, ntype='_N'):
         """From global node IDs to partition IDs
         """
+        assert ntype == '_N', 'Base partition book only supports homogeneous graph.'
         return F.gather_row(self._nid2partid, nids)
 
-    def eid2partid(self, eids, _):
+    def eid2partid(self, eids, etype='_E'):
         """From global edge IDs to partition IDs
         """
+        assert etype == '_E', 'Base partition book only supports homogeneous graph.'
         return F.gather_row(self._eid2partid, eids)
 
-    def partid2nids(self, partid, _):
+    def partid2nids(self, partid, ntype='_N'):
         """From partition id to global node IDs
         """
+        assert ntype == '_N', 'Base partition book only supports homogeneous graph.'
         return self._partid2nids[partid]
 
-    def partid2eids(self, partid, _):
+    def partid2eids(self, partid, etype='_E'):
         """From partition id to global edge IDs
         """
+        assert etype == '_E', 'Base partition book only supports homogeneous graph.'
         return self._partid2eids[partid]
 
-    def nid2localnid(self, nids, partid, _):
+    def nid2localnid(self, nids, partid, ntype='_N'):
         """Get local node IDs within the given partition.
         """
+        assert ntype == '_N', 'Base partition book only supports homogeneous graph.'
         if partid != self._part_id:
             raise RuntimeError('Now GraphPartitionBook does not support \
                 getting remote tensor of nid2localnid.')
         return F.gather_row(self._nidg2l[partid], nids)
 
-    def eid2localeid(self, eids, partid, _):
+    def eid2localeid(self, eids, partid, etype='_E'):
         """Get the local edge ids within the given partition.
         """
+        assert etype == '_E', 'Base partition book only supports homogeneous graph.'
         if partid != self._part_id:
             raise RuntimeError('Now GraphPartitionBook does not support \
                 getting remote tensor of eid2localeid.')

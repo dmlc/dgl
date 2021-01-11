@@ -109,6 +109,7 @@ def load_partition(part_config, part_id):
     gpb, graph_name, ntypes, etypes = load_partition_book(part_config, part_id, graph)
     for ntype in ntypes:
         ntype_id = ntypes[ntype]
+        # graph.ndata[NID] are global homogeneous node Ids.
         nids = F.boolean_mask(graph.ndata[NID], _get_inner_node_mask(graph, ntype_id))
         partids1 = gpb.nid2partid(nids)
         _, per_type_nids = gpb.map_to_per_ntype(nids)
@@ -117,6 +118,7 @@ def load_partition(part_config, part_id):
         assert np.all(F.asnumpy(partids2 == part_id)), 'load a wrong partition'
     for etype in etypes:
         etype_id = etypes[etype]
+        # graph.edata[EID] are global homogeneous edge Ids.
         eids = F.boolean_mask(graph.edata[EID], _get_inner_edge_mask(graph, etype_id))
         partids1 = gpb.eid2partid(eids)
         _, per_type_eids = gpb.map_to_per_etype(eids)
@@ -384,8 +386,6 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             bal_ntypes = sim_g.ndata[NTYPE]
         return sim_g, bal_ntypes
 
-    assert reshuffle, 'NID and EID have to be shuffled.'
-
     if num_parts == 1:
         sim_g = to_homogeneous(g)
         node_parts = F.zeros((sim_g.number_of_nodes(),), F.int64, F.cpu())
@@ -450,9 +450,6 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     typed_eids = np.sort(F.asnumpy(F.boolean_mask(inner_eids, inner_etype_mask)))
                     assert np.all(typed_eids == np.arange(int(typed_eids[0]),
                                                           int(typed_eids[-1]) + 1))
-
-
-            #_verify_graph(g, sim_g, parts)
         else:
             raise NotImplementedError('not shuffled case')
 
@@ -526,13 +523,13 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                 edge_map_val[etype] = [[int(F.as_scalar(inner_eids[0])),
                                         int(F.as_scalar(inner_eids[-1])) + 1]]
 
-    # Double check that the node Ids in the global Id space are sorted.
-    for ntype in node_map_val:
-        val = np.concatenate([np.array(l) for l in node_map_val[ntype]])
-        assert np.all(val[:-1] <= val[1:])
-    for etype in edge_map_val:
-        val = np.concatenate([np.array(l) for l in edge_map_val[etype]])
-        assert np.all(val[:-1] <= val[1:])
+        # Double check that the node Ids in the global Id space are sorted.
+        for ntype in node_map_val:
+            val = np.concatenate([np.array(l) for l in node_map_val[ntype]])
+            assert np.all(val[:-1] <= val[1:])
+        for etype in edge_map_val:
+            val = np.concatenate([np.array(l) for l in edge_map_val[etype]])
+            assert np.all(val[:-1] <= val[1:])
 
     start = time.time()
     ntypes = {ntype:g.get_ntype_id(ntype) for ntype in g.ntypes}
@@ -640,7 +637,6 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         if len(g.etypes) > 1:
             part.ndata['orig_id'] = F.gather_row(sim_g.ndata[NID], part.ndata['orig_id'])
             part.edata['orig_id'] = F.gather_row(sim_g.edata[EID], part.edata['orig_id'])
-        #_verify_graph_feats(g, part, node_feats)
 
         part_dir = os.path.join(out_path, "part" + str(part_id))
         node_feat_file = os.path.join(part_dir, "node_feat.dgl")
