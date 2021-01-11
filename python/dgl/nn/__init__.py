@@ -16,7 +16,11 @@ with "[NN] XXX module".
 import importlib
 import sys
 import os
-from . import functional
+
+# [BarclayII] Not sure what's going on with pylint.
+# Possible issue: https://github.com/PyCQA/pylint/issues/2648
+from . import functional        # pylint: disable=import-self
+
 from ..backend import backend_name
 from ..utils import expand_as_pair
 
