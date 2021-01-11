@@ -308,11 +308,15 @@ class DistGraphServer(KVServer):
 
         if not self.is_backup_server():
             for name in node_feats:
+                # The feature name has the following format: node_type + "/" + feature_name to avoid
+                # feature name collision for different node types.
                 ntype, feat_name = name.split('/')
                 data_name = HeteroDataName(True, ntype, feat_name)
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=node_feats[name])
             for name in edge_feats:
+                # The feature name has the following format: edge_type + "/" + feature_name to avoid
+                # feature name collision for different edge types.
                 etype, feat_name = name.split('/')
                 data_name = HeteroDataName(False, etype, feat_name)
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
@@ -425,11 +429,13 @@ class DistGraph:
                 self._gpb = gpb
             self._g = g
             for name in node_feats:
+                # The feature name has the following format: node_type + "/" + feature_name.
                 ntype, feat_name = name.split('/')
                 self._client.add_data(str(HeteroDataName(True, ntype, feat_name)),
                                       node_feats[name],
                                       NodePartitionPolicy(self._gpb, ntype=ntype))
             for name in edge_feats:
+                # The feature name has the following format: edge_type + "/" + feature_name.
                 etype, feat_name = name.split('/')
                 self._client.add_data(str(HeteroDataName(False, etype, feat_name)),
                                       edge_feats[name],
@@ -454,7 +460,7 @@ class DistGraph:
             self._num_nodes += int(part_md['num_nodes'])
             self._num_edges += int(part_md['num_edges'])
 
-        # The node/edge types are stored in the order of type Ids.
+        # When we store node/edge types in a list, they are stored in the order of type Ids.
         self._ntype_map = {ntype:i for i, ntype in enumerate(self.ntypes)}
         self._etype_map = {etype:i for i, etype in enumerate(self.etypes)}
 
@@ -608,13 +614,47 @@ class DistGraph:
         return self._gpb.etypes
 
     def get_ntype_id(self, ntype):
-        '''Get the node type Id.
-        '''
+        """Return the ID of the given node type.
+
+        ntype can also be None. If so, there should be only one node type in the
+        graph.
+
+        Parameters
+        ----------
+        ntype : str
+            Node type
+
+        Returns
+        -------
+        int
+        """
+        if ntype is None:
+            if len(self._ntype_map) != 1:
+                raise DGLError('Node type name must be specified if there are more than one '
+                               'node types.')
+            return 0
         return self._ntype_map[ntype]
 
     def get_etype_id(self, etype):
-        '''Get the edge type Id.
-        '''
+        """Return the id of the given edge type.
+
+        etype can also be None. If so, there should be only one edge type in the
+        graph.
+
+        Parameters
+        ----------
+        etype : str or tuple of str
+            Edge type
+
+        Returns
+        -------
+        int
+        """
+        if etype is None:
+            if len(self._etype_map) != 1:
+                raise DGLError('Edge type name must be specified if there are more than one '
+                               'edge types.')
+            return 0
         return self._etype_map[etype]
 
     def number_of_nodes(self, ntype='_N'):
@@ -625,8 +665,14 @@ class DistGraph:
         """Alias of :func:`num_edges`"""
         return self.num_edges(etype)
 
-    def num_nodes(self, ntype='_N'):
+    def num_nodes(self, ntype=None):
         """Return the total number of nodes in the distributed graph.
+
+        Parameters
+        ----------
+        ntype : str, optional
+            The node type name. If given, it returns the number of nodes of the
+            type. If not given (default), it returns the total number of nodes of all types.
 
         Returns
         -------
@@ -639,10 +685,27 @@ class DistGraph:
         >>> print(g.num_nodes())
         2449029
         """
+        if ntype is None:
+            if len(self.ntypes) == 1:
+                return self._gpb._num_nodes(self.ntypes[0])
+            else:
+                return sum([self._gpb._num_nodes(ntype) for ntype in self.ntypes])
         return self._gpb._num_nodes(ntype)
 
-    def num_edges(self, etype='_E'):
+    def num_edges(self, etype=None):
         """Return the total number of edges in the distributed graph.
+
+        Parameters
+        ----------
+        etype : str or (str, str, str), optional
+            The type name of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            If not provided, return the total number of edges regardless of the types
+            in the graph.
 
         Returns
         -------
@@ -655,6 +718,11 @@ class DistGraph:
         >>> print(g.num_edges())
         123718280
         """
+        if etype is None:
+            if len(self.etypes) == 1:
+                return self._gpb._num_edges(self.etypes[0])
+            else:
+                return sum([self._gpb._num_edges(etype) for etype in self.etypes])
         return self._gpb._num_edges(etype)
 
     def node_attr_schemes(self):
@@ -741,6 +809,7 @@ class DistGraph:
         tensor
             The destination node ID array.
         """
+        assert len(self.etypes) == 1, 'find_edges does not support heterogeneous graph for now.'
         return dist_find_edges(self, edges)
 
     def get_partition_book(self):

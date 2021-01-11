@@ -170,6 +170,8 @@ class GraphPartitionBook:
         ----------
         nids : tensor
             global node IDs
+        ntype : str
+            The node type
 
         Returns
         -------
@@ -184,6 +186,8 @@ class GraphPartitionBook:
         ----------
         eids : tensor
             global edge IDs
+        etype : str
+            The edge type
 
         Returns
         -------
@@ -198,6 +202,8 @@ class GraphPartitionBook:
         ----------
         partid : int
             partition id
+        ntype : str
+            The node type
 
         Returns
         -------
@@ -212,6 +218,8 @@ class GraphPartitionBook:
         ----------
         partid : int
             partition id
+        etype : str
+            The edge type
 
         Returns
         -------
@@ -228,6 +236,8 @@ class GraphPartitionBook:
             global node IDs
         partid : int
             partition ID
+        ntype : str
+            The node type
 
         Returns
         -------
@@ -244,6 +254,8 @@ class GraphPartitionBook:
             global edge ids
         partid : int
             partition ID
+        etype : str
+            The edge type
 
         Returns
         -------
