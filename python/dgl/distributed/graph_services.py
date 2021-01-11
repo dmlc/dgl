@@ -6,9 +6,8 @@ from ..sampling import sample_neighbors as local_sample_neighbors
 from ..subgraph import in_subgraph as local_in_subgraph
 from .rpc import register_service
 from ..convert import graph
-from ..base import NID, EID, NTYPE, ETYPE
+from ..base import NID, EID
 from ..utils import toindex
-from ..transform import to_block as local_to_block
 from .. import backend as F
 
 __all__ = ['sample_neighbors', 'in_subgraph', 'find_edges']
@@ -311,7 +310,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
             homo_nids.append(gpb.map_to_homo_nid(typed_nodes, ntype))
         nodes = F.cat(homo_nids, 0)
     else:
-        len(g.ntypes) == 1, 'An input heterogeneous graph requires the input nodes to be a dict.'
+        assert len(g.ntypes) == 1, \
+                'An input heterogeneous graph requires the input nodes to be a dict.'
     def issue_remote_req(node_ids):
         return SamplingRequest(node_ids, fanout, edge_dir=edge_dir,
                                prob=prob, replace=replace)

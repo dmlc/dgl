@@ -75,18 +75,22 @@ def get_shared_mem_partition_book(graph_name, graph_part):
     '''
     if not exist_shared_mem_array(_get_ndata_path(graph_name, 'meta')):
         return None
-    is_range_part, part_id, num_parts, node_map_data, edge_map_data = _get_shared_mem_metadata(graph_name)
+    is_range_part, part_id, num_parts, node_map_data, edge_map_data = \
+            _get_shared_mem_metadata(graph_name)
     if is_range_part == 1:
-        # node Id ranges and edge Id ranges are stored in the order of node type Ids and edge type Ids.
+        # node Id ranges and edge Id ranges are stored in the order of node type Ids
+        # and edge type Ids.
         node_map = {}
         ntypes = {}
-        for i, (ntype, nid_range) in enumerate(pickle.loads(bytes(F.asnumpy(node_map_data).tolist()))):
+        node_map_data = pickle.loads(bytes(F.asnumpy(node_map_data).tolist()))
+        for i, (ntype, nid_range) in enumerate(node_map_data):
             ntypes[ntype] = i
             node_map[ntype] = nid_range
 
         edge_map = {}
         etypes = {}
-        for i, (etype, eid_range) in enumerate(pickle.loads(bytes(F.asnumpy(edge_map_data).tolist()))):
+        edge_map_data = pickle.loads(bytes(F.asnumpy(edge_map_data).tolist()))
+        for i, (etype, eid_range) in enumerate(edge_map_data):
             etypes[etype] = i
             edge_map[etype] = eid_range
         return RangePartitionBook(part_id, num_parts, node_map, edge_map, ntypes, etypes)
@@ -515,11 +519,13 @@ class RangePartitionBook(GraphPartitionBook):
         for ntype in ntypes:
             ntype_id = ntypes[ntype]
             self._ntypes[ntype_id] = ntype
-        assert all([ntype is not None for ntype in self._ntypes]), "The node types have invalid Ids."
+        assert all([ntype is not None for ntype in self._ntypes]), \
+                "The node types have invalid Ids."
         for etype in etypes:
             etype_id = etypes[etype]
             self._etypes[etype_id] = etype
-        assert all([etype is not None for etype in self._etypes]), "The edge types have invalid Ids."
+        assert all([etype is not None for etype in self._etypes]), \
+                "The edge types have invalid Ids."
 
         # This stores the node Id ranges for each node type in each partition.
         # The key is the node type, the value is a NumPy matrix with two columns, in which
