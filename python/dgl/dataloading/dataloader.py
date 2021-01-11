@@ -287,6 +287,25 @@ class Collator(ABC):
         """
         raise NotImplementedError
 
+# TODO(BarclayII): DistGraph.idtype and DistGraph.device are in the code, however
+# the underlying DGLGraph object could be None.  I was unable to figure out how
+# to properly implement those two properties so I'm working around that.  If the
+# graph is a DistGraph, I assume that the dtype and device of the data should
+# be the same as the graph already.
+#
+# After idtype and device get properly implemented, we should remove these two
+# _prepare_* functions.
+
+def _prepare_tensor_dict(g, data, name, is_distributed):
+    if is_distributed:
+        x = F.tensor(next(iter(data.values())))
+        return {k: F.copy_to(F.astype(v, F.dtype(x)), F.context(x)) for k, v in data.items()}
+    else:
+        return utils.prepare_tensor_dict(g, data, name)
+
+def _prepare_tensor(g, data, name, is_distributed):
+    return F.tensor(data) if is_distributed else utils.prepare_tensor(g, data, name)
+
 class NodeCollator(Collator):
     """DGL collator to combine nodes and their computation dependencies within a minibatch for
     training node classification or regression on a single graph with neighborhood sampling.
@@ -299,6 +318,9 @@ class NodeCollator(Collator):
         The node set to compute outputs.
     block_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
+    return_eids : bool, default False
+        Whether to additionally return the indices of the input ``nids`` array sampled in the
+        minibatch.
 
     Examples
     --------
@@ -314,19 +336,24 @@ class NodeCollator(Collator):
     >>> for input_nodes, output_nodes, blocks in dataloader:
     ...     train_on(input_nodes, output_nodes, blocks)
     """
-    def __init__(self, g, nids, block_sampler):
+    def __init__(self, g, nids, block_sampler, return_indices=False):
         self.g = g
         self._is_distributed = isinstance(g, DistGraph)
         if not isinstance(nids, Mapping):
             assert len(g.ntypes) == 1, \
                 "nids should be a dict of node type and ids for graph with multiple node types"
-        self.nids = nids
         self.block_sampler = block_sampler
+        self.return_indices = return_indices
 
         if isinstance(nids, Mapping):
-            self._dataset = utils.FlattenedDict(nids)
+            self.nids = _prepare_tensor_dict(g, nids, 'nids', self._is_distributed)
+            dataset = {k: F.arange(0, len(v), F.dtype(v), F.context(v))
+                       for k, v in self.nids.items()} if return_indices else self.nids
+            self._dataset = utils.FlattenedDict(dataset)
         else:
-            self._dataset = nids
+            self.nids = _prepare_tensor(g, nids, 'nids', self._is_distributed)
+            self._dataset = F.arange(0, len(nids), F.dtype(nids), F.context(nids)) \
+                            if return_indices else nids
 
     @property
     def dataset(self):
@@ -342,6 +369,9 @@ class NodeCollator(Collator):
             Either a list of node IDs (for homogeneous graphs), or a list of node type-ID
             pairs (for heterogeneous graphs).
 
+            If ``return_indices`` is True, represents the indices to the seed node
+            array(s) instead.
+
         Returns
         -------
         input_nodes : Tensor or dict[ntype, Tensor]
@@ -354,26 +384,34 @@ class NodeCollator(Collator):
 
             If the original graph has multiple node types, return a dictionary of
             node type names and node ID tensors.  Otherwise, return a single tensor.
+        indices : Tensor or dict[ntype, Tensor], optional
+            The indices of the sampled nodes in the ``nids`` member.
+
+            Only returned if ``return_indices`` is True.
         blocks : list[DGLGraph]
             The list of blocks necessary for computing the representation.
         """
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
+            items = _prepare_tensor_dict(self.g, items, 'items', self._is_distributed)
+        else:
+            items = _prepare_tensor(self.g, items, 'items', self._is_distributed)
 
-        # TODO(BarclayII) Because DistGraph doesn't have idtype and device implemented,
-        # this function does not work.  I'm again skipping this step as a workaround.
-        # We need to fix this.
-        if not self._is_distributed:
-            if isinstance(items, dict):
-                items = utils.prepare_tensor_dict(self.g, items, 'items')
-            else:
-                items = utils.prepare_tensor(self.g, items, 'items')
-        blocks = self.block_sampler.sample_blocks(self.g, items)
+        if isinstance(items, dict):
+            sample_items = {k: F.gather_row(self.nids[k], v) for k, v in items.items()} \
+                           if self.return_indices else items
+        else:
+            sample_items = F.gather_row(self.nids, items) if self.return_indices else items
+
+        blocks = self.block_sampler.sample_blocks(self.g, sample_items)
         output_nodes = blocks[-1].dstdata[NID]
         input_nodes = blocks[0].srcdata[NID]
 
-        return input_nodes, output_nodes, blocks
+        if not self.return_indices:
+            return input_nodes, output_nodes, blocks
+        else:
+            return input_nodes, output_nodes, items, blocks
 
 class EdgeCollator(Collator):
     """DGL collator to combine edges and their computation dependencies within a minibatch for
@@ -453,6 +491,9 @@ class EdgeCollator(Collator):
 
         A set of builtin negative samplers are provided in
         :ref:`the negative sampling module <api-dataloading-negative-sampling>`.
+    return_eids : bool, default False
+        Whether to additionally return the indices of the input ``eids`` array sampled in the
+        minibatch.
 
     Examples
     --------
@@ -541,13 +582,15 @@ class EdgeCollator(Collator):
     ...     train_on(input_nodse, pair_graph, neg_pair_graph, blocks)
     """
     def __init__(self, g, eids, block_sampler, g_sampling=None, exclude=None,
-                 reverse_eids=None, reverse_etypes=None, negative_sampler=None):
+                 reverse_eids=None, reverse_etypes=None, negative_sampler=None,
+                 return_indices=False):
         self.g = g
+        self._is_distributed = isinstance(g, DistGraph)
         if not isinstance(eids, Mapping):
             assert len(g.etypes) == 1, \
                 "eids should be a dict of etype and ids for graph with multiple etypes"
-        self.eids = eids
         self.block_sampler = block_sampler
+        self.return_indices = return_indices
 
         # One may wish to iterate over the edges in one graph while perform sampling in
         # another graph.  This may be the case for iterating over validation and test
@@ -566,9 +609,14 @@ class EdgeCollator(Collator):
         self.negative_sampler = negative_sampler
 
         if isinstance(eids, Mapping):
-            self._dataset = utils.FlattenedDict(eids)
+            self.eids = _prepare_tensor_dict(g, eids, 'eids', self._is_distributed)
+            dataset = {k: F.arange(0, len(v), F.dtype(v), F.context(v))
+                       for k, v in self.eids.items()} if return_indices else self.eids
+            self._dataset = utils.FlattenedDict(dataset)
         else:
-            self._dataset = eids
+            self.eids = _prepare_tensor(g, eids, 'eids', self._is_distributed)
+            self._dataset = F.arange(0, len(eids), F.dtype(eids), F.context(eids)) \
+                            if return_indices else eids
 
     @property
     def dataset(self):
@@ -578,17 +626,23 @@ class EdgeCollator(Collator):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-            items = utils.prepare_tensor_dict(self.g_sampling, items, 'items')
+            items = _prepare_tensor_dict(self.g_sampling, items, 'items', self._is_distributed)
         else:
-            items = utils.prepare_tensor(self.g_sampling, items, 'items')
+            items = _prepare_tensor(self.g_sampling, items, 'items', self._is_distributed)
 
-        pair_graph = self.g.edge_subgraph(items)
+        if isinstance(items, dict):
+            sample_items = {k: F.gather_row(self.eids[k], v) for k, v in items.items()} \
+                           if self.return_indices else items
+        else:
+            sample_items = F.gather_row(self.eids, items) if self.return_indices else items
+
+        pair_graph = self.g.edge_subgraph(sample_items)
         seed_nodes = pair_graph.ndata[NID]
 
         exclude_eids = _find_exclude_eids(
             self.g,
             self.exclude,
-            items,
+            sample_items,
             reverse_eid_map=self.reverse_eids,
             reverse_etype_map=self.reverse_etypes)
 
@@ -596,20 +650,29 @@ class EdgeCollator(Collator):
             self.g_sampling, seed_nodes, exclude_eids=exclude_eids)
         input_nodes = blocks[0].srcdata[NID]
 
-        return input_nodes, pair_graph, blocks
+        if not self.return_indices:
+            return input_nodes, pair_graph, blocks
+        else:
+            return input_nodes, pair_graph, items, blocks
 
     def _collate_with_negative_sampling(self, items):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-            items = utils.prepare_tensor_dict(self.g_sampling, items, 'items')
+            items = _prepare_tensor_dict(self.g_sampling, items, 'items', self._is_distributed)
         else:
-            items = utils.prepare_tensor(self.g_sampling, items, 'items')
+            items = _prepare_tensor(self.g_sampling, items, 'items', self._is_distributed)
 
-        pair_graph = self.g.edge_subgraph(items, preserve_nodes=True)
+        if isinstance(items, dict):
+            sample_items = {k: F.gather_row(self.eids[k], v) for k, v in items.items()} \
+                           if self.return_indices else items
+        else:
+            sample_items = F.gather_row(self.eids, items) if self.return_indices else items
+
+        pair_graph = self.g.edge_subgraph(sample_items, preserve_nodes=True)
         induced_edges = pair_graph.edata[EID]
 
-        neg_srcdst = self.negative_sampler(self.g, items)
+        neg_srcdst = self.negative_sampler(self.g, sample_items)
         if not isinstance(neg_srcdst, Mapping):
             assert len(self.g.etypes) == 1, \
                 'graph has multiple or no edge types; '\
@@ -631,7 +694,7 @@ class EdgeCollator(Collator):
         exclude_eids = _find_exclude_eids(
             self.g,
             self.exclude,
-            items,
+            sample_items,
             reverse_eid_map=self.reverse_eids,
             reverse_etype_map=self.reverse_etypes)
 
@@ -639,7 +702,10 @@ class EdgeCollator(Collator):
             self.g_sampling, seed_nodes, exclude_eids=exclude_eids)
         input_nodes = blocks[0].srcdata[NID]
 
-        return input_nodes, pair_graph, neg_pair_graph, blocks
+        if not self.return_indices:
+            return input_nodes, pair_graph, neg_pair_graph, blocks
+        else:
+            return input_nodes, pair_graph, neg_pair_graph, items, blocks
 
     def collate(self, items):
         """Combines the sampled edges into a minibatch for edge classification, edge
@@ -650,6 +716,9 @@ class EdgeCollator(Collator):
         items : list[int] or list[tuple[str, int]]
             Either a list of edge IDs (for homogeneous graphs), or a list of edge type-ID
             pairs (for heterogeneous graphs).
+
+            If ``return_indices`` is True, represents the indices to the seed edge
+            array(s) instead.
 
         Returns
         -------
@@ -674,6 +743,10 @@ class EdgeCollator(Collator):
 
             Note that the metagraph of this graph will be identical to that of the original
             graph.
+        items : Tensor or dict[ntype, Tensor]
+            The indices of the sampled edges in the ``eids`` member.
+
+            Only returned if ``return_indices`` is True.
         blocks : list[DGLGraph]
             The list of blocks necessary for computing the representation of the edges.
         """
