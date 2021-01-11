@@ -47,7 +47,8 @@ __global__ void _COOSeparateEdgesKernel(
 
 template<typename T>
 int _NumberOfBits(const T& range) {
-  if (range == 0) {
+  if (range <= 1) {
+    // ranges of 0 or 1 require no bits to store
     return 0;
   }
 
@@ -57,7 +58,7 @@ int _NumberOfBits(const T& range) {
   }
 
   CHECK_EQ((range-1) >> bits, 0);
-  CHECK_NE((range-1) >> bits-1, 0);
+  CHECK_NE((range-1) >> (bits-1), 0);
 
   return bits;
 }
