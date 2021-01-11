@@ -1,7 +1,7 @@
 {
     "c5.9xlarge": {
         "tests": [
-            "bench_sage"
+            ""
         ],
         "env": {
             "DEVICE": "cpu"
@@ -9,7 +9,7 @@
     },
     "g4dn.2xlarge": {
         "tests": [
-            "bench_sage"
+            ""
         ],
         "env": {
             "DEVICE": "gpu"

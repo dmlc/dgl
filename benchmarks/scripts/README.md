@@ -4,7 +4,12 @@ Regression Test Suite
 ### Spec of task.json
 ```json
 # Note the test will be run if the name specified below is a substring of the full test name.
-# For example, "bench_sage_ns.track_acc/bench_sage_ns.track_time" and "bench_sage_ns.track_acc/bench_sage_ns.track_time" will both qualified if filtered with "bench_sage". If you want to exclude "bench_sage_ns", you can use "bench_sage." as the filter keyword.
+# The fullname of "benchmarks/model_acc/bench_sage_ns.track_acc" will be "model_acc.bench_sage_ns.track_acc". Test will be run if it contains any keyword.
+# For example, "model_acc" will run all the tests under "model_acc" folder
+# "bench_sage" will run both "bench_sage" and "bench_sage_ns"
+# "bench_sage." will only run "bench_sage"
+# "ns" will run any tests name contains "ms"
+# "" will run all tests
 {
     "c5.9xlarge": { # The instance type to run the test
         "tests": [
