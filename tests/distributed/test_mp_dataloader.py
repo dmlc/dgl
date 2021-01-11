@@ -58,12 +58,14 @@ def start_dist_dataloader(rank, tmpdir, num_server, num_workers, drop_last):
     train_nid = th.arange(num_nodes_to_sample)
     dist_graph = DistGraph("test_mp", gpb=gpb, part_config=tmpdir / 'test_sampling.json')
 
-    orig_nid = F.zeros((dist_graph.number_of_nodes(),), dtype=F.int64)
-    orig_eid = F.zeros((dist_graph.number_of_edges(),), dtype=F.int64)
+    orig_nid = F.arange(0, dist_graph.number_of_nodes())
+    orig_eid = F.arange(0, dist_graph.number_of_edges())
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_sampling.json', i)
-        orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
-        orig_eid[part.edata[dgl.EID]] = part.edata['orig_id']
+        if 'orig_id' in part.ndata:
+            orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
+        if 'orig_id' in part.edata:
+            orig_eid[part.edata[dgl.EID]] = part.edata['orig_id']
 
     # Create sampler
     sampler = NeighborSampler(dist_graph, [5, 10],
@@ -131,7 +133,8 @@ def test_standalone(tmpdir):
 @pytest.mark.parametrize("num_server", [3])
 @pytest.mark.parametrize("num_workers", [0, 4])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last):
+@pytest.mark.parametrize("reshuffle", [True, False])
+def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle):
     ip_config = open("mp_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -143,7 +146,7 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last):
     num_hops = 1
 
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
-                    num_hops=num_hops, part_method='metis', reshuffle=True)
+                    num_hops=num_hops, part_method='metis', reshuffle=reshuffle)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -265,6 +268,8 @@ if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
         test_standalone(Path(tmpdirname))
-        test_dist_dataloader(Path(tmpdirname), 3, 0, True)
-        test_dist_dataloader(Path(tmpdirname), 3, 4, True)
+        test_dist_dataloader(Path(tmpdirname), 3, 0, True, True)
+        test_dist_dataloader(Path(tmpdirname), 3, 4, True, True)
+        test_dist_dataloader(Path(tmpdirname), 3, 0, True, False)
+        test_dist_dataloader(Path(tmpdirname), 3, 4, True, False)
         test_dataloader(Path(tmpdirname), 3, 4, 'node')
