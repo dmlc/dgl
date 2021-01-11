@@ -239,7 +239,9 @@ def check_partition(g, part_method, reshuffle):
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_partition():
     g = create_random_graph(10000)
+    check_partition(g, 'metis', False)
     check_partition(g, 'metis', True)
+    check_partition(g, 'random', False)
     check_partition(g, 'random', True)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
@@ -251,5 +253,5 @@ def test_hetero_partition():
 
 if __name__ == '__main__':
     os.makedirs('/tmp/partition', exist_ok=True)
-    test_hetero_partition()
     test_partition()
+    test_hetero_partition()
