@@ -63,7 +63,7 @@ def check_rpc_sampling(tmpdir, num_server):
     num_hops = 1
 
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
-                    num_hops=num_hops, part_method='metis', reshuffle=True)
+                    num_hops=num_hops, part_method='metis', reshuffle=False)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -291,12 +291,12 @@ def test_rpc_sampling_shuffle(num_server):
         check_rpc_sampling_shuffle(Path(tmpdirname), num_server)
         check_rpc_hetero_sampling_shuffle(Path(tmpdirname), num_server)
 
-def check_standalone_sampling(tmpdir):
+def check_standalone_sampling(tmpdir, reshuffle):
     g = CitationGraphDataset("cora")[0]
     num_parts = 1
     num_hops = 1
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
-                    num_hops=num_hops, part_method='metis', reshuffle=True)
+                    num_hops=num_hops, part_method='metis', reshuffle=reshuffle)
 
     os.environ['DGL_DIST_MODE'] = 'standalone'
     dgl.distributed.initialize("rpc_ip_config.txt", 1)
@@ -317,7 +317,8 @@ def test_standalone_sampling():
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'standalone'
     with tempfile.TemporaryDirectory() as tmpdirname:
-        check_standalone_sampling(Path(tmpdirname))
+        check_standalone_sampling(Path(tmpdirname), False)
+        check_standalone_sampling(Path(tmpdirname), True)
 
 def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
     gpb = None
@@ -395,8 +396,11 @@ if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ['DGL_DIST_MODE'] = 'standalone'
-        check_standalone_sampling(Path(tmpdirname))
+        check_standalone_sampling(Path(tmpdirname), True)
+        check_standalone_sampling(Path(tmpdirname), False)
         os.environ['DGL_DIST_MODE'] = 'distributed'
+        check_rpc_sampling(Path(tmpdirname), 2)
+        check_rpc_sampling(Path(tmpdirname), 1)
         check_rpc_find_edges_shuffle(Path(tmpdirname), 2)
         check_rpc_find_edges_shuffle(Path(tmpdirname), 1)
         check_rpc_in_subgraph_shuffle(Path(tmpdirname), 2)
@@ -404,5 +408,3 @@ if __name__ == "__main__":
         check_rpc_sampling_shuffle(Path(tmpdirname), 2)
         check_rpc_hetero_sampling_shuffle(Path(tmpdirname), 1)
         check_rpc_hetero_sampling_shuffle(Path(tmpdirname), 2)
-        #check_rpc_sampling(Path(tmpdirname), 2)
-        #check_rpc_sampling(Path(tmpdirname), 1)

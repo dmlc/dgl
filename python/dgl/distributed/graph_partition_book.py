@@ -91,7 +91,7 @@ def get_shared_mem_partition_book(graph_name, graph_part):
             edge_map[etype] = eid_range
         return RangePartitionBook(part_id, num_parts, node_map, edge_map, ntypes, etypes)
     else:
-        return BasicPartitionBook(part_id, num_parts, node_map, edge_map, graph_part)
+        return BasicPartitionBook(part_id, num_parts, node_map_data, edge_map_data, graph_part)
 
 class GraphPartitionBook:
     """ The base class of the graph partition book.

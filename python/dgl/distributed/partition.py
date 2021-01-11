@@ -392,6 +392,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         parts = {}
         if reshuffle:
             parts[0], _ = reshuffle_graph(sim_g)
+        else:
+            parts[0] = sim_g
         if NID not in parts[0].ndata:
             parts[0].ndata[NID] = F.arange(0, sim_g.number_of_nodes())
         if EID not in parts[0].edata:
