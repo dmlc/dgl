@@ -44,7 +44,7 @@ def argument():
     
     # check cuda
     if args.gpu != -1 and th.cuda.is_available():
-        args.device = 'cuda:%s'%args.gpu
+        args.device = 'cuda:{}'.format(args.gpu)
     else:
         args.device = 'cpu'
 
