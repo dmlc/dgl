@@ -556,7 +556,11 @@ def node_type_subgraph(graph, ntypes):
     induced_etypes = [graph._etypes[i] for i in etype_ids]   # get the "name" of edge type
     num_nodes_per_induced_type = [graph.number_of_nodes(ntype) for ntype in ntypes]
 
-    metagraph = graph_index.from_edge_list((mapped_meta_src, mapped_meta_dst), True)
+    if len(mapped_meta_src) == 0:
+        # Handle the case with no edges
+        metagraph = graph_index.from_coo(len(ntypes), [], [], True)
+    else:
+        metagraph = graph_index.from_edge_list((mapped_meta_src, mapped_meta_dst), True)
     # num_nodes_per_type should be int64
     hgidx = heterograph_index.create_heterograph_from_relations(
         metagraph, rel_graphs, utils.toindex(num_nodes_per_induced_type, "int64"))
