@@ -53,6 +53,9 @@ class IdMap:
         '''
         if self.num_types == 0:
             return F.zeros((len(ids),), F.dtype(ids), F.cpu()), ids
+        if len(ids) == 0:
+            return ids, ids
+
         ids = utils.toindex(ids)
         ret = _CAPI_DGLHeteroMapIds(ids.todgltensor(),
                                     self.range_start.todgltensor(),

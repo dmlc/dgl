@@ -59,7 +59,8 @@ def _sample_neighbors(local_g, partition_book, seed_nodes, fan_out, edge_dir, pr
         local_g, local_ids, fan_out, edge_dir, prob, replace, _dist_training=True)
     global_nid_mapping = local_g.ndata[NID]
     src, dst = sampled_graph.edges()
-    global_src, global_dst = global_nid_mapping[src], global_nid_mapping[dst]
+    global_src, global_dst = F.gather_row(global_nid_mapping, src), \
+            F.gather_row(global_nid_mapping, dst)
     global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
     return global_src, global_dst, global_eids
 
@@ -328,8 +329,9 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         for etype in g.canonical_etypes:
             etype_id = g.get_etype_id(etype[1])
             edge_idx = eid_type == etype_id
-            subg_edges[etype] = (src_per_type_id[edge_idx], dst_per_type_id[edge_idx],
-                                 eid_per_type_id[edge_idx])
+            subg_edges[etype] = (F.boolean_mask(src_per_type_id, edge_idx),
+                                 F.boolean_mask(dst_per_type_id, edge_idx),
+                                 F.boolean_mask(eid_per_type_id, edge_idx))
         num_nodes = {ntype:g.number_of_nodes(ntype) for ntype in g.ntypes}
         subg = heterograph(subg_edges, num_nodes_dict=num_nodes)
     return subg

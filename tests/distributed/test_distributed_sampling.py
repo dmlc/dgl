@@ -242,13 +242,13 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
     orig_eid_map = F.zeros((g.number_of_edges(),), dtype=F.int64)
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_sampling.json', i)
-        orig_nid_map[part.ndata[dgl.NID]] = part.ndata['orig_id']
-        orig_eid_map[part.edata[dgl.EID]] = part.edata['orig_id']
+        F.scatter_row_inplace(orig_nid_map, part.ndata[dgl.NID], part.ndata['orig_id'])
+        F.scatter_row_inplace(orig_eid_map, part.edata[dgl.EID], part.edata['orig_id'])
 
     src, dst = block.edges()
     # These are global Ids after shuffling.
-    shuffled_src = block.srcdata[dgl.NID][src]
-    shuffled_dst = block.dstdata[dgl.NID][dst]
+    shuffled_src = F.gather_row(block.srcdata[dgl.NID], src)
+    shuffled_dst = F.gather_row(block.dstdata[dgl.NID], dst)
     shuffled_eid = block.edata[dgl.EID]
     # Get node/edge types.
     etype, _ = gpb.map_to_per_etype(shuffled_eid)
@@ -258,9 +258,9 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
     src_type = F.asnumpy(src_type)
     dst_type = F.asnumpy(dst_type)
     # These are global Ids in the original graph.
-    orig_src = F.asnumpy(orig_nid_map[shuffled_src])
-    orig_dst = F.asnumpy(orig_nid_map[shuffled_dst])
-    orig_eid = F.asnumpy(orig_eid_map[shuffled_eid])
+    orig_src = F.asnumpy(F.gather_row(orig_nid_map, shuffled_src))
+    orig_dst = F.asnumpy(F.gather_row(orig_nid_map, shuffled_dst))
+    orig_eid = F.asnumpy(F.gather_row(orig_eid_map, shuffled_eid))
 
     etype_map = {g.get_etype_id(etype):etype for etype in g.etypes}
     etype_to_eptype = {g.get_etype_id(etype):(src_ntype, dst_ntype) for src_ntype, etype, dst_ntype in g.canonical_etypes}
