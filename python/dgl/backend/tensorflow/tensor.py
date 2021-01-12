@@ -259,7 +259,7 @@ def stack(seq, dim):
 
 
 def split(input, sizes_or_sections, dim):
-    return tf.split(input, sizes_or_sections, axis=dim)
+    return [copy_to(_, input.device) for _ in tf.split(input, sizes_or_sections, axis=dim)]
 
 
 def repeat(input, repeats, dim):
