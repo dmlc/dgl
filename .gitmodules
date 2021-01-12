@@ -26,3 +26,6 @@
 [submodule "third_party/xbyak"]
 	path = third_party/xbyak
 	url = https://github.com/herumi/xbyak
+[submodule "third_party/tvm"]
+	path = third_party/tvm
+	url = https://github.com/apache/incubator-tvm

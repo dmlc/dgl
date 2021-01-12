@@ -1,7 +1,7 @@
 """DGL PyTorch DataLoaders"""
 import inspect
 from torch.utils.data import DataLoader
-from ..dataloader import NodeCollator, EdgeCollator
+from ..dataloader import NodeCollator, EdgeCollator, GraphCollator
 from ...distributed import DistGraph
 from ...distributed import DistDataLoader
 
@@ -118,23 +118,26 @@ def _restore_blocks_storage(blocks, g):
 
 class _NodeCollator(NodeCollator):
     def collate(self, items):
-        input_nodes, output_nodes, blocks = super().collate(items)
-        _pop_blocks_storage(blocks, self.g)
-        return input_nodes, output_nodes, blocks
+        # input_nodes, output_nodes, [items], blocks
+        result = super().collate(items)
+        _pop_blocks_storage(result[-1], self.g)
+        return result
 
 class _EdgeCollator(EdgeCollator):
     def collate(self, items):
         if self.negative_sampler is None:
-            input_nodes, pair_graph, blocks = super().collate(items)
-            _pop_subgraph_storage(pair_graph, self.g)
-            _pop_blocks_storage(blocks, self.g_sampling)
-            return input_nodes, pair_graph, blocks
+            # input_nodes, pair_graph, [items], blocks
+            result = super().collate(items)
+            _pop_subgraph_storage(result[1], self.g)
+            _pop_blocks_storage(result[-1], self.g_sampling)
+            return result
         else:
-            input_nodes, pair_graph, neg_pair_graph, blocks = super().collate(items)
-            _pop_subgraph_storage(pair_graph, self.g)
-            _pop_subgraph_storage(neg_pair_graph, self.g)
-            _pop_blocks_storage(blocks, self.g_sampling)
-            return input_nodes, pair_graph, neg_pair_graph, blocks
+            # input_nodes, pair_graph, neg_pair_graph, [items], blocks
+            result = super().collate(items)
+            _pop_subgraph_storage(result[1], self.g)
+            _pop_subgraph_storage(result[2], self.g)
+            _pop_blocks_storage(result[-1], self.g_sampling)
+            return result
 
 class _NodeDataLoaderIter:
     def __init__(self, node_dataloader):
@@ -142,9 +145,10 @@ class _NodeDataLoaderIter:
         self.iter_ = iter(node_dataloader.dataloader)
 
     def __next__(self):
-        input_nodes, output_nodes, blocks = next(self.iter_)
-        _restore_blocks_storage(blocks, self.node_dataloader.collator.g)
-        return input_nodes, output_nodes, blocks
+        # input_nodes, output_nodes, [items], blocks
+        result = next(self.iter_)
+        _restore_blocks_storage(result[-1], self.node_dataloader.collator.g)
+        return result
 
 class _EdgeDataLoaderIter:
     def __init__(self, edge_dataloader):
@@ -153,16 +157,18 @@ class _EdgeDataLoaderIter:
 
     def __next__(self):
         if self.edge_dataloader.collator.negative_sampler is None:
-            input_nodes, pair_graph, blocks = next(self.iter_)
-            _restore_subgraph_storage(pair_graph, self.edge_dataloader.collator.g)
-            _restore_blocks_storage(blocks, self.edge_dataloader.collator.g_sampling)
-            return input_nodes, pair_graph, blocks
+            # input_nodes, pair_graph, [items], blocks
+            result = next(self.iter_)
+            _restore_subgraph_storage(result[1], self.edge_dataloader.collator.g)
+            _restore_blocks_storage(result[-1], self.edge_dataloader.collator.g_sampling)
+            return result
         else:
-            input_nodes, pair_graph, neg_pair_graph, blocks = next(self.iter_)
-            _restore_subgraph_storage(pair_graph, self.edge_dataloader.collator.g)
-            _restore_subgraph_storage(neg_pair_graph, self.edge_dataloader.collator.g)
-            _restore_blocks_storage(blocks, self.edge_dataloader.collator.g_sampling)
-            return input_nodes, pair_graph, neg_pair_graph, blocks
+            # input_nodes, pair_graph, neg_pair_graph, [items], blocks
+            result = next(self.iter_)
+            _restore_subgraph_storage(result[1], self.edge_dataloader.collator.g)
+            _restore_subgraph_storage(result[2], self.edge_dataloader.collator.g)
+            _restore_blocks_storage(result[-1], self.edge_dataloader.collator.g_sampling)
+            return result
 
 class NodeDataLoader:
     """PyTorch dataloader for batch-iterating over a set of nodes, generating the list
@@ -410,6 +416,56 @@ class EdgeDataLoader:
     def __iter__(self):
         """Return the iterator of the data loader."""
         return _EdgeDataLoaderIter(self)
+
+    def __len__(self):
+        """Return the number of batches of the data loader."""
+        return len(self.dataloader)
+
+class GraphDataLoader:
+    """PyTorch dataloader for batch-iterating over a set of graphs, generating the batched
+    graph and corresponding label tensor (if provided) of the said minibatch.
+
+    Parameters
+    ----------
+    collate_fn : Function, default is None
+        The customized collate function. Will use the default collate
+        function if not given.
+    kwargs : dict
+        Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
+
+    Examples
+    --------
+    To train a GNN for graph classification on a set of graphs in ``dataset`` (assume
+    the backend is PyTorch):
+
+    >>> dataloader = dgl.dataloading.GraphDataLoader(
+    ...     dataset, batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for batched_graph, labels in dataloader:
+    ...     train_on(batched_graph, labels)
+    """
+    collator_arglist = inspect.getfullargspec(GraphCollator).args
+
+    def __init__(self, dataset, collate_fn=None, **kwargs):
+        collator_kwargs = {}
+        dataloader_kwargs = {}
+        for k, v in kwargs.items():
+            if k in self.collator_arglist:
+                collator_kwargs[k] = v
+            else:
+                dataloader_kwargs[k] = v
+
+        if collate_fn is None:
+            self.collate = GraphCollator(**collator_kwargs).collate
+        else:
+            self.collate = collate_fn
+
+        self.dataloader = DataLoader(dataset=dataset,
+                                     collate_fn=self.collate,
+                                     **dataloader_kwargs)
+
+    def __iter__(self):
+        """Return the iterator of the data loader."""
+        return iter(self.dataloader)
 
     def __len__(self):
         """Return the number of batches of the data loader."""

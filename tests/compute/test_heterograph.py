@@ -1082,6 +1082,36 @@ def test_convert(idtype):
     assert g.number_of_nodes() == 5
 
 @parametrize_dtype
+def test_to_homo2(idtype):
+    # test the result homogeneous graph has nodes and edges sorted by their types
+    hg = create_test_heterograph(idtype)
+    g = dgl.to_homogeneous(hg)
+    ntypes = F.asnumpy(g.ndata[dgl.NTYPE])
+    etypes = F.asnumpy(g.edata[dgl.ETYPE])
+    p = 0
+    for tid, ntype in enumerate(hg.ntypes):
+        num_nodes = hg.num_nodes(ntype)
+        for i in range(p, p + num_nodes):
+            assert ntypes[i] == tid
+        p += num_nodes
+    p = 0
+    for tid, etype in enumerate(hg.canonical_etypes):
+        num_edges = hg.num_edges(etype)
+        for i in range(p, p + num_edges):
+            assert etypes[i] == tid
+        p += num_edges
+    # test store_type=False
+    g = dgl.to_homogeneous(hg, store_type=False)
+    assert dgl.NTYPE not in g.ndata
+    assert dgl.ETYPE not in g.edata
+    # test return_count=True
+    g, ntype_count, etype_count = dgl.to_homogeneous(hg, return_count=True)
+    for i, count in enumerate(ntype_count):
+        assert count == hg.num_nodes(hg.ntypes[i])
+    for i, count in enumerate(etype_count):
+        assert count == hg.num_edges(hg.canonical_etypes[i])
+
+@parametrize_dtype
 def test_metagraph_reachable(idtype):
     g = create_test_heterograph(idtype)
     x = F.randn((3, 5))

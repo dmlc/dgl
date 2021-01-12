@@ -82,21 +82,14 @@ DGL建议让 ``__getitem__(idx)`` 返回如上面代码所示的元组 ``(图，
     import dgl
     import torch
 
-    from torch.utils.data import DataLoader
+    from dgl.dataloading import GraphDataLoader
     
     # 数据导入
     dataset = QM7bDataset()
     num_labels = dataset.num_labels
     
-    # 创建collate_fn函数
-    def _collate_fn(batch):
-        graphs, labels = batch
-        g = dgl.batch(graphs)
-        labels = torch.tensor(labels, dtype=torch.long)
-        return g, labels
-    
     # 创建 dataloaders
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=_collate_fn)
+    dataloader = GraphDataLoader(dataset, batch_size=1, shuffle=True)
     
     # 训练
     for epoch in range(100):
@@ -286,7 +279,7 @@ DGL建议使用节点掩码来指定数据集的划分。
     
     # 获取训练集掩码
     train_mask = graph.edata['train_mask']
-    train_idx = torch.nonzero(train_mask).squeeze()
+    train_idx = torch.nonzero(train_mask, as_tuple=False).squeeze()
     src, dst = graph.edges(train_idx)
 
     # 获取训练集中的边类型

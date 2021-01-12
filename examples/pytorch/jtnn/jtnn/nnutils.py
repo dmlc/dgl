@@ -8,7 +8,7 @@ def cuda(x):
     if torch.cuda.is_available() and not os.getenv('NOCUDA', None):
         return x.to(torch.device('cuda'))   # works for both DGLGraph and tensor
     else:
-        return tensor
+        return x
 
 
 class GRUUpdate(nn.Module):

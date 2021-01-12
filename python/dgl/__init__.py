@@ -9,8 +9,7 @@ and transforming graphs.
 # This initializes Winsock and performs cleanup at termination as required
 import socket
 
-# Need to ensure that the backend framework is imported before load dgl libs,
-# otherwise weird cuda problem happens
+# Should import backend before importing anything else
 from .backend import load_backend, backend_name
 
 from . import function

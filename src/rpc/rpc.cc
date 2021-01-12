@@ -15,6 +15,7 @@
 #include <dgl/array.h>
 #include <dgl/random.h>
 #include <dgl/zerocopy_serializer.h>
+#include "../runtime/resource_manager.h"
 #include "../c_api_common.h"
 
 using dgl::network::StringPrintf;
@@ -321,22 +322,24 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetTensors")
 
 #if defined(__linux__)
 /*!
- * \brief CtrlCHandler, exits if Ctrl+C is pressed
+ * \brief The signal handler.
  * \param s signal
  */
-void CtrlCHandler(int s) {
+void SigHandler(int s) {
   LOG(INFO) << "\nUser pressed Ctrl+C, Exiting";
+  CleanupResources();
   exit(1);
 }
 
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCHandleCtrlC")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCHandleSignal")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   // Ctrl+C handler
-  struct sigaction sigIntHandler;
-  sigIntHandler.sa_handler = CtrlCHandler;
-  sigemptyset(&sigIntHandler.sa_mask);
-  sigIntHandler.sa_flags = 0;
-  sigaction(SIGINT, &sigIntHandler, nullptr);
+  struct sigaction sigHandler;
+  sigHandler.sa_handler = SigHandler;
+  sigemptyset(&sigHandler.sa_mask);
+  sigHandler.sa_flags = 0;
+  sigaction(SIGINT, &sigHandler, nullptr);
+  sigaction(SIGTERM, &sigHandler, nullptr);
 });
 #endif
 
