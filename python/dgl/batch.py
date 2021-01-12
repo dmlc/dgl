@@ -11,7 +11,7 @@ from . import utils
 
 __all__ = ['batch', 'unbatch', 'batch_hetero', 'unbatch_hetero']
 
-def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
+def batch(graphs, ndata=ALL, edata=ALL, include_empty_data=False, *, node_attrs=None, edge_attrs=None):
     r"""Batch a collection of :class:`DGLGraph` s into one graph for more efficient
     graph computation.
 
@@ -61,6 +61,8 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
         Node features to batch.
     edata : list[str], None, optional
         Edge features to batch.
+    include_empty_data : bool, optional
+        Whether to copy the frame of an ntype and etype, even when no nodes or edges of that type exist.
 
     Returns
     -------
@@ -193,7 +195,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
         for ntype_id, ntype in zip(ntype_ids, ntypes):
             frames = [
                 g._node_frames[ntype_id] for g in graphs
-                if g._graph.number_of_nodes(ntype_id) > 0]
+                if g._graph.number_of_nodes(ntype_id) > 0 or include_empty_data]
             # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently
             # we allow empty graphs to have no features during batching.
             ret_feat = _batch_feat_dicts(frames, ndata, 'nodes["{}"].data'.format(ntype))
@@ -204,7 +206,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
         for etype_id, etype in zip(relation_ids, relations):
             frames = [
                 g._edge_frames[etype_id] for g in graphs
-                if g._graph.number_of_edges(etype_id) > 0]
+                if g._graph.number_of_edges(etype_id) > 0 or include_empty_data]
             # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently
             # we allow empty graphs to have no features during batching.
             ret_feat = _batch_feat_dicts(frames, edata, 'edges[{}].data'.format(etype))
