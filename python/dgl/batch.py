@@ -11,7 +11,7 @@ from . import utils
 
 __all__ = ['batch', 'unbatch', 'batch_hetero', 'unbatch_hetero']
 
-def batch(graphs, ndata=ALL, edata=ALL, include_empty_data=False, *, 
+def batch(graphs, ndata=ALL, edata=ALL, include_empty_data=False, *,
           node_attrs=None, edge_attrs=None):
     r"""Batch a collection of :class:`DGLGraph` s into one graph for more efficient
     graph computation.
