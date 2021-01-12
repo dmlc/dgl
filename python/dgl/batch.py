@@ -11,7 +11,8 @@ from . import utils
 
 __all__ = ['batch', 'unbatch', 'batch_hetero', 'unbatch_hetero']
 
-def batch(graphs, ndata=ALL, edata=ALL, include_empty_data=False, *, node_attrs=None, edge_attrs=None):
+def batch(graphs, ndata=ALL, edata=ALL, include_empty_data=False, *, 
+          node_attrs=None, edge_attrs=None):
     r"""Batch a collection of :class:`DGLGraph` s into one graph for more efficient
     graph computation.
 
@@ -62,7 +63,7 @@ def batch(graphs, ndata=ALL, edata=ALL, include_empty_data=False, *, node_attrs=
     edata : list[str], None, optional
         Edge features to batch.
     include_empty_data : bool, optional
-        Whether to copy the frame of an ntype and etype, even when no nodes or edges of that type exist.
+        Whether to copy a frame even if no nodes or edges exist for it.
 
     Returns
     -------
