@@ -12,7 +12,7 @@ def batcher(device):
                         label=batch_graphs.ndata['label'].to(device))
     return batcher_dev
 
-
+#add a fresh "self-loop" edge type to the untyped PPI dataset and prepare train, val, test loaders
 def load_PPI(batch_size=1, device='cpu'):
     train_set = PPIDataset(mode='train')
     valid_set = PPIDataset(mode='valid')

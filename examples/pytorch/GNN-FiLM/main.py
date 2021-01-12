@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl
 import dgl.function as fn
-from utils import *
-from data_loader import *
+from utils import evaluate_f1_score
+from data_loader import load_PPI
 import argparse
 import numpy as np
 import os
@@ -174,7 +174,7 @@ if __name__ == '__main__':
     parser.add_argument("--out_size", type=int, default=121, help="Output dimensionalities")
     parser.add_argument("--num_layers", type=int, default=4, help="Number of GNN layers")
     parser.add_argument("--batch_size", type=int, default=5, help="Batch size")
-    parser.add_argument("--max_epoch", type=int, default=10000, help="The max number of epoches. Default: 500")
+    parser.add_argument("--max_epoch", type=int, default=1500, help="The max number of epoches. Default: 500")
     parser.add_argument("--early_stopping", type=int, default=80, help="Early stopping. Default: 50")
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate. Default: 3e-1")
     parser.add_argument("--wd", type=float, default=0.0009, help="Weight decay. Default: 3e-1")
