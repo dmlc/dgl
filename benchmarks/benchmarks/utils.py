@@ -52,7 +52,6 @@ def get_graph(name, format):
     return g
 
 
-
 def get_livejournal():
     # Same as https://snap.stanford.edu/data/soc-LiveJournal1.txt.gz
     _download('https://dgl-asv-data.s3-us-west-2.amazonaws.com/dataset/livejournal/soc-LiveJournal1.txt.gz',
@@ -402,6 +401,9 @@ class TestFilter:
             return False
 
 
+filter = TestFilter()
+
+
 device = os.environ.get('DGL_BENCH_DEVICE', 'cpu')
 
 if device == "cpu":
@@ -414,8 +416,6 @@ else:
     raise Exception("Unknown device")
 
 
-filter = TestFilter()
-
 def skip_if_gpu():
     """skip if DGL_BENCH_DEVICE is gpu
     """
@@ -427,6 +427,7 @@ def skip_if_gpu():
             func.benchmark_name = "skip_" + func.__name__
         return func
     return _wrapper
+
 
 def benchmark(track_type, timeout=60):
     """Decorator for indicating the benchmark type.
