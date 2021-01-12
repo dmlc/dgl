@@ -83,7 +83,7 @@ void COOSort_(COOMatrix* coo, bool sort_column) {
         coo->row.Ptr<IdType>(), coo->col.Ptr<IdType>(),
         nnz, col_bits, pos.Ptr<IdType>());
 
-    const auto& sorted = Sort(pos, num_bits);
+    auto sorted = Sort(pos, num_bits);
 
     CUDA_KERNEL_CALL(_COOSeparateEdgesKernel, nb, nt, 0, thr_entry->stream,
         sorted.first.Ptr<IdType>(), nnz, col_bits,
@@ -97,7 +97,7 @@ void COOSort_(COOMatrix* coo, bool sort_column) {
   } else {
     const int num_bits = row_bits;
 
-    const auto& sorted = Sort(coo->row, num_bits);
+    auto sorted = Sort(coo->row, num_bits);
 
     coo->row = sorted.first;
     coo->col = IndexSelect(coo->col, sorted.second);
