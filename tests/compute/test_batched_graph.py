@@ -213,7 +213,7 @@ def test_batch_keeps_empty_data(idtype):
     g1.ndata["nh"] = F.tensor([])
     g1.edata["eh"] = F.tensor([]) 
     g2 = dgl.graph(([], [])).astype(idtype).to(F.ctx())
-    g2.ndata["h"] = F.tensor([])
+    g2.ndata["nh"] = F.tensor([])
     g2.edata["eh"] = F.tensor([]) 
     g = dgl.batch([g1, g2], include_empty_data = True)
     assert "nh" in g.ndata
