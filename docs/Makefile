@@ -29,12 +29,20 @@ pytorch:
 	@echo "##################################################################"
 	@DGLBACKEND=pytorch DGL_LOADALL=true $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) 
 
+tensorflow:
+	@echo "##################################################################"
+	@echo "#                                                                #"
+	@echo "#                Step 3: Building Tensorflow tutorials           #"
+	@echo "#                                                                #"
+	@echo "##################################################################"
+	@DGLBACKEND=tensorflow DGL_LOADALL=true $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) 
+
 html-noexec:
 	DGL_LOADALL=true $(SPHINXBUILD) -D plot_gallery=0 -b html "$(SOURCEDIR)" "$(BUILDDIR)/html" 
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
-html: Makefile mxnet pytorch
+html: Makefile mxnet pytorch tensorflow
 
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
