@@ -60,16 +60,16 @@ class SharedMemory {
   /*
    * \brief create shared memory.
    * It creates the file and shared memory.
-   * \param size the size of the shared memory.
+   * \param sz the size of the shared memory.
    * \return the address of the shared memory
    */
-  void *CreateNew(size_t size);
+  void *CreateNew(size_t sz);
   /*
    * \brief allocate shared memory that has been created.
-   * \param size the size of the shared memory.
+   * \param sz the size of the shared memory.
    * \return the address of the shared memory
    */
-  void *Open(size_t size);
+  void *Open(size_t sz);
 
   /*
    * \brief check if the shared memory exist.

@@ -52,11 +52,11 @@ SharedMemory::SharedMemory(const std::string &name) {
 
 SharedMemory::~SharedMemory() {
 #ifndef _WIN32
-  munmap(ptr, size);
+  CHECK(munmap(ptr, size) != -1) << strerror(errno);
   close(fd);
   if (own) {
     LOG(INFO) << "remove " << name << " for shared memory";
-    shm_unlink(name.c_str());
+    CHECK(shm_unlink(name.c_str()) != -1) << strerror(errno);
     // The resource has been deleted. We don't need to keep track of it any more.
     DeleteResource(name);
   }
@@ -65,7 +65,7 @@ SharedMemory::~SharedMemory() {
 #endif  // _WIN32
 }
 
-void *SharedMemory::CreateNew(size_t size) {
+void *SharedMemory::CreateNew(size_t sz) {
 #ifndef _WIN32
   this->own = true;
 
@@ -76,26 +76,28 @@ void *SharedMemory::CreateNew(size_t size) {
   CHECK_NE(fd, -1) << "fail to open " << name << ": " << strerror(errno);
   // Shared memory cannot be deleted if the process exits abnormally.
   AddResource(name, std::shared_ptr<Resource>(new SharedMemoryResource(name)));
-  auto res = ftruncate(fd, size);
+  auto res = ftruncate(fd, sz);
   CHECK_NE(res, -1)
       << "Failed to truncate the file. " << strerror(errno);
-  ptr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+  ptr = mmap(NULL, sz, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
   CHECK_NE(ptr, MAP_FAILED)
       << "Failed to map shared memory. mmap failed with error " << strerror(errno);
+  this->size = sz;
   return ptr;
 #else
   LOG(FATAL) << "Shared memory is not supported on Windows.";
 #endif  // _WIN32
 }
 
-void *SharedMemory::Open(size_t size) {
+void *SharedMemory::Open(size_t sz) {
 #ifndef _WIN32
   int flag = O_RDWR;
   fd = shm_open(name.c_str(), flag, S_IRUSR | S_IWUSR);
   CHECK_NE(fd, -1) << "fail to open " << name << ": " << strerror(errno);
-  ptr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+  ptr = mmap(NULL, sz, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
   CHECK_NE(ptr, MAP_FAILED)
       << "Failed to map shared memory. mmap failed with error " << strerror(errno);
+  this->size = sz;
   return ptr;
 #else
   LOG(FATAL) << "Shared memory is not supported on Windows.";
