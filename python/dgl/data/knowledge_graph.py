@@ -464,7 +464,7 @@ class FB15k237Dataset(KnowledgeGraphDataset):
 
     def __len__(self):
         r"""The number of graphs in the dataset."""
-        return super(FB15k237Dataset, self).__len__(idx)
+        return super(FB15k237Dataset, self).__len__()
 
 class FB15kDataset(KnowledgeGraphDataset):
     r"""FB15k link prediction dataset.
@@ -601,7 +601,7 @@ class FB15kDataset(KnowledgeGraphDataset):
 
     def __len__(self):
         r"""The number of graphs in the dataset."""
-        return super(FB15kDataset, self).__len__(idx)
+        return super(FB15kDataset, self).__len__()
 
 class WN18Dataset(KnowledgeGraphDataset):
     r""" WN18 link prediction dataset.
@@ -737,7 +737,7 @@ class WN18Dataset(KnowledgeGraphDataset):
 
     def __len__(self):
         r"""The number of graphs in the dataset."""
-        return super(WN18Dataset, self).__len__(idx)
+        return super(WN18Dataset, self).__len__()
 
 def load_data(dataset):
     r"""Load knowledge graph dataset for RGCN link prediction tasks

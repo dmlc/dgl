@@ -1,6 +1,4 @@
-import os
 import backend as F
-import networkx as nx
 import numpy as np
 import dgl
 from test_utils import parametrize_dtype
@@ -18,6 +16,8 @@ def test_node_removal(idtype):
     g.remove_nodes(range(4, 7))
     assert g.number_of_nodes() == 7
     assert F.array_equal(g.ndata['id'], F.tensor([0, 1, 2, 3, 7, 8, 9]))
+    assert dgl.NID not in g.ndata
+    assert dgl.EID not in g.edata
 
     # add nodes
     g.add_nodes(3)
@@ -25,9 +25,11 @@ def test_node_removal(idtype):
     assert F.array_equal(g.ndata['id'], F.tensor([0, 1, 2, 3, 7, 8, 9, 0, 0, 0]))
 
     # remove nodes
-    g.remove_nodes(range(1, 4))
+    g.remove_nodes(range(1, 4), store_ids=True)
     assert g.number_of_nodes() == 7
     assert F.array_equal(g.ndata['id'], F.tensor([0, 7, 8, 9, 0, 0, 0]))
+    assert dgl.NID in g.ndata
+    assert dgl.EID in g.edata
 
 @parametrize_dtype
 def test_multigraph_node_removal(idtype):
@@ -99,6 +101,8 @@ def test_edge_removal(idtype):
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 18
     assert F.array_equal(g.edata['id'], F.tensor(list(range(13)) + list(range(20, 25))))
+    assert dgl.NID not in g.ndata
+    assert dgl.EID not in g.edata
 
     # add edges
     g.add_edge(3, 3)
@@ -107,10 +111,12 @@ def test_edge_removal(idtype):
     assert F.array_equal(g.edata['id'], F.tensor(list(range(13)) + list(range(20, 25)) + [0]))
 
     # remove edges
-    g.remove_edges(range(2, 10))
+    g.remove_edges(range(2, 10), store_ids=True)
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 11
     assert F.array_equal(g.edata['id'], F.tensor([0, 1, 10, 11, 12, 20, 21, 22, 23, 24, 0]))
+    assert dgl.NID in g.ndata
+    assert dgl.EID in g.edata
 
 @parametrize_dtype
 def test_node_and_edge_removal(idtype):
