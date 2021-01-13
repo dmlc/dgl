@@ -151,6 +151,7 @@ def gsddmm(binary_op,
         raise NotImplementedError('CPU schedule not implemented yet.')
 
     # prepare input
+    f_input = []
     f_input.append(row)
     f_input.append(col)
     f_name = '_'.join(str(x) for x in [

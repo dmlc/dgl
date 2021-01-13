@@ -233,7 +233,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_FG_LoadModule")
     dgl::featgraph::LoadFeatGraphModule(path);
   });
 
-DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SDDMMTreeReduction")
+DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SDDMM")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef graph = args[0];
     NDArray lhs = args[1];
@@ -251,9 +251,46 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SDDMMTreeReduction")
     //     {lhs, rhs, out},
     //     {"U_data", "E_data", "V_data"});
     COOMatrix coo = graph.sptr()->GetCOOMatrix(0);
-    dgl::featgraph::SDDMMTreeReduction(coo.row.ToDLPack(), coo.col.ToDLPack(),
-                                       lhs.ToDLPack(), rhs.ToDLPack(), out.ToDLPack());
+    dgl::featgraph::SDDMM(coo.row.ToDLPack(), coo.col.ToDLPack(),
+                          lhs.ToDLPack(), rhs.ToDLPack(), out.ToDLPack());
   });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SPMM")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef graph = args[0];
+    NDArray ufeat = args[1];
+    NDArray efeat = args[2];
+    NDArray out = args[3];
+    NDArray argu = args[4];
+    NDArray arge = args[5];
+    CheckCtx(graph->Context(), {ufeat, efeat, out}, {"ufeat", "efeat", "out"});
+    CheckContiguous({ufeat, efeat, out}, {"ufeat", "efeat", "out"});
+    CHECK_EQ(graph->NumEdgeTypes(), 1);
+    CSRMatrix csc = graph.sptr()->GetCSCMatrix(0);
+    dgl::featgraph::SPMM(csc.indptr.ToDLPack(), csc.indices.ToDLPack(),
+                         ufeat.ToDLPack(), efeat.ToDLPack(),
+                         out.ToDLPack(), argu.ToDLPack(), arge.ToDLPack());
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SegmentReduce")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const std::string op = args[0];
+    NDArray x = args[1];
+    NDArray offsets = args[2];
+    NDArray out = args[3];
+    // TODO(zihao)
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SegmentBwd")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    // TODO(zihao)
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SegmentGEMM")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    // TODO(zihao)
+  });
+
 #endif  // USE_TVM
 
 

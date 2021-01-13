@@ -46,37 +46,33 @@ def _spmm(out_shp, binary_op, reduce_op,
 
 
 def _spmm_cuda_general(sched, out):
-    out_len = prod(out.shape[1:])
     node_axis = out.op.axis[0]
     feat_axis = sched[out].fuse(*out.op.axis[1:])
-    #ntx = tvm.autotvm.task.space.get_pow2s(out_len)[-1]
-    #ntx = 1024 if ntx > 1024 else ntx
-    ntx = 1024
-    feat_outer, feat_inner = sched[out].split(feat_axis, factor=ntx)
-    #nbx = 2**31 - 1 if out.shape[0] > 2**31 - 1 else out.shape[0]
-    #nbx = out.shape[0]
-    #node_outer, _ = sched[out].split(node_axis, nparts=nbx)
-    sched[out].bind(node_axis, te.thread_axis('blockIdx.x'))
+    feat_outer, feat_inner = sched[out].split(feat_axis, factor=32)
+    node_outer, node_inner = sched[out].split(node_axis, factor=32)
+    sched[out].bind(node_outer, te.thread_axis('blockIdx.x'))
     sched[out].bind(feat_outer, te.thread_axis('blockIdx.y'))
     sched[out].bind(feat_inner, te.thread_axis('threadIdx.x'))
+    sched[out].bind(node_inner, te.thread_axis('threadIdx.y'))
 
 
-def _spmm_cuda_tree_reduce(sched, out):
-    reduce_axis = out.op.reduce_axis[0]
+def _spmm_cuda_merge(sched, out):
     node_axis = out.op.axis[0]
     feat_axis = sched[out].fuse(*out.op.axis[1:])
-    _, red_inner = sched[out].split(reduce_axis, factor=32)
-    # TODO(zihao): the following line is problematic, will fix.
-    nbx = 2**31 - 1 if out.shape[0] > 2**31 - 1 else out.shape[0]
-    node_outer, _ = sched[out].split(node_axis, nparts=nbx)
-    sched[out].bind(red_inner, te.thread_axis('threadIdx.x'))
-    sched[out].bind(feat_axis, te.thread_axis('threadIdx.y'))
+    reduce_axis = out.op.reduce_axis[0]
+    node_outer, node_inner = sched[out].split(node_axis, factor=8)
+    feat_outer, feat_inner = sched[out].split(feat_axis, factor=32)
+    reduce_outer, reduce_inner = sched[out].split(reduce_axis, factor=32)
+    sched[out].unroll(reduce_inner)
+    sched[out].bind(feat_inner, te.thread_axis('threadIdx.x'))
+    sched[out].bind(feat_outer, te.thread_axis('blockIdx.y'))
     sched[out].bind(node_outer, te.thread_axis('blockIdx.x'))
-
+    sched[out].bind(node_inner, te.thread_axis('threadIdx.y'))
+    
 
 _gspmm_cuda_schedule = {
     'general': _spmm_cuda_general,
-    'tree': _spmm_cuda_tree_reduce
+    'merge': _spmm_cuda_merge
 }
 
 
