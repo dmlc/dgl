@@ -328,7 +328,7 @@ def test_rgcn():
     assert F.allclose(h_new, h_new_low)
 
     # with norm
-    norm = th.zeros((g.number_of_edges(), 1)).to(ctx)
+    norm = th.rand((g.number_of_edges(), 1)).to(ctx)
 
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
@@ -408,7 +408,7 @@ def test_rgcn_sorted():
     assert F.allclose(h_new, h_new_low)
 
     # with norm
-    norm = th.zeros((g.number_of_edges(), 1)).to(ctx)
+    norm = th.rand((g.number_of_edges(), 1)).to(ctx)
 
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
@@ -965,6 +965,7 @@ if __name__ == '__main__':
     test_simple_pool()
     test_set_trans()
     test_rgcn()
+    test_rgcn_sorted()
     test_tagconv()
     test_gat_conv()
     test_sage_conv()
