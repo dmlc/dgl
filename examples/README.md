@@ -38,6 +38,7 @@
 | [DeepWalk: Online Learning of Social Representations](#deepwalk) |                     | :heavy_check_mark:               |                           |                    | :heavy_check_mark: |
 | [Self-Attention Graph Pooling](#sagpool)                     |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Convolutional Networks on Graphs for Learning Molecular Fingerprints](#nf) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [GNN-FiLM: Graph Neural Networks with Feature-wise Linear Modulation](#gnnfilm) | :heavy_check_mark:  |                     |                     |                     |                     |
 
 ## 2020
 
@@ -56,6 +57,9 @@
 - <a name="prestrategy"></a> Hu et al. Strategies for Pre-training Graph Neural Networks. [Paper link](https://arxiv.org/abs/1905.12265).
     - Example code: [Molecule embedding](https://github.com/awslabs/dgl-lifesci/tree/master/examples/molecule_embeddings), [PyTorch for custom data](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/csv_data_configuration)
     - Tags: molecules, graph classification, unsupervised learning, self-supervised learning, molecular property prediction
+- <a name="GNN-FiLM"></a> Marc Brockschmidt. GNN-FiLM: Graph Neural Networks with Feature-wise Linear Modulation. [Paper link](https://arxiv.org/abs/1906.12192).
+    - Example code: [Pytorch](../examples/pytorch/GNN-FiLM)
+    - Tags: multi-relational graphs, hypernetworks, GNN architectures
 
 ## 2019
 
