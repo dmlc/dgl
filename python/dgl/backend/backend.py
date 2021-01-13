@@ -1600,41 +1600,8 @@ class no_grad(object):
     def __exit__(self, exc_type, exc_value, exc_traceback):
         pass
 
-class GraphSparseQueues(object):
-    """Queues for sparse embeddings metadata synchronization"""
-    def __init__(self):
-        pass
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        pass
-
-class GraphSparseEmbedding(object):
-    """Sparse embeddings for graph embedding"""
-    def __init__(self):
-        pass
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        pass
-
-class SparseAdagradOptimizer(object):
-    """Sparse Adagrad optimizer for GraphSparseEmbeddings"""
-    def __init__(self):
-        pass
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        pass
-
-class SparseAdamOptimizer(object):
-    """Sparse Adam optimizer for GraphSparseEmbeddings"""
+class NodeEmbedding(object):
+    """Sparse node embeddings"""
     def __init__(self):
         pass
 

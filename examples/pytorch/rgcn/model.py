@@ -51,8 +51,8 @@ class BaseRGCN(nn.Module):
         return h
 
 def initializer(emb):
-    nn.init.xavier_uniform_(emb)
-    #emb.uniform_(-1, 1)
+    #nn.init.xavier_uniform_(emb)
+    emb.uniform_(-1, 1)
     return emb
 
 class RelGraphEmbedLayer(nn.Module):
@@ -100,8 +100,8 @@ class RelGraphEmbedLayer(nn.Module):
         for ntype in range(num_of_ntype):
             if isinstance(input_size[ntype], int):
                 if dgl_sparse:
-                    self.node_embeds[str(ntype)] = dgl.GraphSparseEmbedding(input_size[ntype], embed_size, name=str(ntype),
-                        device=self.dev_id, init_func=initializer, group=group)
+                    self.node_embeds[str(ntype)] = dgl.NodeEmbedding(input_size[ntype], embed_size, name=str(ntype),
+                        init_func=initializer, group=group)
                 else:
                     sparse_emb = th.nn.Embedding(input_size[ntype], embed_size, sparse=True)
                     nn.init.uniform_(sparse_emb.weight, -1.0, 1.0)
@@ -145,7 +145,7 @@ class RelGraphEmbedLayer(nn.Module):
         for ntype in range(self.num_of_ntype):
             loc = node_tids == ntype
             if isinstance(features[ntype], int):
-                embeds[loc] = self.node_embeds[str(ntype)](type_ids[loc]).to(self.dev_id)
+                embeds[loc] = self.node_embeds[str(ntype)](type_ids[loc], self.dev_id)
             else:
                 embeds[loc] = features[ntype][type_ids[loc]].to(self.dev_id) @ self.embeds[str(ntype)].to(self.dev_id)
 

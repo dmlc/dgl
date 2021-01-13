@@ -178,9 +178,15 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
     eval_seeds = []
 
     with th.no_grad():
+        nodes = [0, 0, 0]
         for sample_data in tqdm.tqdm(eval_loader):
             th.cuda.empty_cache()
             seeds, blocks = sample_data
+
+            nodes[0] += blocks[0].num_src_nodes()
+            for i, block in enumerate(blocks):
+                nodes[i + 1] += block.num_dst_nodes()
+
             feats = embed_layer(blocks[0].srcdata[dgl.NID],
                     blocks[0].srcdata[dgl.NTYPE],
                     blocks[0].srcdata['type_id'],
@@ -188,14 +194,15 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
             logits = model(blocks, feats)
             eval_logits.append(logits.cpu().detach())
             eval_seeds.append(seeds.cpu().detach())
+
+    print(nodes)
     eval_logits = th.cat(eval_logits)
     eval_seeds = th.cat(eval_seeds)
 
     return eval_logits, eval_seeds
 
-
 @thread_wrapped_func
-def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None, sparse_queues=None):
+def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
     dev_id = devices[proc_id] if devices[proc_id] != 'cpu' else -1
     g, node_feats, num_of_ntype, num_classes, num_rels, target_idx, \
         train_idx, val_idx, test_idx, labels = dataset
@@ -306,7 +313,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None, spar
             dgl_emb = embed_layer.module.dgl_emb
         else:
             dgl_emb = embed_layer.dgl_emb
-        emb_optimizer = dgl.SparseAdamOptimizer(params=dgl_emb, lr=args.sparse_lr) if len(dgl_emb) > 0 else None
+        emb_optimizer = dgl.optim.SparseAdam(params=dgl_emb, lr=args.sparse_lr) if len(dgl_emb) > 0 else None
     else:
         if n_gpus > 1:
             embs = list(embed_layer.module.node_embeds.parameters())
@@ -530,16 +537,15 @@ def main(args, devices):
     if devices[0] == -1:
         run(0, 0, n_cpus, args, ['cpu'],
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-             train_idx, val_idx, test_idx, labels), None, None, None)
+             train_idx, val_idx, test_idx, labels), None, None)
     # gpu
     elif n_gpus == 1:
         run(0, n_gpus, n_cpus, args, devices,
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-            train_idx, val_idx, test_idx, labels), None, None, None)
+            train_idx, val_idx, test_idx, labels), None, None)
     # multi gpu
     else:
         queue = mp.Queue(n_gpus)
-        sparse_queues = dgl.GraphSparseQueues(n_gpus)
         procs = []
         num_train_seeds = train_idx.shape[0]
         num_valid_seeds = val_idx.shape[0]
@@ -569,7 +575,7 @@ def main(args, devices):
                                              (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
                                              train_idx, val_idx, test_idx, labels),
                                              (proc_train_seeds, proc_valid_seeds, proc_test_seeds),
-                                             queue, sparse_queues))
+                                             queue))
             p.start()
             procs.append(p)
         for p in procs:

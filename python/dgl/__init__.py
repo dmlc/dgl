@@ -39,7 +39,8 @@ from .propagate import *
 from .random import *
 from .data.utils import save_graphs, load_graphs
 
-from .backend import GraphSparseQueues, GraphSparseEmbedding, SparseAdagradOptimizer, SparseAdamOptimizer
+from .backend import NodeEmbedding
+from .backend import optim
 
 from ._deprecate.graph import DGLGraph as DGLGraphStale
 from ._deprecate.nodeflow import *
