@@ -8,9 +8,8 @@ from .. import utils
 # edge_ids is not supported on cuda
 @utils.skip_if_gpu()
 @utils.benchmark('time', timeout=1200)
-@utils.parametrize_cpu('graph_name', ['cora', 'livejournal', 'friendster'])
-@utils.parametrize_gpu('graph_name', ['cora', 'livejournal'])
-@utils.parametrize('format', ['csc'])  # csc is not supported
+@utils.parametrize('graph_name', ['cora', 'livejournal', 'friendster'])
+@utils.parametrize('format', ['coo'])  # csr/csc is not supported
 @utils.parametrize('fraction', [0.01, 0.1])
 def track_time(graph_name, format, fraction):
     device = utils.get_bench_device()

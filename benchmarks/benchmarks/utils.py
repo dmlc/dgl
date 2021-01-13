@@ -46,6 +46,14 @@ def get_graph(name, format):
         else:
             g = get_friendster().formats([format])
             dgl.save_graphs(bin_path, [g])
+    elif name == "reddit":
+        bin_path = "/tmp/dataset/reddit/reddit_{}.bin".format(format)
+        if os.path.exists(bin_path):
+            g_list, _ = dgl.load_graphs(bin_path)
+            g = g_list[0]
+        else:
+            g = dgl.data.RedditDataset(self_loop=True)[0].formats([format])
+            dgl.save_graphs(bin_path, [g])
     else:
         raise Exception("Unknown dataset")
     g = g.formats([format])
