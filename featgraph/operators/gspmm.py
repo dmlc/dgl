@@ -63,7 +63,7 @@ def _spmm_cuda_merge(sched, out):
     node_outer, node_inner = sched[out].split(node_axis, factor=8)
     feat_outer, feat_inner = sched[out].split(feat_axis, factor=32)
     reduce_outer, reduce_inner = sched[out].split(reduce_axis, factor=32)
-    sched[out].unroll(reduce_inner)
+    #sched[out].unroll(reduce_inner)
     sched[out].bind(feat_inner, te.thread_axis('threadIdx.x'))
     sched[out].bind(feat_outer, te.thread_axis('blockIdx.y'))
     sched[out].bind(node_outer, te.thread_axis('blockIdx.x'))
