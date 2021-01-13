@@ -143,25 +143,14 @@ DGL内置了常见的图读出函数，例如 :func:`dgl.readout_nodes` 就实�
     dataset = dgl.data.GINDataset('MUTAG', False)
 
 整图分类数据集里的每个数据点是一个图和它对应标签的元组。为提升数据加载速度，
-用户可以在DataLoader里自定义collate函数。
+用户可以调用GraphDataLoader，从而以小批次遍历整个图数据集。
 
 .. code:: python
 
-    def collate(samples):
-        graphs, labels = map(list, zip(*samples))
-        batched_graph = dgl.batch(graphs)
-        batched_labels = torch.tensor(labels)
-        return batched_graph, batched_labels
-
-随后用户可以创建一个以小批次遍历整个图数据集的DataLoader。
-
-.. code:: python
-
-    from torch.utils.data import DataLoader
-    dataloader = DataLoader(
+    from dgl.dataloading import GraphDataLoader
+    dataloader = GraphDataLoader(
         dataset,
         batch_size=1024,
-        collate_fn=collate,
         drop_last=False,
         shuffle=True)
 
