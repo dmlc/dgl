@@ -2,21 +2,22 @@
 
 ## Overview
 
-| Paper                                                                                                                    | node classification | link prediction / classification | graph property prediction | sampling           | OGB                |
-| ------------------------------------------------------------------------------------------------------------------------ | ------------------- | -------------------------------- | ------------------------- | ------------------ | ------------------ |
-| [Heterogeneous Graph Transformer](#hgt)                                                                                  | :heavy_check_mark:  | :heavy_check_mark:               |                           |                    |                    |
-| [Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges](#mwe)                                  | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
-| [SIGN: Scalable Inception Graph Neural Networks](#sign)                                                                  | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
-| [Strategies for Pre-training Graph Neural Networks](#prestrategy)                                                        |                     |                                  | :heavy_check_mark:        |                    |                    |
-| [Predict then Propagate: Graph Neural Networks meet Personalized PageRank](#appnp)                                       | :heavy_check_mark:  |                                  |                           |                    |                    |
-| [Cluster-GCN: An Efficient Algorithm for Training Deep and Large Graph Convolutional Networks](#clustergcn)              | :heavy_check_mark:  |                                  |                           | :heavy_check_mark: | :heavy_check_mark: |
-| [Deep Graph Infomax](#dgi)                                                                                               | :heavy_check_mark:  |                                  |                           |                    |                    |
-| [Hierarchical Graph Representation Learning with Differentiable Pooling](#diffpool)                                      |                     |                                  | :heavy_check_mark:        |                    |                    |
-| [Representation Learning for Attributed Multiplex Heterogeneous Network](#gatne-t)                                       |                     | :heavy_check_mark:               |                           |                    |                    |
-| [How Powerful are Graph Neural Networks?](#gin)                                                                          | :heavy_check_mark:  |                                  | :heavy_check_mark:        |                    | :heavy_check_mark: |
-| [Heterogeneous Graph Attention Network](#han)                                                                            | :heavy_check_mark:  |                                  |                           |                    |                    |
-| [Simplifying Graph Convolutional Networks](#sgc)                                                                         | :heavy_check_mark:  |                                  |                           |                    |                    |
-| [Molecular Property Prediction: A Multilevel Quantum Interactions Modeling Perspective](#mgcn)                           |                     |                                  | :heavy_check_mark:        |                    |                    |
+| Paper                                                        | node classification | link prediction / classification | graph property prediction | sampling           | OGB                |
+| ------------------------------------------------------------ | ------------------- | -------------------------------- | ------------------------- | ------------------ | ------------------ |
+| [Graph Random Neural Network for Semi-Supervised Learning on Graphs](#grand) | :heavy_check_mark:  |                                  |                           |                    |                    |
+| [Heterogeneous Graph Transformer](#hgt)                      | :heavy_check_mark:  | :heavy_check_mark:               |                           |                    |                    |
+| [Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges](#mwe) | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
+| [SIGN: Scalable Inception Graph Neural Networks](#sign)      | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
+| [Strategies for Pre-training Graph Neural Networks](#prestrategy) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [Predict then Propagate: Graph Neural Networks meet Personalized PageRank](#appnp) | :heavy_check_mark:  |                                  |                           |                    |                    |
+| [Cluster-GCN: An Efficient Algorithm for Training Deep and Large Graph Convolutional Networks](#clustergcn) | :heavy_check_mark:  |                                  |                           | :heavy_check_mark: | :heavy_check_mark: |
+| [Deep Graph Infomax](#dgi)                                   | :heavy_check_mark:  |                                  |                           |                    |                    |
+| [Hierarchical Graph Representation Learning with Differentiable Pooling](#diffpool) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [Representation Learning for Attributed Multiplex Heterogeneous Network](#gatne-t) |                     | :heavy_check_mark:               |                           |                    |                    |
+| [How Powerful are Graph Neural Networks?](#gin)              | :heavy_check_mark:  |                                  | :heavy_check_mark:        |                    | :heavy_check_mark: |
+| [Heterogeneous Graph Attention Network](#han)                | :heavy_check_mark:  |                                  |                           |                    |                    |
+| [Simplifying Graph Convolutional Networks](#sgc)             | :heavy_check_mark:  |                                  |                           |                    |                    |
+| [Molecular Property Prediction: A Multilevel Quantum Interactions Modeling Perspective](#mgcn) |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Pushing the Boundaries of Molecular Representation for Drug Discovery with the Graph Attention Mechanism](#attentivefp) |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [MixHop: Higher-Order Graph Convolutional Architectures via Sparsified Neighborhood Mixing](#mixhop)                     | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Graph Attention Networks](#gat)                                                                                         | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
@@ -39,20 +40,21 @@
 | [Convolutional Networks on Graphs for Learning Molecular Fingerprints](#nf)                                              |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Graph Representation Learning via Hard and Channel-Wise Attention Networks](#hardgat)                                   |:heavy_check_mark:                     |                 |                           |                    |                    |
 
+
 ## 2020
 
+- <a name="grand"></a> Feng et al. Graph Random Neural Network for Semi-Supervised Learning on Graphs. [Paper link](https://arxiv.org/abs/2005.11079). 
+    - Example code: [PyTorch](../examples/pytorch/grand)
+    - Tags: semi-supervised node classification, simplifying graph convolution, data augmentation
 - <a name="hgt"></a> Hu et al. Heterogeneous Graph Transformer. [Paper link](https://arxiv.org/abs/2003.01332).
     - Example code: [PyTorch](../examples/pytorch/hgt)
     - Tags: dynamic heterogeneous graphs, large-scale, node classification, link prediction
-
 - <a name="mwe"></a> Chen. Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges. [Paper link](https://cims.nyu.edu/~chenzh/files/GCN_with_edge_weights.pdf).
     - Example code: [PyTorch on ogbn-proteins](../examples/pytorch/ogb/ogbn-proteins)
     - Tags: node classification, weighted graphs, OGB
-
 - <a name="sign"></a> Frasca et al. SIGN: Scalable Inception Graph Neural Networks. [Paper link](https://arxiv.org/abs/2004.11198).
     - Example code: [PyTorch on ogbn-arxiv/products/mag](../examples/pytorch/ogb/sign), [PyTorch](../examples/pytorch/sign)
     - Tags: node classification, OGB, large-scale, heterogeneous graphs
-
 - <a name="prestrategy"></a> Hu et al. Strategies for Pre-training Graph Neural Networks. [Paper link](https://arxiv.org/abs/1905.12265).
     - Example code: [Molecule embedding](https://github.com/awslabs/dgl-lifesci/tree/master/examples/molecule_embeddings), [PyTorch for custom data](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/csv_data_configuration)
     - Tags: molecules, graph classification, unsupervised learning, self-supervised learning, molecular property prediction

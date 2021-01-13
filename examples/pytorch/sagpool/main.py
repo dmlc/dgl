@@ -8,9 +8,9 @@ import torch
 import torch.nn
 import torch.nn.functional as F
 from dgl.data import LegacyTUDataset
+from dgl.dataloading import GraphDataLoader
 from torch.utils.data import random_split
 
-from dataloader import GraphDataLoader
 from network import get_sag_network
 from utils import get_stats
 
@@ -78,11 +78,14 @@ def parse_args():
 def train(model:torch.nn.Module, optimizer, trainloader, device):
     model.train()
     total_loss = 0.
+    num_batches = len(trainloader)
     for batch in trainloader:
         optimizer.zero_grad()
         batch_graphs, batch_labels = batch
+        for (key, value) in batch_graphs.ndata.items():
+            batch_graphs.ndata[key] = value.float()
         batch_graphs = batch_graphs.to(device)
-        batch_labels = batch_labels.to(device)
+        batch_labels = batch_labels.long().to(device)
         out = model(batch_graphs)
         loss = F.nll_loss(out, batch_labels)
         loss.backward()
@@ -90,7 +93,7 @@ def train(model:torch.nn.Module, optimizer, trainloader, device):
 
         total_loss += loss.item()
     
-    return total_loss / len(trainloader.dataset)
+    return total_loss / num_batches
 
 
 @torch.no_grad()
@@ -98,11 +101,13 @@ def test(model:torch.nn.Module, loader, device):
     model.eval()
     correct = 0.
     loss = 0.
-    num_graphs = len(loader.dataset)
+    num_graphs = len(loader)
     for batch in loader:
         batch_graphs, batch_labels = batch
+        for (key, value) in batch_graphs.ndata.items():
+            batch_graphs.ndata[key] = value.float()
         batch_graphs = batch_graphs.to(device)
-        batch_labels = batch_labels.to(device)
+        batch_labels = batch_labels.long().to(device)
         out = model(batch_graphs)
         pred = out.argmax(dim=1)
         loss += F.nll_loss(out, batch_labels, reduction="sum").item()
