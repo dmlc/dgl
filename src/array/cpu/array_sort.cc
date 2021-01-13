@@ -144,6 +144,11 @@ struct PairIterator : public std::iterator<std::random_access_iterator_tag,
     return PairRef<V1, V2>(row, col);
   }
 
+  // required for random access iterators in VS2019
+  PairRef<V1, V2> operator[](size_t offset) const {
+    return PairRef<V1, V2>(row + offset, col + offset);
+  }
+
   V1 *row;
   V2 *col;
 };

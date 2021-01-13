@@ -1,0 +1,8 @@
+{
+    "arch": ["hierarchical", "global"],
+    "hidden": [16, 32, 64, 128],
+    "pool_ratio": [0.25, 0.5],
+    "lr": [1e-2, 5e-2, 1e-3, 5e-3, 1e-4, 5e-4],
+    "weight_decay": [1e-2, 1e-3, 1e-4, 1e-5],
+    "dataset": ["DD", "PROTEINS", "NCI1", "NCI109", "Mutagenicity"]
+}

@@ -190,6 +190,13 @@ SortPooling
     :members:
     :show-inheritance:
 
+WeightAndSum
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.glob.WeightAndSum
+    :members:
+    :show-inheritance:
+
 GlobalAttentionPooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

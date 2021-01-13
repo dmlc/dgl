@@ -16,6 +16,7 @@ and an ``EdgeDataLoader`` for edge/link prediction task.
 
 .. autoclass:: NodeDataLoader
 .. autoclass:: EdgeDataLoader
+.. autoclass:: GraphDataLoader
 
 .. _api-dataloading-neighbor-sampling:
 Neighbor Sampler

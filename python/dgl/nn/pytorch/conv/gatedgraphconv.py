@@ -147,7 +147,7 @@ class GatedGraphConv(nn.Module):
             for _ in range(self._n_steps):
                 graph.ndata['h'] = feat
                 for i in range(self._n_etypes):
-                    eids = (etypes == i).nonzero().view(-1).type(graph.idtype)
+                    eids = th.nonzero(etypes == i, as_tuple=False).view(-1).type(graph.idtype)
                     if len(eids) > 0:
                         graph.apply_edges(
                             lambda edges: {'W_e*h': self.linears[i](edges.src['h'])},
