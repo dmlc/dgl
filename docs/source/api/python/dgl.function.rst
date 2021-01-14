@@ -5,17 +5,11 @@
 dgl.function
 ==================================
 
-In DGL, message passing is expressed by two APIs:
+In DGL, message passing is mainly expressed by ``update_all(message_func, reduce_func)``.
+This API computes messages on all edges and sends to the destination nodes; the nodes
+that receive messages perform aggregation and update their own node data.
 
-- ``send(edges, message_func)`` for computing the messages along the given edges.
-- ``recv(nodes, reduce_func)`` for collecting the incoming messages, perform aggregation and so on.
-
-Although the two-stage abstraction can cover all the models that are defined in the message
-passing paradigm, it is inefficient because it requires storing explicit messages. See the DGL 
-`blog post <https://www.dgl.ai/blog/2019/05/04/kernel.html>`_ for more
-details and performance results.
-
-Our solution, also explained in the blog post, is to fuse the two stages into one kernel so no
+Internally, DGL fuses the message generation and aggregation into one kernel so no
 explicit messages are generated and stored. To achieve this, we recommend using our **built-in
 message and reduce functions** so that DGL can analyze and map them to fused dedicated kernels. Here
 are some examples (in PyTorch syntax).
