@@ -7,10 +7,8 @@ Difference compared to tkipf/relation-gcn
 * remove nodes that won't be touched
 """
 import argparse
-import itertools
 import numpy as np
 import time
-import gc
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
@@ -44,17 +42,25 @@ class EntityClassify(nn.Module):
         Output dim size.
     num_rels : int
         Numer of relation types.
-    num_bases : int
+    num_bases : int, optional
         Number of bases. If is none, use number of relations.
-    num_hidden_layers : int
+        Default None
+    num_hidden_layers : int, optional
         Number of hidden RelGraphConv Layer
+        Default 1
     dropout : float
-        Dropout
-    use_self_loop : bool
-        Use self loop if True, default False.
-    low_mem : bool
+        Dropout.
+        Default 0.
+    use_self_loop : bool, optional
+        Use self loop if True.
+        Default True
+    low_mem : bool, optional
         True to use low memory implementation of relation message passing function
         trade speed with memory consumption
+        Default True
+    layer_norm : bool, optional
+        True to use layer norm.
+        Default False
     """
     def __init__(self,
                  device,
@@ -66,7 +72,7 @@ class EntityClassify(nn.Module):
                  num_hidden_layers=1,
                  dropout=0,
                  use_self_loop=False,
-                 low_mem=False,
+                 low_mem=True,
                  layer_norm=False):
         super(EntityClassify, self).__init__()
         self.device = th.device(device if device >= 0 else 'cpu')
@@ -160,11 +166,7 @@ class NeighborSampler:
                 frontier = dgl.in_subgraph(self.g, cur)
             else:
                 frontier = dgl.sampling.sample_neighbors(self.g, cur, fanout)
-            etypes = self.g.edata[dgl.ETYPE][frontier.edata[dgl.EID]]
             block = dgl.to_block(frontier, cur)
-            block.srcdata[dgl.NTYPE] = self.g.ndata[dgl.NTYPE][block.srcdata[dgl.NID]]
-            block.srcdata['type_id'] = self.g.ndata[dgl.NID][block.srcdata[dgl.NID]]
-            block.edata['etype'] = etypes
             if self.global_norm is False:
                 gen_norm(block)
             cur = block.srcdata[dgl.NID]
@@ -178,24 +180,17 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
     eval_seeds = []
 
     with th.no_grad():
-        nodes = [0, 0, 0]
         for sample_data in tqdm.tqdm(eval_loader):
-            th.cuda.empty_cache()
             seeds, blocks = sample_data
 
-            nodes[0] += blocks[0].num_src_nodes()
-            for i, block in enumerate(blocks):
-                nodes[i + 1] += block.num_dst_nodes()
-
             feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                    blocks[0].srcdata[dgl.NTYPE],
-                    blocks[0].srcdata['type_id'],
-                    node_feats)
+                                blocks[0].srcdata['ntype'],
+                                blocks[0].srcdata['type_id'],
+                                node_feats)
             logits = model(blocks, feats)
             eval_logits.append(logits.cpu().detach())
             eval_seeds.append(seeds.cpu().detach())
 
-    print(nodes)
     eval_logits = th.cat(eval_logits)
     eval_seeds = th.cat(eval_seeds)
 
@@ -313,7 +308,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
             dgl_emb = embed_layer.module.dgl_emb
         else:
             dgl_emb = embed_layer.dgl_emb
-        emb_optimizer = dgl.optim.SparseAdam(params=dgl_emb, lr=args.sparse_lr) if len(dgl_emb) > 0 else None
+        emb_optimizer = dgl.optim.SparseAdam(params=dgl_emb, lr=args.sparse_lr, eps=1e-8) if len(dgl_emb) > 0 else None
     else:
         if n_gpus > 1:
             embs = list(embed_layer.module.node_embeds.parameters())
@@ -340,7 +335,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
             seeds, blocks = sample_data
             t0 = time.time()
             feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                                blocks[0].srcdata[dgl.NTYPE],
+                                blocks[0].srcdata['ntype'],
                                 blocks[0].srcdata['type_id'],
                                 node_feats)
             logits = model(blocks, feats)
@@ -366,6 +361,22 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
             format(epoch, args.n_epochs, forward_time[-1], backward_time[-1]))
         tend = time.time()
         train_time += (tend - tstart)
+
+        def collect_eval():
+            eval_logits = []
+            eval_seeds = []
+            for i in range(n_gpus):
+                log = queue.get()
+                eval_l, eval_s = log
+                eval_logits.append(eval_l)
+                eval_seeds.append(eval_s)
+            eval_logits = th.cat(eval_logits)
+            eval_seeds = th.cat(eval_seeds)
+            eval_loss = F.cross_entropy(eval_logits, labels[eval_seeds].cpu()).item()
+            eval_acc = th.sum(eval_logits.argmax(dim=1) == labels[eval_seeds].cpu()).item() / len(eval_seeds)
+
+            return eval_loss, eval_acc
+
         vstart = time.time()
         if (queue is not None) or (proc_id == 0):
             val_logits, val_seeds = evaluate(model, embed_layer, val_loader, node_feats)
@@ -374,18 +385,9 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
 
             # gather evaluation result from multiple processes
             if proc_id == 0:
-                if queue is not None:
-                    val_logits = []
-                    val_seeds = []
-                    for i in range(n_gpus):
-                        log = queue.get()
-                        val_l, val_s = log
-                        val_logits.append(val_l)
-                        val_seeds.append(val_s)
-                    val_logits = th.cat(val_logits)
-                    val_seeds = th.cat(val_seeds)
-                val_loss = F.cross_entropy(val_logits, labels[val_seeds].cpu()).item()
-                val_acc = th.sum(val_logits.argmax(dim=1) == labels[val_seeds].cpu()).item() / len(val_seeds)
+                val_loss, val_acc = collect_eval() if queue is not None else \
+                    (F.cross_entropy(val_logits, labels[val_seeds].cpu()).item(), \
+                    th.sum(val_logits.argmax(dim=1) == labels[val_seeds].cpu()).item() / len(val_seeds))
 
                 print("Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
                         format(val_acc, val_loss))
@@ -402,18 +404,9 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
 
         # gather evaluation result from multiple processes
         if proc_id == 0:
-            if queue is not None:
-                test_logits = []
-                test_seeds = []
-                for i in range(n_gpus):
-                    log = queue.get()
-                    test_l, test_s = log
-                    test_logits.append(test_l)
-                    test_seeds.append(test_s)
-                test_logits = th.cat(test_logits)
-                test_seeds = th.cat(test_seeds)
-            test_loss = F.cross_entropy(test_logits, labels[test_seeds].cpu()).item()
-            test_acc = th.sum(test_logits.argmax(dim=1) == labels[test_seeds].cpu()).item() / len(test_seeds)
+            test_loss, test_acc = collect_eval() if queue is not None else \
+                (F.cross_entropy(test_logits, labels[test_seeds].cpu()).item(), \
+                th.sum(test_logits.argmax(dim=1) == labels[test_seeds].cpu()).item() / len(test_seeds))
             print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss))
             print()
     tend = time.time()
@@ -512,8 +505,12 @@ def main(args, devices):
             category_id = i
 
     g = dgl.to_homogeneous(hg)
-    g.ndata[dgl.NTYPE].share_memory_()
-    g.edata[dgl.ETYPE].share_memory_()
+    g.ndata['ntype'] = g.ndata[dgl.NTYPE]
+    g.ndata['ntype'].share_memory_()
+    g.edata['etype'] = g.edata[dgl.ETYPE]
+    g.edata['etype'].share_memory_()
+    g.ndata['type_id'] = g.ndata[dgl.NID]
+    g.ndata['type_id'].share_memory_()
     if args.global_norm:
         gen_norm(g)
         g.edata['norm'].share_memory_()

@@ -320,7 +320,7 @@ class SparseAdam(SparseGradOptimizer):
         """
         with th.no_grad():
             beta1 = self._beta1
-            beta2= self._beta2
+            beta2 = self._beta2
             eps = self._eps
 
             clr = self._lr
@@ -347,10 +347,8 @@ class SparseAdam(SparseGradOptimizer):
             state_mem[state_idx] = update_mem.to(state_dev, non_blocking=True)
             state_power[state_idx] = update_power.to(state_dev, non_blocking=True)
 
-            beta1 = th.pow(beta1, state_step)
-            beta2 = th.pow(beta2, state_step)
-            update_mem_corr = update_mem / (1 - beta1).unsqueeze(1)
-            update_power_corr = update_power / (1 - beta2).unsqueeze(1)
+            update_mem_corr = update_mem / (1 - th.pow(beta1, state_step)).unsqueeze(1)
+            update_power_corr = update_power / (1 - th.pow(beta2, state_step)).unsqueeze(1)
             std_values = clr * update_mem_corr / (th.sqrt(update_power_corr) + eps)
 
             emb.emb_tensor[state_idx] -= std_values.to(state_dev)

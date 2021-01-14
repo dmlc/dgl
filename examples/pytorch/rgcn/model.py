@@ -51,7 +51,7 @@ class BaseRGCN(nn.Module):
         return h
 
 def initializer(emb):
-    #nn.init.xavier_uniform_(emb)
+    #nn.init.xavier_uniform_(emb, gain=nn.init.calculate_gain('relu'))
     emb.uniform_(-1, 1)
     return emb
 
@@ -72,8 +72,6 @@ class RelGraphEmbedLayer(nn.Module):
         treat certain input feature as an one-hot encoding feature.
     embed_size : int
         Output embed size
-    embed_name : str, optional
-        Embed name
     """
     def __init__(self,
                  dev_id,
@@ -83,12 +81,10 @@ class RelGraphEmbedLayer(nn.Module):
                  input_size,
                  embed_size,
                  dgl_sparse=False,
-                 group=None,
-                 embed_name='embed'):
+                 group=None):
         super(RelGraphEmbedLayer, self).__init__()
         self.dev_id = th.device(dev_id if dev_id >= 0 else 'cpu')
         self.embed_size = embed_size
-        self.embed_name = embed_name
         self.num_nodes = num_nodes
         self.dgl_sparse = dgl_sparse
 
