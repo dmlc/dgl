@@ -148,7 +148,7 @@ def _to_device(data, device):
     else:
         data = data.to(device)
     return data
-          
+
 class _NodeDataLoaderIter:
     def __init__(self, node_dataloader):
         self.device = node_dataloader.device
@@ -161,8 +161,8 @@ class _NodeDataLoaderIter:
         _restore_blocks_storage(result_[-1], self.node_dataloader.collator.g)
 
         result = []
-        for i in range(len(result_)):
-            result.append(_to_device(result_[i], self.device))
+        for data in result_:
+            result.append(_to_device(data, self.device))
         return result
 
 class _EdgeDataLoaderIter:
@@ -173,7 +173,7 @@ class _EdgeDataLoaderIter:
 
     def __next__(self):
         result_ = next(self.iter_)
-        
+
         if self.edge_dataloader.collator.negative_sampler is not None:
             # input_nodes, pair_graph, neg_pair_graph, [items], blocks
             # Otherwise, input_nodes, pair_graph, [items], blocks
@@ -182,8 +182,8 @@ class _EdgeDataLoaderIter:
         _restore_blocks_storage(result_[-1], self.edge_dataloader.collator.g_sampling)
 
         result = []
-        for i in range(len(result_)):
-            result.append(_to_device(result_[i], self.device))
+        for data in result_:
+            result.append(_to_device(data, self.device))
         return result
 
 class NodeDataLoader:
