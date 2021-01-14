@@ -143,8 +143,11 @@ def _to_device(data, device):
     if isinstance(data, dict):
         for k, v in data.items():
             data[k] = v.to(device)
+    elif isinstance(data, list):
+        data = [item.to(device) for item in data]
     else:
         data = data.to(device)
+    return data
           
 class _NodeDataLoaderIter:
     def __init__(self, node_dataloader):
@@ -154,12 +157,12 @@ class _NodeDataLoaderIter:
 
     def __next__(self):
         # input_nodes, output_nodes, [items], blocks
-        result = next(self.iter_)
-        _restore_blocks_storage(result[-1], self.node_dataloader.collator.g)
-        
-        for i in range(len(result) - 1):
-            result[i] = _to_device(result[i], self.device)
-        result[-1] = [blc.to(self.device) for blc in result[-1]]
+        result_ = next(self.iter_)
+        _restore_blocks_storage(result_[-1], self.node_dataloader.collator.g)
+
+        result = []
+        for i in range(len(result_)):
+            result.append(_to_device(result_[i], self.device))
         return result
 
 class _EdgeDataLoaderIter:
@@ -169,18 +172,18 @@ class _EdgeDataLoaderIter:
         self.iter_ = iter(edge_dataloader.dataloader)
 
     def __next__(self):
-        result = next(self.iter_)
+        result_ = next(self.iter_)
         
         if self.edge_dataloader.collator.negative_sampler is not None:
             # input_nodes, pair_graph, neg_pair_graph, [items], blocks
             # Otherwise, input_nodes, pair_graph, [items], blocks
-            _restore_subgraph_storage(result[2], self.edge_dataloader.collator.g)
-        _restore_subgraph_storage(result[1], self.edge_dataloader.collator.g)
-        _restore_blocks_storage(result[-1], self.edge_dataloader.collator.g_sampling)
-        
-        for i in range(len(result) - 1):
-            result[i] = _to_device(result[i], self.device)
-        result[-1] = [blc.to(self.device) for blc in result[-1]]
+            _restore_subgraph_storage(result_[2], self.edge_dataloader.collator.g)
+        _restore_subgraph_storage(result_[1], self.edge_dataloader.collator.g)
+        _restore_blocks_storage(result_[-1], self.edge_dataloader.collator.g_sampling)
+
+        result = []
+        for i in range(len(result_)):
+            result.append(_to_device(result_[i], self.device))
         return result
 
 class NodeDataLoader:
