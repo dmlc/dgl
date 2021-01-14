@@ -62,8 +62,6 @@ def batch(graphs, ndata=ALL, edata=ALL, include_empty_data=False, *,
         Node features to batch.
     edata : list[str], None, optional
         Edge features to batch.
-    include_empty_data : bool, optional
-        Whether to copy a frame even if no nodes or edges exist for it.
 
     Returns
     -------
