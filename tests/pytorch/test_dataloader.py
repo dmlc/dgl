@@ -233,16 +233,16 @@ def test_node_dataloader():
     g1.ndata['feat'] = F.randn((5, 8))
 
     # return_indices = False
-    dataloader = dgl.dataloading.NodeDataLoader(g1, g1.nodes(), sampler, device=F.ctx(),
-                                                batch_size=g1.num_nodes())
+    dataloader = dgl.dataloading.NodeDataLoader(
+        g1, g1.nodes(), sampler, device=F.ctx(), batch_size=g1.num_nodes())
     for input_nodes, output_nodes, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(output_nodes)
         _check_device(blocks)
 
     # return_indices = True
-    dataloader = dgl.dataloading.NodeDataLoader(g1, g1.nodes(), sampler, device=F.ctx(),
-                                                batch_size=g1.num_nodes(), return_indices=True)
+    dataloader = dgl.dataloading.NodeDataLoader(
+        g1, g1.nodes(), sampler, device=F.ctx(), batch_size=g1.num_nodes(), return_indices=True)
     for input_nodes, output_nodes, items, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(output_nodes)
@@ -260,17 +260,18 @@ def test_node_dataloader():
     batch_size = max(g2.num_nodes(nty) for nty in g2.ntypes)
 
     # return_indices = False
-    dataloader = dgl.dataloading.NodeDataLoader(g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
-                                                sampler, device=F.ctx(), batch_size=batch_size)
+    dataloader = dgl.dataloading.NodeDataLoader(
+        g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
+        sampler, device=F.ctx(), batch_size=batch_size)
     for input_nodes, output_nodes, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(output_nodes)
         _check_device(blocks)
 
     # return_indices = True
-    dataloader = dgl.dataloading.NodeDataLoader(g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
-                                                sampler, device=F.ctx(), batch_size=batch_size,
-                                                return_indices=True)
+    dataloader = dgl.dataloading.NodeDataLoader(
+        g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
+        sampler, device=F.ctx(), batch_size=batch_size, return_indices=True)
     for input_nodes, output_nodes, items, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(output_nodes)
@@ -284,6 +285,24 @@ def test_edge_dataloader():
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
     g1.ndata['feat'] = F.randn((5, 8))
 
+    # return_indices = False & no negative sampler
+    dataloader = dgl.dataloading.EdgeDataLoader(
+        g1, g1.edges(), sampler, device=F.ctx(), batch_size=g1.num_edges())
+    for input_nodes, pos_pair_graph, blocks in dataloader:
+        _check_device(input_nodes)
+        _check_device(pos_pair_graph)
+        _check_device(blocks)
+
+    # return_indices = False & negative sampler
+    dataloader = dgl.dataloading.EdgeDataLoader(
+        g1, g1.edges(), sampler, device=F.ctx(),
+        negative_sampler=neg_sampler, batch_size=g1.num_edges())
+    for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
+        _check_device(input_nodes)
+        _check_device(pos_pair_graph)
+        _check_device(neg_pair_graph)
+        _check_device(blocks)
+
     g2 = dgl.heterograph({
          ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0]),
          ('user', 'followed-by', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]),
@@ -292,28 +311,12 @@ def test_edge_dataloader():
     })
     for ntype in g2.ntypes:
         g2.nodes[ntype].data['feat'] = F.randn((g2.num_nodes(ntype), 8))
-
-    # return_indices = False & no negative sampler
-    dataloader = dgl.dataloading.NodeDataLoader(g1, g1.nodes(), sampler, device=F.ctx(),
-                                                batch_size=g1.num_nodes())
-    for input_nodes, pos_pair_graph, blocks in dataloader:
-        _check_device(input_nodes)
-        _check_device(pos_pair_graph)
-        _check_device(blocks)
-
-    # return_indices = False & negative sampler
-    dataloader = dgl.dataloading.NodeDataLoader(g1, g1.nodes(), sampler, device=F.ctx(),
-                                                negative_sampler=neg_sampler,
-                                                batch_size=g1.num_nodes())
-    for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
-        _check_device(input_nodes)
-        _check_device(pos_pair_graph)
-        _check_device(neg_pair_graph)
-        _check_device(blocks)
+    batch_size = max(g2.num_edges(ety) for ety in g2.canonical_etypes)
 
     # return_indices = True & no negative sampler
-    dataloader = dgl.dataloading.NodeDataLoader(g1, g1.nodes(), sampler, device=F.ctx(),
-                                                batch_size=g1.num_nodes(), return_indices=True)
+    dataloader = dgl.dataloading.EdgeDataLoader(
+        g2, {ety: g2.edges(ety) for ety in g2.canonical_etypes},
+        sampler, device=F.ctx(), batch_size=batch_size, return_indices=True)
     for input_nodes, pos_pair_graph, items, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(pos_pair_graph)
@@ -321,6 +324,10 @@ def test_edge_dataloader():
         _check_device(blocks)
 
     # return_indices = True & negative sampler
+    dataloader = dgl.dataloading.EdgeDataLoader(
+        g2, {ety: g2.edges(ety) for ety in g2.canonical_etypes},
+        sampler, device=F.ctx(), negative_sampler=neg_sampler,
+        batch_size=batch_size, return_indices=True)
     for input_nodes, pos_pair_graph, neg_pair_graph, items, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(pos_pair_graph)
