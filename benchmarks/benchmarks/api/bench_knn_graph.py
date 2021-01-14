@@ -12,7 +12,7 @@ from .. import utils
 @utils.parametrize('dim', [16, 64, 128])
 def track_time(size, dim, k):
     device = utils.get_bench_device()
-    features = np.random.RandomState(666).randn(size, dim)
+    features = np.random.randn(size, dim)
     feat = torch.tensor(features, dtype=torch.float, device=device)
     # dry run
     dgl.knn_graph(feat, 2)

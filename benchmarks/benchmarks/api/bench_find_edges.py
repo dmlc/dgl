@@ -15,7 +15,7 @@ def track_time(graph_name, format, fraction):
     device = utils.get_bench_device()
     graph = utils.get_graph(graph_name, format)
     graph = graph.to(device)
-    eids = np.random.RandomState(666).choice(
+    eids = np.random.choice(
         np.arange(graph.num_edges(), dtype=np.int64), int(graph.num_edges()*fraction))
     eids = torch.tensor(eids, device=device, dtype=torch.int64)
     # dry run

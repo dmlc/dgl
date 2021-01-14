@@ -4,21 +4,26 @@ import torch
 import numpy as np
 
 from .. import utils
-
 # edge_ids is not supported on cuda
-@utils.skip_if_gpu()
+# @utils.skip_if_gpu()
 @utils.benchmark('time', timeout=1200)
-@utils.parametrize('graph_name', ['cora', 'livejournal', 'friendster'])
-@utils.parametrize('format', ['coo'])  # csr/csc is not supported
+@utils.parametrize_cpu('graph_name', ['cora', 'livejournal', 'friendster'])
+@utils.parametrize_gpu('graph_name', ['cora', 'livejournal'])
+@utils.parametrize('format', ['csr'])  # csr/csc is not supported
 @utils.parametrize('fraction', [0.01, 0.1])
-def track_time(graph_name, format, fraction):
+@utils.parametrize('return_uv', [True, False])
+def track_time(graph_name, format, fraction, return_uv):
     device = utils.get_bench_device()
     graph = utils.get_graph(graph_name, format)
+    coo_graph = utils.get_graph(graph_name, 'coo')
     graph = graph.to(device)
-    eids = np.random.RandomState(6666).choice(
+    eids = np.random.choice(
         np.arange(graph.num_edges(), dtype=np.int64), int(graph.num_edges()*fraction))
-    eids = torch.tensor(eids, device=device, dtype=torch.int64)
-    u, v = graph.find_edges(eids)
+    eids = torch.tensor(eids, device="cpu", dtype=torch.int64)
+    u, v = coo_graph.find_edges(eids)
+    del coo_graph, eids
+    u = u.to(device)
+    v = v.to(device)
     # dry run
     for i in range(10):
         out = graph.edge_ids(u[0], v[0])
@@ -26,7 +31,7 @@ def track_time(graph_name, format, fraction):
     # timing
     t0 = time.time()
     for i in range(10):
-        edges = graph.edge_ids(u, v)
+        edges = graph.edge_ids(u, v, return_uv=return_uv)
     t1 = time.time()
 
     return (t1 - t0) / 10
