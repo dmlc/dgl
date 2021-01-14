@@ -165,7 +165,7 @@ class QM9Dataset(DGLDataset):
         g = to_bidirected(g)
         g.ndata['R'] = F.tensor(R, dtype=F.data_type_dict['float32'])
         g.ndata['Z'] = F.tensor(self.Z[self.N_cumsum[idx]:self.N_cumsum[idx + 1]], 
-                                dtype=F.data_type_dict['float32'])
+                                dtype=F.data_type_dict['int32'])
         return g, label
 
     def __len__(self):
