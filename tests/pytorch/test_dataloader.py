@@ -287,7 +287,7 @@ def test_edge_dataloader():
 
     # return_indices = False & no negative sampler
     dataloader = dgl.dataloading.EdgeDataLoader(
-        g1, g1.edges(), sampler, device=F.ctx(), batch_size=g1.num_edges())
+        g1, g1.edges(form='eid'), sampler, device=F.ctx(), batch_size=g1.num_edges())
     for input_nodes, pos_pair_graph, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(pos_pair_graph)
@@ -295,7 +295,7 @@ def test_edge_dataloader():
 
     # return_indices = False & negative sampler
     dataloader = dgl.dataloading.EdgeDataLoader(
-        g1, g1.edges(), sampler, device=F.ctx(),
+        g1, g1.edges(form='eid'), sampler, device=F.ctx(),
         negative_sampler=neg_sampler, batch_size=g1.num_edges())
     for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
         _check_device(input_nodes)
@@ -315,7 +315,7 @@ def test_edge_dataloader():
 
     # return_indices = True & no negative sampler
     dataloader = dgl.dataloading.EdgeDataLoader(
-        g2, {ety: g2.edges(ety) for ety in g2.canonical_etypes},
+        g2, {ety: g2.edges(form='eid', etype=ety) for ety in g2.canonical_etypes},
         sampler, device=F.ctx(), batch_size=batch_size, return_indices=True)
     for input_nodes, pos_pair_graph, items, blocks in dataloader:
         _check_device(input_nodes)
@@ -325,7 +325,7 @@ def test_edge_dataloader():
 
     # return_indices = True & negative sampler
     dataloader = dgl.dataloading.EdgeDataLoader(
-        g2, {ety: g2.edges(ety) for ety in g2.canonical_etypes},
+        g2, {ety: g2.edges(form='eid', etype=ety) for ety in g2.canonical_etypes},
         sampler, device=F.ctx(), negative_sampler=neg_sampler,
         batch_size=batch_size, return_indices=True)
     for input_nodes, pos_pair_graph, neg_pair_graph, items, blocks in dataloader:
