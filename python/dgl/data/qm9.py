@@ -55,7 +55,7 @@ class QM9Dataset(DGLDataset):
     label_keys: list
         Names of the regression property.
     cutoff: float
-        Cutoff distance for interatomic interactions.
+        Cutoff distance for interatomic interactions, i.e. two atoms are connected in the corresponding graph if the distance between them is no larger than this.
         Default: 5.0
     raw_dir : str
         Raw file directory to download/contains the input data directory.
@@ -110,7 +110,7 @@ class QM9Dataset(DGLDataset):
         npz_path = f'{self.raw_dir}/qm9_eV.npz'
         data_dict = np.load(npz_path, allow_pickle=True)
         # the number of atoms in each molecule. 
-        # Atomic properties like Z and R are just concatenated globally, 
+        # Atomic properties (Z and R) of all molecules are concatenated as single tensors,
         # so you need this value to select the correct atoms for each molecule.
         self.N = data_dict['N']
         self.R = data_dict['R']
@@ -125,45 +125,51 @@ class QM9Dataset(DGLDataset):
 
     @property
     def num_labels(self):
-        """Number of labels for each graph, i.e. number of prediction tasks."""
+        r"""
+        Returns
+        --------
+        int
+            Number of labels for each graph, i.e. number of prediction tasks.
+        """
         return self.label.shape[1]
 
     def __getitem__(self, idx):
         r""" Get graph and label by index
+
         Parameters
         ----------
         idx : int
             Item index
+        
         Returns
         -------
-        (:class:`dgl.DGLGraph`, Tensor)
+        dgl.DGLGraph
 
             The graph contains:
 
             - ``ndata['R']``: the coordinates of each atom
             - ``ndata['Z']``: the atomic number
+
+        Tensor
+
+            Property values of molecular graphs
         """
-        if type(idx) is int or type(idx) is np.int64:
-            idx = [idx]
-        
-        labels = torch.tensor(self.label[idx], dtype=torch.float32)
-        graphs = []
-        for i in idx:
-            n_atoms = self.N[i]
-            R = self.R[self.N_cumsum[i]:self.N_cumsum[i + 1]]
-            dist = np.linalg.norm(R[:, None, :] - R[None, :, :], axis=-1)
-            adj = sp.csr_matrix(dist <= self.cutoff) - sp.eye(n_atoms, dtype=np.bool)
-            adj = adj.tocoo()
-            u, v = torch.tensor(adj.row), torch.tensor(adj.col)
-            g = dgl_graph((u, v))
-            g = to_bidirected(g)
-            g.ndata['R'] = torch.tensor(R, dtype=torch.float32)
-            g.ndata['Z'] = torch.tensor(self.Z[self.N_cumsum[i]:self.N_cumsum[i + 1]], dtype=torch.int)
-            graphs.append(g)
-        return graphs, labels
+        label = torch.tensor(self.label[idx], dtype=torch.float32)
+        n_atoms = self.N[idx]
+        R = self.R[self.N_cumsum[idx]:self.N_cumsum[idx + 1]]
+        dist = np.linalg.norm(R[:, None, :] - R[None, :, :], axis=-1)
+        adj = sp.csr_matrix(dist <= self.cutoff) - sp.eye(n_atoms, dtype=np.bool)
+        adj = adj.tocoo()
+        u, v = torch.tensor(adj.row), torch.tensor(adj.col)
+        g = dgl_graph((u, v))
+        g = to_bidirected(g)
+        g.ndata['R'] = torch.tensor(R, dtype=torch.float32)
+        g.ndata['Z'] = torch.tensor(self.Z[self.N_cumsum[idx]:self.N_cumsum[idx + 1]], dtype=torch.int)
+        return g, label
 
     def __len__(self):
         r"""Number of graphs in the dataset.
+        
         Return
         -------
         int
