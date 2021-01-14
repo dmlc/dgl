@@ -1,11 +1,8 @@
 """
-Graph Attention Networks in DGL using SPMV optimization.
-Multiple heads are also batched together for faster training.
+Graph Representation Learning via Hard Attention Networks in DGL using Adam optimization.
 References
 ----------
-Paper: https://arxiv.org/abs/1710.10903
-Author's code: https://github.com/PetarV-/GAT
-Pytorch implementation: https://github.com/Diego999/pyGAT
+Paper: https://arxiv.org/abs/1907.04652
 """
 
 import argparse
@@ -13,6 +10,7 @@ import numpy as np
 import networkx as nx
 import time
 import torch
+from torch._C import Value
 import torch.nn.functional as F
 import dgl
 from dgl.data import register_data_args
@@ -47,7 +45,9 @@ def main(args):
         data = PubmedGraphDataset()
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
-
+    
+    if args.num_layers <=0:
+        raise ValueError("num layer must be positive int")
     g = data[0]
     if args.gpu < 0:
         cuda = False
