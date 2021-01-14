@@ -7,10 +7,8 @@ Paper: https://arxiv.org/abs/1907.04652
 
 import argparse
 import numpy as np
-import networkx as nx
 import time
 import torch
-from torch._C import Value
 import torch.nn.functional as F
 import dgl
 from dgl.data import register_data_args
@@ -91,7 +89,6 @@ def main(args):
                 args.attn_drop,
                 args.negative_slope,
                 args.residual,
-                args.model,
                 args.k)
     print(model)
     if args.early_stop:
@@ -175,8 +172,6 @@ if __name__ == '__main__':
                         help="indicates whether to use early stop or not")
     parser.add_argument('--fastmode', action="store_true", default=False,
                         help="skip re-evaluate the validation set")
-    parser.add_argument('--model',type=str,default='hgat',
-                        help='Attention model selection, HardGAT: hgat;GAT: gat')
     parser.add_argument('--k',type=int,default=8,
                         help='top k neighor for attention calculation')
     args = parser.parse_args()

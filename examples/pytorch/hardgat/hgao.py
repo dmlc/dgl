@@ -8,7 +8,7 @@ Paper: https://arxiv.org/abs/1907.04652
 import torch
 import torch.nn as nn
 import dgl.function as fn
-from dgl.nn.pytorch import edge_softmax, GATConv
+from dgl.nn.pytorch import edge_softmax
 from dgl.sampling import select_topk
 from functools import partial
 from dgl.nn.pytorch.utils import Identity
@@ -88,11 +88,11 @@ class HardGAO(nn.Module):
             # Using vector matrix elementwise mul for acceleration
             feat = subgraph.ndata['y'].view(-1,1)*feat
             feat = self.feat_drop(feat)
-            feat = self.fc(feat).view(-1, self.num_heads, self.out_feats)
-            el = (feat * self.attn_l).sum(dim=-1).unsqueeze(-1)
-            er = (feat * self.attn_r).sum(dim=-1).unsqueeze(-1)
+            h = self.fc(feat).view(-1, self.num_heads, self.out_feats)
+            el = (h * self.attn_l).sum(dim=-1).unsqueeze(-1)
+            er = (h * self.attn_r).sum(dim=-1).unsqueeze(-1)
             # Assign the value on the subgraph
-            subgraph.srcdata.update({'ft': feat, 'el': el})
+            subgraph.srcdata.update({'ft': h, 'el': el})
             subgraph.dstdata.update({'er': er})
             # compute edge attention, el and er are a_l Wh_i and a_r Wh_j respectively.
             subgraph.apply_edges(fn.u_add_v('el', 'er', 'e'))
@@ -109,7 +109,7 @@ class HardGAO(nn.Module):
                 rst = self.activation(rst)
             # Residual
             if self.residual:
-                rst = rst + self.residual_module(feat).view(rst.shape[0],-1,rst.shape[2])
+                rst = rst + self.residual_module(feat).view(feat.shape[0],-1,self.out_feats)
 
             if get_attention:
                 return rst, subgraph.edata['a']
@@ -129,15 +129,14 @@ class HardGAT(nn.Module):
                  attn_drop,
                  negative_slope,
                  residual,
-                 model,k):
+                 k):
         super(HardGAT, self).__init__()
         self.g = g
         self.num_layers = num_layers
         self.gat_layers = nn.ModuleList()
         self.activation = activation
-        gat_layer = partial(HardGAO,k=k) if model == 'hgat' else GATConv
+        gat_layer = partial(HardGAO,k=k)
         muls = heads
-        self.model = model
         # input projection (no residual)
         self.gat_layers.append(gat_layer(
             in_dim, num_hidden, heads[0],
