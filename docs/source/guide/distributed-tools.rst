@@ -3,6 +3,8 @@
 7.3 Tools for launching distributed training/inference
 ------------------------------------------------------
 
+:ref:`(中文版) <guide_cn-distributed-tools>`
+
 DGL provides two scripts to assist in distributed training:
 
 * *tools/copy_files.py* for copying graph partitions to a graph,
