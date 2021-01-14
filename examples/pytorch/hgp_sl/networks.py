@@ -5,7 +5,7 @@ import torch.nn
 from layers import ConvPoolReadout
 
 
-class Model(torch.nn.Module):
+class HGPSLModel(torch.nn.Module):
     r"""
 
     Description
@@ -41,7 +41,7 @@ class Model(torch.nn.Module):
                  dropout:float=0., pool_ratio:float=.5, conv_layers:int=3,
                  sample:bool=False, sparse:bool=True, sl:bool=True,
                  lamb:float=1.):
-        super(Model, self).__init__()
+        super(HGPSLModel, self).__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
         self.hid_feat = hid_feat

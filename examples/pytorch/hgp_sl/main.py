@@ -12,7 +12,7 @@ from dgl.data import LegacyTUDataset
 from dgl.dataloading import GraphDataLoader
 from torch.utils.data import random_split
 
-from networks import Model
+from networks import HGPSLModel
 from utils import get_stats
 
 
@@ -147,11 +147,9 @@ def main(args):
     # Step 2: Create model =================================================================== #
     num_feature, num_classes, _ = dataset.statistics()
 
-    # model = SimpleModel(in_feat=num_feature, out_feat=num_classes, hid_feat=args.hid_dim,
-    #                     dropout=args.dropout, pool_ratio=args.pool_ratio, lamb=args.lamb).to(device)
-    model = Model(in_feat=num_feature, out_feat=num_classes, hid_feat=args.hid_dim,
-                  conv_layers=args.conv_layers, dropout=args.dropout, pool_ratio=args.pool_ratio,
-                  lamb=args.lamb, sample=args.sample).to(device)
+    model = HGPSLModel(in_feat=num_feature, out_feat=num_classes, hid_feat=args.hid_dim,
+                       conv_layers=args.conv_layers, dropout=args.dropout, pool_ratio=args.pool_ratio,
+                       lamb=args.lamb, sample=args.sample).to(device)
     args.num_feature = int(num_feature)
     args.num_classes = int(num_classes)
 
