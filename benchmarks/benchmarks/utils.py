@@ -26,11 +26,45 @@ def _download(url, path, filename):
     print('Download finished.')
 
 
+def get_graph(name, format):
+    g = None
+    if name == 'cora':
+        g = dgl.data.CoraGraphDataset()[0]
+    elif name == 'livejournal':
+        bin_path = "/tmp/dataset/livejournal/livejournal_{}.bin".format(format)
+        if os.path.exists(bin_path):
+            g_list, _ = dgl.load_graphs(bin_path)
+            g = g_list[0]
+        else:
+            g = get_livejournal().formats([format])
+            dgl.save_graphs(bin_path, [g])
+    elif name == "friendster":
+        bin_path = "/tmp/dataset/friendster/friendster_{}.bin".format(format)
+        if os.path.exists(bin_path):
+            g_list, _ = dgl.load_graphs(bin_path)
+            g = g_list[0]
+        else:
+            g = get_friendster().formats([format])
+            dgl.save_graphs(bin_path, [g])
+    elif name == "reddit":
+        bin_path = "/tmp/dataset/reddit/reddit_{}.bin".format(format)
+        if os.path.exists(bin_path):
+            g_list, _ = dgl.load_graphs(bin_path)
+            g = g_list[0]
+        else:
+            g = dgl.data.RedditDataset(self_loop=True)[0].formats([format])
+            dgl.save_graphs(bin_path, [g])
+    else:
+        raise Exception("Unknown dataset")
+    g = g.formats([format])
+    return g
+
+
 def get_livejournal():
     # Same as https://snap.stanford.edu/data/soc-LiveJournal1.txt.gz
     _download('https://dgl-asv-data.s3-us-west-2.amazonaws.com/dataset/livejournal/soc-LiveJournal1.txt.gz',
-              '/tmp/dataset', 'soc-LiveJournal1.txt.gz')
-    df = pandas.read_csv('/tmp/dataset/soc-LiveJournal1.txt.gz', sep='\t', skiprows=4, header=None,
+              '/tmp/dataset/livejournal', 'soc-LiveJournal1.txt.gz')
+    df = pandas.read_csv('/tmp/dataset/livejournal/soc-LiveJournal1.txt.gz', sep='\t', skiprows=4, header=None,
                          names=['src', 'dst'], compression='gzip')
     src = df['src'].values
     dst = df['dst'].values
@@ -38,11 +72,11 @@ def get_livejournal():
     return dgl.graph((src, dst))
 
 
-def get_filmbaster():
+def get_friendster():
     # Same as https://snap.stanford.edu/data/bigdata/communities/com-friendster.ungraph.txt.gz
     _download('https://dgl-asv-data.s3-us-west-2.amazonaws.com/dataset/friendster/com-friendster.ungraph.txt.gz',
-              '/tmp/dataset', 'com-friendster.ungraph.txt.gz')
-    df = pandas.read_csv('/tmp/dataset/com-friendster.ungraph.txt.gz', sep='\t', skiprows=4, header=None,
+              '/tmp/dataset/friendster', 'com-friendster.ungraph.txt.gz')
+    df = pandas.read_csv('/tmp/dataset/friendster/com-friendster.ungraph.txt.gz', sep='\t', skiprows=4, header=None,
                          names=['src', 'dst'], compression='gzip')
     src = df['src'].values
     dst = df['dst'].values
@@ -50,12 +84,12 @@ def get_filmbaster():
     return dgl.graph((src, dst))
 
 
-def get_graph(name):
-    if name == 'livejournal':
-        return get_livejournal()
-    else:
-        print(name + " doesn't exist")
-        return None
+# def get_graph(name):
+#     if name == 'livejournal':
+#         return get_livejournal()
+#     else:
+#         print(name + " doesn't exist")
+#         return None
 
 
 class OGBDataset(object):
@@ -78,6 +112,7 @@ class OGBDataset(object):
 
     def __getitem__(self, idx):
         return self._g
+
 
 def load_ogb_product():
     name = 'ogbn-products'
@@ -110,6 +145,7 @@ def load_ogb_product():
     graph.ndata['test_mask'] = test_mask
 
     return OGBDataset(graph, num_labels)
+
 
 def load_ogb_mag():
     name = 'ogbn-mag'
@@ -145,6 +181,7 @@ def load_ogb_mag():
 
     num_classes = dataset.num_classes
     return OGBDataset(hg, num_classes, 'paper')
+
 
 class PinsageDataset:
     def __init__(self, g, user_ntype, item_ntype, textset):
@@ -334,6 +371,14 @@ def parametrize(param_name, params):
     return _wrapper
 
 
+def noop_decorator(param_name, params):
+    """noop decorator
+    """
+    def _wrapper(func):
+        return func
+    return _wrapper
+
+
 class TestFilter:
     def __init__(self):
         self.conf = None
@@ -365,6 +410,31 @@ class TestFilter:
 
 
 filter = TestFilter()
+
+
+device = os.environ.get('DGL_BENCH_DEVICE', 'cpu')
+
+if device == "cpu":
+    parametrize_cpu = parametrize
+    parametrize_gpu = noop_decorator
+elif device == "gpu":
+    parametrize_cpu = noop_decorator
+    parametrize_gpu = parametrize
+else:
+    raise Exception("Unknown device")
+
+
+def skip_if_gpu():
+    """skip if DGL_BENCH_DEVICE is gpu
+    """
+    device = os.environ.get('DGL_BENCH_DEVICE', 'cpu')
+
+    def _wrapper(func):
+        if device == "gpu":
+            # skip if not enabled
+            func.benchmark_name = "skip_" + func.__name__
+        return func
+    return _wrapper
 
 
 def benchmark(track_type, timeout=60):
