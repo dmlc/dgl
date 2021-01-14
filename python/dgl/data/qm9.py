@@ -2,12 +2,12 @@
 import os
 import numpy as np
 import scipy.sparse as sp
-import torch
 
 from .dgl_dataset import DGLDataset
 from .utils import download, _get_dgl_url
 from ..convert import graph as dgl_graph
 from ..transform import to_bidirected
+from .. import backend as F
 
 class QM9Dataset(DGLDataset):
     r"""QM9 dataset for graph property prediction (regression)
@@ -154,17 +154,18 @@ class QM9Dataset(DGLDataset):
 
             Property values of molecular graphs
         """
-        label = torch.tensor(self.label[idx], dtype=torch.float32)
+        label = F.tensor(self.label[idx], dtype=F.data_type_dict['float32'])
         n_atoms = self.N[idx]
         R = self.R[self.N_cumsum[idx]:self.N_cumsum[idx + 1]]
         dist = np.linalg.norm(R[:, None, :] - R[None, :, :], axis=-1)
         adj = sp.csr_matrix(dist <= self.cutoff) - sp.eye(n_atoms, dtype=np.bool)
         adj = adj.tocoo()
-        u, v = torch.tensor(adj.row), torch.tensor(adj.col)
+        u, v = F.tensor(adj.row), F.tensor(adj.col)
         g = dgl_graph((u, v))
         g = to_bidirected(g)
-        g.ndata['R'] = torch.tensor(R, dtype=torch.float32)
-        g.ndata['Z'] = torch.tensor(self.Z[self.N_cumsum[idx]:self.N_cumsum[idx + 1]], dtype=torch.int)
+        g.ndata['R'] = F.tensor(R, dtype=F.data_type_dict['float32'])
+        g.ndata['Z'] = F.tensor(self.Z[self.N_cumsum[idx]:self.N_cumsum[idx + 1]], 
+                                dtype=F.data_type_dict['float32'])
         return g, label
 
     def __len__(self):
