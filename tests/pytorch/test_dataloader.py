@@ -230,7 +230,7 @@ def test_node_dataloader():
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(2)
 
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
-    g1.ndata['feat'] = F.randn((5, 8))
+    g1.ndata['feat'] = F.copy_to(F.randn((5, 8)), F.cpu())
 
     # return_indices = False
     dataloader = dgl.dataloading.NodeDataLoader(
@@ -256,7 +256,7 @@ def test_node_dataloader():
          ('game', 'played-by', 'user'): ([0, 1, 2, 0, 2], [0, 1, 1, 3, 5])
     })
     for ntype in g2.ntypes:
-        g2.nodes[ntype].data['feat'] = F.randn((g2.num_nodes(ntype), 8))
+        g2.nodes[ntype].data['feat'] = F.copy_to(F.randn((g2.num_nodes(ntype), 8)), F.cpu())
     batch_size = max(g2.num_nodes(nty) for nty in g2.ntypes)
 
     # return_indices = False
@@ -283,7 +283,7 @@ def test_edge_dataloader():
     neg_sampler = dgl.dataloading.negative_sampler.Uniform(2)
 
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
-    g1.ndata['feat'] = F.randn((5, 8))
+    g1.ndata['feat'] = F.copy_to(F.randn((5, 8)), F.cpu())
 
     # return_indices = False & no negative sampler
     dataloader = dgl.dataloading.EdgeDataLoader(
@@ -310,7 +310,7 @@ def test_edge_dataloader():
          ('game', 'played-by', 'user'): ([0, 1, 2, 0, 2], [0, 1, 1, 3, 5])
     })
     for ntype in g2.ntypes:
-        g2.nodes[ntype].data['feat'] = F.randn((g2.num_nodes(ntype), 8))
+        g2.nodes[ntype].data['feat'] = F.copy_to(F.randn((g2.num_nodes(ntype), 8)), F.cpu())
     batch_size = max(g2.num_edges(ety) for ety in g2.canonical_etypes)
 
     # return_indices = True & no negative sampler
