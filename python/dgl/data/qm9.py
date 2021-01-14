@@ -5,7 +5,7 @@ import scipy.sparse as sp
 import torch
 
 from .dgl_dataset import DGLDataset
-from .utils import download
+from .utils import download, _get_dgl_url
 from ..convert import graph as dgl_graph
 from ..transform import to_bidirected
 
@@ -13,18 +13,50 @@ class QM9Dataset(DGLDataset):
     r"""QM9 dataset for graph property prediction (regression)
 
     This dataset consists of 13,0831 molecules with 12 regression targets.
-    - id: [0, 1, ..., 133884], a unique identifier for each molecule.
-    - R: [2358210, 3], the coordinates of each atom.
-    - Z: [2358210, ], the atomic number.
-    - N: [130831, ], the number of atoms in each molecule. Atomic properties like Z and R are just concatenated globally, so you need this value to select the correct atoms for each molecule.
+    Node means atom and edge means bond.
 
+    Reference: `"Directional Message Passing for Molecular Graphs" <https://arxiv.org/abs/2003.03123>`_
+    
     Statistics:
 
     - Number of graphs: 13,0831
     - Number of regression targets: 12
 
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | Keys   | Property                         | Description                                                                       | Unit                                        |
+    +========+==================================+===================================================================================+=============================================+
+    | mu     | :math:`\mu`                      | Dipole moment                                                                     | :math:`\textrm{D}`                          |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | alpha  | :math:`\alpha`                   | Isotropic polarizability                                                          | :math:`{a_0}^3`                             |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | homo   | :math:`\epsilon_{\textrm{HOMO}}` | Highest occupied molecular orbital energy                                         | :math:`\textrm{eV}`                         |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | lumo   | :math:`\epsilon_{\textrm{LUMO}}` | Lowest unoccupied molecular orbital energy                                        | :math:`\textrm{eV}`                         |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | gap    | :math:`\Delta \epsilon`          | Gap between :math:`\epsilon_{\textrm{HOMO}}` and :math:`\epsilon_{\textrm{LUMO}}` | :math:`\textrm{eV}`                         |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | r2     | :math:`\langle R^2 \rangle`      | Electronic spatial extent                                                         | :math:`{a_0}^2`                             |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | zpve   | :math:`\textrm{ZPVE}`            | Zero point vibrational energy                                                     | :math:`\textrm{eV}`                         |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | U0     | :math:`U_0`                      | Internal energy at 0K                                                             | :math:`\textrm{eV}`                         |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | U      | :math:`U`                        | Internal energy at 298.15K                                                        | :math:`\textrm{eV}`                         |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | H      | :math:`H`                        | Enthalpy at 298.15K                                                               | :math:`\textrm{eV}`                         |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | G      | :math:`G`                        | Free energy at 298.15K                                                            | :math:`\textrm{eV}`                         |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | Cv     | :math:`c_{\textrm{v}}`           | Heat capavity at 298.15K                                                          | :math:`\frac{\textrm{cal}}{\textrm{mol K}}` |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+
     Parameters
     ----------
+    label_keys: list
+        Names of the regression property.
+    cutoff: float
+        Cutoff distance for interatomic interactions.
+        Default: 5.0
     raw_dir : str
         Raw file directory to download/contains the input data directory.
         Default: ~/.dgl/
@@ -45,22 +77,28 @@ class QM9Dataset(DGLDataset):
     
     Examples
     --------
-    >>> data = QM9Dataset()
+    >>> data = QM9Dataset(label_keys=['mu', 'gap'], cutoff=5.0)
     >>> data.num_labels
     12
     >>>
     >>> # iterate over the dataset
     >>> for g, label in data:
-    ...     # get feature
+    ...     R = g.ndata['R'] # get coordinates of each atom
+    ...     Z = g.ndata['Z'] # get atomic numbers of each atom
     ...     # your code here...
     >>>
     """
 
-    _url = 'qm9_eV.npz'
-
-    def __init__(self, cutoff, label_keys, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self,
+                 label_keys,
+                 cutoff=5.0,
+                 raw_dir=None,
+                 force_reload=False,
+                 verbose=False):
+    
         self.cutoff = cutoff
         self.label_keys = label_keys
+        self._url = _get_dgl_url('dataset/qm9_eV.npz')
 
         super(QM9Dataset, self).__init__(name='qm9',
                                          url=self._url,
@@ -69,8 +107,11 @@ class QM9Dataset(DGLDataset):
                                          verbose=verbose)
 
     def process(self):
-        npz_path = f'{self.raw_dir}/{self._url}'
+        npz_path = f'{self.raw_dir}/qm9_eV.npz'
         data_dict = np.load(npz_path, allow_pickle=True)
+        # the number of atoms in each molecule. 
+        # Atomic properties like Z and R are just concatenated globally, 
+        # so you need this value to select the correct atoms for each molecule.
         self.N = data_dict['N']
         self.R = data_dict['R']
         self.Z = data_dict['Z']
@@ -78,7 +119,7 @@ class QM9Dataset(DGLDataset):
         self.N_cumsum = np.concatenate([[0], np.cumsum(self.N)])
 
     def download(self):
-        file_path = f'{self.raw_dir}/{self._url}'
+        file_path = f'{self.raw_dir}/qm9_eV.npz'
         if not os.path.exists(file_path):
             download(self._url, path=file_path)
 
@@ -96,6 +137,11 @@ class QM9Dataset(DGLDataset):
         Returns
         -------
         (:class:`dgl.DGLGraph`, Tensor)
+
+            The graph contains:
+
+            - ``ndata['R']``: the coordinates of each atom
+            - ``ndata['Z']``: the atomic number
         """
         if type(idx) is int or type(idx) is np.int64:
             idx = [idx]
