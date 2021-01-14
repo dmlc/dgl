@@ -2,11 +2,12 @@
 import os
 import numpy as np
 import scipy.sparse as sp
-import dgl
 import torch
 
-from dgl.data import DGLDataset
-from dgl.data.utils import download, load_graphs, save_graphs
+from .dgl_dataset import DGLDataset
+from .utils import download
+from ..convert import graph as dgl_graph
+from ..transform import to_bidirected
 
 class QM9Dataset(DGLDataset):
     r"""QM9 dataset for graph property prediction (regression)
@@ -108,8 +109,8 @@ class QM9Dataset(DGLDataset):
             adj = sp.csr_matrix(dist <= self.cutoff) - sp.eye(n_atoms, dtype=np.bool)
             adj = adj.tocoo()
             u, v = torch.tensor(adj.row), torch.tensor(adj.col)
-            g = dgl.graph((u, v))
-            g = dgl.to_bidirected(g)
+            g = dgl_graph((u, v))
+            g = to_bidirected(g)
             g.ndata['R'] = torch.tensor(R, dtype=torch.float32)
             g.ndata['Z'] = torch.tensor(self.Z[self.N_cumsum[i]:self.N_cumsum[i + 1]], dtype=torch.int)
             graphs.append(g)
@@ -123,6 +124,4 @@ class QM9Dataset(DGLDataset):
         """
         return self.label.shape[0]
 
-if __name__ == "__main__":
-    QM9 = QM9Dataset(cutoff=5, label_keys=['mu', 'homo'], raw_dir='./')
-    print(QM9[[1, 2, 3, 4, 5]])
+QM9 = QM9Dataset
