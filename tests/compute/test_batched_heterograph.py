@@ -329,7 +329,7 @@ def test_batch_keeps_empty_data(idtype):
     g2 = dgl.heterograph({("a", "to", "a"): ([], [])}).astype(idtype).to(F.ctx())
     g2.nodes["a"].data["nh"] = F.tensor([])
     g2.edges[("a", "to", "a")].data["eh"] = F.tensor([]) 
-    g = dgl.batch([g1, g2], include_empty_data = True)
+    g = dgl.batch([g1, g2])
     assert "nh" in g.nodes["a"].data
     assert "eh" in g.edges[("a", "to", "a")].data
 
