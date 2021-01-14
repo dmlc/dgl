@@ -25,14 +25,14 @@ class SharedMemory {
    * If shared memory is created in the object, it'll be owned by the object
    * and will be responsible for deleting it when the object is destroyed.
    */
-  bool own;
+  bool own_;
 
   /* \brief the file descripter of the shared memory. */
-  int fd;
+  int fd_;
   /* \brief the address of the shared memory. */
-  void *ptr;
+  void *ptr_;
   /* \brief the size of the shared memory. */
-  size_t size;
+  size_t size_;
 
   /*
    * \brief the name of the object.
