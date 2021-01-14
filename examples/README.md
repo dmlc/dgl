@@ -1,60 +1,69 @@
 # Official DGL Examples and Modules
 
+The folder contains example implementations of selected research papers related to Graph Neural Networks. Note that the examples may not work with incompatible DGL versions.
+* For examples working with the latest master (or the latest [nightly build](https://www.dgl.ai/pages/start.html)), check out https://github.com/dmlc/dgl/tree/master/examples.
+* For examples working with a certain release, check out `https://github.com/dmlc/dgl/tree/<release_version>/examples` (E.g., https://github.com/dmlc/dgl/tree/0.5.x/examples)
+
 ## Overview
 
-| Paper                                                                                                                    | node classification | link prediction / classification | graph property prediction | sampling           | OGB                |
-| ------------------------------------------------------------------------------------------------------------------------ | ------------------- | -------------------------------- | ------------------------- | ------------------ | ------------------ |
-| [Heterogeneous Graph Transformer](#hgt)                                                                                  | :heavy_check_mark:  | :heavy_check_mark:               |                           |                    |                    |
-| [Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges](#mwe)                                  | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
-| [SIGN: Scalable Inception Graph Neural Networks](#sign)                                                                  | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
-| [Strategies for Pre-training Graph Neural Networks](#prestrategy)                                                        |                     |                                  | :heavy_check_mark:        |                    |                    |
-| [Predict then Propagate: Graph Neural Networks meet Personalized PageRank](#appnp)                                       | :heavy_check_mark:  |                                  |                           |                    |                    |
-| [Cluster-GCN: An Efficient Algorithm for Training Deep and Large Graph Convolutional Networks](#clustergcn)              | :heavy_check_mark:  |                                  |                           | :heavy_check_mark: | :heavy_check_mark: |
-| [Deep Graph Infomax](#dgi)                                                                                               | :heavy_check_mark:  |                                  |                           |                    |                    |
-| [Hierarchical Graph Representation Learning with Differentiable Pooling](#diffpool)                                      |                     |                                  | :heavy_check_mark:        |                    |                    |
-| [Representation Learning for Attributed Multiplex Heterogeneous Network](#gatne-t)                                       |                     | :heavy_check_mark:               |                           |                    |                    |
-| [How Powerful are Graph Neural Networks?](#gin)                                                                          | :heavy_check_mark:  |                                  | :heavy_check_mark:        |                    | :heavy_check_mark: |
-| [Heterogeneous Graph Attention Network](#han)                                                                            | :heavy_check_mark:  |                                  |                           |                    |                    |
-| [Simplifying Graph Convolutional Networks](#sgc)                                                                         | :heavy_check_mark:  |                                  |                           |                    |                    |
-| [Molecular Property Prediction: A Multilevel Quantum Interactions Modeling Perspective](#mgcn)                           |                     |                                  | :heavy_check_mark:        |                    |                    |
+| Paper                                                        | node classification | link prediction / classification | graph property prediction | sampling           | OGB                |
+| ------------------------------------------------------------ | ------------------- | -------------------------------- | ------------------------- | ------------------ | ------------------ |
+| [Graph Random Neural Network for Semi-Supervised Learning on Graphs](#grand) | :heavy_check_mark:  |                                  |                           |                    |                    |
+| [Heterogeneous Graph Transformer](#hgt)                      | :heavy_check_mark:  | :heavy_check_mark:               |                           |                    |                    |
+| [Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges](#mwe) | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
+| [SIGN: Scalable Inception Graph Neural Networks](#sign)      | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
+| [Strategies for Pre-training Graph Neural Networks](#prestrategy) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [Predict then Propagate: Graph Neural Networks meet Personalized PageRank](#appnp) | :heavy_check_mark:  |                                  |                           |                    |                    |
+| [Cluster-GCN: An Efficient Algorithm for Training Deep and Large Graph Convolutional Networks](#clustergcn) | :heavy_check_mark:  |                                  |                           | :heavy_check_mark: | :heavy_check_mark: |
+| [Deep Graph Infomax](#dgi)                                   | :heavy_check_mark:  |                                  |                           |                    |                    |
+| [Hierarchical Graph Representation Learning with Differentiable Pooling](#diffpool) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [Representation Learning for Attributed Multiplex Heterogeneous Network](#gatne-t) |                     | :heavy_check_mark:               |                           |                    |                    |
+| [How Powerful are Graph Neural Networks?](#gin)              | :heavy_check_mark:  |                                  | :heavy_check_mark:        |                    | :heavy_check_mark: |
+| [Heterogeneous Graph Attention Network](#han)                | :heavy_check_mark:  |                                  |                           |                    |                    |
+| [Simplifying Graph Convolutional Networks](#sgc)             | :heavy_check_mark:  |                                  |                           |                    |                    |
+| [Molecular Property Prediction: A Multilevel Quantum Interactions Modeling Perspective](#mgcn) |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Pushing the Boundaries of Molecular Representation for Drug Discovery with the Graph Attention Mechanism](#attentivefp) |                     |                                  | :heavy_check_mark:        |                    |                    |
-| [MixHop: Higher-Order Graph Convolutional Architectures via Sparsified Neighborhood Mixing](#mixhop)                     | :heavy_check_mark:  |                                  |                           |                    |                    |
-| [Graph Attention Networks](#gat)                                                                                         | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
-| [Attention-based Graph Neural Network for Semi-supervised Learning](#agnn)                                               | :heavy_check_mark:  |                                  |                           | :heavy_check_mark: |                    |
-| [Graph Convolutional Neural Networks for Web-Scale Recommender Systems](#pinsage)                                        |                     |                                  |                           |                    |                    |
-| [Semi-Supervised Classification with Graph Convolutional Networks](#gcn)                                                 | :heavy_check_mark:  | :heavy_check_mark:               | :heavy_check_mark:        |                    | :heavy_check_mark: |
-| [Graph Convolutional Matrix Completion](#gcmc)                                                                           |                     | :heavy_check_mark:               |                           |                    |                    |
-| [Inductive Representation Learning on Large Graphs](#graphsage)                                                          | :heavy_check_mark:  | :heavy_check_mark:               |                           | :heavy_check_mark: | :heavy_check_mark: |
-| [metapath2vec: Scalable Representation Learning for Heterogeneous Networks](#metapath2vec)                               | :heavy_check_mark:  |                                  |                           |                    |                    |
-| [Topology Adaptive Graph Convolutional Networks](#tagcn)                                                                 | :heavy_check_mark:  |                                  |                           |                    |                    |
-| [Modeling Relational Data with Graph Convolutional Networks](#rgcn)                                                      | :heavy_check_mark:  | :heavy_check_mark:               |                           | :heavy_check_mark: |                    |
-| [Neural Message Passing for Quantum Chemistry](#mpnn)                                                                    |                     |                                  | :heavy_check_mark:        |                    |                    |
-| [SchNet: A continuous-filter convolutional neural network for modeling quantum interactions](#schnet)                    |                     |                                  | :heavy_check_mark:        |                    |                    |
-| [Convolutional Neural Networks on Graphs with Fast Localized Spectral Filtering](#chebnet)                               | :heavy_check_mark:  |                                  | :heavy_check_mark:        |                    |                    |
-| [Geometric deep learning on graphs and manifolds using mixture model CNNs](#monet)                                       | :heavy_check_mark:  |                                  | :heavy_check_mark:        |                    |                    |
-| [Molecular Graph Convolutions: Moving Beyond Fingerprints](#weave)                                                       |                     |                                  | :heavy_check_mark:        |                    |                    |
-| [LINE: Large-scale Information Network Embedding](#line)                                                                 |                     | :heavy_check_mark:               |                           |                    | :heavy_check_mark: |
-| [DeepWalk: Online Learning of Social Representations](#deepwalk)                                                         |                     | :heavy_check_mark:               |                           |                    | :heavy_check_mark: |
-| [Self-Attention Graph Pooling](#sagpool)                                                                                 |                     |                                  | :heavy_check_mark:        |                    |                    |
-| [Convolutional Networks on Graphs for Learning Molecular Fingerprints](#nf)                                              |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [MixHop: Higher-Order Graph Convolutional Architectures via Sparsified Neighborhood Mixing](#mixhop) | :heavy_check_mark:  |                                  |                           |                    |                    |
+| [Graph Attention Networks](#gat)                             | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
+| [Attention-based Graph Neural Network for Semi-supervised Learning](#agnn) | :heavy_check_mark:  |                                  |                           | :heavy_check_mark: |                    |
+| [Graph Convolutional Neural Networks for Web-Scale Recommender Systems](#pinsage) |                     |                                  |                           |                    |                    |
+| [Semi-Supervised Classification with Graph Convolutional Networks](#gcn) | :heavy_check_mark:  | :heavy_check_mark:               | :heavy_check_mark:        |                    | :heavy_check_mark: |
+| [Graph Convolutional Matrix Completion](#gcmc)               |                     | :heavy_check_mark:               |                           |                    |                    |
+| [Inductive Representation Learning on Large Graphs](#graphsage) | :heavy_check_mark:  | :heavy_check_mark:               |                           | :heavy_check_mark: | :heavy_check_mark: |
+| [metapath2vec: Scalable Representation Learning for Heterogeneous Networks](#metapath2vec) | :heavy_check_mark:  |                                  |                           |                    |                    |
+| [Topology Adaptive Graph Convolutional Networks](#tagcn)     | :heavy_check_mark:  |                                  |                           |                    |                    |
+| [Modeling Relational Data with Graph Convolutional Networks](#rgcn) | :heavy_check_mark:  | :heavy_check_mark:               |                           | :heavy_check_mark: |                    |
+| [Neural Message Passing for Quantum Chemistry](#mpnn)        |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [SchNet: A continuous-filter convolutional neural network for modeling quantum interactions](#schnet) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [Convolutional Neural Networks on Graphs with Fast Localized Spectral Filtering](#chebnet) | :heavy_check_mark:  |                                  | :heavy_check_mark:        |                    |                    |
+| [Geometric deep learning on graphs and manifolds using mixture model CNNs](#monet) | :heavy_check_mark:  |                                  | :heavy_check_mark:        |                    |                    |
+| [Molecular Graph Convolutions: Moving Beyond Fingerprints](#weave) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [LINE: Large-scale Information Network Embedding](#line)     |                     | :heavy_check_mark:               |                           |                    | :heavy_check_mark: |
+| [DeepWalk: Online Learning of Social Representations](#deepwalk) |                     | :heavy_check_mark:               |                           |                    | :heavy_check_mark: |
+| [Self-Attention Graph Pooling](#sagpool)                     |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [Convolutional Networks on Graphs for Learning Molecular Fingerprints](#nf) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [GNN-FiLM: Graph Neural Networks with Feature-wise Linear Modulation](#gnnfilm) | :heavy_check_mark:  |                     |                     |                     |                     |
 
 ## 2020
 
+- <a name="grand"></a> Feng et al. Graph Random Neural Network for Semi-Supervised Learning on Graphs. [Paper link](https://arxiv.org/abs/2005.11079). 
+    - Example code: [PyTorch](../examples/pytorch/grand)
+    - Tags: semi-supervised node classification, simplifying graph convolution, data augmentation
 - <a name="hgt"></a> Hu et al. Heterogeneous Graph Transformer. [Paper link](https://arxiv.org/abs/2003.01332).
     - Example code: [PyTorch](../examples/pytorch/hgt)
     - Tags: dynamic heterogeneous graphs, large-scale, node classification, link prediction
-
 - <a name="mwe"></a> Chen. Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges. [Paper link](https://cims.nyu.edu/~chenzh/files/GCN_with_edge_weights.pdf).
     - Example code: [PyTorch on ogbn-proteins](../examples/pytorch/ogb/ogbn-proteins)
     - Tags: node classification, weighted graphs, OGB
-
 - <a name="sign"></a> Frasca et al. SIGN: Scalable Inception Graph Neural Networks. [Paper link](https://arxiv.org/abs/2004.11198).
     - Example code: [PyTorch on ogbn-arxiv/products/mag](../examples/pytorch/ogb/sign), [PyTorch](../examples/pytorch/sign)
     - Tags: node classification, OGB, large-scale, heterogeneous graphs
-
 - <a name="prestrategy"></a> Hu et al. Strategies for Pre-training Graph Neural Networks. [Paper link](https://arxiv.org/abs/1905.12265).
     - Example code: [Molecule embedding](https://github.com/awslabs/dgl-lifesci/tree/master/examples/molecule_embeddings), [PyTorch for custom data](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/csv_data_configuration)
     - Tags: molecules, graph classification, unsupervised learning, self-supervised learning, molecular property prediction
+- <a name="GNN-FiLM"></a> Marc Brockschmidt. GNN-FiLM: Graph Neural Networks with Feature-wise Linear Modulation. [Paper link](https://arxiv.org/abs/1906.12192).
+    - Example code: [Pytorch](../examples/pytorch/GNN-FiLM)
+    - Tags: multi-relational graphs, hypernetworks, GNN architectures
 
 ## 2019
 

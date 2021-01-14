@@ -32,7 +32,7 @@ DGL NN模块额外增加了1个参数 :class:`dgl.DGLGraph`。``forward()`` 函�
 这可能会导致模型性能不佳。但是，在 :class:`~dgl.nn.pytorch.conv.SAGEConv` 模块中，被聚合的特征将会与节点的初始特征拼接起来，
 ``forward()`` 函数的输出不会全为0。在这种情况下，无需进行此类检验。
 
-DGL NN模块可在不同类型的图输入中重复使用，包括：同构图、异构图（:ref:`guide_cn-graph-heterogeneous`）和子图区块（:ref:`guide-minibatch`）。
+DGL NN模块可在不同类型的图输入中重复使用，包括：同构图、异构图（:ref:`guide_cn-graph-heterogeneous`）和子图块（:ref:`guide_cn-minibatch`）。
 
 SAGEConv的数学公式如下：
 

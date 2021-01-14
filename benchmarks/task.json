@@ -1,0 +1,18 @@
+{
+    "c5.9xlarge": {
+        "tests": [
+            ""
+        ],
+        "env": {
+            "DEVICE": "cpu"
+        }
+    },
+    "g4dn.2xlarge": {
+        "tests": [
+            ""
+        ],
+        "env": {
+            "DEVICE": "gpu"
+        }
+    }
+}
