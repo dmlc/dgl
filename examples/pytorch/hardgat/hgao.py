@@ -100,7 +100,6 @@ class HardGAO(nn.Module):
             subgraph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                              fn.sum('m', 'ft'))
             rst = subgraph.dstdata['ft']
-            
             # activation
             if self.activation:
                 rst = self.activation(rst)
