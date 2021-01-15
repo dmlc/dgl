@@ -180,6 +180,7 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
     eval_seeds = []
 
     with th.no_grad():
+        th.cuda.empty_cache()
         for sample_data in tqdm.tqdm(eval_loader):
             seeds, blocks = sample_data
 
@@ -324,6 +325,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
     train_time = 0
     validation_time = 0
     test_time = 0
+    last_val_acc = 0.0
     if n_gpus > 1 and n_cpus - args.num_workers > 0:
         th.set_num_threads(n_cpus-args.num_workers)
     for epoch in range(args.n_epochs):
@@ -389,38 +391,48 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
                     (F.cross_entropy(val_logits, labels[val_seeds].cpu()).item(), \
                     th.sum(val_logits.argmax(dim=1) == labels[val_seeds].cpu()).item() / len(val_seeds))
 
+                do_test = val_acc > last_val_acc
+                last_val_acc = val_acc
                 print("Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
                         format(val_acc, val_loss))
         if n_gpus > 1:
             th.distributed.barrier()
+            if proc_id == 0:
+                for i in range(1, n_gpus):
+                    queue.put(do_test)
+            else:
+                do_test = queue.get()
+
         vend = time.time()
         validation_time += (vend - vstart)
 
-    tstart = time.time()
-    if (queue is not None) or (proc_id == 0):
-        test_logits, test_seeds = evaluate(model, embed_layer, test_loader, node_feats)
-        if queue is not None:
-            queue.put((test_logits, test_seeds))
+        if (epoch + 1) > (args.n_epochs / 2) and do_test:
+            tstart = time.time()
+            if (queue is not None) or (proc_id == 0):
+                test_logits, test_seeds = evaluate(model, embed_layer, test_loader, node_feats)
+                if queue is not None:
+                    queue.put((test_logits, test_seeds))
 
-        # gather evaluation result from multiple processes
-        if proc_id == 0:
-            test_loss, test_acc = collect_eval() if queue is not None else \
-                (F.cross_entropy(test_logits, labels[test_seeds].cpu()).item(), \
-                th.sum(test_logits.argmax(dim=1) == labels[test_seeds].cpu()).item() / len(test_seeds))
-            print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss))
-            print()
-    tend = time.time()
-    test_time += (tend-tstart)
+                # gather evaluation result from multiple processes
+                if proc_id == 0:
+                    test_loss, test_acc = collect_eval() if queue is not None else \
+                        (F.cross_entropy(test_logits, labels[test_seeds].cpu()).item(), \
+                        th.sum(test_logits.argmax(dim=1) == labels[test_seeds].cpu()).item() / len(test_seeds))
+                    print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss))
+                    print()
+            tend = time.time()
+            test_time += (tend-tstart)
 
-    # sync for test
-    if n_gpus > 1:
-        th.distributed.barrier()
+            # sync for test
+            if n_gpus > 1:
+                th.distributed.barrier()
 
     print("{}/{} Mean forward time: {:4f}".format(proc_id, n_gpus,
                                                   np.mean(forward_time[len(forward_time) // 4:])))
     print("{}/{} Mean backward time: {:4f}".format(proc_id, n_gpus,
                                                    np.mean(backward_time[len(backward_time) // 4:])))
     if proc_id == 0:
+        print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss))
         print("Train {}s, valid {}s, test {}s".format(train_time, validation_time, test_time))
 
 def main(args, devices):
@@ -505,15 +517,14 @@ def main(args, devices):
             category_id = i
 
     g = dgl.to_homogeneous(hg)
+    gen_norm(g)
+    g.edata['norm'].share_memory_()
     g.ndata['ntype'] = g.ndata[dgl.NTYPE]
     g.ndata['ntype'].share_memory_()
     g.edata['etype'] = g.edata[dgl.ETYPE]
     g.edata['etype'].share_memory_()
     g.ndata['type_id'] = g.ndata[dgl.NID]
     g.ndata['type_id'].share_memory_()
-    if args.global_norm:
-        gen_norm(g)
-        g.edata['norm'].share_memory_()
     node_ids = th.arange(g.number_of_nodes())
 
     # find out the target node ids
@@ -589,7 +600,7 @@ def config():
             help="gpu")
     parser.add_argument("--lr", type=float, default=1e-2,
             help="learning rate")
-    parser.add_argument("--sparse-lr", type=float, default=5e-2,
+    parser.add_argument("--sparse-lr", type=float, default=2e-2,
             help="sparse embedding learning rate")
     parser.add_argument("--n-bases", type=int, default=-1,
             help="number of filter weight matrices, default: -1 [use all]")
@@ -610,7 +621,7 @@ def config():
     fp.add_argument('--testing', dest='validation', action='store_false')
     parser.add_argument("--batch-size", type=int, default=100,
             help="Mini-batch size. ")
-    parser.add_argument("--eval-batch-size", type=int, default=128,
+    parser.add_argument("--eval-batch-size", type=int, default=64,
             help="Mini-batch size. ")
     parser.add_argument("--num-workers", type=int, default=0,
             help="Number of workers for dataloader.")

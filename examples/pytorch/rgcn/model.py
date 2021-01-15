@@ -52,7 +52,7 @@ class BaseRGCN(nn.Module):
 
 def initializer(emb):
     #nn.init.xavier_uniform_(emb, gain=nn.init.calculate_gain('relu'))
-    emb.uniform_(-1, 1)
+    emb.uniform_(-1.0, 1.0)
     return emb
 
 class RelGraphEmbedLayer(nn.Module):
@@ -141,7 +141,10 @@ class RelGraphEmbedLayer(nn.Module):
         for ntype in range(self.num_of_ntype):
             loc = node_tids == ntype
             if isinstance(features[ntype], int):
-                embeds[loc] = self.node_embeds[str(ntype)](type_ids[loc], self.dev_id)
+                if self.dgl_sparse:
+                    embeds[loc] = self.node_embeds[str(ntype)](type_ids[loc], self.dev_id)
+                else:
+                    embeds[loc] = self.node_embeds[str(ntype)](type_ids[loc]).to(self.dev_id)
             else:
                 embeds[loc] = features[ntype][type_ids[loc]].to(self.dev_id) @ self.embeds[str(ntype)].to(self.dev_id)
 

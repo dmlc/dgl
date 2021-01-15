@@ -43,19 +43,19 @@ AIFB: accuracy avg(5 runs) 90.56%, best 94.44% (DGL)
 python3 entity_classify_mp.py -d aifb --testing --gpu 0 --fanout='20,20' --batch-size 128
 ```
 
-MUTAG: accuracy avg(5 runs) 66.77%, best 69.12% (DGL)
+MUTAG: accuracy avg(5 runs) 70.00%, best 73.53% (DGL)
 ```
-python3 entity_classify_mp.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gpu 0 --batch-size 256 --use-self-loop --n-epochs 40
-```
-
-BGS: accuracy avg(5 runs) 91.72%, best 96.55% (DGL)
-```
-python3 entity_classify_mp.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout '40,40' --n-epochs=40 --batch-size=128
+python3 entity_classify_mp.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gpu 0 --batch-size 64 --fanout '50,40' --use-self-loop --dgl-sparse --n-epochs 30 --sparse-lr 0.01 --dropout 0.7
 ```
 
-AM: accuracy avg(5 runs) 88.28%, best 90.40% (DGL)
+BGS: accuracy avg(5 runs) 84.83%, best 89.66% (DGL)
 ```
-python3 entity_classify_mp.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout '35,35' --batch-size 256 --lr 1e-2 --n-hidden 16 --use-self-loop --n-epochs=40
+python3 entity_classify_mp.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout '50,40' --n-epochs=20 --batch-size=32 --dgl-sparse  --lr 0.01 --sparse-lr 0.01 --dropout 0.3
+```
+
+AM: accuracy avg(5 runs) 88.59%, best 88.89% (DGL)
+```
+python3 entity_classify_mp.py -d am --l2norm 5e-4 --n-bases 40 --testing  --gpu 0 --fanout '35,35' --batch-size 64 --n-hidden 16 --use-self-loop --n-epochs=20 --dgl-sparse --lr 0.01  --sparse-lr 0.02 --dropout 0.7
 ```
 
 ### Entity Classification on OGBN-MAG
@@ -63,7 +63,7 @@ Test-bd: P3-8xlarge
 
 OGBN-MAG accuracy 46.22
 ```
-python3 entity_classify_mp.py -d ogbn-mag --testing --fanout='20,25' --batch-size 1024 --n-hidden 128 --lr 0.01 --num-worker 4 --eval-batch-size 8 --low-mem --gpu 0,1,2,3 --dropout 0.3 --use-self-loop --n-bases 2 --n-epochs 5 --node-feats --dgl-sparse
+python3 entity_classify_mp.py -d ogbn-mag --testing --fanout='30,30' --batch-size 1024 --n-hidden 128 --lr 0.01 --num-worker 4 --eval-batch-size 8 --low-mem --gpu 0,1,2,3 --dropout 0.7 --use-self-loop --n-bases 2 --n-epochs 3 --node-feats --dgl-sparse --sparse-lr 0.05
 ```
 
 python3 entity_classify_mp.py -d ogbn-mag --testing --fanout='20,25' --batch-size 1024 --n-hidden 128 --lr 0.01 --num-worker 4 --eval-batch-size 8 --low-mem --gpu 0,1,2,3 --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --node-feats --dgl-sparse --sparse-lr 0.05
