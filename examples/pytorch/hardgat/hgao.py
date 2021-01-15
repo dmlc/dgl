@@ -14,6 +14,7 @@ from functools import partial
 from dgl.nn.pytorch.utils import Identity
 import torch.nn.functional as F
 from dgl.base import DGLError
+import dgl
 
 class HardGAO(nn.Module):
     def __init__(self,
@@ -61,10 +62,6 @@ class HardGAO(nn.Module):
         if self.residual:
             nn.init.xavier_normal_(self.residual_module.weight,gain=gain)
 
-    def n2e_weight_transfer(self,edges):
-        y = edges.src['y']
-        return {'y':y}
-
     def forward(self, graph, feat, get_attention=False):
             # Check in degree and generate error
             if (graph.in_degrees()==0).any():
@@ -80,7 +77,7 @@ class HardGAO(nn.Module):
             # projection process to get importance vector y
             graph.ndata['y'] = torch.abs(torch.matmul(self.p,feat.T).view(-1))/torch.norm(self.p,p=2)
             # Use edge message passing function to get the weight from src node
-            graph.apply_edges(self.n2e_weight_transfer)
+            graph.apply_edges(fn.copy_u('y','y'))
             # Select Top k neighbors
             subgraph = select_topk(graph,self.k,'y')
             # Sigmoid as information threshold
