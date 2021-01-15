@@ -3,6 +3,8 @@
 6.4 Customizing Neighborhood Sampler
 ----------------------------------------------
 
+:ref:`(中文版) <guide_cn-minibatch-customizing-neighborhood-sampler>`
+
 Although DGL provides some neighborhood sampling strategies, sometimes
 users would want to write their own sampling strategy. This section
 explains how to write your own strategy and plug it into your stochastic
@@ -51,15 +53,13 @@ green nodes:
 Neighborhood sampling with pencil and paper
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We then consider how multi-layer message passing works for computing the
-output of a single node. In the following text we refer to the nodes
-whose GNN outputs are to be computed as *seed nodes*.
+Let's first define a DGL graph according to the above image.
 
 .. code:: python
 
     import torch
     import dgl
-    
+
     src = torch.LongTensor(
         [0, 0, 0, 1, 2, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 8, 9, 10,
          1, 2, 3, 3, 3, 4, 5, 5, 6, 5, 8, 6, 8, 9, 8, 11, 11, 10, 11])
@@ -67,8 +67,10 @@ whose GNN outputs are to be computed as *seed nodes*.
         [1, 2, 3, 3, 3, 4, 5, 5, 6, 5, 8, 6, 8, 9, 8, 11, 11, 10, 11,
          0, 0, 0, 1, 2, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 8, 9, 10])
     g = dgl.graph((src, dst))
-    g.ndata['x'] = torch.randn(12, 5)
-    g.ndata['y'] = torch.randn(12, 1)
+
+We then consider how multi-layer message passing works for computing the
+output of a single node. In the following text we refer to the nodes
+whose GNN outputs are to be computed as *seed nodes*.
 
 Finding the message passing dependency
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -153,7 +155,6 @@ second GNN layer for node 8.
    :alt: Imgur
 
 
-
 Note that the output nodes also appear in the input nodes. The reason is
 that representations of output nodes from the previous layer are needed
 for feature combination after message passing (i.e. :math:`\phi^{(2)}`).
@@ -205,8 +206,6 @@ output nodes via
    <div class="alert alert-info">
 
 ::
-
-   <b>ID Mappings</b>
 
 The original node IDs of the input nodes and output nodes in the block
 can be found as the feature ``dgl.NID``, and the mapping from the

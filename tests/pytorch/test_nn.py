@@ -9,7 +9,6 @@ from test_utils.graph_cases import get_cases, random_graph, random_bipartite, ra
 from test_utils import parametrize_dtype
 from copy import deepcopy
 
-import numpy as np
 import scipy as sp
 
 def _AXWb(A, X, W, b):

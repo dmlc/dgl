@@ -1,5 +1,9 @@
 # Official DGL Examples and Modules
 
+The folder contains example implementations of selected research papers related to Graph Neural Networks. Note that the examples may not work with incompatible DGL versions.
+* For examples working with the latest master (or the latest [nightly build](https://www.dgl.ai/pages/start.html)), check out https://github.com/dmlc/dgl/tree/master/examples.
+* For examples working with a certain release, check out `https://github.com/dmlc/dgl/tree/<release_version>/examples` (E.g., https://github.com/dmlc/dgl/tree/0.5.x/examples)
+
 ## Overview
 
 | Paper                                                        | node classification | link prediction / classification | graph property prediction | sampling           | OGB                |
@@ -38,6 +42,8 @@
 | [DeepWalk: Online Learning of Social Representations](#deepwalk) |                     | :heavy_check_mark:               |                           |                    | :heavy_check_mark: |
 | [Self-Attention Graph Pooling](#sagpool)                     |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Convolutional Networks on Graphs for Learning Molecular Fingerprints](#nf) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [GNN-FiLM: Graph Neural Networks with Feature-wise Linear Modulation](#gnnfilm) | :heavy_check_mark:  |                     |                     |                     |                     |
+| [Graph Representation Learning via Hard and Channel-Wise Attention Networks](#hardgat)                                   |:heavy_check_mark:                     |                 |                           |                    |                    |
 
 ## 2020
 
@@ -56,6 +62,9 @@
 - <a name="prestrategy"></a> Hu et al. Strategies for Pre-training Graph Neural Networks. [Paper link](https://arxiv.org/abs/1905.12265).
     - Example code: [Molecule embedding](https://github.com/awslabs/dgl-lifesci/tree/master/examples/molecule_embeddings), [PyTorch for custom data](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/csv_data_configuration)
     - Tags: molecules, graph classification, unsupervised learning, self-supervised learning, molecular property prediction
+- <a name="GNN-FiLM"></a> Marc Brockschmidt. GNN-FiLM: Graph Neural Networks with Feature-wise Linear Modulation. [Paper link](https://arxiv.org/abs/1906.12192).
+    - Example code: [Pytorch](../examples/pytorch/GNN-FiLM)
+    - Tags: multi-relational graphs, hypernetworks, GNN architectures
 
 ## 2019
 
@@ -134,6 +143,10 @@
 - <a name="sagpool"></a> Lee, Junhyun, et al. Self-Attention Graph Pooling. [Paper link](https://arxiv.org/abs/1904.08082).
     - Example code: [PyTorch](../examples/pytorch/sagpool)
     - Tags: graph classification, pooling
+
+- <a name='hardgat'></a> Gao, Hongyang, et al. Graph Representation Learning via Hard and Channel-Wise Attention Networks [Paper link](https://arxiv.org/abs/1907.04652).
+    - Example code: [Pytorch](../examples/pytorch/hgat)
+    - Tags: node classification, graph attention
 
 ## 2018
 
