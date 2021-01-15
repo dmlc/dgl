@@ -1,1 +1,3 @@
 out/
+python/dgl/_deprecate
+tutorials/
