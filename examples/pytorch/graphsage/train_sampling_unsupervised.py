@@ -5,17 +5,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.multiprocessing as mp
-from torch.utils.data import DataLoader
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
-from _thread import start_new_thread
-from functools import wraps
 from dgl.data import RedditDataset
 from torch.nn.parallel import DistributedDataParallel
 import tqdm
-import traceback
 import sklearn.linear_model as lm
 import sklearn.metrics as skm
 
@@ -37,13 +33,6 @@ class NegativeSampler(object):
             dst = self.weights.multinomial(n*self.k, replacement=True)
         src = src.repeat_interleave(self.k)
         return src, dst
-
-def load_subtensor(g, input_nodes, device):
-    """
-    Copys features and labels of a set of nodes onto GPU.
-    """
-    batch_inputs = g.ndata['features'][input_nodes].to(device)
-    return batch_inputs
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -74,7 +63,7 @@ class SAGE(nn.Module):
                 h = self.dropout(h)
         return h
 
-    def inference(self, g, x, batch_size, device):
+    def inference(self, g, x, device):
         """
         Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
         g : the entire graph.
@@ -88,14 +77,13 @@ class SAGE(nn.Module):
         # Therefore, we compute the representation of all nodes layer by layer.  The nodes
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
-        nodes = th.arange(g.number_of_nodes())
         for l, layer in enumerate(self.layers):
-            y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
+            y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.NodeDataLoader(
                 g,
-                th.arange(g.number_of_nodes()),
+                th.arange(g.num_nodes()),
                 sampler,
                 batch_size=args.batch_size,
                 shuffle=True,
@@ -155,24 +143,23 @@ def compute_acc(emb, labels, train_nids, val_nids, test_nids):
     f1_micro_test = skm.f1_score(test_labels, pred[test_nids], average='micro')
     return f1_micro_eval, f1_micro_test
 
-def evaluate(model, g, inputs, labels, train_nids, val_nids, test_nids, batch_size, device):
+def evaluate(model, g, nfeat, labels, train_nids, val_nids, test_nids, device):
     """
     Evaluate the model on the validation set specified by ``val_mask``.
     g : The entire graph.
     inputs : The features of all the nodes.
     labels : The labels of all the nodes.
     val_mask : A 0-1 mask indicating which nodes do we actually compute the accuracy for.
-    batch_size : Number of nodes to compute at the same time.
     device : The GPU device to evaluate on.
     """
     model.eval()
     with th.no_grad():
         # single gpu
         if isinstance(model, SAGE):
-            pred = model.inference(g, inputs, batch_size, device)
+            pred = model.inference(g, nfeat, device)
         # multi gpu
         else:
-            pred = model.module.inference(g, inputs, batch_size, device)
+            pred = model.module.inference(g, nfeat, device)
     model.train()
     return compute_acc(pred, labels, train_nids, val_nids, test_nids)
 
@@ -188,18 +175,17 @@ def run(proc_id, n_gpus, args, devices, data):
                                           init_method=dist_init_method,
                                           world_size=world_size,
                                           rank=proc_id)
-    train_mask, val_mask, test_mask, in_feats, labels, n_classes, g = data
+    train_mask, val_mask, test_mask, n_classes, g = data
+    nfeat = g.ndata.pop('feat')
+    labels = g.ndata.pop('label')
+    in_feats = nfeat.shape[1]
 
     train_nid = th.LongTensor(np.nonzero(train_mask)).squeeze()
     val_nid = th.LongTensor(np.nonzero(val_mask)).squeeze()
     test_nid = th.LongTensor(np.nonzero(test_mask)).squeeze()
 
-    #train_nid = th.LongTensor(np.nonzero(train_mask)[0])
-    #val_nid = th.LongTensor(np.nonzero(val_mask)[0])
-    #test_nid = th.LongTensor(np.nonzero(test_mask)[0])
-
     # Create PyTorch DataLoader for constructing blocks
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
     train_seeds = np.arange(n_edges)
     if n_gpus > 0:
         num_per_gpu = (train_seeds.shape[0] + n_gpus -1) // n_gpus
@@ -230,7 +216,6 @@ def run(proc_id, n_gpus, args, devices, data):
     if n_gpus > 1:
         model = DistributedDataParallel(model, device_ids=[device], output_device=device)
     loss_fcn = CrossEntropyLoss()
-    loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     # Training loop
@@ -249,7 +234,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
         tic_step = time.time()
         for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
-            batch_inputs = load_subtensor(g, input_nodes, device)
+            batch_inputs = nfeat[input_nodes].to(device)
             d_step = time.time()
 
             pos_graph = pos_graph.to(device)
@@ -263,8 +248,8 @@ def run(proc_id, n_gpus, args, devices, data):
             optimizer.step()
 
             t = time.time()
-            pos_edges = pos_graph.number_of_edges()
-            neg_edges = neg_graph.number_of_edges()
+            pos_edges = pos_graph.num_edges()
+            neg_edges = neg_graph.num_edges()
             iter_pos.append(pos_edges / (t - tic_step))
             iter_neg.append(neg_edges / (t - tic_step))
             iter_d.append(d_step - tic_step)
@@ -276,34 +261,37 @@ def run(proc_id, n_gpus, args, devices, data):
             tic_step = time.time()
 
             if step % args.eval_every == 0 and proc_id == 0:
-                eval_acc, test_acc = evaluate(model, g, g.ndata['features'], labels, train_nid, val_nid, test_nid, args.batch_size, device)
+                eval_acc, test_acc = evaluate(model, g, nfeat, labels, train_nid, val_nid, test_nid, device)
                 print('Eval Acc {:.4f} Test Acc {:.4f}'.format(eval_acc, test_acc))
                 if eval_acc > best_eval_acc:
                     best_eval_acc = eval_acc
                     best_test_acc = test_acc
                 print('Best Eval Acc {:.4f} Test Acc {:.4f}'.format(best_eval_acc, best_test_acc))
+        toc = time.time()
+        if proc_id == 0:
+            print('Epoch Time(s): {:.4f}'.format(toc - tic))
+        if epoch >= 5:
+            avg += toc - tic
         if n_gpus > 1:
             th.distributed.barrier()
-    print('Avg epoch time: {}'.format(avg / (epoch - 4)))
+
+    if proc_id == 0:
+        print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
 def main(args, devices):
     # load reddit data
     data = RedditDataset(self_loop=False)
     n_classes = data.num_classes
     g = data[0]
-    features = g.ndata['feat']
-    in_feats = features.shape[1]
-    labels = g.ndata['label']
     train_mask = g.ndata['train_mask']
     val_mask = g.ndata['val_mask']
     test_mask = g.ndata['test_mask']
-    g.ndata['features'] = features
 
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
     g.create_formats_()
     # Pack data
-    data = train_mask, val_mask, test_mask, in_feats, labels, n_classes, g
+    data = train_mask, val_mask, test_mask, n_classes, g
 
     n_gpus = len(devices)
     if devices[0] == -1:
@@ -324,13 +312,14 @@ def main(args, devices):
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser("multi-gpu training")
     argparser.add_argument("--gpu", type=str, default='0',
-            help="GPU, can be a list of gpus for multi-gpu trianing, e.g., 0,1,2,3; -1 for CPU")
+                           help="GPU, can be a list of gpus for multi-gpu trianing,"
+                                " e.g., 0,1,2,3; -1 for CPU")
     argparser.add_argument('--num-epochs', type=int, default=20)
     argparser.add_argument('--num-hidden', type=int, default=16)
     argparser.add_argument('--num-layers', type=int, default=2)
     argparser.add_argument('--num-negs', type=int, default=1)
     argparser.add_argument('--neg-share', default=False, action='store_true',
-        help="sharing neg nodes for positive nodes")
+                           help="sharing neg nodes for positive nodes")
     argparser.add_argument('--fan-out', type=str, default='10,25')
     argparser.add_argument('--batch-size', type=int, default=10000)
     argparser.add_argument('--log-every', type=int, default=20)
@@ -338,7 +327,7 @@ if __name__ == '__main__':
     argparser.add_argument('--lr', type=float, default=0.003)
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=0,
-        help="Number of sampling processes. Use 0 for no extra process.")
+                           help="Number of sampling processes. Use 0 for no extra process.")
     args = argparser.parse_args()
 
     devices = list(map(int, args.gpu.split(',')))
