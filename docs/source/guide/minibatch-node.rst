@@ -3,6 +3,8 @@
 6.1 Training GNN for Node Classification with Neighborhood Sampling
 -----------------------------------------------------------------------
 
+:ref:`(中文版) <guide_cn-minibatch-node-classification-sampler>`
+
 To make your model been trained stochastically, you need to do the
 followings:
 
