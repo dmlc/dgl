@@ -150,7 +150,7 @@ The folder contains example implementations of selected research papers related 
     - Tags: graph classification, pooling
 
 - <a name='hardgat'></a> Gao, Hongyang, et al. Graph Representation Learning via Hard and Channel-Wise Attention Networks [Paper link](https://arxiv.org/abs/1907.04652).
-    - Example code: [Pytorch](../examples/pytorch/hgat)
+    - Example code: [Pytorch](../examples/pytorch/hardgat)
     - Tags: node classification, graph attention
 
 ## 2018
