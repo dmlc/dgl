@@ -4,6 +4,7 @@ import backend as F
 from dgl.backend.pytorch.sparse_emb import NodeEmbedding
 from dgl.backend.pytorch.sparse_optim import SparseAdam, SparseAdagrad
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_sparse_adam():
     num_embs = 10
     emb_dim = 4

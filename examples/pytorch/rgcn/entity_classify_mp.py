@@ -621,7 +621,7 @@ def config():
     fp.add_argument('--testing', dest='validation', action='store_false')
     parser.add_argument("--batch-size", type=int, default=100,
             help="Mini-batch size. ")
-    parser.add_argument("--eval-batch-size", type=int, default=64,
+    parser.add_argument("--eval-batch-size", type=int, default=32,
             help="Mini-batch size. ")
     parser.add_argument("--num-workers", type=int, default=0,
             help="Number of workers for dataloader.")
