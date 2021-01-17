@@ -7,6 +7,8 @@
 #define DGL_ARRAY_CUDA_FUNCTOR_CUH_
 
 #include "./atomic.cuh"
+#include "./fp16.cuh"
+#include <cmath>
 
 namespace dgl {
 namespace aten {
@@ -124,7 +126,9 @@ template <typename Idx,
           typename DType,
           bool atomic=false>
 struct Sum {
-  static constexpr DType zero = 0;
+  static constexpr __host__ __device__ __forceinline__ DType zero() {
+    return 0.;
+  };
   static constexpr bool require_arg = false;
   static __device__ __forceinline__ void Call(
     DType *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
@@ -148,8 +152,28 @@ struct Sum {
     Idx *arg_u_buf, Idx *arg_e_buf,
     DType val, DType val_ref, Idx uid, Idx eid) {}
 };
-template <typename Idx, typename DType, bool atomic>
-constexpr DType Sum<Idx, DType, atomic>::zero;
+
+template <typename Idx>
+struct Sum<Idx, half, false> {
+  static constexpr __host__ __device__ __forceinline__ half zero() {
+    return __float2half_rn(0.);
+  };
+  static constexpr bool require_arg = false;
+  static __device__ __forceinline__ void Call(
+    half *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
+    half val, Idx uid, Idx eid) {
+    *out_buf += val;
+  }
+  static __device__ __forceinline__ void Call(
+      half *out_buf, Idx *arg_buf,
+      half val, Idx id) {
+    *out_buf += val;
+  }
+  static __device__ __forceinline__ void CallArg(Idx fid,
+    half *arg_u_buf, Idx *arg_e_buf,
+    half val, half val_ref, Idx uid, Idx eid) {}
+};
+
 template <typename Idx, typename DType, bool atomic>
 constexpr bool Sum<Idx, DType, atomic>::require_arg;
 
@@ -157,7 +181,9 @@ template <typename Idx,
           typename DType,
           bool atomic=false>
 struct Max {
-  static constexpr DType zero = -std::numeric_limits<DType>::infinity();
+  static constexpr __host__ __device__ __forceinline__ DType zero() {
+    return -std::numeric_limits<DType>::infinity();
+  };
   static constexpr bool require_arg = true;
   static __device__ __forceinline__ void Call(
     DType *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
@@ -197,8 +223,36 @@ struct Max {
     }
   }
 };
-template <typename Idx, typename DType, bool atomic>
-constexpr DType Max<Idx, DType, atomic>::zero;
+
+template <typename Idx>
+struct Max<Idx, half, false> {
+  static constexpr __host__ __device__ __forceinline__ half zero() {
+    return __float2half_rn(-6.550400e+04f);
+  };
+  static constexpr bool require_arg = true;
+  static __device__ __forceinline__ void Call(
+    half *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
+    half val, Idx uid, Idx eid) {
+    if (*out_buf < val) {
+      *out_buf = val;
+      *arg_u_buf = uid;
+      *arg_e_buf = eid;
+    }
+  }
+  static __device__ __forceinline__ void Call(
+      half *out_buf, Idx *arg_buf,
+      half val, Idx id) {
+    if (*out_buf < val) {
+      *out_buf = val;
+      *arg_buf = id;
+    }
+  }
+  static __device__ __forceinline__ void CallArg(Idx fid,
+    Idx *arg_u_buf, Idx *arg_e_buf,
+    half val, half val_ref, Idx uid, Idx eid) {}
+};
+
+
 template <typename Idx, typename DType, bool atomic>
 constexpr bool Max<Idx, DType, atomic>::require_arg;
 
@@ -206,7 +260,9 @@ template <typename Idx,
           typename DType,
           bool atomic=false>
 struct Min {
-  static constexpr DType zero = std::numeric_limits<DType>::infinity();
+  static constexpr __host__ __device__ __forceinline__ DType zero() {
+    return std::numeric_limits<DType>::infinity();
+  };
   static constexpr bool require_arg = true;
   static __device__ __forceinline__ void Call(
     DType *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
@@ -246,8 +302,36 @@ struct Min {
     }
   }
 };
-template <typename Idx, typename DType, bool atomic>
-constexpr DType Min<Idx, DType, atomic>::zero;
+
+template <typename Idx>
+struct Min<Idx, half, false> {
+  static constexpr __host__ __device__ __forceinline__ half zero() {
+    return __float2half_rn(6.550400e+04f);
+  };
+  static constexpr bool require_arg = true;
+  static __device__ __forceinline__ void Call(
+    half *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
+    half val, Idx uid, Idx eid) {
+    if (*out_buf > val) {
+      *out_buf = val;
+      *arg_u_buf = uid;
+      *arg_e_buf = eid;
+    }
+  }
+  static __device__ __forceinline__ void Call(
+      half *out_buf, Idx *arg_buf,
+      half val, Idx id) {
+    if (*out_buf > val) {
+      *out_buf = val;
+      *arg_buf = id;
+    }
+  }
+  static __device__ __forceinline__ void CallArg(Idx fid,
+    Idx *arg_u_buf, Idx *arg_e_buf,
+    half val, half val_ref, Idx uid, Idx eid) {}
+};
+
+
 template <typename Idx, typename DType, bool atomic>
 constexpr bool Min<Idx, DType, atomic>::require_arg;
 

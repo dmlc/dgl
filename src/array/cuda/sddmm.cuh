@@ -10,6 +10,7 @@
 #include "macro.cuh"
 #include "atomic.cuh"
 #include "functor.cuh"
+#include "fp16.cuh"
 #include "./utils.h"
 #include "../selector.h"
 #include "../../runtime/cuda/cuda_common.h"

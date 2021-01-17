@@ -31,7 +31,7 @@ __global__ void SegmentReduceKernel(
   int row = blockIdx.x;
   int col = blockIdx.y * blockDim.x + threadIdx.x;
   if (col < dim) {
-    DType local_accum = ReduceOp::zero;
+    DType local_accum = ReduceOp::zero();
     IdType local_arg = -1;
     for (IdType i = offsets[row]; i < offsets[row + 1]; ++i) {
       ReduceOp::Call(&local_accum, &local_arg, feat[i * dim + col], i);

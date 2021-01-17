@@ -1,4 +1,5 @@
 import torch as th
+from torch.cuda.amp import custom_fwd, custom_bwd
 from ...base import is_all, ALL
 from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp
 
@@ -60,6 +61,7 @@ def _expand(x, shape):
 
 class GSpMM(th.autograd.Function):
     @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, op, reduce_op, X, Y):
         out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
         ctx.backward_cache = gidx, op, reduce_op
@@ -67,6 +69,7 @@ class GSpMM(th.autograd.Function):
         return out
 
     @staticmethod
+    @custom_bwd
     def backward(ctx, dZ):
         gidx, op, reduce_op = ctx.backward_cache
         X, Y, argX, argY = ctx.saved_tensors
@@ -120,6 +123,7 @@ class GSpMM(th.autograd.Function):
 
 class GSDDMM(th.autograd.Function):
     @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, op, X, Y, lhs_target, rhs_target):
         out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
         ctx.backward_cache = gidx, op, lhs_target, rhs_target
@@ -127,6 +131,7 @@ class GSDDMM(th.autograd.Function):
         return out
 
     @staticmethod
+    @custom_bwd
     def backward(ctx, dZ):
         gidx, op, lhs_target, rhs_target = ctx.backward_cache
         X, Y = ctx.saved_tensors
@@ -179,6 +184,7 @@ class GSDDMM(th.autograd.Function):
 
 class EdgeSoftmax(th.autograd.Function):
     @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, score, eids, norm_by):
         """Forward function.
 
@@ -208,6 +214,7 @@ class EdgeSoftmax(th.autograd.Function):
         return out
 
     @staticmethod
+    @custom_bwd
     def backward(ctx, grad_out):
         """Backward function.
 
@@ -233,6 +240,7 @@ class EdgeSoftmax(th.autograd.Function):
 
 class SegmentReduce(th.autograd.Function):
     @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, op, x, offsets):
         y, arg = _segment_reduce(op, x, offsets)
         ctx.save_for_backward(arg, offsets)
@@ -240,6 +248,7 @@ class SegmentReduce(th.autograd.Function):
         return y
 
     @staticmethod
+    @custom_bwd
     def backward(ctx, dy):
         op = ctx.backward_cache
         arg, offsets = ctx.saved_tensors

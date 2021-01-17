@@ -26,7 +26,7 @@ if __name__ == '__main__':
             np.save(f, u.numpy())
             np.save(f, v.numpy())
         
-        adj = g.adj(scipy_fmt='csr', transpose=True)
+        adj = g.adj(scipy_fmt='csr', transpose=False)
 
         with open('dataset/{}_csr.npy'.format(dataset), 'wb') as f:
             np.save(f, adj.indptr)

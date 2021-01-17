@@ -7,9 +7,7 @@
 #define DGL_ARRAY_CUDA_ATOMIC_H_
 
 #include <cuda_runtime.h>
-#if __CUDA_ARCH__ >= 600
-#include <cuda_fp16.h>
-#endif
+#include "fp16.cuh"
 
 namespace dgl {
 namespace aten {
@@ -17,6 +15,10 @@ namespace cuda {
 
 // Type trait for selecting code type
 template <int Bytes> struct Code { };
+
+template <> struct Code<2> {
+  typedef unsigned short int Type;
+};
 
 template <> struct Code<4> {
   typedef unsigned int Type;
@@ -34,6 +36,16 @@ template <typename T> struct Cast {
   }
   static __device__ __forceinline__ T Decode(Type code) {
     return static_cast<T>(code);
+  }
+};
+
+template <> struct Cast<half> {
+  typedef Code<sizeof(half)>::Type Type;
+  static __device__ __forceinline__ Type Encode(half val) {
+    return __half_as_ushort(val);
+  }
+  static __device__ __forceinline__ float Decode(Type code) {
+    return __ushort_as_half(code);
   }
 };
 
