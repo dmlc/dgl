@@ -129,6 +129,15 @@ void SDDMM(const std::string& op,
   });
 }
 
+NDArray GetEdgeMapping(HeteroGraphRef graph) {
+  SparseFormat format = graph->SelectFormat(0, csc_code);
+  if (format == SparseFormat::kCSC) {
+    return graph.sptr()->GetCSCMatrix(0).data;
+  } else {
+    return NullArray();
+  }
+}
+
 /*! \brief Segment reduce dispatch function. */
 void SegmentReduceDispatch(const std::string& op,
                            NDArray feat,
@@ -224,6 +233,12 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelBwdSegmentCmp")
     CheckCtx(feat->ctx, {feat, arg, out}, {"feat", "arg", "out"});
     CheckContiguous({feat, arg, out}, {"feat", "arg", "out"});
     BackwardSegmentCmpDispatch(feat, arg, out);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGetEdgeMapping")
+.set_body([](DGLArgs args, DGLRetValue *rv) {
+    HeteroGraphRef graph = args[0];
+    *rv = GetEdgeMapping(graph);
   });
 
 #ifdef USE_TVM

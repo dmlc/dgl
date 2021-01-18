@@ -16,15 +16,54 @@ using namespace cuda;
 namespace aten {
 namespace {
 
-/*! \brief Fill the vector started from ptr of size length with val */
+/*! \brief Call cuBLAS geam API for transpose operation for float and double. */
 template <typename DType>
-void _Fill(DType* ptr, size_t length, DType val) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  int nt = FindNumThreads(length);
-  int nb = (length + nt - 1) / nt;  // on x-axis, no need to worry about upperbound.
-  CUDA_KERNEL_CALL(cuda::_FillKernel, nb, nt, 0, thr_entry->stream, ptr, length, val);
+cublasStatus_t Xgeam(cublasHandle_t handle, cublasOperation_t transa,
+    cublasOperation_t transb, int m, int n,
+    const DType* alpha, const DType* A, int lda,
+    const DType* beta, const DType* B, int ldb,
+    DType* C, int ldc) {
+  LOG(INFO) << "Not supported dtype";
+  return CUBLAS_STATUS_EXECUTION_FAILED;
 }
 
+template <>
+cublasStatus_t Xgeam<float>(cublasHandle_t handle, cublasOperation_t transa,
+    cublasOperation_t transb, int m, int n,
+    const float* alpha, const float* A, int lda,
+    const float* beta, const float* B, int ldb,
+    float* C, int ldc) {
+  return cublasSgeam(handle, transa, transb, m, n, alpha, A, lda,
+      beta, B, ldb, C, ldc);
+}
+
+template <>
+cublasStatus_t Xgeam<double>(cublasHandle_t handle, cublasOperation_t transa,
+    cublasOperation_t transb, int m, int n,
+    const double* alpha, const double* A, int lda,
+    const double* beta, const double* B, int ldb,
+    double* C, int ldc) {
+  return cublasDgeam(handle, transa, transb, m, n, alpha, A, lda,
+      beta, B, ldb, C, ldc);
+}
+
+/* \brief IndexSelect operator kernel implementation.
+ * \note duplicate of IndexSelectKernel defined in array_index_select.cu
+ */
+template <typename DType, typename IdType>
+__global__ void _IndexSelectKernel(
+    const DType* __restrict__ in,
+    const IdType* __restrict__ idx,
+    DType* __restrict__ out,
+    int n, int m) {
+  int i = blockIdx.x;
+  for (int j = threadIdx.x; j < m; j += blockDim.x)
+    out[i * m + j] = in[idx[i] * m + j];
+}
+
+/* \brief Transpose operator kernel implementation.
+ * \note not efficient but it's not a bottleneck, used for float16 dtype.
+ */
 template <typename DType>
 __global__ void _TransposeKernel(const DType* __restrict__ in, DType* __restrict__ out, int n, int m) {
   int i = blockIdx.x;
@@ -32,12 +71,85 @@ __global__ void _TransposeKernel(const DType* __restrict__ in, DType* __restrict
     out[i * m + j] = in[j * n + i];
 }
 
+/*
+ * \brief Tranpose the input matrix.
+ * \param row number of rows of input matrix.
+ * \param col number of columns of input matrix.
+ */
 template <typename DType>
-void _Transpose(DType *in, DType* out, int n, int m) {
+void _Transpose(const DType* in, DType* out,
+                int row, int col) {
+  DType alpha = 1., beta = 0.;
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  int nt = FindNumThreads(m);
-  int nb = n;
-  CUDA_KERNEL_CALL(_TransposeKernel, nb, nt, 0, thr_entry->stream, in, out, n, m);  
+  if (!thr_entry->cublas_handle)
+    CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
+  CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, thr_entry->stream));
+  CUBLAS_CALL(Xgeam<DType>(
+      thr_entry->cublas_handle,
+      CUBLAS_OP_T,
+      CUBLAS_OP_N,
+      row, col,
+      &alpha, in, col,
+      &beta, nullptr, col,
+      out, row));
+}
+
+/*
+ * \brief Tranpose the input matrix for data type half.
+ * \note cuBLAS has no geam API for half data type, fallback to our kernel.
+ */
+template <>
+void _Transpose<half>(const half* in, half* out,
+                      int row, int col) {
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  int nt = FindNumThreads(row);
+  int nb = col;
+  CUDA_KERNEL_CALL(_TransposeKernel, nb, nt, 0, thr_entry->stream, in, out, col, row);  
+}
+
+/*
+ * \brief
+ */
+template <typename DType, typename IdType>
+__global__ void _IndexSelectKernel(const DType* array, const IdType* index,
+                                   int64_t length, DType* out) {
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  int stride_x = gridDim.x * blockDim.x;
+  while (tx < length) {
+    out[tx] = array[index[tx]];
+    tx += stride_x;
+  }
+}
+
+/* \brief IndexSelect operator.
+ * \note duplicate of IndexSelect defined in array_op.h but it can
+ *    not be applied to float16 dtype.
+ */
+template<typename DType, typename IdType>
+NDArray _IndexSelect(NDArray array, NDArray index) {
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  const DType* array_data = static_cast<DType*>(array->data);
+  const IdType* idx_data = static_cast<IdType*>(index->data);
+  const int64_t arr_len = array->shape[0];
+  const int64_t len = index->shape[0];
+  NDArray ret = NDArray::Empty({len}, array->dtype, array->ctx);
+  if (len == 0)
+    return ret;
+  DType* ret_data = static_cast<DType*>(ret->data);
+  const int nt = FindNumThreads(len);
+  const int nb = (len + nt - 1) / nt;
+  CUDA_KERNEL_CALL(_IndexSelectKernel, nb, nt, 0, thr_entry->stream,
+      array_data, idx_data, len, ret_data);
+  return ret;
+}
+
+/*! \brief Fill the vector started from ptr of size length with val */
+template <typename DType>
+void _Fill(DType* ptr, size_t length, DType val) {
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  int nt = FindNumThreads(length);
+  int nb = (length + nt - 1) / nt;  // on x-axis, no need to worry about upperbound.
+  CUDA_KERNEL_CALL(cuda::_FillKernel, nb, nt, 0, thr_entry->stream, ptr, length, val);
 }
 
 }  // namespace
@@ -77,36 +189,6 @@ cusparseStatus_t Xcsrmm2<double>(cusparseHandle_t handle, cusparseOperation_t tr
       B, ldb, beta, C, ldc);
 }
 #endif
-
-template <typename DType>
-cublasStatus_t Xgeam(cublasHandle_t handle, cublasOperation_t transa,
-    cublasOperation_t transb, int m, int n,
-    const DType* alpha, const DType* A, int lda,
-    const DType* beta, const DType* B, int ldb,
-    DType* C, int ldc) {
-  LOG(INFO) << "Not supported dtype";
-  return CUBLAS_STATUS_EXECUTION_FAILED;
-}
-
-template <>
-cublasStatus_t Xgeam<float>(cublasHandle_t handle, cublasOperation_t transa,
-    cublasOperation_t transb, int m, int n,
-    const float* alpha, const float* A, int lda,
-    const float* beta, const float* B, int ldb,
-    float* C, int ldc) {
-  return cublasSgeam(handle, transa, transb, m, n, alpha, A, lda,
-      beta, B, ldb, C, ldc);
-}
-
-template <>
-cublasStatus_t Xgeam<double>(cublasHandle_t handle, cublasOperation_t transa,
-    cublasOperation_t transb, int m, int n,
-    const double* alpha, const double* A, int lda,
-    const double* beta, const double* B, int ldb,
-    double* C, int ldc) {
-  return cublasDgeam(handle, transa, transb, m, n, alpha, A, lda,
-      beta, B, ldb, C, ldc);
-}
 
 /*! Cusparse implementation of SpMM on Csr format. */
 template <typename DType>
@@ -170,13 +252,13 @@ void CusparseCsrmm2(
   CUSPARSE_CALL(cusparseSpMM_bufferSize(
       thr_entry->cusparse_handle, transA, transB,
       &alpha, matA, matB, &beta, matC,
-      cuda_dtype, CUSPARSE_CSRMM_ALG1,
+      cuda_dtype, CUSPARSE_SPMM_ALG_DEFAULT,
       &workspace_size));
   void* workspace = device->AllocWorkspace(ctx, workspace_size);
   CUSPARSE_CALL(cusparseSpMM(
       thr_entry->cusparse_handle, transA, transB,
       &alpha, matA, matB, &beta, matC,
-      cuda_dtype, CUSPARSE_CSRMM_ALG1,
+      cuda_dtype, CUSPARSE_SPMM_ALG_DEFAULT,
       workspace));
   device->FreeWorkspace(ctx, workspace);
 
@@ -202,18 +284,7 @@ void CusparseCsrmm2(
   if (valptr)
     device->FreeWorkspace(ctx, valptr);
   // transpose the output matrix
-  //_Transpose(trans_out, C_data, m, n);
-  if (!thr_entry->cublas_handle)
-    CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
-  CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, thr_entry->stream));
-  CUBLAS_CALL(Xgeam<DType>(
-      thr_entry->cublas_handle,
-      CUBLAS_OP_T,
-      CUBLAS_OP_N,
-      n, m,
-      &alpha, trans_out, m,
-      &beta, nullptr, n,
-      C_data, n));
+  _Transpose(trans_out, C_data, n, m);
   device->FreeWorkspace(ctx, trans_out);
 }
 }  // namespace cusparse
@@ -277,6 +348,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
   bool use_efeat = op != "copy_lhs";
 
   if (reduce == "sum") {
+	  /*
     if (sizeof(IdType) == 4 && op == "copy_lhs") {  // cusparse
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i)
@@ -294,7 +366,9 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
       for (int i = 1; i < ufeat->ndim; ++i)
         x_length *= ufeat->shape[i];
       if (!IsNullArray(csr.data))
-        efeat = IndexSelect(efeat, csr.data);
+        SWITCH_BITS(bits, DType, {
+          efeat = _IndexSelect<DType, IdType>(efeat, csr.data);
+        });
       SWITCH_BITS(bits, DType, {
         cusparse::CusparseCsrmm2<DType>(
             ufeat->ctx, csr,
@@ -304,13 +378,14 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
             x_length);
       });
     } else {  // general kernel
+    */
       SWITCH_BITS(bits, DType, {
         SWITCH_OP(op, Op, {
           cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
               bcast, csr, ufeat, efeat, out, NullArray(), NullArray());
         });
       });
-    }
+    //}
   } else if (reduce == "max") {
     SWITCH_BITS(bits, DType, {
       SWITCH_OP(op, Op, {

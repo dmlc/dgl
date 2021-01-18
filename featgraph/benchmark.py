@@ -22,7 +22,7 @@ def reordering(indptr, indices, row, col):
 
 def bench_spmm():
     mod = tvm.build(
-        gspmm('copy_lhs', 'min', 'int32', 'float16', schedule_type='general'),
+        gspmm('copy_lhs', 'sum', 1, 'int32', 'float32', schedule_type='general'),
         target='cuda',
         target_host='llvm'
     )

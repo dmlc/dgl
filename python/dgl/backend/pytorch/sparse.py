@@ -1,7 +1,26 @@
 import torch as th
-from torch.cuda.amp import custom_fwd, custom_bwd
+from distutils.version import LooseVersion
 from ...base import is_all, ALL
 from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp
+
+if LooseVersion(th.__version__) >= LooseVersion("1.6.0"):
+    from torch.cuda.amp import custom_fwd, custom_bwd
+else:
+    import functools
+    """PyTorch natively supports automatic mixed precision in DGL 1.6, we redefine
+    the custom_fwd and custom_bwd function to be compatible with DGL 1.5.
+    """
+    def custom_fwd(fwd=None, **kwargs):
+        @functools.wraps(fwd)
+        def decorate_fwd(*args, **kwargs):
+            return fwd(*args, **kwargs)
+        return decorate_fwd
+
+    def custom_bwd(bwd):
+        @functools.wraps(bwd)
+        def decorate_bwd(*args, **kwargs):
+            return bwd(*args, **kwargs)
+        return decorate_bwd
 
 __all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce']
 

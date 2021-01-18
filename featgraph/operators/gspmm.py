@@ -55,28 +55,13 @@ def _spmm_cuda_general(sched, out):
     sched[out].bind(feat_axis, te.thread_axis('threadIdx.x'))
 
 
-def _spmm_cuda_merge(sched, out):
-    node_axis = out.op.axis[0]
-    feat_axis = sched[out].fuse(*out.op.axis[1:])
-    reduce_axis = out.op.reduce_axis[0]
-    node_outer, node_inner = sched[out].split(node_axis, factor=8)
-    feat_outer, feat_inner = sched[out].split(feat_axis, factor=32)
-    reduce_outer, reduce_inner = sched[out].split(reduce_axis, factor=32)
-    #sched[out].unroll(reduce_inner)
-    sched[out].bind(feat_inner, te.thread_axis('threadIdx.x'))
-    sched[out].bind(feat_outer, te.thread_axis('blockIdx.y'))
-    sched[out].bind(node_outer, te.thread_axis('blockIdx.x'))
-    sched[out].bind(node_inner, te.thread_axis('threadIdx.y'))
-    
-
 _gspmm_cuda_schedule = {
     'general': _spmm_cuda_general,
-    'merge': _spmm_cuda_merge
 }
 
 
 def gspmm(binary_op, reduce_op,
-          #lhs_code, rhs_code,
+          ndim,
           indice_type, feat_type,
           schedule_type='general',
           target='cuda'):
@@ -89,10 +74,9 @@ def gspmm(binary_op, reduce_op,
 
     indptr = te.placeholder((num_rows + 1,), indice_type, 'indptr')
     indices = te.placeholder((nnz,), indice_type, 'indices')
-    #ndim = len(lhs_code)
-    out_feat_shp = [te.var('d', indice_type)] #[te.var('d_{}'.format(i)) for i in range(ndim)]
-    ufeat_shp = out_feat_shp#[out_feat_shp[i] if lc == 'x' else 1 for i, lc in enumerate(lhs_code)]
-    efeat_shp = out_feat_shp#[out_feat_shp[i] if rc == 'x' else 1 for i, rc in enumerate(rhs_code)]
+    out_feat_shp = [te.var('do_{}'.format(i), indice_type) for i in range(ndim)]
+    ufeat_shp = [te.var('du_{}'.format(i), indice_type) for i in range(ndim)]
+    efeat_shp = [te.var('dv_{}'.format(i), indice_type) for i in range(ndim)]
 
     ufeat = te.placeholder([num_cols] + ufeat_shp, feat_type, 'ufeat')
     efeat = te.placeholder([nnz] + efeat_shp, feat_type, 'efeat')
@@ -123,6 +107,11 @@ def gspmm(binary_op, reduce_op,
         f_input.append(efeat)
 
     f_input += ret
+    u_buffer = decl_buffer(ufeat.shape, ufeat.dtype, name='u_buf',
+                           buffer_type='auto_broadcast')
+    e_buffer = decl_buffer(efeat.shape, efeat.dtype, name='e_buf',
+                           buffer_type='auto_broadcast')
+    binds = {ufeat: u_buffer, efeat: e_buffer}
 
-    return tvm.lower(sched, f_input, name=f_name)
+    return tvm.lower(sched, f_input, name=f_name, binds=binds)
 
