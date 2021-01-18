@@ -36,6 +36,8 @@ networks to this problem has been a popular approach recently. This can be seen 
 # Implement a synthetic dataset :class:`data.MiniGCDataset` in DGL. The dataset has eight 
 # different types of graphs and each class has the same number of graph samples.
 
+import dgl
+import torch
 from dgl.data import MiniGCDataset
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -68,20 +70,6 @@ plt.show()
 #     :width: 400pt
 #     :align: center
 #
-# Define the following ``collate`` function to form a mini-batch from a given
-# list of graph and label pairs.
-
-import dgl
-import torch
-
-def collate(samples):
-    # The input `samples` is a list of pairs
-    #  (graph, label).
-    graphs, labels = map(list, zip(*samples))
-    batched_graph = dgl.batch(graphs)
-    return batched_graph, torch.tensor(labels)
-
-###############################################################################
 # The return type of :func:`dgl.batch` is still a graph. In the same way, 
 # a batch of tensors is still a tensor. This means that any code that works
 # for one graph immediately works for a batch of graphs. More importantly,
@@ -149,15 +137,14 @@ class Classifier(nn.Module):
 # :math:`80` graphs constitute a test set.
 
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from dgl.dataloading import GraphDataLoader
 
 # Create training and test sets.
 trainset = MiniGCDataset(320, 10, 20)
 testset = MiniGCDataset(80, 10, 20)
-# Use PyTorch's DataLoader and the collate function
-# defined before.
-data_loader = DataLoader(trainset, batch_size=32, shuffle=True,
-                         collate_fn=collate)
+# Use DGL's GraphDataLoader. It by default handles the 
+# graph batching operation for every mini-batch.
+data_loader = GraphDataLoader(trainset, batch_size=32, shuffle=True)
 
 # Create model
 model = Classifier(1, 256, trainset.num_classes)
