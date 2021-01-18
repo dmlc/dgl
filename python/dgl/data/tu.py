@@ -359,7 +359,7 @@ class TUDataset(DGLBuiltinDataset):
 
     def has_cache(self):
         graph_path = os.path.join(self.save_path, 'tu_{}.bin'.format(self.name))
-        info_path = os.path.join(self.save_path, 'legacy_tu_{}.pkl'.format(self.name))
+        info_path = os.path.join(self.save_path, 'tu_{}.pkl'.format(self.name))
         if os.path.exists(graph_path) and os.path.exists(info_path):
             return True
         return False
