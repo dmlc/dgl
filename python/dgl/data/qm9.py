@@ -54,7 +54,7 @@ class QM9Dataset(DGLDataset):
     Parameters
     ----------
     label_keys: list
-        Names of the regression property.
+        Names of the regression property, which should be a subset of the keys in the table above.
     cutoff: float
         Cutoff distance for interatomic interactions, i.e. two atoms are connected in the corresponding graph if the distance between them is no larger than this.
         Default: 5.0 Angstrom
