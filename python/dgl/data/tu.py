@@ -138,6 +138,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
             print("No Node Attribute Data")
 
         if 'feat' not in g.ndata.keys():
+            hidden_size = self.hidden_size
             for idxs, g in zip(node_idx_list, self.graph_lists):
                 g.ndata['feat'] = np.ones((g.number_of_nodes(), hidden_size))
             self.data_mode = "constant"
