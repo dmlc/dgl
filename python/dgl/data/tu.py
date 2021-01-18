@@ -138,12 +138,11 @@ class LegacyTUDataset(DGLBuiltinDataset):
             print("No Node Attribute Data")
 
         if 'feat' not in g.ndata.keys():
-            hidden_size = self.hidden_size
             for idxs, g in zip(node_idx_list, self.graph_lists):
-                g.ndata['feat'] = np.ones((g.number_of_nodes(), hidden_size))
+                g.ndata['feat'] = np.ones((g.number_of_nodes(), self.hidden_size))
             self.data_mode = "constant"
             if self.verbose:
-                print("Use Constant one as Feature with hidden size {}".format(hidden_size))
+                print("Use Constant one as Feature with hidden size {}".format(self.hidden_size))
 
         # remove graphs that are too large by user given standard
         # optional pre-processing steop in conformity with Rex Ying's original
