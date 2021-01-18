@@ -57,7 +57,7 @@ class QM9Dataset(DGLDataset):
         Names of the regression property.
     cutoff: float
         Cutoff distance for interatomic interactions, i.e. two atoms are connected in the corresponding graph if the distance between them is no larger than this.
-        Default: 5.0
+        Default: 5.0 Angstrom
     raw_dir : str
         Raw file directory to download/contains the input data directory.
         Default: ~/.dgl/
@@ -110,7 +110,7 @@ class QM9Dataset(DGLDataset):
     def process(self):
         npz_path = f'{self.raw_dir}/qm9_eV.npz'
         data_dict = np.load(npz_path, allow_pickle=True)
-        # the number of atoms in each molecule. 
+        # data_dict['N'] contains the number of atoms in each molecule.
         # Atomic properties (Z and R) of all molecules are concatenated as single tensors,
         # so you need this value to select the correct atoms for each molecule.
         self.N = data_dict['N']
@@ -145,14 +145,12 @@ class QM9Dataset(DGLDataset):
         Returns
         -------
         dgl.DGLGraph
-
             The graph contains:
 
             - ``ndata['R']``: the coordinates of each atom
             - ``ndata['Z']``: the atomic number
 
         Tensor
-
             Property values of molecular graphs
         """
         label = F.tensor(self.label[idx], dtype=F.data_type_dict['float32'])
