@@ -73,7 +73,7 @@ def reshuffle_graph(g, node_part=None):
             sorted_part, new2old_map = F.sort_1d(node_part * num_node_types + g.ndata[NTYPE])
         else:
             sorted_part, new2old_map = F.sort_1d(g.ndata[NTYPE])
-        sorted_part = F.div_int(sorted_part, num_node_types)
+        sorted_part = F.floor_div(sorted_part, num_node_types)
     elif node_part is not None:
         sorted_part, new2old_map = F.sort_1d(node_part)
     else:

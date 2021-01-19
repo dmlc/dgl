@@ -355,8 +355,8 @@ def sum(input, dim, keepdims=False):
     """
     pass
 
-def div_int(in1, in2):
-    """Element-wise integer division
+def floor_div(in1, in2):
+    """Element-wise integer division and rounds each quotient towards zero.
 
     Parameters
     ----------
