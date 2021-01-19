@@ -6,7 +6,7 @@ Difference compared to tkipf/relation-gcn
 * l2norm applied to all weights
 * remove nodes that won't be touched
 """
-import argparse
+import argparse, gc
 import numpy as np
 import time
 import torch as th
@@ -359,6 +359,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
             if i % 100 and proc_id == 0:
                 print("Train Accuracy: {:.4f} | Train Loss: {:.4f}".
                     format(train_acc, loss.item()))
+        gc.collect()
         print("Epoch {:05d}:{:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".
             format(epoch, args.n_epochs, forward_time[-1], backward_time[-1]))
         tend = time.time()
