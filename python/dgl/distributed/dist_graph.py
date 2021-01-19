@@ -828,6 +828,48 @@ class DistGraph:
         """
         return self._gpb
 
+    def get_node_partition_policy(self, ntype):
+        """Get the partition policy for a node type.
+
+        When creating a new distributed tensor, we need to provide a partition policy
+        that indicates how to distribute data of the distributed tensor in a cluster
+        of machines. When we load a distributed graph in the cluster, we have pre-defined
+        partition policies for each node type and each edge type. By providing
+        the node type, we can reference to the pre-defined partition policy for the node type.
+
+        Parameters
+        ----------
+        ntype : str
+            The node type
+
+        Returns
+        -------
+        PartitionPolicy
+            The partition policy for the node type.
+        """
+        retrun NodePartitionPolicy(self.get_partition_book(), ntype)
+
+    def get_edge_partition_policy(self, etype):
+        """Get the partition policy for an edge type.
+
+        When creating a new distributed tensor, we need to provide a partition policy
+        that indicates how to distribute data of the distributed tensor in a cluster
+        of machines. When we load a distributed graph in the cluster, we have pre-defined
+        partition policies for each node type and each edge type. By providing
+        the edge type, we can reference to the pre-defined partition policy for the edge type.
+
+        Parameters
+        ----------
+        etype : str
+            The edge type
+
+        Returns
+        -------
+        PartitionPolicy
+            The partition policy for the edge type.
+        """
+        retrun EdgePartitionPolicy(self.get_partition_book(), etype)
+
     def barrier(self):
         '''Barrier for all client nodes.
 

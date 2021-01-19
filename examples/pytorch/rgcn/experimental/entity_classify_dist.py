@@ -162,7 +162,7 @@ class DistEmbedLayer(nn.Module):
                 for ntype in g.ntypes:
                     # We only create embeddings for nodes without node features.
                     if feat_name not in g.nodes[ntype].data:
-                        part_policy = dgl.distributed.NodePartitionPolicy(g.get_partition_book(), ntype)
+                        part_policy = g.get_node_partition_policy(ntype)
                         self.node_embeds[ntype] = dgl.distributed.DistEmbedding(g.number_of_nodes(ntype),
                                 self.embed_size,
                                 embed_name + '_' + ntype,
