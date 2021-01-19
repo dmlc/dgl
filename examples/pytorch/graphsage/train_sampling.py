@@ -104,11 +104,11 @@ def evaluate(model, g, nfeat, labels, val_nid, device):
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid].to(pred.device))
 
-def load_subtensor(nfeat, labels, seeds, input_nodes, device):
+def load_subtensor(is_sparse, nfeat, labels, seeds, input_nodes, device):
     """
     Extracts features and labels for a subset of nodes
     """
-    batch_inputs = nfeat[input_nodes].to(device)
+    batch_inputs = nfeat(input_nodes, device) if is_sparse else nfeat[input_nodes].to(device)
     batch_labels = labels[seeds].to(device)
     return batch_inputs, batch_labels
 
@@ -121,6 +121,15 @@ def run(args, device, data):
     train_nid = th.nonzero(train_g.ndata['train_mask'], as_tuple=True)[0]
     val_nid = th.nonzero(val_g.ndata['val_mask'], as_tuple=True)[0]
     test_nid = th.nonzero(~(test_g.ndata['train_mask'] | test_g.ndata['val_mask']), as_tuple=True)[0]
+
+    def initializer(emb):
+        #nn.init.xavier_uniform_(emb, gain=nn.init.calculate_gain('relu'))
+        emb.uniform_(-1.0, 1.0)
+        return emb
+
+    if args.sparse_dim > 0:
+        train_nfeat = val_nfeat = test_nfeat = dgl.NodeEmbedding(g.num_nodes(), args.sparse_dim, name='example', init_func=initializer)
+        in_feats = args.sparse_dim
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
@@ -139,6 +148,8 @@ def run(args, device, data):
     model = model.to(device)
     loss_fcn = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    if args.sparse_dim > 0:
+        sparse_optimizer = dgl.optim.SparseAdam(params=[train_nfeat], lr=args.lr)
 
     # Training loop
     avg = 0
@@ -151,7 +162,7 @@ def run(args, device, data):
         tic_step = time.time()
         for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
             # Load the input features as well as output labels
-            batch_inputs, batch_labels = load_subtensor(train_nfeat, train_labels,
+            batch_inputs, batch_labels = load_subtensor(args.sparse_dim > 0, train_nfeat, train_labels,
                                                         seeds, input_nodes, device)
             blocks = [block.int().to(device) for block in blocks]
 
@@ -159,7 +170,12 @@ def run(args, device, data):
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, batch_labels)
             optimizer.zero_grad()
+            if args.sparse_dim > 0:
+                sparse_optimizer.zero_grad()
+
             loss.backward()
+            if args.sparse_dim > 0:
+                sparse_optimizer.step()
             optimizer.step()
 
             iter_tput.append(len(seeds) / (time.time() - tic_step))
@@ -205,6 +221,7 @@ if __name__ == '__main__':
                                 "on GPU when using it to save time for data copy. This may "
                                 "be undesired if they cannot fit in GPU memory at once. "
                                 "This flag disables that.")
+    argparser.add_argument('--sparse-dim', type=int, default=-1)
     args = argparser.parse_args()
 
     if args.gpu >= 0:
