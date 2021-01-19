@@ -43,6 +43,7 @@ The folder contains example implementations of selected research papers related 
 | [Self-Attention Graph Pooling](#sagpool)                     |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Convolutional Networks on Graphs for Learning Molecular Fingerprints](#nf) |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [GNN-FiLM: Graph Neural Networks with Feature-wise Linear Modulation](#gnnfilm) | :heavy_check_mark:  |                     |                     |                     |                     |
+| [Hierarchical Graph Pooling with Structure Learning](#hgp-sl)                                                                                 |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Graph Representation Learning via Hard and Channel-Wise Attention Networks](#hardgat)                                   |:heavy_check_mark:                     |                 |                           |                    |                    |
 
 ## 2020
@@ -144,8 +145,12 @@ The folder contains example implementations of selected research papers related 
     - Example code: [PyTorch](../examples/pytorch/sagpool)
     - Tags: graph classification, pooling
 
+- <a name="hgp-sl"></a> Zhang, Zhen, et al. Hierarchical Graph Pooling with Structure Learning. [Paper link](https://arxiv.org/abs/1911.05954).
+    - Example code: [PyTorch](../examples/pytorch/hgp_sl)
+    - Tags: graph classification, pooling
+
 - <a name='hardgat'></a> Gao, Hongyang, et al. Graph Representation Learning via Hard and Channel-Wise Attention Networks [Paper link](https://arxiv.org/abs/1907.04652).
-    - Example code: [Pytorch](../examples/pytorch/hgat)
+    - Example code: [Pytorch](../examples/pytorch/hardgat)
     - Tags: node classification, graph attention
 
 ## 2018

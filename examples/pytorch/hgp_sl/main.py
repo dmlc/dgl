@@ -3,6 +3,7 @@ import json
 import logging
 import os
 from time import time
+
 import dgl
 import torch
 import torch.nn
@@ -11,40 +12,41 @@ from dgl.data import LegacyTUDataset
 from dgl.dataloading import GraphDataLoader
 from torch.utils.data import random_split
 
-from network import get_sag_network
+from networks import HGPSLModel
 from utils import get_stats
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Self-Attention Graph Pooling")
+    parser = argparse.ArgumentParser(description="HGP-SL-DGL")
     parser.add_argument("--dataset", type=str, default="DD",
-                        choices=["DD", "PROTEINS", "NCI1", "NCI109", "Mutagenicity"],
-                        help="DD/PROTEINS/NCI1/NCI109/Mutagenicity")
-    parser.add_argument("--batch_size", type=int, default=128,
+                        choices=["DD", "PROTEINS", "NCI1", "NCI109", "Mutagenicity", "ENZYMES"],
+                        help="DD/PROTEINS/NCI1/NCI109/Mutagenicity/ENZYMES")
+    parser.add_argument("--batch_size", type=int, default=512,
                         help="batch size")
-    parser.add_argument("--lr", type=float, default=5e-4,
+    parser.add_argument("--sample", type=str, default="true",
+                        help="use sample method")
+    parser.add_argument("--lr", type=float, default=1e-3,
                         help="learning rate")
-    parser.add_argument("--weight_decay", type=float, default=1e-4,
+    parser.add_argument("--weight_decay", type=float, default=1e-3,
                         help="weight decay")
     parser.add_argument("--pool_ratio", type=float, default=0.5,
                         help="pooling ratio")
     parser.add_argument("--hid_dim", type=int, default=128,
                         help="hidden size")
-    parser.add_argument("--dropout", type=float, default=0.5,
+    parser.add_argument("--conv_layers", type=int, default=3,
+                        help="number of conv layers")
+    parser.add_argument("--dropout", type=float, default=0.0,
                         help="dropout ratio")
-    parser.add_argument("--epochs", type=int, default=100000,
+    parser.add_argument("--lamb", type=float, default=1.0,
+                        help="trade-off parameter")
+    parser.add_argument("--epochs", type=int, default=1000,
                         help="max number of training epochs")
-    parser.add_argument("--patience", type=int, default=50,
+    parser.add_argument("--patience", type=int, default=100,
                         help="patience for early stopping")
     parser.add_argument("--device", type=int, default=-1,
                         help="device id, -1 for cpu")
-    parser.add_argument("--architecture", type=str, default="hierarchical",
-                        choices=["hierarchical", "global"],
-                        help="model architecture")
     parser.add_argument("--dataset_path", type=str, default="./dataset",
                         help="path to dataset")
-    parser.add_argument("--conv_layers", type=int, default=3,
-                        help="number of conv layers")
     parser.add_argument("--print_every", type=int, default=10,
                         help="print trainlog every k epochs, -1 for silent training")
     parser.add_argument("--num_trials", type=int, default=1,
@@ -63,13 +65,19 @@ def parse_args():
     if args.print_every == -1:
         args.print_every = args.epochs + 1
 
+    # bool args
+    if args.sample.lower() == "true":
+        args.sample = True
+    else:
+        args.sample = False
+
     # paths
     if not os.path.exists(args.dataset_path):
         os.makedirs(args.dataset_path)
     if not os.path.exists(args.output_path):
         os.makedirs(args.output_path)
-    name = "Data={}_Hidden={}_Arch={}_Pool={}_WeightDecay={}_Lr={}.log".format(
-        args.dataset, args.hid_dim, args.architecture, args.pool_ratio, args.weight_decay, args.lr)
+    name = "Data={}_Hidden={}_Pool={}_WeightDecay={}_Lr={}_Sample={}.log".format(
+        args.dataset, args.hid_dim, args.pool_ratio, args.weight_decay, args.lr, args.sample)
     args.output_path = os.path.join(args.output_path, name)
 
     return args
@@ -86,7 +94,7 @@ def train(model:torch.nn.Module, optimizer, trainloader, device):
             batch_graphs.ndata[key] = value.float()
         batch_graphs = batch_graphs.to(device)
         batch_labels = batch_labels.long().to(device)
-        out = model(batch_graphs)
+        out = model(batch_graphs, batch_graphs.ndata["feat"])
         loss = F.nll_loss(out, batch_labels)
         loss.backward()
         optimizer.step()
@@ -109,7 +117,7 @@ def test(model:torch.nn.Module, loader, device):
             batch_graphs.ndata[key] = value.float()
         batch_graphs = batch_graphs.to(device)
         batch_labels = batch_labels.long().to(device)
-        out = model(batch_graphs)
+        out = model(batch_graphs, batch_graphs.ndata["feat"])
         pred = out.argmax(dim=1)
         loss += F.nll_loss(out, batch_labels, reduction="sum").item()
         correct += pred.eq(batch_labels).sum().item()
@@ -138,9 +146,10 @@ def main(args):
     
     # Step 2: Create model =================================================================== #
     num_feature, num_classes, _ = dataset.statistics()
-    model_op = get_sag_network(args.architecture)
-    model = model_op(in_dim=num_feature, hid_dim=args.hid_dim, out_dim=num_classes,
-                     num_convs=args.conv_layers, pool_ratio=args.pool_ratio, dropout=args.dropout).to(device)
+
+    model = HGPSLModel(in_feat=num_feature, out_feat=num_classes, hid_feat=args.hid_dim,
+                       conv_layers=args.conv_layers, dropout=args.dropout, pool_ratio=args.pool_ratio,
+                       lamb=args.lamb, sample=args.sample).to(device)
     args.num_feature = int(num_feature)
     args.num_classes = int(num_classes)
 
@@ -186,7 +195,7 @@ if __name__ == "__main__":
         res.append(acc)
         train_times.append(train_time)
 
-    mean, err_bd = get_stats(res)
+    mean, err_bd = get_stats(res, conf_interval=False)
     print("mean acc: {:.4f}, error bound: {:.4f}".format(mean, err_bd))
 
     out_dict = {"hyper-parameters": vars(args),
