@@ -6,7 +6,7 @@ import time
 import numpy as np
 
 from .. import backend as F
-from ..base import NID, EID, NTYPE, ETYPE
+from ..base import NID, EID, NTYPE, ETYPE, dgl_warning
 from ..convert import to_homogeneous
 from ..random import choice as random_choice
 from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
