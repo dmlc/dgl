@@ -847,7 +847,7 @@ class DistGraph:
         PartitionPolicy
             The partition policy for the node type.
         """
-        retrun NodePartitionPolicy(self.get_partition_book(), ntype)
+        return NodePartitionPolicy(self.get_partition_book(), ntype)
 
     def get_edge_partition_policy(self, etype):
         """Get the partition policy for an edge type.
@@ -868,7 +868,7 @@ class DistGraph:
         PartitionPolicy
             The partition policy for the edge type.
         """
-        retrun EdgePartitionPolicy(self.get_partition_book(), etype)
+        return EdgePartitionPolicy(self.get_partition_book(), etype)
 
     def barrier(self):
         '''Barrier for all client nodes.

@@ -542,16 +542,16 @@ class RangePartitionBook(GraphPartitionBook):
         number of total partitions
     node_map : dict[str, Tensor]
         Global node ID ranges within partitions for each node type. The key is the node type
-        name in string. The value is a tensor of shape :math:`(K, 2)`, where :math:`K` is the number
-        of partitions. Each row has two integers: the starting and the ending IDs for a particular node
-        type in a partition. For example, all nodes of type ``"T"`` in partition ``i`` has ID range
-        ``node_map["T"][i][0]`` to ``node_map["T"][i][1]``.
+        name in string. The value is a tensor of shape :math:`(K, 2)`, where :math:`K` is
+        the number of partitions. Each row has two integers: the starting and the ending IDs
+        for a particular node type in a partition. For example, all nodes of type ``"T"`` in
+        partition ``i`` has ID range ``node_map["T"][i][0]`` to ``node_map["T"][i][1]``.
     edge_map : dict[str, Tensor]
         Global edge ID ranges within partitions for each edge type. The key is the edge type
-        name in string. The value is a tensor of shape :math:`(K, 2)`, where :math:`K` is the number
-        of partitions. Each row has two integers: the starting and the ending IDs for a particular edge
-        type in a partition. For example, all edges of type ``"T"`` in partition ``i`` has ID range
-        ``edge_map["T"][i][0]`` to ``edge_map["T"][i][1]``.
+        name in string. The value is a tensor of shape :math:`(K, 2)`, where :math:`K` is
+        the number of partitions. Each row has two integers: the starting and the ending IDs
+        for a particular edge type in a partition. For example, all edges of type ``"T"`` in
+        partition ``i`` has ID range ``edge_map["T"][i][0]`` to ``edge_map["T"][i][1]``.
     ntypes : dict[str, int]
         map ntype strings to ntype IDs.
     etypes : dict[str, int]
@@ -589,7 +589,7 @@ class RangePartitionBook(GraphPartitionBook):
             if not isinstance(node_map[key], np.ndarray):
                 node_map[key] = F.asnumpy(node_map[key])
             assert node_map[key].shape == (num_parts, 2)
-            self._typed_nid_range[key] = node_map[key].reshape(-1, 2)
+            self._typed_nid_range[key] = node_map[key]
             # This is used for per-node-type lookup.
             self._typed_node_map[key] = np.cumsum(self._typed_nid_range[key][:, 1]
                                                   - self._typed_nid_range[key][:, 0])
@@ -608,7 +608,7 @@ class RangePartitionBook(GraphPartitionBook):
             if not isinstance(edge_map[key], np.ndarray):
                 edge_map[key] = F.asnumpy(edge_map[key])
             assert edge_map[key].shape == (num_parts, 2)
-            self._typed_eid_range[key] = edge_map[key].reshape(-1, 2)
+            self._typed_eid_range[key] = edge_map[key]
             # This is used for per-edge-type lookup.
             self._typed_edge_map[key] = np.cumsum(self._typed_eid_range[key][:, 1]
                                                   - self._typed_eid_range[key][:, 0])
