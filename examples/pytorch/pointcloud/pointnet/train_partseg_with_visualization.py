@@ -12,6 +12,11 @@ import tqdm
 import urllib
 import os
 import argparse
+import time
+
+import torchvision
+from torch.utils.tensorboard import SummaryWriter
+from torchvision import datasets, transforms
 
 from ShapeNet import ShapeNet
 from pointnet_partseg import PointNetPartSeg, PartSegLoss
@@ -41,7 +46,22 @@ CustomDataLoader = partial(
         shuffle=True,
         drop_last=True)
 
-def train(net, opt, scheduler,  train_loader, dev):
+# Select 50 distinct colors for different parts
+color_map = torch.tensor([
+    [47, 79, 79],[139, 69, 19],[112, 128, 144],[85, 107, 47],[139, 0, 0],[128, 128, 0],[72, 61, 139],[0, 128, 0],[188, 143, 143],[60, 179, 113],
+    [205, 133, 63],[0, 139, 139],[70, 130, 180],[205, 92, 92],[154, 205, 50],[0, 0, 139],[50, 205, 50],[250, 250, 250],[218, 165, 32],[139, 0, 139],
+    [10, 10, 10],[176, 48, 96],[72, 209, 204],[153, 50, 204],[255, 69, 0],[255, 145, 0],[0, 0, 205],[255, 255, 0],[0, 255, 0],[233, 150, 122],
+    [220, 20, 60],[0, 191, 255],[160, 32, 240],[192,192,192],[173, 255, 47],[218, 112, 214],[216, 191, 216],[255, 127, 80],[255, 0, 255],[100, 149, 237],
+    [128,128,128],[221, 160, 221],[144, 238, 144],[123, 104, 238],[255, 160, 122],[175, 238, 238],[238, 130, 238],[127, 255, 212],[255, 218, 185],[255, 105, 180],
+])
+# paint each point according to its pred
+def paint(batched_points):
+    B, N = batched_points.shape
+    colored = color_map[batched_points].squeeze(2)
+    return colored
+
+
+def train(net, opt, scheduler,  train_loader, dev, epoch):
     category_list = sorted(list(shapenet.seg_classes.keys()))
     eye_mat = np.eye(16)
     net.train()
@@ -50,22 +70,28 @@ def train(net, opt, scheduler,  train_loader, dev):
     num_batches = 0
     total_correct = 0
     count = 0
+
+    start = time.time()
+
     with tqdm.tqdm(train_loader, ascii=True) as tq:
-        for data, label, cat in tq:
+        for batch_id, (data, label, cat) in enumerate(tq):
+            # batch_size
             num_examples = data.shape[0]
-            data = data.to(dev, dtype=torch.float)
+            data = data.to(dev, dtype=torch.float)  # [B, N, C]
             label = label.to(dev, dtype=torch.long).view(-1)
             opt.zero_grad()
             cat_ind = [category_list.index(c) for c in cat]
             # An one-hot encoding for the object category
             cat_tensor = torch.tensor(eye_mat[cat_ind]).to(dev, dtype=torch.float).repeat(1, 2048)
-            cat_tensor = cat_tensor.view(num_examples, -1, 16).permute(0,2,1)
+            cat_tensor = cat_tensor.view(num_examples, -1, 16).permute(0, 2, 1)  # [B, B, N]
+
             logits = net(data, cat_tensor)
+
             loss = L(logits, label)
             loss.backward()
             opt.step()
 
-            _, preds = logits.max(1)
+            _, preds = logits.max(1)  # [B, N]
 
             count += num_examples * 2048
             loss = loss.item()
@@ -74,10 +100,21 @@ def train(net, opt, scheduler,  train_loader, dev):
             correct = (preds.view(-1) == label).sum().item()
             total_correct += correct
 
+            AvgLoss = total_loss / num_batches
+            AvgAcc = total_correct / count
+
             tq.set_postfix({
-                'AvgLoss': '%.5f' % (total_loss / num_batches),
-                'AvgAcc': '%.5f' % (total_correct / count)})
+                'AvgLoss': '%.5f' % AvgLoss,
+                'AvgAcc': '%.5f' % AvgAcc})
     scheduler.step()
+
+    end = time.time()
+    # for visualization in Tensorboard
+    colored = paint(preds)
+    writer.add_mesh('data', vertices=data, colors=colored, global_step=epoch)
+    writer.add_scalar('training time for one epoch', end - start, global_step=epoch)
+
+    return AvgLoss, AvgAcc
 
 def mIoU(preds, label, cat, cat_miou, seg_classes):
     for i in range(preds.shape[0]):
@@ -170,8 +207,16 @@ test_loader = CustomDataLoader(shapenet.test())
 best_test_miou = 0
 best_test_per_cat_miou = 0
 
+# Tensorboard
+writer = SummaryWriter()
+
 for epoch in range(args.num_epochs):
-    train(net, opt, scheduler, train_loader, dev)
+
+    AvgLoss, AvgAcc = train(net, opt, scheduler, train_loader, dev, epoch)
+    # Tensorboard
+    writer.add_scalar('AvgLoss', AvgLoss, global_step=epoch)
+    writer.add_scalar('AvgAcc', AvgAcc, global_step=epoch)
+
     if (epoch + 1) % 5 == 0:
         print('Epoch #%d Testing' % epoch)
         test_miou, test_per_cat_miou = evaluate(net, test_loader, dev, (epoch + 1) % 5 ==0)
@@ -182,3 +227,6 @@ for epoch in range(args.num_epochs):
                 torch.save(net.state_dict(), args.save_model_path)
         print('Current test mIoU: %.5f (best: %.5f), per-Category mIoU: %.5f (best: %.5f)' % (
                test_miou, best_test_miou, test_per_cat_miou, best_test_per_cat_miou))
+        writer.add_scalar('test mIoU', test_miou, global_step=epoch)
+        writer.add_scalar('best test mIoU', best_test_miou, global_step=epoch)
+writer.close()
