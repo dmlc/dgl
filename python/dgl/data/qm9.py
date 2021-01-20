@@ -80,7 +80,7 @@ class QM9Dataset(DGLDataset):
     --------
     >>> data = QM9Dataset(label_keys=['mu', 'gap'], cutoff=5.0)
     >>> data.num_labels
-    12
+    2
     >>>
     >>> # iterate over the dataset
     >>> for g, label in data:
