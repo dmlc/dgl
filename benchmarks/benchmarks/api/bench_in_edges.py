@@ -16,7 +16,7 @@ from .. import utils
 def track_time(graph_name, format, fraction):
     device = utils.get_bench_device()
     graph = utils.get_graph(graph_name, format)
-    
+
     graph = graph.to(device)
     nids = np.random.choice(
         np.arange(graph.num_nodes(), dtype=np.int64), int(graph.num_nodes()*fraction))
