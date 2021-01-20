@@ -168,6 +168,12 @@ QM7b dataset
 .. autoclass:: QM7bDataset
     :members: __getitem__, __len__
 
+.. _qm9data:
+
+QM9 dataset
+```````````````````````````````````
+.. autoclass:: QM9Dataset
+    :members: __getitem__, __len__
 
 .. _minigcdataset:
 
