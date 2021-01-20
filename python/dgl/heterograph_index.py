@@ -907,7 +907,7 @@ class HeteroGraphIndex(ObjectBase):
         else:
             if isinstance(formats, str):
                 formats = [formats]
-            return _CAPI_DGLHeteroGetFormatGraph(self, format)
+            return _CAPI_DGLHeteroGetFormatGraph(self, formats)
 
     def create_formats_(self):
         """Create all sparse matrices allowed for the graph."""
