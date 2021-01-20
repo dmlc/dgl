@@ -16,8 +16,7 @@ def track_time(graph_name, format, k):
     graph = graph.to(device)
     graph = graph.formats([format])
     # dry run
-    dgl.khop_graph(graph, 1)
-    dgl.khop_graph(graph, 3)
+    dgl.khop_graph(graph, k)
 
     # timing
     t0 = time.time()
