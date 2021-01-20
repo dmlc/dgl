@@ -338,6 +338,14 @@ def test_hypersparse_query():
     assert g.out_degree(0) == 1
     assert g.out_degree(1) == 0
 
+def test_empty_data_initialized():
+    g = dgl.DGLGraph()
+    g = g.to(F.ctx())
+    g.ndata["ha"] = F.tensor([])
+    g.add_nodes(1, {"hb": F.tensor([1])})
+    assert "ha" in g.ndata
+    assert len(g.ndata["ha"]) == 1
+
 if __name__ == '__main__':
     test_query()
     test_mutation()

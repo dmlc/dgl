@@ -22,6 +22,7 @@ Contributors
 * [Yicheng Wu](https://github.com/MilkshakeForReal): RotatE in PyTorch
 * [Hao Xiong](https://github.com/ShawXh): DeepWalk in PyTorch
 * [Zhi Lin](https://github.com/kira-lin): Integrate FeatGraph into DGL
+* [Andrew Tsesis](https://github.com/noncomputable): Framework-Agnostic Graph Ops
 
 Other improvement
 * [Brett Koonce](https://github.com/brettkoonce)

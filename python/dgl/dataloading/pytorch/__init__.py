@@ -139,36 +139,52 @@ class _EdgeCollator(EdgeCollator):
             _pop_blocks_storage(result[-1], self.g_sampling)
             return result
 
+def _to_device(data, device):
+    if isinstance(data, dict):
+        for k, v in data.items():
+            data[k] = v.to(device)
+    elif isinstance(data, list):
+        data = [item.to(device) for item in data]
+    else:
+        data = data.to(device)
+    return data
+
 class _NodeDataLoaderIter:
     def __init__(self, node_dataloader):
+        self.device = node_dataloader.device
         self.node_dataloader = node_dataloader
         self.iter_ = iter(node_dataloader.dataloader)
 
     def __next__(self):
         # input_nodes, output_nodes, [items], blocks
-        result = next(self.iter_)
-        _restore_blocks_storage(result[-1], self.node_dataloader.collator.g)
+        result_ = next(self.iter_)
+        _restore_blocks_storage(result_[-1], self.node_dataloader.collator.g)
+
+        result = []
+        for data in result_:
+            result.append(_to_device(data, self.device))
         return result
 
 class _EdgeDataLoaderIter:
     def __init__(self, edge_dataloader):
+        self.device = edge_dataloader.device
         self.edge_dataloader = edge_dataloader
         self.iter_ = iter(edge_dataloader.dataloader)
 
     def __next__(self):
-        if self.edge_dataloader.collator.negative_sampler is None:
-            # input_nodes, pair_graph, [items], blocks
-            result = next(self.iter_)
-            _restore_subgraph_storage(result[1], self.edge_dataloader.collator.g)
-            _restore_blocks_storage(result[-1], self.edge_dataloader.collator.g_sampling)
-            return result
-        else:
+        result_ = next(self.iter_)
+
+        if self.edge_dataloader.collator.negative_sampler is not None:
             # input_nodes, pair_graph, neg_pair_graph, [items], blocks
-            result = next(self.iter_)
-            _restore_subgraph_storage(result[1], self.edge_dataloader.collator.g)
-            _restore_subgraph_storage(result[2], self.edge_dataloader.collator.g)
-            _restore_blocks_storage(result[-1], self.edge_dataloader.collator.g_sampling)
-            return result
+            # Otherwise, input_nodes, pair_graph, [items], blocks
+            _restore_subgraph_storage(result_[2], self.edge_dataloader.collator.g)
+        _restore_subgraph_storage(result_[1], self.edge_dataloader.collator.g)
+        _restore_blocks_storage(result_[-1], self.edge_dataloader.collator.g_sampling)
+
+        result = []
+        for data in result_:
+            result.append(_to_device(data, self.device))
+        return result
 
 class NodeDataLoader:
     """PyTorch dataloader for batch-iterating over a set of nodes, generating the list
@@ -182,6 +198,9 @@ class NodeDataLoader:
         The node set to compute outputs.
     block_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
+    device : device context, optional
+        The device of the generated blocks in each iteration, which should be a
+        PyTorch device object (e.g., ``torch.device``).
     kwargs : dict
         Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
 
@@ -200,7 +219,7 @@ class NodeDataLoader:
     """
     collator_arglist = inspect.getfullargspec(NodeCollator).args
 
-    def __init__(self, g, nids, block_sampler, **kwargs):
+    def __init__(self, g, nids, block_sampler, device='cpu', **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -210,6 +229,7 @@ class NodeDataLoader:
                 dataloader_kwargs[k] = v
 
         if isinstance(g, DistGraph):
+            assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
             # Distributed DataLoader currently does not support heterogeneous graphs
             # and does not copy features.  Fallback to normal solution
             self.collator = NodeCollator(g, nids, block_sampler, **collator_kwargs)
@@ -224,6 +244,7 @@ class NodeDataLoader:
                                          collate_fn=self.collator.collate,
                                          **dataloader_kwargs)
             self.is_distributed = False
+        self.device = device
 
     def __iter__(self):
         """Return the iterator of the data loader."""
@@ -267,6 +288,9 @@ class EdgeDataLoader:
         The edge set in graph :attr:`g` to compute outputs.
     block_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
+    device : device context, optional
+        The device of the generated blocks and graphs in each iteration, which should be a
+        PyTorch device object (e.g., ``torch.device``).
     g_sampling : DGLGraph, optional
         The graph where neighborhood sampling is performed.
 
@@ -397,7 +421,7 @@ class EdgeDataLoader:
     """
     collator_arglist = inspect.getfullargspec(EdgeCollator).args
 
-    def __init__(self, g, eids, block_sampler, **kwargs):
+    def __init__(self, g, eids, block_sampler, device='cpu', **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -412,6 +436,7 @@ class EdgeDataLoader:
                 + 'Please use DistDataLoader directly.'
         self.dataloader = DataLoader(
             self.collator.dataset, collate_fn=self.collator.collate, **dataloader_kwargs)
+        self.device = device
 
     def __iter__(self):
         """Return the iterator of the data loader."""
@@ -427,7 +452,7 @@ class GraphDataLoader:
 
     Parameters
     ----------
-    collate : Function, default is None
+    collate_fn : Function, default is None
         The customized collate function. Will use the default collate
         function if not given.
     kwargs : dict
@@ -445,7 +470,7 @@ class GraphDataLoader:
     """
     collator_arglist = inspect.getfullargspec(GraphCollator).args
 
-    def __init__(self, dataset, collate=None, **kwargs):
+    def __init__(self, dataset, collate_fn=None, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -454,10 +479,10 @@ class GraphDataLoader:
             else:
                 dataloader_kwargs[k] = v
 
-        if collate is None:
+        if collate_fn is None:
             self.collate = GraphCollator(**collator_kwargs).collate
         else:
-            self.collate = collate
+            self.collate = collate_fn
 
         self.dataloader = DataLoader(dataset=dataset,
                                      collate_fn=self.collate,
