@@ -5411,7 +5411,7 @@ class DGLHeteroGraph(object):
             hgidx = heterograph_index.create_unitgraph_from_coo(
                 1 if u_type == v_type else 2,
                 self.num_nodes(u_type),
-                self.num_edges(v_type),
+                self.num_nodes(v_type),
                 u, v, ['coo', 'csr', 'csc'])
             relation_graphs.append(hgidx)
         hgidx = heterograph_index.create_heterograph_from_relations(
