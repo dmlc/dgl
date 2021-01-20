@@ -2531,7 +2531,6 @@ def test_sort_by_srcdst(idtype):
     assert sg.device == g.device
     for ntype in g.ntypes:
         assert sg.num_nodes(ntype) == g.num_nodes(ntype)
-        assert F.allclose(g.ndata['h'], sg.ndata['h'])
     for ntype in g.ndata['h']:
         assert F.allclose(g.nodes[ntype].data['h'], sg.nodes[ntype].data['h'])
     assert F.allclose(sg.edges['r1'].data['h'], F.copy_to(F.tensor([3, 0, 2, 1]), ctx=F.ctx()))
