@@ -328,13 +328,6 @@ CSRMatrix COOToCSR(COOMatrix coo) {
       Bp[i + 1] = Bp[i] + j - k;
     }
 
-    // TODO(minjie): Many of our current implementation assumes that CSR must have
-    //   a data array. This is a temporary workaround. Remove this after:
-    //   - The old immutable graph implementation is deprecated.
-    //   - The old binary reduce kernel is deprecated.
-    if (!COOHasData(coo))
-      coo.data = aten::Range(0, NNZ, coo.row->dtype.bits, coo.row->ctx);
-
     // compute indices and data
     ret_indices = coo.col;
     ret_data = coo.data;
