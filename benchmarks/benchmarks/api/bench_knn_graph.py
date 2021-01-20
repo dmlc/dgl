@@ -15,7 +15,7 @@ def track_time(size, dim, k):
     features = np.random.randn(size, dim)
     feat = torch.tensor(features, dtype=torch.float, device=device)
     # dry run
-    dgl.knn_graph(feat, 2)
+    dgl.knn_graph(feat, k)
     # timing
     t0 = time.time()
     for i in range(10):
