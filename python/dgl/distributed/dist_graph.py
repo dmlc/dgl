@@ -73,8 +73,8 @@ def _copy_graph_to_shared_mem(g, graph_name):
     new_g.edata[EID] = _to_shared_mem(g.edata[EID], _get_edata_path(graph_name, EID))
     return new_g
 
-FIELD_DICT = {'inner_node': F.int32,
-              'inner_edge': F.int32,
+FIELD_DICT = {'inner_node': F.int32,    # A flag indicates whether the node is inside a partition.
+              'inner_edge': F.int32,    # A flag indicates whether the edge is inside a partition.
               NID: F.int64,
               EID: F.int64,
               NTYPE: F.int16,
@@ -129,7 +129,7 @@ NodeSpace = namedtuple('NodeSpace', ['data'])
 EdgeSpace = namedtuple('EdgeSpace', ['data'])
 
 class HeteroNodeView(object):
-    """A NodeView class to act as G.nodes for a DGLHeteroGraph."""
+    """A NodeView class to act as G.nodes for a DistGraph."""
     __slots__ = ['_graph']
 
     def __init__(self, graph):
@@ -140,7 +140,7 @@ class HeteroNodeView(object):
         return NodeSpace(data=NodeDataView(self._graph, key))
 
 class HeteroEdgeView(object):
-    """A NodeView class to act as G.nodes for a DGLHeteroGraph."""
+    """A NodeView class to act as G.nodes for a DistGraph."""
     __slots__ = ['_graph']
 
     def __init__(self, graph):
@@ -517,7 +517,7 @@ class DistGraph:
 
     @property
     def edges(self):
-        '''Return a edge view
+        '''Return an edge view
         '''
         return HeteroEdgeView(self)
 
@@ -878,21 +878,6 @@ class DistGraph:
         '''
         self._client.barrier()
 
-    def _split_type_name(self, data_names, types):
-        # The ndata_name contains both node type and data name. We need to find the right node type
-        # and get the node name from ndata_name.
-        # We have the double loop to split ndata_name. It's not a big issue because it's only
-        # called once.
-        for i, name in enumerate(data_names):
-            right_type = None
-            for data_type in types:
-                if data_type == name[:len(data_type)]:
-                    right_type = data_type
-                    break
-            assert right_type is not None
-            data_names[i] = (right_type, name[(len(right_type) + 1):])
-        return data_names
-
     def _get_ndata_names(self, ntype=None):
         ''' Get the names of all node data.
         '''
@@ -1035,13 +1020,13 @@ def node_split(nodes, partition_book=None, ntype='_N', rank=None, force_even=Tru
     ----------
     nodes : 1D tensor or DistTensor
         A boolean mask vector that indicates input nodes.
-    partition_book : GraphPartitionBook
+    partition_book : GraphPartitionBook, optional
         The graph partition book
-    ntype : str
+    ntype : str, optional
         The node type of the input nodes.
-    rank : int
+    rank : int, optional
         The rank of a process. If not given, the rank of the current process is used.
-    force_even : bool
+    force_even : bool, optional
         Force the nodes are split evenly.
 
     Returns
@@ -1088,13 +1073,13 @@ def edge_split(edges, partition_book=None, etype='_E', rank=None, force_even=Tru
     ----------
     edges : 1D tensor or DistTensor
         A boolean mask vector that indicates input edges.
-    partition_book : GraphPartitionBook
+    partition_book : GraphPartitionBook, optional
         The graph partition book
-    etype : str
+    etype : str, optional
         The edge type of the input edges.
-    rank : int
+    rank : int, optional
         The rank of a process. If not given, the rank of the current process is used.
-    force_even : bool
+    force_even : bool, optional
         Force the edges are split evenly.
 
     Returns
