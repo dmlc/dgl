@@ -2503,7 +2503,41 @@ def test_frame_device(idtype):
     assert F.context(ng._node_frames[0]._columns['hh'].storage) == F.ctx()
     assert F.context(ng._edge_frames[0]._columns['h'].storage) == F.cpu()
 
+@parametrize_dtype
+def test_sort_by_srcdst(idtype):
+    # Homogeneous graph
+    g = dgl.graph(([0, 1, 1, 0], [1, 3, 2, 0]), idtype=idtype, device=F.ctx(), num_nodes=10)
+    g.ndata['h'] = F.copy_to(F.randn((g.num_nodes(), 6)), ctx=F.ctx())
+    g.edata['h'] = F.copy_to(F.arange(0, g.num_edges()), ctx=F.ctx())
+    sg, raw_eids = g.sort_by_srcdst()
+    assert sg.idtype == g.idtype
+    assert sg.device == g.device
+    assert sg.num_nodes() == g.num_nodes()
+    assert F.allclose(g.ndata['h'], sg.ndata['h'])
+    assert F.allclose(sg.edata['h'], F.copy_to(F.tensor([3, 0, 2, 1]), ctx=F.ctx()))
+    assert F.allclose(raw_eids, F.copy_to(F.tensor([3, 0, 2, 1], dtype=idtype), ctx=F.ctx()))
 
+    # Heterogeneous graph
+    g = dgl.heterograph({
+        ('A', 'r1', 'B'): ([0, 1, 1, 0], [1, 3, 2, 0]),
+        ('C', 'r2', 'D'): ([1, 1, 0], [3, 2, 1])
+    }, num_nodes_dict={'A': 5, 'B': 5, 'C': 5, 'D': 5}, idtype=idtype, device=F.ctx())
+    g.nodes['A'].data['h'] = F.copy_to(F.randn((g.num_nodes('A'), 6)), ctx=F.ctx())
+    g.nodes['C'].data['h'] = F.copy_to(F.randn((g.num_nodes('C'), 3)), ctx=F.ctx())
+    g.edges['r1'].data['h'] = F.copy_to(F.arange(0, g.num_edges('r1')), ctx=F.ctx())
+    g.edges['r2'].data['h'] = F.copy_to(F.arange(0, g.num_edges('r2')), ctx=F.ctx())
+    sg, raw_eids = g.sort_by_srcdst()
+    assert sg.idtype == g.idtype
+    assert sg.device == g.device
+    for ntype in g.ntypes:
+        assert sg.num_nodes(ntype) == g.num_nodes(ntype)
+        assert F.allclose(g.ndata['h'], sg.ndata['h'])
+    for ntype in g.ndata['h']:
+        assert F.allclose(g.nodes[ntype].data['h'], sg.nodes[ntype].data['h'])
+    assert F.allclose(sg.edges['r1'].data['h'], F.copy_to(F.tensor([3, 0, 2, 1]), ctx=F.ctx()))
+    assert F.allclose(sg.edges['r2'].data['h'], F.copy_to(F.tensor([2, 1, 0]), ctx=F.ctx()))
+    for cetype in raw_eids:
+        assert F.allclose(raw_eids[cetype], g.edges(form='eid', order='srcdst', etype=cetype))
 
 if __name__ == '__main__':
     # test_create()
