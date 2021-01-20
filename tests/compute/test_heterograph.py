@@ -1814,47 +1814,6 @@ def test_format(idtype):
     assert len(g1.formats()['not created']) == 0
 
 @parametrize_dtype
-def test_csc_no_eids(idtype):
-    # single relation, unsorted
-    g = dgl.graph(([0, 1, 1, 0], [1, 1, 0, 2]), idtype=idtype, device=F.ctx())
-    srcdst_eids = g.edges(form='eid', order='srcdst')
-    g.edata['h'] = F.astype(g.edges(form='eid', order='eid'), F.float32)
-    g1, g1_raw_eids = g.csc_no_eids()
-    assert F.array_equal(g1_raw_eids, srcdst_eids)
-    assert F.array_equal(g1.edata['h'], F.astype(srcdst_eids, F.float32))
-
-    # single relation sorted
-    g = dgl.graph(([0, 0, 1, 1], [1, 2, 0, 1]), idtype=idtype, device=F.ctx())
-    g.edata['h'] = F.astype(g.edges(form='eid', order='eid'), F.float32)
-    g1 = g.csc_no_eids(sort=False)
-    assert F.array_equal(g1.edata['h'], F.astype(g.edges(form='eid', order='srcdst'), F.float32))
-
-    # multiple relation, unsorted
-    g = dgl.heterograph({
-        ('A', 'r1', 'B'): ([0, 0, 1], [1, 0, 0]),
-        ('A', 'r2', 'C'): ([0, 1, 1, 0], [1, 1, 0, 2])
-        }, idtype=idtype, device=F.ctx())
-    g.edges['r1'].data['h'] = F.astype(g.edges(form='eid', order='eid', etype='r1'), F.float32)
-    g.edges['r2'].data['h'] = F.astype(g.edges(form='eid', order='eid', etype='r2'), F.float32)
-    g1, g1_raw_eids = g.csc_no_eids()
-    for cetype in g.canonical_etypes:
-        srcdst_eids = g.edges(form='eid', order='srcdst', etype=cetype)
-        assert F.array_equal(g1_raw_eids[cetype], srcdst_eids)
-        assert F.array_equal(g1.edges[cetype].data['h'], F.astype(srcdst_eids, F.float32))
-
-    # multiple relations, sorted
-    g = dgl.heterograph({
-        ('A', 'r1', 'B'): ([0, 0, 1], [0, 1, 0]),
-        ('A', 'r2', 'C'): ([0, 0, 1, 1], [1, 2, 0, 1])
-        }, idtype=idtype, device=F.ctx())
-    g.edges['r1'].data['h'] = F.astype(g.edges(form='eid', order='eid', etype='r1'), F.float32)
-    g.edges['r2'].data['h'] = F.astype(g.edges(form='eid', order='eid', etype='r2'), F.float32)
-    g1 = g.csc_no_eids(sort=False)
-    for cetype in g.canonical_etypes:
-        srcdst_eids = g.edges(form='eid', order='srcdst', etype=cetype)
-        assert F.array_equal(g1.edges[cetype].data['h'], F.astype(srcdst_eids, F.float32))
-
-@parametrize_dtype
 def test_edges_order(idtype):
     # (0, 2), (1, 2), (0, 1), (0, 1), (2, 1)
     g = dgl.graph((

@@ -619,14 +619,13 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     List<Value> formats = args[1];
-    bool store_eid = args[2];
     std::vector<SparseFormat> formats_vec;
     for (Value val : formats) {
       std::string fmt = val->data;
       formats_vec.push_back(ParseSparseFormat(fmt));
     }
     auto hgptr = hg->GetGraphInFormat(
-        SparseFormatsToCode(formats_vec), store_eid);
+        SparseFormatsToCode(formats_vec));
     *rv = HeteroGraphRef(hgptr);
 });
 

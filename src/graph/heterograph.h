@@ -209,7 +209,7 @@ class HeteroGraph : public BaseHeteroGraph {
   HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override;
 
-  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats, bool store_eid) const override;
+  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats) const override;
 
   FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const override;
 

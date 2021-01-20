@@ -398,7 +398,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return subg;
   }
 
-  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats, bool store_eid) const override {
+  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats) const override {
     LOG(FATAL) << "Not enabled for COO graph.";
     return nullptr;
   }
@@ -451,6 +451,8 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK(aten::IsValidIdArray(indptr));
     CHECK(aten::IsValidIdArray(indices));
     CHECK(aten::IsValidIdArray(edge_ids));
+    CHECK_EQ(indices->shape[0], edge_ids->shape[0])
+      << "indices and edge id arrays should have the same length";
 
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
   }
@@ -773,7 +775,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return {};
   }
 
-  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats, bool store_eid) const override {
+  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats) const override {
     LOG(FATAL) << "Not enabled for CSR graph.";
     return nullptr;
   }
@@ -1418,7 +1420,7 @@ HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
   }
 }
 
-HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats, bool store_eid) const {
+HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats) const {
   if (formats == all_code)
     return HeteroGraphPtr(
         // TODO(xiangsx) Make it as graph storage.Clone()
@@ -1438,11 +1440,7 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats, bool store
     return CreateFromCOO(num_vtypes, GetCOO(false)->adj(), formats);
   if (formats & csr_code)
     return CreateFromCSR(num_vtypes, GetOutCSR(false)->adj(), formats);
-  if (store_eid == true)
-    return CreateFromCSC(num_vtypes, GetInCSR(false)->adj(), formats);
-  const aten::CSRMatrix& mat = GetInCSR(false)->adj();
-  return CreateFromCSC(num_vtypes, mat.num_rows, mat.num_cols,
-                       mat.indptr, mat.indices, aten::NullArray(), formats);
+  return CreateFromCSC(num_vtypes, GetInCSR(false)->adj(), formats);
 }
 
 SparseFormat UnitGraph::SelectFormat(dgl_format_code_t preferred_formats) const {
