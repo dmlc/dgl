@@ -583,7 +583,7 @@ class RangePartitionBook(GraphPartitionBook):
         # This stores the node ID map for per-node-type IDs in each partition.
         # The key is the node type, the value is a NumPy vector which indicates
         # the last node ID in a partition.
-        self._typed_node_map = {}
+        self._typed_max_node_ids = {}
         max_node_map = np.zeros((num_parts,), dtype=np.int64)
         for key in node_map:
             if not isinstance(node_map[key], np.ndarray):
@@ -591,18 +591,18 @@ class RangePartitionBook(GraphPartitionBook):
             assert node_map[key].shape == (num_parts, 2)
             self._typed_nid_range[key] = node_map[key]
             # This is used for per-node-type lookup.
-            self._typed_node_map[key] = np.cumsum(self._typed_nid_range[key][:, 1]
-                                                  - self._typed_nid_range[key][:, 0])
+            self._typed_max_node_ids[key] = np.cumsum(self._typed_nid_range[key][:, 1]
+                                                      - self._typed_nid_range[key][:, 0])
             # This is used for homogeneous node ID lookup.
             max_node_map = np.maximum(self._typed_nid_range[key][:, 1], max_node_map)
         # This is a vector that indicates the last node ID in each partition.
         # The ID is the global ID in the homogeneous representation.
-        self._node_map = node_map = max_node_map
+        self._max_node_ids = max_node_map
 
         # Similar to _typed_nid_range.
         self._typed_eid_range = {}
-        # similar to _typed_edge_map.
-        self._typed_edge_map = {}
+        # similar to _typed_max_node_ids.
+        self._typed_max_edge_ids = {}
         max_edge_map = np.zeros((num_parts,), dtype=np.int64)
         for key in edge_map:
             if not isinstance(edge_map[key], np.ndarray):
@@ -610,12 +610,12 @@ class RangePartitionBook(GraphPartitionBook):
             assert edge_map[key].shape == (num_parts, 2)
             self._typed_eid_range[key] = edge_map[key]
             # This is used for per-edge-type lookup.
-            self._typed_edge_map[key] = np.cumsum(self._typed_eid_range[key][:, 1]
-                                                  - self._typed_eid_range[key][:, 0])
+            self._typed_max_edge_ids[key] = np.cumsum(self._typed_eid_range[key][:, 1]
+                                                      - self._typed_eid_range[key][:, 0])
             # This is used for homogeneous edge ID lookup.
             max_edge_map = np.maximum(self._typed_eid_range[key][:, 1], max_edge_map)
-        # Similar to _node_map
-        self._edge_map = edge_map = max_edge_map
+        # Similar to _max_node_ids
+        self._max_edge_ids = max_edge_map
 
         # These two are map functions that map node/edge IDs to node/edge type IDs.
         self._nid_map = IdMap(self._typed_nid_range)
@@ -624,12 +624,12 @@ class RangePartitionBook(GraphPartitionBook):
         # Get meta data of the partition book
         self._partition_meta_data = []
         for partid in range(self._num_partitions):
-            nrange_start = node_map[partid - 1] if partid > 0 else 0
-            nrange_end = node_map[partid]
+            nrange_start = max_node_map[partid - 1] if partid > 0 else 0
+            nrange_end = max_node_map[partid]
             num_nodes = nrange_end - nrange_start
 
-            erange_start = edge_map[partid - 1] if partid > 0 else 0
-            erange_end = edge_map[partid]
+            erange_start = max_edge_map[partid - 1] if partid > 0 else 0
+            erange_end = max_edge_map[partid]
             num_edges = erange_end - erange_start
 
             part_info = {}
@@ -673,17 +673,17 @@ class RangePartitionBook(GraphPartitionBook):
         """ The total number of nodes
         """
         if ntype == '_N':
-            return int(self._node_map[-1])
+            return int(self._max_node_ids[-1])
         else:
-            return int(self._typed_node_map[ntype][-1])
+            return int(self._typed_max_node_ids[ntype][-1])
 
     def _num_edges(self, etype='_E'):
         """ The total number of edges
         """
         if etype == '_E':
-            return int(self._edge_map[-1])
+            return int(self._max_edge_ids[-1])
         else:
-            return int(self._typed_edge_map[etype][-1])
+            return int(self._typed_max_edge_ids[etype][-1])
 
     def metadata(self):
         """Return the partition meta data.
@@ -709,7 +709,7 @@ class RangePartitionBook(GraphPartitionBook):
         """
         ids = utils.toindex(ids).tousertensor()
         partids = self.nid2partid(ids, ntype)
-        end_diff = F.tensor(self._typed_node_map[ntype])[partids] - ids
+        end_diff = F.tensor(self._typed_max_node_ids[ntype])[partids] - ids
         return F.tensor(self._typed_nid_range[ntype][:, 1])[partids] - end_diff
 
     def map_to_homo_eid(self, ids, etype):
@@ -717,7 +717,7 @@ class RangePartitionBook(GraphPartitionBook):
         """
         ids = utils.toindex(ids).tousertensor()
         partids = self.eid2partid(ids, etype)
-        end_diff = F.tensor(self._typed_edge_map[etype][partids]) - ids
+        end_diff = F.tensor(self._typed_max_edge_ids[etype][partids]) - ids
         return F.tensor(self._typed_eid_range[etype][:, 1])[partids] - end_diff
 
     def nid2partid(self, nids, ntype='_N'):
@@ -725,9 +725,9 @@ class RangePartitionBook(GraphPartitionBook):
         """
         nids = utils.toindex(nids)
         if ntype == '_N':
-            ret = np.searchsorted(self._node_map, nids.tonumpy(), side='right')
+            ret = np.searchsorted(self._max_node_ids, nids.tonumpy(), side='right')
         else:
-            ret = np.searchsorted(self._typed_node_map[ntype], nids.tonumpy(), side='right')
+            ret = np.searchsorted(self._typed_max_node_ids[ntype], nids.tonumpy(), side='right')
         ret = utils.toindex(ret)
         return ret.tousertensor()
 
@@ -736,9 +736,9 @@ class RangePartitionBook(GraphPartitionBook):
         """
         eids = utils.toindex(eids)
         if etype == '_E':
-            ret = np.searchsorted(self._edge_map, eids.tonumpy(), side='right')
+            ret = np.searchsorted(self._max_edge_ids, eids.tonumpy(), side='right')
         else:
-            ret = np.searchsorted(self._typed_edge_map[etype], eids.tonumpy(), side='right')
+            ret = np.searchsorted(self._typed_max_edge_ids[etype], eids.tonumpy(), side='right')
         ret = utils.toindex(ret)
         return ret.tousertensor()
 
@@ -748,12 +748,12 @@ class RangePartitionBook(GraphPartitionBook):
         """
         # TODO do we need to cache it?
         if ntype == '_N':
-            start = self._node_map[partid - 1] if partid > 0 else 0
-            end = self._node_map[partid]
+            start = self._max_node_ids[partid - 1] if partid > 0 else 0
+            end = self._max_node_ids[partid]
             return F.arange(start, end)
         else:
-            start = self._typed_node_map[ntype][partid - 1] if partid > 0 else 0
-            end = self._typed_node_map[ntype][partid]
+            start = self._typed_max_node_ids[ntype][partid - 1] if partid > 0 else 0
+            end = self._typed_max_node_ids[ntype][partid]
             return F.arange(start, end)
 
 
@@ -762,12 +762,12 @@ class RangePartitionBook(GraphPartitionBook):
         """
         # TODO do we need to cache it?
         if etype == '_E':
-            start = self._edge_map[partid - 1] if partid > 0 else 0
-            end = self._edge_map[partid]
+            start = self._max_edge_ids[partid - 1] if partid > 0 else 0
+            end = self._max_edge_ids[partid]
             return F.arange(start, end)
         else:
-            start = self._typed_edge_map[etype][partid - 1] if partid > 0 else 0
-            end = self._typed_edge_map[etype][partid]
+            start = self._typed_max_edge_ids[etype][partid - 1] if partid > 0 else 0
+            end = self._typed_max_edge_ids[etype][partid]
             return F.arange(start, end)
 
 
@@ -781,9 +781,9 @@ class RangePartitionBook(GraphPartitionBook):
         nids = utils.toindex(nids)
         nids = nids.tousertensor()
         if ntype == '_N':
-            start = self._node_map[partid - 1] if partid > 0 else 0
+            start = self._max_node_ids[partid - 1] if partid > 0 else 0
         else:
-            start = self._typed_node_map[ntype][partid - 1] if partid > 0 else 0
+            start = self._typed_max_node_ids[ntype][partid - 1] if partid > 0 else 0
         return nids - int(start)
 
 
@@ -797,9 +797,9 @@ class RangePartitionBook(GraphPartitionBook):
         eids = utils.toindex(eids)
         eids = eids.tousertensor()
         if etype == '_E':
-            start = self._edge_map[partid - 1] if partid > 0 else 0
+            start = self._max_edge_ids[partid - 1] if partid > 0 else 0
         else:
-            start = self._typed_edge_map[etype][partid - 1] if partid > 0 else 0
+            start = self._typed_max_edge_ids[etype][partid - 1] if partid > 0 else 0
         return eids - int(start)
 
 
