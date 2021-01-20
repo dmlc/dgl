@@ -243,7 +243,8 @@ struct edge_property {
   int part_id;
 };
 
-// TODO(JJ): What's this?
+// Reassign edge IDs so that all edges in a partition have contiguous edge IDs.
+// The original edge IDs are returned.
 DGL_REGISTER_GLOBAL("partition._CAPI_DGLReassignEdges_Hetero")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef g = args[0];

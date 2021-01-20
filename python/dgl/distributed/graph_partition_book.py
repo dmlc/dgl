@@ -710,7 +710,6 @@ class RangePartitionBook(GraphPartitionBook):
         ids = utils.toindex(ids).tousertensor()
         partids = self.nid2partid(ids, ntype)
         end_diff = F.tensor(self._typed_node_map[ntype])[partids] - ids
-        # TODO(zhengda) make everything operate on Pytorch tensors.
         return F.tensor(self._typed_nid_range[ntype][:, 1])[partids] - end_diff
 
     def map_to_homo_eid(self, ids, etype):
@@ -719,7 +718,6 @@ class RangePartitionBook(GraphPartitionBook):
         ids = utils.toindex(ids).tousertensor()
         partids = self.eid2partid(ids, etype)
         end_diff = F.tensor(self._typed_edge_map[etype][partids]) - ids
-        # TODO(zhengda) make everything operate on Pytorch tensors.
         return F.tensor(self._typed_eid_range[etype][:, 1])[partids] - end_diff
 
     def nid2partid(self, nids, ntype='_N'):

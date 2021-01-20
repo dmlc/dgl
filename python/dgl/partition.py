@@ -13,9 +13,9 @@ __all__ = ["metis_partition", "metis_partition_assignment",
 
 
 def reorder_nodes(g, new_node_ids):
-    """ Generate a new graph with new node Ids.
+    """ Generate a new graph with new node IDs.
 
-    We assign each node in the input graph with a new node Id. This results in
+    We assign each node in the input graph with a new node ID. This results in
     a new graph.
 
     Parameters
@@ -23,11 +23,11 @@ def reorder_nodes(g, new_node_ids):
     g : DGLGraph
         The input graph
     new_node_ids : a tensor
-        The new node Ids
+        The new node IDs
     Returns
     -------
     DGLGraph
-        The graph with new node Ids.
+        The graph with new node IDs.
     """
     assert len(new_node_ids) == g.number_of_nodes(), \
         "The number of new node ids must match #nodes in the graph."
@@ -35,7 +35,7 @@ def reorder_nodes(g, new_node_ids):
     sorted_ids, idx = F.sort_1d(new_node_ids.tousertensor())
     assert F.asnumpy(sorted_ids[0]) == 0 \
         and F.asnumpy(sorted_ids[-1]) == g.number_of_nodes() - 1, \
-        "The new node Ids are incorrect."
+        "The new node IDs are incorrect."
     new_gidx = _CAPI_DGLReorderGraph_Hetero(
         g._graph, new_node_ids.todgltensor())
     new_g = DGLHeteroGraph(gidx=new_gidx, ntypes=['_N'], etypes=['_E'])
@@ -47,13 +47,28 @@ def _get_halo_heterosubgraph_inner_node(halo_subg):
     return _CAPI_GetHaloSubgraphInnerNodes_Hetero(halo_subg)
 
 def reshuffle_graph(g, node_part=None):
-    '''Reshuffle node ids and edge Ids of a graph.
+    '''Reshuffle node ids and edge IDs of a graph.
 
-    We need to reshuffle them so that all nodes/edges of the same type have contiguous Ids.
-    In the case that a graph is partitioned, all nodes/edges in a partition should
-    get contiguous Ids; within a partition, all nodes/edges of the same type have contigous Ids.
+    This function reshuffles nodes and edges in a graph so that all nodes/edges of the same type
+    have contiguous IDs. If a graph is partitioned and nodes are assigned to different partitions,
+    all nodes/edges in a partition should
+    get contiguous IDs; within a partition, all nodes/edges of the same type have contigous IDs.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+    node_part : Tensor
+        This is a vector whose length is the same as the number of nodes in the input graph.
+        Each element indicates the partition ID the corresponding node is assigned to.
+
+    Returns
+    -------
+    (DGLGraph, Tensor)
+        The graph whose nodes and edges are reshuffled.
+        The 1D tensor that indicates the partition IDs of the nodes in the reshuffled graph.
     '''
-    # In this case, we don't need to reshuffle node Ids and edge Ids.
+    # In this case, we don't need to reshuffle node IDs and edge IDs.
     if node_part is None:
         g.ndata['orig_id'] = F.arange(0, g.number_of_nodes())
         g.edata['orig_id'] = F.arange(0, g.number_of_edges())
@@ -89,7 +104,7 @@ def reshuffle_graph(g, node_part=None):
     g = reorder_nodes(g, new_node_ids)
     node_part = utils.toindex(sorted_part)
     # We reassign edges in in-CSR. In this way, after partitioning, we can ensure
-    # that all edges in a partition are in the contiguous Id space.
+    # that all edges in a partition are in the contiguous ID space.
     etype_idx = utils.toindex(etype)
     orig_eids = _CAPI_DGLReassignEdges_Hetero(g._graph, etype_idx.todgltensor(),
                                               node_part.todgltensor(), True)
@@ -108,10 +123,10 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     not belong to the partition of a subgraph but are connected to the nodes
     in the partition within a fixed number of hops.
 
-    If `reshuffle` is turned on, the function reshuffles node Ids and edge Ids
+    If `reshuffle` is turned on, the function reshuffles node IDs and edge IDs
     of the input graph before partitioning. After reshuffling, all nodes and edges
-    in a partition fall in a contiguous Id range in the input graph.
-    The partitioend subgraphs have node data 'orig_id', which stores the node Ids
+    in a partition fall in a contiguous ID range in the input graph.
+    The partitioend subgraphs have node data 'orig_id', which stores the node IDs
     in the original input graph.
 
     Parameters
@@ -121,16 +136,16 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     node_part: 1D tensor
         Specify which partition a node is assigned to. The length of this tensor
         needs to be the same as the number of nodes of the graph. Each element
-        indicates the partition Id of a node.
+        indicates the partition ID of a node.
     extra_cached_hops: int
         The number of hops a HALO node can be accessed.
     reshuffle : bool
-        Resuffle nodes so that nodes in the same partition are in the same Id range.
+        Resuffle nodes so that nodes in the same partition are in the same ID range.
 
     Returns
     --------
     a dict of DGLGraphs
-        The key is the partition Id and the value is the DGLGraph of the partition.
+        The key is the partition ID and the value is the DGLGraph of the partition.
     '''
     assert len(node_part) == g.number_of_nodes()
     if reshuffle:
@@ -211,7 +226,7 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
     Returns
     -------
     a 1-D tensor
-        A vector with each element that indicates the partition Id of a vertex.
+        A vector with each element that indicates the partition ID of a vertex.
     '''
     # METIS works only on symmetric graphs.
     # The METIS runs on the symmetric graph to generate the node assignment to partitions.
@@ -292,10 +307,10 @@ def metis_partition(g, k, extra_cached_hops=0, reshuffle=False,
     To balance the node types, a user needs to pass a vector of N elements to indicate
     the type of each node. N is the number of nodes in the input graph.
 
-    If `reshuffle` is turned on, the function reshuffles node Ids and edge Ids
+    If `reshuffle` is turned on, the function reshuffles node IDs and edge IDs
     of the input graph before partitioning. After reshuffling, all nodes and edges
-    in a partition fall in a contiguous Id range in the input graph.
-    The partitioend subgraphs have node data 'orig_id', which stores the node Ids
+    in a partition fall in a contiguous ID range in the input graph.
+    The partitioend subgraphs have node data 'orig_id', which stores the node IDs
     in the original input graph.
 
     The partitioned subgraph is stored in DGLGraph. The DGLGraph has the `part_id`
@@ -311,7 +326,7 @@ def metis_partition(g, k, extra_cached_hops=0, reshuffle=False,
     extra_cached_hops: int
         The number of hops a HALO node can be accessed.
     reshuffle : bool
-        Resuffle nodes so that nodes in the same partition are in the same Id range.
+        Resuffle nodes so that nodes in the same partition are in the same ID range.
     balance_ntypes : tensor
         Node type of each node
     balance_edges : bool
@@ -320,7 +335,7 @@ def metis_partition(g, k, extra_cached_hops=0, reshuffle=False,
     Returns
     --------
     a dict of DGLGraphs
-        The key is the partition Id and the value is the DGLGraph of the partition.
+        The key is the partition ID and the value is the DGLGraph of the partition.
     '''
     node_part = metis_partition_assignment(g, k, balance_ntypes, balance_edges)
     if node_part is None:
