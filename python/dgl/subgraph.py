@@ -541,32 +541,9 @@ def node_type_subgraph(graph, ntypes):
     for stid, dtid, etid in zip(stids, dtids, etids):
         if stid in ntid and dtid in ntid:
             etypes.append(graph.canonical_etypes[etid])
-
-    etype_ids = [graph.get_etype_id(etype) for etype in etypes]
-    # meta graph is homogeneous graph, still using int64
-    meta_src, meta_dst, _ = graph._graph.metagraph.find_edges(utils.toindex(etype_ids, "int64"))
-    rel_graphs = [graph._graph.get_relation_graph(i) for i in etype_ids]
-    meta_src = meta_src.tonumpy()
-    meta_dst = meta_dst.tonumpy()
-    ntypes_invmap = {n: i for i, n in enumerate(set(meta_src) | set(meta_dst))}
-    mapped_meta_src = [ntypes_invmap[v] for v in meta_src]
-    mapped_meta_dst = [ntypes_invmap[v] for v in meta_dst]
-    node_frames = [graph._node_frames[i] for i in ntid]
-    edge_frames = [graph._edge_frames[i] for i in etype_ids]
-    induced_etypes = [graph._etypes[i] for i in etype_ids]   # get the "name" of edge type
-    num_nodes_per_induced_type = [graph.number_of_nodes(ntype) for ntype in ntypes]
-
-    if len(mapped_meta_src) == 0:
-        # Handle the case with no edges
-        metagraph = graph_index.from_coo(len(ntypes), [], [], True)
-    else:
-        metagraph = graph_index.from_edge_list((mapped_meta_src, mapped_meta_dst), True)
-    # num_nodes_per_type should be int64
-    hgidx = heterograph_index.create_heterograph_from_relations(
-        metagraph, rel_graphs, utils.toindex(num_nodes_per_induced_type, "int64"))
-    hg = DGLHeteroGraph(hgidx, ntypes, induced_etypes, node_frames, edge_frames)
-
-    return hg
+    if len(etypes) == 0:
+        raise DGLError('There are no edges among nodes of the specified types.')
+    return edge_type_subgraph(graph, etypes)
 
 DGLHeteroGraph.node_type_subgraph = utils.alias_func(node_type_subgraph)
 
