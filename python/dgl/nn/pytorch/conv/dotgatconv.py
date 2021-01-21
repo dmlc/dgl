@@ -192,11 +192,11 @@ class DotGatConv(nn.Module):
         if isinstance(feat, tuple):
             h_src = feat[0]
             h_dst = feat[1]
-            feat_src = self.fc_src(h_src).view(-1,self._num_heads,self._out_feats)
-            feat_dst = self.fc_dst(h_dst).view(-1,self._num_heads,self._out_feats)
+            feat_src = self.fc_src(h_src).view(-1, self._num_heads, self._out_feats)
+            feat_dst = self.fc_dst(h_dst).view(-1, self._num_heads, self._out_feats)
         else:
             h_src = feat
-            feat_src = feat_dst = self.fc(h_src).view(-1,self._num_heads,self._out_feats)
+            feat_src = feat_dst = self.fc(h_src).view(-1, self._num_heads, self._out_feats)
             if graph.is_block:
                 feat_dst = feat_src[:graph.number_of_dst_nodes()]
 
