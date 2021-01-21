@@ -10,8 +10,6 @@
 
 #include <cuda_fp16.h>
 
-#if CUDART_VERSION < 11000  // CUDA 11 already implements max/min
-
 static __device__ __forceinline__ half max(half a, half b)
 {
   return __hgt(__half(a), __half(b)) ? a : b;
@@ -21,7 +19,5 @@ static __device__ __forceinline__ half min(half a, half b)
 {
   return __hlt(__half(a), __half(b)) ? a : b;
 }
-
-#endif  // CUDART_VERSION < 11000
 
 #endif  // DGL_ARRAY_FP16_CUH_
