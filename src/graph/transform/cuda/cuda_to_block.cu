@@ -568,7 +568,7 @@ class DeviceNodeMapMaker {
           prefix_sum_bytes,
           static_cast<IdType*>(nullptr),
           static_cast<IdType*>(nullptr),
-          RoundUp(max_num, BLOCK_SIZE)));
+          RoundUp(max_num, TILE_SIZE)+1));
     return RoundUp(prefix_sum_bytes, 8);
   }
 
@@ -633,7 +633,7 @@ class DeviceNodeMapMaker {
       if (nodes->shape[0] > 0) {
         CHECK_EQ(nodes->ctx.device_type, kDLGPU);
 
-        const dim3 grid(RoundUpDiv(nodes->shape[0], BLOCK_SIZE));
+        const dim3 grid(RoundUpDiv(nodes->shape[0], TILE_SIZE));
         const dim3 block(BLOCK_SIZE);
 
         generate_hashmap_duplicates<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
@@ -676,7 +676,7 @@ class DeviceNodeMapMaker {
       if (nodes->shape[0] > 0) {
         CHECK_EQ(nodes->ctx.device_type, kDLGPU);
 
-        const dim3 grid(RoundUpDiv(nodes->shape[0], BLOCK_SIZE));
+        const dim3 grid(RoundUpDiv(nodes->shape[0], TILE_SIZE));
         const dim3 block(BLOCK_SIZE);
 
         generate_hashmap_unique<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
