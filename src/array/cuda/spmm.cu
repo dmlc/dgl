@@ -191,7 +191,7 @@ cusparseStatus_t Xcsrmm2<double>(cusparseHandle_t handle, cusparseOperation_t tr
 #endif
 
 /*! Cusparse implementation of SpMM on Csr format. */
-template <typename DType>
+template <typename DType, typename IdType>
 void CusparseCsrmm2(
     const DLContext& ctx,
     const CSRMatrix& csr,
@@ -228,21 +228,21 @@ void CusparseCsrmm2(
 #if CUDART_VERSION >= 11000
   cusparseSpMatDescr_t matA;
   cusparseDnMatDescr_t matB, matC;
-  constexpr auto cuda_dtype = std::is_same<DType, float>::value ? CUDA_R_32F : (
-      std::is_same<DType, double>::value ? CUDA_R_64F : CUDA_R_16F);
+  constexpr auto dtype = cuda_dtype<DType>::value;
+  constexpr auto idtype = cusparse_idtype<IdType>::value;
   CUSPARSE_CALL(cusparseCreateCsr(&matA,
       m, k, nnz,
-      static_cast<int32_t*>(csr.indptr->data),
-      static_cast<int32_t*>(csr.indices->data),
+      static_cast<IdType*>(csr.indptr->data),
+      static_cast<IdType*>(csr.indices->data),
       const_cast<DType*>(valptr? valptr : A_data),
-      CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I,
-      CUSPARSE_INDEX_BASE_ZERO, cuda_dtype));
+      idtype, idtype,
+      CUSPARSE_INDEX_BASE_ZERO, dtype));
   CUSPARSE_CALL(cusparseCreateDnMat(&matB,
       k, n, n,
-      const_cast<DType*>(B_data), cuda_dtype, CUSPARSE_ORDER_ROW));
+      const_cast<DType*>(B_data), dtype, CUSPARSE_ORDER_ROW));
   CUSPARSE_CALL(cusparseCreateDnMat(&matC,
       m, n, n,
-      C_data, cuda_dtype, CUSPARSE_ORDER_ROW));
+      C_data, dtype, CUSPARSE_ORDER_ROW));
 
   auto transA = CUSPARSE_OPERATION_NON_TRANSPOSE;
   auto transB = CUSPARSE_OPERATION_NON_TRANSPOSE;
@@ -250,13 +250,13 @@ void CusparseCsrmm2(
   CUSPARSE_CALL(cusparseSpMM_bufferSize(
       thr_entry->cusparse_handle, transA, transB,
       &alpha, matA, matB, &beta, matC,
-      cuda_dtype, CUSPARSE_SPMM_CSR_ALG2,
+      dtype, CUSPARSE_SPMM_CSR_ALG2,
       &workspace_size));
   void* workspace = device->AllocWorkspace(ctx, workspace_size);
   CUSPARSE_CALL(cusparseSpMM(
       thr_entry->cusparse_handle, transA, transB,
       &alpha, matA, matB, &beta, matC,
-      cuda_dtype, CUSPARSE_SPMM_CSR_ALG2,
+      dtype, CUSPARSE_SPMM_CSR_ALG2,
       workspace));
   device->FreeWorkspace(ctx, workspace);
 
@@ -369,7 +369,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
       for (int i = 1; i < ufeat->ndim; ++i)
         x_length *= ufeat->shape[i];
       SWITCH_BITS(bits, DType, {
-        cusparse::CusparseCsrmm2<DType>(
+        cusparse::CusparseCsrmm2<DType, IdType>(
             ufeat->ctx, csr,
             static_cast<DType*>(ufeat->data),
             nullptr,
@@ -385,7 +385,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
           efeat = _IndexSelect<DType, IdType>(efeat, csr.data);
         });
       SWITCH_BITS(bits, DType, {
-        cusparse::CusparseCsrmm2<DType>(
+        cusparse::CusparseCsrmm2<DType, IdType>(
             ufeat->ctx, csr,
             static_cast<DType*>(ufeat->data),
             static_cast<DType*>(efeat->data),
