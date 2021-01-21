@@ -29,8 +29,7 @@ void SegmentReduce(
         cpu::SegmentCmp<IdType, DType, cpu::op::Max<DType>>(
             feat, offsets, out, arg);
       });
-    }
-    else {
+    } else {
       SWITCH_BITS(bits, DType, {
           cpu::SegmentCmp<IdType, DType, cpu::op::Min<DType>>(
               feat, offsets, out, arg);
