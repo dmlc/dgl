@@ -25,7 +25,8 @@ target_include_directories(featgraph_runtime PRIVATE "./include")
 target_include_directories(featgraph_runtime PRIVATE "../third_party/tvm/include")
 target_include_directories(featgraph_runtime PRIVATE "../third_party/tvm/3rdparty/dmlc-core/include")
 target_include_directories(featgraph_runtime PRIVATE "../third_party/tvm/3rdparty/dlpack/include")
-target_link_libraries(featgraph_runtime ${CUDA_CUDART_LIBRARY}
+target_link_libraries(featgraph_runtime "dl"  # dynamic linking
+                                        ${CUDA_CUDART_LIBRARY}
                                         ${CUDA_CUDA_LIBRARY}
                                         ${CUDA_NVRTC_LIBRARY})
 add_dependencies(featgraph_runtime featgraph_kernel)
