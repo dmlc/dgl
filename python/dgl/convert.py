@@ -354,6 +354,37 @@ def heterograph(data_dict,
 
     return retg.to(device)
 
+def create_block(data_dict, num_nodes=None, idtype=None, device=None):
+    """Create a :class:`DGLBlock` object.
+
+    Parameters
+    ----------
+    data_dict : graph data
+        The dictionary data for constructing a block. The keys are in the form of
+        string triplets (src_type, edge_type, dst_type), specifying the input node type,
+        edge type, and output node type. The values are graph data in the form of
+        :math:`(U, V)`, where :math:`(U[i], V[i])` forms the edge with ID :math:`i`.
+        The allowed graph data formats are:
+
+        - ``(Tensor, Tensor)``: Each tensor must be a 1D tensor containing node IDs. DGL calls
+          this format "tuple of node-tensors". The tensors should have the same data type,
+          which must be either int32 or int64. They should also have the same device context
+          (see below the descriptions of :attr:`idtype` and :attr:`device`).
+        - ``(iterable[int], iterable[int])``: Similar to the tuple of node-tensors
+          format, but stores node IDs in two sequences (e.g. list, tuple, numpy.ndarray).
+
+        If you would like to create a block with a single input node type, a single output
+        ndoe type, and a single edge type, then you can pass in the graph data directly
+        without wrapping it as a dictionary.
+    num_nodes_dicts : tuple[dict[str, int], dict[str, int]] or tuple[int, int], optional
+        The number of nodes for each input and output node type, which is a pair of dictionaries
+        mapping a node type :math:`T` to the number of :math:`T` 
+
+    See also
+    --------
+    to_block
+    """
+
 def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
                      etype_field=ETYPE, metagraph=None):
     """Convert a homogeneous graph to a heterogeneous graph and return.
