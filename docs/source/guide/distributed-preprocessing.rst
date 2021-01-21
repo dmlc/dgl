@@ -3,6 +3,8 @@
 7.1 Preprocessing for Distributed Training
 ------------------------------------------
 
+:ref:`(中文版) <guide_cn-distributed-preprocessing>`
+
 DGL requires preprocessing the graph data for distributed training, including two steps:
 1) partition a graph into subgraphs, 2) assign nodes/edges with new Ids. DGL provides
 a partitioning API that performs the two steps. The API supports both random partitioning

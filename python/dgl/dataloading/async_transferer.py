@@ -13,7 +13,7 @@ class Transfer(object):
         Parameters
         ----------
         transfer_id : int
-            The id of the asynchronous tranfer.
+            The id of the asynchronous transfer.
         handle : DGLAsyncTransferer
             The handle of the DGLAsyncTransferer object that initiated the
             transfer.

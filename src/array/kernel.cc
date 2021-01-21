@@ -6,6 +6,10 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/base_heterograph.h>
 
+#ifdef USE_TVM
+#include <featgraph.h>
+#endif  // USE_TVM
+
 #include "kernel_decl.h"
 #include "../c_api_common.h"
 
@@ -220,7 +224,38 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelBwdSegmentCmp")
     CheckCtx(feat->ctx, {feat, arg, out}, {"feat", "arg", "out"});
     CheckContiguous({feat, arg, out}, {"feat", "arg", "out"});
     BackwardSegmentCmpDispatch(feat, arg, out);
-});
+  });
+
+#ifdef USE_TVM
+DGL_REGISTER_GLOBAL("sparse._CAPI_FG_LoadModule")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const std::string path = args[0];
+    dgl::featgraph::LoadFeatGraphModule(path);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SDDMMTreeReduction")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef graph = args[0];
+    NDArray lhs = args[1];
+    NDArray rhs = args[2];
+    NDArray out = args[3];
+    CheckCtx(graph->Context(), {lhs, rhs, out}, {"lhs", "rhs", "out"});
+    CheckContiguous({lhs, rhs, out}, {"lhs", "rhs", "out"});
+    CHECK_EQ(graph->NumEdgeTypes(), 1);
+    // auto pair = graph->meta_graph()->FindEdge(0);  // only one etype in the graph.
+    // const dgl_type_t src_vtype = pair.first;
+    // const dgl_type_t dst_vtype = pair.second;
+    // CheckShape(
+    //     {graph->NumVertices(src_vtype), graph->NumEdges(0), graph->NumVertices(dst_vtype)},
+    //     {lhs_target, rhs_target, 1},
+    //     {lhs, rhs, out},
+    //     {"U_data", "E_data", "V_data"});
+    COOMatrix coo = graph.sptr()->GetCOOMatrix(0);
+    dgl::featgraph::SDDMMTreeReduction(coo.row.ToDLPack(), coo.col.ToDLPack(),
+                                       lhs.ToDLPack(), rhs.ToDLPack(), out.ToDLPack());
+  });
+#endif  // USE_TVM
+
 
 }  // namespace aten
 }  // namespace dgl
