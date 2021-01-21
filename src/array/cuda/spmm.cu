@@ -331,6 +331,21 @@ void CusparseCsrmm2(
   } while (0)
 
 /*!
+ * \brief Determine whether cusparse SpMM function is applicable.
+ */
+template <int bits, typename IdType>
+inline bool cusparse_available() {
+#if CUDART_VERSION < 11000
+  if (std::is_same<IdType, int>::value)
+    if (bits > 16)
+      return true;
+  return false;
+#else
+  return true;
+#endif
+}
+
+/*!
  * \brief CUDA implementation of g-SpMM on Csr format.
  * \note use cusparse if the reduce operator is `sum` and there is
  *       no broadcast, use dgl's kernel in other cases.
@@ -348,8 +363,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
   bool use_efeat = op != "copy_lhs";
 
   if (reduce == "sum") {
-	  /*
-    if (sizeof(IdType) == 4 && op == "copy_lhs") {  // cusparse
+    if (op == "copy_lhs" && cusparse_available<bits, IdType>()) {  // cusparse
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i)
         x_length *= ufeat->shape[i];
@@ -361,7 +375,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
             static_cast<DType*>(out->data),
             x_length);
       });
-    } else if (sizeof(IdType) == 4 && op == "mul" && is_scalar_efeat) {  // cusparse
+    } else if (op == "mul" && is_scalar_efeat && cusparse_available<bits, IdType>()) {  // cusparse
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i)
         x_length *= ufeat->shape[i];
@@ -378,14 +392,13 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
             x_length);
       });
     } else {  // general kernel
-    */
       SWITCH_BITS(bits, DType, {
         SWITCH_OP(op, Op, {
           cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
               bcast, csr, ufeat, efeat, out, NullArray(), NullArray());
         });
       });
-    //}
+    }
   } else if (reduce == "max") {
     SWITCH_BITS(bits, DType, {
       SWITCH_OP(op, Op, {

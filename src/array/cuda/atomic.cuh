@@ -7,7 +7,16 @@
 #define DGL_ARRAY_CUDA_ATOMIC_H_
 
 #include <cuda_runtime.h>
+#include <cassert>
 #include "fp16.cuh"
+
+#if defined(CUDART_VERSION) && CUDART_VERSION <= 10000
+static __device__ __forceinline__ unsigned short int atomicCAS(unsigned short int *address, 
+                                                               unsigned short int compare, 
+                                                               unsigned short int val) {
+  return val;
+}
+#endif
 
 namespace dgl {
 namespace aten {
@@ -44,7 +53,7 @@ template <> struct Cast<half> {
   static __device__ __forceinline__ Type Encode(half val) {
     return __half_as_ushort(val);
   }
-  static __device__ __forceinline__ float Decode(Type code) {
+  static __device__ __forceinline__ half Decode(Type code) {
     return __ushort_as_half(code);
   }
 };

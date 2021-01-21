@@ -7,7 +7,6 @@
 #define DGL_ARRAY_SEGMENT_REDUCE_CUH_
 
 #include "../../runtime/cuda/cuda_common.h"
-#include "./atomic.cuh"
 #include "./utils.h"
 
 namespace dgl {

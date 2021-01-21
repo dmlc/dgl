@@ -12,12 +12,12 @@
 
 #if CUDART_VERSION < 11000  // CUDA 11 already implements max/min
 
-__device__ half max(half a, half b)
+static __device__ __forceinline__ half max(half a, half b)
 {
   return __hgt(__half(a), __half(b)) ? a : b;
 }
 
-__device__ half min(half a, half b)
+static __device__ __forceinline__ half min(half a, half b)
 {
   return __hlt(__half(a), __half(b)) ? a : b;
 }

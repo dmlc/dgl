@@ -206,6 +206,12 @@ void SpMMCoo(
     const COOMatrix& coo,
     NDArray ufeat, NDArray efeat,
     NDArray out, NDArray argu, NDArray arge) {
+#if defined(CUDART_VERSION) && CUDART_VERSION <= 10000
+  if (std::is_same<DType, half>::value)
+    LOG(FATAL) << "SpMMCoo requires atomicCAS, which is not supported "
+               << "for float16 in CUDA 10.0. Please upgrade your CUDA "
+               << "to later versions.";
+#endif
   const Idx *row = coo.row.Ptr<Idx>(),
             *col = coo.col.Ptr<Idx>(),
             *edge_map = coo.data.Ptr<Idx>();
