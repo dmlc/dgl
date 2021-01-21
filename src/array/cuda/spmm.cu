@@ -65,7 +65,10 @@ __global__ void _IndexSelectKernel(
  * \note not efficient but it's not a bottleneck, used for float16 dtype.
  */
 template <typename DType>
-__global__ void _TransposeKernel(const DType* __restrict__ in, DType* __restrict__ out, int n, int m) {
+__global__ void _TransposeKernel(
+    const DType* __restrict__ in,
+    DType* __restrict__ out,
+    int n, int m) {
   int i = blockIdx.x;
   for (int j = threadIdx.x; j < m; j += blockDim.x)
     out[i * m + j] = in[j * n + i];
@@ -104,7 +107,7 @@ void _Transpose<half>(const half* in, half* out,
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = FindNumThreads(row);
   int nb = col;
-  CUDA_KERNEL_CALL(_TransposeKernel, nb, nt, 0, thr_entry->stream, in, out, col, row);  
+  CUDA_KERNEL_CALL(_TransposeKernel, nb, nt, 0, thr_entry->stream, in, out, col, row);
 }
 
 /*
@@ -342,6 +345,8 @@ inline bool cusparse_available() {
       return true;
   return false;
 #else
+  if (bits == 16)
+    return false;  // cusparse's SpMM on fp16 is slow, temporally disabled.
   return true;
 #endif
 }
@@ -380,10 +385,11 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i)
         x_length *= ufeat->shape[i];
-      if (!IsNullArray(csr.data))
+      if (!IsNullArray(csr.data)) {
         SWITCH_BITS(bits, DType, {
           efeat = _IndexSelect<DType, IdType>(efeat, csr.data);
         });
+      }
       SWITCH_BITS(bits, DType, {
         cusparse::CusparseCsrmm2<DType, IdType>(
             ufeat->ctx, csr,
