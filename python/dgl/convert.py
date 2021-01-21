@@ -1,5 +1,6 @@
 """Module for converting graph from/to other object."""
 from collections import defaultdict
+from collections.abc import Mapping
 from scipy.sparse import spmatrix
 import numpy as np
 import networkx as nx
@@ -321,7 +322,7 @@ def heterograph(data_dict,
             if num_nodes_dict[dty] < vrange:
                 raise DGLError('The given number of nodes of node type {} must be larger than'
                                ' the max ID in the data, but got {} and {}.'.format(
-                                   sty, num_nodes_dict[dty], vrange - 1))
+                                   dty, num_nodes_dict[dty], vrange - 1))
     # Create the graph
 
     # Sort the ntypes and relation tuples to have a deterministic order for the same set
@@ -378,12 +379,192 @@ def create_block(data_dict, num_nodes=None, idtype=None, device=None):
         without wrapping it as a dictionary.
     num_nodes_dicts : tuple[dict[str, int], dict[str, int]] or tuple[int, int], optional
         The number of nodes for each input and output node type, which is a pair of dictionaries
-        mapping a node type :math:`T` to the number of :math:`T` 
+        mapping a node type :math:`T` to the number of :math:`T`-typed nodes.  The former element
+        contains the number of nodes for input node types and the the latter element contains the
+        number of nodes for output node types.
+
+        If not given for a node type :math:`T`, DGL finds the largest ID appearing in *every*
+        graph data whose input or output node type is :math:`T`, and sets the number of nodes to
+        be that ID plus one. If given and the value is no greater than the largest ID for some
+        node type, DGL will raise an error. By default, DGL infers the number of nodes for all
+        node types.
+
+        If you would like to create a block with a single input node type, a single output
+        ndoe type, and a single edge type, then you can pass in a pair of integers to directly
+        represent the number of input nodes and the number of output nodes.
+    idtype : int32 or int64, optional
+        The data type for storing the structure-related graph information such as node and
+        edge IDs. It should be a framework-specific data type object (e.g., ``torch.int32``).
+        If ``None`` (default), DGL infers the ID type from the :attr:`data_dict` argument.
+    device : device context, optional
+        The device of the returned graph, which should be a framework-specific device object
+        (e.g., ``torch.device``). If ``None`` (default), DGL uses the device of the tensors of
+        the :attr:`data` argument. If :attr:`data` is not a tuple of node-tensors, the
+        returned graph is on CPU.  If the specified :attr:`device` differs from that of the
+        provided tensors, it casts the given tensors to the specified device first.
+
+    Returns
+    -------
+    DGLBlock
+        The created block.
+
+    Notes
+    -----
+    1. If the :attr:`idtype` argument is not given then:
+
+       - in the case of the tuple of node-tensor format, DGL uses
+         the data type of the given ID tensors.
+       - in the case of the tuple of sequence format, DGL uses int64.
+
+       Once the graph has been created, you can change the data type by using
+       :func:`dgl.DGLGraph.long` or :func:`dgl.DGLGraph.int`.
+
+       If the specified :attr:`idtype` argument differs from the data type of the provided
+       tensors, it casts the given tensors to the specified data type first.
+    2. The most efficient construction approach is to provide a tuple of node tensors without
+       specifying :attr:`idtype` and :attr:`device`. This is because the returned graph shares
+       the storage with the input node-tensors in this case.
+    3. DGL internally maintains multiple copies of the graph structure in different sparse
+       formats and chooses the most efficient one depending on the computation invoked.
+       If memory usage becomes an issue in the case of large graphs, use
+       :func:`dgl.DGLGraph.formats` to restrict the allowed formats.
+    4. DGL internally decides a deterministic order for the same set of node types and canonical
+       edge types, which does not necessarily follow the order in :attr:`data_dict`.
+
+    Examples
+    --------
+
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch
+    >>> block = dgl.create_block(([0, 1, 2], [1, 2, 3]), (3, 4))
+    >>> block
+
+    >>> block = dgl.create_block({
+    ...     ('A', 'AB', 'B'): ([1, 2, 3], [2, 1, 0]),
+    ...     ('B', 'BA', 'A'): ([2, 1], [2, 3])})
+    >>> block
 
     See also
     --------
     to_block
     """
+    need_infer = num_nodes_dict is None
+    if not isinstance(data_dict, Mapping):
+        data_dict = {('_N', '_E', '_N'): data_dict}
+
+        if not need_infer:
+            assert isinstance(num_nodes_dicts[0], int), \
+                "num_nodes_dicts must be a pair of integers if data_dict is not a dict"
+            assert isinstance(num_nodes_dicts[1], int), \
+                "num_nodes_dicts must be a pair of integers if data_dict is not a dict"
+            num_nodes_dicts = ({'_N': num_nodes_dicts[0]}, {'_N': num_nodes_dicts[1]})
+
+    num_srcnodes_dict, num_dstnodes_dict = num_nodes_dicts
+
+    # Convert all data to node tensors first
+    node_tensor_dict = {}
+    for (sty, ety, dty), data in data_dict.items():
+        if isinstance(data, spmatrix):
+            raise DGLError("dgl.heterograph no longer supports graph construction from a SciPy "
+                           "sparse matrix, use dgl.from_scipy instead.")
+
+        if isinstance(data, nx.Graph):
+            raise DGLError("dgl.heterograph no longer supports graph construction from a NetworkX "
+                           "graph, use dgl.from_networkx instead.")
+        is_bipartite = (sty != dty)
+        u, v, urange, vrange = utils.graphdata2tensors(data, idtype, bipartite=is_bipartite)
+        node_tensor_dict[(sty, ety, dty)] = (u, v)
+        if need_infer:
+            num_srcnodes_dict[sty] = max(num_srcnodes_dict[sty], urange)
+            num_dstnodes_dict[dty] = max(num_dstnodes_dict[dty], vrange)
+        else:  # sanity check
+            if num_srcnodes_dict[sty] < urange:
+                raise DGLError('The given number of nodes of node type {} must be larger than'
+                               ' the max ID in the data, but got {} and {}.'.format(
+                                   sty, num_srcnodes_dict[sty], urange - 1))
+            if num_dstnodes_dict[dty] < vrange:
+                raise DGLError('The given number of nodes of node type {} must be larger than'
+                               ' the max ID in the data, but got {} and {}.'.format(
+                                   dty, num_dstnodes_dict[dty], vrange - 1))
+    # Create the graph
+
+    # Sort the ntypes and relation tuples to have a deterministic order for the same set
+    # of type names.
+    srctypes = list(sorted(num_srcnodes_dict.keys()))
+    dsttypes = list(sorted(num_dstnodes_dict.keys()))
+    relations = list(sorted(node_tensor_dict.keys()))
+
+    num_nodes_per_type = utils.toindex(
+        [num_srcnodes_dict[ntype] for ntype in srctypes] +
+        [num_dstnodes_dict[ntype] for ntype in dsttypes], "int64")
+    srctype_dict = {ntype: i for i, ntype in enumerate(srctypes)}
+    dsttype_dict = {ntype: i + len(srctypes) for i, ntype in enumerate(dsttypes)}
+
+    meta_edges_src = []
+    meta_edges_dst = []
+    etypes = []
+    rel_graphs = []
+    for srctype, etype, dsttype in relations:
+        meta_edges_src.append(srctype_dict[srctype])
+        meta_edges_dst.append(dsttype_dict[dsttype])
+        etypes.append(etype)
+        src, dst = node_tensor_dict[(srctype, etype, dsttype)]
+        g = create_from_edges(src, dst, 'SRC/' + srctype, etype, 'DST/' + dsttype,
+                              num_srcnodes_dict[srctype], num_dstnodes_dict[dsttype])
+        rel_graphs.append(g)
+
+    # metagraph is DGLGraph, currently still using int64 as index dtype
+    metagraph = graph_index.from_coo(len(ntypes), meta_edges_src, meta_edges_dst, True)
+    # create graph index
+    hgidx = heterograph_index.create_heterograph_from_relations(
+        metagraph, [rgrh._graph for rgrh in rel_graphs], num_nodes_per_type)
+    retg = DGLBlock(hgidx, (srctypes, dsttypes), etypes)
+
+    return retg.to(device)
+
+def block_to_graph(block):
+    """Convert a :class:`DGLBlock` object to a :class:`DGLGraph`.
+
+    DGL will rename all the input node types by suffixing with ``_src``, and
+    all the output node types by suffixing with ``_dst``.
+
+    The storage of the graph will be shared with that of the input block.
+
+    Features on the returned graph will be preserved, shared with that of the input block.
+
+    Parameters
+    ----------
+    block : DGLBlock
+        The block.
+
+    Returns
+    -------
+    DGLGraph
+        The graph.
+
+    Examples
+    --------
+    >>> block = dgl.create_block({
+    ...     ('A', 'AB', 'B'): ([1, 2, 3], [2, 1, 0]),
+    ...     ('B', 'BA', 'A'): ([2, 1], [2, 3])})
+    >>> g = dgl.block_to_graph(block)
+    >>> g
+    """
+    new_types = [ntype + '_src' for ntype in block.srctypes] + \
+                [ntype + '_dst' for ntype in block.dsttypes]
+    retg = DGLGraph(block._graph, new_types, block.etypes)
+
+    for srctype in block.srctypes:
+        retg.nodes[srctype + '_src'].update(block.srcnodes[srctype].data)
+    for dsttype in block.dsttypes:
+        retg.nodes[dsttype + '_dst'].update(block.dstnodes[dsttype].data)
+    for srctype, etype, dsttype in block.canonical_etypes:
+        retg.edges[srctype + '_src', etype, dsttype + '_dst'].update(
+            block.edges[srctype, etype, dsttype].data)
+
+    return retg
 
 def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
                      etype_field=ETYPE, metagraph=None):
