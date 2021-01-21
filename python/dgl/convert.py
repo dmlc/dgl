@@ -7,7 +7,7 @@ import networkx as nx
 
 from . import backend as F
 from . import heterograph_index
-from .heterograph import DGLHeteroGraph, combine_frames
+from .heterograph import DGLHeteroGraph, combine_frames, DGLBlock
 from . import graph_index
 from . import utils
 from .base import NTYPE, ETYPE, NID, EID, DGLError, dgl_warning
@@ -18,6 +18,8 @@ __all__ = [
     'hetero_from_relations',
     'hetero_from_shared_memory',
     'heterograph',
+    'create_block',
+    'block_to_graph',
     'to_heterogeneous',
     'to_hetero',
     'to_homogeneous',
@@ -377,7 +379,7 @@ def create_block(data_dict, num_nodes=None, idtype=None, device=None):
         If you would like to create a block with a single input node type, a single output
         ndoe type, and a single edge type, then you can pass in the graph data directly
         without wrapping it as a dictionary.
-    num_nodes_dicts : tuple[dict[str, int], dict[str, int]] or tuple[int, int], optional
+    num_nodes : tuple[dict[str, int], dict[str, int]] or tuple[int, int], optional
         The number of nodes for each input and output node type, which is a pair of dictionaries
         mapping a node type :math:`T` to the number of :math:`T`-typed nodes.  The former element
         contains the number of nodes for input node types and the the latter element contains the
@@ -437,31 +439,40 @@ def create_block(data_dict, num_nodes=None, idtype=None, device=None):
     The following example uses PyTorch backend.
 
     >>> import dgl
-    >>> import torch
     >>> block = dgl.create_block(([0, 1, 2], [1, 2, 3]), (3, 4))
     >>> block
+    Block(num_src_nodes=3, num_dst_nodes=4, num_edges=3)
 
     >>> block = dgl.create_block({
     ...     ('A', 'AB', 'B'): ([1, 2, 3], [2, 1, 0]),
-    ...     ('B', 'BA', 'A'): ([2, 1], [2, 3])})
+    ...     ('B', 'BA', 'A'): ([2, 1], [2, 3])},
+    ...     num_nodes=({'A': 6, 'B': 5}, {'A': 4, 'B': 3}))
     >>> block
+    Block(num_src_nodes={'A': 6, 'B': 5},
+          num_dst_nodes={'A': 4, 'B': 3},
+          num_edges={('A', 'AB', 'B'): 3, ('B', 'BA', 'A'): 2},
+          metagraph=[('A', 'B', 'AB'), ('B', 'A', 'BA')])
 
     See also
     --------
     to_block
     """
-    need_infer = num_nodes_dict is None
+    need_infer = num_nodes is None
     if not isinstance(data_dict, Mapping):
         data_dict = {('_N', '_E', '_N'): data_dict}
 
         if not need_infer:
-            assert isinstance(num_nodes_dicts[0], int), \
-                "num_nodes_dicts must be a pair of integers if data_dict is not a dict"
-            assert isinstance(num_nodes_dicts[1], int), \
-                "num_nodes_dicts must be a pair of integers if data_dict is not a dict"
-            num_nodes_dicts = ({'_N': num_nodes_dicts[0]}, {'_N': num_nodes_dicts[1]})
+            assert isinstance(num_nodes[0], int), \
+                "num_nodes must be a pair of integers if data_dict is not a dict"
+            assert isinstance(num_nodes[1], int), \
+                "num_nodes must be a pair of integers if data_dict is not a dict"
+            num_nodes = ({'_N': num_nodes[0]}, {'_N': num_nodes[1]})
 
-    num_srcnodes_dict, num_dstnodes_dict = num_nodes_dicts
+    if need_infer:
+        num_srcnodes_dict = defaultdict(int)
+        num_dstnodes_dict = defaultdict(int)
+    else:
+        num_srcnodes_dict, num_dstnodes_dict = num_nodes
 
     # Convert all data to node tensors first
     node_tensor_dict = {}
@@ -473,8 +484,7 @@ def create_block(data_dict, num_nodes=None, idtype=None, device=None):
         if isinstance(data, nx.Graph):
             raise DGLError("dgl.heterograph no longer supports graph construction from a NetworkX "
                            "graph, use dgl.from_networkx instead.")
-        is_bipartite = (sty != dty)
-        u, v, urange, vrange = utils.graphdata2tensors(data, idtype, bipartite=is_bipartite)
+        u, v, urange, vrange = utils.graphdata2tensors(data, idtype, bipartite=True)
         node_tensor_dict[(sty, ety, dty)] = (u, v)
         if need_infer:
             num_srcnodes_dict[sty] = max(num_srcnodes_dict[sty], urange)
@@ -516,7 +526,8 @@ def create_block(data_dict, num_nodes=None, idtype=None, device=None):
         rel_graphs.append(g)
 
     # metagraph is DGLGraph, currently still using int64 as index dtype
-    metagraph = graph_index.from_coo(len(ntypes), meta_edges_src, meta_edges_dst, True)
+    metagraph = graph_index.from_coo(
+        len(srctypes) + len(dsttypes), meta_edges_src, meta_edges_dst, True)
     # create graph index
     hgidx = heterograph_index.create_heterograph_from_relations(
         metagraph, [rgrh._graph for rgrh in rel_graphs], num_nodes_per_type)
@@ -551,17 +562,20 @@ def block_to_graph(block):
     ...     ('B', 'BA', 'A'): ([2, 1], [2, 3])})
     >>> g = dgl.block_to_graph(block)
     >>> g
+    Graph(num_nodes={'A_src': 4, 'B_src': 3, 'A_dst': 4, 'B_dst': 3},
+          num_edges={('A_src', 'AB', 'B_dst'): 3, ('B_src', 'BA', 'A_dst'): 2},
+          metagraph=[('A_src', 'B_dst', 'AB'), ('B_src', 'A_dst', 'BA')])
     """
     new_types = [ntype + '_src' for ntype in block.srctypes] + \
                 [ntype + '_dst' for ntype in block.dsttypes]
-    retg = DGLGraph(block._graph, new_types, block.etypes)
+    retg = DGLHeteroGraph(block._graph, new_types, block.etypes)
 
     for srctype in block.srctypes:
-        retg.nodes[srctype + '_src'].update(block.srcnodes[srctype].data)
+        retg.nodes[srctype + '_src'].data.update(block.srcnodes[srctype].data)
     for dsttype in block.dsttypes:
-        retg.nodes[dsttype + '_dst'].update(block.dstnodes[dsttype].data)
+        retg.nodes[dsttype + '_dst'].data.update(block.dstnodes[dsttype].data)
     for srctype, etype, dsttype in block.canonical_etypes:
-        retg.edges[srctype + '_src', etype, dsttype + '_dst'].update(
+        retg.edges[srctype + '_src', etype, dsttype + '_dst'].data.update(
             block.edges[srctype, etype, dsttype].data)
 
     return retg
