@@ -24,23 +24,25 @@ void SegmentReduce(
       cpu::SegmentSum<IdType, DType>(feat, offsets, out);
     });
   } else if (op == "max" || op == "min") {
-    if (op == "max")
+    if (op == "max") {
       SWITCH_BITS(bits, DType, {
         cpu::SegmentCmp<IdType, DType, cpu::op::Max<DType>>(
             feat, offsets, out, arg);
       });
-    else
+    }
+    else {
       SWITCH_BITS(bits, DType, {
           cpu::SegmentCmp<IdType, DType, cpu::op::Min<DType>>(
               feat, offsets, out, arg);
       });
+    }
   } else {
     LOG(FATAL) << "Unsupported reduce function " << op;
   }
 }
 
 /*! \brief Backward function of segment cmp.*/
-template <int XPU, typename IdType, int bits> 
+template <int XPU, typename IdType, int bits>
 void BackwardSegmentCmp(
     NDArray feat,
     NDArray arg,
