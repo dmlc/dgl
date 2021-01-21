@@ -237,7 +237,7 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLPartitionWithHalo_Hetero")
   });
 
 template<class IdType>
-struct edge_property {
+struct EdgeProperty {
   IdType eid;
   int64_t idx;
   int part_id;
@@ -273,7 +273,7 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLReassignEdges_Hetero")
       const IdType *indptr_data = static_cast<IdType *>(csrmat.indptr->data);
       IdType *typed_data = static_cast<IdType *>(csrmat.data->data);
       IdType *typed_new_data = static_cast<IdType *>(new_data->data);
-      std::vector<edge_property<IdType>> indexed_eids(num_edges);
+      std::vector<EdgeProperty<IdType>> indexed_eids(num_edges);
       for (int64_t i = 0; i < num_rows; i++) {
         for (int64_t j = indptr_data[i]; j < indptr_data[i + 1]; j++) {
           indexed_eids[j].eid = typed_data[j];
@@ -281,7 +281,7 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLReassignEdges_Hetero")
           indexed_eids[j].part_id = part_id_data[i];
         }
       }
-      auto comp = [etype_data](const edge_property<IdType> &a, const edge_property<IdType> &b) {
+      auto comp = [etype_data](const EdgeProperty<IdType> &a, const EdgeProperty<IdType> &b) {
         if (a.part_id == b.part_id) {
           return etype_data[a.eid] < etype_data[b.eid];
         } else {
