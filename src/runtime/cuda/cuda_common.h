@@ -102,12 +102,12 @@ struct cusparse_idtype {
 };
 
 template <>
-struct cusparse_idtype<int> {
+struct cusparse_idtype<int32_t> {
   static constexpr cusparseIndexType_t value = CUSPARSE_INDEX_32I;
 };
 
 template <>
-struct cusparse_idtype<long long> {
+struct cusparse_idtype<int64_t> {
   static constexpr cusparseIndexType_t value = CUSPARSE_INDEX_64I;
 };
 
