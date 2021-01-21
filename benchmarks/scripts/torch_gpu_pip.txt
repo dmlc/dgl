@@ -10,4 +10,7 @@ networkx
 matplotlib
 nltk
 requests[security]
-tqdm  
+tqdm
+awscli
+# 0.6.0 is for pytorch 1.5
+torchtext==0.6.0

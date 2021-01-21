@@ -343,7 +343,7 @@ class DistGraph:
     The example shows the creation of ``DistGraph`` in the standalone mode.
 
     >>> dgl.distributed.partition_graph(g, 'graph_name', 1, num_hops=1, part_method='metis',
-                                        out_path='output/', reshuffle=True)
+    ...                                 out_path='output/', reshuffle=True)
     >>> g = dgl.distributed.DistGraph('graph_name', part_config='output/graph_name.json')
 
     The example shows the creation of ``DistGraph`` in the distributed mode.
@@ -357,7 +357,7 @@ class DistGraph:
     ...     frontier = dgl.distributed.sample_neighbors(g, seeds, 10)
     ...     return dgl.to_block(frontier, seeds)
     >>> dataloader = dgl.distributed.DistDataLoader(dataset=nodes, batch_size=1000,
-                                                    collate_fn=sample, shuffle=True)
+    ...                                             collate_fn=sample, shuffle=True)
     >>> for block in dataloader:
     ...     feat = g.ndata['features'][block.srcdata[dgl.NID]]
     ...     labels = g.ndata['labels'][block.dstdata[dgl.NID]]
@@ -492,6 +492,7 @@ class DistGraph:
         long
         int
         """
+        # TODO(da?): describe when self._g is None and idtype shouldn't be called.
         return self._g.idtype
 
     @property
@@ -513,6 +514,7 @@ class DistGraph:
         -------
         Device context object
         """
+        # TODO(da?): describe when self._g is None and device shouldn't be called.
         return self._g.device
 
     @property
@@ -788,7 +790,7 @@ def _split_even(partition_book, rank, elements):
     # here we divide the element list as evenly as possible. If we use range partitioning,
     # the split results also respect the data locality. Range partitioning is the default
     # strategy.
-    # TODO(zhegnda) we need another way to divide the list for other partitioning strategy.
+    # TODO(zhengda) we need another way to divide the list for other partitioning strategy.
 
     # compute the offset of each split and ensure that the difference of each partition size
     # is 1.

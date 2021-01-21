@@ -139,10 +139,10 @@ class LegacyTUDataset(DGLBuiltinDataset):
 
         if 'feat' not in g.ndata.keys():
             for idxs, g in zip(node_idx_list, self.graph_lists):
-                g.ndata['feat'] = np.ones((g.number_of_nodes(), hidden_size))
+                g.ndata['feat'] = np.ones((g.number_of_nodes(), self.hidden_size))
             self.data_mode = "constant"
             if self.verbose:
-                print("Use Constant one as Feature with hidden size {}".format(hidden_size))
+                print("Use Constant one as Feature with hidden size {}".format(self.hidden_size))
 
         # remove graphs that are too large by user given standard
         # optional pre-processing steop in conformity with Rex Ying's original
@@ -359,7 +359,7 @@ class TUDataset(DGLBuiltinDataset):
 
     def has_cache(self):
         graph_path = os.path.join(self.save_path, 'tu_{}.bin'.format(self.name))
-        info_path = os.path.join(self.save_path, 'legacy_tu_{}.pkl'.format(self.name))
+        info_path = os.path.join(self.save_path, 'tu_{}.pkl'.format(self.name))
         if os.path.exists(graph_path) and os.path.exists(info_path):
             return True
         return False

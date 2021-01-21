@@ -347,6 +347,8 @@ class RelGraphConv(nn.Module):
                 pos = _searchsorted(sorted_etypes, th.arange(self.num_rels, device=g.device))
                 num = th.tensor([len(etypes)], device=g.device)
                 etypes = (th.cat([pos[1:], num]) - pos).tolist()
+                if norm is not None:
+                    norm = norm[index]
 
         with g.local_scope():
             g.srcdata['h'] = feat
