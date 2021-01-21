@@ -5375,6 +5375,61 @@ class DGLHeteroGraph(object):
         self._node_frames = old_nframes
         self._edge_frames = old_eframes
 
+    def sort_by_srcdst(self):
+        r"""Get a new graph with edges sorted in srcdst order.
+
+        The function will sort the edges first by their source node IDs and then break
+        ties by their destination node IDs. It will also reorder the edge features accordingly.
+
+        Returns
+        -------
+        DGLGraph
+            A new graph with edges reordered.
+        raw_eids : Tensor or dict[str, Tensor]
+            If the graph has one edge type, raw_eids is a Tensor and ``raw_eids[i]`` gives the
+            original ID of the i-th edge in the sorted graph. If the graph has multiple edge
+            types, raw_eids is a dictionary and ``raw_eids[canonical_etype][i]`` gives the
+            original ID of the i-th edge in the sorted graph with the corresponding canonical
+            edge type.
+        """
+        ret = copy.copy(self)
+
+        # Keep raw eids
+        raw_eids_dict = dict()
+        for c_etype in ret.canonical_etypes:
+            raw_eids_dict[c_etype] = ret.edges(form='eid', order='srcdst', etype=c_etype)
+
+        # Create new graph index
+        metagraph = self._graph.metagraph
+        num_nodes_per_type = []
+        for ntype in self.ntypes:
+            num_nodes_per_type.append(self.num_nodes(ntype))
+        relation_graphs = []
+        for c_etype in self.canonical_etypes:
+            u_type, _, v_type = c_etype
+            u, v = self.edges(form='uv', order='srcdst', etype=c_etype)
+            hgidx = heterograph_index.create_unitgraph_from_coo(
+                1 if u_type == v_type else 2,
+                self.num_nodes(u_type),
+                self.num_nodes(v_type),
+                u, v, ['coo', 'csr', 'csc'])
+            relation_graphs.append(hgidx)
+        hgidx = heterograph_index.create_heterograph_from_relations(
+            metagraph, relation_graphs, utils.toindex(num_nodes_per_type, "int64"))
+        ret._graph = hgidx
+
+        # Reorder edge features
+        edges = [raw_eids_dict[c_etype] for c_etype in ret.canonical_etypes]
+        edge_frames = utils.extract_edge_subframes(ret, edges, store_ids=False)
+        utils.set_new_frames(ret, edge_frames=edge_frames)
+
+        if len(ret.canonical_etypes) == 1:
+            raw_eids = raw_eids_dict[ret.canonical_etypes[0]]
+        else:
+            raw_eids = raw_eids_dict
+
+        return ret, raw_eids
+
     def formats(self, formats=None):
         r"""Get a cloned graph with the specified sparse format(s) or query
         for the usage status of sparse formats

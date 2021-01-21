@@ -120,13 +120,6 @@ CSRMatrix COOToCSR<kDLGPU, int64_t>(COOMatrix coo) {
   }
 
   const int64_t nnz = coo.row->shape[0];
-  // TODO(minjie): Many of our current implementation assumes that CSR must have
-  //   a data array. This is a temporary workaround. Remove this after:
-  //   - The old immutable graph implementation is deprecated.
-  //   - The old binary reduce kernel is deprecated.
-  if (!COOHasData(coo))
-    coo.data = aten::Range(0, nnz, coo.row->dtype.bits, coo.row->ctx);
-
   IdArray rowids = Range(0, coo.num_rows, nbits, ctx);
   const int nt = cuda::FindNumThreads(coo.num_rows);
   const int nb = (coo.num_rows + nt - 1) / nt;
