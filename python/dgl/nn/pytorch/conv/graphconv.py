@@ -25,6 +25,15 @@ class GraphConv(nn.Module):
     (i.e.,  :math:`c_{ij} = \sqrt{|\mathcal{N}(i)|}\sqrt{|\mathcal{N}(j)|}`),
     and :math:`\sigma` is an activation function.
 
+    If a scalar weight on each edge is provided, the weighted graph convolution is defined as:
+
+    .. math::
+      h_i^{(l+1)} = \sigma(b^{(l)} + \sum_{j\in\mathcal{N}(i)}\frac{e_{ji}}{c_{ij}}h_j^{(l)}W^{(l)})
+
+    where :math:`e_{ji}` is the scalar weight on the edge from node :math:`j` to node :math:`i`. To customize the
+    normalization term :math:`c_{ij}`, one can first set ``norm='none'`` for the model, and send the pre-normalized
+    :math:`e_{ji}` to the forward computation.
+
     Parameters
     ----------
     in_feats : int
@@ -185,7 +194,7 @@ class GraphConv(nn.Module):
         """
         self._allow_zero_in_degree = set_value
 
-    def forward(self, graph, feat, weight=None):
+    def forward(self, graph, feat, weight=None, edge_weight=None):
         r"""
 
         Description
@@ -205,6 +214,10 @@ class GraphConv(nn.Module):
             :math:`(N_{out}, D_{in_{dst}})`.
         weight : torch.Tensor, optional
             Optional external weight tensor.
+        edge_weight : torch.Tensor, optional
+            Optional tensor on the edge. If given, the convolution will weight
+            with regard to the edge feature. The shape is expected to be
+            :math:`(E_{edge}, 1)`.
 
         Returns
         -------
@@ -243,6 +256,15 @@ class GraphConv(nn.Module):
                                    'the issue. Setting ``allow_zero_in_degree`` '
                                    'to be `True` when constructing this module will '
                                    'suppress the check and let the code run.')
+            aggregate_fn = fn.copy_src('h', 'm')
+            if edge_weight is not None:
+                if len(edge_weight.shape) > 2 or
+                    (len(edge_weight.shape) == 2 and edge_weight.shape[1] > 1):
+                    raise DGLError('Currently GraphConv only supports scalar weight '
+                                   'on each edge. Please customize your own module '
+                                   'for multi-dimensional edge weights.')
+                graph.edata['_edge_weight'] = edge_weight
+                aggregate_fn = fn.src_mul_edge('h', '_edge_weight', 'm')
 
             # (BarclayII) For RGCN on heterogeneous graphs we need to support GCN on bipartite.
             feat_src, feat_dst = expand_as_pair(feat, graph)
@@ -266,14 +288,12 @@ class GraphConv(nn.Module):
                 if weight is not None:
                     feat_src = th.matmul(feat_src, weight)
                 graph.srcdata['h'] = feat_src
-                graph.update_all(fn.copy_src(src='h', out='m'),
-                                 fn.sum(msg='m', out='h'))
+                graph.update_all(aggretate_fn, fn.sum(msg='m', out='h'))
                 rst = graph.dstdata['h']
             else:
                 # aggregate first then mult W
                 graph.srcdata['h'] = feat_src
-                graph.update_all(fn.copy_src(src='h', out='m'),
-                                 fn.sum(msg='m', out='h'))
+                graph.update_all(aggretate_fn, fn.sum(msg='m', out='h'))
                 rst = graph.dstdata['h']
                 if weight is not None:
                     rst = th.matmul(rst, weight)

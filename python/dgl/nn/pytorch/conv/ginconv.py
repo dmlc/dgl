@@ -20,6 +20,15 @@ class GINConv(nn.Module):
         \mathrm{aggregate}\left(\left\{h_j^{l}, j\in\mathcal{N}(i)
         \right\}\right)\right)
 
+    If a scalar weight on each edge is provided, the weighted graph convolution is defined as:
+
+    .. math::
+        h_i^{(l+1)} = f_\Theta \left((1 + \epsilon) h_i^{l} +
+        \mathrm{aggregate}\left(\left\{e_{ji} h_j^{l}, j\in\mathcal{N}(i)
+        \right\}\right)\right)
+
+    where :math:`e_{ji}` is the scalar weight on the edge from node :math:`j` to node :math:`i`.
+
     Parameters
     ----------
     apply_func : callable activation function/layer or None
@@ -80,7 +89,7 @@ class GINConv(nn.Module):
         else:
             self.register_buffer('eps', th.FloatTensor([init_eps]))
 
-    def forward(self, graph, feat):
+    def forward(self, graph, feat, edge_weight=None):
         r"""
 
         Description
@@ -98,6 +107,10 @@ class GINConv(nn.Module):
             :math:`(N_{in}, D_{in})` and :math:`(N_{out}, D_{in})`.
             If ``apply_func`` is not None, :math:`D_{in}` should
             fit the input dimensionality requirement of ``apply_func``.
+        edge_weight : torch.Tensor, optional
+            Optional tensor on the edge. If given, the convolution will weight
+            with regard to the edge feature. The shape is expected to be
+            :math:`(E_{edge}, 1)`.
 
         Returns
         -------
@@ -108,9 +121,19 @@ class GINConv(nn.Module):
             as input dimensionality.
         """
         with graph.local_scope():
+            aggregate_fn = fn.copy_src('h', 'm')
+            if edge_weight is not None:
+                if len(edge_weight.shape) > 2 or
+                    (len(edge_weight.shape) == 2 and edge_weight.shape[1] > 1):
+                    raise DGLError('Currently GraphConv only supports scalar weight '
+                                   'on each edge. Please customize your own module '
+                                   'for multi-dimensional edge weights.')
+                graph.edata['_edge_weight'] = edge_weight
+                aggregate_fn = fn.src_mul_edge('h', '_edge_weight', 'm')
+
             feat_src, feat_dst = expand_as_pair(feat, graph)
             graph.srcdata['h'] = feat_src
-            graph.update_all(fn.copy_u('h', 'm'), self._reducer('m', 'neigh'))
+            graph.update_all(aggregate_fn, self._reducer('m', 'neigh'))
             rst = (1 + self.eps) * feat_dst + graph.dstdata['neigh']
             if self.apply_func is not None:
                 rst = self.apply_func(rst)
