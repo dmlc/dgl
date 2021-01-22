@@ -236,7 +236,7 @@ def src_mul_edge(src, edge, out):
     src : str
         The source feature field.
     edge : str
-        The destination feature field.
+        The edge feature field.
     out : str
         The output message field.
 

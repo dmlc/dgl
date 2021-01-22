@@ -25,14 +25,15 @@ class GraphConv(nn.Module):
     (i.e.,  :math:`c_{ij} = \sqrt{|\mathcal{N}(i)|}\sqrt{|\mathcal{N}(j)|}`),
     and :math:`\sigma` is an activation function.
 
-    If a scalar weight on each edge is provided, the weighted graph convolution is defined as:
+    If a weight tensor on each edge is provided, the weighted graph convolution is defined as:
 
     .. math::
       h_i^{(l+1)} = \sigma(b^{(l)} + \sum_{j\in\mathcal{N}(i)}\frac{e_{ji}}{c_{ij}}h_j^{(l)}W^{(l)})
 
     where :math:`e_{ji}` is the scalar weight on the edge from node :math:`j` to node :math:`i`.
     To customize the normalization term :math:`c_{ij}`, one can first set ``norm='none'`` for
-    the model, and send the pre-normalize :math:`e_{ji}` to the forward computation.
+    the model, and send the pre-normalize :math:`e_{ji}` to the forward computation. Please make
+    sure that `e_{ji}` is broadcastable with `h_j^{l}`.
 
     Parameters
     ----------
@@ -216,8 +217,7 @@ class GraphConv(nn.Module):
             Optional external weight tensor.
         edge_weight : torch.Tensor, optional
             Optional tensor on the edge. If given, the convolution will weight
-            with regard to the edge feature. The shape is expected to be
-            :math:`(E_{edge}, 1)`.
+            with regard to the edge feature.
 
         Returns
         -------
@@ -258,11 +258,7 @@ class GraphConv(nn.Module):
                                    'suppress the check and let the code run.')
             aggregate_fn = fn.copy_src('h', 'm')
             if edge_weight is not None:
-                if len(edge_weight.shape) > 2 or \
-                    (len(edge_weight.shape) == 2 and edge_weight.shape[1] > 1):
-                    raise DGLError('Currently GraphConv only supports scalar weight '
-                                   'on each edge. Please customize your own module '
-                                   'for multi-dimensional edge weights.')
+                assert edge_weight.shape[0] == graph.number_of_edges()
                 graph.edata['_edge_weight'] = edge_weight
                 aggregate_fn = fn.src_mul_edge('h', '_edge_weight', 'm')
 

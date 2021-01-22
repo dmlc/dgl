@@ -25,13 +25,14 @@ class SAGEConv(nn.Module):
 
         h_{i}^{(l+1)} &= \mathrm{norm}(h_{i}^{l})
 
-    If a scalar weight on each edge is provided, the aggregation becomes:
+    If a weight tensor on each edge is provided, the aggregation becomes:
 
     .. math::
         h_{\mathcal{N}(i)}^{(l+1)} &= \mathrm{aggregate}
         \left(\{e_{ji} h_{j}^{l}, \forall j \in \mathcal{N}(i) \}\right)
 
     where :math:`e_{ji}` is the scalar weight on the edge from node :math:`j` to node :math:`i`.
+    Please make sure that `e_{ji}` is broadcastable with `h_j^{l}`.
 
     Parameters
     ----------
@@ -174,8 +175,7 @@ class SAGEConv(nn.Module):
             :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
         edge_weight : torch.Tensor, optional
             Optional tensor on the edge. If given, the convolution will weight
-            with regard to the edge feature. The shape is expected to be
-            :math:`(E_{edge}, 1)`.
+            with regard to the edge feature.
 
         Returns
         -------
@@ -193,11 +193,7 @@ class SAGEConv(nn.Module):
                     feat_dst = feat_src[:graph.number_of_dst_nodes()]
             aggregate_fn = fn.copy_src('h', 'm')
             if edge_weight is not None:
-                if len(edge_weight.shape) > 2 or \
-                    (len(edge_weight.shape) == 2 and edge_weight.shape[1] > 1):
-                    raise DGLError('Currently GraphConv only supports scalar weight '
-                                   'on each edge. Please customize your own module '
-                                   'for multi-dimensional edge weights.')
+                assert edge_weight.shape[0] == graph.number_of_edges()
                 graph.edata['_edge_weight'] = edge_weight
                 aggregate_fn = fn.src_mul_edge('h', '_edge_weight', 'm')
 
