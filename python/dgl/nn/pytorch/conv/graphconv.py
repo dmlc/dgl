@@ -30,9 +30,9 @@ class GraphConv(nn.Module):
     .. math::
       h_i^{(l+1)} = \sigma(b^{(l)} + \sum_{j\in\mathcal{N}(i)}\frac{e_{ji}}{c_{ij}}h_j^{(l)}W^{(l)})
 
-    where :math:`e_{ji}` is the scalar weight on the edge from node :math:`j` to node :math:`i`. To customize the
-    normalization term :math:`c_{ij}`, one can first set ``norm='none'`` for the model, and send the pre-normalized
-    :math:`e_{ji}` to the forward computation.
+    where :math:`e_{ji}` is the scalar weight on the edge from node :math:`j` to node :math:`i`.
+    To customize the normalization term :math:`c_{ij}`, one can first set ``norm='none'`` for
+    the model, and send the pre-normalize :math:`e_{ji}` to the forward computation.
 
     Parameters
     ----------
@@ -288,12 +288,12 @@ class GraphConv(nn.Module):
                 if weight is not None:
                     feat_src = th.matmul(feat_src, weight)
                 graph.srcdata['h'] = feat_src
-                graph.update_all(aggretate_fn, fn.sum(msg='m', out='h'))
+                graph.update_all(aggregate_fn, fn.sum(msg='m', out='h'))
                 rst = graph.dstdata['h']
             else:
                 # aggregate first then mult W
                 graph.srcdata['h'] = feat_src
-                graph.update_all(aggretate_fn, fn.sum(msg='m', out='h'))
+                graph.update_all(aggregate_fn, fn.sum(msg='m', out='h'))
                 rst = graph.dstdata['h']
                 if weight is not None:
                     rst = th.matmul(rst, weight)
