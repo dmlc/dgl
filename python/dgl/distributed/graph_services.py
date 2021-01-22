@@ -245,8 +245,7 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
     sampled_graph = merge_graphs(res_list, g.number_of_nodes())
     return sampled_graph
 
-def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
-                     output_format='homogeneous'):
+def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     """Sample from the neighbors of the given nodes from a distributed graph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
