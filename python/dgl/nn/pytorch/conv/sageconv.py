@@ -155,7 +155,7 @@ class SAGEConv(nn.Module):
         _, (rst, _) = self.lstm(m, h)
         return {'neigh': rst.squeeze(0)}
 
-    def forward(self, graph, feat):
+    def forward(self, graph, feat, edge_weight=None):
         r"""
 
         Description
