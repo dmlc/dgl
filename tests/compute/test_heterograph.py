@@ -2510,7 +2510,17 @@ def test_create_block(idtype):
     assert block.num_dst_nodes() == 4
     assert block.num_edges() == 3
 
-    block = dgl.create_block(([0, 1, 2], [1, 2, 3]), (4, 5), idtype=idtype, device=F.ctx())
+    block = dgl.create_block(([], []), idtype=idtype, device=F.ctx())
+    assert block.num_src_nodes() == 0
+    assert block.num_dst_nodes() == 0
+    assert block.num_edges() == 0
+
+    block = dgl.create_block(([], []), 3, 4, idtype=idtype, device=F.ctx())
+    assert block.num_src_nodes() == 3
+    assert block.num_dst_nodes() == 4
+    assert block.num_edges() == 0
+
+    block = dgl.create_block(([0, 1, 2], [1, 2, 3]), 4, 5, idtype=idtype, device=F.ctx())
     assert block.num_src_nodes() == 4
     assert block.num_dst_nodes() == 5
     assert block.num_edges() == 3
@@ -2542,9 +2552,34 @@ def test_create_block(idtype):
     assert block.num_edges('BA') == 2
 
     block = dgl.create_block({
+        ('A', 'AB', 'B'): ([], []),
+        ('B', 'BA', 'A'): ([], [])},
+        idtype=idtype, device=F.ctx())
+    assert block.num_src_nodes('A') == 0
+    assert block.num_src_nodes('B') == 0
+    assert block.num_dst_nodes('B') == 0
+    assert block.num_dst_nodes('A') == 0
+    assert block.num_edges('AB') == 0
+    assert block.num_edges('BA') == 0
+
+    block = dgl.create_block({
+        ('A', 'AB', 'B'): ([], []),
+        ('B', 'BA', 'A'): ([], [])},
+        num_src_nodes={'A': 5, 'B': 5},
+        num_dst_nodes={'A': 6, 'B': 4},
+        idtype=idtype, device=F.ctx())
+    assert block.num_src_nodes('A') == 5
+    assert block.num_src_nodes('B') == 5
+    assert block.num_dst_nodes('B') == 4
+    assert block.num_dst_nodes('A') == 6
+    assert block.num_edges('AB') == 0
+    assert block.num_edges('BA') == 0
+
+    block = dgl.create_block({
         ('A', 'AB', 'B'): ([1, 2, 3], [2, 1, 0]),
         ('B', 'BA', 'A'): ([2, 3], [3, 4])},
-        num_nodes=({'A': 5, 'B': 5}, {'A': 6, 'B': 4}),
+        num_src_nodes={'A': 5, 'B': 5},
+        num_dst_nodes={'A': 6, 'B': 4},
         idtype=idtype, device=F.ctx())
     assert block.num_src_nodes('A') == 5
     assert block.num_src_nodes('B') == 5

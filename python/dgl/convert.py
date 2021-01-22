@@ -357,7 +357,7 @@ def heterograph(data_dict,
 
     return retg.to(device)
 
-def create_block(data_dict, num_nodes=None, idtype=None, device=None):
+def create_block(data_dict, num_src_nodes=None, num_dst_nodes=None, idtype=None, device=None):
     """Create a :class:`DGLBlock` object.
 
     Parameters
@@ -377,23 +377,34 @@ def create_block(data_dict, num_nodes=None, idtype=None, device=None):
           format, but stores node IDs in two sequences (e.g. list, tuple, numpy.ndarray).
 
         If you would like to create a block with a single input node type, a single output
-        ndoe type, and a single edge type, then you can pass in the graph data directly
+        node type, and a single edge type, then you can pass in the graph data directly
         without wrapping it as a dictionary.
-    num_nodes : tuple[dict[str, int], dict[str, int]] or tuple[int, int], optional
-        The number of nodes for each input and output node type, which is a pair of dictionaries
-        mapping a node type :math:`T` to the number of :math:`T`-typed nodes.  The former element
-        contains the number of nodes for input node types and the the latter element contains the
-        number of nodes for output node types.
+    num_src_nodes : dict[str, int] or int, optional
+        The number of nodes for each input node type, which is a dictionary mapping a node type
+        :math:`T` to the number of :math:`T`-typed input nodes.
 
         If not given for a node type :math:`T`, DGL finds the largest ID appearing in *every*
-        graph data whose input or output node type is :math:`T`, and sets the number of nodes to
+        graph data whose input node type is :math:`T`, and sets the number of nodes to
         be that ID plus one. If given and the value is no greater than the largest ID for some
-        node type, DGL will raise an error. By default, DGL infers the number of nodes for all
-        node types.
+        input node type, DGL will raise an error. By default, DGL infers the number of nodes for
+        all input node types.
 
         If you would like to create a block with a single input node type, a single output
-        ndoe type, and a single edge type, then you can pass in a pair of integers to directly
-        represent the number of input nodes and the number of output nodes.
+        node type, and a single edge type, then you can pass in an integer to directly
+        represent the number of input nodes.
+    num_dst_nodes : dict[str, int] or int, optional
+        The number of nodes for each output node type, which is a dictionary mapping a node type
+        :math:`T` to the number of :math:`T`-typed output nodes.
+
+        If not given for a node type :math:`T`, DGL finds the largest ID appearing in *every*
+        graph data whose output node type is :math:`T`, and sets the number of nodes to
+        be that ID plus one. If given and the value is no greater than the largest ID for some
+        output node type, DGL will raise an error. By default, DGL infers the number of nodes for
+        all output node types.
+
+        If you would like to create a block with a single output node type, a single output
+        node type, and a single edge type, then you can pass in an integer to directly
+        represent the number of output nodes.
     idtype : int32 or int64, optional
         The data type for storing the structure-related graph information such as node and
         edge IDs. It should be a framework-specific data type object (e.g., ``torch.int32``).
@@ -439,14 +450,15 @@ def create_block(data_dict, num_nodes=None, idtype=None, device=None):
     The following example uses PyTorch backend.
 
     >>> import dgl
-    >>> block = dgl.create_block(([0, 1, 2], [1, 2, 3]), (3, 4))
+    >>> block = dgl.create_block(([0, 1, 2], [1, 2, 3]), num_src_nodes=3, num_dst_nodes=4)
     >>> block
     Block(num_src_nodes=3, num_dst_nodes=4, num_edges=3)
 
     >>> block = dgl.create_block({
     ...     ('A', 'AB', 'B'): ([1, 2, 3], [2, 1, 0]),
     ...     ('B', 'BA', 'A'): ([2, 1], [2, 3])},
-    ...     num_nodes=({'A': 6, 'B': 5}, {'A': 4, 'B': 3}))
+    ...     num_src_nodes={'A': 6, 'B': 5},
+    ...     num_dst_nodes={'A': 4, 'B': 3})
     >>> block
     Block(num_src_nodes={'A': 6, 'B': 5},
           num_dst_nodes={'A': 4, 'B': 3},
@@ -457,58 +469,56 @@ def create_block(data_dict, num_nodes=None, idtype=None, device=None):
     --------
     to_block
     """
-    need_infer = num_nodes is None
+    need_infer = num_src_nodes is None and num_dst_nodes is None
     if not isinstance(data_dict, Mapping):
         data_dict = {('_N', '_E', '_N'): data_dict}
 
         if not need_infer:
-            assert isinstance(num_nodes[0], int), \
-                "num_nodes must be a pair of integers if data_dict is not a dict"
-            assert isinstance(num_nodes[1], int), \
-                "num_nodes must be a pair of integers if data_dict is not a dict"
-            num_nodes = ({'_N': num_nodes[0]}, {'_N': num_nodes[1]})
+            assert isinstance(num_src_nodes, int), \
+                "num_src_nodes must be a pair of integers if data_dict is not a dict"
+            assert isinstance(num_dst_nodes, int), \
+                "num_dst_nodes must be a pair of integers if data_dict is not a dict"
+            num_src_nodes = {'_N': num_src_nodes}
+            num_dst_nodes = {'_N': num_dst_nodes}
+    else:
+        if not need_infer:
+            assert isinstance(num_src_nodes, Mapping), \
+                "num_src_nodes must be a dict if data_dict is a dict"
+            assert isinstance(num_dst_nodes, Mapping), \
+                "num_dst_nodes must be a dict if data_dict is a dict"
 
     if need_infer:
-        num_srcnodes_dict = defaultdict(int)
-        num_dstnodes_dict = defaultdict(int)
-    else:
-        num_srcnodes_dict, num_dstnodes_dict = num_nodes
+        num_src_nodes = defaultdict(int)
+        num_dst_nodes = defaultdict(int)
 
     # Convert all data to node tensors first
     node_tensor_dict = {}
     for (sty, ety, dty), data in data_dict.items():
-        if isinstance(data, spmatrix):
-            raise DGLError("dgl.heterograph no longer supports graph construction from a SciPy "
-                           "sparse matrix, use dgl.from_scipy instead.")
-
-        if isinstance(data, nx.Graph):
-            raise DGLError("dgl.heterograph no longer supports graph construction from a NetworkX "
-                           "graph, use dgl.from_networkx instead.")
         u, v, urange, vrange = utils.graphdata2tensors(data, idtype, bipartite=True)
         node_tensor_dict[(sty, ety, dty)] = (u, v)
         if need_infer:
-            num_srcnodes_dict[sty] = max(num_srcnodes_dict[sty], urange)
-            num_dstnodes_dict[dty] = max(num_dstnodes_dict[dty], vrange)
+            num_src_nodes[sty] = max(num_src_nodes[sty], urange)
+            num_dst_nodes[dty] = max(num_dst_nodes[dty], vrange)
         else:  # sanity check
-            if num_srcnodes_dict[sty] < urange:
-                raise DGLError('The given number of nodes of node type {} must be larger than'
-                               ' the max ID in the data, but got {} and {}.'.format(
-                                   sty, num_srcnodes_dict[sty], urange - 1))
-            if num_dstnodes_dict[dty] < vrange:
-                raise DGLError('The given number of nodes of node type {} must be larger than'
-                               ' the max ID in the data, but got {} and {}.'.format(
-                                   dty, num_dstnodes_dict[dty], vrange - 1))
+            if num_src_nodes[sty] < urange:
+                raise DGLError('The given number of nodes of input node type {} must be larger'
+                               ' than the max ID in the data, but got {} and {}.'.format(
+                                   sty, num_src_nodes[sty], urange - 1))
+            if num_dst_nodes[dty] < vrange:
+                raise DGLError('The given number of nodes of output node type {} must be larger'
+                               ' than the max ID in the data, but got {} and {}.'.format(
+                                   dty, num_dst_nodes[dty], vrange - 1))
     # Create the graph
 
     # Sort the ntypes and relation tuples to have a deterministic order for the same set
     # of type names.
-    srctypes = list(sorted(num_srcnodes_dict.keys()))
-    dsttypes = list(sorted(num_dstnodes_dict.keys()))
+    srctypes = list(sorted(num_src_nodes.keys()))
+    dsttypes = list(sorted(num_dst_nodes.keys()))
     relations = list(sorted(node_tensor_dict.keys()))
 
     num_nodes_per_type = utils.toindex(
-        [num_srcnodes_dict[ntype] for ntype in srctypes] +
-        [num_dstnodes_dict[ntype] for ntype in dsttypes], "int64")
+        [num_src_nodes[ntype] for ntype in srctypes] +
+        [num_dst_nodes[ntype] for ntype in dsttypes], "int64")
     srctype_dict = {ntype: i for i, ntype in enumerate(srctypes)}
     dsttype_dict = {ntype: i + len(srctypes) for i, ntype in enumerate(dsttypes)}
 
@@ -522,7 +532,7 @@ def create_block(data_dict, num_nodes=None, idtype=None, device=None):
         etypes.append(etype)
         src, dst = node_tensor_dict[(srctype, etype, dsttype)]
         g = create_from_edges(src, dst, 'SRC/' + srctype, etype, 'DST/' + dsttype,
-                              num_srcnodes_dict[srctype], num_dstnodes_dict[dsttype])
+                              num_src_nodes[srctype], num_dst_nodes[dsttype])
         rel_graphs.append(g)
 
     # metagraph is DGLGraph, currently still using int64 as index dtype
