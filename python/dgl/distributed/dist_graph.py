@@ -1008,10 +1008,10 @@ def node_split(nodes, partition_book=None, ntype='_N', rank=None, force_even=Tru
 
     There are two strategies to split the nodes. By default, it splits the nodes
     in a way to maximize data locality. That is, all nodes that belong to a process
-    are returned. If `force_even` is set to true, the nodes are split evenly so
+    are returned. If ``force_even`` is set to true, the nodes are split evenly so
     that each process gets almost the same number of nodes.
 
-    When `force_even` is True, the data locality is still preserved if a graph is partitioned
+    When ``force_even`` is True, the data locality is still preserved if a graph is partitioned
     with Metis and the node/edge IDs are shuffled.
     In this case, majority of the nodes returned for a process are the ones that
     belong to the process. If node/edge IDs are not shuffled, data locality is not guaranteed.
@@ -1061,10 +1061,10 @@ def edge_split(edges, partition_book=None, etype='_E', rank=None, force_even=Tru
 
     There are two strategies to split the edges. By default, it splits the edges
     in a way to maximize data locality. That is, all edges that belong to a process
-    are returned. If `force_even` is set to true, the edges are split evenly so
+    are returned. If ``force_even`` is set to true, the edges are split evenly so
     that each process gets almost the same number of edges.
 
-    When `force_even` is True, the data locality is still preserved if a graph is partitioned
+    When ``force_even`` is True, the data locality is still preserved if a graph is partitioned
     with Metis and the node/edge IDs are shuffled.
     In this case, majority of the nodes returned for a process are the ones that
     belong to the process. If node/edge IDs are not shuffled, data locality is not guaranteed.

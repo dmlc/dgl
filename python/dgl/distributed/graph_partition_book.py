@@ -157,13 +157,13 @@ class GraphPartitionBook:
     * the node IDs and the edge IDs that a partition has.
     * the local IDs of nodes and edges in a partition.
 
-    Currently, there are two classes that implement `GraphPartitionBook`:
-    `BasicGraphPartitionBook` and `RangePartitionBook`. `BasicGraphPartitionBook`
+    Currently, there are two classes that implement ``GraphPartitionBook``:
+    ``BasicGraphPartitionBook`` and ``RangePartitionBook``. ``BasicGraphPartitionBook``
     stores the mappings between every individual node/edge ID and partition ID on
-    every machine, which usually consumes a lot of memory, while `RangePartitionBook`
+    every machine, which usually consumes a lot of memory, while ``RangePartitionBook``
     calculates the mapping between node/edge IDs and partition IDs based on some small
     metadata because nodes/edges have been relabeled to have IDs in the same partition
-    fall in a contiguous ID range. `RangePartitionBook` is usually a preferred way to
+    fall in a contiguous ID range. ``RangePartitionBook`` is usually a preferred way to
     provide mappings between node/edge IDs and partition IDs.
 
     A graph partition book is constructed automatically when a graph is partitioned.

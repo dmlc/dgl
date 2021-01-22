@@ -240,7 +240,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
               |-- graph.dgl
 
     First, the metadata of the original graph and the partitioning is stored in a JSON file
-    named after `graph_name`. This JSON file contains the information of the original graph
+    named after ``graph_name``. This JSON file contains the information of the original graph
     as well as the path of the files that store each partition. Below show an example.
 
     .. code-block:: none
@@ -276,19 +276,19 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
 
     Here are the definition of the fields in the partition configuration file:
 
-    * `graph_name` is the name of the graph given by a user.
-    * `part_method` is the method used to assign nodes to partitions.
+    * ``graph_name`` is the name of the graph given by a user.
+    * ``part_method`` is the method used to assign nodes to partitions.
       Currently, it supports "random" and "metis".
-    * `num_parts` is the number of partitions.
-    * `halo_hops` is the number of hops of nodes we include in a partition as HALO nodes.
-    * `node_map` is the node assignment map, which tells the partition ID a node is assigned to.
-      The format of `node_map` is described below.
-    * `edge_map` is the edge assignment map, which tells the partition ID an edge is assigned to.
-    * `num_nodes` is the number of nodes in the global graph.
-    * `num_edges` is the number of edges in the global graph.
+    * ``num_parts`` is the number of partitions.
+    * ``halo_hops`` is the number of hops of nodes we include in a partition as HALO nodes.
+    * ``node_map`` is the node assignment map, which tells the partition ID a node is assigned to.
+      The format of ``node_map`` is described below.
+    * ``edge_map`` is the edge assignment map, which tells the partition ID an edge is assigned to.
+    * ``num_nodes`` is the number of nodes in the global graph.
+    * ``num_edges`` is the number of edges in the global graph.
     * `part-*` stores the data of a partition.
 
-    If `reshuffle=False`, node IDs and edge IDs of a partition do not fall into contiguous
+    If ``reshuffle=False``, node IDs and edge IDs of a partition do not fall into contiguous
     ID ranges. In this case, DGL stores node/edge mappings (from
     node/edge IDs to partition IDs) in separate files (node_map.npy and edge_map.npy).
     The node/edge mappings are stored in numpy files.
@@ -297,10 +297,10 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         this format is deprecated and will not be supported by the next release. In other words,
         the future release will always shuffle node IDs and edge IDs when partitioning a graph.
 
-    If `reshuffle=True`, `node_map` and `edge_map` contains the information
+    If ``reshuffle=True``, ``node_map`` and ``edge_map`` contains the information
     for mapping between global node/edge IDs to partition-local node/edge IDs.
-    For heterogeneous graphs, the information in `node_map` and `edge_map` can also be used
-    to compute node types and edge types. The format of the data in `node_map` and `edge_map`
+    For heterogeneous graphs, the information in ``node_map`` and ``edge_map`` can also be used
+    to compute node types and edge types. The format of the data in ``node_map`` and ``edge_map``
     is as follows:
 
     .. code-block:: none
@@ -312,7 +312,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             ...
         },
 
-    Essentially, the data in `node_map` and `edge_map` is a dictionary. The key is node type
+    Essentially, the data in ``node_map`` and ``edge_map`` is a dictionary. The key is node type
     and the value is partitioning information of the node type. The partition information
     is stored as a list of two-element tuples. The length of the list is the number of
     partitions; each element in the list is a tuple that stores the start and the end of
@@ -344,8 +344,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     Current, it supports two constrants to balance the partitioning. By default, Metis
     always tries to balance the number of nodes in each partition.
 
-    * `balance_ntypes` balances the number of nodes of different types in each partition.
-    * `balance_edges` balances the number of edges in each partition.
+    * ``balance_ntypes`` balances the number of nodes of different types in each partition.
+    * ``balance_edges`` balances the number of edges in each partition.
 
     To balance the node types, a user needs to pass a vector of N elements to indicate
     the type of each node. N is the number of nodes in the input graph.
