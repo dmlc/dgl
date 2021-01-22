@@ -17,7 +17,7 @@ PyTorch backend
 ---------------
 
 Export ``DGLBACKEND`` as ``pytorch`` to specify PyTorch backend. The required PyTorch
-version is 1.1.0 or later. See `pytorch.org <https://pytorch.org>`_ for installation instructions.
+version is 1.5.0 or later. See `pytorch.org <https://pytorch.org>`_ for installation instructions.
 
 MXNet backend
 -------------
@@ -44,5 +44,5 @@ instructions. In addition, DGL will set ``TF_FORCE_GPU_ALLOW_GROWTH`` to ``true`
 
 .. code:: bash
 
-   pip install "tensorflow>=2.2.0rc1"  # when using tensorflow cpu version
+   pip install "tensorflow>=2.2.0"  # when using tensorflow cpu version
 
