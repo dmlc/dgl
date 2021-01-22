@@ -1,6 +1,6 @@
 import torch as th
 from .tensor import attach_grad, is_recording
-from .util import get_shared_mem_array, create_shared_mem_array
+from .utils import get_shared_mem_array, create_shared_mem_array
 from datetime import timedelta
 
 from ... import ndarray as nd
@@ -8,23 +8,31 @@ from ... import ndarray as nd
 _store = None
 
 class NodeEmbedding: # NodeEmbedding
-    '''Sparse node embeddings for graph.
+    '''Node embeddings for graph.
 
-    DGL provides a sparse embedding to support models that require learnable embeddings.
-    DGL's sparse embeddings are mainly used for learning node embeddings of graph models.
-    The sparse embeddings have to be updated by DGL's optimizers instead of
-    the optimizers provided by the deep learning frameworks (e.g., Pytorch).
+    When training node embeddings on a graph, the embedding layer is typically very large.
+    We need to use train the embedding layer with sparse gradient updates
+    in order to scale to a graph with many nodes. NodeEmbedding is optimized for
+    such use case. It provides an efficient way to only update the embeddings involved
+    in a mini-batch and can scale to a graph with millions of nodes. It supports multi-GPU
+    training efficiently by partitioning the embeddings.
 
-    To support efficient training on a graph with many nodes, the embeddings support sparse
-    updates. That is, only the embeddings involved in a mini-batch computation are updated.
-    Currently, DGL provides two optimizer: `SparseAdagrad` and `SparseAdam. DGL will provide more
-    optimizers in the future.
+    Currently, DGL provides two optimizer for NodeEmbedding: `SparseAdagrad` and `SparseAdam.
+    DGL will provide more optimizers in the future.
+
+    NOTE: NodeEmbedding can only support single node single-GPU training and
+    single node multi-GPU training.
+
+    The implementation is based on torch.distributed package. It depends on the pytorch
+    default distributed process group to collect multi-process information and uses
+    torch.distributed.TCPStore to share meta-data information across multiple gpu processes.
+    It use the local address of '127.0.0.1:12346' to initialize the TCPStore.
 
     Parameters
     ----------
     num_embeddings : int
         The number of embeddings. Currently, the number of embeddings has to be the same as
-        the number of nodes or the number of edges.
+        the number of nodes.
     embedding_dim : int
         The dimension size of embeddings.
     name : str
@@ -32,12 +40,6 @@ class NodeEmbedding: # NodeEmbedding
     init_func : callable, optional
         The function to create the initial data. If the init function is not provided,
         the values of the embeddings are initialized to zero.
-    group : str, optional
-        Group name.
-    host_name : str, optional
-        The hostname or IP Address the server store should run on.
-    port : int, optional
-        The port on which the server store should listen for incoming requests.
 
     Examples
     --------
@@ -49,8 +51,8 @@ class NodeEmbedding: # NodeEmbedding
 
     In each multiple gpu process
 
-    >>> emb = dgl.GraphSparseEmbedding(g.number_of_nodes(), 10, 'emb', init_func=initializer)
-    >>> optimizer = dgl.SparseAdagrad([emb], lr=0.001)
+    >>> emb = dgl.NodeEmbedding(g.number_of_nodes(), 10, 'emb', init_func=initializer)
+    >>> optimizer = dgl.SparseAdam([emb], lr=0.001)
     >>> for blocks in dataloader:
     ...     feats = emb(nids, gpu_0)
     ...     loss = F.sum(feats + 1, 0)
@@ -59,20 +61,20 @@ class NodeEmbedding: # NodeEmbedding
     '''
 
     def __init__(self, num_embeddings, embedding_dim, name,
-                 init_func=None, group=None, host_name='127.0.0.1', port=12346):
+                 init_func=None):
         global _store
 
         # Check whether it is multi-gpu training or not.
         if th.distributed.is_initialized():
-            rank = th.distributed.get_rank() if group is None \
-                else th.distributed.get_rank(group)
-            world_size = th.distributed.get_world_size() if group is None \
-                else th.distributed.get_world_size(group)
+            rank = th.distributed.get_rank()
+            world_size = th.distributed.get_world_size()
         else:
             rank = -1
             world_size = 0
         self._rank = rank
         self._world_size = world_size
+        host_name='127.0.0.1'
+        port=12346
 
         if rank <= 0:
             emb = create_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)

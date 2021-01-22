@@ -48,9 +48,9 @@ class EntityClassify(nn.Module):
     num_hidden_layers : int, optional
         Number of hidden RelGraphConv Layer
         Default 1
-    dropout : float
+    dropout : float, optional
         Dropout.
-        Default 0.
+        Default 0
     use_self_loop : bool, optional
         Use self loop if True.
         Default True

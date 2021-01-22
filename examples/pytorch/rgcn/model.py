@@ -51,7 +51,6 @@ class BaseRGCN(nn.Module):
         return h
 
 def initializer(emb):
-    #nn.init.xavier_uniform_(emb, gain=nn.init.calculate_gain('relu'))
     emb.uniform_(-1.0, 1.0)
     return emb
 
@@ -72,6 +71,8 @@ class RelGraphEmbedLayer(nn.Module):
         treat certain input feature as an one-hot encoding feature.
     embed_size : int
         Output embed size
+    dgl_sparse : bool, optional
+        If true, use dgl.NodeEmbedding otherwise use torch.nn.Embedding
     """
     def __init__(self,
                  dev_id,
@@ -80,8 +81,7 @@ class RelGraphEmbedLayer(nn.Module):
                  num_of_ntype,
                  input_size,
                  embed_size,
-                 dgl_sparse=False,
-                 group=None):
+                 dgl_sparse=False):
         super(RelGraphEmbedLayer, self).__init__()
         self.dev_id = th.device(dev_id if dev_id >= 0 else 'cpu')
         self.embed_size = embed_size
@@ -97,7 +97,7 @@ class RelGraphEmbedLayer(nn.Module):
             if isinstance(input_size[ntype], int):
                 if dgl_sparse:
                     self.node_embeds[str(ntype)] = dgl.NodeEmbedding(input_size[ntype], embed_size, name=str(ntype),
-                        init_func=initializer, group=group)
+                        init_func=initializer)
                 else:
                     sparse_emb = th.nn.Embedding(input_size[ntype], embed_size, sparse=True)
                     nn.init.uniform_(sparse_emb.weight, -1.0, 1.0)

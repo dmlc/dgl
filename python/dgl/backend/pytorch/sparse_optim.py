@@ -2,7 +2,7 @@ import abc
 from abc import abstractmethod
 import torch as th
 
-from .util import get_shared_mem_array, create_shared_mem_array
+from .utils import get_shared_mem_array, create_shared_mem_array
 from .sparse_emb import NodeEmbedding
 
 class SparseGradOptimizer(abc.ABC):
@@ -282,9 +282,8 @@ class SparseAdam(SparseGradOptimizer):
                 assert self._rank == emb.rank, 'MultiGPU rank for each embedding should be same.'
                 assert self._world_size == emb.world_size, 'MultiGPU world_size for each embedding should be same.'
             if self._rank <= 0:
-                # may overflow if steps > 2B
                 emb_name = emb.name
-                state_step = create_shared_mem_array(emb_name+'_step', (emb.emb_tensor.shape[0],), th.int).zero_()
+                state_step = create_shared_mem_array(emb_name+'_step', (emb.emb_tensor.shape[0],), th.int64).zero_()
                 state_mem = create_shared_mem_array(emb_name+'_mem', emb.emb_tensor.shape, th.float32).zero_()
                 state_power = create_shared_mem_array(emb_name+'_power', emb.emb_tensor.shape, th.float32).zero_()
             if self._rank == 0:
@@ -297,7 +296,7 @@ class SparseAdam(SparseGradOptimizer):
                 # receive
                 emb_name = emb.name
                 emb.store.wait([emb_name+'_opt'])
-                state_step = get_shared_mem_array(emb_name+'_step', (emb.emb_tensor.shape[0],), th.int)
+                state_step = get_shared_mem_array(emb_name+'_step', (emb.emb_tensor.shape[0],), th.int64)
                 state_mem = get_shared_mem_array(emb_name+'_mem', emb.emb_tensor.shape, th.float32)
                 state_power = get_shared_mem_array(emb_name+'_power', emb.emb_tensor.shape, th.float32)
 
@@ -328,7 +327,8 @@ class SparseAdam(SparseGradOptimizer):
             exec_dev = grad.device
             state_dev = state_step.device
 
-            # the update is non-linear so indices must be unique
+            # There can be duplicated indices due to sampling.
+            # Thus unique them here and average the gradient here.
             grad_indices, inverse, cnt = th.unique(idx, return_inverse=True, return_counts=True)
             state_idx = grad_indices.to(state_dev)
             state_step[state_idx] += 1
