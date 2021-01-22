@@ -180,7 +180,7 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
     eval_seeds = []
  
     with th.no_grad():
-        for sample_data in tqdm.tqdm(eval_loader):
+        for sample_data in eval_loader:
             th.cuda.empty_cache()
             seeds, blocks = sample_data
             feats = embed_layer(blocks[0].srcdata[dgl.NID],
