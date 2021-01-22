@@ -193,7 +193,7 @@ class SAGEConv(nn.Module):
                     feat_dst = feat_src[:graph.number_of_dst_nodes()]
             aggregate_fn = fn.copy_src('h', 'm')
             if edge_weight is not None:
-                if len(edge_weight.shape) > 2 or
+                if len(edge_weight.shape) > 2 or \
                     (len(edge_weight.shape) == 2 and edge_weight.shape[1] > 1):
                     raise DGLError('Currently GraphConv only supports scalar weight '
                                    'on each edge. Please customize your own module '
