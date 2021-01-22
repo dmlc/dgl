@@ -288,11 +288,6 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
 
         For sampling without replacement, if fanout > the number of neighbors, all the
         neighbors are sampled. If fanout == -1, all neighbors are collected.
-    output_format : str, optional
-        The format of the sampled subgraph. A user can specify the output subgraph to be
-        stored in a homogeneous graph format or in a heterogeneous graph format. The valid
-        values are "homogeneous" and "heterogeneous". This argument is only valid if
-        the input graph is heterogeneous.
 
     Returns
     -------
@@ -319,22 +314,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
     def local_access(local_g, partition_book, local_nids):
         return _sample_neighbors(local_g, partition_book, local_nids,
                                  fanout, edge_dir, prob, replace)
-    subg = _distributed_access(g, nodes, issue_remote_req, local_access)
-    if output_format == "heterogeneous" and len(g.etypes) > 1:
-        src, dst = subg.edges()
-        src_per_type_id, _ = gpb.map_to_per_ntype(src)
-        dst_per_type_id, _ = gpb.map_to_per_ntype(dst)
-        eid_per_type_id, eid_type = gpb.map_to_per_etype(subg.edata[dgl.EID])
-        subg_edges = {}
-        for etype in g.canonical_etypes:
-            etype_id = g.get_etype_id(etype[1])
-            edge_idx = eid_type == etype_id
-            subg_edges[etype] = (F.boolean_mask(src_per_type_id, edge_idx),
-                                 F.boolean_mask(dst_per_type_id, edge_idx),
-                                 F.boolean_mask(eid_per_type_id, edge_idx))
-        num_nodes = {ntype:g.number_of_nodes(ntype) for ntype in g.ntypes}
-        subg = heterograph(subg_edges, num_nodes_dict=num_nodes)
-    return subg
+    return _distributed_access(g, nodes, issue_remote_req, local_access)
 
 def _distributed_edge_access(g, edges, issue_remote_req, local_access):
     """A routine that fetches local edges from distributed graph.
