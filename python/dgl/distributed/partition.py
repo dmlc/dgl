@@ -31,9 +31,9 @@ def _get_inner_edge_mask(graph, etype_id):
 def _get_part_ranges(id_ranges):
     res = {}
     for key in id_ranges:
-        # Normally, each element has two values that represent the starting Id and the ending Id
-        # of the Id range in a partition.
-        # If not, the data is probably still in the old format, in which only the ending Id is
+        # Normally, each element has two values that represent the starting ID and the ending ID
+        # of the ID range in a partition.
+        # If not, the data is probably still in the old format, in which only the ending ID is
         # stored. We need to convert it to the format we expect.
         if not isinstance(id_ranges[key][0], list):
             start = 0
@@ -61,20 +61,24 @@ def load_partition(part_config, part_id):
     part_config : str
         The path of the partition config file.
     part_id : int
-        The partition Id.
+        The partition ID.
 
     Returns
     -------
     DGLGraph
         The graph partition structure.
-    dict of tensors
+    Dict[str, Tensor]
         Node features.
-    dict of tensors
+    Dict[str, Tensor]
         Edge features.
     GraphPartitionBook
         The graph partition information.
     str
         The graph name
+    List[str]
+        The node types
+    List[str]
+        The edge types
     '''
     with open(part_config) as conf_f:
         part_metadata = json.load(conf_f)
@@ -103,13 +107,13 @@ def load_partition(part_config, part_id):
     node_feats = node_feats1
     edge_feats = edge_feats1
 
-    assert NID in graph.ndata, "the partition graph should contain node mapping to global node Id"
-    assert EID in graph.edata, "the partition graph should contain edge mapping to global edge Id"
+    assert NID in graph.ndata, "the partition graph should contain node mapping to global node ID"
+    assert EID in graph.edata, "the partition graph should contain edge mapping to global edge ID"
 
     gpb, graph_name, ntypes, etypes = load_partition_book(part_config, part_id, graph)
     for ntype in ntypes:
         ntype_id = ntypes[ntype]
-        # graph.ndata[NID] are global homogeneous node Ids.
+        # graph.ndata[NID] are global homogeneous node IDs.
         nids = F.boolean_mask(graph.ndata[NID], _get_inner_node_mask(graph, ntype_id))
         partids1 = gpb.nid2partid(nids)
         _, per_type_nids = gpb.map_to_per_ntype(nids)
@@ -118,7 +122,7 @@ def load_partition(part_config, part_id):
         assert np.all(F.asnumpy(partids2 == part_id)), 'load a wrong partition'
     for etype in etypes:
         etype_id = etypes[etype]
-        # graph.edata[EID] are global homogeneous edge Ids.
+        # graph.edata[EID] are global homogeneous edge IDs.
         eids = F.boolean_mask(graph.edata[EID], _get_inner_edge_mask(graph, etype_id))
         partids1 = gpb.eid2partid(eids)
         _, per_type_eids = gpb.map_to_per_etype(eids)
@@ -135,7 +139,7 @@ def load_partition_book(part_config, part_id, graph=None):
     part_config : str
         The path of the partition config file.
     part_id : int
-        The partition Id.
+        The partition ID.
     graph : DGLGraph
         The graph structure
 
@@ -277,22 +281,24 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
       Currently, it supports "random" and "metis".
     * `num_parts` is the number of partitions.
     * `halo_hops` is the number of hops of nodes we include in a partition as HALO nodes.
-    * `node_map` is the node assignment map, which tells the partition Id a node is assigned to.
+    * `node_map` is the node assignment map, which tells the partition ID a node is assigned to.
       The format of `node_map` is described below.
-    * `edge_map` is the edge assignment map, which tells the partition Id an edge is assigned to.
+    * `edge_map` is the edge assignment map, which tells the partition ID an edge is assigned to.
     * `num_nodes` is the number of nodes in the global graph.
     * `num_edges` is the number of edges in the global graph.
     * `part-*` stores the data of a partition.
 
-    If node IDs and edge IDs are not shuffled to ensure that all nodes/edges in a partition
-    fall into a contiguous ID range, DGL needs to store node/edge mappings (from
+    If `reshuffle=False`, node IDs and edge IDs of a partition do not fall into contiguous
+    ID ranges. In this case, DGL stores node/edge mappings (from
     node/edge IDs to partition IDs) in separate files (node_map.npy and edge_map.npy).
-    The node/edge mappings are stored in numpy files. **Note**: this format is
-    deprecated and will not be supported by the next release. In other words, the future
-    release will always shuffle node Ids and edge Ids when partitioning a graph.
+    The node/edge mappings are stored in numpy files.
 
-    If node Ids and edge Ids are shuffled, `node_map` and `edge_map` contains the information
-    for mapping between global node/edge Ids to partition-local node/edge Ids.
+    .. warning::
+        this format is deprecated and will not be supported by the next release. In other words,
+        the future release will always shuffle node IDs and edge IDs when partitioning a graph.
+
+    If `reshuffle=True`, `node_map` and `edge_map` contains the information
+    for mapping between global node/edge IDs to partition-local node/edge IDs.
     For heterogeneous graphs, the information in `node_map` and `edge_map` can also be used
     to compute node types and edge types. The format of the data in `node_map` and `edge_map`
     is as follows:
@@ -310,7 +316,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     and the value is partitioning information of the node type. The partition information
     is stored as a list of two-element tuples. The length of the list is the number of
     partitions; each element in the list is a tuple that stores the start and the end of
-    an Id range for a particular node/edge type in the partition.
+    an ID range for a particular node/edge type in the partition.
 
     The graph structure of a partition is stored in a file with the DGLGraph format.
     Nodes in each partition is *relabeled* to always start with zero. We call the node
@@ -326,7 +332,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
 
     * "inner_node" indicates whether a node belongs to a partition.
     * "inner_edge" indicates whether an edge belongs to a partition.
-    * "orig_id" exists when reshuffle=True. It indicates the original node Ids in the original
+    * "orig_id" exists when reshuffle=True. It indicates the original node IDs in the original
     graph before reshuffling.
 
     Node and edge features are splitted and stored together with each graph partition.
@@ -362,7 +368,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         The partition method. It supports "random" and "metis". The default value is "metis".
     reshuffle : bool, optional
         Reshuffle nodes and edges so that nodes and edges in a partition are in
-        contiguous Id range. The default value is True. The argument is deprecated
+        contiguous ID range. The default value is True. The argument is deprecated
         and will be removed in the next release.
     balance_ntypes : tensor, optional
         Node type of each node. This is a 1D-array of integers. Its values indicates the node
@@ -449,11 +455,11 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     else:
         raise Exception('Unknown partitioning method: ' + part_method)
 
-    # If the input is a heterogeneous graph, get the original node types and original node Ids.
+    # If the input is a heterogeneous graph, get the original node types and original node IDs.
     # `part' has three types of node data at this point.
     # NTYPE: the node type.
-    # orig_id: the global node Ids in the homogeneous version of input graph.
-    # NID: the global node Ids in the reshuffled homogeneous version of the input graph.
+    # orig_id: the global node IDs in the homogeneous version of input graph.
+    # NID: the global node IDs in the reshuffled homogeneous version of the input graph.
     if len(g.etypes) > 1:
         if reshuffle:
             for name in parts:
@@ -461,13 +467,13 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                 ntype = F.gather_row(sim_g.ndata[NTYPE], orig_ids)
                 parts[name].ndata[NTYPE] = F.astype(ntype, F.int32)
                 assert np.all(F.asnumpy(ntype) == F.asnumpy(parts[name].ndata[NTYPE]))
-                # Get the original edge types and original edge Ids.
+                # Get the original edge types and original edge IDs.
                 orig_ids = parts[name].edata['orig_id']
                 etype = F.gather_row(sim_g.edata[ETYPE], orig_ids)
                 parts[name].edata[ETYPE] = F.astype(etype, F.int32)
                 assert np.all(F.asnumpy(etype) == F.asnumpy(parts[name].edata[ETYPE]))
 
-                # Calculate the global node Ids to per-node Ids mapping.
+                # Calculate the global node IDs to per-node IDs mapping.
                 inner_ntype = F.boolean_mask(parts[name].ndata[NTYPE],
                                              parts[name].ndata['inner_node'] == 1)
                 inner_nids = F.boolean_mask(parts[name].ndata[NID],
@@ -475,11 +481,11 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                 for ntype in g.ntypes:
                     inner_ntype_mask = inner_ntype == g.get_ntype_id(ntype)
                     typed_nids = F.boolean_mask(inner_nids, inner_ntype_mask)
-                    # inner node Ids are in a contiguous Id range.
+                    # inner node IDs are in a contiguous ID range.
                     expected_range = np.arange(int(F.as_scalar(typed_nids[0])),
                                                int(F.as_scalar(typed_nids[-1])) + 1)
                     assert np.all(F.asnumpy(typed_nids) == expected_range)
-                # Calculate the global edge Ids to per-edge Ids mapping.
+                # Calculate the global edge IDs to per-edge IDs mapping.
                 inner_etype = F.boolean_mask(parts[name].edata[ETYPE],
                                              parts[name].edata['inner_edge'] == 1)
                 inner_eids = F.boolean_mask(parts[name].edata[EID],
@@ -499,7 +505,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         edge_parts = np.zeros((g.number_of_edges(),), dtype=np.int64) - 1
         for part_id in parts:
             part = parts[part_id]
-            # To get the edges in the input graph, we should use original node Ids.
+            # To get the edges in the input graph, we should use original node IDs.
             local_edges = F.boolean_mask(part.edata[EID], part.edata['inner_edge'])
             edge_parts[F.asnumpy(local_edges)] = part_id
         print('Calculate edge assignment: {:.3f} seconds'.format(time.time() - start))
@@ -518,7 +524,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         edge_map_val = edge_part_file + ".npy"
     else:
         # With reshuffling, we can ensure that all nodes and edges are reshuffled
-        # and are in contiguous Id space.
+        # and are in contiguous ID space.
         if num_parts > 1:
             node_map_val = {}
             edge_map_val = {}
@@ -562,7 +568,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                 edge_map_val[etype] = [[int(F.as_scalar(inner_eids[0])),
                                         int(F.as_scalar(inner_eids[-1])) + 1]]
 
-        # Double check that the node Ids in the global Id space are sorted.
+        # Double check that the node IDs in the global ID space are sorted.
         for ntype in node_map_val:
             val = np.concatenate([np.array(l) for l in node_map_val[ntype]])
             assert np.all(val[:-1] <= val[1:])
@@ -592,11 +598,11 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         if num_parts > 1:
             for ntype in g.ntypes:
                 ntype_id = g.get_ntype_id(ntype)
-                # To get the edges in the input graph, we should use original node Ids.
-                # Both orig_id and NID stores the per-node-type Ids.
+                # To get the edges in the input graph, we should use original node IDs.
+                # Both orig_id and NID stores the per-node-type IDs.
                 ndata_name = 'orig_id' if reshuffle else NID
                 inner_node_mask = _get_inner_node_mask(part, ntype_id)
-                # This is global node Ids.
+                # This is global node IDs.
                 local_nodes = F.boolean_mask(part.ndata[ndata_name], inner_node_mask)
                 if len(g.ntypes) > 1:
                     # If the input is a heterogeneous graph.
@@ -618,7 +624,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                 etype_id = g.get_etype_id(etype)
                 edata_name = 'orig_id' if reshuffle else EID
                 inner_edge_mask = _get_inner_edge_mask(part, etype_id)
-                # This is global edge Ids.
+                # This is global edge IDs.
                 local_edges = F.boolean_mask(part.edata[edata_name], inner_edge_mask)
                 if len(g.etypes) > 1:
                     local_edges = F.gather_row(sim_g.edata[EID], local_edges)
@@ -641,7 +647,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     ndata_name = 'orig_id'
                     ntype_id = g.get_ntype_id(ntype)
                     inner_node_mask = _get_inner_node_mask(part, ntype_id)
-                    # This is global node Ids.
+                    # This is global node IDs.
                     local_nodes = F.boolean_mask(part.ndata[ndata_name], inner_node_mask)
                     local_nodes = F.gather_row(sim_g.ndata[NID], local_nodes)
                 elif reshuffle:
@@ -659,7 +665,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     edata_name = 'orig_id'
                     etype_id = g.get_etype_id(etype)
                     inner_edge_mask = _get_inner_edge_mask(part, etype_id)
-                    # This is global edge Ids.
+                    # This is global edge IDs.
                     local_edges = F.boolean_mask(part.edata[edata_name], inner_edge_mask)
                     local_edges = F.gather_row(sim_g.edata[EID], local_edges)
                 elif reshuffle:

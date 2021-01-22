@@ -47,10 +47,10 @@ class FindEdgeResponse(Response):
 def _sample_neighbors(local_g, partition_book, seed_nodes, fan_out, edge_dir, prob, replace):
     """ Sample from local partition.
 
-    The input nodes use global Ids. We need to map the global node Ids to local node Ids,
-    perform sampling and map the sampled results to the global Ids space again.
+    The input nodes use global IDs. We need to map the global node IDs to local node IDs,
+    perform sampling and map the sampled results to the global IDs space again.
     The sampled results are stored in three vectors that store source nodes, destination nodes
-    and edge Ids.
+    and edge IDs.
     """
     local_ids = partition_book.nid2localnid(seed_nodes, partition_book.partid)
     local_ids = F.astype(local_ids, local_g.idtype)
@@ -79,10 +79,10 @@ def _find_edges(local_g, partition_book, seed_edges):
 def _in_subgraph(local_g, partition_book, seed_nodes):
     """ Get in subgraph from local partition.
 
-    The input nodes use global Ids. We need to map the global node Ids to local node Ids,
-    get in-subgraph and map the sampled results to the global Ids space again.
+    The input nodes use global IDs. We need to map the global node IDs to local node IDs,
+    get in-subgraph and map the sampled results to the global IDs space again.
     The results are stored in three vectors that store source nodes, destination nodes
-    and edge Ids.
+    and edge IDs.
     """
     local_ids = partition_book.nid2localnid(seed_nodes, partition_book.partid)
     local_ids = F.astype(local_ids, local_g.idtype)

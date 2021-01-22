@@ -462,7 +462,7 @@ class DistGraph:
             self._num_nodes += int(part_md['num_nodes'])
             self._num_edges += int(part_md['num_edges'])
 
-        # When we store node/edge types in a list, they are stored in the order of type Ids.
+        # When we store node/edge types in a list, they are stored in the order of type IDs.
         self._ntype_map = {ntype:i for i, ntype in enumerate(self.ntypes)}
         self._etype_map = {etype:i for i, etype in enumerate(self.etypes)}
 
@@ -903,23 +903,23 @@ class DistGraph:
         return edata_names
 
 def _get_overlap(mask_arr, ids):
-    """ Select the Ids given a boolean mask array.
+    """ Select the IDs given a boolean mask array.
 
-    The boolean mask array indicates all of the Ids to be selected. We want to
-    find the overlap between the Ids selected by the boolean mask array and
-    the Id array.
+    The boolean mask array indicates all of the IDs to be selected. We want to
+    find the overlap between the IDs selected by the boolean mask array and
+    the ID array.
 
     Parameters
     ----------
     mask_arr : 1D tensor
         A boolean mask array.
     ids : 1D tensor
-        A vector with Ids.
+        A vector with IDs.
 
     Returns
     -------
     1D tensor
-        The selected Ids.
+        The selected IDs.
     """
     if isinstance(mask_arr, DistTensor):
         masks = mask_arr[ids]
@@ -1032,7 +1032,7 @@ def node_split(nodes, partition_book=None, ntype='_N', rank=None, force_even=Tru
     Returns
     -------
     1D-tensor
-        The vector of node Ids that belong to the rank.
+        The vector of node IDs that belong to the rank.
     '''
     if not isinstance(nodes, DistTensor):
         assert partition_book is not None, 'Regular tensor requires a partition book.'
@@ -1085,7 +1085,7 @@ def edge_split(edges, partition_book=None, etype='_E', rank=None, force_even=Tru
     Returns
     -------
     1D-tensor
-        The vector of edge Ids that belong to the rank.
+        The vector of edge IDs that belong to the rank.
     '''
     if not isinstance(edges, DistTensor):
         assert partition_book is not None, 'Regular tensor requires a partition book.'

@@ -11,7 +11,7 @@ from .. import backend as F
 def _default_init_data(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
 
-# These Ids can identify the anonymous distributed tensors.
+# These IDs can identify the anonymous distributed tensors.
 DIST_TENSOR_ID = 0
 
 class DistTensor:
@@ -137,7 +137,7 @@ class DistTensor:
             assert not persistent, 'We cannot generate anonymous persistent distributed tensors'
             global DIST_TENSOR_ID
             # All processes of the same role should create DistTensor synchronously.
-            # Thus, all of them should have the same Ids.
+            # Thus, all of them should have the same IDs.
             name = 'anonymous-' + get_role() + '-' + str(DIST_TENSOR_ID)
             DIST_TENSOR_ID += 1
         assert isinstance(name, str), 'name {} is type {}'.format(name, type(name))
