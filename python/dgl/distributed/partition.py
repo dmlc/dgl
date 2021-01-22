@@ -312,9 +312,10 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             ...
         },
 
-    Essentially, the data in ``node_map`` and ``edge_map`` is a dictionary. The key is node type
-    and the value is partitioning information of the node type. The partition information
-    is stored as a list of two-element tuples. The length of the list is the number of
+    Essentially, ``node_map`` and ``edge_map`` are dictionaries. The keys are
+    node/edge types. The values are lists of pairs containing the start and end of
+    the ID range for the corresponding types in a partition.
+    The length of the list is the number of
     partitions; each element in the list is a tuple that stores the start and the end of
     an ID range for a particular node/edge type in the partition.
 
