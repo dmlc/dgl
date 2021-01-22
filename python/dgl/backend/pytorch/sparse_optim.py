@@ -283,7 +283,7 @@ class SparseAdam(SparseGradOptimizer):
                 assert self._world_size == emb.world_size, 'MultiGPU world_size for each embedding should be same.'
             if self._rank <= 0:
                 emb_name = emb.name
-                state_step = create_shared_mem_array(emb_name+'_step', (emb.emb_tensor.shape[0],), th.int64).zero_()
+                state_step = create_shared_mem_array(emb_name+'_step', (emb.emb_tensor.shape[0],), th.float32).zero_()
                 state_mem = create_shared_mem_array(emb_name+'_mem', emb.emb_tensor.shape, th.float32).zero_()
                 state_power = create_shared_mem_array(emb_name+'_power', emb.emb_tensor.shape, th.float32).zero_()
             if self._rank == 0:
@@ -296,7 +296,7 @@ class SparseAdam(SparseGradOptimizer):
                 # receive
                 emb_name = emb.name
                 emb.store.wait([emb_name+'_opt'])
-                state_step = get_shared_mem_array(emb_name+'_step', (emb.emb_tensor.shape[0],), th.int64)
+                state_step = get_shared_mem_array(emb_name+'_step', (emb.emb_tensor.shape[0],), th.float32)
                 state_mem = get_shared_mem_array(emb_name+'_mem', emb.emb_tensor.shape, th.float32)
                 state_power = get_shared_mem_array(emb_name+'_power', emb.emb_tensor.shape, th.float32)
 
