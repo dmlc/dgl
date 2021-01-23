@@ -1,6 +1,6 @@
 ## Distributed training
 
-This is an example of training RGCN node classification in a distributed fashion. Currently, the example only support training RGCN graphs with no input features. The current implementation follows ../rgcn/entity_claasify_mp.py.
+This is an example of training RGCN node classification in a distributed fashion. Currently, the example train RGCN graphs with input node features. The current implementation follows ../rgcn/entity_claasify_mp.py.
 
 Before training, please install some python libs by pip:
 
@@ -35,6 +35,8 @@ the number of nodes, the number of edges and the number of labelled nodes.
 ```bash
 python3 partition_graph.py --dataset ogbn-mag --num_parts 4 --balance_train --balance_edges
 ```
+
+This script generates partitioned graphs and store them in the directory called `data`.
 
 ### Step 2: copy the partitioned data to the cluster
 DGL provides a script for copying partitioned data to the cluster. Before that, copy the training script to a local folder:

@@ -114,8 +114,6 @@ def init_emb(shape, dtype):
     nn.init.uniform_(arr, -1.0, 1.0)
     return arr
 
-feat_name = 'feat'
-
 class DistEmbedLayer(nn.Module):
     r"""Embedding layer for featureless heterograph.
     Parameters
@@ -141,6 +139,7 @@ class DistEmbedLayer(nn.Module):
                  embed_size,
                  sparse_emb=False,
                  dgl_sparse_emb=False,
+                 feat_name='feat',
                  embed_name='node_emb'):
         super(DistEmbedLayer, self).__init__()
         self.dev_id = dev_id
@@ -187,22 +186,17 @@ class DistEmbedLayer(nn.Module):
         """Forward computation
         Parameters
         ----------
-        node_ids : tensor
+        node_ids : Tensor
             node ids to generate embedding for.
-        node_ids : tensor
+        ntype_ids : Tensor
             node type ids
-        features : list of features
-            list of initial features for nodes belong to different node type.
-            If None, the corresponding features is an one-hot encoding feature,
-            else use the features directly as input feature and matmul a
-            projection matrix.
         Returns
         -------
         tensor
             embeddings as the input of the next layer
         """
         embeds = th.empty(node_ids.shape[0], self.embed_size, device=self.dev_id)
-        for ntype_id in th.unique(ntype_ids):
+        for ntype_id in th.unique(ntype_ids).tolist():
             ntype = self.ntype_id_map[int(ntype_id)]
             loc = ntype_ids == ntype_id
             if feat_name in self.g.nodes[ntype].data:
@@ -212,6 +206,23 @@ class DistEmbedLayer(nn.Module):
         return embeds
 
 class GetEdgeData:
+    '''Get the edge data
+
+    This class helps us to get edge features from the input graph for a mini-batch. The edges
+    can have different types, but all of them must have the same dimension. All edge features
+    will be put in one tensor, regardless of the number of edge types.
+
+    Parameters
+    ----------
+    g : DistGraph
+        The distributed graph.
+    feat_name : str
+        The name of the edge feature
+    num_feats : int
+        The number of features
+    dev_id : int
+        The device ID where we will have the edge data.
+    '''
     def __init__(self, g, feat_name, num_feats, dev_id):
         self.g = g
         self.feat_name = feat_name
@@ -220,8 +231,20 @@ class GetEdgeData:
         self.etype_id_map = {i:etype for i, etype in enumerate(g.etypes)}
 
     def __call__(self, edge_ids, etype_ids):
+        """Forward computation
+        Parameters
+        ----------
+        edge_ids : Tensor
+            Edge ids where we get data.
+        etype_ids : Tensor
+            Edge type ids
+        Returns
+        -------
+        Tensor
+            The edge data
+        """
         data = th.empty(edge_ids.shape[0], self.num_feats, device=self.dev_id)
-        for etype_id in th.unique(etype_ids):
+        for etype_id in th.unique(etype_ids).tolist():
             etype = self.g.etypes[etype_id]
             loc = etype_ids == etype_id
             assert np.all(edge_ids[loc].numpy() < self.g.number_of_edges(etype))
@@ -368,7 +391,8 @@ def run(args, device, data):
                                  g,
                                  args.n_hidden,
                                  sparse_emb=args.sparse_embedding,
-                                 dgl_sparse_emb=args.dgl_sparse)
+                                 dgl_sparse_emb=args.dgl_sparse,
+                                 feat_name='feat')
     get_edata = GetEdgeData(g, 'norm', 1, device)
 
     model = EntityClassify(device,
