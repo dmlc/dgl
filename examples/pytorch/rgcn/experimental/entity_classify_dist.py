@@ -145,6 +145,7 @@ class DistEmbedLayer(nn.Module):
         self.dev_id = dev_id
         self.embed_size = embed_size
         self.embed_name = embed_name
+        self.feat_name = feat_name
         self.sparse_emb = sparse_emb
         self.g = g
         self.ntype_id_map = {g.get_ntype_id(ntype):ntype for ntype in g.ntypes}
@@ -199,8 +200,8 @@ class DistEmbedLayer(nn.Module):
         for ntype_id in th.unique(ntype_ids).tolist():
             ntype = self.ntype_id_map[int(ntype_id)]
             loc = ntype_ids == ntype_id
-            if feat_name in self.g.nodes[ntype].data:
-                embeds[loc] = self.node_projs[ntype](self.g.nodes[ntype].data[feat_name][node_ids[ntype_ids == ntype_id]].to(self.dev_id))
+            if self.feat_name in self.g.nodes[ntype].data:
+                embeds[loc] = self.node_projs[ntype](self.g.nodes[ntype].data[self.feat_name][node_ids[ntype_ids == ntype_id]].to(self.dev_id))
             else:
                 embeds[loc] = self.node_embeds[ntype](node_ids[ntype_ids == ntype_id]).to(self.dev_id)
         return embeds
