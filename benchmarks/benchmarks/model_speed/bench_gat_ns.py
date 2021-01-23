@@ -76,7 +76,7 @@ def track_time(data):
     g.ndata['labels'] = g.ndata['label']
     g = g.remove_self_loop().add_self_loop()
     in_feats = g.ndata['features'].shape[1]
-    n_classes = data.num_labels
+    n_classes = data.num_classes
 
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
