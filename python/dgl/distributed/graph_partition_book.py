@@ -2,6 +2,7 @@
 
 import pickle
 import numpy as np
+from abc import ABC
 
 from .. import backend as F
 from ..base import NID, EID
@@ -143,7 +144,7 @@ def get_shared_mem_partition_book(graph_name, graph_part):
     else:
         return BasicPartitionBook(part_id, num_parts, node_map_data, edge_map_data, graph_part)
 
-class GraphPartitionBook:
+class GraphPartitionBook(ABC):
     """ The base class of the graph partition book.
 
     For distributed training, a graph is partitioned into multiple parts and is loaded
