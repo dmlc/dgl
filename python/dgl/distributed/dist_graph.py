@@ -160,7 +160,14 @@ class NodeDataView(MutableMapping):
         # When this is created, the server may already load node data. We need to
         # initialize the node data in advance.
         names = g._get_ndata_names(ntype)
-        self._data = g._ndata_store
+        if ntype is None:
+            self._data = g._ndata_store
+        else:
+            if ntype in g._ndata_store:
+                self._data = g._ndata_store[ntype]
+            else:
+                self._data = {}
+                g._ndata_store[ntype] = self._data
         for name in names:
             assert name.is_node()
             policy = PartitionPolicy(name.policy_str, g.get_partition_book())
@@ -207,7 +214,14 @@ class EdgeDataView(MutableMapping):
         # When this is created, the server may already load edge data. We need to
         # initialize the edge data in advance.
         names = g._get_edata_names(etype)
-        self._data = g._edata_store
+        if etype is None:
+            self._data = g._edata_store
+        else:
+            if etype in g._edata_store:
+                self._data = g._edata_store[etype]
+            else:
+                self._data = {}
+                g._edata_store[etype] = self._data
         for name in names:
             assert name.is_edge()
             policy = PartitionPolicy(name.policy_str, g.get_partition_book())

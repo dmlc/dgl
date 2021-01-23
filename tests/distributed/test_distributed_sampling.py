@@ -197,6 +197,9 @@ def start_hetero_sample_client(rank, tmpdir, disable_shared_mem):
         _, _, _, gpb, _, _, _ = load_partition(tmpdir / 'test_sampling.json', rank)
     dgl.distributed.initialize("rpc_ip_config.txt", 1)
     dist_graph = DistGraph("test_sampling", gpb=gpb)
+    assert 'feat' in dist_graph.nodes['n1'].data
+    assert 'feat' not in dist_graph.nodes['n2'].data
+    assert 'feat' not in dist_graph.nodes['n3'].data
     if gpb is None:
         gpb = dist_graph.get_partition_book()
     try:
