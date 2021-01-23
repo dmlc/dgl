@@ -53,8 +53,6 @@ class IdMap:
             ranges[i::self.num_types] = id_range
             map1 = np.cumsum(id_range[:, 1] - id_range[:, 0])
             typed_map.append(map1)
-        print(ranges)
-        print(typed_map)
 
         assert np.all(np.diff(ranges[:, 0]) >= 0)
         assert np.all(np.diff(ranges[:, 1]) >= 0)
