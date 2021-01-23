@@ -207,6 +207,18 @@ def test_batch_no_edge(idtype):
     g3.add_nodes(1)  # no edges
     g = dgl.batch([g1, g3, g2]) # should not throw an error
 
+@parametrize_dtype
+def test_batch_keeps_empty_data(idtype):
+    g1 = dgl.graph(([], [])).astype(idtype).to(F.ctx())
+    g1.ndata["nh"] = F.tensor([])
+    g1.edata["eh"] = F.tensor([]) 
+    g2 = dgl.graph(([], [])).astype(idtype).to(F.ctx())
+    g2.ndata["nh"] = F.tensor([])
+    g2.edata["eh"] = F.tensor([]) 
+    g = dgl.batch([g1, g2])
+    assert "nh" in g.ndata
+    assert "eh" in g.edata    
+
 def _get_subgraph_batch_info(keys, induced_indices_arr, batch_num_objs):
     """Internal function to compute batch information for subgraphs.
     Parameters

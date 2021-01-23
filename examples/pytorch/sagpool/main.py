@@ -101,9 +101,10 @@ def test(model:torch.nn.Module, loader, device):
     model.eval()
     correct = 0.
     loss = 0.
-    num_graphs = len(loader)
+    num_graphs = 0
     for batch in loader:
         batch_graphs, batch_labels = batch
+        num_graphs += batch_labels.size(0)
         for (key, value) in batch_graphs.ndata.items():
             batch_graphs.ndata[key] = value.float()
         batch_graphs = batch_graphs.to(device)

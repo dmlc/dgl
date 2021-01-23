@@ -3,6 +3,8 @@
 6.5 Implementing Custom GNN Module for Mini-batch Training
 -------------------------------------------------------------
 
+:ref:`(中文版) <guide_cn-minibatch-custom-gnn-module>`
+
 If you were familiar with how to write a custom GNN module for updating
 the entire graph for homogeneous or heterogeneous graphs (see
 :ref:`guide-nn`), the code for computing on

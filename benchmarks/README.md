@@ -32,7 +32,7 @@ export DGL_BENCH_DEVICE=cuda:0
 To select which benchmark to run, use the `--bench` flag. For example,
 
 ```bash
-asv run -n -e --python=save --verbose --bench model_acc.bench_gat
+asv run -n -e --python=same --verbose --bench model_acc.bench_gat
 ```
 
 Run in docker locally
