@@ -11,7 +11,6 @@ from ..convert import to_homogeneous
 from ..random import choice as random_choice
 from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 from ..transform import metis_partition_assignment, partition_graph_with_halo
-from ..partition import reshuffle_graph
 from .graph_partition_book import BasicPartitionBook, RangePartitionBook
 
 def _get_inner_node_mask(graph, ntype_id):
