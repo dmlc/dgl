@@ -359,7 +359,7 @@ class RelGraphConv(nn.Module):
                                                          self.loop_weight)
             # message passing
             g.update_all(functools.partial(self.message_func, etypes=etypes),
-                         fn.sum(msg='msg', out='h'))
+                         fn.mean(msg='msg', out='h'))
             # apply bias and activation
             node_repr = g.dstdata['h']
             if self.layer_norm:

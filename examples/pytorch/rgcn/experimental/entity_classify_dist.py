@@ -106,7 +106,8 @@ class EntityClassify(nn.Module):
         h = feats
         for layer, block in zip(self.layers, blocks):
             block = block.to(self.device)
-            h = layer(block, h, block.edata[dgl.ETYPE], block.edata['norm'])
+            #h = layer(block, h, block.edata[dgl.ETYPE], block.edata['norm'])
+            h = layer(block, h, block.edata[dgl.ETYPE])
         return h
 
 def init_emb(shape, dtype):
@@ -270,8 +271,8 @@ def evaluate(g, model, embed_layer, get_edata, labels, eval_loader, test_loader,
     with th.no_grad():
         for sample_data in tqdm.tqdm(eval_loader):
             seeds, blocks = sample_data
-            for block in blocks:
-                block.edata['norm'] = get_edata(block.edata[dgl.EID], block.edata[dgl.ETYPE])
+            #for block in blocks:
+            #    block.edata['norm'] = get_edata(block.edata[dgl.EID], block.edata[dgl.ETYPE])
             feats = embed_layer(blocks[0].srcdata[dgl.NID], blocks[0].srcdata[dgl.NTYPE])
             logits = model(blocks, feats)
             eval_logits.append(logits.cpu().detach())
@@ -286,8 +287,8 @@ def evaluate(g, model, embed_layer, get_edata, labels, eval_loader, test_loader,
     with th.no_grad():
         for sample_data in tqdm.tqdm(test_loader):
             seeds, blocks = sample_data
-            for block in blocks:
-                block.edata['norm'] = get_edata(block.edata[dgl.EID], block.edata[dgl.ETYPE])
+            #for block in blocks:
+            #    block.edata['norm'] = get_edata(block.edata[dgl.EID], block.edata[dgl.ETYPE])
             feats = embed_layer(blocks[0].srcdata[dgl.NID], blocks[0].srcdata[dgl.NTYPE])
             logits = model(blocks, feats)
             test_logits.append(logits.cpu().detach())
@@ -472,8 +473,8 @@ def run(args, device, data):
             sample_time += tic_step - start
             sample_t.append(tic_step - start)
 
-            for block in blocks:
-                block.edata['norm'] = get_edata(block.edata[dgl.EID], block.edata[dgl.ETYPE])
+            #for block in blocks:
+            #    block.edata['norm'] = get_edata(block.edata[dgl.EID], block.edata[dgl.ETYPE])
             feats = embed_layer(blocks[0].srcdata[dgl.NID], blocks[0].srcdata[dgl.NTYPE])
             label = labels[seeds]
             copy_time = time.time()
