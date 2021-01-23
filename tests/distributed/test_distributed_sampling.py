@@ -177,7 +177,7 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
     assert np.array_equal(F.asnumpy(eids1), F.asnumpy(eids))
 
 def create_random_hetero():
-    num_nodes = {'n1': 10000, 'n2': 10010, 'n3': 10020}
+    num_nodes = {'n1': 1010, 'n2': 1000, 'n3': 1020}
     etypes = [('n1', 'r1', 'n2'),
               ('n1', 'r2', 'n3'),
               ('n2', 'r3', 'n3')]
@@ -200,7 +200,7 @@ def start_hetero_sample_client(rank, tmpdir, disable_shared_mem):
     if gpb is None:
         gpb = dist_graph.get_partition_book()
     try:
-        nodes = {'n3': [0, 10, 99, 66, 1024, 2008]}
+        nodes = {'n3': [0, 10, 99, 66, 124, 208]}
         sampled_graph = sample_neighbors(dist_graph, nodes, 3)
         nodes = gpb.map_to_homo_nid(nodes['n3'], 'n3')
         block = dgl.to_block(sampled_graph, nodes)

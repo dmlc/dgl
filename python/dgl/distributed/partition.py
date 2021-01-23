@@ -435,12 +435,12 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         node_parts = F.zeros((sim_g.number_of_nodes(),), F.int64, F.cpu())
         parts = {}
         if reshuffle:
-            parts[0], _ = reshuffle_graph(sim_g)
+            parts[0] = sim_g.clone()
+            parts[0].ndata[NID] = parts[0].ndata['orig_id'] = F.arange(0, sim_g.number_of_nodes())
+            parts[0].edata[EID] = parts[0].edata['orig_id'] = F.arange(0, sim_g.number_of_edges())
         else:
-            parts[0] = sim_g
-        if NID not in parts[0].ndata:
+            parts[0] = sim_g.clone()
             parts[0].ndata[NID] = F.arange(0, sim_g.number_of_nodes())
-        if EID not in parts[0].edata:
             parts[0].edata[EID] = F.arange(0, sim_g.number_of_edges())
         parts[0].ndata['inner_node'] = F.ones((sim_g.number_of_nodes(),), F.int8, F.cpu())
         parts[0].edata['inner_edge'] = F.ones((sim_g.number_of_edges(),), F.int8, F.cpu())
