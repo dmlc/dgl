@@ -1,8 +1,8 @@
 """Define graph partition book."""
 
 import pickle
-import numpy as np
 from abc import ABC
+import numpy as np
 
 from .. import backend as F
 from ..base import NID, EID
