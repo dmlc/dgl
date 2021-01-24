@@ -25,8 +25,10 @@ def _reverse(gidx):
     """
     
     g_rev = gidx.reverse()
-    g_rev = g_rev.formats([
-        _inverse_format[fmt['created'] + fmt['not created']] for fmt in gidx.formats()])
+    original_formats_dict = gidx.formats()
+    original_formats = original_formats_dict['created'] +\
+                       original_formats_dict['not created']
+    g_rev = g_rev.formats([_inverse_format[fmt] for fmt in original_formats])
     return g_rev
 
 
