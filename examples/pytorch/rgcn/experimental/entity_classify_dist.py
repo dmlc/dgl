@@ -302,8 +302,11 @@ class NeighborSampler:
         ntypes = []
         seeds = th.LongTensor(np.asarray(seeds))
         gpb = self.g.get_partition_book()
+        # We need to map the per-type node IDs to homogeneous IDs.
         cur = gpb.map_to_homo_nid(seeds, 'paper')
         for fanout in self.fanouts:
+            # For a heterogeneous input graph, the returned frontier is stored in
+            # the homogeneous graph format.
             frontier = self.sample_neighbors(self.g, cur, fanout, replace=False)
             block = dgl.to_block(frontier, cur)
             cur = block.srcdata[dgl.NID]

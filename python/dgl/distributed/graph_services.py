@@ -255,7 +255,19 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     Node/edge features are not preserved. The original IDs of
     the sampled edges are stored as the `dgl.EID` feature in the returned graph.
 
-    For now, we only support the input graph with one node type and one edge type.
+    This version provides an experimental support for heterogeneous graphs.
+    When the input graph is heterogeneous, the sampled subgraph is still stored in
+    the homogeneous graph format. That is, all nodes and edges are assigned with
+    unique IDs (in contrast, we typically use a type name and a node/edge ID to
+    identify a node or an edge in ``DGLGraph``). We refer to this type of IDs
+    as *homogeneous ID*.
+    Users can use :func:`dgl.distributed.GraphPartitionBook.map_to_per_ntype`
+    and :func:`dgl.distributed.GraphPartitionBook.map_to_per_etype`
+    to identify their node/edge types and node/edge IDs of that type.
+
+    For heterogeneous graphs, ``nodes`` can be a dictionary whose key is node type
+    and the value is type-specific node IDs; ``nodes`` can also be a tensor of
+    *homogeneous ID*.
 
     Parameters
     ----------
