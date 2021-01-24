@@ -9,6 +9,7 @@ import numpy as np
 import pandas
 import dgl
 import torch
+import time
 
 
 def _download(url, path, filename):
@@ -82,14 +83,6 @@ def get_friendster():
     dst = df['dst'].values
     print('construct the graph')
     return dgl.graph((src, dst))
-
-
-# def get_graph(name):
-#     if name == 'livejournal':
-#         return get_livejournal()
-#     else:
-#         print(name + " doesn't exist")
-#         return None
 
 
 class OGBDataset(object):
@@ -421,7 +414,7 @@ elif device == "gpu":
     parametrize_cpu = noop_decorator
     parametrize_gpu = parametrize
 else:
-    raise Exception("Unknown device")
+    raise Exception("Unknown device. Must be one of ['cpu', 'gpu'], but got {}".format(device))
 
 
 def skip_if_gpu():
@@ -469,3 +462,28 @@ def benchmark(track_type, timeout=60):
             func.benchmark_name = "skip_" + func.__name__
         return func
     return _wrapper
+
+#####################################
+# Timer
+#####################################
+
+class TorchOpTimer:
+    def __init__(self, device):
+        self.device = device
+
+    def __enter__(self):
+        if self.device == 'cuda:0':
+            self.start_event = torch.cuda.Event(enable_timing=True)
+            self.end_event = torch.cuda.Event(enable_timing=True)
+            self.start_event.record()
+        else:
+            self.tic = time.time()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if self.device == 'cuda:0':
+            self.end_event.record()
+            torch.cuda.synchronize()  # Wait for the events to be recorded!
+            self.time = self.start_event.elapsed_time(self.end_event) / 1e3
+        else:
+            self.time = time.time() - self.tic
