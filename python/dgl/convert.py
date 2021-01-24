@@ -551,9 +551,7 @@ def block_to_graph(block):
     DGL will rename all the input node types by suffixing with ``_src``, and
     all the output node types by suffixing with ``_dst``.
 
-    The storage of the graph will be shared with that of the input block.
-
-    Features on the returned graph will be preserved, shared with that of the input block.
+    Features on the returned graph will be preserved.
 
     Parameters
     ----------
