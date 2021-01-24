@@ -1,9 +1,9 @@
 """Module for mapping between node/edge IDs and node/edge types."""
 import numpy as np
 
-from ._ffi.function import _init_api
-from . import backend as F
-from . import utils
+from .._ffi.function import _init_api
+from .. import backend as F
+from .. import utils
 
 class IdMap:
     '''Map node/edge IDs in the homogeneous form to per-type IDs and determine their types.
@@ -86,4 +86,4 @@ class IdMap:
         ret = utils.toindex(ret).tousertensor()
         return ret[:len(ids)], ret[len(ids):]
 
-_init_api("dgl.id_map")
+_init_api("dgl.distributed.id_map")

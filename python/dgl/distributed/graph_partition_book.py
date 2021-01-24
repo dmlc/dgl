@@ -10,7 +10,7 @@ from .. import utils
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from .._ffi.ndarray import empty_shared_mem
 from ..ndarray import exist_shared_mem_array
-from ..id_map import IdMap
+from .id_map import IdMap
 
 def _move_metadata_to_shared_mem(graph_name, num_nodes, num_edges, part_id,
                                  num_partitions, node_map, edge_map, is_range_part):
