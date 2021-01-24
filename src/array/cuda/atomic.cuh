@@ -10,13 +10,6 @@
 #include <cassert>
 #include "fp16.cuh"
 
-#if defined(CUDART_VERSION) && CUDART_VERSION <= 10000
-static __device__ __forceinline__ unsigned short int atomicCAS(unsigned short int *address, 
-                                                               unsigned short int compare, 
-                                                               unsigned short int val) {
-  return val;
-}
-#endif
 
 namespace dgl {
 namespace aten {
@@ -78,6 +71,18 @@ template <> struct Cast<double> {
   }
 };
 
+static __device__ __forceinline__ unsigned short int atomicCASshort(
+    unsigned short int *address,
+    unsigned short int compare,
+    unsigned short int val) {
+#if (defined(CUDART_VERSION) && (CUDART_VERSION > 10000))
+#if (defined(__CUDA_ARCH__) && (__CUDA_ARCH__) >= 700)
+  return atomicCAS(address, compare, val);
+#endif  // (defined(__CUDA_ARCH__) && (__CUDA_ARCH__) >= 700)
+#endif  // (defined(CUDART_VERSION) && (CUDART_VERSION > 10000))
+  return val;
+}
+
 #define DEFINE_ATOMIC(NAME) \
   template <typename T>                                          \
   __device__ __forceinline__ T Atomic##NAME(T* addr, T val) {    \
@@ -93,51 +98,67 @@ template <> struct Cast<double> {
     return Cast<T>::Decode(old);                                 \
   }
 
+#define DEFINE_ATOMIC_HALF(NAME) \
+  template <>                                                    \
+  __device__ __forceinline__ half Atomic##NAME<half>(half* addr, half val) {  \
+    typedef unsigned short int CT;                               \
+    CT* addr_as_ui = reinterpret_cast<CT*>(addr);                \
+    CT old = *addr_as_ui;                                        \
+    CT assumed = old;                                            \
+    do {                                                         \
+      assumed = old;                                             \
+      old = atomicCASshort(addr_as_ui, assumed,                  \
+          Cast<half>::Encode(OP(val, Cast<half>::Decode(old)))); \
+    } while (assumed != old);                                    \
+    return Cast<half>::Decode(old);                              \
+  }
+
 #define OP(a, b) max(a, b)
 DEFINE_ATOMIC(Max)
+DEFINE_ATOMIC_HALF(Max)
 #undef OP
 
 #define OP(a, b) min(a, b)
 DEFINE_ATOMIC(Min)
+DEFINE_ATOMIC_HALF(Min)
 #undef OP
 
 #define OP(a, b) a + b
 DEFINE_ATOMIC(Add)
 #undef OP
 
-#if __CUDA_ARCH__ >= 200
 template <>
 __device__ __forceinline__ float AtomicAdd<float>(float* addr, float val) {
+#if __CUDA_ARCH__ >= 200
   return atomicAdd(addr, val);
-}
+#else
+  return *addr + val;
 #endif  // __CUDA_ARCH__
+}
 
-#if __CUDA_ARCH__ >= 600
 template <>
 __device__ __forceinline__ double AtomicAdd<double>(double* addr, double val) {
+#if __CUDA_ARCH__ >= 600
   return atomicAdd(addr, val);
-}
+#else
+  return *addr + val;
 #endif
+}
 
 #if defined(CUDART_VERSION) && CUDART_VERSION >= 10000
-#if __CUDA_ARCH__ >= 600
 template <>
-__device__ __forceinline__ __half2 AtomicAdd<__half2>(__half2* addr, __half2 val) {
-  return atomicAdd(addr, val);
-}
-#endif  // __CUDA_ARCH__
-
+__device__ __forceinline__ half AtomicAdd<half>(half* addr, half val) {
 #if __CUDA_ARCH__ >= 700
-template <>
-__device__ __forceinline__ __half AtomicAdd<__half>(__half* addr, __half val) {
   return atomicAdd(addr, val);
-}
+#else
+  return *addr + val;
 #endif  // __CUDA_ARCH__
+}
 #endif
 
-#define OP(a, b) a * b
-DEFINE_ATOMIC(Mul)
-#undef OP
+//#define OP(a, b) a * b
+//DEFINE_ATOMIC(Mul)
+//#undef OP
 
 }  // namespace cuda
 }  // namespace aten

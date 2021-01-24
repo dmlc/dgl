@@ -13,12 +13,20 @@
 
 static __device__ __forceinline__ half max(half a, half b)
 {
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 530
   return __hgt(__half(a), __half(b)) ? a : b;
+#else
+  return a;
+#endif
 }
 
 static __device__ __forceinline__ half min(half a, half b)
 {
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 530
   return __hlt(__half(a), __half(b)) ? a : b;
+#else
+  return a;
+#endif
 }
 
 #endif  // DGL_ARRAY_FP16_CUH_
