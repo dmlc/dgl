@@ -1591,10 +1591,10 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     ``etype`` connecting from node ID ``u`` of type ``utype`` in the input side to node
     ID ``v`` of type ``vtype`` in the output side.
 
-    The output nodes of the block will only contain the nodes that have at least one
-    inbound edge of any type.  The input nodes of the block will only contain the nodes
-    that appear in the output nodes, as well as the nodes that have at least one outbound
-    edge connecting to one of the output nodes.
+    For blocks returned by :func:`to_block`, the output nodes of the block will only
+    contain the nodes that have at least one inbound edge of any type.  The input nodes
+    of the block will only contain the nodes that appear in the output nodes, as well
+    as the nodes that have at least one outbound edge connecting to one of the output nodes.
 
     If the :attr:`dst_nodes` argument is not None, it specifies the output nodes instead.
 
@@ -1636,6 +1636,8 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     for stochastic training on a large graph.  Please refer to the user guide
     :ref:`guide-minibatch` for a more thorough discussion about the methodology
     of stochastic training.
+
+    See also :func:`create_block` for more flexible construction of blocks.
 
     Examples
     --------
@@ -1705,6 +1707,10 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
 
     >>> block.srcnodes['A'].data[dgl.NID]
     tensor([2, 1])
+
+    See also
+    --------
+    create_block
     """
     assert g.device == F.cpu(), 'the graph must be on CPU'
 
