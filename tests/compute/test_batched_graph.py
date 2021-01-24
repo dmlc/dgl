@@ -1,4 +1,5 @@
 import dgl
+import numpy as np
 import backend as F
 import unittest
 from test_utils import parametrize_dtype
@@ -206,13 +207,95 @@ def test_batch_no_edge(idtype):
     g3.add_nodes(1)  # no edges
     g = dgl.batch([g1, g3, g2]) # should not throw an error
 
+@parametrize_dtype
+def test_batch_keeps_empty_data(idtype):
+    g1 = dgl.graph(([], [])).astype(idtype).to(F.ctx())
+    g1.ndata["nh"] = F.tensor([])
+    g1.edata["eh"] = F.tensor([]) 
+    g2 = dgl.graph(([], [])).astype(idtype).to(F.ctx())
+    g2.ndata["nh"] = F.tensor([])
+    g2.edata["eh"] = F.tensor([]) 
+    g = dgl.batch([g1, g2])
+    assert "nh" in g.ndata
+    assert "eh" in g.edata    
+
+def _get_subgraph_batch_info(keys, induced_indices_arr, batch_num_objs):
+    """Internal function to compute batch information for subgraphs.
+    Parameters
+    ----------
+    keys : List[str]
+        The node/edge type keys.
+    induced_indices_arr : List[Tensor]
+        The induced node/edge index tensor for all node/edge types.
+    batch_num_objs : Tensor
+        Number of nodes/edges for each graph in the original batch.
+    Returns
+    -------
+    Mapping[str, Tensor]
+        A dictionary mapping all node/edge type keys to the ``batch_num_objs``
+        array of corresponding graph.
+    """
+    bucket_offset = np.expand_dims(np.cumsum(F.asnumpy(batch_num_objs), 0), -1)  # (num_bkts, 1)
+    ret = {}
+    for key, induced_indices in zip(keys, induced_indices_arr):
+        # NOTE(Zihao): this implementation is not efficient and we can replace it with
+        # binary search in the future.
+        induced_indices = np.expand_dims(F.asnumpy(induced_indices), 0)  # (1, num_nodes)
+        new_offset = np.sum((induced_indices < bucket_offset), 1)  # (num_bkts,)
+        # start_offset = [0] + [new_offset[i-1] for i in range(1, n_bkts)]
+        start_offset = np.concatenate([np.zeros((1,)), new_offset[:-1]], 0)
+        new_batch_num_objs = new_offset - start_offset
+        ret[key] = F.tensor(new_batch_num_objs, dtype=F.dtype(batch_num_objs))
+    return ret
+
+@parametrize_dtype
+def test_set_batch_info(idtype):
+    ctx = F.ctx()
+
+    g1 = dgl.rand_graph(30, 100).astype(idtype).to(F.ctx())
+    g2 = dgl.rand_graph(40, 200).astype(idtype).to(F.ctx())
+    bg = dgl.batch([g1, g2])
+    batch_num_nodes = F.astype(bg.batch_num_nodes(), idtype)
+    batch_num_edges = F.astype(bg.batch_num_edges(), idtype)
+    
+    # test homogeneous node subgraph
+    sg_n = dgl.node_subgraph(bg, list(range(10, 20)) + list(range(50, 60)))
+    induced_nodes = sg_n.ndata['_ID']
+    induced_edges = sg_n.edata['_ID']
+    new_batch_num_nodes = _get_subgraph_batch_info(bg.ntypes, [induced_nodes], batch_num_nodes)
+    new_batch_num_edges = _get_subgraph_batch_info(bg.canonical_etypes, [induced_edges], batch_num_edges)
+    sg_n.set_batch_num_nodes(new_batch_num_nodes)
+    sg_n.set_batch_num_edges(new_batch_num_edges)
+    subg_n1, subg_n2 = dgl.unbatch(sg_n)
+    subg1 = dgl.node_subgraph(g1, list(range(10, 20)))
+    subg2 = dgl.node_subgraph(g2, list(range(20, 30)))
+    assert subg_n1.num_edges() == subg1.num_edges()
+    assert subg_n2.num_edges() == subg2.num_edges()
+
+    # test homogeneous edge subgraph
+    sg_e = dgl.edge_subgraph(bg, list(range(40, 70)) + list(range(150, 200)), preserve_nodes=True)
+    induced_nodes = sg_e.ndata['_ID']
+    induced_edges = sg_e.edata['_ID']
+    new_batch_num_nodes = _get_subgraph_batch_info(bg.ntypes, [induced_nodes], batch_num_nodes)
+    new_batch_num_edges = _get_subgraph_batch_info(bg.canonical_etypes, [induced_edges], batch_num_edges)
+    sg_e.set_batch_num_nodes(new_batch_num_nodes)
+    sg_e.set_batch_num_edges(new_batch_num_edges)
+    subg_e1, subg_e2 = dgl.unbatch(sg_e)
+    subg1 = dgl.edge_subgraph(g1, list(range(40, 70)), preserve_nodes=True)
+    subg2 = dgl.edge_subgraph(g2, list(range(50, 100)), preserve_nodes=True)
+    assert subg_e1.num_nodes() == subg1.num_nodes()
+    assert subg_e2.num_nodes() == subg2.num_nodes()
+
+
 if __name__ == '__main__':
-    test_batch_unbatch()
-    test_batch_unbatch1()
-    test_batch_unbatch_frame()
+    #test_batch_unbatch()
+    #test_batch_unbatch1()
+    #test_batch_unbatch_frame()
     #test_batch_unbatch2()
     #test_batched_edge_ordering()
     #test_batch_send_then_recv()
     #test_batch_send_and_recv()
     #test_batch_propagate()
     #test_batch_no_edge()
+    test_set_batch_info(F.int32)
+    
