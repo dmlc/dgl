@@ -543,6 +543,8 @@ def node_type_subgraph(graph, ntypes):
     for stid, dtid, etid in zip(stids, dtids, etids):
         if stid in ntid and dtid in ntid:
             etypes.append(graph.canonical_etypes[etid])
+    if len(etypes) == 0:
+        raise DGLError('There are no edges among nodes of the specified types.')
     return edge_type_subgraph(graph, etypes)
 
 DGLHeteroGraph.node_type_subgraph = utils.alias_func(node_type_subgraph)
