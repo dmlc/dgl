@@ -32,14 +32,14 @@ template <typename IdType>
 __global__ void _COOGetRowNNZKernel(
     const IdType* __restrict__ row_indices,
     IdType* __restrict__ glb_cnt,
-    const IdType row_key,
+    const IdType row_query,
     IdType nnz) {
   extern __shared__ IdType local_cnt[];
   IdType tx = threadIdx.x;
   IdType bx = blockIdx.x;
   local_cnt[tx] = 0;
   if (bx * blockDim.x + tx < nnz)
-    local_cnt[tx] = (row_indices[bx * blockDim.x + tx] == row_key);
+    local_cnt[tx] = (row_indices[bx * blockDim.x + tx] == row_query);
   __syncthreads();
 
   local_cnt[tx] += local_cnt[tx + 512];
@@ -82,17 +82,53 @@ template int64_t COOGetRowNNZ<kDLGPU, int32_t>(COOMatrix, int64_t);
 template int64_t COOGetRowNNZ<kDLGPU, int64_t>(COOMatrix, int64_t);
 
 template <typename IdType>
-void _COOGetRowNNZ(
+void _COOGetBatchRowNNZKernel(
     const IdType* __restrict__ row_indices,
-    const IdType* __restrict__ row_keys,
+    const IdType* __restrict__ row_queries,
     IdType __restrict__ *cnts,
     IdType nnz) {
-  // TODO(zihao)
+  extern __shared__ IdType local_cnt[];
+  IdType tx = threadIdx.x;
+  IdType bx = blockIdx.x;
+  IdType query = row_queries[bx];
+  local_cnt[tx] = 0;
+  for (int i = tx; i < nnz; i += blockDim.x)
+    local_cnt[tx] += (row_indices[i] == query);
+  __syncthreads();
+
+  local_cnt[tx] += local_cnt[tx + 512];
+  __syncthreads();
+
+  local_cnt[tx] += local_cnt[tx + 256];
+  __syncthreads();
+
+  local_cnt[tx] += local_cnt[tx + 128];
+  __syncthreads();
+
+  local_cnt[tx] += local_cnt[tx + 64];
+  __syncthreads();
+
+  _warpReduce(local_cnt, tx);
+  if (tx == 0) {
+    cnts[bx] = local_cnt[tx];
+  }
 }
 
 template <DLDeviceType XPU, typename IdType>
 NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows) {
-  // TODO(zihao) each block is responsible for a row.
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  const auto& ctx = csr.indptr->ctx;
+  int nnz = coo.row->shape[0];
+  int num_queries = rows->shape[0];
+  int nt = 1024;
+  int nb = cuda::FindNumBlocks<'x'>((num_queries + nt - 1) / nt);
+  int smem_size = sizeof(IdType) * nt;
+  NDArray rst = NDArray::Empty({num_queries}, rows->dtype, rows->ctx)
+  CUDA_KERNEL_CALL(_COOGetBatchRowNNZKernel,
+      nb, nt, smem_size, thr_entry->stream,
+      coo.rows.Ptr<IdType>(), rows.Ptr<IdType>(), rst.Ptr<IdType>(),
+      nnz);
+  return rst;
 }
 
 template NDArray COOGetRowNNZ<kDLGPU, int32_t>(COOMatrix, NDArray);
