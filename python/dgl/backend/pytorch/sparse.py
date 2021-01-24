@@ -10,11 +10,15 @@ else:
     """PyTorch natively supports automatic mixed precision in DGL 1.6, we redefine
     the custom_fwd and custom_bwd function to be compatible with DGL 1.5.
     """
-    def custom_fwd(fwd=None, **kwargs):
-        @functools.wraps(fwd)
-        def decorate_fwd(*args, **kwargs):
-            return fwd(*args, **kwargs)
-        return decorate_fwd
+    def custom_fwd(**kwargs):
+        def custom_fwd_inner(fwd):
+            @functools.wraps(fwd)
+            def decorate_fwd(*args, **kwargs):
+                if fwd is None:
+                    return functools.partial(custom_fwd, )
+                return fwd(*args, **kwargs)
+            return decorate_fwd
+        return custom_fwd_inner
 
     def custom_bwd(bwd):
         @functools.wraps(bwd)
