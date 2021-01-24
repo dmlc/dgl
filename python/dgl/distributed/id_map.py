@@ -6,23 +6,74 @@ from .. import backend as F
 from .. import utils
 
 class IdMap:
-    '''Map node/edge IDs in the homogeneous form to per-type IDs and determine their types.
+    '''A map for converting node/edge IDs to their type IDs and type-wise IDs.
 
-    For a heterogeneous graph, we can use a homogeneous graph format to store it. With
-    this format, all nodes have unique IDs. We refer to these IDs as homogeneous IDs.
-    In a heterogeneous graph format, IDs are only unique within the type. We refer to
-    this type of IDs as per-type IDs.
+    For a heterogeneous graph, DGL assigns an integer ID to each node/edge type;
+    node and edge of different types have independent IDs starting from zero.
+    Therefore, a node/edge can be uniquely identified by an ID pair,
+    ``(type_id, type_wise_id)``. To make it convenient for distributed processing,
+    DGL further encodes the ID pair into one integer ID, which we refer to
+    as *homogeneous ID*.
 
-    When storing a heterogeneous graph in the homogeneous format, we arrange node IDs
-    and edge IDs so that all nodes of the same type have contiguous IDs. If
-    the graph is partitioned, the nodes of the same type within a partition have
-    contiguous IDs.
+    DGL arranges nodes and edges so that all nodes of the same type have contiguous
+    homogeneous IDs. If the graph is partitioned, the nodes/edges of the same type
+    within a partition have contiguous homogeneous IDs.
 
-    The table below shows an example of storing node IDs in a heterogeneous graph
-    in the homogeneous format. The heterogeneous graph has two node types and has
-    two partitions. The homogeneous ID range [0, 100) is used for nodes of type 0
+    Below is an example adjancency matrix of an unpartitioned heterogeneous graph
+    stored using the above ID assignment. Here, the graph has two types of nodes
+    (``T0`` and ``T1``), and four types of edges (``R0``, ``R1``, ``R2``, ``R3``).
+    There are a total of 400 nodes in the graph and each type has 200 nodes. Nodes
+    of type 0 have IDs in [0,200), while nodes of type 1 have IDs in [200, 400).
+
+    ```
+        0 <- T0 -> 200 <- T1 -> 400
+     0  +-----------+------------+
+        |           |            |
+     ^  |    R0     |     R1     |
+     T0 |           |            |
+     v  |           |            |
+    200 +-----------+------------+
+        |           |            |
+     ^  |    R2     |     R3     |
+     T1 |           |            |
+     v  |           |            |
+    400 +-----------+------------+
+    ```
+
+    Below shows the adjacency matrix after the graph is partitioned into two.
+    Note that each partition still has two node types and four edge types,
+    and nodes/edges of the same type have contiguous IDs.
+
+    ```
+                partition 0              partition 1
+
+        0 <- T0 -> 100 <- T1 -> 200 <- T0 -> 300 <- T1 -> 400
+     0  +-----------+------------+-----------+------------+
+        |           |            |                        |
+     ^  |    R0     |     R1     |                        |
+     T0 |           |            |                        |
+     v  |           |            |                        |
+    100 +-----------+------------+                        |
+        |           |            |                        |
+     ^  |    R2     |     R3     |                        |
+     T1 |           |            |                        |
+     v  |           |            |                        |
+    200 +-----------+------------+-----------+------------+
+        |                        |           |            |
+     ^  |                        |    R0     |     R1     |
+     T0 |                        |           |            |
+     v  |                        |           |            |
+    100 |                        +-----------+------------+
+        |                        |           |            |
+     ^  |                        |    R2     |     R3     |
+     T1 |                        |           |            |
+     v  |                        |           |            |
+    200 +-----------+------------+-----------+------------+
+    ```
+
+    The following table is an alternative way to represent the above ID assignments.
+    It is easy to see that the homogeneous ID range [0, 100) is used for nodes of type 0
     in partition 0, [100, 200) is used for nodes of type 1 in partition 0, and so on.
-
     ```
     +---------+------+----------
       range   | type | partition
@@ -32,15 +83,19 @@ class IdMap:
     [300,400) |   1  |    1
     ```
 
-    This class is to map any homogeneous ID to a per-type ID and its type. For example,
-    homogeneous node ID 90 is mapped to type 0 and per-type ID 90; homogeneous node ID
-    201 is mapped to type 0 and per-type ID 101.
+    The goal of this class is to, given a node's homogenous ID, convert it into the
+    ID pair ``(type_id, type_wise_id)``. For example, homogeneous node ID 90 is mapped
+    to (0, 90); homogeneous node ID 201 is mapped to (0, 101).
 
     Parameters
     ----------
     id_ranges : dict[str, Tensor].
-        The ID ranges of each partition for each type. It stores the same information
-        as the `node_map` argument in `RangePartitionBook`.
+        Node ID ranges within partitions for each node type. The key is the node type
+        name in string. The value is a tensor of shape :math:`(K, 2)`, where :math:`K` is
+        the number of partitions. Each row has two integers: the starting and the ending IDs
+        for a particular node type in a partition. For example, all nodes of type ``"T"`` in
+        partition ``i`` has ID range ``id_ranges["T"][i][0]`` to ``id_ranges["T"][i][1]``.
+        It is the same as the `node_map` argument in `RangePartitionBook`.
     '''
     def __init__(self, id_ranges):
         self.num_parts = list(id_ranges.values())[0].shape[0]
@@ -61,7 +116,7 @@ class IdMap:
         self.typed_map = utils.toindex(np.concatenate(typed_map))
 
     def __call__(self, ids):
-        '''Map IDs in the homogeneous form to per-type IDs and types.
+        '''Convert the homogeneous IDs to (type_id, type_wise_id).
 
         Parameters
         ----------
@@ -70,7 +125,10 @@ class IdMap:
 
         Returns
         -------
-            type_ids, per_type_ids
+        type_ids : Tensor
+            Type IDs
+        per_type_ids : Tensor
+            Type-wise IDs
         '''
         if self.num_types == 0:
             return F.zeros((len(ids),), F.dtype(ids), F.cpu()), ids
