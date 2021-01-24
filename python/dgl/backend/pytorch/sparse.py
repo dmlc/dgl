@@ -7,7 +7,7 @@ __all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce']
 
 _inverse_format = {
     'coo': 'coo',
-    'csr': 'csr',
+    'csr': 'csc',
     'csc': 'csr'
 }
 
@@ -24,6 +24,7 @@ def _reverse(gidx):
     HeteroGraphIndex
     """
     
+
     g_rev = gidx.reverse()
     original_formats_dict = gidx.formats()
     original_formats = original_formats_dict['created'] +\
