@@ -33,15 +33,6 @@ def load_ogb(dataset):
         print('Number of valid: {}'.format(len(val_idx)))
         print('Number of test: {}'.format(len(test_idx)))
 
-        # calculate norm for each edge type and store in edge
-        for canonical_etype in hg.canonical_etypes:
-            u, v, eid = hg.all_edges(form='all', etype=canonical_etype)
-            _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
-            degrees = count[inverse_index]
-            norm = th.ones(eid.shape[0]) / degrees
-            norm = norm.unsqueeze(1)
-            hg.edges[canonical_etype].data['norm'] = norm
-
         # get target category id
         category_id = len(hg.ntypes)
         for i, ntype in enumerate(hg.ntypes):

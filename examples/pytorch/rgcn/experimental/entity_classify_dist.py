@@ -206,52 +206,6 @@ class DistEmbedLayer(nn.Module):
                 embeds[loc] = self.node_embeds[ntype](node_ids[ntype_ids == ntype_id]).to(self.dev_id)
         return embeds
 
-class GetEdgeData:
-    '''Get the edge data
-
-    This class helps us to get edge features from the input graph for a mini-batch. The edges
-    can have different types, but all of them must have the same dimension. All edge features
-    will be put in one tensor, regardless of the number of edge types.
-
-    Parameters
-    ----------
-    g : DistGraph
-        The distributed graph.
-    feat_name : str
-        The name of the edge feature
-    num_feats : int
-        The number of features
-    dev_id : int
-        The device ID where we will have the edge data.
-    '''
-    def __init__(self, g, feat_name, num_feats, dev_id):
-        self.g = g
-        self.feat_name = feat_name
-        self.num_feats = num_feats
-        self.dev_id = dev_id
-        self.etype_id_map = {i:etype for i, etype in enumerate(g.etypes)}
-
-    def __call__(self, edge_ids, etype_ids):
-        """Forward computation
-        Parameters
-        ----------
-        edge_ids : Tensor
-            Edge ids where we get data.
-        etype_ids : Tensor
-            Edge type ids
-        Returns
-        -------
-        Tensor
-            The edge data
-        """
-        data = th.empty(edge_ids.shape[0], self.num_feats, device=self.dev_id)
-        for etype_id in th.unique(etype_ids).tolist():
-            etype = self.g.etypes[etype_id]
-            loc = etype_ids == etype_id
-            assert np.all(edge_ids[loc].numpy() < self.g.number_of_edges(etype))
-            data[loc] = self.g.edges[etype].data[self.feat_name][edge_ids[loc]]
-        return data
-
 def compute_acc(results, labels):
     """
     Compute the accuracy of prediction given the labels.
@@ -259,7 +213,15 @@ def compute_acc(results, labels):
     labels = labels.long()
     return (results == labels).float().sum() / len(results)
 
-def evaluate(g, model, embed_layer, get_edata, labels, eval_loader, test_loader, all_val_nid, all_test_nid):
+def gen_norm(g):
+    _, v, eid = g.all_edges(form='all')
+    _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
+    degrees = count[inverse_index]
+    norm = th.ones(eid.shape[0], device=eid.device) / degrees
+    norm = norm.unsqueeze(1)
+    g.edata['norm'] = norm
+
+def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, all_val_nid, all_test_nid):
     model.eval()
     embed_layer.eval()
     eval_logits = []
@@ -271,7 +233,7 @@ def evaluate(g, model, embed_layer, get_edata, labels, eval_loader, test_loader,
         for sample_data in tqdm.tqdm(eval_loader):
             seeds, blocks = sample_data
             for block in blocks:
-                block.edata['norm'] = get_edata(block.edata[dgl.EID], block.edata[dgl.ETYPE])
+                gen_norm(block)
             feats = embed_layer(blocks[0].srcdata[dgl.NID], blocks[0].srcdata[dgl.NTYPE])
             logits = model(blocks, feats)
             eval_logits.append(logits.cpu().detach())
@@ -287,7 +249,7 @@ def evaluate(g, model, embed_layer, get_edata, labels, eval_loader, test_loader,
         for sample_data in tqdm.tqdm(test_loader):
             seeds, blocks = sample_data
             for block in blocks:
-                block.edata['norm'] = get_edata(block.edata[dgl.EID], block.edata[dgl.ETYPE])
+                gen_norm(block)
             feats = embed_layer(blocks[0].srcdata[dgl.NID], blocks[0].srcdata[dgl.NTYPE])
             logits = model(blocks, feats)
             test_logits.append(logits.cpu().detach())
@@ -394,7 +356,6 @@ def run(args, device, data):
                                  sparse_emb=args.sparse_embedding,
                                  dgl_sparse_emb=args.dgl_sparse,
                                  feat_name='feat')
-    get_edata = GetEdgeData(g, 'norm', 1, device)
 
     model = EntityClassify(device,
                            args.n_hidden,
@@ -473,7 +434,7 @@ def run(args, device, data):
             sample_t.append(tic_step - start)
 
             for block in blocks:
-                block.edata['norm'] = get_edata(block.edata[dgl.EID], block.edata[dgl.ETYPE])
+                gen_norm(block)
             feats = embed_layer(blocks[0].srcdata[dgl.NID], blocks[0].srcdata[dgl.NTYPE])
             label = labels[seeds]
             copy_time = time.time()
@@ -517,7 +478,7 @@ def run(args, device, data):
 
         start = time.time()
         g.barrier()
-        val_acc, test_acc = evaluate(g, model, embed_layer, get_edata, labels,
+        val_acc, test_acc = evaluate(g, model, embed_layer, labels,
             valid_dataloader, test_dataloader, all_val_nid, all_test_nid)
         if val_acc >= 0:
             print('Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(val_acc, test_acc,
@@ -605,8 +566,6 @@ if __name__ == '__main__':
             help='Whether to use DGL sparse embedding')
     parser.add_argument('--node-feats', default=False, action='store_true',
             help='Whether use node features')
-    parser.add_argument('--global-norm', default=False, action='store_true',
-            help='User global norm instead of per node type norm')
     parser.add_argument('--layer-norm', default=False, action='store_true',
             help='Use layer norm')
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
