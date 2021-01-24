@@ -304,9 +304,6 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
                 typed_nodes = toindex(nodes[ntype]).tousertensor()
             homo_nids.append(gpb.map_to_homo_nid(typed_nodes, ntype))
         nodes = F.cat(homo_nids, 0)
-    else:
-        assert len(g.ntypes) == 1, \
-                'An input heterogeneous graph requires the input nodes to be a dict.'
     def issue_remote_req(node_ids):
         return SamplingRequest(node_ids, fanout, edge_dir=edge_dir,
                                prob=prob, replace=replace)
