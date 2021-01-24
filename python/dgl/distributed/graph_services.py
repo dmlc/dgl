@@ -293,6 +293,20 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     DGLGraph
         A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
     """
+    gpb = g.get_partition_book()
+    if isinstance(nodes, dict):
+        homo_nids = []
+        for ntype in nodes:
+            assert ntype in g.ntypes, 'The sampled node type does not exist in the input graph'
+            if F.is_tensor(nodes[ntype]):
+                typed_nodes = nodes[ntype]
+            else:
+                typed_nodes = toindex(nodes[ntype]).tousertensor()
+            homo_nids.append(gpb.map_to_homo_nid(typed_nodes, ntype))
+        nodes = F.cat(homo_nids, 0)
+    else:
+        assert len(g.ntypes) == 1, \
+                'An input heterogeneous graph requires the input nodes to be a dict.'
     def issue_remote_req(node_ids):
         return SamplingRequest(node_ids, fanout, edge_dir=edge_dir,
                                prob=prob, replace=replace)
