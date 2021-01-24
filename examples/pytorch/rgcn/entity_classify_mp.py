@@ -136,11 +136,10 @@ class NeighborSampler:
         Fanout of each hop starting from the seed nodes. If a fanout is None,
         sample full neighbors.
     """
-    def __init__(self, g, target_idx, fanouts, global_norm=False):
+    def __init__(self, g, target_idx, fanouts):
         self.g = g
         self.target_idx = target_idx
         self.fanouts = fanouts
-        self.global_norm = global_norm
 
     """Do neighbor sample
     Parameters
@@ -167,8 +166,7 @@ class NeighborSampler:
             else:
                 frontier = dgl.sampling.sample_neighbors(self.g, cur, fanout)
             block = dgl.to_block(frontier, cur)
-            if self.global_norm is False:
-                gen_norm(block)
+            gen_norm(block)
             cur = block.srcdata[dgl.NID]
             blocks.insert(0, block)
         return seeds, blocks
@@ -518,8 +516,6 @@ def main(args, devices):
             category_id = i
 
     g = dgl.to_homogeneous(hg)
-    gen_norm(g)
-    g.edata['norm'].share_memory_()
     g.ndata['ntype'] = g.ndata[dgl.NTYPE]
     g.ndata['ntype'].share_memory_()
     g.edata['etype'] = g.edata[dgl.ETYPE]
@@ -632,8 +628,6 @@ def config():
             help='Use sparse embedding for node embeddings.')
     parser.add_argument('--node-feats', default=False, action='store_true',
             help='Whether use node features')
-    parser.add_argument('--global-norm', default=False, action='store_true',
-            help='User global norm instead of per node type norm')
     parser.add_argument('--layer-norm', default=False, action='store_true',
             help='Use layer norm')
     parser.set_defaults(validation=True)
