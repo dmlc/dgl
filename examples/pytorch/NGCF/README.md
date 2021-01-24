@@ -42,4 +42,4 @@ The following results are the results in 400 epoches.
 
 Time Consumption
 -------------------------
-The profile of the main function (train for an epoch and test for an epoch) is saved in main_profile.txt. The profile of the forward function of the NGCFLayer (train for a batch, test for an epoch) is saved in ngcf_layer_forward_profile.txt.
+The profile of the main function (train for an epoch and test for an epoch) is saved in NGCF/main_profile.txt. The profile of the forward function of the NGCFLayer (train for a batch, test for an epoch) is saved in NGCF/ngcf_layer_forward_profile.txt.
