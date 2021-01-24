@@ -644,8 +644,8 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
     :math:`(i_1, j_1), (i_2, j_2), \cdots` of type ``(U, E, V)`` is a new graph with edges
     :math:`(j_1, i_1), (j_2, i_2), \cdots` of type ``(V, E, U)``.
 
-    The returned graph shares the data structure with the original graph, i.e. it will not
-    create extra storage. 
+    The returned graph shares the data structure with the original graph, i.e. dgl.reverse
+    will not create extra storage for the reversed graph.
 
     Parameters
     ----------
