@@ -45,17 +45,27 @@ def start_server(rank, tmpdir, disable_shared_mem, num_clients):
     g.start()
 
 
-def start_dist_dataloader(rank, tmpdir, disable_shared_mem, num_workers, drop_last):
+def start_dist_dataloader(rank, tmpdir, num_server, num_workers, drop_last):
     import dgl
     import torch as th
     dgl.distributed.initialize("mp_ip_config.txt", 1, num_workers=num_workers)
     gpb = None
+    disable_shared_mem = num_server > 0
     if disable_shared_mem:
-        _, _, _, gpb, _ = load_partition(tmpdir / 'test_sampling.json', rank)
+        _, _, _, gpb, _, _, _ = load_partition(tmpdir / 'test_sampling.json', rank)
     num_nodes_to_sample = 202
     batch_size = 32
     train_nid = th.arange(num_nodes_to_sample)
     dist_graph = DistGraph("test_mp", gpb=gpb, part_config=tmpdir / 'test_sampling.json')
+
+    orig_nid = F.arange(0, dist_graph.number_of_nodes())
+    orig_eid = F.arange(0, dist_graph.number_of_edges())
+    for i in range(num_server):
+        part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_sampling.json', i)
+        if 'orig_id' in part.ndata:
+            orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
+        if 'orig_id' in part.edata:
+            orig_eid[part.edata[dgl.EID]] = part.edata['orig_id']
 
     # Create sampler
     sampler = NeighborSampler(dist_graph, [5, 10],
@@ -80,9 +90,12 @@ def start_dist_dataloader(rank, tmpdir, disable_shared_mem, num_workers, drop_la
                 o_src, o_dst =  block.edges()
                 src_nodes_id = block.srcdata[dgl.NID][o_src]
                 dst_nodes_id = block.dstdata[dgl.NID][o_dst]
+                max_nid.append(np.max(F.asnumpy(dst_nodes_id)))
+
+                src_nodes_id = orig_nid[src_nodes_id]
+                dst_nodes_id = orig_nid[dst_nodes_id]
                 has_edges = groundtruth_g.has_edges_between(src_nodes_id, dst_nodes_id)
                 assert np.all(F.asnumpy(has_edges))
-                max_nid.append(np.max(F.asnumpy(dst_nodes_id)))
                 # assert np.all(np.unique(np.sort(F.asnumpy(dst_nodes_id))) == np.arange(idx, batch_size))
             if drop_last:
                 assert np.max(max_nid) == num_nodes_to_sample - 1 - num_nodes_to_sample % batch_size
@@ -105,11 +118,11 @@ def test_standalone(tmpdir):
     num_hops = 1
 
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
-                    num_hops=num_hops, part_method='metis', reshuffle=False)
+                    num_hops=num_hops, part_method='metis', reshuffle=True)
 
     os.environ['DGL_DIST_MODE'] = 'standalone'
     try:
-        start_dist_dataloader(0, tmpdir, False, 2, True)
+        start_dist_dataloader(0, tmpdir, 1, 2, True)
     except Exception as e:
         print(e)
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
@@ -120,7 +133,8 @@ def test_standalone(tmpdir):
 @pytest.mark.parametrize("num_server", [3])
 @pytest.mark.parametrize("num_workers", [0, 4])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last):
+@pytest.mark.parametrize("reshuffle", [True, False])
+def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle):
     ip_config = open("mp_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -132,7 +146,7 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last):
     num_hops = 1
 
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
-                    num_hops=num_hops, part_method='metis', reshuffle=False)
+                    num_hops=num_hops, part_method='metis', reshuffle=reshuffle)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -146,7 +160,7 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last):
     time.sleep(3)
     os.environ['DGL_DIST_MODE'] = 'distributed'
     ptrainer = ctx.Process(target=start_dist_dataloader, args=(
-        0, tmpdir, num_server > 1, num_workers, drop_last))
+        0, tmpdir, num_server, num_workers, drop_last))
     ptrainer.start()
     time.sleep(1)
 
@@ -154,17 +168,25 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last):
         p.join()
     ptrainer.join()
 
-def start_node_dataloader(rank, tmpdir, disable_shared_mem, num_workers):
+def start_node_dataloader(rank, tmpdir, num_server, num_workers):
     import dgl
     import torch as th
     dgl.distributed.initialize("mp_ip_config.txt", 1, num_workers=num_workers)
     gpb = None
+    disable_shared_mem = num_server > 1
     if disable_shared_mem:
-        _, _, _, gpb, _ = load_partition(tmpdir / 'test_sampling.json', rank)
+        _, _, _, gpb, _, _, _ = load_partition(tmpdir / 'test_sampling.json', rank)
     num_nodes_to_sample = 202
     batch_size = 32
     train_nid = th.arange(num_nodes_to_sample)
     dist_graph = DistGraph("test_mp", gpb=gpb, part_config=tmpdir / 'test_sampling.json')
+
+    orig_nid = F.zeros((dist_graph.number_of_nodes(),), dtype=F.int64)
+    orig_eid = F.zeros((dist_graph.number_of_edges(),), dtype=F.int64)
+    for i in range(num_server):
+        part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_sampling.json', i)
+        orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
+        orig_eid[part.edata[dgl.EID]] = part.edata['orig_id']
 
     # Create sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler([5, 10])
@@ -190,6 +212,8 @@ def start_node_dataloader(rank, tmpdir, disable_shared_mem, num_workers):
                 o_src, o_dst =  block.edges()
                 src_nodes_id = block.srcdata[dgl.NID][o_src]
                 dst_nodes_id = block.dstdata[dgl.NID][o_dst]
+                src_nodes_id = orig_nid[src_nodes_id]
+                dst_nodes_id = orig_nid[dst_nodes_id]
                 has_edges = groundtruth_g.has_edges_between(src_nodes_id, dst_nodes_id)
                 assert np.all(F.asnumpy(has_edges))
                 max_nid.append(np.max(F.asnumpy(dst_nodes_id)))
@@ -215,7 +239,7 @@ def test_dataloader(tmpdir, num_server, num_workers, dataloader_type):
     num_hops = 1
 
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
-                    num_hops=num_hops, part_method='metis', reshuffle=False)
+                    num_hops=num_hops, part_method='metis', reshuffle=True)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -231,7 +255,7 @@ def test_dataloader(tmpdir, num_server, num_workers, dataloader_type):
     ptrainer_list = []
     if dataloader_type == 'node':
         p = ctx.Process(target=start_node_dataloader, args=(
-            0, tmpdir, num_server > 1, num_workers))
+            0, tmpdir, num_server, num_workers))
         p.start()
         time.sleep(1)
         ptrainer_list.append(p)
@@ -243,7 +267,9 @@ def test_dataloader(tmpdir, num_server, num_workers, dataloader_type):
 if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
-        test_dataloader(Path(tmpdirname), 3, 4, 'node')
         test_standalone(Path(tmpdirname))
-        test_dist_dataloader(Path(tmpdirname), 3, 0, True)
-        test_dist_dataloader(Path(tmpdirname), 3, 4, True)
+        test_dist_dataloader(Path(tmpdirname), 3, 0, True, True)
+        test_dist_dataloader(Path(tmpdirname), 3, 4, True, True)
+        test_dist_dataloader(Path(tmpdirname), 3, 0, True, False)
+        test_dist_dataloader(Path(tmpdirname), 3, 4, True, False)
+        test_dataloader(Path(tmpdirname), 3, 4, 'node')

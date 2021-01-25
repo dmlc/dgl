@@ -1,6 +1,6 @@
 ## Distributed training
 
-This is an example of training RGCN node classification in a distributed fashion. Currently, the example only support training RGCN graphs with no input features. The current implementation follows ../rgcn/entity_claasify_mp.py.
+This is an example of training RGCN node classification in a distributed fashion. Currently, the example train RGCN graphs with input node features. The current implementation follows ../rgcn/entity_claasify_mp.py.
 
 Before training, please install some python libs by pip:
 
@@ -35,6 +35,8 @@ the number of nodes, the number of edges and the number of labelled nodes.
 ```bash
 python3 partition_graph.py --dataset ogbn-mag --num_parts 4 --balance_train --balance_edges
 ```
+
+This script generates partitioned graphs and store them in the directory called `data`.
 
 ### Step 2: copy the partitioned data to the cluster
 DGL provides a script for copying partitioned data to the cluster. Before that, copy the training script to a local folder:
@@ -78,7 +80,7 @@ python3 ~/dgl/tools/launch.py \
 --num_samplers 4 \
 --part_config data/ogbn-mag.json \
 --ip_config ip_config.txt \
-"python3 dgl_code/entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 512  --n-hidden 64 --lr 0.01 --eval-batch-size 16  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt  --num-workers 4 --num-servers 1 --sparse-embedding  --sparse-lr 0.06"
+"python3 dgl_code/entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 512  --n-hidden 64 --lr 0.01 --eval-batch-size 16  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt  --num-workers 4 --num-servers 1 --sparse-embedding  --sparse-lr 0.06 --node-feats"
 ```
 
 We can get the performance score at the second epoch:
@@ -98,5 +100,5 @@ python3 partition_graph.py --dataset ogbn-mag --num_parts 1
 
 ### Step 2: run the training script
 ```bash
-python3 entity_classify_dist.py --graph-name ogbn-mag  --dataset ogbn-mag --fanout='25,25' --batch-size 256 --n-hidden 64 --lr 0.01 --eval-batch-size 8 --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt --conf-path 'data/ogbn-mag.json' --standalone
+python3 entity_classify_dist.py --graph-name ogbn-mag  --dataset ogbn-mag --fanout='25,25' --batch-size 512 --n-hidden 64 --lr 0.01 --eval-batch-size 128 --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt --conf-path 'data/ogbn-mag.json' --standalone  --sparse-embedding  --sparse-lr 0.06 --node-feats
 ```
