@@ -10,7 +10,7 @@ endif()
 include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag("-std=c++14"   SUPPORT_CXX14)
 
-set(dgl_known_gpu_archs "60 70")
+set(dgl_known_gpu_archs "35 50 60 70")
 
 ################################################################################################
 # A function for automatic detection of GPUs installed  (if autodetection is enabled)
