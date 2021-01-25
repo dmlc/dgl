@@ -886,9 +886,9 @@ class KVClient(object):
         def push_handler(data_store, name, local_offset, data)
         ```
 
-        `data_store` is a dict that contains all tensors in the kvstore. `name` is the name
-        of the tensor where new data is pushed to. `local_offset` is the offset where new
-        data should be written in the tensor in the local partition. `data` is the new data
+        ``data_store`` is a dict that contains all tensors in the kvstore. ``name`` is the name
+        of the tensor where new data is pushed to. ``local_offset`` is the offset where new
+        data should be written in the tensor in the local partition. ``data`` is the new data
         to be written.
 
         Parameters
@@ -919,8 +919,8 @@ class KVClient(object):
         def pull_handler(data_store, name, local_offset)
         ```
 
-        `data_store` is a dict that contains all tensors in the kvstore. `name` is the name
-        of the tensor where new data is pushed to. `local_offset` is the offset where new
+        ``data_store`` is a dict that contains all tensors in the kvstore. ``name`` is the name
+        of the tensor where new data is pushed to. ``local_offset`` is the offset where new
         data should be written in the tensor in the local partition.
 
         Parameters

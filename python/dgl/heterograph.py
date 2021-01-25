@@ -1291,13 +1291,16 @@ class DGLHeteroGraph(object):
         >>> import torch
 
         Create a homogeneous graph.
+
         >>> g = dgl.graph(([0, 1, 2, 3, 4, 5], [1, 2, 0, 4, 5, 3]))
 
         Manually set batch information
+
         >>> g.set_batch_num_nodes(torch.tensor([3, 3])
         >>> g.set_batch_num_edges(torch.tensor([3, 3])
 
         Unbatch the graph.
+
         >>> dgl.unbatch(g)
         [Graph(num_nodes=3, num_edges=3,
               ndata_schemes={}
@@ -1433,13 +1436,16 @@ class DGLHeteroGraph(object):
         >>> import torch
 
         Create a homogeneous graph.
+
         >>> g = dgl.graph(([0, 1, 2, 3, 4, 5], [1, 2, 0, 4, 5, 3]))
 
         Manually set batch information
+
         >>> g.set_batch_num_nodes(torch.tensor([3, 3])
         >>> g.set_batch_num_edges(torch.tensor([3, 3])
 
         Unbatch the graph.
+
         >>> dgl.unbatch(g)
             [Graph(num_nodes=3, num_edges=3,
                   ndata_schemes={}
