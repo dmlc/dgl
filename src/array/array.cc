@@ -592,7 +592,7 @@ bool COOHasDuplicate(COOMatrix coo) {
 
 int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
   int64_t ret = 0;
-  ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetRowNNZ", {
+  ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COOGetRowNNZ", {
     ret = impl::COOGetRowNNZ<XPU, IdType>(coo, row);
   });
   return ret;
@@ -600,7 +600,7 @@ int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
 
 NDArray COOGetRowNNZ(COOMatrix coo, NDArray row) {
   NDArray ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetRowNNZ", {
+  ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COOGetRowNNZ", {
     ret = impl::COOGetRowNNZ<XPU, IdType>(coo, row);
   });
   return ret;
