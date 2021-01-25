@@ -7,6 +7,8 @@ from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
 
+__all__ = ['_gspmm', '_gsddmm', '_segment_reduce', '_bwd_segment_cmp', '_reverse']
+
 
 def infer_broadcast_shape(op, shp1, shp2):
     r"""Check the shape validity, and infer the output shape given input shape and operator.
@@ -63,6 +65,33 @@ def to_dgl_nd(x):
 def to_dgl_nd_for_write(x):
     """Convert framework-specific tensor/None to dgl ndarray for write."""
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
+
+
+inverse_format = {
+    'coo': 'coo',
+    'csr': 'csc',
+    'csc': 'csr'
+}
+
+
+def _reverse(gidx):
+    """Reverse the given graph index while retaining its formats.
+    ``dgl.reverse`` would not keep graph format information by default.
+
+    Parameters
+    ----------
+    gidx: HeteroGraphIndex
+
+    Return
+    ------
+    HeteroGraphIndex
+    """
+    g_rev = gidx.reverse()
+    original_formats_dict = gidx.formats()
+    original_formats = original_formats_dict['created'] +\
+                       original_formats_dict['not created']
+    g_rev = g_rev.formats([inverse_format[fmt] for fmt in original_formats])
+    return g_rev
 
 
 target_mapping = {
