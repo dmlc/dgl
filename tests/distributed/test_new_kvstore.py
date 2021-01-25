@@ -64,10 +64,10 @@ gpb = dgl.distributed.graph_partition_book.BasicPartitionBook(part_id=0,
                                                               edge_map=edge_map,
                                                               part_graph=g)
 
-node_policy = dgl.distributed.PartitionPolicy(policy_str='node',
+node_policy = dgl.distributed.PartitionPolicy(policy_str='node:_N',
                                               partition_book=gpb)
 
-edge_policy = dgl.distributed.PartitionPolicy(policy_str='edge',
+edge_policy = dgl.distributed.PartitionPolicy(policy_str='edge:_E',
                                               partition_book=gpb)
 
 data_0 = F.tensor([[1.,1.],[1.,1.],[1.,1.],[1.,1.],[1.,1.],[1.,1.]], F.float32)
@@ -88,8 +88,6 @@ def add_push(target, name, id_tensor, data_tensor):
 
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
 def test_partition_policy():
-    assert node_policy.policy_str == 'node'
-    assert edge_policy.policy_str == 'edge'
     assert node_policy.part_id == 0
     assert edge_policy.part_id == 0
     local_nid = node_policy.to_local(F.tensor([0,1,2,3,4,5]))
@@ -114,15 +112,15 @@ def start_server(server_id, num_clients, num_servers):
     kvserver.add_part_policy(node_policy)
     kvserver.add_part_policy(edge_policy)
     if kvserver.is_backup_server():
-        kvserver.init_data('data_0', 'node')
-        kvserver.init_data('data_0_1', 'node')
-        kvserver.init_data('data_0_2', 'node')
-        kvserver.init_data('data_0_3', 'node')
+        kvserver.init_data('data_0', 'node:_N')
+        kvserver.init_data('data_0_1', 'node:_N')
+        kvserver.init_data('data_0_2', 'node:_N')
+        kvserver.init_data('data_0_3', 'node:_N')
     else:
-        kvserver.init_data('data_0', 'node', data_0)
-        kvserver.init_data('data_0_1', 'node', data_0_1)
-        kvserver.init_data('data_0_2', 'node', data_0_2)
-        kvserver.init_data('data_0_3', 'node', data_0_3)
+        kvserver.init_data('data_0', 'node:_N', data_0)
+        kvserver.init_data('data_0_1', 'node:_N', data_0_1)
+        kvserver.init_data('data_0_2', 'node:_N', data_0_2)
+        kvserver.init_data('data_0_3', 'node:_N', data_0_3)
     # start server
     server_state = dgl.distributed.ServerState(kv_store=kvserver, local_g=None, partition_book=None)
     dgl.distributed.start_server(server_id=server_id,
@@ -139,9 +137,9 @@ def start_server_mul_role(server_id, num_clients, num_servers):
                                         num_clients=num_clients)
     kvserver.add_part_policy(node_policy)
     if kvserver.is_backup_server():
-        kvserver.init_data('data_0', 'node')
+        kvserver.init_data('data_0', 'node:_N')
     else:
-        kvserver.init_data('data_0', 'node', data_0)
+        kvserver.init_data('data_0', 'node:_N', data_0)
     # start server
     server_state = dgl.distributed.ServerState(kv_store=kvserver, local_g=None, partition_book=None)
     dgl.distributed.start_server(server_id=server_id,
@@ -183,37 +181,37 @@ def start_client(num_clients, num_servers):
     dtype, shape, policy = meta
     assert dtype == F.dtype(data_0)
     assert shape == F.shape(data_0)
-    assert policy.policy_str == 'node'
+    assert policy.policy_str == 'node:_N'
 
     meta = kvclient.get_data_meta('data_0_1')
     dtype, shape, policy = meta
     assert dtype == F.dtype(data_0_1)
     assert shape == F.shape(data_0_1)
-    assert policy.policy_str == 'node'
+    assert policy.policy_str == 'node:_N'
 
     meta = kvclient.get_data_meta('data_0_2')
     dtype, shape, policy = meta
     assert dtype == F.dtype(data_0_2)
     assert shape == F.shape(data_0_2)
-    assert policy.policy_str == 'node'
+    assert policy.policy_str == 'node:_N'
 
     meta = kvclient.get_data_meta('data_0_3')
     dtype, shape, policy = meta
     assert dtype == F.dtype(data_0_3)
     assert shape == F.shape(data_0_3)
-    assert policy.policy_str == 'node'
+    assert policy.policy_str == 'node:_N'
 
     meta = kvclient.get_data_meta('data_1')
     dtype, shape, policy = meta
     assert dtype == F.dtype(data_1)
     assert shape == F.shape(data_1)
-    assert policy.policy_str == 'edge'
+    assert policy.policy_str == 'edge:_E'
 
     meta = kvclient.get_data_meta('data_2')
     dtype, shape, policy = meta
     assert dtype == F.dtype(data_2)
     assert shape == F.shape(data_2)
-    assert policy.policy_str == 'node'
+    assert policy.policy_str == 'node:_N'
 
     # Test push and pull
     id_tensor = F.tensor([0,2,4], F.int64)
