@@ -79,6 +79,7 @@ int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
   IdType nt = 1024;
   IdType nb = dgl::cuda::FindNumBlocks<'x'>((nnz + nt - 1) / nt);
   NDArray rst = NDArray::Empty({1}, coo.row->dtype, coo.row->ctx);
+  _Fill(rst.Ptr<IdType>(), 1, IdType(0));
   CUDA_KERNEL_CALL(_COOGetRowNNZKernel,
       nb, nt, 0, thr_entry->stream,
       coo.row.Ptr<IdType>(), rst.Ptr<IdType>(),
@@ -91,7 +92,7 @@ template int64_t COOGetRowNNZ<kDLGPU, int32_t>(COOMatrix, int64_t);
 template int64_t COOGetRowNNZ<kDLGPU, int64_t>(COOMatrix, int64_t);
 
 template <typename IdType>
-__global__ void _COOGetBatchRowNNZKernel(
+__global__ void _COOGetAllRowNNZKernel(
     const IdType* __restrict__ row_indices,
     IdType* __restrict__ glb_cnts,
     IdType nnz) {
@@ -110,15 +111,29 @@ NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows) {
   IdType nnz = coo.row->shape[0];
   IdType num_rows = coo.num_rows;
   IdType num_queries = rows->shape[0];
-  IdType nt = 1024;
-  IdType nb = dgl::cuda::FindNumBlocks<'x'>((nnz + nt - 1) / nt);
-  NDArray in_degrees = NDArray::Empty({num_rows}, rows->dtype, rows->ctx);
-  _Fill(in_degrees.Ptr<IdType>(), num_rows, IdType(0));
-  CUDA_KERNEL_CALL(_COOGetBatchRowNNZKernel,
-      nb, nt, 0, thr_entry->stream,
-      coo.row.Ptr<IdType>(), in_degrees.Ptr<IdType>(),
-      nnz);
-  return IndexSelect(in_degrees, rows);
+  if (num_queries == 1) {
+    auto rows_cpu = rows.CopyTo(DLContext{kDLCPU, 0});
+    int64_t row = *rows_cpu.Ptr<IdType>();
+    IdType nt = 1024;
+    IdType nb = dgl::cuda::FindNumBlocks<'x'>((nnz + nt - 1) / nt);
+    NDArray rst = NDArray::Empty({1}, coo.row->dtype, coo.row->ctx);
+    _Fill(rst.Ptr<IdType>(), 1, IdType(0));
+    CUDA_KERNEL_CALL(_COOGetRowNNZKernel,
+        nb, nt, 0, thr_entry->stream,
+        coo.row.Ptr<IdType>(), rst.Ptr<IdType>(),
+        row, nnz);
+    return rst;
+  } else {
+    IdType nt = 1024;
+    IdType nb = dgl::cuda::FindNumBlocks<'x'>((nnz + nt - 1) / nt);
+    NDArray in_degrees = NDArray::Empty({num_rows}, rows->dtype, rows->ctx);
+    _Fill(in_degrees.Ptr<IdType>(), num_rows, IdType(0));
+    CUDA_KERNEL_CALL(_COOGetAllRowNNZKernel,
+        nb, nt, 0, thr_entry->stream,
+        coo.row.Ptr<IdType>(), in_degrees.Ptr<IdType>(),
+        nnz);
+    return IndexSelect(in_degrees, rows);
+  }
 }
 
 template NDArray COOGetRowNNZ<kDLGPU, int32_t>(COOMatrix, NDArray);
