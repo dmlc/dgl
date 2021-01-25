@@ -134,7 +134,8 @@ class EdgeWeightNorm(nn.Module):
                 graph.dstdata['_dst_in_w'] = norm
 
             graph.apply_edges(lambda e: {'_norm_edge_weights': e.src['_src_out_w'] * \
-                                                               e.dst['_dst_in_w'] * e.data['_edge_w']})
+                                                               e.dst['_dst_in_w'] * \
+                                                               e.data['_edge_w']})
             return graph.edata['_norm_edge_weights']
 
 # pylint: disable=W0235
