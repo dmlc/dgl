@@ -133,7 +133,7 @@ class DistDataLoader:
         if not self.drop_last and len(dataset) % self.batch_size != 0:
             self.expected_idxs += 1
 
-        # We need to have a unique Id for each data loader to identify itself
+        # We need to have a unique ID for each data loader to identify itself
         # in the sampler processes.
         global DATALOADER_ID
         self.name = "dataloader-" + str(DATALOADER_ID)
