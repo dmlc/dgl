@@ -55,13 +55,13 @@ COLLAB
 
 How to run example files
 --------------------------------
-If you want to reproduce the author's result, in the GXN-DGL folder, run
+If you want to reproduce the author's result, at the root directory of this example (gxn), run
 
 ```bash
 bash scripts/run_gxn.sh ${dataset_name} ${device_id} ${num_trials} ${print_trainlog_every}
 ```
 
-If you want to perform a early-stop version experiment, in the GXN-DGL folder, run
+If you want to perform a early-stop version experiment, at the root directory of this example, run
 
 ```bash
 bash scripts/run_gxn_early_stop.sh ${dataset_name} ${device_id} ${num_trials} ${print_trainlog_every}
@@ -74,7 +74,7 @@ where
 - print_training_log_every: Print training log every ? epochs. -1 for silent training.
 
 
-NOTE: If your have problem when using 'IMDB-BINARY', 'IMDB-MULTI' and 'COLLAB', it could be caused by a bug in `LegacyTUDataset`/`TUDataset` in DGL (see [here](https://github.com/dmlc/dgl/pull/2543)). Try update your DGL or
+NOTE: If your have problem when using 'IMDB-BINARY', 'IMDB-MULTI' and 'COLLAB', it could be caused by a bug in `LegacyTUDataset`/`TUDataset` in DGL (see [here](https://github.com/dmlc/dgl/pull/2543)). If your DGL version is less than or equal to 0.5.3 and you encounter problems like "undefined variable" (`LegacyTUDataset`) or "the argument `force_reload=False` does not work" (`TUDataset`), try:
 - use `TUDataset` with `force_reload=True`
 - delete dataset files 
 - change `degree_as_feature(dataset)` and `node_label_as_feature(dataset, mode=mode)` to `degree_as_feature(dataset, save=False)` and `node_label_as_feature(dataset, mode=mode, save=False)` in `main.py`.
