@@ -9,6 +9,7 @@
 #define DGL_ARRAY_FP16_CUH_
 
 
+#ifdef USE_AMP
 #include <cuda_fp16.h>
 
 static __device__ __forceinline__ half max(half a, half b)
@@ -28,5 +29,6 @@ static __device__ __forceinline__ half min(half a, half b)
   return a;
 #endif
 }
+#endif  // USE_AMP
 
 #endif  // DGL_ARRAY_FP16_CUH_

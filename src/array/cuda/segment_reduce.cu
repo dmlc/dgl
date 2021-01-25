@@ -6,28 +6,13 @@
 #include <dgl/array.h>
 #include "./segment_reduce.cuh"
 #include "./functor.cuh"
+#include "./utils.h"
 
 namespace dgl {
 
 using namespace cuda;
 
 namespace aten {
-
-#define SWITCH_BITS(bits, DType, ...)                           \
-  do {                                                          \
-    if ((bits) == 16) {                                         \
-      typedef half DType;                                       \
-      { __VA_ARGS__ }                                           \
-    } else if ((bits) == 32) {                                  \
-      typedef float DType;                                      \
-      { __VA_ARGS__ }                                           \
-    } else if ((bits) == 64) {                                  \
-      typedef double DType;                                     \
-      { __VA_ARGS__ }                                           \
-    } else {                                                    \
-      LOG(FATAL) << "Data type not renogized with bits " << bits; \
-    }                                                           \
-  } while (0)
 
 
 template <int XPU, typename IdType, int bits>

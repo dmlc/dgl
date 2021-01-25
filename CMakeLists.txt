@@ -25,6 +25,7 @@ endif()
 dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(USE_AVX "Build with AVX optimization" ON)
+dgl_option(USE_AMP "Build with fp16 support to enable AMP(automatic mixed precision)" OFF)
 dgl_option(USE_TVM "Build with TVM kernels" OFF)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
@@ -101,11 +102,13 @@ if(USE_OPENMP)
     set(CMAKE_C_FLAGS "${OpenMP_C_FLAGS} ${CMAKE_C_FLAGS}")
     set(CMAKE_CXX_FLAGS "${OpenMP_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
   endif(OPENMP_FOUND)
+  message(STATUS "Build with OpenMP.")
 endif(USE_OPENMP)
 
 if(USE_AVX)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_AVX")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_AVX")
+  message(STATUS "Build with AVX optimization.")
 endif(USE_AVX)
 
 # To compile METIS correct for DGL.
@@ -194,7 +197,15 @@ if(USE_TVM)
   target_include_directories(dgl PRIVATE "featgraph/include")
   add_subdirectory("featgraph/")
   list(APPEND DGL_LINKER_LIBS featgraph_runtime)
+  message(STATUS "Build with TVM runtime and featgraph kernels.")
 endif(USE_TVM)
+
+# Support fp16
+if(USE_AMP)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_AMP")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_AMP")
+  message(STATUS "Build with fp16 support for automatic mixed precision.")
+endif(USE_AMP)
 
 # support PARALLEL_ALGORITHMS
 if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)

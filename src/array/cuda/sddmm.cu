@@ -10,22 +10,6 @@
 namespace dgl {
 namespace aten {
 
-#define SWITCH_BITS(bits, DType, ...)                           \
-  do {                                                          \
-    if ((bits) == 16) {                                         \
-      typedef half DType;                                       \
-      { __VA_ARGS__ }                                           \
-    } else if ((bits) == 32) {                                  \
-      typedef float DType;                                      \
-      { __VA_ARGS__ }                                           \
-    } else if ((bits) == 64) {                                  \
-      typedef double DType;                                     \
-      { __VA_ARGS__ }                                           \
-    } else {                                                    \
-      LOG(FATAL) << "Data type not renogized with bits " << bits; \
-    }                                                           \
-  } while (0)
-
 #define SWITCH_OP(op, Op, ...)                                      \
   do {                                                              \
     if ((op) == "add") {                                            \
