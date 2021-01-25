@@ -51,47 +51,59 @@ class EdgeWeightNorm(nn.Module):
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> g = dgl.add_self_loop(g)
     >>> feat = th.ones(6, 10)
-    >>> edge_weight = th.tensor([0.5,0.6,0.4,0.7,0.9,0.1])
+    >>> edge_weight = th.tensor([0.5, 0.6, 0.4, 0.7, 0.9, 0.1, 1, 1, 1, 1, 1, 1])
     >>> norm = EdgeWeightNorm(norm='both')
     >>> norm_edge_weight = norm(g, edge_weight)
-    >>> conv = GraphConv(10, 2, norm='none', weight=True, bias=True, edge_weight=norm_edge_weight)
-    >>> res = conv(g, feat)
+    >>> conv = GraphConv(10, 2, norm='none', weight=True, bias=True)
+    >>> res = conv(g, feat, edge_weight=norm_edge_weight)
     >>> print(res)
+    tensor([[-1.1849, -0.7525],
+            [-1.3514, -0.8582],
+            [-1.2384, -0.7865],
+            [-1.9949, -1.2669],
+            [-1.3658, -0.8674],
+            [-0.8323, -0.5286]], grad_fn=<AddBackward0>)
     """
     def __init__(self, norm='both'):
         super(EdgeWeightNorm, self).__init__()
         self._norm = norm
 
     def forward(self, g, edge_weight):
-        if isinstance(g, DGLBlock):
-            g = block_to_graph(g)
-        if len(edge_weight.shape) > 2 or \
-            (len(edge_weight.shape) == 2 and edge_weight.shape[1] > 1):
-            raise DGLError('Currently the normalization is only defined '
-                           'on scalar edge weight. Please customize the '
-                           'normalization for your high-dimensional weights.')
-        if torch.any(edge_weight <= 0).item():
-            raise DGLError('Currently the normalization only supports '
-                           'positive scalar edge weights.')
-        g.edata['_edge_weight'] = edge_weight
-        res = edge_weight
-        if self._norm == 'both':
-            reversed_g = reverse(g)
-            reversed_g.update_all(fn.copy_edge('_edge_weight', 'm'), fn.sum('m', 'out_weight'))
-            degs = reversed_g.dstdata['out_weight'] + 1
-            norm = th.pow(degs, -0.5)
-            res = res * norm
+        with g.local_scope():
+            if isinstance(g, DGLBlock):
+                g = block_to_graph(g)
+            if len(edge_weight.shape) > 2 or \
+                (len(edge_weight.shape) == 2 and edge_weight.shape[1] > 1):
+                raise DGLError('Currently the normalization is only defined '
+                               'on scalar edge weight. Please customize the '
+                               'normalization for your high-dimensional weights.')
+            if th.any(edge_weight <= 0).item():
+                raise DGLError('Currently the normalization only supports '
+                               'positive scalar edge weights.')
+            g.srcdata['_src_out_weight'] = th.ones((g.number_of_src_nodes())).to(g.device)
+            g.dstdata['_dst_in_weight'] = th.ones((g.number_of_src_nodes())).to(g.device)
+            g.edata['_edge_weight'] = edge_weight
 
-        if self._norm != 'none':
-            g.update_all(fn.copy_edge('_edge_weight', 'm'), fn.sum('m', 'in_weight'))
-            degs = g.dstdata['in_weight'] + 1
             if self._norm == 'both':
+                reversed_g = reverse(g)
+                reversed_g.edata['_edge_weight'] = edge_weight
+                reversed_g.update_all(fn.copy_edge('_edge_weight', 'm'), fn.sum('m', 'out_weight'))
+                degs = reversed_g.dstdata['out_weight'] + 1
                 norm = th.pow(degs, -0.5)
-            else:
-                norm = 1.0 / degs
-            res = res * norm
+                g.srcdata['_src_out_weight'] = norm
 
-        return res
+            if self._norm != 'none':
+                g.update_all(fn.copy_edge('_edge_weight', 'm'), fn.sum('m', 'in_weight'))
+                degs = g.dstdata['in_weight'] + 1
+                if self._norm == 'both':
+                    norm = th.pow(degs, -0.5)
+                else:
+                    norm = 1.0 / degs
+                g.dstdata['_dst_in_weight'] = norm
+
+            g.apply_edges(lambda edges: {'_norm_edge_weights': edges.src['_src_out_weight'] * \
+                                                               edges.dst['_dst_in_weight']})
+            return g.edata['_norm_edge_weights']
 
 # pylint: disable=W0235
 class GraphConv(nn.Module):
