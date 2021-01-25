@@ -7,6 +7,91 @@ from torch.nn import init
 from .... import function as fn
 from ....base import DGLError
 from ....utils import expand_as_pair
+from ....transform import reverse
+from ....convert import block_to_graph
+from ....heterograph import DGLBlock
+
+class EdgeWeightNorm(nn.Module):
+    r"""
+
+    Description
+    -----------
+    This module normalizes positive scalar edge weights on a graph
+    following the form in `GCN <https://arxiv.org/abs/1609.02907>`__.
+
+    Mathematically, setting ``norm='both'`` yields the following normalization term:
+
+    .. math:
+      d_{ji} = (\sqrt{\sum_{k\in\mathcal{N}(j)}e_{jk}}\sqrt{\sum_{k\in\mathcal{N}(i)}e_{ki}})^{-1}
+
+    And, setting ``norm='right'`` yields the following normalization term:
+
+    .. math:
+      d_{ji} = (\sum_{k\in\mathcal{N}(i)}}e_{ki})^{-1}
+
+    where :math:`e_{ji}` is the scalar weight on the edge from node :math:`j` t node :math:`i`.
+
+    The module returns the normalized weight :math:`e_{ji}/d_{ji}`.
+
+    Parameters
+    ----------
+    norm : str, optional
+        How to apply the normalizer. If is `'right'`, divide the aggregated messages
+        by each node's in-degrees, which is equivalent to averaging the received messages.
+        If is `'none'`, no normalization is applied. Default is `'both'`,
+        where the :math:`c_{ij}` in the paper is applied.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> from dgl.nn import EdgeWeightNorm, GraphConv
+
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> g = dgl.add_self_loop(g)
+    >>> feat = th.ones(6, 10)
+    >>> edge_weight = th.tensor([0.5,0.6,0.4,0.7,0.9,0.1])
+    >>> norm = EdgeWeightNorm(norm='both')
+    >>> norm_edge_weight = norm(g, edge_weight)
+    >>> conv = GraphConv(10, 2, norm='none', weight=True, bias=True, edge_weight=norm_edge_weight)
+    >>> res = conv(g, feat)
+    >>> print(res)
+    """
+    def __init__(self, norm='both'):
+        super(EdgeWeightNorm, self).__init__()
+        self._norm = norm
+
+    def forward(self, g, edge_weight):
+        if isinstance(g, DGLBlock):
+            g = block_to_graph(g)
+        if len(edge_weight.shape) > 2 or \
+            (len(edge_weight.shape) == 2 and edge_weight.shape[1] > 1):
+            raise DGLError('Currently the normalization is only defined '
+                           'on scalar edge weight. Please customize the '
+                           'normalization for your high-dimensional weights.')
+        if torch.any(edge_weight <= 0).item():
+            raise DGLError('Currently the normalization only supports '
+                           'positive scalar edge weights.')
+        g.edata['_edge_weight'] = edge_weight
+        res = edge_weight
+        if self._norm == 'both':
+            reversed_g = reverse(g)
+            reversed_g.update_all(fn.copy_edge('_edge_weight', 'm'), fn.sum('m', 'out_weight'))
+            degs = reversed_g.dstdata['out_weight'] + 1
+            norm = th.pow(degs, -0.5)
+            res = res * norm
+
+        if self._norm != 'none':
+            g.update_all(fn.copy_edge('_edge_weight', 'm'), fn.sum('m', 'in_weight'))
+            degs = g.dstdata['in_weight'] + 1
+            if self._norm == 'both':
+                norm = th.pow(degs, -0.5)
+            else:
+                norm = 1.0 / degs
+            res = res * norm
+
+        return res
 
 # pylint: disable=W0235
 class GraphConv(nn.Module):
@@ -31,6 +116,10 @@ class GraphConv(nn.Module):
       h_i^{(l+1)} = \sigma(b^{(l)} + \sum_{j\in\mathcal{N}(i)}\frac{e_{ji}}{c_{ij}}h_j^{(l)}W^{(l)})
 
     where :math:`e_{ji}` is the scalar weight on the edge from node :math:`j` to node :math:`i`.
+    This is NOT equivalent to the weighted graph convolutional network formulation in the paper.
+    For scalar edge weight, users may call ``EdgeWeightNorm`` on the weight tensor, then pass it
+    to ``GraphConv`` with ``norm='none'``.
+
     To customize the normalization term :math:`c_{ij}`, one can first set ``norm='none'`` for
     the model, and send the pre-normalize :math:`e_{ji}` to the forward computation. Please make
     sure that `e_{ji}` is broadcastable with `h_j^{l}`.
