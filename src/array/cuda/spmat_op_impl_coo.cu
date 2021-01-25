@@ -68,7 +68,7 @@ __global__ void _COOGetRowNNZKernel(
   }
 
   if (tx == 0) {
-    cuda::AtomicAdd(glb_cnt, local_cnt[tx]); 
+    cuda::AtomicAdd(glb_cnt, local_cnt[tx]);
   }
 }
 
