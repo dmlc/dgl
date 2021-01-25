@@ -68,42 +68,66 @@ class EdgeWeightNorm(nn.Module):
         super(EdgeWeightNorm, self).__init__()
         self._norm = norm
 
-    def forward(self, g, edge_weight):
-        with g.local_scope():
-            if isinstance(g, DGLBlock):
-                g = block_to_graph(g)
+    def forward(self, graph, edge_weight):
+        r"""
+
+        Description
+        -----------
+        Compute normalized edge weight for the GCN model.
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            The graph.
+        edge_weight : torch.Tensor
+            Unnormalized scalar weights on the edges. If given,
+            the convolution will weight with regard to the edge feature.
+            The shape is expected to be :math:`(|E|)` or :math:`(|E|, 1)`.
+
+        Returns
+        -------
+        torch.Tensor
+            The normalized edge weight.
+
+        Raises
+        ------
+        DGLError
+            The edge weight is multi-dimensional. Currently this module
+            only supports a scalar weight on each edge.
+        """
+        with graph.local_scope():
+            if isinstance(graph, DGLBlock):
+                graph = block_to_graph(graph)
             if len(edge_weight.shape) > 2 or \
                 (len(edge_weight.shape) == 2 and edge_weight.shape[1] > 1):
                 raise DGLError('Currently the normalization is only defined '
                                'on scalar edge weight. Please customize the '
                                'normalization for your high-dimensional weights.')
-            if th.any(edge_weight <= 0).item():
-                raise DGLError('Currently the normalization only supports '
-                               'positive scalar edge weights.')
-            g.srcdata['_src_out_weight'] = th.ones((g.number_of_src_nodes())).to(g.device)
-            g.dstdata['_dst_in_weight'] = th.ones((g.number_of_src_nodes())).to(g.device)
-            g.edata['_edge_weight'] = edge_weight
+            dev = graph.device
+            graph.srcdata['_src_out_weight'] = th.ones((graph.number_of_src_nodes())).to(dev)
+            graph.dstdata['_dst_in_weight'] = th.ones((graph.number_of_dst_nodes())).to(dev)
+            graph.edata['_edge_weight'] = edge_weight
 
             if self._norm == 'both':
-                reversed_g = reverse(g)
+                reversed_g = reverse(graph)
                 reversed_g.edata['_edge_weight'] = edge_weight
                 reversed_g.update_all(fn.copy_edge('_edge_weight', 'm'), fn.sum('m', 'out_weight'))
                 degs = reversed_g.dstdata['out_weight'] + 1
                 norm = th.pow(degs, -0.5)
-                g.srcdata['_src_out_weight'] = norm
+                graph.srcdata['_src_out_weight'] = norm
 
             if self._norm != 'none':
-                g.update_all(fn.copy_edge('_edge_weight', 'm'), fn.sum('m', 'in_weight'))
-                degs = g.dstdata['in_weight'] + 1
+                graph.update_all(fn.copy_edge('_edge_weight', 'm'), fn.sum('m', 'in_weight'))
+                degs = graph.dstdata['in_weight'] + 1
                 if self._norm == 'both':
                     norm = th.pow(degs, -0.5)
                 else:
                     norm = 1.0 / degs
-                g.dstdata['_dst_in_weight'] = norm
+                graph.dstdata['_dst_in_weight'] = norm
 
-            g.apply_edges(lambda edges: {'_norm_edge_weights': edges.src['_src_out_weight'] * \
-                                                               edges.dst['_dst_in_weight']})
-            return g.edata['_norm_edge_weights']
+            graph.apply_edges(lambda edges: {'_norm_edge_weights': edges.src['_src_out_weight'] * \
+                                                                   edges.dst['_dst_in_weight']})
+            return graph.edata['_norm_edge_weights']
 
 # pylint: disable=W0235
 class GraphConv(nn.Module):
