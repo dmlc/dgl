@@ -25,7 +25,7 @@ endif()
 dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(USE_AVX "Build with AVX optimization" ON)
-dgl_option(USE_AMP "Build with fp16 support to enable AMP(automatic mixed precision)" OFF)
+dgl_option(USE_FP16 "Build with fp16 support to enable mixed precision training" OFF)
 dgl_option(USE_TVM "Build with TVM kernels" OFF)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
@@ -200,12 +200,12 @@ if(USE_TVM)
   message(STATUS "Build with TVM runtime and featgraph kernels.")
 endif(USE_TVM)
 
-# Support fp16
-if(USE_AMP)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_AMP")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_AMP")
-  message(STATUS "Build with fp16 support for automatic mixed precision.")
-endif(USE_AMP)
+# Build with fp16 to support mixed precision training.
+if(USE_FP16)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_FP16")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_FP16")
+  message(STATUS "Build with fp16 to support mixed precision training")
+endif(USE_FP16)
 
 # support PARALLEL_ALGORITHMS
 if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)

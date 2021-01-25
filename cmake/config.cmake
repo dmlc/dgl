@@ -49,5 +49,5 @@ set(BUILD_TORCH ON)
 # Whether to enable CUDA kernels compiled with TVM.
 set(USE_TVM OFF)
 
-# Whether to enable fp16 for automatic mixed precision in PyTorch.
-set(USE_AMP OFF)
+# Whether to enable fp16 to support mixed precision training.
+set(USE_FP16 OFF)

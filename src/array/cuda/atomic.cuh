@@ -41,7 +41,7 @@ template <typename T> struct Cast {
   }
 };
 
-#ifdef USE_AMP
+#ifdef USE_FP16
 template <> struct Cast<half> {
   typedef Code<sizeof(half)>::Type Type;
   static __device__ __forceinline__ Type Encode(half val) {
@@ -117,16 +117,16 @@ static __device__ __forceinline__ unsigned short int atomicCASshort(
 
 #define OP(a, b) max(a, b)
 DEFINE_ATOMIC(Max)
-#ifdef USE_AMP
+#ifdef USE_FP16
 DEFINE_ATOMIC_HALF(Max)
-#endif  // USE_AMP
+#endif  // USE_FP16
 #undef OP
 
 #define OP(a, b) min(a, b)
 DEFINE_ATOMIC(Min)
-#ifdef USE_AMP
+#ifdef USE_FP16
 DEFINE_ATOMIC_HALF(Min)
-#endif  // USE_AMP
+#endif  // USE_FP16
 #undef OP
 
 #define OP(a, b) a + b
@@ -151,7 +151,7 @@ __device__ __forceinline__ double AtomicAdd<double>(double* addr, double val) {
 #endif
 }
 
-#ifdef USE_AMP
+#ifdef USE_FP16
 #if defined(CUDART_VERSION) && CUDART_VERSION >= 10000
 template <>
 __device__ __forceinline__ half AtomicAdd<half>(half* addr, half val) {
@@ -162,7 +162,7 @@ __device__ __forceinline__ half AtomicAdd<half>(half* addr, half val) {
 #endif  // __CUDA_ARCH__
 }
 #endif  // defined(CUDART_VERSION) && CUDART_VERSION >= 10000
-#endif  // USE_AMP
+#endif  // USE_FP16
 
 
 }  // namespace cuda
