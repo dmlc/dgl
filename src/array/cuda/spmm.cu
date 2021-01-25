@@ -146,15 +146,6 @@ NDArray _IndexSelect(NDArray array, NDArray index) {
   return ret;
 }
 
-/*! \brief Fill the vector started from ptr of size length with val */
-template <typename DType>
-void _Fill(DType* ptr, size_t length, DType val) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  int nt = FindNumThreads(length);
-  int nb = (length + nt - 1) / nt;  // on x-axis, no need to worry about upperbound.
-  CUDA_KERNEL_CALL(cuda::_FillKernel, nb, nt, 0, thr_entry->stream, ptr, length, val);
-}
-
 }  // namespace
 
 namespace cusparse {

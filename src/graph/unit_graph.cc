@@ -1238,6 +1238,18 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
   }
 }
 
+void UnitGraph::InvalidateCSR() {
+  this->out_csr_ = CSRPtr(new CSR());
+}
+
+void UnitGraph::InvalidateCSC() {
+  this->in_csr_ = CSRPtr(new CSR());
+}
+
+void UnitGraph::InvalidateCOO() {
+  this->coo_ = COOPtr(new COO());
+}
+
 UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
                      dgl_format_code_t formats)
   : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
