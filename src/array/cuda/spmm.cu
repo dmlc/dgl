@@ -93,7 +93,7 @@ void _Transpose(const DType* in, DType* out,
       CUBLAS_OP_N,
       row, col,
       &alpha, in, col,
-      &beta, nullptr, col,
+      &beta, nullptr, row,
       out, row));
 }
 
