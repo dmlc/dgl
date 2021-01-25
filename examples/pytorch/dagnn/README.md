@@ -40,7 +40,7 @@ The DGL's built-in Cora, Pubmed and Citeseer datasets. Dataset summary:
 ```
 --runs             int     Number of training runs.               Default is 1
 --epochs           int     Number of training epochs.             Default is 1500.
---early_stopping   int     Early stopping patience rounds.        Default is 100.
+--early-stopping   int     Early stopping patience rounds.        Default is 100.
 --lr               float   Adam optimizer learning rate.          Default is 0.01.
 --lamb             float   L2 regularization coefficient.         Default is 5e-3.
 --k                int     Number of propagation layers.          Default is 10.
