@@ -26,6 +26,7 @@ class DAGNNConv(nn.Module):
         nn.init.xavier_uniform_(self.s, gain=gain)
 
     def forward(self, graph, feats):
+
         with graph.local_scope():
             results = [feats]
 
@@ -37,8 +38,8 @@ class DAGNNConv(nn.Module):
                 feats = feats * norm
                 graph.ndata['h'] = feats
                 graph.update_all(fn.copy_u('h', 'm'),
-                             fn.sum('m', 'h'))
-                feats = graph.ndata.pop('h')
+                                 fn.sum('m', 'h'))
+                feats = graph.ndata['h']
                 feats = feats * norm
                 results.append(feats)
 
@@ -90,7 +91,7 @@ class DAGNN(nn.Module):
                  out_dim,
                  bias=True,
                  activation=F.relu,
-                 dropout=0,):
+                 dropout=0, ):
         super(DAGNN, self).__init__()
         self.mlp = nn.ModuleList()
         self.mlp.append(MLPLayer(in_dim=in_dim, out_dim=hid_dim, bias=bias,
@@ -107,7 +108,6 @@ class DAGNN(nn.Module):
 
 
 def main(args):
-
     # Step 1: Prepare graph data and retrieve train/validation/test index ============================= #
     # Load from DGL dataset
     if args.dataset == 'Cora':
@@ -162,8 +162,8 @@ def main(args):
     opt = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.lamb)
 
     # Step 4: training epochs =============================================================== #
-    loss = None
-    best_acc = None
+    loss = float('inf')
+    best_acc = 0
     no_improvement = 0
     epochs = trange(args.epochs, desc='Accuracy & Loss')
 
@@ -187,19 +187,15 @@ def main(args):
         epochs.set_description('Train Acc {:.4f} | Train Loss {:.4f} | Val Acc {:.4f} | Val loss {:.4f}'.format(
             train_acc, train_loss.item(), valid_acc, valid_loss.item()))
 
-        if loss is None:
+        if valid_loss > loss:
+            no_improvement += 1
+            if no_improvement == args.early_stopping:
+                print('Early stop.')
+                break
+        else:
+            no_improvement = 0
             loss = valid_loss
             best_acc = test_acc
-        else:
-            if valid_loss > loss:
-                no_improvement += 1
-                if no_improvement == args.early_stopping:
-                    print('Early stop.')
-                    break
-            else:
-                no_improvement = 0
-                loss = valid_loss
-                best_acc = test_acc
 
     print("Test Acc {:.4f}".format(best_acc))
     return best_acc
@@ -211,7 +207,7 @@ if __name__ == "__main__":
     """
     parser = argparse.ArgumentParser(description='DAGNN')
     # data source params
-    parser.add_argument('--dataset', type=str, default='Cora', help='Name of dataset.')
+    parser.add_argument('--dataset', type=str, default='Cora', choices=["Cora", "Citeseer", "Pubmed"], help='Name of dataset.')
     # cuda params
     parser.add_argument('--gpu', type=int, default=-1, help='GPU index. Default: -1, using CPU.')
     # training params
