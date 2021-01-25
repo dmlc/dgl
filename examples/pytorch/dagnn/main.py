@@ -29,7 +29,7 @@ class DAGNNConv(nn.Module):
         with graph.local_scope():
             results = [feats]
 
-            degs = graph.in_degrees().float().clamp(min=1)
+            degs = graph.in_degrees().float()
             norm = torch.pow(degs, -0.5)
             norm = norm.to(feats.device).unsqueeze(1)
 
@@ -56,18 +56,12 @@ class MLPLayer(nn.Module):
                  out_dim,
                  bias=True,
                  activation=None,
-                 batchnorm=False,
-                 dropout=0,
-                 drop_bef=True):
+                 dropout=0):
         super(MLPLayer, self).__init__()
 
         self.linear = nn.Linear(in_dim, out_dim, bias=bias)
         self.activation = activation
-        self.batchnorm = batchnorm
-        if batchnorm:
-            self.bn = nn.BatchNorm1d(out_dim)
         self.dropout = nn.Dropout(dropout)
-        self.drop_bef = drop_bef
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -77,25 +71,13 @@ class MLPLayer(nn.Module):
         nn.init.xavier_uniform_(self.linear.weight, gain=gain)
         if self.linear.bias is not None:
             nn.init.zeros_(self.linear.bias)
-        if self.batchnorm:
-            self.bn.reset_parameters()
 
     def forward(self, feats):
 
-        if self.drop_bef:
-            feats = self.dropout(feats)
-            feats = self.linear(feats)
-            if self.batchnorm:
-                feats = self.bn(feats)
-            if self.activation:
-                feats = self.activation(feats)
-        else:
-            feats = self.linear(feats)
-            if self.batchnorm:
-                feats = self.bn(feats)
-            if self.activation:
-                feats = self.activation(feats)
-            feats = self.dropout(feats)
+        feats = self.dropout(feats)
+        feats = self.linear(feats)
+        if self.activation:
+            feats = self.activation(feats)
 
         return feats
 
@@ -108,17 +90,13 @@ class DAGNN(nn.Module):
                  out_dim,
                  bias=True,
                  activation=F.relu,
-                 batchnorm=False,
-                 dropout=0,
-                 drop_bef=True):
+                 dropout=0,):
         super(DAGNN, self).__init__()
         self.mlp = nn.ModuleList()
         self.mlp.append(MLPLayer(in_dim=in_dim, out_dim=hid_dim, bias=bias,
-                                 activation=activation, batchnorm=batchnorm,
-                                 dropout=dropout, drop_bef=drop_bef))
+                                 activation=activation, dropout=dropout))
         self.mlp.append(MLPLayer(in_dim=hid_dim, out_dim=out_dim, bias=bias,
-                                 activation=None, batchnorm=batchnorm,
-                                 dropout=dropout, drop_bef=drop_bef))
+                                 activation=None, dropout=dropout))
         self.dagnn = DAGNNConv(in_dim=out_dim, k=k)
 
     def forward(self, graph, feats):
@@ -142,8 +120,7 @@ def main(args):
         raise ValueError('Dataset {} is invalid.'.format(args.dataset))
 
     graph = dataset[0]
-    graph = graph.remove_self_loop().add_self_loop()
-
+    graph = graph.add_self_loop()
 
     # check cuda
     if args.gpu >= 0 and torch.cuda.is_available():
@@ -177,16 +154,14 @@ def main(args):
                   in_dim=n_features,
                   hid_dim=args.hid_dim,
                   out_dim=n_classes,
-                  batchnorm=args.batchnorm,
-                  dropout=args.dropout,
-                  drop_bef=args.drop_bef)
+                  dropout=args.dropout)
     model = model.to(device)
 
     # Step 3: Create training components ===================================================== #
     loss_fn = F.cross_entropy
     opt = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.lamb)
 
-    # Step 4: training epoches =============================================================== #
+    # Step 4: training epochs =============================================================== #
     loss = None
     best_acc = None
     no_improvement = 0
@@ -205,7 +180,6 @@ def main(args):
         train_loss.backward()
         opt.step()
 
-        # Validation using a full graph
         train_loss, train_acc, valid_loss, valid_acc, test_loss, test_acc = evaluate(model, graph, feats, labels,
                                                                                      (train_idx, val_idx, test_idx))
 
@@ -239,7 +213,7 @@ if __name__ == "__main__":
     # data source params
     parser.add_argument('--dataset', type=str, default='Cora', help='Name of dataset.')
     # cuda params
-    parser.add_argument('--gpu', type=int, default=0, help='GPU index. Default: -1, using CPU.')
+    parser.add_argument('--gpu', type=int, default=-1, help='GPU index. Default: -1, using CPU.')
     # training params
     parser.add_argument('--runs', type=int, default=1, help='Training runs.')
     parser.add_argument('--epochs', type=int, default=1500, help='Training epochs.')
@@ -247,11 +221,9 @@ if __name__ == "__main__":
     parser.add_argument('--lr', type=float, default=0.01, help='Learning rate.')
     parser.add_argument('--lamb', type=float, default=0.005, help='L2 reg.')
     # model params
-    parser.add_argument('--k', type=int, default=10, help='Number of propagation.')
+    parser.add_argument('--k', type=int, default=12, help='Number of propagation layers.')
     parser.add_argument("--hid-dim", type=int, default=64, help='Hidden layer dimensionalities.')
-    parser.add_argument('--batchnorm', action='store_true', default=False, help="batchnorm")
     parser.add_argument('--dropout', type=float, default=0.8, help='dropout')
-    parser.add_argument('--drop_bef', action='store_true', default=True, help='Location of dropout')
     args = parser.parse_args()
     print(args)
 
