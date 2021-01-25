@@ -74,8 +74,8 @@ int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
       nb, nt, smem_size, thr_entry->stream,
       rows.Ptr<IdType>(), rst.Ptr<IdType>(),
       row, nnz);
-  
-  // TODO(zihao): copy data from GPU to CPU. 
+  rst = rst.CopyTo(DLContext{kDLCPU, 0});
+  return rst.Ptr<IdType>();
 }
 
 template int64_t COOGetRowNNZ<kDLGPU, int32_t>(COOMatrix, int64_t);
