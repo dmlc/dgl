@@ -56,7 +56,7 @@ SharedMemory::~SharedMemory() {
   close(fd_);
   if (own_) {
     LOG(INFO) << "remove " << name << " for shared memory";
-    CHECK(shm_unlink(name.c_str()) != -1) << strerror(errno);
+    shm_unlink(name.c_str());
     // The resource has been deleted. We don't need to keep track of it any more.
     DeleteResource(name);
   }
