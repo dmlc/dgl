@@ -29,7 +29,7 @@ def _download(url, path, filename):
 def get_graph(name, format):
     g = None
     if name == 'cora':
-        g = dgl.data.CoraGraphDataset()[0]
+        g = dgl.data.CoraGraphDataset(verbose=False)[0]
     elif name == 'livejournal':
         bin_path = "/tmp/dataset/livejournal/livejournal_{}.bin".format(format)
         if os.path.exists(bin_path):
@@ -83,13 +83,6 @@ def get_friendster():
     print('construct the graph')
     return dgl.graph((src, dst))
 
-
-# def get_graph(name):
-#     if name == 'livejournal':
-#         return get_livejournal()
-#     else:
-#         print(name + " doesn't exist")
-#         return None
 
 
 class OGBDataset(object):
@@ -469,3 +462,40 @@ def benchmark(track_type, timeout=60):
             func.benchmark_name = "skip_" + func.__name__
         return func
     return _wrapper
+
+
+import time
+import multiprocessing
+from functools import partial, reduce, wraps
+
+import torch.multiprocessing as mp
+from _thread import start_new_thread
+import traceback
+
+def thread_wrapped_func(func):
+    """
+    Wraps a process entry point to make it work with OpenMP.
+    """
+
+    @wraps(func)
+    def decorated_function(*args, **kwargs):
+        queue = mp.Queue()
+
+        def _queue_result():
+            exception, trace, res = None, None, None
+            try:
+                res = func(*args, **kwargs)
+            except Exception as e:
+                exception = e
+                trace = traceback.format_exc()
+            queue.put((res, exception, trace))
+
+        start_new_thread(_queue_result, ())
+        result, exception, trace = queue.get()
+        if exception is None:
+            return result
+        else:
+            assert isinstance(exception, Exception)
+            raise exception.__class__(trace)
+
+    return decorated_function
