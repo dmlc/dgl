@@ -53,11 +53,11 @@ The DGL's built-in Cora, Pubmed and Citeseer datasets. Dataset summary:
 Train a model which follows the original hyperparameters on different datasets.
 ```bash
 # Cora:
-python main.py --dataset Cora --gpu 0 --runs 100 --lr 0.01 --lam 0.005 --k 12 --dropout 0.8
+python main.py --dataset Cora --gpu 0 --runs 100 --lamb 0.005 --k 12
 # Citeseer:
-python main.py --dataset Citeseer --gpu 0 --runs 100 --lr 0.01 --lam 0.02 --k 16 --dropout 0.8
+python main.py --dataset Citeseer --gpu 0 --runs 100 --lamb 0.02 --k 16
 # Pubmed:
-python main.py --dataset Pubmed --gpu 0 --runs 100 --lr 0.01 --lam 0.005 --k 20 --dropout 0.8
+python main.py --dataset Pubmed --gpu 0 --runs 100 --lamb 0.005 --k 20
 ```
 ### Performance
 
