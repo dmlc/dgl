@@ -141,6 +141,7 @@ Getting Started
    faq
    env_var
    resources
+   mixed_precision
 
 Relationship of DGL to other frameworks
 ---------------------------------------

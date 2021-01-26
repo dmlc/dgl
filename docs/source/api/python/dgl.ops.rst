@@ -262,8 +262,8 @@ DGL provide operators to reduce value tensor along the first dimension by segmen
 
 Supported Data types
 --------------------
-Operators defined in ``dgl.ops`` support floating data types, i.e. the feature must
-be ``float16``(``half``)/``float32``(``float``)/``float64``(``double``) tensors.
+Operators defined in ``dgl.ops`` support floating point data types, i.e. the operands
+must be ``float16``(``half``)/``float32``(``float``)/``float64``(``double``) tensors.
 The input tensors must have the same data type (if one input tensor has type float16
 and the other input tensor has data type float32, user must convert one of them to
 align with the other one).
