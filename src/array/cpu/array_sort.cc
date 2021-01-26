@@ -161,7 +161,7 @@ namespace aten {
 namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
-std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits) {
+std::pair<IdArray, IdArray> Sort(IdArray array, int /* num_bits */) {
   const int64_t nitem = array->shape[0];
   IdArray val = array.Clone();
   IdArray idx = aten::Range(0, nitem, 64, array->ctx);

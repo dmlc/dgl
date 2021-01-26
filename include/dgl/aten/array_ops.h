@@ -314,7 +314,16 @@ IdArray NonZero(NDArray array);
  * is always in int64.
  *
  * \param array Input array.
- * \param num_bits The number of bits used by the range of values in the array.
+ * \param num_bits The number of bits used by the range of values in the array,
+ * or 0 to use all bits of the type. This is currently only used when sort
+ * arrays on the GPU. 
+ * \param num_bits The number of bits used in key comparison. The bits are
+ * right aligned. For example, setting `num_bits` to 8 means using bits from
+ * `sizeof(IdType) * 8 - num_bits` (inclusive) to `sizeof(IdType) * 8`
+ * (exclusive). Setting it to a small value could speed up the sorting if the
+ * underlying sorting algorithm is radix sort (e.g., on GPU). Setting it to
+ * value of zero, uses full number of bits of the type (sizeof(IdType)*8).
+ * On CPU, it currently has no effect.
  * \return A pair of arrays: sorted values and sorted index to the original position.
  */
 std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits = 0);
