@@ -40,7 +40,7 @@ def build_dgl_win64(dev) {
   init_git_win64()
   bat "CALL tests\\scripts\\build_dgl.bat"
   pack_lib("dgl-${dev}-win64", dgl_win64_libs)
-  archiveArtifacts artifacts: "build/python/dist/*", fingerprint: true
+  archiveArtifacts artifacts: "python/dist/*", fingerprint: true
 }
 
 def cpp_unit_test_linux() {
