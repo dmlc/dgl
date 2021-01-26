@@ -175,7 +175,7 @@ class SAGEConv(nn.Module):
             :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
         edge_weight : torch.Tensor, optional
             Optional tensor on the edge. If given, the convolution will weight
-            with regard to the edge feature.
+            with regard to the message.
 
         Returns
         -------

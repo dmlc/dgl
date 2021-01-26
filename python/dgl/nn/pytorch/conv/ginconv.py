@@ -110,7 +110,7 @@ class GINConv(nn.Module):
             fit the input dimensionality requirement of ``apply_func``.
         edge_weight : torch.Tensor, optional
             Optional tensor on the edge. If given, the convolution will weight
-            with regard to the edge feature.
+            with regard to the message.
 
         Returns
         -------

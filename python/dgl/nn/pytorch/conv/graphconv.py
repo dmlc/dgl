@@ -37,6 +37,8 @@ class EdgeWeightNorm(nn.Module):
     ----------
     norm : str, optional
         The normalizer as specified above. Default is `'both'`.
+    eps : float, optional
+        A small offset value in the denominator. Default is 0.
 
     Examples
     --------
@@ -61,9 +63,10 @@ class EdgeWeightNorm(nn.Module):
             [-1.3658, -0.8674],
             [-0.8323, -0.5286]], grad_fn=<AddBackward0>)
     """
-    def __init__(self, norm='both'):
+    def __init__(self, norm='both', eps=0.):
         super(EdgeWeightNorm, self).__init__()
         self._norm = norm
+        self._eps = eps
 
     def forward(self, graph, edge_weight):
         r"""
@@ -116,13 +119,13 @@ class EdgeWeightNorm(nn.Module):
                 reversed_g = reverse(graph)
                 reversed_g.edata['_edge_w'] = edge_weight
                 reversed_g.update_all(fn.copy_edge('_edge_w', 'm'), fn.sum('m', 'out_weight'))
-                degs = reversed_g.dstdata['out_weight'] + 1
+                degs = reversed_g.dstdata['out_weight'] + self._eps
                 norm = th.pow(degs, -0.5)
                 graph.srcdata['_src_out_w'] = norm
 
             if self._norm != 'none':
                 graph.update_all(fn.copy_edge('_edge_w', 'm'), fn.sum('m', 'in_weight'))
-                degs = graph.dstdata['in_weight'] + 1
+                degs = graph.dstdata['in_weight'] + self._eps
                 if self._norm == 'both':
                     norm = th.pow(degs, -0.5)
                 else:
@@ -158,12 +161,10 @@ class GraphConv(nn.Module):
 
     where :math:`e_{ji}` is the scalar weight on the edge from node :math:`j` to node :math:`i`.
     This is NOT equivalent to the weighted graph convolutional network formulation in the paper.
-    For scalar edge weight, users may call ``EdgeWeightNorm`` on the weight tensor, then pass it
-    to ``GraphConv`` with ``norm='none'``.
 
     To customize the normalization term :math:`c_{ij}`, one can first set ``norm='none'`` for
-    the model, and send the pre-normalize :math:`e_{ji}` to the forward computation. Please make
-    sure that `e_{ji}` is broadcastable with `h_j^{l}`.
+    the model, and send the pre-normalized :math:`e_{ji}` to the forward computation. We provide
+    :class:`~dgl.nn.pytorch.EdgeWeightNorm` to normalize scalar edge weight following the GCN paper.
 
     Parameters
     ----------
@@ -347,7 +348,7 @@ class GraphConv(nn.Module):
             Optional external weight tensor.
         edge_weight : torch.Tensor, optional
             Optional tensor on the edge. If given, the convolution will weight
-            with regard to the edge feature.
+            with regard to the message.
 
         Returns
         -------
