@@ -17,8 +17,19 @@ namespace impl {
 
 ///////////////////////////// COOSort_ /////////////////////////////
 
+/**
+* @brief Encode row and column IDs into a single scalar per edge.
+*
+* @tparam IdType The type to encode as.
+* @param row The row (src) IDs per edge.
+* @param col The column (dst) IDs per edge.
+* @param nnz The number of edges.
+* @param col_bits The number of bits used to encode the destination. The row
+* information is packed into the remaining bits.
+* @param key The encoded edges (output).
+*/
 template <typename IdType>
-__global__ void _COOMergeEdgesKernel(
+__global__ void _COOEncodeEdgesKernel(
     const IdType* const row, const IdType* const col,
     const int64_t nnz, const int col_bits, IdType * const key) {
 
@@ -29,8 +40,18 @@ __global__ void _COOMergeEdgesKernel(
   }
 }
 
+/**
+* @brief Decode row and column IDs from the encoded edges.
+*
+* @tparam IdType The type the edges are encoded as.
+* @param key The encoded edges.
+* @param nnz The number of edges.
+* @param col_bits The number of bits used to store the column/dst ID.
+* @param row The row (src) IDs per edge (output).
+* @param col The col (dst) IDs per edge (output).
+*/
 template <typename IdType>
-__global__ void _COOSeparateEdgesKernel(
+__global__ void _COODecodeEdgesKernel(
     const IdType* const key, const int64_t nnz, const int col_bits,
     IdType * const row, IdType * const col) {
 
@@ -79,13 +100,13 @@ void COOSort_(COOMatrix* coo, bool sort_column) {
 
     IdArray pos = aten::NewIdArray(nnz, coo->row->ctx, coo->row->dtype.bits);
 
-    CUDA_KERNEL_CALL(_COOMergeEdgesKernel, nb, nt, 0, thr_entry->stream,
+    CUDA_KERNEL_CALL(_COOEncodeEdgesKernel, nb, nt, 0, thr_entry->stream,
         coo->row.Ptr<IdType>(), coo->col.Ptr<IdType>(),
         nnz, col_bits, pos.Ptr<IdType>());
 
     auto sorted = Sort(pos, num_bits);
 
-    CUDA_KERNEL_CALL(_COOSeparateEdgesKernel, nb, nt, 0, thr_entry->stream,
+    CUDA_KERNEL_CALL(_COODecodeEdgesKernel, nb, nt, 0, thr_entry->stream,
         sorted.first.Ptr<IdType>(), nnz, col_bits,
         coo->row.Ptr<IdType>(), coo->col.Ptr<IdType>());
 
