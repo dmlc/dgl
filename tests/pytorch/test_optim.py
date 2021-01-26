@@ -1,8 +1,8 @@
 import torch as th
 import backend as F
 
-from dgl.backend.pytorch.sparse_emb import NodeEmbedding
-from dgl.backend.pytorch.sparse_optim import SparseAdam, SparseAdagrad
+from dgl.nn import NodeEmbedding
+from dgl.optim import SparseAdam, SparseAdagrad
 
 import unittest, os
 
