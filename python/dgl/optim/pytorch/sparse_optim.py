@@ -2,8 +2,8 @@ import abc
 from abc import abstractmethod
 import torch as th
 
-from .utils import get_shared_mem_array, create_shared_mem_array
-from .sparse_emb import NodeEmbedding
+from ...utils import get_shared_mem_array, create_shared_mem_array
+from ...nn import NodeEmbedding
 
 class SparseGradOptimizer(abc.ABC):
     r''' The abstract sparse optimizer.
@@ -155,12 +155,12 @@ class SparseGradOptimizer(abc.ABC):
         self._clean_grad = True
 
 class SparseAdagrad(SparseGradOptimizer):
-    r''' The sparse Adagrad optimizer.
+    r''' Node embedding optimizer using the Adagrad algorithm.
 
-    This optimizer implements a sparse version of Adagrad algorithm for optimizing
-    :func:`dgl.backend.NodeEmbedding`. In each mini-batch, it only updates the embeddings
-    involved in the mini-batch to support efficient training on a graph with many
-    nodes and edges.
+    This optimizer implements a sparse version of Adagrad algorithm for
+    optimizing :class:`dgl.nn.NodeEmbedding`. Being sparse means it only updates
+    the embeddings whose gradients have updates, which are usually a very
+    small portion of the total embeddings.
 
     Adagrad maintains a :math:`G_{t,i,j}` for every parameter in the embeddings, where
     :math:`G_{t,i,j}=G_{t-1,i,j} + g_{t,i,j}^2` and :math:`g_{t,i,j}` is the gradient of
@@ -168,13 +168,27 @@ class SparseAdagrad(SparseGradOptimizer):
 
     Parameters
     ----------
-    params : list of NodeEmbedding
-        The list of NodeEmbedding.
+    params : list[dgl.nn.NodeEmbedding]
+        The list of dgl.nn.NodeEmbedding.
     lr : float
         The learning rate.
     eps : float, Optional
         The term added to the denominator to improve numerical stability
         Default: 1e-10
+
+    Examples
+    --------
+    >>> def initializer(emb):
+            th.nn.init.xavier_uniform_(emb)
+            return emb
+    >>> emb = dgl.nn.NodeEmbedding(g.number_of_nodes(), 10, 'emb', init_func=initializer)
+    >>> optimizer = dgl.optim.SparseAdagrad([emb], lr=0.001)
+    >>> for blocks in dataloader:
+    ...     ...
+    ...     feats = emb(nids, gpu_0)
+    ...     loss = F.sum(feats + 1, 0)
+    ...     loss.backward()
+    ...     optimizer.step()
     '''
     def __init__(self, params, lr, eps=1e-10):
         super(SparseAdagrad, self).__init__(params, lr)
@@ -239,14 +253,15 @@ class SparseAdagrad(SparseGradOptimizer):
         emb.emb_tensor[state_idx] -= tmp.to(state_dev)
 
 class SparseAdam(SparseGradOptimizer):
-    r''' The sparse Adam optimizer.
+    r''' Node embedding optimizer using the Adam algorithm.
 
-    This optimizer implements a sparse version of Adam algorithm for optimizing
-    :func:`dgl.backend.NodeEmbedding`. In each mini-batch, it only updates the embeddings
-    involved in the mini-batch to support efficient training on a graph with many
-    nodes and edges.
+    This optimizer implements a sparse version of Adagrad algorithm for
+    optimizing :class:`dgl.nn.NodeEmbedding`. Being sparse means it only
+    updates the embeddings whose gradients have updates, which are usually
+    a very small portion of the total embeddings.
 
-    Adam maintains a :math:`Gm_{t,i,j}` and `Gp_{t,i,j}` for every parameter in the embeddings, where
+    Adam maintains a :math:`Gm_{t,i,j}` and `Gp_{t,i,j}` for every parameter
+    in the embeddings, where
     :math:`Gm_{t,i,j}=beta1 * Gm_{t-1,i,j} + (1-beta1) * g_{t,i,j}`,
     :math:`Gp_{t,i,j}=beta2 * Gp_{t-1,i,j} + (1-beta2) * g_{t,i,j}^2`,
     :math:`g_{t,i,j} = lr * Gm_{t,i,j} / (1 - beta1^t) / \sqrt{Gp_{t,i,j} / (1 - beta2^t)}` and
@@ -254,16 +269,30 @@ class SparseAdam(SparseGradOptimizer):
 
     Parameters
     ----------
-    params : list of NodeEmbedding
-        The list of NodeEmbeddings.
+    params : list[dgl.nn.NodeEmbedding]
+        The list of dgl.nn.NodeEmbeddings.
     lr : float
         The learning rate.
-    betas : Tuple[float, float], Optional
+    betas : tuple[float, float], Optional
         Coefficients used for computing running averages of gradient and its square.
         Default: (0.9, 0.999)
     eps : float, Optional
         The term added to the denominator to improve numerical stability
         Default: 1e-8
+
+    Examples:
+
+    >>> def initializer(emb):
+            th.nn.init.xavier_uniform_(emb)
+            return emb
+    >>> emb = dgl.nn.NodeEmbedding(g.number_of_nodes(), 10, 'emb', init_func=initializer)
+    >>> optimizer = dgl.optim.SparseAdam([emb], lr=0.001)
+    >>> for blocks in dataloader:
+    ...     ...
+    ...     feats = emb(nids, gpu_0)
+    ...     loss = F.sum(feats + 1, 0)
+    ...     loss.backward()
+    ...     optimizer.step()
     '''
     def __init__(self, params, lr, betas=(0.9, 0.999), eps=1e-08):
         super(SparseAdam, self).__init__(params, lr)

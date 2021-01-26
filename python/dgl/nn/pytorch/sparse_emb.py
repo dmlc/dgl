@@ -1,6 +1,6 @@
 import torch as th
-from .tensor import attach_grad, is_recording
-from .utils import get_shared_mem_array, create_shared_mem_array
+from ...backend import pytorch as F
+from ...utils import get_shared_mem_array, create_shared_mem_array
 from datetime import timedelta
 
 from ... import ndarray as nd
@@ -8,24 +8,22 @@ from ... import ndarray as nd
 _store = None
 
 class NodeEmbedding: # NodeEmbedding
-    '''Node embeddings for graph.
+    '''Class for storing node embeddings.
 
-    When training node embeddings on a graph, the embedding layer is typically very large.
-    We need to use train the embedding layer with sparse gradient updates
-    in order to scale to a graph with many nodes. NodeEmbedding is optimized for
-    such use case. It provides an efficient way to only update the embeddings involved
-    in a mini-batch and can scale to a graph with millions of nodes. It supports multi-GPU
-    training efficiently by partitioning the embeddings.
+    The class is optimized for training large-scale node embeddings. It updates the embedding in
+    a sparse way and can scale to graphs with millions of nodes. It also supports partitioning
+    to multiple GPUs (on a single machine) for more acceleration. It does not support partitioning
+    across machines.
 
-    Currently, DGL provides two optimizer for NodeEmbedding: `SparseAdagrad` and `SparseAdam.
-    DGL will provide more optimizers in the future.
+    Currently, DGL provides two optimizers that work with this NodeEmbedding
+    class: ``SparseAdagrad`` and ``SparseAdam``.
 
     NOTE: NodeEmbedding can only support single node single-GPU training and
     single node multi-GPU training.
 
     The implementation is based on torch.distributed package. It depends on the pytorch
     default distributed process group to collect multi-process information and uses
-    torch.distributed.TCPStore to share meta-data information across multiple gpu processes.
+    ``torch.distributed.TCPStore`` to share meta-data information across multiple gpu processes.
     It use the local address of '127.0.0.1:12346' to initialize the TCPStore.
 
     Parameters
@@ -36,7 +34,7 @@ class NodeEmbedding: # NodeEmbedding
     embedding_dim : int
         The dimension size of embeddings.
     name : str
-        The name of the embeddings. The name should uniquely identify embeddings in a system.
+        The name of the embeddings. The name should uniquely identify the embeddings in the system.
     init_func : callable, optional
         The function to create the initial data. If the init function is not provided,
         the values of the embeddings are initialized to zero.
@@ -49,11 +47,12 @@ class NodeEmbedding: # NodeEmbedding
             th.nn.init.xavier_uniform_(emb)
             return emb
 
-    In each multiple gpu process
+    In each training process
 
-    >>> emb = dgl.NodeEmbedding(g.number_of_nodes(), 10, 'emb', init_func=initializer)
-    >>> optimizer = dgl.SparseAdam([emb], lr=0.001)
+    >>> emb = dgl.nn.NodeEmbedding(g.number_of_nodes(), 10, 'emb', init_func=initializer)
+    >>> optimizer = dgl.optim.SparseAdam([emb], lr=0.001)
     >>> for blocks in dataloader:
+    ...     ...
     ...     feats = emb(nids, gpu_0)
     ...     loss = F.sum(feats + 1, 0)
     ...     loss.backward()
@@ -106,17 +105,17 @@ class NodeEmbedding: # NodeEmbedding
         self._optm_state = None # track optimizer state
         self._trace = [] # track minibatch
 
-    def __call__(self, idx, device=th.device('cpu')):
+    def __call__(self, node_ids, device=th.device('cpu')):
         """
-        idx : th.tensor
+        node_ids : th.tensor
             Index of the embeddings to collect.
         device : th.device
             Target device to put the collected embeddings.
         """
-        emb = self._tensor[idx].to(device)
-        if is_recording():
-            emb = attach_grad(emb)
-            self._trace.append((idx.to(device, non_blocking=True), emb))
+        emb = self._tensor[node_ids].to(device)
+        if F.is_recording():
+            emb = F.attach_grad(emb)
+            self._trace.append((node_ids.to(device, non_blocking=True), emb))
         return emb
 
     @property

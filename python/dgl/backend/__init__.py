@@ -73,9 +73,6 @@ def load_backend(mod_name):
             else:
                 setattr(thismod, api, _gen_missing_api(api, mod_name))
 
-    mod = importlib.import_module('.%s.sparse_optim' % mod_name, __name__)
-    setattr(thismod, 'optim', mod)
-
 def get_preferred_backend():
     config_path = os.path.join(os.path.expanduser('~'), '.dgl', 'config.json')
     backend_name = None

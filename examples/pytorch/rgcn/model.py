@@ -72,7 +72,7 @@ class RelGraphEmbedLayer(nn.Module):
     embed_size : int
         Output embed size
     dgl_sparse : bool, optional
-        If true, use dgl.NodeEmbedding otherwise use torch.nn.Embedding
+        If true, use dgl.nn.NodeEmbedding otherwise use torch.nn.Embedding
     """
     def __init__(self,
                  dev_id,
@@ -96,7 +96,7 @@ class RelGraphEmbedLayer(nn.Module):
         for ntype in range(num_of_ntype):
             if isinstance(input_size[ntype], int):
                 if dgl_sparse:
-                    self.node_embeds[str(ntype)] = dgl.NodeEmbedding(input_size[ntype], embed_size, name=str(ntype),
+                    self.node_embeds[str(ntype)] = dgl.nn.NodeEmbedding(input_size[ntype], embed_size, name=str(ntype),
                         init_func=initializer)
                 else:
                     sparse_emb = th.nn.Embedding(input_size[ntype], embed_size, sparse=True)
