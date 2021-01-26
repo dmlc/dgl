@@ -29,17 +29,14 @@ class EdgeWeightNorm(nn.Module):
     .. math:
       d_{ji} = (\sum_{k\in\mathcal{N}(i)}}e_{ki})^{-1}
 
-    where :math:`e_{ji}` is the scalar weight on the edge from node :math:`j` t node :math:`i`.
+    where :math:`e_{ji}` is the scalar weight on the edge from node :math:`j` to node :math:`i`.
 
-    The module returns the normalized weight :math:`e_{ji}/d_{ji}`.
+    The module returns the normalized weight :math:`e_{ji} * d_{ji}`.
 
     Parameters
     ----------
     norm : str, optional
-        How to apply the normalizer. If is `'right'`, divide the aggregated messages
-        by each node's in-degrees, which is equivalent to averaging the received messages.
-        If is `'none'`, no normalization is applied. Default is `'both'`,
-        where the :math:`c_{ij}` in the paper is applied.
+        The normalizer as specified above. Default is `'both'`.
 
     Examples
     --------
@@ -80,8 +77,7 @@ class EdgeWeightNorm(nn.Module):
         graph : DGLGraph
             The graph.
         edge_weight : torch.Tensor
-            Unnormalized scalar weights on the edges. If given,
-            the convolution will weight with regard to the edge feature.
+            Unnormalized scalar weights on the edges.
             The shape is expected to be :math:`(|E|)`.
 
         Returns
@@ -98,7 +94,7 @@ class EdgeWeightNorm(nn.Module):
 
             Case 2:
             The edge weight has non-positive values with ``norm='both'``.
-            This will trigger square root of a negative number.
+            This will trigger square root and division by a non-positive number.
         """
         with graph.local_scope():
             if isinstance(graph, DGLBlock):
