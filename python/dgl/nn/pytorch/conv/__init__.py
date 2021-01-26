@@ -9,6 +9,7 @@ from .gatconv import GATConv
 from .ginconv import GINConv
 from .gmmconv import GMMConv
 from .graphconv import GraphConv
+from .graphconvii import GraphConvII
 from .nnconv import NNConv
 from .relgraphconv import RelGraphConv
 from .sageconv import SAGEConv
@@ -25,4 +26,5 @@ from .dotgatconv import DotGatConv
 __all__ = ['GraphConv', 'GATConv', 'TAGConv', 'RelGraphConv', 'SAGEConv',
            'SGConv', 'APPNPConv', 'GINConv', 'GatedGraphConv', 'GMMConv',
            'ChebConv', 'AGNNConv', 'NNConv', 'DenseGraphConv', 'DenseSAGEConv',
-           'DenseChebConv', 'EdgeConv', 'AtomicConv', 'CFConv', 'DotGatConv']
+           'DenseChebConv', 'EdgeConv', 'AtomicConv', 'CFConv', 'DotGatConv',
+           'GraphConvII']
