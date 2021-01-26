@@ -22,6 +22,8 @@ CALL workon %BUILD_TAG%
 
 PUSHD python
 DEL /S /Q build *.egg-info dist
+pip install build
+python -m build --wheel --sdist --outdir dist
 pip install -e . || EXIT /B 1
 POPD
 
