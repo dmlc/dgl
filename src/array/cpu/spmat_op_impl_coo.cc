@@ -297,7 +297,9 @@ template COOMatrix COOTranspose<kDLCPU, int64_t>(COOMatrix coo);
 
 ///////////////////////////// COOToCSR /////////////////////////////
 
-// complexity: time O(NNZ), space O(NNZ)
+// complexity: time O(NNZ), space O(1) if the coo is row sorted,
+// time O(NNZ/p + N), space O(NNZ + N*p) otherwise, where p is the number of
+// threads.
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix COOToCSR(COOMatrix coo) {
   const int64_t N = coo.num_rows;
