@@ -11,7 +11,7 @@ from .. import utils
 @utils.parametrize('graph_name', ['cora', 'livejournal'])
 @utils.parametrize('format', ['coo', 'csr'])
 @utils.parametrize('feat_size', [8, 32, 128, 512])
-@utils.parametrize('msg_type', ['copy_u', 'copy_v', 'u_mul_e'])
+@utils.parametrize('msg_type', ['copy_u', 'u_mul_e'])
 @utils.parametrize('reduce_type', ['sum', 'mean', 'max'])
 def track_time(graph_name, format, feat_size, msg_type, reduce_type):
     device = utils.get_bench_device()
@@ -26,7 +26,6 @@ def track_time(graph_name, format, feat_size, msg_type, reduce_type):
     
     msg_udf_dict = {
         'copy_u': lambda edges: {'x': edges.src['h']},
-        'copy_v': lambda edges: {'x': edges.dst['h']},
         'u_mul_e': lambda edges: {'x': edges.src['h']*edges.data['e']},
     }
 

@@ -11,7 +11,7 @@ from .. import utils
 @utils.parametrize('graph_name', ['cora', 'livejournal'])
 @utils.parametrize('format', ['coo', 'csr'])
 @utils.parametrize('feat_size', [8, 32, 128, 512])
-@utils.parametrize('reduce_type', ['u->e', 'v->e', 'u+v', 'u*v', 'udotv'])
+@utils.parametrize('reduce_type', ['u->e', 'u+v'])
 def track_time(graph_name, format, feat_size, reduce_type):
     device = utils.get_bench_device()
     graph = utils.get_graph(graph_name, format)
@@ -23,10 +23,7 @@ def track_time(graph_name, format, feat_size, reduce_type):
 
     reduce_udf_dict = {
         'u->e': lambda edges: {'x': edges.src['h']},
-        'v->e': lambda edges: {'x': edges.dst['h']},
-        'u+v': lambda edges: {'x': edges.src['h']+edges.dst['h']},
-        'u*v': lambda edges: {'x': edges.src['h']*edges.dst['h']},
-        'udotv': lambda edges: {'x': (edges.src['h']*edges.dst['h']).sum(-1)},
+        'u+v': lambda edges: {'x': edges.src['h'] + edges.dst['h']},
     }
 
     # dry run

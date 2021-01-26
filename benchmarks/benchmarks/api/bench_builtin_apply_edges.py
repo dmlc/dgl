@@ -7,11 +7,11 @@ import dgl.function as fn
 from .. import utils
 
 
-@utils.benchmark('time', timeout=7200)
+@utils.benchmark('time', timeout=600)
 @utils.parametrize('graph_name', ['cora', 'livejournal'])
 @utils.parametrize('format', ['coo', 'csr'])
 @utils.parametrize('feat_size', [8, 32, 128, 512])
-@utils.parametrize('reduce_type', ['u->e', 'v->e', 'u+v', 'u*v', 'udotv'])
+@utils.parametrize('reduce_type', ['u->e', 'u+v'])
 def track_time(graph_name, format, feat_size, reduce_type):
     device = utils.get_bench_device()
     graph = utils.get_graph(graph_name, format)
@@ -23,10 +23,7 @@ def track_time(graph_name, format, feat_size, reduce_type):
 
     reduce_builtin_dict = {
         'u->e': fn.copy_u('h', 'x'),
-        'v->e': fn.copy_u('h', 'x'),
         'u+v': fn.u_add_v('h', 'h', 'x'),
-        'u*v': fn.u_mul_v('h', 'h', 'x'),
-        'udotv': fn.u_dot_v('h', 'h', 'x'),
     }
 
     # dry run
