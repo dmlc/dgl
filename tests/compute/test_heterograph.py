@@ -1813,6 +1813,17 @@ def test_format(idtype):
     assert g1.formats()['created'] == ['csc']
     assert len(g1.formats()['not created']) == 0
 
+    # in_degrees
+    g = dgl.rand_graph(100, 2340).to(F.ctx())
+    ind_arr = []
+    for vid in range(0, 100):
+        ind_arr.append(g.in_degrees(vid))
+    in_degrees = g.in_degrees()
+    g = g.formats('coo')
+    for vid in range(0, 100):
+        assert g.in_degrees(vid) == ind_arr[vid]
+    assert F.array_equal(in_degrees, g.in_degrees())
+
 @parametrize_dtype
 def test_edges_order(idtype):
     # (0, 2), (1, 2), (0, 1), (0, 1), (2, 1)
@@ -2503,6 +2514,117 @@ def test_frame_device(idtype):
     assert F.context(ng._node_frames[0]._columns['hh'].storage) == F.ctx()
     assert F.context(ng._edge_frames[0]._columns['h'].storage) == F.cpu()
 
+@parametrize_dtype
+def test_create_block(idtype):
+    block = dgl.create_block(([0, 1, 2], [1, 2, 3]), idtype=idtype, device=F.ctx())
+    assert block.num_src_nodes() == 3
+    assert block.num_dst_nodes() == 4
+    assert block.num_edges() == 3
+
+    block = dgl.create_block(([], []), idtype=idtype, device=F.ctx())
+    assert block.num_src_nodes() == 0
+    assert block.num_dst_nodes() == 0
+    assert block.num_edges() == 0
+
+    block = dgl.create_block(([], []), 3, 4, idtype=idtype, device=F.ctx())
+    assert block.num_src_nodes() == 3
+    assert block.num_dst_nodes() == 4
+    assert block.num_edges() == 0
+
+    block = dgl.create_block(([0, 1, 2], [1, 2, 3]), 4, 5, idtype=idtype, device=F.ctx())
+    assert block.num_src_nodes() == 4
+    assert block.num_dst_nodes() == 5
+    assert block.num_edges() == 3
+
+    sx = F.randn((4, 5))
+    dx = F.randn((5, 6))
+    ex = F.randn((3, 4))
+    block.srcdata['x'] = sx
+    block.dstdata['x'] = dx
+    block.edata['x'] = ex
+
+    g = dgl.block_to_graph(block)
+    assert g.num_src_nodes() == 4
+    assert g.num_dst_nodes() == 5
+    assert g.num_edges() == 3
+    assert g.srcdata['x'] is sx
+    assert g.dstdata['x'] is dx
+    assert g.edata['x'] is ex
+
+    block = dgl.create_block({
+        ('A', 'AB', 'B'): ([1, 2, 3], [2, 1, 0]),
+        ('B', 'BA', 'A'): ([2, 3], [3, 4])},
+        idtype=idtype, device=F.ctx())
+    assert block.num_src_nodes('A') == 4
+    assert block.num_src_nodes('B') == 4
+    assert block.num_dst_nodes('B') == 3
+    assert block.num_dst_nodes('A') == 5
+    assert block.num_edges('AB') == 3
+    assert block.num_edges('BA') == 2
+
+    block = dgl.create_block({
+        ('A', 'AB', 'B'): ([], []),
+        ('B', 'BA', 'A'): ([], [])},
+        idtype=idtype, device=F.ctx())
+    assert block.num_src_nodes('A') == 0
+    assert block.num_src_nodes('B') == 0
+    assert block.num_dst_nodes('B') == 0
+    assert block.num_dst_nodes('A') == 0
+    assert block.num_edges('AB') == 0
+    assert block.num_edges('BA') == 0
+
+    block = dgl.create_block({
+        ('A', 'AB', 'B'): ([], []),
+        ('B', 'BA', 'A'): ([], [])},
+        num_src_nodes={'A': 5, 'B': 5},
+        num_dst_nodes={'A': 6, 'B': 4},
+        idtype=idtype, device=F.ctx())
+    assert block.num_src_nodes('A') == 5
+    assert block.num_src_nodes('B') == 5
+    assert block.num_dst_nodes('B') == 4
+    assert block.num_dst_nodes('A') == 6
+    assert block.num_edges('AB') == 0
+    assert block.num_edges('BA') == 0
+
+    block = dgl.create_block({
+        ('A', 'AB', 'B'): ([1, 2, 3], [2, 1, 0]),
+        ('B', 'BA', 'A'): ([2, 3], [3, 4])},
+        num_src_nodes={'A': 5, 'B': 5},
+        num_dst_nodes={'A': 6, 'B': 4},
+        idtype=idtype, device=F.ctx())
+    assert block.num_src_nodes('A') == 5
+    assert block.num_src_nodes('B') == 5
+    assert block.num_dst_nodes('B') == 4
+    assert block.num_dst_nodes('A') == 6
+    assert block.num_edges(('A', 'AB', 'B')) == 3
+    assert block.num_edges(('B', 'BA', 'A')) == 2
+
+    sax = F.randn((5, 3))
+    sbx = F.randn((5, 4))
+    dax = F.randn((6, 5))
+    dbx = F.randn((4, 6))
+    eabx = F.randn((3, 7))
+    ebax = F.randn((2, 8))
+    block.srcnodes['A'].data['x'] = sax
+    block.srcnodes['B'].data['x'] = sbx
+    block.dstnodes['A'].data['x'] = dax
+    block.dstnodes['B'].data['x'] = dbx
+    block.edges['AB'].data['x'] = eabx
+    block.edges['BA'].data['x'] = ebax
+
+    hg = dgl.block_to_graph(block)
+    assert hg.num_nodes('A_src') == 5
+    assert hg.num_nodes('B_src') == 5
+    assert hg.num_nodes('A_dst') == 6
+    assert hg.num_nodes('B_dst') == 4
+    assert hg.num_edges(('A_src', 'AB', 'B_dst')) == 3
+    assert hg.num_edges(('B_src', 'BA', 'A_dst')) == 2
+    assert hg.nodes['A_src'].data['x'] is sax
+    assert hg.nodes['B_src'].data['x'] is sbx
+    assert hg.nodes['A_dst'].data['x'] is dax
+    assert hg.nodes['B_dst'].data['x'] is dbx
+    assert hg.edges['AB'].data['x'] is eabx
+    assert hg.edges['BA'].data['x'] is ebax
 
 
 if __name__ == '__main__':
@@ -2541,4 +2663,5 @@ if __name__ == '__main__':
     #test_frame(F.int32)
     #test_frame_device(F.int32)
     #test_empty_query(F.int32)
+    #test_create_block(F.int32)
     pass
