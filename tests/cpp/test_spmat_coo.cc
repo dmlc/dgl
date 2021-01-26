@@ -121,7 +121,7 @@ void _TestCOOToCSR(DLContext ctx) {
   auto tcsr = aten::COOToCSR(coo);
   ASSERT_EQ(coo.num_rows, csr.num_rows);
   ASSERT_EQ(coo.num_cols, csr.num_cols);
-  ASSERT_TRUE(ArrayEQ<IDX>(csr.indptr, tcsr.indptr)) << "csr.indptr = " << csr.indptr << ", tcsr.indptr = " << tcsr.indptr;
+  ASSERT_TRUE(ArrayEQ<IDX>(csr.indptr, tcsr.indptr));
 
   coo = COO2<IDX>(ctx);
   csr = CSR2<IDX>(ctx);

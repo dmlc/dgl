@@ -23,9 +23,9 @@ std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits) {
   IdArray sorted_idx = NewIdArray(nitems, ctx, 64);
 
   const IdType* keys_in = array.Ptr<IdType>();
-  const IdType* values_in = orig_idx.Ptr<int64_t>();
+  const int64_t* values_in = orig_idx.Ptr<int64_t>();
   IdType* keys_out = sorted_array.Ptr<IdType>();
-  IdType* values_out = sorted_idx.Ptr<int64_t>();
+  int64_t* values_out = sorted_idx.Ptr<int64_t>();
 
   if (num_bits == 0) {
     num_bits = sizeof(IdType)*8;

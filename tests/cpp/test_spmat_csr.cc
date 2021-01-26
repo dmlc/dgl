@@ -30,7 +30,7 @@ aten::CSRMatrix CSR2(DLContext ctx = CTX) {
   //  [0, 0, 1, 1, 0],
   //  [0, 0, 0, 0, 0]]
   // data: [0, 2, 5, 3, 1, 4]
-   return aten::CSRMatrix(
+  return aten::CSRMatrix(
       4, 5,
       aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 6, 6}), sizeof(IDX)*8, ctx),
       aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX)*8, ctx),
