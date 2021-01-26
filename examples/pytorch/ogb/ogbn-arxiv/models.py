@@ -4,7 +4,7 @@ import torch.nn as nn
 from dgl import function as fn
 from dgl._ffi.base import DGLError
 from dgl.nn.pytorch.utils import Identity
-from dgl.ops import edge_softmax
+from dgl.nn.functional import edge_softmax
 from dgl.utils import expand_as_pair
 
 
