@@ -236,7 +236,15 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLPartitionWithHalo_Hetero")
     *rv = ret_list;
   });
 
-// TODO(JJ): What's this?
+template<class IdType>
+struct EdgeProperty {
+  IdType eid;
+  int64_t idx;
+  int part_id;
+};
+
+// Reassign edge IDs so that all edges in a partition have contiguous edge IDs.
+// The original edge IDs are returned.
 DGL_REGISTER_GLOBAL("partition._CAPI_DGLReassignEdges_Hetero")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef g = args[0];
@@ -245,26 +253,54 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLReassignEdges_Hetero")
     CHECK_EQ(hgptr->relation_graphs().size(), 1)
       << "Reorder only supports HomoGraph";
     auto ugptr = hgptr->relation_graphs()[0];
-    bool is_incsr = args[1];
+    IdArray etype = args[1];
+    IdArray part_id = args[2];
+    bool is_incsr = args[3];
     auto csrmat = is_incsr ? ugptr->GetCSCMatrix(0) : ugptr->GetCSRMatrix(0);
     int64_t num_edges = csrmat.data->shape[0];
+    int64_t num_rows = csrmat.indptr->shape[0] - 1;
     IdArray new_data =
       IdArray::Empty({num_edges}, csrmat.data->dtype, csrmat.data->ctx);
     // Return the original edge Ids.
     *rv = new_data;
-    // TODO(zhengda) I need to invalidate out-CSR and COO.
 
     // Generate new edge Ids.
-    // TODO(zhengda) after assignment, we actually don't need to store them
-    // physically.
     ATEN_ID_TYPE_SWITCH(new_data->dtype, IdType, {
-      IdType *typed_new_data = static_cast<IdType *>(new_data->data);
+      CHECK(etype->dtype.bits == sizeof(IdType) * 8);
+      CHECK(part_id->dtype.bits == sizeof(IdType) * 8);
+      const IdType *part_id_data = static_cast<IdType *>(part_id->data);
+      const IdType *etype_data = static_cast<IdType *>(etype->data);
+      const IdType *indptr_data = static_cast<IdType *>(csrmat.indptr->data);
       IdType *typed_data = static_cast<IdType *>(csrmat.data->data);
-      for (int64_t i = 0; i < num_edges; i++) {
-        typed_new_data[i] = typed_data[i];
-        typed_data[i] = i;
+      IdType *typed_new_data = static_cast<IdType *>(new_data->data);
+      std::vector<EdgeProperty<IdType>> indexed_eids(num_edges);
+      for (int64_t i = 0; i < num_rows; i++) {
+        for (int64_t j = indptr_data[i]; j < indptr_data[i + 1]; j++) {
+          indexed_eids[j].eid = typed_data[j];
+          indexed_eids[j].idx = j;
+          indexed_eids[j].part_id = part_id_data[i];
+        }
+      }
+      auto comp = [etype_data](const EdgeProperty<IdType> &a, const EdgeProperty<IdType> &b) {
+        if (a.part_id == b.part_id) {
+          return etype_data[a.eid] < etype_data[b.eid];
+        } else {
+          return a.part_id < b.part_id;
+        }
+      };
+      // We only need to sort the edges if the input graph has multiple relations.
+      // If it's a homogeneous grap, we'll just assign edge Ids based on its previous order.
+      if (etype->shape[0] > 0) {
+        std::sort(indexed_eids.begin(), indexed_eids.end(), comp);
+      }
+      for (int64_t new_eid = 0; new_eid < num_edges; new_eid++) {
+        int64_t orig_idx = indexed_eids[new_eid].idx;
+        typed_new_data[new_eid] = typed_data[orig_idx];
+        typed_data[orig_idx] = new_eid;
       }
     });
+    ugptr->InvalidateCSR();
+    ugptr->InvalidateCOO();
   });
 
 DGL_REGISTER_GLOBAL("partition._CAPI_GetHaloSubgraphInnerNodes_Hetero")
