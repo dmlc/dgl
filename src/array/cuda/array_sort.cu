@@ -18,14 +18,14 @@ std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits) {
   const auto& ctx = array->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
   const int64_t nitems = array->shape[0];
-  IdArray orig_idx = Range(0, nitems, sizeof(IdType)*8, ctx);
+  IdArray orig_idx = Range(0, nitems, 64, ctx);
   IdArray sorted_array = NewIdArray(nitems, ctx, array->dtype.bits);
-  IdArray sorted_idx = NewIdArray(nitems, ctx, sizeof(IdType)*8);
+  IdArray sorted_idx = NewIdArray(nitems, ctx, 64);
 
   const IdType* keys_in = array.Ptr<IdType>();
-  const IdType* values_in = orig_idx.Ptr<IdType>();
+  const IdType* values_in = orig_idx.Ptr<int64_t>();
   IdType* keys_out = sorted_array.Ptr<IdType>();
-  IdType* values_out = sorted_idx.Ptr<IdType>();
+  IdType* values_out = sorted_idx.Ptr<int64_t>();
 
   if (num_bits == 0) {
     num_bits = sizeof(IdType)*8;
