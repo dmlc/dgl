@@ -43,17 +43,17 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
         self._print_info()
 
     def has_cache(self):
-        graph_path = os.path.join(self.save_path, 'dgl_graph_fix.bin')
+        graph_path = os.path.join(self.save_path, 'dgl_graph_v1.bin')
         if os.path.exists(graph_path):
             return True
         return False
 
     def save(self):
-        graph_path = os.path.join(self.save_path, 'dgl_graph_fix.bin')
+        graph_path = os.path.join(self.save_path, 'dgl_graph_v1.bin')
         save_graphs(graph_path, self._graph)
 
     def load(self):
-        graph_path = os.path.join(self.save_path, 'dgl_graph_fix.bin')
+        graph_path = os.path.join(self.save_path, 'dgl_graph_v1.bin')
         graphs, _ = load_graphs(graph_path)
         self._graph = graphs[0]
         self._data = [graphs[0]]
