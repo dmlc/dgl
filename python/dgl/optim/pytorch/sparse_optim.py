@@ -144,7 +144,7 @@ class SparseGradOptimizer(abc.ABC):
             Index of the embeddings to be updated.
         grad : tensor
             Gradient of each embedding.
-        emb : NodeEmbedding
+        emb : dgl.nn.NodeEmbedding
             Sparse node embedding to update.
         """
         pass
@@ -195,7 +195,7 @@ class SparseAdagrad(SparseGradOptimizer):
         self._eps = eps
         # We need to register a state sum for each embedding in the kvstore.
         for emb in params:
-            assert isinstance(emb, NodeEmbedding), 'SparseAdagrad only supports NodeEmbedding'
+            assert isinstance(emb, NodeEmbedding), 'SparseAdagrad only supports dgl.nn.NodeEmbedding'
 
             if self._rank is None:
                 self._rank = emb.rank
@@ -228,7 +228,7 @@ class SparseAdagrad(SparseGradOptimizer):
             Index of the embeddings to be updated.
         grad : tensor
             Gradient of each embedding.
-        emb : NodeEmbedding
+        emb : dgl.nn.NodeEmbedding
             Sparse embedding to update.
         """
         eps = self._eps
@@ -302,7 +302,7 @@ class SparseAdam(SparseGradOptimizer):
         self._eps = eps
         # We need to register a state sum for each embedding in the kvstore.
         for emb in params:
-            assert isinstance(emb, NodeEmbedding), 'SparseAdam only supports NodeEmbedding'
+            assert isinstance(emb, NodeEmbedding), 'SparseAdam only supports dgl.nn.NodeEmbedding'
 
             if self._rank is None:
                 self._rank = emb.rank
@@ -343,7 +343,7 @@ class SparseAdam(SparseGradOptimizer):
             Index of the embeddings to be updated.
         grad : tensor
             Gradient of each embedding.
-        emb : NodeEmbedding
+        emb : dgl.nn.NodeEmbedding
             Sparse embedding to update.
         """
         with th.no_grad():
