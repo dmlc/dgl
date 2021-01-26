@@ -125,7 +125,7 @@ class GINConv(nn.Module):
             if edge_weight is not None:
                 assert edge_weight.shape[0] == graph.number_of_edges()
                 graph.edata['_edge_weight'] = edge_weight
-                aggregate_fn = fn.src_mul_edge('h', '_edge_weight', 'm')
+                aggregate_fn = fn.u_mul_e('h', '_edge_weight', 'm')
 
             feat_src, feat_dst = expand_as_pair(feat, graph)
             graph.srcdata['h'] = feat_src
