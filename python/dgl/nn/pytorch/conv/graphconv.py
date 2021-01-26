@@ -22,16 +22,16 @@ class EdgeWeightNorm(nn.Module):
     Mathematically, setting ``norm='both'`` yields the following normalization term:
 
     .. math:
-      d_{ji} = (\sqrt{\sum_{k\in\mathcal{N}(j)}e_{jk}}\sqrt{\sum_{k\in\mathcal{N}(i)}e_{ki}})^{-1}
+      c_{ji} = (\sqrt{\sum_{k\in\mathcal{N}(j)}e_{jk}}\sqrt{\sum_{k\in\mathcal{N}(i)}e_{ki}})
 
     And, setting ``norm='right'`` yields the following normalization term:
 
     .. math:
-      d_{ji} = (\sum_{k\in\mathcal{N}(i)}}e_{ki})^{-1}
+      c_{ji} = (\sum_{k\in\mathcal{N}(i)}}e_{ki})
 
     where :math:`e_{ji}` is the scalar weight on the edge from node :math:`j` to node :math:`i`.
 
-    The module returns the normalized weight :math:`e_{ji} * d_{ji}`.
+    The module returns the normalized weight :math:`e_{ji} / c_{ji}`.
 
     Parameters
     ----------
@@ -147,22 +147,22 @@ class GraphConv(nn.Module):
     and mathematically is defined as follows:
 
     .. math::
-      h_i^{(l+1)} = \sigma(b^{(l)} + \sum_{j\in\mathcal{N}(i)}\frac{1}{c_{ij}}h_j^{(l)}W^{(l)})
+      h_i^{(l+1)} = \sigma(b^{(l)} + \sum_{j\in\mathcal{N}(i)}\frac{1}{c_{ji}}h_j^{(l)}W^{(l)})
 
     where :math:`\mathcal{N}(i)` is the set of neighbors of node :math:`i`,
-    :math:`c_{ij}` is the product of the square root of node degrees
-    (i.e.,  :math:`c_{ij} = \sqrt{|\mathcal{N}(i)|}\sqrt{|\mathcal{N}(j)|}`),
+    :math:`c_{ji}` is the product of the square root of node degrees
+    (i.e.,  :math:`c_{ji} = \sqrt{|\mathcal{N}(j)|}\sqrt{|\mathcal{N}(i)|}`),
     and :math:`\sigma` is an activation function.
 
     If a weight tensor on each edge is provided, the weighted graph convolution is defined as:
 
     .. math::
-      h_i^{(l+1)} = \sigma(b^{(l)} + \sum_{j\in\mathcal{N}(i)}\frac{e_{ji}}{c_{ij}}h_j^{(l)}W^{(l)})
+      h_i^{(l+1)} = \sigma(b^{(l)} + \sum_{j\in\mathcal{N}(i)}\frac{e_{ji}}{c_{ji}}h_j^{(l)}W^{(l)})
 
     where :math:`e_{ji}` is the scalar weight on the edge from node :math:`j` to node :math:`i`.
     This is NOT equivalent to the weighted graph convolutional network formulation in the paper.
 
-    To customize the normalization term :math:`c_{ij}`, one can first set ``norm='none'`` for
+    To customize the normalization term :math:`c_{ji}`, one can first set ``norm='none'`` for
     the model, and send the pre-normalized :math:`e_{ji}` to the forward computation. We provide
     :class:`~dgl.nn.pytorch.EdgeWeightNorm` to normalize scalar edge weight following the GCN paper.
 
@@ -176,7 +176,7 @@ class GraphConv(nn.Module):
         How to apply the normalizer. If is `'right'`, divide the aggregated messages
         by each node's in-degrees, which is equivalent to averaging the received messages.
         If is `'none'`, no normalization is applied. Default is `'both'`,
-        where the :math:`c_{ij}` in the paper is applied.
+        where the :math:`c_{ji}` in the paper is applied.
     weight : bool, optional
         If True, apply a linear layer. Otherwise, aggregating the messages
         without a weight matrix.
