@@ -111,6 +111,13 @@ if(USE_AVX)
   message(STATUS "Build with AVX optimization.")
 endif(USE_AVX)
 
+# Build with fp16 to support mixed precision training.
+if(USE_FP16)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_FP16")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_FP16")
+  message(STATUS "Build with fp16 to support mixed precision training")
+endif(USE_FP16)
+
 # To compile METIS correct for DGL.
 if(MSVC)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /DIDXTYPEWIDTH=64 /DREALTYPEWIDTH=32")
@@ -199,13 +206,6 @@ if(USE_TVM)
   list(APPEND DGL_LINKER_LIBS featgraph_runtime)
   message(STATUS "Build with TVM runtime and featgraph kernels.")
 endif(USE_TVM)
-
-# Build with fp16 to support mixed precision training.
-if(USE_FP16)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_FP16")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_FP16")
-  message(STATUS "Build with fp16 to support mixed precision training")
-endif(USE_FP16)
 
 # support PARALLEL_ALGORITHMS
 if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
