@@ -1,4 +1,5 @@
 import os
+import json
 import argparse
 import numpy as np
 import dgl
@@ -9,6 +10,8 @@ parser.add_argument('--input-dir', required=True, type=str,
                     help='The directory path that contains the partition results.')
 parser.add_argument('--graph-name', required=True, type=str,
                     help='The graph name')
+parser.add_argument('--schema', required=True, type=str,
+                    help='The schema of the graph')
 parser.add_argument('--num-parts', required=True, type=int,
                     help='The number of partitions')
 parser.add_argument('--num-ntypes', type=int, required=True,
@@ -17,7 +20,7 @@ parser.add_argument('--num-node-weights', required=True, type=int,
                     help='The number of node weights used by METIS.')
 parser.add_argument('--workspace', type=str, default='/tmp',
                     help='The directory to store the intermediate results')
-parser.add_argument('-o', '--output', required=True, type=str,
+parser.add_argument('--output', required=True, type=str,
                     help='The output directory of the partitioned results')
 args = parser.parse_args()
 
@@ -31,10 +34,11 @@ edge_attr_dtype = np.int64
 workspace_dir = args.workspace
 output_dir = args.output
 
-id_ranges = [[0, 163820],
-             [163820, 262111]]
-id_ranges = np.stack([np.array(row) for row in id_ranges], 1)
-id_map = dgl.distributed.id_map.IdMap({'_N': id_ranges})
+with open(args.schema) as json_file:
+    schema = json.load(json_file)
+id_ranges = schema['nid']
+id_ranges = {key: np.array(id_ranges[key]).reshape(1, 2) for key in id_ranges}
+id_map = dgl.distributed.id_map.IdMap(id_ranges)
 
 num_edges = 0
 for part_id in range(num_parts):
