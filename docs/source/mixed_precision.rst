@@ -3,8 +3,8 @@ Mixed Precision Training
 DGL is compatible with `PyTorch's automatic mixed precision package
 <https://pytorch.org/docs/stable/amp.html>`_
 for mixed precision training, thus saving both training time and GPU memory
-consumption. To enable this feature, user need to install PyTorch 1.6+ and
-build DGL from source file to support float16 data type (this feature is
+consumption. To enable this feature, users need to install PyTorch 1.6+ and
+build DGL from source file to support ``float16`` data type (this feature is
 still in its beta stage and we do not provide official pre-built pip wheels).
 
 Installation
@@ -30,7 +30,7 @@ Then install the Python binding.
 
 Message-Passing with Half Precision
 -----------------------------------
-DGL with fp16 support allows message-passing on float16 features for both
+DGL with fp16 support allows message-passing on ``float16`` features for both
 UDF(User Defined Function)s and built-in functions (e.g. ``dgl.function.sum``,
 ``dgl.function.copy_u``).
 
@@ -74,5 +74,107 @@ features:
 
 End-to-End Mixed Precision Training
 -----------------------------------
-The user experience on end-to-end mixed precision training of DGL is exactly the same
-as `PyTorch's <https://pytorch.org/docs/stable/notes/amp_examples.html>`_.
+DGL relies on PyTorch's AMP package for mixed precision training,
+and the user experience is exactly
+the same as `PyTorch's <https://pytorch.org/docs/stable/notes/amp_examples.html>`_.
+
+By wrapping the forward pass (including loss computation) of your GNN model with
+``torch.cuda.amp.autocast()``, PyTorch automatically selects the appropriate datatype
+for each op and tensor. Half precision tensors are memory efficient, most operators
+on half precision tensors are faster as they leverage GPU's tensorcores.
+
+Small Gradients in ``float16`` format have underflow problems (flush to zero), and
+PyTorch provides a ``GradScaler`` module to address this issue. ``GradScaler`` multiplies
+loss by a factor and invokes backward pass on scaled loss, and unscales graidents before
+optimizers update the parameters, thus preventing the underflow problem.
+The scale factor is determined automatically.
+
+Following is the training script of 3-layer GAT on Reddit dataset (w/ 114 million edges),
+note the difference in codes when ``use_fp16`` is activated/not activated:
+
+.. code::
+
+    import torch 
+    import torch.nn as nn
+    import torch.nn.functional as F
+    from torch.cuda.amp import autocast, GradScaler
+    import dgl
+    from dgl.data import RedditDataset
+    from dgl.nn import GATConv
+
+    use_fp16 = True
+
+
+    class GAT(nn.Module):
+        def __init__(self,
+                     in_feats,
+                     n_hidden,
+                     n_classes,
+                     heads):
+            super().__init__()
+            self.layers = nn.ModuleList()
+            self.layers.append(GATConv(in_feats, n_hidden, heads[0], activation=F.elu))
+            self.layers.append(GATConv(n_hidden * heads[0], n_hidden, heads[1], activation=F.elu))
+            self.layers.append(GATConv(n_hidden * heads[1], n_classes, heads[2], activation=F.elu))
+
+        def forward(self, g, h):
+            for l, layer in enumerate(self.layers):
+                h = layer(g, h)
+                if l != len(self.layers) - 1:
+                    h = h.flatten(1)
+                else:
+                    h = h.mean(1)
+            return h
+
+    # Data loading
+    data = RedditDataset()
+    device = torch.device(0)
+    g = data[0]
+    g = dgl.add_self_loop(g)
+    g = g.int().to(device)
+    train_mask = g.ndata['train_mask']
+    features = g.ndata['feat']
+    labels = g.ndata['label']
+    in_feats = features.shape[1]
+    n_hidden = 256
+    n_classes = data.num_classes
+    n_edges = g.number_of_edges()
+    heads = [1, 1, 1]
+    model = GAT(in_feats, n_hidden, n_classes, heads)
+    model = model.to(device)
+
+    # Create optimizer
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=5e-4)
+    # Create gradient scaler
+    scaler = GradScaler()
+
+    for epoch in range(100):
+        model.train()
+        optimizer.zero_grad()
+
+        # Wrap forward pass with autocast
+        with autocast(enabled=use_fp16):
+            logits = model(g, features)
+            loss = F.cross_entropy(logits[train_mask], labels[train_mask])
+        
+        if use_fp16:
+            # Backprop w/ gradient scaling
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            loss.backward()
+            optimizer.step()
+
+        print('Epoch {} | Loss {}'.format(epoch, loss.item()))
+
+
+On a NVIDIA V100 (16GB) machine, training this model without fp16 consumes
+14.3GB GPU memory; with fp16 turned on, the training consumes 13.2G
+GPU memory, the loss converges to similar values in both settings.
+If we change the number of heads to ``[2, 2, 2]``, training without fp16
+triggers GPU OOM(out-of-memory) issue while training with fp16 consumes
+14.8G GPU memory.
+
+DGL is still improving its half-precision support and the compute kernel's
+performance is far from optimal, please stay tuned to our future updates.

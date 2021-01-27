@@ -249,7 +249,7 @@ DGL provide operators to reduce value tensor along the first dimension by segmen
 Supported Data types
 --------------------
 Operators defined in ``dgl.ops`` support floating point data types, i.e. the operands
-must be ``float16``(``half``)/``float32``(``float``)/``float64``(``double``) tensors.
+must be ``half`` (``float16``) /``float``/``double`` tensors.
 The input tensors must have the same data type (if one input tensor has type float16
 and the other input tensor has data type float32, user must convert one of them to
 align with the other one).
@@ -259,9 +259,7 @@ compute capacity requirement of ``sm_53`` (Pascal, Volta, Turing and Ampere
 architectures).
 
 User can enable float16 for mixed precision training by compiling DGL from source
-and set the flag ``USE_FP16=ON`` either by passing ``-DUSE_FP16=ON`` to cmake
-command or copying ``cmake/config.cmake`` to build directory and changing
-``USE_FP16`` to ``ON``.
+(see :doc:`Mixed Precision Training </mixed_precision>` tutorial for details).
 
 Relation with Message Passing APIs
 ----------------------------------

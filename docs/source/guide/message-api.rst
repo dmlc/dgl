@@ -99,12 +99,10 @@ The math formula for the above function is:
 .. math::  {final\_ft}_i = 2 * \sum_{j\in\mathcal{N}(i)} ({ft}_j * a_{ij})
 
 DGL's built-in functions support floating point data types, i.e. the feature must
-be ``float16``(``half``)/``float32``(``float``)/``float64``(``double``) tensors.
+be ``half`` (``float16``) /``float``/``double`` tensors.
 ``float16`` data type support is disabled by default as it has a minimum GPU
 compute capacity requirement of ``sm_53`` (Pascal, Volta, Turing and Ampere
 architectures).
 
 User can enable float16 for mixed precision training by compiling DGL from source
-and set the flag ``USE_FP16=ON`` either by passing ``-DUSE_FP16=ON`` to cmake
-command or copying ``cmake/config.cmake`` to build directory and changing
-``USE_FP16`` to ``ON``.
+(see :doc:`Mixed Precision Training </mixed_precision>` tutorial for details).
