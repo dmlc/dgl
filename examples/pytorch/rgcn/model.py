@@ -76,7 +76,8 @@ class RelGraphEmbedLayer(nn.Module):
                  input_size,
                  embed_size,
                  sparse_emb=False,
-                 embed_name='embed'):
+                 embed_name='embed',
+                 gamma=-1):
         super(RelGraphEmbedLayer, self).__init__()
         self.dev_id = th.device(dev_id if dev_id >= 0 else 'cpu')
         self.embed_size = embed_size
@@ -97,7 +98,11 @@ class RelGraphEmbedLayer(nn.Module):
                 self.embeds[str(ntype)] = embed
 
         self.node_embeds = th.nn.Embedding(node_tids.shape[0], self.embed_size, sparse=self.sparse_emb)
-        nn.init.uniform_(self.node_embeds.weight, -1.0, 1.0)
+        if gamma <= 0:
+            nn.init.uniform_(self.node_embeds.weight, -1.0, 1.0)
+        else:
+            emb_init = gamma / embed_size
+            nn.init.uniform_(self.node_embeds.weight, -emb_init, emb_init)
 
     def forward(self, node_ids, node_tids, type_ids, features):
         """Forward computation
