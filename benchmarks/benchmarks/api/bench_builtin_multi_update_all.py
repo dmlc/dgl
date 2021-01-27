@@ -9,9 +9,9 @@ from .. import utils
 
 @utils.benchmark('time', timeout=600)
 @utils.parametrize('feat_size', [32, 128, 512])
-@utils.parametrize('num_relations', [3, 6, 12])
-@utils.thread_wrapped_func
-def track_time(feat_size, num_relations):
+@utils.parametrize('num_relations', [5, 50, 500])
+@utils.parametrize('multi_reduce_type', ["sum", "stuck"])
+def track_time(feat_size, num_relations, multi_reduce_type):
     device = utils.get_bench_device()
     dd = {}
     candidate_edges = [dgl.data.CoraGraphDataset(verbose=False)[0].edges(), dgl.data.PubmedGraphDataset(verbose=False)[
@@ -21,7 +21,6 @@ def track_time(feat_size, num_relations):
                                                              len(candidate_edges)]
     graph = dgl.heterograph(dd)
 
-    # Remove format strict
     graph = graph.to(device)
     graph.nodes['n1'].data['h'] = torch.randn(
         (graph.num_nodes('n1'), feat_size), device=device)
@@ -35,14 +34,14 @@ def track_time(feat_size, num_relations):
             fn.copy_src('h', 'm'), fn.sum('m', 'h'))
     graph.multi_update_all(
         update_dict,
-        "sum")
+        multi_reduce_type)
 
     # timing
     t0 = time.time()
     for i in range(3):
         graph.multi_update_all(
             update_dict,
-            "sum")
+            multi_reduce_type)
     t1 = time.time()
 
     return (t1 - t0) / 3

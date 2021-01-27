@@ -16,8 +16,6 @@ from .. import utils
 def track_time(graph_name, format, feat_size, msg_type, reduce_type):
     device = utils.get_bench_device()
     graph = utils.get_graph(graph_name, format)
-    # Remove format strict
-    graph = graph.formats(['coo', 'csr', 'csc'])
     graph = graph.to(device)
     graph.ndata['h'] = torch.randn(
         (graph.num_nodes(), feat_size), device=device)
