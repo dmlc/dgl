@@ -1813,6 +1813,17 @@ def test_format(idtype):
     assert g1.formats()['created'] == ['csc']
     assert len(g1.formats()['not created']) == 0
 
+    # in_degrees
+    g = dgl.rand_graph(100, 2340).to(F.ctx())
+    ind_arr = []
+    for vid in range(0, 100):
+        ind_arr.append(g.in_degrees(vid))
+    in_degrees = g.in_degrees()
+    g = g.formats('coo')
+    for vid in range(0, 100):
+        assert g.in_degrees(vid) == ind_arr[vid]
+    assert F.array_equal(in_degrees, g.in_degrees())
+
 @parametrize_dtype
 def test_edges_order(idtype):
     # (0, 2), (1, 2), (0, 1), (0, 1), (2, 1)

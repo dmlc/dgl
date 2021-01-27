@@ -19,20 +19,6 @@ using namespace cuda;
 namespace aten {
 namespace cuda {
 
-/*!
- * \brief CUDA Kernel of filling the vector started from ptr of size length
- *        with val.
- * \note internal use only.
- */
-template <typename DType>
-__global__ void _FillKernel(DType* ptr, size_t length, DType val) {
-  int tx = blockIdx.x * blockDim.x + threadIdx.x;
-  int stride_x = gridDim.x * blockDim.x;
-  while (tx < length) {
-    ptr[tx] = val;
-    tx += stride_x;
-  }
-}
 
 /*!
  * \brief CUDA kernel of g-SpMM on Coo format.
