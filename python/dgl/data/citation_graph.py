@@ -184,9 +184,9 @@ class CitationGraphDataset(DGLBuiltinDataset):
         self._graph = nx.DiGraph(graph)
 
         self._num_classes = info['num_classes']
-        self._g.ndata['train_mask'] = generate_mask_tensor(self._g.ndata['train_mask'].numpy())
-        self._g.ndata['val_mask'] = generate_mask_tensor(self._g.ndata['val_mask'].numpy())
-        self._g.ndata['test_mask'] = generate_mask_tensor(self._g.ndata['test_mask'].numpy())
+        self._g.ndata['train_mask'] = generate_mask_tensor(F.asnumpy(self._g.ndata['train_mask']))
+        self._g.ndata['val_mask'] = generate_mask_tensor(F.asnumpy(self._g.ndata['val_mask']))
+        self._g.ndata['test_mask'] = generate_mask_tensor(F.asnumpy(self._g.ndata['test_mask']))
         # hack for mxnet compatability
 
         if self.verbose:
