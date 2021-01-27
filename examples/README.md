@@ -45,6 +45,7 @@ The folder contains example implementations of selected research papers related 
 | [GNN-FiLM: Graph Neural Networks with Feature-wise Linear Modulation](#gnnfilm) | :heavy_check_mark:  |                     |                     |                     |                     |
 | [Hierarchical Graph Pooling with Structure Learning](#hgp-sl)                                                                                 |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Graph Representation Learning via Hard and Channel-Wise Attention Networks](#hardgat)                                   |:heavy_check_mark:                     |                 |                           |                    |                    |
+| [Graph Cross Networks with Vertex Infomax Pooling](#gxn)                                   |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Towards Deeper Graph Neural Networks](#dagnn) | :heavy_check_mark:  |                                  |                           |                    |                    |
 
 ## 2020
@@ -72,6 +73,10 @@ The folder contains example implementations of selected research papers related 
 - <a name="GNN-FiLM"></a> Marc Brockschmidt. GNN-FiLM: Graph Neural Networks with Feature-wise Linear Modulation. [Paper link](https://arxiv.org/abs/1906.12192).
     - Example code: [Pytorch](../examples/pytorch/GNN-FiLM)
     - Tags: multi-relational graphs, hypernetworks, GNN architectures
+
+- <a name="gxn"></a> Li, Maosen, et al. Graph Cross Networks with Vertex Infomax Pooling. [Paper link](https://arxiv.org/abs/2010.01804).
+    - Example code: [Pytorch](../examples/pytorch/gxn)
+    - Tags: pooling, graph classification
 
 - <a name="dagnn"></a> Liu et al. Towards Deeper Graph Neural Networks. [Paper link](https://arxiv.org/abs/2007.09296).
     - Example code: [Pytorch](../examples/pytorch/dagnn)
