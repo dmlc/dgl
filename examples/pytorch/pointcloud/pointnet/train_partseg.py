@@ -12,6 +12,7 @@ import tqdm
 import urllib
 import os
 import argparse
+import time
 
 from ShapeNet import ShapeNet
 from pointnet_partseg import PointNetPartSeg, PartSegLoss
@@ -25,6 +26,7 @@ parser.add_argument('--save-model-path', type=str, default='')
 parser.add_argument('--num-epochs', type=int, default=250)
 parser.add_argument('--num-workers', type=int, default=4)
 parser.add_argument('--batch-size', type=int, default=16)
+parser.add_argument('--tensorboard', type=bool, default=False)
 args = parser.parse_args()
 
 num_workers = args.num_workers
@@ -41,7 +43,7 @@ CustomDataLoader = partial(
         shuffle=True,
         drop_last=True)
 
-def train(net, opt, scheduler,  train_loader, dev):
+def train(net, opt, scheduler, train_loader, dev):
     category_list = sorted(list(shapenet.seg_classes.keys()))
     eye_mat = np.eye(16)
     net.train()
@@ -50,6 +52,7 @@ def train(net, opt, scheduler,  train_loader, dev):
     num_batches = 0
     total_correct = 0
     count = 0
+    start = time.time()
     with tqdm.tqdm(train_loader, ascii=True) as tq:
         for data, label, cat in tq:
             num_examples = data.shape[0]
@@ -74,10 +77,15 @@ def train(net, opt, scheduler,  train_loader, dev):
             correct = (preds.view(-1) == label).sum().item()
             total_correct += correct
 
+            AvgLoss = total_loss / num_batches
+            AvgAcc = total_correct / count
+
             tq.set_postfix({
-                'AvgLoss': '%.5f' % (total_loss / num_batches),
-                'AvgAcc': '%.5f' % (total_correct / count)})
+                'AvgLoss': '%.5f' % AvgLoss,
+                'AvgAcc': '%.5f' % AvgAcc})
     scheduler.step()
+    end = time.time()
+    return data, preds, AvgLoss, AvgAcc, end-start
 
 def mIoU(preds, label, cat, cat_miou, seg_classes):
     for i in range(preds.shape[0]):
@@ -167,11 +175,31 @@ shapenet = ShapeNet(2048, normal_channel=False)
 train_loader = CustomDataLoader(shapenet.trainval())
 test_loader = CustomDataLoader(shapenet.test())
 
+# Tensorboard
+if args.tensorboard:
+    import torchvision
+    from torch.utils.tensorboard import SummaryWriter
+    from torchvision import datasets, transforms
+    writer = SummaryWriter()
+# Select 50 distinct colors for different parts
+color_map = torch.tensor([
+    [47, 79, 79],[139, 69, 19],[112, 128, 144],[85, 107, 47],[139, 0, 0],[128, 128, 0],[72, 61, 139],[0, 128, 0],[188, 143, 143],[60, 179, 113],
+    [205, 133, 63],[0, 139, 139],[70, 130, 180],[205, 92, 92],[154, 205, 50],[0, 0, 139],[50, 205, 50],[250, 250, 250],[218, 165, 32],[139, 0, 139],
+    [10, 10, 10],[176, 48, 96],[72, 209, 204],[153, 50, 204],[255, 69, 0],[255, 145, 0],[0, 0, 205],[255, 255, 0],[0, 255, 0],[233, 150, 122],
+    [220, 20, 60],[0, 191, 255],[160, 32, 240],[192,192,192],[173, 255, 47],[218, 112, 214],[216, 191, 216],[255, 127, 80],[255, 0, 255],[100, 149, 237],
+    [128,128,128],[221, 160, 221],[144, 238, 144],[123, 104, 238],[255, 160, 122],[175, 238, 238],[238, 130, 238],[127, 255, 212],[255, 218, 185],[255, 105, 180],
+])
+# paint each point according to its pred
+def paint(batched_points):
+    B, N = batched_points.shape
+    colored = color_map[batched_points].squeeze(2)
+    return colored
+
 best_test_miou = 0
 best_test_per_cat_miou = 0
 
 for epoch in range(args.num_epochs):
-    train(net, opt, scheduler, train_loader, dev)
+    data, preds, AvgLoss, AvgAcc, training_time = train(net, opt, scheduler, train_loader, dev)
     if (epoch + 1) % 5 == 0:
         print('Epoch #%d Testing' % epoch)
         test_miou, test_per_cat_miou = evaluate(net, test_loader, dev, (epoch + 1) % 5 ==0)
@@ -182,3 +210,13 @@ for epoch in range(args.num_epochs):
                 torch.save(net.state_dict(), args.save_model_path)
         print('Current test mIoU: %.5f (best: %.5f), per-Category mIoU: %.5f (best: %.5f)' % (
                test_miou, best_test_miou, test_per_cat_miou, best_test_per_cat_miou))
+    # Tensorboard
+    if args.tensorboard:
+        colored = paint(preds)
+        writer.add_mesh('data', vertices=data, colors=colored, global_step=epoch)
+        writer.add_scalar('training time for one epoch', training_time, global_step=epoch)
+        writer.add_scalar('AvgLoss', AvgLoss, global_step=epoch)
+        writer.add_scalar('AvgAcc', AvgAcc, global_step=epoch)
+        if (epoch + 1) % 5 == 0:
+            writer.add_scalar('test mIoU', test_miou, global_step=epoch)
+            writer.add_scalar('best test mIoU', best_test_miou, global_step=epoch)
