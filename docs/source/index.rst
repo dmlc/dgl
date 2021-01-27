@@ -97,6 +97,7 @@ Getting Started
    guide/training
    guide/minibatch
    guide/distributed
+   guide/mixed_precision
 
 .. toctree::
    :maxdepth: 2
@@ -141,7 +142,6 @@ Getting Started
    faq
    env_var
    resources
-   mixed_precision
 
 Relationship of DGL to other frameworks
 ---------------------------------------

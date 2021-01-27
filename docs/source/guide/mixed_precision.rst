@@ -1,5 +1,7 @@
-Mixed Precision Training
-========================
+.. _guide-mixed_precision:
+
+Chapter 8: Mixed Precision Training
+===================================
 DGL is compatible with `PyTorch's automatic mixed precision package
 <https://pytorch.org/docs/stable/amp.html>`_
 for mixed precision training, thus saving both training time and GPU memory

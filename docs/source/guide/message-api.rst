@@ -105,4 +105,4 @@ compute capacity requirement of ``sm_53`` (Pascal, Volta, Turing and Ampere
 architectures).
 
 User can enable float16 for mixed precision training by compiling DGL from source
-(see :doc:`Mixed Precision Training </mixed_precision>` tutorial for details).
+(see :doc:`Mixed Precision Training <mixed_precision>` tutorial for details).
