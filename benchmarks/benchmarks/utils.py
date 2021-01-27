@@ -10,7 +10,7 @@ import pandas
 import dgl
 import torch
 import time
-
+from ogb.nodeproppred import DglNodePropPredDataset
 
 def _download(url, path, filename):
     fn = os.path.join(path, filename)
@@ -55,11 +55,17 @@ def get_graph(name, format):
         else:
             g = dgl.data.RedditDataset(self_loop=True)[0].formats([format])
             dgl.save_graphs(bin_path, [g])
+    elif name.startswith("ogb"):
+        g = get_ogb_graph(name)
     else:
         raise Exception("Unknown dataset")
     g = g.formats([format])
     return g
 
+def get_ogb_graph(name):
+    os.symlink('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
+    data = DglNodePropPredDataset(name=name)
+    return data[0][0]
 
 def get_livejournal():
     # Same as https://snap.stanford.edu/data/soc-LiveJournal1.txt.gz
@@ -109,8 +115,6 @@ class OGBDataset(object):
 
 def load_ogb_product():
     name = 'ogbn-products'
-    from ogb.nodeproppred import DglNodePropPredDataset
-
     os.symlink('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
 
     print('load', name)
@@ -142,8 +146,6 @@ def load_ogb_product():
 
 def load_ogb_mag():
     name = 'ogbn-mag'
-    from ogb.nodeproppred import DglNodePropPredDataset
-
     os.symlink('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
 
     print('load', name)
@@ -289,15 +291,21 @@ def setup_track_acc(*args, **kwargs):
     np.random.seed(42)
     torch.random.manual_seed(42)
 
+def setup_track_flops(*args, **kwargs):
+    # fix random seed
+    np.random.seed(42)
+    torch.random.manual_seed(42)
 
 TRACK_UNITS = {
     'time': 's',
     'acc': '%',
+    'flops': 'GFLOPS',
 }
 
 TRACK_SETUP = {
     'time': setup_track_time,
     'acc': setup_track_acc,
+    'flops': setup_track_flops,
 }
 
 
@@ -440,6 +448,7 @@ def benchmark(track_type, timeout=60):
 
             - 'time' : For timing. Unit: second.
             - 'acc' : For accuracy. Unit: percentage, value between 0 and 100.
+            - 'flops' : Unit: GFlops, number of floating point operations per second.
     timeout : int
         Timeout threshold in second.
 
@@ -451,7 +460,7 @@ def benchmark(track_type, timeout=60):
         def foo():
             pass
     """
-    assert track_type in ['time', 'acc']
+    assert track_type in ['time', 'acc', 'flops']
 
     def _wrapper(func):
         func.unit = TRACK_UNITS[track_type]
