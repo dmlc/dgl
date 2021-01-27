@@ -45,11 +45,11 @@ Use *area under the ROC curve* (AUC) and *average precision* (AP) scores for eac
 
 ### Dataset from website
 
-| Dataset  | AUC            | AP            |
-| -------- | -------------- | ------------- |
-| Cora     | 87.2$\pm$ 0.01 | 90.0$\pm$0.01 |
-| Citeseer | 81.9$\pm$0.02  | 86.9$\pm$0.02 |
-| Pubmed   | 81.8$\pm$0.01  | 86.2$\pm$0.01 |
+| Dataset  | AUC            | AP             |
+| -------- | -------------- | -------------- |
+| Cora     | 90.9$\pm$ 0.01 | 92.1$\pm$0.01  |
+| Citeseer | 90.3$\pm$0.01  | 91.8$\pm$0.01  |
+| Pubmed   | 94.4$\pm$ 0.01 | 94.6$\pm$ 0.01 |
 
 ### Reported results in paper
 
@@ -58,3 +58,4 @@ Use *area under the ROC curve* (AUC) and *average precision* (AP) scores for eac
 | Cora     | 91.4$\pm$ 0.01 | 92.6$\pm$0.01 |
 | Citeseer | 90.8$\pm$0.02  | 92.0$\pm$0.02 |
 | Pubmed   | 94.4$\pm$0.02  | 94.7$\pm$0.02 |
+

@@ -18,12 +18,12 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 parser = argparse.ArgumentParser(description='Variant Graph Auto Encoder')
 parser.add_argument('--learning_rate', type=float, default=0.01, help='Initial learning rate.')
-parser.add_argument('--epochs', '-e', type=int, default=500, help='Number of epochs to train.')
+parser.add_argument('--epochs', '-e', type=int, default=200, help='Number of epochs to train.')
 parser.add_argument('--hidden1', '-h1', type=int, default=32, help='Number of units in hidden layer 1.')
 parser.add_argument('--hidden2', '-h2', type=int, default=16, help='Number of units in hidden layer 2.')
 parser.add_argument('--datasrc', '-s', type=str, default='website',
                     help='Dataset download from dgl Dataset or website.')
-parser.add_argument('--dataset', '-d', type=str, default='cora', help='Dataset string.')
+parser.add_argument('--dataset', '-d', type=str, default='pubmed', help='Dataset string.')
 parser.add_argument('--gpu_id', type=int, default=0, help='GPU id to use.')
 args = parser.parse_args()
 
@@ -151,6 +151,8 @@ def dgl_main():
 def web_main():
     adj, features = load_data(args.dataset)
 
+    features = sparse_to_tuple(features.tocoo())
+
     # Store original adjacency matrix (without diagonal entries) for later
     adj_orig = adj
     adj_orig = adj_orig - sp.dia_matrix((adj_orig.diagonal()[np.newaxis, :], [0]), shape=adj_orig.shape)
@@ -159,10 +161,16 @@ def web_main():
     adj_train, train_edges, val_edges, val_edges_false, test_edges, test_edges_false = mask_test_edges(adj)
     adj = adj_train
 
-    # Some preprocessing
-    adj_norm = preprocess_graph(adj)
+    # # Create model
+    # graph = dgl.from_scipy(adj)
+    # graph.add_self_loop()
 
-    features = sparse_to_tuple(features.tocoo())
+    # Some preprocessing
+    adj_normalization, adj_norm = preprocess_graph(adj)
+
+    # Create model
+    graph = dgl.from_scipy(adj_normalization)
+    graph.add_self_loop()
 
     # Create Model
     pos_weight = float(adj.shape[0] * adj.shape[0] - adj.sum()) / adj.sum()
@@ -184,15 +192,6 @@ def web_main():
     weight_mask = adj_label.to_dense().view(-1) == 1
     weight_tensor = torch.ones(weight_mask.size(0))
     weight_tensor[weight_mask] = pos_weight
-
-    # row = adj.tocoo().row
-    # col = adj.tocoo().col
-    # row = torch.tensor(row)
-    # col = torch.tensor(col)
-    # graph = dgl.graph((row, col))
-
-    graph = dgl.from_scipy(adj)
-    graph.add_self_loop()
 
     features = features.to_dense()
     in_dim = features.shape[-1]
@@ -266,11 +265,13 @@ def web_main():
 
     test_roc, test_ap = get_scores(test_edges, test_edges_false, logits)
     print("End of training!", "test_roc=", "{:.5f}".format(test_roc), "test_ap=", "{:.5f}".format(test_ap))
+    # roc_means.append(test_roc)
+    # ap_means.append(test_ap)
 
 
 # if __name__ == '__main__':
 #     for i in range(10):
-#         main()
+#         web_main()
 #
 #     roc_mean = np.mean(roc_means)
 #     roc_std = np.std(roc_means, ddof=1)
