@@ -90,7 +90,8 @@ def _reverse(gidx):
     original_formats_dict = gidx.formats()
     original_formats = original_formats_dict['created'] +\
                        original_formats_dict['not created']
-    g_rev = g_rev.formats([inverse_format[fmt] for fmt in original_formats])
+    if len(original_formats) < 3:
+        g_rev = g_rev.formats([inverse_format[fmt] for fmt in original_formats])
     return g_rev
 
 
