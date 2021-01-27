@@ -314,11 +314,6 @@ CSRMatrix COOToCSR(COOMatrix coo) {
 
   bool row_sorted = coo.row_sorted;
   bool col_sorted = coo.col_sorted;
-  if (!row_sorted) {
-    // It is possible that the flag is simply not set (default value is false),
-    // so we still perform a linear scan to check the flag.
-    std::tie(row_sorted, col_sorted) = COOIsSorted(coo);
-  }
 
   if (row_sorted) {
     // compute indptr
@@ -352,8 +347,9 @@ CSRMatrix COOToCSR(COOMatrix coo) {
     IdType* const Bi = static_cast<IdType*>(ret_indices->data);
     IdType* const Bx = static_cast<IdType*>(ret_data->data);
 
-
-    std::vector<std::vector<int64_t>> local_ptrs;
+    // the offset within each row, that each thread will write to
+    std::vector<std::vector<IdType>> local_ptrs;
+    std::vector<int64_t> thread_prefixsum;
 
 #pragma omp parallel
     {
@@ -372,6 +368,7 @@ CSRMatrix COOToCSR(COOMatrix coo) {
 #pragma omp master
       {
         local_ptrs.resize(num_threads);
+        thread_prefixsum.resize(num_threads+1);
       }
 
 #pragma omp barrier
@@ -382,42 +379,35 @@ CSRMatrix COOToCSR(COOMatrix coo) {
       }
 
 #pragma omp barrier
-
       // compute prefixsum in parallel
-      constexpr const int cache_line = 64/ sizeof(IdType);
-      std::array<IdType, cache_line> line;
-      for (int64_t i = n_start; i < n_end; i+=cache_line) {
-        // use 1d cache blocking
-        std::fill(line.begin(), line.end(), 0);
+      int64_t sum = 0;
+      for (int64_t i = n_start; i < n_end; ++i) {
+        IdType tmp = 0;
         for (int j = 0; j < num_threads; ++j) {
-#pragma unroll
-          for (int k = 0; k < cache_line; ++k) {
-            if (i+k  < n_end) {
-              const IdType tmp = line[k];
-              line[k] += local_ptrs[j][i+k];
-              local_ptrs[j][i+k] = tmp;
-            }
-          }
+          std::swap(tmp, local_ptrs[j][i]);
+          tmp += local_ptrs[j][i];
         }
-
-#pragma unroll
-        for (int k = 0; k < cache_line; ++k) {
-          if (i+k < n_end) {
-            Bp[i+k+1] = line[k];
-          }
-        }
+        sum += tmp;
+        Bp[i+1] = sum;
       }
+      thread_prefixsum[thread_id+1] = sum;
 
 #pragma omp barrier
-      #pragma omp master
+#pragma omp master
       {
-        for (int64_t i = 0; i < N; ++i) {
-          Bp[i+1] += Bp[i];
+        for (int64_t i = 0; i < num_threads; ++i) {
+          thread_prefixsum[i+1] += thread_prefixsum[i];
         }
-        CHECK_EQ(Bp[N], NNZ);
+        CHECK_EQ(thread_prefixsum[num_threads], NNZ);
       }
 #pragma omp barrier
 
+      sum = thread_prefixsum[thread_id];
+      for (int64_t i = n_start; i < n_end; ++i) {
+        Bp[i+1] += sum;
+      }
+
+#pragma omp barrier
       for (int64_t i = nz_start; i < nz_end; ++i) {
         const IdType r = row_data[i];
         const int64_t index = Bp[r] + local_ptrs[thread_id][r]++;
@@ -425,6 +415,7 @@ CSRMatrix COOToCSR(COOMatrix coo) {
         Bx[index] = data ? data[i] : i;
       }
     }
+    CHECK_EQ(Bp[N], NNZ);
   }
 
   return CSRMatrix(coo.num_rows, coo.num_cols,
