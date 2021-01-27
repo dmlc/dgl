@@ -17,8 +17,6 @@ class NodeEmbedding: # NodeEmbedding
     Currently, DGL provides two optimizers that work with this NodeEmbedding
     class: ``SparseAdagrad`` and ``SparseAdam``.
 
-    NOTE: NodeEmbedding can only support single node training.
-
     The implementation is based on torch.distributed package. It depends on the pytorch
     default distributed process group to collect multi-process information and uses
     ``torch.distributed.TCPStore`` to share meta-data information across multiple gpu processes.
