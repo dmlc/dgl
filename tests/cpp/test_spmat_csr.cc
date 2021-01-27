@@ -39,6 +39,30 @@ aten::CSRMatrix CSR2(DLContext ctx = CTX) {
 }
 
 template <typename IDX>
+aten::CSRMatrix CSR3(DLContext ctx = CTX) {
+  // has duplicate entries and the columns are not sorted
+  // [[0, 1, 1, 1, 0],
+  //  [1, 0, 0, 0, 0],
+  //  [0, 0, 1, 1, 0],
+  //  [0, 0, 0, 0, 0],
+  //  [1, 1, 1, 0, 0],
+  //  [0, 0, 0, 1, 0]],
+  //  [0, 0, 0, 0, 0]],
+  //  [1, 2, 1, 1, 0]],
+  //  [0, 1, 0, 0, 1]],
+  // data: [5, 2, 0, 3, 1, 4, 8, 7, 6, 9, 12, 13, 11, 10, 14, 15, 16]
+  return aten::CSRMatrix(
+      9, 6,
+      aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 6, 6, 9, 10, 10, 15, 17}),
+          sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(std::vector<IDX>({3, 2, 1, 0, 2, 3, 1, 2, 0, 3, 1,
+          2, 1, 3, 0, 5, 1}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(std::vector<IDX>({0, 2, 5, 3, 1, 4, 6, 8, 7, 9, 13,
+          10, 11, 14, 12, 16, 15}), sizeof(IDX)*8, ctx),
+      false);
+}
+
+template <typename IDX>
 aten::COOMatrix COO1(DLContext ctx = CTX) {
   // [[0, 1, 1, 0, 0],
   //  [1, 0, 0, 0, 0],
@@ -115,7 +139,7 @@ aten::COOMatrix COO3(DLContext ctx) {
 }  // namespace
 
 template <typename IDX>
-void _TestCSRIsNonZero(DLContext ctx) {
+void _TestCSRIsNonZero1(DLContext ctx) {
   auto csr = CSR1<IDX>(ctx);
   ASSERT_TRUE(aten::CSRIsNonZero(csr, 0, 1));
   ASSERT_FALSE(aten::CSRIsNonZero(csr, 0, 0));
@@ -126,12 +150,28 @@ void _TestCSRIsNonZero(DLContext ctx) {
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 }
 
+template <typename IDX>
+void _TestCSRIsNonZero2(DLContext ctx) {
+  auto csr = CSR3<IDX>(ctx);
+  ASSERT_TRUE(aten::CSRIsNonZero(csr, 0, 1));
+  ASSERT_FALSE(aten::CSRIsNonZero(csr, 0, 0));
+  IdArray r = aten::VecToIdArray(std::vector<IDX>({0, 0, 0, 0, 0, }), sizeof(IDX)*8, ctx);
+  IdArray c = aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 3, 4, }), sizeof(IDX)*8, ctx);
+  IdArray x = aten::CSRIsNonZero(csr, r, c);
+  IdArray tx = aten::VecToIdArray(std::vector<IDX>({0, 1, 1, 1, 0}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(x, tx)) << " x = " << x << ", tx = " << tx;
+}
+
 TEST(SpmatTest, TestCSRIsNonZero) {
-  _TestCSRIsNonZero<int32_t>(CPU);
-  _TestCSRIsNonZero<int64_t>(CPU);
+  _TestCSRIsNonZero1<int32_t>(CPU);
+  _TestCSRIsNonZero1<int64_t>(CPU);
+  _TestCSRIsNonZero2<int32_t>(CPU);
+  _TestCSRIsNonZero2<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
-  _TestCSRIsNonZero<int32_t>(GPU);
-  _TestCSRIsNonZero<int64_t>(GPU);
+  _TestCSRIsNonZero1<int32_t>(GPU);
+  _TestCSRIsNonZero1<int64_t>(GPU);
+  _TestCSRIsNonZero2<int32_t>(GPU);
+  _TestCSRIsNonZero2<int64_t>(GPU);
 #endif
 }
 
@@ -382,7 +422,7 @@ TEST(SpmatTest, TestCSRSliceRows) {
 }
 
 template <typename IDX>
-void _TestCSRSliceMatrix(DLContext ctx) {
+void _TestCSRSliceMatrix1(DLContext ctx) {
   auto csr = CSR2<IDX>(ctx);
   {
   // square
@@ -439,12 +479,76 @@ void _TestCSRSliceMatrix(DLContext ctx) {
   }
 }
 
+template <typename IDX>
+void _TestCSRSliceMatrix2(DLContext ctx) {
+  auto csr = CSR3<IDX>(ctx);
+  {
+  // square
+  auto r = aten::VecToIdArray(std::vector<IDX>({0, 1, 3}), sizeof(IDX)*8, ctx);
+  auto c = aten::VecToIdArray(std::vector<IDX>({1, 2, 3}), sizeof(IDX)*8, ctx);
+  auto x = aten::CSRSliceMatrix(csr, r, c);
+  // [[1, 1, 1],
+  //  [0, 0, 0],
+  //  [0, 0, 0]]
+  // data: [5, 2, 0]
+  ASSERT_EQ(x.num_rows, 3);
+  ASSERT_EQ(x.num_cols, 3);
+  auto tp = aten::VecToIdArray(std::vector<IDX>({0, 3, 3, 3}), sizeof(IDX)*8, ctx);
+  // indexes are in reverse order in CSR3
+  auto ti = aten::VecToIdArray(std::vector<IDX>({2, 1, 0}), sizeof(IDX)*8, ctx);
+  auto td = aten::VecToIdArray(std::vector<IDX>({0, 2, 5}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(x.indptr, tp));
+  ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
+  ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
+  }
+  {
+  // non-square
+  auto r = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, ctx);
+  auto c = aten::VecToIdArray(std::vector<IDX>({0, 1}), sizeof(IDX)*8, ctx);
+  auto x = aten::CSRSliceMatrix(csr, r, c);
+  // [[0, 1],
+  //  [1, 0],
+  //  [0, 0]]
+  // data: [0, 3]
+  ASSERT_EQ(x.num_rows, 3);
+  ASSERT_EQ(x.num_cols, 2);
+  auto tp = aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 2}), sizeof(IDX)*8, ctx);
+  auto ti = aten::VecToIdArray(std::vector<IDX>({1, 0}), sizeof(IDX)*8, ctx);
+  auto td = aten::VecToIdArray(std::vector<IDX>({5, 3}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(x.indptr, tp));
+  ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
+  ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
+  }
+  {
+  // empty slice
+  auto r = aten::VecToIdArray(std::vector<IDX>({2, 3}), sizeof(IDX)*8, ctx);
+  auto c = aten::VecToIdArray(std::vector<IDX>({0, 1}), sizeof(IDX)*8, ctx);
+  auto x = aten::CSRSliceMatrix(csr, r, c);
+  // [[0, 0],
+  //  [0, 0]]
+  // data: []
+  ASSERT_EQ(x.num_rows, 2);
+  ASSERT_EQ(x.num_cols, 2);
+  auto tp = aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX)*8, ctx);
+  auto ti = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+  auto td = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(x.indptr, tp));
+  ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
+  ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
+  }
+}
+
+
 TEST(SpmatTest, CSRSliceMatrix) {
-  _TestCSRSliceMatrix<int32_t>(CPU);
-  _TestCSRSliceMatrix<int64_t>(CPU);
+  _TestCSRSliceMatrix1<int32_t>(CPU);
+  _TestCSRSliceMatrix1<int64_t>(CPU);
+  _TestCSRSliceMatrix2<int32_t>(CPU);
+  _TestCSRSliceMatrix2<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
-  _TestCSRSliceMatrix<int32_t>(GPU);
-  _TestCSRSliceMatrix<int64_t>(GPU);
+  _TestCSRSliceMatrix1<int32_t>(GPU);
+  _TestCSRSliceMatrix1<int64_t>(GPU);
+  _TestCSRSliceMatrix2<int32_t>(GPU);
+  _TestCSRSliceMatrix2<int64_t>(GPU);
 #endif
 }
 

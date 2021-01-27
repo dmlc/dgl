@@ -286,7 +286,7 @@ IdArray NonZero(NDArray array) {
   return ret;
 }
 
-std::pair<IdArray, IdArray> Sort(IdArray array) {
+std::pair<IdArray, IdArray> Sort(IdArray array, const int num_bits) {
   if (array.NumElements() == 0) {
     IdArray idx = NewIdArray(0, array->ctx, 64);
     return std::make_pair(array, idx);
@@ -294,7 +294,7 @@ std::pair<IdArray, IdArray> Sort(IdArray array) {
   std::pair<IdArray, IdArray> ret;
   ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "Sort", {
     ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
-      ret = impl::Sort<XPU, IdType>(array);
+      ret = impl::Sort<XPU, IdType>(array, num_bits);
     });
   });
   return ret;
