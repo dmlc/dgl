@@ -37,7 +37,7 @@ class SparseGradOptimizer(abc.ABC):
             shared_emb = {emb.name: ([], []) for emb in self._params}
 
             # Go through all sparse embeddings
-            for emb in self._params:
+            for emb in self._params: # pylint: disable=too-many-nested-blocks
                 num_embeddings = emb.num_embeddings
                 emb_name = emb.name
 
@@ -277,7 +277,8 @@ class SparseAdam(SparseGradOptimizer):
     :math:`Gm_{t,i,j}=beta1 * Gm_{t-1,i,j} + (1-beta1) * g_{t,i,j}`,
     :math:`Gp_{t,i,j}=beta2 * Gp_{t-1,i,j} + (1-beta2) * g_{t,i,j}^2`,
     :math:`g_{t,i,j} = lr * Gm_{t,i,j} / (1 - beta1^t) / \sqrt{Gp_{t,i,j} / (1 - beta2^t)}` and
-    :math:`g_{t,i,j}` is the gradient of the dimension :math:`j` of embedding :math:`i` at step :math:`t`.
+    :math:`g_{t,i,j}` is the gradient of the dimension :math:`j` of embedding :math:`i`
+    at step :math:`t`.
 
     Parameters
     ----------
