@@ -1,9 +1,8 @@
 """Torch NodeEmbedding."""
+from datetime import timedelta
+import torch as th
 from ...backend import pytorch as F
 from ...utils import get_shared_mem_array, create_shared_mem_array
-from datetime import timedelta
-
-import torch as th
 
 _STORE = None
 

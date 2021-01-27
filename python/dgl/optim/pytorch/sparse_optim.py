@@ -4,7 +4,7 @@ from abc import abstractmethod
 import torch as th
 
 from ...utils import get_shared_mem_array, create_shared_mem_array
-from ...nn import NodeEmbedding
+from ...nn.pytorch import NodeEmbedding
 
 class SparseGradOptimizer(abc.ABC):
     r''' The abstract sparse optimizer.
@@ -107,9 +107,9 @@ class SparseGradOptimizer(abc.ABC):
                                 size = int(emb.store.get(idx_shmem_name))
                                 if idx_shmem_name not in self._shared_cache[emb_name] or \
                                     self._shared_cache[emb_name][idx_shmem_name].shape[0] < size:
-                                    idx_shmem = get_shared_mem_array(idx_shmem_name,
+                                    idx_shmem = get_shared_mem_array(idx_shmem_name, \
                                         (size * 2 + 2,), idx_dtype)
-                                    grad_shmem = get_shared_mem_array(grad_shmem_name,
+                                    grad_shmem = get_shared_mem_array(grad_shmem_name, \
                                         (size * 2 + 2, grad_dim), grad_dtype)
                                     self._shared_cache[emb_name][idx_shmem_name] = idx_shmem
                                     self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
@@ -202,17 +202,21 @@ class SparseAdagrad(SparseGradOptimizer):
         self._eps = eps
         # We need to register a state sum for each embedding in the kvstore.
         for emb in params:
-            assert isinstance(emb, NodeEmbedding), 'SparseAdagrad only supports dgl.nn.NodeEmbedding'
+            assert isinstance(emb, NodeEmbedding), \
+                'SparseAdagrad only supports dgl.nn.NodeEmbedding'
 
             if self._rank is None:
                 self._rank = emb.rank
                 self._world_size = emb.world_size
             else:
-                assert self._rank == emb.rank, 'MultiGPU rank for each embedding should be same.'
-                assert self._world_size == emb.world_size, 'MultiGPU world_size for each embedding should be same.'
+                assert self._rank == emb.rank, \
+                    'MultiGPU rank for each embedding should be same.'
+                assert self._world_size == emb.world_size, \
+                    'MultiGPU world_size for each embedding should be same.'
             if self._rank <= 0:
                 emb_name = emb.name
-                state = create_shared_mem_array(emb_name+'_state', emb.emb_tensor.shape, th.float32).zero_()
+                state = create_shared_mem_array(emb_name+'_state', \
+                    emb.emb_tensor.shape, th.float32).zero_()
             if self._rank == 0:
                 for _ in range(1, world_size):
                     # send embs
@@ -221,7 +225,8 @@ class SparseAdagrad(SparseGradOptimizer):
                 # receive
                 emb_name = emb.name
                 emb.store.wait([emb_name+'_opt'])
-                state = get_shared_mem_array(emb_name+'_state', emb.emb_tensor.shape, th.float32)
+                state = get_shared_mem_array(emb_name+'_state', \
+                    emb.emb_tensor.shape, th.float32)
             emb.set_optm_state(state)
 
     def update(self, idx, grad, emb):
