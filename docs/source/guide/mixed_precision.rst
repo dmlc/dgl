@@ -172,11 +172,11 @@ note the difference in codes when ``use_fp16`` is activated/not activated:
 
 
 On a NVIDIA V100 (16GB) machine, training this model without fp16 consumes
-14.3GB GPU memory; with fp16 turned on, the training consumes 13.2G
+15.2GB GPU memory; with fp16 turned on, the training consumes 12.8G
 GPU memory, the loss converges to similar values in both settings.
 If we change the number of heads to ``[2, 2, 2]``, training without fp16
 triggers GPU OOM(out-of-memory) issue while training with fp16 consumes
-14.8G GPU memory.
+15.7G GPU memory.
 
 DGL is still improving its half-precision support and the compute kernel's
 performance is far from optimal, please stay tuned to our future updates.
