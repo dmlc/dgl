@@ -30,23 +30,6 @@ struct EmptyKey {
 // GPU Code ///////////////////////////////////////////////////////////////////
 
 template<typename IdType>
-struct BlockPrefixCallbackOp {
-  IdType running_total_;
-
-  __device__ BlockPrefixCallbackOp(
-      const IdType running_total) :
-    running_total_(running_total) {
-  }
-
-  __device__ IdType operator()(const IdType block_aggregate) {
-      const IdType old_prefix = running_total_;
-      running_total_ += block_aggregate;
-      return old_prefix;
-  }
-};
-
-
-template<typename IdType>
 inline __device__ bool attempt_insert_at(
     const size_t pos,
     const IdType id,
