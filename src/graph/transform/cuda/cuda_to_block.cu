@@ -15,9 +15,11 @@
 #include <algorithm>
 
 #include "../../../runtime/cuda/cuda_common.h"
+#include "../../../runtime/cuda/cuda_device_common.cuh"
 #include "../../heterograph.h"
 
 using namespace dgl::aten;
+using namespace dgl::runtime::cuda;
 
 namespace dgl {
 namespace transform {
@@ -40,36 +42,6 @@ struct EmptyKey {
 
 
 // GPU Code ///////////////////////////////////////////////////////////////////
-
-inline __device__ int64_t atomicCAS(
-    int64_t * const address,
-    const int64_t compare,
-    const int64_t val) {
-  // match the type of "::atomicCAS", so ignore lint warning
-  using Type = unsigned long long int; // NOLINT
-
-  static_assert(sizeof(Type) == sizeof(*address), "Type width must match");
-
-  return ::atomicCAS(reinterpret_cast<Type*>(address),
-                   static_cast<Type>(compare),
-                   static_cast<Type>(val));
-}
-
-
-inline __device__ int32_t atomicCAS(
-    int32_t * const address,
-    const int32_t compare,
-    const int32_t val) {
-  // match the type of "::atomicCAS", so ignore lint warning
-  using Type = int; // NOLINT
-
-  static_assert(sizeof(Type) == sizeof(*address), "Type width must match");
-
-  return ::atomicCAS(reinterpret_cast<Type*>(address),
-                   static_cast<Type>(compare),
-                   static_cast<Type>(val));
-}
-
 
 template<typename IdType>
 struct BlockPrefixCallbackOp {
@@ -94,7 +66,7 @@ inline __device__ bool attempt_insert_at(
     const IdType id,
     const size_t index,
     Mapping<IdType> * const table) {
-  const IdType key = atomicCAS(&table[pos].key, EmptyKey<IdType>::value, id);
+  const IdType key = AtomicCAS(&table[pos].key, EmptyKey<IdType>::value, id);
   if (key == EmptyKey<IdType>::value || key == id) {
     // we either set a match key, or found a matching key, so then place the
     // minimum index in position. Match the type of atomicMin, so ignore
