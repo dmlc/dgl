@@ -1,11 +1,11 @@
-import torch as th
+"""Torch NodeEmbedding."""
 from ...backend import pytorch as F
 from ...utils import get_shared_mem_array, create_shared_mem_array
 from datetime import timedelta
 
-from ... import ndarray as nd
+import torch as th
 
-_store = None
+_STORE = None
 
 class NodeEmbedding: # NodeEmbedding
     '''Class for storing node embeddings.
@@ -60,7 +60,7 @@ class NodeEmbedding: # NodeEmbedding
 
     def __init__(self, num_embeddings, embedding_dim, name,
                  init_func=None):
-        global _store
+        global _STORE
 
         # Check whether it is multi-gpu training or not.
         if th.distributed.is_initialized():
@@ -71,8 +71,8 @@ class NodeEmbedding: # NodeEmbedding
             world_size = 0
         self._rank = rank
         self._world_size = world_size
-        host_name='127.0.0.1'
-        port=12346
+        host_name = '127.0.0.1'
+        port = 12346
 
         if rank <= 0:
             emb = create_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
@@ -82,21 +82,21 @@ class NodeEmbedding: # NodeEmbedding
             if world_size > 1:
                 # for multi-gpu training, setup a TCPStore for
                 # embeding status synchronization across GPU processes
-                if _store is None:
-                    _store = th.distributed.TCPStore(
+                if _STORE is None:
+                    _STORE = th.distributed.TCPStore(
                         host_name, port, world_size, True, timedelta(seconds=30))
-                for i in range(1, world_size):
+                for _ in range(1, world_size):
                     # send embs
-                    _store.set(name, name)
+                    _STORE.set(name, name)
         elif rank > 0:
             # receive
-            if _store is None:
-                _store = th.distributed.TCPStore(
+            if _STORE is None:
+                _STORE = th.distributed.TCPStore(
                     host_name, port, world_size, False, timedelta(seconds=30))
-            _store.wait([name])
+            _STORE.wait([name])
             emb = get_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
 
-        self._store = _store
+        self._store = _STORE
         self._tensor = emb
         self._num_embeddings = num_embeddings
         self._embedding_dim = embedding_dim
@@ -119,42 +119,106 @@ class NodeEmbedding: # NodeEmbedding
 
     @property
     def store(self):
+        """Return torch.distributed.TCPStore for
+        meta data sharing across processes.
+
+        Returns
+        -------
+        torch.distributed.TCPStore
+            KVStore used for meta data sharing.
+        """
         return self._store
 
     @property
     def rank(self):
+        """Return rank of current process.
+
+        Returns
+        -------
+        int
+            The rank of current process.
+        """
         return self._rank
 
     @property
-    def name(self):
-        return self._name
-
-    @property
     def world_size(self):
+        """Return world size of the pytorch distributed training env.
+
+        Returns
+        -------
+        int
+            The world size of the pytorch distributed training env.
+        """
         return self._world_size
 
     @property
-    def num_embeddings(self):
-        return self._num_embeddings
+    def name(self):
+        """Return the name of NodeEmbedding.
+
+        Returns
+        -------
+        str
+            The name of NodeEmbedding.
+        """
+        return self._name
 
     @property
-    def kvstore(self):
-        return self._store
+    def num_embeddings(self):
+        """Return the number of embeddings.
+
+        Returns
+        -------
+        int
+            The number of embeddings.
+        """
+        return self._num_embeddings
 
     def set_optm_state(self, state):
+        """Store the optimizer related state tensor.
+
+        Parameters
+        ----------
+        state : tuple of torch.Tensor
+            Optimizer related state.
+        """
         self._optm_state = state
 
     @property
     def optm_state(self):
+        """Return the optimizer related state tensor.
+
+        Returns
+        -------
+        tuple of torch.Tensor
+            The optimizer related state.
+        """
         return self._optm_state
 
     @property
     def trace(self):
+        """Return a trace of the indices of embeddings
+        used in the training step(s).
+
+        Returns
+        -------
+        [torch.Tensor]
+            The indices of embeddings used in the training step(s).
+        """
         return self._trace
 
     def reset_trace(self):
+        """Clean up the trace of the indices of embeddings
+        used in the training step(s).
+        """
         self._trace = []
 
     @property
     def emb_tensor(self):
+        """Return the tensor storing the node embeddings
+
+        Returns
+        -------
+        torch.Tensor
+            The tensor storing the node embeddings
+        """
         return self._tensor

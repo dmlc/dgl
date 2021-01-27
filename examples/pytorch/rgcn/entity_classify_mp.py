@@ -514,6 +514,7 @@ def main(args, devices):
     for i, ntype in enumerate(hg.ntypes):
         if ntype == category:
             category_id = i
+        print('{}:{}'.format(i, ntype))
 
     g = dgl.to_homogeneous(hg)
     g.ndata['ntype'] = g.ndata[dgl.NTYPE]

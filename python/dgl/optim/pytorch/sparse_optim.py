@@ -1,3 +1,4 @@
+"""Node embedding optimizers"""
 import abc
 from abc import abstractmethod
 import torch as th
@@ -33,7 +34,7 @@ class SparseGradOptimizer(abc.ABC):
         with th.no_grad():
             # Frequently alloc and free shared memory to hold intermediate tensor is expensive
             # We cache shared memory buffers in shared_emb.
-            shared_emb = {emb.name: ([],[]) for emb in self._params}
+            shared_emb = {emb.name: ([], []) for emb in self._params}
 
             # Go through all sparse embeddings
             for emb in self._params:
@@ -65,7 +66,7 @@ class SparseGradOptimizer(abc.ABC):
                             elif i + 1 == self._world_size:
                                 mask = idx >= start
                             else:
-                                mask = th.logical_and((idx >= start),(idx < end))
+                                mask = th.logical_and((idx >= start), (idx < end))
                             idx_i = idx[mask]
                             grad_i = grad[mask]
 
@@ -74,23 +75,28 @@ class SparseGradOptimizer(abc.ABC):
                                 shared_emb[emb_name][1].append(grad_i)
                             else:
                                 # currently nccl does not support Alltoallv operation
-                                # we need to use CPU shared memory to share gradient across processes
+                                # we need to use CPU shared memory to share gradient
+                                # across processes
                                 idx_i = idx_i.to(th.device('cpu'))
                                 grad_i = grad_i.to(th.device('cpu'))
                                 idx_shmem_name = 'idx_{}_{}_{}'.format(emb_name, self._rank, i)
                                 grad_shmem_name = 'grad_{}_{}_{}'.format(emb_name, self._rank, i)
 
                                 if idx_shmem_name not in self._shared_cache[emb_name] or \
-                                    self._shared_cache[emb_name][idx_shmem_name].shape[0] < idx_i.shape[0]:
-                                    idx_shmem = create_shared_mem_array(idx_shmem_name,
-                                        (idx_i.shape[0] * 2 + 2,), idx_dtype) # in case idx_i.shape[0] is 0
-                                    grad_shmem = create_shared_mem_array(grad_shmem_name,
+                                    self._shared_cache[emb_name][idx_shmem_name].shape[0] \
+                                        < idx_i.shape[0]:
+                                    # in case idx_i.shape[0] is 0
+                                    idx_shmem = create_shared_mem_array(idx_shmem_name, \
+                                        (idx_i.shape[0] * 2 + 2,), idx_dtype)
+                                    grad_shmem = create_shared_mem_array(grad_shmem_name, \
                                         (idx_i.shape[0] * 2 + 2, grad_dim), grad_dtype)
                                     self._shared_cache[emb_name][idx_shmem_name] = idx_shmem
                                     self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
 
-                                self._shared_cache[emb_name][idx_shmem_name][:idx_i.shape[0]] = idx_i
-                                self._shared_cache[emb_name][grad_shmem_name][:idx_i.shape[0]] = grad_i
+                                self._shared_cache[emb_name][idx_shmem_name][:idx_i.shape[0]] \
+                                    = idx_i
+                                self._shared_cache[emb_name][grad_shmem_name][:idx_i.shape[0]] \
+                                    = grad_i
                                 emb.store.set(idx_shmem_name, str(idx_i.shape[0]))
 
                         # gather gradients from all other processes
@@ -109,8 +115,10 @@ class SparseGradOptimizer(abc.ABC):
                                     self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
                                 idx_i = self._shared_cache[emb_name][idx_shmem_name][:size]
                                 grad_i = self._shared_cache[emb_name][grad_shmem_name][:size]
-                                shared_emb[emb_name][0].append(idx_i.to(device, non_blocking=True))
-                                shared_emb[emb_name][1].append(grad_i.to(device, non_blocking=True))
+                                shared_emb[emb_name][0].append(idx_i.to(device,
+                                                                        non_blocking=True))
+                                shared_emb[emb_name][1].append(grad_i.to(device,
+                                                                         non_blocking=True))
                     else:
                         shared_emb[emb_name][0].append(idx)
                         shared_emb[emb_name][1].append(grad)
@@ -147,10 +155,9 @@ class SparseGradOptimizer(abc.ABC):
         emb : dgl.nn.NodeEmbedding
             Sparse node embedding to update.
         """
-        pass
 
     def zero_grad(self):
-        """
+        """clean grad cache
         """
         self._clean_grad = True
 
@@ -207,7 +214,7 @@ class SparseAdagrad(SparseGradOptimizer):
                 emb_name = emb.name
                 state = create_shared_mem_array(emb_name+'_state', emb.emb_tensor.shape, th.float32).zero_()
             if self._rank == 0:
-                for i in range(1, world_size):
+                for _ in range(1, world_size):
                     # send embs
                     emb.store.set(emb_name+'_opt', emb_name)
             elif self._rank > 0:
@@ -302,32 +309,41 @@ class SparseAdam(SparseGradOptimizer):
         self._eps = eps
         # We need to register a state sum for each embedding in the kvstore.
         for emb in params:
-            assert isinstance(emb, NodeEmbedding), 'SparseAdam only supports dgl.nn.NodeEmbedding'
+            assert isinstance(emb, NodeEmbedding), \
+                'SparseAdam only supports dgl.nn.NodeEmbedding'
 
             if self._rank is None:
                 self._rank = emb.rank
                 self._world_size = emb.world_size
             else:
-                assert self._rank == emb.rank, 'MultiGPU rank for each embedding should be same.'
-                assert self._world_size == emb.world_size, 'MultiGPU world_size for each embedding should be same.'
+                assert self._rank == emb.rank, \
+                    'MultiGPU rank for each embedding should be same.'
+                assert self._world_size == emb.world_size, \
+                    'MultiGPU world_size for each embedding should be same.'
             if self._rank <= 0:
                 emb_name = emb.name
-                state_step = create_shared_mem_array(emb_name+'_step', (emb.emb_tensor.shape[0],), th.float32).zero_()
-                state_mem = create_shared_mem_array(emb_name+'_mem', emb.emb_tensor.shape, th.float32).zero_()
-                state_power = create_shared_mem_array(emb_name+'_power', emb.emb_tensor.shape, th.float32).zero_()
+                state_step = create_shared_mem_array(emb_name+'_step', \
+                    (emb.emb_tensor.shape[0],), th.float32).zero_()
+                state_mem = create_shared_mem_array(emb_name+'_mem', \
+                    emb.emb_tensor.shape, th.float32).zero_()
+                state_power = create_shared_mem_array(emb_name+'_power', \
+                    emb.emb_tensor.shape, th.float32).zero_()
             if self._rank == 0:
                 state = (state_step, state_mem, state_power)
                 emb_name = emb.name
-                for i in range(1, self._world_size):
+                for _ in range(1, self._world_size):
                     # send embs
                     emb.store.set(emb_name+'_opt', emb_name)
             elif self._rank > 0:
                 # receive
                 emb_name = emb.name
                 emb.store.wait([emb_name+'_opt'])
-                state_step = get_shared_mem_array(emb_name+'_step', (emb.emb_tensor.shape[0],), th.float32)
-                state_mem = get_shared_mem_array(emb_name+'_mem', emb.emb_tensor.shape, th.float32)
-                state_power = get_shared_mem_array(emb_name+'_power', emb.emb_tensor.shape, th.float32)
+                state_step = get_shared_mem_array(emb_name+'_step', \
+                    (emb.emb_tensor.shape[0],), th.float32)
+                state_mem = get_shared_mem_array(emb_name+'_mem', \
+                    emb.emb_tensor.shape, th.float32)
+                state_power = get_shared_mem_array(emb_name+'_power', \
+                    emb.emb_tensor.shape, th.float32)
 
             state = (state_step, state_mem, state_power)
             emb.set_optm_state(state)
@@ -358,7 +374,9 @@ class SparseAdam(SparseGradOptimizer):
 
             # There can be duplicated indices due to sampling.
             # Thus unique them here and average the gradient here.
-            grad_indices, inverse, cnt = th.unique(idx, return_inverse=True, return_counts=True)
+            grad_indices, inverse, cnt = th.unique(idx,
+                                                   return_inverse=True,
+                                                   return_counts=True)
             state_idx = grad_indices.to(state_dev)
             state_step[state_idx] += 1
             state_step = state_step[state_idx].to(exec_dev, non_blocking=True)
