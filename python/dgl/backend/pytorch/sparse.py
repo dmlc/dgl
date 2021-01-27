@@ -14,8 +14,6 @@ else:
         def custom_fwd_inner(fwd):
             @functools.wraps(fwd)
             def decorate_fwd(*args, **kwargs):
-                if fwd is None:
-                    return functools.partial(custom_fwd, )
                 return fwd(*args, **kwargs)
             return decorate_fwd
         return custom_fwd_inner
