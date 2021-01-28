@@ -8,20 +8,21 @@ This is a reproduction of the papers
 # Performance
 
 ## Classification
-| Model           | Dataset    | Metric   | Score |
-|-----------------|------------|----------|-------|
-| PointNet        | ModelNet40 | Accuracy | 89.3  |
-| PointNet++(SSG) | ModelNet40 | Accuracy | 93.26 |
-| PointNet++(MSG) | ModelNet40 | Accuracy | 93.26 |
+| Model           | Dataset    | Metric   | Score - PyTorch  | Score - DGL |
+|-----------------|------------|----------|------------------|-------------|
+| PointNet        | ModelNet40 | Accuracy | 89.2(Official)   | 89.3        |
+| PointNet++(SSG) | ModelNet40 | Accuracy | 92.4             | 93.3        |
+| PointNet++(MSG) | ModelNet40 | Accuracy | 92.8             | 93.3        |
 
 ## Part Segmentation
 
-| Model           | Dataset    | Metric   | Score |
-|-----------------|------------|----------|-------|
-| PointNet        | ShapeNet   | mIoU     | 83.6  |
-| PointNet++(SSG) | ShapeNet   | mIoU     | 84.5  |
-| PointNet++(MSG) | ShapeNet   | mIoU     | 84.6  |
+| Model           | Dataset    | Metric   | Score - PyTorch | Score - DGL |
+|-----------------|------------|----------|-----------------|-------------|
+| PointNet        | ShapeNet   | mIoU     | 84.3            | 83.6        |
+| PointNet++(SSG) | ShapeNet   | mIoU     | 84.9            | 84.5        |
+| PointNet++(MSG) | ShapeNet   | mIoU     | 85.4            | 84.6        |
 
+Score - PyTorch data are collected from [this repo](https://github.com/yanx27/Pointnet_Pointnet2_pytorch).
 # How to Run
 
 For point cloud classification, run with
@@ -37,6 +38,7 @@ python train_partseg.py
 ```
 
 ## To Visualize Part Segmentation in Tensorboard
+![Screenshot](vis.png)
 First ``pip install tensorboard``
 then run
 ```python 
