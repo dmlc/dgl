@@ -21,13 +21,13 @@ def track_time(batch_size, feat_size, readout_op, type):
         g.ndata['h'] = torch.randn((g.num_nodes(), feat_size), device=device)    
         t0 = time.time()
         for i in range(10):
-            out = dgl.readout_nodes(g, 'h', readout_op)
+            out = dgl.readout_nodes(g, 'h', op=readout_op)
         t1 = time.time()
     elif type == 'edge':
         g.edata['h'] = torch.randn((g.num_edges(), feat_size), device=device)
         t0 = time.time()
         for i in range(10):
-            out = dgl.readout_edges(g, 'h', readout_op)
+            out = dgl.readout_edges(g, 'h', op=readout_op)
         t1 = time.time()
     else:
         raise Exception("Unknown type")
