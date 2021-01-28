@@ -798,7 +798,7 @@ def test_dotgat_conv(g, idtype):
 def test_dotgat_conv_bi(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    dotgat = nn.DotGatConv(5, 2, 4)
+    dotgat = nn.DotGatConv((5, 5), 2, 4)
     feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
     dotgat = dotgat.to(ctx)
     h = dotgat(g, feat)
