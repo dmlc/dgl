@@ -18,6 +18,37 @@ namespace cuda {
 #define CUDA_MAX_NUM_BLOCKS_Z 0xFFFF
 #define CUDA_MAX_NUM_THREADS 1024
 
+#ifdef USE_FP16
+#define SWITCH_BITS(bits, DType, ...)                           \
+  do {                                                          \
+    if ((bits) == 16) {                                         \
+      typedef half DType;                                       \
+      { __VA_ARGS__ }                                           \
+    } else if ((bits) == 32) {                                  \
+      typedef float DType;                                      \
+      { __VA_ARGS__ }                                           \
+    } else if ((bits) == 64) {                                  \
+      typedef double DType;                                     \
+      { __VA_ARGS__ }                                           \
+    } else {                                                    \
+      LOG(FATAL) << "Data type not renogized with bits " << bits; \
+    }                                                           \
+  } while (0)
+#else  // USE_FP16
+#define SWITCH_BITS(bits, DType, ...)                           \
+  do {                                                          \
+    if ((bits) == 32) {                                         \
+      typedef float DType;                                      \
+      { __VA_ARGS__ }                                           \
+    } else if ((bits) == 64) {                                  \
+      typedef double DType;                                     \
+      { __VA_ARGS__ }                                           \
+    } else {                                                    \
+      LOG(FATAL) << "Data type not renogized with bits " << bits; \
+    }                                                           \
+  } while (0)
+#endif  // USE_FP16
+
 /*! \brief Calculate the number of threads needed given the dimension length.
  *
  * It finds the biggest number that is smaller than min(dim, max_nthrs)
