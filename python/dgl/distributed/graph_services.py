@@ -47,10 +47,10 @@ class FindEdgeResponse(Response):
 def _sample_neighbors(local_g, partition_book, seed_nodes, fan_out, edge_dir, prob, replace):
     """ Sample from local partition.
 
-    The input nodes use global Ids. We need to map the global node Ids to local node Ids,
-    perform sampling and map the sampled results to the global Ids space again.
+    The input nodes use global IDs. We need to map the global node IDs to local node IDs,
+    perform sampling and map the sampled results to the global IDs space again.
     The sampled results are stored in three vectors that store source nodes, destination nodes
-    and edge Ids.
+    and edge IDs.
     """
     local_ids = partition_book.nid2localnid(seed_nodes, partition_book.partid)
     local_ids = F.astype(local_ids, local_g.idtype)
@@ -59,7 +59,8 @@ def _sample_neighbors(local_g, partition_book, seed_nodes, fan_out, edge_dir, pr
         local_g, local_ids, fan_out, edge_dir, prob, replace, _dist_training=True)
     global_nid_mapping = local_g.ndata[NID]
     src, dst = sampled_graph.edges()
-    global_src, global_dst = global_nid_mapping[src], global_nid_mapping[dst]
+    global_src, global_dst = F.gather_row(global_nid_mapping, src), \
+            F.gather_row(global_nid_mapping, dst)
     global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
     return global_src, global_dst, global_eids
 
@@ -78,10 +79,10 @@ def _find_edges(local_g, partition_book, seed_edges):
 def _in_subgraph(local_g, partition_book, seed_nodes):
     """ Get in subgraph from local partition.
 
-    The input nodes use global Ids. We need to map the global node Ids to local node Ids,
-    get in-subgraph and map the sampled results to the global Ids space again.
+    The input nodes use global IDs. We need to map the global node IDs to local node IDs,
+    get in-subgraph and map the sampled results to the global IDs space again.
     The results are stored in three vectors that store source nodes, destination nodes
-    and edge Ids.
+    and edge IDs.
     """
     local_ids = partition_book.nid2localnid(seed_nodes, partition_book.partid)
     local_ids = F.astype(local_ids, local_g.idtype)
@@ -254,7 +255,19 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     Node/edge features are not preserved. The original IDs of
     the sampled edges are stored as the `dgl.EID` feature in the returned graph.
 
-    For now, we only support the input graph with one node type and one edge type.
+    This version provides an experimental support for heterogeneous graphs.
+    When the input graph is heterogeneous, the sampled subgraph is still stored in
+    the homogeneous graph format. That is, all nodes and edges are assigned with
+    unique IDs (in contrast, we typically use a type name and a node/edge ID to
+    identify a node or an edge in ``DGLGraph``). We refer to this type of IDs
+    as *homogeneous ID*.
+    Users can use :func:`dgl.distributed.GraphPartitionBook.map_to_per_ntype`
+    and :func:`dgl.distributed.GraphPartitionBook.map_to_per_etype`
+    to identify their node/edge types and node/edge IDs of that type.
+
+    For heterogeneous graphs, ``nodes`` can be a dictionary whose key is node type
+    and the value is type-specific node IDs; ``nodes`` can also be a tensor of
+    *homogeneous ID*.
 
     Parameters
     ----------
@@ -292,9 +305,17 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     DGLGraph
         A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
     """
+    gpb = g.get_partition_book()
     if isinstance(nodes, dict):
-        assert len(nodes) == 1, 'The distributed sampler only supports one node type for now.'
-        nodes = list(nodes.values())[0]
+        homo_nids = []
+        for ntype in nodes:
+            assert ntype in g.ntypes, 'The sampled node type does not exist in the input graph'
+            if F.is_tensor(nodes[ntype]):
+                typed_nodes = nodes[ntype]
+            else:
+                typed_nodes = toindex(nodes[ntype]).tousertensor()
+            homo_nids.append(gpb.map_to_homo_nid(typed_nodes, ntype))
+        nodes = F.cat(homo_nids, 0)
     def issue_remote_req(node_ids):
         return SamplingRequest(node_ids, fanout, edge_dir=edge_dir,
                                prob=prob, replace=replace)
