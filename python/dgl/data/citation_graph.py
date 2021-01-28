@@ -43,7 +43,9 @@ class CitationGraphDataset(DGLBuiltinDataset):
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose: bool
-      Whether to print out progress information. Default: True.
+        Whether to print out progress information. Default: True.
+    reverse_edge: bool
+        Whether to reverse edge in graph. Default: True.
     """
     _urls = {
         'cora_v2' : 'dataset/cora_v2.zip',
@@ -51,7 +53,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
         'pubmed' : 'dataset/pubmed.zip',
     }
 
-    def __init__(self, name, raw_dir=None, force_reload=False, verbose=True):
+    def __init__(self, name, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
         assert name.lower() in ['cora', 'citeseer', 'pubmed']
 
         # Previously we use the pre-processing in pygcn (https://github.com/tkipf/pygcn)
@@ -64,7 +66,8 @@ class CitationGraphDataset(DGLBuiltinDataset):
                                                    url=url,
                                                    raw_dir=raw_dir,
                                                    force_reload=force_reload,
-                                                   verbose=verbose)
+                                                   verbose=verbose,
+                                                   reverse_edge=reverse_edge)
 
     def process(self):
         """Loads input data from data directory
@@ -104,7 +107,11 @@ class CitationGraphDataset(DGLBuiltinDataset):
 
         features = sp.vstack((allx, tx)).tolil()
         features[test_idx_reorder, :] = features[test_idx_range, :]
-        graph = nx.DiGraph(nx.from_dict_of_lists(graph))
+
+        if reverse_edge == True:
+            graph = nx.DiGraph(nx.from_dict_of_lists(graph))
+        else
+            graph = nx.Graph(nx.from_dict_of_lists(graph))
 
         onehot_labels = np.vstack((ally, ty))
         onehot_labels[test_idx_reorder, :] = onehot_labels[test_idx_range, :]
@@ -343,6 +350,8 @@ class CoraGraphDataset(CitationGraphDataset):
         Whether to reload the dataset. Default: False
     verbose: bool
         Whether to print out progress information. Default: True.
+    reverse_edge: bool
+        Whether to reverse edge in graph. Default: True.
 
     Attributes
     ----------
@@ -385,10 +394,10 @@ class CoraGraphDataset(CitationGraphDataset):
     >>> # Train, Validation and Test
 
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=True):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
         name = 'cora'
 
-        super(CoraGraphDataset, self).__init__(name, raw_dir, force_reload, verbose)
+        super(CoraGraphDataset, self).__init__(name, raw_dir, force_reload, verbose, reverse_edge)
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -483,6 +492,8 @@ class CiteseerGraphDataset(CitationGraphDataset):
         Whether to reload the dataset. Default: False
     verbose: bool
         Whether to print out progress information. Default: True.
+    reverse_edge: bool
+        Whether to reverse edge in graph. Default: True.
 
     Attributes
     ----------
@@ -528,10 +539,10 @@ class CiteseerGraphDataset(CitationGraphDataset):
     >>> # Train, Validation and Test
 
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=True):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
         name = 'citeseer'
 
-        super(CiteseerGraphDataset, self).__init__(name, raw_dir, force_reload, verbose)
+        super(CiteseerGraphDataset, self).__init__(name, raw_dir, force_reload, verbose, reverse_edge)
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -626,6 +637,8 @@ class PubmedGraphDataset(CitationGraphDataset):
         Whether to reload the dataset. Default: False
     verbose: bool
         Whether to print out progress information. Default: True.
+    reverse_edge: bool
+        Whether to reverse edge in graph. Default: True.
 
     Attributes
     ----------
@@ -668,10 +681,10 @@ class PubmedGraphDataset(CitationGraphDataset):
     >>> # Train, Validation and Test
 
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=True):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
         name = 'pubmed'
 
-        super(PubmedGraphDataset, self).__init__(name, raw_dir, force_reload, verbose)
+        super(PubmedGraphDataset, self).__init__(name, raw_dir, force_reload, verbose, reverse_edge)
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -699,7 +712,7 @@ class PubmedGraphDataset(CitationGraphDataset):
         r"""The number of graphs in the dataset."""
         return super(PubmedGraphDataset, self).__len__()
 
-def load_cora(raw_dir=None, force_reload=False, verbose=True):
+def load_cora(raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
     """Get CoraGraphDataset
 
     Parameters
@@ -711,15 +724,17 @@ def load_cora(raw_dir=None, force_reload=False, verbose=True):
         Whether to reload the dataset. Default: False
     verbose: bool
     Whether to print out progress information. Default: True.
+    reverse_edge: bool
+        Whether to reverse edge in graph. Default: True.
 
     Return
     -------
     CoraGraphDataset
     """
-    data = CoraGraphDataset(raw_dir, force_reload, verbose)
+    data = CoraGraphDataset(raw_dir, force_reload, verbose, reverse_edge)
     return data
 
-def load_citeseer(raw_dir=None, force_reload=False, verbose=True):
+def load_citeseer(raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
     """Get CiteseerGraphDataset
 
     Parameters
@@ -731,15 +746,17 @@ def load_citeseer(raw_dir=None, force_reload=False, verbose=True):
         Whether to reload the dataset. Default: False
     verbose: bool
     Whether to print out progress information. Default: True.
+    reverse_edge: bool
+        Whether to reverse edge in graph. Default: True.
 
     Return
     -------
     CiteseerGraphDataset
     """
-    data = CiteseerGraphDataset(raw_dir, force_reload, verbose)
+    data = CiteseerGraphDataset(raw_dir, force_reload, verbose, reverse_edge)
     return data
 
-def load_pubmed(raw_dir=None, force_reload=False, verbose=True):
+def load_pubmed(raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
     """Get PubmedGraphDataset
 
     Parameters
@@ -751,12 +768,14 @@ def load_pubmed(raw_dir=None, force_reload=False, verbose=True):
             Whether to reload the dataset. Default: False
         verbose: bool
         Whether to print out progress information. Default: True.
+    reverse_edge: bool
+        Whether to reverse edge in graph. Default: True.
 
     Return
     -------
     PubmedGraphDataset
     """
-    data = PubmedGraphDataset(raw_dir, force_reload, verbose)
+    data = PubmedGraphDataset(raw_dir, force_reload, verbose, reverse_edge)
     return data
 
 class CoraBinary(DGLBuiltinDataset):
