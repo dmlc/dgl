@@ -913,16 +913,7 @@ def test_hetero_conv(agg, idtype):
     gf = F.randn((4, 4))
     sf = F.randn((2, 3))
 
-    h = conv(g, {'user': uf})
-    assert set(h.keys()) == {'user', 'game'}
-    if agg != 'stack':
-        assert h['user'].shape == (4, 3)
-        assert h['game'].shape == (4, 4)
-    else:
-        assert h['user'].shape == (4, 1, 3)
-        assert h['game'].shape == (4, 1, 4)
-
-    h = conv(g, {'user': uf, 'store': sf})
+    h = conv(g, {'user': uf, 'game': gf, 'store': sf})
     assert set(h.keys()) == {'user', 'game'}
     if agg != 'stack':
         assert h['user'].shape == (4, 3)
@@ -931,37 +922,15 @@ def test_hetero_conv(agg, idtype):
         assert h['user'].shape == (4, 1, 3)
         assert h['game'].shape == (4, 2, 4)
 
-    h = conv(g, {'store': sf})
-    assert set(h.keys()) == {'game'}
-    if agg != 'stack':
-        assert h['game'].shape == (4, 4)
-    else:
-        assert h['game'].shape == (4, 1, 4)
-
-    # test with pair input
-    conv = nn.HeteroGraphConv({
-        'follows': nn.SAGEConv(2, 3, 'mean'),
-        'plays': nn.SAGEConv((2, 4), 4, 'mean'),
-        'sells': nn.SAGEConv(3, 4, 'mean')},
-        agg)
-    conv = conv.to(F.ctx())
-
-    h = conv(g, ({'user': uf}, {'user' : uf, 'game' : gf}))
+    block = dgl.to_block(g, {'user': [0, 1, 2, 3], 'game': [0, 1, 2, 3], 'store': []})
+    h = conv(g, ({'user': uf, 'game': gf, 'store': sf}, {'user': uf, 'game': gf, 'store': sf[0:0]}))
     assert set(h.keys()) == {'user', 'game'}
     if agg != 'stack':
         assert h['user'].shape == (4, 3)
         assert h['game'].shape == (4, 4)
     else:
         assert h['user'].shape == (4, 1, 3)
-        assert h['game'].shape == (4, 1, 4)
-
-    # pair input requires both src and dst type features to be provided
-    h = conv(g, ({'user': uf}, {'game' : gf}))
-    assert set(h.keys()) == {'game'}
-    if agg != 'stack':
-        assert h['game'].shape == (4, 4)
-    else:
-        assert h['game'].shape == (4, 1, 4)
+        assert h['game'].shape == (4, 2, 4)
 
     # test with mod args
     class MyMod(th.nn.Module):
@@ -988,7 +957,7 @@ def test_hetero_conv(agg, idtype):
     conv = conv.to(F.ctx())
     mod_args = {'follows' : (1,), 'plays' : (1,)}
     mod_kwargs = {'sells' : {'arg2' : 'abc'}}
-    h = conv(g, {'user' : uf, 'store' : sf}, mod_args=mod_args, mod_kwargs=mod_kwargs)
+    h = conv(g, {'user' : uf, 'game': gf, 'store' : sf}, mod_args=mod_args, mod_kwargs=mod_kwargs)
     assert mod1.carg1 == 1
     assert mod1.carg2 == 0
     assert mod2.carg1 == 1
