@@ -26,7 +26,7 @@ parser.add_argument('--save-model-path', type=str, default='')
 parser.add_argument('--num-epochs', type=int, default=250)
 parser.add_argument('--num-workers', type=int, default=4)
 parser.add_argument('--batch-size', type=int, default=16)
-parser.add_argument('--tensorboard', type=bool, default=False)
+parser.add_argument('--tensorboard', action='store_true')
 args = parser.parse_args()
 
 num_workers = args.num_workers
