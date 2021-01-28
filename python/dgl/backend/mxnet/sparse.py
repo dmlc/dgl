@@ -1,7 +1,7 @@
 import mxnet as mx
 import numpy as np
 from mxnet import nd
-from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp, _reverse
+from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp
 from ...base import dgl_warning, is_all, ALL
 from .tensor import asnumpy, copy_to, zerocopy_from_numpy, context, to_backend_ctx
 
@@ -132,7 +132,7 @@ class GSpMM(mx.autograd.Function):
         X, Y, argX, argY = self.saved_tensors
         gidx, op, reduce_op = self.gidx, self.op, self.reduce_op
         if op != 'copy_rhs':
-            g_rev = _reverse(gidx)
+            g_rev = gidx.reverse()
             if reduce_op == 'sum':
                 if op in ['mul', 'div']:
                     dX = _gspmm(g_rev, 'mul', 'sum', dZ, _muldiv(op, Y))[0]
@@ -215,7 +215,7 @@ class GSDDMM(mx.autograd.Function):
         lhs_target, rhs_target = self.lhs_target, self.rhs_target
         if op != 'copy_rhs':
             if lhs_target in ['u', 'v']:
-                _gidx = gidx if self.lhs_target == 'v' else _reverse(gidx)
+                _gidx = gidx if self.lhs_target == 'v' else gidx.reverse()
                 if op in ['add', 'sub', 'copy_lhs']:
                     dX = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ)[0]
                 else:  # mul, div, dot
@@ -235,7 +235,7 @@ class GSDDMM(mx.autograd.Function):
             dX = nd.zeros_like(X)
         if op != 'copy_lhs':
             if self.rhs_target in ['u', 'v']:
-                _gidx = gidx if rhs_target == 'v' else _reverse(gidx)
+                _gidx = gidx if rhs_target == 'v' else gidx.reverse()
                 if op in ['add', 'sub', 'copy_rhs']:
                     dY = _gspmm(_gidx, 'copy_rhs', 'sum', None, _addsub(op, dZ))[0]
                 else:  # mul, div, dot
@@ -277,7 +277,7 @@ class EdgeSoftmax(mx.autograd.Function):
         if not is_all(eids):
             gidx = gidx.edge_subgraph([eids], True).graph
         if norm_by == 'src':
-            gidx = _reverse(gidx)
+            gidx = gidx.reverse()
         self.gidx = gidx
 
     def forward(self, score):
