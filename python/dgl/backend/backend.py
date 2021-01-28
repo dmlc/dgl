@@ -235,7 +235,7 @@ def context(input):
 
 def device_type(ctx):
     """Return a str representing device type.
-    
+
     Parameters
     ----------
     ctx : Device context object.
@@ -252,7 +252,7 @@ def device_id(ctx):
 
     For CPU, the index does not matter. For GPU, the index means which GPU
     device on the machine.
-    
+
     Parameters
     ----------
     ctx : Device context object.
@@ -354,6 +354,22 @@ def sum(input, dim, keepdims=False):
         A framework-specific tensor.
     """
     pass
+
+def floor_div(in1, in2):
+    """Element-wise integer division and rounds each quotient towards zero.
+
+    Parameters
+    ----------
+    in1 : Tensor
+        The input tensor
+    in2 : Tensor or integer
+        The input
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor.
+    """
 
 def reduce_sum(input):
     """Returns the sum of all elements in the input tensor.
@@ -1591,6 +1607,17 @@ class record_grad(object):
 
 class no_grad(object):
     """Context manager that explicitly disables gradient computation"""
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass
+
+class NodeEmbedding(object):
+    """Sparse node embeddings"""
     def __init__(self):
         pass
 
