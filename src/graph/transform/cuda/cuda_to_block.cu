@@ -42,7 +42,7 @@ __device__ void map_vertex_ids(
   const IdType tile_end = min(TILE_SIZE*(blockIdx.x+1), num_vertices);
 
   for (IdType idx = threadIdx.x+tile_start; idx < tile_end; idx+=BLOCK_SIZE) {
-    const Mapping& mapping = *search_hashmap(global[idx], table);
+    const Mapping& mapping = *table.search(global[idx]);
     new_global[idx] = mapping.local;
   }
 }
@@ -72,7 +72,7 @@ __global__ void generate_hashmap_duplicates(
   #pragma unroll
   for (size_t index = threadIdx.x + block_start; index < block_end; index += BLOCK_SIZE) {
     if (index < num_nodes) {
-      insert_hashmap(nodes[index], index, table);
+      table.insert(nodes[index], index);
     }
   }
 }
@@ -102,7 +102,7 @@ __global__ void generate_hashmap_unique(
   #pragma unroll
   for (size_t index = threadIdx.x + block_start; index < block_end; index += BLOCK_SIZE) {
     if (index < num_nodes) {
-      const size_t pos = insert_hashmap(nodes[index], index, table);
+      const size_t pos = table.insert(nodes[index], index);
 
       // since we are only inserting unique nodes, we know their local id
       // will be equal to their index
@@ -144,8 +144,7 @@ __global__ void count_hashmap(
   #pragma unroll
   for (size_t index = threadIdx.x + block_start; index < block_end; index += BLOCK_SIZE) {
     if (index < num_nodes) {
-      const Mapping& mapping = *search_hashmap(
-          nodes[index], table);
+      const Mapping& mapping = *table.search(nodes[index]);
       if (mapping.index == index) {
         ++count;
       }
@@ -226,7 +225,7 @@ __global__ void compact_hashmap(
     FlagType flag;
     Mapping * kv;
     if (index < num_nodes) {
-      kv = search_hashmap(nodes[index], table);
+      kv = table.search(nodes[index]);
       flag = kv->index == index;
     } else {
       flag = 0;

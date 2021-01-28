@@ -78,88 +78,73 @@ class HashTable
       return key % size_;
     }
 
+    inline __device__ bool attempt_insert_at(
+        const size_t pos,
+        const IdType id,
+        const size_t index) {
+      const IdType key = AtomicCAS(&table_[pos].key, EmptyKey, id);
+      if (key == EmptyKey || key == id) {
+        // we either set a match key, or found a matching key, so then place the
+        // minimum index in position. Match the type of atomicMin, so ignore
+        // linting
+        atomicMin(reinterpret_cast<unsigned long long*>(&table_[pos].index), // NOLINT
+            static_cast<unsigned long long>(index)); // NOLINT
+        return true;
+      } else {
+        // we need to search elsewhere
+        return false;
+      }
+    }
+
+    inline __device__ size_t insert(
+        const IdType id,
+        const size_t index) {
+      size_t pos = hash(id);
+
+      // linearly scan for an empty slot or matching entry
+      IdType delta = 1;
+      while (!attempt_insert_at(pos, id, index)) {
+        pos = hash(pos+delta);
+        delta +=1;
+      }
+
+      return pos;
+    }
+
+    inline __device__ IdType search_for_pos(
+        const IdType id) const {
+      IdType pos = hash(id);
+
+      // linearly scan for matching entry
+      IdType delta = 1;
+      while (table_[pos].key != id) {
+        assert(table_[pos].key != EmptyKey);
+        pos = hash(pos+delta);
+        delta +=1;
+      }
+      assert(pos < size_);
+
+      return pos;
+    }
+
+    inline __device__ const typename HashTable<IdType>::Mapping * search(
+        const IdType id) const {
+      const IdType pos = search_for_pos(id);
+
+      return &table_[pos];
+    }
+
+    inline __device__ typename HashTable<IdType>::Mapping * search(
+        const IdType id) {
+      const IdType pos = search_for_pos(id);
+
+      return &table_[pos];
+    }
+
   private:
     Mapping * table_;
     size_t size_;
 };
-
-// GPU Code ///////////////////////////////////////////////////////////////////
-
-template<typename IdType>
-inline __device__ bool attempt_insert_at(
-    const size_t pos,
-    const IdType id,
-    const size_t index,
-    HashTable<IdType>& table) {
-  const IdType key = AtomicCAS(&table[pos].key, HashTable<IdType>::EmptyKey, id);
-  if (key == HashTable<IdType>::EmptyKey || key == id) {
-    // we either set a match key, or found a matching key, so then place the
-    // minimum index in position. Match the type of atomicMin, so ignore
-    // linting
-    atomicMin(reinterpret_cast<unsigned long long*>(&table[pos].index), // NOLINT
-        static_cast<unsigned long long>(index)); // NOLINT
-    return true;
-  } else {
-    // we need to search elsewhere
-    return false;
-  }
-}
-
-
-template<typename IdType>
-inline __device__ size_t insert_hashmap(
-    const IdType id,
-    const size_t index,
-    HashTable<IdType>& table) {
-  size_t pos = table.hash(id);
-
-  // linearly scan for an empty slot or matching entry
-  IdType delta = 1;
-  while (!attempt_insert_at(pos, id, index, table)) {
-    pos = table.hash(pos+delta);
-    delta +=1;
-  }
-
-  return pos;
-}
-
-
-template<typename IdType>
-inline __device__ IdType search_hashmap_for_pos(
-    const IdType id,
-    const HashTable<IdType>& table) {
-  IdType pos = table.hash(id);
-
-  // linearly scan for matching entry
-  IdType delta = 1;
-  while (table[pos].key != id) {
-    assert(table[pos].key != HashTable<IdType>::EmptyKey);
-    pos = table.hash(pos+delta);
-    delta +=1;
-  }
-  assert(pos < table.size());
-
-  return pos;
-}
-
-
-template<typename IdType>
-inline __device__ const typename HashTable<IdType>::Mapping * search_hashmap(
-    const IdType id,
-    const HashTable<IdType>& table) {
-  const IdType pos = search_hashmap_for_pos(id, table);
-
-  return &table[pos];
-}
-
-template<typename IdType>
-inline __device__ typename HashTable<IdType>::Mapping * search_hashmap(
-    const IdType id,
-    HashTable<IdType>& table) {
-  const IdType pos = search_hashmap_for_pos(id, table);
-
-  return &table[pos];
-}
 
 }  // cuda
 }  // runtime
