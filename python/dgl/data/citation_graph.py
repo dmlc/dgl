@@ -110,7 +110,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
 
         if self.reverse_edge == True:
             graph = nx.DiGraph(nx.from_dict_of_lists(graph))
-        else
+        else:
             graph = nx.Graph(nx.from_dict_of_lists(graph))
 
         onehot_labels = np.vstack((ally, ty))
