@@ -1,7 +1,7 @@
 import torch as th
 from distutils.version import LooseVersion
 from ...base import is_all, ALL
-from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp, _reverse
+from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp
 
 if LooseVersion(th.__version__) >= LooseVersion("1.6.0"):
     from torch.cuda.amp import custom_fwd, custom_bwd
@@ -25,6 +25,34 @@ else:
         return decorate_bwd
 
 __all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce']
+
+
+_inverse_format = {
+    'coo': 'coo',
+    'csr': 'csc',
+    'csc': 'csr'
+}
+
+
+def _reverse(gidx):
+    """Reverse the given graph index while retaining its formats.
+
+    Parameters
+    ----------
+    gidx: HeteroGraphIndex
+
+    Return
+    ------
+    HeteroGraphIndex
+    """
+    
+
+    g_rev = gidx.reverse()
+    original_formats_dict = gidx.formats()
+    original_formats = original_formats_dict['created'] +\
+                       original_formats_dict['not created']
+    g_rev = g_rev.formats([_inverse_format[fmt] for fmt in original_formats])
+    return g_rev
 
 
 def _reduce_grad(grad, shape):
