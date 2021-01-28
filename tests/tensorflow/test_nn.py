@@ -411,7 +411,7 @@ def test_hetero_conv(agg, idtype):
         assert h['user'].shape == (4, 1, 3)
         assert h['game'].shape == (4, 2, 4)
 
-    block = dgl.to_block(g, {'user': [0, 1, 2, 3], 'game': [0, 1, 2, 3], 'store': []})
+    block = dgl.to_block(g.to('cpu'), {'user': [0, 1, 2, 3], 'game': [0, 1, 2, 3], 'store': []})
     h = conv(block, ({'user': uf, 'game': gf, 'store': sf}, {'user': uf, 'game': gf, 'store': sf[0:0]}))
     assert set(h.keys()) == {'user', 'game'}
     if agg != 'stack':
