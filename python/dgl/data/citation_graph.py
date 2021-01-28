@@ -108,7 +108,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
         features = sp.vstack((allx, tx)).tolil()
         features[test_idx_reorder, :] = features[test_idx_range, :]
 
-        if reverse_edge == True:
+        if self.reverse_edge == True:
             graph = nx.DiGraph(nx.from_dict_of_lists(graph))
         else
             graph = nx.Graph(nx.from_dict_of_lists(graph))
