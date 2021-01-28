@@ -268,3 +268,9 @@ SegmentedKNNGraph
     :members:
     :show-inheritance:
 
+NodeEmbedding
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.sparse_emb.NodeEmbedding
+    :members:
+    :show-inheritance:
