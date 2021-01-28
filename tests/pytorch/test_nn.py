@@ -779,6 +779,32 @@ def test_edge_conv_bi(g, idtype):
     x0 = F.randn((g.number_of_dst_nodes(), 5))
     h1 = edge_conv(g, (h0, x0))
     assert h1.shape == (g.number_of_dst_nodes(), 2)
+    
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
+def test_dotgat_conv(g, idtype):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    dotgat = nn.DotGatConv(5, 2, 4)
+    feat = F.randn((g.number_of_nodes(), 5))
+    dotgat = dotgat.to(ctx)
+    h = dotgat(g, feat)
+    assert h.shape == (g.number_of_nodes(), 4, 2)
+    _, a = dotgat(g, feat, get_attention=True)
+    assert a.shape == (g.number_of_edges(), 4, 1)
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
+def test_dotgat_conv_bi(g, idtype):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    dotgat = nn.DotGatConv(5, 2, 4)
+    feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
+    dotgat = dotgat.to(ctx)
+    h = dotgat(g, feat)
+    assert h.shape == (g.number_of_dst_nodes(), 4, 2)
+    _, a = dotgat(g, feat, get_attention=True)
+    assert a.shape == (g.number_of_edges(), 4, 1)    
 
 def test_dense_cheb_conv():
     for k in range(1, 4):
@@ -1016,6 +1042,7 @@ if __name__ == '__main__':
     test_gated_graph_conv()
     test_nn_conv()
     test_gmm_conv()
+    test_dotgat_conv()
     test_dense_graph_conv()
     test_dense_sage_conv()
     test_dense_cheb_conv()
