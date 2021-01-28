@@ -209,7 +209,7 @@ class DotGatConv(nn.Module):
 
         # Step 2. edge softmax to compute attention scores
         graph.edata['sa'] = edge_softmax(graph, graph.edata['a'])/(self._out_feats**0.5)
-        
+
         # Step 3. Broadcast softmax value to each edge, and aggregate dst node
         graph.update_all(fn.u_mul_e('ft', 'sa', 'attn'), fn.sum('attn', 'agg_u'))
 
