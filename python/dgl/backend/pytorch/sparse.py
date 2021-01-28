@@ -1,6 +1,28 @@
 import torch as th
+from distutils.version import LooseVersion
 from ...base import is_all, ALL
-from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp, _reverse
+from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp
+
+if LooseVersion(th.__version__) >= LooseVersion("1.6.0"):
+    from torch.cuda.amp import custom_fwd, custom_bwd
+else:
+    import functools
+    """PyTorch natively supports automatic mixed precision in DGL 1.6, we redefine
+    the custom_fwd and custom_bwd function to be compatible with DGL 1.5.
+    """
+    def custom_fwd(**kwargs):
+        def custom_fwd_inner(fwd):
+            @functools.wraps(fwd)
+            def decorate_fwd(*args, **kwargs):
+                return fwd(*args, **kwargs)
+            return decorate_fwd
+        return custom_fwd_inner
+
+    def custom_bwd(bwd):
+        @functools.wraps(bwd)
+        def decorate_bwd(*args, **kwargs):
+            return bwd(*args, **kwargs)
+        return decorate_bwd
 
 __all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce']
 
@@ -60,6 +82,7 @@ def _expand(x, shape):
 
 class GSpMM(th.autograd.Function):
     @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, op, reduce_op, X, Y):
         out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
         ctx.backward_cache = gidx, op, reduce_op
@@ -67,11 +90,12 @@ class GSpMM(th.autograd.Function):
         return out
 
     @staticmethod
+    @custom_bwd
     def backward(ctx, dZ):
         gidx, op, reduce_op = ctx.backward_cache
         X, Y, argX, argY = ctx.saved_tensors
         if op != 'copy_rhs' and ctx.needs_input_grad[3]:
-            g_rev = _reverse(gidx)
+            g_rev = gidx.reverse()
             if reduce_op == 'sum':
                 if op in ['mul', 'div']:
                     dX = gspmm(g_rev, 'mul', 'sum', dZ, _muldiv(op, Y))
@@ -120,6 +144,7 @@ class GSpMM(th.autograd.Function):
 
 class GSDDMM(th.autograd.Function):
     @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, op, X, Y, lhs_target, rhs_target):
         out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
         ctx.backward_cache = gidx, op, lhs_target, rhs_target
@@ -127,12 +152,13 @@ class GSDDMM(th.autograd.Function):
         return out
 
     @staticmethod
+    @custom_bwd
     def backward(ctx, dZ):
         gidx, op, lhs_target, rhs_target = ctx.backward_cache
         X, Y = ctx.saved_tensors
         if op != 'copy_rhs' and ctx.needs_input_grad[2]:
             if lhs_target in ['u', 'v']:
-                _gidx = gidx if lhs_target == 'v' else _reverse(gidx)
+                _gidx = gidx if lhs_target == 'v' else gidx.reverse()
                 if op in ['add', 'sub', 'copy_lhs']:
                     dX = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ)
                 else:  # mul, div, dot
@@ -152,7 +178,7 @@ class GSDDMM(th.autograd.Function):
             dX = None
         if op != 'copy_lhs' and ctx.needs_input_grad[3]:
             if rhs_target in ['u', 'v']:
-                _gidx = gidx if rhs_target == 'v' else _reverse(gidx)
+                _gidx = gidx if rhs_target == 'v' else gidx.reverse()
                 if op in ['add', 'sub', 'copy_rhs']:
                     dY = gspmm(_gidx, 'copy_rhs', 'sum', None, _addsub(op, dZ))
                 else:  # mul, div, dot
@@ -179,6 +205,7 @@ class GSDDMM(th.autograd.Function):
 
 class EdgeSoftmax(th.autograd.Function):
     @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, score, eids, norm_by):
         """Forward function.
 
@@ -198,7 +225,7 @@ class EdgeSoftmax(th.autograd.Function):
         if not is_all(eids):
             gidx = gidx.edge_subgraph([eids], True).graph
         if norm_by == 'src':
-            gidx = _reverse(gidx)
+            gidx = gidx.reverse()
         score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
         score = th.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
         score_sum = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
@@ -208,6 +235,7 @@ class EdgeSoftmax(th.autograd.Function):
         return out
 
     @staticmethod
+    @custom_bwd
     def backward(ctx, grad_out):
         """Backward function.
 
@@ -233,6 +261,7 @@ class EdgeSoftmax(th.autograd.Function):
 
 class SegmentReduce(th.autograd.Function):
     @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, op, x, offsets):
         y, arg = _segment_reduce(op, x, offsets)
         ctx.save_for_backward(arg, offsets)
@@ -240,6 +269,7 @@ class SegmentReduce(th.autograd.Function):
         return y
 
     @staticmethod
+    @custom_bwd
     def backward(ctx, dy):
         op = ctx.backward_cache
         arg, offsets = ctx.saved_tensors
