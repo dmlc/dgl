@@ -15,7 +15,6 @@
 #include <algorithm>
 
 #include "../../../runtime/cuda/cuda_common.h"
-#include "../../../runtime/cuda/cuda_device_common.cuh"
 #include "../../../runtime/cuda/cuda_hashtable.cuh"
 #include "../../heterograph.h"
 
@@ -34,16 +33,16 @@ __device__ void map_vertex_ids(
     const IdType * const global,
     IdType * const new_global,
     const IdType num_vertices,
-    const Mapping<IdType> * const mappings,
-    const IdType hash_size) {
+    const HashTable<IdType>& table) {
   assert(BLOCK_SIZE == blockDim.x);
+
+  using Mapping = typename HashTable<IdType>::Mapping;
 
   const IdType tile_start = TILE_SIZE*blockIdx.x;
   const IdType tile_end = min(TILE_SIZE*(blockIdx.x+1), num_vertices);
 
   for (IdType idx = threadIdx.x+tile_start; idx < tile_end; idx+=BLOCK_SIZE) {
-    const Mapping<IdType>& mapping = *search_hashmap(global[idx], mappings,
-        hash_size);
+    const Mapping& mapping = *search_hashmap(global[idx], table);
     new_global[idx] = mapping.local;
   }
 }
@@ -58,15 +57,13 @@ __device__ void map_vertex_ids(
 * @tparam TILE_SIZE The number of entries each thread block will process.
 * @param nodes The nodes to insert.
 * @param num_nodes The number of nodes to insert.
-* @param hash_size The size of the hash table.
-* @param pairs The hash table.
+* @param table The hash table.
 */
 template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void generate_hashmap_duplicates(
     const IdType * const nodes,
     const int64_t num_nodes,
-    const size_t hash_size,
-    Mapping<IdType> * const mappings) {
+    HashTable<IdType> table) {
   assert(BLOCK_SIZE == blockDim.x);
 
   const size_t block_start = TILE_SIZE*blockIdx.x;
@@ -75,7 +72,7 @@ __global__ void generate_hashmap_duplicates(
   #pragma unroll
   for (size_t index = threadIdx.x + block_start; index < block_end; index += BLOCK_SIZE) {
     if (index < num_nodes) {
-      insert_hashmap(nodes[index], index, mappings, hash_size);
+      insert_hashmap(nodes[index], index, table);
     }
   }
 }
@@ -90,15 +87,13 @@ __global__ void generate_hashmap_duplicates(
 * @tparam TILE_SIZE The number of entries each thread block will process.
 * @param nodes The unique nodes to insert.
 * @param num_nodes The number of nodes to insert.
-* @param hash_size The size of the hash table.
-* @param pairs The hash table.
+* @param table The hash table.
 */
 template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void generate_hashmap_unique(
     const IdType * const nodes,
     const int64_t num_nodes,
-    const size_t hash_size,
-    Mapping<IdType> * const mappings) {
+    HashTable<IdType> table) {
   assert(BLOCK_SIZE == blockDim.x);
 
   const size_t block_start = TILE_SIZE*blockIdx.x;
@@ -107,11 +102,11 @@ __global__ void generate_hashmap_unique(
   #pragma unroll
   for (size_t index = threadIdx.x + block_start; index < block_end; index += BLOCK_SIZE) {
     if (index < num_nodes) {
-      const size_t pos = insert_hashmap(nodes[index], index, mappings, hash_size);
+      const size_t pos = insert_hashmap(nodes[index], index, table);
 
       // since we are only inserting unique nodes, we know their local id
       // will be equal to their index
-      mappings[pos].local = static_cast<IdType>(index);
+      table[pos].local = static_cast<IdType>(index);
     }
   }
 }
@@ -134,12 +129,12 @@ template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void count_hashmap(
     const IdType * nodes,
     const size_t num_nodes,
-    const IdType hash_size,
-    const Mapping<IdType> * const pairs,
+    const HashTable<IdType> table,
     IdType * const num_unique_nodes) {
   assert(BLOCK_SIZE == blockDim.x);
 
   using BlockReduce = typename cub::BlockReduce<IdType, BLOCK_SIZE>;
+  using Mapping = typename HashTable<IdType>::Mapping;
 
   const size_t block_start = TILE_SIZE*blockIdx.x;
   const size_t block_end = TILE_SIZE*(blockIdx.x+1);
@@ -149,8 +144,8 @@ __global__ void count_hashmap(
   #pragma unroll
   for (size_t index = threadIdx.x + block_start; index < block_end; index += BLOCK_SIZE) {
     if (index < num_nodes) {
-      const Mapping<IdType>& mapping = *search_hashmap(
-          nodes[index], pairs, hash_size);
+      const Mapping& mapping = *search_hashmap(
+          nodes[index], table);
       if (mapping.index == index) {
         ++count;
       }
@@ -206,8 +201,7 @@ template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void compact_hashmap(
     const IdType * const nodes,
     const size_t num_nodes,
-    const IdType hash_size,
-    Mapping<IdType> * const mappings,
+    HashTable<IdType> table,
     const IdType * const num_nodes_prefix,
     IdType * const global_nodes,
     int64_t * const global_node_count) {
@@ -215,6 +209,7 @@ __global__ void compact_hashmap(
 
   using FlagType = uint16_t;
   using BlockScan = typename cub::BlockScan<FlagType, BLOCK_SIZE>;
+  using Mapping = typename HashTable<IdType>::Mapping;
 
   constexpr const int32_t VALS_PER_THREAD = TILE_SIZE / BLOCK_SIZE;
 
@@ -229,9 +224,9 @@ __global__ void compact_hashmap(
     const IdType index = threadIdx.x + i*BLOCK_SIZE + blockIdx.x*TILE_SIZE;
 
     FlagType flag;
-    Mapping<IdType>* kv;
+    Mapping * kv;
     if (index < num_nodes) {
-      kv = search_hashmap(nodes[index], mappings, hash_size);
+      kv = search_hashmap(nodes[index], table);
       flag = kv->index == index;
     } else {
       flag = 0;
@@ -279,10 +274,8 @@ __global__ void map_edge_ids(
     const IdType * const global_dsts_device,
     IdType * const new_global_dsts_device,
     const IdType num_edges,
-    const Mapping<IdType> * const src_mapping,
-    const IdType src_hash_size,
-    const Mapping<IdType> * const dst_mapping,
-    const IdType dst_hash_size) {
+    const HashTable<IdType> src_mapping,
+    const HashTable<IdType> dst_mapping) {
   assert(BLOCK_SIZE == blockDim.x);
   assert(2 == gridDim.y);
 
@@ -291,15 +284,13 @@ __global__ void map_edge_ids(
         global_srcs_device,
         new_global_srcs_device,
         num_edges,
-        src_mapping,
-        src_hash_size);
+        src_mapping);
   } else {
     map_vertex_ids<IdType, BLOCK_SIZE, TILE_SIZE>(
         global_dsts_device,
         new_global_dsts_device,
         num_edges,
-        dst_mapping,
-        dst_hash_size);
+        dst_mapping);
   }
 }
 
@@ -326,59 +317,61 @@ class DeviceNodeMap {
  public:
   constexpr static const int HASH_SCALING = 2;
 
+  using Mapping = typename HashTable<IdType>::Mapping;
+
   DeviceNodeMap(
       const std::vector<int64_t>& num_nodes,
       DGLContext ctx,
       cudaStream_t stream) :
     num_types_(num_nodes.size()),
     rhs_offset_(num_types_/2),
-    masks_(num_types_),
-    hash_prefix_(num_types_+1, 0),
-    hash_tables_(nullptr),
+    workspaces_(),
+    hash_tables_(),
     ctx_(ctx) {
     auto device = runtime::DeviceAPI::Get(ctx);
 
+    hash_tables_.reserve(num_types_);
+    workspaces_.reserve(num_types_);
     for (int64_t i = 0; i < num_types_; ++i) {
       const size_t hash_size = GetHashSize(num_nodes[i]);
-      masks_[i] = hash_size -1;
-      hash_prefix_[i+1] = hash_prefix_[i] + hash_size;
+      size_t workspace_size = HashTable<IdType>::RequiredWorkspace(hash_size);
+      void * workspace = device->AllocWorkspace(ctx, workspace_size);
+      workspaces_.emplace_back(workspace);
+      hash_tables_.emplace_back(
+          HashTable<IdType>(
+            hash_size,
+            workspace,
+            workspace_size,
+            stream));
     }
-
-    // configure workspace
-    hash_tables_ = static_cast<Mapping<IdType>*>(device->AllocWorkspace(ctx,
-        hash_prefix_.back()*sizeof(*hash_tables_)));
-
-    CUDA_CALL(cudaMemsetAsync(
-      hash_tables_,
-      -1,
-      hash_prefix_.back()*sizeof(*hash_tables_),
-      stream));
   }
 
   ~DeviceNodeMap() {
     auto device = runtime::DeviceAPI::Get(ctx_);
-    device->FreeWorkspace(ctx_, hash_tables_);
+    for (void * ptr : workspaces_) {
+      device->FreeWorkspace(ctx_, ptr);
+    }
   }
 
 
-  Mapping<IdType> * LhsHashTable(
+  HashTable<IdType>& LhsHashTable(
       const size_t index) {
-    return HashTable(index);
+    return HashData(index);
   }
 
-  Mapping<IdType> * RhsHashTable(
+  HashTable<IdType>& RhsHashTable(
       const size_t index) {
-    return HashTable(index+rhs_offset_);
+    return HashData(index+rhs_offset_);
   }
 
-  const Mapping<IdType> * LhsHashTable(
+  const HashTable<IdType>& LhsHashTable(
       const size_t index) const {
-    return HashTable(index);
+    return HashData(index);
   }
 
-  const Mapping<IdType> * RhsHashTable(
+  const HashTable<IdType>& RhsHashTable(
       const size_t index) const {
-    return HashTable(index+rhs_offset_);
+    return HashData(index+rhs_offset_);
   }
 
   IdType LhsHashSize(
@@ -392,15 +385,14 @@ class DeviceNodeMap {
   }
 
   size_t Size() const {
-    return masks_.size();
+    return hash_tables_.size();
   }
 
  private:
   size_t num_types_;
   size_t rhs_offset_;
-  std::vector<int> masks_;
-  std::vector<size_t> hash_prefix_;
-  Mapping<IdType> * hash_tables_;
+  std::vector<void*> workspaces_;
+  std::vector<HashTable<IdType>> hash_tables_;
   DGLContext ctx_;
 
   static size_t GetHashSize(const size_t num_nodes) {
@@ -414,19 +406,21 @@ class DeviceNodeMap {
     return hash_size;
   }
 
-  inline Mapping<IdType> * HashTable(
+  inline HashTable<IdType>& HashData(
       const size_t index) {
-    return hash_tables_ + hash_prefix_[index];
+    CHECK_LT(index, hash_tables_.size());
+    return hash_tables_[index];
   }
 
-  inline const Mapping<IdType> * HashTable(
+  inline const HashTable<IdType>& HashData(
       const size_t index) const {
-    return hash_tables_ + hash_prefix_[index];
+    CHECK_LT(index, hash_tables_.size());
+    return hash_tables_[index];
   }
 
   inline IdType HashSize(
       const size_t index) const {
-    return hash_prefix_[index+1]-hash_prefix_[index];
+    return HashData(index).size();
   }
 };
 
@@ -515,14 +509,12 @@ class DeviceNodeMapMaker {
         generate_hashmap_duplicates<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
             nodes.Ptr<IdType>(),
             nodes->shape[0],
-            node_maps->LhsHashSize(ntype),
             node_maps->LhsHashTable(ntype));
         CUDA_CALL(cudaGetLastError());
 
         count_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
             nodes.Ptr<IdType>(),
             nodes->shape[0],
-            node_maps->LhsHashSize(ntype),
             node_maps->LhsHashTable(ntype),
             node_prefix);
         CUDA_CALL(cudaGetLastError());
@@ -537,7 +529,6 @@ class DeviceNodeMapMaker {
         compact_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
             nodes.Ptr<IdType>(),
             nodes->shape[0],
-            node_maps->LhsHashSize(ntype),
             node_maps->LhsHashTable(ntype),
             node_prefix,
             (*lhs_device)[ntype].Ptr<IdType>(),
@@ -558,7 +549,6 @@ class DeviceNodeMapMaker {
         generate_hashmap_unique<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
             nodes.Ptr<IdType>(),
             nodes->shape[0],
-            node_maps->RhsHashSize(ntype),
             node_maps->RhsHashTable(ntype));
         CUDA_CALL(cudaGetLastError());
       }
@@ -616,9 +606,7 @@ MapEdges(
         new_rhs.back().Ptr<IdType>(),
         num_edges,
         node_map.LhsHashTable(src_type),
-        node_map.LhsHashSize(src_type),
-        node_map.RhsHashTable(dst_type),
-        node_map.RhsHashSize(dst_type));
+        node_map.RhsHashTable(dst_type));
       CUDA_CALL(cudaGetLastError());
     } else {
       new_lhs.emplace_back(aten::NullArray());
