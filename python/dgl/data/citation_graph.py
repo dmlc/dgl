@@ -67,7 +67,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
                                                    raw_dir=raw_dir,
                                                    force_reload=force_reload,
                                                    verbose=verbose)
-        self.reverse_edge = reverse_edge
+        self._reverse_edge = reverse_edge
 
     def process(self):
         """Loads input data from data directory
@@ -260,6 +260,11 @@ class CitationGraphDataset(DGLBuiltinDataset):
     def features(self):
         deprecate_property('dataset.feat', 'g.ndata[\'feat\']')
         return self._g.ndata['feat']
+
+    @property
+    def reverse_edge(self):
+        return self._reverse_edge
+    
 
 def _preprocess_features(features):
     """Row-normalize feature matrix and convert to tuple representation"""
