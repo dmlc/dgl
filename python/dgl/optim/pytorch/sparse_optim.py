@@ -41,17 +41,19 @@ class SparseGradOptimizer(abc.ABC):
                     'MultiGPU world_size for each embedding should be same.'
 
             emb_name = emb.name
-            if self._rank <= 0:
+            if self._rank <= 0 and self._world_size > 1:
                 opt_meta = create_shared_mem_array(emb_name+'_opt_meta', \
                     (self._world_size, self._world_size), th.int32).zero_()
             if self._rank == 0:
-                emb.store.set(emb_name+'_opt_meta', emb_name)
+                if self._world_size > 1:
+                    emb.store.set(emb_name+'_opt_meta', emb_name)
+                    self._opt_meta[emb_name] = opt_meta
             elif self._rank > 0:
                 # receive
                 emb.store.wait([emb_name+'_opt_meta'])
                 opt_meta = get_shared_mem_array(emb_name+'_opt_meta', \
                     (self._world_size, self._world_size), th.int32)
-            self._opt_meta[emb_name] = opt_meta
+                self._opt_meta[emb_name] = opt_meta
 
     def step(self):
         ''' The step function.
@@ -255,7 +257,8 @@ class SparseAdagrad(SparseGradOptimizer):
                 state = create_shared_mem_array(emb_name+'_state', \
                     emb.emb_tensor.shape, th.float32).zero_()
             if self._rank == 0:
-                emb.store.set(emb_name+'_opt', emb_name)
+                if self._world_size > 1:
+                    emb.store.set(emb_name+'_opt', emb_name)
             elif self._rank > 0:
                 # receive
                 emb_name = emb.name
@@ -363,7 +366,8 @@ class SparseAdam(SparseGradOptimizer):
                     emb.emb_tensor.shape, th.float32).zero_()
             if self._rank == 0:
                 emb_name = emb.name
-                emb.store.set(emb_name+'_opt', emb_name)
+                if self._world_size > 1:
+                    emb.store.set(emb_name+'_opt', emb_name)
             elif self._rank > 0:
                 # receive
                 emb_name = emb.name
