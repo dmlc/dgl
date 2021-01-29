@@ -1,9 +1,13 @@
 import os
 import json
+import time
 import argparse
 import numpy as np
 import dgl
 import torch as th
+import pyarrow
+from pyarrow import csv
+from pyinstrument import Profiler
 
 parser = argparse.ArgumentParser(description='Construct graph partitions')
 parser.add_argument('--input-dir', required=True, type=str,
@@ -29,7 +33,7 @@ graph_name = args.graph_name
 num_ntypes = args.num_ntypes
 num_parts = args.num_parts
 num_node_weights = args.num_node_weights
-node_attr_dtype = np.float32
+node_attr_dtype = np.int64
 edge_attr_dtype = np.int64
 workspace_dir = args.workspace
 output_dir = args.output
@@ -51,6 +55,15 @@ etypes.sort(key=lambda e: e[1])
 etypes = [e[0] for e in etypes]
 etypes_map = {e:i for i, e in enumerate(etypes)}
 
+profiler = Profiler()
+profiler.start()
+
+def read_feats(file_name):
+    attrs = csv.read_csv(file_name, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True),
+                         parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
+    num_cols = len(attrs.columns)
+    return np.stack([attrs.columns[i].to_numpy() for i in range(num_cols)], 1)
+
 num_edges = 0
 num_nodes = 0
 node_map_val = {ntype:[] for ntype in ntypes}
@@ -67,8 +80,9 @@ for part_id in range(num_parts):
     tmp_output = workspace_dir + '/' + node_file + '.tmp'
     os.system('awk \'{print $1, $2, $' + str(orig_nid_col) + '}\''
               + ' {} > {}'.format(input_dir + '/' + node_file, tmp_output))
-    nodes = np.loadtxt(tmp_output, dtype=np.int64)
-    nids, ntype_ids, orig_nid = nodes[:,0], nodes[:,1], nodes[:,2]
+    nodes = csv.read_csv(tmp_output, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True),
+                         parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
+    nids, ntype_ids, orig_nid = nodes.columns[0].to_numpy(), nodes.columns[1].to_numpy(), nodes.columns[2].to_numpy()
     assert np.all(nids[1:] - nids[:-1] == 1)
     nid_range = (nids[0], nids[-1])
     num_nodes += len(nodes)
@@ -80,7 +94,7 @@ for part_id in range(num_parts):
     os.system('cut -d\' \' -f {}- {} > {}'.format(first_attr_col,
                                                   input_dir + '/' + node_file,
                                                   tmp_output))
-    node_attrs = np.loadtxt(tmp_output, dtype=node_attr_dtype)
+    node_attrs = read_feats(tmp_output)
     node_feats = {}
     # nodes in a partition has been sorted based on node types.
     for ntype_name in nid_ranges:
@@ -97,9 +111,10 @@ for part_id in range(num_parts):
     tmp_output = workspace_dir + '/' + edge_file + '.tmp'
     os.system('awk \'{print $1, $2, $3, $4, $5, $6}\'' + ' {} > {}'.format(input_dir + '/' + edge_file,
                                                                            tmp_output))
-    edges = np.loadtxt(tmp_output, dtype=np.int64)
-    src_id, dst_id, orig_src_id, orig_dst_id, orig_edge_id, etype_ids = edges[:,0], edges[:,1], \
-            edges[:,2], edges[:,3], edges[:,4], edges[:,5]
+    edges = csv.read_csv(tmp_output, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True),
+                         parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
+    num_cols = len(edges.columns)
+    src_id, dst_id, orig_src_id, orig_dst_id, orig_edge_id, etype_ids = [edges.columns[i].to_numpy() for i in range(num_cols)]
     # It's not guaranteed that the edges are sorted based on edge type.
     # Let's sort edges and all attributes on the edges.
     sort_idx = np.argsort(etype_ids)
@@ -112,7 +127,7 @@ for part_id in range(num_parts):
     # In practice, this is not the same, in which we need more complex solution to
     # encode and decode edge attributes.
     os.system('cut -d\' \' -f 7- {} > {}'.format(input_dir + '/' + edge_file, tmp_output))
-    edge_attrs = th.as_tensor(np.loadtxt(tmp_output, dtype=edge_attr_dtype))[sort_idx]
+    edge_attrs = th.as_tensor(read_feats(tmp_output))[sort_idx]
     edge_feats = {}
     edge_id_start = num_edges
     for etype_name in eid_ranges:
@@ -163,3 +178,6 @@ part_metadata = {'graph_name': graph_name,
                  'etypes': etypes}
 with open('{}/{}.json'.format(output_dir, graph_name), 'w') as outfile:
     json.dump(part_metadata, outfile, sort_keys=True, indent=4)
+
+profiler.stop()
+print(profiler.output_text(unicode=True, color=True))
