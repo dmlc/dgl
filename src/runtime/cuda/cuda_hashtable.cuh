@@ -79,21 +79,6 @@ class OrderedHashTable
         stream));
     }
 
-    inline __device__ Iterator Insert(
-        const IdType id,
-        const size_t index) {
-      size_t pos = Hash(id);
-
-      // linearly scan for an empty slot or matching entry
-      IdType delta = 1;
-      while (!AttemptInsertAt(pos, id, index)) {
-        pos = Hash(pos+delta);
-        delta +=1;
-      }
-
-      return table_+pos;
-    }
-
     inline __device__ const typename OrderedHashTable<IdType>::Mapping * Search(
         const IdType id) const {
       const IdType pos = SearchForPosition(id);
@@ -115,6 +100,28 @@ class OrderedHashTable
         int64_t * const num_unique,
         DGLContext ctx,
         cudaStream_t stream); 
+
+    void FillWithUnique(
+        const IdType * const input,
+        const size_t num_input,
+        DGLContext ctx,
+        cudaStream_t stream); 
+
+    inline __device__ Iterator Insert(
+        const IdType id,
+        const size_t index) {
+      size_t pos = Hash(id);
+
+      // linearly scan for an empty slot or matching entry
+      IdType delta = 1;
+      while (!AttemptInsertAt(pos, id, index)) {
+        pos = Hash(pos+delta);
+        delta +=1;
+      }
+
+      return table_+pos;
+    }
+
 
   private:
     Mapping * table_;
@@ -162,6 +169,7 @@ class OrderedHashTable
     {
       return key % size_;
     }
+
 };
 
 /**
@@ -408,6 +416,27 @@ void OrderedHashTable<IdType>::FillWithDuplicates(
       num_unique);
   CUDA_CALL(cudaGetLastError());
   device->FreeWorkspace(ctx, item_prefix);
+}
+
+template<typename IdType>
+void OrderedHashTable<IdType>::FillWithUnique(
+    const IdType * const input,
+    const size_t num_input,
+    DGLContext /* ctx */,
+    cudaStream_t stream) {
+
+  const int64_t num_tiles = (num_input+TILE_SIZE-1)/TILE_SIZE;
+
+  const dim3 grid(num_tiles);
+  const dim3 block(BLOCK_SIZE);
+
+  generate_hashmap_unique<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
+      input,
+      num_input,
+      *this);
+  CUDA_CALL(cudaGetLastError());
+
+
 }
 
 }  // cuda

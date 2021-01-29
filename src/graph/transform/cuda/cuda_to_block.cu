@@ -300,16 +300,11 @@ class DeviceNodeMapMaker {
     for (int64_t ntype = 0; ntype < rhs_nodes.size(); ++ntype) {
       const IdArray& nodes = rhs_nodes[ntype];
       if (nodes->shape[0] > 0) {
-        CHECK_EQ(nodes->ctx.device_type, kDLGPU);
-
-        const dim3 grid(RoundUpDiv(nodes->shape[0], TILE_SIZE));
-        const dim3 block(BLOCK_SIZE);
-
-        generate_hashmap_unique<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
+        node_maps->RhsHashTable(ntype).FillWithUnique(
             nodes.Ptr<IdType>(),
             nodes->shape[0],
-            node_maps->RhsHashTable(ntype));
-        CUDA_CALL(cudaGetLastError());
+            nodes->ctx,
+            stream);
       }
     }
   }
