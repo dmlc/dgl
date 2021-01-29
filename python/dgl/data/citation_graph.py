@@ -45,7 +45,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
     verbose: bool
         Whether to print out progress information. Default: True.
     reverse_edge: bool
-        Whether to reverse edge in graph. Default: True.
+        Whether to add reverse edges in graph. Default: True.
     """
     _urls = {
         'cora_v2' : 'dataset/cora_v2.zip',
