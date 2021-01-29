@@ -38,7 +38,7 @@ class TGN(nn.Module):
                                                    self.edge_feat_dim,
                                                    self.temporal_dim)
 
-        print(self.edge_feat_dim,self.memory_dim,self.temporal_dim,self.embedding_dim,self.num_heads)
+        #print(self.edge_feat_dim,self.memory_dim,self.temporal_dim,self.embedding_dim,self.num_heads)
         self.embedding_attn      = TemporalGATConv(self.edge_feat_dim,
                                                    self.memory_dim,
                                                    self.temporal_dim,
@@ -49,31 +49,37 @@ class TGN(nn.Module):
 
     # Each batch forward once
     def forward(self,srcs,dsts,negs,timestamps,subg,mode):
-        # TODO: Attention for embedding using src, dst, neg edge flow while loop
+        # TODO: Set neighbors' ts to be zero to prevent mistake.
         pred_list_pos = []
         pred_list_neg = []
         for src,dst,neg,ts in zip(srcs,dsts,negs,timestamps):
             # Does negative sampling means allow overlap
             pos_subg = self.edge_sampler(src,dst,ts,mode)
-            pos_subg = dgl.remove_self_loop(pos_subg)
-            pos_subg = dgl.add_self_loop(pos_subg)
             n_ts = ts.repeat(pos_subg.num_nodes())
-            nodes = [src,dst]
+            nodes = pos_subg.ndata[dgl.NID]
             memory_cell = self.memory.memory[nodes,:]
-            print(pos_subg)
+            #print("Outter shape: ",memory_cell.shape)
+            #print(pos_subg)
             z_pos = self.embedding_attn(pos_subg,memory_cell,n_ts) #[src_embedding,dst_embedding]
-            neg_subg = self.node_sampler(neg,ts,mode)
+            new_neg,neg_subg = self.node_sampler(neg,ts,mode)
+            #print(neg_subg)
             n_ts = ts.repeat(neg_subg.num_nodes())
-            memory_cell = self.memory.memory[neg,:]
-            z_neg = self.embedding_attn(neg_subg,memory_cell,n_ts)
+            # Here need to index the memory cell using the backtraced index of entire subg
+            nodes = neg_subg.ndata[dgl.NID]
+            memory_cell = self.memory.memory[nodes,:].view(len(nodes),-1)
+            z_neg = self.embedding_attn(neg_subg,memory_cell,n_ts)[new_neg]
+            #Need to recover the index of z_neg
             pred_list_pos.append(self.linkpredictor(z_pos[0],z_pos[1]))
             pred_list_neg.append(self.linkpredictor(z_pos[0],z_neg.squeeze()))
+            #print(pred_list_pos[-1].shape)
         # TODO: Update memory module.
+        #print(subg)
         subg = dgl.remove_self_loop(subg)
         subg = dgl.add_self_loop(subg)
         new_g = self.memory_ops(subg)
         self.memory.set_memory(new_g.ndata[dgl.NID],new_g.ndata['s'])
         pred_pos = torch.cat(pred_list_pos)
+        #print(pred_list_pos)
         pred_neg = torch.cat(pred_list_neg)
         return pred_pos, pred_neg
 

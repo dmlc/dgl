@@ -14,9 +14,11 @@ def train(model,dataloader,criterion,optimizer):
     done = False
     batch_size = dataloader.batch_size
     total_loss = 0
+    batch_cnt = 0
     while not done:
         optimizer.zero_grad()
         done,src_list,dst_list, t_stamps, subgraph = dataloader.get_next_batch(mode="train")
+        #print(subgraph.edges())
         neg_list = negative_sampler(dataloader.train_g,size=batch_size)
         pred_pos,pred_neg = model(src_list,dst_list,neg_list,t_stamps,subgraph,mode="train")
         loss = criterion(pred_pos,torch.ones_like(pred_pos))
@@ -25,6 +27,12 @@ def train(model,dataloader,criterion,optimizer):
         loss.backward() # May be very problematic
         optimizer.step()
         model.detach_memory()
+        print("Batch: ",batch_cnt)
+        batch_cnt += 1
+        '''
+        if batch_cnt == 10:
+            return total_loss
+        '''
     return total_loss/dataloader.train_g.num_edges()
 
 
@@ -35,18 +43,25 @@ def test_val(model,dataloader,criterion,mode='valid'):
     total_loss = 0
     # Metrics
     aps,aucs = [], []
-    with torch.no_grad:
+    batch_cnt = 0
+    with torch.no_grad():
         while not done:
             done,src_list,dst_list,t_stamps, subgraph = dataloader.get_next_batch(mode=mode)
-            neg_list = negative_sampler(dataloader.train_g,size=batch_size)
+            print(dataloader.graph_dict[mode])
+            neg_list = negative_sampler(dataloader.graph_dict[mode],size=batch_size)
             pred_pos, pred_neg = model(src_list,dst_list,neg_list,t_stamps,subgraph,mode=mode)
             loss = criterion(pred_pos,torch.ones_like(pred_pos))
             loss+= criterion(pred_pos,torch.zeros_like(pred_neg))
             total_loss += float(loss)*batch_size
             y_pred = torch.cat([pred_pos,pred_neg],dim=0).sigmoid().cpu()
-            y_true = torch.cat([torch.ones(pred_pos.size(0)),torch.ones(pred_neg.size(0))],dim=0)
+            y_true = torch.cat([torch.ones(pred_pos.size(0)),torch.zeros(pred_neg.size(0))],dim=0)
             aps.append(average_precision_score(y_true,y_pred))
             aucs.append(roc_auc_score(y_true,y_pred))
+            batch_cnt += 1
+            '''
+            if batch_cnt == 10:
+                return float(torch.tensor(aps).mean()),float(torch.tensor(aucs).mean())
+            '''
     return float(torch.tensor(aps).mean()), float(torch.tensor(aucs).mean())
 
 
@@ -93,7 +108,7 @@ if __name__ == "__main__":
                 num_nodes = num_node,
                 n_neighbors = args.n_neighbors,
                 memory_updater_type=args.memory_updater)
-    model.attach_sampler(dataloader.get_edge_affiliation,dataloader.get_edge_affiliation)
+    model.attach_sampler(dataloader.get_edge_affiliation,dataloader.get_node_affiliation)
 
     criterion = torch.nn.BCEWithLogitsLoss()
     optimizer  = torch.optim.Adam(model.parameters(),lr=0.0001)
@@ -101,10 +116,10 @@ if __name__ == "__main__":
     for i in range(args.epochs):
         train_loss     = train(model,dataloader,criterion,optimizer)
         val_ap,val_auc = test_val(model,dataloader,criterion,mode='valid')
-        print("Epoch: {}; Training Loss: {} | Validation AP: {.3f} AUC: {.3f}".format(i,train_loss,val_ap,val_auc))
+        print("Epoch: {}; Training Loss: {} | Validation AP: {:.3f} AUC: {:.3f}".format(i,train_loss,val_ap,val_auc))
     print("========Training is Done========")
     test_ap,test_auc = test_val(model,dataloader,criterion,mode="test")
     # Test with new Nodes
     nn_test_ap,nn_test_auc = test_val(model,dataloader,criterion,mode="nn_test")
-    print("Test: AP: {.3f} AUC: {.3f}".format(test_ap,test_auc))
-    print("New node Test: AP: {.3f} AUC: {.3f}".format(nn_test_ap,nn_test_auc))
+    print("Test: AP: {:.3f} AUC: {:.3f}".format(test_ap,test_auc))
+    print("New node Test: AP: {:.3f} AUC: {:.3f}".format(nn_test_ap,nn_test_auc))

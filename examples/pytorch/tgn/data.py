@@ -1,3 +1,4 @@
+from numpy.core.numeric import full
 import torch
 import dgl
 import pandas as pd
@@ -103,8 +104,9 @@ def TemporalWikipediaDataset():
         run('wikipedia')
         raw_connection = pd.read_csv('./data/ml_wikipedia.csv')
         raw_feature    = np.load('./data/ml_wikipedia.npy')
-        src = raw_connection['u'].to_numpy()
-        dst = raw_connection['i'].to_numpy()
+        # -1 for re-index the node
+        src = raw_connection['u'].to_numpy()-1
+        dst = raw_connection['i'].to_numpy()-1
         # Create directed graph
         g = dgl.graph((src,dst))
         g.edata['timestamp'] =torch.from_numpy(raw_connection['ts'].to_numpy())
@@ -135,8 +137,8 @@ def TemporalRedditDataset():
         run('reddit')
         raw_connection = pd.read_csv('./data/ml_reddit.csv')
         raw_feature    = np.load('./data/ml_reddit.npy')
-        src = raw_connection['u'].to_numpy()
-        dst = raw_connection['i'].to_numpy()
+        src = raw_connection['u'].to_numpy()-1
+        dst = raw_connection['i'].to_numpy()-1
         # Create directed graph
         g = dgl.graph((src,dst))
         g.edata['timestamp'] =torch.from_numpy(raw_connection['ts'].to_numpy())
@@ -156,6 +158,28 @@ def negative_sampler(g,size):
     dst = g.edges()[1] # A torch tensor
     ret = dst[idx]
     return ret
+
+def temporal_sort(g,key):
+    edge_keys = list(g.edata.keys())
+    node_keys = list(g.ndata.keys())
+
+    sorted_idx = g.edata[key].sort()[1]
+    buf_graph = dgl.graph((g.edges()[0][sorted_idx],g.edges()[1][sorted_idx]))
+    # copy back edge and node data
+    for ek in edge_keys:
+        buf_graph.edata[ek] = g.edata[ek][sorted_idx]
+
+    # Since node index unchanged direct copy
+    for nk in node_keys:
+        buf_graph.ndata[nk] = g.ndata[nk]
+    return buf_graph
+
+# Probe ahead to get the valid spliting point
+def probe_division(g,div):
+    for i in range(div,-1,-1):
+        ret = (g.edata[dgl.EID]==i).int().argmax()
+        if ret:
+            return ret
 
 # TODO: Define the dataloader
 class DictNode:
@@ -181,6 +205,7 @@ class TemporalDataLoader:
     def __init__(self,g,batch_size,n_neighbors,sampling_method='topk'):
         self.g  = g
         self.bg = dgl.add_reverse_edges(self.g,copy_edata=True)
+        #print("Init",self.bg.in_degrees(0))
         self.d_g= DictNode(parent=None)
         # TODO: Implement Training, Test Validation division as well as unseen nodes
         # Assume graph edge id follow chronological order.
@@ -190,33 +215,45 @@ class TemporalDataLoader:
         valid_div = int(0.85*num_edges)
 
         self.nn_test_g  = dgl.edge_subgraph(self.g,range(valid_div,num_edges))
+        self.nn_test_g = temporal_sort(self.nn_test_g,'timestamp')
+
         self.d_nn_test_g= DictNode(parent=self.d_g,NIDdict=self.nn_test_g.ndata[dgl.NID])
-        
         # New Node random non-repeated choice
         np.random.seed(2020)
         # the new node is chosen from test graph and applied to validation and training set
         test_nodes = self.nn_test_g.ndata[dgl.NID].numpy()
-        print(test_nodes.shape)
+        #print(test_nodes.shape)
         n_test_nodes = len(test_nodes)
         # We Need to get node subgraph from previous training graph
         #print(int(0.1*n_test_nodes))
         new_node_idxs = np.random.choice(test_nodes,replace=False,size=int(0.1*n_test_nodes))
         non_new_node_idxs = np.delete(self.g.nodes().numpy(),new_node_idxs)
+        #print(new_node_idxs)
         # Need to get the training and validation subgraph
         self.nn_mask_g   = dgl.node_subgraph(self.g,non_new_node_idxs)
+        # Sort graph for order keeping
+        self.nn_mask_g = temporal_sort(self.nn_mask_g,'timestamp')
+    
         self.nn_mask_bg  = dgl.add_reverse_edges(self.nn_mask_g,copy_edata=True)
+        
+        # 
         self.d_nn_mask_g = DictNode(self.d_g,self.nn_mask_g.ndata[dgl.NID])
-        self.parentn_id = self.nn_mask_g.ndata[dgl.NID].clone()
-        self.parente_id = self.nn_mask_g.edata[dgl.EID].clone()
+        #self.parentn_id = self.nn_mask_g.ndata[dgl.NID].clone()
+        #self.parente_id = self.nn_mask_g.edata[dgl.EID].clone()
         # Divide the training validation and test subgraph
         # Remapping
-        train_div = (self.nn_mask_g.edata[dgl.EID]==train_div).int().argmax()
-        valid_div = (self.nn_mask_g.edata[dgl.EID]==valid_div).int().argmax()
+        train_div = probe_division(self.nn_mask_g,train_div)
+        # edge might be removed by masking Then the idea will be condition by time.
+        valid_div = probe_division(self.nn_mask_g,valid_div)
+        print("Validation div: ",valid_div)
         self.train_g = dgl.edge_subgraph(self.nn_mask_g,range(0,train_div))
+        self.train_g = temporal_sort(self.train_g,'timestamp')
         self.d_train_g = DictNode(self.d_nn_mask_g,self.train_g.ndata[dgl.NID])
         self.valid_g = dgl.edge_subgraph(self.nn_mask_g,range(train_div,valid_div))
+        self.valid_g = temporal_sort(self.valid_g,'timestamp')
         self.d_valid_g = DictNode(self.d_nn_mask_g,self.valid_g.ndata[dgl.NID])
         self.test_g  = dgl.edge_subgraph(self.nn_mask_g,range(valid_div,self.nn_mask_g.num_edges()))
+        self.test_g  = temporal_sort(self.test_g,'timestamp')
         self.d_test_g  = DictNode(self.d_nn_mask_g,self.test_g.ndata[dgl.NID])
         self.graph_dict = {'train':self.train_g,'valid':self.valid_g,'nn_test':self.nn_test_g,'test':self.test_g}
         self.dict_dict  = {'train':self.d_train_g,'valid':self.d_valid_g,'nn_test':self.d_nn_test_g,'test':self.d_test_g}
@@ -241,7 +278,9 @@ class TemporalDataLoader:
         done = False
         #print(self.g.edges()[1].shape)
         src_list = graph.edges()[0][self.batch_cnt*self.batch_size:min((self.batch_cnt+1)*self.batch_size,graph.num_edges())]
+        #print("Direct Indexing",graph.edges()[0])
         dst_list = graph.edges()[1][self.batch_cnt*self.batch_size:min((self.batch_cnt+1)*self.batch_size,graph.num_edges())]
+        #print(dst_list)
         t_stamps = graph.edata['timestamp'][self.batch_cnt*self.batch_size:min((self.batch_cnt+1)*self.batch_size,graph.num_edges())]
         # The index is problematic.
         edge_ids = range(self.batch_cnt*self.batch_size,min((self.batch_cnt+1)*self.batch_size,graph.num_edges()))
@@ -254,17 +293,27 @@ class TemporalDataLoader:
             done = True
         return done, src_list,dst_list,t_stamps,subgraph
 
-    def get_edge_affiliation(self,src,dst,timestamp,mode='training'): # Here source and dst are node id
-        frontier = [src,dst] # The src and dst are in original graph index scheme
-        if mode != 'nn_test':
-            frontier_ = self.d_nn_mask_g.GetRootID(frontier).tolist()
+    def get_edge_affiliation(self,src,dst,timestamp,mode='train'): # Here source and dst are node id
+        frontier = [int(src),int(dst)] # The src and dst are in original graph index scheme
+        if mode == 'nn_test':
+            frontier_ = self.d_nn_test_g.GetRootID(frontier).tolist()
         else:
-            frontier_ = frontier
+            # backtrace once
+            #print(frontier)
+            frontier_ = self.graph_dict[mode].ndata[dgl.NID][frontier].tolist()
+            
         # All neighbor node across time
         graph = self.bg if mode == 'nn_test' else self.nn_mask_bg
         dict_ = self.d_g if mode == 'nn_test' else self.d_nn_mask_g
         full_neigh_subgraph = dgl.in_subgraph(graph,frontier_)
+
+        #print("Here ",graph.in_degrees(src),src)
+        #exit(0)
         # Only valid the edge happen before timestamp
+        full_neigh_subgraph = dgl.add_edges(full_neigh_subgraph,
+                                            torch.tensor(frontier_),
+                                            torch.tensor(frontier_))
+        #print(timestamp)
         temporal_edge_mask = full_neigh_subgraph.edata['timestamp'] < timestamp
         # Get the subgraph whose edge happen only before current timestamp
         temporal_subgraph  = dgl.edge_subgraph(full_neigh_subgraph,temporal_edge_mask)
@@ -275,21 +324,29 @@ class TemporalDataLoader:
         frontier = torch.arange(0,temporal_subgraph.num_nodes())[mask].tolist()
         # Random sample or sample top k
         final_subgraph = self.sampler(g=temporal_subgraph,nodes=frontier)
+        final_subgraph = dgl.remove_self_loop(final_subgraph)
+        final_subgraph = dgl.add_self_loop(final_subgraph)
+
         # Ideally the final subgraph should be directly applicable to attention compute
         return final_subgraph
 
 
     # for negative sampling the result should be a star graph ready to compute attention
-    def get_node_affiliation(self,node,timestamp,mode='training'):
+    def get_node_affiliation(self,node,timestamp,mode='train'):
         frontier = [node]
-        if mode != 'nn_test':
-            frontier_ = self.d_nn_mask_g.GetRootID(frontier).tolist()
-        else:
-            frontier_ = frontier
+        origin = self.dict_dict[mode].GetRootID(frontier).tolist()
+        frontier_ = origin if mode == 'nn_test' else self.graph_dict[mode].ndata[dgl.NID][frontier].tolist()
+
         graph = self.bg if mode == 'nn_test' else self.nn_mask_bg
         dict_ = self.d_g if mode == 'nn_test' else self.d_nn_mask_g
         # All neighbor node across time in bidirectional graph
-        full_neigh_subgraph = dgl.in_subgraph(self.bg,frontier_)
+        full_neigh_subgraph = dgl.in_subgraph(graph,frontier_)
+        # Add frontier self loop to prevent node deletion
+        #src = torch.tensor(frontier_)
+        #dst = src.clone()
+        full_neigh_subgraph = dgl.add_edges(full_neigh_subgraph,
+                                            torch.tensor(frontier_),
+                                            torch.tensor(frontier_))
         # Only valid the edge happen before timestamp
         temporal_edge_mask = full_neigh_subgraph.edata['timestamp'] < timestamp
         # Get the subgraph whose edge happen only before current timestamp
@@ -297,10 +354,15 @@ class TemporalDataLoader:
         working_dict = DictNode(dict_,temporal_subgraph.ndata[dgl.NID])
         temporal_subgraph.ndata[dgl.NID] = torch.from_numpy(working_dict.GetRootID(range(temporal_subgraph.num_nodes())))
         # Random sample or sample top k
-        frontier = torch.arange(0,temporal_subgraph.num_nodes())[temporal_subgraph[dgl.NID]==node]
+        
+        frontier = torch.arange(0,temporal_subgraph.num_nodes())[temporal_subgraph.ndata[dgl.NID]==origin[0]]
+        #print(temporal_subgraph.ndata[dgl.NID],origin)
         final_subgraph = self.sampler(g=temporal_subgraph,nodes=frontier)
+        final_subgraph = dgl.remove_self_loop(final_subgraph)
+        final_subgraph = dgl.add_self_loop(final_subgraph)
         # Ideally the final subgraph should be directly applicable to attention compute
-        return final_subgraph
+        #print(frontier)
+        return frontier,final_subgraph
 
     def reset(self):
         self.batch_cnt = 0

@@ -50,19 +50,18 @@ class TimeEncode(torch.nn.Module):
     self.w = torch.nn.Linear(1, dimension)
 
     self.w.weight = torch.nn.Parameter((torch.from_numpy(1 / 10 ** np.linspace(0, 9, dimension)))
-                                       .float().reshape(dimension, -1))
-    self.w.bias = torch.nn.Parameter(torch.zeros(dimension).float())
+                                       .double().reshape(dimension, -1))
+    self.w.bias = torch.nn.Parameter(torch.zeros(dimension).double())
 
   def forward(self, t):
     # t has shape [batch_size, seq_len]
     # Add dimension at the end to apply linear layer --> [batch_size, seq_len, 1]
     t = t.unsqueeze(dim=2)
-
     # output has shape [batch_size, seq_len, dimension]
     output = torch.cos(self.w(t))
-
     return output
-# TODO: Implement Memory module and memory updator KEY
+
+# TODO: Take a closer look to the gradient path of the memory module.
 class MemoryModule(nn.Module):
     def __init__(self,n_node,hidden_dim):
         super(MemoryModule,self).__init__()
@@ -94,18 +93,11 @@ class MemoryModule(nn.Module):
         return self.last_update_t[node_idxs]
 
     def detach_memory(self):
-        # Why such detach is necessary, would it be the case that the computational graph has been destroyed?
-        # Need to be tested on the auther's code
+        # Since the memory update itself will not receive gradient but will be propagated to the next batched iteration
         self.memory.detach_()
         # How to detach edge weights since they are in graph
 
-
-# Directly condition on input str token for model selection
-# should be a dgl update function on call. Since use the dgl message passing style
-# Consider operating on a subgraph sampled from each iteration
-# The node feature time stamped will be assign to node from memory based on indexs
-
-# Memory operation should be inductive in nature
+# TODO: Check about the node id matching problem
 class MemoryOperation(nn.Module):
     def __init__(self,updater_type, memory, e_feat_dim, temporal_dim):
         super(MemoryOperation,self).__init__()
@@ -128,34 +120,24 @@ class MemoryOperation(nn.Module):
         self.memory.last_update_t[g.ndata[dgl.NID]] = g.ndata['timestamp']
 
     def msg_fn_cat(self,edges):
-        ## 
         src_delta_time = edges.data['timestamp'] - edges.src['timestamp']
         time_encode = self.temporal_encoder(src_delta_time.unsqueeze(dim=1)).view(len(edges.data['timestamp']),-1)
-        # The message should
         ret = torch.cat([edges.src['s'],edges.dst['s'],edges.data['feats'],time_encode],dim=1)
-        #print("Msg: ",edges.data['timestamp'].shape)
         return {'m':ret,'timestamp':edges.data['timestamp']}
 
     def agg_last(self,nodes):
         # Implement lastest interaction update
         # Message passing need to include timestamp
-        # Can we assume centralized ?+
-        #print("latest: ",nodes.mailbox['timestamp'].shape)
-        #print("Start Here")
-        latest_idx = torch.argmax(nodes.mailbox['timestamp'],dim=1)
-        #print("latest: ",latest_idx,nodes.mailbox['m'].shape)
-        ret = nodes.mailbox['m'].gather(1,latest_idx.repeat(self.message_dim).view(-1,1,self.message_dim))
-        #ret = nodes.mailbox['m'][latest_idx]
-        #print("Reach Here")
-        #print("m_bar: ",ret.shape)
-        return {'m_bar':ret.reshape(-1,self.message_dim),'timestamp':nodes.mailbox['timestamp'][latest_idx,:]}
-    # Should be a node wise UDF
-    # The updated memory should reflected in the subgraph features
-    # After reduce functionm it should operate aggreagted feature
+        # Can we assume centralized ?
+        timestamp,latest_idx = torch.max(nodes.mailbox['timestamp'],dim=1)
+        ret = nodes.mailbox['m'].gather(1,latest_idx.repeat(self.message_dim).view(-1,1,self.message_dim)).view(-1,self.message_dim)
+        #print("Shape of ts: ",nodes.mailbox['timestamp'][:,latest_idx].shape,"Shape of messages: ",nodes.mailbox['m'].shape,"Shape of memory: ",ret.reshape(-1,self.message_dim).shape)
+        return {'m_bar':ret.reshape(-1,self.message_dim),'timestamp':timestamp}
+    
+
     def update_memory(self,nodes):
         # It should pass the feature through RNN
-        # self.updater(x,h)
-        ret = self.updater(nodes.data['m_bar'],nodes.data['s'])
+        ret = self.updater(nodes.data['m_bar'].float(),nodes.data['s'].float())
         return {'s':ret}
 
     # Entire message aggregation procedure based on current memory
@@ -195,9 +177,9 @@ class TemporalGATConv(nn.Module):
     # TODO: Check dimension which might be problematic
     def weight_fn(self,edges): # need to know the size of temporal feature.
         t0 = torch.zeros_like(edges.dst['timestamp'])
-        q = torch.cat([edges.dst['s'],self.temporal_encoder(t0.unsqueeze(dim=1)).view(len(t0),-1)],dim=1)
+        q = torch.cat([edges.dst['s'],self.temporal_encoder(t0.unsqueeze(dim=1)).view(len(t0),-1)],dim=1).float()
         time_diff = edges.data['timestamp']-edges.src['timestamp']
-        k = torch.cat([edges.src['s'],edges.data['feats'],self.temporal_encoder(time_diff.unsqueeze(dim=1)).view(len(t0),-1)],dim=1)
+        k = torch.cat([edges.src['s'],edges.data['feats'],self.temporal_encoder(time_diff.unsqueeze(dim=1)).view(len(t0),-1)],dim=1).float()
         squeezed_k = self.fc_K(k).view(-1,self._num_heads,self._out_feats)
         squeezed_q = self.fc_Q(q).view(-1,self._num_heads,self._out_feats)
         ret = torch.sum(squeezed_q*squeezed_k,dim=2)
@@ -224,7 +206,7 @@ class TemporalGATConv(nn.Module):
                                'to be `True` when constructing this module will '
                                'suppress the check and let the code run.')
 
-            
+        #print("Shape: ",memory.shape,ts.shape)
         graph.srcdata.update({'s':memory,'timestamp':ts})
         graph.dstdata.update({'s':memory,'timestamp':ts})
 
