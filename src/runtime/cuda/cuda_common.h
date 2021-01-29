@@ -93,6 +93,7 @@ struct cuda_dtype<double> {
   static constexpr cudaDataType_t value = CUDA_R_64F;
 };
 
+#if CUDART_VERSION >= 11000
 /*
  * \brief Cast index data type to cusparseIndexType_t.
  */
@@ -110,6 +111,7 @@ template <>
 struct cusparse_idtype<int64_t> {
   static constexpr cusparseIndexType_t value = CUSPARSE_INDEX_64I;
 };
+#endif
 
 /*! \brief Thread local workspace */
 class CUDAThreadEntry {
