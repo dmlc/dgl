@@ -25,6 +25,33 @@ class SparseGradOptimizer(abc.ABC):
         self._world_size = None
         self._shared_cache = {}
         self._clean_grad = False
+        self._opt_meta = {}
+
+        for emb in params:
+            assert isinstance(emb, NodeEmbedding), \
+                'DGL SparseOptimizer only supports dgl.nn.NodeEmbedding'
+
+            if self._rank is None:
+                self._rank = emb.rank
+                self._world_size = emb.world_size
+            else:
+                assert self._rank == emb.rank, \
+                    'MultiGPU rank for each embedding should be same.'
+                assert self._world_size == emb.world_size, \
+                    'MultiGPU world_size for each embedding should be same.'
+
+            emb_name = emb.name
+            if self._rank <= 0:
+                opt_meta = create_shared_mem_array(emb_name+'_opt_meta', \
+                    (self._world_size, self._world_size), th.int32).zero_()
+            if self._rank == 0:
+                emb.store.set(emb_name+'_opt_meta', emb_name)
+            elif self._rank > 0:
+                # receive
+                emb.store.wait([emb_name+'_opt_meta'])
+                opt_meta = get_shared_mem_array(emb_name+'_opt_meta', \
+                    (self._world_size, self._world_size), th.int32)
+            self._opt_meta[emb_name] = opt_meta
 
     def step(self):
         ''' The step function.
@@ -45,83 +72,101 @@ class SparseGradOptimizer(abc.ABC):
                 # thus we can parallel the gradient update.
                 range_size = (num_embeddings + self._world_size - 1) // self._world_size \
                     if self._world_size > 0 else 0
-                for idx, data in emb._trace:
-                    grad = data.grad.data
-                    device = grad.device
-                    idx_dtype = idx.dtype
-                    grad_dtype = grad.dtype
-                    grad_dim = grad.shape[1]
 
-                    if self._world_size > 0:
-                        if emb_name not in self._shared_cache:
-                            self._shared_cache[emb_name] = {}
+                # we need to combine gradients from multiple forward paths
+                idx = []
+                grad = []
+                for i, data in emb._trace:
+                    idx.append(i)
+                    grad.append(data.grad.data)
+                idx = th.cat(idx, dim=0)
+                grad = th.cat(grad, dim=0)
+                device = grad.device
+                idx_dtype = idx.dtype
+                grad_dtype = grad.dtype
+                grad_dim = grad.shape[1]
 
-                        for i in range(self._world_size):
-                            start = i * range_size
-                            end = (i + 1) * range_size \
-                                if (i + 1) * range_size < num_embeddings \
-                                else num_embeddings
-                            if i == 0:
-                                mask = idx < end
-                            elif i + 1 == self._world_size:
-                                mask = idx >= start
-                            else:
-                                mask = th.logical_and((idx >= start), (idx < end))
-                            idx_i = idx[mask]
-                            grad_i = grad[mask]
+                if self._world_size > 1:
+                    if emb_name not in self._shared_cache:
+                        self._shared_cache[emb_name] = {}
 
-                            if i == self._rank:
-                                shared_emb[emb_name][0].append(idx_i)
-                                shared_emb[emb_name][1].append(grad_i)
-                            else:
-                                # currently nccl does not support Alltoallv operation
-                                # we need to use CPU shared memory to share gradient
-                                # across processes
-                                idx_i = idx_i.to(th.device('cpu'))
-                                grad_i = grad_i.to(th.device('cpu'))
-                                idx_shmem_name = 'idx_{}_{}_{}'.format(emb_name, self._rank, i)
-                                grad_shmem_name = 'grad_{}_{}_{}'.format(emb_name, self._rank, i)
+                    for i in range(self._world_size):
+                        start = i * range_size
+                        end = (i + 1) * range_size \
+                            if (i + 1) * range_size < num_embeddings \
+                            else num_embeddings
+                        if i == 0:
+                            mask = idx < end
+                        elif i + 1 == self._world_size:
+                            mask = idx >= start
+                        else:
+                            mask = th.logical_and((idx >= start), (idx < end))
+                        idx_i = idx[mask]
+                        grad_i = grad[mask]
 
-                                if idx_shmem_name not in self._shared_cache[emb_name] or \
-                                    self._shared_cache[emb_name][idx_shmem_name].shape[0] \
-                                        < idx_i.shape[0]:
-                                    # in case idx_i.shape[0] is 0
-                                    idx_shmem = create_shared_mem_array(idx_shmem_name, \
-                                        (idx_i.shape[0] * 2 + 2,), idx_dtype)
-                                    grad_shmem = create_shared_mem_array(grad_shmem_name, \
-                                        (idx_i.shape[0] * 2 + 2, grad_dim), grad_dtype)
-                                    self._shared_cache[emb_name][idx_shmem_name] = idx_shmem
-                                    self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
+                        if i == self._rank:
+                            shared_emb[emb_name][0].append(idx_i)
+                            shared_emb[emb_name][1].append(grad_i)
+                        else:
+                            # currently nccl does not support Alltoallv operation
+                            # we need to use CPU shared memory to share gradient
+                            # across processes
+                            idx_i = idx_i.to(th.device('cpu'))
+                            grad_i = grad_i.to(th.device('cpu'))
+                            idx_shmem_name = 'idx_{}_{}_{}'.format(emb_name, self._rank, i)
+                            grad_shmem_name = 'grad_{}_{}_{}'.format(emb_name, self._rank, i)
 
-                                self._shared_cache[emb_name][idx_shmem_name][:idx_i.shape[0]] \
-                                    = idx_i
-                                self._shared_cache[emb_name][grad_shmem_name][:idx_i.shape[0]] \
-                                    = grad_i
-                                emb.store.set(idx_shmem_name, str(idx_i.shape[0]))
+                            if idx_shmem_name not in self._shared_cache[emb_name] or \
+                                self._shared_cache[emb_name][idx_shmem_name].shape[0] \
+                                    < idx_i.shape[0]:
+                                # in case idx_i.shape[0] is 0
+                                idx_shmem = create_shared_mem_array(idx_shmem_name, \
+                                    (idx_i.shape[0] * 2 + 2,), idx_dtype)
+                                grad_shmem = create_shared_mem_array(grad_shmem_name, \
+                                    (idx_i.shape[0] * 2 + 2, grad_dim), grad_dtype)
+                                self._shared_cache[emb_name][idx_shmem_name] = idx_shmem
+                                self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
 
-                        # gather gradients from all other processes
-                        for i in range(self._world_size):
-                            if i != self._rank:
-                                idx_shmem_name = 'idx_{}_{}_{}'.format(emb_name, i, self._rank)
-                                grad_shmem_name = 'grad_{}_{}_{}'.format(emb_name, i, self._rank)
-                                size = int(emb.store.get(idx_shmem_name))
-                                if idx_shmem_name not in self._shared_cache[emb_name] or \
-                                    self._shared_cache[emb_name][idx_shmem_name].shape[0] < size:
-                                    idx_shmem = get_shared_mem_array(idx_shmem_name, \
-                                        (size * 2 + 2,), idx_dtype)
-                                    grad_shmem = get_shared_mem_array(grad_shmem_name, \
-                                        (size * 2 + 2, grad_dim), grad_dtype)
-                                    self._shared_cache[emb_name][idx_shmem_name] = idx_shmem
-                                    self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
-                                idx_i = self._shared_cache[emb_name][idx_shmem_name][:size]
-                                grad_i = self._shared_cache[emb_name][grad_shmem_name][:size]
-                                shared_emb[emb_name][0].append(idx_i.to(device,
+                            self._shared_cache[emb_name][idx_shmem_name][:idx_i.shape[0]] \
+                                = idx_i
+                            self._shared_cache[emb_name][grad_shmem_name][:idx_i.shape[0]] \
+                                = grad_i
+                            self._opt_meta[emb_name][self._rank][i] = idx_i.shape[0]
+                else:
+                    shared_emb[emb_name][0].append(idx)
+                    shared_emb[emb_name][1].append(grad)
+
+            # make sure the idx shape is passed to each process through opt_meta
+            if self._world_size > 1:
+                th.distributed.barrier()
+            for emb in self._params: # pylint: disable=too-many-nested-blocks
+                emb_name = emb.name
+                if self._world_size > 1:
+                    # gather gradients from all other processes
+                    for i in range(self._world_size):
+                        if i != self._rank:
+                            idx_shmem_name = 'idx_{}_{}_{}'.format(emb_name, i, self._rank)
+                            grad_shmem_name = 'grad_{}_{}_{}'.format(emb_name, i, self._rank)
+
+                    for i in range(self._world_size):
+                        if i != self._rank:
+                            idx_shmem_name = 'idx_{}_{}_{}'.format(emb_name, i, self._rank)
+                            grad_shmem_name = 'grad_{}_{}_{}'.format(emb_name, i, self._rank)
+                            size = self._opt_meta[emb_name][i][self._rank]
+                            if idx_shmem_name not in self._shared_cache[emb_name] or \
+                                self._shared_cache[emb_name][idx_shmem_name].shape[0] < size:
+                                idx_shmem = get_shared_mem_array(idx_shmem_name, \
+                                    (size * 2 + 2,), idx_dtype)
+                                grad_shmem = get_shared_mem_array(grad_shmem_name, \
+                                    (size * 2 + 2, grad_dim), grad_dtype)
+                                self._shared_cache[emb_name][idx_shmem_name] = idx_shmem
+                                self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
+                            idx_i = self._shared_cache[emb_name][idx_shmem_name][:size]
+                            grad_i = self._shared_cache[emb_name][grad_shmem_name][:size]
+                            shared_emb[emb_name][0].append(idx_i.to(device,
+                                                                    non_blocking=True))
+                            shared_emb[emb_name][1].append(grad_i.to(device,
                                                                         non_blocking=True))
-                                shared_emb[emb_name][1].append(grad_i.to(device,
-                                                                         non_blocking=True))
-                    else:
-                        shared_emb[emb_name][0].append(idx)
-                        shared_emb[emb_name][1].append(grad)
 
             if self._clean_grad:
                 # clean gradient track
@@ -205,22 +250,12 @@ class SparseAdagrad(SparseGradOptimizer):
             assert isinstance(emb, NodeEmbedding), \
                 'SparseAdagrad only supports dgl.nn.NodeEmbedding'
 
-            if self._rank is None:
-                self._rank = emb.rank
-                self._world_size = emb.world_size
-            else:
-                assert self._rank == emb.rank, \
-                    'MultiGPU rank for each embedding should be same.'
-                assert self._world_size == emb.world_size, \
-                    'MultiGPU world_size for each embedding should be same.'
             if self._rank <= 0:
                 emb_name = emb.name
                 state = create_shared_mem_array(emb_name+'_state', \
                     emb.emb_tensor.shape, th.float32).zero_()
             if self._rank == 0:
-                for _ in range(1, world_size):
-                    # send embs
-                    emb.store.set(emb_name+'_opt', emb_name)
+                emb.store.set(emb_name+'_opt', emb_name)
             elif self._rank > 0:
                 # receive
                 emb_name = emb.name
@@ -318,14 +353,6 @@ class SparseAdam(SparseGradOptimizer):
             assert isinstance(emb, NodeEmbedding), \
                 'SparseAdam only supports dgl.nn.NodeEmbedding'
 
-            if self._rank is None:
-                self._rank = emb.rank
-                self._world_size = emb.world_size
-            else:
-                assert self._rank == emb.rank, \
-                    'MultiGPU rank for each embedding should be same.'
-                assert self._world_size == emb.world_size, \
-                    'MultiGPU world_size for each embedding should be same.'
             if self._rank <= 0:
                 emb_name = emb.name
                 state_step = create_shared_mem_array(emb_name+'_step', \
@@ -335,11 +362,8 @@ class SparseAdam(SparseGradOptimizer):
                 state_power = create_shared_mem_array(emb_name+'_power', \
                     emb.emb_tensor.shape, th.float32).zero_()
             if self._rank == 0:
-                state = (state_step, state_mem, state_power)
                 emb_name = emb.name
-                for _ in range(1, self._world_size):
-                    # send embs
-                    emb.store.set(emb_name+'_opt', emb_name)
+                emb.store.set(emb_name+'_opt', emb_name)
             elif self._rank > 0:
                 # receive
                 emb_name = emb.name
