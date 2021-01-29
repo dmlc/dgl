@@ -27,22 +27,21 @@ namespace cuda {
 
 namespace {
 
-
 template<typename IdType, int BLOCK_SIZE, IdType TILE_SIZE>
 __device__ void map_vertex_ids(
     const IdType * const global,
     IdType * const new_global,
     const IdType num_vertices,
-    const HashTable<IdType>& table) {
+    const OrderedHashTable<IdType>& table) {
   assert(BLOCK_SIZE == blockDim.x);
 
-  using Mapping = typename HashTable<IdType>::Mapping;
+  using Mapping = typename OrderedHashTable<IdType>::Mapping;
 
   const IdType tile_start = TILE_SIZE*blockIdx.x;
   const IdType tile_end = min(TILE_SIZE*(blockIdx.x+1), num_vertices);
 
   for (IdType idx = threadIdx.x+tile_start; idx < tile_end; idx+=BLOCK_SIZE) {
-    const Mapping& mapping = *table.search(global[idx]);
+    const Mapping& mapping = *table.Search(global[idx]);
     new_global[idx] = mapping.local;
   }
 }
@@ -63,7 +62,7 @@ template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void generate_hashmap_duplicates(
     const IdType * const nodes,
     const int64_t num_nodes,
-    HashTable<IdType> table) {
+    OrderedHashTable<IdType> table) {
   assert(BLOCK_SIZE == blockDim.x);
 
   const size_t block_start = TILE_SIZE*blockIdx.x;
@@ -72,7 +71,7 @@ __global__ void generate_hashmap_duplicates(
   #pragma unroll
   for (size_t index = threadIdx.x + block_start; index < block_end; index += BLOCK_SIZE) {
     if (index < num_nodes) {
-      table.insert(nodes[index], index);
+      table.Insert(nodes[index], index);
     }
   }
 }
@@ -93,8 +92,10 @@ template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void generate_hashmap_unique(
     const IdType * const nodes,
     const int64_t num_nodes,
-    HashTable<IdType> table) {
+    OrderedHashTable<IdType> table) {
   assert(BLOCK_SIZE == blockDim.x);
+
+  using Iterator = typename OrderedHashTable<IdType>::Iterator;
 
   const size_t block_start = TILE_SIZE*blockIdx.x;
   const size_t block_end = TILE_SIZE*(blockIdx.x+1);
@@ -102,11 +103,11 @@ __global__ void generate_hashmap_unique(
   #pragma unroll
   for (size_t index = threadIdx.x + block_start; index < block_end; index += BLOCK_SIZE) {
     if (index < num_nodes) {
-      const size_t pos = table.insert(nodes[index], index);
+      const Iterator pos = table.Insert(nodes[index], index);
 
       // since we are only inserting unique nodes, we know their local id
       // will be equal to their index
-      table[pos].local = static_cast<IdType>(index);
+      pos->local = static_cast<IdType>(index);
     }
   }
 }
@@ -129,12 +130,12 @@ template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void count_hashmap(
     const IdType * nodes,
     const size_t num_nodes,
-    const HashTable<IdType> table,
+    const OrderedHashTable<IdType> table,
     IdType * const num_unique_nodes) {
   assert(BLOCK_SIZE == blockDim.x);
 
   using BlockReduce = typename cub::BlockReduce<IdType, BLOCK_SIZE>;
-  using Mapping = typename HashTable<IdType>::Mapping;
+  using Mapping = typename OrderedHashTable<IdType>::Mapping;
 
   const size_t block_start = TILE_SIZE*blockIdx.x;
   const size_t block_end = TILE_SIZE*(blockIdx.x+1);
@@ -144,7 +145,7 @@ __global__ void count_hashmap(
   #pragma unroll
   for (size_t index = threadIdx.x + block_start; index < block_end; index += BLOCK_SIZE) {
     if (index < num_nodes) {
-      const Mapping& mapping = *table.search(nodes[index]);
+      const Mapping& mapping = *table.Search(nodes[index]);
       if (mapping.index == index) {
         ++count;
       }
@@ -200,7 +201,7 @@ template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void compact_hashmap(
     const IdType * const nodes,
     const size_t num_nodes,
-    HashTable<IdType> table,
+    OrderedHashTable<IdType> table,
     const IdType * const num_nodes_prefix,
     IdType * const global_nodes,
     int64_t * const global_node_count) {
@@ -208,7 +209,7 @@ __global__ void compact_hashmap(
 
   using FlagType = uint16_t;
   using BlockScan = typename cub::BlockScan<FlagType, BLOCK_SIZE>;
-  using Mapping = typename HashTable<IdType>::Mapping;
+  using Mapping = typename OrderedHashTable<IdType>::Mapping;
 
   constexpr const int32_t VALS_PER_THREAD = TILE_SIZE / BLOCK_SIZE;
 
@@ -225,7 +226,7 @@ __global__ void compact_hashmap(
     FlagType flag;
     Mapping * kv;
     if (index < num_nodes) {
-      kv = table.search(nodes[index]);
+      kv = table.Search(nodes[index]);
       flag = kv->index == index;
     } else {
       flag = 0;
@@ -273,8 +274,8 @@ __global__ void map_edge_ids(
     const IdType * const global_dsts_device,
     IdType * const new_global_dsts_device,
     const IdType num_edges,
-    const HashTable<IdType> src_mapping,
-    const HashTable<IdType> dst_mapping) {
+    const OrderedHashTable<IdType> src_mapping,
+    const OrderedHashTable<IdType> dst_mapping) {
   assert(BLOCK_SIZE == blockDim.x);
   assert(2 == gridDim.y);
 
@@ -316,7 +317,7 @@ class DeviceNodeMap {
  public:
   constexpr static const int HASH_SCALING = 2;
 
-  using Mapping = typename HashTable<IdType>::Mapping;
+  using Mapping = typename OrderedHashTable<IdType>::Mapping;
 
   DeviceNodeMap(
       const std::vector<int64_t>& num_nodes,
@@ -333,11 +334,11 @@ class DeviceNodeMap {
     workspaces_.reserve(num_types_);
     for (int64_t i = 0; i < num_types_; ++i) {
       const size_t hash_size = GetHashSize(num_nodes[i]);
-      size_t workspace_size = HashTable<IdType>::RequiredWorkspace(hash_size);
+      size_t workspace_size = OrderedHashTable<IdType>::RequiredWorkspace(hash_size);
       void * workspace = device->AllocWorkspace(ctx, workspace_size);
       workspaces_.emplace_back(workspace);
       hash_tables_.emplace_back(
-          HashTable<IdType>(
+          OrderedHashTable<IdType>(
             hash_size,
             workspace,
             workspace_size,
@@ -353,22 +354,22 @@ class DeviceNodeMap {
   }
 
 
-  HashTable<IdType>& LhsHashTable(
+  OrderedHashTable<IdType>& LhsHashTable(
       const size_t index) {
     return HashData(index);
   }
 
-  HashTable<IdType>& RhsHashTable(
+  OrderedHashTable<IdType>& RhsHashTable(
       const size_t index) {
     return HashData(index+rhs_offset_);
   }
 
-  const HashTable<IdType>& LhsHashTable(
+  const OrderedHashTable<IdType>& LhsHashTable(
       const size_t index) const {
     return HashData(index);
   }
 
-  const HashTable<IdType>& RhsHashTable(
+  const OrderedHashTable<IdType>& RhsHashTable(
       const size_t index) const {
     return HashData(index+rhs_offset_);
   }
@@ -391,7 +392,7 @@ class DeviceNodeMap {
   size_t num_types_;
   size_t rhs_offset_;
   std::vector<void*> workspaces_;
-  std::vector<HashTable<IdType>> hash_tables_;
+  std::vector<OrderedHashTable<IdType>> hash_tables_;
   DGLContext ctx_;
 
   static size_t GetHashSize(const size_t num_nodes) {
@@ -405,13 +406,13 @@ class DeviceNodeMap {
     return hash_size;
   }
 
-  inline HashTable<IdType>& HashData(
+  inline OrderedHashTable<IdType>& HashData(
       const size_t index) {
     CHECK_LT(index, hash_tables_.size());
     return hash_tables_[index];
   }
 
-  inline const HashTable<IdType>& HashData(
+  inline const OrderedHashTable<IdType>& HashData(
       const size_t index) const {
     CHECK_LT(index, hash_tables_.size());
     return hash_tables_[index];
