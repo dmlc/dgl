@@ -136,7 +136,7 @@ function(dgl_select_nvcc_arch_flags out_variable)
   string(REGEX MATCHALL "[0-9]+"   __cuda_arch_ptx "${__cuda_arch_ptx}")
   mshadow_list_unique(__cuda_arch_bin __cuda_arch_ptx)
 
-  set(__nvcc_flags "")
+  set(__nvcc_flags "--expt-relaxed-constexpr")
   set(__nvcc_archs_readable "")
 
   # Tell NVCC to add binaries for the specified GPUs
@@ -246,6 +246,9 @@ macro(dgl_config_cuda out_variable)
   # 0. Add host flags
   message(STATUS "${CMAKE_CXX_FLAGS}")
   string(REGEX REPLACE "[ \t\n\r]" "," CXX_HOST_FLAGS "${CMAKE_CXX_FLAGS}")
+  if(MSVC AND NOT USE_MSVC_MT)
+    string(CONCAT CXX_HOST_FLAGS ${CXX_HOST_FLAGS} ",/MD")
+  endif()
   list(APPEND CUDA_NVCC_FLAGS "-Xcompiler ,${CXX_HOST_FLAGS}")
 
   # 1. Add arch flags
@@ -260,7 +263,7 @@ macro(dgl_config_cuda out_variable)
   include(CheckCXXCompilerFlag)
   check_cxx_compiler_flag("-std=c++14"    SUPPORT_CXX14)
   string(REPLACE "-std=c++11" "" CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}")
-  list(APPEND CUDA_NVCC_FLAGS "--std=c++14")
+  list(APPEND CUDA_NVCC_FLAGS "-std=c++14")
 
   message(STATUS "CUDA flags: ${CUDA_NVCC_FLAGS}")
 

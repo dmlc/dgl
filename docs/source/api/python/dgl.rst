@@ -26,6 +26,8 @@ Operators for constructing :class:`DGLGraph` from raw data formats.
     rand_bipartite
     knn_graph
     segmented_knn_graph
+    create_block
+    block_to_graph
 
 .. _api-subgraph-extraction:
 

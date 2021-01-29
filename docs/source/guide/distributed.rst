@@ -1,5 +1,9 @@
+.. _guide-distributed:
+
 Chapter 7: Distributed Training
 =====================================
+
+:ref:`(中文版) <guide_cn-distributed>`
 
 DGL adopts a fully distributed approach that distributes both data and computation
 across a collection of computation resources. In the context of this section, we
