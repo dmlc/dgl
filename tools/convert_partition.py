@@ -176,6 +176,15 @@ part_metadata = {'graph_name': graph_name,
                  'edge_map': edge_map_val,
                  'ntypes': ntypes,
                  'etypes': etypes}
+
+for part_id in range(num_parts):
+    part_dir = output_dir + '/part' + str(part_id)
+    node_feat_file = os.path.join(part_dir, "node_feat.dgl")
+    edge_feat_file = os.path.join(part_dir, "edge_feat.dgl")
+    part_graph_file = os.path.join(part_dir, "graph.dgl")
+    part_metadata['part-{}'.format(part_id)] = {'node_feats': node_feat_file,
+                                                'edge_feats': edge_feat_file,
+                                                'part_graph': part_graph_file}
 with open('{}/{}.json'.format(output_dir, graph_name), 'w') as outfile:
     json.dump(part_metadata, outfile, sort_keys=True, indent=4)
 
