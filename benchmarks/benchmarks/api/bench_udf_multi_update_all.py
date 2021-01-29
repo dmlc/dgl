@@ -12,7 +12,7 @@ from .. import utils
 @utils.benchmark('time', timeout=600)
 @utils.parametrize('feat_size', [32, 128, 512])
 @utils.parametrize('num_relations', [5, 50, 500])
-@utils.parametrize('multi_reduce_type', ["sum", "stuck"])
+@utils.parametrize('multi_reduce_type', ["sum", "stack"])
 def track_time(feat_size, num_relations, multi_reduce_type):
     device = utils.get_bench_device()
     dd = {}
