@@ -14,6 +14,8 @@ subhg = dgl.compact_graphs(dgl.node_subgraph(hg, subg_nodes))
 subg = dgl.to_homogeneous(subhg)
 subg.ndata['orig_id'] = subg.ndata[dgl.NID]
 subg.edata['orig_id'] = subg.edata[dgl.EID]
+subg.ndata['feat'] = th.arange(subg.number_of_nodes())
+subg.edata['feat'] = th.arange(subg.number_of_edges())
 dgl.save_graphs('mag.dgl', [subg])
 print('|V|=' + str(subg.number_of_nodes()))
 print('|E|=' + str(subg.number_of_edges()))
@@ -22,12 +24,15 @@ print('|NTYPE|=' + str(len(th.unique(subg.ndata[dgl.NTYPE]))))
 node_data = th.stack([subg.ndata[dgl.NTYPE],
                       subg.ndata[dgl.NTYPE] == 0,
                       subg.ndata[dgl.NTYPE] == 1,
-                      subg.ndata['orig_id']], 1)
+                      subg.ndata['orig_id'],
+                      subg.ndata['feat']], 1)
 np.savetxt('mag_nodes.txt', node_data.numpy(), fmt='%d', delimiter=' ')
 
 src_id, dst_id = subg.edges()
 edge_data = th.stack([src_id, dst_id,
-                      subg.edata['orig_id'], subg.edata[dgl.ETYPE]], 1)
+                      subg.edata['orig_id'],
+                      subg.edata[dgl.ETYPE],
+                      subg.edata['feat']], 1)
 np.savetxt('mag_edges.txt', edge_data.numpy(), fmt='%d', delimiter=' ')
 
 graph_stats = [subg.number_of_nodes(), subg.number_of_edges(), 2]
