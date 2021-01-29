@@ -46,226 +46,21 @@ __device__ void map_vertex_ids(
   }
 }
 
-
 /**
-* @brief This generates a hash map where the keys are the global node numbers,
-* and the values are indexes, and inputs may have duplciates.
+* \brief Generate mapped edge endpoint ids.
 *
-* @tparam IdType The type of of id.
-* @tparam BLOCK_SIZE The size of the thread block.
-* @tparam TILE_SIZE The number of entries each thread block will process.
-* @param nodes The nodes to insert.
-* @param num_nodes The number of nodes to insert.
-* @param table The hash table.
-*/
-template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
-__global__ void generate_hashmap_duplicates(
-    const IdType * const nodes,
-    const int64_t num_nodes,
-    OrderedHashTable<IdType> table) {
-  assert(BLOCK_SIZE == blockDim.x);
-
-  const size_t block_start = TILE_SIZE*blockIdx.x;
-  const size_t block_end = TILE_SIZE*(blockIdx.x+1);
-
-  #pragma unroll
-  for (size_t index = threadIdx.x + block_start; index < block_end; index += BLOCK_SIZE) {
-    if (index < num_nodes) {
-      table.Insert(nodes[index], index);
-    }
-  }
-}
-
-
-/**
-* @brief This generates a hash map where the keys are the global node numbers,
-* and the values are indexes, and all inputs are unique.
-*
-* @tparam IdType The type of of id.
-* @tparam BLOCK_SIZE The size of the thread block.
-* @tparam TILE_SIZE The number of entries each thread block will process.
-* @param nodes The unique nodes to insert.
-* @param num_nodes The number of nodes to insert.
-* @param table The hash table.
-*/
-template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
-__global__ void generate_hashmap_unique(
-    const IdType * const nodes,
-    const int64_t num_nodes,
-    OrderedHashTable<IdType> table) {
-  assert(BLOCK_SIZE == blockDim.x);
-
-  using Iterator = typename OrderedHashTable<IdType>::Iterator;
-
-  const size_t block_start = TILE_SIZE*blockIdx.x;
-  const size_t block_end = TILE_SIZE*(blockIdx.x+1);
-
-  #pragma unroll
-  for (size_t index = threadIdx.x + block_start; index < block_end; index += BLOCK_SIZE) {
-    if (index < num_nodes) {
-      const Iterator pos = table.Insert(nodes[index], index);
-
-      // since we are only inserting unique nodes, we know their local id
-      // will be equal to their index
-      pos->local = static_cast<IdType>(index);
-    }
-  }
-}
-
-
-/**
-* @brief This counts the number of nodes inserted per thread block.
-*
-* @tparam IdType The type of of id.
-* @tparam BLOCK_SIZE The size of the thread block.
-* @tparam TILE_SIZE The number of entries each thread block will process.
-* @param nodes The nodes ot insert.
-* @param num_nodes The number of nodes to insert.
-* @param hash_size The size of the hash table.
-* @param pairs The hash table.
-* @param num_unique_nodes The number of nodes inserted into the hash table per thread
-* block.
-*/
-template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
-__global__ void count_hashmap(
-    const IdType * nodes,
-    const size_t num_nodes,
-    const OrderedHashTable<IdType> table,
-    IdType * const num_unique_nodes) {
-  assert(BLOCK_SIZE == blockDim.x);
-
-  using BlockReduce = typename cub::BlockReduce<IdType, BLOCK_SIZE>;
-  using Mapping = typename OrderedHashTable<IdType>::Mapping;
-
-  const size_t block_start = TILE_SIZE*blockIdx.x;
-  const size_t block_end = TILE_SIZE*(blockIdx.x+1);
-
-  IdType count = 0;
-
-  #pragma unroll
-  for (size_t index = threadIdx.x + block_start; index < block_end; index += BLOCK_SIZE) {
-    if (index < num_nodes) {
-      const Mapping& mapping = *table.Search(nodes[index]);
-      if (mapping.index == index) {
-        ++count;
-      }
-    }
-  }
-
-  __shared__ typename BlockReduce::TempStorage temp_space;
-
-  count = BlockReduce(temp_space).Sum(count);
-
-  if (threadIdx.x == 0) {
-    num_unique_nodes[blockIdx.x] = count;
-    if (blockIdx.x == 0) {
-      num_unique_nodes[gridDim.x] = 0;
-    }
-  }
-}
-
-template<typename IdType>
-struct BlockPrefixCallbackOp {
-  IdType running_total_;
-
-  __device__ BlockPrefixCallbackOp(
-      const IdType running_total) :
-    running_total_(running_total) {
-  }
-
-  __device__ IdType operator()(const IdType block_aggregate) {
-      const IdType old_prefix = running_total_;
-      running_total_ += block_aggregate;
-      return old_prefix;
-  }
-};
-
-
-
-/**
-* @brief Update the local numbering of elements in the hashmap.
-*
-* @tparam IdType The type of id.
-* @tparam BLOCK_SIZE The size of the thread blocks.
-* @tparam TILE_SIZE The number of elements each thread block works on.
-* @param nodes The set of non-unique nodes to update from.
-* @param num_nodes The number of non-unique nodes.
-* @param hash_size The size of the hash table.
-* @param mappings The hash table.
-* @param num_nodes_prefix The number of unique nodes preceding each thread
-* block.
-* @param global_nodes The set of unique nodes (output).
-* @param global_node_count The number of unique nodes (output).
-*/
-template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
-__global__ void compact_hashmap(
-    const IdType * const nodes,
-    const size_t num_nodes,
-    OrderedHashTable<IdType> table,
-    const IdType * const num_nodes_prefix,
-    IdType * const global_nodes,
-    int64_t * const global_node_count) {
-  assert(BLOCK_SIZE == blockDim.x);
-
-  using FlagType = uint16_t;
-  using BlockScan = typename cub::BlockScan<FlagType, BLOCK_SIZE>;
-  using Mapping = typename OrderedHashTable<IdType>::Mapping;
-
-  constexpr const int32_t VALS_PER_THREAD = TILE_SIZE / BLOCK_SIZE;
-
-  __shared__ typename BlockScan::TempStorage temp_space;
-
-  const IdType offset = num_nodes_prefix[blockIdx.x];
-
-  BlockPrefixCallbackOp<FlagType> prefix_op(0);
-
-  // count successful placements
-  for (int32_t i = 0; i < VALS_PER_THREAD; ++i) {
-    const IdType index = threadIdx.x + i*BLOCK_SIZE + blockIdx.x*TILE_SIZE;
-
-    FlagType flag;
-    Mapping * kv;
-    if (index < num_nodes) {
-      kv = table.Search(nodes[index]);
-      flag = kv->index == index;
-    } else {
-      flag = 0;
-    }
-
-    if (!flag) {
-      kv = nullptr;
-    }
-
-    BlockScan(temp_space).ExclusiveSum(flag, flag, prefix_op);
-    __syncthreads();
-
-    if (kv) {
-      const IdType pos = offset+flag;
-      kv->local = pos;
-      global_nodes[pos] = nodes[index];
-    }
-  }
-
-  if (threadIdx.x == 0 && blockIdx.x == 0) {
-    *global_node_count = num_nodes_prefix[gridDim.x];
-  }
-}
-
-/**
-* @brief Generate mapped edge endpoint ids.
-*
-* @tparam IdType The type of id.
-* @tparam BLOCK_SIZE The size of each thread block.
-* @tparam TILE_SIZE The number of edges to process per thread block.
-* @param global_srcs_device The source ids to map.
-* @param new_global_srcs_device The mapped source ids (output).
-* @param global_dsts_device The destination ids to map.
-* @param new_global_dsts_device The mapped destination ids (output).
-* @param num_edges The number of edges to map.
-* @param src_mapping The mapping of sources ids.
-* @param src_hash_size The the size of source id hash table/mapping.
-* @param dst_mapping The mapping of destination ids.
-* @param dst_hash_size The the size of destination id hash table/mapping.
+* \tparam IdType The type of id.
+* \tparam BLOCK_SIZE The size of each thread block.
+* \tparam TILE_SIZE The number of edges to process per thread block.
+* \param global_srcs_device The source ids to map.
+* \param new_global_srcs_device The mapped source ids (output).
+* \param global_dsts_device The destination ids to map.
+* \param new_global_dsts_device The mapped destination ids (output).
+* \param num_edges The number of edges to map.
+* \param src_mapping The mapping of sources ids.
+* \param src_hash_size The the size of source id hash table/mapping.
+* \param dst_mapping The mapping of destination ids.
+* \param dst_hash_size The the size of destination id hash table/mapping.
 */
 template<typename IdType, int BLOCK_SIZE, IdType TILE_SIZE>
 __global__ void map_edge_ids(
@@ -458,14 +253,14 @@ class DeviceNodeMapMaker {
   }
 
   /**
-  * @brief This function builds node maps for each node type, preserving the
+  * \brief This function builds node maps for each node type, preserving the
   * order of the input nodes.
   *
-  * @param nodes The set of input nodes.
-  * @param nodes_maps The constructed node maps.
-  * @param workspace The scratch space to use.
-  * @param workspaceSize The size of the scratch space.
-  * @param stream The stream to operate on.
+  * \param nodes The set of input nodes.
+  * \param nodes_maps The constructed node maps.
+  * \param workspace The scratch space to use.
+  * \param workspaceSize The size of the scratch space.
+  * \param stream The stream to operate on.
   */
   void Make(
       const std::vector<IdArray>& lhs_nodes,
@@ -473,21 +268,9 @@ class DeviceNodeMapMaker {
       DeviceNodeMap<IdType> * const node_maps,
       int64_t * const count_lhs_device,
       std::vector<IdArray>* const lhs_device,
-      void * const workspace,
-      const size_t workspaceSize,
+      void *,
+      size_t,
       cudaStream_t stream) {
-    if (workspaceSize < RequiredWorkspaceBytes()) {
-      throw std::runtime_error("Not enough space for sorting: " +
-          std::to_string(workspaceSize) + " / " +
-          std::to_string(RequiredWorkspaceBytes()));
-    }
-
-    void * const prefix_sum_space = workspace;
-    size_t prefix_sum_bytes = RequiredPrefixSumBytes(
-        max_num_nodes_);
-
-    IdType * const node_prefix = reinterpret_cast<IdType*>(
-        static_cast<uint8_t*>(prefix_sum_space) + prefix_sum_bytes);
 
     const int64_t num_ntypes = lhs_nodes.size() + rhs_nodes.size();
 
@@ -503,37 +286,13 @@ class DeviceNodeMapMaker {
       if (nodes->shape[0] > 0) {
         CHECK_EQ(nodes->ctx.device_type, kDLGPU);
 
-        const dim3 grid(RoundUpDiv(nodes->shape[0], TILE_SIZE));
-        const dim3 block(BLOCK_SIZE);
-
-        generate_hashmap_duplicates<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
+        node_maps->LhsHashTable(ntype).FillWithDuplicates(
             nodes.Ptr<IdType>(),
             nodes->shape[0],
-            node_maps->LhsHashTable(ntype));
-        CUDA_CALL(cudaGetLastError());
-
-        count_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
-            nodes.Ptr<IdType>(),
-            nodes->shape[0],
-            node_maps->LhsHashTable(ntype),
-            node_prefix);
-        CUDA_CALL(cudaGetLastError());
-
-        CUDA_CALL(cub::DeviceScan::ExclusiveSum(
-            prefix_sum_space,
-            prefix_sum_bytes,
-            node_prefix,
-            node_prefix,
-            grid.x+1, stream));
-
-        compact_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
-            nodes.Ptr<IdType>(),
-            nodes->shape[0],
-            node_maps->LhsHashTable(ntype),
-            node_prefix,
             (*lhs_device)[ntype].Ptr<IdType>(),
-            count_lhs_device+ntype);
-        CUDA_CALL(cudaGetLastError());
+            count_lhs_device+ntype,
+            nodes->ctx,
+            stream);
       }
     }
 
