@@ -81,13 +81,13 @@ void SpMM(const std::string& op, const std::string& reduce,
 
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SpMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
-      ATEN_FLOAT_TYPE_SWITCH(out->dtype, DType, "Feature data", {
+      ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "Feature data", {
         if (format == SparseFormat::kCSC) {
-          SpMMCsr<XPU, IdType, DType>(
+          SpMMCsr<XPU, IdType, bits>(
               op, reduce, bcast, graph->GetCSCMatrix(0),
               ufeat, efeat, out, out_aux);
         } else if (format == SparseFormat::kCOO) {
-          SpMMCoo<XPU, IdType, DType>(
+          SpMMCoo<XPU, IdType, bits>(
               op, reduce, bcast, graph->GetCOOMatrix(0),
               ufeat, efeat, out, out_aux);
         } else {
@@ -112,13 +112,13 @@ void SDDMM(const std::string& op,
 
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SDDMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
-      ATEN_FLOAT_TYPE_SWITCH(out->dtype, DType, "Feature data", {
+      ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "Feature data", {
         if (format == SparseFormat::kCSR) {
-          SDDMMCsr<XPU, IdType, DType>(
+          SDDMMCsr<XPU, IdType, bits>(
               op, bcast, graph->GetCSRMatrix(0),
               lhs, rhs, out, lhs_target, rhs_target);
         } else if (format == SparseFormat::kCOO) {
-          SDDMMCoo<XPU, IdType, DType>(
+          SDDMMCoo<XPU, IdType, bits>(
               op, bcast, graph->GetCOOMatrix(0),
               lhs, rhs, out, lhs_target, rhs_target);
         } else {
@@ -129,6 +129,15 @@ void SDDMM(const std::string& op,
   });
 }
 
+NDArray GetEdgeMapping(HeteroGraphRef graph) {
+  SparseFormat format = graph->SelectFormat(0, csc_code);
+  if (format == SparseFormat::kCSC) {
+    return graph.sptr()->GetCSCMatrix(0).data;
+  } else {
+    return NullArray();
+  }
+}
+
 /*! \brief Segment reduce dispatch function. */
 void SegmentReduceDispatch(const std::string& op,
                            NDArray feat,
@@ -137,8 +146,8 @@ void SegmentReduceDispatch(const std::string& op,
                            NDArray arg) {
   ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "SegmentReduce", {
     ATEN_ID_TYPE_SWITCH(offsets->dtype, IdType, {
-      ATEN_FLOAT_TYPE_SWITCH(feat->dtype, DType, "Feature data", {
-          SegmentReduce<XPU, IdType, DType>(op, feat, offsets, out, arg);
+      ATEN_FLOAT_BITS_SWITCH(feat->dtype, bits, "Feature data", {
+          SegmentReduce<XPU, IdType, bits>(op, feat, offsets, out, arg);
       });
     });
   });
@@ -148,8 +157,8 @@ void SegmentReduceDispatch(const std::string& op,
 void BackwardSegmentCmpDispatch(NDArray feat, NDArray arg, NDArray out) {
   ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "BackwardSegmentCmp", {
     ATEN_ID_TYPE_SWITCH(arg->dtype, IdType, {
-      ATEN_FLOAT_TYPE_SWITCH(feat->dtype, DType, "Feature data", {
-        BackwardSegmentCmp<XPU, IdType, DType>(feat, arg, out);
+      ATEN_FLOAT_BITS_SWITCH(feat->dtype, bits, "Feature data", {
+        BackwardSegmentCmp<XPU, IdType, bits>(feat, arg, out);
       });
     });
   });
@@ -224,6 +233,12 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelBwdSegmentCmp")
     CheckCtx(feat->ctx, {feat, arg, out}, {"feat", "arg", "out"});
     CheckContiguous({feat, arg, out}, {"feat", "arg", "out"});
     BackwardSegmentCmpDispatch(feat, arg, out);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGetEdgeMapping")
+.set_body([](DGLArgs args, DGLRetValue *rv) {
+    HeteroGraphRef graph = args[0];
+    *rv = GetEdgeMapping(graph);
   });
 
 #ifdef USE_TVM
