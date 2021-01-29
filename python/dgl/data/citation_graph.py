@@ -351,11 +351,7 @@ class CoraGraphDataset(CitationGraphDataset):
     verbose: bool
         Whether to print out progress information. Default: True.
     reverse_edge: bool
-<<<<<<< HEAD
-        Whether to add reverse edge in graph. Default: True.
-=======
-        Whether to reverse edge in graph. Default: True.
->>>>>>> 9d89d99b3cd78b78e849890e5e368e6660e94dc8
+        Whether to add reverse edges in graph. Default: True.
 
     Attributes
     ----------
@@ -497,11 +493,7 @@ class CiteseerGraphDataset(CitationGraphDataset):
     verbose: bool
         Whether to print out progress information. Default: True.
     reverse_edge: bool
-<<<<<<< HEAD
-        Whether to add reverse edge in graph. Default: True.
-=======
-        Whether to reverse edge in graph. Default: True.
->>>>>>> 9d89d99b3cd78b78e849890e5e368e6660e94dc8
+        Whether to add reverse edges in graph. Default: True.
 
     Attributes
     ----------
@@ -646,11 +638,7 @@ class PubmedGraphDataset(CitationGraphDataset):
     verbose: bool
         Whether to print out progress information. Default: True.
     reverse_edge: bool
-<<<<<<< HEAD
-        Whether to add reverse edge in graph. Default: True.
-=======
-        Whether to reverse edge in graph. Default: True.
->>>>>>> 9d89d99b3cd78b78e849890e5e368e6660e94dc8
+        Whether to add reverse edges in graph. Default: True.
 
     Attributes
     ----------
@@ -737,11 +725,7 @@ def load_cora(raw_dir=None, force_reload=False, verbose=True, reverse_edge=True)
     verbose: bool
     Whether to print out progress information. Default: True.
     reverse_edge: bool
-<<<<<<< HEAD
-        Whether to add reverse edge in graph. Default: True.
-=======
-        Whether to reverse edge in graph. Default: True.
->>>>>>> 9d89d99b3cd78b78e849890e5e368e6660e94dc8
+        Whether to add reverse edges in graph. Default: True.
 
     Return
     -------
@@ -763,11 +747,7 @@ def load_citeseer(raw_dir=None, force_reload=False, verbose=True, reverse_edge=T
     verbose: bool
     Whether to print out progress information. Default: True.
     reverse_edge: bool
-<<<<<<< HEAD
-        Whether to add reverse edge in graph. Default: True.
-=======
-        Whether to reverse edge in graph. Default: True.
->>>>>>> 9d89d99b3cd78b78e849890e5e368e6660e94dc8
+        Whether to add reverse edges in graph. Default: True.
 
     Return
     -------
@@ -789,11 +769,7 @@ def load_pubmed(raw_dir=None, force_reload=False, verbose=True, reverse_edge=Tru
         verbose: bool
         Whether to print out progress information. Default: True.
     reverse_edge: bool
-<<<<<<< HEAD
-        Whether to add reverse edge in graph. Default: True.
-=======
-        Whether to reverse edge in graph. Default: True.
->>>>>>> 9d89d99b3cd78b78e849890e5e368e6660e94dc8
+        Whether to add reverse edges in graph. Default: True.
 
     Return
     -------
