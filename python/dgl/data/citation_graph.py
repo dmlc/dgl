@@ -66,8 +66,8 @@ class CitationGraphDataset(DGLBuiltinDataset):
                                                    url=url,
                                                    raw_dir=raw_dir,
                                                    force_reload=force_reload,
-                                                   verbose=verbose,
-                                                   reverse_edge=reverse_edge)
+                                                   verbose=verbose)
+        self.reverse_edge = reverse_edge
 
     def process(self):
         """Loads input data from data directory

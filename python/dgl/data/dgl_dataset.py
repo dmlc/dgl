@@ -49,8 +49,6 @@ class DGLDataset(object):
         Whether to reload the dataset. Default: False
     verbose : bool
         Whether to print out progress information
-    reverse_edge: bool
-        Whether to add reverse edges in graph. Default: True
 
     Attributes
     ----------
@@ -73,12 +71,11 @@ class DGLDataset(object):
         Hash value for the dataset and the setting.
     """
     def __init__(self, name, url=None, raw_dir=None, save_dir=None,
-                 hash_key=(), force_reload=False, verbose=False, reverse_edge=True):
+                 hash_key=(), force_reload=False, verbose=False):
         self._name = name
         self._url = url
         self._force_reload = force_reload
         self._verbose = verbose
-        self._reverse_edge = reverse_edge
         self._hash_key = hash_key
         self._hash = self._get_hash()
 
@@ -242,12 +239,6 @@ class DGLDataset(object):
         return self._verbose
 
     @property
-    def reverse_edge(self):
-        r"""Whether to add reverse edges.
-        """
-        return self._reverse_edge
-
-    @property
     def hash(self):
         r"""Hash value for the dataset and the setting.
         """
@@ -286,18 +277,15 @@ class DGLBuiltinDataset(DGLDataset):
         Whether to reload the dataset. Default: False
     verbose: bool
         Whether to print out progress information. Default: False
-    reverse_edge: bool
-        Whether to reverse edge in graph. Default: True.
     """
-    def __init__(self, name, url, raw_dir=None, hash_key=(), force_reload=False, verbose=False, reverse_edge=True):
+    def __init__(self, name, url, raw_dir=None, hash_key=(), force_reload=False, verbose=False):
         super(DGLBuiltinDataset, self).__init__(name,
                                                 url=url,
                                                 raw_dir=raw_dir,
                                                 save_dir=None,
                                                 hash_key=hash_key,
                                                 force_reload=force_reload,
-                                                verbose=verbose,
-                                                reverse_edge=reverse_edge)
+                                                verbose=verbose)
 
     def download(self):
         r""" Automatically download data and extract it.
