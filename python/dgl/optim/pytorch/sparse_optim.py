@@ -166,7 +166,7 @@ class SparseGradOptimizer(abc.ABC):
                             shared_emb[emb_name][0].append(idx_i.to(device,
                                                                     non_blocking=True))
                             shared_emb[emb_name][1].append(grad_i.to(device,
-                                                                        non_blocking=True))
+                                                                     non_blocking=True))
 
             if self._clean_grad:
                 # clean gradient track
