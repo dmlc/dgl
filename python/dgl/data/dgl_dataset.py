@@ -243,7 +243,11 @@ class DGLDataset(object):
 
     @property
     def reverse_edge(self):
+<<<<<<< HEAD
         r"""Whether to add reverse edges.
+=======
+        r"""Whether to reverse edges.
+>>>>>>> 9d89d99b3cd78b78e849890e5e368e6660e94dc8
         """
         return self._reverse_edge
 
