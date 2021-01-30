@@ -167,9 +167,19 @@ for part_id in range(num_parts):
     print('|V|={}'.format(compact_g.number_of_nodes()))
     print('|E|={}'.format(compact_g.number_of_edges()))
 
+    # We need to reshuffle nodes in a partition so that all local nodes are labelled starting from 0.
+    reshuffle_nodes = th.arange(compact_g.number_of_nodes())
+    reshuffle_nodes = th.cat([reshuffle_nodes[compact_g.ndata['inner_node'].bool()],
+                              reshuffle_nodes[compact_g.ndata['inner_node'] == 0]])
+    compact_g1 = dgl.node_subgraph(compact_g, reshuffle_nodes)
+    compact_g1.ndata['orig_id'] = compact_g.ndata['orig_id'][reshuffle_nodes]
+    compact_g1.ndata[dgl.NTYPE] = compact_g.ndata[dgl.NTYPE][reshuffle_nodes]
+    compact_g1.ndata[dgl.NID] = compact_g.ndata[dgl.NID][reshuffle_nodes]
+    compact_g1.ndata['inner_node'] = compact_g.ndata['inner_node'][reshuffle_nodes]
+
     part_dir = output_dir + '/part' + str(part_id)
     os.makedirs(part_dir, exist_ok=True)
-    dgl.save_graphs(part_dir + '/graph.dgl', [compact_g])
+    dgl.save_graphs(part_dir + '/graph.dgl', [compact_g1])
 
 part_metadata = {'graph_name': graph_name,
                  'num_nodes': num_nodes,
