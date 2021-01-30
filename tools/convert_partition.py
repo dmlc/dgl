@@ -24,6 +24,10 @@ parser.add_argument('--num-node-weights', required=True, type=int,
                     help='The number of node weights used by METIS.')
 parser.add_argument('--workspace', type=str, default='/tmp',
                     help='The directory to store the intermediate results')
+parser.add_argument('--node-attr-dtype', type=str, default=None,
+                    help='The data type of the node attributes')
+parser.add_argument('--edge-attr-dtype', type=str, default=None,
+                    help='The data type of the edge attributes')
 parser.add_argument('--output', required=True, type=str,
                     help='The output directory of the partitioned results')
 args = parser.parse_args()
@@ -33,8 +37,8 @@ graph_name = args.graph_name
 num_ntypes = args.num_ntypes
 num_parts = args.num_parts
 num_node_weights = args.num_node_weights
-node_attr_dtype = np.int64
-edge_attr_dtype = np.int64
+node_attr_dtype = args.node_attr_dtype
+edge_attr_dtype = args.edge_attr_dtype
 workspace_dir = args.workspace
 output_dir = args.output
 
@@ -87,22 +91,24 @@ for part_id in range(num_parts):
     nid_range = (nids[0], nids[-1])
     num_nodes += len(nodes)
 
-    # Get node attributes
-    # Here we just assume all nodes have the same attributes.
-    # In practice, this is not the same, in which we need more complex solution to
-    # encode and decode node attributes.
-    os.system('cut -d\' \' -f {}- {} > {}'.format(first_attr_col,
-                                                  input_dir + '/' + node_file,
-                                                  tmp_output))
-    node_attrs = read_feats(tmp_output)
-    node_feats = {}
-    # nodes in a partition has been sorted based on node types.
-    for ntype_name in nid_ranges:
-        ntype_id = ntypes_map[ntype_name]
-        type_nids = nids[ntype_ids == ntype_id]
-        assert np.all(type_nids == np.arange(type_nids[0], type_nids[-1] + 1))
-        node_map_val[ntype_name].append([int(type_nids[0]), int(type_nids[-1]) + 1])
-        node_feats[ntype_name + '/feat'] = th.as_tensor(node_attrs[ntype_ids == ntype_id])
+    if node_attr_dtype is not None:
+        # Get node attributes
+        # Here we just assume all nodes have the same attributes.
+        # In practice, this is not the same, in which we need more complex solution to
+        # encode and decode node attributes.
+        os.system('cut -d\' \' -f {}- {} > {}'.format(first_attr_col,
+                                                      input_dir + '/' + node_file,
+                                                      tmp_output))
+        node_attrs = read_feats(tmp_output)
+        node_feats = {}
+        # nodes in a partition has been sorted based on node types.
+        for ntype_name in nid_ranges:
+            ntype_id = ntypes_map[ntype_name]
+            type_nids = nids[ntype_ids == ntype_id]
+            assert np.all(type_nids == np.arange(type_nids[0], type_nids[-1] + 1))
+            node_map_val[ntype_name].append([int(type_nids[0]), int(type_nids[-1]) + 1])
+            node_feats[ntype_name + '/feat'] = th.as_tensor(node_attrs[ntype_ids == ntype_id])
+        dgl.data.utils.save_tensors(os.path.join(part_dir, "node_feat.dgl"), node_feats)
 
     edge_file = 'p{:03}-{}_edges.txt'.format(part_id, graph_name)
     # The format of each line in the edge file:
@@ -122,20 +128,22 @@ for part_id in range(num_parts):
             orig_src_id[sort_idx], orig_dst_id[sort_idx], orig_edge_id[sort_idx], etype_ids[sort_idx]
     assert np.all(np.diff(etype_ids) >= 0)
 
-    # Get edge attributes
-    # Here we just assume all edges have the same attributes.
-    # In practice, this is not the same, in which we need more complex solution to
-    # encode and decode edge attributes.
-    os.system('cut -d\' \' -f 7- {} > {}'.format(input_dir + '/' + edge_file, tmp_output))
-    edge_attrs = th.as_tensor(read_feats(tmp_output))[sort_idx]
-    edge_feats = {}
-    edge_id_start = num_edges
-    for etype_name in eid_ranges:
-        etype_id = etypes_map[etype_name]
-        edge_map_val[etype_name].append([int(edge_id_start),
-                                         int(edge_id_start + np.sum(etype_ids == etype_id))])
-        edge_id_start += np.sum(etype_ids == etype_id)
-        edge_feats[etype_name + '/feat'] = th.as_tensor(edge_attrs[etype_ids == etype_id])
+    if edge_attr_dtype is not None:
+        # Get edge attributes
+        # Here we just assume all edges have the same attributes.
+        # In practice, this is not the same, in which we need more complex solution to
+        # encode and decode edge attributes.
+        os.system('cut -d\' \' -f 7- {} > {}'.format(input_dir + '/' + edge_file, tmp_output))
+        edge_attrs = th.as_tensor(read_feats(tmp_output))[sort_idx]
+        edge_feats = {}
+        edge_id_start = num_edges
+        for etype_name in eid_ranges:
+            etype_id = etypes_map[etype_name]
+            edge_map_val[etype_name].append([int(edge_id_start),
+                                             int(edge_id_start + np.sum(etype_ids == etype_id))])
+            edge_id_start += np.sum(etype_ids == etype_id)
+            edge_feats[etype_name + '/feat'] = th.as_tensor(edge_attrs[etype_ids == etype_id])
+        dgl.data.utils.save_tensors(os.path.join(part_dir, "edge_feat.dgl"), edge_feats)
 
     ids = np.concatenate([src_id, dst_id])
     uniq_ids, idx, inverse_idx = np.unique(ids, return_index=True, return_inverse=True)
@@ -148,7 +156,6 @@ for part_id in range(num_parts):
     compact_g.edata['inner_edge'] = th.ones(compact_g.number_of_edges(), dtype=th.bool)
     compact_g.edata[dgl.EID] = th.arange(num_edges, num_edges + compact_g.number_of_edges())
     num_edges += compact_g.number_of_edges()
-    assert num_edges == edge_id_start
 
     orig_ids = np.concatenate([orig_src_id, orig_dst_id])
     orig_homo_ids = orig_ids[idx]
@@ -163,8 +170,6 @@ for part_id in range(num_parts):
     part_dir = output_dir + '/part' + str(part_id)
     os.makedirs(part_dir, exist_ok=True)
     dgl.save_graphs(part_dir + '/graph.dgl', [compact_g])
-    dgl.data.utils.save_tensors(os.path.join(part_dir, "node_feat.dgl"), node_feats)
-    dgl.data.utils.save_tensors(os.path.join(part_dir, "edge_feat.dgl"), edge_feats)
 
 part_metadata = {'graph_name': graph_name,
                  'num_nodes': num_nodes,
