@@ -52,10 +52,12 @@ id_map = dgl.distributed.id_map.IdMap(nid_ranges)
 
 ntypes = [(key, nid_ranges[key][0,0]) for key in nid_ranges]
 ntypes.sort(key=lambda e: e[1])
+ntype_offset_np = np.array([e[1] for e in ntypes])
 ntypes = [e[0] for e in ntypes]
 ntypes_map = {e:i for i, e in enumerate(ntypes)}
 etypes = [(key, eid_ranges[key][0,0]) for key in eid_ranges]
 etypes.sort(key=lambda e: e[1])
+etype_offset_np = np.array([e[1] for e in etypes])
 etypes = [e[0] for e in etypes]
 etypes_map = {e:i for i, e in enumerate(etypes)}
 
@@ -75,18 +77,20 @@ edge_map_val = {etype:[] for etype in etypes}
 for part_id in range(num_parts):
     node_file = 'p{:03}-{}_nodes.txt'.format(part_id, graph_name)
     # The format of each line in the node file:
-    # <node_id> <ndoe_type> <weight1> ... <orig_node_id> <attributes>
+    # <node_id> <node_type> <weight1> ... <orig_type_node_id> <attributes>
     # The node file contains nodes that belong to a partition. It doesn't include HALO nodes.
-    orig_nid_col = 3 + num_node_weights
+    orig_type_nid_col = 3 + num_node_weights
     first_attr_col = 4 + num_node_weights
 
     # Get the first two columns which is the node ID and node type.
     tmp_output = workspace_dir + '/' + node_file + '.tmp'
-    os.system('awk \'{print $1, $2, $' + str(orig_nid_col) + '}\''
+    os.system('awk \'{print $1, $2, $' + str(orig_type_nid_col) + '}\''
               + ' {} > {}'.format(input_dir + '/' + node_file, tmp_output))
     nodes = csv.read_csv(tmp_output, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True),
                          parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
-    nids, ntype_ids, orig_nid = nodes.columns[0].to_numpy(), nodes.columns[1].to_numpy(), nodes.columns[2].to_numpy()
+    nids, ntype_ids, orig_type_nid = nodes.columns[0].to_numpy(), nodes.columns[1].to_numpy(), \
+            nodes.columns[2].to_numpy()
+    orig_homo_nid = ntype_offset_np[ntype_ids] + orig_type_nid
     assert np.all(nids[1:] - nids[:-1] == 1)
     nid_range = (nids[0], nids[-1])
     num_nodes += len(nodes)
@@ -145,11 +149,18 @@ for part_id in range(num_parts):
             edge_feats[etype_name + '/feat'] = th.as_tensor(edge_attrs[etype_ids == etype_id])
         dgl.data.utils.save_tensors(os.path.join(part_dir, "edge_feat.dgl"), edge_feats)
 
-    ids = np.concatenate([src_id, dst_id])
+    # Here we want to compute the unique IDs in the edge list.
+    # It is possible that a node that belongs to the partition but it doesn't appear
+    # in the edge list. That is, the node is assigned to this partition, but its neighbor
+    # belongs to another partition so that the edge is assigned to another partition.
+    # This happens in a directed graph.
+    # To avoid this kind of nodes being removed from the graph, we add node IDs that
+    # belong to this partition.
+    ids = np.concatenate([src_id, dst_id, np.arange(nid_range[0], nid_range[1] + 1)])
     uniq_ids, idx, inverse_idx = np.unique(ids, return_index=True, return_inverse=True)
     assert len(uniq_ids) == len(idx)
-    local_src_id, local_dst_id = np.split(inverse_idx, 2)
-    # TODO: Do we need to make sure all non-HALO nodes are assigned with lower local IDs?
+    # We get the edge list with their node IDs mapped to a contiguous ID range.
+    local_src_id, local_dst_id = np.split(inverse_idx[:len(src_id) * 2], 2)
     compact_g = dgl.graph((local_src_id, local_dst_id))
     compact_g.edata['orig_id'] = th.as_tensor(orig_edge_id)
     compact_g.edata[dgl.ETYPE] = th.as_tensor(etype_ids)
@@ -157,13 +168,17 @@ for part_id in range(num_parts):
     compact_g.edata[dgl.EID] = th.arange(num_edges, num_edges + compact_g.number_of_edges())
     num_edges += compact_g.number_of_edges()
 
-    orig_ids = np.concatenate([orig_src_id, orig_dst_id])
+    # The original IDs are homogeneous IDs.
+    # Similarly, we need to add the original homogeneous node IDs
+    orig_ids = np.concatenate([orig_src_id, orig_dst_id, orig_homo_nid])
     orig_homo_ids = orig_ids[idx]
     ntype, per_type_ids = id_map(orig_homo_ids)
     compact_g.ndata['orig_id'] = th.as_tensor(per_type_ids)
     compact_g.ndata[dgl.NTYPE] = th.as_tensor(ntype)
     compact_g.ndata[dgl.NID] = th.as_tensor(uniq_ids)
     compact_g.ndata['inner_node'] = th.as_tensor(np.logical_and(uniq_ids >= nid_range[0], uniq_ids <= nid_range[1]))
+    local_nids = compact_g.ndata[dgl.NID][compact_g.ndata['inner_node'].bool()]
+    assert np.all((local_nids == th.arange(local_nids[0], local_nids[-1] + 1)).numpy())
     print('|V|={}'.format(compact_g.number_of_nodes()))
     print('|E|={}'.format(compact_g.number_of_edges()))
 
