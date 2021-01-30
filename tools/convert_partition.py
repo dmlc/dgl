@@ -110,9 +110,14 @@ for part_id in range(num_parts):
             ntype_id = ntypes_map[ntype_name]
             type_nids = nids[ntype_ids == ntype_id]
             assert np.all(type_nids == np.arange(type_nids[0], type_nids[-1] + 1))
-            node_map_val[ntype_name].append([int(type_nids[0]), int(type_nids[-1]) + 1])
             node_feats[ntype_name + '/feat'] = th.as_tensor(node_attrs[ntype_ids == ntype_id])
         dgl.data.utils.save_tensors(os.path.join(part_dir, "node_feat.dgl"), node_feats)
+
+    # Determine the node ID ranges of different node types.
+    for ntype_name in nid_ranges:
+        ntype_id = ntypes_map[ntype_name]
+        type_nids = nids[ntype_ids == ntype_id]
+        node_map_val[ntype_name].append([int(type_nids[0]), int(type_nids[-1]) + 1])
 
     edge_file = 'p{:03}-{}_edges.txt'.format(part_id, graph_name)
     # The format of each line in the edge file:
@@ -140,14 +145,18 @@ for part_id in range(num_parts):
         os.system('cut -d\' \' -f 7- {} > {}'.format(input_dir + '/' + edge_file, tmp_output))
         edge_attrs = th.as_tensor(read_feats(tmp_output))[sort_idx]
         edge_feats = {}
-        edge_id_start = num_edges
         for etype_name in eid_ranges:
             etype_id = etypes_map[etype_name]
-            edge_map_val[etype_name].append([int(edge_id_start),
-                                             int(edge_id_start + np.sum(etype_ids == etype_id))])
-            edge_id_start += np.sum(etype_ids == etype_id)
             edge_feats[etype_name + '/feat'] = th.as_tensor(edge_attrs[etype_ids == etype_id])
         dgl.data.utils.save_tensors(os.path.join(part_dir, "edge_feat.dgl"), edge_feats)
+
+    # Determine the edge ID range of different edge types.
+    edge_id_start = num_edges
+    for etype_name in eid_ranges:
+        etype_id = etypes_map[etype_name]
+        edge_map_val[etype_name].append([int(edge_id_start),
+                                         int(edge_id_start + np.sum(etype_ids == etype_id))])
+        edge_id_start += np.sum(etype_ids == etype_id)
 
     # Here we want to compute the unique IDs in the edge list.
     # It is possible that a node that belongs to the partition but it doesn't appear
@@ -191,6 +200,10 @@ for part_id in range(num_parts):
     compact_g1.ndata[dgl.NTYPE] = compact_g.ndata[dgl.NTYPE][reshuffle_nodes]
     compact_g1.ndata[dgl.NID] = compact_g.ndata[dgl.NID][reshuffle_nodes]
     compact_g1.ndata['inner_node'] = compact_g.ndata['inner_node'][reshuffle_nodes]
+    compact_g1.edata['orig_id'] = compact_g.edata['orig_id'][compact_g1.edata[dgl.EID]]
+    compact_g1.edata[dgl.ETYPE] = compact_g.edata[dgl.ETYPE][compact_g1.edata[dgl.EID]]
+    compact_g1.edata['inner_edge'] = compact_g.edata['inner_edge'][compact_g1.edata[dgl.EID]]
+    compact_g1.edata[dgl.EID] = compact_g.edata[dgl.EID][compact_g1.edata[dgl.EID]]
 
     part_dir = output_dir + '/part' + str(part_id)
     os.makedirs(part_dir, exist_ok=True)
