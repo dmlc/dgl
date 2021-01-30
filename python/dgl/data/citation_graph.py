@@ -62,12 +62,13 @@ class CitationGraphDataset(DGLBuiltinDataset):
             name = 'cora_v2'
 
         url = _get_dgl_url(self._urls[name])
+        self._reverse_edge = reverse_edge
+
         super(CitationGraphDataset, self).__init__(name,
                                                    url=url,
                                                    raw_dir=raw_dir,
                                                    force_reload=force_reload,
                                                    verbose=verbose)
-        self._reverse_edge = reverse_edge
 
     def process(self):
         """Loads input data from data directory
@@ -108,7 +109,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
         features = sp.vstack((allx, tx)).tolil()
         features[test_idx_reorder, :] = features[test_idx_range, :]
 
-        if self.reverse_edge == True:
+        if self.reverse_edge:
             graph = nx.DiGraph(nx.from_dict_of_lists(graph))
         else:
             graph = nx.Graph(nx.from_dict_of_lists(graph))
