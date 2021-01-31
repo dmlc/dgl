@@ -7,7 +7,15 @@ from pyinstrument import Profiler
 
 # Load OGB-MAG.
 dataset = DglNodePropPredDataset(name='ogbn-mag')
-hg, labels = dataset[0]
+hg_orig, labels = dataset[0]
+subgs = {}
+for etype in hg_orig.canonical_etypes:
+    u, v = hg_orig.all_edges(etype=etype)
+    subgs[etype] = (u, v)
+    subgs[(etype[2], 'rev-'+etype[1], etype[0])] = (v, u)
+hg = dgl.heterograph(subgs)
+hg.nodes['paper'].data['feat'] = hg_orig.nodes['paper'].data['feat']
+print(hg)
 #subg_nodes = {}
 #for ntype in hg.ntypes:
 #    subg_nodes[ntype] = np.random.choice(hg.number_of_nodes(ntype), int(hg.number_of_nodes(ntype) / 5), replace=False)
