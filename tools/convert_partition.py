@@ -217,8 +217,8 @@ part_metadata = {'graph_name': graph_name,
                  'halo_hops': 1,
                  'node_map': node_map_val,
                  'edge_map': edge_map_val,
-                 'ntypes': ntypes,
-                 'etypes': etypes}
+                 'ntypes': ntypes_map,
+                 'etypes': etypes_map}
 
 for part_id in range(num_parts):
     part_dir = output_dir + '/part' + str(part_id)

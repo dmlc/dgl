@@ -41,8 +41,17 @@ for key in node_feats:
 for key in edge_feats:
     edge_feats[key] = th.cat(edge_feats[key])
 
-ntypes = metadata['ntypes']
-etypes = metadata['etypes']
+ntype_map = metadata['ntypes']
+ntypes = [None] * len(ntype_map)
+for key in ntype_map:
+    ntype_id = ntype_map[key]
+    ntypes[ntype_id] = key
+etype_map = metadata['etypes']
+etypes = [None] * len(etype_map)
+for key in etype_map:
+    etype_id = etype_map[key]
+    etypes[etype_id] = key
+
 node_map = metadata['node_map']
 for key in node_map:
     node_map[key] = th.stack([th.tensor(row) for row in node_map[key]], 0)
