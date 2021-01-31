@@ -90,24 +90,24 @@ ParMETIS Installation
 
 For now, we need to compile and install ParMETIS manually. We clone the DGL branch of ParMETIS as follows:
 
-```
-git clone --branch dgl https://github.com/KarypisLab/ParMETIS.git
-```
+.. code-block:: none
+
+    git clone --branch dgl https://github.com/KarypisLab/ParMETIS.git
 
 Then we follow the instructions in its Github to install its dependencies including METIS
 and then compile and install ParMETIS.
 
-```
-make config cc=mpicc prefix=~/local
-make install
-```
+.. code-block:: none
+
+    make config cc=mpicc prefix=~/local
+    make install
 
 Before running ParMETIS, we need to set two environment variables: `PATH` and `LD_LIBRARY_PATH`.
 
-```
-export PATH=$PATH:$HOME/local/bin
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/local/lib/
-```
+.. code-block:: none
+
+    export PATH=$PATH:$HOME/local/bin
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/local/lib/
 
 Input format for ParMETIS
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -117,9 +117,10 @@ The input graph for ParMETIS is stored in three files with the following names: 
 
 Each row in `xxx_nodes.txt` stores the information of a node with the following format:
 
-```
-<node_type> <weight1> ... <orig_type_node_id> <attributes>
-```
+.. code-block:: none
+
+    <node_type> <weight1> ... <orig_type_node_id> <attributes>
+
 All fields are separated by whitespace:
 
 * `<node_type>` is an integer. For a homogeneous graph, its value is always 0. For heterogeneous graphs,
@@ -143,21 +144,22 @@ Below shows an example of a node file for a heterogeneous graph with two node ty
 nodes; node type 1 has four nodes. It uses two node weights to ensure that ParMETIS will generate partitions
 with roughly the same number of nodes for type 0 and the same number of nodes for type 1.
 
-```
-0 1 0 0
-0 1 0 1
-0 1 0 2
-1 0 1 0
-1 0 1 1
-1 0 1 2
-1 0 1 3
-```
+.. code-block:: none
+
+    0 1 0 0
+    0 1 0 1
+    0 1 0 2
+    1 0 1 0
+    1 0 1 1
+    1 0 1 2
+    1 0 1 3
 
 Similarly, each row in `xxx_edges.txt` stores the information of an edge with the following format:
 
-```
-<src_id> <dst_id> <type_edge_id> <edge_type> <attributes>
-```
+.. code-block:: none
+
+    <src_id> <dst_id> <type_edge_id> <edge_type> <attributes>
+
 All fields are separated by whitespace:
 
 * `<src_id>` is the *homogeneous* ID of the source node.
@@ -170,9 +172,9 @@ All fields are separated by whitespace:
 `xxx_stats.txt` stores some basic statistics of the graph. It has only one line with three fields
 separated by whitespace:
 
-```
-<num_nodes> <num_edges> <num_node_weights>
-```
+.. code-block:: none
+
+    <num_nodes> <num_edges> <num_node_weights>
 
 * `num_nodes` stores the total number of nodes regardless of node types.
 * `num_edges` stores the total number of edges regardless of edge types.
@@ -194,9 +196,9 @@ the same type are assigned with contiguous IDs.
 `p<part_id>-xxx_nodes.txt` stores the node data of the partition. Each row represents
 a node with the following fields:
 
-```
-<node_id> <node_type> <weight1> ... <orig_type_node_id> <attributes>
-```
+.. code-block:: none
+
+    <node_id> <node_type> <weight1> ... <orig_type_node_id> <attributes>
 
 * `<node_id>` is the *homogeneous* node IDs after ID reassignment.
 * `<node_type>` is the node type.
@@ -207,9 +209,9 @@ a node with the following fields:
 `p<part_id>-xxx_edges.txt` stores the edge data of the partition. Each row represents
 an edge with the following fields:
 
-```
-<src_id> <dst_id> <orig_src_id> <orig_dst_id> <orig_type_edge_id> <edge_type> <attributes>
-```
+.. code-block:: none
+
+    <src_id> <dst_id> <orig_src_id> <orig_dst_id> <orig_type_edge_id> <edge_type> <attributes>
 
 * `<src_id>` is the *homogeneous* ID of the source node after ID reassignment.
 * `<dst_id>` is the *homogeneous* ID of the destination node after ID reassignment.
@@ -223,18 +225,18 @@ When invoking `pm_dglpart`, the three input files: `xxx_nodes.txt`, `xxx_edges.t
 should be located in the directory where `pm_dglpart` runs.  The following command partitions the graph
 named `xxx` into two partitions.
 
-```
-pm_dglpart xxx 2
-```
+.. code-block:: none
+
+    pm_dglpart xxx 2
 
 The following command partitions the graph named `xxx` into  eight partitions. In this case,
 the three input files: `xxx_nodes.txt`, `xxx_edges.txt`, `xxx_stats.txt` should still be located
 in the directory where `pm_dglpart` runs. **Note**: the command actually splits the input graph
 into eight partitions.
 
-```
-mpirun -np 4 pm_dglpart xxx 2
-```
+.. code-block:: none
+
+    mpirun -np 4 pm_dglpart xxx 2
 
 Convert ParMETIS outputs to DGLGraph
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
