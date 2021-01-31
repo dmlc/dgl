@@ -91,6 +91,8 @@ Val Acc 0.4323, Test Acc 0.4255, time: 128.0379
 ## Partition a graph with ParMETIS
 
 It has four steps to partition a graph with ParMETIS for DGL's distributed training.
+More details about the four steps are explained in our
+[user guide](https://doc.dgl.ai/guide/distributed-preprocessing.html).
 
 ### Step 1: write the graph into files.
 
