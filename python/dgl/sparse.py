@@ -225,9 +225,9 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     use_lhs = op != 'copy_rhs'
     use_rhs = op != 'copy_lhs'
     if use_lhs and use_rhs:
-        if F.dtype(use_lhs) != F.dtype(use_rhs):
+        if F.dtype(lhs) != F.dtype(rhs):
             raise DGLError("The operands data type don't match: {} and {}, please convert them"
-                           " to the same dtype.".format(F.dtype(use_lhs), F.dtype(use_rhs)))
+                           " to the same type.".format(F.dtype(lhs), F.dtype(rhs)))
     # deal with scalar features.
     expand_lhs, expand_rhs = False, False
     if use_lhs:
