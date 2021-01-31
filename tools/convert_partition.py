@@ -18,8 +18,6 @@ parser.add_argument('--schema', required=True, type=str,
                     help='The schema of the graph')
 parser.add_argument('--num-parts', required=True, type=int,
                     help='The number of partitions')
-parser.add_argument('--num-ntypes', type=int, required=True,
-                    help='The number of node types in the graph.')
 parser.add_argument('--num-node-weights', required=True, type=int,
                     help='The number of node weights used by METIS.')
 parser.add_argument('--workspace', type=str, default='/tmp',
@@ -34,7 +32,6 @@ args = parser.parse_args()
 
 input_dir = args.input_dir
 graph_name = args.graph_name
-num_ntypes = args.num_ntypes
 num_parts = args.num_parts
 num_node_weights = args.num_node_weights
 node_attr_dtype = args.node_attr_dtype
