@@ -322,12 +322,3 @@ with torch.no_grad():
     neg_score = pred(test_neg_g, h)
     print('AUC', compute_auc(pos_score, neg_score))
 
-
-######################################################################
-# What’s Next?
-# ------------
-# 
-# -  See :doc:`here <L2_large_link_prediction` for a tutorial on link
-#    prediction on a large-scale graph.
-# 
-
