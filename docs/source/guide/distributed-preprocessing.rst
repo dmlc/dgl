@@ -51,8 +51,8 @@ the graph structure of the partition as well as some metadata on nodes and edges
             |-- edge_feats.dgl
             |-- graph.dgl
 
-7.1.1 Load balancing
-~~~~~~~~~~~~~~~~~~~~
+Load balancing
+^^^^^^^^^^^^^^
 
 When partitioning a graph, by default, Metis only balances the number of nodes in each partition.
 This can result in suboptimal configuration, depending on the task at hand. For example, in the case
@@ -78,7 +78,7 @@ The graph name will be used by :class:`dgl.distributed.DistGraph` to identify a 
 A legal graph name should only contain alphabetic characters and underscores.
 
 
-7.1.2 Distributed partitioning
+7.1.1 Distributed partitioning
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For a large graph, DGL uses `ParMetis <http://glaros.dtc.umn.edu/gkhome/metis/parmetis/overview>`__ to partition
