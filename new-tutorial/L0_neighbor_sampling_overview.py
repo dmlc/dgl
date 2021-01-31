@@ -81,12 +81,12 @@ By the end of this tutorial, you will be able to
 # :math:`\boldsymbol{h}_8^{(2)}`, you can choose two of the neighbors
 # instead of all of them to aggregate, as in the following animation:
 # 
-# |image1|
+# |image2|
 # 
 # You can see that this method could give us fewer nodes needed for input
 # features.
 # 
-# .. |image1| image:: https://data.dgl.ai/tutorial/img/bipartite.gif
+# .. |image2| image:: https://data.dgl.ai/tutorial/img/bipartite.gif
 # 
 
 
