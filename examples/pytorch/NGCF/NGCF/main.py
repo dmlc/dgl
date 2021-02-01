@@ -17,21 +17,17 @@ def main(args):
     g=g.to(device)
 
     # Step 2: Create model and training components=========================================================== #
-    args.mess_dropout = eval(args.mess_dropout)
-    args.layer_size = eval(args.layer_size)
-    lmbd = eval(args.regs)[0]
-    model = NGCF(g, args.embed_size, args.layer_size, args.mess_dropout, lmbd).to(device)
+    model = NGCF(g, args.embed_size, args.layer_size, args.mess_dropout, args.regs[0]).to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     # Step 3: training epoches ============================================================================== #
+    n_batch = data_generator.n_train // args.batch_size + 1
     t0 = time()
     cur_best_pre_0, stopping_step = 0, 0
     loss_loger, pre_loger, rec_loger, ndcg_loger, hit_loger = [], [], [], [], []
     for epoch in range(args.epoch):
         t1 = time()
         loss, mf_loss, emb_loss = 0., 0., 0.
-        n_batch = data_generator.n_train // args.batch_size + 1
-
         for idx in range(n_batch):
             users, pos_items, neg_items = data_generator.sample()
             u_g_embeddings, pos_i_g_embeddings, neg_i_g_embeddings = model(g, 'user', 'item', users,
@@ -55,7 +51,7 @@ def main(args):
                 perf_str = 'Epoch %d [%.1fs]: train==[%.5f=%.5f + %.5f]' % (
                     epoch, time() - t1, loss, mf_loss, emb_loss)
                 print(perf_str)
-            continue
+            continue #end the current epoch and move to the next epoch, let the following evaluation run every 10 epoches
 
         #evaluate the model every 10 epoches
         t2 = time()
@@ -106,4 +102,9 @@ def main(args):
 if __name__ == '__main__':
     if not os.path.exists(args.weights_path):
         os.mkdir(args.weights_path)
+    args.mess_dropout = eval(args.mess_dropout)
+    args.layer_size = eval(args.layer_size)
+    args.regs = eval(args.regs)
+    print(args)
     main(args)
+

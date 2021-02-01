@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import dgl.function as fn
 
 class NGCFLayer(nn.Module):
-    def __init__(self, in_size, out_size, etypes, dropout):
+    def __init__(self, in_size, out_size, dropout):
         super(NGCFLayer, self).__init__()
         self.in_size = in_size
         self.out_size = out_size
@@ -33,15 +33,15 @@ class NGCFLayer(nn.Module):
             if srctype == dsttype: #for self loops
                 messages = self.W1(feat_dict[srctype])
                 g.nodes[srctype].data[etype] = messages   #store in ndata
-                funcs[etype] = (fn.copy_u(etype, 'm'), fn.sum('m', 'h'))  #define message and reduce functions
+                funcs[(srctype, etype, dsttype)] = (fn.copy_u(etype, 'm'), fn.sum('m', 'h'))  #define message and reduce functions
             else:
-                src, dst = g.edges(etype=etype)
-                dst_degree = g.in_degrees(dst, etype=etype).float() #obtain degrees
-                src_degree = g.out_degrees(src, etype=etype).float()
+                src, dst = g.edges(etype=(srctype, etype, dsttype))
+                dst_degree = g.in_degrees(dst, etype=(srctype, etype, dsttype)).float() #obtain degrees
+                src_degree = g.out_degrees(src, etype=(srctype, etype, dsttype)).float()
                 norm = torch.pow(src_degree * dst_degree, -0.5).unsqueeze(1) #compute norm
                 messages = norm * (self.W1(feat_dict[srctype][src]) + self.W2(feat_dict[srctype][src]*feat_dict[dsttype][dst])) #compute messages
-                g.edges[etype].data[etype] = messages  #store in edata
-                funcs[etype] = (fn.copy_e(etype, 'm'), fn.sum('m', 'h'))  #define message and reduce functions
+                g.edges[(srctype, etype, dsttype)].data[etype] = messages  #store in edata
+                funcs[(srctype, etype, dsttype)] = (fn.copy_e(etype, 'm'), fn.sum('m', 'h'))  #define message and reduce functions
 
         g.multi_update_all(funcs, 'sum') #update all, reduce by first type-wisely then across different types
         feature_dict={}
@@ -58,12 +58,12 @@ class NGCF(nn.Module):
         self.lmbd = lmbd
         self.layers = nn.ModuleList()
         self.layers.append(
-            NGCFLayer(in_size, layer_size[0], g.etypes, dropout[0])
+            NGCFLayer(in_size, layer_size[0], dropout[0])
         )
         self.num_layers = len(layer_size)
         for i in range(self.num_layers-1):
             self.layers.append(
-                NGCFLayer(layer_size[i], layer_size[i+1], g.etypes, dropout[i+1])
+                NGCFLayer(layer_size[i], layer_size[i+1], dropout[i+1])
             )
         self.initializer = nn.init.xavier_uniform_
 

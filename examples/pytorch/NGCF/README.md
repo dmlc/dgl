@@ -10,7 +10,7 @@ This example was implemented by [Kounianhua Du](https://github.com/KounianhuaDu)
 
 The graph dataset used in this example 
 ---------------------------------------
-Gowalla: This is the check-in dataset obtained from Gowalla, where users share their locations by checking-in. To ensure thequality of the dataset, we use the 10-core setting, i.e., retainingusers and items with at least ten interactions
+Gowalla: This is the check-in dataset obtained from Gowalla, where users share their locations by checking-in. To ensure the quality of the dataset, we use the 10-core setting, i.e., retaining users and items with at least ten interactions.
 
 Statistics:
 - Users: 29858
@@ -33,13 +33,10 @@ NOTE: Following the paper's setting, the node dropout is disabled.
 Performance
 -------------------------
 The following results are the results in 400 epoches.
+
 **NGCF results**
-| Model         | Paper (tensorflow)               | ours (dgl)                  |
+| Model         | Paper (tensorflow)               | ours (DGL)                  |
 | ------------- | -------------------------------- | --------------------------- |
 | recall@20     | 0.1569                           | 0.1552                      |
 | ndcg@20       | 0.1327                           | 0.2707                      |
 
-
-Time Consumption
--------------------------
-The profile of the main function (train for an epoch and test for an epoch) is saved in NGCF/main_profile.txt. The profile of the forward function of the NGCFLayer (train for a batch, test for an epoch) is saved in NGCF/ngcf_layer_forward_profile.txt.
