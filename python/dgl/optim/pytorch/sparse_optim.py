@@ -1,5 +1,5 @@
 """Node embedding optimizers"""
-import abc
+import abc, gc
 from abc import abstractmethod
 import torch as th
 
@@ -65,15 +65,14 @@ class SparseGradOptimizer(abc.ABC):
             # We cache shared memory buffers in shared_emb.
             shared_emb = {emb.name: ([], []) for emb in self._params}
 
+            # hold released shared memory to let other process to munmap it first
+            # unless it will crash the training
+            shmem_ptr_holder = []
+
             # Go through all sparse embeddings
             for emb in self._params: # pylint: disable=too-many-nested-blocks
                 num_embeddings = emb.num_embeddings
                 emb_name = emb.name
-
-                # Each gpu process takes the resposibility of update a range of sparse embedding,
-                # thus we can parallel the gradient update.
-                range_size = (num_embeddings + self._world_size - 1) // self._world_size \
-                    if self._world_size > 0 else 0
 
                 # we need to combine gradients from multiple forward paths
                 idx = []
@@ -83,26 +82,31 @@ class SparseGradOptimizer(abc.ABC):
                     grad.append(data.grad.data)
                 idx = th.cat(idx, dim=0)
                 grad = th.cat(grad, dim=0)
+
                 device = grad.device
                 idx_dtype = idx.dtype
                 grad_dtype = grad.dtype
                 grad_dim = grad.shape[1]
-
                 if self._world_size > 1:
                     if emb_name not in self._shared_cache:
                         self._shared_cache[emb_name] = {}
 
+                    # Each training process takes the resposibility of updating a range of node embeddings,
+                    # thus we can parallel the gradient update. The overall progress includes:
+                    #   1. In each training process:
+                    #     1.a Deciding which process a node embedding belongs to according to the formula:
+                    #         process_id = node_idx mod num_of_process(N)
+                    #     1.b Split the node index tensor and gradient tensor into N parts according to step 1.
+                    #     1.c Write each node index sub-tensor and gradient sub-tensor into different DGL shared
+                    #         memory buffers.
+                    #   2. Cross training process synchronization
+                    #   3. In each traning process:
+                    #     3.a Collect node index sub-tensors and gradient sub-tensors
+                    #     3.b Do gradient update
+                    #   4. Done
+                    idx_split = th.remainder(idx, self._world_size).long()
                     for i in range(self._world_size):
-                        start = i * range_size
-                        end = (i + 1) * range_size \
-                            if (i + 1) * range_size < num_embeddings \
-                            else num_embeddings
-                        if i == 0:
-                            mask = idx < end
-                        elif i + 1 == self._world_size:
-                            mask = idx >= start
-                        else:
-                            mask = th.logical_and((idx >= start), (idx < end))
+                        mask = idx_split == i
                         idx_i = idx[mask]
                         grad_i = grad[mask]
 
@@ -118,9 +122,18 @@ class SparseGradOptimizer(abc.ABC):
                             idx_shmem_name = 'idx_{}_{}_{}'.format(emb_name, self._rank, i)
                             grad_shmem_name = 'grad_{}_{}_{}'.format(emb_name, self._rank, i)
 
+                            # Create shared memory to hold temporal index and gradient tensor for
+                            # cross-process send and recv.
                             if idx_shmem_name not in self._shared_cache[emb_name] or \
                                 self._shared_cache[emb_name][idx_shmem_name].shape[0] \
                                     < idx_i.shape[0]:
+
+                                if idx_shmem_name in self._shared_cache[emb_name]:
+                                    shmem_ptr_holder.append(
+                                        self._shared_cache[emb_name][idx_shmem_name])
+                                    shmem_ptr_holder.append(
+                                        self._shared_cache[emb_name][grad_shmem_name])
+
                                 # in case idx_i.shape[0] is 0
                                 idx_shmem = create_shared_mem_array(idx_shmem_name, \
                                     (idx_i.shape[0] * 2 + 2,), idx_dtype)
@@ -129,6 +142,7 @@ class SparseGradOptimizer(abc.ABC):
                                 self._shared_cache[emb_name][idx_shmem_name] = idx_shmem
                                 self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
 
+                            # Fill shared memory with temporal index tensor and gradient tensor
                             self._shared_cache[emb_name][idx_shmem_name][:idx_i.shape[0]] \
                                 = idx_i
                             self._shared_cache[emb_name][grad_shmem_name][:idx_i.shape[0]] \
@@ -149,12 +163,10 @@ class SparseGradOptimizer(abc.ABC):
                         if i != self._rank:
                             idx_shmem_name = 'idx_{}_{}_{}'.format(emb_name, i, self._rank)
                             grad_shmem_name = 'grad_{}_{}_{}'.format(emb_name, i, self._rank)
-
-                    for i in range(self._world_size):
-                        if i != self._rank:
-                            idx_shmem_name = 'idx_{}_{}_{}'.format(emb_name, i, self._rank)
-                            grad_shmem_name = 'grad_{}_{}_{}'.format(emb_name, i, self._rank)
                             size = self._opt_meta[emb_name][i][self._rank]
+
+                            # Retrive shared memory holding the temporal index and gradient
+                            # tensor that is sent to current training process
                             if idx_shmem_name not in self._shared_cache[emb_name] or \
                                 self._shared_cache[emb_name][idx_shmem_name].shape[0] < size:
                                 idx_shmem = get_shared_mem_array(idx_shmem_name, \
@@ -163,6 +175,10 @@ class SparseGradOptimizer(abc.ABC):
                                     (size * 2 + 2, grad_dim), grad_dtype)
                                 self._shared_cache[emb_name][idx_shmem_name] = idx_shmem
                                 self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
+                                # make sure shared memory are released in child process first
+                                # This will not be called frequently
+                                # TODO(xiangsx) Provide API to mumap shared memory directly
+                                gc.collect()
                             idx_i = self._shared_cache[emb_name][idx_shmem_name][:size]
                             grad_i = self._shared_cache[emb_name][grad_shmem_name][:size]
                             shared_emb[emb_name][0].append(idx_i.to(device,
