@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file runtime/cuda/cuda_device_common.cuh 
- * \brief Device level functions for within cuda kernels. 
+ * \file runtime/cuda/cuda_device_common.cuh
+ * \brief Device level functions for within cuda kernels.
  */
 
 #ifndef DGL_RUNTIME_CUDA_CUDA_HASHTABLE_CUH_
@@ -39,11 +39,10 @@ struct BlockPrefixCallbackOp {
 * \brief An on GPU hash table implementation, which preserves the order of
 * inserted elements. It uses quadratic probing for collisions. The size/number
 * buckets the hash table is created with, should be much greater than the
-* number of unique items to be inserted. Using less than the number of 
+* number of unique items to be inserted. Using less than the number of
 */
 template<typename IdType>
-class OrderedHashTable
-{
+class OrderedHashTable {
   public:
     struct Mapping {
       IdType key;
@@ -71,8 +70,7 @@ class OrderedHashTable
     */
     static size_t RequiredWorkspace(
         const size_t size,
-        const int scale = DEFAULT_SCALE)
-    {
+        const int scale = DEFAULT_SCALE) {
       return sizeof(Mapping)*TableSize(size, scale);
     }
 
@@ -93,8 +91,7 @@ class OrderedHashTable
         cudaStream_t stream,
         const int scale = DEFAULT_SCALE) :
       table_(static_cast<Mapping*>(workspace)),
-      size_(TableSize(size, scale))
-    {
+      size_(TableSize(size, scale)) {
       if (RequiredWorkspace(size, scale) > workspace_size) {
         throw std::runtime_error("Insufficient workspace: requires " +
             std::to_string(RequiredWorkspace(size, scale)) + " but only provided " +
@@ -128,13 +125,13 @@ class OrderedHashTable
         IdType * const unique,
         int64_t * const num_unique,
         DGLContext ctx,
-        cudaStream_t stream); 
+        cudaStream_t stream);
 
     void FillWithUnique(
         const IdType * const input,
         const size_t num_input,
         DGLContext ctx,
-        cudaStream_t stream); 
+        cudaStream_t stream);
 
     inline __device__ Iterator Insert(
         const IdType id,
@@ -155,8 +152,7 @@ class OrderedHashTable
     */
     static size_t TableSize(
         const size_t num,
-        const int scale)
-    {
+        const int scale) {
       const size_t next_pow2 = 1 << static_cast<size_t>(1 + std::log2(num >> 1));
       return next_pow2<<scale;
     }
@@ -210,8 +206,7 @@ class OrderedHashTable
     * \return The hash.
     */
     inline __device__ size_t Hash(
-        const IdType id) const
-    {
+        const IdType id) const {
       return id % size_;
     }
 };

@@ -88,8 +88,6 @@ __global__ void map_edge_ids(
   }
 }
 
-// CPU Code ///////////////////////////////////////////////////////////////////
-
 template<typename IdType>
 inline size_t RoundUpDiv(
     const IdType num,
@@ -232,7 +230,6 @@ class DeviceNodeMapMaker {
       int64_t * const count_lhs_device,
       std::vector<IdArray>* const lhs_device,
       cudaStream_t stream) {
-
     const int64_t num_ntypes = lhs_nodes.size() + rhs_nodes.size();
 
     CUDA_CALL(cudaMemsetAsync(
