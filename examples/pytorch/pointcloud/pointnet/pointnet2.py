@@ -114,22 +114,6 @@ class RelativePositionMessage(nn.Module):
             res = pos
         return {'agg_feat': res}
 
-class RelativePositionMessageMSG(nn.Module):
-    '''
-    Compute the input feature from neighbors
-    '''
-    def __init__(self, n_neighbor):
-        super(RelativePositionMessageMSG, self).__init__()
-        self.n_neighbor = n_neighbor
-
-    def forward(self, edges):
-        pos = edges.src['pos'] - edges.dst['pos']
-        if 'feat' in edges.src:
-            res = torch.cat([edges.src['feat'], pos], 1)
-        else:
-            res = pos
-        return {'agg_feat': res}
-
 class PointNetConv(nn.Module):
     '''
     Feature aggregation
@@ -220,7 +204,7 @@ class SAMSGModule(nn.Module):
         for i in range(self.group_size):
             self.frnn_graph_list.append(FixedRadiusNNGraph(radius_list[i],
                                                            n_neighbor_list[i]))
-            self.message_list.append(RelativePositionMessageMSG(n_neighbor_list[i]))
+            self.message_list.append(RelativePositionMessage(n_neighbor_list[i]))
             self.conv_list.append(PointNetConv(mlp_sizes_list[i], batch_size))
 
     def forward(self, pos, feat):
