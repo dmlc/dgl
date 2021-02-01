@@ -89,6 +89,45 @@ def test_graph_conv(idtype, g, norm, weight, bias):
     assert h_out.shape == (ndst, 2)
 
 @parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['has_scalar_e_feature'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('norm', ['none', 'both', 'right'])
+@pytest.mark.parametrize('weight', [True, False])
+@pytest.mark.parametrize('bias', [True, False])
+def test_graph_conv_e_weight(idtype, g, norm, weight, bias):
+    g = g.astype(idtype).to(F.ctx())
+    conv = nn.GraphConv(5, 2, norm=norm, weight=weight, bias=bias).to(F.ctx())
+    ext_w = F.randn((5, 2)).to(F.ctx())
+    nsrc = g.number_of_src_nodes()
+    ndst = g.number_of_dst_nodes()
+    h = F.randn((nsrc, 5)).to(F.ctx())
+    e_w = g.edata['scalar_w']
+    if weight:
+        h_out = conv(g, h, edge_weight=e_w)
+    else:
+        h_out = conv(g, h, weight=ext_w, edge_weight=e_w)
+    assert h_out.shape == (ndst, 2)
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['has_scalar_e_feature'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('norm', ['none', 'both', 'right'])
+@pytest.mark.parametrize('weight', [True, False])
+@pytest.mark.parametrize('bias', [True, False])
+def test_graph_conv_e_weight_norm(idtype, g, norm, weight, bias):
+    g = g.astype(idtype).to(F.ctx())
+    conv = nn.GraphConv(5, 2, norm=norm, weight=weight, bias=bias).to(F.ctx())
+    ext_w = F.randn((5, 2)).to(F.ctx())
+    nsrc = g.number_of_src_nodes()
+    ndst = g.number_of_dst_nodes()
+    h = F.randn((nsrc, 5)).to(F.ctx())
+    edgenorm = nn.EdgeWeightNorm(norm=norm)
+    norm_weight = edgenorm(g, g.edata['scalar_w'])
+    if weight:
+        h_out = conv(g, h, edge_weight=norm_weight)
+    else:
+        h_out = conv(g, h, weight=ext_w, edge_weight=norm_weight)
+    assert h_out.shape == (ndst, 2)
+
+@parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree', 'dglgraph']))
 @pytest.mark.parametrize('norm', ['none', 'both', 'right'])
 @pytest.mark.parametrize('weight', [True, False])
@@ -959,6 +998,8 @@ def test_hetero_conv(agg, idtype):
 
 if __name__ == '__main__':
     test_graph_conv()
+    test_graph_conv_e_weight()
+    test_graph_conv_e_weight_norm()
     test_set2set()
     test_glob_att_pool()
     test_simple_pool()
