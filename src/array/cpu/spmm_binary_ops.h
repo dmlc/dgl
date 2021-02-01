@@ -146,6 +146,19 @@ constexpr DType Min<DType>::zero;
     }                                                           \
   } while (0)
 
+#define SWITCH_BITS(bits, DType, ...)                           \
+  do {                                                          \
+    if ((bits) == 16 || (bits) == 32) {                         \
+      typedef float DType;                                      \
+      { __VA_ARGS__ }                                           \
+    } else if ((bits) == 64) {                                  \
+      typedef double DType;                                     \
+      { __VA_ARGS__ }                                           \
+    } else {                                                    \
+      LOG(FATAL) << "Data type not renogized with bits " << bits; \
+    }                                                           \
+  } while (0)
+
 }  // namespace op
 
 }  // namespace cpu

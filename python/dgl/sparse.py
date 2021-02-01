@@ -7,8 +7,6 @@ from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
 
-__all__ = ['_gspmm', '_gsddmm', '_segment_reduce', '_bwd_segment_cmp', '_reverse']
-
 
 def infer_broadcast_shape(op, shp1, shp2):
     r"""Check the shape validity, and infer the output shape given input shape and operator.
@@ -67,33 +65,6 @@ def to_dgl_nd_for_write(x):
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
 
 
-inverse_format = {
-    'coo': 'coo',
-    'csr': 'csc',
-    'csc': 'csr'
-}
-
-
-def _reverse(gidx):
-    """Reverse the given graph index while retaining its formats.
-    ``dgl.reverse`` would not keep graph format information by default.
-
-    Parameters
-    ----------
-    gidx: HeteroGraphIndex
-
-    Return
-    ------
-    HeteroGraphIndex
-    """
-    g_rev = gidx.reverse()
-    original_formats_dict = gidx.formats()
-    original_formats = original_formats_dict['created'] +\
-                       original_formats_dict['not created']
-    g_rev = g_rev.formats([inverse_format[fmt] for fmt in original_formats])
-    return g_rev
-
-
 target_mapping = {
     'u': 0,
     'e': 1,
@@ -149,6 +120,11 @@ def _gspmm(gidx, op, reduce_op, u, e):
         raise DGLError("We only support gspmm on graph with one edge type")
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
+    if use_u and use_e:
+        if F.dtype(u) != F.dtype(e):
+            raise DGLError("The node features' data type {} doesn't match edge"
+                           " features' data type {}, please convert them to the"
+                           " same type.".format(F.dtype(u), F.dtype(e)))
     # deal with scalar features.
     expand_u, expand_e = False, False
     if use_u:
@@ -159,6 +135,7 @@ def _gspmm(gidx, op, reduce_op, u, e):
         if F.ndim(e) == 1:
             e = F.unsqueeze(e, -1)
             expand_e = True
+
     ctx = F.context(u) if use_u else F.context(e)
     dtype = F.dtype(u) if use_u else F.dtype(e)
     u_shp = F.shape(u) if use_u else (0,)
@@ -247,6 +224,10 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
         raise DGLError("We only support gsddmm on graph with one edge type")
     use_lhs = op != 'copy_rhs'
     use_rhs = op != 'copy_lhs'
+    if use_lhs and use_rhs:
+        if F.dtype(lhs) != F.dtype(rhs):
+            raise DGLError("The operands data type don't match: {} and {}, please convert them"
+                           " to the same type.".format(F.dtype(lhs), F.dtype(rhs)))
     # deal with scalar features.
     expand_lhs, expand_rhs = False, False
     if use_lhs:
