@@ -1,6 +1,7 @@
 """Node embedding optimizers"""
-import abc, gc
+import abc
 from abc import abstractmethod
+import gc
 import torch as th
 
 from ...utils import get_shared_mem_array, create_shared_mem_array
@@ -71,7 +72,6 @@ class SparseGradOptimizer(abc.ABC):
 
             # Go through all sparse embeddings
             for emb in self._params: # pylint: disable=too-many-nested-blocks
-                num_embeddings = emb.num_embeddings
                 emb_name = emb.name
 
                 # we need to combine gradients from multiple forward paths
@@ -91,14 +91,16 @@ class SparseGradOptimizer(abc.ABC):
                     if emb_name not in self._shared_cache:
                         self._shared_cache[emb_name] = {}
 
-                    # Each training process takes the resposibility of updating a range of node embeddings,
-                    # thus we can parallel the gradient update. The overall progress includes:
+                    # Each training process takes the resposibility of updating a range
+                    # of node embeddings, thus we can parallel the gradient update.
+                    # The overall progress includes:
                     #   1. In each training process:
-                    #     1.a Deciding which process a node embedding belongs to according to the formula:
-                    #         process_id = node_idx mod num_of_process(N)
-                    #     1.b Split the node index tensor and gradient tensor into N parts according to step 1.
-                    #     1.c Write each node index sub-tensor and gradient sub-tensor into different DGL shared
-                    #         memory buffers.
+                    #     1.a Deciding which process a node embedding belongs to according
+                    #         to the formula: process_id = node_idx mod num_of_process(N)
+                    #     1.b Split the node index tensor and gradient tensor into N parts
+                    #         according to step 1.
+                    #     1.c Write each node index sub-tensor and gradient sub-tensor into
+                    #         different DGL shared memory buffers.
                     #   2. Cross training process synchronization
                     #   3. In each traning process:
                     #     3.a Collect node index sub-tensors and gradient sub-tensors
