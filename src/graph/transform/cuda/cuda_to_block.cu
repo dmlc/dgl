@@ -343,6 +343,9 @@ ToBlockInternal(
   auto device = runtime::DeviceAPI::Get(ctx);
 
   CHECK_EQ(ctx.device_type, kDLGPU);
+  for (const auto& nodes : rhs_nodes) {
+    CHECK_EQ(ctx.device_type, nodes->ctx.device_type);
+  }
 
   // Since DST nodes are included in SRC nodes, a common requirement is to fetch
   // the DST node features from the SRC nodes features. To avoid expensive sparse lookup,

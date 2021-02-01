@@ -1632,7 +1632,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     DGLError
         If :attr:`dst_nodes` is specified but it is not a superset of all the nodes that
         have at least one inbound edge.
-    ValueError
+
         If :attr:`dst_nodes` is not None, and :attr:`g` and :attr:`dst_nodes`
         are not in the same context.
 
@@ -1728,7 +1728,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     elif not isinstance(dst_nodes, Mapping):
         # dst_nodes is a Tensor, check if the g has only one type.
         if len(g.ntypes) > 1:
-            raise ValueError(
+            raise DGLError(
                 'Graph has more than one node type; please specify a dict for dst_nodes.')
         dst_nodes = {g.ntypes[0]: dst_nodes}
 
