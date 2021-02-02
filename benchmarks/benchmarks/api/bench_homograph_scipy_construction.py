@@ -23,9 +23,8 @@ def track_time(size, scipy_format):
     dgl.from_scipy(matrix_dict[size])
 
     # timing
-    t0 = time.time()
-    for i in range(3):
-        dgl.from_scipy(matrix_dict[size])
-    t1 = time.time()
+    with utils.Timer() as t:
+        for i in range(3):
+            dgl.from_scipy(matrix_dict[size])
 
-    return (t1 - t0) / 3
+    return t.elapsed_secs / 3

@@ -21,9 +21,9 @@ def track_time(graph_name, format):
         g = graph.add_self_loop()
 
     # timing
-    t0 = time.time()
-    for i in range(3):
-        edges = graph.add_self_loop()
-    t1 = time.time()
+    
+    with utils.Timer() as t:
+        for i in range(3):
+            edges = graph.add_self_loop()
 
-    return (t1 - t0) / 3
+    return t.elapsed_secs / 3

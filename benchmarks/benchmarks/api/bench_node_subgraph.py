@@ -24,9 +24,8 @@ def track_time(graph_name, format, seed_nodes_num):
         dgl.node_subgraph(graph, seed_nodes)
 
     # timing
-    t0 = time.time()
-    for i in range(3):
-        dgl.node_subgraph(graph, seed_nodes)
-    t1 = time.time()
+    with utils.Timer() as t:
+        for i in range(3):
+            dgl.node_subgraph(graph, seed_nodes)
 
-    return (t1 - t0) / 3
+    return t.elapsed_secs / 3

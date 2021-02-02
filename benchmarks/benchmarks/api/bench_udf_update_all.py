@@ -20,7 +20,7 @@ def track_time(graph_name, format, feat_size, msg_type, reduce_type):
     graph.ndata['h'] = torch.randn(
         (graph.num_nodes(), feat_size), device=device)
     graph.edata['e'] = torch.randn(
-        (graph.num_edges(), feat_size), device=device)
+        (graph.num_edges(), ), device=device)
     
     msg_udf_dict = {
         'copy_u': lambda edges: {'x': edges.src['h']},
@@ -37,10 +37,9 @@ def track_time(graph_name, format, feat_size, msg_type, reduce_type):
     graph.update_all(msg_udf_dict[msg_type], reduct_udf_dict[reduce_type])
 
     # timing
-    t0 = time.time()
-    for i in range(3):
-        graph.update_all(msg_udf_dict[msg_type], reduct_udf_dict[reduce_type])
-    t1 = time.time()
+    with utils.Timer() as t:
+        for i in range(3):
+            graph.update_all(msg_udf_dict[msg_type], reduct_udf_dict[reduce_type])
 
-    return (t1 - t0) / 3
+    return t.elapsed_secs / 3
 

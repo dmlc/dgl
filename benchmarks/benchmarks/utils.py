@@ -514,6 +514,26 @@ def benchmark(track_type, timeout=60):
 # Timer
 #####################################
 
+def sync():
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+
+from timeit import default_timer
+
+class Timer(object):
+    def __init__(self):
+        self.timer = default_timer
+        
+    def __enter__(self):
+        sync()
+        self.start = self.timer()
+        return self
+        
+    def __exit__(self, *args):
+        sync()
+        end = self.timer()
+        self.elapsed_secs = end - self.start
+
 class TorchOpTimer:
     def __init__(self, device):
         self.device = device

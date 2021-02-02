@@ -24,9 +24,9 @@ def track_time(graph_name, format, seed_egdes_num):
         dgl.edge_subgraph(graph, seed_edges)
 
     # timing
-    t0 = time.time()
-    for i in range(3):
-        dgl.edge_subgraph(graph, seed_edges)
-    t1 = time.time()
+    
+    with utils.Timer() as t:
+        for i in range(3):
+            dgl.edge_subgraph(graph, seed_edges)
 
-    return (t1 - t0) / 3
+    return t.elapsed_secs / 3

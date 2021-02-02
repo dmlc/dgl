@@ -28,9 +28,9 @@ def track_time(graph_name, format, feat_size, reduce_type):
     graph.apply_edges(reduce_builtin_dict[reduce_type])
 
     # timing
-    t0 = time.time()
-    for i in range(3):
-        graph.apply_edges(reduce_builtin_dict[reduce_type])
-    t1 = time.time()
+    
+    with utils.Timer() as t:
+        for i in range(3):
+            graph.apply_edges(reduce_builtin_dict[reduce_type])
 
-    return (t1 - t0) / 3
+    return t.elapsed_secs / 3

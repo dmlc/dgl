@@ -39,11 +39,10 @@ def track_time(feat_size, num_relations, multi_reduce_type):
         multi_reduce_type)
 
     # timing
-    t0 = time.time()
-    for i in range(3):
-        graph.multi_update_all(
-            update_dict,
-            multi_reduce_type)
-    t1 = time.time()
+    with utils.Timer() as t:
+        for i in range(3):
+            graph.multi_update_all(
+                update_dict,
+                multi_reduce_type)
 
-    return (t1 - t0) / 3
+    return t.elapsed_secs / 3

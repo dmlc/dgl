@@ -27,10 +27,9 @@ def track_time(graph_name, format, seed_nodes_num, fanout):
             graph, seed_nodes, fanout, edge_dir=edge_dir)
 
     # timing
-    t0 = time.time()
-    for i in range(3):
-        dgl.sampling.sample_neighbors(
-            graph, seed_nodes, fanout, edge_dir=edge_dir)
-    t1 = time.time()
+    with utils.Timer() as t:
+        for i in range(3):
+            dgl.sampling.sample_neighbors(
+                graph, seed_nodes, fanout, edge_dir=edge_dir)
 
-    return (t1 - t0) / 3
+    return t.elapsed_secs / 3

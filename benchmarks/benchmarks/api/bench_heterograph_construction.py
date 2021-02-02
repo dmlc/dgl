@@ -23,9 +23,8 @@ def track_time(num_relations):
     graph = dgl.heterograph(dd)
 
     # timing
-    t0 = time.time()
-    for i in range(3):
-        graph = dgl.heterograph(dd)
-    t1 = time.time()
+    with utils.Timer() as t:
+        for i in range(3):
+            graph = dgl.heterograph(dd)
 
-    return (t1 - t0) / 3
+    return t.elapsed_secs / 3
