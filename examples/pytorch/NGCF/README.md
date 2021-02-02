@@ -10,7 +10,7 @@ This example was implemented by [Kounianhua Du](https://github.com/KounianhuaDu)
 
 The graph dataset used in this example 
 ---------------------------------------
-Gowalla: This is the check-in dataset obtained from Gowalla, where users share their locations by checking-in. To ensure the quality of the dataset, we use the 10-core setting, i.e., retaining users and items with at least ten interactions.
+Gowalla: This is the check-in dataset obtained from Gowalla, where users share their locations by checking-in. To ensure the quality of the dataset, we use the 10-core setting, i.e., retaining users and items with at least ten interactions. The dataset used can be found [here](https://github.com/xiangwang1223/neural_graph_collaborative_filtering/tree/master/Data).
 
 Statistics:
 - Users: 29858
