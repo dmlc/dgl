@@ -276,6 +276,8 @@ class SegmentReduce(th.autograd.Function):
         m = offsets[-1].item()
         if op == 'sum':
             offsets = offsets[1:]
+            # To address the issue of trailing zeros, related issue:
+            # https://github.com/dmlc/dgl/pull/2610
             indices = th.zeros(
                 (m + 1,), device=offsets.device, dtype=offsets.dtype)
             indices.scatter_add_(0, offsets, th.ones_like(offsets))
