@@ -216,10 +216,11 @@ class DeviceNodeMapMaker {
   * \brief This function builds node maps for each node type, preserving the
   * order of the input nodes.
   *
-  * \param nodes The set of input nodes.
-  * \param nodes_maps The constructed node maps.
-  * \param workspace The scratch space to use.
-  * \param workspaceSize The size of the scratch space.
+  * \param lhs_nodes The set of source input nodes.
+  * \param rhs_nodes The set of destination input nodes.
+  * \param node_maps The node maps to be constructed.
+  * \param count_lhs_device The number of unique source nodes (on the GPU).
+  * \param lhs_device The unique source nodes (on the GPU).
   * \param stream The stream to operate on.
   */
   void Make(
