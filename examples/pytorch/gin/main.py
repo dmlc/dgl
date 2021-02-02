@@ -22,11 +22,9 @@ def train(args, net, trainloader, optimizer, criterion, epoch):
 
     for pos, (graphs, labels) in zip(bar, trainloader):
         # batch graphs will be shipped to device in forward part of model
-        for key in graphs.node_attr_schemes().keys():
-            graphs.ndata[key] = graphs.ndata[key].float()
         labels = labels.to(args.device)
-        feat = graphs.ndata.pop('attr').to(args.device)
         graphs = graphs.to(args.device)
+        feat = graphs.ndata.pop('attr')
         outputs = net(graphs, feat)
 
         loss = criterion(outputs, labels)
@@ -55,11 +53,9 @@ def eval_net(args, net, dataloader, criterion):
 
     for data in dataloader:
         graphs, labels = data
-        for key in graphs.node_attr_schemes().keys():
-            graphs.ndata[key] = graphs.ndata[key].float()
-        feat = graphs.ndata.pop('attr').to(args.device)
         graphs = graphs.to(args.device)
         labels = labels.to(args.device)
+        feat = graphs.ndata.pop('attr')
         total += len(labels)
         outputs = net(graphs, feat)
         _, predicted = torch.max(outputs.data, 1)
