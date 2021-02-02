@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import dgl.function as fn
 
 class NGCFLayer(nn.Module):
-    def __init__(self, in_size, out_size, dropout):
+    def __init__(self, in_size, out_size, norm_dict, dropout):
         super(NGCFLayer, self).__init__()
         self.in_size = in_size
         self.out_size = out_size
@@ -25,6 +25,9 @@ class NGCFLayer(nn.Module):
         torch.nn.init.xavier_uniform_(self.W2.weight)
         torch.nn.init.constant_(self.W2.bias, 0)
 
+        #norm
+        self.norm_dict = norm_dict
+
     def forward(self, g, feat_dict):
 
         funcs = {} #message and reduce functions dict
@@ -36,9 +39,7 @@ class NGCFLayer(nn.Module):
                 funcs[(srctype, etype, dsttype)] = (fn.copy_u(etype, 'm'), fn.sum('m', 'h'))  #define message and reduce functions
             else:
                 src, dst = g.edges(etype=(srctype, etype, dsttype))
-                dst_degree = g.in_degrees(dst, etype=(srctype, etype, dsttype)).float() #obtain degrees
-                src_degree = g.out_degrees(src, etype=(srctype, etype, dsttype)).float()
-                norm = torch.pow(src_degree * dst_degree, -0.5).unsqueeze(1) #compute norm
+                norm = self.norm_dict[(srctype, etype, dsttype)]
                 messages = norm * (self.W1(feat_dict[srctype][src]) + self.W2(feat_dict[srctype][src]*feat_dict[dsttype][dst])) #compute messages
                 g.edges[(srctype, etype, dsttype)].data[etype] = messages  #store in edata
                 funcs[(srctype, etype, dsttype)] = (fn.copy_e(etype, 'm'), fn.sum('m', 'h'))  #define message and reduce functions
@@ -56,14 +57,22 @@ class NGCF(nn.Module):
     def __init__(self, g, in_size, layer_size, dropout, lmbd=1e-5):
         super(NGCF, self).__init__()
         self.lmbd = lmbd
+        self.norm_dict = dict()
+        for srctype, etype, dsttype in g.canonical_etypes:
+            src, dst = g.edges(etype=(srctype, etype, dsttype))
+            dst_degree = g.in_degrees(dst, etype=(srctype, etype, dsttype)).float() #obtain degrees
+            src_degree = g.out_degrees(src, etype=(srctype, etype, dsttype)).float()
+            norm = torch.pow(src_degree * dst_degree, -0.5).unsqueeze(1) #compute norm
+            self.norm_dict[(srctype, etype, dsttype)] = norm
+
         self.layers = nn.ModuleList()
         self.layers.append(
-            NGCFLayer(in_size, layer_size[0], dropout[0])
+            NGCFLayer(in_size, layer_size[0], self.norm_dict, dropout[0])
         )
         self.num_layers = len(layer_size)
         for i in range(self.num_layers-1):
             self.layers.append(
-                NGCFLayer(layer_size[i], layer_size[i+1], dropout[i+1])
+                NGCFLayer(layer_size[i], layer_size[i+1], self.norm_dict, dropout[i+1])
             )
         self.initializer = nn.init.xavier_uniform_
 
