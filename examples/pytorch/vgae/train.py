@@ -28,8 +28,8 @@ parser.add_argument('--gpu_id', type=int, default=0, help='GPU id to use.')
 args = parser.parse_args()
 
 
-roc_means = []
-ap_means = []
+# roc_means = []
+# ap_means = []
 
 def compute_loss_para(adj):
     pos_weight = ((adj.shape[0] * adj.shape[0] - adj.sum()) / adj.sum())
@@ -265,23 +265,23 @@ def web_main():
 
     test_roc, test_ap = get_scores(test_edges, test_edges_false, logits)
     print("End of training!", "test_roc=", "{:.5f}".format(test_roc), "test_ap=", "{:.5f}".format(test_ap))
-    roc_means.append(test_roc)
-    ap_means.append(test_ap)
+    # roc_means.append(test_roc)
+    # ap_means.append(test_ap)
 
-
-if __name__ == '__main__':
-    for i in range(10):
-        web_main()
-
-    roc_mean = np.mean(roc_means)
-    roc_std = np.std(roc_means, ddof=1)
-    ap_mean = np.mean(ap_means)
-    ap_std = np.std(ap_means, ddof=1)
-    print("roc_mean=", "{:.5f}".format(roc_mean), "roc_std=", "{:.5f}".format(roc_std), "ap_mean=",
-          "{:.5f}".format(ap_mean), "ap_std=", "{:.5f}".format(ap_std))
 
 # if __name__ == '__main__':
-#     if args.datasrc == 'dgl':
-#         dgl_main()
-#     elif args.datasrc == 'website':
+#     for i in range(10):
 #         web_main()
+#
+#     roc_mean = np.mean(roc_means)
+#     roc_std = np.std(roc_means, ddof=1)
+#     ap_mean = np.mean(ap_means)
+#     ap_std = np.std(ap_means, ddof=1)
+#     print("roc_mean=", "{:.5f}".format(roc_mean), "roc_std=", "{:.5f}".format(roc_std), "ap_mean=",
+#           "{:.5f}".format(ap_mean), "ap_std=", "{:.5f}".format(ap_std))
+
+if __name__ == '__main__':
+    if args.datasrc == 'dgl':
+        dgl_main()
+    elif args.datasrc == 'website':
+        web_main()
