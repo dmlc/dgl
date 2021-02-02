@@ -7,11 +7,11 @@ __all__ = ['edge_softmax']
 
 
 def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
-    r"""
+    r"""Compute softmax over weights of incoming edges for every node.
 
     Description
     -----------
-    Compute edge softmax. For a node :math:`i`, edge softmax is an operation that computes
+    For a node :math:`i`, edge softmax is an operation that computes
 
     .. math::
       a_{ij} = \frac{\exp(z_{ij})}{\sum_{j\in\mathcal{N}(i)}\exp(z_{ij})}
