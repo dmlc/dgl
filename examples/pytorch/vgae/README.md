@@ -7,7 +7,7 @@
 
 - Pytorch
 - Python 3.x
-- DGL 0.5.3
+- DGL 0.6
 - scikit-learn
 
 ## Run the demo
@@ -40,8 +40,8 @@ Use *area under the ROC curve* (AUC) and *average precision* (AP) scores for eac
 | Dataset  | AUC            | AP            |
 | -------- | -------------- | ------------- |
 | Cora     | 91.8$\pm$ 0.01 | 92.5$\pm$0.01 |
-| Citeseer | 87.6$\pm$0.01  | 89.6$\pm$0.01 |
-| Pubmed   | 89.6$\pm$0.01  | 91.7$\pm$0.01 |
+| Citeseer | 89.2$\pm$0.02  | 90.8$\pm$0.01 |
+| Pubmed   | 94.5$\pm$0.01  | 94.6$\pm$0.01 |
 
 ### Dataset from website
 

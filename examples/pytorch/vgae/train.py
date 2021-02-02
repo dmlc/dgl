@@ -21,15 +21,15 @@ parser.add_argument('--learning_rate', type=float, default=0.01, help='Initial l
 parser.add_argument('--epochs', '-e', type=int, default=200, help='Number of epochs to train.')
 parser.add_argument('--hidden1', '-h1', type=int, default=32, help='Number of units in hidden layer 1.')
 parser.add_argument('--hidden2', '-h2', type=int, default=16, help='Number of units in hidden layer 2.')
-parser.add_argument('--datasrc', '-s', type=str, default='website',
+parser.add_argument('--datasrc', '-s', type=str, default='dgl',
                     help='Dataset download from dgl Dataset or website.')
 parser.add_argument('--dataset', '-d', type=str, default='pubmed', help='Dataset string.')
 parser.add_argument('--gpu_id', type=int, default=0, help='GPU id to use.')
 args = parser.parse_args()
 
 
-# roc_means = []
-# ap_means = []
+roc_means = []
+ap_means = []
 
 def compute_loss_para(adj):
     pos_weight = ((adj.shape[0] * adj.shape[0] - adj.sum()) / adj.sum())
@@ -71,11 +71,11 @@ def get_scores(edges_pos, edges_neg, adj_rec):
 def dgl_main():
     # Load from DGL dataset
     if args.dataset == 'cora':
-        dataset = CoraGraphDataset()
+        dataset = CoraGraphDataset(reverse_edge=False)
     elif args.dataset == 'citeseer':
-        dataset = CiteseerGraphDataset()
+        dataset = CiteseerGraphDataset(reverse_edge=False)
     elif args.dataset == 'pubmed':
-        dataset = PubmedGraphDataset()
+        dataset = PubmedGraphDataset(reverse_edge=False)
     else:
         raise NotImplementedError
     graph = dataset[0]
@@ -265,23 +265,23 @@ def web_main():
 
     test_roc, test_ap = get_scores(test_edges, test_edges_false, logits)
     print("End of training!", "test_roc=", "{:.5f}".format(test_roc), "test_ap=", "{:.5f}".format(test_ap))
-    # roc_means.append(test_roc)
-    # ap_means.append(test_ap)
+    roc_means.append(test_roc)
+    ap_means.append(test_ap)
 
-
-# if __name__ == '__main__':
-#     for i in range(10):
-#         web_main()
-#
-#     roc_mean = np.mean(roc_means)
-#     roc_std = np.std(roc_means, ddof=1)
-#     ap_mean = np.mean(ap_means)
-#     ap_std = np.std(ap_means, ddof=1)
-#     print("roc_mean=", "{:.5f}".format(roc_mean), "roc_std=", "{:.5f}".format(roc_std), "ap_mean=",
-#           "{:.5f}".format(ap_mean), "ap_std=", "{:.5f}".format(ap_std))
 
 if __name__ == '__main__':
-    if args.datasrc == 'dgl':
-        dgl_main()
-    elif args.datasrc == 'website':
+    for i in range(10):
         web_main()
+
+    roc_mean = np.mean(roc_means)
+    roc_std = np.std(roc_means, ddof=1)
+    ap_mean = np.mean(ap_means)
+    ap_std = np.std(ap_means, ddof=1)
+    print("roc_mean=", "{:.5f}".format(roc_mean), "roc_std=", "{:.5f}".format(roc_std), "ap_mean=",
+          "{:.5f}".format(ap_mean), "ap_std=", "{:.5f}".format(ap_std))
+
+# if __name__ == '__main__':
+#     if args.datasrc == 'dgl':
+#         dgl_main()
+#     elif args.datasrc == 'website':
+#         web_main()
