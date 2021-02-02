@@ -5,7 +5,6 @@
  * ids.
  */
 
-#include "cuda_to_block.h"
 
 #include <dgl/runtime/device_api.h>
 #include <dgl/immutable_graph.h>
@@ -16,13 +15,13 @@
 #include "../../../runtime/cuda/cuda_common.h"
 #include "../../../runtime/cuda/cuda_hashtable.cuh"
 #include "../../heterograph.h"
+#include "../to_bipartite.h"
 
 using namespace dgl::aten;
 using namespace dgl::runtime::cuda;
 
 namespace dgl {
 namespace transform {
-namespace cuda {
 
 namespace {
 
@@ -332,9 +331,11 @@ MapEdges(
 }
 
 
+// Since partial specialization is not allowed for functions, use this as an
+// intermediate for ToBlock where XPU = kDLGPU.
 template<typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
-ToBlockInternal(
+ToBlockGPU(
     HeteroGraphPtr graph,
     const std::vector<IdArray> &rhs_nodes,
     const bool include_rhs_in_lhs) {
@@ -526,22 +527,26 @@ ToBlockInternal(
   // return the new graph, the new src nodes, and new edges
   return std::make_tuple(new_graph, lhs_nodes, induced_edges);
 }
+
 }  // namespace
 
-
+template<>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
-CudaToBlock(
+ToBlock<kDLGPU, int32_t>(
     HeteroGraphPtr graph,
     const std::vector<IdArray> &rhs_nodes,
     bool include_rhs_in_lhs) {
-  std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>> ret;
-  ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
-    ret = ToBlockInternal<IdType>(graph, rhs_nodes, include_rhs_in_lhs);
-  });
-  return ret;
+  return ToBlockGPU<int32_t>(graph, rhs_nodes, include_rhs_in_lhs);
 }
 
+template<>
+std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
+ToBlock<kDLGPU, int64_t>(
+    HeteroGraphPtr graph,
+    const std::vector<IdArray> &rhs_nodes,
+    bool include_rhs_in_lhs) {
+  return ToBlockGPU<int64_t>(graph, rhs_nodes, include_rhs_in_lhs);
+}
 
-}  // namespace cuda
 }  // namespace transform
 }  // namespace dgl
