@@ -45,10 +45,8 @@ The folder contains example implementations of selected research papers related 
 | [GNN-FiLM: Graph Neural Networks with Feature-wise Linear Modulation](#gnnfilm) | :heavy_check_mark:  |                     |                     |                     |                     |
 | [Hierarchical Graph Pooling with Structure Learning](#hgp-sl)                                                                                 |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Graph Representation Learning via Hard and Channel-Wise Attention Networks](#hardgat)                                   |:heavy_check_mark:                     |                 |                           |                    |                    |
-| [Neural Graph Collaborative Filtering](#ngcf) |             | :heavy_check_mark: |                     |                   |                   |
 | [Graph Cross Networks with Vertex Infomax Pooling](#gxn)                                   |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Towards Deeper Graph Neural Networks](#dagnn) | :heavy_check_mark:  |                                  |                           |                    |                    |
-
 
 ## 2020
 
@@ -72,7 +70,7 @@ The folder contains example implementations of selected research papers related 
     - Example code: [Molecule embedding](https://github.com/awslabs/dgl-lifesci/tree/master/examples/molecule_embeddings), [PyTorch for custom data](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/csv_data_configuration)
     - Tags: molecules, graph classification, unsupervised learning, self-supervised learning, molecular property prediction
 
-- <a name="gnnfilm"></a> Marc Brockschmidt. GNN-FiLM: Graph Neural Networks with Feature-wise Linear Modulation. [Paper link](https://arxiv.org/abs/1906.12192).
+- <a name="GNN-FiLM"></a> Marc Brockschmidt. GNN-FiLM: Graph Neural Networks with Feature-wise Linear Modulation. [Paper link](https://arxiv.org/abs/1906.12192).
     - Example code: [Pytorch](../examples/pytorch/GNN-FiLM)
     - Tags: multi-relational graphs, hypernetworks, GNN architectures
 
@@ -169,11 +167,6 @@ The folder contains example implementations of selected research papers related 
 - <a name='hardgat'></a> Gao, Hongyang, et al. Graph Representation Learning via Hard and Channel-Wise Attention Networks [Paper link](https://arxiv.org/abs/1907.04652).
     - Example code: [Pytorch](../examples/pytorch/hardgat)
     - Tags: node classification, graph attention
-
-- <a name='ngcf'></a> Wang, Xiang, et al. Neural Graph Collaborative Filtering. [Paper link](https://arxiv.org/abs/1905.08108).
-    - Example code: [Pytorch](../examples/pytorch/NGCF)
-    - Tags: Collaborative Filtering, Recommendation, Graph Neural Network 
-
 
 ## 2018
 
