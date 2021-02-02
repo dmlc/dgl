@@ -31,7 +31,7 @@ def track_time(graph_name, format, fraction, return_uv):
     # timing
     
     with utils.Timer() as t:
-        for i in range(10):
+        for i in range(3):
             edges = graph.edge_ids(u, v, return_uv=return_uv)
 
-    return t.elapsed_secs / 10
+    return t.elapsed_secs / 3
