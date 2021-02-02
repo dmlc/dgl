@@ -96,8 +96,6 @@ def get_graph(name, format):
     else:
         raise Exception("Unknown dataset")
     g = g.formats([format])
-    # Remove format strict
-    g = g.formats(['coo', 'csr', 'csc'])
     return g
 
 def get_ogb_graph(name):
