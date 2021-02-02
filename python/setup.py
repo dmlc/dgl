@@ -92,10 +92,10 @@ def config_cython():
         path = "dgl/_ffi/_cython"
         if os.name == 'nt':
             library_dirs = ['dgl', '../build/Release', '../build']
-            libraries = ['libtvm']
+            libraries = ['dgl']
         else:
-            library_dirs = None
-            libraries = None
+            library_dirs = ['dgl', '../build/Release', '../build']
+            libraries = ['dgl']
         for fn in os.listdir(path):
             if not fn.endswith(".pyx"):
                 continue
