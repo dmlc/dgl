@@ -275,11 +275,11 @@ class SegmentReduce(th.autograd.Function):
         arg, offsets = ctx.saved_tensors
         m = offsets[-1].item()
         if op == 'sum':
-            offsets = offsets[1:-1]
+            offsets = offsets[1:]
             indices = th.zeros(
-                (m,), device=offsets.device, dtype=offsets.dtype)
+                (m + 1,), device=offsets.device, dtype=offsets.dtype)
             indices.scatter_add_(0, offsets, th.ones_like(offsets))
-            indices = th.cumsum(indices, -1)
+            indices = th.cumsum(indices, -1)[:-1]
             dx = dy[indices]
         else:
             dx = _bwd_segment_cmp(dy, arg, m)
