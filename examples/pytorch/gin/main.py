@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from dgl.data.gindt import GINDataset
+from dgl.data import GINDataset
 from dataloader import GINDataLoader
 from parser import Parser
 from gin import GIN

@@ -136,7 +136,8 @@ class LegacyTUDataset(DGLBuiltinDataset):
 
         if 'feat' not in g.ndata.keys():
             for idxs, g in zip(node_idx_list, self.graph_lists):
-                g.ndata['feat'] = np.ones((g.number_of_nodes(), self.hidden_size))
+                g.ndata['feat'] = F.ones((g.number_of_nodes(), self.hidden_size),
+                                         F.float32, F.cpu())
             self.data_mode = "constant"
             if self.verbose:
                 print("Use Constant one as Feature with hidden size {}".format(self.hidden_size))
