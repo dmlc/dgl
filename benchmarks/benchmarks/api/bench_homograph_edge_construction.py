@@ -23,7 +23,7 @@ def track_time(size):
 
     # timing
     with utils.Timer() as t:
-        for i in range(3):
+        for i in range(10):
             g = dgl.graph(edge_list[size])
 
-    return t.elapsed_secs / 3
+    return t.elapsed_secs / 10
