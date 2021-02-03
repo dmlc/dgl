@@ -8,8 +8,8 @@ from .. import utils
 
 
 @utils.benchmark('time', timeout=7200)
-@utils.parametrize('graph_name', ['cora', 'livejournal'])
-@utils.parametrize('format', ['coo', 'csc'])
+@utils.parametrize('graph_name', ['cora', 'pubmed'])
+@utils.parametrize('format', ['coo']) # only coo supports udf
 @utils.parametrize('feat_size', [8, 32, 128, 512])
 @utils.parametrize('msg_type', ['copy_u', 'u_mul_e'])
 @utils.parametrize('reduce_type', ['sum', 'mean', 'max'])

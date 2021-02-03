@@ -74,6 +74,8 @@ def get_graph(name, format):
     g = None
     if name == 'cora':
         g = dgl.data.CoraGraphDataset(verbose=False)[0]
+    elif name == 'pubmed':
+        g = dgl.data.PubmedGraphDataset(verbose=False)[0]
     elif name == 'livejournal':
         bin_path = "/tmp/dataset/livejournal/livejournal_{}.bin".format(format)
         if os.path.exists(bin_path):

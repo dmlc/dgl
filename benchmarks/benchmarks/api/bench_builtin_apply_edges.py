@@ -8,7 +8,7 @@ from .. import utils
 
 
 @utils.benchmark('time', timeout=600)
-@utils.parametrize('graph_name', ['cora', 'livejournal'])
+@utils.parametrize('graph_name', ['cora', 'reddit'])
 @utils.parametrize('format', ['coo', 'csr'])
 @utils.parametrize('feat_size', [8, 128, 512])
 @utils.parametrize('reduce_type', ['u->e', 'u+v'])
