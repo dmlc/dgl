@@ -8,21 +8,22 @@ This is a reproduction of the papers
 # Performance
 
 ## Classification
-| Model           | Dataset    | Metric   | Score - PyTorch  | Score - DGL |
-|-----------------|------------|----------|------------------|-------------|
-| PointNet        | ModelNet40 | Accuracy | 89.2(Official)   | 89.3        |
-| PointNet++(SSG) | ModelNet40 | Accuracy | 92.4             | 93.3        |
-| PointNet++(MSG) | ModelNet40 | Accuracy | 92.8             | 93.3        |
+| Model           | Dataset    | Metric   | Score - PyTorch  | Score - DGL | Time(s) - PyTorch | Time(s) - DGL |
+|-----------------|------------|----------|------------------|-------------|-------------------|---------------|
+| PointNet        | ModelNet40 | Accuracy | 89.2(Official)   | 89.3        | 181.8             | 95.0          |
+| PointNet++(SSG) | ModelNet40 | Accuracy | 92.4             | 93.3        | 182.6             | 133.7         |
+| PointNet++(MSG) | ModelNet40 | Accuracy | 92.8             | 93.3        | 383.6             | 240.5         |
 
 ## Part Segmentation
 
-| Model           | Dataset    | Metric   | Score - PyTorch | Score - DGL |
-|-----------------|------------|----------|-----------------|-------------|
-| PointNet        | ShapeNet   | mIoU     | 84.3            | 83.6        |
-| PointNet++(SSG) | ShapeNet   | mIoU     | 84.9            | 84.5        |
-| PointNet++(MSG) | ShapeNet   | mIoU     | 85.4            | 84.6        |
+| Model           | Dataset    | Metric   | Score - PyTorch | Score - DGL | Time(s) - PyTorch | Time(s) - DGL |
+|-----------------|------------|----------|-----------------|-------------|-------------------|---------------|
+| PointNet        | ShapeNet   | mIoU     | 84.3            | 83.6        | 251.6             | 234.0.        |
+| PointNet++(SSG) | ShapeNet   | mIoU     | 84.9            | 84.5        | 361.7.            | 240.1         |
+| PointNet++(MSG) | ShapeNet   | mIoU     | 85.4            | 84.6        | 817.3             | 821.8         |
 
-Score - PyTorch data are collected from [this repo](https://github.com/yanx27/Pointnet_Pointnet2_pytorch).
++ Score - PyTorch are collected from [this repo](https://github.com/yanx27/Pointnet_Pointnet2_pytorch).
++ Time(s) are the average training time per epoch, measured on EC2 g4dn.4xlarge instance w/ Tesla T4 GPU.
 # How to Run
 
 For point cloud classification, run with
