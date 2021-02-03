@@ -123,7 +123,7 @@ DGL provides a tool called `convert_partition.py` to load one partition at a tim
 and save it into a file.
 
 ```bash
-python3 ~/dgl/tools/convert_partition.py --input-dir . --graph-name mag --schema mag.json --num-parts 2 --num-ntypes 4 --num-node-weights 4 --output outputs
+python3 ~/dgl/tools/convert_partition.py --input-dir . --graph-name mag --schema mag.json --num-parts 2 --num-node-weights 4 --output outputs
 ```
 
 ### Step 4: Read node data and edge data for each partition
