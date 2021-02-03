@@ -30,9 +30,9 @@ def argument():
     parser.add_argument("--hid_dim", type=int, default=32, help='Hidden layer dimensionalities.')
     parser.add_argument('--dropnode_rate', type=float, default=0.5,
                         help='Dropnode rate (1 - keep probability).')
-    parser.add_argument('--input_droprate', type=float, default=0.0,
+    parser.add_argument('--input_droprate', type=float, default=0.5,
                     help='dropout rate of input layer')
-    parser.add_argument('--hidden_droprate', type=float, default=0.0,
+    parser.add_argument('--hidden_droprate', type=float, default=0.5,
                     help='dropout rate of hidden layer')
     parser.add_argument('--order', type=int, default=8, help='Propagation step')
     parser.add_argument('--sample', type=int, default=4, help='Sampling times of dropnode')
@@ -58,7 +58,7 @@ def consis_loss(logps, temp, lam):
     sharp_p = (th.pow(avg_p, 1./temp) / th.sum(th.pow(avg_p, 1./temp), dim=1, keepdim=True)).detach()
 
     sharp_p = sharp_p.unsqueeze(2)
-    loss = th.mean(th.sum(th.pow(ps - sharp_p, 1./temp), dim = 1, keepdim=True))
+    loss = th.mean(th.sum(th.pow(ps - sharp_p, 2), dim = 1, keepdim=True))
 
     loss = lam * loss
     return loss
@@ -102,12 +102,10 @@ if __name__ == '__main__':
     test_idx = th.nonzero(test_mask, as_tuple=False).squeeze().to(device)
 
     # Step 2: Create model =================================================================== #
-    
     model = GRAND(n_features, args.hid_dim, n_classes, args.sample, args.order,
                   args.dropnode_rate, args.input_droprate, 
                   args.hidden_droprate, args.use_bn)
 
-    
     model = model.to(args.device)
     graph = graph.to(args.device)
     
@@ -144,7 +142,7 @@ if __name__ == '__main__':
         loss_train.backward()
         opt.step()
 
-        ''' Validating '''
+        ''' Validation '''
         model.eval()
         with th.no_grad():
         
@@ -184,3 +182,7 @@ if __name__ == '__main__':
 
     print("Test Acc: {:.4f}".format(test_acc))
 
+
+    # files = open("pubmed100+", "a+")
+    # files.write("{:.4f} \n".format(test_acc))
+    # files.close()
