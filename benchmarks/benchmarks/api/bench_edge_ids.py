@@ -29,9 +29,9 @@ def track_time(graph_name, format, fraction, return_uv):
         out = graph.edge_ids(u[0], v[0])
 
     # timing
-    t0 = time.time()
-    for i in range(10):
-        edges = graph.edge_ids(u, v, return_uv=return_uv)
-    t1 = time.time()
+    
+    with utils.Timer() as t:
+        for i in range(3):
+            edges = graph.edge_ids(u, v, return_uv=return_uv)
 
-    return (t1 - t0) / 10
+    return t.elapsed_secs / 3

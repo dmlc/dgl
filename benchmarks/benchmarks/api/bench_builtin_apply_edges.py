@@ -10,7 +10,7 @@ from .. import utils
 @utils.benchmark('time', timeout=600)
 @utils.parametrize('graph_name', ['cora', 'livejournal'])
 @utils.parametrize('format', ['coo', 'csr'])
-@utils.parametrize('feat_size', [8, 32, 128, 512])
+@utils.parametrize('feat_size', [8, 128, 512])
 @utils.parametrize('reduce_type', ['u->e', 'u+v'])
 def track_time(graph_name, format, feat_size, reduce_type):
     device = utils.get_bench_device()
@@ -28,9 +28,9 @@ def track_time(graph_name, format, feat_size, reduce_type):
     graph.apply_edges(reduce_builtin_dict[reduce_type])
 
     # timing
-    t0 = time.time()
-    for i in range(3):
-        graph.apply_edges(reduce_builtin_dict[reduce_type])
-    t1 = time.time()
+    
+    with utils.Timer() as t:
+        for i in range(3):
+            graph.apply_edges(reduce_builtin_dict[reduce_type])
 
-    return (t1 - t0) / 3
+    return t.elapsed_secs / 3
