@@ -1296,8 +1296,8 @@ class DGLHeteroGraph(object):
 
         Manually set batch information
 
-        >>> g.set_batch_num_nodes(torch.tensor([3, 3])
-        >>> g.set_batch_num_edges(torch.tensor([3, 3])
+        >>> g.set_batch_num_nodes(torch.tensor([3, 3]))
+        >>> g.set_batch_num_edges(torch.tensor([3, 3]))
 
         Unbatch the graph.
 
@@ -1441,17 +1441,17 @@ class DGLHeteroGraph(object):
 
         Manually set batch information
 
-        >>> g.set_batch_num_nodes(torch.tensor([3, 3])
-        >>> g.set_batch_num_edges(torch.tensor([3, 3])
+        >>> g.set_batch_num_nodes(torch.tensor([3, 3]))
+        >>> g.set_batch_num_edges(torch.tensor([3, 3]))
 
         Unbatch the graph.
 
         >>> dgl.unbatch(g)
-            [Graph(num_nodes=3, num_edges=3,
-                  ndata_schemes={}
-                  edata_schemes={}), Graph(num_nodes=3, num_edges=3,
-                  ndata_schemes={}
-                  edata_schemes={})]
+        [Graph(num_nodes=3, num_edges=3,
+              ndata_schemes={}
+              edata_schemes={}), Graph(num_nodes=3, num_edges=3,
+              ndata_schemes={}
+              edata_schemes={})]
 
         Create a heterogeneous graph.
 
