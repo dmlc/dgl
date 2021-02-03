@@ -19,7 +19,7 @@ This is a reproduction of the papers
 | Model           | Dataset    | Metric   | Score - PyTorch | Score - DGL | Time(s) - PyTorch | Time(s) - DGL |
 |-----------------|------------|----------|-----------------|-------------|-------------------|---------------|
 | PointNet        | ShapeNet   | mIoU     | 84.3            | 83.6        | 251.6             | 234.0         |
-| PointNet++(SSG) | ShapeNet   | mIoU     | 84.9            | 84.5        | 361.7.            | 240.1         |
+| PointNet++(SSG) | ShapeNet   | mIoU     | 84.9            | 84.5        | 361.7             | 240.1         |
 | PointNet++(MSG) | ShapeNet   | mIoU     | 85.4            | 84.6        | 817.3             | 821.8         |
 
 + Score - PyTorch are collected from [this repo](https://github.com/yanx27/Pointnet_Pointnet2_pytorch).
