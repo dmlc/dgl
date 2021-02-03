@@ -58,7 +58,7 @@ def consis_loss(logps, temp, lam):
     sharp_p = (th.pow(avg_p, 1./temp) / th.sum(th.pow(avg_p, 1./temp), dim=1, keepdim=True)).detach()
 
     sharp_p = sharp_p.unsqueeze(2)
-    loss = th.mean(th.sum(th.pow(ps - sharp_p, 1./temp), dim = 1, keepdim=True))
+    loss = th.mean(th.sum(th.pow(ps - sharp_p, 2), dim = 1, keepdim=True))
 
     loss = lam * loss
     return loss
@@ -102,7 +102,6 @@ if __name__ == '__main__':
     test_idx = th.nonzero(test_mask, as_tuple=False).squeeze().to(device)
 
     # Step 2: Create model =================================================================== #
-    
     model = GRAND(n_features, args.hid_dim, n_classes, args.sample, args.order,
                   args.dropnode_rate, args.input_droprate, 
                   args.hidden_droprate, args.use_bn)
