@@ -32,4 +32,4 @@ def track_flops(graph, feat_size, reducer):
         for i in range(10):
             y = op(graph, x)
 
-    return calc_gflops(graph, feat_size, t.elapsed / 10)
+    return calc_gflops(graph, feat_size, t.elapsed_secs / 10)

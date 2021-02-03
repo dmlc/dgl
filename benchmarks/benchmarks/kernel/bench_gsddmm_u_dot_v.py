@@ -35,4 +35,4 @@ def track_flops(graph, feat_size, num_heads):
         for i in range(10):
             y = dgl.ops.u_dot_v(graph, x, x)
 
-    return calc_gflops(graph, feat_size, num_heads, t.elapsed / 10)
+    return calc_gflops(graph, feat_size, num_heads, t.elapsed_secs / 10)
