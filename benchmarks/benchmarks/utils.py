@@ -64,7 +64,7 @@ def _download(url, path, filename):
     print('Download finished.')
 
 
-GRAPH_CACHE = {}
+# GRAPH_CACHE = {}
 
 
 def get_graph(name, format):
