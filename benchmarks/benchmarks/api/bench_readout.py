@@ -6,8 +6,8 @@ from .. import utils
 
 
 @utils.benchmark('time')
-@utils.parametrize('batch_size', [4, 32, 256])
-@utils.parametrize('feat_size', [32, 128, 256])
+@utils.parametrize('batch_size', [4, 256, 1024])
+@utils.parametrize('feat_size', [16, 128, 512])
 @utils.parametrize('readout_op', ['sum', 'max', 'min', 'mean'])
 @utils.parametrize('type', ['edge', 'node'])
 def track_time(batch_size, feat_size, readout_op, type):

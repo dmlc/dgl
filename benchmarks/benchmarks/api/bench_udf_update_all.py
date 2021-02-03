@@ -20,7 +20,7 @@ def track_time(graph_name, format, feat_size, msg_type, reduce_type):
     graph.ndata['h'] = torch.randn(
         (graph.num_nodes(), feat_size), device=device)
     graph.edata['e'] = torch.randn(
-        (graph.num_edges(), ), device=device)
+        (graph.num_edges(), 1), device=device)
     
     msg_udf_dict = {
         'copy_u': lambda edges: {'x': edges.src['h']},

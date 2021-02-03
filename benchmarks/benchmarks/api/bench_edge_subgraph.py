@@ -8,6 +8,7 @@ import dgl.function as fn
 from .. import utils
 
 
+@utils.skip_if_gpu()
 @utils.benchmark('time')
 @utils.parametrize('graph_name', ['livejournal', 'reddit'])
 @utils.parametrize('format', ['coo', 'csc'])
