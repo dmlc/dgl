@@ -346,10 +346,10 @@ class SegmentReduce(mx.autograd.Function):
         offsets = self.offsets
         m = offsets[-1].asscalar()
         if self.op == 'sum':
-            offsets_np = asnumpy(offsets[1:-1])
-            indices_np = np.zeros((m,), dtype=offsets_np.dtype)
+            offsets_np = asnumpy(offsets[1:])
+            indices_np = np.zeros((m + 1,), dtype=offsets_np.dtype)
             np.add.at(indices_np, offsets_np, np.ones_like(offsets_np))
-            indices_np = np.cumsum(indices_np, -1)
+            indices_np = np.cumsum(indices_np, -1)[:-1]
             indices = zerocopy_from_numpy(indices_np)
             dx = dy[indices]
         else:
