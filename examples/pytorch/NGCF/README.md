@@ -21,7 +21,13 @@ Statistics:
 
 How to run example files
 --------------------------------
-In the NGCF folder, run
+First to get the data, in the Data folder, run
+
+```bash
+sh load_gowalla.sh
+```
+
+Then, in the NGCF folder, run
 
 ```bash
 python main.py --dataset gowalla --regs [1e-5] --embed_size 64 --layer_size [64,64,64] --lr 0.0001 --save_flag 1 --batch_size 1024 --epoch 400 --verbose 1 --mess_dropout [0.1,0.1,0.1] --gpu 0 
