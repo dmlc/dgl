@@ -3,7 +3,7 @@
  * \file array/cpu/spmat_op_impl.cc
  * \brief CPU implementation of COO sparse matrix operators
  */
-#include <omp.h>
+#include <dmlc/omp.h>
 #include <vector>
 #include <unordered_set>
 #include <unordered_map>

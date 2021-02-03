@@ -779,6 +779,32 @@ def test_edge_conv_bi(g, idtype):
     x0 = F.randn((g.number_of_dst_nodes(), 5))
     h1 = edge_conv(g, (h0, x0))
     assert h1.shape == (g.number_of_dst_nodes(), 2)
+    
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
+def test_dotgat_conv(g, idtype):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    dotgat = nn.DotGatConv(5, 2, 4)
+    feat = F.randn((g.number_of_nodes(), 5))
+    dotgat = dotgat.to(ctx)
+    h = dotgat(g, feat)
+    assert h.shape == (g.number_of_nodes(), 4, 2)
+    _, a = dotgat(g, feat, get_attention=True)
+    assert a.shape == (g.number_of_edges(), 4, 1)
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
+def test_dotgat_conv_bi(g, idtype):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    dotgat = nn.DotGatConv((5, 5), 2, 4)
+    feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
+    dotgat = dotgat.to(ctx)
+    h = dotgat(g, feat)
+    assert h.shape == (g.number_of_dst_nodes(), 4, 2)
+    _, a = dotgat(g, feat, get_attention=True)
+    assert a.shape == (g.number_of_edges(), 4, 1)    
 
 def test_dense_cheb_conv():
     for k in range(1, 4):
@@ -913,16 +939,7 @@ def test_hetero_conv(agg, idtype):
     gf = F.randn((4, 4))
     sf = F.randn((2, 3))
 
-    h = conv(g, {'user': uf})
-    assert set(h.keys()) == {'user', 'game'}
-    if agg != 'stack':
-        assert h['user'].shape == (4, 3)
-        assert h['game'].shape == (4, 4)
-    else:
-        assert h['user'].shape == (4, 1, 3)
-        assert h['game'].shape == (4, 1, 4)
-
-    h = conv(g, {'user': uf, 'store': sf})
+    h = conv(g, {'user': uf, 'game': gf, 'store': sf})
     assert set(h.keys()) == {'user', 'game'}
     if agg != 'stack':
         assert h['user'].shape == (4, 3)
@@ -931,37 +948,24 @@ def test_hetero_conv(agg, idtype):
         assert h['user'].shape == (4, 1, 3)
         assert h['game'].shape == (4, 2, 4)
 
-    h = conv(g, {'store': sf})
-    assert set(h.keys()) == {'game'}
-    if agg != 'stack':
-        assert h['game'].shape == (4, 4)
-    else:
-        assert h['game'].shape == (4, 1, 4)
-
-    # test with pair input
-    conv = nn.HeteroGraphConv({
-        'follows': nn.SAGEConv(2, 3, 'mean'),
-        'plays': nn.SAGEConv((2, 4), 4, 'mean'),
-        'sells': nn.SAGEConv(3, 4, 'mean')},
-        agg)
-    conv = conv.to(F.ctx())
-
-    h = conv(g, ({'user': uf}, {'user' : uf, 'game' : gf}))
+    block = dgl.to_block(g.to(F.cpu()), {'user': [0, 1, 2, 3], 'game': [0, 1, 2, 3], 'store': []}).to(F.ctx())
+    h = conv(block, ({'user': uf, 'game': gf, 'store': sf}, {'user': uf, 'game': gf, 'store': sf[0:0]}))
     assert set(h.keys()) == {'user', 'game'}
     if agg != 'stack':
         assert h['user'].shape == (4, 3)
         assert h['game'].shape == (4, 4)
     else:
         assert h['user'].shape == (4, 1, 3)
-        assert h['game'].shape == (4, 1, 4)
+        assert h['game'].shape == (4, 2, 4)
 
-    # pair input requires both src and dst type features to be provided
-    h = conv(g, ({'user': uf}, {'game' : gf}))
-    assert set(h.keys()) == {'game'}
+    h = conv(block, {'user': uf, 'game': gf, 'store': sf})
+    assert set(h.keys()) == {'user', 'game'}
     if agg != 'stack':
+        assert h['user'].shape == (4, 3)
         assert h['game'].shape == (4, 4)
     else:
-        assert h['game'].shape == (4, 1, 4)
+        assert h['user'].shape == (4, 1, 3)
+        assert h['game'].shape == (4, 2, 4)
 
     # test with mod args
     class MyMod(th.nn.Module):
@@ -988,7 +992,7 @@ def test_hetero_conv(agg, idtype):
     conv = conv.to(F.ctx())
     mod_args = {'follows' : (1,), 'plays' : (1,)}
     mod_kwargs = {'sells' : {'arg2' : 'abc'}}
-    h = conv(g, {'user' : uf, 'store' : sf}, mod_args=mod_args, mod_kwargs=mod_kwargs)
+    h = conv(g, {'user' : uf, 'game': gf, 'store' : sf}, mod_args=mod_args, mod_kwargs=mod_kwargs)
     assert mod1.carg1 == 1
     assert mod1.carg2 == 0
     assert mod2.carg1 == 1
@@ -1016,6 +1020,7 @@ if __name__ == '__main__':
     test_gated_graph_conv()
     test_nn_conv()
     test_gmm_conv()
+    test_dotgat_conv()
     test_dense_graph_conv()
     test_dense_sage_conv()
     test_dense_cheb_conv()
