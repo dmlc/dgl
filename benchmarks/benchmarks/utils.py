@@ -1,3 +1,4 @@
+from timeit import default_timer
 import json
 import os
 import pickle
@@ -64,10 +65,12 @@ def _download(url, path, filename):
 
 
 GRAPH_CACHE = {}
+
+
 def get_graph(name, format):
-    global GRAPH_CACHE
-    if name in GRAPH_CACHE:
-        return GRAPH_CACHE[name].to(format)
+    # global GRAPH_CACHE
+    # if name in GRAPH_CACHE:
+    #     return GRAPH_CACHE[name].to(format)
     g = None
     if name == 'cora':
         g = dgl.data.CoraGraphDataset(verbose=False)[0]
@@ -99,14 +102,16 @@ def get_graph(name, format):
         g = get_ogb_graph(name)
     else:
         raise Exception("Unknown dataset")
-    GRAPH_CACHE[name] = g
+    # GRAPH_CACHE[name] = g
     g = g.formats([format])
     return g
+
 
 def get_ogb_graph(name):
     os.symlink('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
     data = DglNodePropPredDataset(name=name)
     return data[0][0]
+
 
 def get_livejournal():
     # Same as https://snap.stanford.edu/data/soc-LiveJournal1.txt.gz
@@ -332,10 +337,12 @@ def setup_track_acc(*args, **kwargs):
     np.random.seed(42)
     torch.random.manual_seed(42)
 
+
 def setup_track_flops(*args, **kwargs):
     # fix random seed
     np.random.seed(42)
     torch.random.manual_seed(42)
+
 
 TRACK_UNITS = {
     'time': 's',
@@ -463,7 +470,8 @@ elif device == "gpu":
     parametrize_cpu = noop_decorator
     parametrize_gpu = parametrize
 else:
-    raise Exception("Unknown device. Must be one of ['cpu', 'gpu'], but got {}".format(device))
+    raise Exception(
+        "Unknown device. Must be one of ['cpu', 'gpu'], but got {}".format(device))
 
 
 def skip_if_gpu():
@@ -517,29 +525,14 @@ def benchmark(track_type, timeout=60):
 # Timer
 #####################################
 
-def sync():
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
 
-from timeit import default_timer
-
-class Timer(object):
-    def __init__(self):
+class Timer:
+    def __init__(self, device=None):
         self.timer = default_timer
-        
-    def __enter__(self):
-        sync()
-        self.start = self.timer()
-        return self
-        
-    def __exit__(self, *args):
-        sync()
-        end = self.timer()
-        self.elapsed_secs = end - self.start
-
-class TorchOpTimer:
-    def __init__(self, device):
-        self.device = device
+        if device is None:
+            self.device = get_bench_device()
+        else:
+            self.device = device
 
     def __enter__(self):
         if self.device == 'cuda:0':
@@ -547,13 +540,13 @@ class TorchOpTimer:
             self.end_event = torch.cuda.Event(enable_timing=True)
             self.start_event.record()
         else:
-            self.tic = time.time()
+            self.tic = self.timer()
         return self
 
     def __exit__(self, type, value, traceback):
         if self.device == 'cuda:0':
             self.end_event.record()
             torch.cuda.synchronize()  # Wait for the events to be recorded!
-            self.time = self.start_event.elapsed_time(self.end_event) / 1e3
+            self.elapsed = self.start_event.elapsed_time(self.end_event) / 1e3
         else:
-            self.time = time.time() - self.tic
+            self.elapsed = self.timer() - self.tic
