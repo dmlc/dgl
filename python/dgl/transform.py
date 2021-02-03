@@ -644,6 +644,9 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
     :math:`(i_1, j_1), (i_2, j_2), \cdots` of type ``(U, E, V)`` is a new graph with edges
     :math:`(j_1, i_1), (j_2, i_2), \cdots` of type ``(V, E, U)``.
 
+    The returned graph shares the data structure with the original graph, i.e. dgl.reverse
+    will not create extra storage for the reversed graph.
+
     Parameters
     ----------
     g : DGLGraph
@@ -1116,7 +1119,7 @@ def add_edges(g, u, v, data=None, etype=None):
     g.add_edges(u, v, data=data, etype=etype)
     return g
 
-def remove_edges(g, eids, etype=None):
+def remove_edges(g, eids, etype=None, store_ids=False):
     r"""Remove the specified edges and return a new graph.
 
     Also delete the features of the edges. The edges must exist in the graph.
@@ -1135,6 +1138,10 @@ def remove_edges(g, eids, etype=None):
           triplet format in the graph.
 
         Can be omitted if the graph has only one type of edges.
+    store_ids : bool, optional
+        If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata``
+        and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
+        respectively.
 
     Return
     ------
@@ -1179,11 +1186,11 @@ def remove_edges(g, eids, etype=None):
     remove_nodes
     """
     g = g.clone()
-    g.remove_edges(eids, etype=etype)
+    g.remove_edges(eids, etype=etype, store_ids=store_ids)
     return g
 
 
-def remove_nodes(g, nids, ntype=None):
+def remove_nodes(g, nids, ntype=None, store_ids=False):
     r"""Remove the specified nodes and return a new graph.
 
     Also delete the features. Edges that connect from/to the nodes will be
@@ -1197,6 +1204,10 @@ def remove_nodes(g, nids, ntype=None):
     ntype : str, optional
         The type of the nodes to remove. Can be omitted if there is
         only one node type in the graph.
+    store_ids : bool, optional
+        If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata``
+        and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
+        respectively.
 
     Return
     ------
@@ -1247,7 +1258,7 @@ def remove_nodes(g, nids, ntype=None):
     remove_edges
     """
     g = g.clone()
-    g.remove_nodes(nids, ntype=ntype)
+    g.remove_nodes(nids, ntype=ntype, store_ids=store_ids)
     return g
 
 def add_self_loop(g, etype=None):
@@ -1583,10 +1594,10 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     ``etype`` connecting from node ID ``u`` of type ``utype`` in the input side to node
     ID ``v`` of type ``vtype`` in the output side.
 
-    The output nodes of the block will only contain the nodes that have at least one
-    inbound edge of any type.  The input nodes of the block will only contain the nodes
-    that appear in the output nodes, as well as the nodes that have at least one outbound
-    edge connecting to one of the output nodes.
+    For blocks returned by :func:`to_block`, the output nodes of the block will only
+    contain the nodes that have at least one inbound edge of any type.  The input nodes
+    of the block will only contain the nodes that appear in the output nodes, as well
+    as the nodes that have at least one outbound edge connecting to one of the output nodes.
 
     If the :attr:`dst_nodes` argument is not None, it specifies the output nodes instead.
 
@@ -1628,6 +1639,8 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     for stochastic training on a large graph.  Please refer to the user guide
     :ref:`guide-minibatch` for a more thorough discussion about the methodology
     of stochastic training.
+
+    See also :func:`create_block` for more flexible construction of blocks.
 
     Examples
     --------
@@ -1697,6 +1710,10 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
 
     >>> block.srcnodes['A'].data[dgl.NID]
     tensor([2, 1])
+
+    See also
+    --------
+    create_block
     """
     assert g.device == F.cpu(), 'the graph must be on CPU'
 

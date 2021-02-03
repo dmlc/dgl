@@ -14,8 +14,8 @@ from ...function.base import TargetCode
 from ...base import dgl_warning
 
 if LooseVersion(th.__version__) < LooseVersion("1.5.0"):
-    dgl_warning("Detected an old version of PyTorch. Suggest using torch>=1.5.0 "
-                "for the best experience.")
+    raise Exception("Detected an old version of PyTorch. Please update torch>=1.5.0 "
+                    "for the best experience.")
 
 def data_type_dict():
     return {'float16' : th.float16,
@@ -116,6 +116,9 @@ def copy_to(input, ctx, **kwargs):
 
 def sum(input, dim, keepdims=False):
     return th.sum(input, dim=dim, keepdim=keepdims)
+
+def floor_div(in1, in2):
+    return in1 // in2
 
 def reduce_sum(input):
     return input.sum()
