@@ -73,7 +73,35 @@ void SegmentCmp(NDArray feat, NDArray offsets,
 }
 
 /*!
+ * \brief CPU kernel of Scatter sum operator.
+ * \note math equation: out[idx[i], *] += feat[i, *]
+ * \param feat The input tensor.
+ * \param idx The indices tensor.
+ * \param out The output tensor.
+ */
+template <typename IdType, typename DType>
+void ScatterSum(NDArray feat, NDArray idx, NDArray out) {
+  int n = feat->shape[0];
+  int dim = 1;
+  for (int i = 0; i < out->ndim; ++i)
+    dim *= out->shape[i];
+  const DType* feat_data = feat.Ptr<DType>();
+  const IdType* idx_data = idx.Ptr<IdType>();
+  DType* out_data = out.Ptr<DType>();
+#pragma omp parallel for
+  for (int i = 0; i < n; ++i) {
+    for (int k = 0; k < dim; ++k) {
+      int write_row = idx_data[i * dim + k];
+      if (write_row >= 0)
+#pragma omp atomic
+        out_data[write_row * dim + k] += feat_data[i * dim + k];
+    }
+  }
+}
+
+/*!
  * \brief CPU kernel of backward phase of segment min/max.
+ * \note math equation: out[arg[i], *] = feat[i, *]
  * \param feat The input tensor.
  * \param arg The argmin/argmax tensor.
  * \param out The output tensor.

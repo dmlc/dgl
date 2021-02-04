@@ -9,6 +9,7 @@ from ._ffi.function import _init_api
 from .base import dgl_warning, DGLError
 from . import convert
 from .heterograph import DGLHeteroGraph, DGLBlock
+from .frame import Frame
 from . import ndarray as nd
 from . import backend as F
 from . import utils, batch
@@ -1757,7 +1758,8 @@ def to_simple(g,
               return_counts='count',
               writeback_mapping=False,
               copy_ndata=True,
-              copy_edata=False):
+              copy_edata=False,
+              aggregator='random'):
     r"""Convert a graph to a simple graph without parallel edges and return.
 
     For a heterogeneous graph with multiple edge types, DGL treats edges with the same
@@ -1798,12 +1800,19 @@ def to_simple(g,
     copy_edata: bool, optional
         If True, the edge features of the simple graph are copied
         from the original graph. If there exists duplicate edges between
-        two nodes (u, v), the feature of the edge is randomly selected
-        from one of the duplicate edges.
+        two nodes (u, v), the feature of the edge is the aggregation
+        of edge feature of duplicate edges.
 
         If False, the simple graph will not have any edge features.
 
         (Default: False)
+    aggregator: str, optional
+        Indicate how to aggregate edge feature of duplicate edges.
+        If ``random``, randomly select one of the duplicate edges' feature.
+        If ``sum``, compute the summation of duplicate edges' feature.
+        If ``mean``, compute the average of duplicate edges' feature.
+
+        (Default: ``random``)
 
     Returns
     -------
@@ -1898,13 +1907,25 @@ def to_simple(g,
         node_frames = utils.extract_node_subframes(g, None)
         utils.set_new_frames(simple_graph, node_frames=node_frames)
     if copy_edata:
-        eids = []
-        for i in range(len(g.canonical_etypes)):
-            feat_idx = F.asnumpy(edge_maps[i])
-            _, indices = np.unique(feat_idx, return_index=True)
-            eids.append(F.zerocopy_from_numpy(indices))
+        if aggregator == 'random':
+            eids = []
+            for i in range(len(g.canonical_etypes)):
+                feat_idx = F.asnumpy(edge_maps[i])
+                _, indices = np.unique(feat_idx, return_index=True)
+                eids.append(F.zerocopy_from_numpy(indices))
 
-        edge_frames = utils.extract_edge_subframes(g, eids)
+            edge_frames = utils.extract_edge_subframes(g, eids)
+        else:
+            edge_frames = []
+            for i in range(len(g.canonical_etypes)):
+                feat_idx = F.asnumpy(edge_maps[i])
+                _, indices = np.unique(feat_idx, return_index=True)
+                _data = {
+                    key:  col.data for key, col in g._edge_frames[i]
+                }
+                _num_rows = len(indices)
+                newf = Frame(data=_data, num_rows=_num_rows)
+                edge_frames.append(newf)
         utils.set_new_frames(simple_graph, edge_frames=edge_frames)
 
     if return_counts is not None:

@@ -40,6 +40,16 @@ void SegmentReduce(
   }
 }
 
+/*! \brief Scatter sum.*/
+template <int XPU, typename IdType, int bits>
+void ScatterSum(NDArray feat,
+                NDArray idx,
+                NDArray out) {
+  SWITCH_BITS(bits, DType, {
+    cpu::ScatterSum<IdType, DType>(feat, idx, out);
+  });
+}
+
 /*! \brief Backward function of segment cmp.*/
 template <int XPU, typename IdType, int bits>
 void BackwardSegmentCmp(
@@ -87,6 +97,30 @@ template void SegmentReduce<kDLCPU, int64_t, 64>(
     NDArray offsets,
     NDArray out,
     NDArray arg);
+template void ScatterSum<kDLCPU, int32_t, 16>(
+    NDArray feat,
+    NDArray idx,
+    NDArray out);
+template void ScatterSum<kDLCPU, int64_t, 16>(
+    NDArray feat,
+    NDArray idx,
+    NDArray out);
+template void ScatterSum<kDLCPU, int32_t, 32>(
+    NDArray feat,
+    NDArray idx,
+    NDArray out);
+template void ScatterSum<kDLCPU, int64_t, 32>(
+    NDArray feat,
+    NDArray idx,
+    NDArray out);
+template void ScatterSum<kDLCPU, int32_t, 64>(
+    NDArray feat,
+    NDArray idx,
+    NDArray out);
+template void ScatterSum<kDLCPU, int64_t, 64>(
+    NDArray feat,
+    NDArray arg,
+    NDArray out);
 template void BackwardSegmentCmp<kDLCPU, int32_t, 16>(
     NDArray feat,
     NDArray arg,

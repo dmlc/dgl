@@ -38,6 +38,16 @@ void SegmentReduce(const std::string& op,
 }
 
 
+template <int XPU, typename IdType, itn bits>
+void ScatterSum(NDArray feat,
+                NDArray idx,
+                NDArray out) {
+  SWITCH_BITS(bits, DType, {
+    cuda::ScatterSum<IdType, DType>(feat, idx, out);
+  });
+}
+
+
 template <int XPU, typename IdType, int bits>
 void BackwardSegmentCmp(NDArray feat,
                         NDArray arg,
@@ -84,6 +94,30 @@ template void SegmentReduce<kDLGPU, int64_t, 64>(
     NDArray offsets,
     NDArray out,
     NDArray arg);
+template void ScatterSum<kDLGPU, int32_t, 16>(
+    NDArray feat,
+    NDArray idx,
+    NDArray out);
+template void ScatterSum<kDLGPU, int64_t, 16>(
+    NDArray feat,
+    NDArray idx,
+    NDArray out);
+template void ScatterSum<kDLGPU, int32_t, 32>(
+    NDArray feat,
+    NDArray idx,
+    NDArray out);
+template void ScatterSum<kDLGPU, int64_t, 32>(
+    NDArray feat,
+    NDArray idx,
+    NDArray out);
+template void ScatterSum<kDLGPU, int32_t, 64>(
+    NDArray feat,
+    NDArray idx,
+    NDArray out);
+template void ScatterSum<kDLGPU, int64_t, 64>(
+    NDArray feat,
+    NDArray idx,
+    NDArray out);
 template void BackwardSegmentCmp<kDLGPU, int32_t, 16>(
     NDArray feat,
     NDArray arg,

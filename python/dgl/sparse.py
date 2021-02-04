@@ -1,7 +1,6 @@
 """Module for sparse matrix operators."""
 # pylint: disable= invalid-name
 from __future__ import absolute_import
-
 import dgl.ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
@@ -307,6 +306,19 @@ def _segment_reduce(op, feat, offsets):
                                  arg_nd)
     arg = None if arg is None else F.zerocopy_from_dgl_ndarray(arg_nd)
     return out, arg
+
+
+def _scatter_sum(feat, idx, m):
+    r""" Scatter sum operator implementation.
+    """
+    out_shp = (m,) + F.shape(feat)[1:]
+    ctx = F.context(feat)
+    dtype = F.dtype(feat)
+    out = F.zeros(out_shp, dtype, ctx)
+    _CAPI_DGLKernelScatterSum(to_dgl_nd(feat),
+                              to_dgl_nd(idx),
+                              to_dgl_nd_for_write(out))
+    return out
 
 
 def _bwd_segment_cmp(feat, arg, m):
