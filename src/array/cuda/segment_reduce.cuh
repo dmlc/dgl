@@ -57,7 +57,7 @@ __global__ void ScatterSumKernel(
   if (col < dim) {
     cuda::AtomicAdd(out + write_row * dim + col, feat[row * dim + col]);
   }
-)
+}
 
 /*!
  * \brief CUDA kernel of backward phase in segment min/max.
