@@ -1915,16 +1915,22 @@ def to_simple(g,
                 eids.append(F.zerocopy_from_numpy(indices))
 
             edge_frames = utils.extract_edge_subframes(g, eids)
-        else:
+        else:  # 'sum'/'mean'
             edge_frames = []
             for i in range(len(g.canonical_etypes)):
                 feat_idx = edge_maps[i]
                 _, indices = np.unique(F.asnumpy(feat_idx), return_index=True)
                 _num_rows = len(indices)
-                _data = {
-                    key: F.scatter_add(col.data, feat_idx, _num_rows)
-                    for key, col in g._edge_frames[i]._columns.items()
-                }
+                _data = {}
+                for key, col in g._edge_frames[i]._columns.items():
+                    data = col.data
+                    new_data = F.scatter_add(data, feat_idx, _num_rows)
+                    if aggregator == 'mean':
+                        norm = F.astype(counts[i], F.dtype(data))
+                        norm = F.reshape(norm, (F.shape(norm)[0],) + (1,) * (F.ndim(data) - 1))
+                        new_data /= norm
+                    _data[key] = new_data
+
                 newf = Frame(data=_data, num_rows=_num_rows)
                 edge_frames.append(newf)
         utils.set_new_frames(simple_graph, edge_frames=edge_frames)
