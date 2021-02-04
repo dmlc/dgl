@@ -23,9 +23,8 @@ def track_time(graph_name, format):
     graph.formats([to_format])
 
     # timing
-    t0 = time.time()
-    for i in range(10):
-        gg = graph.formats([to_format])
-    t1 = time.time()
+    with utils.Timer() as t:
+        for i in range(10):
+            gg = graph.formats([to_format])
 
-    return (t1 - t0) / 10
+    return t.elapsed_secs / 10

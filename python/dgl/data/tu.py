@@ -1,13 +1,10 @@
 from __future__ import absolute_import
 import numpy as np
 import os
-import random
-
 
 from .dgl_dataset import DGLBuiltinDataset
 from .utils import loadtxt, save_graphs, load_graphs, save_info, load_info
 from .. import backend as F
-from ..utils import retry_method_with_fix
 from ..convert import graph as dgl_graph
 
 class LegacyTUDataset(DGLBuiltinDataset):
@@ -48,7 +45,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
     >>> g, label = data[1024]
     >>> g
     Graph(num_nodes=88, num_edges=410,
-          ndata_schemes={'feat': Scheme(shape=(89,), dtype=torch.float64), '_ID': Scheme(shape=(), dtype=torch.int64)}
+          ndata_schemes={'feat': Scheme(shape=(89,), dtype=torch.float32), '_ID': Scheme(shape=(), dtype=torch.int64)}
           edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
     >>> label
     tensor(1)
@@ -60,7 +57,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
     >>> batched_labels = torch.tensor(labels)
     >>> batched_graphs
     Graph(num_nodes=9539, num_edges=47382,
-          ndata_schemes={'feat': Scheme(shape=(89,), dtype=torch.float64), '_ID': Scheme(shape=(), dtype=torch.int64)}
+          ndata_schemes={'feat': Scheme(shape=(89,), dtype=torch.float32), '_ID': Scheme(shape=(), dtype=torch.int64)}
           edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
 
     Notes
@@ -121,7 +118,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
             g.ndata['node_label'] = F.tensor(DS_node_labels)
             one_hot_node_labels = self._to_onehot(DS_node_labels)
             for idxs, g in zip(node_idx_list, self.graph_lists):
-                g.ndata['feat'] = F.tensor(one_hot_node_labels[idxs, :])
+                g.ndata['feat'] = F.tensor(one_hot_node_labels[idxs, :], F.float32)
             self.data_mode = "node_label"
         except IOError:
             print("No Node Label Data")
@@ -132,14 +129,15 @@ class LegacyTUDataset(DGLBuiltinDataset):
             if DS_node_attr.ndim == 1:
                 DS_node_attr = np.expand_dims(DS_node_attr, -1)
             for idxs, g in zip(node_idx_list, self.graph_lists):
-                g.ndata['feat'] = F.tensor(DS_node_attr[idxs, :])
+                g.ndata['feat'] = F.tensor(DS_node_attr[idxs, :], F.float32)
             self.data_mode = "node_attr"
         except IOError:
             print("No Node Attribute Data")
 
         if 'feat' not in g.ndata.keys():
             for idxs, g in zip(node_idx_list, self.graph_lists):
-                g.ndata['feat'] = np.ones((g.number_of_nodes(), self.hidden_size))
+                g.ndata['feat'] = F.ones((g.number_of_nodes(), self.hidden_size),
+                                         F.float32, F.cpu())
             self.data_mode = "constant"
             if self.verbose:
                 print("Use Constant one as Feature with hidden size {}".format(self.hidden_size))
