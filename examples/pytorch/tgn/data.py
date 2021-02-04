@@ -293,76 +293,50 @@ class TemporalDataLoader:
             done = True
         return done, src_list,dst_list,t_stamps,subgraph
 
-    def get_edge_affiliation(self,src,dst,timestamp,mode='train'): # Here source and dst are node id
-        frontier = [int(src),int(dst)] # The src and dst are in original graph index scheme
-        if mode == 'nn_test':
-            frontier_ = self.d_nn_test_g.GetRootID(frontier).tolist()
+    # Temporal Sampling Module
+    def get_nodes_affiliation(self,nodes,timestamp,mode='train'):
+        if type(nodes) != list:
+            nodes = [int(nodes)]
         else:
-            # backtrace once
-            #print(frontier)
-            frontier_ = self.graph_dict[mode].ndata[dgl.NID][frontier].tolist()
-            
-        # All neighbor node across time
-        graph = self.bg if mode == 'nn_test' else self.nn_mask_bg
-        dict_ = self.d_g if mode == 'nn_test' else self.d_nn_mask_g
-        full_neigh_subgraph = dgl.in_subgraph(graph,frontier_)
-
-        #print("Here ",graph.in_degrees(src),src)
-        #exit(0)
-        # Only valid the edge happen before timestamp
-        full_neigh_subgraph = dgl.add_edges(full_neigh_subgraph,
-                                            torch.tensor(frontier_),
-                                            torch.tensor(frontier_))
-        #print(timestamp)
-        temporal_edge_mask = full_neigh_subgraph.edata['timestamp'] < timestamp
-        # Get the subgraph whose edge happen only before current timestamp
-        temporal_subgraph  = dgl.edge_subgraph(full_neigh_subgraph,temporal_edge_mask)
-        working_dict = DictNode(dict_,temporal_subgraph.ndata[dgl.NID])
-        temporal_subgraph.ndata[dgl.NID] = torch.from_numpy(working_dict.GetRootID(range(temporal_subgraph.num_nodes())))
-        # Convert index to be subgraph index
-        mask = (temporal_subgraph.ndata[dgl.NID]==frontier[0])+(temporal_subgraph.ndata[dgl.NID]==frontier[1])
-        frontier = torch.arange(0,temporal_subgraph.num_nodes())[mask].tolist()
-        # Random sample or sample top k
-        final_subgraph = self.sampler(g=temporal_subgraph,nodes=frontier)
-        final_subgraph = dgl.remove_self_loop(final_subgraph)
-        final_subgraph = dgl.add_self_loop(final_subgraph)
-
-        # Ideally the final subgraph should be directly applicable to attention compute
-        return final_subgraph
-
-
-    # for negative sampling the result should be a star graph ready to compute attention
-    def get_node_affiliation(self,node,timestamp,mode='train'):
-        frontier = [node]
-        origin = self.dict_dict[mode].GetRootID(frontier).tolist()
-        frontier_ = origin if mode == 'nn_test' else self.graph_dict[mode].ndata[dgl.NID][frontier].tolist()
-
-        graph = self.bg if mode == 'nn_test' else self.nn_mask_bg
-        dict_ = self.d_g if mode == 'nn_test' else self.d_nn_mask_g
-        # All neighbor node across time in bidirectional graph
-        full_neigh_subgraph = dgl.in_subgraph(graph,frontier_)
-        # Add frontier self loop to prevent node deletion
-        #src = torch.tensor(frontier_)
-        #dst = src.clone()
-        full_neigh_subgraph = dgl.add_edges(full_neigh_subgraph,
-                                            torch.tensor(frontier_),
-                                            torch.tensor(frontier_))
-        # Only valid the edge happen before timestamp
-        temporal_edge_mask = full_neigh_subgraph.edata['timestamp'] < timestamp
-        # Get the subgraph whose edge happen only before current timestamp
-        temporal_subgraph  = dgl.edge_subgraph(full_neigh_subgraph,temporal_edge_mask)
-        working_dict = DictNode(dict_,temporal_subgraph.ndata[dgl.NID])
-        temporal_subgraph.ndata[dgl.NID] = torch.from_numpy(working_dict.GetRootID(range(temporal_subgraph.num_nodes())))
-        # Random sample or sample top k
+            nodes = [int(nodes[0]),int(nodes[1])]
+        origins  = self.dict_dict[mode].GetRootID(nodes).tolist()
+        if mode == 'nn_test':
+            frontier = origins
+            graph = self.bg
+            dict_ = self.d_g 
+        else:
+            frontier = self.graph_dict[mode].ndata[dgl.NID][nodes].tolist()
+            graph = self.nn_mask_bg
+            dict_ = self.d_nn_mask_g
         
-        frontier = torch.arange(0,temporal_subgraph.num_nodes())[temporal_subgraph.ndata[dgl.NID]==origin[0]]
-        #print(temporal_subgraph.ndata[dgl.NID],origin)
+        # All Neighbor regardless of time
+        full_neighbor_subgraph = dgl.in_subgraph(graph,frontier)
+        full_neighbor_subgraph = dgl.add_edges(full_neighbor_subgraph,
+                                               torch.tensor(frontier),
+                                               torch.tensor(frontier))
+        
+        # Temporal sampling
+        temporal_edge_mask = full_neighbor_subgraph.edata['timestamp'] < timestamp
+        temporal_subgraph = dgl.edge_subgraph(full_neighbor_subgraph,temporal_edge_mask)
+
+        # Build a working dict for parent node backtrace
+        working_dict = DictNode(dict_, temporal_subgraph.ndata[dgl.NID])
+        root_nid = working_dict.GetRootID(range(temporal_subgraph.num_nodes()))
+        temporal_subgraph.ndata[dgl.NID] = torch.from_numpy(root_nid)
+
+        # Update the frontier to current graph
+        node1_mask = temporal_subgraph.ndata[dgl.NID]==origins[0]
+        frontier = [int(torch.arange(0,temporal_subgraph.num_nodes())[node1_mask])]
+        if len(nodes)!=1:
+            node2_mask = temporal_subgraph.ndata[dgl.NID]==origins[1]
+            frontier.append(int(torch.arange(0,temporal_subgraph.num_nodes())[node2_mask]))
+        
+        # Top k or random sample from subgraph to reduce complexity
         final_subgraph = self.sampler(g=temporal_subgraph,nodes=frontier)
         final_subgraph = dgl.remove_self_loop(final_subgraph)
         final_subgraph = dgl.add_self_loop(final_subgraph)
-        # Ideally the final subgraph should be directly applicable to attention compute
-        #print(frontier)
-        return frontier,final_subgraph
+
+        return frontier, final_subgraph
 
     def reset(self):
         self.batch_cnt = 0

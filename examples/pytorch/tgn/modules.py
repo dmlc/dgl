@@ -174,14 +174,15 @@ class TemporalGATConv(nn.Module):
         self.merge= MergeLayer(self._memory_feats,self._out_feats*self._num_heads,512,self._out_feats)
         self.temporal_encoder = TimeEncode(self._temporal_feats)
 
-    # TODO: Check dimension which might be problematic
-    def weight_fn(self,edges): # need to know the size of temporal feature.
+    def weight_fn(self,edges):
         t0 = torch.zeros_like(edges.dst['timestamp'])
-        q = torch.cat([edges.dst['s'],self.temporal_encoder(t0.unsqueeze(dim=1)).view(len(t0),-1)],dim=1).float()
+        q = torch.cat([edges.dst['s'],
+                       self.temporal_encoder(t0.unsqueeze(dim=1)).view(len(t0),-1)],dim=1)
         time_diff = edges.data['timestamp']-edges.src['timestamp']
-        k = torch.cat([edges.src['s'],edges.data['feats'],self.temporal_encoder(time_diff.unsqueeze(dim=1)).view(len(t0),-1)],dim=1).float()
-        squeezed_k = self.fc_K(k).view(-1,self._num_heads,self._out_feats)
-        squeezed_q = self.fc_Q(q).view(-1,self._num_heads,self._out_feats)
+        time_encode = self.temporal_encoder(time_diff.unsqueeze(dim=1)).view(len(t0),-1)
+        k = torch.cat([edges.src['s'],edges.data['feats'],time_encode],dim=1)
+        squeezed_k = self.fc_K(k.float()).view(-1,self._num_heads,self._out_feats)
+        squeezed_q = self.fc_Q(q.float()).view(-1,self._num_heads,self._out_feats)
         ret = torch.sum(squeezed_q*squeezed_k,dim=2)
         return {'a':ret,'efeat':squeezed_k} 
 
@@ -214,9 +215,9 @@ class TemporalGATConv(nn.Module):
         graph.apply_edges(self.weight_fn)
 
         # Edge softmax
-        graph.edata['sa'] = edge_softmax(graph,graph.edata['a'])
+        graph.edata['sa'] = edge_softmax(graph,graph.edata['a'])/(self._out_feats**0.5)
 
-        # Update dst node
+        # Update dst node Here msg_fn include edge feature
         graph.update_all(self.msg_fn,fn.sum('attn','agg_u'))
 
         rst = graph.dstdata['agg_u']
