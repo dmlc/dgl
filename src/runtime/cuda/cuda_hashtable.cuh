@@ -35,12 +35,17 @@ struct BlockPrefixCallbackOp {
 
 
 
-/**
-* \brief An on GPU hash table implementation, which preserves the order of
-* inserted elements. It uses quadratic probing for collisions. The size/number
-* buckets the hash table is created with, should be much greater than the
-* number of unique items to be inserted. Using less than the number of
-*/
+/*!
+ * \brief A hashtable for mapping items to the first index at which they
+ * appear in the provided data array.
+ *
+ * For any ID array A, one can view it as a mapping from the index `i`
+ * (continuous integer range from zero) to its element `A[i]`. This hashtable
+ * serves as a reverse mapping, i.e., from element `A[i]` to its index `i`. It
+ * uses quadratic probing for collisions.
+ *
+ * \tparam IdType The type of the IDs.
+ */
 template<typename IdType>
 class OrderedHashTable {
   public:
@@ -53,86 +58,106 @@ class OrderedHashTable {
     static constexpr int DEFAULT_SCALE = 3;
 
     typedef Mapping* Iterator;
+    typedef const Mapping* ConstIterator;
 
     // Must be uniform bytes for memset to work
     static constexpr IdType EmptyKey = static_cast<IdType>(-1);
 
     /**
-    * \brief Get the amount of workspace the hashtable needs to function, given
-    * the number of positions.
-    *
-    * \param size The number of items to insert into the hash table.
-    * \param scale The power of two times larger the number of buckets should
-    * be than the number of items. Increasing should decrease the number of
-    * collisions in the hashtable, at the expense of memory consumption.
-    *
-    * \return The required number of bytes for the hashtable.
-    */
-    static size_t RequiredWorkspace(
-        const size_t size,
-        const int scale = DEFAULT_SCALE) {
-      return sizeof(Mapping)*TableSize(size, scale);
-    }
-
-    /**
     * \brief Create a new ordered hash table.
     *
     * \param size The number of items to insert into the hashtable.
-    * \param workspace The allocated workspace on the GPU.
-    * \param workspace_size The size of the provided workspace.
+    * \param ctx The device context to store the hashtable on.
     * \param scale The power of two times larger the number of buckets should
     * be than the number of items.
-    * \param stream The stream to use.
+    * \param stream The stream to use for initializing the hashtable.
     */
     OrderedHashTable(
         const size_t size,
-        void * workspace,
-        const size_t workspace_size,
+        DGLContext ctx,
         cudaStream_t stream,
-        const int scale = DEFAULT_SCALE) :
-      table_(static_cast<Mapping*>(workspace)),
-      size_(TableSize(size, scale)) {
-      if (RequiredWorkspace(size, scale) > workspace_size) {
-        throw std::runtime_error("Insufficient workspace: requires " +
-            std::to_string(RequiredWorkspace(size, scale)) + " but only provided " +
-            std::to_string(workspace_size));
-      }
+        const int scale = DEFAULT_SCALE);
 
-      CUDA_CALL(cudaMemsetAsync(
-        table_,
-        EmptyKey,
-        sizeof(Mapping)*size_,
-        stream));
-    }
+    /**
+    * @brief Cleanup after the hashtable.
+    */
+    ~OrderedHashTable();
 
-    inline __device__ const typename OrderedHashTable<IdType>::Mapping * Search(
+    /**
+    * @brief Find the non-mutable mapping of a given key within the hash table.
+    *
+    * WARNING: The key must exist within the hashtable. Searching for a key not
+    * in the hashtable is undefined behavior.
+    *
+    * @param id The key to search for.
+    *
+    * @return An iterator to the mapping.
+    */
+    inline __device__ ConstIterator Search(
         const IdType id) const {
       const IdType pos = SearchForPosition(id);
 
       return &table_[pos];
     }
 
-    inline __device__ typename OrderedHashTable<IdType>::Mapping * Search(
+    /**
+    * @brief Find the mutable mapping of a given key within the hash table.
+    *
+    * WARNING: The key must exist within the hashtable. Searching for a key not
+    * in the hashtable is undefined behavior.
+    *
+    * @param id The key to search for.
+    *
+    * @return The mapping.
+    */
+    inline __device__ Iterator Search(
         const IdType id) {
       const IdType pos = SearchForPosition(id);
 
       return &table_[pos];
     }
 
+    /**
+    * @brief Fill the hashtable with the array containing possibly duplicate
+    * IDs.
+    *
+    * @param input The array of IDs to insert.
+    * @param num_input The number of IDs to insert.
+    * @param unique The list of unique IDs inserted.
+    * @param num_unique The number of unique IDs inserted.
+    * @param stream The stream to perform operations on.
+    */
     void FillWithDuplicates(
         const IdType * const input,
         const size_t num_input,
         IdType * const unique,
         int64_t * const num_unique,
-        DGLContext ctx,
         cudaStream_t stream);
 
+    /**
+    * @brief Fill the hashtable with an array of unique keys.
+    *
+    * @param input The array of unique IDs.
+    * @param num_input The number of keys.
+    * @param stream The stream to perform operations on.
+    */
     void FillWithUnique(
         const IdType * const input,
         const size_t num_input,
-        DGLContext ctx,
         cudaStream_t stream);
 
+    /**
+    * @brief Insert key-index pair into the hashtable.
+    *
+    * NOTE: This is public soley so that it can be access from within CUDA
+    * kernels. It should not be used except for within the hashable's
+    * implementation.
+    *
+    * @param id The ID to insert.
+    * @param index The index at which the ID occured.
+    *
+    * @return An iterator to inserted mapping.
+    */
     inline __device__ Iterator Insert(
         const IdType id,
         const size_t index);
@@ -140,23 +165,7 @@ class OrderedHashTable {
   private:
     Mapping * table_;
     size_t size_;
-
-    /**
-    * \brief Calculate the size of the table for the given number of items.
-    *
-    * \param num The number of items.
-    * \param scale The power of two times large the number of buckets should be
-    * than the number of items.
-    *
-    * \return The number of buckets in the table.
-    */
-    static size_t TableSize(
-        const size_t num,
-        const int scale) {
-      const size_t next_pow2 = 1 << static_cast<size_t>(1 + std::log2(num >> 1));
-      return next_pow2<<scale;
-    }
-
+    DGLContext ctx_;
 
     /**
     * \brief Attempt to insert into the hash table at a specific location.

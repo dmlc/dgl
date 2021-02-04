@@ -122,26 +122,13 @@ class DeviceNodeMap {
     hash_tables_.reserve(num_types_);
     workspaces_.reserve(num_types_);
     for (int64_t i = 0; i < num_types_; ++i) {
-      size_t workspace_size = OrderedHashTable<IdType>::RequiredWorkspace(
-          num_nodes[i]);
-      void * workspace = device->AllocWorkspace(ctx, workspace_size);
-      workspaces_.emplace_back(workspace);
       hash_tables_.emplace_back(
           OrderedHashTable<IdType>(
             num_nodes[i],
-            workspace,
-            workspace_size,
+            ctx_,
             stream));
     }
   }
-
-  ~DeviceNodeMap() {
-    auto device = runtime::DeviceAPI::Get(ctx_);
-    for (void * ptr : workspaces_) {
-      device->FreeWorkspace(ctx_, ptr);
-    }
-  }
-
 
   OrderedHashTable<IdType>& LhsHashTable(
       const size_t index) {
@@ -249,7 +236,6 @@ class DeviceNodeMapMaker {
             nodes->shape[0],
             (*lhs_device)[ntype].Ptr<IdType>(),
             count_lhs_device+ntype,
-            nodes->ctx,
             stream);
       }
     }
@@ -262,7 +248,6 @@ class DeviceNodeMapMaker {
         node_maps->RhsHashTable(ntype).FillWithUnique(
             nodes.Ptr<IdType>(),
             nodes->shape[0],
-            nodes->ctx,
             stream);
       }
     }

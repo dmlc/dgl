@@ -19,6 +19,26 @@ namespace {
 constexpr static const int BLOCK_SIZE = 256;
 constexpr static const size_t TILE_SIZE = 1024;
 
+/**
+* @brief Calculate the number of buckets in the hashtable. To guarantee we can
+* fill the hashtable in the worst case, we must use a number of buckets which
+* is a power of two.
+* https://en.wikipedia.org/wiki/Quadratic_probing#Limitations
+*
+* @param num The number of items to insert (should be an upper bound on the
+* number of unique keys).
+* @param scale The power of two larger the number of buckets should be than the
+* unique keys.
+*
+* @return The number of buckets the table should contain.
+*/
+size_t TableSize(
+    const size_t num,
+    const int scale) {
+  const size_t next_pow2 = 1 << static_cast<size_t>(1 + std::log2(num >> 1));
+  return next_pow2 << scale;
+}
+
 }  // namespace
 
 
@@ -244,15 +264,43 @@ __global__ void compact_hashmap(
 }
 
 template<typename IdType>
+OrderedHashTable<IdType>::OrderedHashTable(
+    const size_t size,
+    DGLContext ctx,
+    cudaStream_t stream,
+    const int scale) :
+  table_(nullptr),
+  size_(TableSize(size, scale)),
+  ctx_(ctx) {
+  // make sure we will at least as many buckets as items.
+  CHECK_GT(scale, 0);
+
+  auto device = runtime::DeviceAPI::Get(ctx_);
+  table_ = static_cast<Mapping*>(
+      device->AllocWorkspace(ctx_, sizeof(Mapping)*size_));
+
+  CUDA_CALL(cudaMemsetAsync(
+    table_,
+    EmptyKey,
+    sizeof(Mapping)*size_,
+    stream));
+}
+
+template<typename IdType>
+OrderedHashTable<IdType>::~OrderedHashTable() {
+  auto device = runtime::DeviceAPI::Get(ctx_);
+  device->FreeWorkspace(ctx_, table_);
+}
+
+
+template<typename IdType>
 void OrderedHashTable<IdType>::FillWithDuplicates(
     const IdType * const input,
     const size_t num_input,
     IdType * const unique,
     int64_t * const num_unique,
-    DGLContext ctx,
     cudaStream_t stream) {
-
-  auto device = runtime::DeviceAPI::Get(ctx);
+  auto device = runtime::DeviceAPI::Get(ctx_);
 
   const int64_t num_tiles = (num_input+TILE_SIZE-1)/TILE_SIZE;
 
@@ -266,7 +314,7 @@ void OrderedHashTable<IdType>::FillWithDuplicates(
   CUDA_CALL(cudaGetLastError());
 
   IdType * item_prefix = static_cast<IdType*>(
-      device->AllocWorkspace(ctx, sizeof(IdType)*(num_input+1)));
+      device->AllocWorkspace(ctx_, sizeof(IdType)*(num_input+1)));
 
   count_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
       input,
@@ -282,7 +330,7 @@ void OrderedHashTable<IdType>::FillWithDuplicates(
       static_cast<IdType*>(nullptr),
       static_cast<IdType*>(nullptr),
       grid.x+1));
-  void * workspace = device->AllocWorkspace(ctx, workspace_bytes);
+  void * workspace = device->AllocWorkspace(ctx_, workspace_bytes);
 
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(
       workspace,
@@ -290,7 +338,7 @@ void OrderedHashTable<IdType>::FillWithDuplicates(
       item_prefix,
       item_prefix,
       grid.x+1, stream));
-  device->FreeWorkspace(ctx, workspace);
+  device->FreeWorkspace(ctx_, workspace);
 
   compact_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
       input,
@@ -300,14 +348,13 @@ void OrderedHashTable<IdType>::FillWithDuplicates(
       unique,
       num_unique);
   CUDA_CALL(cudaGetLastError());
-  device->FreeWorkspace(ctx, item_prefix);
+  device->FreeWorkspace(ctx_, item_prefix);
 }
 
 template<typename IdType>
 void OrderedHashTable<IdType>::FillWithUnique(
     const IdType * const input,
     const size_t num_input,
-    DGLContext /* ctx */,
     cudaStream_t stream) {
 
   const int64_t num_tiles = (num_input+TILE_SIZE-1)/TILE_SIZE;
