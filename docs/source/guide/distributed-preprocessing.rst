@@ -125,12 +125,13 @@ All fields are separated by whitespace:
 
 * `<node_type>` is an integer. For a homogeneous graph, its value is always 0. For heterogeneous graphs,
   its value indicates the type of each node.
-* `<weight1>`, `<weight2>`, etc are integers that indicate the node weights.
-  They are used by ParMETIS to balance graph partitions.
-  That is, ParMETIS will try their best effort to ensure that the sum of all node weights in each partition
-  is roughly the same. For example, if we want to balance the number of nodes of each type among partitions,
-  the number of node weights should be the same as the number of node types; each node weight indicates
-  whether a node belongs to a node type.
+* `<weight1>`, `<weight2>`, etc are integers that indicate the node weights used by ParMETIS to balance
+  graph partitions. If a user does not provide node weights, ParMETIS partitions a graph and balance
+  the number of nodes in each partition (it is important to balance graph partitions in order to achieve
+  good training speed). However, this default strategy may not be sufficient for many use cases.
+  For example, in a heterogeneous graph, we want to partition the graph so that all partitions have
+  roughly the same number of nodes for each node type. The toy example below shows how we can use
+  node weights to balance the number of nodes of different types.
 * `<orig_type_node_id>` is an integer representing the node ID in its own type. In DGL, nodes of each type
   are assigned with IDs starting from 0. For a homogeneous graph, this field is the same as the node ID. 
 * `<attributes>` are optional fields. They can be used to store any values and ParMETIS does not interpret
