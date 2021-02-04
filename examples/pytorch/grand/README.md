@@ -61,7 +61,6 @@ Train a model which follows the original hyperparameters on different datasets.
 python main.py --dataname cora --gpu 0 --lam 1.0 --tem 0.5 --order 8 --sample 4 --input_droprate 0.5 --hidden_droprate 0.5 --dropnode_rate 0.5 --hid_dim 32 --early_stopping 100 --lr 1e-2  --epochs 2000
 # Citeseer:
 python main.py --dataname citeseer --gpu 0 --lam 0.7 --tem 0.3 --order 2 --sample 2 --input_droprate 0.0 --hidden_droprate 0.2 --dropnode_rate 0.5 --hid_dim 32 --early_stopping 100 --lr 1e-2  --epochs 2000
-
 # Pubmed:
 python main.py --dataname pubmed --gpu 0 --lam 1.0 --tem 0.2 --order 5 --sample 4 --input_droprate 0.6 --hidden_droprate 0.8 --dropnode_rate 0.5 --hid_dim 32 --early_stopping 200 --lr 0.2 --epochs 2000 --use_bn
 ```

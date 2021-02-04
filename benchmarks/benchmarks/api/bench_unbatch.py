@@ -18,9 +18,8 @@ def track_time(batch_size):
         glist = dgl.unbatch(bg)
 
     # timing
-    t0 = time.time()
-    for i in range(100):
-        glist = dgl.unbatch(bg)
-    t1 = time.time()
+    with utils.Timer() as t:
+        for i in range(100):
+            glist = dgl.unbatch(bg)
 
-    return (t1 - t0) / 100
+    return t.elapsed_secs / 100
