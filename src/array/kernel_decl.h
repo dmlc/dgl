@@ -77,10 +77,10 @@ void SegmentReduce(const std::string& op,
                    NDArray arg);
 
 /*!
- * \brief Scatter sum.
+ * \brief Scatter Add on first dimension.
  */
 template <int XPU, typename IdType, int bits>
-void ScatterSum(NDArray feat,
+void ScatterAdd(NDArray feat,
                 NDArray idx,
                 NDArray out);
 

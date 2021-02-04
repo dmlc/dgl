@@ -73,14 +73,14 @@ void SegmentCmp(NDArray feat, NDArray offsets,
 }
 
 /*!
- * \brief CPU kernel of Scatter sum operator.
+ * \brief CPU kernel of Scatter Add (on first dimension) operator.
  * \note math equation: out[idx[i], *] += feat[i, *]
  * \param feat The input tensor.
  * \param idx The indices tensor.
  * \param out The output tensor.
  */
 template <typename IdType, typename DType>
-void ScatterSum(NDArray feat, NDArray idx, NDArray out) {
+void ScatterAdd(NDArray feat, NDArray idx, NDArray out) {
   int n = feat->shape[0];
   int dim = 1;
   for (int i = 0; i < out->ndim; ++i)

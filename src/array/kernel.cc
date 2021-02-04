@@ -153,12 +153,12 @@ void SegmentReduceDispatch(const std::string& op,
   });
 }
 
-/*! \brief Scatter sum dispatch function. */
-void ScatterSumDispatch(NDArray feat, NDArray idx, NDArray out) {
-  ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "ScatterSum", {
+/*! \brief Scatter Add (on first dimension) dispatch function. */
+void ScatterAddDispatch(NDArray feat, NDArray idx, NDArray out) {
+  ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "ScatterAdd", {
     ATEN_ID_TYPE_SWITCH(idx->dtype, IdType, {
       ATEN_FLOAT_BITS_SWITCH(feat->dtype, bits, "Feature data", {
-        ScatterSum<XPU, IdType, bits>(feat, idx, out);
+        ScatterAdd<XPU, IdType, bits>(feat, idx, out);
       });
     });
   });
@@ -236,14 +236,14 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSegmentReduce")
     SegmentReduceDispatch(op, feat, offsets, out, arg);
   });
 
-DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelScatterSum")
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelScatterAdd")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     NDArray feat = args[0];
     NDArray idx = args[1];
     NDArray out = args[2];
     CheckCtx(feat->ctx, {feat, idx, out}, {"feat", "idx", "out"});
     CheckContiguous({feat, idx, out}, {"feat", "idx", "out"});
-    ScatterSumDispatch(feat, idx, out);
+    ScatterAddDispatch(feat, idx, out);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelBwdSegmentCmp")

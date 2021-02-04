@@ -308,14 +308,30 @@ def _segment_reduce(op, feat, offsets):
     return out, arg
 
 
-def _scatter_sum(feat, idx, m):
-    r""" Scatter sum operator implementation.
+def _scatter_add(x, idx, m):
+    r""" Scatter add operator (on first dimension) implementation.
+
+    Math: y[idx[i], *] += x[i, *]
+
+    Parameters
+    ----------
+    x : Tensor
+        The input feature.
+    idx : Tensor
+        The indices array.
+    m : int
+        The length of output.
+    
+    Returns
+    -------
+    Tensor
+        The output tensor.
     """
-    out_shp = (m,) + F.shape(feat)[1:]
-    ctx = F.context(feat)
-    dtype = F.dtype(feat)
+    out_shp = (m,) + F.shape(x)[1:]
+    ctx = F.context(x)
+    dtype = F.dtype(x)
     out = F.zeros(out_shp, dtype, ctx)
-    _CAPI_DGLKernelScatterSum(to_dgl_nd(feat),
+    _CAPI_DGLKernelScatterAdd(to_dgl_nd(x),
                               to_dgl_nd(idx),
                               to_dgl_nd_for_write(out))
     return out

@@ -1918,12 +1918,13 @@ def to_simple(g,
         else:
             edge_frames = []
             for i in range(len(g.canonical_etypes)):
-                feat_idx = F.asnumpy(edge_maps[i])
-                _, indices = np.unique(feat_idx, return_index=True)
-                _data = {
-                    key:  col.data for key, col in g._edge_frames[i]
-                }
+                feat_idx = edge_maps[i]
+                _, indices = np.unique(F.asnumpy(feat_idx), return_index=True)
                 _num_rows = len(indices)
+                _data = {
+                    key: F.scatter_add(col.data, feat_idx, _num_rows)
+                    for key, col in g._edge_frames[i]
+                }
                 newf = Frame(data=_data, num_rows=_num_rows)
                 edge_frames.append(newf)
         utils.set_new_frames(simple_graph, edge_frames=edge_frames)

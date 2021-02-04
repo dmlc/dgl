@@ -43,12 +43,12 @@ __global__ void SegmentReduceKernel(
 }
 
 /*!
- * \brief CUDA kernel of scatter sum.
+ * \brief CUDA kernel of scatter add.
  * \note each blockthread is responsible for adding a row in feature tensor
  *       to a target row in output tensor.
  */
 template <typename IdType, typename DType>
-__global__ void ScatterSumKernel(
+__global__ void ScatterAddKernel(
     const DType *feat, const IdType *idx, DType *out,
     int64_t n, int64_t dim) {
   const int row = blockIdx.x;
@@ -116,14 +116,14 @@ void SegmentReduce(
 }
 
 /*!
- * \brief CUDA implementation of scatter sum.
+ * \brief CUDA implementation of Scatter Add (on first dimension).
  * \note math equation: out[idx[i], *] += feat[i, *]
  * \param feat The input tensor.
  * \param idx The indices tensor.
  * \param out The output tensor.
  */
 template <typename IdType, typename DType>
-void ScatterSum(
+void ScatterAdd(
     NDArray feat,
     NDArray idx,
     NDArray out) {
@@ -143,7 +143,7 @@ void ScatterSum(
   const int nty = 1;
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
-  CUDA_KERNEL_CALL((ScatterSumKernel<IdType, DType>),
+  CUDA_KERNEL_CALL((ScatterAddKernel<IdType, DType>),
                    nblks, nthrs, 0, thr_entry->stream,
                    feat_data, idx_data, out_data,
                    n, dim);
