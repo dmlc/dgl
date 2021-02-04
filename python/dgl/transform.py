@@ -1923,7 +1923,7 @@ def to_simple(g,
                 _num_rows = len(indices)
                 _data = {
                     key: F.scatter_add(col.data, feat_idx, _num_rows)
-                    for key, col in g._edge_frames[i]
+                    for key, col in g._edge_frames[i]._columns.items()
                 }
                 newf = Frame(data=_data, num_rows=_num_rows)
                 edge_frames.append(newf)
