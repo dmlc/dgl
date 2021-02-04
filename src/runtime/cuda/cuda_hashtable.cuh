@@ -11,7 +11,6 @@
 
 #include "cuda_runtime.h"
 #include "cuda_common.h"
-#include "cuda_device_common.cuh"
 
 namespace dgl {
 namespace runtime {

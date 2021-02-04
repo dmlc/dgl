@@ -8,7 +8,9 @@
 #include <cassert>
 
 #include "cuda_hashtable.cuh"
+#include "../../kernel/cuda/atomic.cuh"
 
+using namespace dgl::kernel::cuda;
 
 namespace dgl {
 namespace runtime {
