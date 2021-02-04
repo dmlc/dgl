@@ -27,9 +27,8 @@ def track_time(graph_name, format, fraction):
         out = graph.in_edges(i)
 
     # timing
-    t0 = time.time()
-    for i in range(10):
-        edges = graph.in_edges(nids)
-    t1 = time.time()
+    with utils.Timer() as t:
+        for i in range(10):
+            edges = graph.in_edges(nids)
 
-    return (t1 - t0) / 10
+    return t.elapsed_secs / 10

@@ -20,9 +20,9 @@ def track_time(batch_size):
         g = dgl.batch(graphs)
 
     # timing
-    t0 = time.time()
-    for i in range(100):
-        g = dgl.batch(graphs)
-    t1 = time.time()
+    
+    with utils.Timer() as t:
+        for i in range(100):
+            g = dgl.batch(graphs)
 
-    return (t1 - t0) / 100
+    return t.elapsed_secs / 100

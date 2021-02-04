@@ -32,7 +32,7 @@ class SharedMemoryResource: public Resource {
   }
 
   void Destroy() {
-    LOG(INFO) << "remove " << name << " for shared memory";
+    // LOG(INFO) << "remove " << name << " for shared memory";
     shm_unlink(name.c_str());
   }
 };
@@ -55,7 +55,7 @@ SharedMemory::~SharedMemory() {
   CHECK(munmap(ptr_, size_) != -1) << strerror(errno);
   close(fd_);
   if (own_) {
-    LOG(INFO) << "remove " << name << " for shared memory";
+    // LOG(INFO) << "remove " << name << " for shared memory";
     shm_unlink(name.c_str());
     // The resource has been deleted. We don't need to keep track of it any more.
     DeleteResource(name);
