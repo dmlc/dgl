@@ -33,7 +33,8 @@ class MutableDeviceOrderedHashTable : public DeviceOrderedHashTable<IdType> {
   * @param hostTable The original hash table on the host.
   */
   explicit MutableDeviceOrderedHashTable(
-      OrderedHashTable<IdType>& hostTable) : DeviceOrderedHashTable<IdType>(hostTable.ToDevice()) {
+      OrderedHashTable<IdType>* const hostTable) :
+    DeviceOrderedHashTable<IdType>(hostTable->ToDevice()) {
   }
 
   /**
@@ -394,7 +395,7 @@ void OrderedHashTable<IdType>::FillWithDuplicates(
   const dim3 grid(num_tiles);
   const dim3 block(BLOCK_SIZE);
 
-  auto device_table = MutableDeviceOrderedHashTable<IdType>(*this);
+  auto device_table = MutableDeviceOrderedHashTable<IdType>(this);
 
   generate_hashmap_duplicates<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
       input,
@@ -451,7 +452,7 @@ void OrderedHashTable<IdType>::FillWithUnique(
   const dim3 grid(num_tiles);
   const dim3 block(BLOCK_SIZE);
 
-  auto device_table = MutableDeviceOrderedHashTable<IdType>(*this);
+  auto device_table = MutableDeviceOrderedHashTable<IdType>(this);
 
   generate_hashmap_unique<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
       input,
