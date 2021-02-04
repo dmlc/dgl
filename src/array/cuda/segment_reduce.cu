@@ -38,7 +38,7 @@ void SegmentReduce(const std::string& op,
 }
 
 
-template <int XPU, typename IdType, itn bits>
+template <int XPU, typename IdType, int bits>
 void ScatterSum(NDArray feat,
                 NDArray idx,
                 NDArray out) {
