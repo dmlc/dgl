@@ -192,10 +192,12 @@ train(g, model)
 # Training on GPU requires to put both the model and the graph onto GPU
 # with the ``to`` method, similar to what you will do in PyTorch.
 # 
-
-g = g.to('cuda')
-model = GCN(g.ndata['feat'].shape[1], 16, dataset.num_classes).to('cuda')
-train(g, model)
+# .. code:: python
+#
+#    g = g.to('cuda')
+#    model = GCN(g.ndata['feat'].shape[1], 16, dataset.num_classes).to('cuda')
+#    train(g, model)
+#
 
 
 ######################################################################

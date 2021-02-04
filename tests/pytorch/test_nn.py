@@ -9,7 +9,6 @@ from test_utils.graph_cases import get_cases, random_graph, random_bipartite, ra
 from test_utils import parametrize_dtype
 from copy import deepcopy
 
-import numpy as np
 import scipy as sp
 
 def _AXWb(A, X, W, b):
@@ -87,6 +86,45 @@ def test_graph_conv(idtype, g, norm, weight, bias):
         h_out = conv(g, h)
     else:
         h_out = conv(g, h, weight=ext_w)
+    assert h_out.shape == (ndst, 2)
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['has_scalar_e_feature'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('norm', ['none', 'both', 'right'])
+@pytest.mark.parametrize('weight', [True, False])
+@pytest.mark.parametrize('bias', [True, False])
+def test_graph_conv_e_weight(idtype, g, norm, weight, bias):
+    g = g.astype(idtype).to(F.ctx())
+    conv = nn.GraphConv(5, 2, norm=norm, weight=weight, bias=bias).to(F.ctx())
+    ext_w = F.randn((5, 2)).to(F.ctx())
+    nsrc = g.number_of_src_nodes()
+    ndst = g.number_of_dst_nodes()
+    h = F.randn((nsrc, 5)).to(F.ctx())
+    e_w = g.edata['scalar_w']
+    if weight:
+        h_out = conv(g, h, edge_weight=e_w)
+    else:
+        h_out = conv(g, h, weight=ext_w, edge_weight=e_w)
+    assert h_out.shape == (ndst, 2)
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['has_scalar_e_feature'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('norm', ['none', 'both', 'right'])
+@pytest.mark.parametrize('weight', [True, False])
+@pytest.mark.parametrize('bias', [True, False])
+def test_graph_conv_e_weight_norm(idtype, g, norm, weight, bias):
+    g = g.astype(idtype).to(F.ctx())
+    conv = nn.GraphConv(5, 2, norm=norm, weight=weight, bias=bias).to(F.ctx())
+    ext_w = F.randn((5, 2)).to(F.ctx())
+    nsrc = g.number_of_src_nodes()
+    ndst = g.number_of_dst_nodes()
+    h = F.randn((nsrc, 5)).to(F.ctx())
+    edgenorm = nn.EdgeWeightNorm(norm=norm)
+    norm_weight = edgenorm(g, g.edata['scalar_w'])
+    if weight:
+        h_out = conv(g, h, edge_weight=norm_weight)
+    else:
+        h_out = conv(g, h, weight=ext_w, edge_weight=norm_weight)
     assert h_out.shape == (ndst, 2)
 
 @parametrize_dtype
@@ -328,7 +366,7 @@ def test_rgcn():
     assert F.allclose(h_new, h_new_low)
 
     # with norm
-    norm = th.zeros((g.number_of_edges(), 1)).to(ctx)
+    norm = th.rand((g.number_of_edges(), 1)).to(ctx)
 
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
@@ -408,7 +446,7 @@ def test_rgcn_sorted():
     assert F.allclose(h_new, h_new_low)
 
     # with norm
-    norm = th.zeros((g.number_of_edges(), 1)).to(ctx)
+    norm = th.rand((g.number_of_edges(), 1)).to(ctx)
 
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
@@ -741,6 +779,32 @@ def test_edge_conv_bi(g, idtype):
     x0 = F.randn((g.number_of_dst_nodes(), 5))
     h1 = edge_conv(g, (h0, x0))
     assert h1.shape == (g.number_of_dst_nodes(), 2)
+    
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
+def test_dotgat_conv(g, idtype):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    dotgat = nn.DotGatConv(5, 2, 4)
+    feat = F.randn((g.number_of_nodes(), 5))
+    dotgat = dotgat.to(ctx)
+    h = dotgat(g, feat)
+    assert h.shape == (g.number_of_nodes(), 4, 2)
+    _, a = dotgat(g, feat, get_attention=True)
+    assert a.shape == (g.number_of_edges(), 4, 1)
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
+def test_dotgat_conv_bi(g, idtype):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    dotgat = nn.DotGatConv((5, 5), 2, 4)
+    feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
+    dotgat = dotgat.to(ctx)
+    h = dotgat(g, feat)
+    assert h.shape == (g.number_of_dst_nodes(), 4, 2)
+    _, a = dotgat(g, feat, get_attention=True)
+    assert a.shape == (g.number_of_edges(), 4, 1)    
 
 def test_dense_cheb_conv():
     for k in range(1, 4):
@@ -875,16 +939,7 @@ def test_hetero_conv(agg, idtype):
     gf = F.randn((4, 4))
     sf = F.randn((2, 3))
 
-    h = conv(g, {'user': uf})
-    assert set(h.keys()) == {'user', 'game'}
-    if agg != 'stack':
-        assert h['user'].shape == (4, 3)
-        assert h['game'].shape == (4, 4)
-    else:
-        assert h['user'].shape == (4, 1, 3)
-        assert h['game'].shape == (4, 1, 4)
-
-    h = conv(g, {'user': uf, 'store': sf})
+    h = conv(g, {'user': uf, 'game': gf, 'store': sf})
     assert set(h.keys()) == {'user', 'game'}
     if agg != 'stack':
         assert h['user'].shape == (4, 3)
@@ -893,37 +948,24 @@ def test_hetero_conv(agg, idtype):
         assert h['user'].shape == (4, 1, 3)
         assert h['game'].shape == (4, 2, 4)
 
-    h = conv(g, {'store': sf})
-    assert set(h.keys()) == {'game'}
-    if agg != 'stack':
-        assert h['game'].shape == (4, 4)
-    else:
-        assert h['game'].shape == (4, 1, 4)
-
-    # test with pair input
-    conv = nn.HeteroGraphConv({
-        'follows': nn.SAGEConv(2, 3, 'mean'),
-        'plays': nn.SAGEConv((2, 4), 4, 'mean'),
-        'sells': nn.SAGEConv(3, 4, 'mean')},
-        agg)
-    conv = conv.to(F.ctx())
-
-    h = conv(g, ({'user': uf}, {'user' : uf, 'game' : gf}))
+    block = dgl.to_block(g.to(F.cpu()), {'user': [0, 1, 2, 3], 'game': [0, 1, 2, 3], 'store': []}).to(F.ctx())
+    h = conv(block, ({'user': uf, 'game': gf, 'store': sf}, {'user': uf, 'game': gf, 'store': sf[0:0]}))
     assert set(h.keys()) == {'user', 'game'}
     if agg != 'stack':
         assert h['user'].shape == (4, 3)
         assert h['game'].shape == (4, 4)
     else:
         assert h['user'].shape == (4, 1, 3)
-        assert h['game'].shape == (4, 1, 4)
+        assert h['game'].shape == (4, 2, 4)
 
-    # pair input requires both src and dst type features to be provided
-    h = conv(g, ({'user': uf}, {'game' : gf}))
-    assert set(h.keys()) == {'game'}
+    h = conv(block, {'user': uf, 'game': gf, 'store': sf})
+    assert set(h.keys()) == {'user', 'game'}
     if agg != 'stack':
+        assert h['user'].shape == (4, 3)
         assert h['game'].shape == (4, 4)
     else:
-        assert h['game'].shape == (4, 1, 4)
+        assert h['user'].shape == (4, 1, 3)
+        assert h['game'].shape == (4, 2, 4)
 
     # test with mod args
     class MyMod(th.nn.Module):
@@ -950,7 +992,7 @@ def test_hetero_conv(agg, idtype):
     conv = conv.to(F.ctx())
     mod_args = {'follows' : (1,), 'plays' : (1,)}
     mod_kwargs = {'sells' : {'arg2' : 'abc'}}
-    h = conv(g, {'user' : uf, 'store' : sf}, mod_args=mod_args, mod_kwargs=mod_kwargs)
+    h = conv(g, {'user' : uf, 'game': gf, 'store' : sf}, mod_args=mod_args, mod_kwargs=mod_kwargs)
     assert mod1.carg1 == 1
     assert mod1.carg2 == 0
     assert mod2.carg1 == 1
@@ -960,11 +1002,14 @@ def test_hetero_conv(agg, idtype):
 
 if __name__ == '__main__':
     test_graph_conv()
+    test_graph_conv_e_weight()
+    test_graph_conv_e_weight_norm()
     test_set2set()
     test_glob_att_pool()
     test_simple_pool()
     test_set_trans()
     test_rgcn()
+    test_rgcn_sorted()
     test_tagconv()
     test_gat_conv()
     test_sage_conv()
@@ -975,6 +1020,7 @@ if __name__ == '__main__':
     test_gated_graph_conv()
     test_nn_conv()
     test_gmm_conv()
+    test_dotgat_conv()
     test_dense_graph_conv()
     test_dense_sage_conv()
     test_dense_cheb_conv()

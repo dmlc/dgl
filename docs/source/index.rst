@@ -97,6 +97,7 @@ Getting Started
    guide/training
    guide/minibatch
    guide/distributed
+   guide/mixed_precision
 
 .. toctree::
    :maxdepth: 2

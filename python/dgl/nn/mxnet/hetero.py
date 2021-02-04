@@ -40,7 +40,7 @@ class HeteroGraphConv(nn.Block):
     ``'user'`` and ``'game'`` nodes.
 
     >>> import mxnet.ndarray as nd
-    >>> h1 = {'user' : nd.randomrandn(g.number_of_nodes('user'), 5)}
+    >>> h1 = {'user' : nd.random.randn(g.number_of_nodes('user'), 5)}
     >>> h2 = conv(g, h1)
     >>> print(h2.keys())
     dict_keys(['user', 'game'])
@@ -167,7 +167,7 @@ class HeteroGraphConv(nn.Block):
                     continue
                 dstdata = self.mods[etype](
                     rel_graph,
-                    inputs[stype],
+                    (inputs[stype], inputs[dtype]),
                     *mod_args.get(etype, ()),
                     **mod_kwargs.get(etype, {}))
                 outputs[dtype].append(dstdata)

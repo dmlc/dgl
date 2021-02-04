@@ -3,6 +3,8 @@
 6.3 Training GNN for Link Prediction with Neighborhood Sampling
 --------------------------------------------------------------------
 
+:ref:`(中文版) <guide_cn-minibatch-link-classification-sampler>`
+
 Define a neighborhood sampler and data loader with negative sampling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -262,6 +264,7 @@ Then you can give the dataloader a dictionary of edge types and edge IDs as well
 sampler.  For instance, the following iterates over all edges of the heterogeneous graph.
 
 .. code:: python
+
     train_eid_dict = {
         g.edges(etype=etype, form='eid')
         for etype in g.etypes}
