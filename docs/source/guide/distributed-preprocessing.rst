@@ -10,7 +10,7 @@ DGL requires to preprocess the graph data for distributed training. This include
 graphs, DGL provides a partitioning API :func:`dgl.distributed.partition_graph` that performs
 the two steps above. The API runs on one machine. Therefore, if a graph is large, users will
 need a large machine to partition a graph when using this API. In addition to this API, we also
-provide a solution to partition a large graph in a cluster of machines below (see Section 7.1.2).
+provide a solution to partition a large graph in a cluster of machines below (see Section 7.1.1).
 
 :func:`dgl.distributed.partition_graph` supports both random partitioning
 and a `Metis <http://glaros.dtc.umn.edu/gkhome/views/metis>`__-based partitioning.
