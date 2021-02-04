@@ -21,6 +21,98 @@ namespace {
 constexpr static const int BLOCK_SIZE = 256;
 constexpr static const size_t TILE_SIZE = 1024;
 
+template<typename IdType>
+class MutableDeviceOrderedHashTable : public DeviceOrderedHashTable<IdType> {
+ public:
+  typedef typename DeviceOrderedHashTable<IdType>::Mapping* Iterator;
+  static constexpr IdType kEmptyKey = DeviceOrderedHashTable<IdType>::kEmptyKey;
+
+  /**
+  * @brief Create a new mutable hashtable for use on the device.
+  *
+  * @param hostTable The original hash table on the host.
+  */
+  explicit MutableDeviceOrderedHashTable(
+      OrderedHashTable<IdType>& hostTable) : DeviceOrderedHashTable<IdType>(hostTable.ToDevice()) {
+  }
+
+  /**
+  * @brief Find the mutable mapping of a given key within the hash table.
+  *
+  * WARNING: The key must exist within the hashtable. Searching for a key not
+  * in the hashtable is undefined behavior.
+  *
+  * @param id The key to search for.
+  *
+  * @return The mapping.
+  */
+  inline __device__ Iterator Search(
+      const IdType id) {
+    const IdType pos = SearchForPosition(id);
+
+    return GetMutable(pos);
+  }
+
+  /**
+  * \brief Attempt to insert into the hash table at a specific location.
+  *
+  * \param pos The position to insert at.
+  * \param id The ID to insert into the hash table.
+  * \param index The original index of the item being inserted.
+  *
+  * \return True, if the insertion was successful.
+  */
+  inline __device__ bool AttemptInsertAt(
+      const size_t pos,
+      const IdType id,
+      const size_t index) {
+    const IdType key = AtomicCAS(&GetMutable(pos)->key, kEmptyKey, id);
+    if (key == kEmptyKey || key == id) {
+      // we either set a match key, or found a matching key, so then place the
+      // minimum index in position. Match the type of atomicMin, so ignore
+      // linting
+      atomicMin(reinterpret_cast<unsigned long long*>(&GetMutable(pos)->index), // NOLINT
+          static_cast<unsigned long long>(index)); // NOLINT
+      return true;
+    } else {
+      // we need to search elsewhere
+      return false;
+    }
+  }
+
+  /**
+  * @brief Insert key-index pair into the hashtable.
+  *
+  * @param id The ID to insert.
+  * @param index The index at which the ID occured.
+  *
+  * @return An iterator to inserted mapping.
+  */
+  inline __device__ Iterator Insert(
+      const IdType id,
+      const size_t index) {
+    size_t pos = Hash(id);
+
+    // linearly scan for an empty slot or matching entry
+    IdType delta = 1;
+    while (!AttemptInsertAt(pos, id, index)) {
+      pos = Hash(pos+delta);
+      delta +=1;
+    }
+
+    return GetMutable(pos);
+  }
+
+ private:
+  inline __device__ Iterator GetMutable(const size_t pos) {
+    assert(pos < this->size_);
+    // The parent class Device is read-only, but we ensure this can only be
+    // constructed from a mutable version of OrderedHashTable, making this
+    // a safe cast to perform.
+    return const_cast<Iterator>(this->table_+pos);
+  }
+};
+
 /**
 * @brief Calculate the number of buckets in the hashtable. To guarantee we can
 * fill the hashtable in the worst case, we must use a number of buckets which
@@ -41,43 +133,24 @@ size_t TableSize(
   return next_pow2 << scale;
 }
 
+template<typename IdType>
+struct BlockPrefixCallbackOp {
+  IdType running_total_;
+
+  __device__ BlockPrefixCallbackOp(
+      const IdType running_total) :
+    running_total_(running_total) {
+  }
+
+  __device__ IdType operator()(const IdType block_aggregate) {
+      const IdType old_prefix = running_total_;
+      running_total_ += block_aggregate;
+      return old_prefix;
+  }
+};
+
 }  // namespace
 
-
-template<typename IdType>
-inline __device__ bool OrderedHashTable<IdType>::AttemptInsertAt(
-    const size_t pos,
-    const IdType id,
-    const size_t index) {
-  const IdType key = AtomicCAS(&table_[pos].key, EmptyKey, id);
-  if (key == EmptyKey || key == id) {
-    // we either set a match key, or found a matching key, so then place the
-    // minimum index in position. Match the type of atomicMin, so ignore
-    // linting
-    atomicMin(reinterpret_cast<unsigned long long*>(&table_[pos].index), // NOLINT
-        static_cast<unsigned long long>(index)); // NOLINT
-    return true;
-  } else {
-    // we need to search elsewhere
-    return false;
-  }
-}
-
-template<typename IdType>
-inline __device__ OrderedHashTable<IdType>::Iterator OrderedHashTable<IdType>::Insert(
-    const IdType id,
-    const size_t index) {
-  size_t pos = Hash(id);
-
-  // linearly scan for an empty slot or matching entry
-  IdType delta = 1;
-  while (!AttemptInsertAt(pos, id, index)) {
-    pos = Hash(pos+delta);
-    delta +=1;
-  }
-
-  return table_+pos;
-}
 
 
 /**
@@ -95,7 +168,7 @@ template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void generate_hashmap_duplicates(
     const IdType * const nodes,
     const int64_t num_nodes,
-    OrderedHashTable<IdType> table) {
+    MutableDeviceOrderedHashTable<IdType> table) {
   assert(BLOCK_SIZE == blockDim.x);
 
   const size_t block_start = TILE_SIZE*blockIdx.x;
@@ -124,10 +197,10 @@ template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void generate_hashmap_unique(
     const IdType * const nodes,
     const int64_t num_nodes,
-    OrderedHashTable<IdType> table) {
+    MutableDeviceOrderedHashTable<IdType> table) {
   assert(BLOCK_SIZE == blockDim.x);
 
-  using Iterator = typename OrderedHashTable<IdType>::Iterator;
+  using Iterator = typename MutableDeviceOrderedHashTable<IdType>::Iterator;
 
   const size_t block_start = TILE_SIZE*blockIdx.x;
   const size_t block_end = TILE_SIZE*(blockIdx.x+1);
@@ -161,12 +234,12 @@ template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void count_hashmap(
     const IdType * nodes,
     const size_t num_nodes,
-    const OrderedHashTable<IdType> table,
+    DeviceOrderedHashTable<IdType> table,
     IdType * const num_unique_nodes) {
   assert(BLOCK_SIZE == blockDim.x);
 
   using BlockReduce = typename cub::BlockReduce<IdType, BLOCK_SIZE>;
-  using Mapping = typename OrderedHashTable<IdType>::Mapping;
+  using Mapping = typename DeviceOrderedHashTable<IdType>::Mapping;
 
   const size_t block_start = TILE_SIZE*blockIdx.x;
   const size_t block_end = TILE_SIZE*(blockIdx.x+1);
@@ -215,7 +288,7 @@ template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void compact_hashmap(
     const IdType * const nodes,
     const size_t num_nodes,
-    OrderedHashTable<IdType> table,
+    MutableDeviceOrderedHashTable<IdType> table,
     const IdType * const num_nodes_prefix,
     IdType * const global_nodes,
     int64_t * const global_node_count) {
@@ -223,7 +296,7 @@ __global__ void compact_hashmap(
 
   using FlagType = uint16_t;
   using BlockScan = typename cub::BlockScan<FlagType, BLOCK_SIZE>;
-  using Mapping = typename OrderedHashTable<IdType>::Mapping;
+  using Mapping = typename DeviceOrderedHashTable<IdType>::Mapping;
 
   constexpr const int32_t VALS_PER_THREAD = TILE_SIZE / BLOCK_SIZE;
 
@@ -283,7 +356,7 @@ OrderedHashTable<IdType>::OrderedHashTable(
 
   CUDA_CALL(cudaMemsetAsync(
     table_,
-    EmptyKey,
+    DeviceOrderedHashTable<IdType>::kEmptyKey,
     sizeof(Mapping)*size_,
     stream));
 }
@@ -294,6 +367,18 @@ OrderedHashTable<IdType>::~OrderedHashTable() {
   device->FreeWorkspace(ctx_, table_);
 }
 
+template<typename IdType>
+DeviceOrderedHashTable<IdType>::DeviceOrderedHashTable(
+    const Mapping* const table,
+    const size_t size) :
+  table_(table),
+  size_(size) {
+}
+
+template<typename IdType>
+DeviceOrderedHashTable<IdType> OrderedHashTable<IdType>::ToDevice() const {
+  return DeviceOrderedHashTable<IdType>(table_, size_);
+}
 
 template<typename IdType>
 void OrderedHashTable<IdType>::FillWithDuplicates(
@@ -309,10 +394,12 @@ void OrderedHashTable<IdType>::FillWithDuplicates(
   const dim3 grid(num_tiles);
   const dim3 block(BLOCK_SIZE);
 
+  auto device_table = MutableDeviceOrderedHashTable<IdType>(*this);
+
   generate_hashmap_duplicates<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
       input,
       num_input,
-      *this);
+      device_table);
   CUDA_CALL(cudaGetLastError());
 
   IdType * item_prefix = static_cast<IdType*>(
@@ -321,7 +408,7 @@ void OrderedHashTable<IdType>::FillWithDuplicates(
   count_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
       input,
       num_input,
-      *this,
+      device_table,
       item_prefix);
   CUDA_CALL(cudaGetLastError());
 
@@ -345,7 +432,7 @@ void OrderedHashTable<IdType>::FillWithDuplicates(
   compact_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
       input,
       num_input,
-      *this,
+      device_table,
       item_prefix,
       unique,
       num_unique);
@@ -364,10 +451,12 @@ void OrderedHashTable<IdType>::FillWithUnique(
   const dim3 grid(num_tiles);
   const dim3 block(BLOCK_SIZE);
 
+  auto device_table = MutableDeviceOrderedHashTable<IdType>(*this);
+
   generate_hashmap_unique<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
       input,
       num_input,
-      *this);
+      device_table);
   CUDA_CALL(cudaGetLastError());
 }
 

@@ -11,6 +11,7 @@
 #include <cuda_runtime.h>
 #include <utility>
 #include <algorithm>
+#include <memory>
 
 #include "../../../runtime/cuda/cuda_common.h"
 #include "../../../runtime/cuda/cuda_hashtable.cuh"
@@ -30,7 +31,7 @@ __device__ void map_vertex_ids(
     const IdType * const global,
     IdType * const new_global,
     const IdType num_vertices,
-    const OrderedHashTable<IdType>& table) {
+    const DeviceOrderedHashTable<IdType>& table) {
   assert(BLOCK_SIZE == blockDim.x);
 
   using Mapping = typename OrderedHashTable<IdType>::Mapping;
@@ -67,8 +68,8 @@ __global__ void map_edge_ids(
     const IdType * const global_dsts_device,
     IdType * const new_global_dsts_device,
     const IdType num_edges,
-    const OrderedHashTable<IdType> src_mapping,
-    const OrderedHashTable<IdType> dst_mapping) {
+    DeviceOrderedHashTable<IdType> src_mapping,
+    DeviceOrderedHashTable<IdType> dst_mapping) {
   assert(BLOCK_SIZE == blockDim.x);
   assert(2 == gridDim.y);
 
@@ -123,7 +124,7 @@ class DeviceNodeMap {
     workspaces_.reserve(num_types_);
     for (int64_t i = 0; i < num_types_; ++i) {
       hash_tables_.emplace_back(
-          OrderedHashTable<IdType>(
+          new OrderedHashTable<IdType>(
             num_nodes[i],
             ctx_,
             stream));
@@ -168,19 +169,19 @@ class DeviceNodeMap {
   int64_t num_types_;
   size_t rhs_offset_;
   std::vector<void*> workspaces_;
-  std::vector<OrderedHashTable<IdType>> hash_tables_;
+  std::vector<std::unique_ptr<OrderedHashTable<IdType>>> hash_tables_;
   DGLContext ctx_;
 
   inline OrderedHashTable<IdType>& HashData(
       const size_t index) {
     CHECK_LT(index, hash_tables_.size());
-    return hash_tables_[index];
+    return *hash_tables_[index];
   }
 
   inline const OrderedHashTable<IdType>& HashData(
       const size_t index) const {
     CHECK_LT(index, hash_tables_.size());
-    return hash_tables_[index];
+    return *hash_tables_[index];
   }
 
   inline IdType HashSize(
@@ -193,7 +194,7 @@ template<typename IdType>
 class DeviceNodeMapMaker {
  public:
   DeviceNodeMapMaker(
-      const std::vector<int64_t> maxNodesPerType) :
+      const std::vector<int64_t>& maxNodesPerType) :
       max_num_nodes_(0) {
     max_num_nodes_ = *std::max_element(maxNodesPerType.begin(),
         maxNodesPerType.end());
@@ -303,8 +304,8 @@ MapEdges(
         edges.dst.Ptr<IdType>(),
         new_rhs.back().Ptr<IdType>(),
         num_edges,
-        node_map.LhsHashTable(src_type),
-        node_map.RhsHashTable(dst_type));
+        node_map.LhsHashTable(src_type).ToDevice(),
+        node_map.RhsHashTable(dst_type).ToDevice());
       CUDA_CALL(cudaGetLastError());
     } else {
       new_lhs.emplace_back(aten::NullArray());
