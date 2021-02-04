@@ -10,7 +10,7 @@
 
 namespace dgl {
 
-using namespace cuda;
+//using namespace cuda;
 
 namespace aten {
 

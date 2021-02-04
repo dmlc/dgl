@@ -51,10 +51,10 @@ template <typename IdType, typename DType>
 __global__ void ScatterSumKernel(
     const DType *feat, const IdType *idx, DType *out,
     int64_t n, int64_t dim) {
-  int row = blockIdx.x;
-  int col = blockIdx.y * blockDim.x + threadIdx.x;
+  const int row = blockIdx.x;
+  const int write_row = idx[row];
+  const int col = blockIdx.y * blockDim.x + threadIdx.x;
   if (col < dim) {
-    int write_row = idx[row * dim + col];
     cuda::AtomicAdd(out + write_row * dim + col, feat[row * dim + col]);
   }
 )
@@ -151,7 +151,7 @@ void ScatterSum(
 
 /*!
  * \brief CUDA implementation of backward phase of Segment Reduce with Min/Max reducer.
- * \note math equation: out[arg[i], *] = feat[i, *]
+ * \note math equation: out[arg[i, k], k] = feat[i, k]
  * \param feat The input tensor.
  * \param arg The ArgMin/Max information, used for indexing.
  * \param out The output tensor.
