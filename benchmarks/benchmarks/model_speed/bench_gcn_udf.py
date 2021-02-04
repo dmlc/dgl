@@ -102,20 +102,19 @@ def track_time(data):
                                  lr=1e-2,
                                  weight_decay=5e-4)
     # dry run
-    for epoch in range(10):
+    for epoch in range(5):
         logits = model(g, features)
         loss = loss_fcn(logits[train_mask], labels[train_mask])
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-    t0 = time.time()
-    for epoch in range(200):
-        logits = model(g, features)
-        loss = loss_fcn(logits[train_mask], labels[train_mask])
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-    t1 = time.time()
+    with utils.Timer(device) as t:
+        for epoch in range(200):
+            logits = model(g, features)
+            loss = loss_fcn(logits[train_mask], labels[train_mask])
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-    return (t1 - t0) / 200
+    return t.elapsed_secs / 200
