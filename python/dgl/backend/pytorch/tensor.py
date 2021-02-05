@@ -245,10 +245,12 @@ def pad_packed_tensor(input, lengths, value, l_min=None):
     return x.view(batch_size, max_len, *old_shape[1:])
 
 def pack_padded_tensor(input, lengths):
-    batch_size, max_len = input.shape[:2]
+    _, max_len = input.shape[:2]
     if not is_tensor(lengths):
         lengths = th.LongTensor(lengths, device=input.device)
-    index = th.ones(len(input), dtype=th.int64, device=input.device)
+    input = input.view(-1, *input.shape[2:])
+    out_len = lengths.sum().item()
+    index = th.ones(out_len, dtype=th.int64, device=input.device)
     cum_lengths = th.cumsum(lengths, 0)
     index[cum_lengths[:-1]] += (max_len - lengths[:-1])
     index = th.cumsum(index, 0) - 1
