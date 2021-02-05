@@ -64,7 +64,7 @@ print('Number of graph categories:', dataset.gclasses)
 # dataset. In DGL, you can use the ``GraphDataLoader``.
 # 
 # You can also use various dataset samplers provided in
-# ```torch.utils.data.sampler`` <https://pytorch.org/docs/stable/data.html#data-loading-order-and-sampler>`__.
+# `torch.utils.data.sampler <https://pytorch.org/docs/stable/data.html#data-loading-order-and-sampler>`__.
 # For example, this tutorial creates a training ``GraphDataLoader`` and
 # test ``GraphDataLoader``, using ``SubsetRandomSampler`` to tell PyTorch
 # to sample from only a subset of the dataset.
