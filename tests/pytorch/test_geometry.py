@@ -1,8 +1,13 @@
-import torch as th
-import dgl.nn
-from dgl.geometry.pytorch import FarthestPointSampler
 import backend as F
+import dgl.nn
 import numpy as np
+import pytest
+import torch as th
+from dgl.geometry.pytorch import FarthestPointSampler
+from dgl.geometry import graph_matching
+from test_utils import parametrize_dtype
+from test_utils.graph_cases import get_cases
+
 
 def test_fps():
     N = 1000
@@ -42,6 +47,21 @@ def test_knn():
     g = kg(x, [3, 5])
     check_knn(g, x, 0, 3)
     check_knn(g, x, 3, 8)
+
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
+@pytest.mark.parametrize('weight', [True, False])
+def test_graph_matching(idtype, g, weight):
+    g = g.astype(idtype).to(F.ctx())
+    edge_weight = None
+    if weight:
+        edge_weight = F.abs(F.randn((g.num_edges(),))).to(F.ctx())
+    node_labels = graph_matching(g, edge_weight)
+
+    assert node_labels.shape == (g.num_nodes(),)    # shape correct
+    assert F.reduce_sum(node_labels == -1).item() == 0  # all nodes marked
+
 
 if __name__ == '__main__':
     test_fps()

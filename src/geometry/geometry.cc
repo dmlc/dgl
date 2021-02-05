@@ -13,6 +13,32 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace geometry {
 
+// Check whether the given arguments have the same context.
+inline void CheckCtx(
+    const DLContext& ctx,
+    const std::vector<NDArray>& arrays,
+    const std::vector<std::string>& names) {
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    if (aten::IsNullArray(arrays[i]))
+      continue;
+    CHECK_EQ(ctx, arrays[i]->ctx)
+      << "Expected device context " << ctx << ". But got "
+      << arrays[i]->ctx << " for " << names[i] << ".";
+  }
+}
+
+// Check whether input tensors are contiguous.
+inline void CheckContiguous(
+    const std::vector<NDArray>& arrays,
+    const std::vector<std::string>& names) {
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    if (aten::IsNullArray(arrays[i]))
+      continue;
+    CHECK(arrays[i].IsContiguous())
+      << "Expect " << names[i] << " to be a contiguous tensor";
+  }
+}
+
 void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result) {
 
@@ -43,6 +69,58 @@ DGL_REGISTER_GLOBAL("geometry._CAPI_FarthestPointSampler")
     IdArray result = args[5];
 
     FarthestPointSampler(data, batch_size, sample_points, dist, start_idx, result);
+  });
+
+DGL_REGISTER_GLOBAL("geometry._CAPI_GraphMatching")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const NDArray indptr = args[0];
+    const NDArray indices = args[1];
+    const NDArray weight = args[2];
+    const NDArray vis_order = args[3];
+    NDArray result = args[4];
+
+    // check context and contiguous
+    CheckCtx(indptr->ctx, {indices, weight, vis_order, result},
+      {"indices", "edge_weight", "node_visit_order", "result"});
+    CheckContiguous({indptr, indices, weight, vis_order, result},
+      {"indptr", "indices", "edge_weight", "node_visit_order", "result"});
+
+    // check shape
+    CHECK_EQ(indptr->ndim, 1) << "indptr should be an 1D tensor.";
+    CHECK_EQ(indices->ndim, 1) << "indices should be an 1D tensor.";
+    CHECK_EQ(result->ndim, 1) << "result should be an 1D tensor.";
+    CHECK_EQ(vis_order->ndim, 1) << "node_visit_order shoule be an 1D tensor.";
+    CHECK_EQ(indptr->shape[0] - 1, result->shape[0])
+      << "The number of nodes in CSR matrix should be the same as the result tensor.";
+    CHECK_EQ(result->shape[0], vis_order->shape[0])
+      << "The shape of result must be the same as the shape of node_visit_order.";
+
+    if (!aten::IsNullArray(weight)) {
+      CHECK_EQ(weight->ndim, 1) << "weight should be an 1D tensor.";
+      CHECK_EQ(indices->shape[0], weight->shape[0])
+        << "indices of CSR matrix should have the same shape "
+        << "as the edge weight tensor.";
+    }
+
+    // call implementation
+    if (!aten::IsNullArray(weight)) {
+      ATEN_FLOAT_TYPE_SWITCH(weight->dtype, FloatType, "weight", {
+        ATEN_ID_TYPE_SWITCH(indptr->dtype, IdType, {
+          ATEN_XPU_SWITCH_CUDA(indptr->ctx.device_type, XPU, "GraphMatching", {
+            impl::GraphMatching<XPU, FloatType, IdType>(
+                indptr, indices, weight, vis_order, result);
+          });
+        });
+      });
+    } else {
+      ATEN_ID_TYPE_SWITCH(indptr->dtype, IdType, {
+        ATEN_XPU_SWITCH_CUDA(indptr->ctx.device_type, XPU, "GraphMatching", {
+          impl::GraphMatching<XPU, float, IdType>(
+              indptr, indices, weight, vis_order, result);
+          });
+        });
+    }
+
   });
 
 }  // namespace geometry
