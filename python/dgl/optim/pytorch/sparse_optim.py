@@ -42,13 +42,12 @@ class SparseGradOptimizer(abc.ABC):
                     'MultiGPU world_size for each embedding should be same.'
 
             emb_name = emb.name
-            if self._rank <= 0 and self._world_size > 1:
+            if self._rank == 0: # the master gpu process
                 opt_meta = create_shared_mem_array(emb_name+'_opt_meta', \
                     (self._world_size, self._world_size), th.int32).zero_()
             if self._rank == 0:
-                if self._world_size > 1:
-                    emb.store.set(emb_name+'_opt_meta', emb_name)
-                    self._opt_meta[emb_name] = opt_meta
+                emb.store.set(emb_name+'_opt_meta', emb_name)
+                self._opt_meta[emb_name] = opt_meta
             elif self._rank > 0:
                 # receive
                 emb.store.wait([emb_name+'_opt_meta'])
@@ -124,7 +123,7 @@ class SparseGradOptimizer(abc.ABC):
                             idx_shmem_name = 'idx_{}_{}_{}'.format(emb_name, self._rank, i)
                             grad_shmem_name = 'grad_{}_{}_{}'.format(emb_name, self._rank, i)
 
-                            # Create shared memory to hold temporal index and gradient tensor for
+                            # Create shared memory to hold temporary index and gradient tensor for
                             # cross-process send and recv.
                             if idx_shmem_name not in self._shared_cache[emb_name] or \
                                 self._shared_cache[emb_name][idx_shmem_name].shape[0] \
