@@ -5,7 +5,7 @@ from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp, _scatt
 from ...base import dgl_warning, is_all, ALL
 from .tensor import asnumpy, copy_to, zerocopy_from_numpy, context, to_backend_ctx
 
-__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce']
+__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce', 'scatter_add']
 
 
 def _scatter_nd(index, src, n_rows):
