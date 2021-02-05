@@ -28,10 +28,8 @@ def track_flops(graph, feat_size, reducer):
         y = op(graph, x)
 
     # timing
-    accum = 0.
-    for i in range(10):
-        with utils.TorchOpTimer(device) as timer:
+    with utils.Timer(device) as t:
+        for i in range(10):
             y = op(graph, x)
-        accum += timer.time
 
-    return calc_gflops(graph, feat_size, accum / 10)
+    return calc_gflops(graph, feat_size, t.elapsed_secs / 10)
