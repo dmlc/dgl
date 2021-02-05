@@ -66,19 +66,19 @@ template<typename IdType>
 class DeviceOrderedHashTable {
   public:
     /**
-    * @brief An entry in the hashtable.
+    * \brief An entry in the hashtable.
     */
     struct Mapping {
       /**
-      * @brief The ID of the item inserted.
+      * \brief The ID of the item inserted.
       */
       IdType key;
       /**
-      * @brief The index of the item in the unique list.
+      * \brief The index of the item in the unique list.
       */
       IdType local;
       /**
-      * @brief The index of the item when inserted into the hashtable (e.g.,
+      * \brief The index of the item when inserted into the hashtable (e.g.,
       * the index within the array passed into FillWithDuplicates()).
       */
       int64_t index;
@@ -86,23 +86,20 @@ class DeviceOrderedHashTable {
 
     typedef const Mapping* ConstIterator;
 
-    // Must be uniform bytes for memset to work
-    static constexpr IdType kEmptyKey = static_cast<IdType>(-1);
-
     DeviceOrderedHashTable(
         const DeviceOrderedHashTable& other) = default;
     DeviceOrderedHashTable& operator=(
         const DeviceOrderedHashTable& other) = default;
 
     /**
-    * @brief Find the non-mutable mapping of a given key within the hash table.
+    * \brief Find the non-mutable mapping of a given key within the hash table.
     *
     * WARNING: The key must exist within the hashtable. Searching for a key not
     * in the hashtable is undefined behavior.
     *
-    * @param id The key to search for.
+    * \param id The key to search for.
     *
-    * @return An iterator to the mapping.
+    * \return An iterator to the mapping.
     */
     inline __device__ ConstIterator Search(
         const IdType id) const {
@@ -112,14 +109,17 @@ class DeviceOrderedHashTable {
     }
 
   protected:
+    // Must be uniform bytes for memset to work
+    static constexpr IdType kEmptyKey = static_cast<IdType>(-1);
+
     const Mapping * table_;
     size_t size_;
 
     /**
-    * @brief Create a new device-side handle to the hash table.
+    * \brief Create a new device-side handle to the hash table.
     *
-    * @param table The table stored in GPU memory.
-    * @param size The size of the table.
+    * \param table The table stored in GPU memory.
+    * \param size The size of the table.
     */
     explicit DeviceOrderedHashTable(
         const Mapping * table,
@@ -221,7 +221,7 @@ class OrderedHashTable {
         const int scale = kDefaultScale);
 
     /**
-    * @brief Cleanup after the hashtable.
+    * \brief Cleanup after the hashtable.
     */
     ~OrderedHashTable();
 
@@ -232,14 +232,14 @@ class OrderedHashTable {
         const OrderedHashTable& other) = delete;
 
     /**
-    * @brief Fill the hashtable with the array containing possibly duplicate
+    * \brief Fill the hashtable with the array containing possibly duplicate
     * IDs.
     *
-    * @param input The array of IDs to insert.
-    * @param num_input The number of IDs to insert.
-    * @param unique The list of unique IDs inserted.
-    * @param num_unique The number of unique IDs inserted.
-    * @param stream The stream to perform operations on.
+    * \param input The array of IDs to insert.
+    * \param num_input The number of IDs to insert.
+    * \param unique The list of unique IDs inserted.
+    * \param num_unique The number of unique IDs inserted.
+    * \param stream The stream to perform operations on.
     */
     void FillWithDuplicates(
         const IdType * const input,
@@ -249,11 +249,11 @@ class OrderedHashTable {
         cudaStream_t stream);
 
     /**
-    * @brief Fill the hashtable with an array of unique keys.
+    * \brief Fill the hashtable with an array of unique keys.
     *
-    * @param input The array of unique IDs.
-    * @param num_input The number of keys.
-    * @param stream The stream to perform operations on.
+    * \param input The array of unique IDs.
+    * \param num_input The number of keys.
+    * \param stream The stream to perform operations on.
     */
     void FillWithUnique(
         const IdType * const input,
@@ -261,9 +261,9 @@ class OrderedHashTable {
         cudaStream_t stream);
 
     /**
-    * @brief Get a verison of the hashtable usable from device functions.
+    * \brief Get a verison of the hashtable usable from device functions.
     * 
-    * @return This hashtable.
+    * \return This hashtable.
     */
     DeviceOrderedHashTable<IdType> DeviceHandle() const;
 
