@@ -79,7 +79,7 @@ class HardGAO(nn.Module):
             # Use edge message passing function to get the weight from src node
             graph.apply_edges(fn.copy_u('y','y'))
             # Select Top k neighbors
-            subgraph = select_topk(graph,self.k,'y')
+            subgraph = select_topk(graph.cpu(),self.k,'y').to(graph.device)
             # Sigmoid as information threshold
             subgraph.ndata['y'] = torch.sigmoid(subgraph.ndata['y'])
             # Using vector matrix elementwise mul for acceleration
