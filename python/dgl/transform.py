@@ -258,6 +258,11 @@ def to_bidirected(g, copy_ndata=False, readonly=None):
     tensors with the input graph. Hence, users should try to avoid in-place operations
     which will be visible to both graphs.
 
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
+
     Examples
     --------
     The following examples use PyTorch backend.
@@ -353,6 +358,11 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
     tensors with the input graph. Hence, users should try to avoid in-place operations
     which will be visible to both graphs. On the contrary, the two graphs do not share
     the same edge feature storage.
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Examples
     --------
@@ -481,6 +491,11 @@ def line_graph(g, backtracking=True, shared=False):
 
     * The function supports input graph on GPU but copies it to CPU during computation.
 
+    * This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
+
     Examples
     --------
     Assume that the graph has the following adjacency matrix: ::
@@ -594,6 +609,11 @@ def khop_graph(g, k, copy_ndata=True):
     tensors with the input graph. Hence, users should try to avoid in-place operations
     which will be visible to both graphs.
 
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
+
     Examples
     --------
 
@@ -671,6 +691,11 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
     the resulting graph will share the node or edge feature
     tensors with the input graph. Hence, users should try to avoid in-place operations
     which will be visible to both graphs.
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Examples
     --------
@@ -774,6 +799,14 @@ def to_simple_graph(g):
     -------
     DGLGraph
         A simple graph.
+
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
     """
     dgl_warning('dgl.to_simple_graph is renamed to dgl.to_simple in v0.5.')
     return to_simple(g)
@@ -803,6 +836,11 @@ def to_bidirected_stale(g, readonly=True):
     Notes
     -----
     Please make sure g is a simple graph, otherwise the return value is undefined.
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Returns
     -------
@@ -896,6 +934,14 @@ def metapath_reachable_graph(g, metapath):
         A homogeneous or unidirectional bipartite graph. It will be on CPU regardless of
         whether the input graph is on CPU or GPU.
 
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
+
     Examples
     --------
     >>> g = dgl.heterograph({
@@ -951,6 +997,10 @@ def add_nodes(g, num, data=None, ntype=None):
       DGL assigns zero features for the newly added nodes.
     * For feature in :attr:`data` but not in :attr:`g`, DGL assigns zero features
       for the existing nodes in the graph.
+    * This function discards the batch information. Please use
+      :func:`dgl.DGLGraph.set_batch_num_nodes`
+      and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+      to maintain the information.
 
     Examples
     --------
@@ -1051,6 +1101,10 @@ def add_edges(g, u, v, data=None, etype=None):
       DGL assigns zero features for the newly added nodes.
     * For feature in :attr:`data` but not in :attr:`g`, DGL assigns zero features
       for the existing nodes in the graph.
+    * This function discards the batch information. Please use
+      :func:`dgl.DGLGraph.set_batch_num_nodes`
+      and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+      to maintain the information.
 
     Examples
     --------
@@ -1148,6 +1202,14 @@ def remove_edges(g, eids, etype=None, store_ids=False):
     DGLGraph
         The graph with edges deleted.
 
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
+
     Examples
     --------
     >>> import dgl
@@ -1213,6 +1275,14 @@ def remove_nodes(g, nids, ntype=None, store_ids=False):
     ------
     DGLGraph
         The graph with nodes deleted.
+
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Examples
     --------
@@ -1290,6 +1360,10 @@ def add_self_loop(g, etype=None):
       If one wishes to have exactly one self-loop for every node,
       call :func:`remove_self_loop` before invoking :func:`add_self_loop`.
     * Features of the new edges (self-loop edges) will be filled with zeros.
+    * This function discards the batch information. Please use
+      :func:`dgl.DGLGraph.set_batch_num_nodes`
+      and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+      to maintain the information.
 
     Examples
     --------
@@ -1359,6 +1433,11 @@ def remove_self_loop(g, etype=None):
     -----
     If a node has multiple self-loops, remove them all. Do nothing for nodes without
     self-loops.
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Examples
     ---------
@@ -1473,6 +1552,11 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
     If :attr:`copy_edata` is True, the resulting graph will share the edge feature
     tensors with the input graph. Hence, users should try to avoid in-place operations
     which will be visible to both graphs.
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Examples
     --------
@@ -1817,6 +1901,11 @@ def to_simple(g,
     If :attr:`copy_ndata` is True, the resulting graph will share the node feature
     tensors with the input graph. Hence, users should try to avoid in-place operations
     which will be visible to both graphs.
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Examples
     --------

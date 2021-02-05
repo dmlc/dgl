@@ -221,6 +221,10 @@ class DGLHeteroGraph(object):
         * If the key of ``data`` contains new feature fields, those features for
         the old nodes will be created by initializers defined with
         :func:`set_n_initializer` (default initializer fills zeros).
+        *This function discards the batch information. Please use
+        :func:`dgl.DGLGraph.set_batch_num_nodes`
+        and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+        to maintain the information.
 
         Examples
         --------
@@ -376,6 +380,10 @@ class DGLHeteroGraph(object):
         * If the key of ``data`` contains new feature fields, those features for
         the old edges will be created by initializers defined with
         :func:`set_n_initializer` (default initializer fills zeros).
+        *This function discards the batch information. Please use
+        :func:`dgl.DGLGraph.set_batch_num_nodes`
+        and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+        to maintain the information.
 
         Examples
         --------
@@ -541,6 +549,14 @@ class DGLHeteroGraph(object):
             and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
             respectively.
 
+        Notes
+        -----
+
+        This function discards the batch information. Please use
+        :func:`dgl.DGLGraph.set_batch_num_nodes`
+        and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+        to maintain the information.
+
         Examples
         --------
 
@@ -631,6 +647,14 @@ class DGLHeteroGraph(object):
             If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata``
             and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
             respectively.
+
+        Notes
+        -----
+
+        This function discards the batch information. Please use
+        :func:`dgl.DGLGraph.set_batch_num_nodes`
+        and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+        to maintain the information.
 
         Examples
         --------
