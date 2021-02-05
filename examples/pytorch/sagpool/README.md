@@ -45,6 +45,14 @@ Mutagenicity
 - NumFeats: 14
 - NumClasses: 2
 
+|                  | DD     | PROTEINS | NCI1  | NCI109 | Mutagenicity |
+| ---------------- | ------ | -------- | ----- | ------ | ------------ |
+| NumGraphs        | 1178   | 1113     | 4110  | 4127   | 4337         |
+| AvgNodesPerGraph | 284.32 | 39.06    | 29.87 | 29.68  | 30.32        |
+| AvgEdgesPerGraph | 715.66 | 72.82    | 32.30 | 32.13  | 30.77        |
+| NumFeats         | 89     | 1        | 37    | 38     | 14           |
+| NumClasses       | 2      | 2        | 2     | 2      | 2            |
+
 
 How to run example files
 --------------------------------
