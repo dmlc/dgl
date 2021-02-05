@@ -583,9 +583,6 @@ def _topk_on(graph, typestr, feat, k, descending, sortby, ntype_or_etype):
 
     topk_indices = F.slice_axis(order, 1, 0, k)
 
-    # zero padding
-    feat_ = F.pad_packed_tensor(feat, batch_num_objs, 0, l_min=k)
-
     if sortby is not None:
         feat_ = F.reshape(feat_, (batch_size * length, -1))
         shift = F.repeat(F.arange(0, batch_size) * length, k, -1)
@@ -598,7 +595,7 @@ def _topk_on(graph, typestr, feat, k, descending, sortby, ntype_or_etype):
         shift = F.copy_to(shift, F.context(feat))
         topk_indices_ = F.reshape(topk_indices, (-1,)) * hidden_size + shift
 
-    return F.reshape(F.gather_row(feat_, topk_indices_), (batch_size, k, -1)),\
+    return F.replace_inf_with_zero(F.reshape(F.gather_row(feat_, topk_indices_), (batch_size, k, -1))),\
         topk_indices
 
 def topk_nodes(graph, feat, k, *, descending=True, sortby=None, ntype=None):
