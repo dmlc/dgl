@@ -9,6 +9,11 @@ Example implementor
 This example was implemented by [Kounianhua Du](https://github.com/KounianhuaDu) during her Software Dev Engineer Intern work at the AWS Shanghai AI Lab.
 
 
+Dependencies
+----------------------
+- scikit-learn
+
+
 The graph dataset used in this example 
 ---------------------------------------
 The DGL's built-in PPIDataset. This is a Protein-Protein Interaction dataset for inductive node classification. The PPIDataset is a toy Protein-Protein Interaction network dataset. The dataset contains 24 graphs. The average number of nodes per graph is 2372. Each node has 50 features and 121 labels. There are 20 graphs for training, 2 for validation, and 2 for testing.
