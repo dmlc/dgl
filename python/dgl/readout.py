@@ -1,6 +1,5 @@
 """Classes and functions for batching multiple graphs together."""
 from __future__ import absolute_import
-from python.dgl.backend.backend import topk
 
 from .base import DGLError
 from . import backend as F
