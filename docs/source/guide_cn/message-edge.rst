@@ -18,7 +18,7 @@ DGL的处理方法是：
 
     import dgl.function as fn
 
-    # eweight是一个形状为(E, *)的张量，E是边的数量。
+    # 假定eweight是一个形状为(E, *)的张量，E是边的数量。
     graph.edata['a'] = eweight
     graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                      fn.sum('m', 'ft'))

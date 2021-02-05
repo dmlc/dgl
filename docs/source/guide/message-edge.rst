@@ -20,7 +20,7 @@ For example:
 
     import dgl.function as fn
 
-    # eweight is a tensor of shape (E, *), where E is the number of edges.
+    # Suppose eweight is a tensor of shape (E, *), where E is the number of edges.
     graph.edata['a'] = eweight
     graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                      fn.sum('m', 'ft'))
