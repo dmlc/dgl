@@ -11,7 +11,10 @@ This example was implemented by [Kounianhua Du](https://github.com/KounianhuaDu)
 
 Dependencies
 ----------------------
-- scikit-learn
+- numpy=1.19.4
+- sklearn=0.22.1
+- pytorch=1.4.0
+- dgl=0.5.3
 
 
 The graph dataset used in this example 
