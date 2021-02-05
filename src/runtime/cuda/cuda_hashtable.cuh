@@ -205,7 +205,8 @@ class OrderedHashTable {
     using Mapping = typename DeviceOrderedHashTable<IdType>::Mapping;
 
     /**
-    * \brief Create a new ordered hash table.
+    * \brief Create a new ordered hash table. The amoutn of GPU memory
+    * consumed by the resulting hashtable is O(`size` * 2^`scale`).
     *
     * \param size The number of items to insert into the hashtable.
     * \param ctx The device context to store the hashtable on.

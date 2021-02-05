@@ -147,6 +147,12 @@ size_t TableSize(
   return next_pow2 << scale;
 }
 
+/**
+* @brief This structure is used with cub's block-level prefixscan in order to
+* keep a running sum as items are iteratively processed.
+*
+* @tparam IdType The type to perform the prefixsum on.
+*/
 template<typename IdType>
 struct BlockPrefixCallbackOp {
   IdType running_total_;
@@ -166,20 +172,20 @@ struct BlockPrefixCallbackOp {
 }  // namespace
 
 /**
-* \brief This generates a hash map where the keys are the global node numbers,
+* \brief This generates a hash map where the keys are the global item numbers,
 * and the values are indexes, and inputs may have duplciates.
 *
 * \tparam IdType The type of of id.
 * \tparam BLOCK_SIZE The size of the thread block.
 * \tparam TILE_SIZE The number of entries each thread block will process.
-* \param nodes The nodes to insert.
-* \param num_nodes The number of nodes to insert.
+* \param items The items to insert.
+* \param num_items The number of items to insert.
 * \param table The hash table.
 */
 template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void generate_hashmap_duplicates(
-    const IdType * const nodes,
-    const int64_t num_nodes,
+    const IdType * const items,
+    const int64_t num_items,
     MutableDeviceOrderedHashTable<IdType> table) {
   assert(BLOCK_SIZE == blockDim.x);
 
@@ -188,27 +194,27 @@ __global__ void generate_hashmap_duplicates(
 
   #pragma unroll
   for (size_t index = threadIdx.x + block_start; index < block_end; index += BLOCK_SIZE) {
-    if (index < num_nodes) {
-      table.Insert(nodes[index], index);
+    if (index < num_items) {
+      table.Insert(items[index], index);
     }
   }
 }
 
 /**
-* \brief This generates a hash map where the keys are the global node numbers,
+* \brief This generates a hash map where the keys are the global item numbers,
 * and the values are indexes, and all inputs are unique.
 *
 * \tparam IdType The type of of id.
 * \tparam BLOCK_SIZE The size of the thread block.
 * \tparam TILE_SIZE The number of entries each thread block will process.
-* \param nodes The unique nodes to insert.
-* \param num_nodes The number of nodes to insert.
+* \param items The unique items to insert.
+* \param num_items The number of items to insert.
 * \param table The hash table.
 */
 template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void generate_hashmap_unique(
-    const IdType * const nodes,
-    const int64_t num_nodes,
+    const IdType * const items,
+    const int64_t num_items,
     MutableDeviceOrderedHashTable<IdType> table) {
   assert(BLOCK_SIZE == blockDim.x);
 
@@ -219,10 +225,10 @@ __global__ void generate_hashmap_unique(
 
   #pragma unroll
   for (size_t index = threadIdx.x + block_start; index < block_end; index += BLOCK_SIZE) {
-    if (index < num_nodes) {
-      const Iterator pos = table.Insert(nodes[index], index);
+    if (index < num_items) {
+      const Iterator pos = table.Insert(items[index], index);
 
-      // since we are only inserting unique nodes, we know their local id
+      // since we are only inserting unique items, we know their local id
       // will be equal to their index
       pos->local = static_cast<IdType>(index);
     }
@@ -235,19 +241,18 @@ __global__ void generate_hashmap_unique(
 * \tparam IdType The type of of id.
 * \tparam BLOCK_SIZE The size of the thread block.
 * \tparam TILE_SIZE The number of entries each thread block will process.
-* \param nodes The nodes ot insert.
-* \param num_nodes The number of nodes to insert.
-* \param hash_size The size of the hash table.
-* \param pairs The hash table.
-* \param num_unique_nodes The number of nodes inserted into the hash table per thread
+* \param input The nodes to insert.
+* \param num_input The number of nodes to insert.
+* \param table The hash table.
+* \param num_unique The number of nodes inserted into the hash table per thread
 * block.
 */
 template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void count_hashmap(
-    const IdType * nodes,
-    const size_t num_nodes,
+    const IdType * items,
+    const size_t num_items,
     DeviceOrderedHashTable<IdType> table,
-    IdType * const num_unique_nodes) {
+    IdType * const num_unique) {
   assert(BLOCK_SIZE == blockDim.x);
 
   using BlockReduce = typename cub::BlockReduce<IdType, BLOCK_SIZE>;
@@ -260,8 +265,8 @@ __global__ void count_hashmap(
 
   #pragma unroll
   for (size_t index = threadIdx.x + block_start; index < block_end; index += BLOCK_SIZE) {
-    if (index < num_nodes) {
-      const Mapping& mapping = *table.Search(nodes[index]);
+    if (index < num_items) {
+      const Mapping& mapping = *table.Search(items[index]);
       if (mapping.index == index) {
         ++count;
       }
@@ -273,9 +278,9 @@ __global__ void count_hashmap(
   count = BlockReduce(temp_space).Sum(count);
 
   if (threadIdx.x == 0) {
-    num_unique_nodes[blockIdx.x] = count;
+    num_unique[blockIdx.x] = count;
     if (blockIdx.x == 0) {
-      num_unique_nodes[gridDim.x] = 0;
+      num_unique[gridDim.x] = 0;
     }
   }
 }
@@ -287,23 +292,22 @@ __global__ void count_hashmap(
 * \tparam IdType The type of id.
 * \tparam BLOCK_SIZE The size of the thread blocks.
 * \tparam TILE_SIZE The number of elements each thread block works on.
-* \param nodes The set of non-unique nodes to update from.
-* \param num_nodes The number of non-unique nodes.
-* \param hash_size The size of the hash table.
-* \param mappings The hash table.
-* \param num_nodes_prefix The number of unique nodes preceding each thread
+* \param items The set of non-unique items to update from.
+* \param num_items The number of non-unique items.
+* \param table The hash table.
+* \param num_items_prefix The number of unique items preceding each thread
 * block.
-* \param global_nodes The set of unique nodes (output).
-* \param global_node_count The number of unique nodes (output).
+* \param unique_items The set of unique items (output).
+* \param num_unique_items The number of unique items (output).
 */
 template<typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void compact_hashmap(
-    const IdType * const nodes,
-    const size_t num_nodes,
+    const IdType * const items,
+    const size_t num_items,
     MutableDeviceOrderedHashTable<IdType> table,
-    const IdType * const num_nodes_prefix,
-    IdType * const global_nodes,
-    int64_t * const global_node_count) {
+    const IdType * const num_items_prefix,
+    IdType * const unique_items,
+    int64_t * const num_unique_items) {
   assert(BLOCK_SIZE == blockDim.x);
 
   using FlagType = uint16_t;
@@ -314,7 +318,7 @@ __global__ void compact_hashmap(
 
   __shared__ typename BlockScan::TempStorage temp_space;
 
-  const IdType offset = num_nodes_prefix[blockIdx.x];
+  const IdType offset = num_items_prefix[blockIdx.x];
 
   BlockPrefixCallbackOp<FlagType> prefix_op(0);
 
@@ -324,8 +328,8 @@ __global__ void compact_hashmap(
 
     FlagType flag;
     Mapping * kv;
-    if (index < num_nodes) {
-      kv = table.Search(nodes[index]);
+    if (index < num_items) {
+      kv = table.Search(items[index]);
       flag = kv->index == index;
     } else {
       flag = 0;
@@ -341,12 +345,12 @@ __global__ void compact_hashmap(
     if (kv) {
       const IdType pos = offset+flag;
       kv->local = pos;
-      global_nodes[pos] = nodes[index];
+      unique_items[pos] = items[index];
     }
   }
 
   if (threadIdx.x == 0 && blockIdx.x == 0) {
-    *global_node_count = num_nodes_prefix[gridDim.x];
+    *num_unique_items = num_items_prefix[gridDim.x];
   }
 }
 
