@@ -10,41 +10,6 @@ The DGL's built-in LegacyTUDataset. This is a serial of graph kernel datasets fo
 
 NOTE: Since there is no data attributes in some of these datasets, we use node_id (in one-hot vector whose length is the max number of nodes across all graphs) as the node feature. Also note that the node_id in some datasets is not unique (e.g. a graph may has two nodes with the same id).
 
-DD
-- NumGraphs: 1178
-- AvgNodesPerGraph: 284.32
-- AvgEdgesPerGraph: 715.66
-- NumFeats: 89
-- NumClasses: 2
-
-PROTEINS
-- NumGraphs: 1113
-- AvgNodesPerGraph: 39.06
-- AvgEdgesPerGraph: 72.82
-- NumFeats: 1
-- NumClasses: 2
-
-NCI1
-- NumGraphs: 4110
-- AvgNodesPerGraph: 29.87
-- AvgEdgesPerGraph: 32.30
-- NumFeats: 37
-- NumClasses: 2
-
-NCI109
-- NumGraphs: 4127
-- AvgNodesPerGraph: 29.68
-- AvgEdgesPerGraph: 32.13
-- NumFeats: 38
-- NumClasses: 2
-
-Mutagenicity
-- NumGraphs: 4337
-- AvgNodesPerGraph: 30.32
-- AvgEdgesPerGraph: 30.77
-- NumFeats: 14
-- NumClasses: 2
-
 |                  | DD     | PROTEINS | NCI1  | NCI109 | Mutagenicity |
 | ---------------- | ------ | -------- | ----- | ------ | ------------ |
 | NumGraphs        | 1178   | 1113     | 4110  | 4127   | 4337         |
