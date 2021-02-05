@@ -229,7 +229,7 @@ def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     device = input.device
     if not is_tensor(lengths):
-        lengths = th.LongTensor(lengths, device=device)
+        lengths = th.tensor(lengths, dtype=th.int64, device=device)
     else:
         lengths = lengths.to(device)
     max_len = as_scalar(lengths.max())
@@ -251,7 +251,7 @@ def pack_padded_tensor(input, lengths):
     _, max_len = input.shape[:2]
     device = input.device
     if not is_tensor(lengths):
-        lengths = th.LongTensor(lengths, device=device)
+        lengths = th.tensor(lengths, dtype=th.int64, device=device)
     else:
         lengths = lengths.to(device)
     input = input.view(-1, *input.shape[2:])
