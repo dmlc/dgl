@@ -594,7 +594,7 @@ def _topk_on(graph, typestr, feat, k, descending, sortby, ntype_or_etype):
                 F.cat([F.arange(0, hidden_size)] * batch_size * k, -1)
         shift = F.copy_to(shift, F.context(feat))
         topk_indices_ = F.reshape(topk_indices, (-1,)) * hidden_size + shift
-    
+
     out = F.reshape(F.gather_row(feat_, topk_indices_), (batch_size, k, -1))
     out = F.replace_inf_with_zero(out)
 
