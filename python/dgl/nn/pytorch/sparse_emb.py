@@ -75,16 +75,15 @@ class NodeEmbedding: # NodeEmbedding
             emb = create_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
             if init_func is not None:
                 emb = init_func(emb)
-        if rank == 0:
-            if world_size > 1:
-                # for multi-gpu training, setup a TCPStore for
-                # embeding status synchronization across GPU processes
-                if _STORE is None:
-                    _STORE = th.distributed.TCPStore(
-                        host_name, port, world_size, True, timedelta(seconds=30))
-                for _ in range(1, world_size):
-                    # send embs
-                    _STORE.set(name, name)
+        if rank == 0: # the master gpu process
+            # for multi-gpu training, setup a TCPStore for
+            # embeding status synchronization across GPU processes
+            if _STORE is None:
+                _STORE = th.distributed.TCPStore(
+                    host_name, port, world_size, True, timedelta(seconds=30))
+            for _ in range(1, world_size):
+                # send embs
+                _STORE.set(name, name)
         elif rank > 0:
             # receive
             if _STORE is None:

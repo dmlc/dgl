@@ -48,8 +48,6 @@ def train(model:torch.nn.Module, optimizer, trainloader,
     for batch in trainloader:
         optimizer.zero_grad()
         batch_graphs, batch_labels = batch
-        for (key, value) in batch_graphs.ndata.items():
-            batch_graphs.ndata[key] = value.float()
         batch_graphs = batch_graphs.to(device)
         batch_labels = batch_labels.long().to(device)
         out, l1, l2 = model(batch_graphs, 
@@ -74,8 +72,6 @@ def test(model:torch.nn.Module, loader, device):
     for batch in loader:
         batch_graphs, batch_labels = batch
         num_graphs += batch_labels.size(0)
-        for (key, value) in batch_graphs.ndata.items():
-            batch_graphs.ndata[key] = value.float()
         batch_graphs = batch_graphs.to(device)
         batch_labels = batch_labels.long().to(device)
         out, _, _ = model(batch_graphs, batch_graphs.ndata["feat"])

@@ -221,7 +221,7 @@ updating the model.
     opt = torch.optim.Adam(model.parameters())
     for epoch in range(20):
         for batched_graph, labels in dataloader:
-            feats = batched_graph.ndata['attr'].float()
+            feats = batched_graph.ndata['attr']
             logits = model(batched_graph, feats)
             loss = F.cross_entropy(logits, labels)
             opt.zero_grad()
