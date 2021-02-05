@@ -304,8 +304,8 @@ MapEdges(
         edges.dst.Ptr<IdType>(),
         new_rhs.back().Ptr<IdType>(),
         num_edges,
-        node_map.LhsHashTable(src_type).ToDevice(),
-        node_map.RhsHashTable(dst_type).ToDevice());
+        node_map.LhsHashTable(src_type).DeviceHandle(),
+        node_map.RhsHashTable(dst_type).DeviceHandle());
       CUDA_CALL(cudaGetLastError());
     } else {
       new_lhs.emplace_back(aten::NullArray());

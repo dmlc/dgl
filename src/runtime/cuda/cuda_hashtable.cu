@@ -21,6 +21,12 @@ namespace {
 constexpr static const int BLOCK_SIZE = 256;
 constexpr static const size_t TILE_SIZE = 1024;
 
+/**
+* @brief This is the mutable version of the DeviceOrderedHashTable, for use in
+* inserting elements into the hashtable.
+*
+* @tparam IdType The type of ID to store in the hashtable.
+*/
 template<typename IdType>
 class MutableDeviceOrderedHashTable : public DeviceOrderedHashTable<IdType> {
  public:
@@ -34,7 +40,7 @@ class MutableDeviceOrderedHashTable : public DeviceOrderedHashTable<IdType> {
   */
   explicit MutableDeviceOrderedHashTable(
       OrderedHashTable<IdType>* const hostTable) :
-    DeviceOrderedHashTable<IdType>(hostTable->ToDevice()) {
+    DeviceOrderedHashTable<IdType>(hostTable->DeviceHandle()) {
   }
 
   /**
@@ -105,6 +111,13 @@ class MutableDeviceOrderedHashTable : public DeviceOrderedHashTable<IdType> {
   }
 
  private:
+  /**
+  * @brief Get a mutable iterator to the given bucket in the hashtable.
+  *
+  * @param pos The given bucket.
+  *
+  * @return The iterator.
+  */
   inline __device__ Iterator GetMutable(const size_t pos) {
     assert(pos < this->size_);
     // The parent class Device is read-only, but we ensure this can only be
@@ -151,8 +164,6 @@ struct BlockPrefixCallbackOp {
 };
 
 }  // namespace
-
-
 
 /**
 * \brief This generates a hash map where the keys are the global node numbers,
@@ -339,6 +350,23 @@ __global__ void compact_hashmap(
   }
 }
 
+// DeviceOrderedHashTable implementation
+
+template<typename IdType>
+DeviceOrderedHashTable<IdType>::DeviceOrderedHashTable(
+    const Mapping* const table,
+    const size_t size) :
+  table_(table),
+  size_(size) {
+}
+
+template<typename IdType>
+DeviceOrderedHashTable<IdType> OrderedHashTable<IdType>::DeviceHandle() const {
+  return DeviceOrderedHashTable<IdType>(table_, size_);
+}
+
+// OrderedHashTable implementation
+
 template<typename IdType>
 OrderedHashTable<IdType>::OrderedHashTable(
     const size_t size,
@@ -366,19 +394,6 @@ template<typename IdType>
 OrderedHashTable<IdType>::~OrderedHashTable() {
   auto device = runtime::DeviceAPI::Get(ctx_);
   device->FreeWorkspace(ctx_, table_);
-}
-
-template<typename IdType>
-DeviceOrderedHashTable<IdType>::DeviceOrderedHashTable(
-    const Mapping* const table,
-    const size_t size) :
-  table_(table),
-  size_(size) {
-}
-
-template<typename IdType>
-DeviceOrderedHashTable<IdType> OrderedHashTable<IdType>::ToDevice() const {
-  return DeviceOrderedHashTable<IdType>(table_, size_);
 }
 
 template<typename IdType>

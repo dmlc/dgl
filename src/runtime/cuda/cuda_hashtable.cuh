@@ -19,6 +19,49 @@ namespace cuda {
 template<typename>
 class OrderedHashTable;
 
+/*!
+ * \brief A device-side handle for a GPU hashtable for mapping items to the
+ * first index at which they appear in the provided data array.
+ *
+ * For any ID array A, one can view it as a mapping from the index `i`
+ * (continuous integer range from zero) to its element `A[i]`. This hashtable
+ * serves as a reverse mapping, i.e., from element `A[i]` to its index `i`.
+ * Quadratic probing is used for collision resolution. See
+ * DeviceOrderedHashTable's documentation for how the Mapping structure is
+ * used.
+ *
+ * The hash table should be used in two phases, with the first being populating
+ * the hash table with the OrderedHashTable object, and then generating this 
+ * handle from it. This object can then be used to search the hash table,
+ * to find mappings, from with CUDA code.
+ *
+ * If a device-side handle is created from a hash table with the following
+ * entries:
+ * [
+ *   {key: 0, local: 0, index: 0},
+ *   {key: 3, local: 1, index: 1},
+ *   {key: 2, local: 2, index: 2},
+ *   {key: 8, local: 3, index: 4},
+ *   {key: 4, local: 4, index: 5},
+ *   {key: 1, local: 5, index: 8}
+ * ]
+ * The array [0, 3, 2, 0, 8, 4, 3, 2, 1, 8] could have `Search()` called on
+ * each id, to be mapped via:
+ * ```
+ * __global__ void map(int32_t * array,
+ *                     size_t size,
+ *                     DeviceOrderedHashTable<int32_t> table) {
+ *   int idx = threadIdx.x + blockIdx.x*blockDim.x;
+ *   if (idx < size) {
+ *     array[idx] = table.Search(array[idx])->local;
+ *   }
+ * }
+ * ```
+ * to get the remaped array:
+ * [0, 1, 2, 0, 3, 4, 1, 2, 5, 3]
+ *
+ * \tparam IdType The type of the IDs.
+ */
 template<typename IdType>
 class DeviceOrderedHashTable {
   public:
@@ -72,6 +115,12 @@ class DeviceOrderedHashTable {
     const Mapping * table_;
     size_t size_;
 
+    /**
+    * @brief Create a new device-side handle to the hash table.
+    *
+    * @param table The table stored in GPU memory.
+    * @param size The size of the table.
+    */
     explicit DeviceOrderedHashTable(
         const Mapping * table,
         size_t size);
@@ -118,13 +167,33 @@ class DeviceOrderedHashTable {
 };
 
 /*!
- * \brief A hashtable for mapping items to the first index at which they
- * appear in the provided data array.
+ * \brief A host-side handle for a GPU hashtable for mapping items to the
+ * first index at which they appear in the provided data array. This host-side
+ * handle is responsible for allocating and free the GPU memory of the
+ * hashtable.
  *
  * For any ID array A, one can view it as a mapping from the index `i`
  * (continuous integer range from zero) to its element `A[i]`. This hashtable
- * serves as a reverse mapping, i.e., from element `A[i]` to its index `i`. It
- * uses quadratic probing for collisions.
+ * serves as a reverse mapping, i.e., from element `A[i]` to its index `i`.
+ * Quadratic probing is used for collision resolution.
+ *
+ * The hash table should be used in two phases, the first is filling the hash
+ * table via 'FillWithDuplicates()' or 'FillWithUnique()'. Then, the
+ * 'DeviceHandle()' method can be called, to get a version suitable for
+ * searching from device and kernel functions.
+ *
+ * If 'FillWithDuplicates()' was called with an array of:
+ * [0, 3, 2, 0, 8, 4, 3, 2, 1, 8]
+ *
+ * The resulting entries in the hash-table would be:
+ * [
+ *   {key: 0, local: 0, index: 0},
+ *   {key: 3, local: 1, index: 1},
+ *   {key: 2, local: 2, index: 2},
+ *   {key: 8, local: 3, index: 4},
+ *   {key: 4, local: 4, index: 5},
+ *   {key: 1, local: 5, index: 8}
+ * ]
  *
  * \tparam IdType The type of the IDs.
  */
@@ -195,7 +264,7 @@ class OrderedHashTable {
     * 
     * @return This hashtable.
     */
-    DeviceOrderedHashTable<IdType> ToDevice() const;
+    DeviceOrderedHashTable<IdType> DeviceHandle() const;
 
   private:
     Mapping * table_;
