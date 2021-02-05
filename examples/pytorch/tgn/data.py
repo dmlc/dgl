@@ -8,6 +8,8 @@ import requests
 import os
 from functools import partial
 from tqdm import tqdm
+import ssl
+from six.moves import urllib
 
 # TODO: Preprocesser
 def preprocess(data_name):
@@ -95,10 +97,10 @@ def TemporalWikipediaDataset():
 
             url = 'https://snap.stanford.edu/jodie/wikipedia.csv'
             print("Start Downloading File....")
-            r = requests.get(url,stream=True)
+            context = ssl._create_unverified_context()
+            data = urllib.request.urlopen(url,context=context)
             with open("./data/wikipedia.csv","wb") as handle:
-                for data in tqdm(r.iter_content()):
-                    handle.write(data)
+                handle.write(data.read())
 
         print("Start Process Data ...")
         run('wikipedia')
@@ -128,10 +130,10 @@ def TemporalRedditDataset():
 
             url = 'https://snap.stanford.edu/jodie/reddit.csv'
             print("Start Downloading File....")
-            r = requests.get(url,stream=True)
+            context = ssl._create_unverified_context()
+            data = urllib.request.urlopen(url,context = context)
             with open("./data/reddit.csv","wb") as handle:
-                for data in tqdm(r.iter_content()):
-                    handle.write(data)
+                handle.write(data.read())
 
         print("Start Process Data ...")
         run('reddit')
@@ -238,8 +240,6 @@ class TemporalDataLoader:
         
         # 
         self.d_nn_mask_g = DictNode(self.d_g,self.nn_mask_g.ndata[dgl.NID])
-        #self.parentn_id = self.nn_mask_g.ndata[dgl.NID].clone()
-        #self.parente_id = self.nn_mask_g.edata[dgl.EID].clone()
         # Divide the training validation and test subgraph
         # Remapping
         train_div = probe_division(self.nn_mask_g,train_div)
@@ -308,7 +308,9 @@ class TemporalDataLoader:
             frontier = self.graph_dict[mode].ndata[dgl.NID][nodes].tolist()
             graph = self.nn_mask_bg
             dict_ = self.d_nn_mask_g
-        
+        # Sampler for pure profiling
+        #sg_prof = self.sampler(g=graph,nodes = nodes)
+        # End
         # All Neighbor regardless of time
         full_neighbor_subgraph = dgl.in_subgraph(graph,frontier)
         full_neighbor_subgraph = dgl.add_edges(full_neighbor_subgraph,
