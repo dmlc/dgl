@@ -358,7 +358,7 @@ class PinSAGECollator(object):
         assign_features_to_blocks(blocks, self.g, self.textset, self.ntype)
         return blocks
 
-@utils.benchmark('time', 36000)
+@utils.benchmark('time', 600)
 @utils.parametrize('data', ['nowplaying_rs'])
 def track_time(data):
     dataset = utils.process_data(data)

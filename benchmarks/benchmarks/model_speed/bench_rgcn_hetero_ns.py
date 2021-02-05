@@ -227,7 +227,7 @@ class EntityClassify(nn.Module):
             h = layer(block, h)
         return h
 
-@utils.benchmark('time', 3600)
+@utils.benchmark('time', 600)
 @utils.parametrize('data', ['am', 'ogbn-mag'])
 def track_time(data):
     dataset = utils.process_data(data)

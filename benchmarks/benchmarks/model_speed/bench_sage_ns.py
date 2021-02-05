@@ -47,7 +47,7 @@ def load_subtensor(g, seeds, input_nodes, device):
     batch_labels = g.ndata['labels'][seeds].to(device)
     return batch_inputs, batch_labels
 
-@utils.benchmark('time', 3600)
+@utils.benchmark('time', 600)
 @utils.parametrize('data', ['reddit', 'ogbn-products'])
 def track_time(data):
     data = utils.process_data(data)

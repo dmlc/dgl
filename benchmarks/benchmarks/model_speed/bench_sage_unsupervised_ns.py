@@ -89,7 +89,7 @@ class CrossEntropyLoss(nn.Module):
         loss = F.binary_cross_entropy_with_logits(score, label.float())
         return loss
 
-@utils.benchmark('time', 72000)
+@utils.benchmark('time', 600)
 @utils.parametrize('data', ['reddit'])
 def track_time(data):
     data = utils.process_data(data)

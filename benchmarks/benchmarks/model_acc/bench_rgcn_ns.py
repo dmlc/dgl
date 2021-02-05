@@ -196,7 +196,7 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
     return eval_logits, eval_seeds
 
 
-@utils.benchmark('time', 3600)
+@utils.benchmark('time', 600)
 @utils.parametrize('data', ['am', 'ogbn-mag'])
 def track_acc(data):
     dataset = utils.process_data(data)
