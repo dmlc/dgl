@@ -572,7 +572,7 @@ def _topk_on(graph, typestr, feat, k, descending, sortby, ntype_or_etype):
     if F.backend_name == 'pytorch' and sortby is not None:
         # PyTorch's implementation of top-K
         keys = feat_[..., sortby]  # (batch_size, l)
-        return _topk_torch(keys, k, descending, feat_, batch_num_objs)
+        return _topk_torch(keys, k, descending, feat_)
 
     # Fallback to framework-agnostic implementation of top-K
     if sortby is not None:
@@ -594,9 +594,11 @@ def _topk_on(graph, typestr, feat, k, descending, sortby, ntype_or_etype):
                 F.cat([F.arange(0, hidden_size)] * batch_size * k, -1)
         shift = F.copy_to(shift, F.context(feat))
         topk_indices_ = F.reshape(topk_indices, (-1,)) * hidden_size + shift
+    
+    out = F.reshape(F.gather_row(feat_, topk_indices_), (batch_size, k, -1))
+    out = F.replace_inf_with_zero(out)
 
-    return F.replace_inf_with_zero(F.reshape(F.gather_row(feat_, topk_indices_), (batch_size, k, -1))),\
-        topk_indices
+    return out, topk_indices
 
 def topk_nodes(graph, feat, k, *, descending=True, sortby=None, ntype=None):
     """Return a graph-level representation by a graph-wise top-k on
