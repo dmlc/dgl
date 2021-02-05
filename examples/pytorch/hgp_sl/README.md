@@ -62,14 +62,24 @@ How to run example files
 In the HGP-SL-DGL folder, run
 
 ```bash
-python main.py --dataset ${your_dataset_name_here}
+python main.py --dataset ${your_dataset_name_here} [hyper-parameters]
 ```
 
 If want to use a GPU, run
 
 ```bash
-python main.py --device ${your_device_id_here} --dataset ${your_dataset_name_here}
+python main.py --device ${your_device_id_here} --dataset ${your_dataset_name_here} [hyper-parameters]
 ```
+
+For example, to perform experiments on DD dataset on GPU, run:
+
+```bash
+python main.py --device 0 --dataset DD --lr 0.0001 --batch_size 64 --pool_ratio 0.3 --dropout 0.5 --conv_layers 2
+```
+
+NOTE: Be careful when modifying `batch_size` and `pool_ratio` for large dataset like DD. Too large batch size or pooling ratio may cause out-of-memory and other severe errors.
+
+You can find the detailed hyper-parameter settings below (in the Performance section).
 
 Performance
 -------------------------
