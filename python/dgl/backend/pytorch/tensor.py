@@ -227,8 +227,11 @@ def randint(shape, dtype, ctx, low, high):
 
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
+    device = input.device
     if not is_tensor(lengths):
-        lengths = th.LongTensor(lengths, device=input.device)
+        lengths = th.LongTensor(lengths, device=device)
+    else:
+        lengths = lengths.to(device)
     max_len = as_scalar(lengths.max())
 
     if l_min is not None:
@@ -237,7 +240,7 @@ def pad_packed_tensor(input, lengths, value, l_min=None):
     batch_size = len(lengths)
     x = input.new(batch_size * max_len, *old_shape[1:])
     x.fill_(value)
-    index = th.ones(len(input), dtype=th.int64, device=input.device)
+    index = th.ones(len(input), dtype=th.int64, device=device)
     cum_lengths = th.cumsum(lengths, 0)
     index[cum_lengths[:-1]] += (max_len - lengths[:-1])
     index = th.cumsum(index, 0) - 1
@@ -246,11 +249,14 @@ def pad_packed_tensor(input, lengths, value, l_min=None):
 
 def pack_padded_tensor(input, lengths):
     _, max_len = input.shape[:2]
+    device = input.device
     if not is_tensor(lengths):
-        lengths = th.LongTensor(lengths, device=input.device)
+        lengths = th.LongTensor(lengths, device=device)
+    else:
+        lengths = lengths.to(device)
     input = input.view(-1, *input.shape[2:])
     out_len = lengths.sum().item()
-    index = th.ones(out_len, dtype=th.int64, device=input.device)
+    index = th.ones(out_len, dtype=th.int64, device=device)
     cum_lengths = th.cumsum(lengths, 0)
     index[cum_lengths[:-1]] += (max_len - lengths[:-1])
     index = th.cumsum(index, 0) - 1
