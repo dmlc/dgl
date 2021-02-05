@@ -157,8 +157,7 @@ all node types.
 .. code:: python
 
     # Define a Heterograph Conv model
-    import dgl.nn as dglnn
-    
+
     class RGCN(nn.Module):
         def __init__(self, in_feats, hid_feats, out_feats, rel_names):
             super().__init__()

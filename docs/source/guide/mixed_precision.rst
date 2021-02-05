@@ -5,7 +5,7 @@ Chapter 8: Mixed Precision Training
 DGL is compatible with `PyTorch's automatic mixed precision package
 <https://pytorch.org/docs/stable/amp.html>`_
 for mixed precision training, thus saving both training time and GPU memory
-consumption. To enable this feature, users need to install PyTorch 1.6+ and
+consumption. To enable this feature, users need to install PyTorch 1.6+ with python 3.7+ and
 build DGL from source file to support ``float16`` data type (this feature is
 still in its beta stage and we do not provide official pre-built pip wheels).
 
