@@ -10,7 +10,7 @@ from .. import utils
 @utils.benchmark('time', timeout=600)
 @utils.parametrize('feat_size', [32, 128, 512])
 @utils.parametrize('num_relations', [5, 50, 500])
-@utils.parametrize('multi_reduce_type', ["sum", "stuck"])
+@utils.parametrize('multi_reduce_type', ["sum", "stack"])
 def track_time(feat_size, num_relations, multi_reduce_type):
     device = utils.get_bench_device()
     dd = {}
@@ -37,11 +37,11 @@ def track_time(feat_size, num_relations, multi_reduce_type):
         multi_reduce_type)
 
     # timing
-    t0 = time.time()
-    for i in range(3):
-        graph.multi_update_all(
-            update_dict,
-            multi_reduce_type)
-    t1 = time.time()
+    
+    with utils.Timer() as t:
+        for i in range(3):
+            graph.multi_update_all(
+                update_dict,
+                multi_reduce_type)
 
-    return (t1 - t0) / 3
+    return t.elapsed_secs / 3

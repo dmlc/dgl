@@ -49,7 +49,7 @@ class GINDataset(DGLBuiltinDataset):
     >>> g, label = data[128]
     >>> g
     Graph(num_nodes=13, num_edges=26,
-          ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float64)}
+          ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float32)}
           edata_schemes={})
     >>> label
     tensor(1)
@@ -61,7 +61,7 @@ class GINDataset(DGLBuiltinDataset):
     >>> batched_labels = torch.tensor(labels)
     >>> batched_graphs
     Graph(num_nodes=330, num_edges=748,
-          ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float64)}
+          ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float32)}
           edata_schemes={})
     """
 
@@ -175,7 +175,6 @@ class GINDataset(DGLBuiltinDataset):
                     if tmp == len(nrow):
                         # no node attributes
                         nrow = [int(w) for w in nrow]
-                        nattr = None
                     elif tmp > len(nrow):
                         nrow = [int(w) for w in nrow[:tmp]]
                         nattr = [float(w) for w in nrow[tmp:]]
@@ -208,10 +207,8 @@ class GINDataset(DGLBuiltinDataset):
 
                 if nattrs != []:
                     nattrs = np.stack(nattrs)
-                    g.ndata['attr'] = F.tensor(nattrs)
+                    g.ndata['attr'] = F.tensor(nattrs, F.float32)
                     self.nattrs_flag = True
-                else:
-                    nattrs = None
 
                 g.ndata['label'] = F.tensor(nlabels)
                 if len(self.nlabel_dict) > 1:
@@ -230,7 +227,6 @@ class GINDataset(DGLBuiltinDataset):
         if not self.nattrs_flag:
             if self.verbose:
                 print('there are no node features in this dataset!')
-            label2idx = {}
             # generate node attr by node degree
             if self.degree_as_nlabel:
                 if self.verbose:
@@ -265,7 +261,7 @@ class GINDataset(DGLBuiltinDataset):
                     g.number_of_nodes(), len(label2idx)))
                 attr[range(g.number_of_nodes()), [label2idx[nl]
                                                   for nl in F.asnumpy(g.ndata['label']).tolist()]] = 1
-                g.ndata['attr'] = F.tensor(attr)
+                g.ndata['attr'] = F.tensor(attr, F.float32)
 
         # after load, get the #classes and #dim
         self.gclasses = len(self.glabel_dict)
