@@ -485,6 +485,31 @@ READOUT_ON_ATTRS = {
     'edges': ('edata', 'batch_num_edges', 'number_of_edges'),
 }
 
+def _topk_torch(keys, k, descending, x):
+    """Internal function to take graph-wise top-k node/edge features according to
+    the rank given by keys, this function is PyTorch only.
+
+    Parameters
+    ----------
+    keys : Tensor
+        The key for ranking.
+    k : int
+        The :math:`k` in "top-:math:`k`".
+    descending : bool
+        Indicates whether to return the feature corresponding to largest or
+        smallest elements.
+    x : Tensor
+        The padded feature with shape (batch, max_len, *)
+    """
+    import torch as th
+    batch_size, max_len = x.shape[0], x.shape[1]
+    topk_indices = keys.topk(k, -1, largest=descending)[1]  # (batch_size, k)
+    x = x.view((batch_size * max_len), -1)
+    shift = th.arange(0, batch_size, device=x.device).view(batch_size, 1) * max_len
+    topk_indices_ = topk_indices + shift
+    x = x[topk_indices_].view(batch_size, k, -1)
+    return th.masked_fill(x, th.isinf(x), 0), topk_indices
+
 def _topk_on(graph, typestr, feat, k, descending, sortby, ntype_or_etype):
     """Internal function to take graph-wise top-k node/edge features of
     field :attr:`feat` in :attr:`graph` ranked by keys at given
@@ -543,41 +568,38 @@ def _topk_on(graph, typestr, feat, k, descending, sortby, ntype_or_etype):
     length = max(max(F.asnumpy(batch_num_objs)), k)
     fill_val = -float('inf') if descending else float('inf')
     feat_ = F.pad_packed_tensor(feat, batch_num_objs, fill_val, l_min=k)  # (batch_size, l, d)
+
     if F.backend_name == 'pytorch' and sortby is not None:
-        import torch as th
+        # PyTorch's implementation of top-K
         keys = feat_[..., sortby]  # (batch_size, l)
-        topk_indices = keys.topk(k, -1, largest=descending)[1]  # (batch_size, k)
-        feat_ = F.pad_packed_tensor(feat, batch_num_objs, 0, l_min=k)
-        feat_ = feat_.view((batch_size * length), -1)
-        shift = th.arange(0, batch_size, device=feat_.device).view(batch_size, 1) * length
-        topk_indices_ = topk_indices + shift
-        return feat_[topk_indices_].view(batch_size, k, -1), topk_indices
+        return _topk_torch(keys, k, descending, feat_, batch_num_objs)
+
+    # Fallback to framework-agnostic implementation of top-K
+    if sortby is not None:
+        keys = F.squeeze(F.slice_axis(feat_, -1, sortby, sortby+1), -1)
+        order = F.argsort(keys, -1, descending=descending)
     else:
-        if sortby is not None:
-            keys = F.squeeze(F.slice_axis(feat_, -1, sortby, sortby+1), -1)
-            order = F.argsort(keys, -1, descending=descending)
-        else:
-            order = F.argsort(feat_, 1, descending=descending)
+        order = F.argsort(feat_, 1, descending=descending)
 
-        topk_indices = F.slice_axis(order, 1, 0, k)
+    topk_indices = F.slice_axis(order, 1, 0, k)
 
-        # zero padding
-        feat_ = F.pad_packed_tensor(feat, batch_num_objs, 0, l_min=k)
+    # zero padding
+    feat_ = F.pad_packed_tensor(feat, batch_num_objs, 0, l_min=k)
 
-        if sortby is not None:
-            feat_ = F.reshape(feat_, (batch_size * length, -1))
-            shift = F.repeat(F.arange(0, batch_size) * length, k, -1)
-            shift = F.copy_to(shift, F.context(feat))
-            topk_indices_ = F.reshape(topk_indices, (-1,)) + shift
-        else:
-            feat_ = F.reshape(feat_, (-1,))
-            shift = F.repeat(F.arange(0, batch_size), k * hidden_size, -1) * length * hidden_size +\
-                    F.cat([F.arange(0, hidden_size)] * batch_size * k, -1)
-            shift = F.copy_to(shift, F.context(feat))
-            topk_indices_ = F.reshape(topk_indices, (-1,)) * hidden_size + shift
+    if sortby is not None:
+        feat_ = F.reshape(feat_, (batch_size * length, -1))
+        shift = F.repeat(F.arange(0, batch_size) * length, k, -1)
+        shift = F.copy_to(shift, F.context(feat))
+        topk_indices_ = F.reshape(topk_indices, (-1,)) + shift
+    else:
+        feat_ = F.reshape(feat_, (-1,))
+        shift = F.repeat(F.arange(0, batch_size), k * hidden_size, -1) * length * hidden_size +\
+                F.cat([F.arange(0, hidden_size)] * batch_size * k, -1)
+        shift = F.copy_to(shift, F.context(feat))
+        topk_indices_ = F.reshape(topk_indices, (-1,)) * hidden_size + shift
 
-        return F.reshape(F.gather_row(feat_, topk_indices_), (batch_size, k, -1)),\
-            topk_indices
+    return F.reshape(F.gather_row(feat_, topk_indices_), (batch_size, k, -1)),\
+        topk_indices
 
 def topk_nodes(graph, feat, k, *, descending=True, sortby=None, ntype=None):
     """Return a graph-level representation by a graph-wise top-k on
