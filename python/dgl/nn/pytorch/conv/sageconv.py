@@ -28,11 +28,11 @@ class SAGEConv(nn.Module):
     If a weight tensor on each edge is provided, the aggregation becomes:
 
     .. math::
-        h_{\mathcal{N}(i)}^{(l+1)} &= \mathrm{aggregate}
+        h_{\mathcal{N}(i)}^{(l+1)} = \mathrm{aggregate}
         \left(\{e_{ji} h_{j}^{l}, \forall j \in \mathcal{N}(i) \}\right)
 
     where :math:`e_{ji}` is the scalar weight on the edge from node :math:`j` to node :math:`i`.
-    Please make sure that `e_{ji}` is broadcastable with `h_j^{l}`.
+    Please make sure that :math:`e_{ji}` is broadcastable with :math:`h_j^{l}`.
 
     Parameters
     ----------
