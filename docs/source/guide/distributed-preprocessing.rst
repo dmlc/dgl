@@ -85,6 +85,8 @@ For a large graph, DGL uses `ParMetis <http://glaros.dtc.umn.edu/gkhome/metis/pa
 a graph in a cluster of machines. This solution requires users to prepare data for ParMETIS and use a DGL script
 `tools/convert_partition.py` to construct :class:`dgl.DGLGraph` for the partitions output by ParMETIS.
 
+**Note**: `convert_partition.py` uses the `pyarrow` package to load csv files. Please install `pyarrow`.
+
 ParMETIS Installation
 ^^^^^^^^^^^^^^^^^^^^^
 
@@ -245,7 +247,8 @@ Convert ParMETIS outputs to DGLGraph
 DGL provides a script named `convert_partition.py`, located in the `tools` directory, to convert the data
 in the partition files into :class:`dgl.DGLGraph` objects and save them into files.
 **Note**: `convert_partition.py` runs in a single machine. In the future, we will extend it to convert
-graph data in parallel across multiple machines.
+graph data in parallel across multiple machines. **Note**: please install the `pyarrow` package
+for loading data in csv files.
 
 `convert_partition.py` has the following arguments:
 
