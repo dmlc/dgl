@@ -7,7 +7,15 @@ Before training, please install some python libs by pip:
 ```bash
 sudo pip3 install ogb
 sudo pip3 install pyinstrument
+sudo pip3 install pyarrow
 ```
+
+To use the example and tools provided by DGL, please clone the DGL Github repository.
+
+```bash
+git clone --recursive https://github.com/dmlc/dgl.git
+```
+Below, we assume the repository is cloned in the home directory.
 
 To train RGCN, it has four steps:
 
@@ -44,7 +52,7 @@ DGL provides a script for copying partitioned data to the cluster. Before that, 
 
 ```bash
 mkdir ~/dgl_code
-cp /home/ubuntu/dgl/examples/pytorch/rgcn/experimental/entity_classify_dist.py ~/dgl_code
+cp ~/dgl/examples/pytorch/rgcn/experimental/entity_classify_dist.py ~/dgl_code
 ```
 
 
