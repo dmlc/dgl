@@ -17,6 +17,6 @@ echo "DGL_BENCH_DEVICE=$DGL_BENCH_DEVICE"
 pushd $ROOT/benchmarks
 cat asv.conf.json
 asv machine --yes
-asv run -e
+asv run -e -v
 asv publish
 popd

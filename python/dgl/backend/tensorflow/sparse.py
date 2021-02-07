@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 from .tensor import tensor, copy_to, context, asnumpy, zerocopy_from_numpy
 from ...base import is_all, ALL
-from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp, _reverse
+from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp
 
 __all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce']
 
@@ -110,7 +110,7 @@ def gspmm_real(gidx, op, reduce_op, X, Y):
     def grad(dZ):
         dZ = tensor(dZ)
         if op != 'copy_rhs':
-            g_rev = _reverse(gidx)
+            g_rev = gidx.reverse()
             if reduce_op == 'sum':
                 if op in ['mul', 'div']:
                     dX = _gspmm(g_rev, 'mul', 'sum', dZ, _muldiv(op, Y))[0]
@@ -172,7 +172,7 @@ def gsddmm_real(gidx, op, X, Y, lhs_target, rhs_target):
     def grad(dZ):
         if op != 'copy_rhs':
             if lhs_target in ['u', 'v']:
-                _gidx = gidx if lhs_target == 'v' else _reverse(gidx)
+                _gidx = gidx if lhs_target == 'v' else gidx.reverse()
                 if op in ['add', 'sub', 'copy_lhs']:
                     dX = _gspmm(_gidx, 'copy_rhs', 'sum', None, dZ)[0]
                 else:  # mul, div, dot
@@ -192,7 +192,7 @@ def gsddmm_real(gidx, op, X, Y, lhs_target, rhs_target):
             dX = tf.zeros_like(X)
         if op != 'copy_lhs':
             if rhs_target in ['u', 'v']:
-                _gidx = gidx if rhs_target == 'v' else _reverse(gidx)
+                _gidx = gidx if rhs_target == 'v' else gidx.reverse()
                 if op in ['add', 'sub', 'copy_rhs']:
                     dY = _gspmm(_gidx, 'copy_rhs', 'sum', None, _addsub(op, dZ))[0]
                 else:  # mul, div, dot
@@ -233,7 +233,7 @@ def edge_softmax_real(gidx, score, eids=ALL, norm_by='dst'):
     if not is_all(eids):
         gidx = gidx.edge_subgraph([eids], True).graph
     if norm_by == 'src':
-        gidx = _reverse(gidx)
+        gidx = gidx.reverse()
     score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
     score = tf.math.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
     score_sum = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
@@ -261,10 +261,10 @@ def segment_reduce_real(op, x, offsets):
     def segment_reduce_backward(dy):
         m = x.shape[0]
         if op == 'sum':
-            offsets_np = asnumpy(offsets[1:-1])
-            indices_np = np.zeros((m,), dtype=offsets_np.dtype)
+            offsets_np = asnumpy(offsets[1:])
+            indices_np = np.zeros((m + 1,), dtype=offsets_np.dtype)
             np.add.at(indices_np, offsets_np, np.ones_like(offsets_np))
-            indices_np = np.cumsum(indices_np, -1)
+            indices_np = np.cumsum(indices_np, -1)[:-1]
             indices = zerocopy_from_numpy(indices_np)
             dx = tf.gather(dy, indices)
         else:

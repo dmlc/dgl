@@ -47,7 +47,7 @@ template <DLDeviceType XPU, typename DType>
 IdArray NonZero(BoolArray bool_arr);
 
 template <DLDeviceType XPU, typename DType>
-std::pair<IdArray, IdArray> Sort(IdArray array);
+std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits);
 
 template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray Scatter(NDArray array, IdArray indices);

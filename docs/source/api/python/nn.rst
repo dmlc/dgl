@@ -26,4 +26,4 @@ GNN-like structures, e.g.
 .. autosummary::
     :toctree: ../../generated/
 
-   nn.functional.edge_softmax
+   functional.edge_softmax

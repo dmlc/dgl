@@ -7,7 +7,15 @@ Before training, please install some python libs by pip:
 ```bash
 sudo pip3 install ogb
 sudo pip3 install pyinstrument
+sudo pip3 install pyarrow
 ```
+
+To use the example and tools provided by DGL, please clone the DGL Github repository.
+
+```bash
+git clone --recursive https://github.com/dmlc/dgl.git
+```
+Below, we assume the repository is cloned in the home directory.
 
 To train RGCN, it has four steps:
 
@@ -44,7 +52,7 @@ DGL provides a script for copying partitioned data to the cluster. Before that, 
 
 ```bash
 mkdir ~/dgl_code
-cp /home/ubuntu/dgl/examples/pytorch/rgcn/experimental/entity_classify_dist.py ~/dgl_code
+cp ~/dgl/examples/pytorch/rgcn/experimental/entity_classify_dist.py ~/dgl_code
 ```
 
 
@@ -91,6 +99,8 @@ Val Acc 0.4323, Test Acc 0.4255, time: 128.0379
 ## Partition a graph with ParMETIS
 
 It has four steps to partition a graph with ParMETIS for DGL's distributed training.
+More details about the four steps are explained in our
+[user guide](https://doc.dgl.ai/guide/distributed-preprocessing.html).
 
 ### Step 1: write the graph into files.
 
@@ -130,7 +140,7 @@ DGL provides a tool called `convert_partition.py` to load one partition at a tim
 and save it into a file.
 
 ```bash
-python3 ~/dgl/tools/convert_partition.py --input-dir . --graph-name mag --schema mag.json --num-parts 2 --num-ntypes 4 --num-node-weights 4 --output outputs
+python3 ~/dgl/tools/convert_partition.py --input-dir . --graph-name mag --schema mag.json --num-parts 2 --num-node-weights 4 --output outputs
 ```
 
 ### Step 4: Read node data and edge data for each partition

@@ -5449,13 +5449,6 @@ class DGLHeteroGraph(object):
         >>> # Only allowed formats will be displayed in the status query
         >>> csr_g.formats()
         {'created': ['csr'], 'not created': []}
-
-        Notes
-        -----
-        DGL will create sparse formats (only constrained to the allowed formats, i.e.
-        created formats and not created formats) on-the-fly during the training of Graph
-        Neural Networks. Once a format was created, it would be cached and reused until
-        user changes the graph structure.
         """
         if formats is None:
             # Return the format information

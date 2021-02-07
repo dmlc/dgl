@@ -34,13 +34,13 @@ print('|NTYPE|=' + str(len(th.unique(g.ndata[dgl.NTYPE]))))
 
 # Store the metadata of nodes.
 num_node_weights = 0
-node_data = [g.ndata[dgl.NTYPE]]
+node_data = [g.ndata[dgl.NTYPE].numpy()]
 for ntype_id in th.unique(g.ndata[dgl.NTYPE]):
-    node_data.append(g.ndata[dgl.NTYPE] == ntype_id)
+    node_data.append((g.ndata[dgl.NTYPE] == ntype_id).numpy())
     num_node_weights += 1
-node_data.append(g.ndata['orig_id'])
-node_data = th.stack(node_data, 1)
-np.savetxt('mag_nodes.txt', node_data.numpy(), fmt='%d', delimiter=' ')
+node_data.append(g.ndata['orig_id'].numpy())
+node_data = np.stack(node_data, 1)
+np.savetxt('mag_nodes.txt', node_data, fmt='%d', delimiter=' ')
 
 # Store the node features
 node_feats = {}
