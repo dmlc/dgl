@@ -221,7 +221,7 @@ class DGLHeteroGraph(object):
         * If the key of ``data`` contains new feature fields, those features for
         the old nodes will be created by initializers defined with
         :func:`set_n_initializer` (default initializer fills zeros).
-        *This function discards the batch information. Please use
+        * This function discards the batch information. Please use
         :func:`dgl.DGLGraph.set_batch_num_nodes`
         and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
         to maintain the information.
@@ -380,7 +380,7 @@ class DGLHeteroGraph(object):
         * If the key of ``data`` contains new feature fields, those features for
         the old edges will be created by initializers defined with
         :func:`set_n_initializer` (default initializer fills zeros).
-        *This function discards the batch information. Please use
+        * This function discards the batch information. Please use
         :func:`dgl.DGLGraph.set_batch_num_nodes`
         and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
         to maintain the information.
