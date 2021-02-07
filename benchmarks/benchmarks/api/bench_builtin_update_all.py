@@ -8,9 +8,10 @@ from .. import utils
 
 
 @utils.benchmark('time', timeout=7200)
-@utils.parametrize('graph_name', ['cora', 'livejournal'])
+@utils.parametrize('graph_name', ['cora', 'reddit'])
 @utils.parametrize('format', ['coo', 'csr'])
-@utils.parametrize('feat_size', [8, 32, 128, 512])
+@utils.parametrize_cpu('feat_size', [8, 128, 512])
+@utils.parametrize_gpu('feat_size', [8, 32, 256])
 @utils.parametrize('msg_type', ['copy_u', 'u_mul_e'])
 @utils.parametrize('reduce_type', ['sum', 'mean', 'max'])
 def track_time(graph_name, format, feat_size, msg_type, reduce_type):
@@ -20,7 +21,7 @@ def track_time(graph_name, format, feat_size, msg_type, reduce_type):
     graph.ndata['h'] = torch.randn(
         (graph.num_nodes(), feat_size), device=device)
     graph.edata['e'] = torch.randn(
-        (graph.num_edges(), feat_size), device=device)
+        (graph.num_edges(), 1), device=device)
     
     msg_builtin_dict = {
         'copy_u': fn.copy_u('h', 'x'),
@@ -37,10 +38,10 @@ def track_time(graph_name, format, feat_size, msg_type, reduce_type):
     graph.update_all(msg_builtin_dict[msg_type], reduce_builtin_dict[reduce_type])
 
     # timing
-    t0 = time.time()
-    for i in range(3):
-        graph.update_all(msg_builtin_dict[msg_type], reduce_builtin_dict[reduce_type])
-    t1 = time.time()
+   
+    with utils.Timer() as t:
+        for i in range(3):
+            graph.update_all(msg_builtin_dict[msg_type], reduce_builtin_dict[reduce_type])
 
-    return (t1 - t0) / 3
+    return t.elapsed_secs / 3
 

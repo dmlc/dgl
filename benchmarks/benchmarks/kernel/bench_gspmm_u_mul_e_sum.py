@@ -33,10 +33,8 @@ def track_flops(graph, feat_size, num_heads):
         y = dgl.ops.u_mul_e_sum(graph, x, w)
 
     # timing
-    accum = 0.
-    for i in range(10):
-        with utils.TorchOpTimer(device) as timer:
+    with utils.Timer(device) as t:
+        for i in range(10):
             y = dgl.ops.u_mul_e_sum(graph, x, w)
-        accum += timer.time
 
-    return calc_gflops(graph, feat_size, num_heads, accum / 10)
+    return calc_gflops(graph, feat_size, num_heads, t.elapsed_secs / 10)

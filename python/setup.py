@@ -90,12 +90,8 @@ def config_cython():
             subdir = "_cy2"
         ret = []
         path = "dgl/_ffi/_cython"
-        if os.name == 'nt':
-            library_dirs = ['dgl', '../build/Release', '../build']
-            libraries = ['libtvm']
-        else:
-            library_dirs = None
-            libraries = None
+        library_dirs = ['dgl', '../build/Release', '../build']
+        libraries = ['dgl']
         for fn in os.listdir(path):
             if not fn.endswith(".pyx"):
                 continue
@@ -109,7 +105,7 @@ def config_cython():
                 library_dirs=library_dirs,
                 libraries=libraries,
                 language="c++"))
-        return cythonize(ret)
+        return cythonize(ret, force=True)
     except ImportError:
         print("WARNING: Cython is not installed, will compile without cython module")
         return []
