@@ -8,6 +8,9 @@
 Note: TensorFlow uses a different implementation of weight decay in AdamW to PyTorch. This results in differences in performance. You can see this by manually adding the L2 of the weights to the loss like [this](https://github.com/dmlc/dgl/blob/d696558b0bbcb60f1c4cf68dc93cd22c1077ce06/examples/tensorflow/gcn/train.py#L99) for comparison.
 
 ## Requirements
+
+This example is tested with TensorFlow 2.3.0.
+
 ```bash
 $ pip install dgl tensorflow tensorflow_addons
 ```
