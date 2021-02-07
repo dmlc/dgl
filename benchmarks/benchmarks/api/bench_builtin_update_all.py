@@ -7,13 +7,12 @@ import dgl.function as fn
 from .. import utils
 
 
-@utils.benchmark('time', timeout=7200)
-@utils.parametrize('graph_name', ['cora', 'reddit'])
-@utils.parametrize('format', ['coo', 'csr'])
-@utils.parametrize_cpu('feat_size', [8, 128, 512])
-@utils.parametrize_gpu('feat_size', [8, 32, 256])
+@utils.benchmark('time', timeout=600)
+@utils.parametrize('graph_name', ['ogbn-arxiv', 'reddit', 'ogbn-proteins'])
+@utils.parametrize('format', ['csc'])
+@utils.parametrize('feat_size', [4, 32, 256])
 @utils.parametrize('msg_type', ['copy_u', 'u_mul_e'])
-@utils.parametrize('reduce_type', ['sum', 'mean', 'max'])
+@utils.parametrize('reduce_type', ['sum', 'max'])
 def track_time(graph_name, format, feat_size, msg_type, reduce_type):
     device = utils.get_bench_device()
     graph = utils.get_graph(graph_name, format)
