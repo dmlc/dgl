@@ -115,6 +115,15 @@ mpirun -np 4 pm_dglpart mag 2
 ```
 This partitions the graph into eight parts with four processes.
 
+```
+mpirun --hostfile hostfile -np 4 pm_dglpart mag 2
+```
+This partitions the graph into eight parts with four processes on multiple machines.
+`hostfile` specifies the IPs of the machines; one line for a machine. The input files
+should reside in the machine where the command line runs. Each process will write
+the partitions to files in the local machine. For simplicity, we recommend users to
+write the files on NFS.
+
 ### Step 3: Convert the ParMETIS partitions into DGLGraph
 
 DGL provides a tool called `convert_partition.py` to load one partition at a time and convert it into a DGLGraph
