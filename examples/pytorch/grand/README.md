@@ -6,12 +6,13 @@ Paper link: https://arxiv.org/abs/2005.11079
 
 Author's code: https://github.com/THUDM/GRAND
 
-Contributor: Hengrui Zhang ([@hengruizhang98](https://github.com/hengruizhang98))
+## Example Implementor
+
+This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang98) during his Applied Scientist Intern work at the AWS Shanghai AI Lab.
 
 ## Dependecies
 - Python 3.7
 - PyTorch 1.7.1
-- numpy
 - dgl 0.5.3
 
 ## Dataset
