@@ -18,10 +18,13 @@ import torch
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
-dataset = DglNodePropPredDataset('ogbn-products')
+dataset = DglNodePropPredDataset('ogbn-arxiv')
 device = 'cpu'      # change to 'cuda' for GPU
 
 graph, node_labels = dataset[0]
+# Add reverse edges since ogbn-arxiv is unidirectional.
+graph = dgl.add_reverse_edges(graph)
+graph.ndata['label'] = node_labels[:, 0]
 idx_split = dataset.get_idx_split()
 train_nids = idx_split['train']
 node_features = graph.ndata['feat']
@@ -171,7 +174,7 @@ class SAGEConv(nn.Module):
             g.srcdata['h'] = h_src                        # <---
             g.dstdata['h'] = h_dst                        # <---
             # update_all is a message passing API.
-            g.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'h_neigh'))
+            g.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'h_N'))
             h_N = g.dstdata['h_N']
             h_total = torch.cat([h_dst, h_N], dim=1)      # <---
             return self.linear(h_total)

@@ -3,9 +3,9 @@ Stochastic Training of GNN for Link Prediction
 ==============================================
 
 This tutorial will show how to train a multi-layer GraphSAGE for link
-prediction on Amazon Co-purchase Network provided by `Open Graph Benchmark
+prediction on ``ogbn-arxiv`` provided by `Open Graph Benchmark
 (OGB) <https://ogb.stanford.edu/>`__. The dataset
-contains 2.4 million nodes and 61 million edges.
+contains around 170 thousand nodes and 1 million edges.
 
 By the end of this tutorial, you will be able to
 
@@ -57,10 +57,12 @@ import torch
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
-dataset = DglNodePropPredDataset('ogbn-products')
-device = 'cpu'      # change to 'cuda' for GPU
+dataset = DglNodePropPredDataset('ogbn-arxiv')
+device = 'cuda'      # change to 'cuda' for GPU
 
 graph, node_labels = dataset[0]
+# Add reverse edges since ogbn-arxiv is unidirectional.
+graph = dgl.add_reverse_edges(graph)
 print(graph)
 print(node_labels)
 
@@ -264,7 +266,7 @@ def inference(model, graph, node_features):
 import sklearn.metrics
 
 def evaluate(emb, label, train_nids, valid_nids, test_nids):
-    classifier = nn.Linear(emb.shape[1], label.max().item()).to(device)
+    classifier = nn.Linear(emb.shape[1], num_classes).to(device)
     opt = torch.optim.LBFGS(classifier.parameters())
 
     def compute_loss():
@@ -340,7 +342,7 @@ for epoch in range(1):
 
             tq.set_postfix({'loss': '%.03f' % loss.item()}, refresh=False)
 
-            if step % 1000 == 999:
+            if (step + 1) % 500 == 0:
                 model.eval()
                 emb = inference(model, graph, node_features)
                 valid_acc, test_acc = evaluate(emb, node_labels, train_nids, valid_nids, test_nids)
