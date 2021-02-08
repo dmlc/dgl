@@ -4,6 +4,7 @@
  * \brief Heterograph CAPI bindings.
  */
 #include <dgl/array.h>
+#include <dgl/aten/coo.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
@@ -35,7 +36,16 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCOO")
       formats_vec.push_back(ParseSparseFormat(fmt));
     }
     auto code = SparseFormatsToCode(formats_vec);
-    auto hgptr = CreateFromCOO(nvtypes, num_src, num_dst, row, col, code);
+
+    // setup sorted flags
+    bool row_sorted, col_sorted;
+    std::tie(row_sorted, col_sorted) = COOIsSorted(
+        aten::COOMatrix(num_src, num_dst, row, col));
+    std::cout << "Checked if new matrix is sorted: " << row_sorted <<
+    std::endl;
+
+    auto hgptr = CreateFromCOO(nvtypes, num_src, num_dst, row, col, 
+        row_sorted, col_sorted, code);
     *rv = HeteroGraphRef(hgptr);
   });
 

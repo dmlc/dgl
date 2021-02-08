@@ -499,12 +499,23 @@ ToBlockGPU(
           aten::NullArray(DLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx),
           aten::NullArray(DLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx)));
     } else {
+      // setup sorted flags
+      bool row_sorted, col_sorted;
+      std::tie(row_sorted, col_sorted) = COOIsSorted(
+          COOMatrix(
+            lhs_nodes[srctype]->shape[0],
+            rhs_nodes[dsttype]->shape[0],
+            new_lhs[etype],
+            new_rhs[etype]));
+
       rel_graphs.push_back(CreateFromCOO(
           2,
           lhs_nodes[srctype]->shape[0],
           rhs_nodes[dsttype]->shape[0],
           new_lhs[etype],
-          new_rhs[etype]));
+          new_rhs[etype],
+          row_sorted,
+          col_sorted));
     }
   }
 

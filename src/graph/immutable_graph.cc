@@ -305,11 +305,13 @@ void CSR::Save(dmlc::Stream *fs) const {
 // COO graph implementation
 //
 //////////////////////////////////////////////////////////
-COO::COO(int64_t num_vertices, IdArray src, IdArray dst) {
+COO::COO(int64_t num_vertices, IdArray src, IdArray dst,
+        bool row_sorted, bool col_sorted) {
   CHECK(aten::IsValidIdArray(src));
   CHECK(aten::IsValidIdArray(dst));
   CHECK_EQ(src->shape[0], dst->shape[0]);
-  adj_ = aten::COOMatrix{num_vertices, num_vertices, src, dst};
+  adj_ = aten::COOMatrix{num_vertices, num_vertices, src, dst,
+                         aten::NullArray(), row_sorted, col_sorted};
 }
 
 bool COO::IsMultigraph() const {
@@ -424,14 +426,15 @@ CSRPtr ImmutableGraph::GetInCSR() const {
 /* !\brief Return out csr. If not exist, transpose the other one.*/
 CSRPtr ImmutableGraph::GetOutCSR() const {
   if (!out_csr_) {
-    if (in_csr_) {
+    // fastest path is converting a sorted COO, so prefer that
+    if (coo_ && (coo_->ToCOOMatrix().row_sorted || !in_csr_)) {
+      const_cast<ImmutableGraph*>(this)->out_csr_ = coo_->ToCSR();
+    } else {
+      CHECK(in_csr_) << "None of CSR, COO exist";
       const_cast<ImmutableGraph*>(this)->out_csr_ = in_csr_->Transpose();
       if (in_csr_->IsSharedMem())
         LOG(WARNING) << "We just construct an out-CSR from a shared-memory in CSR. "
                      << "It may dramatically increase memory consumption.";
-    } else {
-      CHECK(coo_) << "None of CSR, COO exist";
-      const_cast<ImmutableGraph*>(this)->out_csr_ = coo_->ToCSR();
     }
   }
   return out_csr_;
@@ -440,11 +443,12 @@ CSRPtr ImmutableGraph::GetOutCSR() const {
 /* !\brief Return coo. If not exist, create from csr.*/
 COOPtr ImmutableGraph::GetCOO() const {
   if (!coo_) {
-    if (in_csr_) {
-      const_cast<ImmutableGraph*>(this)->coo_ = in_csr_->ToCOO()->Transpose();
-    } else {
-      CHECK(out_csr_) << "Both CSR are missing.";
+    if (out_csr_) {
+      // prefer the path that gets us a sorted COO
       const_cast<ImmutableGraph*>(this)->coo_ = out_csr_->ToCOO();
+    } else {
+      CHECK(in_csr_) << "Both CSR are missing.";
+      const_cast<ImmutableGraph*>(this)->coo_ = in_csr_->ToCOO()->Transpose();
     }
   }
   return coo_;
@@ -537,8 +541,9 @@ ImmutableGraphPtr ImmutableGraph::CreateFromCSR(const std::string &name) {
 }
 
 ImmutableGraphPtr ImmutableGraph::CreateFromCOO(
-    int64_t num_vertices, IdArray src, IdArray dst) {
-  COOPtr coo(new COO(num_vertices, src, dst));
+    int64_t num_vertices, IdArray src, IdArray dst,
+    bool row_sorted, bool col_sorted) {
+  COOPtr coo(new COO(num_vertices, src, dst, row_sorted, col_sorted));
   return std::make_shared<ImmutableGraph>(coo);
 }
 
