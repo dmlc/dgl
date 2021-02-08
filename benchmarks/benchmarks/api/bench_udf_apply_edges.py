@@ -8,7 +8,7 @@ from .. import utils
 
 
 @utils.benchmark('time', timeout=7200)
-@utils.parametrize('graph_name', ['cora', 'pubmed'])
+@utils.parametrize('graph_name', ['ogbn-arxiv', 'pubmed'])
 @utils.parametrize('format', ['coo'])  # only coo supports udf
 @utils.parametrize('feat_size', [8, 32, 128, 512])
 @utils.parametrize('reduce_type', ['u->e', 'u+v'])
