@@ -488,13 +488,11 @@ def line_graph(g, backtracking=True, shared=False):
     * If :attr:`shared` is True, the node features of the resulting graph share the same
       storage with the edge features of the input graph. Hence, users should try to
       avoid in-place operations which will be visible to both graphs.
-
     * The function supports input graph on GPU but copies it to CPU during computation.
-
     * This function discards the batch information. Please use
-    :func:`dgl.DGLGraph.set_batch_num_nodes`
-    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
-    to maintain the information.
+      :func:`dgl.DGLGraph.set_batch_num_nodes`
+      and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+      to maintain the information.
 
     Examples
     --------

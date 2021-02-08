@@ -216,15 +216,15 @@ class DGLHeteroGraph(object):
 
         * Inplace update is applied to the current graph.
         * If the key of ``data`` does not contain some existing feature fields,
-        those features for the new nodes will be created by initializers
-        defined with :func:`set_n_initializer` (default initializer fills zeros).
+          those features for the new nodes will be created by initializers
+          defined with :func:`set_n_initializer` (default initializer fills zeros).
         * If the key of ``data`` contains new feature fields, those features for
-        the old nodes will be created by initializers defined with
-        :func:`set_n_initializer` (default initializer fills zeros).
+          the old nodes will be created by initializers defined with
+          :func:`set_n_initializer` (default initializer fills zeros).
         * This function discards the batch information. Please use
-        :func:`dgl.DGLGraph.set_batch_num_nodes`
-        and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
-        to maintain the information.
+          :func:`dgl.DGLGraph.set_batch_num_nodes`
+          and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+          to maintain the information.
 
         Examples
         --------
@@ -370,20 +370,20 @@ class DGLHeteroGraph(object):
 
         * Inplace update is applied to the current graph.
         * If end nodes of adding edges does not exists, add_nodes is invoked
-        to add new nodes. The node features of the new nodes will be created
-        by initializers defined with :func:`set_n_initializer` (default
-        initializer fills zeros). In certain cases, it is recommanded to
-        add_nodes first and then add_edges.
+          to add new nodes. The node features of the new nodes will be created
+          by initializers defined with :func:`set_n_initializer` (default
+          initializer fills zeros). In certain cases, it is recommanded to
+          add_nodes first and then add_edges.
         * If the key of ``data`` does not contain some existing feature fields,
-        those features for the new edges will be created by initializers
-        defined with :func:`set_n_initializer` (default initializer fills zeros).
+          those features for the new edges will be created by initializers
+          defined with :func:`set_n_initializer` (default initializer fills zeros).
         * If the key of ``data`` contains new feature fields, those features for
-        the old edges will be created by initializers defined with
-        :func:`set_n_initializer` (default initializer fills zeros).
+          the old edges will be created by initializers defined with
+          :func:`set_n_initializer` (default initializer fills zeros).
         * This function discards the batch information. Please use
-        :func:`dgl.DGLGraph.set_batch_num_nodes`
-        and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
-        to maintain the information.
+          :func:`dgl.DGLGraph.set_batch_num_nodes`
+          and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+          to maintain the information.
 
         Examples
         --------
