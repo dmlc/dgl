@@ -13,7 +13,7 @@ Contributor: Liu Tang ([@lt610](https://github.com/lt610))
 - PyTorch 1.4.0
 - numpy 1.18.1
 - dgl 0.5.3
-- tqdm
+- tqdm 4.44.1
 
 ## Dataset
 
