@@ -158,7 +158,6 @@ def graph(data,
                            ' but got {} and {}.'.format(num_nodes, max(urange, vrange) - 1))
         urange, vrange = num_nodes, num_nodes
 
-    print("convert.graph() called")
     g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange)
 
     return g.to(device)
