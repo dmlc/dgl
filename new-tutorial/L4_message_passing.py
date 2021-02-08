@@ -18,9 +18,13 @@ import torch
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
-dataset = DglNodePropPredDataset('ogbn-products')
+dataset = DglNodePropPredDataset('ogbn-arxiv')
+device = 'cpu'      # change to 'cuda' for GPU
 
 graph, node_labels = dataset[0]
+# Add reverse edges since ogbn-arxiv is unidirectional.
+graph = dgl.add_reverse_edges(graph)
+graph.ndata['label'] = node_labels[:, 0]
 idx_split = dataset.get_idx_split()
 train_nids = idx_split['train']
 node_features = graph.ndata['feat']
@@ -170,7 +174,7 @@ class SAGEConv(nn.Module):
             g.srcdata['h'] = h_src                        # <---
             g.dstdata['h'] = h_dst                        # <---
             # update_all is a message passing API.
-            g.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'h_neigh'))
+            g.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'h_N'))
             h_N = g.dstdata['h_N']
             h_total = torch.cat([h_dst, h_N], dim=1)      # <---
             return self.linear(h_total)
@@ -192,18 +196,18 @@ class Model(nn.Module):
 sampler = dgl.dataloading.MultiLayerNeighborSampler([4, 4])
 train_dataloader = dgl.dataloading.NodeDataLoader(
     graph, train_nids, sampler,
+    device=device,
     batch_size=1024,
     shuffle=True,
     drop_last=False,
     num_workers=0
 )
-model = Model(graph.ndata['feat'].shape[1], 128, dataset.num_classes).cuda()
+model = Model(graph.ndata['feat'].shape[1], 128, dataset.num_classes).to(device)
 
 with tqdm.tqdm(train_dataloader) as tq:
     for step, (input_nodes, output_nodes, bipartites) in enumerate(tq):
-        bipartites = [b.to(torch.device('cuda')) for b in bipartites]
-        inputs = node_features[input_nodes].cuda()
-        labels = node_labels[output_nodes].cuda()
+        inputs = bipartites[0].srcdata['feat']
+        labels = bipartites[-1].dstdata['label']
         predictions = model(bipartites, inputs)
 
 
