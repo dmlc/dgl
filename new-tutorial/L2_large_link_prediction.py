@@ -3,9 +3,9 @@ Stochastic Training of GNN for Link Prediction
 ==============================================
 
 This tutorial will show how to train a multi-layer GraphSAGE for link
-prediction on Amazon Co-purchase Network provided by `Open Graph Benchmark
+prediction on ``ogbn-arxiv`` provided by `Open Graph Benchmark
 (OGB) <https://ogb.stanford.edu/>`__. The dataset
-contains 2.4 million nodes and 61 million edges.
+contains around 170 thousand nodes and 1 million edges.
 
 By the end of this tutorial, you will be able to
 
@@ -57,9 +57,12 @@ import torch
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
-dataset = DglNodePropPredDataset('ogbn-products')
+dataset = DglNodePropPredDataset('ogbn-arxiv')
+device = 'cpu'      # change to 'cuda' for GPU
 
 graph, node_labels = dataset[0]
+# Add reverse edges since ogbn-arxiv is unidirectional.
+graph = dgl.add_reverse_edges(graph)
 print(graph)
 print(node_labels)
 
@@ -114,7 +117,7 @@ train_dataloader = dgl.dataloading.EdgeDataLoader(
     torch.arange(graph.number_of_edges()),  # The edges to iterate over
     sampler,                                # The neighbor sampler
     negative_sampler=negative_sampler,      # The negative sampler
-    device='cuda',                          # Put the bipartite graphs on GPU
+    device=device,                          # Put the bipartite graphs on CPU or GPU
     # The following arguments are inherited from PyTorch DataLoader.
     batch_size=1024,    # Batch size
     shuffle=True,       # Whether to shuffle the nodes for every epoch
@@ -185,7 +188,7 @@ class Model(nn.Module):
         h = self.conv2(bipartites[1], (h, h_dst))
         return h
 
-model = Model(num_features, 128).cuda()
+model = Model(num_features, 128).to(device)
 
 
 ######################################################################
@@ -250,7 +253,7 @@ def inference(model, graph, node_features):
             shuffle=False,
             drop_last=False,
             num_workers=4,
-            device='cuda')
+            device=device)
 
         result = []
         for input_nodes, output_nodes, bipartites in train_dataloader:
@@ -263,12 +266,12 @@ def inference(model, graph, node_features):
 import sklearn.metrics
 
 def evaluate(emb, label, train_nids, valid_nids, test_nids):
-    classifier = nn.Linear(emb.shape[1], label.max().item()).cuda()
+    classifier = nn.Linear(emb.shape[1], num_classes).to(device)
     opt = torch.optim.LBFGS(classifier.parameters())
 
     def compute_loss():
-        pred = classifier(emb[train_nids].cuda())
-        loss = F.cross_entropy(pred, label[train_nids].cuda())
+        pred = classifier(emb[train_nids].to(device))
+        loss = F.cross_entropy(pred, label[train_nids].to(device))
         return loss
 
     def closure():
@@ -289,7 +292,7 @@ def evaluate(emb, label, train_nids, valid_nids, test_nids):
                 prev_loss = loss
 
     with torch.no_grad():
-        pred = classifier(emb.cuda()).cpu()
+        pred = classifier(emb.to(device)).cpu()
         label = label
         valid_acc = sklearn.metrics.accuracy_score(label[valid_nids].numpy(), pred[valid_nids].numpy().argmax(1))
         test_acc = sklearn.metrics.accuracy_score(label[test_nids].numpy(), pred[test_nids].numpy().argmax(1))
@@ -303,8 +306,8 @@ def evaluate(emb, label, train_nids, valid_nids, test_nids):
 # The following initializes the model and defines the optimizer.
 #
 
-model = Model(node_features.shape[1], 128).cuda()
-predictor = DotPredictor().cuda()
+model = Model(node_features.shape[1], 128).to(device)
+predictor = DotPredictor().to(device)
 opt = torch.optim.Adam(list(model.parameters()) + list(predictor.parameters()))
 
 
@@ -339,7 +342,7 @@ for epoch in range(1):
 
             tq.set_postfix({'loss': '%.03f' % loss.item()}, refresh=False)
 
-            if step % 1000 == 999:
+            if (step + 1) % 500 == 0:
                 model.eval()
                 emb = inference(model, graph, node_features)
                 valid_acc, test_acc = evaluate(emb, node_labels, train_nids, valid_nids, test_nids)
