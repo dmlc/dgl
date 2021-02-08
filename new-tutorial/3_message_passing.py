@@ -76,7 +76,7 @@ import torch.nn.functional as F
 # opposite direction.
 # 
 # Although DGL has builtin support of GraphSAGE via
-# :class:```dgl.nn.SAGEConv`` <dgl.nn.pytorch.SAGEConv>`,
+# :class:`dgl.nn.SAGEConv <dgl.nn.pytorch.SAGEConv>`,
 # here is how you can implement GraphSAGE convolution in DGL by your own.
 # 
 
@@ -118,7 +118,7 @@ class SAGEConv(nn.Module):
 
 ######################################################################
 # The central piece in this code is the
-# :func:```g.update_all`` <dgl.DGLGraph.update_all>`
+# :func:`g.update_all <dgl.DGLGraph.update_all>`
 # function, which gathers and averages the neighbor features. There are
 # three concepts here:
 #

@@ -81,7 +81,30 @@ Getting Started
 
    install/index
    install/backend
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Basic Tutorials
+   :hidden:
+   :glob:
+
    new-tutorial/1_introduction
+   new-tutorial/2_dglgraph
+   new-tutorial/3_message_passing
+   new-tutorial/4_link_predict
+   new-tutorial/5_graph_classification
+   new-tutorial/6_load_data
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Stochastic GNN Training Tutorials
+   :hidden:
+   :glob:
+
+   new-tutorial/L0_neighbor_sampling_overview
+   new-tutorial/L1_large_node_classification
+   new-tutorial/L2_large_link_prediction
+   new-tutorial/L4_message_passing
 
 .. toctree::
    :maxdepth: 2
