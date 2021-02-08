@@ -58,7 +58,7 @@ import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
 dataset = DglNodePropPredDataset('ogbn-arxiv')
-device = 'cuda'      # change to 'cuda' for GPU
+device = 'cpu'      # change to 'cuda' for GPU
 
 graph, node_labels = dataset[0]
 # Add reverse edges since ogbn-arxiv is unidirectional.

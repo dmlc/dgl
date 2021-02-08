@@ -31,7 +31,7 @@ import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
 dataset = DglNodePropPredDataset('ogbn-arxiv')
-device = 'cuda'      # change to 'cuda' for GPU
+device = 'cpu'      # change to 'cuda' for GPU
 
 
 ######################################################################
