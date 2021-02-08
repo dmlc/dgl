@@ -8,7 +8,7 @@ from .. import utils
 
 
 @utils.benchmark('time', timeout=7200)
-@utils.parametrize('graph_name', ['pubmed'])
+@utils.parametrize('graph_name', ['pubmed', "ogbn-arxiv"])
 @utils.parametrize('format', ['csr'])  # only coo supports udf
 @utils.parametrize('feat_size', [8, 32, 128, 512])
 @utils.parametrize('msg_type', ['copy_u', 'u_mul_e'])
