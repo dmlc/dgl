@@ -196,7 +196,7 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
     return eval_logits, eval_seeds
 
 
-@utils.benchmark('time', 1200)
+@utils.benchmark('time', 3600)  # ogbn-mag takes ~1 hour to train
 @utils.parametrize('data', ['am', 'ogbn-mag'])
 def track_acc(data):
     dataset = utils.process_data(data)
@@ -209,7 +209,7 @@ def track_acc(data):
     elif data == 'ogbn-mag':
         n_bases = 2
         l2norm = 0
-        n_epochs = 6
+        n_epochs = 20
     else:
         raise ValueError()
 
