@@ -12,7 +12,7 @@ from .. import utils
 @utils.parametrize('format', ['csc'])
 @utils.parametrize('feat_size', [4, 32, 256])
 @utils.parametrize('msg_type', ['copy_u', 'u_mul_e'])
-@utils.parametrize('reduce_type', ['sum', 'max'])
+@utils.parametrize('reduce_type', ['sum', 'mean','max'])
 def track_time(graph_name, format, feat_size, msg_type, reduce_type):
     device = utils.get_bench_device()
     graph = utils.get_graph(graph_name, format)

@@ -8,15 +8,17 @@ from .. import utils
 
 
 @utils.benchmark('time', timeout=7200)
-@utils.parametrize('graph_name', ['cora', 'pubmed'])
-@utils.parametrize('format', ['coo']) # only coo supports udf
+@utils.parametrize('graph_name', ['pubmed'])
+@utils.parametrize('format', ['csr'])  # only coo supports udf
 @utils.parametrize('feat_size', [8, 32, 128, 512])
 @utils.parametrize('msg_type', ['copy_u', 'u_mul_e'])
 @utils.parametrize('reduce_type', ['sum', 'mean', 'max'])
 def track_time(graph_name, format, feat_size, msg_type, reduce_type):
     device = utils.get_bench_device()
     graph = utils.get_graph(graph_name, format)
+    graph = graph.formats(['coo', 'csr', 'csc'])
     graph = graph.to(device)
+    graph = graph.formats(['coo', 'csr', 'csc'])
     graph.ndata['h'] = torch.randn(
         (graph.num_nodes(), feat_size), device=device)
     graph.edata['e'] = torch.randn(
