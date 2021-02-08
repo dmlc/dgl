@@ -3,9 +3,9 @@ Training GNN with Neighbor Sampling for Node Classification
 ===========================================================
 
 This tutorial shows how to train a multi-layer GraphSAGE for node
-classification on Amazon Co-purchase Network provided by `Open Graph
-Benchmark (OGB) <https://ogb.stanford.edu/>`__. The dataset contains 2.4
-million nodes and 61 million edges.
+classification on ``ogbn-arxiv`` provided by `Open Graph
+Benchmark (OGB) <https://ogb.stanford.edu/>`__. The dataset contains around
+170 thousand nodes and 1 million edges.
 
 By the end of this tutorial, you will be able to
 
@@ -30,16 +30,19 @@ import torch
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
-dataset = DglNodePropPredDataset('ogbn-products')
+dataset = DglNodePropPredDataset('ogbn-arxiv')
+device = 'cpu'      # change to 'cuda' for GPU
 
 
 ######################################################################
-# OGB dataset is a collection of graphs and their labels. The Amazon
-# Co-purchase Network dataset only contains a single graph. So you can
+# OGB dataset is a collection of graphs and their labels. ``ogbn-arxiv``
+# dataset only contains a single graph. So you can
 # simply get the graph and its node labels like this:
 #
 
 graph, node_labels = dataset[0]
+# Add reverse edges since ogbn-arxiv is unidirectional.
+graph = dgl.add_reverse_edges(graph)
 graph.ndata['label'] = node_labels[:, 0]
 print(graph)
 print(node_labels)
@@ -110,7 +113,7 @@ train_dataloader = dgl.dataloading.NodeDataLoader(
     graph,              # The graph
     train_nids,         # The node IDs to iterate over in minibatches
     sampler,            # The neighbor sampler
-    device='cuda',      # Put the sampled bipartite graphs to GPU
+    device=device,      # Put the sampled bipartite graphs on CPU or GPU
     # The following arguments are inherited from PyTorch DataLoader.
     batch_size=1024,    # Batch size
     shuffle=True,       # Whether to shuffle the nodes for every epoch
@@ -184,7 +187,7 @@ class Model(nn.Module):
         h = self.conv2(bipartites[1], (h, h_dst))  # <---
         return h
 
-model = Model(num_features, 128, num_classes).cuda()
+model = Model(num_features, 128, num_classes).to(device)
 
 
 ######################################################################
@@ -255,7 +258,8 @@ valid_dataloader = dgl.dataloading.NodeDataLoader(
     batch_size=1024,
     shuffle=False,
     drop_last=False,
-    num_workers=0
+    num_workers=0,
+    device=device
 )
 
 
@@ -295,9 +299,8 @@ for epoch in range(10):
     labels = []
     with tqdm.tqdm(valid_dataloader) as tq, torch.no_grad():
         for input_nodes, output_nodes, bipartites in tq:
-            bipartites = [b.to(torch.device('cuda')) for b in bipartites]
-            inputs = node_features[input_nodes].cuda()
-            labels.append(node_labels[output_nodes].numpy())
+            inputs = bipartites[0].srcdata['feat']
+            labels.append(bipartites[-1].dstdata['label'].cpu().numpy())
             predictions.append(model(bipartites, inputs).argmax(1).cpu().numpy())
         predictions = np.concatenate(predictions)
         labels = np.concatenate(labels)
