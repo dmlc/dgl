@@ -324,6 +324,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
     validation_time = 0
     test_time = 0
     last_val_acc = 0.0
+    do_test = False
     if n_gpus > 1 and n_cpus - args.num_workers > 0:
         th.set_num_threads(n_cpus-args.num_workers)
     for epoch in range(args.n_epochs):
@@ -405,7 +406,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
         vend = time.time()
         validation_time += (vend - vstart)
 
-        if (epoch + 1) > (args.n_epochs / 2) and do_test:
+        if epoch > 0 and do_test:
             tstart = time.time()
             if (queue is not None) or (proc_id == 0):
                 test_logits, test_seeds = evaluate(model, embed_layer, test_loader, node_feats)
@@ -431,7 +432,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
     print("{}/{} Mean backward time: {:4f}".format(proc_id, n_gpus,
                                                    np.mean(backward_time[len(backward_time) // 4:])))
     if proc_id == 0:
-        print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss))
+        print("Final Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss))
         print("Train {}s, valid {}s, test {}s".format(train_time, validation_time, test_time))
 
 def main(args, devices):

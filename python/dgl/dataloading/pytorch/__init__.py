@@ -244,6 +244,11 @@ class NodeDataLoader:
                                          collate_fn=self.collator.collate,
                                          **dataloader_kwargs)
             self.is_distributed = False
+
+            # Precompute the CSR and CSC representations so each subprocess does not
+            # duplicate.
+            if dataloader_kwargs.get('num_workers', 0) > 0:
+                g.create_formats_()
         self.device = device
 
     def __iter__(self):
@@ -437,6 +442,11 @@ class EdgeDataLoader:
         self.dataloader = DataLoader(
             self.collator.dataset, collate_fn=self.collator.collate, **dataloader_kwargs)
         self.device = device
+
+        # Precompute the CSR and CSC representations so each subprocess does not
+        # duplicate.
+        if dataloader_kwargs.get('num_workers', 0) > 0:
+            g.create_formats_()
 
     def __iter__(self):
         """Return the iterator of the data loader."""

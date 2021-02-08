@@ -15,61 +15,38 @@ The DGL's built-in [LegacyTUDataset](https://docs.dgl.ai/api/python/dgl.data.htm
 
 NOTE: Since there is no data attributes in some of these datasets, we use node_id (in one-hot vector whose length is the max number of nodes across all graphs) as the node feature. Also note that the node_id in some datasets is not unique (e.g. a graph may has two nodes with the same id).
 
-DD
-- NumGraphs: 1178
-- AvgNodesPerGraph: 284.32
-- AvgEdgesPerGraph: 715.66
-- NumFeats: 89
-- NumClasses: 2
+|                  | DD     | PROTEINS | NCI1  | NCI109 | Mutagenicity | ENZYMES |
+| ---------------- | ------ | -------- | ----- | ------ | ------------ | ------- |
+| NumGraphs        | 1178   | 1113     | 4110  | 4127   | 4337         | 600     |
+| AvgNodesPerGraph | 284.32 | 39.06    | 29.87 | 29.68  | 30.32        | 32.63   |
+| AvgEdgesPerGraph | 715.66 | 72.82    | 32.30 | 32.13  | 30.77        | 62.14   |
+| NumFeats         | 89     | 1        | 37    | 38     | 14           | 18      |
+| NumClasses       | 2      | 2        | 2     | 2      | 2            | 6       |
 
-PROTEINS
-- NumGraphs: 1113
-- AvgNodesPerGraph: 39.06
-- AvgEdgesPerGraph: 72.82
-- NumFeats: 1
-- NumClasses: 2
-
-NCI1
-- NumGraphs: 4110
-- AvgNodesPerGraph: 29.87
-- AvgEdgesPerGraph: 32.30
-- NumFeats: 37
-- NumClasses: 2
-
-NCI109
-- NumGraphs: 4127
-- AvgNodesPerGraph: 29.68
-- AvgEdgesPerGraph: 32.13
-- NumFeats: 38
-- NumClasses: 2
-
-Mutagenicity
-- NumGraphs: 4337
-- AvgNodesPerGraph: 30.32
-- AvgEdgesPerGraph: 30.77
-- NumFeats: 14
-- NumClasses: 2
-
-ENZYMES
-- NumGraphs: 600
-- AvgNodesPerGraph: 32.63
-- AvgEdgesPerGraph: 62.14
-- NumFeats: 18
-- NumClasses: 6
 
 How to run example files
 --------------------------------
 In the HGP-SL-DGL folder, run
 
 ```bash
-python main.py --dataset ${your_dataset_name_here}
+python main.py --dataset ${your_dataset_name_here} [hyper-parameters]
 ```
 
 If want to use a GPU, run
 
 ```bash
-python main.py --device ${your_device_id_here} --dataset ${your_dataset_name_here}
+python main.py --device ${your_device_id_here} --dataset ${your_dataset_name_here} [hyper-parameters]
 ```
+
+For example, to perform experiments on DD dataset on GPU, run:
+
+```bash
+python main.py --device 0 --dataset DD --lr 0.0001 --batch_size 64 --pool_ratio 0.3 --dropout 0.5 --conv_layers 2
+```
+
+NOTE: Be careful when modifying `batch_size` and `pool_ratio` for large dataset like DD. Too large batch size or pooling ratio may cause out-of-memory and other severe errors.
+
+You can find the detailed hyper-parameter settings below (in the Performance section).
 
 Performance
 -------------------------
