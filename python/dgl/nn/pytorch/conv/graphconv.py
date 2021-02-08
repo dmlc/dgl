@@ -250,7 +250,7 @@ class GraphConv(nn.Module):
     >>> # Case 2: Unidirectional bipartite graph
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
-    >>> g = dgl.bipartite((u, v))
+    >>> g = dgl.heterograph({('_U', '_E', '_V') : (u, v)})
     >>> u_fea = th.rand(2, 5)
     >>> v_fea = th.rand(4, 5)
     >>> conv = GraphConv(5, 2, norm='both', weight=True, bias=True)
