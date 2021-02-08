@@ -821,7 +821,6 @@ def test_to_simple(idtype):
     assert 'h' not in sg.nodes['user'].data
     assert 'hh' not in sg.nodes['user'].data
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 @parametrize_dtype
 def test_to_block(idtype):
     def check(g, bg, ntype, etype, dst_nodes, include_dst_in_src=True):
@@ -838,6 +837,7 @@ def test_to_block(idtype):
         induced_src = bg.srcdata[dgl.NID]
         induced_dst = bg.dstdata[dgl.NID]
         induced_eid = bg.edata[dgl.EID]
+
         bg_src, bg_dst = bg.all_edges(order='eid')
         src_ans, dst_ans = g.all_edges(order='eid')
 
@@ -860,7 +860,7 @@ def test_to_block(idtype):
     g = dgl.heterograph({
         ('A', 'AA', 'A'): ([0, 2, 1, 3], [1, 3, 2, 4]),
         ('A', 'AB', 'B'): ([0, 1, 3, 1], [1, 3, 5, 6]),
-        ('B', 'BA', 'A'): ([2, 3], [3, 2])}, idtype=idtype)
+        ('B', 'BA', 'A'): ([2, 3], [3, 2])}, idtype=idtype, device=F.ctx())
     g.nodes['A'].data['x'] = F.randn((5, 10))
     g.nodes['B'].data['x'] = F.randn((7, 5))
     g.edges['AA'].data['x'] = F.randn((4, 3))

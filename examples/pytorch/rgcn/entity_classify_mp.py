@@ -432,7 +432,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
     print("{}/{} Mean backward time: {:4f}".format(proc_id, n_gpus,
                                                    np.mean(backward_time[len(backward_time) // 4:])))
     if proc_id == 0:
-        print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss))
+        print("Final Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss))
         print("Train {}s, valid {}s, test {}s".format(train_time, validation_time, test_time))
 
 def main(args, devices):
