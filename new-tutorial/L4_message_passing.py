@@ -19,6 +19,7 @@ import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
 dataset = DglNodePropPredDataset('ogbn-products')
+device = 'cpu'      # change to 'cuda' for GPU
 
 graph, node_labels = dataset[0]
 idx_split = dataset.get_idx_split()
@@ -192,18 +193,18 @@ class Model(nn.Module):
 sampler = dgl.dataloading.MultiLayerNeighborSampler([4, 4])
 train_dataloader = dgl.dataloading.NodeDataLoader(
     graph, train_nids, sampler,
+    device=device,
     batch_size=1024,
     shuffle=True,
     drop_last=False,
     num_workers=0
 )
-model = Model(graph.ndata['feat'].shape[1], 128, dataset.num_classes).cuda()
+model = Model(graph.ndata['feat'].shape[1], 128, dataset.num_classes).to(device)
 
 with tqdm.tqdm(train_dataloader) as tq:
     for step, (input_nodes, output_nodes, bipartites) in enumerate(tq):
-        bipartites = [b.to(torch.device('cuda')) for b in bipartites]
-        inputs = node_features[input_nodes].cuda()
-        labels = node_labels[output_nodes].cuda()
+        inputs = bipartites[0].srcdata['feat']
+        labels = bipartites[-1].dstdata['label']
         predictions = model(bipartites, inputs)
 
 

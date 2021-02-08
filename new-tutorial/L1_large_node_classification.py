@@ -31,6 +31,7 @@ import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
 dataset = DglNodePropPredDataset('ogbn-products')
+device = 'cpu'      # change to 'cuda' for GPU
 
 
 ######################################################################
@@ -110,7 +111,7 @@ train_dataloader = dgl.dataloading.NodeDataLoader(
     graph,              # The graph
     train_nids,         # The node IDs to iterate over in minibatches
     sampler,            # The neighbor sampler
-    device='cuda',      # Put the sampled bipartite graphs to GPU
+    device=device,      # Put the sampled bipartite graphs on CPU or GPU
     # The following arguments are inherited from PyTorch DataLoader.
     batch_size=1024,    # Batch size
     shuffle=True,       # Whether to shuffle the nodes for every epoch
@@ -184,7 +185,7 @@ class Model(nn.Module):
         h = self.conv2(bipartites[1], (h, h_dst))  # <---
         return h
 
-model = Model(num_features, 128, num_classes).cuda()
+model = Model(num_features, 128, num_classes).to(device)
 
 
 ######################################################################
@@ -295,9 +296,8 @@ for epoch in range(10):
     labels = []
     with tqdm.tqdm(valid_dataloader) as tq, torch.no_grad():
         for input_nodes, output_nodes, bipartites in tq:
-            bipartites = [b.to(torch.device('cuda')) for b in bipartites]
-            inputs = node_features[input_nodes].cuda()
-            labels.append(node_labels[output_nodes].numpy())
+            inputs = bipartites[0].srcdata['feat']
+            labels.append(bipartites[-1].dstdata['label'].cpu().numpy())
             predictions.append(model(bipartites, inputs).argmax(1).cpu().numpy())
         predictions = np.concatenate(predictions)
         labels = np.concatenate(labels)
