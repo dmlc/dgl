@@ -59,6 +59,14 @@ def node_subgraph(graph, nodes, store_ids=True):
     G : DGLGraph
         The subgraph.
 
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
+
     Examples
     --------
     The following example uses PyTorch backend.
@@ -186,6 +194,14 @@ def edge_subgraph(graph, edges, preserve_nodes=False, store_ids=True):
     -------
     G : DGLGraph
         The subgraph.
+
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Examples
     --------
@@ -322,6 +338,14 @@ def in_subgraph(g, nodes):
     DGLGraph
         The subgraph.
 
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
+
     Examples
     --------
     The following example uses PyTorch backend.
@@ -420,6 +444,14 @@ def out_subgraph(g, nodes):
     DGLGraph
         The subgraph.
 
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
+
     Examples
     --------
     The following example uses PyTorch backend.
@@ -501,6 +533,14 @@ def node_type_subgraph(graph, ntypes):
     G : DGLGraph
         The subgraph.
 
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
+
     Examples
     --------
     The following example uses PyTorch backend.
@@ -574,6 +614,14 @@ def edge_type_subgraph(graph, etypes):
     -------
     G : DGLGraph
         The subgraph.
+
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Examples
     --------
