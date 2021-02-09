@@ -41,10 +41,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCOO")
     bool row_sorted, col_sorted;
     std::tie(row_sorted, col_sorted) = COOIsSorted(
         aten::COOMatrix(num_src, num_dst, row, col));
-    std::cout << "Checked if new matrix is sorted: " << row_sorted <<
-    std::endl;
 
-    auto hgptr = CreateFromCOO(nvtypes, num_src, num_dst, row, col, 
+    auto hgptr = CreateFromCOO(nvtypes, num_src, num_dst, row, col,
         row_sorted, col_sorted, code);
     *rv = HeteroGraphRef(hgptr);
   });

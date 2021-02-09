@@ -1345,17 +1345,16 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
         CodeToStr(formats_) << ", cannot create CSR matrix.";
   CSRPtr ret = out_csr_;
   if (!out_csr_->defined()) {
-    if (coo_->defined() && (coo_->adj().row_sorted || !in_csr_->defined())) {
-      const auto& newadj = aten::COOToCSR(coo_->adj());
+    if (in_csr_->defined()) {
+      const auto& newadj = aten::CSRTranspose(in_csr_->adj());
 
       if (inplace)
         *(const_cast<UnitGraph*>(this)->out_csr_) = CSR(meta_graph(), newadj);
       else
         ret = std::make_shared<CSR>(meta_graph(), newadj);
     } else {
-      CHECK(in_csr_->defined()) << "None of CSR, COO exist";
-
-      const auto& newadj = aten::CSRTranspose(in_csr_->adj());
+      CHECK(coo_->defined()) << "None of CSR, COO exist";
+      const auto& newadj = aten::COOToCSR(coo_->adj());
 
       if (inplace)
         *(const_cast<UnitGraph*>(this)->out_csr_) = CSR(meta_graph(), newadj);
@@ -1374,19 +1373,16 @@ UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
         CodeToStr(formats_) << ", cannot create COO matrix.";
   COOPtr ret = coo_;
   if (!coo_->defined()) {
-    if (out_csr_->defined()) {
-      // prefer the path that gets us a sorted COO
-      const auto& newadj = aten::CSRToCOO(out_csr_->adj(), true);
+    if (in_csr_->defined()) {
+      const auto& newadj = aten::COOTranspose(aten::CSRToCOO(in_csr_->adj(), true));
 
       if (inplace)
         *(const_cast<UnitGraph*>(this)->coo_) = COO(meta_graph(), newadj);
       else
         ret = std::make_shared<COO>(meta_graph(), newadj);
-
     } else {
-      CHECK(in_csr_->defined()) << "Both CSR are missing.";
-
-      const auto& newadj = aten::COOTranspose(aten::CSRToCOO(in_csr_->adj(), true));
+      CHECK(out_csr_->defined()) << "Both CSR are missing.";
+      const auto& newadj = aten::CSRToCOO(out_csr_->adj(), true);
 
       if (inplace)
         *(const_cast<UnitGraph*>(this)->coo_) = COO(meta_graph(), newadj);

@@ -426,15 +426,14 @@ CSRPtr ImmutableGraph::GetInCSR() const {
 /* !\brief Return out csr. If not exist, transpose the other one.*/
 CSRPtr ImmutableGraph::GetOutCSR() const {
   if (!out_csr_) {
-    // fastest path is converting a sorted COO, so prefer that
-    if (coo_ && (coo_->ToCOOMatrix().row_sorted || !in_csr_)) {
-      const_cast<ImmutableGraph*>(this)->out_csr_ = coo_->ToCSR();
-    } else {
-      CHECK(in_csr_) << "None of CSR, COO exist";
+    if (in_csr_) {
       const_cast<ImmutableGraph*>(this)->out_csr_ = in_csr_->Transpose();
       if (in_csr_->IsSharedMem())
         LOG(WARNING) << "We just construct an out-CSR from a shared-memory in CSR. "
                      << "It may dramatically increase memory consumption.";
+    } else {
+      CHECK(coo_) << "None of CSR, COO exist";
+      const_cast<ImmutableGraph*>(this)->out_csr_ = coo_->ToCSR();
     }
   }
   return out_csr_;
@@ -443,12 +442,11 @@ CSRPtr ImmutableGraph::GetOutCSR() const {
 /* !\brief Return coo. If not exist, create from csr.*/
 COOPtr ImmutableGraph::GetCOO() const {
   if (!coo_) {
-    if (out_csr_) {
-      // prefer the path that gets us a sorted COO
-      const_cast<ImmutableGraph*>(this)->coo_ = out_csr_->ToCOO();
-    } else {
-      CHECK(in_csr_) << "Both CSR are missing.";
+    if (in_csr_) {
       const_cast<ImmutableGraph*>(this)->coo_ = in_csr_->ToCOO()->Transpose();
+    } else {
+      CHECK(out_csr_) << "Both CSR are missing.";
+      const_cast<ImmutableGraph*>(this)->coo_ = out_csr_->ToCOO();
     }
   }
   return coo_;
