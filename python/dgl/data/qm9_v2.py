@@ -158,7 +158,7 @@ class QM9Dataset_v2(DGLDataset):
             
             new_edge_attr =  F.cat([edge_attr, dist.type_as(edge_attr)], dim = -1)
             
-            new_graph = dgl.graph((row,col))
+            new_graph = dgl_graph((row,col))
             
             new_graph.ndata['attr'] = graph.ndata['attr']
             new_graph.edata['edge_attr'] = new_edge_attr
