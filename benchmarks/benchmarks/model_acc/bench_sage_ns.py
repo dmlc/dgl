@@ -118,7 +118,7 @@ def load_subtensor(g, seeds, input_nodes, device):
     return batch_inputs, batch_labels
 
 
-@utils.benchmark('acc', 3600)
+@utils.benchmark('acc', 600)
 @utils.parametrize('data', ['ogbn-products', "reddit"])
 def track_acc(data):
     data = utils.process_data(data)
