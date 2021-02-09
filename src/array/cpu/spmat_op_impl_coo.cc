@@ -325,46 +325,52 @@ CSRMatrix COOToCSR(COOMatrix coo) {
       // Leave empty, and populate from inside of parallel block
       coo.data = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
     }
+    IdType * const fill_data = data ? nullptr : static_cast<IdType*>(coo.data->data);
 
-    #pragma omp parallel
-    {
-      const int num_threads = omp_get_num_threads();
-      const int thread_id = omp_get_thread_num();
+    if (NNZ > 0) {
+      #pragma omp parallel default(none)
+      {
+        const int num_threads = omp_get_num_threads();
+        const int thread_id = omp_get_thread_num();
 
-      // each thread searchs the row array for a change, and marks it's
-      // location in Bp
-      const int64_t nz_chunk = (NNZ+num_threads-1)/num_threads;
-      const int64_t nz_start = thread_id*nz_chunk;
-      const int64_t nz_end = std::min(NNZ, nz_start+nz_chunk);
+        const int64_t nz_chunk = (NNZ+num_threads-1)/num_threads;
+        const int64_t nz_start = thread_id*nz_chunk;
+        const int64_t nz_end = std::min(NNZ, nz_start+nz_chunk);
 
-      int64_t row = 0;
-      if (nz_start < nz_end) {
-        row = nz_start == 0 ? 0 : row_data[nz_start-1];
-        for (int64_t i = nz_start; i < nz_end; ++i) {
-          while (row != row_data[i]) {
-            ++row;
-            Bp[row] = i;
+        // each thread searchs the row array for a change, and marks it's
+        // location in Bp. Threads have overlapping ranges from nz_start-1 to
+        // nz_end.
+        int64_t row = 0;
+        if (nz_start < nz_end) {
+          row = nz_start == 0 ? 0 : row_data[nz_start-1];
+          for (int64_t i = nz_start; i < nz_end; ++i) {
+            while (row != row_data[i]) {
+              ++row;
+              Bp[row] = i;
+            }
           }
-        }
 
-        // the last active thread needs finish the Bp array
-        if (nz_end == NNZ) {
-          while (row < N) {
-            ++row;
-            Bp[row] = NNZ;
+          // the last active thread needs finish the Bp array
+          if (nz_end == NNZ) {
+            while (row < N) {
+              ++row;
+              Bp[row] = NNZ;
+            }
           }
-        }
 
-        if (!data) {
-          // TODO(minjie): Many of our current implementation assumes that CSR must have
-          //   a data array. This is a temporary workaround. Remove this after:
-          //   - The old immutable graph implementation is deprecated.
-          //   - The old binary reduce kernel is deprecated.
-          std::iota(static_cast<IdType*>(coo.data->data)+nz_start,
-                    static_cast<IdType*>(coo.data->data)+nz_end,
-                    nz_start);
+          if (fill_data) {
+            // TODO(minjie): Many of our current implementation assumes that CSR must have
+            //   a data array. This is a temporary workaround. Remove this after:
+            //   - The old immutable graph implementation is deprecated.
+            //   - The old binary reduce kernel is deprecated.
+            std::iota(fill_data+nz_start,
+                      fill_data+nz_end,
+                      nz_start);
+          }
         }
       }
+    } else {
+      std::fill(Bp, Bp+N+1, 0);
     }
 
     // compute indices and data
