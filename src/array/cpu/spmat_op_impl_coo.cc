@@ -328,7 +328,7 @@ CSRMatrix COOToCSR(COOMatrix coo) {
     IdType * const fill_data = data ? nullptr : static_cast<IdType*>(coo.data->data);
 
     if (NNZ > 0) {
-      #pragma omp parallel default(none)
+      #pragma omp parallel
       {
         const int num_threads = omp_get_num_threads();
         const int thread_id = omp_get_thread_num();
