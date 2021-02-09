@@ -8,8 +8,8 @@ from .. import utils
 
 @utils.benchmark('time', timeout=60)
 @utils.parametrize('k', [3, 5, 10])
-@utils.parametrize('size', [50, 200, ])
-@utils.parametrize('dim', [16, 64, 128])
+@utils.parametrize('size', [50, 200, 1000])
+@utils.parametrize('dim', [16, 128, 512])
 def track_time(size, dim, k):
     device = utils.get_bench_device()
     features = np.random.randn(size, dim)
