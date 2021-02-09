@@ -96,15 +96,9 @@ ToBlockCPU(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes, bool inc
           << "Node " << edge_arrays[etype].dst.Ptr<IdType>()[i] << " does not exist"
           << " in `rhs_nodes`. Argument `rhs_nodes` must contain all the edge"
           << " destination nodes.";
-
-      // setup sorted flags
-      bool row_sorted, col_sorted;
-      std::tie(row_sorted, col_sorted) = COOIsSorted(
-          COOMatrix(lhs_map.Size(), rhs_map.Size(), new_src, new_dst));
-
       rel_graphs.push_back(CreateFromCOO(
           2, lhs_map.Size(), rhs_map.Size(),
-          new_src, new_dst, row_sorted, col_sorted));
+          new_src, new_dst));
       induced_edges.push_back(edge_arrays[etype].id);
     }
   }
