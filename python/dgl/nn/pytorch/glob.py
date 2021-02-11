@@ -1164,20 +1164,28 @@ class WeightAndSum(nn.Module):
     >>> import torch as th
     >>> from dgl.nn import WeightAndSum
     >>>
-    >>> g1 = dgl.rand_graph(10, 20)  # g1 is a random graph with 10 nodes and 20 edges
-    >>> g1_node_feats = th.ones(10, 16)  # feature size is 16
+    >>> g1 = dgl.rand_graph(3, 4)  # g1 is a random graph with 3 nodes and 4 edges
+    >>> g1_node_feats = th.rand(3, 5)  # feature size is 5
+    >>> g1_node_feats
+    tensor([[0.8948, 0.0699, 0.9137, 0.7567, 0.3637],
+            [0.8137, 0.8938, 0.8377, 0.4249, 0.6118],
+            [0.5197, 0.9030, 0.6825, 0.5725, 0.4755]])
     >>>
-    >>> g2 = dgl.rand_graph(20, 50)  # g2 is a random graph with 20 nodes and 50 edges
-    >>> g2_node_feats = th.ones(20, 16)  # feature size is 16
+    >>> g2 = dgl.rand_graph(4, 6)  # g2 is a random graph with 4 nodes and 6 edges
+    >>> g2_node_feats = th.rand(4, 5)  # feature size is 5
+    >>> g2_node_feats
+    tensor([[0.2053, 0.2426, 0.4111, 0.9028, 0.5658],
+            [0.5278, 0.6365, 0.9990, 0.2351, 0.8945],
+            [0.3134, 0.0580, 0.4349, 0.7949, 0.3891],
+            [0.0142, 0.2709, 0.3330, 0.8521, 0.6925]])
     >>>
-    >>> weight_and_sum = WeightAndSum(16)  # create a weight and sum layer(in_feats=16)
+    >>> weight_and_sum = WeightAndSum(5)  # create a weight and sum layer(in_feats=16)
 
     Case 1: Input a single graph
 
     >>> weight_and_sum(g1, g1_node_feats)
-        tensor([[5.1436, 5.1436, 5.1436, 5.1436, 5.1436, 5.1436, 5.1436, 5.1436, 5.1436,
-                 5.1436, 5.1436, 5.1436, 5.1436, 5.1436, 5.1436, 5.1436]],
-               grad_fn=<SegmentReduceBackward>)
+    tensor([[1.2194, 0.9490, 1.3235, 0.9609, 0.7710]],
+           grad_fn=<SegmentReduceBackward>)
 
     Case 2: Input a batch of graphs
 
@@ -1186,12 +1194,10 @@ class WeightAndSum(nn.Module):
     >>> batch_g = dgl.batch([g1, g2])
     >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
     >>>
-    >>> sumpool(batch_g, batch_f)
-        tensor([[ 5.1436,  5.1436,  5.1436,  5.1436,  5.1436,  5.1436,  5.1436,  5.1436,
-                  5.1436,  5.1436,  5.1436,  5.1436,  5.1436,  5.1436,  5.1436,  5.1436],
-                [10.2872, 10.2872, 10.2872, 10.2872, 10.2872, 10.2872, 10.2872, 10.2872,
-                 10.2872, 10.2872, 10.2872, 10.2872, 10.2872, 10.2872, 10.2872, 10.2872]],
-               grad_fn=<SegmentReduceBackward>)
+    >>> weight_and_sum(batch_g, batch_f)
+    tensor([[1.2194, 0.9490, 1.3235, 0.9609, 0.7710],
+            [0.5322, 0.5840, 1.0729, 1.3665, 1.2360]],
+           grad_fn=<SegmentReduceBackward>)
 
     Notes
     -----
