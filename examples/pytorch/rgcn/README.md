@@ -43,14 +43,14 @@ AIFB: accuracy avg(5 runs) 90.56%, best 94.44% (DGL)
 python3 entity_classify_mp.py -d aifb --testing --gpu 0 --fanout='20,20' --batch-size 128
 ```
 
-MUTAG: accuracy avg(5 runs) 70.00%, best 73.53% (DGL)
+MUTAG: accuracy avg(10 runs) 69.41%, best 76.47% (DGL)
 ```
-python3 entity_classify_mp.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gpu 0 --batch-size 64 --fanout '50,40' --use-self-loop --dgl-sparse --n-epochs 30 --sparse-lr 0.01 --dropout 0.7
+python3 entity_classify_mp.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gpu 0 --batch-size 64 --fanout "-1, -1" --use-self-loop --dgl-sparse --n-epochs 20 --sparse-lr 0.01 --dropout 0.5
 ```
 
-BGS: accuracy avg(5 runs) 84.83%, best 89.66% (DGL)
+BGS: accuracy avg(5 runs) 85.52%, best 93.10% (DGL)
 ```
-python3 entity_classify_mp.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout '50,40' --n-epochs=20 --batch-size=32 --dgl-sparse  --lr 0.01 --sparse-lr 0.01 --dropout 0.3
+python3 entity_classify_mp.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout "-1, -1"  --n-epochs=16 --batch-size=16 --dgl-sparse  --lr 0.01 --sparse-lr 0.05 --dropout 0.3
 ```
 
 AM: accuracy avg(5 runs) 88.59%, best 88.89% (DGL)
@@ -68,7 +68,7 @@ python3 entity_classify_mp.py -d ogbn-mag --testing --fanout='30,30' --batch-siz
 
 OGBN-MAG without node-feats 42.79
 ```
-python3 entity_classify_mp.py -d ogbn-mag --testing --fanout='30,30' --batch-size 1024 --n-hidden 128 --lr 0.01 --num-worker 4 --eval-batch-size 8 --low-mem --gpu 0,1,2,3 --dropout 0.7 --use-self-loop --n-bases 2 --n-epochs 3 --dgl-sparse --sparse-lr 0.0
+python3 entity_classify_mp.py -d ogbn-mag --testing --fanout='30,30' --batch-size 1024 --n-hidden 128 --lr 0.01 --num-worker 4 --eval-batch-size 8 --low-mem --gpu 0,1,2,3 --dropout 0.7 --use-self-loop --n-bases 2 --n-epochs 3 --dgl-sparse --sparse-lr 0.08
 ```
 
 Test-bd: P2-8xlarge

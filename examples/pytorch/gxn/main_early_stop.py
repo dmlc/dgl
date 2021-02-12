@@ -5,12 +5,12 @@ from datetime import datetime
 
 import dgl
 from dgl.data import LegacyTUDataset
+from dgl.dataloading import GraphDataLoader
 from torch.utils.data import random_split
 import torch
 from torch import Tensor
 import torch.nn.functional as F
 
-from dataloader import GraphDataLoader
 from networks import GraphClassifier
 from utils import get_stats, parse_args
 from data_preprocess import degree_as_feature, node_label_as_feature
