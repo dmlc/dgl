@@ -273,6 +273,8 @@ class SortPooling(nn.Module):
     -----------
     Apply Sort Pooling (`An End-to-End Deep Learning Architecture for Graph Classification
     <https://www.cse.wustl.edu/~ychen/public/DGCNN.pdf>`__) over the nodes in a graph.
+    Sort Pooling first sorts the node features in ascending order along the feature dimension,
+    and selects the sorted features of top-k nodes (ranked by the largest value of each node).
 
     Parameters
     ----------
