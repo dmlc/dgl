@@ -610,13 +610,11 @@ class Set2Set(nn.Module):
         return summary.format(**self.__dict__)
 
 
-def _gen_mask(batch_size, lengths_x, lengths_y, max_len_x, max_len_y):
+def _gen_mask(lengths_x, lengths_y, max_len_x, max_len_y):
     """ Generate binary mask array for given x and y input pairs.
 
     Parameters
     ----------
-    batch_size : int
-        The batch size.
     lengths_x : Tensor
         The int tensor indicates the segment information of x.
     lengths_y : Tensor
@@ -639,7 +637,7 @@ def _gen_mask(batch_size, lengths_x, lengths_y, max_len_x, max_len_y):
     # mask: (batch_size, 1, max_len_x, max_len_y)
     mask = (x_mask.unsqueeze(-1) & y_mask.unsqeeze(-2)).unsqueeze(1)
     return mask
-    
+
 
 class MultiHeadAttention(nn.Module):
     r"""Multi-Head Attention block, used in Transformer, Set Transformer and so on.
@@ -728,7 +726,7 @@ class MultiHeadAttention(nn.Module):
         e = e / np.sqrt(self.d_head)
 
         # generate mask
-        mask = _gen_mask(batch_size, lengths_x, lengths_mem, max_len_x, max_len_y)
+        mask = _gen_mask(lengths_x, lengths_mem, max_len_x, max_len_mem)
         e[mask] = -float('inf')
 
         # apply softmax
