@@ -635,7 +635,7 @@ def _gen_mask(lengths_x, lengths_y, max_len_x, max_len_y):
     # y_mask: (batch_size, max_len_y)
     y_mask = th.arange(max_len_y, device=device).unsqueeze(0) < lengths_y.unsqueeze(1)
     # mask: (batch_size, 1, max_len_x, max_len_y)
-    mask = (x_mask.unsqueeze(-1) & y_mask.unsqeeze(-2)).unsqueeze(1)
+    mask = (x_mask.unsqueeze(-1) & y_mask.unsqueeze(-2)).unsqueeze(1)
     return mask
 
 
