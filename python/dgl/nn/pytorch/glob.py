@@ -610,6 +610,37 @@ class Set2Set(nn.Module):
         return summary.format(**self.__dict__)
 
 
+def _gen_mask(batch_size, lengths_x, lengths_y, max_len_x, max_len_y):
+    """ Generate binary mask array for given x and y input pairs.
+
+    Parameters
+    ----------
+    batch_size : int
+        The batch size.
+    lengths_x : Tensor
+        The int tensor indicates the segment information of x.
+    lengths_y : Tensor
+        The int tensor indicates the segment information of y.
+    max_len_x : int
+        The maximum element in lengths_x.
+    max_len_y : int
+        The maximum element in lengths_y.
+
+    Returns
+    -------
+    Tensor
+        the mask tensor with shape (batch_size, 1, max_len_x, max_len_y)
+    """
+    device = lengths_x.device
+    # x_mask: (batch_size, max_len_x)
+    x_mask = th.arange(max_len_x, device=device).unsqueeze(0) < lengths_x.unsqueeze(1)
+    # y_mask: (batch_size, max_len_y)
+    y_mask = th.arange(max_len_y, device=device).unsqueeze(0) < lengths_y.unsqueeze(1)
+    # mask: (batch_size, 1, max_len_x, max_len_y)
+    mask = (x_mask.unsqueeze(-1) & y_mask.unsqeeze(-2)).unsqueeze(1)
+    return mask
+    
+
 class MultiHeadAttention(nn.Module):
     r"""Multi-Head Attention block, used in Transformer, Set Transformer and so on.
 
@@ -678,6 +709,9 @@ class MultiHeadAttention(nn.Module):
         batch_size = len(lengths_x)
         max_len_x = max(lengths_x)
         max_len_mem = max(lengths_mem)
+        device = x.device
+        lengths_x = th.tensor(lengths_x, dtype=th.int64, device=device)
+        lengths_mem = th.tensor(lengths_mem, dtype=th.int64, device=device)
 
         queries = self.proj_q(x).view(-1, self.num_heads, self.d_head)
         keys = self.proj_k(mem).view(-1, self.num_heads, self.d_head)
@@ -694,14 +728,13 @@ class MultiHeadAttention(nn.Module):
         e = e / np.sqrt(self.d_head)
 
         # generate mask
-        mask = th.zeros(batch_size, max_len_x, max_len_mem).to(e.device)
-        for i in range(batch_size):
-            mask[i, :lengths_x[i], :lengths_mem[i]].fill_(1)
-        mask = mask.unsqueeze(1)
-        e.masked_fill_(mask == 0, -float('inf'))
+        mask = _gen_mask(batch_size, lengths_x, lengths_mem, max_len_x, max_len_y)
+        e[mask] = -float('inf')
 
         # apply softmax
         alpha = th.softmax(e, dim=-1)
+        alpha[alpha.isnan()] = 0.
+
         # sum of value weighted by alpha
         out = th.einsum('bhxy,byhd->bxhd', alpha, values)
         # project to output
