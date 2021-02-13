@@ -18,8 +18,9 @@ DGL的处理方法是：
 
     import dgl.function as fn
 
-    graph.edata['a'] = affinity
+    # 假定eweight是一个形状为(E, *)的张量，E是边的数量。
+    graph.edata['a'] = eweight
     graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                      fn.sum('m', 'ft'))
 
-在以上代码中，affinity被用作边的权重。边权重通常是一个标量。
+在以上代码中，eweight被用作边的权重。边权重通常是一个标量。

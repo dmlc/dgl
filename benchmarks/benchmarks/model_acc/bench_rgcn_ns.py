@@ -182,21 +182,21 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
     with th.no_grad():
         for sample_data in eval_loader:
             th.cuda.empty_cache()
-            seeds, blocks = sample_data
+            _, _, blocks = sample_data
             feats = embed_layer(blocks[0].srcdata[dgl.NID],
                     blocks[0].srcdata[dgl.NTYPE],
                     blocks[0].srcdata['type_id'],
                     node_feats)
             logits = model(blocks, feats)
             eval_logits.append(logits.cpu().detach())
-            eval_seeds.append(seeds.cpu().detach())
+            eval_seeds.append(blocks[-1].dstdata['type_id'].cpu().detach())
     eval_logits = th.cat(eval_logits)
     eval_seeds = th.cat(eval_seeds)
  
     return eval_logits, eval_seeds
 
 
-@utils.benchmark('time', 3600)
+@utils.benchmark('time', 3600)  # ogbn-mag takes ~1 hour to train
 @utils.parametrize('data', ['am', 'ogbn-mag'])
 def track_acc(data):
     dataset = utils.process_data(data)
@@ -205,9 +205,11 @@ def track_acc(data):
     if data == 'am':
         n_bases = 40
         l2norm = 5e-4
+        n_epochs = 20
     elif data == 'ogbn-mag':
         n_bases = 2
         l2norm = 0
+        n_epochs = 20
     else:
         raise ValueError()
 
@@ -218,7 +220,6 @@ def track_acc(data):
     dropout = 0.5
     use_self_loop = True
     lr = 0.01
-    n_epochs = 20
     low_mem = True
     num_workers = 4
 
@@ -264,26 +265,28 @@ def track_acc(data):
     node_tids = g.ndata[dgl.NTYPE]
     loc = (node_tids == category_id)
     target_nids = node_ids[loc]
-    train_nids = target_nids[train_idx]
 
-    # Create csr/coo/csc formats before launching training processes with multi-gpu.
-    # This avoids creating certain formats in each sub-process, which saves momory and CPU.
-    g.create_formats_()
+    g = g.formats('csc')
     sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
-    collator = dgl.dataloading.NodeCollator(g, train_nids, sampler, return_indices=True)
-    loader = dgl.dataloading.DataLoader(
-        collator.dataset, collate_fn=collator.collate,
-        batch_size=batch_size, shuffle=True, num_workers=4)
-    # test_sampler =  dgl.dataloading.MultiLayerNeighborSampler(fanouts)
-    test_loader = DataLoader(dataset=test_idx.numpy(),
-                             batch_size=batch_size,
-                             collate_fn=collator.collate,
-                             shuffle=False,
-                             num_workers=4)
+    train_loader = dgl.dataloading.NodeDataLoader(
+        g,
+        target_nids[train_idx],
+        sampler,
+        batch_size=batch_size,
+        shuffle=True,
+        drop_last=False,
+        num_workers=num_workers)
+    test_loader = dgl.dataloading.NodeDataLoader(
+        g,
+        target_nids[test_idx],
+        sampler,
+        batch_size=batch_size,
+        shuffle=True,
+        drop_last=False,
+        num_workers=num_workers)
 
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
-    #
     embed_layer = RelGraphEmbedLayer(device,
                                      g.number_of_nodes(),
                                      node_tids,
@@ -314,19 +317,19 @@ def track_acc(data):
     emb_optimizer = th.optim.SparseAdam(list(embed_layer.node_embeds.parameters()), lr=lr)
 
     print("start training...")
-    t0 = time.time()
     for epoch in range(n_epochs):
         model.train()
         embed_layer.train()
 
-        for i, sample_data in enumerate(loader):
-            input_nodes, output_nodes, seed_idx, blocks = sample_data
+        for i, sample_data in enumerate(train_loader):
+            input_nodes, output_nodes, blocks = sample_data
             feats = embed_layer(input_nodes,
                                 blocks[0].srcdata['ntype'],
                                 blocks[0].srcdata['type_id'],
                                 node_feats)
             logits = model(blocks, feats)
-            loss = F.cross_entropy(logits, labels[train_idx][seed_idx])
+            seed_idx = blocks[-1].dstdata['type_id']
+            loss = F.cross_entropy(logits, labels[seed_idx])
             optimizer.zero_grad()
             emb_optimizer.zero_grad()
 
@@ -334,8 +337,10 @@ def track_acc(data):
             optimizer.step()
             emb_optimizer.step()
 
+    print('start testing...')
+
     test_logits, test_seeds = evaluate(model, embed_layer, test_loader, node_feats)
     test_loss = F.cross_entropy(test_logits, labels[test_seeds].cpu()).item()
     test_acc = th.sum(test_logits.argmax(dim=1) == labels[test_seeds].cpu()).item() / len(test_seeds)
-    t1 = time.time()
+
     return test_acc

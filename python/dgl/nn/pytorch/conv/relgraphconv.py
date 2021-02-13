@@ -238,7 +238,7 @@ class RelGraphConv(nn.Module):
                 etypes = th.repeat_interleave(th.arange(len(etypes), device=device),
                                               th.tensor(etypes, device=device))
             weight = weight.index_select(0, etypes)
-            msg = th.bmm(h.unsqueeze(1), weight).squeeze()
+            msg = th.bmm(h.unsqueeze(1), weight).squeeze(1)
 
         if 'norm' in edges.data:
             msg = msg * edges.data['norm']

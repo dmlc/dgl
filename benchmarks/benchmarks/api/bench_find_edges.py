@@ -6,7 +6,7 @@ import numpy as np
 from .. import utils
 
 
-@utils.benchmark('time', timeout=1200)
+@utils.benchmark('time', timeout=600)
 @utils.parametrize_cpu('graph_name', ['cora', 'livejournal', 'friendster'])
 @utils.parametrize_gpu('graph_name', ['cora', 'livejournal'])
 @utils.parametrize('format', ['coo'])  # csc is not supported

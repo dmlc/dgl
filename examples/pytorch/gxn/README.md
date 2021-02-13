@@ -10,47 +10,13 @@ The DGL's built-in LegacyTUDataset. This is a serial of graph kernel datasets fo
 
 NOTE: Follow the setting of the author's implementation, for 'DD' and 'PROTEINS', we use one-hot node label as input node features. For ENZYMES', 'IMDB-BINARY', 'IMDB-MULTI' and 'COLLAB', we use the concatenation of one-hot node label (if available) and one-hot node degree as input node features.
 
-DD
-- NumGraphs: 1178
-- AvgNodesPerGraph: 284.32
-- AvgEdgesPerGraph: 715.66
-- NumFeats: 89
-- NumClasses: 2
-
-PROTEINS
-- NumGraphs: 1113
-- AvgNodesPerGraph: 39.06
-- AvgEdgesPerGraph: 72.82
-- NumFeats: 1
-- NumClasses: 2
-
-ENZYMES
-- NumGraphs: 600
-- AvgNodesPerGraph: 32.63
-- AvgEdgesPerGraph: 62.14
-- NumFeats: 18
-- NumClasses: 6
-
-IMDB-BINARY
-- NumGraphs: 1000
-- AvgNodesPerGraph: 19.77
-- AvgEdgesPerGraph: 96.53
-- NumFeats: -
-- NumClasses: 2
-
-IMDB-MULTI
-- NumGraphs: 1500
-- AvgNodesPerGraph: 13.00
-- AvgEdgesPerGraph: 65.94
-- NumFeats: -
-- NumClasses: 3
-
-COLLAB
-- NumGraphs: 5000
-- AvgNodesPerGraph: 74.49
-- AvgEdgesPerGraph: 2457.78
-- NumFeats: -
-- NumClasses: 3
+|                  | DD     | PROTEINS | ENZYMES | IMDB-BINARY  | IMDB-MULTI | COLLAB   |
+| ---------------- | ------ | -------- | ------- | ------------ | ---------- | -------- |
+| NumGraphs        | 1178   | 1113     | 600     | 1000         | 1500       | 5000     |
+| AvgNodesPerGraph | 284.32 | 39.06    | 32.63   | 19.77        | 13.00      | 74.49    |
+| AvgEdgesPerGraph | 715.66 | 72.82    | 62.14   | 96.53        | 65.94      | 2457.78  |
+| NumFeats         | 89     | 1        | 18      | -            | -          | -        |
+| NumClasses       | 2      | 2        | 6       | 2            | 3          | 2        |
 
 
 How to run example files
