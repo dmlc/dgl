@@ -321,7 +321,7 @@ def _scatter_add(x, idx, m):
         The indices array.
     m : int
         The length of output.
-    
+
     Returns
     -------
     Tensor
