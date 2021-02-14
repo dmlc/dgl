@@ -116,8 +116,7 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
 
 template <DLDeviceType XPU, typename FloatType, typename IdType>
 void GraphMatching(const NDArray indptr, const NDArray indices,
-                   const NDArray weight, const NDArray vis_order,
-                   NDArray result) {
+                   const NDArray weight, NDArray result) {
   return;
 }
 
@@ -136,20 +135,16 @@ template void FarthestPointSampler<kDLGPU, double, int64_t>(
 
 template void GraphMatching<kDLGPU, float, int32_t>(
     const NDArray indptr, const NDArray indices,
-    const NDArray weight, const NDArray vis_order,
-    NDArray result);
+    const NDArray weight, NDArray result);
 template void GraphMatching<kDLGPU, float, int64_t>(
     const NDArray indptr, const NDArray indices,
-    const NDArray weight, const NDArray vis_order,
-    NDArray result);
+    const NDArray weight, NDArray result);
 template void GraphMatching<kDLGPU, double, int32_t>(
     const NDArray indptr, const NDArray indices,
-    const NDArray weight, const NDArray vis_order,
-    NDArray result);
+    const NDArray weight, NDArray result);
 template void GraphMatching<kDLGPU, double, int64_t>(
     const NDArray indptr, const NDArray indices,
-    const NDArray weight, const NDArray vis_order,
-    NDArray result);
+    const NDArray weight, NDArray result);
 
 }  // namespace impl
 }  // namespace geometry

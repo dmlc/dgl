@@ -23,8 +23,7 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
  */
 template <DLDeviceType XPU, typename FloatType, typename IdType>
 void GraphMatching(const NDArray indptr, const NDArray indices,
-                   const NDArray weight, const NDArray vis_order,
-                   NDArray result);
+                   const NDArray weight, NDArray result);
 
 }  // namespace impl
 }  // namespace geometry

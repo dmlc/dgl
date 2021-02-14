@@ -96,12 +96,12 @@ def graph_matching(graph, edge_weights=None):
     indptr[1:] = F.cumsum(deg, dim=0)
 
     node_label = F.full_1d(num_nodes, -1, F.dtype(src), F.context(src))
-    node_vis_order = F.rand_shuffle(F.arange(0, num_nodes, F.dtype(src), F.context(src)))
+    # node_vis_order = F.rand_shuffle(F.arange(0, num_nodes, F.dtype(src), F.context(src)))
 
     _CAPI_GraphMatching(F.zerocopy_to_dgl_ndarray(indptr),
                         F.zerocopy_to_dgl_ndarray(dst),
                         nd.NULL["int64"] if edge_weights is None else F.zerocopy_to_dgl_ndarray(edge_weights),
-                        F.zerocopy_to_dgl_ndarray(node_vis_order),
+                        # F.zerocopy_to_dgl_ndarray(node_vis_order),
                         F.zerocopy_to_dgl_ndarray_for_write(node_label))
 
     return node_label

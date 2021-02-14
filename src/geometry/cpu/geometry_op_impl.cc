@@ -4,6 +4,7 @@
  * \brief Geometry operator CPU implementation
  */
 #include <dgl/array.h>
+#include <dgl/random.h>
 #include <numeric>
 #include <vector>
 
@@ -11,6 +12,21 @@ namespace dgl {
 using runtime::NDArray;
 namespace geometry {
 namespace impl {
+
+/*!
+ * \brief Knuth shuffle algorithm 
+ */
+template <typename IdType>
+void IndexShuffle(IdType *idxs, int64_t num_elems) {
+  for (int64_t i = num_elems - 1; i > 0; --i) {
+    int64_t j = dgl::RandomEngine::ThreadLocal()->RandInt(i);
+    auto tmp = idxs[i];
+    idxs[i] = idxs[j];
+    idxs[j] = tmp;
+  }
+}
+template void IndexShuffle<int32_t>(int32_t *idxs, int64_t num_elems);
+template void IndexShuffle<int64_t>(int64_t *idxs, int64_t num_elems);
 
 /*!
  * \brief Farthest Point Sampler without the need to compute all pairs of distance.
@@ -84,13 +100,17 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
 
 template <DLDeviceType XPU, typename FloatType, typename IdType>
 void GraphMatching(const NDArray indptr, const NDArray indices,
-                   const NDArray weight, const NDArray vis_order,
-                   NDArray result) {
+                   const NDArray weight, NDArray result) {
   const int64_t num_nodes = indptr->shape[0] - 1;
   const IdType* indptr_data = static_cast<IdType*>(indptr->data);
   const IdType* indices_data = static_cast<IdType*>(indices->data);
-  const IdType* vis_order_data = static_cast<IdType*>(vis_order->data);
   IdType* result_data = static_cast<IdType*>(result->data);
+
+  // build vis order
+  IdArray vis_order = aten::NewIdArray(num_nodes, DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
+  IdType* vis_order_data = static_cast<IdType*>(vis_order->data);
+  std::iota(vis_order_data, vis_order_data + num_nodes, 0);
+  IndexShuffle(vis_order_data, num_nodes);
 
   if (aten::IsNullArray(weight)) {
     for (int64_t n = 0; n < num_nodes; ++n) {
@@ -155,20 +175,16 @@ template void FarthestPointSampler<kDLCPU, double, int64_t>(
 
 template void GraphMatching<kDLCPU, float, int32_t>(
     const NDArray indptr, const NDArray indices,
-    const NDArray weight, const NDArray vis_order,
-    NDArray result);
+    const NDArray weight, NDArray result);
 template void GraphMatching<kDLCPU, float, int64_t>(
     const NDArray indptr, const NDArray indices,
-    const NDArray weight, const NDArray vis_order,
-    NDArray result);
+    const NDArray weight, NDArray result);
 template void GraphMatching<kDLCPU, double, int32_t>(
     const NDArray indptr, const NDArray indices,
-    const NDArray weight, const NDArray vis_order,
-    NDArray result);
+    const NDArray weight, NDArray result);
 template void GraphMatching<kDLCPU, double, int64_t>(
     const NDArray indptr, const NDArray indices,
-    const NDArray weight, const NDArray vis_order,
-    NDArray result);
+    const NDArray weight, NDArray result);
 
 }  // namespace impl
 }  // namespace geometry

@@ -76,24 +76,20 @@ DGL_REGISTER_GLOBAL("geometry._CAPI_GraphMatching")
     const NDArray indptr = args[0];
     const NDArray indices = args[1];
     const NDArray weight = args[2];
-    const NDArray vis_order = args[3];
-    NDArray result = args[4];
+    NDArray result = args[3];
 
     // check context and contiguous
-    CheckCtx(indptr->ctx, {indices, weight, vis_order, result},
-      {"indices", "edge_weight", "node_visit_order", "result"});
-    CheckContiguous({indptr, indices, weight, vis_order, result},
-      {"indptr", "indices", "edge_weight", "node_visit_order", "result"});
+    CheckCtx(indptr->ctx, {indices, weight, result},
+      {"indices", "edge_weight", "result"});
+    CheckContiguous({indptr, indices, weight, result},
+      {"indptr", "indices", "edge_weight", "result"});
 
     // check shape
     CHECK_EQ(indptr->ndim, 1) << "indptr should be an 1D tensor.";
     CHECK_EQ(indices->ndim, 1) << "indices should be an 1D tensor.";
     CHECK_EQ(result->ndim, 1) << "result should be an 1D tensor.";
-    CHECK_EQ(vis_order->ndim, 1) << "node_visit_order shoule be an 1D tensor.";
     CHECK_EQ(indptr->shape[0] - 1, result->shape[0])
       << "The number of nodes in CSR matrix should be the same as the result tensor.";
-    CHECK_EQ(result->shape[0], vis_order->shape[0])
-      << "The shape of result must be the same as the shape of node_visit_order.";
 
     if (!aten::IsNullArray(weight)) {
       CHECK_EQ(weight->ndim, 1) << "weight should be an 1D tensor.";
@@ -108,7 +104,7 @@ DGL_REGISTER_GLOBAL("geometry._CAPI_GraphMatching")
         ATEN_ID_TYPE_SWITCH(indptr->dtype, IdType, {
           ATEN_XPU_SWITCH_CUDA(indptr->ctx.device_type, XPU, "GraphMatching", {
             impl::GraphMatching<XPU, FloatType, IdType>(
-                indptr, indices, weight, vis_order, result);
+                indptr, indices, weight, result);
           });
         });
       });
@@ -116,7 +112,7 @@ DGL_REGISTER_GLOBAL("geometry._CAPI_GraphMatching")
       ATEN_ID_TYPE_SWITCH(indptr->dtype, IdType, {
         ATEN_XPU_SWITCH_CUDA(indptr->ctx.device_type, XPU, "GraphMatching", {
           impl::GraphMatching<XPU, float, IdType>(
-              indptr, indices, weight, vis_order, result);
+              indptr, indices, weight, result);
           });
         });
     }
