@@ -20,20 +20,8 @@ In this example, if we use a tuple to identify the nodes, nodes of `T0` are iden
 (T0, type-wise ID), where type-wise ID falls in [0, 200); nodes of `T1` are identified as
 (T1, type-wise ID), where type-wise ID also falls in [0, 200).
 
-    ```
-        0 <- T0 -> 200 <- T1 -> 400
-     0  +-----------+------------+
-        |           |            |
-     ^  |    R0     |     R1     |
-     T0 |           |            |
-     v  |           |            |
-    200 +-----------+------------+
-        |           |            |
-     ^  |    R2     |     R3     |
-     T1 |           |            |
-     v  |           |            |
-    400 +-----------+------------+
-    ```
+.. figure:: https://data.dgl.ai/tutorial/hetero/heterograph_ids.png
+   :alt: Imgur
 
 7.3.1 Access distributed graph data
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
