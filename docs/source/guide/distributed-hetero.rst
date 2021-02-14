@@ -40,8 +40,11 @@ needs to use type-wise IDs and corresponding node types or edge types.
 A user can create distributed tensors and distributed embeddings for a particular node type or
 edge type. Distributed tensors and embeddings are split and stored in multiple machines. To create
 one, a user needs to specify how it is partitioned with :class:`~dgl.distributed.PartitionPolicy`.
-Below shows an example of creating a distributed tensor for node type `T0` and store it as node data
-of node type `T0`.
+By default, DGL chooses the right partition policy based on the size of the first dimension.
+However, if multiple node types or edge types have the same number of nodes or edges, DGL cannot
+determine the partition policy automatically. A user needs to explicitly specify the partition policy.
+Below shows an example of creating a distributed tensor for node type `T0` by using the partition policy
+for `T0` and store it as node data of `T0`.
 
 .. code:: python
 
