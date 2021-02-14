@@ -727,10 +727,12 @@ class MultiHeadAttention(nn.Module):
 
         # generate mask
         mask = _gen_mask(lengths_x, lengths_mem, max_len_x, max_len_mem)
-        e.masked_fill_(mask == 0, -float('inf'))
+        e = e.masked_fill(mask == 0, -float('inf'))
 
         # apply softmax
         alpha = th.softmax(e, dim=-1)
+        # the following line addresses the NaN issue, see
+        # https://github.com/dmlc/dgl/issues/2657
         alpha = alpha.masked_fill(mask == 0, 0.)
 
         # sum of value weighted by alpha
