@@ -731,7 +731,7 @@ class MultiHeadAttention(nn.Module):
 
         # apply softmax
         alpha = th.softmax(e, dim=-1)
-        alpha.masked_fill_(mask == 0, 0.)
+        alpha = alpha.masked_fill(mask == 0, 0.)
 
         # sum of value weighted by alpha
         out = th.einsum('bhxy,byhd->bxhd', alpha, values)
