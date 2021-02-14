@@ -727,11 +727,11 @@ class MultiHeadAttention(nn.Module):
 
         # generate mask
         mask = _gen_mask(lengths_x, lengths_mem, max_len_x, max_len_mem)
-        e[mask] = -float('inf')
+        e.masked_fill(mask == 0, -float('inf'))
 
         # apply softmax
         alpha = th.softmax(e, dim=-1)
-        alpha[alpha.isnan()] = 0.
+        alpha.masked_fill(mask == 0, -float('inf'))
 
         # sum of value weighted by alpha
         out = th.einsum('bhxy,byhd->bxhd', alpha, values)
