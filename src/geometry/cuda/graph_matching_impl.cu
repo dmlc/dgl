@@ -135,7 +135,7 @@ __global__ void weighted_respond_kernel(const IdType *indptr, const IdType *indi
     FloatType weight_max = 0.;
 
     for (IdType i = indptr[idx]; i < indptr[idx + 1]; ++i) {
-      auto v = indices[idx];
+      auto v = indices[i];
 
       if (result[v] < 0)
         has_unmatched_neighbors = true;
