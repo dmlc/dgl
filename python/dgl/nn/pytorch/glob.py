@@ -1,5 +1,6 @@
 """Torch modules for graph global pooling."""
 # pylint: disable= no-member, arguments-differ, invalid-name, W0235
+from python.dgl.base import dgl_warning
 import torch as th
 import torch.nn as nn
 import numpy as np
@@ -798,6 +799,8 @@ class InducedSetAttentionBlock(nn.Module):
 
     Parameters
     ----------
+    m : int
+        The number of induced vectors.
     d_model : int
         The feature size (input and output) in Multi-Head Attention layer.
     num_heads : int
@@ -818,6 +821,8 @@ class InducedSetAttentionBlock(nn.Module):
     def __init__(self, m, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(InducedSetAttentionBlock, self).__init__()
         self.m = m
+        if m == 1:
+            dgl_warning("if m is set to 1, W_q and W_k would not be updated during training.")
         self.d_model = d_model
         self.inducing_points = nn.Parameter(
             th.FloatTensor(m, d_model)
@@ -865,6 +870,8 @@ class PMALayer(nn.Module):
 
     Parameters
     ----------
+    k : int
+        The number of seed vectors.
     d_model : int
         The feature size (input and output) in Multi-Head Attention layer.
     num_heads : int
@@ -885,6 +892,8 @@ class PMALayer(nn.Module):
     def __init__(self, k, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(PMALayer, self).__init__()
         self.k = k
+        if k == 1:
+            dgl_warning("if k is set to 1, W_q and W_k would not be updated during training.")
         self.d_model = d_model
         self.seed_vectors = nn.Parameter(
             th.FloatTensor(k, d_model)
