@@ -1,11 +1,11 @@
 """Torch modules for graph global pooling."""
 # pylint: disable= no-member, arguments-differ, invalid-name, W0235
-from python.dgl.base import dgl_warning
 import torch as th
 import torch.nn as nn
 import numpy as np
 
 from ...backend import pytorch as F
+from ...base import dgl_warning
 from ...readout import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
     softmax_nodes, topk_nodes
 
