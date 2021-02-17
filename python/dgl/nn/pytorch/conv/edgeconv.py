@@ -109,7 +109,7 @@ class EdgeConv(nn.Module):
         """The message computation function.
         """
         theta_x = self.theta(edges.dst['x'] - edges.src['x'])
-        phi_x = self.phi(edges.src['x'])
+        phi_x = self.phi(edges.dst['x'])
         return {'e': theta_x + phi_x}
 
     def set_allow_zero_in_degree(self, set_value):
