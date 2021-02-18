@@ -25,6 +25,12 @@ class EdgeConv(nn.Block):
     where :math:`\mathcal{N}(i)` is the neighbor of :math:`i`.
     :math:`\Theta` and :math:`\Phi` are linear layers.
 
+    .. note::
+
+       The original formulation includes a ReLU inside the maximum operator.
+       This is equivalent to first applying a maximum operator then applying
+       the ReLU.
+
     Parameters
     ----------
     in_feat : int
