@@ -4,9 +4,8 @@
 --------------------------------------------
 
 DGL v0.6.0 provides an experimental support for distributed training on heterogeneous graphs.
-In this version, each node or edge is assigned with two IDs: homogeneous ID and type-wise ID.
 In DGL, a node or edge in a heterogeneous graph has a unique ID in its own node type or edge type.
-We identify a node or edge with a tuple: node/edge type and type-wise ID. In distributed training,
+DGL identifies a node or edge with a tuple: node/edge type and type-wise ID. In distributed training,
 a node or edge can be identified by a homogeneous ID, in addition to the tuple of node/edge type
 and type-wise ID. The homogeneous ID is unique regardless of the node type and edge type.
 DGL arranges nodes and edges so that all nodes of the same type have contiguous
@@ -59,7 +58,7 @@ Accessing distributed tensors and embeddings also requires type-wise IDs.
 7.3.2 Distributed sampling
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-DGL v0.6 uses homogeneous IDs in distributed sampling. **Note**: this will change in the future release.
+DGL v0.6 uses homogeneous IDs in distributed sampling. **Note**: this may change in the future release.
 DGL provides four APIs to convert node IDs and edge IDs between the homogeneous IDs and type-wise IDs: 
 
 * :func:`~dgl.distributed.GraphPartitionBook.map_to_per_ntype`: convert a homogeneous node ID to type-wise ID and node type ID.
@@ -68,9 +67,9 @@ DGL provides four APIs to convert node IDs and edge IDs between the homogeneous 
 * :func:`~dgl.distributed.GraphPartitionBook.map_to_homo_eid`: convert type-wise ID and edge type to a homogeneous edge ID.
 
 Below shows an example of sampling a subgraph with :func:`~dgl.distributed.sample_neighbors` from a heterogeneous graph
-with a node type called `paper`. We first convert type-wise node IDs to homogeneous node IDs. After sampling a subgraph
-from the seed nodes, we convert homogeneous node IDs and edge IDs to type-wise IDs and also store type IDs as node data
-or edge data.
+with a node type called `paper`. It first converts type-wise node IDs to homogeneous node IDs. After sampling a subgraph
+from the seed nodes, it converts homogeneous node IDs and edge IDs to type-wise IDs and also stores type IDs as node data
+and edge data.
 
 .. code:: python
 
@@ -90,5 +89,5 @@ or edge data.
         block.srcdata[dgl.NTYPE], block.srcdata[dgl.NID] = gpb.map_to_per_ntype(block.srcdata[dgl.NID])
         block.dstdata[dgl.NTYPE], block.dstdata[dgl.NID] = gpb.map_to_per_ntype(block.dstdata[dgl.NID])
 
-From node/edge type IDs, we can retrieve node/edge types. For example, `g.ntypes[node_type_id]`. Once we have
-node/edge type and type-wise IDs, we can retrieve node/edge data from `DistGraph` for mini-batch computation.
+From node/edge type IDs, a user can retrieve node/edge types. For example, `g.ntypes[node_type_id]`.
+With node/edge types and type-wise IDs, a user can retrieve node/edge data from `DistGraph` for mini-batch computation.

@@ -30,7 +30,7 @@ class DistTensor:
     determined based on the first dimension if the partition policy is not provided. If the first
     dimension matches the number of nodes of a node type, ``DistTensor`` will use the partition
     policy for this particular node type; if the first dimension matches the number of edges of
-    an edge type, ``DistTensor`` wll use the partition policy for this particular edge type.
+    an edge type, ``DistTensor`` will use the partition policy for this particular edge type.
     If DGL cannot determine the partition policy automatically (e.g., multiple node types or
     edge types have the same number of nodes or edges), users have to explicity provide
     the partition policy.
