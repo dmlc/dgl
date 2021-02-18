@@ -752,7 +752,7 @@ def test_atomic_conv(g, idtype):
     assert h.shape[-1] == 4
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'bipartite'], exclude=['zero-degree']))
 def test_cf_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     cfconv = nn.CFConv(node_in_feats=2,

@@ -123,18 +123,21 @@ class CFConv(nn.Module):
         ----------
         g : DGLGraph
             The graph.
-        node_feats : float32 tensor of shape (V, node_in_feats)
-            Input node features, V for the number of nodes.
-        edge_feats : float32 tensor of shape (E, edge_in_feats)
-            Input edge features, E for the number of edges.
+        node_feats : torch.Tensor
+            The input node feature of shape :math:`(N_{in}, node_in_feats)`
+            where :math:`N_{in}` is the number of source nodes.
+        edge_feats : torch.Tensor
+            The input edge feature of shape :math:`(E, edge_in_feats)`
+            where :math:`E` is the number of edges.
 
         Returns
         -------
-        float32 tensor of shape (V, out_feats)
-            Updated node representations.
+        torch.Tensor
+            The output node feature of shape :math:`(N_{out}, out_feats)`
+            where :math:`N_{out}` is the number of destination nodes.
         """
         with g.local_scope():
-            g.ndata['hv'] = self.project_node(node_feats)
+            g.srcdata['hv'] = self.project_node(node_feats)
             g.edata['he'] = self.project_edge(edge_feats)
             g.update_all(fn.u_mul_e('hv', 'he', 'm'), fn.sum('m', 'h'))
-            return self.project_out(g.ndata['h'])
+            return self.project_out(g.dstdata['h'])
