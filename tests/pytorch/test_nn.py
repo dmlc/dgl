@@ -936,7 +936,7 @@ def test_cf_conv(g, idtype, out_dim):
     if F.gpu_ctx():
         cfconv = cfconv.to(ctx)
 
-    node_feats = F.randn((g.number_of_nodes(), 2))
+    node_feats = F.randn((g.number_of_src_nodes(), 2))
     edge_feats = F.randn((g.number_of_edges(), 3))
     h = cfconv(g, node_feats, edge_feats)
     # current we only do shape check
