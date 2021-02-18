@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl.function as fn
-from dgl.ops import edge_softmax
+from dgl.nn.functional import edge_softmax
 
 class HGTLayer(nn.Module):
     def __init__(self,

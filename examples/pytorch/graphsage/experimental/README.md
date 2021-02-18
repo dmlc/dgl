@@ -39,6 +39,8 @@ the number of nodes, the number of edges and the number of labelled nodes.
 python3 partition_graph.py --dataset ogb-product --num_parts 4 --balance_train --balance_edges
 ```
 
+This script generates partitioned graphs and store them in the directory called `data`.
+
 ### Step 2: copy the partitioned data and files to the cluster
 
 DGL provides a script for copying partitioned data and files to the cluster. Before that, copy the training script to a local folder:
@@ -67,6 +69,10 @@ After runing this command, user can find a folder called ``graphsage`` on each m
 
 DGL provides a script to launch the training job in the cluster. `part_config` and `ip_config`
 specify relative paths to the path of the workspace.
+
+The command below launches one training process on each machine and each training process has 4 sampling processes.
+**Note**: There is a known bug in Python 3.8. The training process hangs when running multiple sampling processes for each training process.
+Please set the number of sampling processes to 0 if you are using Python 3.8.
 
 ```bash
 python3 ~/dgl/tools/launch.py \

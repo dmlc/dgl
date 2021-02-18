@@ -1,7 +1,7 @@
 """DGL PyTorch DataLoaders"""
 import inspect
 from torch.utils.data import DataLoader
-from ..dataloader import NodeCollator, EdgeCollator
+from ..dataloader import NodeCollator, EdgeCollator, GraphCollator
 from ...distributed import DistGraph
 from ...distributed import DistDataLoader
 
@@ -118,51 +118,73 @@ def _restore_blocks_storage(blocks, g):
 
 class _NodeCollator(NodeCollator):
     def collate(self, items):
-        input_nodes, output_nodes, blocks = super().collate(items)
-        _pop_blocks_storage(blocks, self.g)
-        return input_nodes, output_nodes, blocks
+        # input_nodes, output_nodes, [items], blocks
+        result = super().collate(items)
+        _pop_blocks_storage(result[-1], self.g)
+        return result
 
 class _EdgeCollator(EdgeCollator):
     def collate(self, items):
         if self.negative_sampler is None:
-            input_nodes, pair_graph, blocks = super().collate(items)
-            _pop_subgraph_storage(pair_graph, self.g)
-            _pop_blocks_storage(blocks, self.g_sampling)
-            return input_nodes, pair_graph, blocks
+            # input_nodes, pair_graph, [items], blocks
+            result = super().collate(items)
+            _pop_subgraph_storage(result[1], self.g)
+            _pop_blocks_storage(result[-1], self.g_sampling)
+            return result
         else:
-            input_nodes, pair_graph, neg_pair_graph, blocks = super().collate(items)
-            _pop_subgraph_storage(pair_graph, self.g)
-            _pop_subgraph_storage(neg_pair_graph, self.g)
-            _pop_blocks_storage(blocks, self.g_sampling)
-            return input_nodes, pair_graph, neg_pair_graph, blocks
+            # input_nodes, pair_graph, neg_pair_graph, [items], blocks
+            result = super().collate(items)
+            _pop_subgraph_storage(result[1], self.g)
+            _pop_subgraph_storage(result[2], self.g)
+            _pop_blocks_storage(result[-1], self.g_sampling)
+            return result
+
+def _to_device(data, device):
+    if isinstance(data, dict):
+        for k, v in data.items():
+            data[k] = v.to(device)
+    elif isinstance(data, list):
+        data = [item.to(device) for item in data]
+    else:
+        data = data.to(device)
+    return data
 
 class _NodeDataLoaderIter:
     def __init__(self, node_dataloader):
+        self.device = node_dataloader.device
         self.node_dataloader = node_dataloader
         self.iter_ = iter(node_dataloader.dataloader)
 
     def __next__(self):
-        input_nodes, output_nodes, blocks = next(self.iter_)
-        _restore_blocks_storage(blocks, self.node_dataloader.collator.g)
-        return input_nodes, output_nodes, blocks
+        # input_nodes, output_nodes, [items], blocks
+        result_ = next(self.iter_)
+        _restore_blocks_storage(result_[-1], self.node_dataloader.collator.g)
+
+        result = []
+        for data in result_:
+            result.append(_to_device(data, self.device))
+        return result
 
 class _EdgeDataLoaderIter:
     def __init__(self, edge_dataloader):
+        self.device = edge_dataloader.device
         self.edge_dataloader = edge_dataloader
         self.iter_ = iter(edge_dataloader.dataloader)
 
     def __next__(self):
-        if self.edge_dataloader.collator.negative_sampler is None:
-            input_nodes, pair_graph, blocks = next(self.iter_)
-            _restore_subgraph_storage(pair_graph, self.edge_dataloader.collator.g)
-            _restore_blocks_storage(blocks, self.edge_dataloader.collator.g_sampling)
-            return input_nodes, pair_graph, blocks
-        else:
-            input_nodes, pair_graph, neg_pair_graph, blocks = next(self.iter_)
-            _restore_subgraph_storage(pair_graph, self.edge_dataloader.collator.g)
-            _restore_subgraph_storage(neg_pair_graph, self.edge_dataloader.collator.g)
-            _restore_blocks_storage(blocks, self.edge_dataloader.collator.g_sampling)
-            return input_nodes, pair_graph, neg_pair_graph, blocks
+        result_ = next(self.iter_)
+
+        if self.edge_dataloader.collator.negative_sampler is not None:
+            # input_nodes, pair_graph, neg_pair_graph, [items], blocks
+            # Otherwise, input_nodes, pair_graph, [items], blocks
+            _restore_subgraph_storage(result_[2], self.edge_dataloader.collator.g)
+        _restore_subgraph_storage(result_[1], self.edge_dataloader.collator.g)
+        _restore_blocks_storage(result_[-1], self.edge_dataloader.collator.g_sampling)
+
+        result = []
+        for data in result_:
+            result.append(_to_device(data, self.device))
+        return result
 
 class NodeDataLoader:
     """PyTorch dataloader for batch-iterating over a set of nodes, generating the list
@@ -176,6 +198,9 @@ class NodeDataLoader:
         The node set to compute outputs.
     block_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
+    device : device context, optional
+        The device of the generated blocks in each iteration, which should be a
+        PyTorch device object (e.g., ``torch.device``).
     kwargs : dict
         Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
 
@@ -194,7 +219,7 @@ class NodeDataLoader:
     """
     collator_arglist = inspect.getfullargspec(NodeCollator).args
 
-    def __init__(self, g, nids, block_sampler, **kwargs):
+    def __init__(self, g, nids, block_sampler, device='cpu', **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -204,6 +229,7 @@ class NodeDataLoader:
                 dataloader_kwargs[k] = v
 
         if isinstance(g, DistGraph):
+            assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
             # Distributed DataLoader currently does not support heterogeneous graphs
             # and does not copy features.  Fallback to normal solution
             self.collator = NodeCollator(g, nids, block_sampler, **collator_kwargs)
@@ -218,6 +244,12 @@ class NodeDataLoader:
                                          collate_fn=self.collator.collate,
                                          **dataloader_kwargs)
             self.is_distributed = False
+
+            # Precompute the CSR and CSC representations so each subprocess does not
+            # duplicate.
+            if dataloader_kwargs.get('num_workers', 0) > 0:
+                g.create_formats_()
+        self.device = device
 
     def __iter__(self):
         """Return the iterator of the data loader."""
@@ -261,6 +293,9 @@ class EdgeDataLoader:
         The edge set in graph :attr:`g` to compute outputs.
     block_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
+    device : device context, optional
+        The device of the generated blocks and graphs in each iteration, which should be a
+        PyTorch device object (e.g., ``torch.device``).
     g_sampling : DGLGraph, optional
         The graph where neighborhood sampling is performed.
 
@@ -391,7 +426,7 @@ class EdgeDataLoader:
     """
     collator_arglist = inspect.getfullargspec(EdgeCollator).args
 
-    def __init__(self, g, eids, block_sampler, **kwargs):
+    def __init__(self, g, eids, block_sampler, device='cpu', **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -406,10 +441,66 @@ class EdgeDataLoader:
                 + 'Please use DistDataLoader directly.'
         self.dataloader = DataLoader(
             self.collator.dataset, collate_fn=self.collator.collate, **dataloader_kwargs)
+        self.device = device
+
+        # Precompute the CSR and CSC representations so each subprocess does not
+        # duplicate.
+        if dataloader_kwargs.get('num_workers', 0) > 0:
+            g.create_formats_()
 
     def __iter__(self):
         """Return the iterator of the data loader."""
         return _EdgeDataLoaderIter(self)
+
+    def __len__(self):
+        """Return the number of batches of the data loader."""
+        return len(self.dataloader)
+
+class GraphDataLoader:
+    """PyTorch dataloader for batch-iterating over a set of graphs, generating the batched
+    graph and corresponding label tensor (if provided) of the said minibatch.
+
+    Parameters
+    ----------
+    collate_fn : Function, default is None
+        The customized collate function. Will use the default collate
+        function if not given.
+    kwargs : dict
+        Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
+
+    Examples
+    --------
+    To train a GNN for graph classification on a set of graphs in ``dataset`` (assume
+    the backend is PyTorch):
+
+    >>> dataloader = dgl.dataloading.GraphDataLoader(
+    ...     dataset, batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for batched_graph, labels in dataloader:
+    ...     train_on(batched_graph, labels)
+    """
+    collator_arglist = inspect.getfullargspec(GraphCollator).args
+
+    def __init__(self, dataset, collate_fn=None, **kwargs):
+        collator_kwargs = {}
+        dataloader_kwargs = {}
+        for k, v in kwargs.items():
+            if k in self.collator_arglist:
+                collator_kwargs[k] = v
+            else:
+                dataloader_kwargs[k] = v
+
+        if collate_fn is None:
+            self.collate = GraphCollator(**collator_kwargs).collate
+        else:
+            self.collate = collate_fn
+
+        self.dataloader = DataLoader(dataset=dataset,
+                                     collate_fn=self.collate,
+                                     **dataloader_kwargs)
+
+    def __iter__(self):
+        """Return the iterator of the data loader."""
+        return iter(self.dataloader)
 
     def __len__(self):
         """Return the number of batches of the data loader."""
