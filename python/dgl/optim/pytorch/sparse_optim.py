@@ -27,6 +27,9 @@ class SparseGradOptimizer(abc.ABC):
         self._shared_cache = {}
         self._clean_grad = False
         self._opt_meta = {}
+        # hold released shared memory to let other process to munmap it first
+        # otherwise it will crash the training
+        self.shmem_buffer_holder = []
 
         for emb in params:
             assert isinstance(emb, NodeEmbedding), \
@@ -64,10 +67,6 @@ class SparseGradOptimizer(abc.ABC):
             # Frequently alloc and free shared memory to hold intermediate tensor is expensive
             # We cache shared memory buffers in shared_emb.
             shared_emb = {emb.name: ([], []) for emb in self._params}
-
-            # hold released shared memory to let other process to munmap it first
-            # unless it will crash the training
-            shmem_ptr_holder = []
 
             # Go through all sparse embeddings
             for emb in self._params: # pylint: disable=too-many-nested-blocks
@@ -130,16 +129,21 @@ class SparseGradOptimizer(abc.ABC):
                                     < idx_i.shape[0]:
 
                                 if idx_shmem_name in self._shared_cache[emb_name]:
-                                    shmem_ptr_holder.append(
+                                    self.shmem_buffer_holder.append(
                                         self._shared_cache[emb_name][idx_shmem_name])
-                                    shmem_ptr_holder.append(
+                                    self.shmem_buffer_holder.append(
                                         self._shared_cache[emb_name][grad_shmem_name])
 
-                                # in case idx_i.shape[0] is 0
+                                # The minimun buffer size is 32.
+                                # We extend the buffer by idx_i.shape[0] * 2 to avoid
+                                # frequent shared memory allocation.
+                                # The overall buffer cost will be smaller than three times
+                                # the maximum memory requirement for sharing gradients.
+                                buffer_size = 32 if idx_i.shape[0] < 32 else idx_i.shape[0] * 2
                                 idx_shmem = create_shared_mem_array(idx_shmem_name, \
-                                    (idx_i.shape[0] * 2 + 2,), idx_dtype)
+                                    (buffer_size,), idx_dtype)
                                 grad_shmem = create_shared_mem_array(grad_shmem_name, \
-                                    (idx_i.shape[0] * 2 + 2, grad_dim), grad_dtype)
+                                    (buffer_size, grad_dim), grad_dtype)
                                 self._shared_cache[emb_name][idx_shmem_name] = idx_shmem
                                 self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
 
@@ -170,16 +174,14 @@ class SparseGradOptimizer(abc.ABC):
                             # tensor that is sent to current training process
                             if idx_shmem_name not in self._shared_cache[emb_name] or \
                                 self._shared_cache[emb_name][idx_shmem_name].shape[0] < size:
+                                buffer_size = 32 if size < 32 else size * 2
                                 idx_shmem = get_shared_mem_array(idx_shmem_name, \
-                                    (size * 2 + 2,), idx_dtype)
+                                    (buffer_size,), idx_dtype)
                                 grad_shmem = get_shared_mem_array(grad_shmem_name, \
-                                    (size * 2 + 2, grad_dim), grad_dtype)
+                                    (buffer_size, grad_dim), grad_dtype)
                                 self._shared_cache[emb_name][idx_shmem_name] = idx_shmem
                                 self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
-                                # make sure shared memory are released in child process first
-                                # This will not be called frequently
-                                # TODO(xiangsx) Provide API to mumap shared memory directly
-                                gc.collect()
+
                             idx_i = self._shared_cache[emb_name][idx_shmem_name][:size]
                             grad_i = self._shared_cache[emb_name][grad_shmem_name][:size]
                             shared_emb[emb_name][0].append(idx_i.to(device,
