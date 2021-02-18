@@ -42,7 +42,7 @@ Getting Started
 
 ..
   Follow the :doc:`instructions<install/index>` to install DGL.
-  :doc:`DGL at a glance<tutorials/basics/1_first>` is the most common place to get started with.
+  :doc:`<new-tutorial/1_introduction>` is the most common place to get started with.
   It offers a broad experience of using DGL for deep learning on graph data.
 
   API reference document lists more endetailed specifications of each API and GNN modules,
@@ -50,9 +50,11 @@ Getting Started
 
   You can learn other basic concepts of DGL through the dedicated tutorials.
 
-  * Learn constructing graphs and set/get node and edge features :doc:`here<tutorials/basics/2_basics>`.
-  * Learn performing computation on graph using message passing :doc:`here<tutorials/basics/3_pagerank>`.
-  * Learn processing multiple graph samples in a batch :doc:`here<tutorials/basics/4_batch>`.
+  * Learn constructing, saving and loading graphs with node and edge features :doc:`here<new-tutorial/2_dglgraph>`.
+  * Learn performing computation on graph using message passing :doc:`here<new-tutorial/3_message_passing>`.
+  * Learn link prediction with DGL :doc:`here<new-tutorial/4_link_predict>`.
+  * Learn graph classification with DGL :doc:`here<new-tutorial/5_graph_classification>`.
+  * Learn creating your own dataset for DGL :doc:`here<new-tutorial/6_load_data>`.
   * Learn working with heterogeneous graph data :doc:`here<tutorials/basics/5_hetero>`.
 
   End-to-end model tutorials are other good starting points for learning DGL and popular
@@ -79,7 +81,30 @@ Getting Started
 
    install/index
    install/backend
-   tutorials/basics/1_first
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Basic Tutorials
+   :hidden:
+   :glob:
+
+   new-tutorial/1_introduction
+   new-tutorial/2_dglgraph
+   new-tutorial/3_message_passing
+   new-tutorial/4_link_predict
+   new-tutorial/5_graph_classification
+   new-tutorial/6_load_data
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Stochastic GNN Training Tutorials
+   :hidden:
+   :glob:
+
+   new-tutorial/L0_neighbor_sampling_overview
+   new-tutorial/L1_large_node_classification
+   new-tutorial/L2_large_link_prediction
+   new-tutorial/L4_message_passing
 
 .. toctree::
    :maxdepth: 2
@@ -95,6 +120,7 @@ Getting Started
    guide/training
    guide/minibatch
    guide/distributed
+   guide/mixed_precision
 
 .. toctree::
    :maxdepth: 2

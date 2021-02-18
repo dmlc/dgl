@@ -3,6 +3,8 @@
 6.3 Training GNN for Link Prediction with Neighborhood Sampling
 --------------------------------------------------------------------
 
+:ref:`(中文版) <guide_cn-minibatch-link-classification-sampler>`
+
 Define a neighborhood sampler and data loader with negative sampling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -137,6 +139,11 @@ above.
 
 .. code:: python
 
+    def compute_loss(pos_score, neg_score):
+        # an example hinge loss
+        n = pos_score.shape[0]
+        return (neg_score.view(n, -1) - pos_score.view(n, -1) + 1).clamp(min=0).mean()
+
     model = Model(in_features, hidden_features, out_features)
     model = model.cuda()
     opt = torch.optim.Adam(model.parameters())
@@ -257,6 +264,7 @@ Then you can give the dataloader a dictionary of edge types and edge IDs as well
 sampler.  For instance, the following iterates over all edges of the heterogeneous graph.
 
 .. code:: python
+
     train_eid_dict = {
         g.edges(etype=etype, form='eid')
         for etype in g.etypes}

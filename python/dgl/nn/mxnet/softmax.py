@@ -1,3 +1,3 @@
 """Gluon layer for graph related softmax."""
 # pylint: disable= unused-import
-from ...ops import edge_softmax
+from ..functional import edge_softmax

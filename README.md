@@ -4,12 +4,13 @@
 
 [![PyPi Latest Release](https://img.shields.io/pypi/v/dgl.svg)](https://pypi.org/project/dgl/)
 [![Conda Latest Release](https://anaconda.org/dglteam/dgl/badges/version.svg)](https://anaconda.org/dglteam/dgl)
-[![Build Status](http://ci.dgl.ai:80/buildStatus/icon?job=DGL/master)](http://ci.dgl.ai:80/job/DGL/job/master/)
+[![Build Status](https://ci.dgl.ai/buildStatus/icon?job=DGL/master)](https://ci.dgl.ai/job/DGL/job/master/)
 [![Benchmark by ASV](http://img.shields.io/badge/benchmarked%20by-asv-green.svg?style=flat)](https://asv.dgl.ai/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
-Documentation ([Latest](https://docs.dgl.ai/en/latest/) | [Stable](https://docs.dgl.ai)) | [DGL at a glance](https://docs.dgl.ai/tutorials/basics/1_first.html#sphx-glr-tutorials-basics-1-first-py) | [Model Tutorials](https://docs.dgl.ai/tutorials/models/index.html) | [Discussion Forum](https://discuss.dgl.ai) | [Slack Channel](https://join.slack.com/t/deep-graph-library/shared_invite/zt-eb4ict1g-xcg3PhZAFAB8p6dtKuP6xQ)
+Documentation ([Latest](https://docs.dgl.ai/en/latest/) | [Stable](https://docs.dgl.ai)) | [DGL at a glance](https://docs.dgl.ai/tutorials/basics/1_first.html#sphx-glr-tutorials-basics-1-first-py) | [Model Tutorials](https://docs.dgl.ai/tutorials/models/index.html) | [Official Examples](examples/README.md) | [Discussion Forum](https://discuss.dgl.ai) | [Slack Channel](https://join.slack.com/t/deep-graph-library/shared_invite/zt-eb4ict1g-xcg3PhZAFAB8p6dtKuP6xQ)
 
+**For a full list of official DGL examples, see [here](examples).**
 
 DGL is an easy-to-use, high performance and scalable Python package for deep learning on graphs. DGL is framework agnostic, meaning if a deep graph model is a component of an end-to-end application, the rest of the logics can be implemented in any major frameworks, such as PyTorch, Apache MXNet or TensorFlow.
 
@@ -242,7 +243,7 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**A graph auto-encoder model for miRNA-disease associations prediction**](https://academic.oup.com/bib/advance-article-abstract/doi/10.1093/bib/bbaa240/5929824?redirectedFrom=fulltext), *Zhengwei Li, Jiashu Li, Ru Nie, Zhu-Hong You, Wenzheng Bao*
 
-1. [**Graph convolutional regression of cardiac depolarization from sparse endocardial maps**](https://arxiv.org/abs/2009.14068), *Felix Meister, Tiziano Passerini, Chloé Audigier, Èric Lluch, Viorel Mihalef, Hiroshi Ashikaga, Andreas Maier, Henry Halperin, Tommaso Mansi*
+1. [**Graph convolutional regression of cardiac depolarization from sparse endocardial maps**](https://arxiv.org/abs/2009.14068), STACOM 2020 workshop, *Felix Meister, Tiziano Passerini, Chloé Audigier, Èric Lluch, Viorel Mihalef, Hiroshi Ashikaga, Andreas Maier, Henry Halperin, Tommaso Mansi*
 
 1. [**AttnIO: Knowledge Graph Exploration with In-and-Out Attention Flow for Knowledge-Grounded Dialogue**](https://www.aclweb.org/anthology/2020.emnlp-main.280/), EMNLP'20, *Jaehun Jung, Bokyung Son, Sungwon Lyu*
 
@@ -260,7 +261,7 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Improving Learning to Branch via Reinforcement Learning**](https://openreview.net/forum?id=z4D7-PTxTb), *Haoran Sun, Wenbo Chen, Hui Li, Le Song*
 
-1. [**A Practical Guide to Graph Neural Networks**](https://arxiv.org/pdf/2010.05234.pdf), *Issac Ronald Ward, Jack Joyner, Casey Lickfold, Stash Rowe, Yulan Guo, Mohammed Bennamoun*, [code](https://github.com/isolabs/gnn-tutorial)
+1. [**A Practical Guide to Graph Neural Networks**](https://arxiv.org/pdf/2010.05234.pdf), *Isaac Ronald Ward, Jack Joyner, Casey Lickfold, Stash Rowe, Yulan Guo, Mohammed Bennamoun*, [code](https://github.com/isolabs/gnn-tutorial)
 
 1. [**APAN: Asynchronous Propagation Attention Network for Real-time Temporal Graph Embedding**](https://arxiv.org/pdf/2011.11545.pdf), SIGMOD'21, *Xuhong Wang, Ding Lyu, Mengjian Li, Yang Xia, Qi Yang, Xinwen Wang, Xinguang Wang, Ping Cui, Yupu Yang, Bowen Sun, Zhenyu Guo, Junkui Li*
 
@@ -268,6 +269,25 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Computing Graph Neural Networks: A Survey from Algorithms to Accelerators**](https://arxiv.org/pdf/2010.00130.pdf), *Sergi Abadal, Akshay Jain, Robert Guirado, Jorge López-Alonso, Eduard Alarcón*
 
+1. [**NHK_STRL at WNUT-2020 Task 2: GATs with Syntactic Dependencies as Edges and CTC-based Loss for Text Classification**](https://www.aclweb.org/anthology/2020.wnut-1.43.pdf), *Yuki Yasuda, Taichi Ishiwatari, Taro Miyazaki, Jun Goto*
+
+1. [**Relation-aware Graph Attention Networks with Relational Position Encodings for Emotion Recognition in Conversations**](https://www.aclweb.org/anthology/2020.emnlp-main.597.pdf), *Taichi Ishiwatari, Yuki Yasuda, Taro Miyazaki, Jun Goto*
+
+1. [**PGM-Explainer: Probabilistic Graphical Model Explanations for Graph Neural Networks**](https://proceedings.neurips.cc/paper/2020/file/8fb134f258b1f7865a6ab2d935a897c9-Paper.pdf), *Minh N. Vu, My T. Thai*
+
+1. [**A Generalization of Transformer Networks to Graphs**](https://arxiv.org/pdf/2012.09699.pdf), *Vijay Prakash Dwivedi, Xavier Bresson* 
+
+1. [**Discourse-Aware Neural Extractive Text Summarization**](https://www.aclweb.org/anthology/2020.acl-main.451.pdf), ACL'20, *Jiacheng Xu, Zhe Gan, Yu Cheng, Jingjing Liu*
+
+1. [**Learning Robust Node Representations on Graphs**](https://arxiv.org/abs/2008.11416), *Xu Chen, Ya Zhang, Ivor Tsang, Yuangang Pan*
+
+1. [**Adaptive Graph Diffusion Networks with Hop-wise Attention**](https://arxiv.org/abs/2012.15024), *Chuxiong Sun, Guoshi Wu*
+
+1. [**The Photoswitch Dataset: A Molecular Machine Learning Benchmark for the Advancement of Synthetic Chemistry**](https://arxiv.org/abs/2008.03226), *Aditya R. Thawani, Ryan-Rhys Griffiths, Arian Jamasb, Anthony Bourached, Penelope Jones, William McCorkindale, Alexander A. Aldrick, Alpha A. Lee*
+
+1. [**A community-powered search of machine learning strategy space to find NMR property prediction models**](https://arxiv.org/abs/2008.05994), *Lars A. Bratholm, Will Gerrard, Brandon Anderson, Shaojie Bai, Sunghwan Choi, Lam Dang, Pavel Hanchar, Addison Howard, Guillaume Huard, Sanghoon Kim, Zico Kolter, Risi Kondor, Mordechai Kornbluth, Youhan Lee, Youngsoo Lee, Jonathan P. Mailoa, Thanh Tu Nguyen, Milos Popovic, Goran Rakocevic, Walter Reade, Wonho Song, Luka Stojanovic, Erik H. Thiede, Nebojsa Tijanic, Andres Torrubia, Devin Willmott, Craig P. Butts, David R. Glowacki, Kaggle participants*
+
+1. [**Adaptive Layout Decomposition with Graph Embedding Neural Networks**](http://www.cse.cuhk.edu.hk/~byu/papers/C98-DAC2020-MPL-Selector.pdf), *Wei Li, Jialu Xia, Yuzhe Ma, Jialu Li, Yibo Lin, Bei Yu*, DAC'20
 
 </details>
 
@@ -288,9 +308,7 @@ Right now, DGL works on [PyTorch](https://pytorch.org) 1.5.0+, [MXNet](https://m
 
 ```
 conda install -c dglteam dgl           # cpu version
-conda install -c dglteam dgl-cuda9.0   # CUDA 9.0
 conda install -c dglteam dgl-cuda9.2   # CUDA 9.2
-conda install -c dglteam dgl-cuda10.0  # CUDA 10.0
 conda install -c dglteam dgl-cuda10.1  # CUDA 10.1
 conda install -c dglteam dgl-cuda10.2  # CUDA 10.2
 conda install -c dglteam dgl-cuda11.0  # CUDA 11.0
@@ -302,9 +320,7 @@ conda install -c dglteam dgl-cuda11.0  # CUDA 11.0
 |           | Latest Nightly Build Version  | Stable Version          |
 |-----------|-------------------------------|-------------------------|
 | CPU       | `pip install --pre dgl`       | `pip install dgl`       |
-| CUDA 9.0  | `pip install --pre dgl-cu90`  | `pip install dgl-cu90`  |
 | CUDA 9.2  | `pip install --pre dgl-cu92`  | `pip install dgl-cu92`  |
-| CUDA 10.0 | `pip install --pre dgl-cu100` | `pip install dgl-cu100` |
 | CUDA 10.1 | `pip install --pre dgl-cu101` | `pip install dgl-cu101` |
 | CUDA 10.2 | `pip install --pre dgl-cu102` | `pip install dgl-cu102` |
 | CUDA 11.0 | `pip install --pre dgl-cu110` | `pip install dgl-cu110` |
