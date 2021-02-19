@@ -1,7 +1,7 @@
 """
 .. _model-rgcn:
 
-Relational graph convolutional network
+Relational Graph Convolutional Network
 ================================================
 
 **Author:** Lingfan Yu, Mufei Li, Zheng Zhang

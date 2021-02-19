@@ -1,7 +1,7 @@
 """
 .. _model-line-graph:
 
-Line graph neural network
+Line Graph Neural Network
 =========================
 
 **Author**: `Qi Huang <https://github.com/HQ01>`_, Yu Gai,

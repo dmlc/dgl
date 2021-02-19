@@ -1,8 +1,8 @@
 """
 .. _model-gat:
 
-Graph attention network
-==================================
+Understand Graph Attention Network
+=======================================
 
 **Authors:** `Hao Zhang <https://github.com/sufeidechabei/>`_, `Mufei Li
 <https://github.com/mufeili>`_, `Minjie Wang

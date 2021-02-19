@@ -1,7 +1,7 @@
 """
 .. _model-tree-lstm:
 
-Tutorial: Tree-LSTM in DGL
+Tree-LSTM in DGL
 ==========================
 
 **Author**: Zihao Ye, Qipeng Guo, `Minjie Wang

@@ -14,18 +14,18 @@ Welcome to Deep Graph Library Tutorials and Documentation
 
    install/index
    tutorials/blitz/index
-   tutorials/large/index
-   tutorials/model/index
 
 .. toctree::
    :maxdepth: 2
-   :caption: User Guide
+   :caption: Advanced Materials
    :hidden:
    :titlesonly:
    :glob:
 
    guide/index
    guide_cn/index
+   tutorials/large/index
+   tutorials/models/index
 
 .. toctree::
    :maxdepth: 2
@@ -78,15 +78,17 @@ Getting Started
 For absolute beginners, start with the :doc:`Blitz Introduction to DGL <tutorials/blitz/index>`.
 It covers the basic concepts of common graph machine learning tasks and a step-by-step
 on building Graph Neural Networks (GNNs) to solve them.
-As training GNNs on large graph by mini-batches is quite different from typical Deep Neural
-Networks, the tutorials for :doc:`Stochastic Training of GNNs <tutorials/large/index>` 
-cover this topic. :doc:`Learning DGL by Examples <tutorials/model/index>` is another great way to learn both DGL
-and GNNs.
 
-For acquainted users who wish to learn more advanced usage, the :doc:`User Guide<guide/index>`
-(:doc:`中文版链接<guide_cn/index>`) is the place to go.
-Finally, the :doc:`API reference manual <api/python/index>` organizes all DGL APIs by
-their namespace.
+For acquainted users who wish to learn more advanced usage,
+
+* `Learn DGL by examples <https://github.com/dmlc/dgl/tree/master/examples>`_.
+* Read the :doc:`User Guide<guide/index>` (:doc:`中文版链接<guide_cn/index>`), which explains the concepts
+  and usage of DGL in much more details.
+* Go through the tutorials for :doc:`Stochastic Training of GNNs <tutorials/large/index>`,
+  which covers the basic steps for training GNNs on large graphs in mini-batches.
+* `Study classical papers <tutorials/models/index>` on graph machine learning alongside DGL.
+* Search for the usage of a specific API in the :doc:`API reference manual <api/python/index>`,
+  which organizes all DGL APIs by their namespace.
 
 Contribution
 -------------

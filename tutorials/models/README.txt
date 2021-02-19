@@ -1,2 +1,2 @@
-Paper Studying with DGL
+Paper Study with DGL
 =========================================

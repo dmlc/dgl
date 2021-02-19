@@ -1,8 +1,8 @@
 """
 .. _model-transformer:
 
-Transformer tutorial
-====================
+Transformer as a Graph Neural Network
+======================================
 
 **Author**: Zihao Ye, Jinjing Zhou, Qipeng Guo, Quan Gan, Zheng Zhang
 """

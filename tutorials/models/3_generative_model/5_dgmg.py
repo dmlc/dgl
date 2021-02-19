@@ -1,7 +1,7 @@
 """
 .. _model-dgmg:
 
-Tutorial: Generative models of graphs
+Generative Models of Graphs
 ===========================================
 
 **Author**: `Mufei Li <https://github.com/mufeili>`_,

@@ -1,7 +1,7 @@
 """
 .. _model-capsule:
 
-Capsule network tutorial
+Capsule Network
 ===========================
 
 **Author**: Jinjing Zhou, `Jake Zhao <https://cs.nyu.edu/~jakezhao/>`_, Zheng Zhang, Jinyang Li
