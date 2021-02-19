@@ -2,7 +2,7 @@
 Introduction of Neighbor Sampling for GNN Training
 ==================================================
 
-In :doc:`previous tutorials <1_introduction>` you have learned how to
+In :doc:`previous tutorials <../blitz/1_introduction>` you have learned how to
 train GNNs by computing the representations of all nodes on a graph.
 However, sometimes your graph is too large to fit the computation of all
 nodes in a single GPU.
@@ -20,7 +20,7 @@ By the end of this tutorial, you will be able to
 # ----------------------
 #
 # Recall that in `Gilmer et al. <https://arxiv.org/abs/1704.01212>`__
-# (also in :doc:`message passing tutorial <3_message_passing>`), the
+# (also in :doc:`message passing tutorial <../blitz/3_message_passing>`), the
 # message passing formulation is as follows:
 #
 # .. math::
