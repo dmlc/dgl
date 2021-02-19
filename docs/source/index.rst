@@ -122,6 +122,7 @@ Getting Started
    api/python/dgl.function
    api/python/nn
    api/python/dgl.ops
+   api/python/dgl.optim
    api/python/dgl.sampling
    api/python/udf
 
