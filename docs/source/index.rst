@@ -86,7 +86,7 @@ For acquainted users who wish to learn more advanced usage,
   and usage of DGL in much more details.
 * Go through the tutorials for :doc:`Stochastic Training of GNNs <tutorials/large/index>`,
   which covers the basic steps for training GNNs on large graphs in mini-batches.
-* `Study classical papers <tutorials/models/index>` on graph machine learning alongside DGL.
+* :doc:`Study classical papers <tutorials/models/index>` on graph machine learning alongside DGL.
 * Search for the usage of a specific API in the :doc:`API reference manual <api/python/index>`,
   which organizes all DGL APIs by their namespace.
 

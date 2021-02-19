@@ -114,10 +114,13 @@ Utilities for computing adjacency matrix and Lapacian matrix.
     khop_adj
     laplacian_lambda_max
 
-Traversals
+Message Propagation via Traversals
 ------------------------------------------
 
-Utilities for traversing graphs.
+Perform message passing following graph traversal order. ``prop_nodes_XXX``
+calls traversal algorithm ``XXX`` and triggers :func:`~DGLGraph.pull()` on the visited node
+set at each iteration. ``prop_edges_YYY`` applies traversal algorithm ``YYY`` and triggers
+:func:`~DGLGraph.send_and_recv()` on the visited edge set at each iteration.
 
 .. autosummary::
     :toctree: ../../generated/
