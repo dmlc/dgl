@@ -27,7 +27,6 @@ DGL_REGISTER_GLOBAL("utils.internal._CAPI_DGLSetOMPThreads")
   });
 
 
-
 DGL_REGISTER_GLOBAL("utils.checks._CAPI_DGLCOOIsSorted")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     IdArray src = args[0];
