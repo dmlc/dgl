@@ -120,13 +120,6 @@ class EdgeConv(nn.Block):
             if batch_norm:
                 self.bn = nn.BatchNorm(in_channels=out_feat)
 
-    def message(self, edges):
-        r"""The message computation function
-        """
-        theta_x = self.theta(edges.dst['x'] - edges.src['x'])
-        phi_x = self.phi(edges.dst['x'])
-        return {'e': theta_x + phi_x}
-
     def set_allow_zero_in_degree(self, set_value):
         r"""
 
