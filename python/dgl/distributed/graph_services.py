@@ -177,7 +177,7 @@ def merge_graphs(res_list, num_nodes):
         src_tensor = res_list[0].global_src
         dst_tensor = res_list[0].global_dst
         eid_tensor = res_list[0].global_eids
-    g = graph((src_tensor, dst_tensor), num_nodes=num_nodes)
+    g = graph((src_tensor, dst_tensor), num_nodes=num_nodes, check_sorted=False)
     g.edata[EID] = eid_tensor
     return g
 

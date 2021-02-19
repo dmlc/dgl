@@ -37,6 +37,9 @@ def graph(data,
           num_nodes=None,
           idtype=None,
           device=None,
+          row_sorted=False,
+          col_sorted=False,
+          check_sorted=True,
           **deprecated_kwargs):
     """Create a graph and return.
 
@@ -72,7 +75,11 @@ def graph(data,
         the :attr:`data` argument. If :attr:`data` is not a tuple of node-tensors, the
         returned graph is on CPU.  If the specified :attr:`device` differs from that of the
         provided tensors, it casts the given tensors to the specified device first.
-
+    row_sorted : bool, optional
+        Whether or not the rows of the COO are in ascending order.
+    col_sorted : bool, optional
+        Whether or not the columns of the COO are in ascending order within
+        each row. This only has an effect when ``row_sorted`` is True.
     Returns
     -------
     DGLGraph
@@ -158,7 +165,9 @@ def graph(data,
                            ' but got {} and {}.'.format(num_nodes, max(urange, vrange) - 1))
         urange, vrange = num_nodes, num_nodes
 
-    g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange)
+    g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange,
+                          row_sorted=row_sorted, col_sorted=col_sorted,
+                          check_sorted=check_sorted)
 
     return g.to(device)
 
@@ -926,7 +935,7 @@ def to_homogeneous(G, ndata=None, edata=None, store_type=True, return_count=Fals
         eids.append(F.arange(0, num_edges, G.idtype, G.device))
 
     retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)), num_nodes=total_num_nodes,
-                 idtype=G.idtype, device=G.device)
+                 idtype=G.idtype, device=G.device, check_sorted=False)
 
     # copy features
     if ndata is None:
@@ -1590,7 +1599,10 @@ DGLHeteroGraph.to_networkx = to_networkx
 def create_from_edges(u, v,
                       utype, etype, vtype,
                       urange, vrange,
-                      validate=True):
+                      validate=True,
+                      row_sorted=False,
+                      col_sorted=False,
+                      check_sorted=False):
     """Internal function to create a graph from incident nodes with types.
 
     utype could be equal to vtype
@@ -1615,6 +1627,17 @@ def create_from_edges(u, v,
         maximum of the destination node IDs in the edge list plus 1. (Default: None)
     validate : bool, optional
         If True, checks if node IDs are within range.
+    row_sorted : bool, optional
+        Whether or not the rows of the COO are in ascending order.
+    col_sorted : bool, optional
+        Whether or not the columns of the COO are in ascending order within
+        each row. This only has an effect when ``row_sorted`` is True.
+    check_sorted : bool, optional
+        If this is ``True`` and ``row_sorted`` is ``False``, the edge list will
+        be scanned to see if it is in ascending order, and the resulting graph
+        will be marked accordingly.
+
+
 
     Returns
     -------
@@ -1636,7 +1659,8 @@ def create_from_edges(u, v,
         num_ntypes = 2
 
     hgidx = heterograph_index.create_unitgraph_from_coo(
-        num_ntypes, urange, vrange, u, v, ['coo', 'csr', 'csc'])
+        num_ntypes, urange, vrange, u, v, ['coo', 'csr', 'csc'],
+        row_sorted, col_sorted, check_sorted)
     if utype == vtype:
         return DGLHeteroGraph(hgidx, [utype], [etype])
     else:

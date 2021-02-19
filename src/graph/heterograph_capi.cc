@@ -30,6 +30,9 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCOO")
     IdArray row = args[3];
     IdArray col = args[4];
     List<Value> formats = args[5];
+    bool row_sorted = args[6];
+    bool col_sorted = args[7];
+    bool check_sorted = args[8];
     std::vector<SparseFormat> formats_vec;
     for (Value val : formats) {
       std::string fmt = val->data;
@@ -37,10 +40,11 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCOO")
     }
     auto code = SparseFormatsToCode(formats_vec);
 
-    // setup sorted flags
-    bool row_sorted, col_sorted;
-    std::tie(row_sorted, col_sorted) = COOIsSorted(
-        aten::COOMatrix(num_src, num_dst, row, col));
+    if (!row_sorted && check_sorted) {
+        // setup sorted flags
+        std::tie(row_sorted, col_sorted) = COOIsSorted(
+            aten::COOMatrix(num_src, num_dst, row, col));
+    }
 
     auto hgptr = CreateFromCOO(nvtypes, num_src, num_dst, row, col,
         row_sorted, col_sorted, code);
