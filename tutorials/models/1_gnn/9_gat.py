@@ -106,6 +106,12 @@ from dgl.nn.pytorch import GATConv
 # To begin, you can get an overall impression about how a ``GATLayer`` module is
 # implemented in DGL. In this section, the four equations above are broken down 
 # one at a time.
+#
+# .. note::
+#
+#    This is showing how to implement a GAT from scratch.  DGL provides a more
+#    efficient :class:`builtin GAT layer module <dgl.nn.pytorch.conv.GATConv>`.
+#
 
 import torch
 import torch.nn as nn
