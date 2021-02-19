@@ -1,7 +1,7 @@
 .. _tutorials3-index:
 
 Generative models
-==================
+--------------------
 
 * **DGMG** `[paper] <https://arxiv.org/abs/1803.03324>`__ `[tutorial]
   <3_generative_model/5_dgmg.html>`__ `[PyTorch code]

@@ -1,7 +1,7 @@
 .. _tutorials1-index:
 
 Graph neural networks and its variants
-====================================
+--------------------------------------------
 
 * **Graph convolutional network (GCN)** `[research paper] <https://arxiv.org/abs/1609.02907>`__ `[tutorial]
   <1_gnn/1_gcn.html>`__ `[Pytorch code]
