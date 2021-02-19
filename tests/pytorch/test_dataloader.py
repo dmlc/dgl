@@ -10,35 +10,15 @@ def _check_neighbor_sampling_dataloader(g, nids, dl, mode, collator):
 
     for item in dl:
         if mode == 'node':
-            input_nodes, output_nodes, items, blocks = item
+            input_nodes, output_nodes, blocks = item
         elif mode == 'edge':
-            input_nodes, pair_graph, items, blocks = item
+            input_nodes, pair_graph, blocks = item
             output_nodes = pair_graph.ndata[dgl.NID]
         elif mode == 'link':
-            input_nodes, pair_graph, neg_graph, items, blocks = item
+            input_nodes, pair_graph, neg_graph, blocks = item
             output_nodes = pair_graph.ndata[dgl.NID]
             for ntype in pair_graph.ntypes:
                 assert F.array_equal(pair_graph.nodes[ntype].data[dgl.NID], neg_graph.nodes[ntype].data[dgl.NID])
-
-        # TODO: check if items match output nodes/edges
-        if mode == 'node':
-            if len(g.ntypes) > 1:
-                for ntype in g.ntypes:
-                    if ntype not in items:
-                        assert len(output_nodes[ntype]) == 0
-                    else:
-                        assert F.array_equal(output_nodes[ntype], F.gather_row(collator.nids[ntype], items[ntype]))
-            else:
-                assert F.array_equal(output_nodes, F.gather_row(collator.nids, items))
-        else:
-            if len(g.etypes) > 1:
-                for etype, eids in collator.eids.items():
-                    if etype not in items:
-                        assert pair_graph.num_edges(etype=etype) == 0
-                    else:
-                        assert F.array_equal(pair_graph.edges[etype].data[dgl.EID], F.gather_row(eids, items[etype]))
-            else:
-                assert F.array_equal(pair_graph.edata[dgl.EID], F.gather_row(collator.eids, items))
 
         if len(g.ntypes) > 1:
             for ntype in g.ntypes:
@@ -130,34 +110,31 @@ def test_neighbor_sampler_dataloader():
     for seeds, sampler in product(
             [F.tensor([0, 1, 2, 3, 5], dtype=F.int64), F.tensor([4, 5], dtype=F.int64)],
             [g_sampler1, g_sampler2]):
-        collators.append(dgl.dataloading.NodeCollator(g, seeds, sampler, return_indices=True))
+        collators.append(dgl.dataloading.NodeCollator(g, seeds, sampler))
         graphs.append(g)
         nids.append({'user': seeds})
         modes.append('node')
 
-        collators.append(dgl.dataloading.EdgeCollator(g, seeds, sampler, return_indices=True))
+        collators.append(dgl.dataloading.EdgeCollator(g, seeds, sampler))
         graphs.append(g)
         nids.append({'follow': seeds})
         modes.append('edge')
 
         collators.append(dgl.dataloading.EdgeCollator(
-            g, seeds, sampler, exclude='reverse_id', reverse_eids=reverse_eids,
-            return_indices=True))
+            g, seeds, sampler, exclude='reverse_id', reverse_eids=reverse_eids))
         graphs.append(g)
         nids.append({'follow': seeds})
         modes.append('edge')
 
         collators.append(dgl.dataloading.EdgeCollator(
-            g, seeds, sampler, negative_sampler=dgl.dataloading.negative_sampler.Uniform(2),
-            return_indices=True))
+            g, seeds, sampler, negative_sampler=dgl.dataloading.negative_sampler.Uniform(2)))
         graphs.append(g)
         nids.append({'follow': seeds})
         modes.append('link')
 
         collators.append(dgl.dataloading.EdgeCollator(
             g, seeds, sampler, exclude='reverse_id', reverse_eids=reverse_eids,
-            negative_sampler=dgl.dataloading.negative_sampler.Uniform(2),
-            return_indices=True))
+            negative_sampler=dgl.dataloading.negative_sampler.Uniform(2)))
         graphs.append(g)
         nids.append({'follow': seeds})
         modes.append('link')
@@ -166,7 +143,7 @@ def test_neighbor_sampler_dataloader():
             [{'user': F.tensor([0, 1, 3, 5], dtype=F.int64), 'game': F.tensor([0, 1, 2], dtype=F.int64)},
              {'user': F.tensor([4, 5], dtype=F.int64), 'game': F.tensor([0, 1, 2], dtype=F.int64)}],
             [hg_sampler1, hg_sampler2]):
-        collators.append(dgl.dataloading.NodeCollator(hg, seeds, sampler, return_indices=True))
+        collators.append(dgl.dataloading.NodeCollator(hg, seeds, sampler))
         graphs.append(hg)
         nids.append(seeds)
         modes.append('node')
@@ -175,29 +152,26 @@ def test_neighbor_sampler_dataloader():
             [{'follow': F.tensor([0, 1, 3, 5], dtype=F.int64), 'play': F.tensor([1, 3], dtype=F.int64)},
              {'follow': F.tensor([4, 5], dtype=F.int64), 'play': F.tensor([1, 3], dtype=F.int64)}],
             [hg_sampler1, hg_sampler2]):
-        collators.append(dgl.dataloading.EdgeCollator(hg, seeds, sampler, return_indices=True))
+        collators.append(dgl.dataloading.EdgeCollator(hg, seeds, sampler))
         graphs.append(hg)
         nids.append(seeds)
         modes.append('edge')
 
         collators.append(dgl.dataloading.EdgeCollator(
-            hg, seeds, sampler, exclude='reverse_types', reverse_etypes=reverse_etypes,
-            return_indices=True))
+            hg, seeds, sampler, exclude='reverse_types', reverse_etypes=reverse_etypes))
         graphs.append(hg)
         nids.append(seeds)
         modes.append('edge')
 
         collators.append(dgl.dataloading.EdgeCollator(
-            hg, seeds, sampler, negative_sampler=dgl.dataloading.negative_sampler.Uniform(2),
-            return_indices=True))
+            hg, seeds, sampler, negative_sampler=dgl.dataloading.negative_sampler.Uniform(2)))
         graphs.append(hg)
         nids.append(seeds)
         modes.append('link')
 
         collators.append(dgl.dataloading.EdgeCollator(
             hg, seeds, sampler, exclude='reverse_types', reverse_etypes=reverse_etypes,
-            negative_sampler=dgl.dataloading.negative_sampler.Uniform(2),
-            return_indices=True))
+            negative_sampler=dgl.dataloading.negative_sampler.Uniform(2)))
         graphs.append(hg)
         nids.append(seeds)
         modes.append('link')
@@ -232,21 +206,11 @@ def test_node_dataloader():
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
     g1.ndata['feat'] = F.copy_to(F.randn((5, 8)), F.cpu())
 
-    # return_indices = False
     dataloader = dgl.dataloading.NodeDataLoader(
         g1, g1.nodes(), sampler, device=F.ctx(), batch_size=g1.num_nodes())
     for input_nodes, output_nodes, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(output_nodes)
-        _check_device(blocks)
-
-    # return_indices = True
-    dataloader = dgl.dataloading.NodeDataLoader(
-        g1, g1.nodes(), sampler, device=F.ctx(), batch_size=g1.num_nodes(), return_indices=True)
-    for input_nodes, output_nodes, items, blocks in dataloader:
-        _check_device(input_nodes)
-        _check_device(output_nodes)
-        _check_device(items)
         _check_device(blocks)
 
     g2 = dgl.heterograph({
@@ -259,23 +223,12 @@ def test_node_dataloader():
         g2.nodes[ntype].data['feat'] = F.copy_to(F.randn((g2.num_nodes(ntype), 8)), F.cpu())
     batch_size = max(g2.num_nodes(nty) for nty in g2.ntypes)
 
-    # return_indices = False
     dataloader = dgl.dataloading.NodeDataLoader(
         g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
         sampler, device=F.ctx(), batch_size=batch_size)
     for input_nodes, output_nodes, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(output_nodes)
-        _check_device(blocks)
-
-    # return_indices = True
-    dataloader = dgl.dataloading.NodeDataLoader(
-        g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
-        sampler, device=F.ctx(), batch_size=batch_size, return_indices=True)
-    for input_nodes, output_nodes, items, blocks in dataloader:
-        _check_device(input_nodes)
-        _check_device(output_nodes)
-        _check_device(items)
         _check_device(blocks)
 
 def test_edge_dataloader():
@@ -285,7 +238,7 @@ def test_edge_dataloader():
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
     g1.ndata['feat'] = F.copy_to(F.randn((5, 8)), F.cpu())
 
-    # return_indices = False & no negative sampler
+    # no negative sampler
     dataloader = dgl.dataloading.EdgeDataLoader(
         g1, g1.edges(form='eid'), sampler, device=F.ctx(), batch_size=g1.num_edges())
     for input_nodes, pos_pair_graph, blocks in dataloader:
@@ -293,7 +246,7 @@ def test_edge_dataloader():
         _check_device(pos_pair_graph)
         _check_device(blocks)
 
-    # return_indices = False & negative sampler
+    # negative sampler
     dataloader = dgl.dataloading.EdgeDataLoader(
         g1, g1.edges(form='eid'), sampler, device=F.ctx(),
         negative_sampler=neg_sampler, batch_size=g1.num_edges())
@@ -313,26 +266,24 @@ def test_edge_dataloader():
         g2.nodes[ntype].data['feat'] = F.copy_to(F.randn((g2.num_nodes(ntype), 8)), F.cpu())
     batch_size = max(g2.num_edges(ety) for ety in g2.canonical_etypes)
 
-    # return_indices = True & no negative sampler
+    # no negative sampler
     dataloader = dgl.dataloading.EdgeDataLoader(
         g2, {ety: g2.edges(form='eid', etype=ety) for ety in g2.canonical_etypes},
-        sampler, device=F.ctx(), batch_size=batch_size, return_indices=True)
-    for input_nodes, pos_pair_graph, items, blocks in dataloader:
+        sampler, device=F.ctx(), batch_size=batch_size)
+    for input_nodes, pos_pair_graph, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(pos_pair_graph)
-        _check_device(items)
         _check_device(blocks)
 
-    # return_indices = True & negative sampler
+    # negative sampler
     dataloader = dgl.dataloading.EdgeDataLoader(
         g2, {ety: g2.edges(form='eid', etype=ety) for ety in g2.canonical_etypes},
         sampler, device=F.ctx(), negative_sampler=neg_sampler,
-        batch_size=batch_size, return_indices=True)
-    for input_nodes, pos_pair_graph, neg_pair_graph, items, blocks in dataloader:
+        batch_size=batch_size)
+    for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(pos_pair_graph)
         _check_device(neg_pair_graph)
-        _check_device(items)
         _check_device(blocks)
 
 if __name__ == '__main__':
