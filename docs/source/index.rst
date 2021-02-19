@@ -84,27 +84,20 @@ Getting Started
 
 .. toctree::
    :maxdepth: 2
-   :caption: Basic Tutorials
+   :caption: Tutorials
    :hidden:
    :glob:
 
-   new-tutorial/1_introduction
-   new-tutorial/2_dglgraph
-   new-tutorial/3_message_passing
-   new-tutorial/4_link_predict
-   new-tutorial/5_graph_classification
-   new-tutorial/6_load_data
+   new-tutorial/blitz/index
+   new-tutorial/large/index
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Stochastic GNN Training Tutorials
+   :maxdepth: 3
+   :caption: Model Examples
    :hidden:
    :glob:
 
-   new-tutorial/L0_neighbor_sampling_overview
-   new-tutorial/L1_large_node_classification
-   new-tutorial/L2_large_link_prediction
-   new-tutorial/L4_message_passing
+   tutorials/models/index
 
 .. toctree::
    :maxdepth: 2
@@ -113,14 +106,7 @@ Getting Started
    :titlesonly:
    :glob:
 
-   guide/graph
-   guide/message
-   guide/nn
-   guide/data
-   guide/training
-   guide/minibatch
-   guide/distributed
-   guide/mixed_precision
+   guide/index
 
 .. toctree::
    :maxdepth: 2
@@ -136,16 +122,9 @@ Getting Started
    api/python/dgl.function
    api/python/nn
    api/python/dgl.ops
+   api/python/dgl.optim
    api/python/dgl.sampling
    api/python/udf
-
-.. toctree::
-   :maxdepth: 3
-   :caption: Model Tutorials
-   :hidden:
-   :glob:
-
-   tutorials/models/index
 
 .. toctree::
    :maxdepth: 1

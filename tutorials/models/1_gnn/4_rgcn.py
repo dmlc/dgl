@@ -124,6 +124,11 @@ multiple edges among any given pair.
 #    the full weight matrix has three dimensions: relation, input_feature,
 #    output_feature.
 #
+# .. note::
+#
+#    This is showing how to implement an R-GCN from scratch.  DGL provides a more
+#    efficient :class:`builtin R-GCN layer module <dgl.nn.pytorch.conv.RelGraphConv>`.
+#
 
 import torch
 import torch.nn as nn

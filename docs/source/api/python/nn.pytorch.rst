@@ -268,6 +268,9 @@ SegmentedKNNGraph
     :members:
     :show-inheritance:
 
+NodeEmbedding Module
+----------------------------------------
+
 NodeEmbedding
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
