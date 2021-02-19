@@ -174,7 +174,7 @@ def is_sorted_srcdst(src, dst, num_src=None, num_dst=None):
 
     Parameters
     ----------
-    src : IdArray 
+    src : IdArray
         The tensor of source nodes for each edge.
     dst : IdArray
         The tensor of destination nodes for each edge.
@@ -197,8 +197,8 @@ def is_sorted_srcdst(src, dst, num_src=None, num_dst=None):
     src = F.zerocopy_to_dgl_ndarray(src)
     dst = F.zerocopy_to_dgl_ndarray(dst)
 
-    sorted_status = _CAPI_DGLCOOIsSorted(src, dst, num_src, num_dst) 
-    
+    sorted_status = _CAPI_DGLCOOIsSorted(src, dst, num_src, num_dst)
+
     row_sorted = sorted_status > 0
     col_sorted = sorted_status > 1
 
