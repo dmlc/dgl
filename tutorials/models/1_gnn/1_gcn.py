@@ -55,6 +55,12 @@ gcn_reduce = fn.sum(msg='m', out='h')
 ###############################################################################
 # We then proceed to define the GCNLayer module. A GCNLayer essentially performs
 # message passing on all the nodes then applies a fully-connected layer.
+#
+# .. note::
+#
+#    This is showing how to implement a GCN from scratch.  DGL provides a more
+#    efficient :class:`builtin GCN layer module <dgl.nn.pytorch.conv.GraphConv>`.
+#
 
 class GCNLayer(nn.Module):
     def __init__(self, in_feats, out_feats):

@@ -192,7 +192,7 @@ model = Model(num_features, 128, num_classes).to(device)
 
 ######################################################################
 # If you compare against the code in the
-# :doc:`introduction <1_introduction>`, you will notice several
+# :doc:`introduction <../blitz/1_introduction>`, you will notice several
 # differences:
 #
 # -  **DGL GNN layers on bipartite graphs**. Instead of computing on the
