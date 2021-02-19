@@ -822,7 +822,8 @@ class InducedSetAttentionBlock(nn.Module):
         super(InducedSetAttentionBlock, self).__init__()
         self.m = m
         if m == 1:
-            dgl_warning("if m is set to 1, W_q and W_k would not be updated during training.")
+            dgl_warning("if m is set to 1, the parameters corresponding to query and key "
+                        "projections would not get updated during training.")
         self.d_model = d_model
         self.inducing_points = nn.Parameter(
             th.FloatTensor(m, d_model)
@@ -893,7 +894,8 @@ class PMALayer(nn.Module):
         super(PMALayer, self).__init__()
         self.k = k
         if k == 1:
-            dgl_warning("if k is set to 1, W_q and W_k would not be updated during training.")
+            dgl_warning("if k is set to 1, the parameters corresponding to query and key "
+                        "projections would not get updated during training.")
         self.d_model = d_model
         self.seed_vectors = nn.Parameter(
             th.FloatTensor(k, d_model)
