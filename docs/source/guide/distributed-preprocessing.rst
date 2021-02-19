@@ -90,14 +90,24 @@ a graph in a cluster of machines. This solution requires users to prepare data f
 ParMETIS Installation
 ^^^^^^^^^^^^^^^^^^^^^
 
+ParMETIS requires METIS and GKLib. Please follow the instructions `here <https://github.com/KarypisLab/GKlib>`__
+to compile and install GKLib. When compiling and install METIS, please follow the instructions below to
+clone METIS with GIT and compile it with int64 support.
+
+.. code-block:: none
+
+    git clone https://github.com/KarypisLab/METIS.git
+    make config shared=1 cc=gcc prefix=~/local i64=1
+    make install
+
+
 For now, we need to compile and install ParMETIS manually. We clone the DGL branch of ParMETIS as follows:
 
 .. code-block:: none
 
     git clone --branch dgl https://github.com/KarypisLab/ParMETIS.git
 
-Then we follow the instructions in its Github to install its dependencies including METIS
-and then compile and install ParMETIS.
+Then compile and install ParMETIS.
 
 .. code-block:: none
 
@@ -225,17 +235,8 @@ an edge with the following fields:
 * `<attributes>` are optional fields that contain any edge attributes in the input edge file.
 
 When invoking `pm_dglpart`, the three input files: `xxx_nodes.txt`, `xxx_edges.txt`, `xxx_stats.txt`
-should be located in the directory where `pm_dglpart` runs.  The following command partitions the graph
-named `xxx` into two partitions.
-
-.. code-block:: none
-
-    pm_dglpart xxx 2
-
-The following command partitions the graph named `xxx` into  eight partitions. In this case,
-the three input files: `xxx_nodes.txt`, `xxx_edges.txt`, `xxx_stats.txt` should still be located
-in the directory where `pm_dglpart` runs. **Note**: the command actually splits the input graph
-into eight partitions.
+should be located in the directory where `pm_dglpart` runs. The following command run four ParMETIS
+processes to partition the graph named `xxx` into eight partitions (each process handles two partitions).
 
 .. code-block:: none
 
