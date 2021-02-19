@@ -37,7 +37,7 @@ import scipy.sparse as sp
 # either citing or being cited, between two papers exists in a citation
 # network.
 #
-# This tutorial formulates the link prediction problem as a binary
+# This tutorial formulates the link prediction problem as a binary classification
 # problem as follows:
 #
 # -  Treat the edges in the graph as *positive examples*.
