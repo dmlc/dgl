@@ -1842,12 +1842,61 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
 
     return new_graph
 
+def _coalesce_frame(g, edge_map, aggregator):
+    r"""Coalesce the edge feature of duplicate edges by given aggregator in g.
+    
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+    edge_maps : List[Tensor]
+        The edge mapping corresponding to each edge type in g.
+    aggregator : str 
+        Indicates how to coalesce edge features, could be ``arbitrary``, ``sum``
+        or ``mean``. 
+
+    Returns
+    -------
+    List[Frame]
+        The frames corresponding to each edge type.
+    """
+    if aggregator == 'arbitrary':
+        eids = []
+        for i in range(len(g.canonical_etypes)):
+            feat_idx = F.asnumpy(edge_maps[i])
+            _, indices = np.unique(feat_idx, return_index=True)
+            eids.append(F.zerocopy_from_numpy(indices))
+
+        edge_frames = utils.extract_edge_subframes(g, eids)
+    elif aggregator in ['sum', 'mean']:
+        edge_frames = []
+        for i in range(len(g.canonical_etypes)):
+            feat_idx = edge_maps[i]
+            _, indices = np.unique(F.asnumpy(feat_idx), return_index=True)
+            _num_rows = len(indices)
+            _data = {}
+            for key, col in g._edge_frames[i]._columns.items():
+                data = col.data
+                new_data = F.scatter_add(data, feat_idx, _num_rows)
+                if aggregator == 'mean':
+                    norm = F.astype(counts[i], F.dtype(data))
+                    norm = F.reshape(norm, (F.shape(norm)[0],) + (1,) * (F.ndim(data) - 1))
+                    new_data /= norm
+                _data[key] = new_data
+
+            newf = Frame(data=_data, num_rows=_num_rows)
+            edge_frames.append(newf)
+    else:
+        raise DGLError("Aggregator {} not regonized, cannot coalesce edge feature in the "
+                       "specified way".format(aggregator)) 
+    return edge_frames
+
 def to_simple(g,
               return_counts='count',
               writeback_mapping=False,
               copy_ndata=True,
               copy_edata=False,
-              aggregator='random'):
+              aggregator='arbitrary'):
     r"""Convert a graph to a simple graph without parallel edges and return.
 
     For a heterogeneous graph with multiple edge types, DGL treats edges with the same
@@ -1895,12 +1944,12 @@ def to_simple(g,
 
         (Default: False)
     aggregator: str, optional
-        Indicate how to aggregate edge feature of duplicate edges.
-        If ``random``, randomly select one of the duplicate edges' feature.
+        Indicate how to coalesce edge feature of duplicate edges.
+        If ``arbitrary``, select one of the duplicate edges' feature.
         If ``sum``, compute the summation of duplicate edges' feature.
         If ``mean``, compute the average of duplicate edges' feature.
 
-        (Default: ``random``)
+        (Default: ``arbitrary``)
 
     Returns
     -------
@@ -2000,33 +2049,8 @@ def to_simple(g,
         node_frames = utils.extract_node_subframes(g, None)
         utils.set_new_frames(simple_graph, node_frames=node_frames)
     if copy_edata:
-        if aggregator == 'random':
-            eids = []
-            for i in range(len(g.canonical_etypes)):
-                feat_idx = F.asnumpy(edge_maps[i])
-                _, indices = np.unique(feat_idx, return_index=True)
-                eids.append(F.zerocopy_from_numpy(indices))
-
-            edge_frames = utils.extract_edge_subframes(g, eids)
-        else:  # 'sum'/'mean'
-            edge_frames = []
-            for i in range(len(g.canonical_etypes)):
-                feat_idx = edge_maps[i]
-                _, indices = np.unique(F.asnumpy(feat_idx), return_index=True)
-                _num_rows = len(indices)
-                _data = {}
-                for key, col in g._edge_frames[i]._columns.items():
-                    data = col.data
-                    new_data = F.scatter_add(data, feat_idx, _num_rows)
-                    if aggregator == 'mean':
-                        norm = F.astype(counts[i], F.dtype(data))
-                        norm = F.reshape(norm, (F.shape(norm)[0],) + (1,) * (F.ndim(data) - 1))
-                        new_data /= norm
-                    _data[key] = new_data
-
-                newf = Frame(data=_data, num_rows=_num_rows)
-                edge_frames.append(newf)
-        utils.set_new_frames(simple_graph, edge_frames=edge_frames)
+        new_edge_frames = _coalesce_frame(g, edge_maps, aggregator)
+        utils.set_new_frames(simple_graph, edge_frames=new_edge_frames)
 
     if return_counts is not None:
         for count, canonical_etype in zip(counts, g.canonical_etypes):
