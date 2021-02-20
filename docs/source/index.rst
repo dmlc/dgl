@@ -40,6 +40,7 @@ Welcome to Deep Graph Library Tutorials and Documentation
    api/python/dgl.distributed
    api/python/dgl.function
    api/python/nn
+   api/python/nn.functional
    api/python/dgl.ops
    api/python/dgl.optim
    api/python/dgl.sampling
