@@ -114,10 +114,33 @@ Utilities for computing adjacency matrix and Lapacian matrix.
     khop_adj
     laplacian_lambda_max
 
-Traversals
+Graph Traversal & Message Propagation
 ------------------------------------------
 
-Utilities for traversing graphs.
+DGL implements graph traversal algorithms implemented as python generators,
+which returns the visited set of nodes or edges (in ID tensor) at each iteration.
+The naming convention is ``<algorithm>_[nodes|edges]_generator``.
+An example usage is as follows.
+
+.. code:: python
+
+    g = ...  # some DGLGraph
+    for nodes in dgl.bfs_nodes_generator(g, 0):
+        do_something(nodes)
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    bfs_nodes_generator
+    bfs_edges_generator
+    topological_nodes_generator
+    dfs_edges_generator
+    dfs_labeled_edges_generator
+
+DGL provides APIs to perform message passing following graph traversal order. ``prop_nodes_XXX``
+calls traversal algorithm ``XXX`` and triggers :func:`~DGLGraph.pull()` on the visited node
+set at each iteration. ``prop_edges_YYY`` applies traversal algorithm ``YYY`` and triggers
+:func:`~DGLGraph.send_and_recv()` on the visited edge set at each iteration.
 
 .. autosummary::
     :toctree: ../../generated/
