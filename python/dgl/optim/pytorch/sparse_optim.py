@@ -1,7 +1,6 @@
 """Node embedding optimizers"""
 import abc
 from abc import abstractmethod
-import gc
 import torch as th
 
 from ...utils import get_shared_mem_array, create_shared_mem_array
