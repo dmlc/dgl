@@ -76,7 +76,8 @@ def invoke_edge_udf(graph, eid, etype, func, *, orig_eid=None):
         u, v = graph.find_edges(eid)
         edata = graph._edge_frames[etid].subframe(eid)
     if len(u) == 0:
-        dgl_warning('The input graph for the user-defined edge function does not contain valid edges')
+        dgl_warning('The input graph for the user-defined edge function ' \
+                    'does not contain valid edges')
     srcdata = graph._node_frames[stid].subframe(u)
     dstdata = graph._node_frames[dtid].subframe(v)
     ebatch = EdgeBatch(graph, eid if orig_eid is None else orig_eid,
