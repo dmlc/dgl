@@ -1844,7 +1844,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
 
 def _coalesce_edge_frame(g, edge_maps, counts, aggregator):
     r"""Coalesce edge features of duplicate edges via given aggregator in g.
-    
+
     Parameters
     ----------
     g : DGLGraph
@@ -1853,9 +1853,9 @@ def _coalesce_edge_frame(g, edge_maps, counts, aggregator):
         The edge mapping corresponding to each edge type in g.
     counts : List[Tensor]
         The number of duplicated edges from the original graph for each edge type.
-    aggregator : str 
+    aggregator : str
         Indicates how to coalesce edge features, could be ``arbitrary``, ``sum``
-        or ``mean``. 
+        or ``mean``.
 
     Returns
     -------
@@ -1890,7 +1890,7 @@ def _coalesce_edge_frame(g, edge_maps, counts, aggregator):
             edge_frames.append(newf)
     else:
         raise DGLError("Aggregator {} not regonized, cannot coalesce edge feature in the "
-                       "specified way".format(aggregator)) 
+                       "specified way".format(aggregator))
     return edge_frames
 
 def to_simple(g,
