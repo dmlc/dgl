@@ -1,10 +1,18 @@
 """
 .. _model-transformer:
 
-Transformer tutorial
-====================
+Transformer as a Graph Neural Network
+======================================
 
 **Author**: Zihao Ye, Jinjing Zhou, Qipeng Guo, Quan Gan, Zheng Zhang
+
+.. warning::
+
+    The tutorial aims at gaining insights into the paper, with code as a mean
+    of explanation. The implementation thus is NOT optimized for running
+    efficiency. For recommended implementation, please refer to the `official
+    examples <https://github.com/dmlc/dgl/tree/master/examples>`_.
+
 """
 ################################################################################################
 # In this tutorial, you learn about a simplified implementation of the Transformer model.
