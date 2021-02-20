@@ -40,7 +40,7 @@ Sampling for Node Classification <L1_large_node_classification>`.
 #    \mathcal{L} = -\sum_{u\sim v\in \mathcal{D}}\left( y_{u\sim v}\log(\hat{y}_{u\sim v}) + (1-y_{u\sim v})\log(1-\hat{y}_{u\sim v})) \right)
 #
 # This is identical to the link prediction formulation in :doc:`the previous
-# tutorial on link prediction <4_link_predict>`.
+# tutorial on link prediction <../blitz/4_link_predict>`.
 #
 
 
@@ -83,7 +83,7 @@ test_nids = idx_split['test']
 # ------------------------------------------------
 #
 # Different from the :doc:`link prediction tutorial for full
-# graph <4_link_predict>`, a common practice to train GNN on large graphs is
+# graph <../blitz/4_link_predict>`, a common practice to train GNN on large graphs is
 # to iterate over the edges
 # in minibatches, since computing the probability of all edges is usually
 # impossible. For each minibatch of edges, you compute the output
@@ -147,7 +147,7 @@ print(bipartites)
 # The second element and the third element are the positive graph and the
 # negative graph for this minibatch.
 # The concept of positive and negative graphs have been introduced in the
-# :doc:`full-graph link prediction tutorial <4_link_predict>`.  In minibatch
+# :doc:`full-graph link prediction tutorial <../blitz/4_link_predict>`.  In minibatch
 # training, the positive graph and the negative graph only contain nodes
 # necessary for computing the pair-wise scores of positive and negative examples
 # in the current minibatch.
@@ -200,7 +200,7 @@ model = Model(num_features, 128).to(device)
 # edges in the sampled minibatch.
 #
 # The following score predictor, copied from the :doc:`link prediction
-# tutorial <4_link_predict>`, takes a dot product between the
+# tutorial <../blitz/4_link_predict>`, takes a dot product between the
 # incident nodes’ representations.
 #
 
