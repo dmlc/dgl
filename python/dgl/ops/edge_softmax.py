@@ -9,8 +9,6 @@ __all__ = ['edge_softmax']
 def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
     r"""Compute softmax over weights of incoming edges for every node.
 
-    Description
-    -----------
     For a node :math:`i`, edge softmax is an operation that computes
 
     .. math::
@@ -28,6 +26,9 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
     An example of using edge softmax is in
     `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__ where
     the attention weights are computed with this operation.
+    Other non-GNN examples using this are
+    `Transformer <https://papers.nips.cc/paper/7181-attention-is-all-you-need.pdf>`__,
+    `Capsule <https://arxiv.org/pdf/1710.09829.pdf>`__, etc.
 
     Parameters
     ----------

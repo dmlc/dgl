@@ -19,6 +19,7 @@ and an ``EdgeDataLoader`` for edge/link prediction task.
 .. autoclass:: GraphDataLoader
 
 .. _api-dataloading-neighbor-sampling:
+
 Neighbor Sampler
 -----------------------------
 .. currentmodule:: dgl.dataloading.neighbor
