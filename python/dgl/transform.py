@@ -1842,8 +1842,8 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
 
     return new_graph
 
-def _coalesce_frame(g, edge_map, aggregator):
-    r"""Coalesce the edge feature of duplicate edges by given aggregator in g.
+def _coalesce_edge_frame(g, edge_maps, counts, aggregator):
+    r"""Coalesce edge features of duplicate edges via given aggregator in g.
     
     Parameters
     ----------
@@ -1851,6 +1851,8 @@ def _coalesce_frame(g, edge_map, aggregator):
         The input graph.
     edge_maps : List[Tensor]
         The edge mapping corresponding to each edge type in g.
+    counts : List[Tensor]
+        The number of duplicated edges from the original graph for each edge type.
     aggregator : str 
         Indicates how to coalesce edge features, could be ``arbitrary``, ``sum``
         or ``mean``. 
@@ -2049,7 +2051,7 @@ def to_simple(g,
         node_frames = utils.extract_node_subframes(g, None)
         utils.set_new_frames(simple_graph, node_frames=node_frames)
     if copy_edata:
-        new_edge_frames = _coalesce_frame(g, edge_maps, aggregator)
+        new_edge_frames = _coalesce_edge_frame(g, edge_maps, counts, aggregator)
         utils.set_new_frames(simple_graph, edge_frames=new_edge_frames)
 
     if return_counts is not None:
