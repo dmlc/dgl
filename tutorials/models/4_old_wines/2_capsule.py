@@ -9,6 +9,14 @@ Capsule Network
 In this tutorial, you learn how to describe one of the more classical models in terms of graphs. The approach
 offers a different perspective. The tutorial describes how to implement a Capsule model for the
 `capsule network <http://arxiv.org/abs/1710.09829>`__.
+
+.. warning::
+
+    The tutorial aims at gaining insights into the paper, with code as a mean
+    of explanation. The implementation thus is NOT optimized for running
+    efficiency. For recommended implementation, please refer to the `official
+    examples <https://github.com/dmlc/dgl/tree/master/examples>`_.
+
 """
 #######################################################################################
 # Key ideas of Capsule
