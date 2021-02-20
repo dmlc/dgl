@@ -28,17 +28,19 @@ __global__ void SegmentReduceKernel(
     const DType* feat, const IdType* offsets,
     DType* out, IdType* arg,
     int64_t n, int64_t dim){
-  int row = blockIdx.x;
-  int col = blockIdx.y * blockDim.x + threadIdx.x;
-  if (col < dim) {
-    DType local_accum = ReduceOp::zero();
-    IdType local_arg = -1;
-    for (IdType i = offsets[row]; i < offsets[row + 1]; ++i) {
-      ReduceOp::Call(&local_accum, &local_arg, feat[i * dim + col], i);
+  for (int row = blockIdx.x; row < n; row += gridDim.x) {
+    int col = blockIdx.y * blockDim.x + threadIdx.x;
+    while (col < dim) {
+      DType local_accum = ReduceOp::zero();
+      IdType local_arg = -1;
+      for (IdType i = offsets[row]; i < offsets[row + 1]; ++i) {
+        ReduceOp::Call(&local_accum, &local_arg, feat[i * dim + col], i);
+      }
+      out[row * dim + col] = local_accum;
+      if (ReduceOp::require_arg)
+        arg[row * dim + col] = local_arg;
+      col += gridDim.y * blockDim.x;
     }
-    out[row * dim + col] = local_accum;
-    if (ReduceOp::require_arg)
-      arg[row * dim + col] = local_arg;
   }
 }
 
@@ -51,11 +53,13 @@ template <typename IdType, typename DType>
 __global__ void ScatterAddKernel(
     const DType *feat, const IdType *idx, DType *out,
     int64_t n, int64_t dim) {
-  const int row = blockIdx.x;
-  const int write_row = idx[row];
-  const int col = blockIdx.y * blockDim.x + threadIdx.x;
-  if (col < dim) {
-    cuda::AtomicAdd(out + write_row * dim + col, feat[row * dim + col]);
+  for (int row = blockIdx.x; row < n; row += gridDim.x) {
+    const int write_row = idx[row];
+    int col = blockIdx.y * blockDim.x + threadIdx.x;
+    while (col < dim) {
+      cuda::AtomicAdd(out + write_row * dim + col, feat[row * dim + col]);
+      col += gridDim.y * blockDim.x;
+    }
   }
 }
 
@@ -68,12 +72,14 @@ template <typename IdType, typename DType>
 __global__ void BackwardSegmentCmpKernel(
     const DType *feat, const IdType *arg, DType *out,
     int64_t n, int64_t dim) {
-  int row = blockIdx.x;
-  int col = blockIdx.y * blockDim.x + threadIdx.x;
-  if (col < dim) {
-    int write_row = arg[row * dim + col];
-    if (write_row >= 0) {
-      out[write_row * dim + col] = feat[row * dim + col];
+  for (int row = blockIdx.x; row < n; row += gridDim.x) {
+    int col = blockIdx.y * blockDim.x + threadIdx.x;
+    while (col < dim) {
+      int write_row = arg[row * dim + col];
+      if (write_row >= 0) {
+        out[write_row * dim + col] = feat[row * dim + col];
+      }
+      col += gridDim.y * blockDim.x;
     }
   }
 }
@@ -102,9 +108,9 @@ void SegmentReduce(
   for (int i = 1; i < out->ndim; ++i)
     dim *= out->shape[i];
 
-  const int nbx = n;
+  const int nbx = FindNumBlocks<'x'>(n);
   const int ntx = FindNumThreads(dim);
-  const int nby = (dim + ntx - 1) / ntx;
+  const int nby = FindNumBlocks<'y'>((dim + ntx - 1) / ntx);
   const int nty = 1;
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
@@ -137,9 +143,9 @@ void ScatterAdd(
   for (int i = 1; i < out->ndim; ++i)
     dim *= out->shape[i];
 
-  const int nbx = n;
+  const int nbx = FindNumBlocks<'x'>(n);
   const int ntx = FindNumThreads(dim);
-  const int nby = (dim + ntx - 1) / ntx;
+  const int nby = FindNumBlocks<'y'>((dim + ntx - 1) / ntx);
   const int nty = 1;
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
@@ -171,9 +177,9 @@ void BackwardSegmentCmp(
   for (int i = 1; i < out->ndim; ++i)
     dim *= out->shape[i];
 
-  const int nbx = n;
+  const int nbx = FindNumBlocks<'x'>(n);
   const int ntx = FindNumThreads(dim);
-  const int nby = (dim + ntx - 1) / ntx;
+  const int nby = FindNumBlocks<'y'>((dim + ntx - 1) / ntx);
   const int nty = 1;
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
