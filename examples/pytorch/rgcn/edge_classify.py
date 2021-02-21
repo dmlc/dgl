@@ -33,16 +33,17 @@ from dgl.nn.pytorch import RelGraphConv
 from sklearn.metrics import roc_auc_score
 
 from model import RelGraphEmbedLayer
+from entity_classify_mp import EntityClassify
 from fake_data_generator import load_generated_data
 
-class RGCN(nn.Module):
+class RGCN(EntityClassify):
     """ Edge classification class for RGCN
     Parameters
     ----------
     device : int
         Device to run the layer.
     feat_dim : int
-        feature dim size.
+        input feature dim size.
     h_dim : int
         Hidden dim size.
     out_dim : int
@@ -73,18 +74,19 @@ class RGCN(nn.Module):
                  use_self_loop=False,
                  low_mem=True,
                  layer_norm=False):
-        super().__init__()
-        self.device = th.device(device if device >= 0 else 'cpu')
+        super().__init__(device,
+                         None,
+                         h_dim,
+                         out_dim,
+                         num_rels,
+                         num_bases,
+                         num_hidden_layers,
+                         dropout,
+                         use_self_loop,
+                         low_mem,
+                         layer_norm)
+
         self.feat_dim = feat_dim
-        self.h_dim    = h_dim
-        self.out_dim  = out_dim
-        self.num_rels = num_rels
-        self.num_bases = None if num_bases < 0 else num_bases
-        self.num_hidden_layers = num_hidden_layers
-        self.dropout = dropout
-        self.use_self_loop = use_self_loop
-        self.low_mem = low_mem
-        self.layer_norm = layer_norm
 
         self.layers = nn.ModuleList()
         # i2h
@@ -105,16 +107,6 @@ class RGCN(nn.Module):
             self_loop=self.use_self_loop,
             low_mem=self.low_mem, layer_norm = layer_norm))
 
-    def forward(self, blocks, feats, norm=None):
-        if blocks is None:
-            # full graph training
-            blocks = [self.g] * len(self.layers)
-        h = feats
-        for layer, block in zip(self.layers, blocks):
-            block = block.to(self.device)
-            h = layer(block, h, block.edata['etype'], block.edata['norm'])
-        return h
-
 
 class NeighborSampler:
     """Neighbor sampler
@@ -125,7 +117,6 @@ class NeighborSampler:
         sample full neighbors.
     """
     def __init__(self, fanouts):
-
         self.fanouts = fanouts
 
     """Do neighbor sample
@@ -162,31 +153,35 @@ class NeighborSampler:
 
 # edge score prediction
 class ScorePredictor(nn.Module):
-    def __init__(self, num_classes, in_features, edge_features):
+    def __init__(self, num_classes, in_features, edge_features=None, dropout=0.2):
         super().__init__()
         self.edge_features = edge_features
 
-        edge_feature_dim = edge_features.shape[1]
-        h_dim = int(edge_feature_dim / 2)
-        print("edge_feature_dim: ", edge_feature_dim)
-        print("h_dim: ", h_dim)
-        dropout = 0.2
+        if self.edge_features is not None:
+            edge_feature_dim = edge_features.shape[1]
+            h_dim = int(edge_feature_dim / 2)
+            print("edge_feature_dim: ", edge_feature_dim)
+            print("h_dim: ", h_dim)
 
-        # add edge feature (edge features are converted to embeddings by a MLP
-        self.linear_add = th.nn.Sequential(
-            th.nn.Linear(edge_feature_dim, h_dim),
-            th.nn.ReLU(),
-            th.nn.Dropout(dropout)
-        )
+            # add edge feature (edge features are converted to embeddings by a MLP
+            self.linear_add = th.nn.Sequential(
+                th.nn.Linear(edge_feature_dim, h_dim),
+                th.nn.ReLU(),
+                th.nn.Dropout(dropout)
+            )
 
-        self.linear = nn.Linear(2 * in_features + h_dim, num_classes)
+            self.linear = nn.Linear(2 * in_features + h_dim, num_classes)
+        else:
+            self.linear = nn.Linear(2 * in_features, num_classes)
 
     def apply_edges(self, edges):
-        offer_id = edges.data['type_id'].tolist()
-        offer_features = self.edge_features[offer_id]
-        offer_features = th.from_numpy(offer_features)
-        x_add = self.linear_add(offer_features.float())
-        x = th.cat([edges.src['x'], edges.dst['x'], x_add], dim=1)
+        if self.edge_features is not None:
+            offer_id = edges.data['type_id'].tolist()
+            offer_features = self.edge_features[offer_id]
+            x_add = self.linear_add(offer_features.float())
+            x = th.cat([edges.src['x'], edges.dst['x'], x_add], dim=1)
+        else:
+            x = th.cat([edges.src['x'], edges.dst['x']], dim=1)
 
         return {'score': self.linear(x)}
 
@@ -227,7 +222,7 @@ class EdgeClassify(nn.Module):
             layer_norm)
 
         num_classes = 1
-        self.predictor = ScorePredictor(num_classes, out_dim, edge_feats)
+        self.predictor = ScorePredictor(num_classes, out_dim, edge_feats, dropout)
 
     def forward(self, edge_subgraph, blocks, x):
         x = self.rgcn(blocks, x)
@@ -418,8 +413,11 @@ def main(args):
 
     g = dgl.to_homogeneous(hg, edata=["label"])
 
+    # get the edge type id of the edge that will be predicted(i.e. label_edge is "seller-asin" edge).
+    # For example, there are 4 edge types on the graph, indexed by [0, 1, 2, 3]. the label_edge edge type id is 3.
     etype_id = hg.get_etype_id(label_edge)
-    e_ids = np.where(g.edata[dgl.ETYPE].numpy().flatten() == etype_id)[0]
+    print("etype_id", etype_id)
+    e_ids = np.where(g.edata[dgl.ETYPE].numpy().flatten() == etype_id)[0]  # get the e_ids on the homogeneous graph.
     e_ids = e_ids.tolist()
 
     np.random.seed(4)

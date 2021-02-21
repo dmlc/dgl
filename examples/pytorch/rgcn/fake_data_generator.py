@@ -1,3 +1,51 @@
+"""
+This file generates fake data, and then build a graph based on the data
+
+The data contains 5 tables: df, df_seller, df_asin, df_offer, seller_relation_df
+(1) df: seller id(merchant_customer_id), asin id(asin), offer listing's label, offer features(of), seller features(sf),
+and asin features(af). An asin is a product. An offer listing is a seller-asin pair, which can be uniquely identified by
+a pair of seller and asin ids.
+ex:
+merchant_customer_id	asin	label	of1	        of2	        of3	        of4	        sf1	        sf2	        sf3	        af1	        af2
+                s0	    a0	    1	    0.260922	0.407622	0.118446	0.510906	0.158223	0.497794	0.065068	0.350285	0.392781
+                s0	    a1	    0	    0.412472	0.781531	0.37534	    0.759486	0.158223	0.497794	0.065068	0.189026	0.61893
+                s1	    a2	    0	    0.419034	0.354146	0.029774	0.975905	0.545203	0.182445	0.540075	0.472621	0.436766
+                s1	    a0	    1	    0.902422	0.925809	0.537782	0.7365	    0.545203	0.182445	0.540075	0.350285	0.392781
+                s2	    a1	    0	    0.979616	0.720452	0.945828	0.953956	0.524404	0.918383	0.129187	0.189026	0.61893
+
+(2) df_seller: seller id(merchant_customer_id) and seller features.
+ex:
+    merchant_customer_id       sf1       sf2       sf3
+0                    s0  0.158223  0.497794  0.065068
+1                    s1  0.545203  0.182445  0.540075
+2                    s2  0.524404  0.918383  0.129187
+
+(3) df_asin: asin id and asin features
+ex:
+   asin       af1       af2
+0   a0  0.350285  0.392781
+1   a1  0.189026  0.618930
+2   a2  0.472621  0.436766
+
+(4) df_offer: offer label and features
+ex:
+    merchant_customer_id asin  label       of1       of2       of3       of4
+0                    s0   a0      1  0.284056  0.901859  0.825885  0.237311
+1                    s0   a1      0  0.208286  0.499683  0.416775  0.236482
+2                    s1   a2      0  0.698869  0.904695  0.287311  0.104970
+3                    s1   a0      1  0.746850  0.960512  0.753721  0.083001
+
+(5) seller_relation_df: sellers relations
+ex:
+   from_seller to_seller edge_type
+0          s0        s1  bank account
+1          s2        s3  email
+2          s4        s5  bank account
+3          s6        s7  email
+4          s8        s9  bank account
+
+"""
+
 import pandas as pd
 import numpy as np
 import torch as th
@@ -7,8 +55,8 @@ class CreateFakeData:
     def __init__(self):
 
         self.N = 20
-        self.seller_col = "merchant_customer_id"
-        self.asin_col = "asin"
+        self.seller_col = "merchant_customer_id"  # seller id
+        self.asin_col = "asin"  # asin id
         self.label_col = "label"
         self.label_edge = "seller-asin"
 
@@ -181,6 +229,7 @@ class BuildGraph:
             [self.seller_col, self.asin_col]]  # the order of offer_feat table should be the same as df
         offer_feat = offer_feat.merge(self.df_offer, on=[self.seller_col, self.asin_col], how='left')
         offer_feat = offer_feat[self.offer_feature_cols].values
+        offer_feat = th.from_numpy(offer_feat)
 
         return offer_feat
 
