@@ -254,7 +254,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
     if nodes is None:
         nodes = {
             ntype: F.astype(F.arange(0, g.number_of_nodes(ntype)), g.idtype)
-                   for ntype in g.ntypes
+            for ntype in g.ntypes
         }
     elif not isinstance(nodes, dict):
         if len(g.ntypes) > 1:
