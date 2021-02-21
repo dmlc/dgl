@@ -224,7 +224,7 @@ with tqdm.tqdm(train_dataloader) as tq:
 #
 # Here is a step-by-step tutorial for writing a GNN module for both
 # :doc:`full-graph training <../blitz/1_introduction>` *and* :doc:`stochastic
-# training <L1_node_classification>`.
+# training <L1_large_node_classification>`.
 #
 # Say you start with a GNN module that works for full-graph training only:
 #

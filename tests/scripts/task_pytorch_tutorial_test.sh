@@ -4,7 +4,6 @@
 . /opt/conda/etc/profile.d/conda.sh
 conda activate pytorch-ci
 TUTORIAL_ROOT="./tutorials"
-NEW_TUTORIAL_ROOT="./new-tutorial"
 
 function fail {
     echo FAIL: $@
@@ -28,12 +27,4 @@ do
     python3 $f || fail "run ${f}"
 done
 
-popd > /dev/null
-
-pushd ${NEW_TUTORIAL_ROOT} > /dev/null
-for f in $(find . -name "*.py" ! -name "*_mx.py")
-do
-    echo "Running tutorial ${f} ..."
-    python3 $f || fail "run ${f}"
-done
 popd > /dev/null

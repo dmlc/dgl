@@ -77,6 +77,14 @@ void SegmentReduce(const std::string& op,
                    NDArray arg);
 
 /*!
+ * \brief Scatter Add on first dimension.
+ */
+template <int XPU, typename IdType, int bits>
+void ScatterAdd(NDArray feat,
+                NDArray idx,
+                NDArray out);
+
+/*!
  * \brief Backward function of segment cmp.
  */
 template <int XPU, typename IdType, int bits>
