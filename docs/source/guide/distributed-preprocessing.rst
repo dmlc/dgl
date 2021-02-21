@@ -91,7 +91,7 @@ ParMETIS Installation
 ^^^^^^^^^^^^^^^^^^^^^
 
 ParMETIS requires METIS and GKLib. Please follow the instructions `here <https://github.com/KarypisLab/GKlib>`__
-to compile and install GKLib. When compiling and install METIS, please follow the instructions below to
+to compile and install GKLib. For compiling and install METIS, please follow the instructions below to
 clone METIS with GIT and compile it with int64 support.
 
 .. code-block:: none
