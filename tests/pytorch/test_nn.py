@@ -936,9 +936,15 @@ def test_cf_conv(g, idtype, out_dim):
     if F.gpu_ctx():
         cfconv = cfconv.to(ctx)
 
-    node_feats = F.randn((g.number_of_src_nodes(), 2))
+    src_feats = F.randn((g.number_of_src_nodes(), 2))
     edge_feats = F.randn((g.number_of_edges(), 3))
-    h = cfconv(g, node_feats, edge_feats)
+    h = cfconv(g, src_feats, edge_feats)
+    # current we only do shape check
+    assert h.shape[-1] == out_dim
+
+    # case for bipartite graphs
+    dst_feats = F.randn((g.number_of_dst_nodes(), 3))
+    h = cfconv(g, (src_feats, dst_feats), edge_feats)
     # current we only do shape check
     assert h.shape[-1] == out_dim
 

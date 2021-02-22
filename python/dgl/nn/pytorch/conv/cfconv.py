@@ -123,9 +123,14 @@ class CFConv(nn.Module):
         ----------
         g : DGLGraph
             The graph.
-        node_feats : torch.Tensor
-            The input node feature of shape :math:`(N_{in}, node_in_feats)`
-            where :math:`N_{in}` is the number of source nodes.
+        node_feats : torch.Tensor or pair of torch.Tensor
+            The input node features. If a torch.Tensor is given, it represents the input
+            node feature of shape :math:`(N, D_{in})` where :math:`D_{in}` is size of
+            input feature, :math:`N` is the number of nodes.
+            If a pair of torch.Tensor is given, which is the case for bipartite graph,
+            the pair must contain two tensors of shape :math:`(N_{src}, D_{in_{src}})` and
+            :math:`(N_{dst}, D_{in_{dst}})` separately for the source and destination nodes.
+
         edge_feats : torch.Tensor
             The input edge feature of shape :math:`(E, edge_in_feats)`
             where :math:`E` is the number of edges.
@@ -137,7 +142,11 @@ class CFConv(nn.Module):
             where :math:`N_{out}` is the number of destination nodes.
         """
         with g.local_scope():
-            g.srcdata['hv'] = self.project_node(node_feats)
+            if isinstance(node_feats, tuple):
+                node_feats_src, _ = node_feats
+            else:
+                node_feats_src = node_feats
+            g.srcdata['hv'] = self.project_node(node_feats_src)
             g.edata['he'] = self.project_edge(edge_feats)
             g.update_all(fn.u_mul_e('hv', 'he', 'm'), fn.sum('m', 'h'))
             return self.project_out(g.dstdata['h'])
