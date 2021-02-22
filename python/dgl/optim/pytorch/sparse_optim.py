@@ -133,12 +133,14 @@ class SparseGradOptimizer(abc.ABC):
                                     self.shmem_buffer_holder.append(
                                         self._shared_cache[emb_name][grad_shmem_name])
 
-                                # The minimun buffer size is 32.
+                                # The total number of buffers is the number of NodeEmbeddings *
+                                # world_size * (world_size - 1). The minimun buffer size is 128.
+                                #
                                 # We extend the buffer by idx_i.shape[0] * 2 to avoid
                                 # frequent shared memory allocation.
                                 # The overall buffer cost will be smaller than three times
                                 # the maximum memory requirement for sharing gradients.
-                                buffer_size = 32 if idx_i.shape[0] < 32 else idx_i.shape[0] * 2
+                                buffer_size = 128 if idx_i.shape[0] < 128 else idx_i.shape[0] * 2
                                 idx_shmem = create_shared_mem_array(idx_shmem_name, \
                                     (buffer_size,), idx_dtype)
                                 grad_shmem = create_shared_mem_array(grad_shmem_name, \
@@ -173,7 +175,7 @@ class SparseGradOptimizer(abc.ABC):
                             # tensor that is sent to current training process
                             if idx_shmem_name not in self._shared_cache[emb_name] or \
                                 self._shared_cache[emb_name][idx_shmem_name].shape[0] < size:
-                                buffer_size = 32 if size < 32 else size * 2
+                                buffer_size = 128 if size < 128 else size * 2
                                 idx_shmem = get_shared_mem_array(idx_shmem_name, \
                                     (buffer_size,), idx_dtype)
                                 grad_shmem = get_shared_mem_array(grad_shmem_name, \
