@@ -5420,7 +5420,7 @@ class DGLHeteroGraph(object):
 
             * If formats is None, return the usage status of sparse formats
             * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of
-            them, specifying the sparse formats to use.
+              them, specifying the sparse formats to use.
 
         Returns
         -------

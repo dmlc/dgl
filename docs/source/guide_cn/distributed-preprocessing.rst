@@ -53,7 +53,7 @@ JSON文件包含所有划分的配置。如果该API没有为节点和边分配�
 
 .. code:: python
 
-    dgl.distributed.partition_graph(g, ‘graph_name’, 4, ‘/tmp/test’, balance_ntypes=g.ndata[‘train_mask’])
+    dgl.distributed.partition_graph(g, 'graph_name', 4, '/tmp/test', balance_ntypes=g.ndata['train_mask'])
 
 除了平衡节点的类型之外， :func:`dgl.distributed.partition_graph` 还允许通过指定
 ``balance_edges`` 来平衡每个类型节点在子图中的入度。这平衡了不同类型节点的连边数量。

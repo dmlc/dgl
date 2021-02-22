@@ -333,7 +333,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     * "inner_node" indicates whether a node belongs to a partition.
     * "inner_edge" indicates whether an edge belongs to a partition.
     * "orig_id" exists when reshuffle=True. It indicates the original node IDs in the original
-    graph before reshuffling.
+      graph before reshuffling.
 
     Node and edge features are splitted and stored together with each graph partition.
     All node/edge features in a partition are stored in a file with DGL format. The node/edge
