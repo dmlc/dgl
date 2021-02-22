@@ -8,8 +8,9 @@ from .. import utils
 @utils.benchmark('time')
 @utils.parametrize('batch_size', [4, 256, 1024])
 @utils.parametrize('feat_size', [16, 128, 512])
-@utils.parametrize('readout_op', ['sum', 'max', 'min', 'mean'])
-@utils.parametrize('type', ['edge', 'node'])
+@utils.parametrize('readout_op', ['sum'])
+# @utils.parametrize('type', ['edge', 'node'])
+@utils.parametrize('type', ['node'])
 def track_time(batch_size, feat_size, readout_op, type):
     device = utils.get_bench_device()
     ds = dgl.data.QM7bDataset()
@@ -22,7 +23,7 @@ def track_time(batch_size, feat_size, readout_op, type):
         for i in range(10):
             out = dgl.readout_nodes(g, 'h', op=readout_op)
         with utils.Timer() as t:
-            for i in range(10):
+            for i in range(50):
                 out = dgl.readout_nodes(g, 'h', op=readout_op)
     elif type == 'edge':
         g.edata['h'] = torch.randn((g.num_edges(), feat_size), device=device)
