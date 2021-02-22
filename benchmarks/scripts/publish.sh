@@ -65,7 +65,7 @@ else
         --shm-size="4g" \
         --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
 fi
-
+echo "Run"
 docker exec dgl-reg mkdir -p $WS_ROOT
 docker cp ../../.git dgl-reg:$WS_ROOT
 docker cp ../ dgl-reg:$WS_ROOT/benchmarks/
