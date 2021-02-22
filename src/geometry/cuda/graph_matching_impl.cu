@@ -15,6 +15,7 @@
 #define BLUE_P 0.53406
 #define BLUE -1
 #define RED -2
+#define EMPTY_IDX -1
 #define CURAND_CALL(func)           \
 {                                   \
   curandStatus_t e = (func);        \
@@ -60,7 +61,7 @@ __global__ void propose_kernel(const IdType *indptr, const IdType *indices,
         break;
       }
     }
-
+    __syncthreads();
     if (!has_unmatched_neighbor)
       result[idx] = idx;
   }
@@ -76,7 +77,7 @@ __global__ void weighted_propose_kernel(const IdType *indptr, const IdType *indi
 
     bool has_unmatched_neighbor = false;
     FloatType weight_max = 0.;
-    IdType v_max = -1;
+    IdType v_max = EMPTY_IDX;
 
     for (IdType i = indptr[idx]; i < indptr[idx + 1]; ++i) {
       auto v = indices[i];
@@ -99,6 +100,7 @@ template <typename IdType>
 __global__ void respond_kernel(const IdType *indptr, const IdType *indices,
                                int64_t num_elem, IdType *proposal, IdType *result) {
   const IdType idx = blockIdx.x * blockDim.x + threadIdx.x;
+  IdType target = EMPTY_IDX;
   if (idx < num_elem) {
     if (result[idx] != RED) return;
 
@@ -111,10 +113,15 @@ __global__ void respond_kernel(const IdType *indptr, const IdType *indices,
         has_unmatched_neighbors = true;
       if (result[v] == BLUE && proposal[v] == idx) {
         // Match first blue neighbhor v which proposed to u.
-        result[v] = min(idx, v);
-        result[idx] = min(idx, v);
+        target = v;
         break;
       }
+    }
+    __syncthreads();
+
+    if (target != EMPTY_IDX) {
+      result[target] = min(idx, target);
+      result[idx] = min(idx, target);
     }
 
     if (!has_unmatched_neighbors)

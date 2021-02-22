@@ -1,5 +1,6 @@
 import backend as F
 import dgl.nn
+import dgl
 import numpy as np
 import pytest
 import torch as th
@@ -53,14 +54,15 @@ def test_knn():
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
 @pytest.mark.parametrize('weight', [True, False])
 def test_graph_matching(idtype, g, weight):
+    g = dgl.to_bidirected(g)
     g = g.astype(idtype).to(F.ctx())
     edge_weight = None
     if weight:
         edge_weight = F.abs(F.randn((g.num_edges(),))).to(F.ctx())
     node_labels = graph_matching(g, edge_weight)
 
-    assert node_labels.shape == (g.num_nodes(),)    # shape correct
-    assert F.reduce_sum(node_labels == -1).item() == 0  # all nodes marked
+    assert node_labels.shape == (g.num_nodes(),)      # shape correct
+    assert F.reduce_sum(node_labels < 0).item() == 0  # all nodes marked
 
 
 if __name__ == '__main__':
