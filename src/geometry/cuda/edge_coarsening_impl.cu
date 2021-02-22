@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file geometry/cuda/graph_matching_impl.cu
- * \brief Graph matching CUDA implementation
+ * \file geometry/cuda/edge_coarsening_impl.cu
+ * \brief Edge coarsening CUDA implementation
  */
 #include <dgl/array.h>
 #include <curand.h>
@@ -227,8 +227,8 @@ void Respond(const NDArray indptr, const NDArray indices,
 }
 
 template <DLDeviceType XPU, typename FloatType, typename IdType>
-void GraphMatching(const NDArray indptr, const NDArray indices,
-                   const NDArray weight, NDArray result) {
+void EdgeCoarsening(const NDArray indptr, const NDArray indices,
+                    const NDArray weight, NDArray result) {
   // get random generator
   curandGenerator_t gen;
   uint64_t seed = dgl::RandomEngine::ThreadLocal()->RandInt(UINT64_MAX);
@@ -245,16 +245,16 @@ void GraphMatching(const NDArray indptr, const NDArray indices,
   }
 }
 
-template void GraphMatching<kDLGPU, float, int32_t>(
+template void EdgeCoarsening<kDLGPU, float, int32_t>(
     const NDArray indptr, const NDArray indices,
     const NDArray weight, NDArray result);
-template void GraphMatching<kDLGPU, float, int64_t>(
+template void EdgeCoarsening<kDLGPU, float, int64_t>(
     const NDArray indptr, const NDArray indices,
     const NDArray weight, NDArray result);
-template void GraphMatching<kDLGPU, double, int32_t>(
+template void EdgeCoarsening<kDLGPU, double, int32_t>(
     const NDArray indptr, const NDArray indices,
     const NDArray weight, NDArray result);
-template void GraphMatching<kDLGPU, double, int64_t>(
+template void EdgeCoarsening<kDLGPU, double, int64_t>(
     const NDArray indptr, const NDArray indices,
     const NDArray weight, NDArray result);
 

@@ -4,7 +4,7 @@ from .._ffi.function import _init_api
 from .. import backend as F
 from .. import ndarray as nd
 
-__all__ = ["graph_matching"]
+__all__ = ["edge_coarsening"]
 
 
 def farthest_point_sampler(data, batch_size, sample_points, dist, start_idx, result):
@@ -40,11 +40,11 @@ def farthest_point_sampler(data, batch_size, sample_points, dist, start_idx, res
                                F.zerocopy_to_dgl_ndarray(result))
 
 
-def graph_matching(graph, edge_weights=None, relabel_idx=True):
+def edge_coarsening(graph, edge_weights=None, relabel_idx=True):
     """
     Description
     -----------
-    The graph matching (a.k.a. edge coarsening) procedure used in 
+    The edge coarsening procedure used in 
     `Metis <http://cacs.usc.edu/education/cs653/Karypis-METIS-SIAMJSC98.pdf>`__
     and 
     `Graclus <https://www.cs.utexas.edu/users/inderjit/public_papers/multilevel_pami.pdf>`__
@@ -75,7 +75,7 @@ def graph_matching(graph, edge_weights=None, relabel_idx=True):
     Returns
     -------
     a 1-D tensor
-        A vector with each element that indicates the clique ID of a vertex.
+        A vector with each element that indicates the cluster ID of a vertex.
     """
     assert graph.is_homogeneous, \
     "The graph used in graph node matching must be homogeneous"
@@ -109,10 +109,10 @@ def graph_matching(graph, edge_weights=None, relabel_idx=True):
 
     node_label = F.full_1d(num_nodes, -1, F.dtype(src), F.context(src))
 
-    _CAPI_GraphMatching(F.zerocopy_to_dgl_ndarray(indptr),
-                        F.zerocopy_to_dgl_ndarray(dst),
-                        nd.NULL["int64"] if edge_weights is None else F.zerocopy_to_dgl_ndarray(edge_weights),
-                        F.zerocopy_to_dgl_ndarray_for_write(node_label))
+    _CAPI_EdgeCoarsening(F.zerocopy_to_dgl_ndarray(indptr),
+                         F.zerocopy_to_dgl_ndarray(dst),
+                         nd.NULL["int64"] if edge_weights is None else F.zerocopy_to_dgl_ndarray(edge_weights),
+                         F.zerocopy_to_dgl_ndarray_for_write(node_label))
     assert F.reduce_sum(node_label < 0).item() == 0, "Find unmatched node"
 
     # reorder node id

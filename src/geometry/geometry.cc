@@ -71,7 +71,7 @@ DGL_REGISTER_GLOBAL("geometry._CAPI_FarthestPointSampler")
     FarthestPointSampler(data, batch_size, sample_points, dist, start_idx, result);
   });
 
-DGL_REGISTER_GLOBAL("geometry._CAPI_GraphMatching")
+DGL_REGISTER_GLOBAL("geometry._CAPI_EdgeCoarsening")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const NDArray indptr = args[0];
     const NDArray indices = args[1];
@@ -102,16 +102,16 @@ DGL_REGISTER_GLOBAL("geometry._CAPI_GraphMatching")
     if (!aten::IsNullArray(weight)) {
       ATEN_FLOAT_TYPE_SWITCH(weight->dtype, FloatType, "weight", {
         ATEN_ID_TYPE_SWITCH(indptr->dtype, IdType, {
-          ATEN_XPU_SWITCH_CUDA(indptr->ctx.device_type, XPU, "GraphMatching", {
-            impl::GraphMatching<XPU, FloatType, IdType>(
+          ATEN_XPU_SWITCH_CUDA(indptr->ctx.device_type, XPU, "EdgeCoarsening", {
+            impl::EdgeCoarsening<XPU, FloatType, IdType>(
                 indptr, indices, weight, result);
           });
         });
       });
     } else {
       ATEN_ID_TYPE_SWITCH(indptr->dtype, IdType, {
-        ATEN_XPU_SWITCH_CUDA(indptr->ctx.device_type, XPU, "GraphMatching", {
-          impl::GraphMatching<XPU, float, IdType>(
+        ATEN_XPU_SWITCH_CUDA(indptr->ctx.device_type, XPU, "EdgeCoarsening", {
+          impl::EdgeCoarsening<XPU, float, IdType>(
               indptr, indices, weight, result);
           });
         });

@@ -7,6 +7,7 @@
 #include <dgl/random.h>
 #include <numeric>
 #include <vector>
+#include <utility>
 
 namespace dgl {
 using runtime::NDArray;
@@ -20,9 +21,7 @@ template <typename IdType>
 void IndexShuffle(IdType *idxs, int64_t num_elems) {
   for (int64_t i = num_elems - 1; i > 0; --i) {
     int64_t j = dgl::RandomEngine::ThreadLocal()->RandInt(i);
-    auto tmp = idxs[i];
-    idxs[i] = idxs[j];
-    idxs[j] = tmp;
+    std::swap(idxs[i], idxs[j]);
   }
 }
 template void IndexShuffle<int32_t>(int32_t *idxs, int64_t num_elems);
@@ -99,8 +98,8 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
 }
 
 template <DLDeviceType XPU, typename FloatType, typename IdType>
-void GraphMatching(const NDArray indptr, const NDArray indices,
-                   const NDArray weight, NDArray result) {
+void EdgeCoarsening(const NDArray indptr, const NDArray indices,
+                    const NDArray weight, NDArray result) {
   const int64_t num_nodes = indptr->shape[0] - 1;
   const IdType* indptr_data = static_cast<IdType*>(indptr->data);
   const IdType* indices_data = static_cast<IdType*>(indices->data);
@@ -173,16 +172,16 @@ template void FarthestPointSampler<kDLCPU, double, int64_t>(
     NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
 
-template void GraphMatching<kDLCPU, float, int32_t>(
+template void EdgeCoarsening<kDLCPU, float, int32_t>(
     const NDArray indptr, const NDArray indices,
     const NDArray weight, NDArray result);
-template void GraphMatching<kDLCPU, float, int64_t>(
+template void EdgeCoarsening<kDLCPU, float, int64_t>(
     const NDArray indptr, const NDArray indices,
     const NDArray weight, NDArray result);
-template void GraphMatching<kDLCPU, double, int32_t>(
+template void EdgeCoarsening<kDLCPU, double, int32_t>(
     const NDArray indptr, const NDArray indices,
     const NDArray weight, NDArray result);
-template void GraphMatching<kDLCPU, double, int64_t>(
+template void EdgeCoarsening<kDLCPU, double, int64_t>(
     const NDArray indptr, const NDArray indices,
     const NDArray weight, NDArray result);
 
