@@ -44,14 +44,14 @@ def edge_coarsening(graph, edge_weights=None, relabel_idx=True):
     """
     Description
     -----------
-    The edge coarsening procedure used in 
+    The edge coarsening procedure used in
     `Metis <http://cacs.usc.edu/education/cs653/Karypis-METIS-SIAMJSC98.pdf>`__
-    and 
+    and
     `Graclus <https://www.cs.utexas.edu/users/inderjit/public_papers/multilevel_pami.pdf>`__
     for homogeneous graph coarsening. This procedure keeps picking an unmarked
     vertex and matching it with one its unmarked neighbors (that maximizes its
     edge weight) until no match can be done.
-    
+
     If no edge weight is given, this procedure will randomly pick neighbor for each
     vertex.
 
@@ -79,7 +79,7 @@ def edge_coarsening(graph, edge_weights=None, relabel_idx=True):
     """
     assert graph.is_homogeneous, \
     "The graph used in graph node matching must be homogeneous"
-    
+
     # currently only int64 are supported
     if graph.idtype == F.int32:
         graph = graph.long()
@@ -108,10 +108,14 @@ def edge_coarsening(graph, edge_weights=None, relabel_idx=True):
     indptr[1:] = F.cumsum(deg, dim=0)
 
     node_label = F.full_1d(num_nodes, -1, F.dtype(src), F.context(src))
+    if edge_weights is None:
+        edge_weights_dgl = nd.NULL["int64"]
+    else:
+        edge_weights_dgl = F.zerocopy_to_dgl_ndarray(edge_weights)
 
     _CAPI_EdgeCoarsening(F.zerocopy_to_dgl_ndarray(indptr),
                          F.zerocopy_to_dgl_ndarray(dst),
-                         nd.NULL["int64"] if edge_weights is None else F.zerocopy_to_dgl_ndarray(edge_weights),
+                         edge_weights_dgl,
                          F.zerocopy_to_dgl_ndarray_for_write(node_label))
     assert F.reduce_sum(node_label < 0).item() == 0, "Find unmatched node"
 
