@@ -29,9 +29,9 @@ def track_time(batch_size, feat_size, readout_op, type):
         for i in range(3):
             out = dgl.readout_edges(g, 'h', op=readout_op)
         with utils.Timer() as t:
-            for i in range(10):
+            for i in range(50):
                 out = dgl.readout_edges(g, 'h', op=readout_op)
     else:
         raise Exception("Unknown type")
 
-    return t.elapsed_secs / 10
+    return t.elapsed_secs / 50
