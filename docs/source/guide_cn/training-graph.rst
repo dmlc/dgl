@@ -42,6 +42,9 @@
 
    批次化的图
 
+需要注意，DGL里对图进行变换的函数会去掉图上的批次信息。用户可以通过 :func:`dgl.DGLGraph.set_batch_num_nodes`
+和 :func:`dgl.DGLGraph.set_batch_num_edges` 两个函数在变换后的图上重新加入批次信息。
+
 图读出
 ^^^^^^^^^^^^^
 

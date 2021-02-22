@@ -7,11 +7,10 @@ import dgl.function as fn
 from .. import utils
 
 
-@utils.benchmark('time', timeout=7200)
-@utils.parametrize('graph_name', ['cora', 'reddit'])
-@utils.parametrize('format', ['coo', 'csr'])
-@utils.parametrize_cpu('feat_size', [8, 128, 512])
-@utils.parametrize_gpu('feat_size', [8, 32, 256])
+@utils.benchmark('time', timeout=600)
+@utils.parametrize('graph_name', ['ogbn-arxiv', 'reddit', 'ogbn-proteins'])
+@utils.parametrize('format', ['csc'])
+@utils.parametrize('feat_size', [4, 32, 256])
 @utils.parametrize('msg_type', ['copy_u', 'u_mul_e'])
 @utils.parametrize('reduce_type', ['sum', 'mean', 'max'])
 def track_time(graph_name, format, feat_size, msg_type, reduce_type):
@@ -22,10 +21,10 @@ def track_time(graph_name, format, feat_size, msg_type, reduce_type):
         (graph.num_nodes(), feat_size), device=device)
     graph.edata['e'] = torch.randn(
         (graph.num_edges(), 1), device=device)
-    
+
     msg_builtin_dict = {
         'copy_u': fn.copy_u('h', 'x'),
-        'u_mul_e': fn.u_mul_e('h', 'e','x'),
+        'u_mul_e': fn.u_mul_e('h', 'e', 'x'),
     }
 
     reduce_builtin_dict = {
@@ -35,13 +34,14 @@ def track_time(graph_name, format, feat_size, msg_type, reduce_type):
     }
 
     # dry run
-    graph.update_all(msg_builtin_dict[msg_type], reduce_builtin_dict[reduce_type])
+    graph.update_all(msg_builtin_dict[msg_type],
+                     reduce_builtin_dict[reduce_type])
 
     # timing
-   
+
     with utils.Timer() as t:
         for i in range(3):
-            graph.update_all(msg_builtin_dict[msg_type], reduce_builtin_dict[reduce_type])
+            graph.update_all(
+                msg_builtin_dict[msg_type], reduce_builtin_dict[reduce_type])
 
     return t.elapsed_secs / 3
-

@@ -1,6 +1,6 @@
 """
-A Blitz Introduction to DGL - Node Classification
-=================================================
+Node Classification with DGL
+============================
 
 GNNs are powerful tools for many machine learning tasks on graphs. In
 this introductory tutorial, you will learn the basic workflow of using

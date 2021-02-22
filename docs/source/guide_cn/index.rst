@@ -1,8 +1,6 @@
 用户指南
 ==========
 
-(持续更新中)
-
 .. toctree::
   :maxdepth: 2
   :titlesonly:

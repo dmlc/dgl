@@ -64,7 +64,7 @@ print('Number of graph categories:', dataset.gclasses)
 # dataset. In DGL, you can use the ``GraphDataLoader``.
 # 
 # You can also use various dataset samplers provided in
-# ```torch.utils.data.sampler`` <https://pytorch.org/docs/stable/data.html#data-loading-order-and-sampler>`__.
+# `torch.utils.data.sampler <https://pytorch.org/docs/stable/data.html#data-loading-order-and-sampler>`__.
 # For example, this tutorial creates a training ``GraphDataLoader`` and
 # test ``GraphDataLoader``, using ``SubsetRandomSampler`` to tell PyTorch
 # to sample from only a subset of the dataset.
@@ -182,7 +182,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
 for epoch in range(20):
     for batched_graph, labels in train_dataloader:
-        pred = model(batched_graph, batched_graph.ndata['attr'])
+        pred = model(batched_graph, batched_graph.ndata['attr'].float())
         loss = F.cross_entropy(pred, labels)
         optimizer.zero_grad()
         loss.backward()
@@ -191,7 +191,7 @@ for epoch in range(20):
 num_correct = 0
 num_tests = 0
 for batched_graph, labels in test_dataloader:
-    pred = model(batched_graph, batched_graph.ndata['attr'])
+    pred = model(batched_graph, batched_graph.ndata['attr'].float())
     num_correct += (pred.argmax(1) == labels).sum().item()
     num_tests += len(labels)
 
