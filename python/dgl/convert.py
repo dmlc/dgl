@@ -39,7 +39,7 @@ def graph(data,
           device=None,
           row_sorted=False,
           col_sorted=False,
-          check_sorted=True,
+          check_sorted=False,
           **deprecated_kwargs):
     """Create a graph and return.
 
@@ -80,6 +80,11 @@ def graph(data,
     col_sorted : bool, optional
         Whether or not the columns of the COO are in ascending order within
         each row. This only has an effect when ``row_sorted`` is True.
+    check_sorted : bool, optional
+        If this is ``True`` and ``row_sorted`` is ``False``, the edge list will
+        be scanned to see if it is in ascending order, and the resulting graph
+        will be marked accordingly.
+
     Returns
     -------
     DGLGraph
