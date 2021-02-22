@@ -8,9 +8,8 @@ from .. import utils
 @utils.benchmark('time')
 @utils.parametrize('batch_size', [4, 256, 1024])
 @utils.parametrize('feat_size', [16, 128, 512])
-@utils.parametrize('readout_op', ['sum'])
-# @utils.parametrize('type', ['edge', 'node'])
-@utils.parametrize('type', ['node'])
+@utils.parametrize('readout_op', ['sum', 'max', 'min', 'mean'])
+@utils.parametrize('type', ['edge', 'node'])
 def track_time(batch_size, feat_size, readout_op, type):
     device = utils.get_bench_device()
     ds = dgl.data.QM7bDataset()

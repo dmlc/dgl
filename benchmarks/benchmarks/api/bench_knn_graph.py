@@ -19,7 +19,7 @@ def track_time(size, dim, k):
         dgl.knn_graph(feat, k)
     # timing
     with utils.Timer() as t:
-        for i in range(10):
+        for i in range(20):
             dgl.knn_graph(feat, k)
 
-    return t.elapsed_secs / 10
+    return t.elapsed_secs / 20
