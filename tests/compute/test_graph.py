@@ -350,10 +350,10 @@ def test_is_sorted():
    u_src, u_dst = edge_pair_input(False) 
    s_src, s_dst = edge_pair_input(True) 
 
-   u_src = F.tensor(u_src)
-   u_dst = F.tensor(u_dst)
-   s_src = F.tensor(s_src)
-   s_dst = F.tensor(s_dst)
+   u_src = F.tensor(u_src, dtype=F.int32)
+   u_dst = F.tensor(u_dst, dtype=F.int32)
+   s_src = F.tensor(s_src, dtype=F.int32)
+   s_dst = F.tensor(s_dst, dtype=F.int32)
 
    src_sorted, dst_sorted = dgl.utils.is_sorted_srcdst(u_src, u_dst)
    assert src_sorted == False
