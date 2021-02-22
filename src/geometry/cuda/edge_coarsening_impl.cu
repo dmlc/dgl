@@ -36,7 +36,6 @@ __global__ void colorize_kernel(const float *prop, int64_t num_elem, IdType *res
   const IdType idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < num_elem) {
     if (result[idx] < 0) { // unmatched
-      // result[idx] = (IdType)(ceilf(prop[idx] - 1 + BLUE_P) - 2);
       result[idx] = (prop[idx] > BLUE_P) ? RED : BLUE;
       done_d = false;
     }

@@ -53,13 +53,14 @@ def test_knn():
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
 @pytest.mark.parametrize('weight', [True, False])
-def test_edge_coarsening(idtype, g, weight):
+@pytest.mark.parametrize('relabel', [True, False])
+def test_edge_coarsening(idtype, g, weight, relabel):
     g = dgl.to_bidirected(g)
     g = g.astype(idtype).to(F.ctx())
     edge_weight = None
     if weight:
         edge_weight = F.abs(F.randn((g.num_edges(),))).to(F.ctx())
-    node_labels = edge_coarsening(g, edge_weight)
+    node_labels = edge_coarsening(g, edge_weight, relabel_idx=relabel)
 
     assert node_labels.shape == (g.num_nodes(),)      # shape correct
     assert F.reduce_sum(node_labels < 0).item() == 0  # all nodes marked
