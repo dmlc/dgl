@@ -1,16 +1,15 @@
 {
-    "c5.9xlarge": {
+    "r5.16xlarge": {
         "tests": [
-            "bench_sage_unsuper"
+            ""
         ],
         "env": {
             "DEVICE": "cpu"
         }
     },
-    "g4dn.8xlarge": {
+    "g4dn.2xlarge": {
         "tests": [
-            "api",
-            "kernel"
+            ""
         ],
         "env": {
             "DEVICE": "gpu"
