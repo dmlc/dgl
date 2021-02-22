@@ -772,6 +772,14 @@ def test_to_simple(idtype):
     assert 'h' not in sg.ndata
     assert 'h' not in sg.edata
 
+    # test coalesce edge feature
+    sg = dgl.to_simple(g, copy_edata=True, aggregator='arbitrary')
+    assert F.allclose(sg.edata['h'][1], F.tensor([4.]))
+    sg = dgl.to_simple(g, copy_edata=True, aggregator='sum')
+    assert F.allclose(sg.edata['h'][1], F.tensor([10.]))
+    sg = dgl.to_simple(g, copy_edata=True, aggregator='mean')
+    assert F.allclose(sg.edata['h'][1], F.tensor([5.]))
+
     # heterogeneous graph
     g = dgl.heterograph({
         ('user', 'follow', 'user'): ([0, 1, 2, 1, 1, 1],

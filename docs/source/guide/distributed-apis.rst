@@ -101,13 +101,11 @@ Users can also assign a new :class:`~dgl.distributed.DistTensor` to
 
 .. code:: python
 
-    g.ndata['train_mask']
-    <dgl.distributed.dist_graph.DistTensor at 0x7fec820937b8>
-    g.ndata['train_mask'][0]
-    tensor([1], dtype=torch.uint8)
+    g.ndata['train_mask']  # <dgl.distributed.dist_graph.DistTensor at 0x7fec820937b8>
+    g.ndata['train_mask'][0]  # tensor([1], dtype=torch.uint8)
 
 Distributed Tensor
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 
 As mentioned earlier, DGL shards node/edge features and stores them in a cluster of machines.
 DGL provides distributed tensors with a tensor-like interface to access the partitioned
@@ -124,7 +122,7 @@ in the cluster even if the :class:`~dgl.distributed.DistTensor` object disappear
 
 .. code:: python
 
-    tensor = dgl.distributed.DistTensor((g.number_of_nodes(), 10), th.float32, name=’test’)
+    tensor = dgl.distributed.DistTensor((g.number_of_nodes(), 10), th.float32, name='test')
 
 **Note**: :class:`~dgl.distributed.DistTensor` creation is a synchronized operation. All trainers
 have to invoke the creation and the creation succeeds only when all trainers call it. 

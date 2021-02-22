@@ -67,7 +67,7 @@ The following example considers nodes inside the training set and outside the tr
 
 .. code:: python
 
-    dgl.distributed.partition_graph(g, ‘graph_name’, 4, ‘/tmp/test’, balance_ntypes=g.ndata[‘train_mask’])
+    dgl.distributed.partition_graph(g, 'graph_name', 4, '/tmp/test', balance_ntypes=g.ndata['train_mask'])
 
 In addition to balancing the node types, :func:`dgl.distributed.partition_graph` also allows balancing
 between in-degrees of nodes of different node types by specifying ``balance_edges``. This balances
