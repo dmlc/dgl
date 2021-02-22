@@ -153,6 +153,17 @@ void SegmentReduceDispatch(const std::string& op,
   });
 }
 
+/*! \brief Scatter Add (on first dimension) dispatch function. */
+void ScatterAddDispatch(NDArray feat, NDArray idx, NDArray out) {
+  ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "ScatterAdd", {
+    ATEN_ID_TYPE_SWITCH(idx->dtype, IdType, {
+      ATEN_FLOAT_BITS_SWITCH(feat->dtype, bits, "Feature data", {
+        ScatterAdd<XPU, IdType, bits>(feat, idx, out);
+      });
+    });
+  });
+}
+
 /*! \brief Backward segment cmp dispatch function.*/
 void BackwardSegmentCmpDispatch(NDArray feat, NDArray arg, NDArray out) {
   ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "BackwardSegmentCmp", {
@@ -223,6 +234,16 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSegmentReduce")
     CheckCtx(feat->ctx, {feat, offsets, out}, {"feat", "offsets", "out"});
     CheckContiguous({feat, offsets, out}, {"feat", "offsets", "out"});
     SegmentReduceDispatch(op, feat, offsets, out, arg);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelScatterAdd")
+.set_body([](DGLArgs args, DGLRetValue *rv) {
+    NDArray feat = args[0];
+    NDArray idx = args[1];
+    NDArray out = args[2];
+    CheckCtx(feat->ctx, {feat, idx, out}, {"feat", "idx", "out"});
+    CheckContiguous({feat, idx, out}, {"feat", "idx", "out"});
+    ScatterAddDispatch(feat, idx, out);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelBwdSegmentCmp")

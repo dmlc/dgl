@@ -12,3 +12,4 @@ User Guide
   training
   minibatch
   distributed
+  mixed_precision

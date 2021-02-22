@@ -1,11 +1,11 @@
 import mxnet as mx
 import numpy as np
 from mxnet import nd
-from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp
+from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp, _scatter_add
 from ...base import dgl_warning, is_all, ALL
 from .tensor import asnumpy, copy_to, zerocopy_from_numpy, context, to_backend_ctx
 
-__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce']
+__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce', 'scatter_add']
 
 
 def _scatter_nd(index, src, n_rows):
@@ -360,3 +360,22 @@ class SegmentReduce(mx.autograd.Function):
 def segment_reduce(op, x, offsets):
     segment_reduce_op = SegmentReduce(op, offsets)
     return segment_reduce_op(x)
+
+
+class ScatterAdd(mx.autograd.Function):
+    def __init__(self, idx, m):
+        super(ScatterAdd, self).__init__()
+        self.idx = idx
+        self.m = m
+
+    def forward(self, x):
+        y = _scatter_add(x, self.idx, self.m)
+        return y
+    
+    def backward(self, dy):
+        return dy[self.idx]
+
+
+def scatter_add(x, idx, m):
+    scatter_add_op = ScatterAdd(idx, m)
+    return scatter_add_op(x)
