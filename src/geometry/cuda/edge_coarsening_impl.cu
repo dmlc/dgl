@@ -35,7 +35,7 @@ template <typename IdType>
 __global__ void colorize_kernel(const float *prop, int64_t num_elem, IdType *result) {
   const IdType idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < num_elem) {
-    if (result[idx] < 0) { // unmatched
+    if (result[idx] < 0) {  // if unmatched
       result[idx] = (prop[idx] > BLUE_P) ? RED : BLUE;
       done_d = false;
     }
@@ -55,7 +55,7 @@ __global__ void propose_kernel(const IdType *indptr, const IdType *indices,
 
       if (result[v] < 0)
         has_unmatched_neighbor = true;
-      if (result[v] == RED) { // propose to the first red neighbor
+      if (result[v] == RED) {  // propose to the first red neighbor
         proposal[idx] = v;
         break;
       }
@@ -143,9 +143,9 @@ __global__ void weighted_respond_kernel(const IdType *indptr, const IdType *indi
     for (IdType i = indptr[idx]; i < indptr[idx + 1]; ++i) {
       auto v = indices[i];
 
-      if (result[v] < 0)
+      if (result[v] < 0) {
         has_unmatched_neighbors = true;
-      
+      }
       if (result[v] == BLUE && proposal[v] == idx && weights[i] >= weight_max) {
         v_max = v;
         weight_max = weights[i];
@@ -170,15 +170,14 @@ bool Colorize(NDArray result, curandGenerator_t gen) {
   // generate color prop for each node
   const int64_t num_nodes = result->shape[0];
   float *prop;
-  CUDA_CALL(cudaMalloc((void **)&prop, num_nodes * sizeof(float)));
+  CUDA_CALL(cudaMalloc(reinterpret_cast<void **>(&prop), num_nodes * sizeof(float)));
   CURAND_CALL(curandGenerateUniform(gen, prop, num_nodes));
-  cudaDeviceSynchronize(); // wait for random number generation finish since curand is async
+  cudaDeviceSynchronize();  // wait for random number generation finish since curand is async
 
   // call kernel
   IdType * result_data = static_cast<IdType*>(result->data);
   CUDA_KERNEL_CALL(colorize_kernel, BLOCKS(num_nodes), THREADS, 0, thr_entry->stream,
                    prop, num_nodes, result_data);
-  
   bool done_h = false;
   CUDA_CALL(cudaMemcpyFromSymbol(&done_h, done_d, sizeof(done_h), 0, cudaMemcpyDeviceToHost));
   CUDA_CALL(cudaFree(prop));

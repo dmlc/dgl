@@ -116,7 +116,6 @@ DGL_REGISTER_GLOBAL("geometry._CAPI_EdgeCoarsening")
           });
         });
     }
-
   });
 
 }  // namespace geometry
