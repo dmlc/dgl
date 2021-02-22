@@ -240,6 +240,8 @@ class SparseAdagrad(SparseGradOptimizer):
     :math:`G_{t,i,j}=G_{t-1,i,j} + g_{t,i,j}^2` and :math:`g_{t,i,j}` is the gradient of
     the dimension :math:`j` of embedding :math:`i` at step :math:`t`.
 
+    NOTE: The support of sparse Adagrad optimizer is experimental.
+
     Parameters
     ----------
     params : list[dgl.nn.NodeEmbedding]
@@ -338,6 +340,8 @@ class SparseAdam(SparseGradOptimizer):
     :math:`g_{t,i,j}` is the gradient of the dimension :math:`j` of embedding :math:`i`
     at step :math:`t`.
 
+    NOTE: The support of sparse Adam optimizer is experimental.
+
     Parameters
     ----------
     params : list[dgl.nn.NodeEmbedding]
@@ -351,8 +355,8 @@ class SparseAdam(SparseGradOptimizer):
         The term added to the denominator to improve numerical stability
         Default: 1e-8
 
-    Examples:
-
+    Examples
+    --------
     >>> def initializer(emb):
             th.nn.init.xavier_uniform_(emb)
             return emb

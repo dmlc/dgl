@@ -2,9 +2,9 @@ import tensorflow as tf
 import numpy as np
 from .tensor import tensor, copy_to, context, asnumpy, zerocopy_from_numpy
 from ...base import is_all, ALL
-from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp
+from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp, _scatter_add
 
-__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce']
+__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce', 'scatter_add']
 
 
 def _scatter_nd(index, src, n_rows):
@@ -278,4 +278,20 @@ def segment_reduce(op, x, offsets):
     @tf.custom_gradient
     def _lambda(x):
         return segment_reduce_real(op, x, offsets)
+    return _lambda(x)
+
+
+def scatter_add_real(x, idx, m):
+    y = _scatter_add(x, idx, m)
+
+    def scatter_add_backward(dy):
+        return tf.gather(dy, idx)
+    
+    return y, scatter_add_backward
+
+
+def scatter_add(x, idx, m):
+    @tf.custom_gradient
+    def _lambda(x):
+        return scatter_add_real(x, idx, m)
     return _lambda(x)
