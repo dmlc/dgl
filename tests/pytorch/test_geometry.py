@@ -62,15 +62,14 @@ def test_edge_coarsening(idtype, g, weight, relabel):
     if weight:
         edge_weight = F.abs(F.randn((g.num_edges(),))).to(F.ctx())
     node_labels = edge_coarsening(g, edge_weight, relabel_idx=relabel)
+    num_result_ids, counts = th.unique(node_labels, return_counts=True)
+    num_result_ids = num_result_ids.size(0)
 
     # shape correct
     assert node_labels.shape == (g.num_nodes(),)
 
     # all nodes marked
     assert F.reduce_sum(node_labels < 0).item() == 0
-
-    num_result_ids, counts = th.unique(node_labels, return_counts=True)
-    num_result_ids = num_result_ids.size(0)
 
     # number of unique node ids correct.
     assert num_result_ids >= num_nodes // 2 and num_result_ids <= num_nodes
