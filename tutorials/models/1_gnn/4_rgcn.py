@@ -1,10 +1,17 @@
 """
 .. _model-rgcn:
 
-Relational graph convolutional network
+Relational Graph Convolutional Network
 ================================================
 
 **Author:** Lingfan Yu, Mufei Li, Zheng Zhang
+
+.. warning::
+
+    The tutorial aims at gaining insights into the paper, with code as a mean
+    of explanation. The implementation thus is NOT optimized for running
+    efficiency. For recommended implementation, please refer to the `official
+    examples <https://github.com/dmlc/dgl/tree/master/examples>`_.
 
 In this tutorial, you learn how to implement a relational graph convolutional
 network (R-GCN). This type of network is one effort to generalize GCN 
