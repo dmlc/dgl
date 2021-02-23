@@ -10,7 +10,7 @@ from dgl.ops import edge_softmax
 import dgl.function as fn
 
 # TODO: Implememt Output MLP
-class MergeLayer(torch.nn.Module):
+class MergeLayer(nn.Module):
   def __init__(self, dim1, dim2, dim3, dim4):
     super(MergeLayer,self).__init__()
     self.fc1 = torch.nn.Linear(dim1 + dim2, dim3)
@@ -26,7 +26,7 @@ class MergeLayer(torch.nn.Module):
     return self.fc2(h)
 
 
-class LinkPredictor(torch.nn.Module):
+class LinkPredictor(nn.Module):
   def __init__(self, emb_dim, drop=0.3):
     super(LinkPredictor,self).__init__()
     self.fc_1 = torch.nn.Linear(emb_dim, emb_dim)
@@ -39,9 +39,11 @@ class LinkPredictor(torch.nn.Module):
       out = self.fc_3(x)
       return out
 
+class MsgLinkPredictor(torch.nn.module):
+
 
 # TODO: Implement Time encoder
-class TimeEncode(torch.nn.Module):
+class TimeEncode(nn.Module):
   # Time Encoding proposed by TGAT
   def __init__(self, dimension):
     super(TimeEncode, self).__init__()
@@ -88,6 +90,9 @@ class MemoryModule(nn.Module):
     def set_memory(self,node_idxs,values):
         self.memory[node_idxs,:] = values
 
+    def set_last_update_t(self,node_idxs,values):
+        self.last_update_t[node_idxs] = values
+
     # For safety check
     def get_last_update(self,node_idxs):
         return self.last_update_t[node_idxs]
@@ -114,43 +119,30 @@ class MemoryOperation(nn.Module):
     def stick_feat_to_graph(self,g):
         # How can I ensure order of the node ID
         g.ndata['timestamp'] = self.memory.last_update_t[g.ndata[dgl.NID]]
-        g.ndata['s'] = self.memory.memory[g.ndata[dgl.NID]]
-
-    def update_memory_time(self,g):
-        self.memory.last_update_t[g.ndata[dgl.NID]] = g.ndata['timestamp']
+        g.ndata['memory'] = self.memory.memory[g.ndata[dgl.NID]]
 
     def msg_fn_cat(self,edges):
         src_delta_time = edges.data['timestamp'] - edges.src['timestamp']
         time_encode = self.temporal_encoder(src_delta_time.unsqueeze(dim=1)).view(len(edges.data['timestamp']),-1)
-        ret = torch.cat([edges.src['s'],edges.dst['s'],edges.data['feats'],time_encode],dim=1)
-        return {'m':ret,'timestamp':edges.data['timestamp']}
+        ret = torch.cat([edges.src['memory'],edges.dst['memory'],edges.data['feats'],time_encode],dim=1)
+        return {'message':ret,'timestamp':edges.data['timestamp']}
 
     def agg_last(self,nodes):
-        # Implement lastest interaction update
-        # Message passing need to include timestamp
-        # Can we assume centralized ?
         timestamp,latest_idx = torch.max(nodes.mailbox['timestamp'],dim=1)
-        ret = nodes.mailbox['m'].gather(1,latest_idx.repeat(self.message_dim).view(-1,1,self.message_dim)).view(-1,self.message_dim)
-        #print("Shape of ts: ",nodes.mailbox['timestamp'][:,latest_idx].shape,"Shape of messages: ",nodes.mailbox['m'].shape,"Shape of memory: ",ret.reshape(-1,self.message_dim).shape)
-        return {'m_bar':ret.reshape(-1,self.message_dim),'timestamp':timestamp}
+        ret = nodes.mailbox['message'].gather(1,latest_idx.repeat(self.message_dim).view(-1,1,self.message_dim)).view(-1,self.message_dim)
+        return {'message_bar':ret.reshape(-1,self.message_dim),'timestamp':timestamp}
     
 
     def update_memory(self,nodes):
         # It should pass the feature through RNN
-        ret = self.updater(nodes.data['m_bar'].float(),nodes.data['s'].float())
-        return {'s':ret}
+        ret = self.updater(nodes.data['message_bar'].float(),nodes.data['memory'].float())
+        return {'memory':ret}
 
-    # Entire message aggregation procedure based on current memory
-    # Input a sampled subgraph; do message based on available memory
-    # And messages
-    # Then output a subgraph which has feature 's' represent updated memory
-    # In that subgraph which preserve the id.
     def forward(self,g):
         self.stick_feat_to_graph(g)
         g.update_all(self.msg_fn_cat,self.agg_last,self.update_memory)
         return g
     
-# TODO: Implement MultiHead Dotproduct attention
 class TemporalGATConv(nn.Module):
     def __init__(self,
                  edge_feats,

@@ -3,11 +3,13 @@ import torch
 import dgl
 import pandas as pd
 import numpy as np
-from pathlib import Path
-import requests
 import os
 from functools import partial
-from tqdm import tqdm
+import ssl
+from six.moves import urllib
+
+TRAIN_SPLIT = 0.7
+VALID_SPLIT = 0.85
 
 # TODO: Preprocesser
 def preprocess(data_name):
@@ -95,10 +97,10 @@ def TemporalWikipediaDataset():
 
             url = 'https://snap.stanford.edu/jodie/wikipedia.csv'
             print("Start Downloading File....")
-            r = requests.get(url,stream=True)
+            context = ssl._create_unverified_context()
+            data = urllib.request.urlopen(url,context=context)
             with open("./data/wikipedia.csv","wb") as handle:
-                for data in tqdm(r.iter_content()):
-                    handle.write(data)
+                handle.write(data.read())
 
         print("Start Process Data ...")
         run('wikipedia')
@@ -128,10 +130,10 @@ def TemporalRedditDataset():
 
             url = 'https://snap.stanford.edu/jodie/reddit.csv'
             print("Start Downloading File....")
-            r = requests.get(url,stream=True)
+            context = ssl._create_unverified_context()
+            data = urllib.request.urlopen(url,context = context)
             with open("./data/reddit.csv","wb") as handle:
-                for data in tqdm(r.iter_content()):
-                    handle.write(data)
+                handle.write(data.read())
 
         print("Start Process Data ...")
         run('reddit')
@@ -158,6 +160,11 @@ def negative_sampler(g,size):
     dst = g.edges()[1] # A torch tensor
     ret = dst[idx]
     return ret
+
+def negative_sampler2(dst_set,size):
+    dsts = list(dst_set)
+    idx = np.random.choice(dsts,replace=True,size=size)
+    return torch.from_numpy(idx)
 
 def temporal_sort(g,key):
     edge_keys = list(g.edata.keys())
@@ -191,11 +198,11 @@ class DictNode:
             self.NIDdict = None 
         if (parent!=None and NIDdict==None) or (parent == None and NIDdict!=None):
             raise ValueError("Parent and Dict Unmatched")
-            
-        #self.child = None
 
     def GetRootID(self,index):
         # To enable batch process use numpy array
+        if isinstance(index,torch.tensor):
+            index = index.numpy()
         if self.parent==None:
             return index
         map_index = self.NIDdict[index]
@@ -211,9 +218,8 @@ class TemporalDataLoader:
         # Assume graph edge id follow chronological order.
         num_edges = g.num_edges()
         #num_nodes = g.num_nodes()
-        train_div = int(0.7*num_edges)
-        valid_div = int(0.85*num_edges)
-
+        train_div = int(TRAIN_SPLIT*num_edges)
+        valid_div = int(VALID_SPLIT*num_edges)
         self.nn_test_g  = dgl.edge_subgraph(self.g,range(valid_div,num_edges))
         self.nn_test_g = temporal_sort(self.nn_test_g,'timestamp')
 
@@ -238,8 +244,6 @@ class TemporalDataLoader:
         
         # 
         self.d_nn_mask_g = DictNode(self.d_g,self.nn_mask_g.ndata[dgl.NID])
-        #self.parentn_id = self.nn_mask_g.ndata[dgl.NID].clone()
-        #self.parente_id = self.nn_mask_g.edata[dgl.EID].clone()
         # Divide the training validation and test subgraph
         # Remapping
         train_div = probe_division(self.nn_mask_g,train_div)
@@ -286,19 +290,19 @@ class TemporalDataLoader:
         edge_ids = range(self.batch_cnt*self.batch_size,min((self.batch_cnt+1)*self.batch_size,graph.num_edges()))
         subgraph = dgl.edge_subgraph(graph,edge_ids)
         working_d = DictNode(parent=p_dict,NIDdict=subgraph.ndata[dgl.NID])
-        subgraph.ndata[dgl.NID] = torch.from_numpy(working_d.GetRootID(range(subgraph.num_nodes())))
+        subgraph.ndata[dgl.NID] = torch.from_numpy(working_d.GetRootID(subgraph.nodes()))
         self.batch_cnt += 1
         if subgraph.num_edges() < self.batch_size:
             self.batch_cnt = 0
             done = True
-        return done, src_list,dst_list,t_stamps,subgraph
+        return done, src_list,dst_list,t_stamps,None,subgraph
 
     # Temporal Sampling Module
     def get_nodes_affiliation(self,nodes,timestamp,mode='train'):
-        if type(nodes) != list:
+        if len(nodes) == 1:
             nodes = [int(nodes)]
         else:
-            nodes = [int(nodes[0]),int(nodes[1])]
+            nodes = [int(nodes[i]) for i in range(len(nodes))]
         origins  = self.dict_dict[mode].GetRootID(nodes).tolist()
         if mode == 'nn_test':
             frontier = origins
@@ -308,7 +312,9 @@ class TemporalDataLoader:
             frontier = self.graph_dict[mode].ndata[dgl.NID][nodes].tolist()
             graph = self.nn_mask_bg
             dict_ = self.d_nn_mask_g
-        
+        # Sampler for pure profiling
+        #sg_prof = self.sampler(g=graph,nodes = nodes)
+        # End
         # All Neighbor regardless of time
         full_neighbor_subgraph = dgl.in_subgraph(graph,frontier)
         full_neighbor_subgraph = dgl.add_edges(full_neighbor_subgraph,
@@ -321,15 +327,19 @@ class TemporalDataLoader:
 
         # Build a working dict for parent node backtrace
         working_dict = DictNode(dict_, temporal_subgraph.ndata[dgl.NID])
-        root_nid = working_dict.GetRootID(range(temporal_subgraph.num_nodes()))
+        root_nid = working_dict.GetRootID(temporal_subgraph.nodes())
         temporal_subgraph.ndata[dgl.NID] = torch.from_numpy(root_nid)
 
         # Update the frontier to current graph
-        node1_mask = temporal_subgraph.ndata[dgl.NID]==origins[0]
-        frontier = [int(torch.arange(0,temporal_subgraph.num_nodes())[node1_mask])]
+        root2sub_dict = dict(zip(temporal_subgraph.ndata[dgl.NID].tolist(),temporal_subgraph.nodes().tolist()))
+        #node1_mask = temporal_subgraph.ndata[dgl.NID]==origins[0]
+        #frontier = [int(torch.arange(0,temporal_subgraph.num_nodes())[node1_mask])]
+        frontier = [root2sub_dict[n] for n in origins]
+        '''
         if len(nodes)!=1:
             node2_mask = temporal_subgraph.ndata[dgl.NID]==origins[1]
             frontier.append(int(torch.arange(0,temporal_subgraph.num_nodes())[node2_mask]))
+        '''
         
         # Top k or random sample from subgraph to reduce complexity
         final_subgraph = self.sampler(g=temporal_subgraph,nodes=frontier)
@@ -337,7 +347,131 @@ class TemporalDataLoader:
         final_subgraph = dgl.add_self_loop(final_subgraph)
 
         return frontier, final_subgraph
-
+    
     def reset(self):
         self.batch_cnt = 0
+
+class PyGTemporalLoader:
+    def __init__(self, g,batch_size, n_neighbors,sampling_method='topk', device=None):
+        
+        self.n_neighbors = n_neighbors
+        # Useless for placeholding
+        self.sampling_method = sampling_method
+
+        num_nodes = g.num_nodes()
+        self.neighbors = torch.empty((num_nodes, n_neighbors), dtype=torch.long,
+                                     device=device)
+        self.e_id = torch.empty((num_nodes, n_neighbors), dtype=torch.long,
+                                device=device)
+        self.__assoc__ = torch.empty(num_nodes, dtype=torch.long,
+                                     device=device)
+
+        self.reset()
+        # ==== Batching Related Stuffs ====
+        self.g = g
+        self.batch_size = batch_size
+        self.batc_cnt = 0
+        self.div_dict = {'train':int(TRAIN_SPLIT*g.num_edges()),
+                         'valid':int(VALID_SPLIT*g.num_edges()),
+                         'test':g.num_edges()}
+
+    # Here assume the input is the original graph id
+    def get_next_batch(self,mode="train"):
+        done = False
+        working_div = self.div_dict[mode]
+        src_list = self.g.edges()[0][self.batch_cnt*self.batch_size:min((self.batch_cnt+1)*self.batch_size,working_div)]
+        dst_list = self.g.edges()[1][self.batch_cnt*self.batch_size:min((self.batch_cnt+1)*self.batch_size,working_div)]
+        t_stamps = self.g.edata['timestamp'][self.batch_cnt*self.batch_size:min((self.batch_cnt+1)*self.batch_size,working_div)]
+        feats = self.g.edata['feats'][self.batch_cnt*self.batch_size:min((self.batch_cnt+1)*self.batch_size,working_div)]
+        edge_ids = range(self.batch_cnt*self.batch_size,min((self.batch_cnt+1)*self.batch_size,working_div))
+        subgraph = dgl.edge_subgraph(self.g,edge_ids)
+        self.batch_cnt += 1
+        if subgraph.num_edges() < self.batch_size:
+            done = True
+        return done, src_list,dst_list,t_stamps,feats,subgraph
+
+    def get_nodes_affiliation(self, seed_nodes,timestamp=None,mode=None):
+        # Contains non duplicative srcs,dsts,negs
+        n_id = torch.tensor(seed_nodes)
+        neighbors = self.neighbors[n_id]
+        nodes = n_id.view(-1, 1).repeat(1, self.n_neighbors)
+        e_id = self.e_id[n_id]
+
+        # Filter invalid neighbors (identified by `e_id < 0`).
+        # All nodes have neighbors
+        mask = e_id >= 0
+        #print("Before: ",neighbors.shape)
+        # Add self loop to orphan nodes
+        neighbors[~mask]=nodes[~mask]
+        e_id = e_id[mask]
+        neighbors = neighbors.flatten()
+        nodes = nodes.flatten()
+        #neighbors, nodes, e_id = neighbors[mask], nodes[mask], e_id[mask]
+        #print("After: ",neighbors.shape,"Mask Shape: ",mask.shape)
+
+        # Relabel node indices.
+        n_id = torch.cat([n_id, neighbors]).unique()
+        self.__assoc__[n_id] = torch.arange(n_id.size(0), device=n_id.device)
+        neighbors, nodes = self.__assoc__[neighbors], self.__assoc__[nodes]
+
+        # Here returned id is also original graph,
+        # Here the second element is the sparse edge list for new bipartite graph
+        # For information aggregation
+        subg = dgl.graph((nodes,neighbors))
+        subg.ndata[dgl.NID] = n_id #
+        #subg.edata[dgl.EID] = e_id
+        # The null feature for orphan node is zero
+        subg.edata['timestamp'] = torch.zeros(subg.num_edges()).double()
+        subg.edata['timestamp'][mask.flatten()] = self.g.edata['timestamp'][e_id]
+        subg.edata['feats']     = torch.zeros((subg.num_edges(),self.g.edata['feats'].shape[1])).float()
+        subg.edata['feats'][mask.flatten()]     = self.g.edata['feats'][e_id]
+        subg = dgl.remove_self_loop(subg)
+        subg = dgl.add_self_loop(subg)
+        return self.__assoc__[seed_nodes],subg
+
+    def add_edges(self, src, dst,timestamp=None,feats=None):
+        # Inserts newly encountered interactions into an ever growing
+        # (undirected) temporal graph.
+
+        # Collect central nodes, their neighbors and the current event ids.
+        neighbors = torch.cat([src, dst], dim=0)
+        nodes = torch.cat([dst, src], dim=0)
+        e_id = torch.arange(self.cur_e_id, self.cur_e_id + src.size(0),
+                            device=src.device).repeat(2)
+        self.cur_e_id += src.numel()
+
+        # Convert newly encountered interaction ids so that they point to
+        # locations of a "dense" format of shape [num_nodes, size].
+        nodes, perm = nodes.sort()
+        neighbors, e_id = neighbors[perm], e_id[perm]
+
+        n_id = nodes.unique()
+        self.__assoc__[n_id] = torch.arange(n_id.numel(), device=n_id.device)
+
+        dense_id = torch.arange(nodes.size(0), device=nodes.device) % self.n_neighbors
+        dense_id += self.__assoc__[nodes].mul_(self.n_neighbors)
+
+        dense_e_id = e_id.new_full((n_id.numel() * self.n_neighbors, ), -1)
+        dense_e_id[dense_id] = e_id
+        dense_e_id = dense_e_id.view(-1, self.n_neighbors)
+
+        dense_neighbors = e_id.new_empty(n_id.numel() * self.n_neighbors)
+        dense_neighbors[dense_id] = neighbors
+        dense_neighbors = dense_neighbors.view(-1, self.n_neighbors)
+
+        # Collect new and old interactions...
+        e_id = torch.cat([self.e_id[n_id, :self.n_neighbors], dense_e_id], dim=-1)
+        neighbors = torch.cat(
+            [self.neighbors[n_id, :self.n_neighbors], dense_neighbors], dim=-1)
+
+        # And sort them based on `e_id`.
+        e_id, perm = e_id.topk(self.n_neighbors, dim=-1)
+        self.e_id[n_id] = e_id
+        self.neighbors[n_id] = torch.gather(neighbors, 1, perm)
+
+    def reset(self):
+        self.cur_e_id = 0
+        self.batch_cnt= 0
+        self.e_id.fill_(-1)
+
         

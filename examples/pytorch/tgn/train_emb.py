@@ -5,29 +5,33 @@ from tgn import TGN
 from data import TemporalWikipediaDataset,TemporalDataLoader,negative_sampler
 import argparse
 import traceback
+import time
+from pyinstrument import Profiler
 
 from sklearn.metrics import average_precision_score, roc_auc_score
-
-
+# TODO: Implement negative sampling
+# Only can sample from actual node id from the entire graph (masked graph)
+# Negative sampling need based on current data division, which need to tell.
 def train(model,dataloader,criterion,optimizer):
     model.train()
     done = False
     batch_size = dataloader.batch_size
     total_loss = 0
     batch_cnt = 0
+    last_t = time.time()
     while not done:
         optimizer.zero_grad()
         done,src_list,dst_list, t_stamps, subgraph = dataloader.get_next_batch(mode="train")
         neg_list = negative_sampler(dataloader.train_g,size=batch_size)
-        pred_pos,pred_neg = model.embed(src_list,dst_list,neg_list,t_stamps,mode="train")
+        pred_pos,pred_neg = model.batch_forward(src_list,dst_list,neg_list,t_stamps,subgraph,mode="train")
         loss = criterion(pred_pos,torch.ones_like(pred_pos))
         loss+= criterion(pred_neg,torch.zeros_like(pred_neg))
         total_loss += float(loss)*batch_size
         loss.backward()
         optimizer.step()
         model.detach_memory()
-        model.update_memory(subgraph)
-        print("Batch: ",batch_cnt)
+        print("Batch: ",batch_cnt,"Time Taken: ",time.time()-last_t)
+        last_t = time.time()
         batch_cnt += 1
     return total_loss/dataloader.train_g.num_edges()
 
@@ -37,13 +41,14 @@ def test_val(model,dataloader,criterion,mode='valid'):
     done = False
     batch_size = dataloader.batch_size
     total_loss = 0
+    # Metrics
     aps,aucs = [], []
     batch_cnt = 0
     with torch.no_grad():
         while not done:
             done,src_list,dst_list,t_stamps, subgraph = dataloader.get_next_batch(mode=mode)
             neg_list = negative_sampler(dataloader.graph_dict[mode],size=batch_size)
-            pred_pos, pred_neg = model(src_list,dst_list,neg_list,t_stamps,subgraph,mode=mode)
+            pred_pos, pred_neg = model.batch_forward(src_list,dst_list,neg_list,t_stamps,subgraph,mode=mode)
             loss = criterion(pred_pos,torch.ones_like(pred_pos))
             loss+= criterion(pred_neg,torch.zeros_like(pred_neg))
             total_loss += float(loss)*batch_size
@@ -51,6 +56,7 @@ def test_val(model,dataloader,criterion,mode='valid'):
             y_true = torch.cat([torch.ones(pred_pos.size(0)),torch.zeros(pred_neg.size(0))],dim=0)
             aps.append(average_precision_score(y_true,y_pred))
             aucs.append(roc_auc_score(y_true,y_pred))
+            print("Batch: ",batch_cnt)
             batch_cnt += 1
     return float(torch.tensor(aps).mean()), float(torch.tensor(aucs).mean())
 
@@ -98,11 +104,12 @@ if __name__ == "__main__":
                 num_nodes = num_node,
                 n_neighbors = args.n_neighbors,
                 memory_updater_type=args.memory_updater)
-    model.attach_sampler(dataloader.get_nodes_affiliation,dataloader.get_nodes_affiliation)
+    model.attach_sampler(dataloader.get_nodes_affiliation)
 
     criterion = torch.nn.BCEWithLogitsLoss()
     optimizer  = torch.optim.Adam(model.parameters(),lr=0.0001)
     # Implement Logging mechanism
+    # Profiliing
     f = open("logging.txt",'w')
     try:
         for i in range(args.epochs):
@@ -110,10 +117,12 @@ if __name__ == "__main__":
             val_ap,val_auc = test_val(model,dataloader,criterion,mode='valid')
             log_content = "Epoch: {}; Training Loss: {} | Validation AP: {:.3f} AUC: {:.3f}".format(i,train_loss,val_ap,val_auc)
             f.writelines(log_content+'\n')
+            dataloader.reset()
+            model.reset_memory()
             print(log_content)
-    except :
-        traceback.print_exc()
+    except:
         error_content = "Training Interreputed!"
+        traceback.print_exc()
         f.writelines(error_content)
         f.close()
     

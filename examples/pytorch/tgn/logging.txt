@@ -1,1 +1,2 @@
+Epoch: 0; Training Loss: 0.657472270409895 | Validation AP: 0.915 AUC: 0.835
 Training Interreputed!
