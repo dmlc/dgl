@@ -225,3 +225,6 @@ print(sg2)
 #    :func:`dgl.load_graphs`
 # 
 
+
+# Thumbnail Courtesy: Wikipedia
+# sphinx_gallery_thumbnail_path = '_static/blitz_2_dglgraph.png'
