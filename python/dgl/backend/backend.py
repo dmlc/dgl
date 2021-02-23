@@ -1552,6 +1552,28 @@ def segment_reduce(op, x, offsets):
     """
     pass
 
+def scatter_add(x, idx, m):
+
+    """Scatter add (on first dimension) operator.
+
+    Math: y[idx[i], *] += x[i, *]
+
+    Parameters
+    ----------
+    x : Tensor
+        The input feature.
+    idx : Tensor
+        The indices array.
+    m : int
+        The length of output.
+    
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    pass
+
 
 ###############################################################################
 # Other interfaces
