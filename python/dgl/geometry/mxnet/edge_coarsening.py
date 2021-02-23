@@ -1,7 +1,5 @@
-"""Farthest Point Sampler for mxnet Geometry package"""
-#pylint: disable=no-member, invalid-name
-
-from mxnet import nd
+"""Edge coarsening procedure used in Metis and Graclus, for mxnet"""
+# pylint: disable=no-member, invalid-name, W0235
 from mxnet.gluon import nn
 
 from ..capi import edge_coarsening

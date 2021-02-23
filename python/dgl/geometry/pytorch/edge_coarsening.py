@@ -1,4 +1,5 @@
-import torch as th
+"""Edge coarsening procedure used in Metis and Graclus, for pytorch"""
+# pylint: disable=no-member, invalid-name, W0235
 from torch import nn
 
 from ..capi import edge_coarsening
