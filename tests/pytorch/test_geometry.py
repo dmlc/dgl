@@ -55,6 +55,7 @@ def test_knn():
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('relabel', [True, False])
 def test_edge_coarsening(idtype, g, weight, relabel):
+    num_nodes = g.num_nodes()
     g = dgl.to_bidirected(g)
     g = g.astype(idtype).to(F.ctx())
     edge_weight = None
@@ -62,8 +63,20 @@ def test_edge_coarsening(idtype, g, weight, relabel):
         edge_weight = F.abs(F.randn((g.num_edges(),))).to(F.ctx())
     node_labels = edge_coarsening(g, edge_weight, relabel_idx=relabel)
 
-    assert node_labels.shape == (g.num_nodes(),)      # shape correct
-    assert F.reduce_sum(node_labels < 0).item() == 0  # all nodes marked
+    # shape correct
+    assert node_labels.shape == (g.num_nodes(),)
+
+    # all nodes marked
+    assert F.reduce_sum(node_labels < 0).item() == 0
+
+    num_result_ids, counts = th.unique(node_labels, return_counts=True)
+    num_result_ids = num_result_ids.size(0)
+
+    # number of unique node ids correct.
+    assert num_result_ids >= num_nodes // 2 and num_result_ids <= num_nodes
+
+    # each unique id has <= 2 nodes
+    assert F.reduce_sum(counts > 2).item() == 0
 
 
 if __name__ == '__main__':
