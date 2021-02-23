@@ -7,7 +7,7 @@ tutorial teaches you how to write your own graph neural network module
 for stochastic GNN training. It assumes that
 
 1. You know :doc:`how to write GNN modules for full graph
-   training <3_message_passing>`.
+   training <../blitz/3_message_passing>`.
 2. You know :doc:`how stochastic GNN training pipeline
    works <L1_large_node_classification>`.
 
@@ -137,7 +137,7 @@ m_v
 ######################################################################
 # Putting them together, you can implement a GraphSAGE convolution for
 # training with neighbor sampling as follows (the differences to the :doc:`full graph
-# counterpart <3_message_passing>` are highlighted with arrows ``<---``)
+# counterpart <../blitz/3_message_passing>` are highlighted with arrows ``<---``)
 #
 
 import torch.nn as nn
@@ -223,8 +223,8 @@ with tqdm.tqdm(train_dataloader) as tq:
 # ------------------------------------------------------------------------
 #
 # Here is a step-by-step tutorial for writing a GNN module for both
-# :doc:`full-graph training <1_introduction>` *and* :doc:`stochastic
-# training <L1_node_classification>`.
+# :doc:`full-graph training <../blitz/1_introduction>` *and* :doc:`stochastic
+# training <L1_large_node_classification>`.
 #
 # Say you start with a GNN module that works for full-graph training only:
 #
