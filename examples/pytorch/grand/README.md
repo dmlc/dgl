@@ -8,7 +8,7 @@ Author's code: https://github.com/THUDM/GRAND
 
 ## Example Implementor
 
-This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang98) during his Applied Scientist Intern work at the AWS Shanghai AI Lab.
+This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang98) when he was an applied scientist intern at AWS Shanghai AI Lab.
 
 ## Dependecies
 - Python 3.7

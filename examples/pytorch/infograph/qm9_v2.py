@@ -1,6 +1,5 @@
-"""QM9 dataset for graph property prediction (regression)."""
-import os
 import numpy as np
+import os
 from tqdm import tqdm
 
 import torch as th
@@ -8,7 +7,6 @@ import torch as th
 import dgl
 from dgl.data.dgl_dataset import DGLDataset
 from dgl.data.utils import download, load_graphs, _get_dgl_url, extract_archive
-
 
 class QM9Dataset_v2(DGLDataset):
     r"""QM9 dataset for graph property prediction (regression)
@@ -63,7 +61,7 @@ class QM9Dataset_v2(DGLDataset):
     | B      | :math:`B`                        | Rotational constant                                                               | :math:`\textrm{GHz}`                        |
     +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
     | c      | :math:`C`                        | Rotational constant                                                               | :math:`\textrm{GHz}`                        |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    +--------+----------------------------------+----------------------------------------
     Parameters
     ----------
     label_keys: list
@@ -91,7 +89,7 @@ class QM9Dataset_v2(DGLDataset):
     --------
     >>> data = QM9Dataset_v2(label_keys=['mu', 'alpha'])
     >>> data.num_labels
-    2
+    
     
     >>> # make each graph dense
     >>> data.to_dense()
@@ -119,7 +117,7 @@ class QM9Dataset_v2(DGLDataset):
                                             verbose=verbose)
         
     def process(self):
-        print('Begin loading dataset')
+        print('begin loading dataset')
         graphs, label_dict = load_graphs(os.path.join(self.raw_dir, 'qm9_v2.bin'))
         self.graphs = graphs
         if self.label_keys == None:
