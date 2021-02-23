@@ -5,7 +5,7 @@
  */
 #include <dgl/random.h>
 #include <numeric>
-#include "./rowwise_pick.h"
+
 #include "../../kernel/cuda/atomic.cuh"
 
 namespace dgl {
@@ -24,14 +24,37 @@ constexpr int LogPow2(
   }
 }
 
-template<typename DType, int BLOCK_SIZE>
-__global__ void CSRRowWiseSampleKernel(,
+template<typename IdType>
+__global__ void CSRRowWiseSampleDegreeKernel(
+    const int num_picks,
+    const int64_t num_rows,
+    const IdType * const in_rows,
+    const IdType * const in_ptr,
+    IdType * const out_deg)
+{
+  const int tIdx = threadIdx.x + blockIdx.x*blockDim.x;
+
+  if (tIdx < num_rows) {
+    const int in_row = in_rows[tIdx];
+    const int out_row = tIdx;
+    out_deg[out_row] = min(static_cast<IdType>(num_picks), in_ptr[in_row+1]-in_ptr[in_row]);
+
+    if (out_row == num_rows-1) {
+      // make the prefixsum work
+      out_deg[num_rows] = 0;
+    }
+  }
+}
+
+template<typename IdType, int BLOCK_SIZE>
+__global__ void CSRRowWiseSampleKernel(
     const unsigned long rand_seed,
     const int num_picks,
-    const IdType * in_ptr,
-    const IdType * in_index,
-    const IdType * out_ptr,
-    IdType * out_index)
+    const IdType * const in_ptr,
+    const IdType * const in_index,
+    const IdType * const in_rows,
+    const IdType * const out_ptr,
+    IdType * const out_index)
 {
   typedef cub::BlockRadixSort<int, BLOCK_SIZE, 1> BlockRadixSort;
   __shared__ typename BlockRadixSort::TempStorage temp_storage;
@@ -39,12 +62,13 @@ __global__ void CSRRowWiseSampleKernel(,
   __shared__ int shared_keys[BLOCK_SIZE];
   __shared__ int shared_indexes[BLOCK_SIZE];
 
-  const int tIdx = threadIdx.x + blockIdx.x*blockDim.x;
+  const int64_t out_row = threadIdx.x + blockIdx.x*blockDim.x
+  const int64_t in_row = in_rows[out_row];
 
-  const int64_t in_row_start = in_ptr[row];
-  const int deg = in_ptr[row+1] - in_row_start;
+  const int64_t in_row_start = in_ptr[in_row];
+  const int deg = in_ptr[in_row+1] - in_row_start;
 
-  const int64_t out_row_start = out_ptr[row];
+  const int64_t out_row_start = out_ptr[out_row];
 
   if (deg <= num_picks) {
     // just copy row
@@ -54,7 +78,7 @@ __global__ void CSRRowWiseSampleKernel(,
   } else {
     // each thread needs to initialize it's random state
     curandState rng;
-    curand_init(rand_seed, tIdx, 0, &rng);
+    curand_init(rand_seed, out_row, 0, &rng);
 
     if (deg <= BLOCK_SIZE) {
       // shuffle index array, and select based on that
@@ -102,67 +126,75 @@ __global__ void CSRRowWiseSampleKernel(,
 
 /////////////////////////////// CSR ///////////////////////////////
 
-template <DLDeviceType XPU, typename IdxType, typename FloatType>
-COOMatrix CSRRowWiseSampling(CSRMatrix mat, IdArray rows, int64_t num_samples,
-                             FloatArray prob, bool replace) {
-  CHECK(prob.defined());
-  auto pick_fn = GetSamplingPickFn<IdxType, FloatType>(num_samples, prob, replace);
-  return CSRRowWisePick(mat, rows, num_samples, replace, pick_fn);
-}
-
-template COOMatrix CSRRowWiseSampling<kDLGPU, int32_t, float>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLGPU, int64_t, float>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLGPU, int32_t, double>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLGPU, int64_t, double>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
-
-template <DLDeviceType XPU, typename IdxType>
+template <DLDeviceType XPU, typename IdType>
 COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat, IdArray rows,
-                                    int64_t num_samples, bool replace) {
-  // launch 1 thread block per row
+                                    const int64_t num_samples,
+                                    const bool replace) {
 
-  auto pick_fn = GetSamplingUniformPickFn<IdxType>(num_samples, replace);
-  return CSRRowWisePick(mat, rows, num_samples, replace, pick_fn);
+  const auto& ctx = mat.indptr->ctx;
+  auto device = runtime::DeviceAPI::Get(ctx);
+
+  // TODO: get stream from context
+  cudaStream_t stream = 0;
+
+  const int64_t num_rows = rows->shape[0];
+
+  IdType * out_ptr = device->AllocWorkspace(ctx, (num_rows+1)*sizeof(IdType));
+
+  IdArray picked_row = NewIdArray(-1, num_rows * num_picks, sizeof(IdType) * 8, ctx);
+  IdArray picked_col = NewIdArray(-1, num_rows * num_picks, sizeof(IdType) * 8, ctx);
+  IdArray picked_idx = NewIdArray(-1, num_rows * num_picks, sizeof(IdType) * 8, ctx);
+  IdType* const out_rows = static_cast<IdxType*>(picked_row->data);
+  IdType* const out_cols = static_cast<IdxType*>(picked_col->data);
+  IdType* const out_idxs = static_cast<IdxType*>(picked_idx->data);
+
+  if (!replace) {
+    constexpr int BLOCK_SIZE = 128;
+
+    const dim3 block(BLOCK_SIZE);
+    const dim3 grid((num_rows+block.x-1)/block.x);
+
+    // compute degree
+    CSRRowwiseSampleDegreeKernel<<<grid, block, 0, stream>>>(
+      num_picks, num_rows,
+      mat->rowptr,
+      out_deg);
+
+    // fill out_ptr
+    size_t prefix_temp_size;
+    cub::DeviceScan::ExclusiveSum(nullptr, prefix_temp_size,
+        out_ptr,
+        out_ptr,
+        num_rows+1,
+        stream);
+    void * prefix_temp = device->AllocWorkspace(ctx, prefix_temp_size);
+    cub::DeviceScan::ExclusiveSum(nullptr, prefix_temp_size,
+        out_ptr,
+        out_ptr,
+        num_rows+1,
+        stream);
+    device->FreeWorkspace(ctx, prefix_temp);
+
+    // select edges
+    CSRRowWiseSampleKernel<IdType, BLOCK_SIZE><<<grid, block, 0, stream>>>(
+        rand_seed,
+
+    picked_row = picked_row.CreateView({new_len}, picked_row->dtype);
+    picked_col = picked_col.CreateView({new_len}, picked_col->dtype);
+    picked_idx = picked_idx.CreateView({new_len}, picked_idx->dtype);
+  } else {
+    // we can do everything in one kernel since the degree is constant
+    throw std::runtime_error("CSRRowWiseSamplingUniform is not implemented for CUDA");
+  }
+
+  return COOMatrix(mat.num_rows, mat.num_cols, picked_row,
+      picked_col, picked_idx);
 }
 
 template COOMatrix CSRRowWiseSamplingUniform<kDLGPU, int32_t>(
     CSRMatrix, IdArray, int64_t, bool);
 template COOMatrix CSRRowWiseSamplingUniform<kDLGPU, int64_t>(
     CSRMatrix, IdArray, int64_t, bool);
-
-/////////////////////////////// COO ///////////////////////////////
-
-template <DLDeviceType XPU, typename IdxType, typename FloatType>
-COOMatrix COORowWiseSampling(COOMatrix mat, IdArray rows, int64_t num_samples,
-                             FloatArray prob, bool replace) {
-  CHECK(prob.defined());
-  auto pick_fn = GetSamplingPickFn<IdxType, FloatType>(num_samples, prob, replace);
-  return COORowWisePick(mat, rows, num_samples, replace, pick_fn);
-}
-
-template COOMatrix COORowWiseSampling<kDLGPU, int32_t, float>(
-    COOMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix COORowWiseSampling<kDLGPU, int64_t, float>(
-    COOMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix COORowWiseSampling<kDLGPU, int32_t, double>(
-    COOMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix COORowWiseSampling<kDLGPU, int64_t, double>(
-    COOMatrix, IdArray, int64_t, FloatArray, bool);
-
-template <DLDeviceType XPU, typename IdxType>
-COOMatrix COORowWiseSamplingUniform(COOMatrix mat, IdArray rows,
-                                    int64_t num_samples, bool replace) {
-  auto pick_fn = GetSamplingUniformPickFn<IdxType>(num_samples, replace);
-  return COORowWisePick(mat, rows, num_samples, replace, pick_fn);
-}
-
-template COOMatrix COORowWiseSamplingUniform<kDLGPU, int32_t>(
-    COOMatrix, IdArray, int64_t, bool);
-template COOMatrix COORowWiseSamplingUniform<kDLGPU, int64_t>(
-    COOMatrix, IdArray, int64_t, bool);
 
 }  // namespace impl
 }  // namespace aten
