@@ -1,6 +1,6 @@
 # DGL Implementation of ARMA
 
-This DGL example implements the GNN model proposed in the paper [Graph Neural Networks with convolutional ARMA filters](https://arxiv.org/abs/1901.01343). For the original implementation, see [here](https://pytorch-geometric.readthedocs.io/en/latest/modules/nn.html#torch_geometric.nn.conv.ARMAConv).
+This DGL example implements the GNN model proposed in the paper [Graph Neural Networks with convolutional ARMA filters](https://arxiv.org/abs/1901.01343).
 
 Contributor: [xnuohz](https://github.com/xnuohz)
 
@@ -8,7 +8,7 @@ Contributor: [xnuohz](https://github.com/xnuohz)
 The codebase is implemented in Python 3.6. For version requirement of packages, see below.
 
 ```
-dgl 0.6a210202
+dgl
 numpy 1.19.5
 networkx 2.5
 scikit-learn 0.24.1
