@@ -62,8 +62,8 @@ def test_edge_coarsening(idtype, g, weight, relabel):
     if weight:
         edge_weight = F.abs(F.randn((g.num_edges(),))).to(F.ctx())
     node_labels = edge_coarsening(g, edge_weight, relabel_idx=relabel)
-    num_result_ids, counts = th.unique(node_labels, return_counts=True)
-    num_result_ids = num_result_ids.size(0)
+    unique_ids, counts = th.unique(node_labels, return_counts=True)
+    num_result_ids = unique_ids.size(0)
 
     # shape correct
     assert node_labels.shape == (g.num_nodes(),)
@@ -76,6 +76,15 @@ def test_edge_coarsening(idtype, g, weight, relabel):
 
     # each unique id has <= 2 nodes
     assert F.reduce_sum(counts > 2).item() == 0
+
+    # if two nodes have the same id, they must be neighbors
+    idxs = F.arange(0, num_nodes, idtype)
+    for l in unique_ids:
+        l = l.item()
+        idx = idxs[(node_labels == l)]
+        if idx.size(0) == 2:
+            u, v = idx[0].item(), idx[1].item()
+            assert g.has_edges_between(u, v)
 
 
 if __name__ == '__main__':
