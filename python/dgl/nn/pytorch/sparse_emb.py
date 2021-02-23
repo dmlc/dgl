@@ -22,6 +22,8 @@ class NodeEmbedding: # NodeEmbedding
     ``torch.distributed.TCPStore`` to share meta-data information across multiple gpu processes.
     It use the local address of '127.0.0.1:12346' to initialize the TCPStore.
 
+    NOTE: The support of NodeEmbedding is experimental.
+
     Parameters
     ----------
     num_embeddings : int
