@@ -4,9 +4,14 @@
  * \brief rowwise sampling
  */
 #include <dgl/random.h>
+#include <dgl/runtime/device_api.h>
 #include <numeric>
+#include <cub/cub.cuh>
+#include <curand_kernel.h>
 
 #include "../../kernel/cuda/atomic.cuh"
+
+using namespace dgl::kernel::cuda;
 
 namespace dgl {
 namespace aten {
@@ -50,19 +55,19 @@ template<typename IdType, int BLOCK_SIZE>
 __global__ void CSRRowWiseSampleKernel(
     const unsigned long rand_seed,
     const int num_picks,
+    const int num_rows,
+    const IdType * const in_rows,
     const IdType * const in_ptr,
     const IdType * const in_index,
-    const IdType * const in_rows,
     const IdType * const out_ptr,
-    IdType * const out_index)
+    IdType * const out_rows,
+    IdType * const out_cols,
+    IdType * const out_idxs)
 {
-  typedef cub::BlockRadixSort<int, BLOCK_SIZE, 1> BlockRadixSort;
+  typedef cub::BlockRadixSort<int, BLOCK_SIZE, 1, int> BlockRadixSort;
   __shared__ typename BlockRadixSort::TempStorage temp_storage;
 
-  __shared__ int shared_keys[BLOCK_SIZE];
-  __shared__ int shared_indexes[BLOCK_SIZE];
-
-  const int64_t out_row = threadIdx.x + blockIdx.x*blockDim.x
+  const int64_t out_row = threadIdx.x + blockIdx.x*blockDim.x;
   const int64_t in_row = in_rows[out_row];
 
   const int64_t in_row_start = in_ptr[in_row];
@@ -73,7 +78,9 @@ __global__ void CSRRowWiseSampleKernel(
   if (deg <= num_picks) {
     // just copy row
     for (int idx = threadIdx.x; idx < deg; idx += BLOCK_SIZE) {
-      out_index[out_row_start+idx] = in_index[in_row_start+idx];
+      out_rows[out_row_start+idx] = out_row;
+      out_cols[out_row_start+idx] = in_index[in_row_start+idx];
+      out_idxs[out_row_start+idx] = in_row_start+idx;
     }
   } else {
     // each thread needs to initialize it's random state
@@ -82,41 +89,45 @@ __global__ void CSRRowWiseSampleKernel(
 
     if (deg <= BLOCK_SIZE) {
       // shuffle index array, and select based on that
-      constexpr int BLOCK_BITS = LogPow2(BlockSize);
+      constexpr int BLOCK_BITS = LogPow2(BLOCK_SIZE);
       constexpr int BLOCK_MASK = (1<<BLOCK_BITS)-1;
 
       // make sure block size is a power of two
       static_assert((1 << (BLOCK_BITS-1)) == BLOCK_SIZE);
 
       // generate a list of unique indexes, and select those
-      int key = threadIdx.x < deg ? static_cast<int>(curand(&rng) &
-          BlockMask) : BLOCK_SIZE;
-      int value = threadIdx.x;
-      BlockradixSort(temp_storage).Sort(key, value);
+      int key[1] = {threadIdx.x < deg ?
+          static_cast<int>(curand(&rng) & BLOCK_MASK) :
+          BLOCK_SIZE};
+      int value[1] = {static_cast<int>(threadIdx.x)};
+      BlockRadixSort(temp_storage).Sort(key, value, 0, BLOCK_BITS);
 
       // copy permutation
       const int idx = threadIdx.x;
-      if (value != BLOCK_SIZE) {
-        index_out[out_row_start+idx] = index_in[in_row_start+value];
+      if (value[0] != BLOCK_SIZE) {
+        out_rows[out_row_start+idx] = out_row;
+        out_cols[out_row_start+idx] = in_index[in_row_start+value[0]];
+        out_idxs[out_row_start+idx] = in_row_start+value[0];
       }
     } else {
       // generate permutation list via reservoir algorithm
       for (int idx = threadIdx.x; idx < num_picks; ++idx) {
-        index_out[out_row_start+idx] = idx;
+        out_idxs[out_row_start+idx] = in_row_start+idx;
       }
       for (int idx = num_picks+threadIdx.x; idx < deg; ++idx) {
         const int num = curand(&rng)%(idx+1);
         if (num < num_picks) {
           // use max so as to achieve the replacement order the serial
           // algorithm would have
-          AtomicMax(index_out+out_row_start+num, idx);
+          AtomicMax(out_idxs+out_row_start+num, idx);
         }
       }
 
       // copy permutation over
       for (int idx = threadIdx.x; idx < num_picks; ++idx) {
-        const int perm_idx = index_out[out_row_start+idx];
-        index_out[out_row_start+idx] = in_index[in_row_start+perm_idx];
+        const int perm_idx = out_idxs[out_row_start+idx];
+        out_rows[out_row_start+idx] = out_row;
+        out_cols[out_row_start+idx] = in_index[perm_idx];
       }
     }
   }
@@ -127,8 +138,9 @@ __global__ void CSRRowWiseSampleKernel(
 /////////////////////////////// CSR ///////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
-COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat, IdArray rows,
-                                    const int64_t num_samples,
+COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
+                                    IdArray rows,
+                                    const int64_t num_picks,
                                     const bool replace) {
 
   const auto& ctx = mat.indptr->ctx;
@@ -138,15 +150,19 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat, IdArray rows,
   cudaStream_t stream = 0;
 
   const int64_t num_rows = rows->shape[0];
+  const IdType * const slice_rows = static_cast<const IdType*>(rows->data);
 
-  IdType * out_ptr = device->AllocWorkspace(ctx, (num_rows+1)*sizeof(IdType));
+  IdType * out_ptr = static_cast<IdType*>(
+      device->AllocWorkspace(ctx, (num_rows+1)*sizeof(IdType)));
 
-  IdArray picked_row = NewIdArray(-1, num_rows * num_picks, sizeof(IdType) * 8, ctx);
-  IdArray picked_col = NewIdArray(-1, num_rows * num_picks, sizeof(IdType) * 8, ctx);
-  IdArray picked_idx = NewIdArray(-1, num_rows * num_picks, sizeof(IdType) * 8, ctx);
-  IdType* const out_rows = static_cast<IdxType*>(picked_row->data);
-  IdType* const out_cols = static_cast<IdxType*>(picked_col->data);
-  IdType* const out_idxs = static_cast<IdxType*>(picked_idx->data);
+  IdArray picked_row = NewIdArray(num_rows * num_picks, ctx, sizeof(IdType) * 8);
+  IdArray picked_col = NewIdArray(num_rows * num_picks, ctx, sizeof(IdType) * 8);
+  IdArray picked_idx = NewIdArray(num_rows * num_picks, ctx, sizeof(IdType) * 8);
+  const IdType * const in_ptr = static_cast<const IdType*>(mat.indptr->data);
+  const IdType * const in_cols = static_cast<const IdType*>(mat.indices->data);
+  IdType* const out_rows = static_cast<IdType*>(picked_row->data);
+  IdType* const out_cols = static_cast<IdType*>(picked_col->data);
+  IdType* const out_idxs = static_cast<IdType*>(picked_idx->data);
 
   if (!replace) {
     constexpr int BLOCK_SIZE = 128;
@@ -155,10 +171,8 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat, IdArray rows,
     const dim3 grid((num_rows+block.x-1)/block.x);
 
     // compute degree
-    CSRRowwiseSampleDegreeKernel<<<grid, block, 0, stream>>>(
-      num_picks, num_rows,
-      mat->rowptr,
-      out_deg);
+    CSRRowWiseSampleDegreeKernel<<<grid, block, 0, stream>>>(
+        num_picks, num_rows, slice_rows, in_ptr, out_ptr);
 
     // fill out_ptr
     size_t prefix_temp_size;
@@ -175,9 +189,28 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat, IdArray rows,
         stream);
     device->FreeWorkspace(ctx, prefix_temp);
 
+    // TODO: use pinned memory to overlap with the actual sampling, and wait on
+    // a cudaevent
+    IdType new_len;
+    device->CopyDataFromTo(out_ptr+num_rows, 0, &new_len, 0, sizeof(new_len),
+          ctx,
+          DGLContext{kDLCPU, 0},
+          mat.indptr->dtype,
+          stream);
+    device->StreamSync(ctx, stream);
+
     // select edges
     CSRRowWiseSampleKernel<IdType, BLOCK_SIZE><<<grid, block, 0, stream>>>(
-        rand_seed,
+        RandomEngine::ThreadLocal()->RandInt(1000000000),
+        num_picks,
+        num_rows,
+        slice_rows,
+        in_ptr,
+        in_cols,
+        out_ptr,
+        out_rows,
+        out_cols,
+        out_idxs);
 
     picked_row = picked_row.CreateView({new_len}, picked_row->dtype);
     picked_col = picked_col.CreateView({new_len}, picked_col->dtype);
@@ -186,6 +219,7 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat, IdArray rows,
     // we can do everything in one kernel since the degree is constant
     throw std::runtime_error("CSRRowWiseSamplingUniform is not implemented for CUDA");
   }
+  device->FreeWorkspace(ctx, out_ptr);
 
   return COOMatrix(mat.num_rows, mat.num_cols, picked_row,
       picked_col, picked_idx);
