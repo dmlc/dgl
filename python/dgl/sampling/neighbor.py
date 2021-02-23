@@ -119,7 +119,6 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")
         nodes = {g.ntypes[0] : nodes}
-    assert g.device == F.cpu(), "Graph must be on CPU."
 
     nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
     nodes_all_types = []
