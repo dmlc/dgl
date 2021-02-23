@@ -15,6 +15,43 @@ This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang9
 - PyTorch 1.7.1
 - dgl 0.6.0
 
+## Datasets
+
+##### Unsupervised Graph Classification Dataset:
+
+ 'MUTAG', 'PTC', 'IMDBBINARY', 'IMDBMULTI', 'REDDITBINARY', 'REDDITMULTI5K' of dgl.data.GINDataset.
+
+| Dataset         | MUTAG | PTC   | RDT-B  | RDT-M5K | IMDB-B | IMDB-M |
+| --------------- | ----- | ----- | ------ | ------- | ------ | ------ |
+| # Graphs        | 188   | 344   | 2000   | 4999    | 1000   | 1500   |
+| # Classes       | 2     | 2     | 2      | 5       | 2      | 3      |
+| Avg. Graph Size | 17.93 | 14.29 | 429.63 | 508.52  | 19.77  | 13.00  |
+
+**Semi-supervised Graph Regression Dataset:**
+
+QM9 dataset for graph property prediction (regression)
+
+| Dataset | # Graphs | # Regression Tasks |
+| ------- | -------- | ------------------ |
+| QM9     | 130,831  | 12                 |
+
+The 12 tasks are:
+
+| Keys  | Description                                |
+| ----- | :----------------------------------------- |
+| mu    | Dipole moment                              |
+| alpha | Isotropic polarizability                   |
+| homo  | Highest occupied molecular orbital energ   |
+| lumo  | Lowest unoccupied molecular orbital energy |
+| gap   | Gap between 'homo' and 'lumo'              |
+| r2    | Electronic spatial extent                  |
+| zpve  | Zero point vibrational energy              |
+| U0    | Internal energy at 0K                      |
+| U     | Internal energy at 298.15K                 |
+| H     | Enthalpy at 298.15K                        |
+| G     | Free energy at 298.15K                     |
+| Cv    | Heat capavity at 298.15K                   |
+
 ## Arguments
 
 ##### 	Unsupervised Graph Classification:
