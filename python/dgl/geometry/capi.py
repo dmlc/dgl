@@ -1,14 +1,13 @@
 """Python interfaces to DGL farthest point sampler."""
+from dgl._ffi.base import DGLError
 import numpy as np
 from .._ffi.function import _init_api
 from .. import backend as F
 from .. import ndarray as nd
 
-__all__ = ["edge_coarsening"]
-
 
 def farthest_point_sampler(data, batch_size, sample_points, dist, start_idx, result):
-    """Farthest Point Sampler
+    r"""Farthest Point Sampler
 
     Parameters
     ----------
@@ -65,7 +64,7 @@ def edge_coarsening(graph, edge_weights=None, relabel_idx=True):
     ----------
     graph : DGLGraph
         The input homogeneous graph.
-    edge_weight : torch.Tensor, optional
+    edge_weight : tensor, optional
         The edge weight tensor holding non-negative scalar weight for each edge.
         default: :obj:`None`
     relabel_idx : bool, optional
@@ -117,7 +116,8 @@ def edge_coarsening(graph, edge_weights=None, relabel_idx=True):
                          F.zerocopy_to_dgl_ndarray(dst),
                          edge_weights_dgl,
                          F.zerocopy_to_dgl_ndarray_for_write(node_label))
-    assert F.reduce_sum(node_label < 0).item() == 0, "Find unmatched node"
+    if F.reduce_sum(node_label < 0).item() != 0:
+        raise DGLError("Find unmatched node")
 
     # reorder node id
     if relabel_idx:

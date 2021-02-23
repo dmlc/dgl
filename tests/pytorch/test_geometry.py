@@ -4,8 +4,7 @@ import dgl
 import numpy as np
 import pytest
 import torch as th
-from dgl.geometry.pytorch import FarthestPointSampler
-from dgl.geometry import edge_coarsening
+from dgl.geometry.pytorch import FarthestPointSampler, EdgeCoarsening
 from test_utils import parametrize_dtype
 from test_utils.graph_cases import get_cases
 
@@ -55,6 +54,7 @@ def test_knn():
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('relabel', [True, False])
 def test_edge_coarsening(idtype, g, weight, relabel):
+    edge_coarsening = EdgeCoarsening()
     num_nodes = g.num_nodes()
     g = dgl.to_bidirected(g)
     g = g.astype(idtype).to(F.ctx())
