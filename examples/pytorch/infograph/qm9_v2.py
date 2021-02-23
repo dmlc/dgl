@@ -5,10 +5,10 @@ from tqdm import tqdm
 
 import torch as th
 
-from .dgl_dataset import DGLDataset
-from .utils import download, load_graphs, _get_dgl_url, extract_archive
-from ..convert import graph as dgl_graph
-from .. import backend as F
+import dgl
+from dgl.data.dgl_dataset import DGLDataset
+from dgl.data.utils import download, load_graphs, _get_dgl_url, extract_archive
+
 
 class QM9Dataset_v2(DGLDataset):
     r"""QM9 dataset for graph property prediction (regression)
@@ -137,8 +137,8 @@ class QM9Dataset_v2(DGLDataset):
         for id in tqdm(range(n_graph), desc = 'processing graphs'):
             graph = self.graphs[id]
             n_nodes = graph.num_nodes()
-            row = F.arange(n_nodes, dtype = F.long)
-            col = F.arange(n_nodes, dtype = F.long)
+            row = th.arange(n_nodes, dtype = th.long)
+            col = th.arange(n_nodes, dtype = th.long)
 
             row = row.view(-1,1).repeat(1, n_nodes).view(-1)
             col = col.repeat(n_nodes)
@@ -154,11 +154,11 @@ class QM9Dataset_v2(DGLDataset):
             edge_attr[idx] = graph.edata['edge_attr']
             
             pos = graph.ndata['pos']
-            dist = F.norm(pos[col] - pos[row], p=2, dim=-1).view(-1, 1)
+            dist = th.norm(pos[col] - pos[row], p=2, dim=-1).view(-1, 1)
             
-            new_edge_attr =  F.cat([edge_attr, dist.type_as(edge_attr)], dim = -1)
+            new_edge_attr =  th.cat([edge_attr, dist.type_as(edge_attr)], dim = -1)
             
-            new_graph = dgl_graph((row,col))
+            new_graph = dgl.graph((row,col))
             
             new_graph.ndata['attr'] = graph.ndata['attr']
             new_graph.edata['edge_attr'] = new_edge_attr
