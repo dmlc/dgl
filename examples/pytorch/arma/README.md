@@ -55,7 +55,7 @@ The DGL's built-in Cora, Pubmed, Citeseer datasets. Dataset summary:
 ###### Examples
 
 The following commands learn a neural network and predict on the test set.
-Train a ARMA model which follows the original hyperparameters on different datasets.
+Train an ARMA model which follows the original hyperparameters on different datasets.
 ```bash
 # Cora:
 python citation.py --gpu 0
@@ -73,6 +73,6 @@ python citation.py --gpu 0 --dataset Pubmed --dropout 0.25 --num-stacks 1
 
 | Dataset | Cora | Citeseer | Pubmed |
 | :-: | :-: | :-: | :-: |
-| Metrics(Table 1.Node classification accuracy/f1) | 83.4±0.6 | 72.5±0.4 | 78.9±0.3 |
+| Metrics(Table 1.Node classification accuracy) | 83.4±0.6 | 72.5±0.4 | 78.9±0.3 |
 | Metrics(PyG) | 82.3±0.5 | 70.9±1.1 | 78.3±0.8 |
 | Metrics(DGL) | 82.2±0.3 | 72.5±0.2 | 79.4±0.2 |
