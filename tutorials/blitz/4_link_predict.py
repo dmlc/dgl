@@ -335,3 +335,6 @@ with torch.no_grad():
     neg_score = pred(test_neg_g, h)
     print('AUC', compute_auc(pos_score, neg_score))
 
+
+# Thumbnail Courtesy: Link Prediction with Neo4j, Mark Needham
+# sphinx_gallery_thumbnail_path = '_static/blitz_4_link_predict.png'
