@@ -1,11 +1,11 @@
 ## Distributed training
 
-This is an example of training RGCN node classification in a distributed fashion. Currently, the example only support training RGCN graphs with no input features. The current implementation follows [../rgcn/entity_claasify_mp.py](../rgcn/entity_claasify_mp.py).
+This is an example of training RGCN node classification in a distributed fashion. Currently, the example train RGCN graphs with input node features. The current implementation follows ../rgcn/entity_claasify_mp.py.
 
 Before training, install python libs by pip:
 
 ```bash
-pip3 install ogb pyinstrument
+pip3 install ogb pyinstrument pyarrow
 ```
 
 To train RGCN, it has four steps:
