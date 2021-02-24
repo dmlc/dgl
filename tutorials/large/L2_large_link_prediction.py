@@ -364,3 +364,6 @@ for epoch in range(1):
 # for link prediction with neighbor sampling.
 #
 
+
+# Thumbnail Courtesy: Link Prediction with Neo4j, Mark Needham
+# sphinx_gallery_thumbnail_path = '_static/blitz_4_link_predict.png'
