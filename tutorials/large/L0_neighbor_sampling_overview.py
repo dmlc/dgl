@@ -113,3 +113,6 @@ By the end of this tutorial, you will be able to
 # DGL <L1_large_node_classification>`
 #
 
+
+# Thumbnail Courtesy: Understanding graph embedding methods and their applications, Mengjia Xu
+# sphinx_gallery_thumbnail_path = '_static/large_L0_neighbor_sampling_overview.png'

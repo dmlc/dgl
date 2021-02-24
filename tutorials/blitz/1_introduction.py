@@ -215,3 +215,6 @@ train(g, model)
 # -  :ref:`The list of datasets provided by DGL <apidata>`.
 # 
 
+
+# Thumbnail Courtesy: Stanford CS224W Notes
+# sphinx_gallery_thumbnail_path = '_static/blitz_1_introduction.png'
