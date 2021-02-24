@@ -2,8 +2,6 @@
 
 This DGL example implements the GNN model proposed in the paper [Graph Random Neural Network for Semi-Supervised Learning on Graphs]( https://arxiv.org/abs/2005.11079).
 
-Paper link: https://arxiv.org/abs/2005.11079
-
 Author's code: https://github.com/THUDM/GRAND
 
 ## Example Implementor
