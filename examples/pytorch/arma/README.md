@@ -75,4 +75,4 @@ python citation.py --gpu 0 --dataset Pubmed --dropout 0.25 --num-stacks 1
 | :-: | :-: | :-: | :-: |
 | Metrics(Table 1.Node classification accuracy) | 83.4±0.6 | 72.5±0.4 | 78.9±0.3 |
 | Metrics(PyG) | 82.3±0.5 | 70.9±1.1 | 78.3±0.8 |
-| Metrics(DGL) | 82.2±0.3 | 72.5±0.2 | 79.4±0.2 |
+| Metrics(DGL) | 80.9±0.6 | 71.6±0.8 | 75.0±4.2 |
