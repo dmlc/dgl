@@ -36,7 +36,7 @@ class Metapath2VecTrainer:
 
     def train(self):
 
-        optimizer = optim.SparseAdam(self.skip_gram_model.parameters(), lr=self.initial_lr)
+        optimizer = optim.SparseAdam(list(self.skip_gram_model.parameters()), lr=self.initial_lr)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(self.dataloader))
 
         for iteration in range(self.iterations):

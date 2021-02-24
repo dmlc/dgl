@@ -1,3 +1,4 @@
+from timeit import default_timer
 import json
 import os
 import pickle
@@ -9,6 +10,43 @@ import numpy as np
 import pandas
 import dgl
 import torch
+import time
+from ogb.nodeproppred import DglNodePropPredDataset
+
+from functools import partial, reduce, wraps
+
+import torch.multiprocessing as mp
+from _thread import start_new_thread
+import traceback
+
+
+def thread_wrapped_func(func):
+    """
+    Wraps a process entry point to make it work with OpenMP.
+    """
+
+    @wraps(func)
+    def decorated_function(*args, **kwargs):
+        queue = mp.Queue()
+
+        def _queue_result():
+            exception, trace, res = None, None, None
+            try:
+                res = func(*args, **kwargs)
+            except Exception as e:
+                exception = e
+                trace = traceback.format_exc()
+            queue.put((res, exception, trace))
+
+        start_new_thread(_queue_result, ())
+        result, exception, trace = queue.get()
+        if exception is None:
+            return result
+        else:
+            assert isinstance(exception, Exception)
+            raise exception.__class__(trace)
+
+    return decorated_function
 
 
 def _download(url, path, filename):
@@ -26,10 +64,18 @@ def _download(url, path, filename):
     print('Download finished.')
 
 
+# GRAPH_CACHE = {}
+
+
 def get_graph(name, format):
+    # global GRAPH_CACHE
+    # if name in GRAPH_CACHE:
+    #     return GRAPH_CACHE[name].to(format)
     g = None
     if name == 'cora':
-        g = dgl.data.CoraGraphDataset()[0]
+        g = dgl.data.CoraGraphDataset(verbose=False)[0]
+    elif name == 'pubmed':
+        g = dgl.data.PubmedGraphDataset(verbose=False)[0]
     elif name == 'livejournal':
         bin_path = "/tmp/dataset/livejournal/livejournal_{}.bin".format(format)
         if os.path.exists(bin_path):
@@ -54,10 +100,19 @@ def get_graph(name, format):
         else:
             g = dgl.data.RedditDataset(self_loop=True)[0].formats([format])
             dgl.save_graphs(bin_path, [g])
+    elif name.startswith("ogb"):
+        g = get_ogb_graph(name)
     else:
         raise Exception("Unknown dataset")
+    # GRAPH_CACHE[name] = g
     g = g.formats([format])
     return g
+
+
+def get_ogb_graph(name):
+    os.symlink('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
+    data = DglNodePropPredDataset(name=name)
+    return data[0][0]
 
 
 def get_livejournal():
@@ -84,14 +139,6 @@ def get_friendster():
     return dgl.graph((src, dst))
 
 
-# def get_graph(name):
-#     if name == 'livejournal':
-#         return get_livejournal()
-#     else:
-#         print(name + " doesn't exist")
-#         return None
-
-
 class OGBDataset(object):
     def __init__(self, g, num_labels, predict_category=None):
         self._g = g
@@ -116,8 +163,6 @@ class OGBDataset(object):
 
 def load_ogb_product():
     name = 'ogbn-products'
-    from ogb.nodeproppred import DglNodePropPredDataset
-
     os.symlink('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
 
     print('load', name)
@@ -149,8 +194,6 @@ def load_ogb_product():
 
 def load_ogb_mag():
     name = 'ogbn-mag'
-    from ogb.nodeproppred import DglNodePropPredDataset
-
     os.symlink('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
 
     print('load', name)
@@ -297,14 +340,22 @@ def setup_track_acc(*args, **kwargs):
     torch.random.manual_seed(42)
 
 
+def setup_track_flops(*args, **kwargs):
+    # fix random seed
+    np.random.seed(42)
+    torch.random.manual_seed(42)
+
+
 TRACK_UNITS = {
     'time': 's',
     'acc': '%',
+    'flops': 'GFLOPS',
 }
 
 TRACK_SETUP = {
     'time': setup_track_time,
     'acc': setup_track_acc,
+    'flops': setup_track_flops,
 }
 
 
@@ -421,7 +472,8 @@ elif device == "gpu":
     parametrize_cpu = noop_decorator
     parametrize_gpu = parametrize
 else:
-    raise Exception("Unknown device")
+    raise Exception(
+        "Unknown device. Must be one of ['cpu', 'gpu'], but got {}".format(device))
 
 
 def skip_if_gpu():
@@ -447,6 +499,7 @@ def benchmark(track_type, timeout=60):
 
             - 'time' : For timing. Unit: second.
             - 'acc' : For accuracy. Unit: percentage, value between 0 and 100.
+            - 'flops' : Unit: GFlops, number of floating point operations per second.
     timeout : int
         Timeout threshold in second.
 
@@ -458,7 +511,7 @@ def benchmark(track_type, timeout=60):
         def foo():
             pass
     """
-    assert track_type in ['time', 'acc']
+    assert track_type in ['time', 'acc', 'flops']
 
     def _wrapper(func):
         func.unit = TRACK_UNITS[track_type]
@@ -467,5 +520,36 @@ def benchmark(track_type, timeout=60):
         if not filter.check(func):
             # skip if not enabled
             func.benchmark_name = "skip_" + func.__name__
-        return func
+        return thread_wrapped_func(func)
     return _wrapper
+
+#####################################
+# Timer
+#####################################
+
+
+class Timer:
+    def __init__(self, device=None):
+        self.timer = default_timer
+        if device is None:
+            self.device = get_bench_device()
+        else:
+            self.device = device
+
+    def __enter__(self):
+        if self.device == 'cuda:0':
+            self.start_event = torch.cuda.Event(enable_timing=True)
+            self.end_event = torch.cuda.Event(enable_timing=True)
+            self.start_event.record()
+        else:
+            self.tic = self.timer()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if self.device == 'cuda:0':
+            self.end_event.record()
+            torch.cuda.synchronize()  # Wait for the events to be recorded!
+            self.elapsed_secs = self.start_event.elapsed_time(
+                self.end_event) / 1e3
+        else:
+            self.elapsed_secs = self.timer() - self.tic

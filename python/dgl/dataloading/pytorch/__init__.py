@@ -126,13 +126,13 @@ class _NodeCollator(NodeCollator):
 class _EdgeCollator(EdgeCollator):
     def collate(self, items):
         if self.negative_sampler is None:
-            # input_nodes, pair_graph, [items], blocks
+            # input_nodes, pair_graph, blocks
             result = super().collate(items)
             _pop_subgraph_storage(result[1], self.g)
             _pop_blocks_storage(result[-1], self.g_sampling)
             return result
         else:
-            # input_nodes, pair_graph, neg_pair_graph, [items], blocks
+            # input_nodes, pair_graph, neg_pair_graph, blocks
             result = super().collate(items)
             _pop_subgraph_storage(result[1], self.g)
             _pop_subgraph_storage(result[2], self.g)
@@ -156,13 +156,11 @@ class _NodeDataLoaderIter:
         self.iter_ = iter(node_dataloader.dataloader)
 
     def __next__(self):
-        # input_nodes, output_nodes, [items], blocks
+        # input_nodes, output_nodes, blocks
         result_ = next(self.iter_)
         _restore_blocks_storage(result_[-1], self.node_dataloader.collator.g)
 
-        result = []
-        for data in result_:
-            result.append(_to_device(data, self.device))
+        result = [_to_device(data, self.device) for data in result_]
         return result
 
 class _EdgeDataLoaderIter:
@@ -175,15 +173,13 @@ class _EdgeDataLoaderIter:
         result_ = next(self.iter_)
 
         if self.edge_dataloader.collator.negative_sampler is not None:
-            # input_nodes, pair_graph, neg_pair_graph, [items], blocks
-            # Otherwise, input_nodes, pair_graph, [items], blocks
+            # input_nodes, pair_graph, neg_pair_graph, blocks
+            # Otherwise, input_nodes, pair_graph, blocks
             _restore_subgraph_storage(result_[2], self.edge_dataloader.collator.g)
         _restore_subgraph_storage(result_[1], self.edge_dataloader.collator.g)
         _restore_blocks_storage(result_[-1], self.edge_dataloader.collator.g_sampling)
 
-        result = []
-        for data in result_:
-            result.append(_to_device(data, self.device))
+        result = [_to_device(data, self.device) for data in result_]
         return result
 
 class NodeDataLoader:
@@ -244,6 +240,11 @@ class NodeDataLoader:
                                          collate_fn=self.collator.collate,
                                          **dataloader_kwargs)
             self.is_distributed = False
+
+            # Precompute the CSR and CSC representations so each subprocess does not
+            # duplicate.
+            if dataloader_kwargs.get('num_workers', 0) > 0:
+                g.create_formats_()
         self.device = device
 
     def __iter__(self):
@@ -437,6 +438,11 @@ class EdgeDataLoader:
         self.dataloader = DataLoader(
             self.collator.dataset, collate_fn=self.collator.collate, **dataloader_kwargs)
         self.device = device
+
+        # Precompute the CSR and CSC representations so each subprocess does not
+        # duplicate.
+        if dataloader_kwargs.get('num_workers', 0) > 0:
+            g.create_formats_()
 
     def __iter__(self):
         """Return the iterator of the data loader."""

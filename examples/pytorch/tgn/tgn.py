@@ -1,10 +1,7 @@
-import torch
 import torch.nn as nn
 import dgl
-import dgl.function as fn
-from modules import MemoryModule, MemoryOperation, TemporalGATConv, LinkPredictor
-import time
-from pyinstrument import Profiler
+from modules import MemoryModule, MemoryOperation, TemporalGATConv ,MsgLinkPredictor
+import copy
 
 # The TGN Model will take two different types of subgraphs as input
 # Any thing related to dataloader should not appear here
@@ -41,99 +38,28 @@ class TGN(nn.Module):
                                                    self.memory_dim,
                                                    self.temporal_dim,
                                                    self.embedding_dim,
-                                                   self.num_heads)
+                                                   self.num_heads,
+                                                   allow_zero_in_degree=True)
 
-        self.linkpredictor = LinkPredictor(embedding_dim)
-        self.profiler = Profiler()
-    
-    # Need to sample subgraph batchs
-    # The returned result also need to match id
-    # Assume new_pos and new_neg are lists
-    def temporal_batch(self,srcs,dsts,negs,timestamps,mode):
-        # Each positive subgraph contains 2 real mattered nodes
-        batch_graphs = []
-        batch_memorys = []
-        batch_ts = []
-        batch_offset = 0
-        pos_src_id = []
-        pos_dst_id = []
-        neg_id = []
-        for src,dst,neg,ts in zip(srcs,dsts,negs,timestamps):
-            # Here new pos and new neg specify the node in subgraph
-            # After merge the new_pos will be relative position
-            # Need a scrolling offset
-            new_pos,pos_subg = self.sampler([src,dst],ts,mode)
-            pos_src_id.append(new_pos[0]+batch_offset)
-            pos_dst_id.append(new_pos[1]+batch_offset)
-            batch_graphs.append(pos_subg)
-            batch_memorys.append(self.memory.memory[pos_subg.ndata[dgl.NID],:])
-            batch_ts.append(ts.repeat(pos_subg.num_nodes()))
-            batch_offset += pos_subg.num_nodes()
+        self.msg_linkpredictor = MsgLinkPredictor(embedding_dim)
 
-            new_neg,neg_subg = self.sampler(neg,ts,mode)
-            neg_id.append(new_neg[0]+batch_offset)
-            batch_graphs.append(neg_subg)
-            batch_memorys.append(self.memory.memory[neg_subg.ndata[dgl.NID],:])
-            batch_ts.append(ts.repeat(neg_subg.num_nodes()))
-            batch_offset += neg_subg.num_nodes()
-        batch_graph = dgl.batch(batch_graphs)
-        batch_memory= torch.cat(batch_memorys,dim=0)
-        batch_t = torch.cat(batch_ts,dim=0)
-        pos_src_id = torch.tensor(pos_src_id)
-        pos_dst_id = torch.tensor(pos_dst_id)
-        neg_id = torch.tensor(neg_id)
-        return batch_graph,batch_memory,batch_t,pos_src_id,pos_dst_id,neg_id
-
-    def fast_sample(self,srcs,dsts,negs,timestamps,mode):
-        # Generate unique nodes for batching
-        nodes_unique = torch.cat([srcs,dsts,negs]).unique().tolist()
-        timestamps = self.memory.last_update_t[nodes_unique]
-        nodes_unique_sub,emb_graph = self.sampler(nodes_unique,timestamps,mode)
-        
+    def embed(self,postive_graph,negative_graph,blocks):
+        emb_graph = blocks[0]
         emb_memory = self.memory.memory[emb_graph.ndata[dgl.NID],:]
-        emb_t      = self.memory.last_update_t[emb_graph.ndata[dgl.NID]].double()
-        # Map the srcs, dsts, negs to id in subg.
-        # use multiple dictionary since the size of each list is not equal
-        work2sub_dict= dict(zip(nodes_unique,nodes_unique_sub))
-        
-        # Remap might contain duplication
-        for i,j,k in zip(srcs,dsts,negs):
-            pos_src_id = work2sub_dict[int(i)]
-            pos_dst_id = work2sub_dict[int(j)]
-            neg_id     = work2sub_dict[int(k)]
-        return emb_graph,emb_memory,emb_t,pos_src_id,pos_dst_id,neg_id
-
-    def batch_forward(self,srcs,dsts,negs,timestamps,subg,mode):
-        pred_pos,pred_neg = self.embed(srcs,dsts,negs,timestamps,mode)
-        self.update_memory(subg)
-        return pred_pos,pred_neg
-
-    def fast_embed(self,srcs,dsts,negs,timestamps,mode):
-        # Invoking graph sampler for the embedding subgraph
-        # Here the pos_src_id and pos_dst_id as well as neg_id might involve duplication
-        #self.profiler.start()
-        emb_graph,emb_memory,emb_t,pos_src_id,pos_dst_id,neg_id = self.fast_sample(srcs,dsts,negs,timestamps,mode)
+        emb_t = emb_graph.ndata['timestamp']
+        #print(emb_t.shape)
         embedding = self.embedding_attn(emb_graph,emb_memory,emb_t)
-        pred_pos = self.linkpredictor(embedding[pos_src_id],embedding[pos_dst_id])
-        pred_neg = self.linkpredictor(embedding[pos_src_id],embedding[neg_id])
-        #self.profiler.stop()
-        #print(self.profiler.output_text(unicode=True,color=True))
+        emb2pred = dict(zip(emb_graph.ndata[dgl.NID].tolist(),emb_graph.nodes().tolist()))
+        # Since postive graph and negative graph has same is mapping
+        feat_id = [emb2pred[int(n)] for n in postive_graph.ndata[dgl.NID]]
+        feat = embedding[feat_id]
+        pred_pos,pred_neg = self.msg_linkpredictor(feat,postive_graph,negative_graph)
         return pred_pos,pred_neg
-
-    def embed(self,srcs,dsts,negs,timestamps,mode):
-        batch_graph,batch_memory,batch_t,pos_src_id,pos_dst_id,neg_id = self.temporal_batch(srcs,dsts,negs,timestamps,mode)
-        embedding = self.embedding_attn(batch_graph,batch_memory,batch_t)
-        pred_pos = self.linkpredictor(embedding[pos_src_id],embedding[pos_dst_id])
-        pred_neg = self.linkpredictor(embedding[pos_src_id],embedding[neg_id])
-        return pred_pos, pred_neg
 
     def update_memory(self,subg):
         new_g = self.memory_ops(subg)
         self.memory.set_memory(new_g.ndata[dgl.NID],new_g.ndata['memory'])
         self.memory.set_last_update_t(new_g.ndata[dgl.NID],new_g.ndata['timestamp'])
-
-    def attach_sampler(self,temporal_sampler):
-        self.sampler = temporal_sampler
 
     # Some memory operation wrappers
     def detach_memory(self):
@@ -141,3 +67,13 @@ class TGN(nn.Module):
 
     def reset_memory(self):
         self.memory.reset_memory()
+
+    def store_memory(self):
+        memory_checkpoint = {}
+        memory_checkpoint['memory'] = copy.deepcopy(self.memory.memory)
+        memory_checkpoint['last_t'] = copy.deepcopy(self.memory.last_update_t)
+        return memory_checkpoint
+
+    def restore_memory(self,memory_checkpoint):
+        self.memory.memory = memory_checkpoint['memory']
+        self.memory.last_update_time = memory_checkpoint['last_t']

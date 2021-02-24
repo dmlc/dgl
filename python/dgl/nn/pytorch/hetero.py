@@ -169,7 +169,7 @@ class HeteroGraphConv(nn.Module):
                     continue
                 dstdata = self.mods[etype](
                     rel_graph,
-                    inputs[stype],
+                    (inputs[stype], inputs[dtype]),
                     *mod_args.get(etype, ()),
                     **mod_kwargs.get(etype, {}))
                 outputs[dtype].append(dstdata)

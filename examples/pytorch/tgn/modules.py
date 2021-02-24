@@ -8,8 +8,8 @@ from dgl.base import DGLError
 import torch.nn.functional as F
 from dgl.ops import edge_softmax
 import dgl.function as fn
+import copy
 
-# TODO: Implememt Output MLP
 class MergeLayer(nn.Module):
   def __init__(self, dim1, dim2, dim3, dim4):
     super(MergeLayer,self).__init__()
@@ -39,10 +39,33 @@ class LinkPredictor(nn.Module):
       out = self.fc_3(x)
       return out
 
-class MsgLinkPredictor(torch.nn.module):
+# Assume the forward pass will 
+class MsgLinkPredictor(nn.Module):
+    def __init__(self,emb_dim,drop=0.3):
+        super(MsgLinkPredictor,self).__init__()
+        self.src_fc = nn.Linear(emb_dim,emb_dim)
+        self.dst_fc = nn.Linear(emb_dim,emb_dim)
+        self.out_fc = nn.Linear(emb_dim,1)
 
+    def link_pred(self,edges):
+        src_hid = self.src_fc(edges.src['embedding'])
+        dst_hid = self.dst_fc(edges.dst['embedding'])
+        score = F.relu(src_hid+dst_hid)
+        score = self.out_fc(score)
+        return {'score':score}
 
-# TODO: Implement Time encoder
+    def forward(self,x,pos_g,neg_g):
+        # Local Scope?
+        pos_g.ndata['embedding'] = x
+        neg_g.ndata['embedding'] = x
+
+        pos_g.apply_edges(self.link_pred)
+        neg_g.apply_edges(self.link_pred)
+
+        pos_escore = pos_g.edata['score']
+        neg_escore = neg_g.edata['score']
+        return pos_escore,neg_escore
+
 class TimeEncode(nn.Module):
   # Time Encoding proposed by TGAT
   def __init__(self, dimension):
@@ -56,14 +79,10 @@ class TimeEncode(nn.Module):
     self.w.bias = torch.nn.Parameter(torch.zeros(dimension).double())
 
   def forward(self, t):
-    # t has shape [batch_size, seq_len]
-    # Add dimension at the end to apply linear layer --> [batch_size, seq_len, 1]
     t = t.unsqueeze(dim=2)
-    # output has shape [batch_size, seq_len, dimension]
     output = torch.cos(self.w(t))
     return output
 
-# TODO: Take a closer look to the gradient path of the memory module.
 class MemoryModule(nn.Module):
     def __init__(self,n_node,hidden_dim):
         super(MemoryModule,self).__init__()
@@ -98,11 +117,8 @@ class MemoryModule(nn.Module):
         return self.last_update_t[node_idxs]
 
     def detach_memory(self):
-        # Since the memory update itself will not receive gradient but will be propagated to the next batched iteration
         self.memory.detach_()
-        # How to detach edge weights since they are in graph
 
-# TODO: Check about the node id matching problem
 class MemoryOperation(nn.Module):
     def __init__(self,updater_type, memory, e_feat_dim, temporal_dim):
         super(MemoryOperation,self).__init__()
@@ -182,9 +198,6 @@ class TemporalGATConv(nn.Module):
         ret = edges.data['sa'].view(-1,self._num_heads,1)*edges.data['efeat']
         return {'attn':ret}
 
-    # Need to assume the feature include edge feature.
-    # Here the input graph is the temporal subgraph
-    # Assume feat is memory
     def forward(self,graph,memory,ts):
         graph = graph.local_var() # Using local scope for graph
         if not self._allow_zero_in_degree:
