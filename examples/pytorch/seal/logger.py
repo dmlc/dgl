@@ -67,5 +67,3 @@ class LightLogging(object):
 
     def error(self, msg):
         logging.error(msg)
-
-

@@ -25,9 +25,11 @@ Dependencies
 
 - python 3.6+
 - Pytorch 1.5.0+
+- ogb  
 - pandas
 - tqdm
 - scipy
+
 
  How to run example files
 --------------------------------

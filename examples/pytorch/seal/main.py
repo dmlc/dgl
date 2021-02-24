@@ -1,15 +1,20 @@
-import dgl
-from utils import parse_arguments
-from tqdm import tqdm
-from dgl import NID, EID
-from torch.nn import BCEWithLogitsLoss
-from utils import load_ogb_dataset, evaluate_hits
-import torch
-from sampler import SEALData, SEALDataLoader
-from model import GCN, DGCNN
-import numpy as np
-from logger import LightLogging
 import time
+from tqdm import tqdm
+import numpy as np
+import torch
+from torch.nn import BCEWithLogitsLoss
+from dgl import NID, EID
+from dgl.dataloading import GraphDataLoader
+from utils import parse_arguments
+from utils import load_ogb_dataset, evaluate_hits
+from sampler import SEALData
+from model import GCN, DGCNN
+from logger import LightLogging
+
+'''
+Part of the code are adapted from
+https://github.com/facebookresearch/SEAL_OGB
+'''
 
 
 def train(model, dataloader, loss_fn, optimizer, device, num_graphs=32, total_graphs=None):
@@ -89,15 +94,10 @@ def main(args, print_fn=print):
     train_graphs = len(train_data.graph_list)
 
     # Set data loader
-    if dgl.__version__[:5] >= '0.6.0':
-        from dgl.dataloading import GraphDataLoader
-        train_loader = GraphDataLoader(train_data, batch_size=args.batch_size, num_workers=args.num_workers)
-        val_loader = GraphDataLoader(val_data, batch_size=args.batch_size, num_workers=args.num_workers)
-        test_loader = GraphDataLoader(test_data, batch_size=args.batch_size, num_workers=args.num_workers)
-    else:
-        train_loader = SEALDataLoader(train_data, batch_size=args.batch_size, num_workers=args.num_workers)
-        val_loader = SEALDataLoader(val_data, batch_size=args.batch_size, num_workers=args.num_workers)
-        test_loader = SEALDataLoader(test_data, batch_size=args.batch_size, num_workers=args.num_workers)
+
+    train_loader = GraphDataLoader(train_data, batch_size=args.batch_size, num_workers=args.num_workers)
+    val_loader = GraphDataLoader(val_data, batch_size=args.batch_size, num_workers=args.num_workers)
+    test_loader = GraphDataLoader(test_data, batch_size=args.batch_size, num_workers=args.num_workers)
 
     # set model
     if args.model == 'gcn':

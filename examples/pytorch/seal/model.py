@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl.nn.pytorch import SortPooling, SumPooling
-from gcn_layers import GraphConv, SAGEConv
+from dgl.nn.pytorch import GraphConv, SAGEConv
 
 
 class GCN(nn.Module):
@@ -61,12 +61,10 @@ class GCN(nn.Module):
             self.layers.append(GraphConv(initial_dim, hidden_units, allow_zero_in_degree=True))
             for _ in range(num_layers - 1):
                 self.layers.append(GraphConv(hidden_units, hidden_units, allow_zero_in_degree=True))
-            self.layers.append(GraphConv(hidden_units, 1, allow_zero_in_degree=True))
         elif gcn_type == 'sage':
             self.layers.append(SAGEConv(initial_dim, hidden_units, aggregator_type='gcn'))
             for _ in range(num_layers - 1):
                 self.layers.append(SAGEConv(hidden_units, hidden_units, aggregator_type='gcn'))
-            self.layers.append(SAGEConv(hidden_units, 1, aggregator_type='gcn'))
         else:
             raise ValueError('Gcn type error.')
 
@@ -113,13 +111,12 @@ class GCN(nn.Module):
             x = torch.cat([x, n_emb], 1)
 
         for layer in self.layers[:-1]:
-            x = layer(g, x, edge_weight)
+            x = layer(g, x, edge_weight=edge_weight)
             x = F.relu(x)
             x = F.dropout(x, p=self.dropout, training=self.training)
-        x = self.layers[-1](g, x, edge_weight)
+        x = self.layers[-1](g, x, edge_weight=edge_weight)
 
         x = self.pooling(g, x)
-
         x = F.relu(self.linear_1(x))
         F.dropout(x, p=self.dropout, training=self.training)
         x = self.linear_2(x)
@@ -231,7 +228,7 @@ class DGCNN(nn.Module):
 
         xs = [x]
         for layer in self.layers:
-            out = torch.tanh(layer(g, xs[-1], edge_weight))
+            out = torch.tanh(layer(g, xs[-1], edge_weight=edge_weight))
             xs += [out]
 
         x = torch.cat(xs[1:], dim=-1)
