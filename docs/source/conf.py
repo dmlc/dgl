@@ -47,7 +47,7 @@ extensions = [
     'sphinx.ext.intersphinx',
     'sphinx.ext.graphviz',
     'sphinx_gallery.gen_gallery',
-    'sphinx_copybutton',
+    # 'sphinx_copybutton',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
