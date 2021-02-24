@@ -3,6 +3,8 @@
 5.1 Node Classification/Regression
 --------------------------------------------------
 
+:ref:`(中文版) <guide_cn-training-node-classification>`
+
 One of the most popular and widely adopted tasks for graph neural
 networks is node classification, where each node in the
 training/validation/test set is assigned a ground truth category from a
@@ -155,8 +157,7 @@ all node types.
 .. code:: python
 
     # Define a Heterograph Conv model
-    import dgl.nn as dglnn
-    
+
     class RGCN(nn.Module):
         def __init__(self, in_feats, hid_feats, out_feats, rel_names):
             super().__init__()
@@ -179,7 +180,8 @@ all node types.
 feature tensors as input, and returns another dictionary of node types
 and node features.
 
-So given that we have the user and item features in the example above.
+So given that we have the user and item features in the
+:ref:`heterogeneous graph example <guide-training-heterogeneous-graph-example>`.
 
 .. code:: python
 

@@ -1,7 +1,6 @@
 """Module for sparse matrix operators."""
 # pylint: disable= invalid-name
 from __future__ import absolute_import
-
 import dgl.ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
@@ -120,6 +119,11 @@ def _gspmm(gidx, op, reduce_op, u, e):
         raise DGLError("We only support gspmm on graph with one edge type")
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
+    if use_u and use_e:
+        if F.dtype(u) != F.dtype(e):
+            raise DGLError("The node features' data type {} doesn't match edge"
+                           " features' data type {}, please convert them to the"
+                           " same type.".format(F.dtype(u), F.dtype(e)))
     # deal with scalar features.
     expand_u, expand_e = False, False
     if use_u:
@@ -130,6 +134,7 @@ def _gspmm(gidx, op, reduce_op, u, e):
         if F.ndim(e) == 1:
             e = F.unsqueeze(e, -1)
             expand_e = True
+
     ctx = F.context(u) if use_u else F.context(e)
     dtype = F.dtype(u) if use_u else F.dtype(e)
     u_shp = F.shape(u) if use_u else (0,)
@@ -167,6 +172,10 @@ def _gspmm(gidx, op, reduce_op, u, e):
     # To deal with scalar node/edge features.
     if (expand_u or not use_u) and (expand_e or not use_e):
         v = F.squeeze(v, -1)
+    if expand_u and use_cmp:
+        arg_u = F.squeeze(arg_u, -1)
+    if expand_e and use_cmp:
+        arg_e = F.squeeze(arg_e, -1)
     return v, (arg_u, arg_e)
 
 
@@ -214,6 +223,10 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
         raise DGLError("We only support gsddmm on graph with one edge type")
     use_lhs = op != 'copy_rhs'
     use_rhs = op != 'copy_lhs'
+    if use_lhs and use_rhs:
+        if F.dtype(lhs) != F.dtype(rhs):
+            raise DGLError("The operands data type don't match: {} and {}, please convert them"
+                           " to the same type.".format(F.dtype(lhs), F.dtype(rhs)))
     # deal with scalar features.
     expand_lhs, expand_rhs = False, False
     if use_lhs:
@@ -241,6 +254,116 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
                              lhs_target, rhs_target)
     if (expand_lhs or not use_lhs) and (expand_rhs or not use_rhs):
         out = F.squeeze(out, -1)
+    return out
+
+
+def _segment_reduce(op, feat, offsets):
+    r"""Segment reduction operator.
+
+    It aggregates the value tensor along the first dimension by segments.
+    The argument ``offsets`` specifies the start offset of each segment (and
+    the upper bound of the last segment). Zero-length segments are allowed.
+
+    .. math::
+      y_i = \Phi_{j=\mathrm{offsets}_i}^{\mathrm{offsets}_{i+1}-1} x_j
+
+    where :math:`\Phi` is the reduce operator.
+
+    Parameters
+    ----------
+    op : str
+        Aggregation method. Can be ``sum``, ``max``, ``min``.
+    x : Tensor
+        Value to aggregate.
+    offsets : Tensor
+        The start offsets of segments.
+
+    Returns
+    -------
+    tuple(Tensor)
+        The first tensor correspond to aggregated tensor of shape
+        ``(len(seglen), value.shape[1:])``, and the second tensor records
+        the argmin/max at each position for computing gradients.
+
+    Notes
+    -----
+    This function does not handle gradients.
+    """
+    n = F.shape(offsets)[0] - 1
+    out_shp = (n,) + F.shape(feat)[1:]
+    ctx = F.context(feat)
+    dtype = F.dtype(feat)
+    idtype = F.dtype(offsets)
+    out = F.zeros(out_shp, dtype, ctx)
+    arg = None
+    if op in ['min', 'max']:
+        arg = F.zeros(out_shp, idtype, ctx)
+    arg_nd = to_dgl_nd_for_write(arg)
+    _CAPI_DGLKernelSegmentReduce(op,
+                                 to_dgl_nd(feat),
+                                 to_dgl_nd(offsets),
+                                 to_dgl_nd_for_write(out),
+                                 arg_nd)
+    arg = None if arg is None else F.zerocopy_from_dgl_ndarray(arg_nd)
+    return out, arg
+
+
+def _scatter_add(x, idx, m):
+    r""" Scatter add operator (on first dimension) implementation.
+
+    Math: y[idx[i], *] += x[i, *]
+
+    Parameters
+    ----------
+    x : Tensor
+        The input feature.
+    idx : Tensor
+        The indices array.
+    m : int
+        The length of output.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    out_shp = (m,) + F.shape(x)[1:]
+    ctx = F.context(x)
+    dtype = F.dtype(x)
+    out = F.zeros(out_shp, dtype, ctx)
+    _CAPI_DGLKernelScatterAdd(to_dgl_nd(x),
+                              to_dgl_nd(idx),
+                              to_dgl_nd_for_write(out))
+    return out
+
+
+def _bwd_segment_cmp(feat, arg, m):
+    r""" Backward phase of segment reduction (for 'min'/'max' reduction).
+
+    It computes the gradient of input feature given output gradient of
+    the segment reduction result.
+
+    Parameters
+    ----------
+    feat : Tensor
+        The output gradient
+    arg : Tensor
+        The ArgMin/Max tensor produced by segment_reduce op.
+    m : int
+        The length of input gradients' first dimension.
+
+    Returns
+    -------
+    Tensor
+        The input gradient.
+    """
+    out_shp = (m,) + F.shape(feat)[1:]
+    ctx = F.context(feat)
+    dtype = F.dtype(feat)
+    out = F.zeros(out_shp, dtype, ctx)
+    _CAPI_DGLKernelBwdSegmentCmp(to_dgl_nd(feat),
+                                 to_dgl_nd(arg),
+                                 to_dgl_nd_for_write(out))
     return out
 
 

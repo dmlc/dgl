@@ -20,7 +20,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.multiprocessing as mp
-from torch.utils.data import DataLoader
+from dgl.distributed import DistDataLoader
 #from pyinstrument import Profiler
 
 class SAGE(nn.Module):
@@ -207,13 +207,12 @@ class DistSAGE(SAGE):
             sampler = PosNeighborSampler(g, [-1], dgl.distributed.sample_neighbors)
             print('|V|={}, eval batch size: {}'.format(g.number_of_nodes(), batch_size))
             # Create PyTorch DataLoader for constructing blocks
-            dataloader = DataLoader(
+            dataloader = DistDataLoader(
                 dataset=nodes,
                 batch_size=batch_size,
                 collate_fn=sampler.sample_blocks,
                 shuffle=False,
-                drop_last=False,
-                num_workers=args.num_workers)
+                drop_last=False)
 
             for blocks in tqdm.tqdm(dataloader):
                 block = blocks[0].to(device)
@@ -487,7 +486,9 @@ if __name__ == '__main__':
         help="whether to remove edges during sampling")
     args = parser.parse_args()
     assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')), \
-    'The num_workers should be the same value with num_samplers.'
-
+    'The num_workers should be the same value with DGL_NUM_SAMPLER.'
+    assert args.num_servers == int(os.environ.get('DGL_NUM_SERVER')), \
+    'The num_servers should be the same value with DGL_NUM_SERVER.'
+    
     print(args)
     main(args)

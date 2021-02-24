@@ -184,7 +184,7 @@ if __name__ == '__main__':
     parser.add_argument("--n-epochs", type=int, default=200,
                         help="number of training epochs")
     parser.add_argument("--log-every", type=int, default=100,
-                        help="number of training epochs")
+                        help="the frequency to save model")
     parser.add_argument("--batch-size", type=int, default=20,
                         help="batch size")
     parser.add_argument("--psize", type=int, default=1500,

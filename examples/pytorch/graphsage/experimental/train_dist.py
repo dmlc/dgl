@@ -187,13 +187,13 @@ def run(args, device, data):
     # Training loop
     iter_tput = []
     profiler = Profiler()
-    profiler.start()
+    if args.close_profiler == False:
+        profiler.start()
     epoch = 0
     for epoch in range(args.num_epochs):
         tic = time.time()
 
         sample_time = 0
-        copy_time = 0
         forward_time = 0
         backward_time = 0
         update_time = 0
@@ -228,30 +228,22 @@ def run(args, device, data):
             forward_time += forward_end - start
             backward_time += compute_end - forward_end
 
-            # Aggregate gradients in multiple nodes.
-            if not args.standalone:
-                for param in model.parameters():
-                    if param.requires_grad and param.grad is not None:
-                        th.distributed.all_reduce(param.grad.data,
-                                                  op=th.distributed.ReduceOp.SUM)
-                        param.grad.data /= dgl.distributed.get_num_client()
-
             optimizer.step()
             update_time += time.time() - compute_end
 
             step_t = time.time() - tic_step
             step_time.append(step_t)
-            iter_tput.append(num_seeds / (step_t))
+            iter_tput.append(len(blocks[-1].dstdata[dgl.NID]) / step_t)
             if step % args.log_every == 0:
                 acc = compute_acc(batch_pred, batch_labels)
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                print('Part {} | Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB | time {:.3f} s'.format(
+                print('Part {} | Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB | time {:.3f} s'.format(
                     g.rank(), epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc, np.sum(step_time[-args.log_every:])))
             start = time.time()
 
         toc = time.time()
-        print('Part {}, Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
-            g.rank(), toc - tic, sample_time, copy_time, forward_time, backward_time, update_time, num_seeds, num_inputs))
+        print('Part {}, Epoch Time(s): {:.4f}, sample+data_copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
+            g.rank(), toc - tic, sample_time, forward_time, backward_time, update_time, num_seeds, num_inputs))
         epoch += 1
 
 
@@ -261,9 +253,9 @@ def run(args, device, data):
                                          g.ndata['labels'], val_nid, test_nid, args.batch_size_eval, device)
             print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc,
                                                                                   time.time() - start))
-
-    profiler.stop()
-    print(profiler.output_text(unicode=True, color=True))
+    if args.close_profiler == False:
+        profiler.stop()
+        print(profiler.output_text(unicode=True, color=True))
 
 def main(args):
     dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
@@ -321,9 +313,12 @@ if __name__ == '__main__':
         help="Number of sampling processes. Use 0 for no extra process.")
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
+    parser.add_argument('--close_profiler', action='store_true', help='Close pyinstrument profiler')
     args = parser.parse_args()
     assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')), \
-    'The num_workers should be the same value with num_samplers.'
+    'The num_workers should be the same value with DGL_NUM_SAMPLER.'
+    assert args.num_servers == int(os.environ.get('DGL_NUM_SERVER')), \
+    'The num_servers should be the same value with DGL_NUM_SERVER.'
 
     print(args)
     main(args)

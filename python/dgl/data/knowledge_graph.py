@@ -27,7 +27,7 @@ class KnowledgeGraphDataset(DGLBuiltinDataset):
     -----------
     name: str
         Name can be 'FB15k-237', 'FB15k' or 'wn18'.
-    reverse: boo
+    reverse: bool
         Whether add reverse edges. Default: True.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
@@ -342,7 +342,7 @@ class FB15k237Dataset(KnowledgeGraphDataset):
             >>> dataset = FB15k237Dataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.edata['train_mask']
-            >>> train_idx = th.nonzero(train_mask).squeeze()
+            >>> train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(train_idx)
             >>> rel = graph.edata['etype'][train_idx]
 
@@ -351,7 +351,7 @@ class FB15k237Dataset(KnowledgeGraphDataset):
             >>> dataset = FB15k237Dataset()
             >>> graph = dataset[0]
             >>> val_mask = graph.edata['val_mask']
-            >>> val_idx = th.nonzero(val_mask).squeeze()
+            >>> val_idx = th.nonzero(val_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(val_idx)
             >>> rel = graph.edata['etype'][val_idx]
 
@@ -360,7 +360,7 @@ class FB15k237Dataset(KnowledgeGraphDataset):
             >>> dataset = FB15k237Dataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.edata['test_mask']
-            >>> test_idx = th.nonzero(test_mask).squeeze()
+            >>> test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(test_idx)
             >>> rel = graph.edata['etype'][test_idx]
 
@@ -464,7 +464,7 @@ class FB15k237Dataset(KnowledgeGraphDataset):
 
     def __len__(self):
         r"""The number of graphs in the dataset."""
-        return super(FB15k237Dataset, self).__len__(idx)
+        return super(FB15k237Dataset, self).__len__()
 
 class FB15kDataset(KnowledgeGraphDataset):
     r"""FB15k link prediction dataset.
@@ -476,7 +476,7 @@ class FB15kDataset(KnowledgeGraphDataset):
             >>> dataset = FB15kDataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.edata['train_mask']
-            >>> train_idx = th.nonzero(train_mask).squeeze()
+            >>> train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(train_idx)
             >>> rel = graph.edata['etype'][train_idx]
 
@@ -485,7 +485,7 @@ class FB15kDataset(KnowledgeGraphDataset):
             >>> dataset = FB15kDataset()
             >>> graph = dataset[0]
             >>> val_mask = graph.edata['val_mask']
-            >>> val_idx = th.nonzero(val_mask).squeeze()
+            >>> val_idx = th.nonzero(val_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(val_idx)
             >>> rel = graph.edata['etype'][val_idx]
 
@@ -494,7 +494,7 @@ class FB15kDataset(KnowledgeGraphDataset):
             >>> dataset = FB15kDataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.edata['test_mask']
-            >>> test_idx = th.nonzero(test_mask).squeeze()
+            >>> test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(test_idx)
             >>> rel = graph.edata['etype'][test_idx]
 
@@ -601,7 +601,7 @@ class FB15kDataset(KnowledgeGraphDataset):
 
     def __len__(self):
         r"""The number of graphs in the dataset."""
-        return super(FB15kDataset, self).__len__(idx)
+        return super(FB15kDataset, self).__len__()
 
 class WN18Dataset(KnowledgeGraphDataset):
     r""" WN18 link prediction dataset.
@@ -613,7 +613,7 @@ class WN18Dataset(KnowledgeGraphDataset):
             >>> dataset = WN18Dataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.edata['train_mask']
-            >>> train_idx = th.nonzero(train_mask).squeeze()
+            >>> train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(train_idx)
             >>> rel = graph.edata['etype'][train_idx]
 
@@ -622,7 +622,7 @@ class WN18Dataset(KnowledgeGraphDataset):
             >>> dataset = WN18Dataset()
             >>> graph = dataset[0]
             >>> val_mask = graph.edata['val_mask']
-            >>> val_idx = th.nonzero(val_mask).squeeze()
+            >>> val_idx = th.nonzero(val_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(val_idx)
             >>> rel = graph.edata['etype'][val_idx]
 
@@ -631,7 +631,7 @@ class WN18Dataset(KnowledgeGraphDataset):
             >>> dataset = WN18Dataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.edata['test_mask']
-            >>> test_idx = th.nonzero(test_mask).squeeze()
+            >>> test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(test_idx)
             >>> rel = graph.edata['etype'][test_idx]
 
@@ -737,7 +737,7 @@ class WN18Dataset(KnowledgeGraphDataset):
 
     def __len__(self):
         r"""The number of graphs in the dataset."""
-        return super(WN18Dataset, self).__len__(idx)
+        return super(WN18Dataset, self).__len__()
 
 def load_data(dataset):
     r"""Load knowledge graph dataset for RGCN link prediction tasks

@@ -175,7 +175,7 @@ def negative_sampling(pos_samples, num_entity, negative_rate):
 
 def sort_and_rank(score, target):
     _, indices = torch.sort(score, dim=1, descending=True)
-    indices = torch.nonzero(indices == target.view(-1, 1))
+    indices = torch.nonzero(indices == target.view(-1, 1), as_tuple=False)
     indices = indices[:, 1].view(-1)
     return indices
 

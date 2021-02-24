@@ -3,6 +3,8 @@
 6.2 Training GNN for Edge Classification with Neighborhood Sampling
 ----------------------------------------------------------------------
 
+:ref:`(中文版) <guide_cn-minibatch-edge-classification-sampler>`
+
 Training for edge classification/regression is somewhat similar to that
 of node classification/regression with several notable differences.
 
@@ -20,7 +22,7 @@ To use the neighborhood sampler provided by DGL for edge classification,
 one need to instead combine it with
 :class:`~dgl.dataloading.pytorch.EdgeDataLoader`, which iterates
 over a set of edges in minibatches, yielding the subgraph induced by the
-edge minibatch and ``blocks`` to be consumed by the module above.
+edge minibatch and ``blocks`` to be consumed by the module below.
 
 For example, the following code creates a PyTorch DataLoader that
 iterates over the training edge ID array ``train_eids`` in batches,
@@ -54,7 +56,7 @@ advantage.
 Therefore in edge classification you sometimes would like to exclude the
 edges sampled in the minibatch from the original graph for neighborhood
 sampling, as well as the reverse edges of the sampled edges on an
-undirected graph. You can specify ``exclude='reverse'`` in instantiation
+undirected graph. You can specify ``exclude='reverse_id'`` in instantiation
 of :class:`~dgl.dataloading.pytorch.EdgeDataLoader`, with the mapping of the edge
 IDs to their reverse edges IDs.  Usually doing so will lead to much slower
 sampling process due to locating the reverse edges involving in the minibatch
@@ -69,7 +71,7 @@ and removing them.
         # The following two arguments are specifically for excluding the minibatch
         # edges and their reverse edges from the original graph for neighborhood
         # sampling.
-        exclude='reverse',
+        exclude='reverse_id',
         reverse_eids=torch.cat([
             torch.arange(n_edges // 2, n_edges), torch.arange(0, n_edges // 2)]),
     
@@ -188,7 +190,7 @@ classification/regression.
 .. code:: python
 
     class StochasticTwoLayerRGCN(nn.Module):
-        def __init__(self, in_feat, hidden_feat, out_feat):
+        def __init__(self, in_feat, hidden_feat, out_feat, rel_names):
             super().__init__()
             self.conv1 = dglnn.HeteroGraphConv({
                     rel : dglnn.GraphConv(in_feat, hidden_feat, norm='right')
@@ -225,6 +227,18 @@ over the edge types for :meth:`~dgl.DGLHeteroGraph.apply_edges`.
                 for etype in edge_subgraph.canonical_etypes:
                     edge_subgraph.apply_edges(self.apply_edges, etype=etype)
                 return edge_subgraph.edata['score']
+
+    class Model(nn.Module):
+        def __init__(self, in_features, hidden_features, out_features, num_classes,
+                     etypes):
+            super().__init__()
+            self.rgcn = StochasticTwoLayerRGCN(
+                in_features, hidden_features, out_features, etypes)
+            self.pred = ScorePredictor(num_classes, out_features)
+
+        def forward(self, edge_subgraph, blocks, x):
+            x = self.rgcn(blocks, x)
+            return self.pred(edge_subgraph, x)
 
 Data loader definition is also very similar to that of node
 classification. The only difference is that you need
@@ -279,7 +293,7 @@ dictionaries of node types and predictions here.
 
 .. code:: python
 
-    model = Model(in_features, hidden_features, out_features, num_classes)
+    model = Model(in_features, hidden_features, out_features, num_classes, etypes)
     model = model.cuda()
     opt = torch.optim.Adam(model.parameters())
     

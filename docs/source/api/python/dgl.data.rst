@@ -168,6 +168,12 @@ QM7b dataset
 .. autoclass:: QM7bDataset
     :members: __getitem__, __len__
 
+.. _qm9data:
+
+QM9 dataset
+```````````````````````````````````
+.. autoclass:: QM9Dataset
+    :members: __getitem__, __len__
 
 .. _minigcdataset:
 
@@ -190,7 +196,7 @@ TU dataset
 
 Graph isomorphism network dataset
 ```````````````````````````````````
-A compact subset of graph kernel dataset
+
 .. autoclass:: GINDataset
     :members: __getitem__, __len__
 

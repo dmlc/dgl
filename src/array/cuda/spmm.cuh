@@ -8,6 +8,7 @@
 
 #include <dgl/bcast.h>
 #include "macro.cuh"
+#include "fp16.cuh"
 #include "atomic.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
@@ -19,20 +20,6 @@ using namespace cuda;
 namespace aten {
 namespace cuda {
 
-/*! 
- * \brief CUDA Kernel of filling the vector started from ptr of size length
- *        with val.
- * \note internal use only.
- */
-template <typename DType>
-__global__ void _FillKernel(DType* ptr, size_t length, DType val) {
-  int tx = blockIdx.x * blockDim.x + threadIdx.x;
-  int stride_x = gridDim.x * blockDim.x;
-  while (tx < length) {
-    ptr[tx] = val;
-    tx += stride_x;
-  }
-}
 
 /*!
  * \brief CUDA kernel of g-SpMM on Coo format.
@@ -134,7 +121,7 @@ __global__ void ArgSpMMCooKernel(
 /*!
  * \brief CUDA kernel of g-SpMM on Coo format.
  * \note it uses node parallel strategy, different threadblocks (on y-axis)
- *       is responsible for the computation on different destination nodes. 
+ *       is responsible for the computation on different destination nodes.
  *       Threadblocks on the x-axis are responsible for the computation on
  *       different positions in feature dimension.
  */
@@ -150,7 +137,7 @@ __global__ void SpMMCsrKernel(
   const Idx* __restrict__ indptr,
   const Idx* __restrict__ indices,
   const Idx* __restrict__ edge_map,
-  int64_t num_rows, int64_t num_cols, int64_t nnz,
+  int64_t num_rows, int64_t num_cols,
   const int64_t* __restrict__ ubcast_off,
   const int64_t* __restrict__ ebcast_off,
   int64_t ufeat_len, int64_t efeat_len, int64_t out_len) {
@@ -161,7 +148,7 @@ __global__ void SpMMCsrKernel(
   while (ty < num_rows) {
     int tx = blockIdx.x * blockDim.x + threadIdx.x;
     while (tx < out_len) {
-      DType local_accum = ReduceOp::zero;
+      DType local_accum = ReduceOp::zero();
       Idx local_argu = 0, local_arge = 0;
       const int lhs_add = UseBcast ? ubcast_off[tx] : tx;
       const int rhs_add = UseBcast ? ebcast_off[tx] : tx;
@@ -191,10 +178,10 @@ __global__ void SpMMCsrKernel(
  * \param ufeat The feature on source nodes.
  * \param efeat The feature on edges.
  * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes, which refers the source node indices 
+ * \param argu Arg-Min/Max on source nodes, which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \param arge Arg-Min/Max on edges. which refers the source node indices 
+ * \param arge Arg-Min/Max on edges. which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
  */
@@ -205,6 +192,12 @@ void SpMMCoo(
     const COOMatrix& coo,
     NDArray ufeat, NDArray efeat,
     NDArray out, NDArray argu, NDArray arge) {
+#if defined(CUDART_VERSION) && CUDART_VERSION <= 10000
+  if (std::is_same<DType, half>::value)
+    LOG(FATAL) << "SpMMCoo requires atomicCAS, which is not supported "
+               << "for float16 in CUDA 10.0. Please upgrade your CUDA "
+               << "to later versions.";
+#endif
   const Idx *row = coo.row.Ptr<Idx>(),
             *col = coo.col.Ptr<Idx>(),
             *edge_map = coo.data.Ptr<Idx>();
@@ -225,7 +218,7 @@ void SpMMCoo(
   const int nt = FindNumThreads(out_size);
   const int nb = (out_size + nt - 1) / nt;
   CUDA_KERNEL_CALL(_FillKernel, nb, nt, 0, thr_entry->stream,
-      out_data, out_size, ReduceOp::zero);
+      out_data, out_size, ReduceOp::zero());
 
   const int ntx = FindNumThreads(len);
   const int nty = CUDA_MAX_NUM_THREADS / ntx;
@@ -263,10 +256,10 @@ void SpMMCoo(
  * \param ufeat The feature on source nodes.
  * \param efeat The feature on edges.
  * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes, which refers the source node indices 
+ * \param argu Arg-Min/Max on source nodes, which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \param arge Arg-Min/Max on edges. which refers the source node indices 
+ * \param arge Arg-Min/Max on edges. which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
  */
@@ -306,7 +299,7 @@ void SpMMCsr(
         nblks, nthrs, 0, thr_entry->stream,
         ufeat_data, efeat_data, out_data, argu_data, arge_data,
         indptr, indices, edge_map,
-        csr.num_rows, csr.num_cols, efeat->shape[0],
+        csr.num_rows, csr.num_cols,
         ubcast_off, ebcast_off,
         lhs_len, rhs_len, len)
   });

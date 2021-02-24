@@ -25,12 +25,21 @@ class SAGEConv(nn.Module):
 
         h_{i}^{(l+1)} &= \mathrm{norm}(h_{i}^{l})
 
+    If a weight tensor on each edge is provided, the aggregation becomes:
+
+    .. math::
+        h_{\mathcal{N}(i)}^{(l+1)} = \mathrm{aggregate}
+        \left(\{e_{ji} h_{j}^{l}, \forall j \in \mathcal{N}(i) \}\right)
+
+    where :math:`e_{ji}` is the scalar weight on the edge from node :math:`j` to node :math:`i`.
+    Please make sure that :math:`e_{ji}` is broadcastable with :math:`h_j^{l}`.
+
     Parameters
     ----------
     in_feats : int, or pair of ints
         Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
 
-        GATConv can be applied on homogeneous graph and unidirectional
+        SAGEConv can be applied on homogeneous graph and unidirectional
         `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`__.
         If the layer applies on a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
@@ -147,7 +156,7 @@ class SAGEConv(nn.Module):
         _, (rst, _) = self.lstm(m, h)
         return {'neigh': rst.squeeze(0)}
 
-    def forward(self, graph, feat):
+    def forward(self, graph, feat, edge_weight=None):
         r"""
 
         Description
@@ -164,6 +173,9 @@ class SAGEConv(nn.Module):
             where :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
             If a pair of torch.Tensor is given, the pair must contain two tensors of shape
             :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
+        edge_weight : torch.Tensor, optional
+            Optional tensor on the edge. If given, the convolution will weight
+            with regard to the message.
 
         Returns
         -------
@@ -179,6 +191,11 @@ class SAGEConv(nn.Module):
                 feat_src = feat_dst = self.feat_drop(feat)
                 if graph.is_block:
                     feat_dst = feat_src[:graph.number_of_dst_nodes()]
+            aggregate_fn = fn.copy_src('h', 'm')
+            if edge_weight is not None:
+                assert edge_weight.shape[0] == graph.number_of_edges()
+                graph.edata['_edge_weight'] = edge_weight
+                aggregate_fn = fn.u_mul_e('h', '_edge_weight', 'm')
 
             h_self = feat_dst
 
@@ -189,23 +206,23 @@ class SAGEConv(nn.Module):
 
             if self._aggre_type == 'mean':
                 graph.srcdata['h'] = feat_src
-                graph.update_all(fn.copy_src('h', 'm'), fn.mean('m', 'neigh'))
+                graph.update_all(aggregate_fn, fn.mean('m', 'neigh'))
                 h_neigh = graph.dstdata['neigh']
             elif self._aggre_type == 'gcn':
                 check_eq_shape(feat)
                 graph.srcdata['h'] = feat_src
                 graph.dstdata['h'] = feat_dst     # same as above if homogeneous
-                graph.update_all(fn.copy_src('h', 'm'), fn.sum('m', 'neigh'))
+                graph.update_all(aggregate_fn, fn.sum('m', 'neigh'))
                 # divide in_degrees
                 degs = graph.in_degrees().to(feat_dst)
                 h_neigh = (graph.dstdata['neigh'] + graph.dstdata['h']) / (degs.unsqueeze(-1) + 1)
             elif self._aggre_type == 'pool':
                 graph.srcdata['h'] = F.relu(self.fc_pool(feat_src))
-                graph.update_all(fn.copy_src('h', 'm'), fn.max('m', 'neigh'))
+                graph.update_all(aggregate_fn, fn.max('m', 'neigh'))
                 h_neigh = graph.dstdata['neigh']
             elif self._aggre_type == 'lstm':
                 graph.srcdata['h'] = feat_src
-                graph.update_all(fn.copy_src('h', 'm'), self._lstm_reducer)
+                graph.update_all(aggregate_fn, self._lstm_reducer)
                 h_neigh = graph.dstdata['neigh']
             else:
                 raise KeyError('Aggregator type {} not recognized.'.format(self._aggre_type))

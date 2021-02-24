@@ -19,7 +19,7 @@ namespace aten {
 /*!
  * \brief Generalized Sparse Matrix Dense Matrix Multiplication on Csr format.
  */
-template <int XPU, typename IdType, typename DType>
+template <int XPU, typename IdType, int bits>
 void SpMMCsr(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
              const aten::CSRMatrix& csr,
@@ -31,7 +31,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
 /*!
  * \brief Generalized Sparse Matrix Dense Matrix Multiplication on Coo format.
  */
-template <int XPU, typename IdType, typename DType>
+template <int XPU, typename IdType, int bits>
 void SpMMCoo(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
              const aten::COOMatrix& coo,
@@ -43,7 +43,7 @@ void SpMMCoo(const std::string& op, const std::string& reduce,
 /*!
  * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Csr format.
  */
-template <int XPU, typename IdType, typename DType>
+template <int XPU, typename IdType, int bits>
 void SDDMMCsr(const std::string& op,
               const BcastOff& bcast,
               const aten::CSRMatrix& csr,
@@ -56,7 +56,7 @@ void SDDMMCsr(const std::string& op,
 /*!
  * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Coo format.
  */
-template <int XPU, typename IdType, typename DType>
+template <int XPU, typename IdType, int bits>
 void SDDMMCoo(const std::string& op,
               const BcastOff& bcast,
               const aten::COOMatrix& coo,
@@ -65,6 +65,32 @@ void SDDMMCoo(const std::string& op,
               NDArray out,
               int lhs_target,
               int rhs_target);
+
+/*!
+ * \brief Segment reduce.
+ */
+template <int XPU, typename IdType, int bits>
+void SegmentReduce(const std::string& op,
+                   NDArray feat,
+                   NDArray offsets,
+                   NDArray out,
+                   NDArray arg);
+
+/*!
+ * \brief Scatter Add on first dimension.
+ */
+template <int XPU, typename IdType, int bits>
+void ScatterAdd(NDArray feat,
+                NDArray idx,
+                NDArray out);
+
+/*!
+ * \brief Backward function of segment cmp.
+ */
+template <int XPU, typename IdType, int bits>
+void BackwardSegmentCmp(NDArray feat,
+                        NDArray arg,
+                        NDArray out);
 
 }  // namespace aten
 }  // namespace dgl

@@ -1,11 +1,19 @@
 """
 .. _model-line-graph:
 
-Line graph neural network
+Line Graph Neural Network
 =========================
 
 **Author**: `Qi Huang <https://github.com/HQ01>`_, Yu Gai,
 `Minjie Wang <https://jermainewang.github.io/>`_, Zheng Zhang
+
+.. warning::
+
+    The tutorial aims at gaining insights into the paper, with code as a mean
+    of explanation. The implementation thus is NOT optimized for running
+    efficiency. For recommended implementation, please refer to the `official
+    examples <https://github.com/dmlc/dgl/tree/master/examples>`_.
+
 """
 
 ###########################################################################################
@@ -92,12 +100,12 @@ G = dgl.DGLGraph(data.graph)
 labels = th.tensor(data.labels)
 
 # find all the nodes labeled with class 0
-label0_nodes = th.nonzero(labels == 0).squeeze()
+label0_nodes = th.nonzero(labels == 0, as_tuple=False).squeeze()
 # find all the edges pointing to class 0 nodes
 src, _ = G.in_edges(label0_nodes)
 src_labels = labels[src]
 # find all the edges whose both endpoints are in class 0
-intra_src = th.nonzero(src_labels == 0)
+intra_src = th.nonzero(src_labels == 0, as_tuple=False)
 print('Intra-class edges percent: %.4f' % (len(intra_src) / len(src_labels)))
 
 ###########################################################################################

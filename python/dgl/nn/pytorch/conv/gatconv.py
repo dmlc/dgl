@@ -4,7 +4,7 @@ import torch as th
 from torch import nn
 
 from .... import function as fn
-from ....ops import edge_softmax
+from ...functional import edge_softmax
 from ....base import DGLError
 from ..utils import Identity
 from ....utils import expand_as_pair
@@ -33,7 +33,7 @@ class GATConv(nn.Module):
     ----------
     in_feats : int, or pair of ints
         Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
-        ATConv can be applied on homogeneous graph and unidirectional
+        GATConv can be applied on homogeneous graph and unidirectional
         `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`__.
         If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
@@ -208,7 +208,7 @@ class GATConv(nn.Module):
         """
         self._allow_zero_in_degree = set_value
 
-    def forward(self, graph, feat):
+    def forward(self, graph, feat, get_attention=False):
         r"""
 
         Description
@@ -224,12 +224,17 @@ class GATConv(nn.Module):
             :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
             If a pair of torch.Tensor is given, the pair must contain two tensors of shape
             :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
+        get_attention : bool, optional
+            Whether to return the attention values. Default to False.
 
         Returns
         -------
         torch.Tensor
             The output feature of shape :math:`(N, H, D_{out})` where :math:`H`
             is the number of heads, and :math:`D_{out}` is size of output feature.
+        torch.Tensor, optional
+            The attention values of shape :math:`(E, H, 1)`, where :math:`E` is the number of
+            edges. This is returned only when :attr:`get_attention` is ``True``.
 
         Raises
         ------
@@ -255,9 +260,11 @@ class GATConv(nn.Module):
                 h_src = self.feat_drop(feat[0])
                 h_dst = self.feat_drop(feat[1])
                 if not hasattr(self, 'fc_src'):
-                    self.fc_src, self.fc_dst = self.fc, self.fc
-                feat_src = self.fc_src(h_src).view(-1, self._num_heads, self._out_feats)
-                feat_dst = self.fc_dst(h_dst).view(-1, self._num_heads, self._out_feats)
+                    feat_src = self.fc(h_src).view(-1, self._num_heads, self._out_feats)
+                    feat_dst = self.fc(h_dst).view(-1, self._num_heads, self._out_feats)
+                else:
+                    feat_src = self.fc_src(h_src).view(-1, self._num_heads, self._out_feats)
+                    feat_dst = self.fc_dst(h_dst).view(-1, self._num_heads, self._out_feats)
             else:
                 h_src = h_dst = self.feat_drop(feat)
                 feat_src = feat_dst = self.fc(h_src).view(
@@ -294,4 +301,8 @@ class GATConv(nn.Module):
             # activation
             if self.activation:
                 rst = self.activation(rst)
-            return rst
+
+            if get_attention:
+                return rst, graph.edata['a']
+            else:
+                return rst

@@ -115,7 +115,10 @@ class Column(object):
             # copy index to the same context of storage.
             # Copy index is usually cheaper than copy data
             if F.context(self.storage) != F.context(self.index):
-                self.index = F.copy_to(self.index, F.context(self.storage))
+                kwargs = {}
+                if self.device is not None:
+                    kwargs = self.device[1]
+                self.index = F.copy_to(self.index, F.context(self.storage), **kwargs)
             self.storage = F.gather_row(self.storage, self.index)
             self.index = None
 
@@ -148,8 +151,6 @@ class Column(object):
         """
         col = self.clone()
         col.device = (device, kwargs)
-        if self.index is not None:
-            col.index = F.copy_to(self.index, device)
         return col
 
     def __getitem__(self, rowids):
@@ -167,7 +168,7 @@ class Column(object):
         Tensor
             The feature data
         """
-        return F.gather_row(self.data, rwoids)
+        return F.gather_row(self.data, rowids)
 
     def __setitem__(self, rowids, feats):
         """Update the feature data given the index.
@@ -182,7 +183,7 @@ class Column(object):
         feats : Tensor
             New features.
         """
-        self.update(idx, feats)
+        self.update(rowids, feats)
 
     def update(self, rowids, feats):
         """Update the feature data given the index.
@@ -253,6 +254,12 @@ class Column(object):
         if self.index is None:
             return Column(self.storage, self.scheme, rowids, self.device)
         else:
+            if F.context(self.index) != F.context(rowids):
+                # make sure index and row ids are on the same context
+                kwargs = {}
+                if self.device is not None:
+                    kwargs = self.device[1]
+                rowids = F.copy_to(rowids, F.context(self.index), **kwargs)
             return Column(self.storage, self.scheme, F.gather_row(self.index, rowids), self.device)
 
     @staticmethod
@@ -498,31 +505,25 @@ class Frame(MutableMapping):
 
     def _append(self, other):
         """Append ``other`` frame to ``self`` frame."""
-        # NOTE: `other` can be empty.
-        if self.num_rows == 0:
-            # if no rows in current frame; append is equivalent to
-            # directly updating columns.
-            self._columns = {key: Column.create(data) for key, data in other.items()}
-        else:
-            # pad columns that are not provided in the other frame with initial values
-            for key, col in self._columns.items():
-                if key in other:
-                    continue
-                scheme = col.scheme
-                ctx = F.context(col.data)
-                if self.get_initializer(key) is None:
-                    self._set_zero_default_initializer()
-                initializer = self.get_initializer(key)
-                new_data = initializer((other.num_rows,) + scheme.shape,
-                                       scheme.dtype, ctx,
-                                       slice(self._num_rows, self._num_rows + other.num_rows))
-                other[key] = new_data
-            # append other to self
-            for key, col in other._columns.items():
-                if key not in self._columns:
-                    # the column does not exist; init a new column
-                    self.add_column(key, col.scheme, F.context(col.data))
-                self._columns[key].extend(col.data, col.scheme)
+        # pad columns that are not provided in the other frame with initial values
+        for key, col in self._columns.items():
+            if key in other:
+                continue
+            scheme = col.scheme
+            ctx = F.context(col.data)
+            if self.get_initializer(key) is None:
+                self._set_zero_default_initializer()
+            initializer = self.get_initializer(key)
+            new_data = initializer((other.num_rows,) + scheme.shape,
+                                   scheme.dtype, ctx,
+                                   slice(self._num_rows, self._num_rows + other.num_rows))
+            other[key] = new_data
+        # append other to self
+        for key, col in other._columns.items():
+            if key not in self._columns:
+                # the column does not exist; init a new column
+                self.add_column(key, col.scheme, F.context(col.data))
+            self._columns[key].extend(col.data, col.scheme)
 
     def append(self, other):
         """Append another frame's data into this frame.

@@ -9,6 +9,7 @@ from ._ffi.function import _init_api
 from .base import dgl_warning, DGLError
 from . import convert
 from .heterograph import DGLHeteroGraph, DGLBlock
+from .frame import Frame
 from . import ndarray as nd
 from . import backend as F
 from . import utils, batch
@@ -258,6 +259,11 @@ def to_bidirected(g, copy_ndata=False, readonly=None):
     tensors with the input graph. Hence, users should try to avoid in-place operations
     which will be visible to both graphs.
 
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
+
     Examples
     --------
     The following examples use PyTorch backend.
@@ -353,6 +359,11 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
     tensors with the input graph. Hence, users should try to avoid in-place operations
     which will be visible to both graphs. On the contrary, the two graphs do not share
     the same edge feature storage.
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Examples
     --------
@@ -478,8 +489,11 @@ def line_graph(g, backtracking=True, shared=False):
     * If :attr:`shared` is True, the node features of the resulting graph share the same
       storage with the edge features of the input graph. Hence, users should try to
       avoid in-place operations which will be visible to both graphs.
-
     * The function supports input graph on GPU but copies it to CPU during computation.
+    * This function discards the batch information. Please use
+      :func:`dgl.DGLGraph.set_batch_num_nodes`
+      and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+      to maintain the information.
 
     Examples
     --------
@@ -594,6 +608,11 @@ def khop_graph(g, k, copy_ndata=True):
     tensors with the input graph. Hence, users should try to avoid in-place operations
     which will be visible to both graphs.
 
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
+
     Examples
     --------
 
@@ -644,6 +663,9 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
     :math:`(i_1, j_1), (i_2, j_2), \cdots` of type ``(U, E, V)`` is a new graph with edges
     :math:`(j_1, i_1), (j_2, i_2), \cdots` of type ``(V, E, U)``.
 
+    The returned graph shares the data structure with the original graph, i.e. dgl.reverse
+    will not create extra storage for the reversed graph.
+
     Parameters
     ----------
     g : DGLGraph
@@ -668,6 +690,11 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
     the resulting graph will share the node or edge feature
     tensors with the input graph. Hence, users should try to avoid in-place operations
     which will be visible to both graphs.
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Examples
     --------
@@ -771,6 +798,14 @@ def to_simple_graph(g):
     -------
     DGLGraph
         A simple graph.
+
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
     """
     dgl_warning('dgl.to_simple_graph is renamed to dgl.to_simple in v0.5.')
     return to_simple(g)
@@ -800,6 +835,11 @@ def to_bidirected_stale(g, readonly=True):
     Notes
     -----
     Please make sure g is a simple graph, otherwise the return value is undefined.
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Returns
     -------
@@ -893,6 +933,14 @@ def metapath_reachable_graph(g, metapath):
         A homogeneous or unidirectional bipartite graph. It will be on CPU regardless of
         whether the input graph is on CPU or GPU.
 
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
+
     Examples
     --------
     >>> g = dgl.heterograph({
@@ -948,6 +996,10 @@ def add_nodes(g, num, data=None, ntype=None):
       DGL assigns zero features for the newly added nodes.
     * For feature in :attr:`data` but not in :attr:`g`, DGL assigns zero features
       for the existing nodes in the graph.
+    * This function discards the batch information. Please use
+      :func:`dgl.DGLGraph.set_batch_num_nodes`
+      and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+      to maintain the information.
 
     Examples
     --------
@@ -1048,6 +1100,10 @@ def add_edges(g, u, v, data=None, etype=None):
       DGL assigns zero features for the newly added nodes.
     * For feature in :attr:`data` but not in :attr:`g`, DGL assigns zero features
       for the existing nodes in the graph.
+    * This function discards the batch information. Please use
+      :func:`dgl.DGLGraph.set_batch_num_nodes`
+      and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+      to maintain the information.
 
     Examples
     --------
@@ -1116,7 +1172,7 @@ def add_edges(g, u, v, data=None, etype=None):
     g.add_edges(u, v, data=data, etype=etype)
     return g
 
-def remove_edges(g, eids, etype=None):
+def remove_edges(g, eids, etype=None, store_ids=False):
     r"""Remove the specified edges and return a new graph.
 
     Also delete the features of the edges. The edges must exist in the graph.
@@ -1135,11 +1191,23 @@ def remove_edges(g, eids, etype=None):
           triplet format in the graph.
 
         Can be omitted if the graph has only one type of edges.
+    store_ids : bool, optional
+        If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata``
+        and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
+        respectively.
 
     Return
     ------
     DGLGraph
         The graph with edges deleted.
+
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Examples
     --------
@@ -1179,11 +1247,11 @@ def remove_edges(g, eids, etype=None):
     remove_nodes
     """
     g = g.clone()
-    g.remove_edges(eids, etype=etype)
+    g.remove_edges(eids, etype=etype, store_ids=store_ids)
     return g
 
 
-def remove_nodes(g, nids, ntype=None):
+def remove_nodes(g, nids, ntype=None, store_ids=False):
     r"""Remove the specified nodes and return a new graph.
 
     Also delete the features. Edges that connect from/to the nodes will be
@@ -1197,11 +1265,23 @@ def remove_nodes(g, nids, ntype=None):
     ntype : str, optional
         The type of the nodes to remove. Can be omitted if there is
         only one node type in the graph.
+    store_ids : bool, optional
+        If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata``
+        and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
+        respectively.
 
     Return
     ------
     DGLGraph
         The graph with nodes deleted.
+
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Examples
     --------
@@ -1247,7 +1327,7 @@ def remove_nodes(g, nids, ntype=None):
     remove_edges
     """
     g = g.clone()
-    g.remove_nodes(nids, ntype=ntype)
+    g.remove_nodes(nids, ntype=ntype, store_ids=store_ids)
     return g
 
 def add_self_loop(g, etype=None):
@@ -1279,6 +1359,10 @@ def add_self_loop(g, etype=None):
       If one wishes to have exactly one self-loop for every node,
       call :func:`remove_self_loop` before invoking :func:`add_self_loop`.
     * Features of the new edges (self-loop edges) will be filled with zeros.
+    * This function discards the batch information. Please use
+      :func:`dgl.DGLGraph.set_batch_num_nodes`
+      and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+      to maintain the information.
 
     Examples
     --------
@@ -1348,6 +1432,11 @@ def remove_self_loop(g, etype=None):
     -----
     If a node has multiple self-loops, remove them all. Do nothing for nodes without
     self-loops.
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Examples
     ---------
@@ -1462,6 +1551,11 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
     If :attr:`copy_edata` is True, the resulting graph will share the edge feature
     tensors with the input graph. Hence, users should try to avoid in-place operations
     which will be visible to both graphs.
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Examples
     --------
@@ -1583,17 +1677,17 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     ``etype`` connecting from node ID ``u`` of type ``utype`` in the input side to node
     ID ``v`` of type ``vtype`` in the output side.
 
-    The output nodes of the block will only contain the nodes that have at least one
-    inbound edge of any type.  The input nodes of the block will only contain the nodes
-    that appear in the output nodes, as well as the nodes that have at least one outbound
-    edge connecting to one of the output nodes.
+    For blocks returned by :func:`to_block`, the output nodes of the block will only
+    contain the nodes that have at least one inbound edge of any type.  The input nodes
+    of the block will only contain the nodes that appear in the output nodes, as well
+    as the nodes that have at least one outbound edge connecting to one of the output nodes.
 
     If the :attr:`dst_nodes` argument is not None, it specifies the output nodes instead.
 
     Parameters
     ----------
     graph : DGLGraph
-        The graph.  Must be on CPU.
+        The graph.
     dst_nodes : Tensor or dict[str, Tensor], optional
         The list of output nodes.
 
@@ -1622,12 +1716,17 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
         If :attr:`dst_nodes` is specified but it is not a superset of all the nodes that
         have at least one inbound edge.
 
+        If :attr:`dst_nodes` is not None, and :attr:`g` and :attr:`dst_nodes`
+        are not in the same context.
+
     Notes
     -----
     :func:`to_block` is most commonly used in customizing neighborhood sampling
     for stochastic training on a large graph.  Please refer to the user guide
     :ref:`guide-minibatch` for a more thorough discussion about the methodology
     of stochastic training.
+
+    See also :func:`create_block` for more flexible construction of blocks.
 
     Examples
     --------
@@ -1697,9 +1796,11 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
 
     >>> block.srcnodes['A'].data[dgl.NID]
     tensor([2, 1])
-    """
-    assert g.device == F.cpu(), 'the graph must be on CPU'
 
+    See also
+    --------
+    create_block
+    """
     if dst_nodes is None:
         # Find all nodes that appeared as destinations
         dst_nodes = defaultdict(list)
@@ -1710,14 +1811,19 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     elif not isinstance(dst_nodes, Mapping):
         # dst_nodes is a Tensor, check if the g has only one type.
         if len(g.ntypes) > 1:
-            raise ValueError(
+            raise DGLError(
                 'Graph has more than one node type; please specify a dict for dst_nodes.')
         dst_nodes = {g.ntypes[0]: dst_nodes}
 
     dst_node_ids = [
-        utils.toindex(dst_nodes.get(ntype, []), g._idtype_str).tousertensor()
+        utils.toindex(dst_nodes.get(ntype, []), g._idtype_str).tousertensor(
+            ctx=F.to_backend_ctx(g._graph.ctx))
         for ntype in g.ntypes]
     dst_node_ids_nd = [F.to_dgl_nd(nodes) for nodes in dst_node_ids]
+
+    for d in dst_node_ids_nd:
+        if g._graph.ctx != d.ctx:
+            raise ValueError('g and dst_nodes need to have the same context.')
 
     new_graph_index, src_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(
         g._graph, dst_node_ids_nd, include_dst_in_src)
@@ -1736,11 +1842,63 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
 
     return new_graph
 
+def _coalesce_edge_frame(g, edge_maps, counts, aggregator):
+    r"""Coalesce edge features of duplicate edges via given aggregator in g.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+    edge_maps : List[Tensor]
+        The edge mapping corresponding to each edge type in g.
+    counts : List[Tensor]
+        The number of duplicated edges from the original graph for each edge type.
+    aggregator : str
+        Indicates how to coalesce edge features, could be ``arbitrary``, ``sum``
+        or ``mean``.
+
+    Returns
+    -------
+    List[Frame]
+        The frames corresponding to each edge type.
+    """
+    if aggregator == 'arbitrary':
+        eids = []
+        for i in range(len(g.canonical_etypes)):
+            feat_idx = F.asnumpy(edge_maps[i])
+            _, indices = np.unique(feat_idx, return_index=True)
+            eids.append(F.zerocopy_from_numpy(indices))
+
+        edge_frames = utils.extract_edge_subframes(g, eids)
+    elif aggregator in ['sum', 'mean']:
+        edge_frames = []
+        for i in range(len(g.canonical_etypes)):
+            feat_idx = edge_maps[i]
+            _, indices = np.unique(F.asnumpy(feat_idx), return_index=True)
+            _num_rows = len(indices)
+            _data = {}
+            for key, col in g._edge_frames[i]._columns.items():
+                data = col.data
+                new_data = F.scatter_add(data, feat_idx, _num_rows)
+                if aggregator == 'mean':
+                    norm = F.astype(counts[i], F.dtype(data))
+                    norm = F.reshape(norm, (F.shape(norm)[0],) + (1,) * (F.ndim(data) - 1))
+                    new_data /= norm
+                _data[key] = new_data
+
+            newf = Frame(data=_data, num_rows=_num_rows)
+            edge_frames.append(newf)
+    else:
+        raise DGLError("Aggregator {} not regonized, cannot coalesce edge feature in the "
+                       "specified way".format(aggregator))
+    return edge_frames
+
 def to_simple(g,
               return_counts='count',
               writeback_mapping=False,
               copy_ndata=True,
-              copy_edata=False):
+              copy_edata=False,
+              aggregator='arbitrary'):
     r"""Convert a graph to a simple graph without parallel edges and return.
 
     For a heterogeneous graph with multiple edge types, DGL treats edges with the same
@@ -1781,12 +1939,19 @@ def to_simple(g,
     copy_edata: bool, optional
         If True, the edge features of the simple graph are copied
         from the original graph. If there exists duplicate edges between
-        two nodes (u, v), the feature of the edge is randomly selected
-        from one of the duplicate edges.
+        two nodes (u, v), the feature of the edge is the aggregation
+        of edge feature of duplicate edges.
 
         If False, the simple graph will not have any edge features.
 
         (Default: False)
+    aggregator: str, optional
+        Indicate how to coalesce edge feature of duplicate edges.
+        If ``arbitrary``, select one of the duplicate edges' feature.
+        If ``sum``, compute the summation of duplicate edges' feature.
+        If ``mean``, compute the average of duplicate edges' feature.
+
+        (Default: ``arbitrary``)
 
     Returns
     -------
@@ -1800,6 +1965,11 @@ def to_simple(g,
     If :attr:`copy_ndata` is True, the resulting graph will share the node feature
     tensors with the input graph. Hence, users should try to avoid in-place operations
     which will be visible to both graphs.
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Examples
     --------
@@ -1881,14 +2051,8 @@ def to_simple(g,
         node_frames = utils.extract_node_subframes(g, None)
         utils.set_new_frames(simple_graph, node_frames=node_frames)
     if copy_edata:
-        eids = []
-        for i in range(len(g.canonical_etypes)):
-            feat_idx = F.asnumpy(edge_maps[i])
-            _, indices = np.unique(feat_idx, return_index=True)
-            eids.append(F.zerocopy_from_numpy(indices))
-
-        edge_frames = utils.extract_edge_subframes(g, eids)
-        utils.set_new_frames(simple_graph, edge_frames=edge_frames)
+        new_edge_frames = _coalesce_edge_frame(g, edge_maps, counts, aggregator)
+        utils.set_new_frames(simple_graph, edge_frames=new_edge_frames)
 
     if return_counts is not None:
         for count, canonical_etype in zip(counts, g.canonical_etypes):
