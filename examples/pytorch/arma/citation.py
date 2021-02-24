@@ -138,15 +138,11 @@ if __name__ == "__main__":
 
     acc_lists = []
 
-    for _ in range(50):
+    for _ in range(100):
         acc_lists.append(main(args))
 
-    acc_lists = list(reversed(sorted(acc_lists)))
-    acc_lists_top = np.array(acc_lists[:10])
-
-    mean = np.around(np.mean(acc_lists_top, axis=0), decimals=3)
-    std = np.around(np.std(acc_lists_top, axis=0), decimals=3)
+    mean = np.around(np.mean(acc_lists, axis=0), decimals=3)
+    std = np.around(np.std(acc_lists, axis=0), decimals=3)
     print('Total acc: ', acc_lists)
-    print('Top 10 acc:', acc_lists_top)
     print('mean', mean)
     print('std', std)
