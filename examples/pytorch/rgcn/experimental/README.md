@@ -90,7 +90,7 @@ Before that, copy the training script to a local folder:
 
 ```bash
 mkdir ~/dgl_code
-cp /home/ubuntu/dgl/examples/pytorch/rgcn/experimental/entity_classify_dist.py ~/dgl_code
+cp ~/dgl/examples/pytorch/rgcn/experimental/entity_classify_dist.py ~/dgl_code
 ```
 
 The command below copies partition data, ip config file, as well as training scripts to the machines in the cluster.
