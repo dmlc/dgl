@@ -25,6 +25,13 @@ class GINDataset(DGLBuiltinDataset):
     settings. The datasets are ``'MUTAG'``, ``'COLLAB'``, ``'IMDBBINARY'``, ``'IMDBMULTI'``,
     ``'NCI1'``, ``'PROTEINS'``, ``'PTC'``, ``'REDDITBINARY'``, ``'REDDITMULTI5K'``.
 
+    If ``degree_as_nlabel`` is set to ``False``, then ``ndata['label']`` stores the provided node label,
+    otherwise ``ndata['label']`` stores the node in-degrees.
+
+    For graphs that have node attributes, ``ndata['attr']`` stores the node attributes.
+    For graphs that have no attribute, ``ndata['attr']`` stores the corresponding one-hot encoding
+    of ``ndata['label']``.
+
     Parameters
     ---------
     name: str
