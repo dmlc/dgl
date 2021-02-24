@@ -17,7 +17,7 @@ This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang9
 
 ##### Unsupervised Graph Classification Dataset:
 
- 'MUTAG', 'PTC', 'IMDBBINARY', 'IMDBMULTI', 'REDDITBINARY', 'REDDITMULTI5K' of dgl.data.GINDataset.
+ 'MUTAG', 'PTC', 'IMDBBINARY'(IMDB-B), 'IMDBMULTI'(IMDB-M), 'REDDITBINARY'(RDT-B), 'REDDITMULTI5K'(RDT-M) of dgl.data.GINDataset.
 
 | Dataset         | MUTAG | PTC   | RDT-B  | RDT-M5K | IMDB-B | IMDB-M |
 | --------------- | ----- | ----- | ------ | ------- | ------ | ------ |
@@ -57,7 +57,7 @@ The 12 tasks are:
 ###### Dataset options
 
 ```
- --dataname         str     The graph dataset name.               Default is 'MUTAG'.
+  --dataname        str     The graph dataset name.               Default is 'MUTAG'.
 ```
 
 ###### GPU options
@@ -69,8 +69,8 @@ The 12 tasks are:
 ###### Training options
 
 ```
---epochs           int     Number of training epochs.             Default is 20.
---batch_size       int     Size of a training batch               Default is 128.
+--epochs           int     Number of training periods.            Default is 20.
+--batch_size       int     Size of a training batch.              Default is 128.
 --lr               float   Adam optimizer learning rate.          Default is 0.01.
 ```
 
@@ -78,7 +78,7 @@ The 12 tasks are:
 
 ```
 --n_layers         int     Number of GIN layers.                  Default is 3.
---hid_dim          int     Dimension of hidden layer.             Default is 32.
+--hid_dim          int     Dimension of hidden layers.            Default is 32.
 ```
 
 ##### 	Semi-supervised Graph Regression:
@@ -86,8 +86,8 @@ The 12 tasks are:
 ###### Dataset options
 
 ```
- --target          str     The regression Task                    Default is 'mu'.
- --train_num       int     Number of supevised examples.          Default is 5000.
+ --target          str     The regression Task.                   Default is 'mu'.
+ --train_num       int     Number of supervised examples.         Default is 5000.
 ```
 
 ###### GPU options
@@ -99,31 +99,31 @@ The 12 tasks are:
 ###### Training options
 
 ```
---epochs           int     Number of training epochs.             Default is 200
---batch_size       int     Size of a training batch               Default is 20.
---val_batch_size   int     Size of a validation batch.            Default is 100
+--epochs           int     Number of training periods.            Default is 200.
+--batch_size       int     Size of a training batch.              Default is 20.
+--val_batch_size   int     Size of a validation batch.            Default is 100.
 --lr               float   Adam optimizer learning rate.          Default is 0.001.
 ```
 
 ###### Model options
 
 ```
---hid_dim          int     Dimension of hidden layer.             Default is 64.
---reg              int     Regularization weight                  Default is 0.001.
+--hid_dim          int     Dimension of hidden layers.            Default is 64.
+--reg              int     Regularization weight,                 Default is 0.001.
 ```
-
-## 
 
 ## How to run examples
 
-Training and testing unsupervised model on MUTAG.(We recommend using cpu)
+Training and testing unsupervised model on MUTAG.
+
+ (As graphs in these datasets are quite small and sparse, moving graphs from cpu to gpu would take a longer time than training, we recommend using **cpu** for these datasets).
 
 ```bash
 # MUTAG:
 python unsupervised.py --dataname MUTAG --n_layers 4 --hid_dim 32
 ```
 
-Replace 'MUTAG' with dataname in [MUTAG', 'PTC', 'IMDBBINARY', 'IMDBMULTI', 'REDDITBINARY', 'REDDITMULTI5K'] if you'd like to try other datasets.
+Replace 'MUTAG' with dataname in ['MUTAG', 'PTC', 'IMDBBINARY', 'IMDBMULTI', 'REDDITBINARY', 'REDDITMULTI5K'] if you'd like to try other datasets.
 
 Training and testing semi-supervised model on QM9 for graph property 'mu' with gpu.
 
@@ -132,7 +132,7 @@ Training and testing semi-supervised model on QM9 for graph property 'mu' with g
 python semisupervised.py --gpu 0 --target mu
 ```
 
-Replace 'mu' with other target names above
+Replace 'mu' with other target names above.
 
 ## 	Performance
 
@@ -143,7 +143,7 @@ The hyperparameter setting in our implementation is identical to that reported i
 |      Dataset      | MUTAG |  PTC  | REDDIT-B | REDDIT-M | IMDB-B | IMDB-M |
 | :---------------: | :---: | :---: | :------: | -------- | ------ | ------ |
 | Accuracy Reported | 89.01 | 61.65 |  82.50   | 53.46    | 73.03  | 49.69  |
-|  This repository  | 89.88 | 63.54 |  88.50   | 56.27    | 72.70  | 50.13  |
+|        DGL        | 89.88 | 63.54 |  88.50   | 56.27    | 72.70  | 50.13  |
 
 * REDDIT-M dataset would take a quite long time to load and evaluate. 
 
@@ -151,11 +151,11 @@ The hyperparameter setting in our implementation is identical to that reported i
 
 Here we only provide the results of 'mu', 'alpha', 'homo'.
 
-We notice that there's a big gap between the reported RMSE and that of our implementation. We also tried author's code and found that the gap still existed. This issue has been reported in https://github.com/fanyun-sun/InfoGraph/issues/8
+We notice that there's a big gap between the reported RMSE and that of our implementation. We also tried the authors' code and found that the gap still existed. This issue has been reported in https://github.com/fanyun-sun/InfoGraph/issues/8
 
-|     Target      |   mu   | alpha  |  homo  |
-| :-------------: | :----: | :----: | :----: |
-|  RMSE Reported  | 0.3169 | 0.5444 | 0.0060 |
-|  Author's code  | 0.2411 | 0.5192 | 0.1560 |
-| This repository | 0.2355 | 0.5483 | 0.1581 |
+|      Target       |   mu   | alpha  |  homo  |
+| :---------------: | :----: | :----: | :----: |
+|   RMSE Reported   | 0.3169 | 0.5444 | 0.0060 |
+| The authors' code | 0.2411 | 0.5192 | 0.1560 |
+|        DGL        | 0.2355 | 0.5483 | 0.1581 |
 

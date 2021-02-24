@@ -23,8 +23,7 @@ def log_sum_exp(x, axis=None):
 def raise_measure_error(measure):
     supported_measures = ['GAN', 'JSD', 'X2', 'KL', 'RKL', 'DV', 'H2', 'W1']
     raise NotImplementedError(
-        'Measure `{}` not supported. Supported: {}'.format(measure,
-                                                           supported_measures))
+        'Measure `{}` not supported. Supported: {}'.format(measure, supported_measures))
 
 
 def get_positive_expectation(p_samples, measure, average=True):
@@ -100,6 +99,7 @@ def get_negative_expectation(q_samples, measure, average=True):
 
 
 def local_global_loss_(l_enc, g_enc, graph_id, measure):
+
     num_graphs = g_enc.shape[0]
     num_nodes = l_enc.shape[0]
 
@@ -124,15 +124,7 @@ def local_global_loss_(l_enc, g_enc, graph_id, measure):
 
 
 def global_global_loss_(sup_enc, unsup_enc, measure):
-    '''
-    Args:
-        g: Global features
-        g1: Global features.
-        measure: Type of f-divergence. For use with mode `fd`
-        mode: Loss mode. Fenchel-dual `fd`, NCE `nce`, or Donsker-Vadadhan `dv`.
-    Returns:
-        torch.Tensor: Loss.
-    '''
+
     num_graphs = sup_enc.shape[0]
     device = sup_enc.device
 
@@ -149,8 +141,7 @@ def global_global_loss_(sup_enc, unsup_enc, measure):
     return E_neg - E_pos
 
 
-def adj_loss_(l_enc, g_enc, edge_index, batch):
-    num_graphs = g_enc.shape[0]
+def adj_loss_(l_enc, edge_index):
     num_nodes = l_enc.shape[0]
 
     adj = torch.zeros((num_nodes, num_nodes)).cuda()
