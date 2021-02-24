@@ -15,6 +15,7 @@ To train RGCN, it has four steps:
 
 To perform distributed training, files and codes need to be accessed across multiple machines. A distributed file system would perfectly handle the job (i.e., NFS, Ceph). 
 
+#### Server side setup 
 Here is an example of how to setup NFS. First, install essential libs on the storage server
 ```bash
 sudo apt-get install nfs-kernel-server
@@ -44,7 +45,40 @@ The server's internal ip can be checked  via `ifconfig` or `ip`. If the ip does 
 /NFS  172.16.0.0/12(rw,sync,no_subtree_check)
 ```
 
+Then restart NFS, the setup on server side is finished.
+
+```
+sudo systemctl restart nfs-kernel-server
+```
+
 For configraution details, please refer to [NFS ArchWiki](https://wiki.archlinux.org/index.php/NFS).
+
+
+#### Client side setup 
+
+To use NFS, clients also require to install essential packages
+
+```
+sudo apt-get install nfs-common 
+``
+
+You can either mount the NFS manually 
+
+```
+mkdir -p /NFS
+mount -t nfs <nfs-server-ip>:/NFS /NFS
+```
+	
+or edit the fstab so the folder will be mounted automatically 
+
+```
+# vim /etc/fstab
+## append the following line to the file
+<nfs-server-ip>:/NFS   /NFS/client   nfs   defaults	0 0
+```
+
+Then run `mount -a`. 
+
 
 <details><summary>If above setup does not work,  DGL provides a backup solution</summary>
 <p>
