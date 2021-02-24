@@ -334,4 +334,5 @@ for epoch in range(10):
 #
 
 
-
+# Thumbnail Courtesy: Stanford CS224W Notes
+# sphinx_gallery_thumbnail_path = '_static/blitz_1_introduction.png'
