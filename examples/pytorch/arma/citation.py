@@ -1,4 +1,4 @@
-""" The main file to train a ARMA model using a full graph """
+""" The main file to train an ARMA model using a full graph """
 
 import argparse
 import copy
