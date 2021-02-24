@@ -230,7 +230,9 @@ class SEALData(object):
                                               subsample_ratio=subsample_ratio,
                                               shuffle=shuffle)
         if use_coalesce:
-            self.g = coalesce_graph(self.g, copy_data=True)
+            for k, v in g.edata.items():
+                g.edata[k] = v.float()  # dgl.to_simple() requires data is float
+            self.g = dgl.to_simple(g, copy_ndata=True, copy_edata=True, aggregator='sum')
 
         self.ndata = {k: v for k, v in self.g.ndata.items()}
         self.edata = {k: v for k, v in self.g.edata.items()}
