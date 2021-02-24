@@ -157,6 +157,7 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
         g = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0])
         }, {'user': card if card is not None else 4})
+        g = g.to(F.ctx())
         g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2],
@@ -165,10 +166,12 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
             ('user', 'liked-by', 'game'): ([0, 1, 2, 0, 3, 0], [2, 2, 2, 1, 1, 0]),
             ('coin', 'flips', 'user'): ([0, 0, 0, 0], [0, 1, 2, 3])
         }, num_nodes_dict)
+        hg = hg.to(F.ctx())
     else:
         g = dgl.heterograph({
             ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2])
         }, {'user': card if card is not None else 4})
+        g = g.to(F.ctx())
         g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0],
@@ -177,6 +180,7 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
             ('game', 'liked-by', 'user'): ([2, 2, 2, 1, 1, 0], [0, 1, 2, 0, 3, 0]),
             ('user', 'flips', 'coin'): ([0, 1, 2, 3], [0, 0, 0, 0])
         }, num_nodes_dict)
+        hg = hg.to(F.ctx())
     hg.edges['follow'].data['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
     hg.edges['play'].data['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
     hg.edges['liked-by'].data['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
@@ -528,7 +532,6 @@ def _test_sample_neighbors_topk_outedge(hypersparse):
         assert subg['flips'].number_of_edges() == 0
     _test3()
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_sample_neighbors():
     _test_sample_neighbors(False)
     #_test_sample_neighbors(True)
