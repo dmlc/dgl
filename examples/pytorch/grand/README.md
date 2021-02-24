@@ -10,7 +10,7 @@ Author's code: https://github.com/THUDM/GRAND
 
 This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang98) when he was an applied scientist intern at AWS Shanghai AI Lab.
 
-## Dependecies
+## Dependencies
 - Python 3.7
 - PyTorch 1.7.1
 - dgl 0.5.3
