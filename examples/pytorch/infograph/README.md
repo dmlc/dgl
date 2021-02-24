@@ -9,7 +9,7 @@ Author's code: https://github.com/fanyun-sun/InfoGraph
 
 This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang98) when he was an applied scientist intern at AWS Shanghai AI Lab.
 
-## Dependecies
+## Dependencies
 
 - Python 3.7
 - PyTorch 1.7.1
@@ -153,7 +153,7 @@ The hyperparameter setting in our implementation is identical to that reported i
 
 Here we only provide the results of 'mu', 'alpha', 'homo'.
 
-We find that there's a big gap between the reported RMSE and that of our implementation. We also tried author's code and found that the gap still existed. This issue has been reported in https://github.com/fanyun-sun/InfoGraph/issues/8
+We notice that there's a big gap between the reported RMSE and that of our implementation. We also tried author's code and found that the gap still existed. This issue has been reported in https://github.com/fanyun-sun/InfoGraph/issues/8
 
 |     Target      |   mu   | alpha  |  homo  |
 | :-------------: | :----: | :----: | :----: |
