@@ -43,9 +43,6 @@ The folder contains example implementations of selected research papers related 
 | [Self-Attention Graph Pooling](#sagpool)                     |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Convolutional Networks on Graphs for Learning Molecular Fingerprints](#nf) |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [GNN-FiLM: Graph Neural Networks with Feature-wise Linear Modulation](#gnnfilm) | :heavy_check_mark:  |                     |                     |                     |                     |
-<<<<<<< HEAD
-| [Graph Representation Learning via Hard and Channel-Wise Attention Networks](#hardgat)                                   |:heavy_check_mark:                     |                 |                           |                    |                    |
-=======
 | [Hierarchical Graph Pooling with Structure Learning](#hgp-sl)                                                                                 |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Graph Representation Learning via Hard and Channel-Wise Attention Networks](#hardgat)                                   |:heavy_check_mark:                     |                 |                           |                    |                    |
 | [Neural Graph Collaborative Filtering](#ngcf) |             | :heavy_check_mark: |                     |                   |                   |
@@ -81,8 +78,8 @@ The folder contains example implementations of selected research papers related 
 | [Dynamic Graph CNN for Learning on Point Clouds](#dgcnnpoint) |  |                                  |                           |                    |                    |
 | [Supervised Community Detection with Line Graph Neural Networks](#lgnn) |  |                                  |                           |                    |                    |
 | [Text Generation from Knowledge Graphs with Graph Transformers](#graphwriter) |  |                                  |                           |                    |                    |
+| [Temporal Graph Networks For Deep Learning on Dynamic Graphs](#tgn) |  |                                  | :heavy_check_mark:                          |                    |                    |
 
->>>>>>> upstream/master
 
 ## 2020
 
@@ -117,6 +114,10 @@ The folder contains example implementations of selected research papers related 
 - <a name="dagnn"></a> Liu et al. Towards Deeper Graph Neural Networks. [Paper link](https://arxiv.org/abs/2007.09296).
     - Example code: [Pytorch](../examples/pytorch/dagnn)
     - Tags: over-smoothing, node classification
+
+- <a name="dagnn"></a> Rossi et al. Temporal Graph Networks For Deep Learning on Dynamic Graphs. [Paper link](https://arxiv.org/abs/2006.10637).
+    - Example code: [Pytorch](../examples/pytorch/tgn)
+    - Tags: over-smoothing, node classification 
 
 ## 2019
 
@@ -196,12 +197,6 @@ The folder contains example implementations of selected research papers related 
     - Example code: [PyTorch](../examples/pytorch/sagpool)
     - Tags: graph classification, pooling
 
-<<<<<<< HEAD
-- <a name='hardgat'></a> Gao, Hongyang, et al. Graph Representation Learning via Hard and Channel-Wise Attention Networks [Paper link](https://arxiv.org/abs/1907.04652).
-    - Example code: [Pytorch](../examples/pytorch/hgat)
-    - Tags: node classification, graph attention
-
-=======
 - <a name="hgp-sl"></a> Zhang, Zhen, et al. Hierarchical Graph Pooling with Structure Learning. [Paper link](https://arxiv.org/abs/1911.05954).
     - Example code: [PyTorch](../examples/pytorch/hgp_sl)
     - Tags: graph classification, pooling
@@ -215,7 +210,6 @@ The folder contains example implementations of selected research papers related 
     - Tags: Collaborative Filtering, Recommendation, Graph Neural Network 
 
 
->>>>>>> upstream/master
 ## 2018
 
 - <a name="dgmg"></a> Li et al. Learning Deep Generative Models of Graphs. [Paper link](https://arxiv.org/abs/1803.03324).
