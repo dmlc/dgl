@@ -60,7 +60,7 @@ To use NFS, clients also require to install essential packages
 
 ```
 sudo apt-get install nfs-common 
-``
+```
 
 You can either mount the NFS manually 
 
