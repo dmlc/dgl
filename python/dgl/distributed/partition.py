@@ -81,7 +81,7 @@ def load_partition(part_config, part_id):
     '''
     config_path = os.path.dirname(part_config)
     relative_to_config = lambda path: os.path.join(config_path, path)
-    
+
     with open(part_config) as conf_f:
         part_metadata = json.load(conf_f)
     assert 'part-{}'.format(part_id) in part_metadata, "part-{} does not exist".format(part_id)
@@ -690,9 +690,10 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         node_feat_file = os.path.join(part_dir, "node_feat.dgl")
         edge_feat_file = os.path.join(part_dir, "edge_feat.dgl")
         part_graph_file = os.path.join(part_dir, "graph.dgl")
-        part_metadata['part-{}'.format(part_id)] = {'node_feats': os.path.relpath(node_feat_file, out_path),
-                                                    'edge_feats': os.path.relpath(edge_feat_file, out_path),
-                                                    'part_graph': os.path.relpath(part_graph_file, out_path)}
+        part_metadata['part-{}'.format(part_id)] = {
+            'node_feats': os.path.relpath(node_feat_file, out_path),
+            'edge_feats': os.path.relpath(edge_feat_file, out_path),
+            'part_graph': os.path.relpath(part_graph_file, out_path)}
         os.makedirs(part_dir, mode=0o775, exist_ok=True)
         save_tensors(node_feat_file, node_feats)
         save_tensors(edge_feat_file, edge_feats)
