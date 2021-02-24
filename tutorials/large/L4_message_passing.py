@@ -387,3 +387,6 @@ class SAGEConvForBoth(nn.Module):
             h_total = torch.cat([h_dst, h_N], dim=1)
             return self.linear(h_total)
 
+
+# Thumbnail Courtesy: Representation Learning on Networks, Jure Leskovec, WWW 2018
+# sphinx_gallery_thumbnail_path = '_static/blitz_3_message_passing.png'
