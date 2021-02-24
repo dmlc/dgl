@@ -55,44 +55,6 @@ def load_ogb_dataset(dataset):
     return graph, split_edge
 
 
-def coalesce_graph(graph, aggr_type='sum', copy_data=False):
-    """
-    Coalesce multi-edge graph
-    Args:
-        graph(DGLGraph): graph
-        aggr_type(str): type of aggregator for multi edge weights
-        copy_data(bool): if copy ndata and edata in new graph
-
-    Returns:
-        graph(DGLGraph): graph
-
-
-    """
-    src, dst = graph.edges()
-    graph_df = pd.DataFrame({'src': src, 'dst': dst})
-    graph_df['edge_weight'] = graph.edata['edge_weight'].numpy()
-
-    if aggr_type == 'sum':
-        tmp = graph_df.groupby(['src', 'dst'])['edge_weight'].sum().reset_index()
-    elif aggr_type == 'mean':
-        tmp = graph_df.groupby(['src', 'dst'])['edge_weight'].mean().reset_index()
-    else:
-        raise ValueError("aggr type error")
-
-    if copy_data:
-        graph = dgl.to_simple(graph, copy_ndata=True, copy_edata=True)
-    else:
-        graph = dgl.to_simple(graph)
-
-    src, dst = graph.edges()
-    graph_df = pd.DataFrame({'src': src, 'dst': dst})
-    graph_df = pd.merge(graph_df, tmp, how='left', on=['src', 'dst'])
-    graph.edata['edge_weight'] = torch.from_numpy(graph_df['edge_weight'].values).unsqueeze(1)
-
-    graph.edata.pop('count')
-    return graph
-
-
 def drnl_node_labeling(subgraph, src, dst):
     """
     Double Radius Node labeling

@@ -19,12 +19,13 @@ ogbl-collab
  - NumEdgeWeights: 1
  - NumValidEdges: 160084
  - NumTestEdges: 146329
- 
+
 Dependencies
 --------------------------------
 
 - python 3.6+
 - Pytorch 1.5.0+
+- dgl 0.6.0 +
 - ogb  
 - pandas
 - tqdm

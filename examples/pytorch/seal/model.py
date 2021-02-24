@@ -92,9 +92,6 @@ class GCN(nn.Module):
 
         z_emb = self.z_embedding(z)
 
-        # if z_emb.ndim == 3:  # in case z has multiple integer labels
-        #     z_emb = z_emb.sum(dim=1)
-
         if self.use_attribute:
             x = self.node_attributes_lookup(node_id)
             x = torch.cat([z_emb, x], 1)
