@@ -21,12 +21,13 @@ Here is an example of how to setup NFS. First, install essential libs on the sto
 sudo apt-get install nfs-kernel-server
 ``` 
 
+Below we assume the user account is `ubuntu` and we create a directory of `workspace` in the home directory.
 Then create a folder for sharing and (optional) remove all restrictions
 ```bash
-sudo mkdir -p /NFS
+sudo mkdir -p /home/ubuntu/workspace
 # Change ownership and remove restrictions
-sudo chown -R nobody:nogroup /NFS
-sudo chmod 755 /NFS
+sudo chown -R nobody:nogroup /home/ubuntu/workspace
+sudo chmod 755 /home/ubuntu/workspace
 ```
 
 We assume that the all servers are under a subnet with ip range `192.168.0.0` to `192.168.255.255`. The exports configuration needs to be modifed to 
@@ -34,15 +35,15 @@ We assume that the all servers are under a subnet with ip range `192.168.0.0` to
 ```bash
 sudo vim /etc/exports
 # add the following line 
-/NFS  192.168.0.0/16(rw,sync,no_subtree_check)
+/home/ubuntu/workspace  192.168.0.0/16(rw,sync,no_subtree_check)
 ```
 
 The server's internal ip can be checked  via `ifconfig` or `ip`. If the ip does not begin with `192.168`, then you may use
 ```bash
 # for ip range 10.0.0.0 – 10.255.255.255	
-/NFS  10.0.0.0/8(rw,sync,no_subtree_check)
+/home/ubuntu/workspace  10.0.0.0/8(rw,sync,no_subtree_check)
 # for ip range 172.16.0.0 – 172.31.255.255	
-/NFS  172.16.0.0/12(rw,sync,no_subtree_check)
+/home/ubuntu/workspace  172.16.0.0/12(rw,sync,no_subtree_check)
 ```
 
 Then restart NFS, the setup on server side is finished.
@@ -65,8 +66,8 @@ sudo apt-get install nfs-common
 You can either mount the NFS manually 
 
 ```
-mkdir -p /NFS
-mount -t nfs <nfs-server-ip>:/NFS /NFS
+mkdir -p /home/ubuntu/workspace
+mount -t nfs <nfs-server-ip>:/home/ubuntu/workspace /home/ubuntu/workspace
 ```
 	
 or edit the fstab so the folder will be mounted automatically 
@@ -74,7 +75,7 @@ or edit the fstab so the folder will be mounted automatically
 ```
 # vim /etc/fstab
 ## append the following line to the file
-<nfs-server-ip>:/NFS   /NFS/client   nfs   defaults	0 0
+<nfs-server-ip>:/home/ubuntu/workspace   /home/ubuntu/workspace   nfs   defaults	0 0
 ```
 
 Then run `mount -a`. 
