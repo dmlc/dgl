@@ -23,7 +23,7 @@ namespace {
 constexpr int LogPow2(
     const int num)
 {
-  if (num == 0) {
+  if (num == 1) {
     return 0;
   } else {
     return LogPow2(num>>1)+1;
@@ -72,12 +72,9 @@ __global__ void CSRRowWiseSampleDegreeReplaceKernel(
       out_deg[out_row] = static_cast<IdType>(num_picks);
     }
 
-    printf("out_deg[%d] = %d\n", (int)out_row, (int)out_deg[out_row]);
-
     if (out_row == num_rows-1) {
       // make the prefixsum work
       out_deg[num_rows] = 0;
-      printf("out_deg[%d] = %d\n", (int)num_rows, (int)out_deg[num_rows]);
     }
   }
 }
@@ -99,7 +96,7 @@ __global__ void CSRRowWiseSampleKernel(
   typedef cub::BlockRadixSort<int, BLOCK_SIZE, 1, int> BlockRadixSort;
   __shared__ typename BlockRadixSort::TempStorage temp_storage;
 
-  const int64_t out_row = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+  const int64_t out_row = blockIdx.x;
   const int64_t row = in_rows[out_row];
 
   const int64_t in_row_start = in_ptr[row];
@@ -123,21 +120,24 @@ __global__ void CSRRowWiseSampleKernel(
     if (deg <= BLOCK_SIZE) {
       // shuffle index array, and select based on that
       constexpr int BLOCK_BITS = LogPow2(BLOCK_SIZE);
-      constexpr int BLOCK_MASK = (1<<BLOCK_BITS)-1;
+      constexpr int BLOCK_MASK = BLOCK_SIZE-1;
 
       // make sure block size is a power of two
-      static_assert((1 << (BLOCK_BITS-1)) == BLOCK_SIZE);
+      static_assert(BLOCK_MASK >> BLOCK_BITS == 0, "BLOCK_MASK is invalid");
+      static_assert(BLOCK_SIZE >> BLOCK_BITS == 1, "BLOCK_BITS is invalid");
+      static_assert(BLOCK_MASK < BLOCK_SIZE, "BLOCK_SIZE is invalid");
 
       // generate a list of unique indexes, and select those
       int key[1] = {threadIdx.x < deg ?
           static_cast<int>(curand(&rng) & BLOCK_MASK) :
           BLOCK_SIZE};
       int value[1] = {static_cast<int>(threadIdx.x)};
-      BlockRadixSort(temp_storage).Sort(key, value, 0, BLOCK_BITS);
+      BlockRadixSort(temp_storage).Sort(key, value, 0, BLOCK_BITS+1);
 
       // copy permutation
       const int idx = threadIdx.x;
-      if (value[0] != BLOCK_SIZE) {
+      if (idx < num_picks) {
+        assert(value[0] < deg);
         const IdType in_idx = in_row_start+value[0];
         out_rows[out_row_start+idx] = row;
         out_cols[out_row_start+idx] = in_index[in_idx];
@@ -184,7 +184,7 @@ __global__ void CSRRowWiseSampleReplaceKernel(
     IdType * const out_cols,
     IdType * const out_idxs)
 {
-  const int64_t out_row = threadIdx.x + blockIdx.x*blockDim.x;
+  const int64_t out_row = blockIdx.x;
   const int64_t row = in_rows[out_row];
 
   const int64_t in_row_start = in_ptr[row];
@@ -197,11 +197,12 @@ __global__ void CSRRowWiseSampleReplaceKernel(
   const int deg = in_ptr[row+1] - in_row_start;
 
   // each thread then blindly copies in rows 
-  for (int idx = threadIdx.x; idx < deg; idx += blockDim.x) {
+  for (int idx = threadIdx.x; idx < num_picks; idx += blockDim.x) {
     const int edge = curand(&rng) % deg;
-    out_rows[out_row_start+idx] = row;
-    out_cols[out_row_start+idx] = in_index[in_row_start+edge];
-    out_idxs[out_row_start+idx] = data ? data[in_row_start+edge] : in_row_start+edge;
+    const int64_t out_idx = out_row_start+idx;
+    out_rows[out_idx] = row;
+    out_cols[out_idx] = in_index[in_row_start+edge];
+    out_idxs[out_idx] = data ? data[in_row_start+edge] : in_row_start+edge;
   }
 }
 
@@ -237,16 +238,17 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
   const IdType* const data = CSRHasData(mat)? static_cast<IdType*>(mat.data->data) : nullptr;
 
   const dim3 block(BLOCK_SIZE);
-  const dim3 grid((num_rows+block.x-1)/block.x);
+  const dim3 node_grid((num_rows+block.x-1)/block.x);
+  const dim3 edge_grid(num_rows);
 
   // compute degree
   IdType * out_deg = static_cast<IdType*>(
       device->AllocWorkspace(ctx, (num_rows+1)*sizeof(IdType)));
   if (replace) {
-    CSRRowWiseSampleDegreeReplaceKernel<<<grid, block, 0, stream>>>(
+    CSRRowWiseSampleDegreeReplaceKernel<<<node_grid, block, 0, stream>>>(
         num_picks, num_rows, slice_rows, in_ptr, out_deg);
   } else {
-    CSRRowWiseSampleDegreeKernel<<<grid, block, 0, stream>>>(
+    CSRRowWiseSampleDegreeKernel<<<node_grid, block, 0, stream>>>(
         num_picks, num_rows, slice_rows, in_ptr, out_deg);
   }
 
@@ -280,15 +282,12 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
         mat.indptr->dtype,
         stream);
   device->StreamSync(ctx, stream);
-  std::cout << "New length = " << new_len << ", num_rows = " << num_rows <<
-      ", num_pick = " << num_picks << ", replace = " << replace <<
-      " edges = " << mat.indices->shape[0] << std::endl;
 
   const unsigned int random_seed = RandomEngine::ThreadLocal()->RandInt(1000000000);
 
   // select edges
   if (replace) {
-    CSRRowWiseSampleReplaceKernel<<<grid, block, 0, stream>>>(
+    CSRRowWiseSampleReplaceKernel<<<edge_grid, block, 0, stream>>>(
         random_seed,
         num_picks, 
         num_rows,
@@ -301,7 +300,7 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
         out_cols,
         out_idxs);
   } else {
-    CSRRowWiseSampleKernel<IdType, BLOCK_SIZE><<<grid, block, 0, stream>>>(
+    CSRRowWiseSampleKernel<IdType, BLOCK_SIZE><<<edge_grid, block, 0, stream>>>(
         random_seed,
         num_picks,
         num_rows,
