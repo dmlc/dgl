@@ -76,43 +76,7 @@ or edit the fstab so the folder will be mounted automatically
 
 Then run `mount -a`. 
 
-
-<details><summary>If above setup does not work,  DGL provides a backup solution</summary>
-<p>
-
-
-DGL provides a script for copying partitioned data to the cluster. 
-Before that, copy the training script to a local folder:
-
-
-```bash
-mkdir ~/dgl_code
-cp ~/dgl/examples/pytorch/rgcn/experimental/entity_classify_dist.py ~/dgl_code
-```
-
-The command below copies partition data, ip config file, as well as training scripts to the machines in the cluster.
-The configuration of the cluster is defined by `ip_config.txt`.
-The data is copied to `~/rgcn/ogbn-mag` on each of the remote machines.
-`--rel_data_path` specifies the relative path in the workspace where the partitioned data will be stored.
-`--part_config` specifies the location of the partitioned data in the local machine (a user only needs to specify
-the location of the partition configuration file). `--script_folder` specifies the location of the training scripts.
-```bash
-python ~/dgl/tools/copy_files.py --ip_config ip_config.txt \
-                                 --workspace ~/rgcn \
-                                 --rel_data_path data \
-				 --part_config data/ogbn-mag.json \
-			         --script_folder ~/dgl_code
-```
-
-**Note**: users need to make sure that the master node has right permission to ssh to all the other nodes.
-
-Users need to copy the training script to the workspace directory on remote machines as well.
-
-
-</p>
-</details>
-
-
+Now go to `/home/ubuntu/workspace` and clone the DGL Github repository.
 
 ### Step 1: set IP configuration file.
 
@@ -148,14 +112,14 @@ The command below launches one training process on each machine and each trainin
 Please set the number of sampling processes to 0 if you are using Python 3.8.
 
 ```bash
-python3 ~/dgl/tools/launch.py \
---workspace ~/rgcn/ \
+python3 ~/workspace/dgl/tools/launch.py \
+--workspace ~/workspace/dgl/examples/pytorch/rgcn/experimental/ \
 --num_trainers 1 \
 --num_servers 1 \
 --num_samplers 4 \
 --part_config data/ogbn-mag.json \
 --ip_config ip_config.txt \
-"python3 dgl_code/entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 512  --n-hidden 64 --lr 0.01 --eval-batch-size 16  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt  --num-workers 4 --num-servers 1 --sparse-embedding  --sparse-lr 0.06 --node-feats"
+"python3 entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 512  --n-hidden 64 --lr 0.01 --eval-batch-size 16  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt  --num-workers 4 --num-servers 1 --sparse-embedding  --sparse-lr 0.06 --node-feats"
 ```
 
 We can get the performance score at the second epoch:
@@ -207,7 +171,7 @@ DGL provides a tool called `convert_partition.py` to load one partition at a tim
 and save it into a file.
 
 ```bash
-python3 ~/dgl/tools/convert_partition.py --input-dir . --graph-name mag --schema mag.json --num-parts 2 --num-node-weights 4 --output outputs
+python3 ~/workspace/dgl/tools/convert_partition.py --input-dir . --graph-name mag --schema mag.json --num-parts 2 --num-node-weights 4 --output outputs
 ```
 
 ### Step 4: Read node data and edge data for each partition
