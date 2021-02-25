@@ -38,33 +38,34 @@ train_dataloader = dgl.dataloading.NodeDataLoader(
     num_workers=0
 )
 
-input_nodes, output_nodes, bipartites = next(iter(train_dataloader))
+input_nodes, output_nodes, mfgs = next(iter(train_dataloader))
 
 
 ######################################################################
 # DGL Bipartite Graph Introduction
 # --------------------------------
 #
-# In the previous tutorials, you have seen the concept *bipartite graph*,
-# where nodes are divided into two parts.
+# In the previous tutorials, you have seen the concept *message flow graph*
+# (MFG), where nodes are divided into two parts.  It is a kind of (directional)
+# bipartite graph.
 # This section introduces how you can manipulate (directional) bipartite
 # graphs.
 #
-# You can access the input node features and output node features via
+# You can access the source node features and destination node features via
 # ``srcdata`` and ``dstdata`` attributes:
 #
 
-bipartite = bipartites[0]
-print(bipartite.srcdata)
-print(bipartite.dstdata)
+mfg = mfgs[0]
+print(mfg.srcdata)
+print(mfg.dstdata)
 
 
 ######################################################################
 # It also has ``num_src_nodes`` and ``num_dst_nodes`` functions to query
-# how many input nodes and output nodes exist in the bipartite graph:
+# how many source nodes and destination nodes exist in the bipartite graph:
 #
 
-print(bipartite.num_src_nodes(), bipartite.num_dst_nodes())
+print(mfg.num_src_nodes(), mfg.num_dst_nodes())
 
 
 ######################################################################
@@ -72,18 +73,18 @@ print(bipartite.num_src_nodes(), bipartite.num_dst_nodes())
 # will do with ``ndata`` on the graphs you have seen earlier:
 #
 
-bipartite.srcdata['x'] = torch.zeros(bipartite.num_src_nodes(), bipartite.num_dst_nodes())
-dst_feat = bipartite.dstdata['feat']
+mfg.srcdata['x'] = torch.zeros(mfg.num_src_nodes(), mfg.num_dst_nodes())
+dst_feat = mfg.dstdata['feat']
 
 
 ######################################################################
 # Also, since the bipartite graphs are constructed by DGL, you can
-# retrieve the input node IDs (i.e. those that are required to compute the
-# output) and output node IDs (i.e. those whose representations the
+# retrieve the source node IDs (i.e. those that are required to compute the
+# output) and destination node IDs (i.e. those whose representations the
 # current GNN layer should compute) as follows.
 #
 
-bipartite.srcdata[dgl.NID], bipartite.dstdata[dgl.NID]
+mfg.srcdata[dgl.NID], mfg.dstdata[dgl.NID]
 
 
 ######################################################################
@@ -93,30 +94,30 @@ bipartite.srcdata[dgl.NID], bipartite.dstdata[dgl.NID]
 
 
 ######################################################################
-# Recall that the bipartite graphs yielded by the ``NodeDataLoader`` and
-# ``EdgeDataLoader`` have the property that the first few input nodes are
-# always identical to the output nodes:
+# Recall that the MFGs yielded by the ``NodeDataLoader`` and
+# ``EdgeDataLoader`` have the property that the first few source nodes are
+# always identical to the destination nodes:
 #
 # |image1|
 #
 # .. |image1| image:: https://data.dgl.ai/tutorial/img/bipartite.gif
 #
 
-print(torch.equal(bipartite.srcdata[dgl.NID][:bipartite.num_dst_nodes()], bipartite.dstdata[dgl.NID]))
+print(torch.equal(mfg.srcdata[dgl.NID][:mfg.num_dst_nodes()], mfg.dstdata[dgl.NID]))
 
 
 ######################################################################
-# Suppose you have obtained the input node representations
+# Suppose you have obtained the source node representations
 # :math:`h_u^{(l-1)}`:
 #
 
-bipartite.srcdata['h'] = torch.randn(bipartite.num_src_nodes(), 10)
+mfg.srcdata['h'] = torch.randn(mfg.num_src_nodes(), 10)
 
 
 ######################################################################
 # Recall that DGL provides the `update_all` interface for expressing how
 # to compute messages and how to aggregate them on the nodes that receive
-# them. This concept naturally applies to bipartite graphs -- message
+# them. This concept naturally applies to bipartite graphs like MFGs -- message
 # computation happens on the edges between source and destination nodes of
 # the edges, and message aggregation happens on the destination nodes.
 #
@@ -129,8 +130,8 @@ bipartite.srcdata['h'] = torch.randn(bipartite.num_src_nodes(), 10)
 
 import dgl.function as fn
 
-bipartite.update_all(message_func=fn.copy_u('h', 'm'), reduce_func=fn.mean('m', 'h'))
-m_v = bipartite.dstdata['h']
+mfg.update_all(message_func=fn.copy_u('h', 'm'), reduce_func=fn.mean('m', 'h'))
+m_v = mfg.dstdata['h']
 m_v
 
 
@@ -165,9 +166,9 @@ class SAGEConv(nn.Module):
         Parameters
         ----------
         g : Graph
-            The input bipartite graph.
+            The input MFG.
         h : (Tensor, Tensor)
-            The feature of input nodes and output nodes as a pair of Tensors.
+            The feature of source nodes and destination nodes as a pair of Tensors.
         """
         with g.local_scope():
             h_src, h_dst = h
@@ -185,12 +186,12 @@ class Model(nn.Module):
         self.conv1 = SAGEConv(in_feats, h_feats)
         self.conv2 = SAGEConv(h_feats, num_classes)
 
-    def forward(self, bipartites, x):
-        h_dst = x[:bipartites[0].num_dst_nodes()]
-        h = self.conv1(bipartites[0], (x, h_dst))
+    def forward(self, mfgs, x):
+        h_dst = x[:mfgs[0].num_dst_nodes()]
+        h = self.conv1(mfgs[0], (x, h_dst))
         h = F.relu(h)
-        h_dst = h[:bipartites[1].num_dst_nodes()]
-        h = self.conv2(bipartites[1], (h, h_dst))
+        h_dst = h[:mfgs[1].num_dst_nodes()]
+        h = self.conv2(mfgs[1], (h, h_dst))
         return h
 
 sampler = dgl.dataloading.MultiLayerNeighborSampler([4, 4])
@@ -205,15 +206,15 @@ train_dataloader = dgl.dataloading.NodeDataLoader(
 model = Model(graph.ndata['feat'].shape[1], 128, dataset.num_classes).to(device)
 
 with tqdm.tqdm(train_dataloader) as tq:
-    for step, (input_nodes, output_nodes, bipartites) in enumerate(tq):
-        inputs = bipartites[0].srcdata['feat']
-        labels = bipartites[-1].dstdata['label']
-        predictions = model(bipartites, inputs)
+    for step, (input_nodes, output_nodes, mfgs) in enumerate(tq):
+        inputs = mfgs[0].srcdata['feat']
+        labels = mfgs[-1].dstdata['label']
+        predictions = model(mfgs, inputs)
 
 
 ######################################################################
 # Both ``update_all`` and the functions in ``nn.functional`` namespace
-# support bipartite graphs, so you can migrate the code working for small
+# support MFGs, so you can migrate the code working for small
 # graphs to large graph training with minimal changes introduced above.
 #
 
