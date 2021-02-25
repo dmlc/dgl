@@ -1,5 +1,5 @@
 """Edge coarsening procedure used in Metis and Graclus, for pytorch"""
-# pylint: disable=no-member, invalid-name
+# pylint: disable=no-member, invalid-name, W0613
 import dgl
 import torch as th
 from ..capi import _neighbor_matching
@@ -8,12 +8,27 @@ __all__ = ['neighbor_matching']
 
 
 class NeighborMatchingFn(th.autograd.Function):
+    r"""
+    Description
+    -----------
+    AutoGrad function for neighbor matching
+    """
     @staticmethod
     def forward(ctx, gidx, num_nodes, e_weights, relabel_idx):
+        r"""
+        Description
+        -----------
+        Perform forward computation
+        """
         return _neighbor_matching(gidx, num_nodes, e_weights, relabel_idx)
-    
+
     @staticmethod
     def backward(ctx):
+        r"""
+        Description
+        -----------
+        Perform backward computation
+        """
         pass
 
 
