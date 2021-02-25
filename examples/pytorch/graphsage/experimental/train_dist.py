@@ -207,7 +207,6 @@ def run(args, device, data):
             tic_step = time.time()
             sample_time += tic_step - start
 
-            blocks = [block.to(device) for block in blocks]
             # The nodes for input lies at the LHS side of the first block.
             # The nodes for output lies at the RHS side of the last block.
             batch_inputs = blocks[0].srcdata['features']
@@ -216,7 +215,8 @@ def run(args, device, data):
 
             num_seeds += len(blocks[-1].dstdata[dgl.NID])
             num_inputs += len(blocks[0].srcdata[dgl.NID])
-
+            blocks = [block.to(device) for block in blocks]
+            batch_labels = batch_labels.to(device)
             # Compute loss and prediction
             start = time.time()
             batch_pred = model(blocks, batch_inputs)
