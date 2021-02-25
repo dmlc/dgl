@@ -2,7 +2,7 @@
 # pylint: disable=no-member, invalid-name, W0235
 import dgl
 import mxnet as mx
-from ..api import _neighbor_matching
+from ..capi import _neighbor_matching
 
 __all__ = ['neighbor_matching']
 
