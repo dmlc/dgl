@@ -131,11 +131,11 @@ train_dataloader = dgl.dataloading.EdgeDataLoader(
 # will give you.
 #
 
-input_nodes, pos_graph, neg_graph, blocks = next(iter(train_dataloader))
+input_nodes, pos_graph, neg_graph, mfgs = next(iter(train_dataloader))
 print('Number of input nodes:', len(input_nodes))
 print('Positive graph # nodes:', pos_graph.number_of_nodes(), '# edges:', pos_graph.number_of_edges())
 print('Negative graph # nodes:', neg_graph.number_of_nodes(), '# edges:', neg_graph.number_of_edges())
-print(blocks)
+print(mfgs)
 
 
 ######################################################################
@@ -180,12 +180,12 @@ class Model(nn.Module):
         self.conv2 = SAGEConv(h_feats, h_feats, aggregator_type='mean')
         self.h_feats = h_feats
 
-    def forward(self, blocks, x):
-        h_dst = x[:blocks[0].num_dst_nodes()]
-        h = self.conv1(blocks[0], (x, h_dst))
+    def forward(self, mfgs, x):
+        h_dst = x[:mfgs[0].num_dst_nodes()]
+        h = self.conv1(mfgs[0], (x, h_dst))
         h = F.relu(h)
-        h_dst = h[:blocks[1].num_dst_nodes()]
-        h = self.conv2(blocks[1], (h, h_dst))
+        h_dst = h[:mfgs[1].num_dst_nodes()]
+        h = self.conv2(mfgs[1], (h, h_dst))
         return h
 
 model = Model(num_features, 128).to(device)
@@ -256,10 +256,10 @@ def inference(model, graph, node_features):
             device=device)
 
         result = []
-        for input_nodes, output_nodes, blocks in train_dataloader:
+        for input_nodes, output_nodes, mfgs in train_dataloader:
             # feature copy from CPU to GPU takes place here
-            inputs = blocks[0].srcdata['feat']
-            result.append(model(blocks, inputs))
+            inputs = mfgs[0].srcdata['feat']
+            result.append(model(mfgs, inputs))
 
         return torch.cat(result)
 
@@ -324,11 +324,11 @@ best_accuracy = 0
 best_model_path = 'model.pt'
 for epoch in range(1):
     with tqdm.tqdm(train_dataloader) as tq:
-        for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(tq):
+        for step, (input_nodes, pos_graph, neg_graph, mfgs) in enumerate(tq):
             # feature copy from CPU to GPU takes place here
-            inputs = blocks[0].srcdata['feat']
+            inputs = mfgs[0].srcdata['feat']
 
-            outputs = model(blocks, inputs)
+            outputs = model(mfgs, inputs)
             pos_score = predictor(pos_graph, outputs)
             neg_score = predictor(neg_graph, outputs)
 

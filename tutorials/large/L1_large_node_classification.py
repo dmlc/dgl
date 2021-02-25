@@ -126,7 +126,7 @@ train_dataloader = dgl.dataloading.NodeDataLoader(
 # You can iterate over the data loader and see what it yields.
 #
 
-input_nodes, output_nodes, blocks = example_minibatch = next(iter(train_dataloader))
+input_nodes, output_nodes, mfgs = example_minibatch = next(iter(train_dataloader))
 print(example_minibatch)
 print("To compute {} nodes' outputs, we need {} nodes' input features".format(len(output_nodes), len(input_nodes))) 
 
@@ -151,11 +151,11 @@ print("To compute {} nodes' outputs, we need {} nodes' input features".format(le
 # the computation of the new features.
 #
 
-block_0_src = blocks[0].srcdata[dgl.NID]
-block_0_dst = blocks[0].dstdata[dgl.NID]
-print(block_0_src)
-print(block_0_dst)
-print(torch.equal(block_0_src[:blocks[0].num_dst_nodes()], block_0_dst))
+mfg_0_src = mfgs[0].srcdata[dgl.NID]
+mfg_0_dst = mfgs[0].dstdata[dgl.NID]
+print(mfg_0_src)
+print(mfg_0_dst)
+print(torch.equal(mfg_0_src[:mfgs[0].num_dst_nodes()], mfg_0_dst))
 
 
 ######################################################################
@@ -177,14 +177,14 @@ class Model(nn.Module):
         self.conv2 = SAGEConv(h_feats, num_classes, aggregator_type='mean')
         self.h_feats = h_feats
 
-    def forward(self, blocks, x):
+    def forward(self, mfgs, x):
         # Lines that are changed are marked with an arrow: "<---"
 
-        h_dst = x[:blocks[0].num_dst_nodes()]  # <---
-        h = self.conv1(blocks[0], (x, h_dst))  # <---
+        h_dst = x[:mfgs[0].num_dst_nodes()]  # <---
+        h = self.conv1(mfgs[0], (x, h_dst))  # <---
         h = F.relu(h)
-        h_dst = h[:blocks[1].num_dst_nodes()]  # <---
-        h = self.conv2(blocks[1], (h, h_dst))  # <---
+        h_dst = h[:mfgs[1].num_dst_nodes()]  # <---
+        h = self.conv2(mfgs[1], (h, h_dst))  # <---
         return h
 
 model = Model(num_features, 128, num_classes).to(device)
@@ -206,7 +206,7 @@ model = Model(num_features, 128, num_classes).to(device)
 #
 #    .. code:: python
 #
-#       h = self.conv1(blocks[0], (x, h_dst))
+#       h = self.conv1(mfgs[0], (x, h_dst))
 #
 #    All DGL’s GNN modules support message passing on MFGs,
 #    where you supply a pair of features, one for source nodes and another
@@ -218,7 +218,7 @@ model = Model(num_features, 128, num_classes).to(device)
 #
 #    .. code:: python
 #
-#       h_dst = x[:blocks[0].num_dst_nodes()]
+#       h_dst = x[:mfgs[0].num_dst_nodes()]
 #
 #    ``num_dst_nodes`` method works with MFGs, where it will
 #    return the number of destination nodes.
@@ -277,12 +277,12 @@ for epoch in range(10):
     model.train()
 
     with tqdm.tqdm(train_dataloader) as tq:
-        for step, (input_nodes, output_nodes, blocks) in enumerate(tq):
+        for step, (input_nodes, output_nodes, mfgs) in enumerate(tq):
             # feature copy from CPU to GPU takes place here
-            inputs = blocks[0].srcdata['feat']
-            labels = blocks[-1].dstdata['label']
+            inputs = mfgs[0].srcdata['feat']
+            labels = mfgs[-1].dstdata['label']
 
-            predictions = model(blocks, inputs)
+            predictions = model(mfgs, inputs)
 
             loss = F.cross_entropy(predictions, labels)
             opt.zero_grad()
@@ -298,10 +298,10 @@ for epoch in range(10):
     predictions = []
     labels = []
     with tqdm.tqdm(valid_dataloader) as tq, torch.no_grad():
-        for input_nodes, output_nodes, blocks in tq:
-            inputs = blocks[0].srcdata['feat']
-            labels.append(blocks[-1].dstdata['label'].cpu().numpy())
-            predictions.append(model(blocks, inputs).argmax(1).cpu().numpy())
+        for input_nodes, output_nodes, mfgs in tq:
+            inputs = mfgs[0].srcdata['feat']
+            labels.append(mfgs[-1].dstdata['label'].cpu().numpy())
+            predictions.append(model(mfgs, inputs).argmax(1).cpu().numpy())
         predictions = np.concatenate(predictions)
         labels = np.concatenate(labels)
         accuracy = sklearn.metrics.accuracy_score(labels, predictions)

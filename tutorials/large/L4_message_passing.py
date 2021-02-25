@@ -38,7 +38,7 @@ train_dataloader = dgl.dataloading.NodeDataLoader(
     num_workers=0
 )
 
-input_nodes, output_nodes, blocks = next(iter(train_dataloader))
+input_nodes, output_nodes, mfgs = next(iter(train_dataloader))
 
 
 ######################################################################
@@ -55,9 +55,9 @@ input_nodes, output_nodes, blocks = next(iter(train_dataloader))
 # ``srcdata`` and ``dstdata`` attributes:
 #
 
-block = blocks[0]
-print(block.srcdata)
-print(block.dstdata)
+mfg = mfgs[0]
+print(mfg.srcdata)
+print(mfg.dstdata)
 
 
 ######################################################################
@@ -65,7 +65,7 @@ print(block.dstdata)
 # how many source nodes and destination nodes exist in the bipartite graph:
 #
 
-print(block.num_src_nodes(), block.num_dst_nodes())
+print(mfg.num_src_nodes(), mfg.num_dst_nodes())
 
 
 ######################################################################
@@ -73,8 +73,8 @@ print(block.num_src_nodes(), block.num_dst_nodes())
 # will do with ``ndata`` on the graphs you have seen earlier:
 #
 
-block.srcdata['x'] = torch.zeros(block.num_src_nodes(), block.num_dst_nodes())
-dst_feat = block.dstdata['feat']
+mfg.srcdata['x'] = torch.zeros(mfg.num_src_nodes(), mfg.num_dst_nodes())
+dst_feat = mfg.dstdata['feat']
 
 
 ######################################################################
@@ -84,7 +84,7 @@ dst_feat = block.dstdata['feat']
 # current GNN layer should compute) as follows.
 #
 
-block.srcdata[dgl.NID], block.dstdata[dgl.NID]
+mfg.srcdata[dgl.NID], mfg.dstdata[dgl.NID]
 
 
 ######################################################################
@@ -103,7 +103,7 @@ block.srcdata[dgl.NID], block.dstdata[dgl.NID]
 # .. |image1| image:: https://data.dgl.ai/tutorial/img/bipartite.gif
 #
 
-print(torch.equal(block.srcdata[dgl.NID][:block.num_dst_nodes()], block.dstdata[dgl.NID]))
+print(torch.equal(mfg.srcdata[dgl.NID][:mfg.num_dst_nodes()], mfg.dstdata[dgl.NID]))
 
 
 ######################################################################
@@ -111,7 +111,7 @@ print(torch.equal(block.srcdata[dgl.NID][:block.num_dst_nodes()], block.dstdata[
 # :math:`h_u^{(l-1)}`:
 #
 
-block.srcdata['h'] = torch.randn(block.num_src_nodes(), 10)
+mfg.srcdata['h'] = torch.randn(mfg.num_src_nodes(), 10)
 
 
 ######################################################################
@@ -130,8 +130,8 @@ block.srcdata['h'] = torch.randn(block.num_src_nodes(), 10)
 
 import dgl.function as fn
 
-block.update_all(message_func=fn.copy_u('h', 'm'), reduce_func=fn.mean('m', 'h'))
-m_v = block.dstdata['h']
+mfg.update_all(message_func=fn.copy_u('h', 'm'), reduce_func=fn.mean('m', 'h'))
+m_v = mfg.dstdata['h']
 m_v
 
 
@@ -186,12 +186,12 @@ class Model(nn.Module):
         self.conv1 = SAGEConv(in_feats, h_feats)
         self.conv2 = SAGEConv(h_feats, num_classes)
 
-    def forward(self, blocks, x):
-        h_dst = x[:blocks[0].num_dst_nodes()]
-        h = self.conv1(blocks[0], (x, h_dst))
+    def forward(self, mfgs, x):
+        h_dst = x[:mfgs[0].num_dst_nodes()]
+        h = self.conv1(mfgs[0], (x, h_dst))
         h = F.relu(h)
-        h_dst = h[:blocks[1].num_dst_nodes()]
-        h = self.conv2(blocks[1], (h, h_dst))
+        h_dst = h[:mfgs[1].num_dst_nodes()]
+        h = self.conv2(mfgs[1], (h, h_dst))
         return h
 
 sampler = dgl.dataloading.MultiLayerNeighborSampler([4, 4])
@@ -206,10 +206,10 @@ train_dataloader = dgl.dataloading.NodeDataLoader(
 model = Model(graph.ndata['feat'].shape[1], 128, dataset.num_classes).to(device)
 
 with tqdm.tqdm(train_dataloader) as tq:
-    for step, (input_nodes, output_nodes, blocks) in enumerate(tq):
-        inputs = blocks[0].srcdata['feat']
-        labels = blocks[-1].dstdata['label']
-        predictions = model(blocks, inputs)
+    for step, (input_nodes, output_nodes, mfgs) in enumerate(tq):
+        inputs = mfgs[0].srcdata['feat']
+        labels = mfgs[-1].dstdata['label']
+        predictions = model(mfgs, inputs)
 
 
 ######################################################################
