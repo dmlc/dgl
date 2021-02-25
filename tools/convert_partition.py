@@ -218,7 +218,7 @@ part_metadata = {'graph_name': graph_name,
                  'etypes': etypes_map}
 
 for part_id in range(num_parts):
-    part_dir = output_dir + '/part' + str(part_id)
+    part_dir = 'part' + str(part_id)
     node_feat_file = os.path.join(part_dir, "node_feat.dgl")
     edge_feat_file = os.path.join(part_dir, "edge_feat.dgl")
     part_graph_file = os.path.join(part_dir, "graph.dgl")

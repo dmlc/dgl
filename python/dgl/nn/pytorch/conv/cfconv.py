@@ -134,7 +134,11 @@ class CFConv(nn.Module):
             Updated node representations.
         """
         with g.local_scope():
-            g.ndata['hv'] = self.project_node(node_feats)
+            if isinstance(node_feats, tuple):
+                node_feats_src, _ = node_feats
+            else:
+                node_feats_src = node_feats
+            g.srcdata['hv'] = self.project_node(node_feats_src)
             g.edata['he'] = self.project_edge(edge_feats)
             g.update_all(fn.u_mul_e('hv', 'he', 'm'), fn.sum('m', 'h'))
-            return self.project_out(g.ndata['h'])
+            return self.project_out(g.dstdata['h'])

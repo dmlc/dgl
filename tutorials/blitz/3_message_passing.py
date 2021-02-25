@@ -353,3 +353,6 @@ def sum_udf(nodes):
 #    Code <guide-message-passing-efficient>`.
 # 
 
+
+# Thumbnail Courtesy: Representation Learning on Networks, Jure Leskovec, WWW 2018
+# sphinx_gallery_thumbnail_path = '_static/blitz_3_message_passing.png'
