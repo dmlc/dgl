@@ -99,9 +99,19 @@ __global__ void CSRRowWiseSampleKernel(
 
   __shared__ int swap_buffer[WARP_SIZE*BLOCK_ROWS];
   __shared__ int index_buffer[WARP_SIZE*BLOCK_ROWS];
+
+  // we need one state per 256 threads
+  constexpr int NUM_RNG = (WARP_SIZE*BLOCK_ROWS)/256;
+  __shared__ curandState rng_array[NUM_RNG];
+  assert(blockDim.x >= NUM_RNG);
+  if (threadIdx.y == 0 && threadIdx.x < NUM_RNG) {
+    curand_init(rand_seed, 0, threadIdx.x, rng_array+threadIdx.x);
+  }
+  __syncthreads();
+  curandState * const rng = rng_array+((threadIdx.x+WARP_SIZE*threadIdx.y)/256);
   
-  const int64_t out_row = blockIdx.x*blockDim.y+threadIdx.y;
-  if (out_row < num_rows) {
+  int64_t out_row = blockIdx.x*blockDim.y+threadIdx.y;
+  while (out_row < num_rows) {
     const int64_t row = in_rows[out_row];
 
     const int64_t in_row_start = in_ptr[row];
@@ -119,13 +129,10 @@ __global__ void CSRRowWiseSampleKernel(
       }
     } else {
       // each thread needs to initialize it's random state
-      curandState rng;
-      curand_init(rand_seed, out_row, 0, &rng);
-
       if (deg <= WARP_SIZE) {
         // in this case, each thread generates an index to swap with which occurs
         // at or after it's current index
-        swap_buffer[WARP_SIZE*threadIdx.y+threadIdx.x] = threadIdx.x + (curand(&rng) % (num_picks-threadIdx.x));
+        swap_buffer[WARP_SIZE*threadIdx.y+threadIdx.x] = threadIdx.x + (curand(rng) % (num_picks-threadIdx.x));
         index_buffer[WARP_SIZE*threadIdx.y+threadIdx.x] = threadIdx.x;
 
         __syncwarp();
@@ -156,7 +163,7 @@ __global__ void CSRRowWiseSampleKernel(
           out_idxs[out_row_start+idx] = in_row_start+idx;
         }
         for (int idx = num_picks+threadIdx.x; idx < deg; idx+=WARP_SIZE) {
-          const int num = curand(&rng)%(idx+1);
+          const int num = curand(rng)%(idx+1);
           if (num < num_picks) {
             // use max so as to achieve the replacement order the serial
             // algorithm would have
@@ -175,6 +182,8 @@ __global__ void CSRRowWiseSampleKernel(
         }
       }
     }
+
+    out_row += gridDim.x*blockDim.y;
   }
 }
 
