@@ -76,7 +76,7 @@ Now go to `/home/ubuntu/workspace` and clone the DGL Github repository.
 
 ### Step 1: set IP configuration file.
 
-User need to set their own IP configuration file before training. For example, if we have four machines in current cluster, the IP configuration
+User need to set their own IP configuration file `ip_config.txt` before training. For example, if we have four machines in current cluster, the IP configuration
 could like this:
 
 ```bash
@@ -153,6 +153,7 @@ python3 ~/workspace/dgl/tools/launch.py \
 "python3 train_dist.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 30 --batch_size 1000 --num_workers 4 --num_gpus 4"
 ```
 
+**Note:** if you are using conda or other virtual environments on the remote machines, you need to replace `python3` in the command string (i.e. the last argument) with the path to the Python interpreter in that environment.
 
 ## Distributed code runs in the standalone mode
 

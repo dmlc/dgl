@@ -80,7 +80,7 @@ Now go to `/home/ubuntu/workspace` and clone the DGL Github repository.
 
 ### Step 1: set IP configuration file.
 
-User need to set their own IP configuration file before training. For example, if we have four machines in current cluster, the IP configuration could like this:
+User need to set their own IP configuration file `ip_config.txt` before training. For example, if we have four machines in current cluster, the IP configuration could like this:
 
 ```bash
 172.31.0.1
@@ -126,6 +126,8 @@ We can get the performance score at the second epoch:
 ```
 Val Acc 0.4323, Test Acc 0.4255, time: 128.0379
 ```
+
+**Note:** if you are using conda or other virtual environments on the remote machines, you need to replace `python3` in the command string (i.e. the last argument) with the path to the Python interpreter in that environment.
 
 ## Partition a graph with ParMETIS
 
