@@ -131,12 +131,12 @@ Run the program called `pm_dglpart` in ParMETIS to read the node file and the ed
 to partition the graph.
 
 ```
-mpirun -np 4 pm_dglpart mag 2
+mpirun -np 4 pm_dglpart ogbn-products 2
 ```
 This partitions the graph into eight parts with four processes.
 
 ```
-mpirun --hostfile hostfile -np 4 pm_dglpart mag 2
+mpirun --hostfile hostfile -np 4 pm_dglpart ogbn-products 2
 ```
 This partitions the graph into eight parts with four processes on multiple machines.
 `hostfile` specifies the IPs of the machines; one line for a machine. The input files
