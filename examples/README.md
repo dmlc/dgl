@@ -13,6 +13,7 @@ The folder contains example implementations of selected research papers related 
 | [Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges](#mwe) | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
 | [SIGN: Scalable Inception Graph Neural Networks](#sign)      | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
 | [Strategies for Pre-training Graph Neural Networks](#prestrategy) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [Graph Neural Networks with convolutional ARMA filters](#arma) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Predict then Propagate: Graph Neural Networks meet Personalized PageRank](#appnp) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Cluster-GCN: An Efficient Algorithm for Training Deep and Large Graph Convolutional Networks](#clustergcn) | :heavy_check_mark:  |                                  |                           | :heavy_check_mark: | :heavy_check_mark: |
 | [Deep Graph Infomax](#dgi)                                   | :heavy_check_mark:  |                                  |                           |                    |                    |
@@ -116,6 +117,10 @@ The folder contains example implementations of selected research papers related 
     - Tags: over-smoothing, node classification
 
 ## 2019
+
+- <a name="arma"></a>  Bianchi et al. Graph Neural Networks with Convolutional ARMA Filters. [Paper link](https://arxiv.org/abs/1901.01343).
+    - Example code: [PyTorch](../examples/pytorch/arma)
+    - Tags: node classification
 
 - <a name="appnp"></a> Klicpera et al. Predict then Propagate: Graph Neural Networks meet Personalized PageRank. [Paper link](https://arxiv.org/abs/1810.05997).
     - Example code: [PyTorch](../examples/pytorch/appnp), [MXNet](../examples/mxnet/appnp)
