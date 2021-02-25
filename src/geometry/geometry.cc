@@ -88,7 +88,7 @@ DGL_REGISTER_GLOBAL("geometry._CAPI_NeighborMatching")
         << "number of edges in graph should be the same "
         << "as the length of edge weight tensor.";
     }
-    
+
     // call implementation
     NeighborMatching(graph.sptr(), weight, result);
   });

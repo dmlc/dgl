@@ -3,11 +3,13 @@
  * \file array/check.h
  * \brief DGL check utilities
  */
+#ifndef DGL_ARRAY_CHECK_H_
+#define DGL_ARRAY_CHECK_H_
 
 #include <dgl/runtime/ndarray.h>
 #include <dgl/array.h>
 #include <vector>
-
+#include <string>
 
 namespace dgl {
 namespace aten {
@@ -59,5 +61,7 @@ inline void CheckShape(
   }
 }
 
-}  // namespace dgl
 }  // namespace aten
+}  // namespace dgl
+
+#endif  // DGL_ARRAY_CHECK_H_

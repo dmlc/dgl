@@ -3,11 +3,11 @@
  * \file geometry/cuda/edge_coarsening_impl.cu
  * \brief Edge coarsening CUDA implementation
  */
-#include <cstdint>
-#include <curand.h>
 #include <dgl/array.h>
 #include <dgl/random.h>
 #include <dmlc/thread_local.h>
+#include <curand.h>
+#include <cstdint>
 #include "../geometry_op.h"
 #include "../../runtime/cuda/cuda_common.h"
 #include "../../array/cuda/utils.h"

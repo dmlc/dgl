@@ -34,7 +34,8 @@ template void IndexShuffle<int64_t>(int64_t *idxs, int64_t num_elems);
  * \param num_elems length of idxs
  */
 template <typename IdType>
-void GroupIndexShuffle(const IdType *group_idxs, IdType *idxs, int64_t num_groups_idxs, int64_t num_elems) {
+void GroupIndexShuffle(const IdType *group_idxs, IdType *idxs,
+                       int64_t num_groups_idxs, int64_t num_elems) {
   if (num_groups_idxs < 2) return;  // empty idxs array
   CHECK_LE(group_idxs[num_groups_idxs - 1], num_elems) << "group_idxs out of range";
   for (int64_t i = 0; i < num_groups_idxs - 1; ++i) {
@@ -61,7 +62,6 @@ IdArray GroupRandomPerm(const IdType *group_idxs, int64_t num_group_idxs, int64_
   IdArray perm = aten::NewIdArray(num_nodes, DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
   IdType* perm_data = static_cast<IdType*>(perm->data);
   std::iota(perm_data, perm_data + num_nodes, 0);
-  
   GroupIndexShuffle(group_idxs, perm_data, num_group_idxs, num_nodes);
   return perm;
 }
