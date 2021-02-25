@@ -3,30 +3,25 @@
  * \file geometry/cuda/edge_coarsening_impl.cu
  * \brief Edge coarsening CUDA implementation
  */
-#include <dgl/array.h>
-#include <curand.h>
-#include <dgl/random.h>
 #include <cstdint>
+#include <curand.h>
+#include <dgl/array.h>
+#include <dgl/random.h>
+#include <dmlc/thread_local.h>
 #include "../geometry_op.h"
 #include "../../runtime/cuda/cuda_common.h"
+#include "../../array/cuda/utils.h"
 
-#define THREADS 1024
-#define BLOCKS(N) (N + THREADS - 1) / THREADS
-#define BLUE_P 0.53406
-#define BLUE -1
-#define RED -2
-#define EMPTY_IDX -1
-#define CURAND_CALL(func)           \
-{                                   \
-  curandStatus_t e = (func);        \
-  CHECK(e == CURAND_STATUS_SUCCESS) \
-    << "CURAND: Error at "          \
-    << __FILE__ << ":" << __LINE__; \
-}
+#define BLOCKS(N, T) (N + T - 1) / T
 
 namespace dgl {
 namespace geometry {
 namespace impl {
+
+constexpr float BLUE_P = 0.53406;
+constexpr int BLUE = -1;
+constexpr int RED = -2;
+constexpr int EMPTY_IDX = -1;
 
 __device__ bool done_d;
 __global__ void init_done_kernel() { done_d = true; }
@@ -39,30 +34,6 @@ __global__ void colorize_kernel(const float *prop, int64_t num_elem, IdType *res
       result[idx] = (prop[idx] > BLUE_P) ? RED : BLUE;
       done_d = false;
     }
-  }
-}
-
-template <typename IdType>
-__global__ void propose_kernel(const IdType *indptr, const IdType *indices,
-                               int64_t num_elem, IdType *proposal, IdType *result) {
-  const IdType idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx < num_elem) {
-    if (result[idx] != BLUE) return;
-
-    bool has_unmatched_neighbor = false;
-    for (IdType i = indptr[idx]; i < indptr[idx + 1]; ++i) {
-      auto v = indices[i];
-
-      if (result[v] < 0)
-        has_unmatched_neighbor = true;
-      if (result[v] == RED) {  // propose to the first red neighbor
-        proposal[idx] = v;
-        break;
-      }
-    }
-    __syncthreads();
-    if (!has_unmatched_neighbor)
-      result[idx] = idx;
   }
 }
 
@@ -95,39 +66,6 @@ __global__ void weighted_propose_kernel(const IdType *indptr, const IdType *indi
   }
 }
 
-template <typename IdType>
-__global__ void respond_kernel(const IdType *indptr, const IdType *indices,
-                               int64_t num_elem, IdType *proposal, IdType *result) {
-  const IdType idx = blockIdx.x * blockDim.x + threadIdx.x;
-  IdType target = EMPTY_IDX;
-  if (idx < num_elem) {
-    if (result[idx] != RED) return;
-
-    bool has_unmatched_neighbors = false;
-
-    for (IdType i = indptr[idx]; i < indptr[idx + 1]; ++i) {
-      auto v = indices[i];
-
-      if (result[v] < 0)
-        has_unmatched_neighbors = true;
-      if (result[v] == BLUE && proposal[v] == idx) {
-        // Match first blue neighbhor v which proposed to u.
-        target = v;
-        break;
-      }
-    }
-    __syncthreads();
-
-    if (target != EMPTY_IDX) {
-      result[target] = min(idx, target);
-      result[idx] = min(idx, target);
-    }
-
-    if (!has_unmatched_neighbors)
-      result[idx] = idx;
-  }
-}
-
 template <typename FloatType, typename IdType>
 __global__ void weighted_respond_kernel(const IdType *indptr, const IdType *indices,
                                         const FloatType *weights, int64_t num_elem,
@@ -146,7 +84,9 @@ __global__ void weighted_respond_kernel(const IdType *indptr, const IdType *indi
       if (result[v] < 0) {
         has_unmatched_neighbors = true;
       }
-      if (result[v] == BLUE && proposal[v] == idx && weights[i] >= weight_max) {
+      if (result[v] == BLUE
+          && proposal[v] == idx
+          && weights[i] >= weight_max) {
         v_max = v;
         weight_max = weights[i];
       }
@@ -161,22 +101,26 @@ __global__ void weighted_respond_kernel(const IdType *indptr, const IdType *indi
   }
 }
 
+/*! \brief The colorize procedure. This procedure randomly marks unmarked
+ * nodes with BLUE(-1) and RED(-2) and checks whether the node matching
+ * process has finished.
+ */
 template<typename IdType>
-bool Colorize(NDArray result, curandGenerator_t gen) {
+bool Colorize(IdType * result_data, curandGenerator_t gen, int64_t num_nodes) {
   // initial done signal
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   CUDA_KERNEL_CALL(init_done_kernel, 1, 1, 0, thr_entry->stream);
 
   // generate color prop for each node
-  const int64_t num_nodes = result->shape[0];
   float *prop;
   CUDA_CALL(cudaMalloc(reinterpret_cast<void **>(&prop), num_nodes * sizeof(float)));
   CURAND_CALL(curandGenerateUniform(gen, prop, num_nodes));
   cudaDeviceSynchronize();  // wait for random number generation finish since curand is async
 
   // call kernel
-  IdType * result_data = static_cast<IdType*>(result->data);
-  CUDA_KERNEL_CALL(colorize_kernel, BLOCKS(num_nodes), THREADS, 0, thr_entry->stream,
+  auto num_threads = cuda::FindNumThreads(num_nodes);
+  auto num_blocks = cuda::FindNumBlocks<'x'>(BLOCKS(num_nodes, num_threads));
+  CUDA_KERNEL_CALL(colorize_kernel, num_blocks, num_threads, 0, thr_entry->stream,
                    prop, num_nodes, result_data);
   bool done_h = false;
   CUDA_CALL(cudaMemcpyFromSymbol(&done_h, done_d, sizeof(done_h), 0, cudaMemcpyDeviceToHost));
@@ -184,77 +128,90 @@ bool Colorize(NDArray result, curandGenerator_t gen) {
   return done_h;
 }
 
-template<typename FloatType, typename IdType>
-void Propose(const NDArray indptr, const NDArray indices,
-             const NDArray weight, NDArray result, NDArray proposal) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  const int64_t num_nodes = result->shape[0];
-  IdType *indptr_data = static_cast<IdType*>(indptr->data);
-  IdType *indices_data = static_cast<IdType*>(indices->data);
-  IdType *result_data = static_cast<IdType*>(result->data);
-  IdType *proposal_data = static_cast<IdType*>(proposal->data);
-
-  if (aten::IsNullArray(weight)) {
-    CUDA_KERNEL_CALL(propose_kernel, BLOCKS(num_nodes), THREADS, 0, thr_entry->stream,
-                     indptr_data, indices_data, num_nodes, proposal_data, result_data);
-  } else {
-    FloatType *weight_data = static_cast<FloatType*>(weight->data);
-    CUDA_KERNEL_CALL(weighted_propose_kernel, BLOCKS(num_nodes), THREADS, 0, thr_entry->stream,
-                     indptr_data, indices_data, weight_data, num_nodes, proposal_data, result_data);
-  }
-}
-
-template<typename FloatType, typename IdType>
-void Respond(const NDArray indptr, const NDArray indices,
-             const NDArray weight, NDArray result, NDArray proposal) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  const int64_t num_nodes = result->shape[0];
-  IdType *indptr_data = static_cast<IdType*>(indptr->data);
-  IdType *indices_data = static_cast<IdType*>(indices->data);
-  IdType *result_data = static_cast<IdType*>(result->data);
-  IdType *proposal_data = static_cast<IdType*>(proposal->data);
-
-  if (aten::IsNullArray(weight)) {
-    CUDA_KERNEL_CALL(respond_kernel, BLOCKS(num_nodes), THREADS, 0, thr_entry->stream,
-                     indptr_data, indices_data, num_nodes, proposal_data, result_data);
-  } else {
-    FloatType *weight_data = static_cast<FloatType*>(weight->data);
-    CUDA_KERNEL_CALL(weighted_respond_kernel, BLOCKS(num_nodes), THREADS, 0, thr_entry->stream,
-                     indptr_data, indices_data, weight_data, num_nodes, proposal_data, result_data);
-  }
-}
-
+/*! \brief Weighted neighbor matching procedure (GPU version).
+ * This implementation is from `A GPU Algorithm for Greedy Graph Matching
+ * <http://www.staff.science.uu.nl/~bisse101/Articles/match12.pdf>`__
+ * 
+ * This algorithm has three parts: colorize, propose and respond.
+ * In colorize procedure, each unmarked node will be marked as BLUE or
+ * RED randomly. If all nodes are marked, finish and return.
+ * In propose procedure, each BLUE node will propose to the RED
+ * neighbor with the largest weight (or randomly choose one if without weight).
+ * If all its neighbors are marked, mark this node with its id.
+ * In respond procedure, each RED node will respond to the BLUE neighbor
+ * that has proposed to it and has the largest weight. If all neighbors
+ * are marked, mark this node with its id. Else match this (BLUE, RED) node
+ * pair and mark them with the smaller id between them.
+ */
 template <DLDeviceType XPU, typename FloatType, typename IdType>
-void EdgeCoarsening(const NDArray indptr, const NDArray indices,
-                    const NDArray weight, NDArray result) {
-  // get random generator
-  curandGenerator_t gen;
-  uint64_t seed = dgl::RandomEngine::ThreadLocal()->RandInt(UINT64_MAX);
-  CURAND_CALL(curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT));
-  CURAND_CALL(curandSetPseudoRandomGeneratorSeed(gen, seed));
+void WeightedNeighborMatching(const aten::CSRMatrix &csr, const NDArray weight, IdArray result) {
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  if (!thr_entry->curand_gen) {
+    uint64_t seed = dgl::RandomEngine::ThreadLocal()->RandInt(UINT64_MAX);
+    CURAND_CALL(curandCreateGenerator(&thr_entry->curand_gen, CURAND_RNG_PSEUDO_DEFAULT));
+    CURAND_CALL(curandSetPseudoRandomGeneratorSeed(thr_entry->curand_gen, seed));
+  }
 
   // create proposal tensor
   const int64_t num_nodes = result->shape[0];
   IdArray proposal = aten::Full(-1, num_nodes, sizeof(IdType) * 8, result->ctx);
 
-  while (!Colorize<IdType>(result, gen)) {
-    Propose<FloatType, IdType>(indptr, indices, weight, result, proposal);
-    Respond<FloatType, IdType>(indptr, indices, weight, result, proposal);
+  // get data ptrs
+  IdType *indptr_data = static_cast<IdType*>(csr.indptr->data);
+  IdType *indices_data = static_cast<IdType*>(csr.indices->data);
+  IdType *result_data = static_cast<IdType*>(result->data);
+  IdType *proposal_data = static_cast<IdType*>(proposal->data);
+  FloatType *weight_data = static_cast<FloatType*>(weight->data);
+
+  auto num_threads = cuda::FindNumThreads(num_nodes);
+  auto num_blocks = cuda::FindNumBlocks<'x'>(BLOCKS(num_nodes, num_threads));
+  while (!Colorize<IdType>(result_data, thr_entry->curand_gen, num_nodes)) {
+    CUDA_KERNEL_CALL(weighted_propose_kernel, num_blocks, num_threads, 0, thr_entry->stream,
+                     indptr_data, indices_data, weight_data, num_nodes, proposal_data, result_data);
+    CUDA_KERNEL_CALL(weighted_respond_kernel, num_blocks, num_threads, 0, thr_entry->stream,
+                     indptr_data, indices_data, weight_data, num_nodes, proposal_data, result_data);
   }
 }
+template void WeightedNeighborMatching<kDLGPU, float, int32_t>(
+  const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
+template void WeightedNeighborMatching<kDLGPU, float, int64_t>(
+  const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
+template void WeightedNeighborMatching<kDLGPU, double, int32_t>(
+  const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
+template void WeightedNeighborMatching<kDLGPU, double, int64_t>(
+  const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
 
-template void EdgeCoarsening<kDLGPU, float, int32_t>(
-    const NDArray indptr, const NDArray indices,
-    const NDArray weight, NDArray result);
-template void EdgeCoarsening<kDLGPU, float, int64_t>(
-    const NDArray indptr, const NDArray indices,
-    const NDArray weight, NDArray result);
-template void EdgeCoarsening<kDLGPU, double, int32_t>(
-    const NDArray indptr, const NDArray indices,
-    const NDArray weight, NDArray result);
-template void EdgeCoarsening<kDLGPU, double, int64_t>(
-    const NDArray indptr, const NDArray indices,
-    const NDArray weight, NDArray result);
+/*! \brief Unweighted neighbor matching procedure (GPU version).
+ * Instead of directly sample neighbors, we assign each neighbor
+ * with a random weight. We use random weight for 2 reasons:
+ *  1. Random sample for each node in GPU is expensive. Although
+ *     we can perform a global group-wise (neighborhood of each
+ *     node as a group) random permutation as in CPU version,
+ *     it still cost too much compared to directly using random weights.
+ *  2. Graph is sparse, thus neighborhood of each node is small,
+ *     which is suitable for GPU implementation.
+ */
+template <DLDeviceType XPU, typename IdType>
+void NeighborMatching(const aten::CSRMatrix &csr, IdArray result) {
+  const int64_t num_edges = csr.indices->shape[0];
+
+  // generate random weights
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  if (!thr_entry->curand_gen) {
+    uint64_t seed = dgl::RandomEngine::ThreadLocal()->RandInt(UINT64_MAX);
+    CURAND_CALL(curandCreateGenerator(&thr_entry->curand_gen, CURAND_RNG_PSEUDO_DEFAULT));
+    CURAND_CALL(curandSetPseudoRandomGeneratorSeed(thr_entry->curand_gen, seed));
+  }
+  NDArray weight = NDArray::Empty(
+    {num_edges}, DLDataType{kDLFloat, sizeof(float) * 8, 1}, result->ctx);
+  float *weight_data = static_cast<float*>(weight->data);
+  CURAND_CALL(curandGenerateUniform(thr_entry->curand_gen, weight_data, num_edges));
+  cudaDeviceSynchronize();
+
+  WeightedNeighborMatching<XPU, float, IdType>(csr, weight, result);
+}
+template void NeighborMatching<kDLGPU, int32_t>(const aten::CSRMatrix &csr, IdArray result);
+template void NeighborMatching<kDLGPU, int64_t>(const aten::CSRMatrix &csr, IdArray result);
 
 }  // namespace impl
 }  // namespace geometry

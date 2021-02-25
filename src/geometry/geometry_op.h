@@ -16,14 +16,21 @@ template <DLDeviceType XPU, typename FloatType, typename IdType>
 void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
 
-/*! \brief Implementation of edge coarsening procedure used in Metis and Graclus 
- *  for homogeneous graph coarsening. This procedure keeps picking an unmarked
- *  vertex and matching it with one its unmarked neighbors (that maximizes its
- *  edge weight) until no match can be done.
+/*! \brief Implementation of weighted neighbor matching process of edge coarsening used
+ * in Metis and Graclus for homogeneous graph coarsening. This procedure keeps
+ * picking an unmarked vertex and matching it with one its unmarked neighbors
+ * (that maximizes its edge weight) until no match can be done.
  */
 template <DLDeviceType XPU, typename FloatType, typename IdType>
-void EdgeCoarsening(const NDArray indptr, const NDArray indices,
-                    const NDArray weight, NDArray result);
+void WeightedNeighborMatching(const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
+
+/*! \brief Implementation of neighbor matching process of edge coarsening used
+ * in Metis and Graclus for homogeneous graph coarsening. This procedure keeps
+ * picking an unmarked vertex and matching it with one its unmarked neighbors
+ * (that maximizes its edge weight) until no match can be done.
+ */
+template <DLDeviceType XPU, typename IdType>
+void NeighborMatching(const aten::CSRMatrix &csr, IdArray result);
 
 }  // namespace impl
 }  // namespace geometry

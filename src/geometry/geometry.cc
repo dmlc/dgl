@@ -5,39 +5,15 @@
  */
 #include <dgl/array.h>
 #include <dgl/runtime/ndarray.h>
+#include <dgl/base_heterograph.h>
 #include "../c_api_common.h"
 #include "./geometry_op.h"
+#include "../array/check.h"
 
 using namespace dgl::runtime;
 
 namespace dgl {
 namespace geometry {
-
-// Check whether the given arguments have the same context.
-inline void CheckCtx(
-    const DLContext& ctx,
-    const std::vector<NDArray>& arrays,
-    const std::vector<std::string>& names) {
-  for (size_t i = 0; i < arrays.size(); ++i) {
-    if (aten::IsNullArray(arrays[i]))
-      continue;
-    CHECK_EQ(ctx, arrays[i]->ctx)
-      << "Expected device context " << ctx << ". But got "
-      << arrays[i]->ctx << " for " << names[i] << ".";
-  }
-}
-
-// Check whether input tensors are contiguous.
-inline void CheckContiguous(
-    const std::vector<NDArray>& arrays,
-    const std::vector<std::string>& names) {
-  for (size_t i = 0; i < arrays.size(); ++i) {
-    if (aten::IsNullArray(arrays[i]))
-      continue;
-    CHECK(arrays[i].IsContiguous())
-      << "Expect " << names[i] << " to be a contiguous tensor";
-  }
-}
 
 void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result) {
@@ -57,6 +33,26 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
   });
 }
 
+void NeighborMatching(HeteroGraphPtr graph, const NDArray weight, IdArray result) {
+  if (!aten::IsNullArray(weight)) {
+    ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "NeighborMatching", {
+      ATEN_FLOAT_TYPE_SWITCH(weight->dtype, FloatType, "weight", {
+        ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
+          impl::WeightedNeighborMatching<XPU, FloatType, IdType>(
+              graph->GetCSRMatrix(0), weight, result);
+        });
+      });
+    });
+  } else {
+    ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "NeighborMatching", {
+      ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
+        impl::NeighborMatching<XPU, IdType>(
+            graph->GetCSRMatrix(0), result);
+      });
+    });
+  }
+}
+
 ///////////////////////// C APIs /////////////////////////
 
 DGL_REGISTER_GLOBAL("geometry._CAPI_FarthestPointSampler")
@@ -71,51 +67,30 @@ DGL_REGISTER_GLOBAL("geometry._CAPI_FarthestPointSampler")
     FarthestPointSampler(data, batch_size, sample_points, dist, start_idx, result);
   });
 
-DGL_REGISTER_GLOBAL("geometry._CAPI_EdgeCoarsening")
+DGL_REGISTER_GLOBAL("geometry._CAPI_NeighborMatching")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    const NDArray indptr = args[0];
-    const NDArray indices = args[1];
-    const NDArray weight = args[2];
-    NDArray result = args[3];
+    HeteroGraphRef graph = args[0];
+    const NDArray weight = args[1];
+    IdArray result = args[2];
 
-    // check context and contiguous
-    CheckCtx(indptr->ctx, {indices, weight, result},
-      {"indices", "edge_weight", "result"});
-    CheckContiguous({indptr, indices, weight, result},
-      {"indptr", "indices", "edge_weight", "result"});
-
-    // check shape
-    CHECK_EQ(indptr->ndim, 1) << "indptr should be an 1D tensor.";
-    CHECK_EQ(indices->ndim, 1) << "indices should be an 1D tensor.";
+    // sanity check
+    aten::CheckCtx(graph->Context(), {weight, result}, {"edge_weight, result"});
+    aten::CheckContiguous({weight, result}, {"edge_weight", "result"});
+    CHECK_EQ(graph->NumEdgeTypes(), 1) << "homogeneous graph has only one edge type";
     CHECK_EQ(result->ndim, 1) << "result should be an 1D tensor.";
-    CHECK_EQ(indptr->shape[0] - 1, result->shape[0])
-      << "The number of nodes in CSR matrix should be the same as the result tensor.";
-
+    auto pair = graph->meta_graph()->FindEdge(0);
+    const dgl_type_t node_type = pair.first;
+    CHECK_EQ(graph->NumVertices(node_type), result->shape[0])
+      << "The number of nodes should be the same as the length of result tensor.";
     if (!aten::IsNullArray(weight)) {
       CHECK_EQ(weight->ndim, 1) << "weight should be an 1D tensor.";
-      CHECK_EQ(indices->shape[0], weight->shape[0])
-        << "indices of CSR matrix should have the same shape "
-        << "as the edge weight tensor.";
+      CHECK_EQ(graph->NumEdges(0), weight->shape[0])
+        << "number of edges in graph should be the same "
+        << "as the length of edge weight tensor.";
     }
-
+    
     // call implementation
-    if (!aten::IsNullArray(weight)) {
-      ATEN_FLOAT_TYPE_SWITCH(weight->dtype, FloatType, "weight", {
-        ATEN_ID_TYPE_SWITCH(indptr->dtype, IdType, {
-          ATEN_XPU_SWITCH_CUDA(indptr->ctx.device_type, XPU, "EdgeCoarsening", {
-            impl::EdgeCoarsening<XPU, FloatType, IdType>(
-                indptr, indices, weight, result);
-          });
-        });
-      });
-    } else {
-      ATEN_ID_TYPE_SWITCH(indptr->dtype, IdType, {
-        ATEN_XPU_SWITCH_CUDA(indptr->ctx.device_type, XPU, "EdgeCoarsening", {
-          impl::EdgeCoarsening<XPU, float, IdType>(
-              indptr, indices, weight, result);
-          });
-        });
-    }
+    NeighborMatching(graph.sptr(), weight, result);
   });
 
 }  // namespace geometry

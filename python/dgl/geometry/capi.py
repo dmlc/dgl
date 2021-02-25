@@ -39,11 +39,11 @@ def farthest_point_sampler(data, batch_size, sample_points, dist, start_idx, res
                                F.zerocopy_to_dgl_ndarray(result))
 
 
-def edge_coarsening(graph, edge_weights=None, relabel_idx=True):
+def _neighbor_matching(graph_idx, num_nodes, edge_weights=None, relabel_idx=True):
     """
     Description
     -----------
-    The edge coarsening procedure used in
+    The neighbor matching procedure of edge coarsening used in
     `Metis <http://cacs.usc.edu/education/cs653/Karypis-METIS-SIAMJSC98.pdf>`__
     and
     `Graclus <https://www.cs.utexas.edu/users/inderjit/public_papers/multilevel_pami.pdf>`__
@@ -62,8 +62,10 @@ def edge_coarsening(graph, edge_weights=None, relabel_idx=True):
 
     Parameters
     ----------
-    graph : DGLGraph
+    graph : HeteroGraphIndex
         The input homogeneous graph.
+    num_nodes : int
+        The number of nodes in this homogeneous graph.
     edge_weight : tensor, optional
         The edge weight tensor holding non-negative scalar weight for each edge.
         default: :obj:`None`
@@ -76,50 +78,19 @@ def edge_coarsening(graph, edge_weights=None, relabel_idx=True):
     a 1-D tensor
         A vector with each element that indicates the cluster ID of a vertex.
     """
-    assert graph.is_homogeneous, \
-    "The graph used in graph node matching must be homogeneous"
-
-    # currently only int64 are supported
-    if graph.idtype == F.int32:
-        graph = graph.long()
-
-    num_nodes = graph.num_nodes()
-    src, dst = graph.edges()
-
-    # remove self-loops
-    mask = src != dst
-    src, dst = src[mask], dst[mask]
+    edge_weight_capi = nd.NULL["int64"]
     if edge_weights is not None:
-        edge_weights = edge_weights[mask]
-
-    # randomly shuffle if no edge weight is given
-    # thus we can randomly pick neighbors for each node
-    if edge_weights is None:
-        perm = F.rand_shuffle(F.arange(0, src.size(0), F.dtype(src), F.context(src)))
-        src, dst = src[perm], dst[perm]
-
-    # convert to CSR
-    perm = F.argsort(src, 0, False)
-    src, dst = src[perm], dst[perm]
-    deg = F.zeros(num_nodes, F.dtype(src), F.context(src))
-    F.index_add_inplace(deg, src, F.full_1d(F.shape(src)[0], 1, F.dtype(src), F.context(src)))
-    indptr = F.zeros(num_nodes + 1, F.dtype(src), F.context(src))
-    indptr[1:] = F.cumsum(deg, dim=0)
-
-    node_label = F.full_1d(num_nodes, -1, F.dtype(src), F.context(src))
-    if edge_weights is None:
-        edge_weights_dgl = nd.NULL["int64"]
-    else:
-        edge_weights_dgl = F.zerocopy_to_dgl_ndarray(edge_weights)
-
-    _CAPI_EdgeCoarsening(F.zerocopy_to_dgl_ndarray(indptr),
-                         F.zerocopy_to_dgl_ndarray(dst),
-                         edge_weights_dgl,
-                         F.zerocopy_to_dgl_ndarray_for_write(node_label))
+        edge_weight_capi = F.zerocopy_to_dgl_ndarray(edge_weights)
+    node_label = F.full_1d(
+        num_nodes, -1, getattr(F, graph_idx.dtype), F.to_backend_ctx(graph_idx.ctx))
+    node_label_capi = F.zerocopy_to_dgl_ndarray_for_write(node_label)
+    _CAPI_NeighborMatching(graph_idx, edge_weight_capi, node_label_capi)
     if F.reduce_sum(node_label < 0).item() != 0:
         raise DGLError("Find unmatched node")
 
     # reorder node id
+    # TODO: actually we can add `return_inverse` option for `unique`
+    #       function in backend for efficiency.
     if relabel_idx:
         node_label_np = F.zerocopy_to_numpy(node_label)
         _, node_label_np = np.unique(node_label_np, return_inverse=True)
