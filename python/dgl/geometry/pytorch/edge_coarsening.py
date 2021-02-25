@@ -29,7 +29,7 @@ class NeighborMatchingFn(th.autograd.Function):
         -----------
         Perform backward computation
         """
-        pass
+        pass # pylint: disable=unnecessary-pass
 
 
 def neighbor_matching(graph, e_weights=None, relabel_idx=True):

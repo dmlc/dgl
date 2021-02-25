@@ -35,7 +35,7 @@ class NeighborMatchingFn(mx.autograd.Function):
         -----------
         Perform backward computation
         """
-        pass
+        pass # pylint: disable=unnecessary-pass
 
 
 def neighbor_matching(graph, e_weights, relabel_idx):
