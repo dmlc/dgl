@@ -34,6 +34,10 @@ def cpu():
 def tensor(data, dtype=None):
     if isinstance(data, numbers.Number):
         data = [data]
+    elif isinstance(data, list) and len(data) > 0 and \
+            isinstance(data[0], th.Tensor) and not data[0].shape:
+        data = th.stack(data)
+
     if isinstance(data, th.Tensor):
         return th.as_tensor(data, dtype=dtype, device=data.device)
     else:
