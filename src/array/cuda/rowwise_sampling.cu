@@ -79,7 +79,7 @@ __global__ void CSRRowWiseSampleDegreeReplaceKernel(
   }
 }
 
-template<typename IdType, int BLOCK_SIZE>
+template<typename IdType, int BLOCK_ROWS>
 __global__ void CSRRowWiseSampleKernel(
     const unsigned long rand_seed,
     const int num_picks,
@@ -93,77 +93,85 @@ __global__ void CSRRowWiseSampleKernel(
     IdType * const out_cols,
     IdType * const out_idxs)
 {
-  typedef cub::BlockRadixSort<int, BLOCK_SIZE, 1, int> BlockRadixSort;
-  __shared__ typename BlockRadixSort::TempStorage temp_storage;
+  // we assign one warp per row
+  constexpr int WARP_SIZE = 32;
+  assert(blockDim.x == WARP_SIZE);
 
-  const int64_t out_row = blockIdx.x;
-  const int64_t row = in_rows[out_row];
+  __shared__ int swap_buffer[WARP_SIZE*BLOCK_ROWS];
+  __shared__ int index_buffer[WARP_SIZE*BLOCK_ROWS];
+  
+  const int64_t out_row = blockIdx.x*blockDim.y+threadIdx.y;
+  if (out_row < num_rows) {
+    const int64_t row = in_rows[out_row];
 
-  const int64_t in_row_start = in_ptr[row];
-  const int deg = in_ptr[row+1] - in_row_start;
+    const int64_t in_row_start = in_ptr[row];
+    const int deg = in_ptr[row+1] - in_row_start;
 
-  const int64_t out_row_start = out_ptr[out_row];
+    const int64_t out_row_start = out_ptr[out_row];
 
-  if (deg <= num_picks) {
-    // just copy row
-    for (int idx = threadIdx.x; idx < deg; idx += BLOCK_SIZE) {
-      const IdType in_idx = in_row_start+idx;
-      out_rows[out_row_start+idx] = row;
-      out_cols[out_row_start+idx] = in_index[in_idx];
-      out_idxs[out_row_start+idx] = data ? data[in_idx] : in_idx;
-    }
-  } else {
-    // each thread needs to initialize it's random state
-    curandState rng;
-    curand_init(rand_seed, out_row, 0, &rng);
-
-    if (deg <= BLOCK_SIZE) {
-      // shuffle index array, and select based on that
-      constexpr int BLOCK_BITS = LogPow2(BLOCK_SIZE);
-      constexpr int BLOCK_MASK = BLOCK_SIZE-1;
-
-      // make sure block size is a power of two
-      static_assert(BLOCK_MASK >> BLOCK_BITS == 0, "BLOCK_MASK is invalid");
-      static_assert(BLOCK_SIZE >> BLOCK_BITS == 1, "BLOCK_BITS is invalid");
-      static_assert(BLOCK_MASK < BLOCK_SIZE, "BLOCK_SIZE is invalid");
-
-      // generate a list of unique indexes, and select those
-      int key[1] = {threadIdx.x < deg ?
-          static_cast<int>(curand(&rng) & BLOCK_MASK) :
-          BLOCK_SIZE};
-      int value[1] = {static_cast<int>(threadIdx.x)};
-      BlockRadixSort(temp_storage).Sort(key, value, 0, BLOCK_BITS+1);
-
-      // copy permutation
-      const int idx = threadIdx.x;
-      if (idx < num_picks) {
-        assert(value[0] < deg);
-        const IdType in_idx = in_row_start+value[0];
+    if (deg <= num_picks) {
+      // just copy row
+      for (int idx = threadIdx.x; idx < deg; idx += WARP_SIZE) {
+        const IdType in_idx = in_row_start+idx;
         out_rows[out_row_start+idx] = row;
         out_cols[out_row_start+idx] = in_index[in_idx];
         out_idxs[out_row_start+idx] = data ? data[in_idx] : in_idx;
       }
     } else {
-      // generate permutation list via reservoir algorithm
-      for (int idx = threadIdx.x; idx < num_picks; ++idx) {
-        out_idxs[out_row_start+idx] = in_row_start+idx;
-      }
-      for (int idx = num_picks+threadIdx.x; idx < deg; ++idx) {
-        const int num = curand(&rng)%(idx+1);
-        if (num < num_picks) {
-          // use max so as to achieve the replacement order the serial
-          // algorithm would have
-          AtomicMax(out_idxs+out_row_start+num, idx);
-        }
-      }
+      // each thread needs to initialize it's random state
+      curandState rng;
+      curand_init(rand_seed, out_row, 0, &rng);
 
-      // copy permutation over
-      for (int idx = threadIdx.x; idx < num_picks; ++idx) {
-        const int perm_idx = out_idxs[out_row_start+idx];
-        out_rows[out_row_start+idx] = row;
-        out_cols[out_row_start+idx] = in_index[perm_idx];
-        if (data) {
-          out_idxs[out_row_start+idx] = data[perm_idx];
+      if (deg <= WARP_SIZE) {
+        // in this case, each thread generates an index to swap with which occurs
+        // at or after it's current index
+        swap_buffer[WARP_SIZE*threadIdx.y+threadIdx.x] = threadIdx.x + (curand(&rng) % (num_picks-threadIdx.x));
+        index_buffer[WARP_SIZE*threadIdx.y+threadIdx.x] = threadIdx.x;
+
+        __syncwarp();
+        // then the lead thread performs swap up until num_picks on the buffer
+        if (threadIdx.x == 0) {
+          for (int i = 0; i < num_picks; ++i) {
+            const int swap_idx = swap_buffer[WARP_SIZE*threadIdx.y+i];
+            const int tmp = index_buffer[WARP_SIZE*threadIdx.y+i];
+            index_buffer[WARP_SIZE*threadIdx.y+i] = index_buffer[WARP_SIZE*threadIdx.y+swap_idx];
+            index_buffer[WARP_SIZE*threadIdx.y+swap_idx] = tmp;
+          }
+        }
+        __syncwarp();
+
+        // finally, all threads copy the permutation
+        if (threadIdx.x < num_picks) {
+          const int perm_idx = index_buffer[WARP_SIZE*threadIdx.y+threadIdx.x];
+          assert(perm_idx < deg);
+          const int64_t in_idx = in_row_start+perm_idx;
+          const int64_t out_idx = out_row_start+threadIdx.x;
+          out_rows[out_idx] = row;
+          out_cols[out_idx] = in_index[in_idx];
+          out_idxs[out_idx] = data ? data[in_idx] : in_idx;
+        }
+      } else {
+        // generate permutation list via reservoir algorithm
+        for (int idx = threadIdx.x; idx < num_picks; idx+=WARP_SIZE) {
+          out_idxs[out_row_start+idx] = in_row_start+idx;
+        }
+        for (int idx = num_picks+threadIdx.x; idx < deg; idx+=WARP_SIZE) {
+          const int num = curand(&rng)%(idx+1);
+          if (num < num_picks) {
+            // use max so as to achieve the replacement order the serial
+            // algorithm would have
+            AtomicMax(out_idxs+out_row_start+num, idx);
+          }
+        }
+
+        // copy permutation over
+        for (int idx = threadIdx.x; idx < num_picks; idx += WARP_SIZE) {
+          const int perm_idx = out_idxs[out_row_start+idx];
+          out_rows[out_row_start+idx] = row;
+          out_cols[out_row_start+idx] = in_index[perm_idx];
+          if (data) {
+            out_idxs[out_row_start+idx] = data[perm_idx];
+          }
         }
       }
     }
@@ -239,7 +247,6 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
 
   const dim3 block(BLOCK_SIZE);
   const dim3 node_grid((num_rows+block.x-1)/block.x);
-  const dim3 edge_grid(num_rows);
 
   // compute degree
   IdType * out_deg = static_cast<IdType*>(
@@ -287,7 +294,8 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
 
   // select edges
   if (replace) {
-    CSRRowWiseSampleReplaceKernel<<<edge_grid, block, 0, stream>>>(
+    const dim3 grid(num_rows);
+    CSRRowWiseSampleReplaceKernel<<<grid, block, 0, stream>>>(
         random_seed,
         num_picks, 
         num_rows,
@@ -300,7 +308,10 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
         out_cols,
         out_idxs);
   } else {
-    CSRRowWiseSampleKernel<IdType, BLOCK_SIZE><<<edge_grid, block, 0, stream>>>(
+    constexpr int BLOCK_ROWS = 8;
+    const dim3 block(32,BLOCK_ROWS);
+    const dim3 grid((num_rows+block.y-1)/block.y);
+    CSRRowWiseSampleKernel<IdType, BLOCK_ROWS><<<grid, block, 0, stream>>>(
         random_seed,
         num_picks,
         num_rows,
