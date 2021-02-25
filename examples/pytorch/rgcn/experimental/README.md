@@ -23,10 +23,7 @@ sudo apt-get install nfs-kernel-server
 
 Below we assume the user account is `ubuntu` and we create a directory of `workspace` in the home directory.
 ```bash
-sudo mkdir -p /home/ubuntu/workspace
-# Change ownership and remove restrictions
-sudo chown -R nobody:nogroup /home/ubuntu/workspace
-sudo chmod 755 /home/ubuntu/workspace
+mkdir -p /home/ubuntu/workspace
 ```
 
 We assume that the all servers are under a subnet with ip range `192.168.0.0` to `192.168.255.255`. The exports configuration needs to be modifed to 
@@ -66,7 +63,7 @@ You can either mount the NFS manually
 
 ```
 mkdir -p /home/ubuntu/workspace
-mount -t nfs <nfs-server-ip>:/home/ubuntu/workspace /home/ubuntu/workspace
+sudo mount -t nfs <nfs-server-ip>:/home/ubuntu/workspace /home/ubuntu/workspace
 ```
 	
 or edit the fstab so the folder will be mounted automatically 
