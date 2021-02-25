@@ -207,3 +207,6 @@ print('Test accuracy:', num_correct / num_tests)
 #    for an end-to-end graph classification model.
 # 
 
+
+# Thumbnail Courtesy: DGL
+# sphinx_gallery_thumbnail_path = '_static/blitz_5_graph_classification.png'

@@ -37,9 +37,7 @@ import scipy.sparse as sp
 # either citing or being cited, between two papers exists in a citation
 # network.
 #
-# This tutorial follows a relatively simple practice from
-# `SEAL <https://papers.nips.cc/paper/2018/file/53f0d7c537d99b3824f0f99d62ea2428-Paper.pdf>`__.
-# It formulates the link prediction problem as a binary classification
+# This tutorial formulates the link prediction problem as a binary classification
 # problem as follows:
 #
 # -  Treat the edges in the graph as *positive examples*.
@@ -49,6 +47,12 @@ import scipy.sparse as sp
 #    set and a test set.
 # -  Evaluate the model with any binary classification metric such as Area
 #    Under Curve (AUC).
+#
+# .. note::
+#
+#    The practice comes from
+#    `SEAL <https://papers.nips.cc/paper/2018/file/53f0d7c537d99b3824f0f99d62ea2428-Paper.pdf>`__,
+#    although the model here does not use their idea of node labeling.
 #
 # In some domains such as large-scale recommender systems or information
 # retrieval, you may favor metrics that emphasize good performance of
@@ -335,3 +339,6 @@ with torch.no_grad():
     neg_score = pred(test_neg_g, h)
     print('AUC', compute_auc(pos_score, neg_score))
 
+
+# Thumbnail Courtesy: Link Prediction with Neo4j, Mark Needham
+# sphinx_gallery_thumbnail_path = '_static/blitz_4_link_predict.png'

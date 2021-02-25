@@ -1668,35 +1668,35 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     """Convert a graph into a bipartite-structured *block* for message passing.
 
     A block is a graph consisting of two sets of nodes: the
-    *input* nodes and *output* nodes.  The input and output nodes can have multiple
-    node types.  All the edges connect from input nodes to output nodes.
+    *source* nodes and *destination* nodes.  The source and destination nodes can have multiple
+    node types.  All the edges connect from source nodes to destination nodes.
 
-    Specifically, the input nodes and output nodes will have the same node types as the
+    Specifically, the source nodes and destination nodes will have the same node types as the
     ones in the original graph.  DGL maps each edge ``(u, v)`` with edge type
     ``(utype, etype, vtype)`` in the original graph to the edge with type
-    ``etype`` connecting from node ID ``u`` of type ``utype`` in the input side to node
-    ID ``v`` of type ``vtype`` in the output side.
+    ``etype`` connecting from node ID ``u`` of type ``utype`` in the source side to node
+    ID ``v`` of type ``vtype`` in the destination side.
 
-    For blocks returned by :func:`to_block`, the output nodes of the block will only
-    contain the nodes that have at least one inbound edge of any type.  The input nodes
-    of the block will only contain the nodes that appear in the output nodes, as well
-    as the nodes that have at least one outbound edge connecting to one of the output nodes.
+    For blocks returned by :func:`to_block`, the destination nodes of the block will only
+    contain the nodes that have at least one inbound edge of any type.  The source nodes
+    of the block will only contain the nodes that appear in the destination nodes, as well
+    as the nodes that have at least one outbound edge connecting to one of the destination nodes.
 
-    If the :attr:`dst_nodes` argument is not None, it specifies the output nodes instead.
+    The destination nodes are specified by the :attr:`dst_nodes` argument if it is not None.
 
     Parameters
     ----------
     graph : DGLGraph
         The graph.
     dst_nodes : Tensor or dict[str, Tensor], optional
-        The list of output nodes.
+        The list of destination nodes.
 
         If a tensor is given, the graph must have only one node type.
 
         If given, it must be a superset of all the nodes that have at least one inbound
         edge.  An error will be raised otherwise.
     include_dst_in_src : bool
-        If False, do not include output nodes in input nodes.
+        If False, do not include destination nodes in source nodes.
 
         (Default: True)
 
@@ -1734,13 +1734,13 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     >>> g = dgl.graph(([1, 2], [2, 3]))
     >>> block = dgl.to_block(g, torch.LongTensor([3, 2]))
 
-    The output nodes would be exactly the same as the ones given: [3, 2].
+    The destination nodes would be exactly the same as the ones given: [3, 2].
 
     >>> induced_dst = block.dstdata[dgl.NID]
     >>> induced_dst
     tensor([3, 2])
 
-    The first few input nodes would also be exactly the same as
+    The first few source nodes would also be exactly the same as
     the ones given.  The rest of the nodes are the ones necessary for message passing
     into nodes 3, 2.  This means that the node 1 would be included.
 
@@ -1749,7 +1749,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     tensor([3, 2, 1])
 
     You can notice that the first two nodes are identical to the given nodes as well as
-    the output nodes.
+    the destination nodes.
 
     The induced edges can also be obtained by the following:
 
@@ -1764,20 +1764,20 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     >>> induced_src[src], induced_dst[dst]
     (tensor([2, 1]), tensor([3, 2]))
 
-    The output nodes specified must be a superset of the nodes that have edges connecting
-    to them.  For example, the following will raise an error since the output nodes
+    The destination nodes specified must be a superset of the nodes that have edges connecting
+    to them.  For example, the following will raise an error since the destination nodes
     does not contain node 3, which has an edge connecting to it.
 
     >>> g = dgl.graph(([1, 2], [2, 3]))
     >>> dgl.to_block(g, torch.LongTensor([2]))     # error
 
     Converting a heterogeneous graph to a block is similar, except that when specifying
-    the output nodes, you have to give a dict:
+    the destination nodes, you have to give a dict:
 
     >>> g = dgl.heterograph({('A', '_E', 'B'): ([1, 2], [2, 3])})
 
-    If you don't specify any node of type A on the output side, the node type ``A``
-    in the block would have zero nodes on the output side.
+    If you don't specify any node of type A on the destination side, the node type ``A``
+    in the block would have zero nodes on the destination side.
 
     >>> block = dgl.to_block(g, {'B': torch.LongTensor([3, 2])})
     >>> block.number_of_dst_nodes('A')
@@ -1787,12 +1787,12 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     >>> block.dstnodes['B'].data[dgl.NID]
     tensor([3, 2])
 
-    The input side would contain all the nodes on the output side:
+    The source side would contain all the nodes on the destination side:
 
     >>> block.srcnodes['B'].data[dgl.NID]
     tensor([3, 2])
 
-    As well as all the nodes that have connections to the nodes on the output side:
+    As well as all the nodes that have connections to the nodes on the destination side:
 
     >>> block.srcnodes['A'].data[dgl.NID]
     tensor([2, 1])
