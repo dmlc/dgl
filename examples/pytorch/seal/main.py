@@ -162,7 +162,6 @@ def main(args, print_fn=print):
             summary_val.append(val_metric)
             summary_test.append(test_metric)
 
-    # summary_val = np.array(summary_val)
     summary_test = np.array(summary_test)
 
     print_fn("Experiment Results:")
