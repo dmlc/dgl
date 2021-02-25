@@ -17,7 +17,7 @@ This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang9
 
 ##### Unsupervised Graph Classification Dataset:
 
- 'MUTAG', 'PTC', 'IMDBBINARY'(IMDB-B), 'IMDBMULTI'(IMDB-M), 'REDDITBINARY'(RDT-B), 'REDDITMULTI5K'(RDT-M) of dgl.data.GINDataset.
+ 'MUTAG', 'PTC', 'IMDBBINARY'(IMDB-B), 'IMDBMULTI'(IMDB-M), 'REDDITBINARY'(RDT-B), 'REDDITMULTI5K'(RDT-M5K) of dgl.data.GINDataset.
 
 | Dataset         | MUTAG | PTC   | RDT-B  | RDT-M5K | IMDB-B | IMDB-M |
 | --------------- | ----- | ----- | ------ | ------- | ------ | ------ |
@@ -109,7 +109,7 @@ The 12 tasks are:
 
 ```
 --hid_dim          int     Dimension of hidden layers.            Default is 64.
---reg              int     Regularization weight,                 Default is 0.001.
+--reg              int     Regularization weight.                 Default is 0.001.
 ```
 
 ## How to run examples
@@ -140,10 +140,10 @@ The hyperparameter setting in our implementation is identical to that reported i
 
 ##### Unsupervised Graph Classification:
 
-|      Dataset      | MUTAG |  PTC  | REDDIT-B | REDDIT-M | IMDB-B | IMDB-M |
-| :---------------: | :---: | :---: | :------: | -------- | ------ | ------ |
-| Accuracy Reported | 89.01 | 61.65 |  82.50   | 53.46    | 73.03  | 49.69  |
-|        DGL        | 89.88 | 63.54 |  88.50   | 56.27    | 72.70  | 50.13  |
+|      Dataset      | MUTAG |  PTC  | RDT-B | RDT-M5K | IMDB-B | IMDB-M |
+| :---------------: | :---: | :---: | :---: | ------- | ------ | ------ |
+| Accuracy Reported | 89.01 | 61.65 | 82.50 | 53.46   | 73.03  | 49.69  |
+|        DGL        | 89.88 | 63.54 | 88.50 | 56.27   | 72.70  | 50.13  |
 
 * REDDIT-M dataset would take a quite long time to load and evaluate. 
 
