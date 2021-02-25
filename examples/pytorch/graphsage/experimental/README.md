@@ -111,6 +111,57 @@ python3 ~/dgl/tools/launch.py \
 "python3 dgl_code/train_dist.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 30 --batch_size 1000 --num_workers 4 --num_gpus 4"
 ```
 
+## Partition a graph with ParMETIS
+
+It has four steps to partition a graph with ParMETIS for DGL's distributed training.
+More details about the four steps are explained in our
+[user guide](https://doc.dgl.ai/guide/distributed-preprocessing.html).
+
+### Step 1: write the graph into files.
+
+The graph structure should be written as a node file and an edge file. The node features and edge features
+can be written as DGL tensors. `write_ogb.py` shows an example of writing the OGB MAG graph into files.
+
+```bash
+python3 write_ogb.py --dataset ogbn-products
+```
+
+### Step 2: partition the graph with ParMETIS
+Run the program called `pm_dglpart` in ParMETIS to read the node file and the edge file output in Step 1
+to partition the graph.
+
+```
+mpirun -np 4 pm_dglpart ogbn-products 2
+```
+This partitions the graph into eight parts with four processes.
+
+```
+mpirun --hostfile hostfile -np 4 pm_dglpart ogbn-products 2
+```
+This partitions the graph into eight parts with four processes on multiple machines.
+`hostfile` specifies the IPs of the machines; one line for a machine. The input files
+should reside in the machine where the command line runs. Each process will write
+the partitions to files in the local machine. For simplicity, we recommend users to
+write the files on NFS.
+
+### Step 3: Convert the ParMETIS partitions into DGLGraph
+
+DGL provides a tool called `convert_partition.py` to load one partition at a time and convert it into a DGLGraph
+and save it into a file.
+
+```bash
+python3 ~/dgl/tools/convert_partition.py --input-dir . --graph-name ogbn-products --schema ogbn-products.json --num-parts 2 --num-node-weights 1 --output ogbn-products-2p
+```
+
+### Step 4: Read node data and edge data for each partition
+
+This shows an example of reading node data and edge data of each partition and saving them into files located in the same directory as the DGLGraph file.
+
+```bash
+python3 get_ogbn_features.py --dataset ogbn-products --output ogbn-products-2p/
+```
+
+
 
 ## Distributed code runs in the standalone mode
 

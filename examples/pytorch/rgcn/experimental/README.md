@@ -119,11 +119,6 @@ python3 write_mag.py
 Run the program called `pm_dglpart` in ParMETIS to read the node file and the edge file output in Step 1
 to partition the graph.
 
-```bash
-pm_dglpart mag 2
-```
-This partitions the graph into two parts with a single process.
-
 ```
 mpirun -np 4 pm_dglpart mag 2
 ```
