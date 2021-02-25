@@ -117,7 +117,7 @@ train_dataloader = dgl.dataloading.EdgeDataLoader(
     torch.arange(graph.number_of_edges()),  # The edges to iterate over
     sampler,                                # The neighbor sampler
     negative_sampler=negative_sampler,      # The negative sampler
-    device=device,                          # Put the bipartite graphs on CPU or GPU
+    device=device,                          # Put the MFGs on CPU or GPU
     # The following arguments are inherited from PyTorch DataLoader.
     batch_size=1024,    # Batch size
     shuffle=True,       # Whether to shuffle the nodes for every epoch
@@ -131,11 +131,11 @@ train_dataloader = dgl.dataloading.EdgeDataLoader(
 # will give you.
 #
 
-input_nodes, pos_graph, neg_graph, bipartites = next(iter(train_dataloader))
+input_nodes, pos_graph, neg_graph, blocks = next(iter(train_dataloader))
 print('Number of input nodes:', len(input_nodes))
 print('Positive graph # nodes:', pos_graph.number_of_nodes(), '# edges:', pos_graph.number_of_edges())
 print('Negative graph # nodes:', neg_graph.number_of_nodes(), '# edges:', neg_graph.number_of_edges())
-print(bipartites)
+print(blocks)
 
 
 ######################################################################
@@ -152,9 +152,9 @@ print(bipartites)
 # necessary for computing the pair-wise scores of positive and negative examples
 # in the current minibatch.
 #
-# The last element is a list of bipartite graphs storing the computation
-# dependencies for each GNN layer.
-# The bipartite graphs are used to compute the GNN outputs of the nodes
+# The last element is a list of :doc:`MFGs <L0_neighbor_sampling_overview>`
+# storing the computation dependencies for each GNN layer.
+# The MFGs are used to compute the GNN outputs of the nodes
 # involved in positive/negative graph.
 #
 
@@ -180,12 +180,12 @@ class Model(nn.Module):
         self.conv2 = SAGEConv(h_feats, h_feats, aggregator_type='mean')
         self.h_feats = h_feats
 
-    def forward(self, bipartites, x):
-        h_dst = x[:bipartites[0].num_dst_nodes()]
-        h = self.conv1(bipartites[0], (x, h_dst))
+    def forward(self, blocks, x):
+        h_dst = x[:blocks[0].num_dst_nodes()]
+        h = self.conv1(blocks[0], (x, h_dst))
         h = F.relu(h)
-        h_dst = h[:bipartites[1].num_dst_nodes()]
-        h = self.conv2(bipartites[1], (h, h_dst))
+        h_dst = h[:blocks[1].num_dst_nodes()]
+        h = self.conv2(blocks[1], (h, h_dst))
         return h
 
 model = Model(num_features, 128).to(device)
@@ -256,10 +256,10 @@ def inference(model, graph, node_features):
             device=device)
 
         result = []
-        for input_nodes, output_nodes, bipartites in train_dataloader:
+        for input_nodes, output_nodes, blocks in train_dataloader:
             # feature copy from CPU to GPU takes place here
-            inputs = bipartites[0].srcdata['feat']
-            result.append(model(bipartites, inputs))
+            inputs = blocks[0].srcdata['feat']
+            result.append(model(blocks, inputs))
 
         return torch.cat(result)
 
@@ -324,11 +324,11 @@ best_accuracy = 0
 best_model_path = 'model.pt'
 for epoch in range(1):
     with tqdm.tqdm(train_dataloader) as tq:
-        for step, (input_nodes, pos_graph, neg_graph, bipartites) in enumerate(tq):
+        for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(tq):
             # feature copy from CPU to GPU takes place here
-            inputs = bipartites[0].srcdata['feat']
+            inputs = blocks[0].srcdata['feat']
 
-            outputs = model(bipartites, inputs)
+            outputs = model(blocks, inputs)
             pos_score = predictor(pos_graph, outputs)
             neg_score = predictor(neg_graph, outputs)
 
