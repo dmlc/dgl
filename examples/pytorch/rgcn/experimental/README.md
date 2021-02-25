@@ -22,7 +22,6 @@ sudo apt-get install nfs-kernel-server
 ``` 
 
 Below we assume the user account is `ubuntu` and we create a directory of `workspace` in the home directory.
-Then create a folder for sharing and (optional) remove all restrictions
 ```bash
 sudo mkdir -p /home/ubuntu/workspace
 # Change ownership and remove restrictions
