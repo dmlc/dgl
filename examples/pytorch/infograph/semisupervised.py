@@ -48,7 +48,7 @@ def collate(samples):
     batched_targets = th.Tensor(targets)
     
     n_graphs = len(graphs)
-    graph_id = th.tensor(np.arange(n_graphs))
+    graph_id = th.arange(n_graphs)
     graph_id = dgl.broadcast_nodes(batched_graph, graph_id)
     
     batched_graph.ndata['graph_id'] = graph_id

@@ -1,5 +1,4 @@
 import torch as th
-
 import dgl
 from dgl.data import GINDataset
 from dgl.dataloading import GraphDataLoader
@@ -46,7 +45,7 @@ def collate(samples):
     batched_labels = th.tensor(labels)
 
     n_graphs = len(graphs)
-    graph_id = th.tensor(np.arange(n_graphs))
+    graph_id = th.arange(n_graphs)
     graph_id = dgl.broadcast_nodes(batched_graph, graph_id)
 
     batched_graph.ndata['graph_id'] = graph_id
