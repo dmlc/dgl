@@ -159,9 +159,6 @@ class InfoGraph(nn.Module):
 
     def forward(self, graph, feat, graph_id):
 
-        # feat = graph.ndata['attr']
-        # graph_id = graph.ndata['graph_id']
-
         global_emb, local_emb = self.encoder(graph, feat)
 
         global_h = self.global_d(global_emb)    # global hidden representation
