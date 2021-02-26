@@ -1,6 +1,8 @@
 """Data loading components for neighbor sampling"""
 from .dataloader import BlockSampler
 from .. import sampling, subgraph, distributed
+from .. import ndarray as nd
+from .. import backend as F
 
 class MultiLayerNeighborSampler(BlockSampler):
     """Sampler that builds computational dependency of node representations via
@@ -63,6 +65,10 @@ class MultiLayerNeighborSampler(BlockSampler):
         self.fanouts = fanouts
         self.replace = replace
 
+        # used to cache computations and memory allocations
+        self.fanout_arrays = []
+        self.prob_arrays = None
+
     def sample_frontier(self, block_id, g, seed_nodes):
         fanout = self.fanouts[block_id]
         if isinstance(g, distributed.DistGraph):
@@ -76,7 +82,29 @@ class MultiLayerNeighborSampler(BlockSampler):
             if fanout is None:
                 frontier = subgraph.in_subgraph(g, seed_nodes)
             else:
-                frontier = sampling.sample_neighbors(g, seed_nodes, fanout, replace=self.replace)
+                # build fanout_arrays only once for each block
+                while block_id >= len(self.fanout_arrays):
+                    for i in range(len(self.fanouts)):
+                        fanout = self.fanouts[i]
+                        if not isinstance(fanout, dict):
+                            fanout_array = [int(fanout)] * len(g.etypes)
+                        else:
+                            if len(fanout) != len(g.etypes):
+                                raise DGLError('Fan-out must be specified for each edge type '
+                                               'if a dict is provided.')
+                            fanout_array = [None] * len(g.etypes)
+                            for etype, value in fanout.items():
+                                fanout_array[g.get_etype_id(etype)] = value
+                        self.fanout_arrays.append(
+                            F.to_dgl_nd(F.tensor(fanout_array, dtype=F.int64)))
+
+                # build prob_arrays only once
+                if self.prob_arrays is None:
+                    self.prob_arrays = [nd.array([], ctx=nd.cpu())] * len(g.etypes)
+
+                frontier = sampling.sample_neighbors(g, seed_nodes,
+                        self.fanout_arrays[block_id],
+                        replace=self.replace, prob=self.prob_arrays)
         return frontier
 
 class MultiLayerFullNeighborSampler(MultiLayerNeighborSampler):
