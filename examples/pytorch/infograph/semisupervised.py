@@ -135,7 +135,7 @@ if __name__ == '__main__':
         optimizer, mode='min', factor=0.7, patience=5, min_lr=0.000001
     )
 
-    # Step 4: training epoches =============================================================== #
+    # Step 4: training epochs =============================================================== #
     sup_loss_all = 0
     unsup_loss_all = 0
     consis_loss_all = 0
@@ -158,14 +158,18 @@ if __name__ == '__main__':
 
             sup_graph = sup_graph.to(args.device)
             unsup_graph = unsup_graph.to(args.device)
+            
+            sup_nfeat, sup_efeat = sup_graph.ndata['attr'], sup_graph.ndata['edge_attr']
+            unsup_nfeat, unsup_efeat, unsup_graph_id = unsup_graph.ndata['attr'],\
+                                                       unsup_graph.edata['edge_attr'], unsup_graph.edata['graph_id']
 
             sup_target = (sup_target - mean) / std
             sup_target = sup_target.to(args.device)
 
             optimizer.zero_grad()
 
-            sup_loss = F.mse_loss(model(sup_graph), sup_target)
-            unsup_loss, consis_loss = model.unsup_forward(unsup_graph)
+            sup_loss = F.mse_loss(model(sup_graph, sup_nfeat, sup_efeat), sup_target)
+            unsup_loss, consis_loss = model.unsup_forward(unsup_graph, unsup_nfeat, unsup_efeat, unsup_graph_id)
 
             loss = sup_loss + unsup_loss + args.reg * consis_loss
 
@@ -189,10 +193,11 @@ if __name__ == '__main__':
         for val_graphs, val_targets in val_loader:
 
             val_graph = val_graphs.to(args.device)
+            val_nfeat, val_efeat = val_graph.ndata['attr'], val_graph.edata['edge_attr']
             val_target = (val_targets - mean) / std
             val_target = val_target.to(args.device)
 
-            val_error += (model(val_graph) * std - val_target * std).abs().sum().item()
+            val_error += (model(val_graph, val_nfeat, val_efeat) * std - val_target * std).abs().sum().item()
 
         val_error = val_error / val_num
         scheduler.step(val_error)
@@ -203,10 +208,12 @@ if __name__ == '__main__':
             for test_graphs, test_targets in test_loader:
 
                 test_graph = test_graphs.to(args.device)
+                test_nfeat, test_efeat = test_graph.ndata['attr'], test_graph.edata['edge_attr']
+
                 test_target = (test_targets - mean) / std
                 test_target = test_target.to(args.device)
 
-                test_error += (model(test_graph) * std - test_target * std).abs().sum().item()
+                test_error += (model(test_graph, test_nfeat, test_efeat) * std - test_target * std).abs().sum().item()
 
             test_error = test_error / test_num
             best_test_error = test_error

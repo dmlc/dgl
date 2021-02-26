@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.nn import Sequential, ModuleList, Linear, GRU, ReLU, BatchNorm1d
 
 from dgl.nn import GINConv, NNConv, Set2Set
-from dgl.nn.glob import SumPooling
+from dgl.nn.pytorch.glob import SumPooling
 
 from utils import global_global_loss_, local_global_loss_
 
@@ -24,7 +24,7 @@ class FeedforwardNetwork(nn.Module):
     Functions
     -----------
     forward(feat):
-        feat: Tensorww
+        feat: Tensor
             [N * D], input features
     '''
 
@@ -67,7 +67,7 @@ class GINEncoder(nn.Module):
     Functions
     -----------
     forward(graph, feat):
-        graph: DGLGraph,
+        graph: DGLGraph
         feat: Tensor
             [N * D], node features
     '''
@@ -149,32 +149,30 @@ class InfoGraph(nn.Module):
         self.local_d = FeedforwardNetwork(embedding_dim, embedding_dim)   # local discriminator (node-level)
         self.global_d = FeedforwardNetwork(embedding_dim, embedding_dim)  # global discriminator (graph-level)
 
-    def get_embedding(self, graph):
+    def get_embedding(self, graph, feat):
         # get_embedding function for evaluation the learned embeddings
 
         with th.no_grad():
-            feat = graph.ndata['attr']
             global_emb, _ = self.encoder(graph, feat)
 
         return global_emb
 
-    def forward(self, graph):
+    def forward(self, graph, feat, graph_id):
 
-        feat = graph.ndata['attr']
-        graph_id = graph.ndata['graph_id']
+        # feat = graph.ndata['attr']
+        # graph_id = graph.ndata['graph_id']
 
         global_emb, local_emb = self.encoder(graph, feat)
 
         global_h = self.global_d(global_emb)    # global hidden representation
         local_h = self.local_d(local_emb)       # local hidden representation
 
-        measure = 'JSD'
-        loss = local_global_loss_(local_h, global_h, graph_id, measure)
+        loss = local_global_loss_(local_h, global_h, graph_id)
 
         return loss
 
 
-''' Semisupevised Setting '''
+''' Semisupervised Setting '''
 
 class NNConvEncoder(nn.Module):
 
@@ -190,7 +188,7 @@ class NNConvEncoder(nn.Module):
     Functions
     -----------
     forward(graph, nfeat, efeat):
-        graph: DGLGraph,
+        graph: DGLGraph
         nfeat: Tensor
             [N * D1], node features
         efeat: Tensor
@@ -245,7 +243,7 @@ class InfoGraphS(nn.Module):
     Functions
     -----------
     forward(graph):
-        graph: DGLGraph,
+        graph: DGLGraph
 
     unsupforward(graph):
         graph: DGLGraph
@@ -269,11 +267,8 @@ class InfoGraphS(nn.Module):
         self.sup_d = FeedforwardNetwork(2 * hid_dim, hid_dim)
         self.unsup_d = FeedforwardNetwork(2 * hid_dim, hid_dim)
 
-    def forward(self, graph):
-
-        nfeat = graph.ndata['attr']
-        efeat = graph.edata['edge_attr']
-
+    def forward(self, graph, nfeat, efeat):
+        
         sup_global_emb, sup_local_emb = self.sup_encoder(graph, nfeat, efeat)
 
         sup_global_pred = self.fc2(F.relu(self.fc1(sup_global_emb)))
@@ -281,11 +276,7 @@ class InfoGraphS(nn.Module):
 
         return sup_global_pred
     
-    def unsup_forward(self, graph):
-
-        nfeat = graph.ndata['attr']
-        efeat = graph.edata['edge_attr']
-        graph_id = graph.ndata['graph_id']
+    def unsup_forward(self, graph, nfeat, efeat, graph_id):
 
         sup_global_emb, sup_local_emb = self.sup_encoder(graph, nfeat, efeat)
         unsup_global_emb, unsup_local_emb = self.unsup_encoder(graph, nfeat, efeat)
@@ -297,8 +288,7 @@ class InfoGraphS(nn.Module):
         unsup_g_enc = self.unsup_d(unsup_global_emb)
 
         # Calculate loss
-        measure = 'JSD'
-        unsup_loss = local_global_loss_(l_enc, g_enc, graph_id, measure)
-        con_loss = global_global_loss_(sup_g_enc, unsup_g_enc, measure)    
+        unsup_loss = local_global_loss_(l_enc, g_enc, graph_id)
+        con_loss = global_global_loss_(sup_g_enc, unsup_g_enc)
         
         return unsup_loss, con_loss

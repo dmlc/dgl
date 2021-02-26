@@ -90,7 +90,9 @@ if __name__ == '__main__':
     print('===== Before training ======')
     
     wholegraph = wholegraph.to(args.device)
-    emb = model.get_embedding(wholegraph).cpu()
+    wholefeat = wholegraph.ndata['attr']
+    
+    emb = model.get_embedding(wholegraph, wholefeat).cpu()
     res = evaluate_embedding(emb, labels)
 
     print('logreg {:4f}, svc {:4f}'.format(res[0], res[1]))
@@ -100,17 +102,21 @@ if __name__ == '__main__':
     best_epoch = 0
     best_loss = 0
 
-    # Step 4: training epoches =============================================================== #
+    # Step 4: training epochs =============================================================== #
     for epoch in range(1, args.epochs):
         loss_all = 0
         model.train()
     
         for graph, label in dataloader:
+            
             graph = graph.to(args.device)
+            feat = graph.ndata['attr']
+            graph_id = graph.ndata['graph_id']
+            
             n_graph = label.shape[0]
     
             optimizer.zero_grad()
-            loss = model(graph)
+            loss = model(graph, feat, graph_id)
             loss.backward()
             optimizer.step()
             loss_all += loss.item() * n_graph
@@ -121,7 +127,7 @@ if __name__ == '__main__':
 
             # evaulate embeddings
             model.eval()
-            emb = model.get_embedding(wholegraph).cpu()
+            emb = model.get_embedding(wholegraph, wholefeat).cpu()
             res = evaluate_embedding(emb, labels)
             
             if res[0] > best_logreg:
