@@ -86,7 +86,8 @@ could like this:
 172.31.16.98
 ```
 
-Users need to make sure that the master node (node-0) has right permission to ssh to all the other nodes.
+Users need to make sure that the master node (node-0) has right permission to ssh to all the other nodes without password authentication.
+[This link](https://linuxize.com/post/how-to-setup-passwordless-ssh-login/) provides instructions of setting passwordless SSH login.
 
 ### Step 2: partition the graph.
 
