@@ -1,0 +1,33 @@
+name: "dimenet"
+
+model:
+  emb_size: 128
+  num_blocks: 6
+  num_bilinear: 8
+  num_spherical: 7
+  num_radial: 6
+  envelope_exponent: 5
+  cutoff: 5.0
+  num_before_skip: 1
+  num_after_skip: 2
+  num_dense_output: 3
+  # ['mu', 'alpha', 'homo', 'lumo', 'gap', 'r2', 'zpve', 'U0', 'U', 'H', 'G', 'Cv']
+  targets: ['U0']
+  # 'zeros' for mu, homo, lumo, and zpve; 'GlorotOrthogonal' for alpha, R2, U0, U, H, G, and Cv
+  output_init: 'GlorotOrthogonal'
+
+train:
+  num_train: 110000
+  num_valid: 10000
+  data_seed: 42
+  lr: 0.001
+  weight_decay: 0.0001
+  ema_decay: 0.999
+  batch_size: 32
+  epochs: 800
+  early_stopping: 20
+  num_workers: 6
+  gpu: 0
+  interval: 50
+  step_size: 600
+  gamma: 0.1
