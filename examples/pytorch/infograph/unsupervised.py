@@ -93,7 +93,7 @@ if __name__ == '__main__':
     wholefeat = wholegraph.ndata['attr']
     
     emb = model.get_embedding(wholegraph, wholefeat).cpu()
-    res = evaluate_embedding(emb, labels)
+    res = evaluate_embedding(emb, labels, args.device)
 
     print('logreg {:4f}, svc {:4f}'.format(res[0], res[1]))
     
@@ -128,7 +128,7 @@ if __name__ == '__main__':
             # evaulate embeddings
             model.eval()
             emb = model.get_embedding(wholegraph, wholefeat).cpu()
-            res = evaluate_embedding(emb, labels)
+            res = evaluate_embedding(emb, labels, args.device)
             
             if res[0] > best_logreg:
                 best_logreg = res[0]

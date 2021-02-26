@@ -29,7 +29,7 @@ class LogReg(nn.Module):
         ret = self.fc(seq)
         return ret
 
-def logistic_classify(x, y):
+def logistic_classify(x, y, device = 'cpu'):
     nb_classes = np.unique(y).shape[0]
     xent = nn.CrossEntropyLoss()
     hid_units = x.shape[1]
@@ -40,11 +40,12 @@ def logistic_classify(x, y):
         train_embs, test_embs = x[train_index], x[test_index]
         train_lbls, test_lbls= y[train_index], y[test_index]
 
-        train_embs, train_lbls = torch.from_numpy(train_embs).cuda(), torch.from_numpy(train_lbls).cuda()
-        test_embs, test_lbls= torch.from_numpy(test_embs).cuda(), torch.from_numpy(test_lbls).cuda()
+
+        train_embs, train_lbls = torch.from_numpy(train_embs).to(device), torch.from_numpy(train_lbls).to(device)
+        test_embs, test_lbls = torch.from_numpy(test_embs).to(device), torch.from_numpy(test_lbls).to(device)
 
         log = LogReg(hid_units, nb_classes)
-        log.cuda()
+
         opt = torch.optim.Adam(log.parameters(), lr=0.01, weight_decay=0.0)
 
         for it in range(100):
@@ -72,7 +73,7 @@ def svc_classify(x, y, search):
         y_train, y_test = y[train_index], y[test_index]
 
         if search:
-            params = {'C':[0.001, 0.01,0.1,1,10,100,1000]}
+            params = {'C':[0.001, 0.01, 0.1, 1, 10, 100, 1000]}
             classifier = GridSearchCV(SVC(), params, cv=5, scoring='accuracy', verbose=0)
         else:
             classifier = SVC(C=10)
@@ -80,13 +81,13 @@ def svc_classify(x, y, search):
         accuracies.append(accuracy_score(y_test, classifier.predict(x_test)))
     return np.mean(accuracies)
 
-def evaluate_embedding(embeddings, labels, search=True):
+def evaluate_embedding(embeddings, labels, search=True, device = 'cpu'):
     labels = preprocessing.LabelEncoder().fit_transform(labels)
     x, y = np.array(embeddings), np.array(labels)
 
-    logreg_accuracies = [logistic_classify(x, y) for _ in range(1)]
+    logreg_accuracies = [logistic_classify(x, y, device)]
     print('LogReg', np.mean(logreg_accuracies))
-    svc_accuracies = [svc_classify(x,y, search) for _ in range(1)]
+    svc_accuracies = [svc_classify(x,y, search)]
     print('svc', np.mean(svc_accuracies))
 
     return np.mean(logreg_accuracies), np.mean(svc_accuracies)
