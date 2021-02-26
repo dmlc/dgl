@@ -38,23 +38,16 @@ def argument():
     
 def collate(samples):
     ''' collate function for building graph dataloader'''
+    
     graphs, labels = map(list, zip(*samples))
 
     # generate batched graphs and labels
     batched_graph = dgl.batch(graphs)
     batched_labels = th.tensor(labels)
 
-    n_nodes = batched_graph.num_nodes()
-
-    # generate graph_id for each node within the batch
-    graph_id = th.zeros(n_nodes).long()
-    N = 0
-    id = 0
-    for graph in graphs:
-        N_next = N + graph.num_nodes()
-        graph_id[N:N_next] = id
-        N = N_next
-        id += 1
+    n_graphs = len(graphs)
+    graph_id = th.tensor(np.arange(n_graphs))
+    graph_id = dgl.broadcast_nodes(batched_graph, graph_id)
 
     batched_graph.ndata['graph_id'] = graph_id
 
@@ -70,7 +63,7 @@ if __name__ == '__main__':
     log_interval = 1
 
     # load dataset from dgl.data.GINDataset
-    dataset = GINDataset(args.dataname, False)
+    dataset = GINDataset(args.dataname, self_loop = False)
 
     # get graphs and labels
     graphs, labels = map(list, zip(*dataset))
@@ -79,14 +72,14 @@ if __name__ == '__main__':
     wholegraph = dgl.batch(graphs)
     wholegraph.ndata['attr'] = wholegraph.ndata['attr'].to(th.float32)
 
-    # creata dataloader for batch training
+    # create dataloader for batch training
     dataloader = GraphDataLoader(dataset,
-                            batch_size=args.batch_size,
-                            collate_fn=collate,
-                            drop_last=False,
-                            shuffle=True)
+                                 batch_size=args.batch_size,
+                                 collate_fn=collate,
+                                 drop_last=False,
+                                 shuffle=True)
 
-    in_dim = dataset[0][0].ndata['attr'].shape[1]
+    in_dim = wholegraph.ndata['attr'].shape[1]
 
     # Step 2: Create model =================================================================== #
     model = InfoGraph(in_dim, args.hid_dim, args.n_layers)

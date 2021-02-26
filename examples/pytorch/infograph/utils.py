@@ -139,19 +139,3 @@ def global_global_loss_(sup_enc, unsup_enc, measure):
     E_neg = (E_neg * neg_mask).sum() / neg_mask.sum()
 
     return E_neg - E_pos
-
-
-def adj_loss_(l_enc, edge_index):
-    num_nodes = l_enc.shape[0]
-
-    adj = torch.zeros((num_nodes, num_nodes)).cuda()
-    mask = torch.eye(num_nodes).cuda()
-    for node1, node2 in zip(edge_index[0], edge_index[1]):
-        adj[node1.item()][node2.item()] = 1.
-        adj[node2.item()][node1.item()] = 1.
-
-    res = torch.sigmoid((torch.mm(l_enc, l_enc.t())))
-    res = (1 - mask) * res
-
-    loss = nn.BCELoss()(res, adj)
-    return loss

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.nn import Sequential, ModuleList, Linear, GRU, ReLU, BatchNorm1d
 
 from dgl.nn import GINConv, NNConv, Set2Set
-from dgl.nn.pytorch.glob import SumPooling
+from dgl.nn.glob import SumPooling
 
 from utils import global_global_loss_, local_global_loss_
 
@@ -16,13 +16,16 @@ class FeedforwardNetwork(nn.Module):
     3-layer feed-forward neural networks with jumping connections
     Parameters
     -----------
-    in_dim: int, Input feature size.
-    hid_dim: int, Hidden feature size.
+    in_dim: int
+        Input feature size.
+    hid_dim: int
+        Hidden feature size.
 
     Functions
     -----------
     forward(feat):
-        feat: Tensor, [N * D], input features
+        feat: Tensorww
+            [N * D], input features
     '''
 
     def __init__(self, in_dim, hid_dim):
@@ -54,15 +57,19 @@ class GINEncoder(nn.Module):
     Encoder based on dgl.nn.GINConv &  dgl.nn.SumPooling
     Parameters
     -----------
-    in_dim: int, Input feature size.
-    hid_dim: int, Hidden feature size.
-    n_layer: int, number of GIN layers.
+    in_dim: int
+        Input feature size.
+    hid_dim: int
+        Hidden feature size.
+    n_layer: 
+        Number of GIN layers.
 
     Functions
     -----------
     forward(graph, feat):
-        graph: dgl.Graph,
-        feat: Tensor, [N * D], node features
+        graph: DGLGraph,
+        feat: Tensor
+            [N * D], node features
     '''
 
     def __init__(self, in_dim, hid_dim, n_layer):
@@ -84,7 +91,7 @@ class GINEncoder(nn.Module):
                                Linear(hid_dim, hid_dim)
                                )
 
-            conv = GINConv(block, 'sum')
+            conv = GINConv(apply_func = block, aggregator_type = 'sum')
             bn = BatchNorm1d(hid_dim)
 
             self.convs.append(conv)
@@ -118,11 +125,13 @@ class InfoGraph(nn.Module):
         Input feature size.
     hid_dim: int
         Hidden feature size.
+    n_layer: int   
+        Number of the GNN encoder layers.
 
     Functions
     -----------
     forward(graph):
-        graph: dgl.Graph
+        graph: DGLGraph
 
     """
 
@@ -173,15 +182,19 @@ class NNConvEncoder(nn.Module):
     Encoder based on dgl.nn.NNConv & GRU & dgl.nn.set2set pooling
     Parameters
     -----------
-    in_dim: int, Input feature size.
-    hid_dim: int, Hidden feature size.
+    in_dim: int
+        Input feature size.
+    hid_dim: int
+        Hidden feature size.
 
     Functions
     -----------
     forward(graph, nfeat, efeat):
-        graph: dgl.Graph,
-        nfeat: Tensor, [N * D1], node features
-        efeat: Tensor, [E * D2], edge features
+        graph: DGLGraph,
+        nfeat: Tensor
+            [N * D1], node features
+        efeat: Tensor
+            [E * D2], edge features
     '''
 
     def __init__(self, in_dim, hid_dim):
@@ -192,7 +205,7 @@ class NNConvEncoder(nn.Module):
         # mlp for edge convolution in NNConv
         block = Sequential(Linear(5, 128), ReLU(), Linear(128, hid_dim * hid_dim))
 
-        self.conv = NNConv(hid_dim, hid_dim, block, aggregator_type = 'mean', residual = False)
+        self.conv = NNConv(hid_dim, hid_dim, edge_func = block, aggregator_type = 'mean', residual = False)
         self.gru = GRU(hid_dim, hid_dim)
 
         # set2set pooling
@@ -232,10 +245,10 @@ class InfoGraphS(nn.Module):
     Functions
     -----------
     forward(graph):
-        graph: dgl.Graph,
+        graph: DGLGraph,
 
     unsupforward(graph):
-        graph: dgl.Graph
+        graph: DGLGraph
         
     '''
 

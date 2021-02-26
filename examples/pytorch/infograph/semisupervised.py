@@ -42,22 +42,17 @@ def argument():
 def collate(samples):
     ''' collate function for building graph dataloader '''
 
+    # generate batched graphs and labels
     graphs, targets = map(list, zip(*samples))
     batched_graph = dgl.batch(graphs)
     batched_targets = th.Tensor(targets)
-    n_nodes = batched_graph.num_nodes()
-
-    batch = th.zeros(n_nodes).long()
-    N = 0
-    id = 0
-    for graph in graphs:
-        N_next = N + graph.num_nodes()
-        batch[N:N_next] = id
-        N = N_next
-        id += 1
-    batched_graph.ndata['graph_id'] = batch
-    batched_graph.ndata['attr'] = batched_graph.ndata['attr'].to(th.float32)
-
+    
+    n_graphs = len(graphs)
+    graph_id = th.tensor(np.arange(n_graphs))
+    graph_id = dgl.broadcast_nodes(batched_graph, graph_id)
+    
+    batched_graph.ndata['graph_id'] = graph_id
+    
     return batched_graph, batched_targets
 
 
@@ -94,30 +89,30 @@ if __name__ == '__main__':
 
     # generate supervised training dataloader and unsupervised training dataloader
     train_loader = GraphDataLoader(train_data,
-                              batch_size=args.batch_size,
-                              collate_fn=collate,
-                              drop_last=False,
-                              shuffle=True)
+                                   batch_size=args.batch_size,
+                                   collate_fn=collate,
+                                   drop_last=False,
+                                   shuffle=True)
 
     unsup_loader = GraphDataLoader(unsup_data,
-                              batch_size=args.batch_size,
-                              collate_fn=collate,
-                              drop_last=False,
-                              shuffle=True)
+                                   batch_size=args.batch_size,
+                                   collate_fn=collate,
+                                   drop_last=False,
+                                   shuffle=True)
 
     # generate validation & testing datalaoder
 
     val_loader = GraphDataLoader(val_data,
-                              batch_size=args.val_batch_size,
-                              collate_fn=collate,
-                              drop_last=False,
-                              shuffle=True)
+                                 batch_size=args.val_batch_size,
+                                 collate_fn=collate,
+                                 drop_last=False,
+                                 shuffle=True)
 
     test_loader = GraphDataLoader(test_data,
-                              batch_size=args.val_batch_size,
-                              collate_fn=collate,
-                              drop_last=False,
-                              shuffle=True)
+                                  batch_size=args.val_batch_size,
+                                  collate_fn=collate,
+                                  drop_last=False,
+                                  shuffle=True)
 
     print('======== target = {} ========'.format(args.target))
 
