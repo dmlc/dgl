@@ -79,6 +79,7 @@ The folder contains example implementations of selected research papers related 
 | [Dynamic Graph CNN for Learning on Point Clouds](#dgcnnpoint) |  |                                  |                           |                    |                    |
 | [Supervised Community Detection with Line Graph Neural Networks](#lgnn) |  |                                  |                           |                    |                    |
 | [Text Generation from Knowledge Graphs with Graph Transformers](#graphwriter) |  |                                  |                           |                    |                    |
+| [Directional Message Passing for Molecular Graphs](#dimenet) |  |                                  | :heavy_check_mark: |                           |                    |
 
 
 ## 2020
@@ -114,6 +115,10 @@ The folder contains example implementations of selected research papers related 
 - <a name="dagnn"></a> Liu et al. Towards Deeper Graph Neural Networks. [Paper link](https://arxiv.org/abs/2007.09296).
     - Example code: [Pytorch](../examples/pytorch/dagnn)
     - Tags: over-smoothing, node classification
+
+- <a name="dimenet"></a> Klicpera et al. Directional Message Passing for Molecular Graphs. [Paper link](https://arxiv.org/abs/2003.03123).
+    - Example code: [Pytorch](../examples/pytorch/dimenet)
+    - Tags: molecules, molecular property prediction
 
 ## 2019
 
