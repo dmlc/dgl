@@ -1,4 +1,5 @@
 """QM9 dataset for graph property prediction (regression)."""
+"""When building this class, we partially refer to the implementation from https://github.com/Jack-XHP/DGL_QM9EDGE """
 
 import os
 import numpy as np
