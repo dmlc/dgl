@@ -9,8 +9,6 @@ from .utils import download, extract_archive, _get_dgl_url
 from ..convert import graph as dgl_graph
 from .. import backend as F
 
-from tqdm import tqdm
-
 try:
     import rdkit
     from rdkit import Chem
@@ -96,7 +94,7 @@ class QM9EdgeDataset(DGLDataset):
     +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
     | B      | :math:`B`                        | Rotational constant                                                               | :math:`\textrm{GHz}`                        |
     +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | c      | :math:`C`                        | Rotational constant                                                               | :math:`\textrm{GHz}`                        |
+    | C      | :math:`C`                        | Rotational constant                                                               | :math:`\textrm{GHz}`                        |
     +--------+----------------------------------+----------------------------------------
     Parameters
     ----------
@@ -170,8 +168,6 @@ class QM9EdgeDataset(DGLDataset):
                 
         self._url = _get_dgl_url('dataset/qm9_edge.npz')
         
-        
-        
         super(QM9EdgeDataset, self).__init__(name='qm9Edge',
                                             raw_dir=raw_dir,
                                             url = self._url,
@@ -242,12 +238,11 @@ class QM9EdgeDataset(DGLDataset):
             
             Edge_attr = []
             Target = []
-                    
-            for i in tqdm(range(len(suppl)), desc = 'loading graphs'):
+            
+            print('Loading graphs:')
+            for i, mol in enumerate(suppl):
                 if i in skip:
                     continue
-            
-                mol = suppl[i]
                     
                 N = mol.GetNumAtoms()
 
