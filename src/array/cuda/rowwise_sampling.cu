@@ -222,6 +222,7 @@ __global__ void CSRRowWiseSampleReplaceKernel(
       out_cols[out_idx] = in_index[in_row_start+edge];
       out_idxs[out_idx] = data ? data[in_row_start+edge] : in_row_start+edge;
     }
+    out_row += gridDim.x*blockDim.y;
   }
 }
 
