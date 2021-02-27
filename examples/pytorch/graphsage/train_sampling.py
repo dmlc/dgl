@@ -10,7 +10,7 @@ import argparse
 import tqdm
 from torch.cuda import nvtx
 
-from load_graph import load_reddit, inductive_split
+from load_graph import load_reddit, inductive_split, load_ogb
 
 
 class SAGE(nn.Module):
@@ -252,6 +252,8 @@ if __name__ == '__main__':
 
     if args.dataset == 'reddit':
         g, n_classes = load_reddit()
+    elif args.dataset == 'ogb-products':
+        g, n_classes = load_ogb('ogbn-products')
     else:
         raise Exception('unknown dataset')
 
