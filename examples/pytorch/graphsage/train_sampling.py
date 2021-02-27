@@ -8,8 +8,10 @@ import dgl.nn.pytorch as dglnn
 import time
 import argparse
 import tqdm
+from torch.cuda import nvtx
 
 from load_graph import load_reddit, inductive_split
+
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -122,6 +124,13 @@ def run(args, device, data):
     val_nid = th.nonzero(val_g.ndata['val_mask'], as_tuple=True)[0]
     test_nid = th.nonzero(~(test_g.ndata['train_mask'] | test_g.ndata['val_mask']), as_tuple=True)[0]
 
+    dataloader_device = th.device('cpu')
+    if args.sample_gpu:
+        # copy to the GPU
+        train_g = train_g.to(device)
+        train_nid = train_nid.to(device)
+        dataloader_device = device
+
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
@@ -129,6 +138,7 @@ def run(args, device, data):
         train_g,
         train_nid,
         sampler,
+        device=dataloader_device,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
@@ -149,18 +159,40 @@ def run(args, device, data):
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
         tic_step = time.time()
+        nvtx.range_push("dataloader")
         for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
+            nvtx.range_pop()
+
             # Load the input features as well as output labels
+            nvtx.range_push("load_subtensor")
             batch_inputs, batch_labels = load_subtensor(train_nfeat, train_labels,
                                                         seeds, input_nodes, device)
+            nvtx.range_pop()
+
+            nvtx.range_push("blocks_to_gpu")
             blocks = [block.int().to(device) for block in blocks]
+            nvtx.range_pop()
 
             # Compute loss and prediction
+            nvtx.range_push("forward")
             batch_pred = model(blocks, batch_inputs)
+            nvtx.range_pop()
+
+            nvtx.range_push("loss_fcn")
             loss = loss_fcn(batch_pred, batch_labels)
+            nvtx.range_pop()
+
+            nvtx.range_push("zero_grad")
             optimizer.zero_grad()
+            nvtx.range_pop()
+
+            nvtx.range_push("backward")
             loss.backward()
+            nvtx.range_pop()
+
+            nvtx.range_push("step")
             optimizer.step()
+            nvtx.range_pop()
 
             iter_tput.append(len(seeds) / (time.time() - tic_step))
             if step % args.log_every == 0:
@@ -169,6 +201,9 @@ def run(args, device, data):
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB'.format(
                     epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc))
             tic_step = time.time()
+
+            nvtx.range_push("dataloader")
+        nvtx.range_pop()
 
         toc = time.time()
         print('Epoch Time(s): {:.4f}'.format(toc - tic))
@@ -198,6 +233,8 @@ if __name__ == '__main__':
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=4,
                            help="Number of sampling processes. Use 0 for no extra process.")
+    argparser.add_argument('--sample-gpu', action='store_true',
+                           help="Perform the sampling process on the GPU. Must have 0 workers.")
     argparser.add_argument('--inductive', action='store_true',
                            help="Inductive learning setting")
     argparser.add_argument('--data-cpu', action='store_true',
@@ -234,11 +271,6 @@ if __name__ == '__main__':
         train_nfeat = train_nfeat.to(device)
         train_labels = train_labels.to(device)
 
-    # Create csr/coo/csc formats before launching training processes with multi-gpu.
-    # This avoids creating certain formats in each sub-process, which saves momory and CPU.
-    train_g.create_formats_()
-    val_g.create_formats_()
-    test_g.create_formats_()
     # Pack data
     data = n_classes, train_g, val_g, test_g, train_nfeat, train_labels, \
            val_nfeat, val_labels, test_nfeat, test_labels
