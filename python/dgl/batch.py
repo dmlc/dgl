@@ -428,4 +428,4 @@ def unbatch_hetero(*args, **kwargs):
     """DEPREACTED: please use dgl.unbatch """
     dgl_warning('From v0.5, DGLHeteroGraph is merged into DGLGraph. You can safely'
                 ' replace dgl.unbatch_hetero with dgl.unbatch')
-    return batch(*args, **kwargs)
+    return unbatch(*args, **kwargs)
