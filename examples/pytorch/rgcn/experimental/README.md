@@ -89,7 +89,8 @@ User need to set their own IP configuration file `ip_config.txt` before training
 172.31.0.4
 ```
 
-Users need to make sure that the master node (node-0) has right permission to ssh to all the other nodes.
+Users need to make sure that the master node (node-0) has right permission to ssh to all the other nodes without password authentication.
+[This link](https://linuxize.com/post/how-to-setup-passwordless-ssh-login/) provides instructions of setting passwordless SSH login.
 
 ### Step 2: partition the graph.
 
