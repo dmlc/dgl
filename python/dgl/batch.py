@@ -166,7 +166,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *,
         raise DGLError('Invalid argument edata: must be a string list but got {}.'.format(
             type(edata)))
     if any(g.is_block for g in graphs):
-        raise DGLError("Batching a block is not supported.")
+        raise DGLError("Batching a MFG is not supported.")
 
     relations = list(sorted(graphs[0].canonical_etypes))
     relation_ids = [graphs[0].get_etype_id(r) for r in relations]
