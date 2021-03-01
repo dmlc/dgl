@@ -6,7 +6,7 @@
 ## Requirements
 
 - Pytorch
-- Python 3.x
+- Python 3.x 
 - DGL 0.6
 - scikit-learn
 
