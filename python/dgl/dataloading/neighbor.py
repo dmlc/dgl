@@ -82,30 +82,36 @@ class MultiLayerNeighborSampler(BlockSampler):
             if fanout is None:
                 frontier = subgraph.in_subgraph(g, seed_nodes)
             else:
-                # build fanout_arrays only once for each block
-                while block_id >= len(self.fanout_arrays):
-                    for i in range(len(self.fanouts)):
-                        fanout = self.fanouts[i]
-                        if not isinstance(fanout, dict):
-                            fanout_array = [int(fanout)] * len(g.etypes)
-                        else:
-                            if len(fanout) != len(g.etypes):
-                                raise DGLError('Fan-out must be specified for each edge type '
-                                               'if a dict is provided.')
-                            fanout_array = [None] * len(g.etypes)
-                            for etype, value in fanout.items():
-                                fanout_array[g.get_etype_id(etype)] = value
-                        self.fanout_arrays.append(
-                            F.to_dgl_nd(F.tensor(fanout_array, dtype=F.int64)))
+                self._build_fanout(block_id, g)
+                self._build_prob_arrays(g)
 
-                # build prob_arrays only once
-                if self.prob_arrays is None:
-                    self.prob_arrays = [nd.array([], ctx=nd.cpu())] * len(g.etypes)
-
-                frontier = sampling.sample_neighbors(g, seed_nodes,
-                        self.fanout_arrays[block_id],
-                        replace=self.replace, prob=self.prob_arrays)
+                frontier = sampling.sample_neighbors(
+                    g, seed_nodes, self.fanout_arrays[block_id],
+                    replace=self.replace, prob=self.prob_arrays)
         return frontier
+
+    def _build_prob_arrays(self, g):
+        # build prob_arrays only once
+        if self.prob_arrays is None:
+            self.prob_arrays = [nd.array([], ctx=nd.cpu())] * len(g.etypes)
+
+    def _build_fanout(self, block_id, g):
+        # build fanout_arrays only once for each layer
+        while block_id >= len(self.fanout_arrays):
+            for i in range(len(self.fanouts)):
+                fanout = self.fanouts[i]
+                if not isinstance(fanout, dict):
+                    fanout_array = [int(fanout)] * len(g.etypes)
+                else:
+                    if len(fanout) != len(g.etypes):
+                        raise DGLError('Fan-out must be specified for each edge type '
+                                       'if a dict is provided.')
+                    fanout_array = [None] * len(g.etypes)
+                    for etype, value in fanout.items():
+                        fanout_array[g.get_etype_id(etype)] = value
+                self.fanout_arrays.append(
+                    F.to_dgl_nd(F.tensor(fanout_array, dtype=F.int64)))
+
 
 class MultiLayerFullNeighborSampler(MultiLayerNeighborSampler):
     """Sampler that builds computational dependency of node representations by taking messages

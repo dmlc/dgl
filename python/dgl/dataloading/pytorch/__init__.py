@@ -1,10 +1,10 @@
 """DGL PyTorch DataLoaders"""
 import inspect
+import torch as th
 from torch.utils.data import DataLoader
 from ..dataloader import NodeCollator, EdgeCollator, GraphCollator
 from ...distributed import DistGraph
 from ...distributed import DistDataLoader
-import torch as th
 
 class _ScalarDataLoaderIter:
     def __init__(self, dataset, batch_size, collate_fn, drop_last):
@@ -22,8 +22,7 @@ class _ScalarDataLoaderIter:
         if end_idx > num_items:
             if self.drop_last:
                 raise StopIteration
-            else:
-                end_idx = num_items
+            end_idx = num_items
         batch = self.dataset[self.index:end_idx]
         if self.collate_fn:
             batch = self.collate_fn(batch)
@@ -33,7 +32,7 @@ class _ScalarDataLoaderIter:
 
 class _ScalarDataLoader:
     def __init__(self, dataset, collate_fn=None, shuffle=False, batch_size=1,
-            drop_last=False, num_workers=0):
+                 drop_last=False, num_workers=0):
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle = shuffle
@@ -43,14 +42,16 @@ class _ScalarDataLoader:
         if num_workers != 0:
             raise ValueError("_ScaleDataLoader does not support workers")
 
+    def __iter__(self):
         if self.shuffle:
             # permute the dataset
             perm = th.randperm(self.dataset.shape[0], device=self.dataset.device)
-            self.dataset = self.dataset[perm]
+            dataset = self.dataset[perm]
+        else:
+            dataset = self.dataset
 
-    def __iter__(self):
-        return _ScalarDataLoaderIter(self.dataset, self.batch_size,
-                self.collate_fn, self.drop_last)
+        return _ScalarDataLoaderIter(dataset, self.batch_size,
+                                     self.collate_fn, self.drop_last)
 
 def _remove_kwargs_dist(kwargs):
     if 'num_workers' in kwargs:
@@ -291,14 +292,14 @@ class NodeDataLoader:
             self.collator = _NodeCollator(g, nids, block_sampler, **collator_kwargs)
             if "num_workers" in dataloader_kwargs and dataloader_kwargs["num_workers"] > 0:
                 self.dataloader = DataLoader(
-                                         self.collator.dataset,
-                                         collate_fn=self.collator.collate,
-                                         **dataloader_kwargs)
+                    self.collator.dataset,
+                    collate_fn=self.collator.collate,
+                    **dataloader_kwargs)
             else:
                 self.dataloader = _ScalarDataLoader(
-                                         self.collator.dataset,
-                                         collate_fn=self.collator.collate,
-                                         **dataloader_kwargs)
+                    self.collator.dataset,
+                    collate_fn=self.collator.collate,
+                    **dataloader_kwargs)
             self.is_distributed = False
 
             # Precompute the CSR and CSC representations so each subprocess does not

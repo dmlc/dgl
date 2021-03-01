@@ -142,8 +142,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
                 fanout_array[g.get_etype_id(etype)] = value
         fanout_array = F.to_dgl_nd(F.tensor(fanout_array, dtype=F.int64))
 
-    if isinstance(prob, list) and len(prob) > 0 and isinstance(prob[0],
-            nd.NDArray):
+    if isinstance(prob, list) and len(prob) > 0 and \
+            isinstance(prob[0], nd.NDArray):
         prob_arrays = prob
     elif prob is None:
         prob_arrays = [nd.array([], ctx=nd.cpu())] * len(g.etypes)
