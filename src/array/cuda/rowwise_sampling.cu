@@ -23,8 +23,19 @@ namespace {
 
 constexpr int WARP_SIZE = 32;
 
+/**
+* @brief Compute the size of each row in the sampled CSR, without replacement.
+*
+* @tparam IdType The type of node and edge indexes.
+* @param num_picks The number of non-zero entries to pick per row.
+* @param num_rows The number of rows to pick.
+* @param in_rows The set of rows to pick.
+* @param in_ptr The index where each row's edges start.
+* @param out_deg The size of each row in the sampled matrix, as indexed by
+* `in_rows` (output).
+*/
 template<typename IdType>
-__global__ void CSRRowWiseSampleDegreeKernel(
+__global__ void _CSRRowWiseSampleDegreeKernel(
     const int64_t num_picks,
     const int64_t num_rows,
     const IdType * const in_rows,
@@ -44,8 +55,19 @@ __global__ void CSRRowWiseSampleDegreeKernel(
   }
 }
 
+/**
+* @brief Compute the size of each row in the sampled CSR, with replacement.
+*
+* @tparam IdType The type of node and edge indexes.
+* @param num_picks The number of non-zero entries to pick per row.
+* @param num_rows The number of rows to pick.
+* @param in_rows The set of rows to pick.
+* @param in_ptr The index where each row's edges start.
+* @param out_deg The size of each row in the sampled matrix, as indexed by
+* `in_rows` (output).
+*/
 template<typename IdType>
-__global__ void CSRRowWiseSampleDegreeReplaceKernel(
+__global__ void _CSRRowWiseSampleDegreeReplaceKernel(
     const int64_t num_picks,
     const int64_t num_rows,
     const IdType * const in_rows,
@@ -70,8 +92,26 @@ __global__ void CSRRowWiseSampleDegreeReplaceKernel(
   }
 }
 
+/**
+* @brief Perform row-wise sampling on a CSR matrix, and generate a COO matrix,
+* without replacement.
+*
+* @tparam IdType The ID type used for matrices.
+* @tparam BLOCK_ROWS The number of rows covered by each threadblock.
+* @param rand_seed The random seed to use.
+* @param num_picks The number of non-zeros to pick per row.
+* @param num_rows The number of rows to pick.
+* @param in_rows The set of rows to pick.
+* @param in_ptr The indptr array of the input CSR.
+* @param in_index The indices array of the input CSR.
+* @param data The data array of the input CSR.
+* @param out_ptr The offset to write each row to in the output COO.
+* @param out_rows The rows of the output COO (output).
+* @param out_cols The columns of the output COO (output).
+* @param out_idxs The data array of the output COO (output).
+*/
 template<typename IdType, int BLOCK_ROWS>
-__global__ void CSRRowWiseSampleKernel(
+__global__ void _CSRRowWiseSampleKernel(
     const uint64_t rand_seed,
     const int64_t num_picks,
     const int64_t num_rows,
@@ -178,8 +218,26 @@ __global__ void CSRRowWiseSampleKernel(
   }
 }
 
+/**
+* @brief Perform row-wise sampling on a CSR matrix, and generate a COO matrix,
+* without replacement.
+*
+* @tparam IdType The ID type used for matrices.
+* @tparam BLOCK_ROWS The number of rows covered by each threadblock.
+* @param rand_seed The random seed to use.
+* @param num_picks The number of non-zeros to pick per row.
+* @param num_rows The number of rows to pick.
+* @param in_rows The set of rows to pick.
+* @param in_ptr The indptr array of the input CSR.
+* @param in_index The indices array of the input CSR.
+* @param data The data array of the input CSR.
+* @param out_ptr The offset to write each row to in the output COO.
+* @param out_rows The rows of the output COO (output).
+* @param out_cols The columns of the output COO (output).
+* @param out_idxs The data array of the output COO (output).
+*/
 template<typename IdType, int BLOCK_ROWS>
-__global__ void CSRRowWiseSampleReplaceKernel(
+__global__ void _CSRRowWiseSampleReplaceKernel(
     const uint64_t rand_seed,
     const int64_t num_picks,
     const int64_t num_rows,

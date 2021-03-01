@@ -291,6 +291,9 @@ class NodeDataLoader:
         else:
             self.collator = _NodeCollator(g, nids, block_sampler, **collator_kwargs)
             if "num_workers" in dataloader_kwargs and dataloader_kwargs["num_workers"] > 0:
+                assert g.device == 'cpu', \
+                    'Only graphs on the cpu are supported for NodeDataLoader ' \
+                    'in the case of num_workers > 0.'
                 self.dataloader = DataLoader(
                     self.collator.dataset,
                     collate_fn=self.collator.collate,
