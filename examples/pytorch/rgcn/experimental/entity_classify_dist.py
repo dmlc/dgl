@@ -463,14 +463,14 @@ def run(args, device, data):
             if args.sparse_embedding and not args.dgl_sparse:
                 emb_optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
-            if args.sparse_embedding:
-                emb_optimizer.step()
             compute_end = time.time()
             forward_t.append(forward_end - copy_time)
             backward_t.append(compute_end - forward_end)
 
-            # Aggregate gradients in multiple nodes.
+            # Update model parameters
+            optimizer.step()
+            if args.sparse_embedding:
+                emb_optimizer.step()
             update_t.append(time.time() - compute_end)
             step_t = time.time() - start
             step_time.append(step_t)
