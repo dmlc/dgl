@@ -78,7 +78,7 @@ The folder contains example implementations of selected research papers related 
 | [Dynamic Graph CNN for Learning on Point Clouds](#dgcnnpoint) |  |                                  |                           |                    |                    |
 | [Supervised Community Detection with Line Graph Neural Networks](#lgnn) |  |                                  |                           |                    |                    |
 | [Text Generation from Knowledge Graphs with Graph Transformers](#graphwriter) |  |                                  |                           |                    |                    |
-| [Temporal Graph Networks For Deep Learning on Dynamic Graphs](#tgn) |  |                                  | :heavy_check_mark:                          |                    |                    |
+| [Temporal Graph Networks For Deep Learning on Dynamic Graphs](#tgn) |  | :heavy_check_mark:                                 |                           |                    |                    |
 
 
 ## 2020
