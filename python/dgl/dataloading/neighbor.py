@@ -25,7 +25,7 @@ class MultiLayerNeighborSampler(BlockSampler):
     replace : bool, default True
         Whether to sample with replacement
     return_eids : bool, default False
-        Whether to return the edge IDs involved in message passing in the block.
+        Whether to return the edge IDs involved in message passing in the MFG.
         If True, the edge IDs will be stored as an edge feature named ``dgl.EID``.
 
     Examples
@@ -50,6 +50,12 @@ class MultiLayerNeighborSampler(BlockSampler):
     ...     {('user', 'follows', 'user'): 5,
     ...      ('user', 'plays', 'game'): 4,
     ...      ('game', 'played-by', 'user'): 3}] * 3)
+
+    Notes
+    -----
+    For the concept of MFGs, please refer to
+    :ref:`User Guide Section 6 <guide-minibatch>` and
+    :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
     def __init__(self, fanouts, replace=False, return_eids=False):
         super().__init__(len(fanouts), return_eids)
@@ -84,7 +90,7 @@ class MultiLayerFullNeighborSampler(MultiLayerNeighborSampler):
     n_layers : int
         The number of GNN layers to sample.
     return_eids : bool, default False
-        Whether to return the edge IDs involved in message passing in the block.
+        Whether to return the edge IDs involved in message passing in the MFG.
         If True, the edge IDs will be stored as an edge feature named ``dgl.EID``.
 
     Examples
@@ -100,6 +106,12 @@ class MultiLayerFullNeighborSampler(MultiLayerNeighborSampler):
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for blocks in dataloader:
     ...     train_on(blocks)
+
+    Notes
+    -----
+    For the concept of MFGs, please refer to
+    :ref:`User Guide Section 6 <guide-minibatch>` and
+    :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
     def __init__(self, n_layers, return_eids=False):
         super().__init__([None] * n_layers, return_eids=return_eids)

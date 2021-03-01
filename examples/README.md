@@ -13,6 +13,7 @@ The folder contains example implementations of selected research papers related 
 | [Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges](#mwe) | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
 | [SIGN: Scalable Inception Graph Neural Networks](#sign)      | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
 | [Strategies for Pre-training Graph Neural Networks](#prestrategy) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [Graph Neural Networks with convolutional ARMA filters](#arma) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Predict then Propagate: Graph Neural Networks meet Personalized PageRank](#appnp) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Cluster-GCN: An Efficient Algorithm for Training Deep and Large Graph Convolutional Networks](#clustergcn) | :heavy_check_mark:  |                                  |                           | :heavy_check_mark: | :heavy_check_mark: |
 | [Deep Graph Infomax](#dgi)                                   | :heavy_check_mark:  |                                  |                           |                    |                    |
@@ -45,8 +46,40 @@ The folder contains example implementations of selected research papers related 
 | [GNN-FiLM: Graph Neural Networks with Feature-wise Linear Modulation](#gnnfilm) | :heavy_check_mark:  |                     |                     |                     |                     |
 | [Hierarchical Graph Pooling with Structure Learning](#hgp-sl)                                                                                 |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Graph Representation Learning via Hard and Channel-Wise Attention Networks](#hardgat)                                   |:heavy_check_mark:                     |                 |                           |                    |                    |
+| [Neural Graph Collaborative Filtering](#ngcf) |             | :heavy_check_mark: |                     |                   |                   |
 | [Graph Cross Networks with Vertex Infomax Pooling](#gxn)                                   |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Towards Deeper Graph Neural Networks](#dagnn) | :heavy_check_mark:  |                                  |                           |                    |                    |
+| [The PageRank Citation Ranking: Bringing Order to the Web](#pagerank) |  |                                  |                           |                    |                    |
+| [Fast Suboptimal Algorithms for the Computation of Graph Edit Distance](#beam) |  |                                  |                           |                    |                    |
+| [Speeding Up Graph Edit Distance Computation with a Bipartite Heuristic](#astar) |  |                                  |                           |                    |                    |
+| [A Three-Way Model for Collective Learning on Multi-Relational Data](#rescal) |  |                                  |                           |                    |                    |
+| [Speeding Up Graph Edit Distance Computation through Fast Bipartite Matching](#bipartite) |  |                                  |                           |                    |                    |
+| [Translating Embeddings for Modeling Multi-relational Data](#transe) |  |                                  |                           |                    |                    |
+| [A Hausdorff Heuristic for Efficient Computation of Graph Edit Distance](#hausdorff) |  |                                  |                           |                    |                    |
+| [Embedding Entities and Relations for Learning and Inference in Knowledge Bases](#distmul) |  |                                  |                           |                    |                    |
+| [Learning Entity and Relation Embeddings for Knowledge Graph Completion](#transr) |  |                                  |                           |                    |                    |
+| [Order Matters: Sequence to sequence for sets](#seq2seq) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [Improved Semantic Representations From Tree-Structured Long Short-Term Memory Networks](#treelstm) |  |                                  |                           |                    |                    |
+| [Complex Embeddings for Simple Link Prediction](#complex) |  |                                  |                           |                    |                    |
+| [Gated Graph Sequence Neural Networks](#ggnn) |  |                                  |                           |                    |                    |
+| [Atomic Convolutional Networks for Predicting Protein-Ligand Binding Affinity](#acnn) |  |                                  |                           |                    |                    |
+| [Attention Is All You Need](#transformer) |  |                                  |                           |                    |                    |
+| [PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space](#pointnet++) |  |                                  |                           |                    |                    |
+| [PointNet: Deep Learning on Point Sets for 3D Classification and Segmentation](#pointnet) |  |                                  |                           |                    |                    |
+| [Dynamic Routing Between Capsules](#capsule) |  |                                  |                           |                    |                    |
+| [An End-to-End Deep Learning Architecture for Graph Classification](#dgcnn) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [Spatio-Temporal Graph Convolutional Networks: A Deep Learning Framework for Traffic Forecasting](#stgcn) |  |                                  |                           |                    |                    |
+| [Recurrent Relational Networks](#rrn) |  |                                  |                           |                    |                    |
+| [Junction Tree Variational Autoencoder for Molecular Graph Generation](#jtvae) |  |                                  |                           |                    |                    |
+| [Learning Deep Generative Models of Graphs](#dgmg) |  |                                  |                           |                    |                    |
+| [RotatE: Knowledge Graph Embedding by Relational Rotation in Complex Space](#rotate) |  |                                  |                           |                    |                    |
+| [A graph-convolutional neural network model for the prediction of chemical reactivity](#wln) |  |                                  |                           |                    |                    |
+| [Set Transformer: A Framework for Attention-based Permutation-Invariant Neural Networks](#settrans) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [Graphical Contrastive Losses for Scene Graph Parsing](#scenegraph) |  |                                  |                           |                    |                    |
+| [Dynamic Graph CNN for Learning on Point Clouds](#dgcnnpoint) |  |                                  |                           |                    |                    |
+| [Supervised Community Detection with Line Graph Neural Networks](#lgnn) |  |                                  |                           |                    |                    |
+| [Text Generation from Knowledge Graphs with Graph Transformers](#graphwriter) |  |                                  |                           |                    |                    |
+|  [Link Prediction Based on Graph Neural Networks](#seal) | | :heavy_check_mark: | | :heavy_check_mark: | :heavy_check_mark: |
 | [Variational Graph Auto-Encoders](#vgae) |  | :heavy_check_mark: | | | |
 
 ## 2020
@@ -71,7 +104,7 @@ The folder contains example implementations of selected research papers related 
     - Example code: [Molecule embedding](https://github.com/awslabs/dgl-lifesci/tree/master/examples/molecule_embeddings), [PyTorch for custom data](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/csv_data_configuration)
     - Tags: molecules, graph classification, unsupervised learning, self-supervised learning, molecular property prediction
 
-- <a name="GNN-FiLM"></a> Marc Brockschmidt. GNN-FiLM: Graph Neural Networks with Feature-wise Linear Modulation. [Paper link](https://arxiv.org/abs/1906.12192).
+- <a name="gnnfilm"></a> Marc Brockschmidt. GNN-FiLM: Graph Neural Networks with Feature-wise Linear Modulation. [Paper link](https://arxiv.org/abs/1906.12192).
     - Example code: [Pytorch](../examples/pytorch/GNN-FiLM)
     - Tags: multi-relational graphs, hypernetworks, GNN architectures
 
@@ -84,6 +117,10 @@ The folder contains example implementations of selected research papers related 
     - Tags: over-smoothing, node classification
 
 ## 2019
+
+- <a name="arma"></a>  Bianchi et al. Graph Neural Networks with Convolutional ARMA Filters. [Paper link](https://arxiv.org/abs/1901.01343).
+    - Example code: [PyTorch](../examples/pytorch/arma)
+    - Tags: node classification
 
 - <a name="appnp"></a> Klicpera et al. Predict then Propagate: Graph Neural Networks meet Personalized PageRank. [Paper link](https://arxiv.org/abs/1810.05997).
     - Example code: [PyTorch](../examples/pytorch/appnp), [MXNet](../examples/mxnet/appnp)
@@ -169,6 +206,11 @@ The folder contains example implementations of selected research papers related 
     - Example code: [Pytorch](../examples/pytorch/hardgat)
     - Tags: node classification, graph attention
 
+- <a name='ngcf'></a> Wang, Xiang, et al. Neural Graph Collaborative Filtering. [Paper link](https://arxiv.org/abs/1905.08108).
+    - Example code: [Pytorch](../examples/pytorch/NGCF)
+    - Tags: Collaborative Filtering, Recommendation, Graph Neural Network 
+
+
 ## 2018
 
 - <a name="dgmg"></a> Li et al. Learning Deep Generative Models of Graphs. [Paper link](https://arxiv.org/abs/1803.03324).
@@ -202,6 +244,11 @@ The folder contains example implementations of selected research papers related 
 - <a name="dgcnn"></a> Zhang et al. An End-to-End Deep Learning Architecture for Graph Classification. [Paper link](https://www.cse.wustl.edu/~ychen/public/DGCNN.pdf).
     - Pooling module: [PyTorch](https://docs.dgl.ai/api/python/nn.pytorch.html#sortpooling), [TensorFlow](https://docs.dgl.ai/api/python/nn.tensorflow.html#sortpooling), [MXNet](https://docs.dgl.ai/api/python/nn.mxnet.html#sortpooling)
     - Tags: graph classification
+
+- <a name="seal"></a>  Zhang et al. Link Prediction Based on Graph Neural Networks. [Paper link](https://papers.nips.cc/paper/2018/file/53f0d7c537d99b3824f0f99d62ea2428-Paper.pdf).
+    - Example code: [pytorch](../examples/pytorch/seal)
+    - Tags: link prediction, sampling
+
 
 ## 2017
 

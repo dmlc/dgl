@@ -227,32 +227,40 @@ def randint(shape, dtype, ctx, low, high):
 
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
-    if isinstance(lengths, th.Tensor):
-        max_len = as_scalar(lengths.max())
+    device = input.device
+    if not is_tensor(lengths):
+        lengths = th.tensor(lengths, dtype=th.int64, device=device)
     else:
-        max_len = builtins.max(lengths)
+        lengths = lengths.to(device)
+    max_len = as_scalar(lengths.max())
 
     if l_min is not None:
         max_len = builtins.max(max_len, l_min)
 
     batch_size = len(lengths)
-    device = input.device
     x = input.new(batch_size * max_len, *old_shape[1:])
     x.fill_(value)
-    index = []
-    for i, l in enumerate(lengths):
-        index.extend(range(i * max_len, i * max_len + l))
-    index = th.tensor(index).to(device)
-    return scatter_row(x, index, input).view(batch_size, max_len, *old_shape[1:])
+    index = th.ones(len(input), dtype=th.int64, device=device)
+    cum_lengths = th.cumsum(lengths, 0)
+    index[cum_lengths[:-1]] += (max_len - lengths[:-1])
+    index = th.cumsum(index, 0) - 1
+    x[index] = input
+    return x.view(batch_size, max_len, *old_shape[1:])
 
 def pack_padded_tensor(input, lengths):
-    batch_size, max_len = input.shape[:2]
+    max_len = input.shape[1]
     device = input.device
-    index = []
-    for i, l in enumerate(lengths):
-        index.extend(range(i * max_len, i * max_len + l))
-    index = th.tensor(index).to(device)
-    return gather_row(input.view(batch_size * max_len, -1), index)
+    if not is_tensor(lengths):
+        lengths = th.tensor(lengths, dtype=th.int64, device=device)
+    else:
+        lengths = lengths.to(device)
+    input = input.view(-1, *input.shape[2:])
+    out_len = lengths.sum().item()
+    index = th.ones(out_len, dtype=th.int64, device=device)
+    cum_lengths = th.cumsum(lengths, 0)
+    index[cum_lengths[:-1]] += (max_len - lengths[:-1])
+    index = th.cumsum(index, 0) - 1
+    return input[index]
 
 def boolean_mask(input, mask):
     if 'bool' not in str(mask.dtype):

@@ -334,6 +334,66 @@ class GraphPartitionBook(ABC):
         """Get the list of edge types
         """
 
+    def map_to_per_ntype(self, ids):
+        """Map homogeneous node IDs to type-wise IDs and node types.
+
+        Parameters
+        ----------
+        ids : tensor
+            Homogeneous node IDs.
+
+        Returns
+        -------
+        (tensor, tensor)
+            node type IDs and type-wise node IDs.
+        """
+
+    def map_to_per_etype(self, ids):
+        """Map homogeneous edge IDs to type-wise IDs and edge types.
+
+        Parameters
+        ----------
+        ids : tensor
+            Homogeneous edge IDs.
+
+        Returns
+        -------
+        (tensor, tensor)
+            edge type IDs and type-wise edge IDs.
+        """
+
+    def map_to_homo_nid(self, ids, ntype):
+        """Map type-wise node IDs and type IDs to homogeneous node IDs.
+
+        Parameters
+        ----------
+        ids : tensor
+            Type-wise node Ids
+        ntype : str
+            node type
+
+        Returns
+        -------
+        Tensor
+            Homogeneous node IDs.
+        """
+
+    def map_to_homo_eid(self, ids, etype):
+        """Map type-wise edge IDs and type IDs to homogeneous edge IDs.
+
+        Parameters
+        ----------
+        ids : tensor
+            Type-wise edge Ids
+        etype : str
+            edge type
+
+        Returns
+        -------
+        Tensor
+            Homogeneous edge IDs.
+        """
+
 class BasicPartitionBook(GraphPartitionBook):
     """This provides the most flexible way to store parition information.
 
