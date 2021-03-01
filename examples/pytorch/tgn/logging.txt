@@ -1,4 +1,1 @@
-Epoch: 0; Training Loss: 38642.09296107292 | Validation AP: 0.988 AUC: 0.991
-Epoch: 0; Test AP: 0.989 AUC: 0.991
-Epoch: 0; Test New Node AP: 0.982 AUC: 0.984
 Training Interreputed!

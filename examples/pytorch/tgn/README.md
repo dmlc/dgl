@@ -41,19 +41,19 @@ python train.py --dataset wikipedia
 If you want to use GPU, run:
 
 ```python
-python train.py --gpu 0 --dataset wikipedia
+python train.py --dataset wikipedia
 ```
 
 If you want to run in fast mode:
 
 ```python
-python train.py --gpu 0 --dataset wikipedia --fast_mode
+python train.py --dataset wikipedia --fast_mode
 ```
 
 If you want to change memory updating module:
 
 ```python
-python train.py --gpu 0 --dataset wikipedia --memory_updater [rnn/gru]
+python train.py --dataset wikipedia --memory_updater [rnn/gru]
 ```
 
 ## Performance
