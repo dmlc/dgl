@@ -76,6 +76,11 @@ class DistEmbedding:
             self._trace.append((idx, emb))
         return emb
 
+    def reset_trace(self):
+        '''Reset the traced data.
+        '''
+        self._trace = []
+
 class SparseAdagradUDF:
     ''' The UDF to update the embeddings with sparse Adagrad.
 
@@ -151,6 +156,7 @@ class SparseAdagrad:
     def __init__(self, params, lr):
         self._params = params
         self._lr = lr
+        self._clean_grad = False
         # We need to register a state sum for each embedding in the kvstore.
         for emb in params:
             assert isinstance(emb, DistEmbedding), 'SparseAdagrad only supports DistEmbeding'
@@ -185,5 +191,15 @@ class SparseAdagrad:
                     # after we push them.
                     grads = F.cat(grads, 0)
                     kvstore.push(name, idxs, grads)
-                # Clean up the old traces.
-                emb._trace = []
+
+            if self._clean_grad:
+                # clean gradient track
+                for emb in self._params:
+                    emb.reset_trace()
+                self._clean_grad = False
+
+
+    def zero_grad(self):
+        """clean grad cache
+        """
+        self._clean_grad = True

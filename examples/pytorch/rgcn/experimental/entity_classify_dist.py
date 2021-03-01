@@ -460,7 +460,7 @@ def run(args, device, data):
 
             # backward
             optimizer.zero_grad()
-            if args.sparse_embedding and not args.dgl_sparse:
+            if args.sparse_embedding:
                 emb_optimizer.zero_grad()
             loss.backward()
             compute_end = time.time()
