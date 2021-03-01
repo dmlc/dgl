@@ -1,5 +1,5 @@
 ''' Evaluate unsupervised embedding using a variety of basic classifiers. '''
-''' Credit  https://github.com/fanyun-sun/InfoGraph '''
+''' Credit: https://github.com/fanyun-sun/InfoGraph '''
 
 from sklearn import preprocessing
 from sklearn.metrics import accuracy_score
@@ -45,6 +45,7 @@ def logistic_classify(x, y, device = 'cpu'):
         test_embs, test_lbls = torch.from_numpy(test_embs).to(device), torch.from_numpy(test_lbls).to(device)
 
         log = LogReg(hid_units, nb_classes)
+        log = log.to(device)
 
         opt = torch.optim.Adam(log.parameters(), lr=0.01, weight_decay=0.0)
 
@@ -85,9 +86,9 @@ def evaluate_embedding(embeddings, labels, search=True, device = 'cpu'):
     labels = preprocessing.LabelEncoder().fit_transform(labels)
     x, y = np.array(embeddings), np.array(labels)
 
-    logreg_accuracies = [logistic_classify(x, y, device)]
-    print('LogReg', np.mean(logreg_accuracies))
-    svc_accuracies = [svc_classify(x,y, search)]
-    print('svc', np.mean(svc_accuracies))
+    logreg_accuracy = logistic_classify(x, y, device)
+    print('LogReg', logreg_accuracy)
+    svc_accuracy = svc_classify(x,y, search)
+    print('svc', svc_accuracy)
 
-    return np.mean(logreg_accuracies), np.mean(svc_accuracies)
+    return logreg_accuracy, svc_accuracy
