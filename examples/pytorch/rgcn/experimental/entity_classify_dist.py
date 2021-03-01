@@ -371,12 +371,22 @@ def run(args, device, data):
                            low_mem=args.low_mem,
                            layer_norm=args.layer_norm)
     model = model.to(device)
+
     if not args.standalone:
-        model = th.nn.parallel.DistributedDataParallel(model)
-        # If there are dense parameters in the embedding layer
-        # or we use Pytorch saprse embeddings.
-        if len(embed_layer.node_projs) > 0 or not args.dgl_sparse:
-            embed_layer = DistributedDataParallel(embed_layer, device_ids=None, output_device=None)
+        if args.num_gpus == -1:
+            model = DistributedDataParallel(model)
+            # If there are dense parameters in the embedding layer
+            # or we use Pytorch saprse embeddings.
+            if len(embed_layer.node_projs) > 0 or not args.dgl_sparse:
+                embed_layer = DistributedDataParallel(embed_layer)
+        else:
+            dev_id = g.rank() % args.num_gpus
+            model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
+            # If there are dense parameters in the embedding layer
+            # or we use Pytorch saprse embeddings.
+            if len(embed_layer.node_projs) > 0 or not args.dgl_sparse:
+                embed_layer = embed_layer.to(device)
+                embed_layer = DistributedDataParallel(embed_layer, device_ids=[dev_id], output_device=dev_id)
 
     if args.sparse_embedding:
         if args.dgl_sparse and args.standalone:
@@ -439,7 +449,7 @@ def run(args, device, data):
             for block in blocks:
                 gen_norm(block)
             feats = embed_layer(blocks[0].srcdata[dgl.NID], blocks[0].srcdata[dgl.NTYPE])
-            label = labels[seeds]
+            label = labels[seeds].to(device)
             copy_time = time.time()
             feat_copy_t.append(copy_time - tic_step)
 
@@ -504,7 +514,10 @@ def main(args):
           g.rank(), len(train_nid), len(np.intersect1d(train_nid.numpy(), local_nid)),
           len(val_nid), len(np.intersect1d(val_nid.numpy(), local_nid)),
           len(test_nid), len(np.intersect1d(test_nid.numpy(), local_nid))))
-    device = th.device('cpu')
+    if args.num_gpus == -1:
+        device = th.device('cpu')
+    else:
+        device = th.device('cuda:'+str(g.rank() % args.num_gpus))
     labels = g.nodes['paper'].data['labels'][np.arange(g.number_of_nodes('paper'))]
     all_val_nid = th.LongTensor(np.nonzero(g.nodes['paper'].data['val_mask'][np.arange(g.number_of_nodes('paper'))])).squeeze()
     all_test_nid = th.LongTensor(np.nonzero(g.nodes['paper'].data['test_mask'][np.arange(g.number_of_nodes('paper'))])).squeeze()
@@ -524,8 +537,8 @@ if __name__ == '__main__':
     parser.add_argument('--num-servers', type=int, default=1, help='Server count on each machine.')
 
     # rgcn related
-    parser.add_argument("--gpu", type=str, default='0',
-            help="gpu")
+    parser.add_argument('--num_gpus', type=int, default=-1, 
+                        help="the number of GPU device. Use -1 for CPU training")
     parser.add_argument("--dropout", type=float, default=0,
             help="dropout probability")
     parser.add_argument("--n-hidden", type=int, default=16,
