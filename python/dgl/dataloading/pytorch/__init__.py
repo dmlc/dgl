@@ -30,7 +30,15 @@ class _ScalarDataLoaderIter:
 
         return batch
 
+##
 class _ScalarDataLoader:
+    """Custom DataLoader to return mini-batches as tensors, rather than as
+    lists. When used inside of the NodeDataLoader, this significantly reduces
+    the overhead. For the case of a batch size of 1024, instead of giving a
+    list of 1024 tensors to the collator, a single tensor of 1024 dimensions
+    is passed in.
+    This implementation supports only minimum set of features.
+    """
     def __init__(self, dataset, collate_fn=None, shuffle=False, batch_size=1,
                  drop_last=False, num_workers=0):
         self.dataset = dataset
