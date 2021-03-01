@@ -401,14 +401,14 @@ def run(args, device, data):
         else:
             emb_optimizer = th.optim.SparseAdam(list(embed_layer.module.node_embeds.parameters()), lr=args.sparse_lr)
             print('optimize Pytorch sparse embedding:', embed_layer.module.node_embeds)
+
         dense_params = list(model.parameters())
-        if args.node_feats:
-            if args.standalone:
-                dense_params += list(embed_layer.node_projs.parameters())
-                print('optimize dense projection:', embed_layer.node_projs)
-            else:
-                dense_params += list(embed_layer.module.node_projs.parameters())
-                print('optimize dense projection:', embed_layer.module.node_projs)
+        if args.standalone:
+            dense_params += list(embed_layer.node_projs.parameters())
+            print('optimize dense projection:', embed_layer.node_projs)
+        else:
+            dense_params += list(embed_layer.module.node_projs.parameters())
+            print('optimize dense projection:', embed_layer.module.node_projs)
         optimizer = th.optim.Adam(dense_params, lr=args.lr, weight_decay=args.l2norm)
     else:
         all_params = list(model.parameters()) + list(embed_layer.parameters())
@@ -574,14 +574,10 @@ if __name__ == '__main__':
             help="Number of workers for distributed dataloader.")
     parser.add_argument("--low-mem", default=False, action='store_true',
             help="Whether use low mem RelGraphCov")
-    parser.add_argument("--mix-cpu-gpu", default=False, action='store_true',
-            help="Whether store node embeddins in cpu")
     parser.add_argument("--sparse-embedding", action='store_true',
             help='Use sparse embedding for node embeddings.')
     parser.add_argument("--dgl-sparse", action='store_true',
             help='Whether to use DGL sparse embedding')
-    parser.add_argument('--node-feats', default=False, action='store_true',
-            help='Whether use node features')
     parser.add_argument('--layer-norm', default=False, action='store_true',
             help='Use layer norm')
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
