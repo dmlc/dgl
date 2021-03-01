@@ -386,10 +386,10 @@ def run(args, device, data):
             emb_optimizer = dgl.distributed.SparseAdagrad(list(embed_layer.module.node_embeds.values()), lr=args.sparse_lr)
             print('optimize DGL sparse embedding:', embed_layer.module.node_embeds.keys())
         elif args.standalone:
-            emb_optimizer = th.optim.SparseAdam(embed_layer.node_embeds.parameters(), lr=args.sparse_lr)
+            emb_optimizer = th.optim.SparseAdam(list(embed_layer.node_embeds.parameters()), lr=args.sparse_lr)
             print('optimize Pytorch sparse embedding:', embed_layer.node_embeds)
         else:
-            emb_optimizer = th.optim.SparseAdam(embed_layer.module.node_embeds.parameters(), lr=args.sparse_lr)
+            emb_optimizer = th.optim.SparseAdam(list(embed_layer.module.node_embeds.parameters()), lr=args.sparse_lr)
             print('optimize Pytorch sparse embedding:', embed_layer.module.node_embeds)
         dense_params = list(model.parameters())
         if args.node_feats:

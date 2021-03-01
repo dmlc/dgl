@@ -80,6 +80,10 @@ about the list.
     bg.edges()
     # (tensor([0, 1, 2, 4, 4, 4, 5], tensor([1, 2, 3, 4, 5, 6, 4]))
 
+Please note that most dgl transformation functions will discard the batch information.
+In order to maintain such information, please use :func:`dgl.DGLGraph.set_batch_num_nodes`
+and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph.
+
 Graph Readout
 ^^^^^^^^^^^^^
 
@@ -217,7 +221,7 @@ updating the model.
     opt = torch.optim.Adam(model.parameters())
     for epoch in range(20):
         for batched_graph, labels in dataloader:
-            feats = batched_graph.ndata['attr'].float()
+            feats = batched_graph.ndata['attr']
             logits = model(batched_graph, feats)
             loss = F.cross_entropy(logits, labels)
             opt.zero_grad()

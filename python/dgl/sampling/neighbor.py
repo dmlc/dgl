@@ -252,7 +252,10 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
     """
     # Rectify nodes to a dictionary
     if nodes is None:
-        nodes = {ntype: F.arange(0, g.number_of_nodes(ntype)) for ntype in g.ntypes}
+        nodes = {
+            ntype: F.astype(F.arange(0, g.number_of_nodes(ntype)), g.idtype)
+            for ntype in g.ntypes
+        }
     elif not isinstance(nodes, dict):
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")

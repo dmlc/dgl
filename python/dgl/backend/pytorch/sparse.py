@@ -1,7 +1,7 @@
 import torch as th
 from distutils.version import LooseVersion
 from ...base import is_all, ALL
-from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp
+from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp, _scatter_add
 
 if LooseVersion(th.__version__) >= LooseVersion("1.6.0"):
     from torch.cuda.amp import custom_fwd, custom_bwd
@@ -24,7 +24,7 @@ else:
             return bwd(*args, **kwargs)
         return decorate_bwd
 
-__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce']
+__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce', 'scatter_add']
 
 
 def _reduce_grad(grad, shape):
@@ -275,15 +275,32 @@ class SegmentReduce(th.autograd.Function):
         arg, offsets = ctx.saved_tensors
         m = offsets[-1].item()
         if op == 'sum':
-            offsets = offsets[1:-1]
+            offsets = offsets[1:]
+            # To address the issue of trailing zeros, related issue:
+            # https://github.com/dmlc/dgl/pull/2610
             indices = th.zeros(
-                (m,), device=offsets.device, dtype=offsets.dtype)
+                (m + 1,), device=offsets.device, dtype=offsets.dtype)
             indices.scatter_add_(0, offsets, th.ones_like(offsets))
-            indices = th.cumsum(indices, -1)
+            indices = th.cumsum(indices, -1)[:-1]
             dx = dy[indices]
         else:
             dx = _bwd_segment_cmp(dy, arg, m)
         return None, dx, None
+
+
+class ScatterAdd(th.autograd.Function):
+    @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
+    def forward(ctx, x, idx, m):
+        y = _scatter_add(x, idx, m)
+        ctx.save_for_backward(idx)
+        return y
+
+    @staticmethod
+    @custom_bwd
+    def backward(ctx, dy):
+        idx = ctx.saved_tensors
+        return dy[idx], None, None
 
 
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
@@ -300,3 +317,6 @@ def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
 
 def segment_reduce(op, x, offsets):
     return SegmentReduce.apply(op, x, offsets)
+
+def scatter_add(x, idx, m):
+    return ScatterAdd.apply(x, idx, m)

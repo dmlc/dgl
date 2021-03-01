@@ -27,11 +27,13 @@ class DistTensor:
     graph. Therefore, their first dimensions have to be the number of nodes or edges in the graph.
     The tensors are sharded in the first dimension based on the partition policy of nodes
     or edges. When a distributed tensor is created, the partition policy is automatically
-    determined based on the first dimension if the partition policy is not provided: if the first
-    dimension matches the number of nodes, ``DistTensor`` will use the node partition policy;
-    if the first dimension matches the number of edges, ``DistTensor`` wll use the edge partition
-    policy. To determine the partition policy automatically, a DistGraph object has to be created.
-    Users can overwrite the rule by providing a partition policy directly.
+    determined based on the first dimension if the partition policy is not provided. If the first
+    dimension matches the number of nodes of a node type, ``DistTensor`` will use the partition
+    policy for this particular node type; if the first dimension matches the number of edges of
+    an edge type, ``DistTensor`` will use the partition policy for this particular edge type.
+    If DGL cannot determine the partition policy automatically (e.g., multiple node types or
+    edge types have the same number of nodes or edges), users have to explicity provide
+    the partition policy.
 
     A distributed tensor can be ether named or anonymous.
     When a distributed tensor has a name, the tensor can be persistent if ``persistent=True``.
