@@ -16,9 +16,6 @@ class LogReg(nn.Module):
         super(LogReg, self).__init__()
         self.fc = nn.Linear(ft_in, nb_classes)
 
-        for m in self.modules():
-            self.weights_init(m)
-
     def weights_init(self, m):
         if isinstance(m, nn.Linear):
             torch.nn.init.xavier_uniform_(m.weight.data)
@@ -88,7 +85,7 @@ def evaluate_embedding(embeddings, labels, search=True, device = 'cpu'):
 
     logreg_accuracy = logistic_classify(x, y, device)
     print('LogReg', logreg_accuracy)
-    svc_accuracy = svc_classify(x,y, search)
+    svc_accuracy = svc_classify(x, y, search)
     print('svc', svc_accuracy)
 
     return logreg_accuracy, svc_accuracy
