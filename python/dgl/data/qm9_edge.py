@@ -41,7 +41,7 @@ class QM9EdgeDataset(DGLDataset):
     
     Statistics:
 
-    - Number of graphs: 13,0831
+    - Number of graphs: 130,831
     - Number of regression targets: 19
     
     Node attributes:
