@@ -189,14 +189,15 @@ def is_sorted_srcdst(src, dst, num_src=None, num_dst=None):
         Whether ``src`` is in ascending order, and whether ``dst`` is
         in ascending order with respect to ``src``.
     """
+    # for some versions of MXNET and TensorFlow, num_src and num_dst get
+    # incorrectly marked as floats, so force them as integers here
     if num_src is None:
-        num_src = F.as_scalar(F.max(src, dim=0)+1)
+        num_src = int(F.as_scalar(F.max(src, dim=0)+1))
     if num_dst is None:
-        num_dst = F.as_scalar(F.max(dst, dim=0)+1)
+        num_dst = int(F.as_scalar(F.max(dst, dim=0)+1))
 
     src = F.zerocopy_to_dgl_ndarray(src)
     dst = F.zerocopy_to_dgl_ndarray(dst)
-
     sorted_status = _CAPI_DGLCOOIsSorted(src, dst, num_src, num_dst)
 
     row_sorted = sorted_status > 0
