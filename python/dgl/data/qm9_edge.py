@@ -28,7 +28,7 @@ conversion = F.tensor([
 
 class QM9EdgeDataset(DGLDataset):
     r"""QM9Edge dataset for graph property prediction (regression)
-    This dataset consists of 13,0831 molecules with 19 regression targets.
+    This dataset consists of 130,831 molecules with 19 regression targets.
     Node means atom and edge means bond.
     
     This dataset differs from QM9Dataset in the following points:
