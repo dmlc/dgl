@@ -121,6 +121,94 @@ void SegmentReduce(
       n, dim);
 }
 
+namespace {
+
+template <typename DType>
+cublasStatus_t
+Xgemm(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
+      int m, int n, int k, const DType *alpha, const DType *A, int lda,
+      const DType *B, int ldb, const DType *beta, DType *C, int ldc) {
+  LOG(INFO) << "Not supported dtype";
+  return CUBLAS_STATUS_EXECUTION_FAILED;
+}
+
+template <>
+cublasStatus_t
+Xgemm<float> (cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
+              int m, int n, int k, const float *alpha, const float *A, int lda,
+              const float *B, int ldb, const float *beta, float *C, int ldc) {
+  return cublasSgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+}
+
+template <>
+cublasStatus_t
+Xgemm<double> (cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
+               int m, int n, int k, const double *alpha, const double *A, int lda,
+               const double *B, int ldb, const double *beta, double *C, int ldc) {
+  return cublasDgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+}
+
+template<>
+cublasStatus_t
+Xgemm<half> (cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
+             int m, int n, int k, const half *alpha, const half *A, int lda,
+             const half *B, int ldb, const half *beta, half *C, int ldc) {
+  return cublasHgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+}
+
+}  // namespace
+
+/*
+ * \brief CUDA implementation of forward phase of SegmentGemm.
+ * \param A the concatenation of {A_i}
+ * \param B the concatenation of {B_i}
+ * \param C the concatenation of {C_i}
+ * \param n the array of number of rows in A.
+ * \param m the array of number of rows in B / number of columns in A.
+ * \param p the array of number of columns in C.
+ */
+template <typename DType>
+void SegmentGemm(NDArray A, NDArray B, NDArray C,
+                 NDArray n, NDArray m, NDArray p,
+                 bool transA, bool transB) {
+  const DType* A_data = A.Ptr<DType>();
+  const DType* B_data = B.Ptr<DType>();
+  DType* C_data = C.Ptr<DType>();
+  const int64_t* n_data = n.Ptr<int64_t>();
+  const int64_t* m_data = m.Ptr<int64_t>();
+  const int64_t* p_data = p.Ptr<int64_t>();
+  int batch_size = n->shape[0];
+  // TODO(zihao): use multiple stream.
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  if (!thr_entry->cublas_handle)
+    CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
+  CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, thr_entry->stream));
+  int64_t A_off = 0, B_off = 0, C_off = 0;
+  for (int i = 0; i < batch_size; ++i) {
+    int64_t ni = n_data[i],
+            mi = m_data[i],
+            pi = p_data[i];
+    DType alpha = 1., beta = 0.;
+    int ldb = transB ? mi: pi,
+        lda = transA ? ni: mi,
+        ldc = pi;
+    CUBLAS_CALL(Xgemm<DType>(
+        thr_entry->cublas_handle,
+        transB ? CUBLAS_OP_T : CUBLAS_OP_N,
+        transA ? CUBLAS_OP_T : CUBLAS_OP_N,
+        pi, ni, mi,
+        &alpha,
+        B_data + B_off, ldb,
+        A_data + A_off, lda,
+        &beta,
+        C_data + C_off, ldc
+    ));
+    A_off += ni * mi;
+    B_off += mi * pi;
+    C_off += ni * pi;
+  }
+}
+
 /*!
  * \brief CUDA implementation of Scatter Add (on first dimension).
  * \note math equation: out[idx[i], *] += feat[i, *]

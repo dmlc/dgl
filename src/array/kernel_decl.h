@@ -19,7 +19,7 @@ namespace aten {
 /*!
  * \brief Generalized Sparse Matrix Dense Matrix Multiplication on Csr format.
  */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdTyp, int bits>
 void SpMMCsr(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
              const aten::CSRMatrix& csr,
@@ -75,6 +75,15 @@ void SegmentReduce(const std::string& op,
                    NDArray offsets,
                    NDArray out,
                    NDArray arg);
+
+/*!
+ * \brief Segment GEMM.
+ */
+template <int XPU, int bits>
+void SegmentGemm(
+    NDArray A, NDArray B, NDArray C,
+    NDArray n, NDArray m, NDArray p,
+    bool transA, bool transB);
 
 /*!
  * \brief Scatter Add on first dimension.
