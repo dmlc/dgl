@@ -8,9 +8,9 @@ import dgl
 from dgl.data.dgl_dataset import DGLDataset
 from dgl.data.utils import download, load_graphs, _get_dgl_url, extract_archive
 
-class QM9Dataset_v2(DGLDataset):
+class QM9DatasetV2(DGLDataset):
     r"""QM9 dataset for graph property prediction (regression)
-    This dataset consists of 13,0831 molecules with 19 regression targets.
+    This dataset consists of 130,831 molecules with 19 regression targets.
     Node means atom and edge means bond.
     
     Reference: `"MoleculeNet: A Benchmark for Molecular Machine Learning" <https://arxiv.org/abs/1703.00564>`_
@@ -18,7 +18,7 @@ class QM9Dataset_v2(DGLDataset):
     
     Statistics:
 
-    - Number of graphs: 13,0831
+    - Number of graphs: 130,831
     - Number of regression targets: 19
 
     +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
@@ -87,7 +87,7 @@ class QM9Dataset_v2(DGLDataset):
     
     Examples
     --------
-    >>> data = QM9Dataset_v2(label_keys=['mu', 'alpha'])
+    >>> data = QM9DatasetV2(label_keys=['mu', 'alpha'])
     >>> data.num_labels
     
     
@@ -100,7 +100,7 @@ class QM9Dataset_v2(DGLDataset):
     ...     print(labels) # get labels of the corresponding graph
     ...     # your code here...
     >>>
-    
+
     """
     def __init__(self, 
                  label_keys = None,
@@ -110,7 +110,7 @@ class QM9Dataset_v2(DGLDataset):
         
         self.label_keys = label_keys
         self._url = _get_dgl_url('dataset/qm9_ver2.zip')
-        super(QM9Dataset_v2, self).__init__(name='qm9_v2',
+        super(QM9DatasetV2, self).__init__(name='qm9_v2',
                                             url=self._url,
                                             raw_dir=raw_dir,
                                             force_reload=force_reload,

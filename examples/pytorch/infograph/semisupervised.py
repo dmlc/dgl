@@ -3,7 +3,7 @@ import torch as th
 import torch.nn.functional as F
 import dgl
 from dgl.dataloading import GraphDataLoader
-from qm9_v2 import QM9Dataset_v2
+from qm9_v2 import QM9DatasetV2
 from model import InfoGraphS
 import argparse
 
@@ -12,21 +12,21 @@ def argument():
     parser = argparse.ArgumentParser(description='InfoGraphS')
 
     # data source params
-    parser.add_argument('--target', type=str, default='mu', help='Choose regression task}')
-    parser.add_argument('--train_num', type=int, default=5000, help='Number of training set')
+    parser.add_argument('--target', type=str, default='mu', help='Choose regression task')
+    parser.add_argument('--train_num', type=int, default=5000, help='Size of training set')
 
     # training params
     parser.add_argument('--gpu', type=int, default=-1, help='GPU index, default:-1, using CPU.')
     parser.add_argument('--epochs', type=int, default=200, help='Training epochs.')
     parser.add_argument('--batch_size', type=int, default=20, help='Training batch size.')
-    parser.add_argument('--val_batch_size', type=int, default=100, help='Validating batch size.')
+    parser.add_argument('--val_batch_size', type=int, default=100, help='Validation batch size.')
 
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate.')
-    parser.add_argument('--wd', type=float, default=0, help='weight decay.')
+    parser.add_argument('--wd', type=float, default=0, help='Weight decay.')
 
     # model params
-    parser.add_argument('--hid_dim', type=int, default=64, help='Hidden layer dimensionalities')
-    parser.add_argument('--reg', type=int, default=0.001, help='regularization coefficent')
+    parser.add_argument('--hid_dim', type=int, default=64, help='Hidden layer dimensionality')
+    parser.add_argument('--reg', type=float, default=0.001, help='Regularization coefficient')
 
     args = parser.parse_args()
 
@@ -63,7 +63,7 @@ if __name__ == '__main__':
     label_keys = [args.target]
     print(args)
 
-    dataset = QM9Dataset_v2(label_keys)
+    dataset = QM9DatasetV2(label_keys)
     dataset.to_dense()
 
     graphs = dataset.graphs
@@ -100,7 +100,7 @@ if __name__ == '__main__':
                                    drop_last=False,
                                    shuffle=True)
 
-    # generate validation & testing datalaoder
+    # generate validation & testing dataloader
 
     val_loader = GraphDataLoader(val_data,
                                  batch_size=args.val_batch_size,
