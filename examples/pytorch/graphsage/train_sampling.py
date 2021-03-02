@@ -11,7 +11,6 @@ import tqdm
 
 from load_graph import load_reddit, inductive_split, load_ogb
 
-
 class SAGE(nn.Module):
     def __init__(self,
                  in_feats,

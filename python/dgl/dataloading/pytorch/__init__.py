@@ -30,7 +30,6 @@ class _ScalarDataLoaderIter:
 
         return batch
 
-##
 class _ScalarDataLoader:
     """Custom DataLoader to return mini-batches as tensors, rather than as
     lists. When used inside of the NodeDataLoader, this significantly reduces
