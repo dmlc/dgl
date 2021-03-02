@@ -320,12 +320,12 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
   if (replace) {
     const dim3 block(512);
     const dim3 grid((num_rows+block.x-1)/block.x);
-    CSRRowWiseSampleDegreeReplaceKernel<<<grid, block, 0, stream>>>(
+    _CSRRowWiseSampleDegreeReplaceKernel<<<grid, block, 0, stream>>>(
         num_picks, num_rows, slice_rows, in_ptr, out_deg);
   } else {
     const dim3 block(512);
     const dim3 grid((num_rows+block.x-1)/block.x);
-    CSRRowWiseSampleDegreeKernel<<<grid, block, 0, stream>>>(
+    _CSRRowWiseSampleDegreeKernel<<<grid, block, 0, stream>>>(
         num_picks, num_rows, slice_rows, in_ptr, out_deg);
   }
 
@@ -368,7 +368,7 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
     constexpr int BLOCK_ROWS = 128/WARP_SIZE;
     const dim3 block(WARP_SIZE, BLOCK_ROWS);
     const dim3 grid((num_rows+block.y-1)/block.y);
-    CSRRowWiseSampleReplaceKernel<IdType, BLOCK_ROWS><<<grid, block, 0, stream>>>(
+    _CSRRowWiseSampleReplaceKernel<IdType, BLOCK_ROWS><<<grid, block, 0, stream>>>(
         random_seed,
         num_picks,
         num_rows,
@@ -384,7 +384,7 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
     constexpr int BLOCK_ROWS = 128/WARP_SIZE;
     const dim3 block(WARP_SIZE, BLOCK_ROWS);
     const dim3 grid((num_rows+block.y-1)/block.y);
-    CSRRowWiseSampleKernel<IdType, BLOCK_ROWS><<<grid, block, 0, stream>>>(
+    _CSRRowWiseSampleKernel<IdType, BLOCK_ROWS><<<grid, block, 0, stream>>>(
         random_seed,
         num_picks,
         num_rows,
