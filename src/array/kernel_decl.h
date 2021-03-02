@@ -19,7 +19,7 @@ namespace aten {
 /*!
  * \brief Generalized Sparse Matrix Dense Matrix Multiplication on Csr format.
  */
-template <int XPU, typename IdTyp, int bits>
+template <int XPU, typename IdType, int bits>
 void SpMMCsr(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
              const aten::CSRMatrix& csr,
