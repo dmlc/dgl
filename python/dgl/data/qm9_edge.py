@@ -365,7 +365,7 @@ class QM9EdgeDataset(DGLDataset):
         Returns
         -------
         dgl.DGLGraph
-           The graph contains:
+           The graph contains:11
            
            - ``ndata['pos']``: the coordinates of each atom
            - ``ndata['attr']``: the features of each atom
@@ -391,8 +391,9 @@ class QM9EdgeDataset(DGLDataset):
         return g, label
 
     def __len__(self):
-        r"""Number of graphs in the dataset.
-        Return
+        r""" Number of graphs in the dataset.
+        
+        Returns
         -------
         int
         """
