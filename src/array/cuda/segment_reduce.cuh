@@ -182,32 +182,32 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   if (!thr_entry->cublas_handle)
     CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
-  for (int i = 0; i < batch_size && i < 16; ++i) {
-    if (!thr_entry->streams[i]) {
-      cudaStreamCreate(&thr_entry->streams[i]);
-    }
-  }
+  CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, thr_entry->stream));
   int64_t A_off = 0, B_off = 0, C_off = 0;
+  int stream_cnt = 0;
   for (int i = 0; i < batch_size; ++i) {
-    CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, thr_entry->streams[i]));
     int64_t ni = n_data[i],
             mi = m_data[i],
             pi = p_data[i];
-    DType alpha = 1., beta = 0.;
-    int ldb = transB ? mi: pi,
-        lda = transA ? ni: mi,
-        ldc = pi;
-    CUBLAS_CALL(Xgemm<DType>(
-        thr_entry->cublas_handle,
-        transB ? CUBLAS_OP_T : CUBLAS_OP_N,
-        transA ? CUBLAS_OP_T : CUBLAS_OP_N,
-        pi, ni, mi,
-        &alpha,
-        B_data + B_off, ldb,
-        A_data + A_off, lda,
-        &beta,
-        C_data + C_off, ldc
-    ));
+    if (ni > 0 && mi > 0 && pi > 0) {
+      if (stream_cnt == 4)
+        stream_cnt = 0;
+      DType alpha = 1., beta = 0.;
+      int ldb = transB ? mi: pi,
+          lda = transA ? ni: mi,
+          ldc = pi;
+      CUBLAS_CALL(Xgemm<DType>(
+          thr_entry->cublas_handle,
+          transB ? CUBLAS_OP_T : CUBLAS_OP_N,
+          transA ? CUBLAS_OP_T : CUBLAS_OP_N,
+          pi, ni, mi,
+          &alpha,
+          B_data + B_off, ldb,
+          A_data + A_off, lda,
+          &beta,
+          C_data + C_off, ldc
+      ));
+    }
     A_off += ni * mi;
     B_off += mi * pi;
     C_off += ni * pi;
