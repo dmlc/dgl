@@ -1,3 +1,6 @@
+# This file is copied from the author's implementation.
+# <https://github.com/RexYing/gnn-model-explainer/blob/master/utils/synthetic_structsim.py>.
+
 """synthetic_structsim.py
 
     Utilities for generating certain graph shapes.

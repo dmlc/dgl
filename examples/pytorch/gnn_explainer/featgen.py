@@ -1,3 +1,6 @@
+# This file is copied from the author's implementation.
+# <https://github.com/RexYing/gnn-model-explainer/blob/master/utils/featgen.py>.
+
 """ featgen.py
 
 Node feature generators.
