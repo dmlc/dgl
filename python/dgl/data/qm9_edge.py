@@ -1,5 +1,7 @@
-"""QM9 dataset for graph property prediction (regression)."""
-"""When building this class, we partially refer to the implementation from https://github.com/Jack-XHP/DGL_QM9EDGE """
+""" 
+    QM9 dataset for graph property prediction (regression).
+    When building this class, we partially refer to the implementation from https://github.com/Jack-XHP/DGL_QM9EDGE  
+"""
 
 import os
 import numpy as np
@@ -18,8 +20,9 @@ try:
     RDLogger.DisableLog('rdApp.*')
 except ImportError:
     rdkit = None
-HAR2EV = 27.2113825435
-KCALMOL2EV = 0.04336414
+
+HAR2EV = 27.2113825435      # 1 Hartree = 27.2114 eV 
+KCALMOL2EV = 0.04336414     # 1 kcal/mol = 0.043363 eV
 conversion = F.tensor([
     1., 1., HAR2EV, HAR2EV, HAR2EV, 1., HAR2EV, HAR2EV, HAR2EV, HAR2EV, HAR2EV,
     1., KCALMOL2EV, KCALMOL2EV, KCALMOL2EV, KCALMOL2EV, 1., 1., 1.
@@ -29,12 +32,12 @@ conversion = F.tensor([
 class QM9EdgeDataset(DGLDataset):
     r"""QM9Edge dataset for graph property prediction (regression)
     This dataset consists of 130,831 molecules with 19 regression targets.
-    Node means atom and edge means bond.
+    Nodes correspond to atoms and edges correspond to bond.
     
-    This dataset differs from QM9Dataset in the following points:
-        1. It provides the predefined edges(bonds between atoms) with in a molecule. 
-        2. It provides each atom with a 11d attribute and each bond with a 4d attribute.
-        3. The number of regression targets is expanded to 19.
+    This dataset differs from :class:~dgl.data.QM9Dataset in the following points:
+        1. It includes the bonds in a molecule in the edges of the corresponding graph while the edges in :class:~dgl.data.QM9Dataset are purely distance-based. 
+        2. It provides richer node features and edge features.
+        3. The number of regression targets is expanded from 13 to 19 (in :class:~dgl.data.QM9Dataset, it's 13).
 
     Reference: `"MoleculeNet: A Benchmark for Molecular Machine Learning" <https://arxiv.org/abs/1703.00564>`_
                Atom features come from `"Neural Message Passing for Quantum Chemistry" <https://arxiv.org/abs/1704.01212>`_
@@ -95,19 +98,18 @@ class QM9EdgeDataset(DGLDataset):
     | B      | :math:`B`                        | Rotational constant                                                               | :math:`\textrm{GHz}`                        |
     +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
     | C      | :math:`C`                        | Rotational constant                                                               | :math:`\textrm{GHz}`                        |
-    +--------+----------------------------------+----------------------------------------
+    +--------+----------------------------------+----------------------------------------------------------------------------------------------------------------------------------
+    
     Parameters
     ----------
-    load_raw: bool
-        Whether to download and load raw data. Default: False, use the preprocessed data.
     label_keys: list
         Names of the regression property, which should be a subset of the keys in the table above.
-        If not provided, will load all the labels.
+        If not provided, it will load all the labels.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
         Default: ~/.dgl/
     force_reload : bool
-        Whether to reload the dataset. Default: False
+        Whether to reload the dataset. Default: False.
     verbose: bool
         Whether to print out progress information. Default: True.
 
@@ -135,8 +137,7 @@ class QM9EdgeDataset(DGLDataset):
     >>>
     """
     
-    raw_url = ('https://deepchemdata.s3-us-west-1.amazonaws.com/datasets/'
-            'molnet_publish/qm9.zip')
+    raw_url = ('https://deepchemdata.s3-us-west-1.amazonaws.com/datasets/molnet_publish/qm9.zip')
     raw_url2 = 'https://ndownloader.figshare.com/files/3195404'
     
     keys = ['mu', 'alpha', 'homo', 'lumo', 'gap', 'r2', 'zpve', 'U0', 'U', 'H', 'G', 'Cv', 'U0_atom',
@@ -151,7 +152,6 @@ class QM9EdgeDataset(DGLDataset):
         bonds = {BT.SINGLE: 0, BT.DOUBLE: 1, BT.TRIPLE: 2, BT.AROMATIC: 3}
         
     def __init__(self, 
-                 load_raw=False,
                  label_keys=None,
                  raw_dir=None, 
                  force_reload=False, 
@@ -164,19 +164,18 @@ class QM9EdgeDataset(DGLDataset):
             self.targets = [self.map_dict[i] for i in label_keys]
             self.num_labels = len(label_keys)
             
-        self.load_raw = load_raw
                 
         self._url = _get_dgl_url('dataset/qm9_edge.npz')
-        
+        1
         super(QM9EdgeDataset, self).__init__(name='qm9Edge',
-                                            raw_dir=raw_dir,
-                                            url = self._url,
-                                            force_reload=force_reload,
-                                            verbose=verbose)
+                                             raw_dir=raw_dir,
+                                             url=self._url,
+                                             force_reload=force_reload,
+                                             verbose=verbose)
     
     def download(self):
         
-        if rdkit is None or not self.load_raw:
+        if rdkit is None:
             print('Using a pre-processed version of the dataset.'
                   'Please install `rdkit` to alternatively process the raw data.')
             
@@ -185,18 +184,17 @@ class QM9EdgeDataset(DGLDataset):
                 download(self._url, path=file_path)
     
         else:
-            if not os.path.exists(os.path.join(self.raw_dir, "gdb9.sdf.csv")):
+            if not os.path.exists(f'{self.raw_dir}/gdb9.sdf.csv'):
                 file_path = download(self.raw_url, self.raw_dir)
                 extract_archive(file_path, self.raw_dir, overwrite=True)
                 os.unlink(file_path)
 
-            if not os.path.exists(os.path.join(self.raw_dir, "uncharacterized.txt")):
+            if not os.path.exists(f'{self.raw_url2}/uncharacterized.txt'):
                 file_path = download(self.raw_url2, self.raw_dir)
-                os.replace(os.path.join(self.raw_dir, '3195404'),
-                        os.path.join(self.raw_dir, 'uncharacterized.txt'))
+                os.replace(os.path.join(self.raw_dir, '3195404'), os.path.join(self.raw_dir, 'uncharacterized.txt'))
     
     def process(self):
-        if rdkit is None or not self.load_raw:
+        if rdkit is None:
             print('loading downloaded files')
             npz_path = os.path.join(self.raw_dir, "qm9_edge.npz")
         
@@ -217,8 +215,7 @@ class QM9EdgeDataset(DGLDataset):
         else:
             with open(os.path.join(self.raw_dir, "gdb9.sdf.csv"), 'r') as f:
                 target = f.read().split('\n')[1:-1]
-                target = [[float(x) for x in line.split(',')[1:20]]
-                        for line in target]
+                target = [[float(x) for x in line.split(',')[1:20]] for line in target]
                 target = F.tensor(target, dtype=F.data_type_dict['float32'])
                 target = F.cat([target[:, 3:], target[:, :3]], dim=-1)
                 target = (target * conversion.view(1, -1)).tolist()
@@ -286,7 +283,7 @@ class QM9EdgeDataset(DGLDataset):
                 row, col = edge_index
                 
                 hs = (z == 1).to(F.data_type_dict['float32'])
-                out = F.zeros([int(col.max())+1], dtype=hs[row].dtype, ctx='cpu')
+                out = F.zeros([int(col.max())+1], dtype=hs[row].dtype, ctx= F.cpu())
                 num_hs = np.array(out.scatter_add(-1, col, hs[row]))
 
                 row = np.array(row)
