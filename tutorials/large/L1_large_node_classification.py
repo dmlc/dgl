@@ -70,7 +70,7 @@ test_nids = idx_split['test']
 #
 # In the :doc:`previous tutorial <L0_neighbor_sampling_overview>`, you
 # have seen that the computation dependency for message passing of a
-# single node can be described as a series of bipartite graphs.
+# single node can be described as a series of *message flow graphs* (MFG).
 #
 # |image1|
 #
@@ -84,10 +84,10 @@ test_nids = idx_split['test']
 #
 # DGL provides tools to iterate over the dataset in minibatches
 # while generating the computation dependencies to compute their outputs
-# with the bipartite graphs above. For node classification, you can use
+# with the MFGs above. For node classification, you can use
 # ``dgl.dataloading.NodeDataLoader`` for iterating over the dataset.
 # It accepts a sampler object to control how to generate the computation
-# dependencies in the form of bipartite graphs.  DGL provides
+# dependencies in the form of MFGs.  DGL provides
 # implementations of common sampling algorithms such as
 # ``dgl.dataloading.MultiLayerNeighborSampler`` which randomly picks
 # a fixed number of neighbors for each node.
@@ -113,7 +113,7 @@ train_dataloader = dgl.dataloading.NodeDataLoader(
     graph,              # The graph
     train_nids,         # The node IDs to iterate over in minibatches
     sampler,            # The neighbor sampler
-    device=device,      # Put the sampled bipartite graphs on CPU or GPU
+    device=device,      # Put the sampled MFGs on CPU or GPU
     # The following arguments are inherited from PyTorch DataLoader.
     batch_size=1024,    # Batch size
     shuffle=True,       # Whether to shuffle the nodes for every epoch
@@ -126,7 +126,7 @@ train_dataloader = dgl.dataloading.NodeDataLoader(
 # You can iterate over the data loader and see what it yields.
 #
 
-input_nodes, output_nodes, bipartites = example_minibatch = next(iter(train_dataloader))
+input_nodes, output_nodes, mfgs = example_minibatch = next(iter(train_dataloader))
 print(example_minibatch)
 print("To compute {} nodes' outputs, we need {} nodes' input features".format(len(output_nodes), len(input_nodes))) 
 
@@ -138,24 +138,24 @@ print("To compute {} nodes' outputs, we need {} nodes' input features".format(le
 #    are needed on the first GNN layer for this minibatch.
 # -  An ID tensor for the output nodes, i.e. nodes whose representations
 #    are to be computed.
-# -  A list of bipartite graphs storing the computation dependencies
+# -  A list of MFGs storing the computation dependencies
 #    for each GNN layer.
 #
 
 
 ######################################################################
-# You can get the input and output node IDs of the bipartite graphs
-# and verify that the first few input nodes are always the same as the output
+# You can get the source and destination node IDs of the MFGs
+# and verify that the first few source nodes are always the same as the destination
 # nodes.  As we described in the :doc:`overview <L0_neighbor_sampling_overview>`,
-# output nodes' own features from the previous layer may also be necessary in
+# destination nodes' own features from the previous layer may also be necessary in
 # the computation of the new features.
 #
 
-bipartite_0_src = bipartites[0].srcdata[dgl.NID]
-bipartite_0_dst = bipartites[0].dstdata[dgl.NID]
-print(bipartite_0_src)
-print(bipartite_0_dst)
-print(torch.equal(bipartite_0_src[:bipartites[0].num_dst_nodes()], bipartite_0_dst))
+mfg_0_src = mfgs[0].srcdata[dgl.NID]
+mfg_0_dst = mfgs[0].dstdata[dgl.NID]
+print(mfg_0_src)
+print(mfg_0_dst)
+print(torch.equal(mfg_0_src[:mfgs[0].num_dst_nodes()], mfg_0_dst))
 
 
 ######################################################################
@@ -177,14 +177,14 @@ class Model(nn.Module):
         self.conv2 = SAGEConv(h_feats, num_classes, aggregator_type='mean')
         self.h_feats = h_feats
 
-    def forward(self, bipartites, x):
+    def forward(self, mfgs, x):
         # Lines that are changed are marked with an arrow: "<---"
 
-        h_dst = x[:bipartites[0].num_dst_nodes()]  # <---
-        h = self.conv1(bipartites[0], (x, h_dst))  # <---
+        h_dst = x[:mfgs[0].num_dst_nodes()]  # <---
+        h = self.conv1(mfgs[0], (x, h_dst))  # <---
         h = F.relu(h)
-        h_dst = h[:bipartites[1].num_dst_nodes()]  # <---
-        h = self.conv2(bipartites[1], (h, h_dst))  # <---
+        h_dst = h[:mfgs[1].num_dst_nodes()]  # <---
+        h = self.conv2(mfgs[1], (h, h_dst))  # <---
         return h
 
 model = Model(num_features, 128, num_classes).to(device)
@@ -195,44 +195,44 @@ model = Model(num_features, 128, num_classes).to(device)
 # :doc:`introduction <../blitz/1_introduction>`, you will notice several
 # differences:
 #
-# -  **DGL GNN layers on bipartite graphs**. Instead of computing on the
+# -  **DGL GNN layers on MFGs**. Instead of computing on the
 #    full graph:
 #
 #    .. code:: python
 #
 #       h = self.conv1(g, x)
 #
-#    you only compute on the sampled bipartite graph:
+#    you only compute on the sampled MFG:
 #
 #    .. code:: python
 #
-#       h = self.conv1(bipartites[0], (x, h_dst))
+#       h = self.conv1(mfgs[0], (x, h_dst))
 #
-#    All DGL’s GNN modules support message passing on bipartite graphs,
-#    where you supply a pair of features, one for input nodes and another
-#    for output nodes.
+#    All DGL’s GNN modules support message passing on MFGs,
+#    where you supply a pair of features, one for source nodes and another
+#    for destination nodes.
 #
 # -  **Feature slicing for self-dependency**. There are statements that
 #    perform slicing to obtain the previous-layer representation of the
-#    output nodes:
+#     nodes:
 #
 #    .. code:: python
 #
-#       h_dst = x[:bipartites[0].num_dst_nodes()]
+#       h_dst = x[:mfgs[0].num_dst_nodes()]
 #
-#    ``num_dst_nodes`` method works with bipartite graphs, where it will
-#    return the number of output nodes.
+#    ``num_dst_nodes`` method works with MFGs, where it will
+#    return the number of destination nodes.
 #
-#    Since the first few input nodes of the yielded bipartite graph are
-#    always the same as the output nodes, these statements obtain the
-#    representations of the output nodes on the previous layer. They are
+#    Since the first few source nodes of the yielded MFG are
+#    always the same as the destination nodes, these statements obtain the
+#    representations of the destination nodes on the previous layer. They are
 #    then combined with neighbor aggregation in ``dgl.nn.SAGEConv`` layer.
 #
 # .. note::
 #
 #    See the :doc:`custom message passing
 #    tutorial <L4_message_passing>` for more details on how to
-#    manipulate bipartite graphs produced in this way, such as the usage
+#    manipulate MFGs produced in this way, such as the usage
 #    of ``num_dst_nodes``.
 #
 
@@ -277,12 +277,12 @@ for epoch in range(10):
     model.train()
 
     with tqdm.tqdm(train_dataloader) as tq:
-        for step, (input_nodes, output_nodes, bipartites) in enumerate(tq):
+        for step, (input_nodes, output_nodes, mfgs) in enumerate(tq):
             # feature copy from CPU to GPU takes place here
-            inputs = bipartites[0].srcdata['feat']
-            labels = bipartites[-1].dstdata['label']
+            inputs = mfgs[0].srcdata['feat']
+            labels = mfgs[-1].dstdata['label']
 
-            predictions = model(bipartites, inputs)
+            predictions = model(mfgs, inputs)
 
             loss = F.cross_entropy(predictions, labels)
             opt.zero_grad()
@@ -298,10 +298,10 @@ for epoch in range(10):
     predictions = []
     labels = []
     with tqdm.tqdm(valid_dataloader) as tq, torch.no_grad():
-        for input_nodes, output_nodes, bipartites in tq:
-            inputs = bipartites[0].srcdata['feat']
-            labels.append(bipartites[-1].dstdata['label'].cpu().numpy())
-            predictions.append(model(bipartites, inputs).argmax(1).cpu().numpy())
+        for input_nodes, output_nodes, mfgs in tq:
+            inputs = mfgs[0].srcdata['feat']
+            labels.append(mfgs[-1].dstdata['label'].cpu().numpy())
+            predictions.append(model(mfgs, inputs).argmax(1).cpu().numpy())
         predictions = np.concatenate(predictions)
         labels = np.concatenate(labels)
         accuracy = sklearn.metrics.accuracy_score(labels, predictions)
