@@ -105,20 +105,20 @@ The folder contains example implementations of selected research papers related 
     - Tags: molecules, graph classification, unsupervised learning, self-supervised learning, molecular property prediction
 
 - <a name="gnnfilm"></a> Marc Brockschmidt. GNN-FiLM: Graph Neural Networks with Feature-wise Linear Modulation. [Paper link](https://arxiv.org/abs/1906.12192).
-    - Example code: [Pytorch](../examples/pytorch/GNN-FiLM)
+    - Example code: [PyTorch](../examples/pytorch/GNN-FiLM)
     - Tags: multi-relational graphs, hypernetworks, GNN architectures
 
 - <a name="gxn"></a> Li, Maosen, et al. Graph Cross Networks with Vertex Infomax Pooling. [Paper link](https://arxiv.org/abs/2010.01804).
-    - Example code: [Pytorch](../examples/pytorch/gxn)
+    - Example code: [PyTorch](../examples/pytorch/gxn)
     - Tags: pooling, graph classification
 
 - <a name="dagnn"></a> Liu et al. Towards Deeper Graph Neural Networks. [Paper link](https://arxiv.org/abs/2007.09296).
-    - Example code: [Pytorch](../examples/pytorch/dagnn)
+    - Example code: [PyTorch](../examples/pytorch/dagnn)
     - Tags: over-smoothing, node classification
 
 - <a name="dimenet"></a> Klicpera et al. Directional Message Passing for Molecular Graphs. [Paper link](https://arxiv.org/abs/2003.03123).
-    - Example code: [Pytorch](../examples/pytorch/dimenet)
-    - Tags: molecules, molecular property prediction
+    - Example code: [PyTorch](../examples/pytorch/dimenet)
+    - Tags: molecules, molecular property prediction, quantum chemistry
 
 ## 2019
 
@@ -207,11 +207,11 @@ The folder contains example implementations of selected research papers related 
     - Tags: graph classification, pooling
 
 - <a name='hardgat'></a> Gao, Hongyang, et al. Graph Representation Learning via Hard and Channel-Wise Attention Networks [Paper link](https://arxiv.org/abs/1907.04652).
-    - Example code: [Pytorch](../examples/pytorch/hardgat)
+    - Example code: [PyTorch](../examples/pytorch/hardgat)
     - Tags: node classification, graph attention
 
 - <a name='ngcf'></a> Wang, Xiang, et al. Neural Graph Collaborative Filtering. [Paper link](https://arxiv.org/abs/1905.08108).
-    - Example code: [Pytorch](../examples/pytorch/NGCF)
+    - Example code: [PyTorch](../examples/pytorch/NGCF)
     - Tags: Collaborative Filtering, Recommendation, Graph Neural Network 
 
 

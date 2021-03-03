@@ -25,12 +25,12 @@ tqdm 4.56.0
 
 The DGL's built-in QM9 dataset. Dataset summary:
 
-* Molecular Graphs: 13,0831
+* Number of Molecular Graphs: 130,831
 * Number of Tasks: 12
 
 ### Usage
 
-**Note: DimeNet++ is recommended to use instead of DimeNet.**
+**Note: DimeNet++ is recommended to use over DimeNet.**
 
 ###### Model options
 ```
