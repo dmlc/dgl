@@ -294,7 +294,7 @@ class QM9EdgeDataset(DGLDataset):
                 x = np.concatenate((x1,x2), axis = 1)
                 
                 N_node.append(N)
-                N_edge.append(len(mol.GetBonds()) * 2)
+                N_edge.append(mol.GetNumBonds() * 2)
 
                 Node_pos.append(np.array(pos))
                 Node_attr.append(x)
@@ -327,14 +327,15 @@ class QM9EdgeDataset(DGLDataset):
         return os.path.exists(npz_path)
     
     def save(self):
-        np.savez_compressed(os.path.join(self.raw_dir, "qm9_edge.npz"), N_node=self.N_node,
-                                                                        N_edge=self.N_edge,
-                                                                        Node_attr=self.Node_attr,
-                                                                        Node_pos = self.Node_pos,
-                                                                        Edge_attr = self.Edge_attr,
-                                                                        src = self.src,
-                                                                        dst = self.dst,  
-                                                                        Target = self.Target)
+        np.savez_compressed(os.path.join(self.raw_dir, "qm9_edge.npz"), 
+                            N_node=self.N_node,
+                            N_edge=self.N_edge,
+                            Node_attr=self.Node_attr,
+                            Node_pos=self.Node_pos,
+                            Edge_attr=self.Edge_attr,
+                            src=self.src,
+                            dst=self.dst,  
+                            Target=self.Target)
     def load(self):
     
         npz_path = os.path.join(self.raw_dir, "qm9_edge.npz")
@@ -374,15 +375,15 @@ class QM9EdgeDataset(DGLDataset):
             Property values of molecular graphs
         """
         
-        pos = self.Node_pos[self.N_cumsum[idx]:self.N_cumsum[idx + 1]]
+        pos = self.Node_pos[self.N_cumsum[idx]:self.N_cumsum[idx+1]]
         src = self.src[self.NE_cumsum[idx]:self.NE_cumsum[idx+1]]
         dst = self.dst[self.NE_cumsum[idx]:self.NE_cumsum[idx+1]]
 
         g = dgl_graph((src, dst))
           
         g.ndata['pos'] = F.tensor(pos, dtype=F.data_type_dict['float32'])
-        g.ndata['attr'] = F.tensor(self.Node_attr[self.N_cumsum[idx]:self.N_cumsum[idx + 1]], dtype=F.data_type_dict['float32'])
-        g.edata['edge_attr'] = F.tensor(self.Edge_attr[self.NE_cumsum[idx]:self.NE_cumsum[idx + 1]], dtype=F.data_type_dict['float32'])
+        g.ndata['attr'] = F.tensor(self.Node_attr[self.N_cumsum[idx]:self.N_cumsum[idx+1]], dtype=F.data_type_dict['float32'])
+        g.edata['edge_attr'] = F.tensor(self.Edge_attr[self.NE_cumsum[idx]:self.NE_cumsum[idx+1]], dtype=F.data_type_dict['float32'])
         
         
         label = F.tensor(self.Target[idx][self.targets], dtype=F.data_type_dict['float32'])
