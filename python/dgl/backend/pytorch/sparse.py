@@ -315,8 +315,11 @@ class SegmentGemm(th.autograd.Function):
     @custom_bwd
     def backward(ctx, dC):
         A, B, n, m, p = ctx.saved_tensors
-        dA = _segment_gemm(dC, B, n, p, m, False, True)
-        dB = _segment_gemm(A, dC, m, n, p, True, False)
+        dA, dB = None, None
+        if ctx.needs_input_grad[0]:
+            dA = _segment_gemm(dC, B, n, p, m, False, True)
+        if ctx.needs_input_grad[1]:
+            dB = _segment_gemm(A, dC, m, n, p, True, False)
         return dA, dB, None, None, None
 
 

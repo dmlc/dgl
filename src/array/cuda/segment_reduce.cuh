@@ -182,9 +182,14 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   if (!thr_entry->cublas_handle)
     CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
-  CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, thr_entry->stream));
+  for (int i = 0; i < batch_size && i < 16; ++i) {
+    if (!thr_entry->streams[i]) {
+      cudaStreamCreate(&thr_entry->streams[i]);
+    }
+  }
   int64_t A_off = 0, B_off = 0, C_off = 0;
   for (int i = 0; i < batch_size; ++i) {
+    CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, thr_entry->streams[i]));
     int64_t ni = n_data[i],
             mi = m_data[i],
             pi = p_data[i];
