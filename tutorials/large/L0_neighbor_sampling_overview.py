@@ -93,15 +93,16 @@ By the end of this tutorial, you will be able to
 ######################################################################
 # You can also notice in the animation above that the computation
 # dependencies in the animation above can be described as a series of
-# *bipartite graphs*.
-# The output nodes are on one side and all the nodes necessary for inputs
-# are on the other side. The arrows indicate how the sampled neighbors
-# propagates messages to the nodes.
+# bipartite graphs.
+# The output nodes (called *destination nodes*) are on one side and all the
+# nodes necessary for inputs (called *source nodes*) are on the other side.
+# The arrows indicate how the sampled neighbors propagates messages to the nodes.
+# DGL calls such graphs *message flow graphs* (MFG).
 #
-# Note that some GNN modules, such as `SAGEConv`, need to use the output
+# Note that some GNN modules, such as `SAGEConv`, need to use the destination
 # nodes' features on the previous layer to compute the outputs.  Without
-# loss of generality, DGL always includes the output nodes themselves
-# in the input nodes.
+# loss of generality, DGL always includes the destination nodes themselves
+# in the source nodes.
 #
 
 

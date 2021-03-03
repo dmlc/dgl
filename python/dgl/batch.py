@@ -166,7 +166,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *,
         raise DGLError('Invalid argument edata: must be a string list but got {}.'.format(
             type(edata)))
     if any(g.is_block for g in graphs):
-        raise DGLError("Batching a block is not supported.")
+        raise DGLError("Batching a MFG is not supported.")
 
     relations = list(sorted(graphs[0].canonical_etypes))
     relation_ids = [graphs[0].get_etype_id(r) for r in relations]
@@ -428,4 +428,4 @@ def unbatch_hetero(*args, **kwargs):
     """DEPREACTED: please use dgl.unbatch """
     dgl_warning('From v0.5, DGLHeteroGraph is merged into DGLGraph. You can safely'
                 ' replace dgl.unbatch_hetero with dgl.unbatch')
-    return batch(*args, **kwargs)
+    return unbatch(*args, **kwargs)

@@ -923,7 +923,7 @@ def test_atomic_conv(g, idtype):
     assert h.shape[-1] == 4
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'bipartite'], exclude=['zero-degree']))
 @pytest.mark.parametrize('out_dim', [1, 3])
 def test_cf_conv(g, idtype, out_dim):
     g = g.astype(idtype).to(F.ctx())
@@ -936,9 +936,15 @@ def test_cf_conv(g, idtype, out_dim):
     if F.gpu_ctx():
         cfconv = cfconv.to(ctx)
 
-    node_feats = F.randn((g.number_of_nodes(), 2))
+    src_feats = F.randn((g.number_of_src_nodes(), 2))
     edge_feats = F.randn((g.number_of_edges(), 3))
-    h = cfconv(g, node_feats, edge_feats)
+    h = cfconv(g, src_feats, edge_feats)
+    # current we only do shape check
+    assert h.shape[-1] == out_dim
+
+    # case for bipartite graphs
+    dst_feats = F.randn((g.number_of_dst_nodes(), 3))
+    h = cfconv(g, (src_feats, dst_feats), edge_feats)
     # current we only do shape check
     assert h.shape[-1] == out_dim
 
