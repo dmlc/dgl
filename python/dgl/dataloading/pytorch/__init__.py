@@ -306,10 +306,16 @@ class NodeDataLoader:
                     collate_fn=self.collator.collate,
                     **dataloader_kwargs)
             else:
-                self.dataloader = _ScalarDataLoader(
-                    self.collator.dataset,
-                    collate_fn=self.collator.collate,
-                    **dataloader_kwargs)
+                if isinstance(self.collator.dataset, th.Tensor):
+                    self.dataloader = _ScalarDataLoader(
+                        self.collator.dataset,
+                        collate_fn=self.collator.collate,
+                        **dataloader_kwargs)
+                else:
+                    self.dataloader = DataLoader(
+                        self.collator.dataset,
+                        collate_fn=self.collator.collate,
+                        **dataloader_kwargs)
             self.is_distributed = False
 
             # Precompute the CSR and CSC representations so each subprocess does not
