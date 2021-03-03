@@ -156,7 +156,124 @@ Xgemm<half> (cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t 
   return cublasHgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
 }
 
+template <typename DType>
+cublasStatus_t
+XgemmBatched(
+    cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
+    int m, int n, int k,
+    const DType *alpha,
+    const DType *A, int lda, int64_t stride_a,
+    const DType *B, int ldb, int64_t stride_b,
+    const DType *beta,
+    DType *C, int ldc, int64_t stride_c,
+    int batchCount) {
+  LOG(INFO) << "Not supported dtype";
+  return CUBLAS_STATUS_EXECUTION_FAILED;
+}
+
+template <>
+cublasStatus_t
+XgemmBatched<float>(
+    cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
+    int m, int n, int k,
+    const float *alpha,
+    const float *A, int lda, int64_t stride_a,
+    const float *B, int ldb, int64_t stride_b,
+    const float *beta,
+    float *C, int ldc, int64_t stride_c,
+    int batch_count) {
+  return cublasSgemmStridedBatched(
+      handle,
+      transa, transb,
+      m, n, k,
+      alpha,
+      A, lda,
+      stride_a,
+      B, ldb,
+      stride_b,
+      C, ldc,
+      stride_c,
+      batch_count
+  );
+}
+
+template <>
+cublasStatus_t
+XgemmBatched<double>(
+    cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
+    int m, int n, int k,
+    const double *alpha,
+    const double *A, int lda, int64_t stride_a,
+    const double *B, int ldb, int64_t stride_b,
+    const double *beta,
+    double *C, int ldc, int64_t stride_c,
+    int batch_count) {
+  return cublasDgemmStridedBatched(
+      handle,
+      transa, transb,
+      m, n, k,
+      alpha,
+      A, lda,
+      stride_a,
+      B, ldb,
+      stride_b,
+      C, ldc,
+      stride_c,
+      batch_count
+  );
+}
+
+template <>
+cublasStatus_t
+XgemmBatched<half>(
+    cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
+    int m, int n, int k,
+    const half *alpha,
+    const half *A, int lda, int64_t stride_a,
+    const half *B, int ldb, int64_t stride_b,
+    const half *beta,
+    half *C, int ldc, int64_t stride_c,
+    int batch_count) {
+  return cublasHgemmStridedBatched(
+      handle,
+      transa, transb,
+      m, n, k,
+      alpha,
+      A, lda,
+      stride_a,
+      B, ldb,
+      stride_b,
+      C, ldc,
+      stride_c,
+      batch_count
+  );
+}
+
 }  // namespace
+
+template <typename DType>
+__global__ void _PadMatrix(
+    DType* __restrict__ A_dst, const DType* __restrict__ A_src,
+    DType* __restrict__ B_dst, const DType* __restrict__ B_src,
+    DType* __restrict__ C_dst, const DType* __restrict__ B_src,
+    int64_t* __restrict__ parallel_indices,
+    int64_t* n_arr, int64_t* m_arr, int64_t* p_arr,
+    int64_t* A_off, int64_t* B_off, int64_t* C_off,
+    int64_t A_stride, int64_t B_stride, int64_t C_stride) {
+  // TODO(zihao)
+}
+
+template <typename DType>
+__global__ void _UnpadMatrix(
+    DType* __restrict__ A_dst, const DType* __restrict__ A_src,
+    DType* __restrict__ B_dst, const DType* __restrict__ B_src,
+    DType* __restrict__ C_dst, const DType* __restrict__ B_src,
+    int64_t* __restrict__ parallel_indices,
+    int64_t* n_arr, int64_t* m_arr, int64_t* p_arr,
+    int64_t* A_off, int64_t* B_off, int64_t* C_off,
+    int64_t A_stride, int64_t B_stride, int64_t C_stride) {
+  // TODO(zihao)
+}
 
 /*
  * \brief CUDA implementation of forward phase of SegmentGemm.
@@ -171,6 +288,7 @@ template <typename DType>
 void SegmentGemm(NDArray A, NDArray B, NDArray C,
                  NDArray n, NDArray m, NDArray p,
                  bool transA, bool transB) {
+  auto ctx = a->ctx;
   const DType* A_data = A.Ptr<DType>();
   const DType* B_data = B.Ptr<DType>();
   DType* C_data = C.Ptr<DType>();
@@ -178,20 +296,117 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
   const int64_t* m_data = m.Ptr<int64_t>();
   const int64_t* p_data = p.Ptr<int64_t>();
   int batch_size = n->shape[0];
-  // TODO(zihao): use multiple stream.
+  auto device = runtime::DeviceAPI::Get(ctx);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   if (!thr_entry->cublas_handle)
     CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
   CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, thr_entry->stream));
-  int64_t A_off = 0, B_off = 0, C_off = 0;
-  int stream_cnt = 0;
+  int max_n = 0,
+      max_m = 0,
+      max_p = 0;
+  std::vector<int> parallel_indices;
+  std::vector<bool> mask{false};
+  std::vector<int> A_off, B_off, C_off;
+  // collect information
   for (int i = 0; i < batch_size; ++i) {
     int64_t ni = n_data[i],
             mi = m_data[i],
             pi = p_data[i];
-    if (ni > 0 && mi > 0 && pi > 0) {
-      if (stream_cnt == 4)
-        stream_cnt = 0;
+    A_off.push_back(ni * mi);
+    B_off.push_back(mi * pi);
+    C_off.push_back(ni * pi);
+    if (ni > 128 || mi > 128 || pi > 128) {
+      mask[i] = true;
+    } else if (ni > 0 && mi > 0 && pi > 0) {
+      parallel_indices.push_back(i);
+      max_n = std::max(ni, max_n);
+      max_m = std::max(mi, max_m);
+      max_p = std::max(pi, max_p);
+    }
+  } 
+  // alignment to use TensorCore.
+  const int multiple_shp = 8;
+  max_n = multiple_shp * ((max_n + multiple_shp - 1) / multiple_shp);
+  max_m = multiple_shp * ((max_m + multiple_shp - 1) / multiple_shp);
+  max_p = multiple_shp * ((max_p + multiple_shp - 1) / multiple_shp);
+
+  // parallel with cublas batched gemm.
+  int parallel_batch_size = parallel.size();
+  if (parallel_batch_size > 0) {
+    const int64_t stride_a = max_n * max_m,
+                  stride_b = max_m * max_p,
+                  stride_c = max_n * max_p;
+    // allocate memory
+    DType* ptr_0 = static_cast<DType*>(
+        device->AllocWorkspace(sizeof(DType) * (stride_a + stride_b + stride_c) * parallel_batch_size));
+    DType* A_padded = ptr_0,
+           B_padded = ptr_0 + stride_a * parallel_batch_size,
+           C_padded = ptr_0 + (stride_a + stride_b) * parallel_batch_size;
+    int64_t* ptr_1 = static_cast<int64_t*>(device->AllocWorkspace(sizeof(int64_t) * batch_size * 6));
+    int64_t* n_data_gpu = ptr_1,
+             m_data_gpu = ptr_1 + batch_size,
+             p_data_gpu = ptr_1 + 2 * batch_size,
+             A_off_gpu = ptr_1 + 3 * batch_size,
+             B_off_gpu = ptr_1 + 4 * batch_size,
+             C_off_gpu = ptr_1 + 5 * batch_size;
+    int64_t* ptr_2 = static_cast<int64_t*>(device->AllocWorkspace(sizeof(int64_t) * batch_size));
+    int64_t* parallel_indices_gpu = ptr_2;
+    // copy data from CPU to GPU;
+    CUDA_CALL(cudaMemcpy(n_data_gpu, n_data, sizeof(int64_t) * batch_size, cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(m_data_gpu, m_data, sizeof(int64_t) * batch_size, cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(p_data_gpu, p_data, sizeof(int64_t) * batch_size, cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(A_off_gpu, A_off.data(), sizeof(int64_t) * batch_size, cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(B_off_gpu, B_off.data(), sizeof(int64_t) * batch_size, cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(C_off_gpu, C_off.data(), sizeof(int64_t) * batch_size, cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(
+        parallel_indices_gpu, parallel_indices.data(), sizeof(int64_t) * parallel_batch_size, cudaMemcpyHostToDevice));
+    // pad
+    const dim3 nblks(parallel_batch_size),
+               nthrs(1024);
+    CUDA_KERNEL_CALL((_PadMatrix<DType>),
+        nblks, nthrs, 0, thr_entry->stream,
+        A_padded, A_data,
+        B_padded, B_data,
+        C_padded, C_data,
+        parallel_indices_gpu,
+        n_data_gpu, m_data_gpu, p_data_gpu,
+        A_off_gpu, B_off_gpu, C_off_gpu
+        stride_a, stride_b, stride_c);
+    // batched gemm
+    CUBLAS_CALL(XgemmBatched<DType>(
+        thr_entry->cublas_handle,
+        transB ? CUBLAS_OP_T : CUBLAS_OP_N,
+        transA ? CUBLAS_OP_T : CUBLAS_OP_N,
+        max_p, max_n, max_m,
+        &alpha,
+        B_padded, ldb, stride_b,
+        A_padded, lda, stride_a,
+        &beta,
+        C_padded, ldc, stride_c,
+        parallel_batch_size,
+    ));
+    // unpad
+    CUDA_KERNEL_CALL((_UnpadMatrix<DType>),
+        nblks, nthrs, 0, thr_entry->stream,
+        A_data, A_padded,
+        B_data, B_padded,
+        C_data, C_padded,
+        parallel_indices_gpu,
+        n_data_gpu, m_data_gpu, p_data_gpu,
+        A_off_gpu, B_off_gpu, C_off_gpu,
+        stride_a, stride_b, stride_c);
+    // free allocated memory
+    device->FreeWorkspace(ctx, ptr_0);
+    device->FreeWorkspace(ctx, ptr_1);
+    device->FreeWorkspace(ctx, ptr_2);
+  }
+
+  // not parallel (or parallel w/ CUDA stream)
+  for (int i = 0; i < batch_size; ++i) {
+    int64_t ni = n_data[i],
+            mi = m_data[i],
+            pi = p_data[i];
+    if (mask[i]) {
       DType alpha = 1., beta = 0.;
       int ldb = transB ? mi: pi,
           lda = transA ? ni: mi,
@@ -202,15 +417,12 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
           transA ? CUBLAS_OP_T : CUBLAS_OP_N,
           pi, ni, mi,
           &alpha,
-          B_data + B_off, ldb,
-          A_data + A_off, lda,
+          B_data + B_off[i], ldb,
+          A_data + A_off[i], lda,
           &beta,
-          C_data + C_off, ldc
+          C_data + C_off[i], ldc
       ));
     }
-    A_off += ni * mi;
-    B_off += mi * pi;
-    C_off += ni * pi;
   }
 }
 
