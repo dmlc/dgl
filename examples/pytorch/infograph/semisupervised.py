@@ -3,6 +3,7 @@ import torch as th
 import torch.nn.functional as F
 import dgl
 from dgl.dataloading import GraphDataLoader
+from dgl.data.utils import Subset
 from qm9_v2 import QM9DatasetV2
 from model import InfoGraphS
 import argparse
@@ -55,6 +56,18 @@ def collate(samples):
     
     return batched_graph, batched_targets
 
+def evaluate(model, loader, num, device):
+    error = 0
+    for graphs, targets in loader:
+        graphs = graphs.to(device) 
+            
+        nfeat, efeat = graphs.ndata['attr'], graphs.edata['edge_attr']
+        targets = targets.to(device)
+        error += (model(graphs, nfeat, efeat) - targets).abs().sum().item()
+
+    error = error / num
+    
+    return error
 
 if __name__ == '__main__':
 
@@ -80,12 +93,12 @@ if __name__ == '__main__':
     test_idx = all_idx[val_num : val_num + test_num]
     train_idx = all_idx[val_num + test_num : val_num + test_num + args.train_num]
 
-    train_data = [dataset[i] for i in train_idx]
-    val_data = [dataset[i] for i in val_idx]
-    test_data = [dataset[i] for i in test_idx]
+    train_data = Subset(dataset, train_idx)
+    val_data = Subset(dataset, val_idx)
+    test_data = Subset(dataset, test_idx)
 
     unsup_idx = all_idx[val_num + test_num:]
-    unsup_data = [dataset[i] for i in unsup_idx]
+    unsup_data = Subset(dataset, unsup_idx)
 
     # generate supervised training dataloader and unsupervised training dataloader
     train_loader = GraphDataLoader(train_data,
@@ -117,7 +130,7 @@ if __name__ == '__main__':
     print('======== target = {} ========'.format(args.target))
 
     mean = dataset.labels.mean().item()
-    std = dataset.labels.mean().item()
+    std = dataset.labels.std().item()
 
 
     print('mean = {:4f}'.format(mean))
@@ -136,12 +149,9 @@ if __name__ == '__main__':
     )
 
     # Step 4: training epochs =============================================================== #
-    sup_loss_all = 0
-    unsup_loss_all = 0
-    consis_loss_all = 0
-
-    best_val_error = 99999
-    best_test_error = 99999
+    best_val_error = float('inf')
+    test_error = float('inf')
+    
     for epoch in range(args.epochs):
         ''' Training '''
         model.train()
@@ -163,7 +173,7 @@ if __name__ == '__main__':
             unsup_nfeat, unsup_efeat, unsup_graph_id = unsup_graph.ndata['attr'],\
                                                        unsup_graph.edata['edge_attr'], unsup_graph.edata['graph_id']
 
-            sup_target = (sup_target - mean) / std
+            sup_target = sup_target
             sup_target = sup_target.to(args.device)
 
             optimizer.zero_grad()
@@ -182,41 +192,16 @@ if __name__ == '__main__':
             optimizer.step()
 
         print('Epoch: {}, Sup_Loss: {:4f}, Unsup_loss: {:.4f}, Consis_loss: {:.4f}' \
-            .format(epoch, sup_loss_all, unsup_loss_all, consis_loss_all))
+                .format(epoch, sup_loss_all, unsup_loss_all, consis_loss_all))
 
         model.eval()
 
-        val_error = 0
-        test_error = 0
-        
-
-        for val_graphs, val_targets in val_loader:
-
-            val_graph = val_graphs.to(args.device)
-            val_nfeat, val_efeat = val_graph.ndata['attr'], val_graph.edata['edge_attr']
-            val_target = (val_targets - mean) / std
-            val_target = val_target.to(args.device)
-
-            val_error += (model(val_graph, val_nfeat, val_efeat) * std - val_target * std).abs().sum().item()
-
-        val_error = val_error / val_num
+        val_error = evaluate(model, val_loader, val_num, args.device)
         scheduler.step(val_error)
-
+        
         if val_error < best_val_error:
             best_val_error = val_error
+            test_error = evaluate(model, test_loader, test_num, args.device)
 
-            for test_graphs, test_targets in test_loader:
-
-                test_graph = test_graphs.to(args.device)
-                test_nfeat, test_efeat = test_graph.ndata['attr'], test_graph.edata['edge_attr']
-
-                test_target = (test_targets - mean) / std
-                test_target = test_target.to(args.device)
-
-                test_error += (model(test_graph, test_nfeat, test_efeat) * std - test_target * std).abs().sum().item()
-
-            test_error = test_error / test_num
-            best_test_error = test_error
-
-        print('Epoch: {}, LR: {}, best_val_error: {:.4f}, val_error: {:.4f}, best_test_error: {:.4f}' \
-            .format(epoch, lr, best_val_error, val_error, best_test_error))
+        print('Epoch: {}, LR: {}, val_error: {:.4f}, best_test_error: {:.4f}' \
+            .format(epoch, lr, val_error, test_error))

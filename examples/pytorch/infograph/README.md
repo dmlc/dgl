@@ -57,7 +57,7 @@ The 12 tasks are:
 ###### Dataset options
 
 ```
-  --dataname        str     The graph dataset name.               Default is 'MUTAG'.
+--dataname        str      The graph dataset name.                Default is 'MUTAG'.
 ```
 
 ###### GPU options
@@ -72,6 +72,7 @@ The 12 tasks are:
 --epochs           int     Number of training periods.            Default is 20.
 --batch_size       int     Size of a training batch.              Default is 128.
 --lr               float   Adam optimizer learning rate.          Default is 0.01.
+--log_interval     int     Interval bettwen two evaluations.	  Default is 1.
 ```
 
 ###### Model options
@@ -151,11 +152,11 @@ The hyperparameter setting in our implementation is identical to that reported i
 
 Here we only provide the results of 'mu', 'alpha', 'homo'.
 
-We notice that there's a big gap between the reported RMSE and that of our implementation. We also tried the authors' code and found that the gap still existed. This issue has been reported in https://github.com/fanyun-sun/InfoGraph/issues/8
+We notice that there's a big gap between the reported RMSE and that of our implementation. We also tried the authors' code and found that the gap still existed. This issue has been reported in https://github.com/fanyun-sun/InfoGraph/issues/8.
 
 |      Target       |   mu   | alpha  |  homo  |
 | :---------------: | :----: | :----: | :----: |
-|   RMSE Reported   | 0.3169 | 0.5444 | 0.0060 |
+|   MAE Reported    | 0.3169 | 0.5444 | 0.0060 |
 | The authors' code | 0.2411 | 0.5192 | 0.1560 |
 |        DGL        | 0.2355 | 0.5483 | 0.1581 |
 

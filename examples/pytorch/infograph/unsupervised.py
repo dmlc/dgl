@@ -19,10 +19,11 @@ def argument():
     parser.add_argument('--epochs', type=int, default=20, help='Training epochs.')
     parser.add_argument('--batch_size', type=int, default=128, help='Training batch size.')
     parser.add_argument('--lr', type=float, default=0.01, help='Learning rate.')
+    parser.add_argument('--log_interval', type=int, default=1, help='Interval between two evaluations.')
 
     # model params
-    parser.add_argument('--n_layers', type=int, default=3, help='Number of graph convolution layers before each pooling')
-    parser.add_argument('--hid_dim', type=int, default=32, help='Hidden layer dimensionalities')
+    parser.add_argument('--n_layers', type=int, default=3, help='Number of graph convolution layers before each pooling.')
+    parser.add_argument('--hid_dim', type=int, default=32, help='Hidden layer dimensionalities.')
 
     args = parser.parse_args()
 
@@ -58,8 +59,6 @@ if __name__ == '__main__':
     # Step 1: Prepare graph data   ===================================== #
     args = argument()
     print(args)
-
-    log_interval = 1
 
     # load dataset from dgl.data.GINDataset
     dataset = GINDataset(args.dataname, self_loop = False)
@@ -125,7 +124,7 @@ if __name__ == '__main__':
     
         print('Epoch {}, Loss {:.4f}'.format(epoch, loss_all))
     
-        if epoch % log_interval == 0:
+        if epoch % args.log_interval == 0:
 
             # evaluate embeddings
             model.eval()
