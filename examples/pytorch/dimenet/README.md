@@ -81,8 +81,8 @@ early_stopping    int   Patient epochs to wait before early stopping.   Default 
 num_workers       int   Number of subprocesses to use for data loading. Default is 18
 gpu               int   GPU index.                                      Default is 0, using CUDA:0
 interval          int   Time intervals for model evaluation.            Default is 50
-step-size         int   Period of learning rate decay.                  Default is 100.
-gamma             float Factor of learning rate decay.                  Default is 0.3.
+step_size         int   Period of learning rate decay.                  Default is 100
+gamma             float Factor of learning rate decay.                  Default is 0.3
 ```
 
 ##### Examples
