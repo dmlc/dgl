@@ -35,6 +35,13 @@ To select which benchmark to run, use the `--bench` flag. For example,
 asv run -n -e --python=same --verbose --bench model_acc.bench_gat
 ```
 
+Note that OGB dataset need to be download manually to `/tmp/dataset` folder (i.e. `/tmp/dataset/ogbn-products/`) beforehand. 
+You can do it by runnnig the code below in this folder
+```python
+from benchmarks.utils import get_ogb_graph
+get_ogb_graph("ogbn-product")
+```
+
 Run in docker locally
 ---
 
