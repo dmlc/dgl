@@ -9,6 +9,8 @@
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
 #include "./atomic.cuh"
+#include <algorithm>
+#include <vector>
 
 namespace dgl {
 
@@ -191,6 +193,7 @@ XgemmBatched<float>(
       stride_a,
       B, ldb,
       stride_b,
+      beta,
       C, ldc,
       stride_c,
       batch_count
@@ -217,6 +220,7 @@ XgemmBatched<double>(
       stride_a,
       B, ldb,
       stride_b,
+      beta,
       C, ldc,
       stride_c,
       batch_count
@@ -243,6 +247,7 @@ XgemmBatched<half>(
       stride_a,
       B, ldb,
       stride_b,
+      beta,
       C, ldc,
       stride_c,
       batch_count
@@ -252,10 +257,10 @@ XgemmBatched<half>(
 }  // namespace
 
 template <typename DType>
-__global__ void _PadMatrix(
+__global__ void _PadKernel(
     DType* __restrict__ A_dst, const DType* __restrict__ A_src,
     DType* __restrict__ B_dst, const DType* __restrict__ B_src,
-    DType* __restrict__ C_dst, const DType* __restrict__ B_src,
+    DType* __restrict__ C_dst, const DType* __restrict__ C_src,
     int64_t* __restrict__ parallel_indices,
     int64_t* n_arr, int64_t* m_arr, int64_t* p_arr,
     int64_t* A_off, int64_t* B_off, int64_t* C_off,
@@ -264,14 +269,12 @@ __global__ void _PadMatrix(
 }
 
 template <typename DType>
-__global__ void _UnpadMatrix(
-    DType* __restrict__ A_dst, const DType* __restrict__ A_src,
-    DType* __restrict__ B_dst, const DType* __restrict__ B_src,
-    DType* __restrict__ C_dst, const DType* __restrict__ B_src,
+__global__ void _UnpadKernel(
+    DType* __restrict__ C_dst, const DType* __restrict__ C_src,
     int64_t* __restrict__ parallel_indices,
-    int64_t* n_arr, int64_t* m_arr, int64_t* p_arr,
-    int64_t* A_off, int64_t* B_off, int64_t* C_off,
-    int64_t A_stride, int64_t B_stride, int64_t C_stride) {
+    int64_t* n_arr, int64_t* p_arr,
+    int64_t* C_off,
+    int64_t C_stride) {
   // TODO(zihao)
 }
 
@@ -288,7 +291,7 @@ template <typename DType>
 void SegmentGemm(NDArray A, NDArray B, NDArray C,
                  NDArray n, NDArray m, NDArray p,
                  bool transA, bool transB) {
-  auto ctx = a->ctx;
+  auto ctx = A->ctx;
   const DType* A_data = A.Ptr<DType>();
   const DType* B_data = B.Ptr<DType>();
   DType* C_data = C.Ptr<DType>();
@@ -319,9 +322,9 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
       mask[i] = true;
     } else if (ni > 0 && mi > 0 && pi > 0) {
       parallel_indices.push_back(i);
-      max_n = std::max(ni, max_n);
-      max_m = std::max(mi, max_m);
-      max_p = std::max(pi, max_p);
+      max_n = std::max(int(ni), max_n);
+      max_m = std::max(int(mi), max_m);
+      max_p = std::max(int(pi), max_p);
     }
   } 
   // alignment to use TensorCore.
@@ -331,26 +334,25 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
   max_p = multiple_shp * ((max_p + multiple_shp - 1) / multiple_shp);
 
   // parallel with cublas batched gemm.
-  int parallel_batch_size = parallel.size();
+  int parallel_batch_size = parallel_indices.size();
   if (parallel_batch_size > 0) {
-    const int64_t stride_a = max_n * max_m,
-                  stride_b = max_m * max_p,
-                  stride_c = max_n * max_p;
+    int64_t stride_a = max_n * max_m,
+            stride_b = max_m * max_p,
+            stride_c = max_n * max_p;
     // allocate memory
-    DType* ptr_0 = static_cast<DType*>(
-        device->AllocWorkspace(sizeof(DType) * (stride_a + stride_b + stride_c) * parallel_batch_size));
-    DType* A_padded = ptr_0,
-           B_padded = ptr_0 + stride_a * parallel_batch_size,
-           C_padded = ptr_0 + (stride_a + stride_b) * parallel_batch_size;
-    int64_t* ptr_1 = static_cast<int64_t*>(device->AllocWorkspace(sizeof(int64_t) * batch_size * 6));
-    int64_t* n_data_gpu = ptr_1,
-             m_data_gpu = ptr_1 + batch_size,
-             p_data_gpu = ptr_1 + 2 * batch_size,
-             A_off_gpu = ptr_1 + 3 * batch_size,
-             B_off_gpu = ptr_1 + 4 * batch_size,
-             C_off_gpu = ptr_1 + 5 * batch_size;
-    int64_t* ptr_2 = static_cast<int64_t*>(device->AllocWorkspace(sizeof(int64_t) * batch_size));
-    int64_t* parallel_indices_gpu = ptr_2;
+    DType *ptr_0 = static_cast<DType*>(
+        device->AllocWorkspace(ctx, sizeof(DType) * (stride_a + stride_b + stride_c) * parallel_batch_size));
+    DType *A_padded = ptr_0,
+          *B_padded = ptr_0 + stride_a * parallel_batch_size,
+          *C_padded = ptr_0 + (stride_a + stride_b) * parallel_batch_size;
+    int64_t *ptr_1 = static_cast<int64_t*>(device->AllocWorkspace(ctx, sizeof(int64_t) * batch_size * 7));
+    int64_t *n_data_gpu = ptr_1,
+            *m_data_gpu = ptr_1 + batch_size,
+            *p_data_gpu = ptr_1 + 2 * batch_size,
+            *A_off_gpu = ptr_1 + 3 * batch_size,
+            *B_off_gpu = ptr_1 + 4 * batch_size,
+            *C_off_gpu = ptr_1 + 5 * batch_size,
+            *parallel_indices_gpu = ptr_1 + 6 * batch_size;
     // copy data from CPU to GPU;
     CUDA_CALL(cudaMemcpy(n_data_gpu, n_data, sizeof(int64_t) * batch_size, cudaMemcpyHostToDevice));
     CUDA_CALL(cudaMemcpy(m_data_gpu, m_data, sizeof(int64_t) * batch_size, cudaMemcpyHostToDevice));
@@ -363,16 +365,20 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
     // pad
     const dim3 nblks(parallel_batch_size),
                nthrs(1024);
-    CUDA_KERNEL_CALL((_PadMatrix<DType>),
+    CUDA_KERNEL_CALL((_PadKernel<DType>),
         nblks, nthrs, 0, thr_entry->stream,
         A_padded, A_data,
         B_padded, B_data,
         C_padded, C_data,
         parallel_indices_gpu,
         n_data_gpu, m_data_gpu, p_data_gpu,
-        A_off_gpu, B_off_gpu, C_off_gpu
+        A_off_gpu, B_off_gpu, C_off_gpu,
         stride_a, stride_b, stride_c);
     // batched gemm
+    DType alpha = 1., beta = 0.;
+    int ldb = transB ? max_m: max_p,
+        lda = transA ? max_n: max_m,
+        ldc = max_p;
     CUBLAS_CALL(XgemmBatched<DType>(
         thr_entry->cublas_handle,
         transB ? CUBLAS_OP_T : CUBLAS_OP_N,
@@ -383,22 +389,19 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
         A_padded, lda, stride_a,
         &beta,
         C_padded, ldc, stride_c,
-        parallel_batch_size,
+        parallel_batch_size
     ));
     // unpad
-    CUDA_KERNEL_CALL((_UnpadMatrix<DType>),
+    CUDA_KERNEL_CALL((_UnpadKernel<DType>),
         nblks, nthrs, 0, thr_entry->stream,
-        A_data, A_padded,
-        B_data, B_padded,
         C_data, C_padded,
         parallel_indices_gpu,
-        n_data_gpu, m_data_gpu, p_data_gpu,
-        A_off_gpu, B_off_gpu, C_off_gpu,
-        stride_a, stride_b, stride_c);
+        n_data_gpu, p_data_gpu,
+        C_off_gpu,
+        stride_c);
     // free allocated memory
     device->FreeWorkspace(ctx, ptr_0);
     device->FreeWorkspace(ctx, ptr_1);
-    device->FreeWorkspace(ctx, ptr_2);
   }
 
   // not parallel (or parallel w/ CUDA stream)
