@@ -256,24 +256,64 @@ XgemmBatched<half>(
 
 }  // namespace
 
+/*
+ * \param dst the destination padded tensor.
+ * \param src the source packed tensor.
+ * \param parallel_indices the indices of activated blocks.
+ * \param num_rows the numbers of rows in the packed tensor.
+ * \param num_cols the numbers of columns in the packed tensor.
+ * \param offset the offest of i-th block in the packed tensor.
+ * \param row the number of rows in the padded tensor.
+ * \param col the number of columns in the padded tensor.
+ */
 template <typename DType>
 __global__ void _PadKernel(
     DType* __restrict__ dst, const DType* __restrict__ src,
     int64_t* __restrict__ parallel_indices,
-    int64_t* row, int64_t* col,
+    int64_t* num_rows, int64_t* num_cols,
     int64_t* offset,
-    int64_t stride) {
-  // TODO(zihao)
+    int64_t row, int64_t col) {
+  int64_t k = parallel_indices[blockIdx.z];
+  DType *dst_ptr = dst + k * row * col;
+  const DType *src_ptr = src + offset[k];
+  int64_t i = blockIdx.x * blockDim.x + threadIdx.x,
+          j = blockIdx.y * blockDim.y + threadIdx.y;
+  if (i < row && j < col) {
+    DType val = 0.;
+    if (i < num_rows[k] && j < num_cols[k]) {
+      val = src_ptr[i * num_cols[k] + j];
+    }
+    dst_ptr[i * col + j] = val;
+  }
 }
 
+/*
+ * \param dst the destination packed tensor.
+ * \param src the source padded tensor.
+ * \param parallel_indices of activated blocks.
+ * \param num_rows the numbers of rows in the packed tensor.
+ * \param num_cols the numbers of columns in the packed tensor.
+ * \param offset the offest of i-th block in the packed tensor.
+ * \param row the number of rows in the padded tensor.
+ * \param col the number of columns in the padded tensor.
+ */
 template <typename DType>
 __global__ void _UnpadKernel(
-    DType* __restrict__ C_dst, const DType* __restrict__ C_src,
+    DType* __restrict__ dst, const DType* __restrict__ src,
     int64_t* __restrict__ parallel_indices,
-    int64_t* n_arr, int64_t* p_arr,
-    int64_t* C_off,
-    int64_t C_stride) {
-  // TODO(zihao)
+    int64_t* num_rows, int64_t* num_cols,
+    int64_t* offset,
+    int64_t row, int64_t col) {
+  int64_t k = parallel_indices[blockIdx.z];
+  DType *dst_ptr = dst + k * row * col;
+  const DType *src_ptr = src + offset[k];
+  int64_t i = blockIdx.x * blockDim.x + threadIdx.x,
+          j = blockIdx.y * blockDim.y + threadIdx.y;
+  if (i < row && j < col) {
+    if (i < num_rows[k] && j < num_cols[k]) {
+      dst_ptr[i * num_cols[k] + j] = src_ptr[i * col + j];
+    }
+  }
 }
 
 /*
@@ -361,11 +401,10 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
     CUDA_CALL(cudaMemcpy(
         parallel_indices_gpu, parallel_indices.data(), sizeof(int64_t) * parallel_batch_size, cudaMemcpyHostToDevice));
     // pad
-    dim3 nblks(parallel_batch_size, (max_n + 31) / 32, (max_m + 31) / 32),
+    int row = transA ? max_m : max_n,
+        col = transA ? max_n : max_m;
+    dim3 nblks((row + 31) / 32, (col + 31) / 32, parallel_batch_size),
          nthrs(32, 32);
-    if (transA) {
-      std::swap(nblks.y, nblks.z);
-    }
     CUDA_KERNEL_CALL((_PadKernel<DType>),
         nblks, nthrs, 0, thr_entry->stream,
         A_padded, A_data,
@@ -373,12 +412,11 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
         transA ? m_data_gpu: n_data_gpu,
         transA ? n_data_gpu: m_data_gpu,
         A_off_gpu,
-        stride_a);
-    nblks.y = (max_m + 31) / 32;
-    nblks.z = (max_p + 31) / 32;
-    if (transB) {
-      std::swap(nblks.y, nblks.z);
-    }
+        row, col);
+    row = transB ? max_p : max_m;
+    col = transB ? max_m : max_p;
+    nblks.x = (row + 31) / 32;
+    nblks.y = (col + 31) / 32;
     CUDA_KERNEL_CALL((_PadKernel<DType>),
         nblks, nthrs, 0, thr_entry->stream,
         B_padded, B_data,
@@ -386,7 +424,7 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
         transB ? p_data_gpu: m_data_gpu,
         transB ? m_data_gpu: p_data_gpu,
         B_off_gpu,
-        stride_b);
+        row, col);
     // batched gemm
     DType alpha = 1., beta = 0.;
     int ldb = transB ? max_m: max_p,
@@ -405,15 +443,17 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
         parallel_batch_size
     ));
     // unpad
-    nblks.y = (max_n + 31) / 32;
-    nblks.z = (max_p + 31) / 32;
+    row = max_n;
+    col = max_p;
+    nblks.x = (row + 31) / 32;
+    nblks.y = (col + 31) / 32;
     CUDA_KERNEL_CALL((_UnpadKernel<DType>),
         nblks, nthrs, 0, thr_entry->stream,
         C_data, C_padded,
         parallel_indices_gpu,
         n_data_gpu, p_data_gpu,
         C_off_gpu,
-        stride_c);
+        row, col);
     // free allocated memory
     device->FreeWorkspace(ctx, ptr_0);
     device->FreeWorkspace(ctx, ptr_1);
