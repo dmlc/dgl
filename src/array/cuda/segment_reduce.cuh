@@ -258,13 +258,11 @@ XgemmBatched<half>(
 
 template <typename DType>
 __global__ void _PadKernel(
-    DType* __restrict__ A_dst, const DType* __restrict__ A_src,
-    DType* __restrict__ B_dst, const DType* __restrict__ B_src,
-    DType* __restrict__ C_dst, const DType* __restrict__ C_src,
+    DType* __restrict__ dst, const DType* __restrict__ src,
     int64_t* __restrict__ parallel_indices,
-    int64_t* n_arr, int64_t* m_arr, int64_t* p_arr,
-    int64_t* A_off, int64_t* B_off, int64_t* C_off,
-    int64_t A_stride, int64_t B_stride, int64_t C_stride) {
+    int64_t* row, int64_t* col,
+    int64_t* offset,
+    int64_t stride) {
   // TODO(zihao)
 }
 
@@ -363,17 +361,32 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
     CUDA_CALL(cudaMemcpy(
         parallel_indices_gpu, parallel_indices.data(), sizeof(int64_t) * parallel_batch_size, cudaMemcpyHostToDevice));
     // pad
-    const dim3 nblks(parallel_batch_size),
-               nthrs(1024);
+    dim3 nblks(parallel_batch_size, (max_n + 31) / 32, (max_m + 31) / 32),
+         nthrs(32, 32);
+    if (transA) {
+      std::swap(nblks.y, nblks.z);
+    }
     CUDA_KERNEL_CALL((_PadKernel<DType>),
         nblks, nthrs, 0, thr_entry->stream,
         A_padded, A_data,
-        B_padded, B_data,
-        C_padded, C_data,
         parallel_indices_gpu,
-        n_data_gpu, m_data_gpu, p_data_gpu,
-        A_off_gpu, B_off_gpu, C_off_gpu,
-        stride_a, stride_b, stride_c);
+        transA ? m_data_gpu: n_data_gpu,
+        transA ? n_data_gpu: m_data_gpu,
+        A_off_gpu,
+        stride_a);
+    nblks.y = (max_m + 31) / 32;
+    nblks.z = (max_p + 31) / 32;
+    if (transB) {
+      std::swap(nblks.y, nblks.z);
+    }
+    CUDA_KERNEL_CALL((_PadKernel<DType>),
+        nblks, nthrs, 0, thr_entry->stream,
+        B_padded, B_data,
+        parallel_indices_gpu,
+        transB ? p_data_gpu: m_data_gpu,
+        transB ? m_data_gpu: p_data_gpu,
+        B_off_gpu,
+        stride_b);
     // batched gemm
     DType alpha = 1., beta = 0.;
     int ldb = transB ? max_m: max_p,
@@ -392,6 +405,8 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
         parallel_batch_size
     ));
     // unpad
+    nblks.y = (max_n + 31) / 32;
+    nblks.z = (max_p + 31) / 32;
     CUDA_KERNEL_CALL((_UnpadKernel<DType>),
         nblks, nthrs, 0, thr_entry->stream,
         C_data, C_padded,
