@@ -38,6 +38,23 @@ The DGL's built-in QM9 dataset. Dataset summary:
 
 **Note: DimeNet++ is recommended to use over DimeNet.**
 
+##### Examples
+
+The following commands learn a neural network and predict on the test set.
+Training a DimeNet model on QM9 dataset.
+```bash
+python main.py --model-cnf config/dimenet.yaml
+```
+Training a DimeNet++ model on QM9 dataset.
+```bash
+python main.py --model-cnf config/dimenet_pp.yaml
+```
+For faster experimentation, you should first put the author's [pretrained](https://github.com/klicperajo/dimenet/tree/master/pretrained) folder here, which contains pre-trained TensorFlow models. You can convert a TensorFlow model to a PyTorch model by using the following commands.
+```
+python convert_tf_ckpt_to_pytorch.py --model-cnf config/dimenet_pp.yaml --convert-cnf config/convert.yaml
+```
+Then you can set `flag: True` in `dimenet_pp.yaml` and run the above script, DimeNet++ will use the pretrained weights to predict on the test set.
+
 ##### Configuration
 
 For more details, please see `config/dimenet.yaml` and `config/dimenet_pp.yaml`
@@ -84,23 +101,6 @@ interval          int   Time intervals for model evaluation.            Default 
 step_size         int   Period of learning rate decay.                  Default is 100
 gamma             float Factor of learning rate decay.                  Default is 0.3
 ```
-
-##### Examples
-
-The following commands learn a neural network and predict on the test set.
-Training a DimeNet model on QM9 dataset.
-```bash
-python main.py --model-cnf config/dimenet.yaml
-```
-Training a DimeNet++ model on QM9 dataset.
-```bash
-python main.py --model-cnf config/dimenet_pp.yaml
-```
-For faster experimentation, you should first put the author's `pretrained` folder here, and you can convert a TensorFlow model to PyTorch model by using the following commands.
-```
-python convert_tf_ckpt_to_pytorch.py --model-cnf config/dimenet_pp.yaml --convert-cnf config/convert.yaml
-```
-Then you can set `flag: True` in `dimenet_pp.yaml` and run the above script, DimeNet++ will use the pretrained weights to predict on the test set.
 
 ### Performance
 
