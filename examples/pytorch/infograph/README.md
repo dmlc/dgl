@@ -152,7 +152,7 @@ The hyperparameter setting in our implementation is identical to that reported i
 
 Here we only provide the results of 'mu', 'alpha', 'homo'.
 
-We notice that there's a big gap between the reported RMSE and that of our implementation. We also tried the authors' code and found that the gap still existed. This issue has been reported in https://github.com/fanyun-sun/InfoGraph/issues/8.
+
 
 |      Target       |   mu   | alpha  |  homo  |
 | :---------------: | :----: | :----: | :----: |
@@ -160,3 +160,5 @@ We notice that there's a big gap between the reported RMSE and that of our imple
 | The authors' code | 0.2411 | 0.5192 | 0.1560 |
 |        DGL        | 0.2355 | 0.5483 | 0.1581 |
 
+* The source of QM9 Dataset has changed so there's a gap between the MAE reported in the paper and that we reprodcued.
+* See this [issue](https://github.com/fanyun-sun/InfoGraph/issues/8) for authors' response. 
