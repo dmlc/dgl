@@ -107,7 +107,7 @@ gamma             float Factor of learning rate decay.                  Default 
 - Batch size is different
 - Linear learning rate warm-up is not used
 - Exponential learning rate decay is not used
-- Exponential moving average (EMA) is closed
+- Exponential moving average (EMA) is not used
 
 | Target | mu | alpha | homo | lumo | gap | r2 | zpve | U0 | U | H | G | Cv |
 | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
