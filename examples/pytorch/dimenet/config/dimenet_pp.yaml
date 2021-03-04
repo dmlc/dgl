@@ -16,8 +16,6 @@ model:
   num_dense_output: 3
   # ['mu', 'alpha', 'homo', 'lumo', 'gap', 'r2', 'zpve', 'U0', 'U', 'H', 'G', 'Cv']
   targets: ['mu']
-  # 'zeros' for mu, homo, lumo, gap, and zpve; 'GlorotOrthogonal' for alpha, r2, U0, U, H, G, and Cv
-  output_init: 'GlorotOrthogonal'
 
 train:
   num_train: 110000

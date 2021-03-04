@@ -117,7 +117,8 @@ def main(model_cnf):
     logger.info(f'Model params: {model_params}')
     logger.info(f'Train params: {train_params}')
 
-    if model_params['output_init'] == 'zeros':
+    # 'zeros' for mu, homo, lumo, and zpve; 'GlorotOrthogonal' for alpha, R2, U0, U, H, G, and Cv
+    if model_params['targets'] in ['mu', 'homo', 'lumo', 'gap', 'zpve']:
         model_params['output_init'] = nn.init.zeros_
     else:
         model_params['output_init'] = GlorotOrthogonal
