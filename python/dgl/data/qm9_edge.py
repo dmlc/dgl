@@ -36,16 +36,18 @@ class QM9EdgeDataset(DGLDataset):
     
     This dataset differs from :class:`~dgl.data.QM9Dataset` in the following points:
         1. It includes the bonds in a molecule in the edges of the corresponding graph while the edges in :class:`~dgl.data.QM9Dataset` are purely distance-based.
-        2. It provides edge features, and node features in addition to the atom's locations and atomic number.
+        2. It provides edge features, and node features in addition to the atoms' locations and atomic numbers.
         3. The number of regression targets is expanded from 13 to 19 (in :class:`~dgl.data.QM9Dataset`, it's 13).
 
-    Reference: `"MoleculeNet: A Benchmark for Molecular Machine Learning" <https://arxiv.org/abs/1703.00564>`_
-               Atom features come from `"Neural Message Passing for Quantum Chemistry" <https://arxiv.org/abs/1704.01212>`_
+    Reference:
+
+    - `"MoleculeNet: A Benchmark for Molecular Machine Learning" <https://arxiv.org/abs/1703.00564>`_
+    - `"Neural Message Passing for Quantum Chemistry" <https://arxiv.org/abs/1704.01212>`_
     
     Statistics:
 
-    - Number of graphs: 130,831
-    - Number of regression targets: 19
+    - Number of graphs: 130,831.
+    - Number of regression targets: 19.
     
     Node attributes:
     
@@ -98,7 +100,7 @@ class QM9EdgeDataset(DGLDataset):
     | B      | :math:`B`                        | Rotational constant                                                               | :math:`\textrm{GHz}`                        |
     +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
     | C      | :math:`C`                        | Rotational constant                                                               | :math:`\textrm{GHz}`                        |
-    +--------+----------------------------------+----------------------------------------------------------------------------------------------------------------------------------
+    +--------+----------------------------------+---------------------------------------------------------------------------------------------------------------------------------+
     
     Parameters
     ----------
@@ -191,12 +193,12 @@ class QM9EdgeDataset(DGLDataset):
 
             if not os.path.exists(f'{self.raw_url2}/uncharacterized.txt'):
                 file_path = download(self.raw_url2, self.raw_dir)
-                os.replace(os.path.join(self.raw_dir, '3195404'), os.path.join(self.raw_dir, 'uncharacterized.txt'))
+                os.replace(f'{self.raw_dir}/3195404', f'{self.raw_dir}/uncharacterized.txt')
     
     def process(self):
         if rdkit is None:
             print('loading downloaded files')
-            npz_path = os.path.join(self.raw_dir, "qm9_edge.npz")
+            npz_path = f'{self.raw_dir}/qm9_edge.npz'
         
             data_dict = np.load(npz_path, allow_pickle=True)
 
@@ -213,17 +215,17 @@ class QM9EdgeDataset(DGLDataset):
             self.N_cumsum = np.concatenate([[0], np.cumsum(self.N_node)])
             self.NE_cumsum = np.concatenate([[0], np.cumsum(self.N_edge)])
         else:
-            with open(os.path.join(self.raw_dir, "gdb9.sdf.csv"), 'r') as f:
+            with open(f'{self.raw_dir}/gdb9.sdf.csv', 'r') as f:
                 target = f.read().split('\n')[1:-1]
                 target = [[float(x) for x in line.split(',')[1:20]] for line in target]
                 target = F.tensor(target, dtype=F.data_type_dict['float32'])
                 target = F.cat([target[:, 3:], target[:, :3]], dim=-1)
                 target = (target * conversion.view(1, -1)).tolist()
 
-            with open(os.path.join(self.raw_dir, "uncharacterized.txt"), 'r') as f:
+            with open(f'{self.raw_dir}/uncharacterized.txt', 'r') as f:
                 skip = [int(x.split()[0]) - 1 for x in f.read().split('\n')[9:-2]]
 
-            suppl = Chem.SDMolSupplier(os.path.join(self.raw_dir, "gdb9.sdf"), removeHs=False, sanitize=False)    
+            suppl = Chem.SDMolSupplier(f'{self.raw_dir}/gdb9.sdf', removeHs=False, sanitize=False)
         
             n_node = []
             n_edge = []
@@ -322,11 +324,11 @@ class QM9EdgeDataset(DGLDataset):
             self.ne_cumsum = np.concatenate([[0], np.cumsum(self.n_edge)])
         
     def has_cache(self):
-        npz_path = os.path.join(self.raw_dir, "qm9_edge.npz")
+        npz_path = f'{self.raw_dir}/qm9_edge.npz'
         return os.path.exists(npz_path)
     
     def save(self):
-        np.savez_compressed(os.path.join(self.raw_dir, "qm9_edge.npz"), 
+        np.savez_compressed(f'{self.raw_dir}/qm9_edge.npz',
                             n_node=self.n_node,
                             n_edge=self.n_edge,
                             node_attr=self.node_attr,
@@ -337,7 +339,7 @@ class QM9EdgeDataset(DGLDataset):
                             targets=self.targets)
     def load(self):
     
-        npz_path = os.path.join(self.raw_dir, "qm9_edge.npz")
+        npz_path = f'{self.raw_dir}/qm9_edge.npz'
         data_dict = np.load(npz_path, allow_pickle=True)
 
         self.n_node = data_dict['n_node']
