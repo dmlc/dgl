@@ -24,7 +24,7 @@ parser.add_argument('--hidden2', '-h2', type=int, default=16, help='Number of un
 parser.add_argument('--datasrc', '-s', type=str, default='dgl',
                     help='Dataset download from dgl Dataset or website.')
 parser.add_argument('--dataset', '-d', type=str, default='pubmed', help='Dataset string.')
-parser.add_argument('--gpu_id', type=int, default=0, help='GPU id to use.')
+# parser.add_argument('--gpu_id', type=int, default=0, help='GPU id to use.')
 args = parser.parse_args()
 
 
@@ -81,32 +81,30 @@ def dgl_main():
     graph = dataset[0]
 
     # check device
-    device = torch.device("cuda:{}".format(args.gpu_id) if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda:{}".format(args.gpu_id) if torch.cuda.is_available() else "cpu")
 
     # Extract node features
-    feats = graph.ndata.pop('feat').to(device)
+    feats = graph.ndata.pop('feat')
     in_dim = feats.shape[-1]
 
-    graph = graph.to(device)
-
     # generate input
-    adj_orig = graph.adjacency_matrix().to_dense().to(device)
+    adj_orig = graph.adjacency_matrix().to_dense()
 
     # build test set with 10% positive links
     train_edge_idx, val_edges, val_edges_false, test_edges, test_edges_false = mask_test_edges_dgl(graph, adj_orig)
 
     # create train graph
-    train_edge_idx = torch.tensor(train_edge_idx).to(device)
+    train_edge_idx = torch.tensor(train_edge_idx)
     train_graph = dgl.edge_subgraph(graph, train_edge_idx, preserve_nodes=True)
-    train_graph = train_graph.to(device)
-    adj = train_graph.adjacency_matrix().to_dense().to(device)
+    train_graph = train_graph
+    adj = train_graph.adjacency_matrix().to_dense()
 
     # compute loss parameters
     weight_tensor, norm = compute_loss_para(adj)
 
     # create model
     vgae_model = model.VGAEModel(in_dim, args.hidden1, args.hidden2)
-    vgae_model = vgae_model.to(device)
+    vgae_model = vgae_model
 
     # create training component
     optimizer = torch.optim.Adam(vgae_model.parameters(), lr=args.learning_rate)
