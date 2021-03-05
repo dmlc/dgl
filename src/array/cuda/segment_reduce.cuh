@@ -270,11 +270,11 @@ template <typename DType>
 __global__ void _PadKernel(
     DType* __restrict__ dst, const DType* __restrict__ src,
     int64_t* __restrict__ parallel_indices,
-    int64_t* num_rows, int64_t* num_cols,
-    int64_t* offset,
+    int64_t* __restrict__ num_rows, int64_t* __restrict__ num_cols,
+    int64_t* __restrict__ offset,
     int64_t row, int64_t col) {
   int64_t k = parallel_indices[blockIdx.z];
-  DType *dst_ptr = dst + k * row * col;
+  DType *dst_ptr = dst + blockIdx.z * row * col;
   const DType *src_ptr = src + offset[k];
   int64_t i = blockIdx.x * blockDim.x + threadIdx.x,
           j = blockIdx.y * blockDim.y + threadIdx.y;
@@ -301,12 +301,12 @@ template <typename DType>
 __global__ void _UnpadKernel(
     DType* __restrict__ dst, const DType* __restrict__ src,
     int64_t* __restrict__ parallel_indices,
-    int64_t* num_rows, int64_t* num_cols,
-    int64_t* offset,
+    int64_t* __restrict__ num_rows, int64_t* __restrict__ num_cols,
+    int64_t* __restrict__ offset,
     int64_t row, int64_t col) {
   int64_t k = parallel_indices[blockIdx.z];
-  DType *dst_ptr = dst + k * row * col;
-  const DType *src_ptr = src + offset[k];
+  DType *dst_ptr = dst + offset[k];
+  const DType *src_ptr = src + blockIdx.z * row * col;
   int64_t i = blockIdx.x * blockDim.x + threadIdx.x,
           j = blockIdx.y * blockDim.y + threadIdx.y;
   if (i < row && j < col) {
@@ -314,6 +314,14 @@ __global__ void _UnpadKernel(
       dst_ptr[i * num_cols[k] + j] = src_ptr[i * col + j];
     }
   }
+}
+
+__global__ void _PrintKernel(
+    int64_t *ptr, int64_t len) {
+  for (int i = 0; i < len; ++i) {
+    printf("%lld ", ptr[i]);
+  }
+  printf("\n");
 }
 
 /*
@@ -336,43 +344,45 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
   const int64_t* n_data = n.Ptr<int64_t>();
   const int64_t* m_data = m.Ptr<int64_t>();
   const int64_t* p_data = p.Ptr<int64_t>();
-  int batch_size = n->shape[0];
+  int64_t batch_size = n->shape[0];
   auto device = runtime::DeviceAPI::Get(ctx);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   if (!thr_entry->cublas_handle)
     CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
   CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, thr_entry->stream));
-  int max_n = 0,
-      max_m = 0,
-      max_p = 0;
-  std::vector<int> parallel_indices;
-  std::vector<bool> mask{false};
-  std::vector<int> A_off, B_off, C_off;
+  int64_t max_n = 0,
+          max_m = 0,
+          max_p = 0;
+  std::vector<int64_t> parallel_indices;
+  std::vector<bool> mask(batch_size, false);
+  std::vector<int64_t> A_off(batch_size + 1, 0),
+                       B_off(batch_size + 1, 0),
+                       C_off(batch_size + 1, 0);
   // collect information
   for (int i = 0; i < batch_size; ++i) {
     int64_t ni = n_data[i],
             mi = m_data[i],
             pi = p_data[i];
-    A_off.push_back(ni * mi);
-    B_off.push_back(mi * pi);
-    C_off.push_back(ni * pi);
+    A_off[i + 1] = A_off[i] + ni * mi;
+    B_off[i + 1] = B_off[i] + mi * pi;
+    C_off[i + 1] = C_off[i] + ni * pi;
     if (ni > 128 || mi > 128 || pi > 128) {
       mask[i] = true;
     } else if (ni > 0 && mi > 0 && pi > 0) {
       parallel_indices.push_back(i);
-      max_n = std::max(int(ni), max_n);
-      max_m = std::max(int(mi), max_m);
-      max_p = std::max(int(pi), max_p);
+      max_n = std::max(ni, max_n);
+      max_m = std::max(mi, max_m);
+      max_p = std::max(pi, max_p);
     }
   } 
   // alignment to use TensorCore.
-  const int multiple_shp = 8;
+  const int64_t multiple_shp = 8;
   max_n = multiple_shp * ((max_n + multiple_shp - 1) / multiple_shp);
   max_m = multiple_shp * ((max_m + multiple_shp - 1) / multiple_shp);
   max_p = multiple_shp * ((max_p + multiple_shp - 1) / multiple_shp);
 
   // parallel with cublas batched gemm.
-  int parallel_batch_size = parallel_indices.size();
+  int64_t parallel_batch_size = parallel_indices.size();
   if (parallel_batch_size > 0) {
     int64_t stride_a = max_n * max_m,
             stride_b = max_m * max_p,
@@ -392,15 +402,14 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
             *C_off_gpu = ptr_1 + 5 * batch_size,
             *parallel_indices_gpu = ptr_1 + 6 * batch_size;
     // copy data from CPU to GPU;
-    CUDA_CALL(cudaMemcpy(n_data_gpu, n_data, sizeof(int64_t) * batch_size, cudaMemcpyHostToDevice));
-    CUDA_CALL(cudaMemcpy(m_data_gpu, m_data, sizeof(int64_t) * batch_size, cudaMemcpyHostToDevice));
-    CUDA_CALL(cudaMemcpy(p_data_gpu, p_data, sizeof(int64_t) * batch_size, cudaMemcpyHostToDevice));
-    CUDA_CALL(cudaMemcpy(A_off_gpu, A_off.data(), sizeof(int64_t) * batch_size, cudaMemcpyHostToDevice));
-    CUDA_CALL(cudaMemcpy(B_off_gpu, B_off.data(), sizeof(int64_t) * batch_size, cudaMemcpyHostToDevice));
-    CUDA_CALL(cudaMemcpy(C_off_gpu, C_off.data(), sizeof(int64_t) * batch_size, cudaMemcpyHostToDevice));
-    CUDA_CALL(cudaMemcpy(
-        parallel_indices_gpu, parallel_indices.data(), sizeof(int64_t) * parallel_batch_size, cudaMemcpyHostToDevice));
-    // pad
+    CUDA_CALL(cudaMemcpy(n_data_gpu, n_data, sizeof(int64_t) * batch_size, cudaMemcpyDefault));
+    CUDA_CALL(cudaMemcpy(m_data_gpu, m_data, sizeof(int64_t) * batch_size, cudaMemcpyDefault));
+    CUDA_CALL(cudaMemcpy(p_data_gpu, p_data, sizeof(int64_t) * batch_size, cudaMemcpyDefault));
+    CUDA_CALL(cudaMemcpy(A_off_gpu, A_off.data(), sizeof(int64_t) * batch_size, cudaMemcpyDefault));
+    CUDA_CALL(cudaMemcpy(B_off_gpu, B_off.data(), sizeof(int64_t) * batch_size, cudaMemcpyDefault));
+    CUDA_CALL(cudaMemcpy(C_off_gpu, C_off.data(), sizeof(int64_t) * batch_size, cudaMemcpyDefault));
+    CUDA_CALL(cudaMemcpy(parallel_indices_gpu, parallel_indices.data(),
+                         sizeof(int64_t) * parallel_batch_size, cudaMemcpyDefault));
     int row = transA ? max_m : max_n,
         col = transA ? max_n : max_m;
     dim3 nblks((row + 31) / 32, (col + 31) / 32, parallel_batch_size),
@@ -459,7 +468,7 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
     device->FreeWorkspace(ctx, ptr_1);
   }
 
-  // not parallel (or parallel w/ CUDA stream)
+  // not parallel (or parallelize w/ CUDA stream)
   for (int i = 0; i < batch_size; ++i) {
     int64_t ni = n_data[i],
             mi = m_data[i],
