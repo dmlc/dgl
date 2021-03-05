@@ -32,12 +32,12 @@ conversion = F.tensor([
 class QM9EdgeDataset(DGLDataset):
     r"""QM9Edge dataset for graph property prediction (regression)
     This dataset consists of 130,831 molecules with 19 regression targets.
-    Nodes correspond to atoms and edges correspond to bond.
+    Nodes correspond to atoms and edges correspond to bonds.
     
-    This dataset differs from :class:~dgl.data.QM9Dataset in the following points:
-        1. It includes the bonds in a molecule in the edges of the corresponding graph while the edges in :class:~dgl.data.QM9Dataset are purely distance-based. 
-        2. It provides richer node features and edge features.
-        3. The number of regression targets is expanded from 13 to 19 (in :class:~dgl.data.QM9Dataset, it's 13).
+    This dataset differs from :class:`~dgl.data.QM9Dataset` in the following points:
+        1. It includes the bonds in a molecule in the edges of the corresponding graph while the edges in :class:`~dgl.data.QM9Dataset` are purely distance-based.
+        2. It provides edge features, and node features in addition to the atom's locations and atomic number.
+        3. The number of regression targets is expanded from 13 to 19 (in :class:`~dgl.data.QM9Dataset`, it's 13).
 
     Reference: `"MoleculeNet: A Benchmark for Molecular Machine Learning" <https://arxiv.org/abs/1703.00564>`_
                Atom features come from `"Neural Message Passing for Quantum Chemistry" <https://arxiv.org/abs/1704.01212>`_
@@ -156,12 +156,12 @@ class QM9EdgeDataset(DGLDataset):
                  raw_dir=None, 
                  force_reload=False, 
                  verbose=True):
-        
+         
         if label_keys == None:
-            self.targets = None
+            self.label_keys = None
             self.num_labels = 19
         else:
-            self.targets = [self.map_dict[i] for i in label_keys]
+            self.label_keys = [self.map_dict[i] for i in label_keys]
             self.num_labels = len(label_keys)
             
                 
@@ -225,16 +225,16 @@ class QM9EdgeDataset(DGLDataset):
 
             suppl = Chem.SDMolSupplier(os.path.join(self.raw_dir, "gdb9.sdf"), removeHs=False, sanitize=False)    
         
-            N_node = []
-            N_edge = []
-            Node_pos = []
-            Node_attr = []
+            n_node = []
+            n_edge = []
+            node_pos = []
+            node_attr = []
 
             src = []
             dst = []
             
-            Edge_attr = []
-            Target = []
+            edge_attr = []
+            targets = []
             
             print('Loading graphs:')
             for i, mol in enumerate(suppl):
@@ -252,7 +252,6 @@ class QM9EdgeDataset(DGLDataset):
                 sp = []
                 sp2 = []
                 sp3 = []
-                num_hs = []
                 
                 for atom in mol.GetAtoms():
                     type_idx.append(self.types[atom.GetSymbol()])
@@ -293,34 +292,34 @@ class QM9EdgeDataset(DGLDataset):
                 x2 = np.array([atomic_number, aromatic, sp, sp2, sp3, num_hs]).transpose()
                 x = np.concatenate((x1,x2), axis = 1)
                 
-                N_node.append(N)
-                N_edge.append(mol.GetNumBonds() * 2)
+                n_node.append(N)
+                n_edge.append(mol.GetNumBonds() * 2)
 
-                Node_pos.append(np.array(pos))
-                Node_attr.append(x)
+                node_pos.append(np.array(pos))
+                node_attr.append(x)
                 
                 src += list(row)
                 dst += list(col)
-                Edge_attr.append(edge_attr)   
-                Target.append(np.array(target[i]).reshape([1,19]))
+                edge_attr.append(edge_attr)   
+                targets.append(np.array(target[i]).reshape([1,19]))
        
-            Node_attr = np.concatenate(Node_attr, axis = 0)
-            Node_pos = np.concatenate(Node_pos, axis = 0)
-            Edge_attr = np.concatenate(Edge_attr, axis = 0)
-            Target = np.concatenate(Target, axis = 0)
+            node_attr = np.concatenate(node_attr, axis = 0)
+            node_pos = np.concatenate(node_pos, axis = 0)
+            edge_attr = np.concatenate(edge_attr, axis = 0)
+            targets = np.concatenate(targets, axis = 0)
             
-            self.N_node = N_node
-            self.N_edge = N_edge
-            self.Node_attr = Node_attr
-            self.Node_pos = Node_pos
-            self.Edge_attr = Edge_attr
-            self.Target = Target
+            self.n_node = n_node
+            self.n_edge = n_edge
+            self.node_attr = node_attr
+            self.node_pos = node_pos
+            self.edge_attr = edge_attr
+            self.targets = targets
             
             self.src = src
             self.dst = dst
 
-            self.N_cumsum = np.concatenate([[0], np.cumsum(self.N_node)])
-            self.NE_cumsum = np.concatenate([[0], np.cumsum(self.N_edge)])
+            self.n_cumsum = np.concatenate([[0], np.cumsum(self.n_node)])
+            self.ne_cumsum = np.concatenate([[0], np.cumsum(self.n_edge)])
         
     def has_cache(self):
         npz_path = os.path.join(self.raw_dir, "qm9_edge.npz")
@@ -328,31 +327,31 @@ class QM9EdgeDataset(DGLDataset):
     
     def save(self):
         np.savez_compressed(os.path.join(self.raw_dir, "qm9_edge.npz"), 
-                            N_node=self.N_node,
-                            N_edge=self.N_edge,
-                            Node_attr=self.Node_attr,
-                            Node_pos=self.Node_pos,
-                            Edge_attr=self.Edge_attr,
+                            n_node=self.n_node,
+                            n_edge=self.n_edge,
+                            node_attr=self.node_attr,
+                            node_pos=self.node_pos,
+                            edge_attr=self.edge_attr,
                             src=self.src,
                             dst=self.dst,  
-                            Target=self.Target)
+                            targets=self.targets)
     def load(self):
     
         npz_path = os.path.join(self.raw_dir, "qm9_edge.npz")
         data_dict = np.load(npz_path, allow_pickle=True)
 
-        self.N_node = data_dict['N_node']
-        self.N_edge = data_dict['N_edge']
-        self.Node_attr = data_dict['Node_attr']
-        self.Node_pos = data_dict['Node_pos']
-        self.Edge_attr = data_dict['Edge_attr']
-        self.Target = data_dict['Target']
+        self.n_node = data_dict['n_node']
+        self.n_edge = data_dict['n_edge']
+        self.node_attr = data_dict['node_attr']
+        self.node_pos = data_dict['node_pos']
+        self.edge_attr = data_dict['edge_attr']
+        self.targets = data_dict['targets']
         
         self.src = data_dict['src']
         self.dst = data_dict['dst']
         
-        self.N_cumsum = np.concatenate([[0], np.cumsum(self.N_node)])
-        self.NE_cumsum = np.concatenate([[0], np.cumsum(self.N_edge)])
+        self.n_cumsum = np.concatenate([[0], np.cumsum(self.n_node)])
+        self.ne_cumsum = np.concatenate([[0], np.cumsum(self.n_edge)])
     
     def __getitem__(self, idx):
         r""" Get graph and label by index 
@@ -375,18 +374,18 @@ class QM9EdgeDataset(DGLDataset):
             Property values of molecular graphs
         """
         
-        pos = self.Node_pos[self.N_cumsum[idx]:self.N_cumsum[idx+1]]
-        src = self.src[self.NE_cumsum[idx]:self.NE_cumsum[idx+1]]
-        dst = self.dst[self.NE_cumsum[idx]:self.NE_cumsum[idx+1]]
+        pos = self.node_pos[self.n_cumsum[idx]:self.n_cumsum[idx+1]]
+        src = self.src[self.ne_cumsum[idx]:self.ne_cumsum[idx+1]]
+        dst = self.dst[self.ne_cumsum[idx]:self.ne_cumsum[idx+1]]
 
         g = dgl_graph((src, dst))
           
         g.ndata['pos'] = F.tensor(pos, dtype=F.data_type_dict['float32'])
-        g.ndata['attr'] = F.tensor(self.Node_attr[self.N_cumsum[idx]:self.N_cumsum[idx+1]], dtype=F.data_type_dict['float32'])
-        g.edata['edge_attr'] = F.tensor(self.Edge_attr[self.NE_cumsum[idx]:self.NE_cumsum[idx+1]], dtype=F.data_type_dict['float32'])
+        g.ndata['attr'] = F.tensor(self.node_attr[self.n_cumsum[idx]:self.n_cumsum[idx+1]], dtype=F.data_type_dict['float32'])
+        g.edata['edge_attr'] = F.tensor(self.edge_attr[self.ne_cumsum[idx]:self.ne_cumsum[idx+1]], dtype=F.data_type_dict['float32'])
         
         
-        label = F.tensor(self.Target[idx][self.targets], dtype=F.data_type_dict['float32'])
+        label = F.tensor(self.targets[idx][self.label_keys], dtype=F.data_type_dict['float32'])
         
         return g, label
 
@@ -397,7 +396,7 @@ class QM9EdgeDataset(DGLDataset):
         -------
         int
         """
-        return self.N_node.shape[0]
+        return self.n_node.shape[0]
 
 
 QM9Edge = QM9EdgeDataset
