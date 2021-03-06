@@ -4,7 +4,7 @@
  * \brief Array sort GPU implementation
  */
 #include <dgl/array.h>
-// #include <cub/cub.cuh>
+#include <cub/cub.cuh>
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
 
@@ -15,8 +15,6 @@ namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
 std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits) {
-
-/*!
   const auto& ctx = array->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
   const int64_t nitems = array->shape[0];
@@ -46,8 +44,6 @@ std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits) {
   device->FreeWorkspace(ctx, workspace);
 
   return std::make_pair(sorted_array, sorted_idx);
-  */
-  return std::make_pair(NDArray(), NDArray());
 }
 
 template std::pair<IdArray, IdArray> Sort<kDLGPU, int32_t>(IdArray, int num_bits);

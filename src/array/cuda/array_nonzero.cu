@@ -3,10 +3,10 @@
  * \file array/cpu/array_nonzero.cc
  * \brief Array nonzero CPU implementation
  */
-// #include <thrust/iterator/counting_iterator.h>
-// #include <thrust/copy.h>
-// #include <thrust/functional.h>
-// #include <thrust/device_vector.h>
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/copy.h>
+#include <thrust/functional.h>
+#include <thrust/device_vector.h>
 #include <dgl/array.h>
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
@@ -25,7 +25,6 @@ struct IsNonZero {
 
 template <DLDeviceType XPU, typename IdType>
 IdArray NonZero(IdArray array) {
-/*!
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const int64_t len = array->shape[0];
   IdArray ret = NewIdArray(len, array->ctx, 64);
@@ -45,8 +44,6 @@ IdArray NonZero(IdArray array) {
                                      IsNonZero<IdType>());
   const int64_t num_nonzeros = indices_end - out_data;
   return ret.CreateView({num_nonzeros}, ret->dtype, 0);
-  */
-  return NDArray();
 }
 
 template IdArray NonZero<kDLGPU, int32_t>(IdArray);
