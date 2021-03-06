@@ -15,8 +15,7 @@ namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
 std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits) {
-
-/*!
+  /*!
   const auto& ctx = array->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
   const int64_t nitems = array->shape[0];

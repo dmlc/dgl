@@ -18,6 +18,7 @@
 // TODO(BarclayII): currently ToBlock depend on IdHashMap<IdType> implementation which
 // only works on CPU.  Should fix later to make it device agnostic.
 #include "../../array/cpu/array_utils.h"
+#include "dlpack/dlpack.h"
 
 namespace dgl {
 
@@ -141,7 +142,7 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBlock")
 
     ATEN_XPU_SWITCH_CUDA(graph_ref->Context().device_type, XPU, "ToBlock", {
       ATEN_ID_TYPE_SWITCH(graph_ref->DataType(), IdType, {
-      std::tie(new_graph, lhs_nodes, induced_edges) = ToBlock<XPU, IdType>(
+      std::tie(new_graph, lhs_nodes, induced_edges) = ToBlock<kDLCPU, IdType>(
           graph_ref.sptr(), rhs_nodes, include_rhs_in_lhs);
       });
     });

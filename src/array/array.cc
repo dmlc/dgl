@@ -10,9 +10,11 @@
 #include <dgl/runtime/shared_mem.h>
 #include <dgl/runtime/device_api.h>
 #include <sstream>
+#include <utility>
 #include "../c_api_common.h"
 #include "./array_op.h"
 #include "./arith.h"
+#include "dlpack/dlpack.h"
 
 using namespace dgl::runtime;
 
@@ -292,12 +294,16 @@ std::pair<IdArray, IdArray> Sort(IdArray array, const int num_bits) {
     return std::make_pair(array, idx);
   }
   std::pair<IdArray, IdArray> ret;
-  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "Sort", {
-    ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
-      ret = impl::Sort<XPU, IdType>(array, num_bits);
+  DLContext ctx = {kDLCPU, 0};
+  auto cpu_nd = array.CopyTo(ctx);
+  ATEN_XPU_SWITCH_CUDA(cpu_nd->ctx.device_type, XPU, "Sort", {
+    ATEN_ID_TYPE_SWITCH(cpu_nd->dtype, IdType, {
+      ret = impl::Sort<XPU, IdType>(cpu_nd, num_bits);
     });
   });
-  return ret;
+  auto ret_nd_1 = ret.first.CopyTo(array->ctx);
+  auto ret_nd_2 = ret.second.CopyTo(array->ctx);
+  return std::make_pair(ret_nd_1, ret_nd_2);
 }
 
 std::string ToDebugString(NDArray array) {
