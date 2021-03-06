@@ -52,6 +52,7 @@ if(USE_CUDA)
     cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust")
     cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cub")
   endif()
+  add_definitions(-DCUB_CPP_DIALECT=2003)
 endif(USE_CUDA)
 
 # initial variables
