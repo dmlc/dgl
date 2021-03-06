@@ -119,7 +119,7 @@ __global__ void ArgSpMMCooKernel(
 }
 
 /*!
- * \brief CUDA kernel of g-SpMM on Coo format.
+ * \brief CUDA kernel of g-SpMM on Csr format.
  * \note it uses node parallel strategy, different threadblocks (on y-axis)
  *       is responsible for the computation on different destination nodes.
  *       Threadblocks on the x-axis are responsible for the computation on
