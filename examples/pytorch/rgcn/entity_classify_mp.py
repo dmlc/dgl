@@ -18,6 +18,7 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 import dgl
 from dgl import DGLGraph
+from dgl.cuda import nccl
 from functools import partial
 
 from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
@@ -196,7 +197,7 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
     return eval_logits, eval_seeds
 
 @thread_wrapped_func
-def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
+def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=None):
     dev_id = devices[proc_id] if devices[proc_id] != 'cpu' else -1
     g, node_feats, num_of_ntype, num_classes, num_rels, target_idx, \
         train_idx, val_idx, test_idx, labels = dataset
@@ -245,6 +246,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
                                           init_method=dist_init_method,
                                           world_size=world_size,
                                           rank=dev_id)
+
+    nccl_comm = nccl.Communicator(n_gpus, proc_id, nccl_id)
 
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
@@ -534,6 +537,10 @@ def main(args, devices):
     train_idx.share_memory_()
     val_idx.share_memory_()
     test_idx.share_memory_()
+
+    # get nccl unique id before spawning processes
+    nccl_id = nccl.UniqueId()
+
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
     g.create_formats_()
@@ -542,12 +549,12 @@ def main(args, devices):
     n_cpus = mp.cpu_count()
     # cpu
     if devices[0] == -1:
-        run(0, 0, n_cpus, args, ['cpu'],
+        run(0, 0, n_cpus, args, ['cpu'], nccl_id,
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
              train_idx, val_idx, test_idx, labels), None, None)
     # gpu
     elif n_gpus == 1:
-        run(0, n_gpus, n_cpus, args, devices,
+        run(0, n_gpus, n_cpus, args, devices, nccl_id,
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
             train_idx, val_idx, test_idx, labels), None, None)
     # multi gpu

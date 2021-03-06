@@ -55,12 +55,12 @@ ncclComm_t NCCLCommunicator::Get()
 
 /* CAPI **********************************************************************/
 
-DGL_REGISTER_GLOBAL("cuda._CAPI_NCCLGetUniqueId")
+DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLGetUniqueId")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     *rv = NCCLUniqueIdRef(std::make_shared<NCCLUniqueId>());
 });
 
-DGL_REGISTER_GLOBAL("cuda._CAPI_NCCLCreateComm")
+DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLCreateComm")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const int size = args[0];
     const int rank = args[1];
