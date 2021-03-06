@@ -4,7 +4,7 @@
  * \brief Sort CSR index
  */
 #include <dgl/array.h>
-#include <cub/cub.cuh>
+// #include <cub/cub.cuh>
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
 
@@ -127,6 +127,7 @@ void CSRSort_<kDLGPU, int64_t>(CSRMatrix* csr) {
   int64_t* value_out = new_data.Ptr<int64_t>();
 
   // Allocate workspace
+  /*!
   size_t workspace_size = 0;
   cub::DeviceSegmentedRadixSort::SortPairs(nullptr, workspace_size,
       key_in, key_out, value_in, value_out,
@@ -137,13 +138,14 @@ void CSRSort_<kDLGPU, int64_t>(CSRMatrix* csr) {
   cub::DeviceSegmentedRadixSort::SortPairs(workspace, workspace_size,
       key_in, key_out, value_in, value_out,
       nnz, csr->num_rows, offsets, offsets + 1);
+  */
 
   csr->sorted = true;
   csr->indices = new_indices;
   csr->data = new_data;
 
   // free resources
-  device->FreeWorkspace(ctx, workspace);
+  // device->FreeWorkspace(ctx, workspace);
 }
 
 template void CSRSort_<kDLGPU, int32_t>(CSRMatrix* csr);
