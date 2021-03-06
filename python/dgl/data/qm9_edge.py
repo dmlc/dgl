@@ -11,13 +11,14 @@ from .. import backend as F
 
 class QM9EdgeDataset(DGLDataset):
     r"""QM9Edge dataset for graph property prediction (regression)
+
     This dataset consists of 130,831 molecules with 19 regression targets.
     Nodes correspond to atoms and edges correspond to bonds.
     
-    This dataset differs from :class:`~dgl.data.QM9Dataset` in the following points:
+    This dataset differs from :class:`~dgl.data.QM9Dataset` in the following aspects:
         1. It includes the bonds in a molecule in the edges of the corresponding graph while the edges in :class:`~dgl.data.QM9Dataset` are purely distance-based.
-        2. It provides edge features, and node features in addition to the atoms' locations and atomic numbers.
-        3. The number of regression targets is expanded from 13 to 19 (in :class:`~dgl.data.QM9Dataset`, it's 13).
+        2. It provides edge features, and node features in addition to the atoms' coordinates and atomic numbers.
+        3. It provides another 7 regression tasks(from 12 to 19).
 
     This class is built based on a preprocessed dataset version, and we provide the preprocessing datails `here <https://gist.github.com/hengruizhang98/a2da30213b2356fff18b25385c9d3cd2>`_
     

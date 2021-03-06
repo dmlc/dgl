@@ -15,6 +15,11 @@ class QM9Dataset(DGLDataset):
     This dataset consists of 13,0831 molecules with 12 regression targets.
     Node means atom and edge means bond.
 
+    This dataset differers from :class:`~dgl.data.QM9EdgeDataset` in the following aspects:
+        1. Edges in this dataset are purely distance-based
+        2. It only provide the atoms' coordinates and atomic numvers as node attributes. 
+        3. It only provide 12 regression targets.
+
     Reference: `"Quantum-Machine.org" <http://quantum-machine.org/datasets/>`_,
                `"Directional Message Passing for Molecular Graphs" <https://arxiv.org/abs/2003.03123>`_
     
