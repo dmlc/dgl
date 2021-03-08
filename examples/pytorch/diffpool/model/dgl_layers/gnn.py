@@ -144,7 +144,7 @@ class DiffPoolBatchedGraphLayer(nn.Module):
         device = feat.device
         assign_tensor = self.pool_gc(g, h)  # size = (sum_N, N_a), N_a is num of nodes in pooled graph.
         assign_tensor = F.softmax(assign_tensor, dim=1)
-        assign_tensor = torch.split(assign_tensor, g.batch_num_nodes())
+        assign_tensor = torch.split(assign_tensor, g.batch_num_nodes().tolist())
         assign_tensor = torch.block_diag(*assign_tensor)  # size = (sum_N, batch_size * N_a)
 
         h = torch.matmul(torch.t(assign_tensor), feat)
