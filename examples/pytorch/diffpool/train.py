@@ -148,8 +148,7 @@ def graph_classify_task(prog_args):
 
     # calculate assignment dimension: pool_ratio * largest graph's maximum
     # number of nodes  in the dataset
-    assign_dim = int(max_num_node * prog_args.pool_ratio) * \
-        prog_args.batch_size
+    assign_dim = int(max_num_node * prog_args.pool_ratio)
     print("++++++++++MODEL STATISTICS++++++++")
     print("model hidden dim is", hidden_dim)
     print("model embedding dim for graph instance embedding", embedding_dim)
