@@ -98,6 +98,7 @@ the following distributed components:
 
 * :ref:`guide-distributed-preprocessing`
 * :ref:`guide-distributed-apis`
+* :ref:`guide-distributed-hetero`
 * :ref:`guide-distributed-tools`
 
 .. toctree::
@@ -107,4 +108,5 @@ the following distributed components:
 
     distributed-preprocessing
     distributed-apis
+    distributed-hetero
     distributed-tools

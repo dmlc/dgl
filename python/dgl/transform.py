@@ -9,6 +9,7 @@ from ._ffi.function import _init_api
 from .base import dgl_warning, DGLError
 from . import convert
 from .heterograph import DGLHeteroGraph, DGLBlock
+from .frame import Frame
 from . import ndarray as nd
 from . import backend as F
 from . import utils, batch
@@ -1667,35 +1668,35 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     """Convert a graph into a bipartite-structured *block* for message passing.
 
     A block is a graph consisting of two sets of nodes: the
-    *input* nodes and *output* nodes.  The input and output nodes can have multiple
-    node types.  All the edges connect from input nodes to output nodes.
+    *source* nodes and *destination* nodes.  The source and destination nodes can have multiple
+    node types.  All the edges connect from source nodes to destination nodes.
 
-    Specifically, the input nodes and output nodes will have the same node types as the
+    Specifically, the source nodes and destination nodes will have the same node types as the
     ones in the original graph.  DGL maps each edge ``(u, v)`` with edge type
     ``(utype, etype, vtype)`` in the original graph to the edge with type
-    ``etype`` connecting from node ID ``u`` of type ``utype`` in the input side to node
-    ID ``v`` of type ``vtype`` in the output side.
+    ``etype`` connecting from node ID ``u`` of type ``utype`` in the source side to node
+    ID ``v`` of type ``vtype`` in the destination side.
 
-    For blocks returned by :func:`to_block`, the output nodes of the block will only
-    contain the nodes that have at least one inbound edge of any type.  The input nodes
-    of the block will only contain the nodes that appear in the output nodes, as well
-    as the nodes that have at least one outbound edge connecting to one of the output nodes.
+    For blocks returned by :func:`to_block`, the destination nodes of the block will only
+    contain the nodes that have at least one inbound edge of any type.  The source nodes
+    of the block will only contain the nodes that appear in the destination nodes, as well
+    as the nodes that have at least one outbound edge connecting to one of the destination nodes.
 
-    If the :attr:`dst_nodes` argument is not None, it specifies the output nodes instead.
+    The destination nodes are specified by the :attr:`dst_nodes` argument if it is not None.
 
     Parameters
     ----------
     graph : DGLGraph
         The graph.
     dst_nodes : Tensor or dict[str, Tensor], optional
-        The list of output nodes.
+        The list of destination nodes.
 
         If a tensor is given, the graph must have only one node type.
 
         If given, it must be a superset of all the nodes that have at least one inbound
         edge.  An error will be raised otherwise.
     include_dst_in_src : bool
-        If False, do not include output nodes in input nodes.
+        If False, do not include destination nodes in source nodes.
 
         (Default: True)
 
@@ -1733,13 +1734,13 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     >>> g = dgl.graph(([1, 2], [2, 3]))
     >>> block = dgl.to_block(g, torch.LongTensor([3, 2]))
 
-    The output nodes would be exactly the same as the ones given: [3, 2].
+    The destination nodes would be exactly the same as the ones given: [3, 2].
 
     >>> induced_dst = block.dstdata[dgl.NID]
     >>> induced_dst
     tensor([3, 2])
 
-    The first few input nodes would also be exactly the same as
+    The first few source nodes would also be exactly the same as
     the ones given.  The rest of the nodes are the ones necessary for message passing
     into nodes 3, 2.  This means that the node 1 would be included.
 
@@ -1748,7 +1749,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     tensor([3, 2, 1])
 
     You can notice that the first two nodes are identical to the given nodes as well as
-    the output nodes.
+    the destination nodes.
 
     The induced edges can also be obtained by the following:
 
@@ -1763,20 +1764,20 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     >>> induced_src[src], induced_dst[dst]
     (tensor([2, 1]), tensor([3, 2]))
 
-    The output nodes specified must be a superset of the nodes that have edges connecting
-    to them.  For example, the following will raise an error since the output nodes
+    The destination nodes specified must be a superset of the nodes that have edges connecting
+    to them.  For example, the following will raise an error since the destination nodes
     does not contain node 3, which has an edge connecting to it.
 
     >>> g = dgl.graph(([1, 2], [2, 3]))
     >>> dgl.to_block(g, torch.LongTensor([2]))     # error
 
     Converting a heterogeneous graph to a block is similar, except that when specifying
-    the output nodes, you have to give a dict:
+    the destination nodes, you have to give a dict:
 
     >>> g = dgl.heterograph({('A', '_E', 'B'): ([1, 2], [2, 3])})
 
-    If you don't specify any node of type A on the output side, the node type ``A``
-    in the block would have zero nodes on the output side.
+    If you don't specify any node of type A on the destination side, the node type ``A``
+    in the block would have zero nodes on the destination side.
 
     >>> block = dgl.to_block(g, {'B': torch.LongTensor([3, 2])})
     >>> block.number_of_dst_nodes('A')
@@ -1786,12 +1787,12 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     >>> block.dstnodes['B'].data[dgl.NID]
     tensor([3, 2])
 
-    The input side would contain all the nodes on the output side:
+    The source side would contain all the nodes on the destination side:
 
     >>> block.srcnodes['B'].data[dgl.NID]
     tensor([3, 2])
 
-    As well as all the nodes that have connections to the nodes on the output side:
+    As well as all the nodes that have connections to the nodes on the destination side:
 
     >>> block.srcnodes['A'].data[dgl.NID]
     tensor([2, 1])
@@ -1841,11 +1842,63 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
 
     return new_graph
 
+def _coalesce_edge_frame(g, edge_maps, counts, aggregator):
+    r"""Coalesce edge features of duplicate edges via given aggregator in g.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+    edge_maps : List[Tensor]
+        The edge mapping corresponding to each edge type in g.
+    counts : List[Tensor]
+        The number of duplicated edges from the original graph for each edge type.
+    aggregator : str
+        Indicates how to coalesce edge features, could be ``arbitrary``, ``sum``
+        or ``mean``.
+
+    Returns
+    -------
+    List[Frame]
+        The frames corresponding to each edge type.
+    """
+    if aggregator == 'arbitrary':
+        eids = []
+        for i in range(len(g.canonical_etypes)):
+            feat_idx = F.asnumpy(edge_maps[i])
+            _, indices = np.unique(feat_idx, return_index=True)
+            eids.append(F.zerocopy_from_numpy(indices))
+
+        edge_frames = utils.extract_edge_subframes(g, eids)
+    elif aggregator in ['sum', 'mean']:
+        edge_frames = []
+        for i in range(len(g.canonical_etypes)):
+            feat_idx = edge_maps[i]
+            _, indices = np.unique(F.asnumpy(feat_idx), return_index=True)
+            _num_rows = len(indices)
+            _data = {}
+            for key, col in g._edge_frames[i]._columns.items():
+                data = col.data
+                new_data = F.scatter_add(data, feat_idx, _num_rows)
+                if aggregator == 'mean':
+                    norm = F.astype(counts[i], F.dtype(data))
+                    norm = F.reshape(norm, (F.shape(norm)[0],) + (1,) * (F.ndim(data) - 1))
+                    new_data /= norm
+                _data[key] = new_data
+
+            newf = Frame(data=_data, num_rows=_num_rows)
+            edge_frames.append(newf)
+    else:
+        raise DGLError("Aggregator {} not regonized, cannot coalesce edge feature in the "
+                       "specified way".format(aggregator))
+    return edge_frames
+
 def to_simple(g,
               return_counts='count',
               writeback_mapping=False,
               copy_ndata=True,
-              copy_edata=False):
+              copy_edata=False,
+              aggregator='arbitrary'):
     r"""Convert a graph to a simple graph without parallel edges and return.
 
     For a heterogeneous graph with multiple edge types, DGL treats edges with the same
@@ -1886,12 +1939,19 @@ def to_simple(g,
     copy_edata: bool, optional
         If True, the edge features of the simple graph are copied
         from the original graph. If there exists duplicate edges between
-        two nodes (u, v), the feature of the edge is randomly selected
-        from one of the duplicate edges.
+        two nodes (u, v), the feature of the edge is the aggregation
+        of edge feature of duplicate edges.
 
         If False, the simple graph will not have any edge features.
 
         (Default: False)
+    aggregator: str, optional
+        Indicate how to coalesce edge feature of duplicate edges.
+        If ``arbitrary``, select one of the duplicate edges' feature.
+        If ``sum``, compute the summation of duplicate edges' feature.
+        If ``mean``, compute the average of duplicate edges' feature.
+
+        (Default: ``arbitrary``)
 
     Returns
     -------
@@ -1991,14 +2051,8 @@ def to_simple(g,
         node_frames = utils.extract_node_subframes(g, None)
         utils.set_new_frames(simple_graph, node_frames=node_frames)
     if copy_edata:
-        eids = []
-        for i in range(len(g.canonical_etypes)):
-            feat_idx = F.asnumpy(edge_maps[i])
-            _, indices = np.unique(feat_idx, return_index=True)
-            eids.append(F.zerocopy_from_numpy(indices))
-
-        edge_frames = utils.extract_edge_subframes(g, eids)
-        utils.set_new_frames(simple_graph, edge_frames=edge_frames)
+        new_edge_frames = _coalesce_edge_frame(g, edge_maps, counts, aggregator)
+        utils.set_new_frames(simple_graph, edge_frames=new_edge_frames)
 
     if return_counts is not None:
         for count, canonical_etype in zip(counts, g.canonical_etypes):

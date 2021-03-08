@@ -13,6 +13,7 @@ The folder contains example implementations of selected research papers related 
 | [Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges](#mwe) | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
 | [SIGN: Scalable Inception Graph Neural Networks](#sign)      | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
 | [Strategies for Pre-training Graph Neural Networks](#prestrategy) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [Graph Neural Networks with convolutional ARMA filters](#arma) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Predict then Propagate: Graph Neural Networks meet Personalized PageRank](#appnp) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Cluster-GCN: An Efficient Algorithm for Training Deep and Large Graph Convolutional Networks](#clustergcn) | :heavy_check_mark:  |                                  |                           | :heavy_check_mark: | :heavy_check_mark: |
 | [Deep Graph Infomax](#dgi)                                   | :heavy_check_mark:  |                                  |                           |                    |                    |
@@ -78,7 +79,8 @@ The folder contains example implementations of selected research papers related 
 | [Dynamic Graph CNN for Learning on Point Clouds](#dgcnnpoint) |  |                                  |                           |                    |                    |
 | [Supervised Community Detection with Line Graph Neural Networks](#lgnn) |  |                                  |                           |                    |                    |
 | [Text Generation from Knowledge Graphs with Graph Transformers](#graphwriter) |  |                                  |                           |                    |                    |
-
+|  [Link Prediction Based on Graph Neural Networks](#seal) | | :heavy_check_mark: | | :heavy_check_mark: | :heavy_check_mark: |
+| [Variational Graph Auto-Encoders](#vgae) |  | :heavy_check_mark: | | | |
 
 ## 2020
 
@@ -115,6 +117,10 @@ The folder contains example implementations of selected research papers related 
     - Tags: over-smoothing, node classification
 
 ## 2019
+
+- <a name="arma"></a>  Bianchi et al. Graph Neural Networks with Convolutional ARMA Filters. [Paper link](https://arxiv.org/abs/1901.01343).
+    - Example code: [PyTorch](../examples/pytorch/arma)
+    - Tags: node classification
 
 - <a name="appnp"></a> Klicpera et al. Predict then Propagate: Graph Neural Networks meet Personalized PageRank. [Paper link](https://arxiv.org/abs/1810.05997).
     - Example code: [PyTorch](../examples/pytorch/appnp), [MXNet](../examples/mxnet/appnp)
@@ -239,6 +245,11 @@ The folder contains example implementations of selected research papers related 
     - Pooling module: [PyTorch](https://docs.dgl.ai/api/python/nn.pytorch.html#sortpooling), [TensorFlow](https://docs.dgl.ai/api/python/nn.tensorflow.html#sortpooling), [MXNet](https://docs.dgl.ai/api/python/nn.mxnet.html#sortpooling)
     - Tags: graph classification
 
+- <a name="seal"></a>  Zhang et al. Link Prediction Based on Graph Neural Networks. [Paper link](https://papers.nips.cc/paper/2018/file/53f0d7c537d99b3824f0f99d62ea2428-Paper.pdf).
+    - Example code: [pytorch](../examples/pytorch/seal)
+    - Tags: link prediction, sampling
+
+
 ## 2017
 
 - <a name="gcn"></a> Kipf and Welling. Semi-Supervised Classification with Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1609.02907). 
@@ -298,22 +309,21 @@ The folder contains example implementations of selected research papers related 
 - <a name="ggnn"></a> Li et al. Gated Graph Sequence Neural Networks. [Paper link](https://arxiv.org/abs/1511.05493).
     - Example code: [PyTorch](../examples/pytorch/ggnn)
     - Tags: question answering
-
 - <a name="chebnet"></a> Defferrard et al. Convolutional Neural Networks on Graphs with Fast Localized Spectral Filtering. [Paper link](https://arxiv.org/abs/1606.09375).
     - Example code: [PyTorch on image classification](../examples/pytorch/model_zoo/geometric), [PyTorch on node classification](../examples/pytorch/model_zoo/citation_network)
     - Tags: image classification, graph classification, node classification
-
 - <a name="monet"></a> Monti et al. Geometric deep learning on graphs and manifolds using mixture model CNNs. [Paper link](https://arxiv.org/abs/1611.08402).
     - Example code: [PyTorch on image classification](../examples/pytorch/model_zoo/geometric), [PyTorch on node classification](../examples/pytorch/monet), [MXNet on node classification](../examples/mxnet/monet)
     - Tags: image classification, graph classification, node classification
-
 - <a name="weave"></a> Kearnes et al. Molecular Graph Convolutions: Moving Beyond Fingerprints. [Paper link](https://arxiv.org/abs/1603.00856).
     - Example code: [PyTorch](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/moleculenet), [PyTorch for custom data](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/csv_data_configuration)
     - Tags: molecular property prediction
-
 - <a name="complex"></a> Trouillon et al. Complex Embeddings for Simple Link Prediction. [Paper link](http://proceedings.mlr.press/v48/trouillon16.pdf).
     - Example code: [PyTorch](https://github.com/awslabs/dgl-ke/tree/master/examples), [PyTorch for custom data](https://aws-dglke.readthedocs.io/en/latest/commands.html)
     - Tags: knowledge graph embedding
+- <a name="vgae"></a> Thomas et al. Variational Graph Auto-Encoders. [Paper link](https://arxiv.org/abs/1611.07308).
+    - Example code: [PyTorch](../examples/pytorch/vgae)
+    - Tags: link prediction
 
 ## 2015
 

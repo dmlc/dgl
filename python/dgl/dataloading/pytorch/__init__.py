@@ -16,8 +16,8 @@ def _remove_kwargs_dist(kwargs):
 # The following code is a fix to the PyTorch-specific issue in
 # https://github.com/dmlc/dgl/issues/2137
 #
-# Basically the sampled blocks/subgraphs contain the features extracted from the
-# parent graph.  In DGL, the blocks/subgraphs will hold a reference to the parent
+# Basically the sampled MFGs/subgraphs contain the features extracted from the
+# parent graph.  In DGL, the MFGs/subgraphs will hold a reference to the parent
 # graph feature tensor and an index tensor, so that the features could be extracted upon
 # request.  However, in the context of multiprocessed sampling, we do not need to
 # transmit the parent graph feature tensor from the subprocess to the main process,
@@ -26,13 +26,13 @@ def _remove_kwargs_dist(kwargs):
 # it with the following trick:
 #
 # In the collator running in the sampler processes:
-# For each frame in the block, we check each column and the column with the same name
+# For each frame in the MFG, we check each column and the column with the same name
 # in the corresponding parent frame.  If the storage of the former column is the
 # same object as the latter column, we are sure that the former column is a
 # subcolumn of the latter, and set the storage of the former column as None.
 #
 # In the iterator of the main process:
-# For each frame in the block, we check each column and the column with the same name
+# For each frame in the MFG, we check each column and the column with the same name
 # in the corresponding parent frame.  If the storage of the former column is None,
 # we replace it with the storage of the latter column.
 
@@ -118,7 +118,7 @@ def _restore_blocks_storage(blocks, g):
 
 class _NodeCollator(NodeCollator):
     def collate(self, items):
-        # input_nodes, output_nodes, [items], blocks
+        # input_nodes, output_nodes, blocks
         result = super().collate(items)
         _pop_blocks_storage(result[-1], self.g)
         return result
@@ -126,13 +126,13 @@ class _NodeCollator(NodeCollator):
 class _EdgeCollator(EdgeCollator):
     def collate(self, items):
         if self.negative_sampler is None:
-            # input_nodes, pair_graph, [items], blocks
+            # input_nodes, pair_graph, blocks
             result = super().collate(items)
             _pop_subgraph_storage(result[1], self.g)
             _pop_blocks_storage(result[-1], self.g_sampling)
             return result
         else:
-            # input_nodes, pair_graph, neg_pair_graph, [items], blocks
+            # input_nodes, pair_graph, neg_pair_graph, blocks
             result = super().collate(items)
             _pop_subgraph_storage(result[1], self.g)
             _pop_subgraph_storage(result[2], self.g)
@@ -156,13 +156,11 @@ class _NodeDataLoaderIter:
         self.iter_ = iter(node_dataloader.dataloader)
 
     def __next__(self):
-        # input_nodes, output_nodes, [items], blocks
+        # input_nodes, output_nodes, blocks
         result_ = next(self.iter_)
         _restore_blocks_storage(result_[-1], self.node_dataloader.collator.g)
 
-        result = []
-        for data in result_:
-            result.append(_to_device(data, self.device))
+        result = [_to_device(data, self.device) for data in result_]
         return result
 
 class _EdgeDataLoaderIter:
@@ -175,20 +173,18 @@ class _EdgeDataLoaderIter:
         result_ = next(self.iter_)
 
         if self.edge_dataloader.collator.negative_sampler is not None:
-            # input_nodes, pair_graph, neg_pair_graph, [items], blocks
-            # Otherwise, input_nodes, pair_graph, [items], blocks
+            # input_nodes, pair_graph, neg_pair_graph, blocks if None.
+            # Otherwise, input_nodes, pair_graph, blocks
             _restore_subgraph_storage(result_[2], self.edge_dataloader.collator.g)
         _restore_subgraph_storage(result_[1], self.edge_dataloader.collator.g)
         _restore_blocks_storage(result_[-1], self.edge_dataloader.collator.g_sampling)
 
-        result = []
-        for data in result_:
-            result.append(_to_device(data, self.device))
+        result = [_to_device(data, self.device) for data in result_]
         return result
 
 class NodeDataLoader:
     """PyTorch dataloader for batch-iterating over a set of nodes, generating the list
-    of blocks as computation dependency of the said minibatch.
+    of message flow graphs (MFGs) as computation dependency of the said minibatch.
 
     Parameters
     ----------
@@ -199,7 +195,7 @@ class NodeDataLoader:
     block_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
     device : device context, optional
-        The device of the generated blocks in each iteration, which should be a
+        The device of the generated MFGs in each iteration, which should be a
         PyTorch device object (e.g., ``torch.device``).
     kwargs : dict
         Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
@@ -216,6 +212,12 @@ class NodeDataLoader:
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, output_nodes, blocks in dataloader:
     ...     train_on(input_nodes, output_nodes, blocks)
+
+    Notes
+    -----
+    Please refer to
+    :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`
+    and :ref:`User Guide Section 6 <guide-minibatch>` for usage.
     """
     collator_arglist = inspect.getfullargspec(NodeCollator).args
 
@@ -265,8 +267,8 @@ class NodeDataLoader:
 
 class EdgeDataLoader:
     """PyTorch dataloader for batch-iterating over a set of edges, generating the list
-    of blocks as computation dependency of the said minibatch for edge classification,
-    edge regression, and link prediction.
+    of message flow graphs (MFGs) as computation dependency of the said minibatch for
+    edge classification, edge regression, and link prediction.
 
     For each iteration, the object will yield
 
@@ -279,7 +281,7 @@ class EdgeDataLoader:
     * If a negative sampler is given, another graph that contains the "negative edges",
       connecting the source and destination nodes yielded from the given negative sampler.
 
-    * A list of blocks necessary for computing the representation of the incident nodes
+    * A list of MFGs necessary for computing the representation of the incident nodes
       of the edges in the minibatch.
 
     For more details, please refer to :ref:`guide-minibatch-edge-classification-sampler`
@@ -294,7 +296,7 @@ class EdgeDataLoader:
     block_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
     device : device context, optional
-        The device of the generated blocks and graphs in each iteration, which should be a
+        The device of the generated MFGs and graphs in each iteration, which should be a
         PyTorch device object (e.g., ``torch.device``).
     g_sampling : DGLGraph, optional
         The graph where neighborhood sampling is performed.
@@ -410,11 +412,17 @@ class EdgeDataLoader:
     ...     negative_sampler=neg_sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
-    ...     train_on(input_nodse, pair_graph, neg_pair_graph, blocks)
+    ...     train_on(input_nodes, pair_graph, neg_pair_graph, blocks)
 
     See also
     --------
-    :class:`~dgl.dataloading.dataloader.EdgeCollator`
+    dgl.dataloading.dataloader.EdgeCollator
+
+    Notes
+    -----
+    Please refer to
+    :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`
+    and :ref:`User Guide Section 6 <guide-minibatch>` for usage.
 
     For end-to-end usages, please refer to the following tutorial/examples:
 
