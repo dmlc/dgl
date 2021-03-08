@@ -98,11 +98,6 @@ def dgl_main():
     # create train graph
     train_edge_idx = torch.tensor(train_edge_idx)
     train_graph = dgl.edge_subgraph(graph, train_edge_idx, preserve_nodes=True)
-    train_graph = train_graph
-    adj = train_graph.adjacency_matrix().to_dense()
-
-    train_edge_idx = torch.tensor(train_edge_idx)
-    train_graph = dgl.edge_subgraph(graph, train_edge_idx, preserve_nodes=True)
     # train_graph = train_graph.to(device)
     adj = train_graph.adjacency_matrix().to_dense()
 
@@ -111,7 +106,6 @@ def dgl_main():
 
     # create model
     vgae_model = model.VGAEModel(in_dim, args.hidden1, args.hidden2)
-    vgae_model = vgae_model
 #     vgae_model = vgae_model.to(device)
 
     # create training component
