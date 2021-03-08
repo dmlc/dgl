@@ -8,7 +8,7 @@ class HeteroGraphConv(nn.Block):
     r"""A generic module for computing convolution on heterogeneous graphs.
 
     The heterograph convolution applies sub-modules on their associating
-    relation graphs, which reads the features from source nodes and writes the
+    relation graphs in parallel, which reads the features from source nodes and writes the
     updated ones to destination nodes. If multiple relations have the same
     destination node types, their results are aggregated by the specified method.
     If the relation graph has no edge, the corresponding module will not be called.
