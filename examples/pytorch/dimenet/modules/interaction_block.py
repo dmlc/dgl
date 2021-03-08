@@ -46,7 +46,7 @@ class InteractionBlock(nn.Module):
         GlorotOrthogonal(self.final_before_skip.weight)
 
     def edge_transfer(self, edges):
-        # Transform via Bessel basis
+        # Transform from Bessel basis to dence vector
         rbf = self.dense_rbf(edges.data['rbf'])
         # Initial transformation
         x_ji = self.dense_ji(edges.data['m'])
@@ -63,13 +63,12 @@ class InteractionBlock(nn.Module):
         # Apply bilinear layer to interactions and basis function activation
         # [None, 8] * [128, 8, 128] * [None, 128] -> [None, 128]
         x_kj = torch.einsum("wj,wl,ijl->wi", sbf, edges.src['x_kj'], self.W_bilin)
-        # x_kj = self.bilinear(sbf, edges.src['x_kj'])
         return {'x_kj': x_kj}
 
     def forward(self, g, l_g):
         g.apply_edges(self.edge_transfer)
         
-        # node means edge and edge means node in original graph
+        # nodes correspond to edges and edges correspond to nodes in the original graphs
         # node: d, rbf, o, rbf_env, x_kj, x_ji
         for k, v in g.edata.items():
             l_g.ndata[k] = v

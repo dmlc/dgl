@@ -78,7 +78,7 @@ class InteractionPPBlock(nn.Module):
     def forward(self, g, l_g):
         g.apply_edges(self.edge_transfer)
         
-        # node means edge and edge means node in original graph
+        # nodes correspond to edges and edges correspond to nodes in the original graphs
         # node: d, rbf, o, rbf_env, x_kj, x_ji
         for k, v in g.edata.items():
             l_g.ndata[k] = v

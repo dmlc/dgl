@@ -56,8 +56,7 @@ class QM9(DGLDataset):
     label_keys: list
         Names of the regression property, which should be a subset of the keys in the table above.
     edge_funcs: list
-        A list of edge-wise user-defined functions for chemical bonds. Default: None
-        Edge-wise User-defined Functions: <https://docs.dgl.ai/en/0.6.x/api/python/udf.html#edge-wise-user-defined-function>
+        A list of edge-wise user-defined functions <https://docs.dgl.ai/en/0.6.x/api/python/udf.html#edge-wise-user-defined-function> for chemical bonds. Default: None
     cutoff: float
         Cutoff distance for interatomic interactions, i.e. two atoms are connected in the corresponding graph if the distance between them is no larger than this.
         Default: 5.0 Angstrom

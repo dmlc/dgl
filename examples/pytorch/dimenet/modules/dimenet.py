@@ -107,7 +107,6 @@ class DimeNet(nn.Module):
         y = torch.norm(y, dim=-1)
         angle = torch.atan2(y, x)
         # Transform via angles
-        # cbf = [f(angle) for f in self.sph_funcs]
         cbf = [f(angle) for f in self.sbf_layer.get_sph_funcs()]
         cbf = torch.stack(cbf, dim=1)  # [None, 7]
         cbf = cbf.repeat_interleave(self.num_radial, dim=1)  # [None, 42]

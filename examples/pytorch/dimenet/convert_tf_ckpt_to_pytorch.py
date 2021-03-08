@@ -22,9 +22,10 @@ def main(model_cnf, convert_cnf):
     logger.info(f'Model name: {model_name}')
     logger.info(f'Model params: {model_params}')
 
-    if model_params['output_init'] == 'zeros':
+    if model_params['targets'] in ['mu', 'homo', 'lumo', 'gap', 'zpve']:
         model_params['output_init'] = nn.init.zeros_
     else:
+        # 'GlorotOrthogonal' for alpha, R2, U0, U, H, G, and Cv
         model_params['output_init'] = GlorotOrthogonal
 
     # model initialization
