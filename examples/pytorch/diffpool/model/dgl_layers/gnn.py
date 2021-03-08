@@ -101,44 +101,6 @@ class DiffPoolBatchedGraphLayer(nn.Module):
         self.loss_log = {}
         self.reg_loss.append(EntropyLoss())
 
-    def _forward(self, g, h):
-        feat = self.feat_gc(g, h)
-        assign_tensor = self.pool_gc(g, h)
-        device = feat.device
-        assign_tensor_masks = []
-        batch_size = len(g.batch_num_nodes())
-        for g_n_nodes in g.batch_num_nodes():
-            mask = torch.ones((g_n_nodes,
-                               int(assign_tensor.size()[1] / batch_size)))
-            assign_tensor_masks.append(mask)
-        """
-        The first pooling layer is computed on batched graph.
-        We first take the adjacency matrix of the batched graph, which is block-wise diagonal.
-        We then compute the assignment matrix for the whole batch graph, which will also be block diagonal
-        """
-        mask = torch.FloatTensor(
-            block_diag(
-                *
-                assign_tensor_masks)).to(
-            device=device)
-        assign_tensor = masked_softmax(assign_tensor, mask,
-                                       memory_efficient=False)
-        h = torch.matmul(torch.t(assign_tensor), feat)
-        adj = g.adjacency_matrix(transpose=False, ctx=device)
-        adj_new = torch.sparse.mm(adj, assign_tensor)
-        adj_new = torch.mm(torch.t(assign_tensor), adj_new)
-
-        if self.link_pred:
-            current_lp_loss = torch.norm(adj.to_dense() -
-                                         torch.mm(assign_tensor, torch.t(assign_tensor))) / np.power(g.number_of_nodes(), 2)
-            self.loss_log['LinkPredLoss'] = current_lp_loss
-
-        for loss_layer in self.reg_loss:
-            loss_name = str(type(loss_layer).__name__)
-            self.loss_log[loss_name] = loss_layer(adj, adj_new, assign_tensor)
-
-        return adj_new, h
-
     def forward(self, g, h):
         feat = self.feat_gc(g, h)  # size = (sum_N, F_out), sum_N is num of nodes in this batch
         device = feat.device

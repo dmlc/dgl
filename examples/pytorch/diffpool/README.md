@@ -16,7 +16,7 @@ How to run
 ----------
 
 ```bash
-python train.py --dataset ENZYMES --pool_ratio 0.10 --num_pool 1
+python train.py --dataset ENZYMES --pool_ratio 0.10 --num_pool 1 --epochs 1000
 python train.py --dataset DD --pool_ratio 0.15 --num_pool 1  
 ```
 Performance
