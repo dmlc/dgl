@@ -24,19 +24,19 @@ def split_dataset(dataset, num_train, num_valid, shuffle=False, random_state=Non
     Parameters
     ----------
     dataset
-        We assume ``len(dataset)`` gives the number of datapoints and ``dataset[i]``
+        We assume that ``len(dataset)`` gives the number of datapoints and ``dataset[i]``
         gives the ith datapoint.
     num_train : int
-        Number of training datapoints
+        Number of training datapoints.
     num_valid : int
-        Number of validation datapoints
+        Number of validation datapoints.
     shuffle : bool, optional
         By default we perform a consecutive split of the dataset. If True,
         we will first randomly shuffle the dataset.
     random_state : None, int or array_like, optional
         Random seed used to initialize the pseudo-random number generator.
-        Can be any integer between 0 and 2**32 - 1 inclusive, an array
-        (or other sequence) of such integers, or None (the default).
+        This can be any integer between 0 and 2^32 - 1 inclusive, an array
+        (or other sequence) of such integers, or None (the default value).
         If seed is None, then RandomState will try to read data from /dev/urandom
         (or the Windows analogue) if available or seed from the clock otherwise.
 

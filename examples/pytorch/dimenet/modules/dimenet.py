@@ -24,10 +24,10 @@ class DimeNet(nn.Module):
         Number of spherical harmonics
     num_radial
         Number of radial basis functions
-    envelope_exponent
-        Shape of the smooth cutoff
     cutoff
         Cutoff distance for interatomic interactions
+    envelope_exponent
+        Shape of the smooth cutoff
     num_before_skip
         Number of residual layers in interaction block before skip connection
     num_after_skip
@@ -38,6 +38,8 @@ class DimeNet(nn.Module):
         Number of targets to predict
     activation
         Activation function
+    output_init
+        Initial function in output block
     """
     def __init__(self,
                  emb_size,
