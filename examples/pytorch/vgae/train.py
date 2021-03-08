@@ -89,6 +89,16 @@ def dgl_main():
 
     # generate input
     adj_orig = graph.adjacency_matrix().to_dense()
+    # device = torch.device("cuda:{}".format(args.gpu_id) if torch.cuda.is_available() else "cpu")
+
+    # Extract node features
+    feats = graph.ndata.pop('feat')
+    in_dim = feats.shape[-1]
+
+    # graph = graph.to(device)
+
+    # generate input
+    adj_orig = graph.adjacency_matrix().to_dense()
 
     # build test set with 10% positive links
     train_edge_idx, val_edges, val_edges_false, test_edges, test_edges_false = mask_test_edges_dgl(graph, adj_orig)
@@ -99,12 +109,18 @@ def dgl_main():
     train_graph = train_graph
     adj = train_graph.adjacency_matrix().to_dense()
 
+    train_edge_idx = torch.tensor(train_edge_idx)
+    train_graph = dgl.edge_subgraph(graph, train_edge_idx, preserve_nodes=True)
+    # train_graph = train_graph.to(device)
+    adj = train_graph.adjacency_matrix().to_dense()
+
     # compute loss parameters
     weight_tensor, norm = compute_loss_para(adj)
 
     # create model
     vgae_model = model.VGAEModel(in_dim, args.hidden1, args.hidden2)
     vgae_model = vgae_model
+#     vgae_model = vgae_model.to(device)
 
     # create training component
     optimizer = torch.optim.Adam(vgae_model.parameters(), lr=args.learning_rate)
