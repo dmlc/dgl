@@ -117,10 +117,10 @@ def main(model_cnf):
     logger.info(f'Model params: {model_params}')
     logger.info(f'Train params: {train_params}')
 
-    # 'zeros' for mu, homo, lumo, and zpve; 'GlorotOrthogonal' for alpha, R2, U0, U, H, G, and Cv
     if model_params['targets'] in ['mu', 'homo', 'lumo', 'gap', 'zpve']:
         model_params['output_init'] = nn.init.zeros_
     else:
+        # 'GlorotOrthogonal' for alpha, R2, U0, U, H, G, and Cv
         model_params['output_init'] = GlorotOrthogonal
 
     logger.info('Loading Data Set')
@@ -246,7 +246,7 @@ def main(model_cnf):
         scheduler.step()
 
     logger.info('Testing')
-    predictions, labels = evaluate(device, ema_model, test_loader)
+    predictions, labels = evaluate(device, best_model, test_loader)
     test_mae = mean_absolute_error(labels, predictions)
     logger.info('Test MAE {:.4f}'.format(test_mae))
 

@@ -1,7 +1,5 @@
 import numpy as np
 import sympy as sym
-import torch
-import torch.nn.functional as F
 
 from scipy.optimize import brentq
 from scipy import special as sp

@@ -11,15 +11,18 @@ from dgl.convert import graph as dgl_graph
 from dgl.transform import to_bidirected
 from dgl import backend as F
 
-class QM9Dataset(DGLDataset):
+class QM9(DGLDataset):
     r"""QM9 dataset for graph property prediction (regression)
+
     This dataset consists of 13,0831 molecules with 12 regression targets.
-    Node means atom and edge means bond.
+    Nodes correspond to atoms and edges correspond to bonds.
+
     Reference: `"Quantum-Machine.org" <http://quantum-machine.org/datasets/>`_, `"Directional Message Passing for Molecular Graphs" <https://arxiv.org/abs/2003.03123>`_
     
     Statistics:
-    - Number of graphs: 13,0831
+    - Number of graphs: 130,831
     - Number of regression targets: 12
+
     +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
     | Keys   | Property                         | Description                                                                       | Unit                                        |
     +========+==================================+===================================================================================+=============================================+
@@ -47,10 +50,13 @@ class QM9Dataset(DGLDataset):
     +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
     | Cv     | :math:`c_{\textrm{v}}`           | Heat capavity at 298.15K                                                          | :math:`\frac{\textrm{cal}}{\textrm{mol K}}` |
     +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    
     Parameters
     ----------
     label_keys: list
         Names of the regression property, which should be a subset of the keys in the table above.
+    edge_funcs: list
+        A list of edge-wise user-defined functions for molecular bonds. Default: None
     cutoff: float
         Cutoff distance for interatomic interactions, i.e. two atoms are connected in the corresponding graph if the distance between them is no larger than this.
         Default: 5.0 Angstrom
@@ -60,11 +66,13 @@ class QM9Dataset(DGLDataset):
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose: bool
-        Whether to print out progress information. Default: True.
+        Whether to print out progress information. Default: True
+
     Attributes
     ----------
     num_labels : int
         Number of labels for each graph, i.e. number of prediction tasks
+    
     Raises
     ------
     UserWarning
@@ -120,7 +128,9 @@ class QM9Dataset(DGLDataset):
         """ step 3 """
         npz_path = f'{self.raw_dir}/qm9_eV.npz'
         data_dict = np.load(npz_path, allow_pickle=True)
-        # data_dict['N'] contains the number of atoms in each molecule.
+        # data_dict['N'] contains the number of atoms in each molecule,
+        # data_dict['R'] consists of the atomic coordinates,
+        # data_dict['Z'] consists of the atomic numbers.
         # Atomic properties (Z and R) of all molecules are concatenated as single tensors,
         # so you need this value to select the correct atoms for each molecule.
         self.N = data_dict['N']
@@ -133,7 +143,7 @@ class QM9Dataset(DGLDataset):
             self.label_dict[k] = F.tensor(data_dict[k], dtype=F.data_type_dict['float32'])
 
         self.label = F.stack([self.label_dict[key] for key in self.label_keys], dim=1)
-        # graph features
+        # graphs & features
         self.graphs, self.line_graphs = self._load_graph()
     
     def _load_graph(self):
@@ -143,8 +153,11 @@ class QM9Dataset(DGLDataset):
         
         for idx in trange(num_graphs):
             n_atoms = self.N[idx]
+            # get all the atomic coordinates of the idx-th molecular graph
             R = self.R[self.N_cumsum[idx]:self.N_cumsum[idx + 1]]
+            # calculate the distance between all atoms
             dist = np.linalg.norm(R[:, None, :] - R[None, :, :], axis=-1)
+            # keep all edges that don't exceed the cutoff and delete self-loops
             adj = sp.csr_matrix(dist <= self.cutoff) - sp.eye(n_atoms, dtype=np.bool)
             adj = adj.tocoo()
             u, v = F.tensor(adj.row), F.tensor(adj.col)
@@ -153,7 +166,7 @@ class QM9Dataset(DGLDataset):
             g.ndata['Z'] = F.tensor(self.Z[self.N_cumsum[idx]:self.N_cumsum[idx + 1]], 
                                     dtype=F.data_type_dict['int64'])
             
-            # add user defined features
+            # add user-defined features
             if self.edge_funcs is not None:
                 for func in self.edge_funcs:
                     g.apply_edges(func)
@@ -191,6 +204,7 @@ class QM9Dataset(DGLDataset):
 
     def __getitem__(self, idx):
         r""" Get graph and label by index
+
         Parameters
         ----------
         idx : int
@@ -209,10 +223,9 @@ class QM9Dataset(DGLDataset):
 
     def __len__(self):
         r"""Number of graphs in the dataset.
+
         Return
         -------
         int
         """
         return self.label.shape[0]
-
-QM9 = QM9Dataset

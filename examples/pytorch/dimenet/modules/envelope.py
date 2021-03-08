@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 
 class Envelope(nn.Module):
@@ -19,5 +18,4 @@ class Envelope(nn.Module):
         x_p_1 = x_p_0 * x
         x_p_2 = x_p_1 * x
         env_val = 1 / x + self.a * x_p_0 + self.b * x_p_1 + self.c * x_p_2
-        # return torch.where(inputs < 1, env_val, torch.zeros_like(inputs))
         return env_val

@@ -1,5 +1,6 @@
 import tensorflow as tf
 import torch
+import torch.nn as nn
 import click
 import numpy as np
 import os
@@ -8,7 +9,6 @@ from logzero import logger
 from pathlib import Path
 from ruamel.yaml import YAML
 from modules.initializers import GlorotOrthogonal
-from modules.dimenet import DimeNet
 from modules.dimenet_pp import DimeNetPP
 
 @click.command()

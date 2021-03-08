@@ -1,12 +1,8 @@
-import sympy as sym
 import torch
 import torch.nn as nn
-import dgl
 import dgl.function as fn
 
 from modules.residual_layer import ResidualLayer
-from modules.basis_utils import bessel_basis, real_sph_harm
-from modules.envelope import Envelope
 from modules.initializers import GlorotOrthogonal
 
 class InteractionBlock(nn.Module):
@@ -14,7 +10,6 @@ class InteractionBlock(nn.Module):
                  emb_size,
                  num_radial,
                  num_spherical,
-                 envelope_exponent,
                  num_bilinear,
                  num_before_skip,
                  num_after_skip,

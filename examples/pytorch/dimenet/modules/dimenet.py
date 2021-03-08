@@ -1,7 +1,5 @@
-import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from modules.activations import swish
 from modules.bessel_basis_layer import BesselBasisLayer
@@ -93,7 +91,6 @@ class DimeNet(nn.Module):
             InteractionBlock(emb_size=emb_size,
                              num_radial=num_radial,
                              num_spherical=num_spherical,
-                             envelope_exponent=envelope_exponent,
                              num_bilinear=num_bilinear,
                              num_before_skip=num_before_skip,
                              num_after_skip=num_after_skip,

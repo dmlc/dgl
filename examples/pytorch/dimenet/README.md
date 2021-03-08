@@ -18,7 +18,6 @@ click 7.1.2
 dgl 0.5.3
 logzero 1.6.3
 numpy 1.19.5
-pandas 1.1.5
 ruamel.yaml 0.16.12
 scikit-learn 0.24.1
 scipy 1.5.4
