@@ -37,22 +37,23 @@ DD 79.31% (with early stopping)
 
 On V100-SXM2 16GB
 
-| Experiments       | Train time per epoch(s) | Memory usage(MB) |
-| ----------------- | ----------------------: | ---------------: |
-| Original-DD-bs=20 | OOM                     | OOM              |
-| Original-DD-bs=10 | 21.302                  | 5274.620         |
-| Original-ENZYMES  | 1.749                   | 25.685           |
-| Improved-DD-bs=20 | 44.682                  | 10088.889        |
-| Improved-DD-bs=10 | 17.282                  | 2928.568         |
-| Improved-ENZYMES  | 1.685                   | 21.909           |
+|                    | Train time/epoch (original) (s) | Train time/epoch (improved) (s) |
+| ------------------ | ------------------------------: | ------------------------------: |
+| DD (batch_size=10) |                          21.302 |                      **17.282** |
+| DD (batch_size=20) |                             OOM |                      **44.682** |
+| ENZYMES            |                           1.749 |                       **1.685** |
+
+|                    | Memory usage (original) (MB) | Memory usage (improved) (MB) |
+| ------------------ | ---------------------------: | ---------------------------: |
+| DD (batch_size=10) |                     5274.620 |                 **2928.568** |
+| DD (batch_size=20) |                          OOM |                **10088.889** |
+| ENZYMES            |                       25.685 |                   **21.909** |
 
 **Accuracy**
 
 Each experiment with improved model is only conducted once, thus the result may has noise.
 
-| Experiments      | Acc    |
-| ---------------- | -----: |
-| Original-DD      | 79.31% |
-| Original-ENZYMES | 63.33% |
-| Improved-DD      | 78.33% |
-| Improved-ENZYMES | 68.33% |
+|         |   Original |   Improved |
+| ------- | ---------: | ---------: |
+| DD      | **79.31%** |     78.33% |
+| ENZYMES |     63.33% | **68.33%** |
