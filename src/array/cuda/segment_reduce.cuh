@@ -256,72 +256,20 @@ XgemmBatched<half>(
 
 }  // namespace
 
-/*
- * \param dst the destination padded tensor.
- * \param src the source packed tensor.
- * \param parallel_indices the indices of activated blocks.
- * \param num_rows the numbers of rows in the packed tensor.
- * \param num_cols the numbers of columns in the packed tensor.
- * \param offset the offest of i-th block in the packed tensor.
- * \param row the number of rows in the padded tensor.
- * \param col the number of columns in the padded tensor.
- */
 template <typename DType>
-__global__ void _PadKernel(
-    DType* __restrict__ dst, const DType* __restrict__ src,
-    int64_t* __restrict__ parallel_indices,
-    int64_t* __restrict__ num_rows, int64_t* __restrict__ num_cols,
-    int64_t* __restrict__ offset,
-    int64_t row, int64_t col) {
-  int64_t k = parallel_indices[blockIdx.z];
-  DType *dst_ptr = dst + blockIdx.z * row * col;
-  const DType *src_ptr = src + offset[k];
-  int64_t i = blockIdx.x * blockDim.x + threadIdx.x,
-          j = blockIdx.y * blockDim.y + threadIdx.y;
-  if (i < row && j < col) {
-    DType val = 0.;
-    if (i < num_rows[k] && j < num_cols[k]) {
-      val = src_ptr[i * num_cols[k] + j];
-    }
-    dst_ptr[i * col + j] = val;
-  }
-}
-
-/*
- * \param dst the destination packed tensor.
- * \param src the source padded tensor.
- * \param parallel_indices of activated blocks.
- * \param num_rows the numbers of rows in the packed tensor.
- * \param num_cols the numbers of columns in the packed tensor.
- * \param offset the offest of i-th block in the packed tensor.
- * \param row the number of rows in the padded tensor.
- * \param col the number of columns in the padded tensor.
- */
-template <typename DType>
-__global__ void _UnpadKernel(
-    DType* __restrict__ dst, const DType* __restrict__ src,
-    int64_t* __restrict__ parallel_indices,
-    int64_t* __restrict__ num_rows, int64_t* __restrict__ num_cols,
-    int64_t* __restrict__ offset,
-    int64_t row, int64_t col) {
-  int64_t k = parallel_indices[blockIdx.z];
-  DType *dst_ptr = dst + offset[k];
-  const DType *src_ptr = src + blockIdx.z * row * col;
-  int64_t i = blockIdx.x * blockDim.x + threadIdx.x,
-          j = blockIdx.y * blockDim.y + threadIdx.y;
-  if (i < row && j < col) {
-    if (i < num_rows[k] && j < num_cols[k]) {
-      dst_ptr[i * num_cols[k] + j] = src_ptr[i * col + j];
-    }
-  }
-}
-
-__global__ void _PrintKernel(
-    int64_t *ptr, int64_t len) {
-  for (int i = 0; i < len; ++i) {
-    printf("%lld ", ptr[i]);
-  }
-  printf("\n");
+__global__ void SegmentGemmKernel(
+    const DType* __restrict__ A,
+    const DType* __restrict__ B,
+    DType* __restrict__ C,
+    const int64_t* __restrict__ m,
+    const int64_t* __restrict__ n,
+    const int64_t* __restrict__ k,
+    const int64_t* __restrict__ blk_seg_map,
+    bool transA,
+    bool transB
+) {
+  
+  // TODO(zihao)
 }
 
 /*
@@ -329,160 +277,62 @@ __global__ void _PrintKernel(
  * \param A the concatenation of {A_i}
  * \param B the concatenation of {B_i}
  * \param C the concatenation of {C_i}
- * \param n the array of number of rows in A.
- * \param m the array of number of rows in B / number of columns in A.
- * \param p the array of number of columns in C.
+ * \param m the array of number of rows in A.
+ * \param n the array of number of columns in C.
+ * \param k the array of number of rows in B / number of columns in A.
  */
 template <typename DType>
 void SegmentGemm(NDArray A, NDArray B, NDArray C,
-                 NDArray n, NDArray m, NDArray p,
+                 NDArray m, NDArray n, NDArray k,
                  bool transA, bool transB) {
   auto ctx = A->ctx;
-  const DType* A_data = A.Ptr<DType>();
-  const DType* B_data = B.Ptr<DType>();
+  const DType *A_data = A.Ptr<DType>();
+  const DType *B_data = B.Ptr<DType>();
   DType* C_data = C.Ptr<DType>();
-  const int64_t* n_data = n.Ptr<int64_t>();
-  const int64_t* m_data = m.Ptr<int64_t>();
-  const int64_t* p_data = p.Ptr<int64_t>();
+  const int64_t *m_data = m.Ptr<int64_t>();
+  const int64_t *n_data = n.Ptr<int64_t>();
+  const int64_t *k_data = k.Ptr<int64_t>();
   int64_t batch_size = n->shape[0];
   auto device = runtime::DeviceAPI::Get(ctx);
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  auto *thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   if (!thr_entry->cublas_handle)
     CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
   CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, thr_entry->stream));
-  int64_t max_n = 0,
-          max_m = 0,
-          max_p = 0;
-  std::vector<int64_t> parallel_indices;
-  std::vector<bool> mask(batch_size, false);
+
   std::vector<int64_t> A_off(batch_size + 1, 0),
                        B_off(batch_size + 1, 0),
                        C_off(batch_size + 1, 0);
+  std::vector<int64_t> blk_seg_map_cpu;
   // collect information
   for (int i = 0; i < batch_size; ++i) {
-    int64_t ni = n_data[i],
-            mi = m_data[i],
-            pi = p_data[i];
-    A_off[i + 1] = A_off[i] + ni * mi;
-    B_off[i + 1] = B_off[i] + mi * pi;
-    C_off[i + 1] = C_off[i] + ni * pi;
-    if (ni > 128 || mi > 128 || pi > 128) {
-      mask[i] = true;
-    } else if (ni > 0 && mi > 0 && pi > 0) {
-      parallel_indices.push_back(i);
-      max_n = std::max(ni, max_n);
-      max_m = std::max(mi, max_m);
-      max_p = std::max(pi, max_p);
+    int64_t mi = m_data[i],
+            ni = n_data[i],
+            ki = k_data[i];
+    A_off[i + 1] = A_off[i] + mi * ki;
+    B_off[i + 1] = B_off[i] + ki * ni;
+    C_off[i + 1] = C_off[i] + mi * ni;
+    int seg_mi = (mi + 31) / 32,
+        seg_ni = (ni + 31) / 32;
+    for (int j = 0; j < seg_mi * seg_ni; ++j) {
+      blk_seg_map_cpu.push_back(i);
     }
   } 
-  // alignment to use TensorCore.
-  const int64_t multiple_shp = 8;
-  max_n = multiple_shp * ((max_n + multiple_shp - 1) / multiple_shp);
-  max_m = multiple_shp * ((max_m + multiple_shp - 1) / multiple_shp);
-  max_p = multiple_shp * ((max_p + multiple_shp - 1) / multiple_shp);
-
-  // parallel with cublas batched gemm.
-  int64_t parallel_batch_size = parallel_indices.size();
-  if (parallel_batch_size > 0) {
-    int64_t stride_a = max_n * max_m,
-            stride_b = max_m * max_p,
-            stride_c = max_n * max_p;
-    // allocate memory
-    DType *ptr_0 = static_cast<DType*>(
-        device->AllocWorkspace(ctx, sizeof(DType) * (stride_a + stride_b + stride_c) * parallel_batch_size));
-    DType *A_padded = ptr_0,
-          *B_padded = ptr_0 + stride_a * parallel_batch_size,
-          *C_padded = ptr_0 + (stride_a + stride_b) * parallel_batch_size;
-    int64_t *ptr_1 = static_cast<int64_t*>(device->AllocWorkspace(ctx, sizeof(int64_t) * batch_size * 7));
-    int64_t *n_data_gpu = ptr_1,
-            *m_data_gpu = ptr_1 + batch_size,
-            *p_data_gpu = ptr_1 + 2 * batch_size,
-            *A_off_gpu = ptr_1 + 3 * batch_size,
-            *B_off_gpu = ptr_1 + 4 * batch_size,
-            *C_off_gpu = ptr_1 + 5 * batch_size,
-            *parallel_indices_gpu = ptr_1 + 6 * batch_size;
-    // copy data from CPU to GPU;
-    CUDA_CALL(cudaMemcpy(n_data_gpu, n_data, sizeof(int64_t) * batch_size, cudaMemcpyDefault));
-    CUDA_CALL(cudaMemcpy(m_data_gpu, m_data, sizeof(int64_t) * batch_size, cudaMemcpyDefault));
-    CUDA_CALL(cudaMemcpy(p_data_gpu, p_data, sizeof(int64_t) * batch_size, cudaMemcpyDefault));
-    CUDA_CALL(cudaMemcpy(A_off_gpu, A_off.data(), sizeof(int64_t) * batch_size, cudaMemcpyDefault));
-    CUDA_CALL(cudaMemcpy(B_off_gpu, B_off.data(), sizeof(int64_t) * batch_size, cudaMemcpyDefault));
-    CUDA_CALL(cudaMemcpy(C_off_gpu, C_off.data(), sizeof(int64_t) * batch_size, cudaMemcpyDefault));
-    CUDA_CALL(cudaMemcpy(parallel_indices_gpu, parallel_indices.data(),
-                         sizeof(int64_t) * parallel_batch_size, cudaMemcpyDefault));
-    int row = transA ? max_m : max_n,
-        col = transA ? max_n : max_m;
-    dim3 nblks((row + 31) / 32, (col + 31) / 32, parallel_batch_size),
-         nthrs(32, 32);
-    CUDA_KERNEL_CALL((_PadKernel<DType>),
-        nblks, nthrs, 0, thr_entry->stream,
-        A_padded, A_data,
-        parallel_indices_gpu,
-        transA ? m_data_gpu: n_data_gpu,
-        transA ? n_data_gpu: m_data_gpu,
-        A_off_gpu,
-        row, col);
-    row = transB ? max_p : max_m;
-    col = transB ? max_m : max_p;
-    nblks.x = (row + 31) / 32;
-    nblks.y = (col + 31) / 32;
-    CUDA_KERNEL_CALL((_PadKernel<DType>),
-        nblks, nthrs, 0, thr_entry->stream,
-        B_padded, B_data,
-        parallel_indices_gpu,
-        transB ? p_data_gpu: m_data_gpu,
-        transB ? m_data_gpu: p_data_gpu,
-        B_off_gpu,
-        row, col);
-    // batched gemm
-    DType alpha = 1., beta = 0.;
-    int ldb = transB ? max_m: max_p,
-        lda = transA ? max_n: max_m,
-        ldc = max_p;
-    CUBLAS_CALL(XgemmBatched<DType>(
-        thr_entry->cublas_handle,
-        transB ? CUBLAS_OP_T : CUBLAS_OP_N,
-        transA ? CUBLAS_OP_T : CUBLAS_OP_N,
-        max_p, max_n, max_m,
-        &alpha,
-        B_padded, ldb, stride_b,
-        A_padded, lda, stride_a,
-        &beta,
-        C_padded, ldc, stride_c,
-        parallel_batch_size
-    ));
-    // unpad
-    row = max_n;
-    col = max_p;
-    nblks.x = (row + 31) / 32;
-    nblks.y = (col + 31) / 32;
-    CUDA_KERNEL_CALL((_UnpadKernel<DType>),
-        nblks, nthrs, 0, thr_entry->stream,
-        C_data, C_padded,
-        parallel_indices_gpu,
-        n_data_gpu, p_data_gpu,
-        C_off_gpu,
-        row, col);
-    // free allocated memory
-    device->FreeWorkspace(ctx, ptr_0);
-    device->FreeWorkspace(ctx, ptr_1);
-  }
-
-  // not parallel (or parallelize w/ CUDA stream)
+  
+  // parallelize with CUDA stream.
   for (int i = 0; i < batch_size; ++i) {
-    int64_t ni = n_data[i],
-            mi = m_data[i],
-            pi = p_data[i];
-    if (mask[i]) {
+    int64_t mi = m_data[i],
+            ni = n_data[i],
+            ki = k_data[i];
+    if (mi > 0 && ni > 0 && ki > 0) {
       DType alpha = 1., beta = 0.;
-      int ldb = transB ? mi: pi,
-          lda = transA ? ni: mi,
-          ldc = pi;
+      int ldb = transB ? ki: ni,
+          lda = transA ? mi: ki,
+          ldc = ni;
       CUBLAS_CALL(Xgemm<DType>(
           thr_entry->cublas_handle,
           transB ? CUBLAS_OP_T : CUBLAS_OP_N,
           transA ? CUBLAS_OP_T : CUBLAS_OP_N,
-          pi, ni, mi,
+          ni, mi, ki,
           &alpha,
           B_data + B_off[i], ldb,
           A_data + A_off[i], lda,

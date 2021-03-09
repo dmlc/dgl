@@ -1552,7 +1552,7 @@ def segment_reduce(op, x, offsets):
     """
     pass
 
-def segment_gemm(A, B, n, m, p):
+def segment_gemm(A, B, m, n, k):
     """Segment Gemm operator.
     
     TODO(zihao): docstring

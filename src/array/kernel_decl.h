@@ -82,7 +82,7 @@ void SegmentReduce(const std::string& op,
 template <int XPU, int bits>
 void SegmentGemm(
     NDArray A, NDArray B, NDArray C,
-    NDArray n, NDArray m, NDArray p,
+    NDArray m, NDArray n, NDArray k,
     bool transA, bool transB);
 
 /*!

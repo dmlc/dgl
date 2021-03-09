@@ -155,11 +155,11 @@ void SegmentReduceDispatch(const std::string& op,
 
 /* \brief Segment GEMM function. */
 void SegmentGemmDispatch(NDArray A, NDArray B, NDArray C,
-                         NDArray n, NDArray m, NDArray p,
+                         NDArray m, NDArray n, NDArray k,
                          bool transA, bool transB) {
   ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "SegmentGemm", {
     ATEN_FLOAT_BITS_SWITCH(A->dtype, bits, "Feature data", {
-      SegmentGemm<XPU, bits>(A, B, C, n, m, p, transA, transB);
+      SegmentGemm<XPU, bits>(A, B, C, m, n, k, transA, transB);
     });
   });
 }
@@ -262,14 +262,14 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSegmentGemm")
     NDArray A = args[0];
     NDArray B = args[1];
     NDArray C = args[2];
-    NDArray n = args[3];
-    NDArray m = args[4];
-    NDArray p = args[5];
+    NDArray m = args[3];
+    NDArray n = args[4];
+    NDArray k = args[5];
     bool transA = args[6];
     bool transB = args[7];
     CheckCtx(A->ctx, {A, B, C}, {"A", "B", "C"});
     CheckContiguous({A, B, C}, {"A", "B", "C"});
-    SegmentGemmDispatch(A, B, C, n, m, p, transA, transB);
+    SegmentGemmDispatch(A, B, C, m, n, k, transA, transB);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelBwdSegmentCmp")

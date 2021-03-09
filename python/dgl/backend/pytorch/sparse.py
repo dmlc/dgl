@@ -306,20 +306,20 @@ class ScatterAdd(th.autograd.Function):
 class SegmentGemm(th.autograd.Function):
     @staticmethod
     @custom_fwd(cast_inputs=th.float16)
-    def forward(ctx, A, B, n, m, p):
-        C = _segment_gemm(A, B, n, m, p)
-        ctx.save_for_backward(A, B, n, m, p)
+    def forward(ctx, A, B, m, n, k):
+        C = _segment_gemm(A, B, m, n, k)
+        ctx.save_for_backward(A, B, m, n, k)
         return C
         
     @staticmethod
     @custom_bwd
     def backward(ctx, dC):
-        A, B, n, m, p = ctx.saved_tensors
+        A, B, m, n, k = ctx.saved_tensors
         dA, dB = None, None
         if ctx.needs_input_grad[0]:
-            dA = _segment_gemm(dC, B, n, p, m, False, True)
+            dA = _segment_gemm(dC, B, m, k, n, False, True)
         if ctx.needs_input_grad[1]:
-            dB = _segment_gemm(A, dC, m, n, p, True, False)
+            dB = _segment_gemm(A, dC, n, m, k, True, False)
         return dA, dB, None, None, None
 
 
