@@ -2,19 +2,18 @@
 import os
 import numpy as np
 import scipy.sparse as sp
+import torch
 import dgl
 
 from tqdm import trange
 from dgl.data import DGLDataset
 from dgl.data.utils import download, _get_dgl_url, load_graphs, save_graphs
 from dgl.convert import graph as dgl_graph
-from dgl.transform import to_bidirected
-from dgl import backend as F
 
 class QM9(DGLDataset):
     r"""QM9 dataset for graph property prediction (regression)
 
-    This dataset consists of 13,0831 molecules with 12 regression targets.
+    This dataset consists of 130,831 molecules with 12 regression targets.
     Nodes correspond to atoms and edges correspond to bonds.
 
     Reference: `"Quantum-Machine.org" <http://quantum-machine.org/datasets/>`_, `"Directional Message Passing for Molecular Graphs" <https://arxiv.org/abs/2003.03123>`_
@@ -140,9 +139,9 @@ class QM9(DGLDataset):
         # graph labels
         self.label_dict = {}
         for k in self._keys:
-            self.label_dict[k] = F.tensor(data_dict[k], dtype=F.data_type_dict['float32'])
+            self.label_dict[k] = torch.tensor(data_dict[k], dtype=torch.float32)
 
-        self.label = F.stack([self.label_dict[key] for key in self.label_keys], dim=1)
+        self.label = torch.stack([self.label_dict[key] for key in self.label_keys], dim=1)
         # graphs & features
         self.graphs, self.line_graphs = self._load_graph()
     
@@ -160,11 +159,10 @@ class QM9(DGLDataset):
             # keep all edges that don't exceed the cutoff and delete self-loops
             adj = sp.csr_matrix(dist <= self.cutoff) - sp.eye(n_atoms, dtype=np.bool)
             adj = adj.tocoo()
-            u, v = F.tensor(adj.row), F.tensor(adj.col)
+            u, v = torch.tensor(adj.row), torch.tensor(adj.col)
             g = dgl_graph((u, v))
-            g.ndata['R'] = F.tensor(R, dtype=F.data_type_dict['float32'])
-            g.ndata['Z'] = F.tensor(self.Z[self.N_cumsum[idx]:self.N_cumsum[idx + 1]], 
-                                    dtype=F.data_type_dict['int64'])
+            g.ndata['R'] = torch.tensor(R, dtype=torch.float32)
+            g.ndata['Z'] = torch.tensor(self.Z[self.N_cumsum[idx]:self.N_cumsum[idx + 1]], dtype=torch.long)
             
             # add user-defined features
             if self.edge_funcs is not None:
@@ -190,7 +188,7 @@ class QM9(DGLDataset):
         line_graph_path = f'{self.save_path}/dgl_line_graph.bin'
         self.graphs, label_dict = load_graphs(graph_path)
         self.line_graphs, _ = load_graphs(line_graph_path)
-        self.label = F.stack([label_dict[key] for key in self.label_keys], dim=1)
+        self.label = torch.stack([label_dict[key] for key in self.label_keys], dim=1)
 
     @property
     def num_labels(self):
