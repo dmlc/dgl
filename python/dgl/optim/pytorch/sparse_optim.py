@@ -18,7 +18,7 @@ class SparseGradOptimizer(abc.ABC):
     lr : float
         The learning rate.
     '''
-    def __init__(self, params, lr):
+    def __init__(self, params, lr, comm=None):
         self._params = params
         self._lr = lr
         self._rank = None
@@ -26,42 +26,87 @@ class SparseGradOptimizer(abc.ABC):
         self._shared_cache = {}
         self._clean_grad = False
         self._opt_meta = {}
+        self._comm = comm
         # hold released shared memory to let other process to munmap it first
         # otherwise it will crash the training
         self.shmem_buffer_holder = []
 
-        for emb in params:
-            assert isinstance(emb, NodeEmbedding), \
-                'DGL SparseOptimizer only supports dgl.nn.NodeEmbedding'
+        if self._comm:
+            # get the rank and world size from the communicator
+            self._rank = self._comm._rank()
+            self._world_size = self._comm.size()
+        else:
+            # if we are using shared memory for communication
+            for emb in params:
+                assert isinstance(emb, NodeEmbedding), \
+                    'DGL SparseOptimizer only supports dgl.nn.NodeEmbedding'
 
-            if self._rank is None:
-                self._rank = emb.rank
-                self._world_size = emb.world_size
-            else:
-                assert self._rank == emb.rank, \
-                    'MultiGPU rank for each embedding should be same.'
-                assert self._world_size == emb.world_size, \
-                    'MultiGPU world_size for each embedding should be same.'
+                if self._rank is None:
+                    self._rank = emb.rank
+                    self._world_size = emb.world_size
+                else:
+                    assert self._rank == emb.rank, \
+                        'MultiGPU rank for each embedding should be same.'
+                    assert self._world_size == emb.world_size, \
+                        'MultiGPU world_size for each embedding should be same.'
 
-            emb_name = emb.name
-            if self._rank == 0: # the master gpu process
-                opt_meta = create_shared_mem_array(emb_name+'_opt_meta', \
-                    (self._world_size, self._world_size), th.int32).zero_()
-            if self._rank == 0:
-                emb.store.set(emb_name+'_opt_meta', emb_name)
-                self._opt_meta[emb_name] = opt_meta
-            elif self._rank > 0:
-                # receive
-                emb.store.wait([emb_name+'_opt_meta'])
-                opt_meta = get_shared_mem_array(emb_name+'_opt_meta', \
-                    (self._world_size, self._world_size), th.int32)
-                self._opt_meta[emb_name] = opt_meta
+                emb_name = emb.name
+                if self._rank == 0: # the master gpu process
+                    opt_meta = create_shared_mem_array(emb_name+'_opt_meta', \
+                        (self._world_size, self._world_size), th.int32).zero_()
+                if self._rank == 0:
+                    emb.store.set(emb_name+'_opt_meta', emb_name)
+                    self._opt_meta[emb_name] = opt_meta
+                elif self._rank > 0:
+                    # receive
+                    emb.store.wait([emb_name+'_opt_meta'])
+                    opt_meta = get_shared_mem_array(emb_name+'_opt_meta', \
+                        (self._world_size, self._world_size), th.int32)
+                    self._opt_meta[emb_name] = opt_meta
 
     def step(self):
         ''' The step function.
 
         The step function is invoked at the end of every batch to update embeddings
         '''
+        if self._comm:
+            self._comm_step()
+        else:
+            self._shared_step()
+
+
+    def _comm_step(self):
+        with th.no_grad():
+            idx_in = {}
+            grad_in = {}
+            for emb in self._params: # pylint: disable=too-many-nested-blocks
+                emb_name = emb.name
+
+                # we need to combine gradients from multiple forward paths
+                idx = []
+                grad = []
+                for i, data in emb._trace:
+                    idx.append(i)
+                    grad.append(data.grad.data)
+                idx_out = th.cat(idx, dim=0)
+                grad_out = th.cat(grad, dim=0)
+
+                idx_in[emb_name], grad_in[emb_name] = self._comm.sparse_all_to_all(
+                    idx, grad, mode='remainder')
+
+            if self._clean_grad:
+                # clean gradient track
+                for emb in self._params:
+                    emb.reset_trace()
+                self._clean_grad = False
+
+            for emb in self._params:
+                idx = idx_in[emb_name] 
+                grad = grad_in{emb_name] 
+                self.update(idx, grad, emb)
+
+
+    def _shared_step(self):
         with th.no_grad():
             # Frequently alloc and free shared memory to hold intermediate tensor is expensive
             # We cache shared memory buffers in shared_emb.

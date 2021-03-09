@@ -6,13 +6,35 @@
 
 #include "nccl_api.h"
 
+#include <cuda_fp16.h>
+
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/registry.h>
-
 
 namespace dgl {
 namespace runtime {
 namespace cuda {
+
+namespace {
+
+template<typename T> ncclDataType_t NCCLType();
+template<> ncclDataType_t NCCLType<int32_t>() {
+    return ncclInt32; 
+}
+template<> ncclDataType_t NCCLType<int64_t>() {
+    return ncclInt64; 
+}
+template<> ncclDataType_t NCCLType<__half>() {
+    return ncclHalf; 
+}
+template<> ncclDataType_t NCCLType<float>() {
+    return ncclFloat32; 
+}
+template<> ncclDataType_t NCCLType<double>() {
+    return ncclFloat64; 
+}
+
+}
 
 /* NCCLUniqueId **************************************************************/
 
@@ -94,6 +116,56 @@ void NCCLCommunicator::AllToAllV(
   }
   ncclGroupEnd();
 }
+
+template<typename IdType, typename DType>
+void NCCLCommunicator::SparseAllToAll(
+      const IdType * const send_idx,
+      const DType * const send_value,
+      const int64_t * const send_prefix,
+      IdType * const recv_idx,
+      DType * const recv_value,
+      const int64_t * const recv_prefix,
+      cudaStream_t stream)
+{
+  const ncclDataType_t idx_type = NCCLType<IdType>;
+  const ncclDataType_t value_type = NCCLType<IdType>;
+
+  ncclGroupStart();
+  for (int r = 0; r < size_; ++r) {
+    const int64_t send_size = send_prefix[r+1]-send_prefix[r];
+    if (send_size > 0) {
+      ncclSend(send_idx+send_prefix[r], send_size, idx_type, r, comm_, stream);
+      ncclSend(send_value+send_prefix[r], send_size, value_type, r, comm_, stream);
+    }
+    const int64_t recv_size = recv_prefix[r+1]-recv_prefix[r];
+    if (recv_size > 0) {
+      ncclRecv(recv_idx+recv_prefix[r], recv_size, idx_type, r, comm_, stream);
+      ncclRecv(recv_value+recv_prefix[r], recv_size, value_type, r, comm_, stream);
+    }
+  }
+  ncclGroupEnd();
+}
+
+template<>
+void NCCLCommunicator::SparseAllToAll<int32_t, __half>(
+      const int32_t * const send_idx,
+      const __half * const send_value,
+      const int64_t * const send_prefix,
+      int32_t * const recv_idx,
+      __half * const recv_value,
+      const int64_t * const recv_prefix,
+      cudaStream_t stream);
+
+template<>
+void NCCLCommunicator::SparseAllToAll<int64_t, __half>(
+      const int64_t * const send_idx,
+      const __half * const send_value,
+      const int64_t * const send_prefix,
+      int64_t * const recv_idx,
+      __half * const recv_value,
+      const int64_t * const recv_prefix,
+      cudaStream_t stream);
+
 
 
 

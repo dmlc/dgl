@@ -5,6 +5,10 @@ from .. import ndarray
 from .. import utils
 from .._ffi.function import _init_api
 
+_COMM_MODES_MAP = {
+    'remainder': 0
+}
+
 class UniqueId(object):
     def __init__(self):
         """ Create an object reference the current NCCL unique id.
@@ -28,8 +32,22 @@ class Communicator(object):
                 The unique id of the root process (rank=0).
         """
         self._handle = _CAPI_DGLNCCLCreateComm(size, rank, unique_id.get())
+        self._rank = rank
+        self._size = size
+
+    def sparse_all_to_all(self, idx, value, mode):
+        mode_id = _COMM_MODES_MAP[mode]
+
+        out_idx, out_value = _CAPI_DGL_NCCLSparseAllToAll(idx, value, mode_id)
+        return out_idx, out_value
 
     def get(self):
         return self._handle
+
+    def rank(self):
+        return self._rank
+
+    def size(self):
+        return self._size
 
 _init_api("dgl.cuda.nccl")

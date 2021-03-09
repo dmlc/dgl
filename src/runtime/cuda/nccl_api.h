@@ -77,6 +77,32 @@ class NCCLCommunicator : public runtime::Object {
       ncclDataType_t type,
       cudaStream_t stream);
 
+  /**
+   * @brief Perform an all-to-all with sparse data (idx and value pairs). By
+   * necessity, the sizes of each message are variable.
+   *
+   * @tparam IdType The type of index.
+   * @tparam DType The type of value.
+   * @param send_idx The set of indexes to send on the device.
+   * @param send_value The set of values to send on the device.
+   * @param send_prefix The exclusive prefix sum of elements to send on the
+   * host.
+   * @param recv_idx The set of indexes to recieve on the device.
+   * @param recv_value The set of values to recieve on the device.
+   * @param recv_prefix The exclusive prefix sum of the number of elements to
+   * recieve on the host.
+   * @param stream The stream to communicate on.
+   */
+  template<typename IdType, typename DType>
+  void SparseAllToAll(
+          const IdType * send_idx,
+          const DType * send_value,
+          const int64_t * send_prefix,
+          IdType * recv_idx,
+          DType * recv_value,
+          const int64_t * recv_prefix,
+          cudaStream_t stream);
+
   static constexpr const char* _type_key = "cuda.NCCLCommunicator";
   DGL_DECLARE_OBJECT_TYPE_INFO(NCCLCommunicator, Object);
 
