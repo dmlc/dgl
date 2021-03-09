@@ -1,34 +1,25 @@
-"""QM9 dataset for graph property prediction (regression)."""
-import os
 import numpy as np
-import scipy.sparse as sp
+import os
+from tqdm import tqdm
 
-from .dgl_dataset import DGLDataset
-from .utils import download, _get_dgl_url
-from ..convert import graph as dgl_graph
-from ..transform import to_bidirected
-from .. import backend as F
+import torch as th
 
-class QM9Dataset(DGLDataset):
+import dgl
+from dgl.data.dgl_dataset import DGLDataset
+from dgl.data.utils import download, load_graphs, _get_dgl_url, extract_archive
+
+class QM9DatasetV2(DGLDataset):
     r"""QM9 dataset for graph property prediction (regression)
-
-    This dataset consists of 130,831 molecules with 12 regression targets.
-    Nodes correspond to atoms and edges correspond to close atom pairs.
-
-    This dataset differs from :class:`~dgl.data.QM9EdgeDataset` in the following aspects:
-        1. Edges in this dataset are purely distance-based.
-        2. It only provides atoms' coordinates and atomic numbers as node features
-        3. It only provides 12 regression targets.
-
-    Reference: 
+    This dataset consists of 130,831 molecules with 19 regression targets.
+    Node means atom and edge means bond.
     
-    - `"Quantum-Machine.org" <http://quantum-machine.org/datasets/>`_,
-    - `"Directional Message Passing for Molecular Graphs" <https://arxiv.org/abs/2003.03123>`_
+    Reference: `"MoleculeNet: A Benchmark for Molecular Machine Learning" <https://arxiv.org/abs/1703.00564>`_
+               Atom features come from `"Neural Message Passing for Quantum Chemistry" <https://arxiv.org/abs/1704.01212>`_
     
     Statistics:
 
     - Number of graphs: 130,831
-    - Number of regression targets: 12
+    - Number of regression targets: 19
 
     +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
     | Keys   | Property                         | Description                                                                       | Unit                                        |
@@ -57,14 +48,25 @@ class QM9Dataset(DGLDataset):
     +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
     | Cv     | :math:`c_{\textrm{v}}`           | Heat capavity at 298.15K                                                          | :math:`\frac{\textrm{cal}}{\textrm{mol K}}` |
     +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-
+    | U0_atom| :math:`U_0^{\textrm{ATOM}}`      | Atomization energy at 0K                                                          | :math:`\textrm{eV}`                         |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | U_atom | :math:`U^{\textrm{ATOM}}`        | Atomization energy at 298.15K                                                     | :math:`\textrm{eV}`                         |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | H_atom | :math:`H^{\textrm{ATOM}}`        | Atomization enthalpy at 298.15K                                                   | :math:`\textrm{eV}`                         |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | G_atom | :math:`G^{\textrm{ATOM}}`        | Atomization free energy at 298.15K                                                | :math:`\textrm{eV}`                         |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | A      | :math:`A`                        | Rotational constant                                                               | :math:`\textrm{GHz}`                        |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | B      | :math:`B`                        | Rotational constant                                                               | :math:`\textrm{GHz}`                        |
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    | c      | :math:`C`                        | Rotational constant                                                               | :math:`\textrm{GHz}`                        |
+    +--------+----------------------------------+----------------------------------------
     Parameters
     ----------
     label_keys: list
         Names of the regression property, which should be a subset of the keys in the table above.
-    cutoff: float
-        Cutoff distance for interatomic interactions, i.e. two atoms are connected in the corresponding graph if the distance between them is no larger than this.
-        Default: 5.0 Angstrom
+        If not provided, will load all the labels.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
         Default: ~/.dgl/
@@ -85,51 +87,88 @@ class QM9Dataset(DGLDataset):
     
     Examples
     --------
-    >>> data = QM9Dataset(label_keys=['mu', 'gap'], cutoff=5.0)
+    >>> data = QM9DatasetV2(label_keys=['mu', 'alpha'])
     >>> data.num_labels
-    2
-    >>>
+    
+    
+    >>> # make each graph dense
+    >>> data.to_dense()
+    
     >>> # iterate over the dataset
-    >>> for g, label in data:
-    ...     R = g.ndata['R'] # get coordinates of each atom
-    ...     Z = g.ndata['Z'] # get atomic numbers of each atom
+    >>> for graph, labels in data:
+    ...     print(graph) # get information of each graph
+    ...     print(labels) # get labels of the corresponding graph
     ...     # your code here...
     >>>
+
     """
-
-    def __init__(self,
-                 label_keys,
-                 cutoff=5.0,
-                 raw_dir=None,
-                 force_reload=False,
-                 verbose=False):
-    
-        self.cutoff = cutoff
+    def __init__(self, 
+                 label_keys = None,
+                 raw_dir=None, 
+                 force_reload=False, 
+                 verbose=True):
+        
         self.label_keys = label_keys
-        self._url = _get_dgl_url('dataset/qm9_eV.npz')
-
-        super(QM9Dataset, self).__init__(name='qm9',
-                                         url=self._url,
-                                         raw_dir=raw_dir,
-                                         force_reload=force_reload,
-                                         verbose=verbose)
-
+        self._url = _get_dgl_url('dataset/qm9_ver2.zip')
+        super(QM9DatasetV2, self).__init__(name='qm9_v2',
+                                            url=self._url,
+                                            raw_dir=raw_dir,
+                                            force_reload=force_reload,
+                                            verbose=verbose)
+        
     def process(self):
-        npz_path = f'{self.raw_dir}/qm9_eV.npz'
-        data_dict = np.load(npz_path, allow_pickle=True)
-        # data_dict['N'] contains the number of atoms in each molecule.
-        # Atomic properties (Z and R) of all molecules are concatenated as single tensors,
-        # so you need this value to select the correct atoms for each molecule.
-        self.N = data_dict['N']
-        self.R = data_dict['R']
-        self.Z = data_dict['Z']
-        self.label = np.stack([data_dict[key] for key in self.label_keys], axis=1)
-        self.N_cumsum = np.concatenate([[0], np.cumsum(self.N)])
+        print('begin loading dataset')
+        graphs, label_dict = load_graphs(os.path.join(self.raw_dir, 'qm9_v2.bin'))
+        self.graphs = graphs
+        if self.label_keys == None:
+            self.labels = np.stack([label_dict[key] for key in label_dict.keys()], axis=1)
+        else:
+            self.labels = np.stack([label_dict[key] for key in self.label_keys], axis=1)
+
+    def to_dense(self):
+        r""" Transfrom each graph to a dense graph and add additional edge attribute(distance between two atoms)
+        
+        Note: This operation will deprecate graph.ndata['pos']
+        
+        """
+        n_graph = self.labels.shape[0]
+        for id in tqdm(range(n_graph), desc = 'processing graphs'):
+            graph = self.graphs[id]
+            n_nodes = graph.num_nodes()
+            row = th.arange(n_nodes, dtype = th.long)
+            col = th.arange(n_nodes, dtype = th.long)
+
+            row = row.view(-1,1).repeat(1, n_nodes).view(-1)
+            col = col.repeat(n_nodes)
+
+            src = graph.edges()[0]
+            dst = graph.edges()[1]
+
+            idx = src * n_nodes + dst
+            size = list(graph.edata['edge_attr'].size())
+            size[0] = n_nodes * n_nodes
+            edge_attr = graph.edata['edge_attr'].new_zeros(size)
+            
+            edge_attr[idx] = graph.edata['edge_attr']
+            
+            pos = graph.ndata['pos']
+            dist = th.norm(pos[col] - pos[row], p=2, dim=-1).view(-1, 1)
+            
+            new_edge_attr =  th.cat([edge_attr, dist.type_as(edge_attr)], dim = -1)
+            
+            new_graph = dgl.graph((row,col))
+            
+            new_graph.ndata['attr'] = graph.ndata['attr']
+            new_graph.edata['edge_attr'] = new_edge_attr
+            new_graph = new_graph.remove_self_loop()
+            
+            self.graphs[id] = new_graph
 
     def download(self):
-        file_path = f'{self.raw_dir}/qm9_eV.npz'
+        file_path = f'{self.raw_dir}/qm9_v2.zip'
         if not os.path.exists(file_path):
             download(self._url, path=file_path)
+            extract_archive(file_path, self.raw_dir, overwrite = True)
 
     @property
     def num_labels(self):
@@ -139,7 +178,7 @@ class QM9Dataset(DGLDataset):
         int
             Number of labels for each graph, i.e. number of prediction tasks.
         """
-        return self.label.shape[1]
+        return self.labels.shape[1]
 
     def __getitem__(self, idx):
         r""" Get graph and label by index
@@ -154,25 +193,15 @@ class QM9Dataset(DGLDataset):
         dgl.DGLGraph
             The graph contains:
 
-            - ``ndata['R']``: the coordinates of each atom
-            - ``ndata['Z']``: the atomic number
+            - ``ndata['pos']``: the coordinates of each atom
+            - ``ndata['attr']``: the atomic attributes
+            - ``edata['edge_attr']``: the bond attributes
 
         Tensor
             Property values of molecular graphs
         """
-        label = F.tensor(self.label[idx], dtype=F.data_type_dict['float32'])
-        n_atoms = self.N[idx]
-        R = self.R[self.N_cumsum[idx]:self.N_cumsum[idx + 1]]
-        dist = np.linalg.norm(R[:, None, :] - R[None, :, :], axis=-1)
-        adj = sp.csr_matrix(dist <= self.cutoff) - sp.eye(n_atoms, dtype=np.bool)
-        adj = adj.tocoo()
-        u, v = F.tensor(adj.row), F.tensor(adj.col)
-        g = dgl_graph((u, v))
-        g = to_bidirected(g)
-        g.ndata['R'] = F.tensor(R, dtype=F.data_type_dict['float32'])
-        g.ndata['Z'] = F.tensor(self.Z[self.N_cumsum[idx]:self.N_cumsum[idx + 1]], 
-                                dtype=F.data_type_dict['int64'])
-        return g, label
+        
+        return self.graphs[idx], self.labels[idx]
 
     def __len__(self):
         r"""Number of graphs in the dataset.
@@ -181,6 +210,4 @@ class QM9Dataset(DGLDataset):
         -------
         int
         """
-        return self.label.shape[0]
-
-QM9 = QM9Dataset
+        return self.labels.shape[0]
