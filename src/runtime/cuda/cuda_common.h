@@ -9,6 +9,7 @@
 #include <cublas_v2.h>
 #include <cusparse.h>
 #include <cuda_runtime.h>
+#include <curand.h>
 #include <dgl/runtime/packed_func.h>
 #include <string>
 #include "../workspace_pool.h"
@@ -70,6 +71,47 @@ inline bool is_zero<dim3>(dim3 size) {
     CHECK(e == CUBLAS_STATUS_SUCCESS) << "CUBLAS ERROR: " << e;    \
   }
 
+#define CURAND_CALL(func)                                           \
+{                                                                   \
+  curandStatus_t e = (func);                                        \
+  CHECK(e == CURAND_STATUS_SUCCESS)                                 \
+    << "CURAND Error: " << dgl::runtime::curandGetErrorString(e)    \
+    << " at " << __FILE__ << ":" << __LINE__;                       \
+}
+
+inline const char* curandGetErrorString(curandStatus_t error) {
+  switch (error) {
+  case CURAND_STATUS_SUCCESS:
+    return "CURAND_STATUS_SUCCESS";
+  case CURAND_STATUS_VERSION_MISMATCH:
+    return "CURAND_STATUS_VERSION_MISMATCH";
+  case CURAND_STATUS_NOT_INITIALIZED:
+    return "CURAND_STATUS_NOT_INITIALIZED";
+  case CURAND_STATUS_ALLOCATION_FAILED:
+    return "CURAND_STATUS_ALLOCATION_FAILED";
+  case CURAND_STATUS_TYPE_ERROR:
+    return "CURAND_STATUS_TYPE_ERROR";
+  case CURAND_STATUS_OUT_OF_RANGE:
+    return "CURAND_STATUS_OUT_OF_RANGE";
+  case CURAND_STATUS_LENGTH_NOT_MULTIPLE:
+    return "CURAND_STATUS_LENGTH_NOT_MULTIPLE";
+  case CURAND_STATUS_DOUBLE_PRECISION_REQUIRED:
+    return "CURAND_STATUS_DOUBLE_PRECISION_REQUIRED";
+  case CURAND_STATUS_LAUNCH_FAILURE:
+    return "CURAND_STATUS_LAUNCH_FAILURE";
+  case CURAND_STATUS_PREEXISTING_FAILURE:
+    return "CURAND_STATUS_PREEXISTING_FAILURE";
+  case CURAND_STATUS_INITIALIZATION_FAILED:
+    return "CURAND_STATUS_INITIALIZATION_FAILED";
+  case CURAND_STATUS_ARCH_MISMATCH:
+    return "CURAND_STATUS_ARCH_MISMATCH";
+  case CURAND_STATUS_INTERNAL_ERROR:
+    return "CURAND_STATUS_INTERNAL_ERROR";
+  }
+  // To suppress compiler warning.
+  return "Unrecognized curand error string";
+}
+
 /*
  * \brief Cast data type to cudaDataType_t.
  */
@@ -122,6 +164,8 @@ class CUDAThreadEntry {
   cusparseHandle_t cusparse_handle{nullptr};
   /*! \brief The cublas handler */
   cublasHandle_t cublas_handle{nullptr};
+  /*! \brief The curand generator */
+  curandGenerator_t curand_gen{nullptr};
   /*! \brief thread local pool*/
   WorkspacePool pool;
   /*! \brief constructor */
