@@ -54,7 +54,7 @@ class InteractionPPBlock(nn.Module):
         GlorotOrthogonal(self.up_projection.weight)
 
     def edge_transfer(self, edges):
-        # Transform via Bessel basis
+        # Transform from Bessel basis to dense vector
         rbf = self.dense_rbf1(edges.data['rbf'])
         rbf = self.dense_rbf2(rbf)
         # Initial transformation
