@@ -12,7 +12,7 @@ argparser.add_argument('--hist_len',type=int,default=5)
 args = argparser.parse_args()
 
 pos = sim2d.reset()
-gui = sim2d.init_render()
+#gui = sim2d.init_render()
 
 class Hist:
     def __init__(self,hist_len):
@@ -63,6 +63,5 @@ for stage in [('train',args.num_traj),('valid',int(args.num_traj/2)),('test',int
              node_state=src_list,
              node_velocity=hist_list,
              label_state=label_list)
-    print(len(label_list))
 
 print("File has been saved!")

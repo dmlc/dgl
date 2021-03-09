@@ -17,6 +17,7 @@ argparser = argparse.ArgumentParser()
 argparser.add_argument("--batch_size",type=int,default=16)
 argparser.add_argument("--epochs",type=int,default=20)
 argparser.add_argument("--num_workers",type=int,default=0)
+argparser.add_argument("--gpu",type=int,default=-1)
 argparser.add_argument("--profile",action='store_true',default=False)
 
 args = argparser.parse_args()
@@ -25,14 +26,15 @@ batch_size = args.batch_size
 epochs = args.epochs
 num_workers = args.num_workers
 PROFILE = args.profile
+device = torch.device('cpu') if args.gpu==-1 else torch.device('cuda:{}'.format(args.gpu))
 
 
 prep = OfflinePrepareLayer(train_dataset.n_particles,
                    batch_size,
                    train_dataset.dim,
-                   torch.from_numpy(train_dataset.boundary),
+                   torch.from_numpy(train_dataset.boundary).to(device),
                    {'vel_mean':0,'vel_std':1},
-                   0.04)
+                   0.04).to(device)
 
 ignn = InteractionGNN(10,
                       14,
@@ -40,7 +42,7 @@ ignn = InteractionGNN(10,
                       20,
                       10,
                       2,
-                      2)
+                      2).to(device)
 
 collator = GraphCollator(radius = 0.03)
 train_dataloader = DataLoader(train_dataset,batch_size=batch_size,shuffle=True,num_workers=num_workers,collate_fn=collator)
@@ -60,6 +62,10 @@ def train():
     total_loss = 0
     for i,(src_batch_g,src_coord,src_vels,dst_coord) in enumerate(train_dataloader):
         optimizer.zero_grad()
+        src_batch_g = src_batch_g.to(device)
+        src_coord = src_coord.to(device)
+        src_vels  = src_vels.to(device)
+        dst_coord = dst_coord.to(device)
         node_feature,edge_feature,current_v = prep(src_batch_g,src_coord,src_vels)
         # Forward interaction network for prediction
         # Manually add acceleration
