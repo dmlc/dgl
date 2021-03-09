@@ -1119,6 +1119,25 @@ class KVClient(object):
         part_policy = self._part_policy[name]
         return (data_type, data_shape, part_policy)
 
+    def get_partid(self, name, id_tensor):
+        """
+        Parameters
+        ----------
+        name : str
+            data name
+        id_tensor : tensor
+            a vector storing the global data ID
+        """
+        assert len(name) > 0, 'name cannot be empty.'
+        id_tensor = utils.toindex(id_tensor)
+        id_tensor = id_tensor.tousertensor()
+        assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
+        # partition data
+        machine_id = self._part_policy[name].to_partid(id_tensor)
+
+        return machine_id
+
+
     def push(self, name, id_tensor, data_tensor):
         """Push data to KVServer.
 
