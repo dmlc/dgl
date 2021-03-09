@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import DataLoader
 from pyinstrument import Profiler
 import argparse
+import os
 
 train_dataset = TaichiTrainDataset()
 valid_dataset = TaichiValidDataset()
@@ -87,6 +88,10 @@ def train():
 def evaluate(loader):
     total_loss = 0
     for i,(src_batch_g,src_coord,src_vels,dst_coord) in enumerate(loader):
+        src_batch_g = src_batch_g.to(device)
+        src_coord = src_coord.to(device)
+        src_vels  = src_vels.to(device)
+        dst_coord = dst_coord.to(device)
         node_feature,edge_feature,current_v = prep(src_batch_g,src_coord,src_vels)
         # Forward interaction network for prediction
         # Manually add acceleration
@@ -101,11 +106,15 @@ def evaluate(loader):
 
 if __name__ == '__main__':
     epochs = 20
+    if not os.path.exists('saved_models'):
+        os.mkdir('saved_models')
     for i in range(epochs):
         train_loss = train()
         valid_loss = evaluate(valid_dataloader)
         test_loss  = evaluate(test_dataloader)
         print("Epoch {} Valid Loss: {} Test Loss: {}".format(epochs,valid_loss,test_loss))
+        torch.save(ignn.state_dict(),'saved_models/model{}.pth'.format(i))
+
     
 
 
