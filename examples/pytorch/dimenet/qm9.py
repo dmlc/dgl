@@ -6,11 +6,11 @@ import torch
 import dgl
 
 from tqdm import trange
-from dgl.data import DGLDataset
+from dgl.data import QM9Dataset
 from dgl.data.utils import download, _get_dgl_url, load_graphs, save_graphs
 from dgl.convert import graph as dgl_graph
 
-class QM9(DGLDataset):
+class QM9(QM9Dataset):
     r"""QM9 dataset for graph property prediction (regression)
 
     This dataset consists of 130,831 molecules with 12 regression targets.
@@ -98,30 +98,21 @@ class QM9(DGLDataset):
                  raw_dir=None,
                  force_reload=False,
                  verbose=False):
-    
-        self.cutoff = cutoff
-        self.label_keys = label_keys
+
         self.edge_funcs = edge_funcs
-        self._url = _get_dgl_url('dataset/qm9_eV.npz')
         self._keys = ['mu', 'alpha', 'homo', 'lumo', 'gap', 'r2', 'zpve', 'U0', 'U', 'H', 'G', 'Cv']
 
-        super(QM9Dataset, self).__init__(name='qm9',
-                                         url=self._url,
-                                         raw_dir=raw_dir,
-                                         force_reload=force_reload,
-                                         verbose=verbose)
+        super(QM9, self).__init__(label_keys=label_keys,
+                                  cutoff=cutoff,
+                                  raw_dir=raw_dir,
+                                  force_reload=force_reload,
+                                  verbose=verbose)
 
     def has_cache(self):
-        """ step 1, if True, goto step 5 """
+        """ step 1, if True, goto step 5; else goto download(step 2), then step 3"""
         graph_path = f'{self.save_path}/dgl_graph.bin'
         line_graph_path = f'{self.save_path}/dgl_line_graph.bin'
         return os.path.exists(graph_path) and os.path.exists(line_graph_path)
-    
-    def download(self):
-        """ step 2 """
-        file_path = f'{self.raw_dir}/qm9_eV.npz'
-        if not os.path.exists(file_path):
-            download(self._url, path=file_path)
 
     def process(self):
         """ step 3 """
@@ -190,16 +181,6 @@ class QM9(DGLDataset):
         self.line_graphs, _ = load_graphs(line_graph_path)
         self.label = torch.stack([label_dict[key] for key in self.label_keys], dim=1)
 
-    @property
-    def num_labels(self):
-        r"""
-        Returns
-        --------
-        int
-            Number of labels for each graph, i.e. number of prediction tasks.
-        """
-        return self.label.shape[1]
-
     def __getitem__(self, idx):
         r""" Get graph and label by index
 
@@ -218,12 +199,3 @@ class QM9(DGLDataset):
             Property values of molecular graphs
         """
         return self.graphs[idx], self.line_graphs[idx], self.label[idx]
-
-    def __len__(self):
-        r"""Number of graphs in the dataset.
-
-        Return
-        -------
-        int
-        """
-        return self.label.shape[0]

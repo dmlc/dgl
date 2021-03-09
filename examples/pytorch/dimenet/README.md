@@ -107,8 +107,10 @@ gamma             float Factor of learning rate decay.                  Default 
 - Linear learning rate warm-up is not used
 - Exponential learning rate decay is not used
 - Exponential moving average (EMA) is not used
-- The values for tasks except Cv, mu, alpha, r2 should be x 10^-3
+- The values for tasks except mu, alpha, r2, Cv should be x 10^-3
 - The author's code didn't provide the pretrained model for gap task
+- MAE(DimeNet in Table 1) is from [here](https://arxiv.org/abs/2003.03123)
+- MAE(DimeNet++ in Table 2) is from [here](https://arxiv.org/abs/2011.14115)
 
 | Target | mu | alpha | homo | lumo | gap | r2 | zpve | U0 | U | H | G | Cv |
 | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
