@@ -7,7 +7,7 @@ import dgl
 
 from tqdm import trange
 from dgl.data import QM9Dataset
-from dgl.data.utils import download, _get_dgl_url, load_graphs, save_graphs
+from dgl.data.utils import load_graphs, save_graphs
 from dgl.convert import graph as dgl_graph
 
 class QM9(QM9Dataset):
