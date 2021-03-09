@@ -16,9 +16,13 @@ class QM9(QM9Dataset):
     This dataset consists of 130,831 molecules with 12 regression targets.
     Nodes correspond to atoms and edges correspond to bonds.
 
-    Reference: `"Quantum-Machine.org" <http://quantum-machine.org/datasets/>`_, `"Directional Message Passing for Molecular Graphs" <https://arxiv.org/abs/2003.03123>`_
+    Reference: 
+    
+    - `"Quantum-Machine.org" <http://quantum-machine.org/datasets/>`_
+    - `"Directional Message Passing for Molecular Graphs" <https://arxiv.org/abs/2003.03123>`_
     
     Statistics:
+
     - Number of graphs: 130,831
     - Number of regression targets: 12
 
