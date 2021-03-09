@@ -205,10 +205,12 @@ class SparseAdagrad:
                         grad_list.append(grad_i)
 
                     # use scatter to sync across trainers about the p2p tensor size
+                    # Note: If we have GPU nccl support, we can use all_to_all to sync information here
                     gather_list = [th.empty((1,), dtype=th.long) for _ in range(kvstore.num_servers)]
                     for i in range(kvstore.num_servers):
                         dist.scatter(gather_list[i], idx_split_size if i == kvstore.machine_id else [], src=kvstore.machine_id)
 
+                    # Note: We may use nccl alltoallv to simplify this
                     # send tensor to each target trainer using torch.distributed.isend
                     # isend is async
                     for i in range(kvstore.num_servers):
