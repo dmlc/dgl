@@ -15,7 +15,7 @@ The codebase is implemented in Python 3.6. For version requirement of packages, 
 
 ```
 click 7.1.2
-dgl 0.5.3
+dgl 0.6.0
 logzero 1.6.3
 numpy 1.19.5
 ruamel.yaml 0.16.12
