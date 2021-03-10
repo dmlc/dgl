@@ -47,16 +47,15 @@ class NCCLCommunicator : public runtime::Object {
    * @brief Perform an all-to-all communication.
    *
    * @param send The continous array of data to send.
-   * @param size The size of data to send to each rank.
    * @param recv The continous array of data to recieve.
-   * @param type The type of data to send.
+   * @param count The size of data to send to each rank.
    * @param stream The stream to operate on.
    */
+  template<typename T>
   void AllToAll(
-      const void * send,
-      int64_t size,
-      void * recv,
-      ncclDataType_t type,
+      const T * send,
+      T * recv,
+      int64_t count,
       cudaStream_t stream);
 
   /**
@@ -102,6 +101,10 @@ class NCCLCommunicator : public runtime::Object {
           DType * recv_value,
           const int64_t * recv_prefix,
           cudaStream_t stream);
+
+  int size() const;
+
+  int rank() const;
 
   static constexpr const char* _type_key = "cuda.NCCLCommunicator";
   DGL_DECLARE_OBJECT_TYPE_INFO(NCCLCommunicator, Object);
