@@ -278,7 +278,8 @@ __global__ void SegmentGemmKernel(
     const int64_t* __restrict__ B_off,
     const int64_t* __restrict__ C_off,
     const int64_t* __restrict__ seg_indices,
-    const int64_t* __restrict__ seg_offsets) {
+    const int64_t* __restrict__ seg_offsets_m,
+    const int64_t* __restrict__ seg_offsets_n) {
   // TODO(zihao): use cutlass device-wide function in the future.
   __shared__ DType A_local[32 * 32],
                    B_local[32 * 32];
@@ -286,15 +287,14 @@ __global__ void SegmentGemmKernel(
   __syncthreads();
   // Preparation
   int64_t seg_id = seg_indices[blockIdx.x],
-          seg_off = seg_offsets[blockIdx.x];
+          cta_m = seg_offsets_m[blockIdx.x] * 32,
+          cta_n = seg_offsets_n[blockIdx.x] * 32;
   const DType *A_global = A + A_off[seg_id],
               *B_global = B + B_off[seg_id];
   DType *C_global = C + C_off[seg_id];
   int64_t m = m_arr[seg_id],
           n = n_arr[seg_id],
           k = k_arr[seg_id];
-  int64_t cta_m = (seg_off / n) * 32,
-          cta_n = (seg_off % n) * 32;
   DType sum = 0.;
   for (int cta_k = 0; cta_k < k; cta_k += 32) {
     // Copying global data to local shared mem.
@@ -360,7 +360,7 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
   std::vector<int64_t> A_off(batch_size + 1, 0),
                        B_off(batch_size + 1, 0),
                        C_off(batch_size + 1, 0);
-  std::vector<int64_t> seg_indices, seg_offsets;
+  std::vector<int64_t> seg_indices, seg_offsets_m, seg_offsets_n;
   // collect information
   for (int i = 0; i < batch_size; ++i) {
     int64_t mi = m_data[i],
@@ -371,9 +371,12 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
     C_off[i + 1] = C_off[i] + mi * ni;
     int seg_mi = (mi + 31) / 32,
         seg_ni = (ni + 31) / 32;
-    for (int j = 0; j < seg_mi * seg_ni; ++j) {
-      seg_indices.push_back(i);
-      seg_offsets.push_back(j);
+    for (int j = 0; j < seg_mi; ++j) {
+      for (int k = 0; k < seg_ni; ++k) {
+        seg_indices.push_back(i);
+        seg_offsets_m.push_back(j);
+        seg_offsets_n.push_back(k);
+      }
     }
   }
 
@@ -383,7 +386,7 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
 
     // allocate memory and data movement
     int64_t *pool = static_cast<int64_t*>(
-        device->AllocWorkspace(ctx, (6 * batch_size + 2 * nblks) * sizeof(int64_t)));
+        device->AllocWorkspace(ctx, (6 * batch_size + 3 * nblks) * sizeof(int64_t)));
     int64_t *m_gpu = pool,
             *n_gpu = m_gpu + batch_size,
             *k_gpu = n_gpu + batch_size,
@@ -391,7 +394,8 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
             *B_off_gpu = A_off_gpu + batch_size,
             *C_off_gpu = B_off_gpu + batch_size,
             *seg_indices_gpu = C_off_gpu + batch_size,
-            *seg_offsets_gpu = seg_indices_gpu + nblks;
+            *seg_offsets_m_gpu = seg_indices_gpu + nblks,
+            *seg_offsets_n_gpu = seg_offsets_m_gpu + nblks;
     CUDA_CALL(cudaMemcpy(m_gpu, m_data,
         batch_size * sizeof(int64_t), cudaMemcpyHostToDevice));
     CUDA_CALL(cudaMemcpy(n_gpu, n_data,
@@ -406,7 +410,9 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
         batch_size * sizeof(int64_t), cudaMemcpyHostToDevice));
     CUDA_CALL(cudaMemcpy(seg_indices_gpu, seg_indices.data(),
         nblks * sizeof(int64_t), cudaMemcpyHostToDevice));
-    CUDA_CALL(cudaMemcpy(seg_offsets_gpu, seg_offsets.data(),
+    CUDA_CALL(cudaMemcpy(seg_offsets_m_gpu, seg_offsets_m.data(),
+        nblks * sizeof(int64_t), cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(seg_offsets_n_gpu, seg_offsets_n.data(),
         nblks * sizeof(int64_t), cudaMemcpyHostToDevice));
 
     // trigger kernel
@@ -417,7 +423,7 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
           A_data, B_data, C_data,
           m_gpu, n_gpu, k_gpu,
           A_off_gpu, B_off_gpu, C_off_gpu,
-          seg_indices_gpu, seg_offsets_gpu
+          seg_indices_gpu, seg_offsets_m_gpu, seg_offsets_n_gpu
         );
       });
     });
