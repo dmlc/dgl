@@ -256,20 +256,69 @@ XgemmBatched<half>(
 
 }  // namespace
 
-template <typename DType>
+#define TRANS_SWITCH(trans_x, transX, ...) do { \
+  if (trans_x) {                                \
+    constexpr bool transX = true;               \
+    { __VA_ARGS__ }                             \
+  } else {                                      \
+    constexpr bool transX = false;              \
+    { __VA_ARGS__ }                             \
+  }                                             \
+} while (0)
+
+template <typename DType, bool transA, bool transB>
 __global__ void SegmentGemmKernel(
     const DType* __restrict__ A,
     const DType* __restrict__ B,
     DType* __restrict__ C,
-    const int64_t* __restrict__ m,
-    const int64_t* __restrict__ n,
-    const int64_t* __restrict__ k,
-    const int64_t* __restrict__ blk_seg_map,
-    bool transA,
-    bool transB
-) {
-  
-  // TODO(zihao)
+    const int64_t* __restrict__ m_arr,
+    const int64_t* __restrict__ n_arr,
+    const int64_t* __restrict__ k_arr,
+    const int64_t* __restrict__ A_off,
+    const int64_t* __restrict__ B_off,
+    const int64_t* __restrict__ C_off,
+    const int64_t* __restrict__ seg_indices,
+    const int64_t* __restrict__ seg_offsets) {
+  // TODO(zihao): use cutlass device-wide function in the future.
+  __shared__ DType A_local[32 * 32],
+                   B_local[32 * 32];
+  int64_t tx = threadIdx.x, ty = threadIdx.y;
+  __syncthreads();
+  // Preparation
+  int64_t seg_id = seg_indices[blockIdx.x],
+          seg_off = seg_offsets[blockIdx.x];
+  const DType *A_global = A + A_off[seg_id],
+              *B_global = B + B_off[seg_id];
+  DType *C_global = C + C_off[seg_id];
+  int64_t m = m_arr[seg_id],
+          n = n_arr[seg_id],
+          k = k_arr[seg_id];
+  int64_t cta_m = (seg_off / n) * 32,
+          cta_n = (seg_off % n) * 32;
+  DType sum = 0.;
+  for (int cta_k = 0; cta_k < k; cta_k += 32) {
+    // Copying global data to local shared mem.
+    // copy A
+    if (cta_m + ty < m && cta_k + tx < k) {
+      A_local[ty * 32 + tx] = A_global[(cta_m + ty) * k + (cta_k + tx)];
+    } else {
+      A_local[ty * 32 + tx] = 0.;
+    }
+    // copy B
+    if (cta_k + ty < k && cta_n + tx < n) {
+      B_local[ty * 32 + tx] = B_global[(cta_k + ty) * n + (cta_n + tx)];
+    } else {
+      B_local[ty * 32 + tx] = 0.;
+    }
+    __syncthreads();
+#pragma unroll
+    for (int iter_k = 0; iter_k < 32; iter_k++) {
+      sum += A_local[ty * 32 + iter_k] * B_local[iter_k * 32 + tx];
+    }
+  }
+  // Write local data back to global mem.
+  if (cta_m + ty < m && cta_n + tx < n)
+    C_global[(cta_m + ty) * n + (cta_n + tx)] = sum;
 }
 
 /*
@@ -280,11 +329,13 @@ __global__ void SegmentGemmKernel(
  * \param m the array of number of rows in A.
  * \param n the array of number of columns in C.
  * \param k the array of number of rows in B / number of columns in A.
+ * \param trans_a if A_i need to be transposed.
+ * \param trans_b if B_i need to be transposed.
  */
 template <typename DType>
 void SegmentGemm(NDArray A, NDArray B, NDArray C,
                  NDArray m, NDArray n, NDArray k,
-                 bool transA, bool transB) {
+                 bool trans_a, bool trans_b) {
   auto ctx = A->ctx;
   const DType *A_data = A.Ptr<DType>();
   const DType *B_data = B.Ptr<DType>();
@@ -302,7 +353,7 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
   std::vector<int64_t> A_off(batch_size + 1, 0),
                        B_off(batch_size + 1, 0),
                        C_off(batch_size + 1, 0);
-  std::vector<int64_t> blk_seg_map_cpu;
+  std::vector<int64_t> seg_indices, seg_offsets;
   // collect information
   for (int i = 0; i < batch_size; ++i) {
     int64_t mi = m_data[i],
@@ -314,31 +365,81 @@ void SegmentGemm(NDArray A, NDArray B, NDArray C,
     int seg_mi = (mi + 31) / 32,
         seg_ni = (ni + 31) / 32;
     for (int j = 0; j < seg_mi * seg_ni; ++j) {
-      blk_seg_map_cpu.push_back(i);
+      seg_indices.push_back(i);
+      seg_offsets.push_back(j);
     }
-  } 
+  }
   
-  // parallelize with CUDA stream.
-  for (int i = 0; i < batch_size; ++i) {
-    int64_t mi = m_data[i],
-            ni = n_data[i],
-            ki = k_data[i];
-    if (mi > 0 && ni > 0 && ki > 0) {
-      DType alpha = 1., beta = 0.;
-      int ldb = transB ? ki: ni,
-          lda = transA ? mi: ki,
-          ldc = ni;
-      CUBLAS_CALL(Xgemm<DType>(
-          thr_entry->cublas_handle,
-          transB ? CUBLAS_OP_T : CUBLAS_OP_N,
-          transA ? CUBLAS_OP_T : CUBLAS_OP_N,
-          ni, mi, ki,
-          &alpha,
-          B_data + B_off[i], ldb,
-          A_data + A_off[i], lda,
-          &beta,
-          C_data + C_off[i], ldc
-      ));
+  const int nblks = seg_indices.size();
+  const dim3 nthrs(32, 32);
+
+  // allocate memory and data movement
+  int64_t *pool = static_cast<int64_t*>(
+      device->AllocWorkspace(ctx, (6 * batch_size + 2 * nblks) * sizeof(int64_t)));
+  int64_t *m_gpu = pool,
+          *n_gpu = m_gpu + batch_size,
+          *k_gpu = n_gpu + batch_size,
+          *A_off_gpu = k_gpu + batch_size,
+          *B_off_gpu = A_off_gpu + batch_size,
+          *C_off_gpu = B_off_gpu + batch_size,
+          *seg_indices_gpu = C_off_gpu + batch_size,
+          *seg_offsets_gpu = seg_indices_gpu + nblks;
+  CUDA_CALL(cudaMemcpy(m_gpu, m_data,
+      batch_size * sizeof(int64_t), cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMemcpy(n_gpu, n_data,
+      batch_size * sizeof(int64_t), cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMemcpy(k_gpu, k_data,
+      batch_size * sizeof(int64_t), cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMemcpy(A_off_gpu, A_off.data(),
+      batch_size * sizeof(int64_t), cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMemcpy(B_off_gpu, B_off.data(),
+      batch_size * sizeof(int64_t), cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMemcpy(C_off_gpu, C_off.data(),
+      batch_size * sizeof(int64_t), cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMemcpy(seg_indices_gpu, seg_indices.data(),
+      nblks * sizeof(int64_t), cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMemcpy(seg_offsets_gpu, seg_offsets.data(),
+      nblks * sizeof(int64_t), cudaMemcpyHostToDevice));
+
+  // trigger kernel
+  TRANS_SWITCH(trans_a, transA, {
+    TRANS_SWITCH(trans_b, transB, {
+      CUDA_KERNEL_CALL((SegmentGemmKernel<DType, transA, transB>),
+        nblks, nthrs, 0, thr_entry->stream,
+        A_data, B_data, C_data,
+        m_gpu, n_gpu, k_gpu,
+        A_off_gpu, B_off_gpu, C_off_gpu,
+        seg_indices_gpu, seg_offsets_gpu,
+      );
+    })
+  });
+
+  // deallocate memory
+  device->FreeDataSpace(ctx, pool);
+  
+  if (false) {
+    // parallelize with CUDA stream.
+    for (int i = 0; i < batch_size; ++i) {
+      int64_t mi = m_data[i],
+              ni = n_data[i],
+              ki = k_data[i];
+      if (mi > 0 && ni > 0 && ki > 0) {
+        DType alpha = 1., beta = 0.;
+        int ldb = transB ? ki: ni,
+            lda = transA ? mi: ki,
+            ldc = ni;
+        CUBLAS_CALL(Xgemm<DType>(
+            thr_entry->cublas_handle,
+            transB ? CUBLAS_OP_T : CUBLAS_OP_N,
+            transA ? CUBLAS_OP_T : CUBLAS_OP_N,
+            ni, mi, ki,
+            &alpha,
+            B_data + B_off[i], ldb,
+            A_data + A_off[i], lda,
+            &beta,
+            C_data + C_off[i], ldc
+        ));
+      }
     }
   }
 }

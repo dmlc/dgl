@@ -319,7 +319,7 @@ class SegmentGemm(th.autograd.Function):
         if ctx.needs_input_grad[0]:
             dA = _segment_gemm(dC, B, m, k, n, False, True)
         if ctx.needs_input_grad[1]:
-            dB = _segment_gemm(A, dC, n, m, k, True, False)
+            dB = _segment_gemm(A, dC, k, n, m, True, False)
         return dA, dB, None, None, None
 
 

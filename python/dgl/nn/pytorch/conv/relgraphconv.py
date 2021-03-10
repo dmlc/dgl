@@ -237,8 +237,8 @@ class RelGraphConv(nn.Module):
             """
             msg = segment_gemm(h.view(-1), weight.view(-1),
                                th.tensor(etypes),
-                               th.tensor([self.in_feat] * self.num_rels),
-                               th.tensor([self.out_feat] * self.num_rels))
+                               th.tensor([self.out_feat] * self.num_rels),
+                               th.tensor([self.in_feat] * self.num_rels))
             msg = msg.view(-1, self.out_feat)
         else:
             # Use batched matmult
