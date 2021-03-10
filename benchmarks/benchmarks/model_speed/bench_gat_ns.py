@@ -66,7 +66,7 @@ def load_subtensor(g, seeds, input_nodes, device):
     batch_labels = g.ndata['labels'][seeds].to(device)
     return batch_inputs, batch_labels
 
-@utils.benchmark('time', 3600)
+@utils.benchmark('time', 600)
 @utils.parametrize('data', ['reddit', 'ogbn-products'])
 def track_time(data):
     data = utils.process_data(data)
@@ -82,7 +82,6 @@ def track_time(data):
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
     g.create_formats_()
 
-    num_epochs = 20
     num_hidden = 16
     num_heads = 8
     num_layers = 2
@@ -113,7 +112,7 @@ def track_time(data):
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
-    # dry run one epoch
+    # dry run
     for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
         # Load the input features as well as output labels
         #batch_inputs, batch_labels = load_subtensor(g, seeds, input_nodes, device)
@@ -128,27 +127,31 @@ def track_time(data):
         loss.backward()
         optimizer.step()
 
+        if step >= 3:
+            break
+
     # Training loop
     avg = 0
     iter_tput = []
     t0 = time.time()
-    for epoch in range(num_epochs):
-        # Loop over the dataloader to sample the computation dependency graph as a list of
-        # blocks.
-        for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
-            # Load the input features as well as output labels
-            #batch_inputs, batch_labels = load_subtensor(g, seeds, input_nodes, device)
-            blocks = [block.int().to(device) for block in blocks]
-            batch_inputs = blocks[0].srcdata['features']
-            batch_labels = blocks[-1].dstdata['labels']
+    # Loop over the dataloader to sample the computation dependency graph as a list of
+    # blocks.
+    for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
+        # Load the input features as well as output labels
+        blocks = [block.int().to(device) for block in blocks]
+        batch_inputs = blocks[0].srcdata['features']
+        batch_labels = blocks[-1].dstdata['labels']
 
-            # Compute loss and prediction
-            batch_pred = model(blocks, batch_inputs)
-            loss = loss_fcn(batch_pred, batch_labels)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+        # Compute loss and prediction
+        batch_pred = model(blocks, batch_inputs)
+        loss = loss_fcn(batch_pred, batch_labels)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if step >= 9:  # time 10 loops
+            break
 
     t1 = time.time()
 
-    return (t1 - t0) / num_epochs
+    return (t1 - t0) / (step + 1)

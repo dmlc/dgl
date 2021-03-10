@@ -236,7 +236,9 @@ macro(dgl_config_cuda out_variable)
     src/kernel/cuda/*.cc
     src/kernel/cuda/*.cu
     src/runtime/cuda/*.cc
+    src/runtime/cuda/*.cu
     src/geometry/cuda/*.cu
+    src/graph/transform/cuda/*.cu
   )
 
   # NVCC flags
@@ -270,7 +272,8 @@ macro(dgl_config_cuda out_variable)
   list(APPEND DGL_LINKER_LIBS
     ${CUDA_CUDART_LIBRARY}
     ${CUDA_CUBLAS_LIBRARIES}
-    ${CUDA_cusparse_LIBRARY})
+    ${CUDA_cusparse_LIBRARY}
+    ${CUDA_CURAND_LIBRARY})
 
   set(${out_variable} ${DGL_CUDA_SRC})
 endmacro()

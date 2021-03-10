@@ -12,59 +12,13 @@
 
 #include "kernel_decl.h"
 #include "../c_api_common.h"
+#include "./check.h"
 
 using namespace dgl::runtime;
 
 namespace dgl {
 namespace aten {
 namespace {
-
-// Check whether the given arguments have the same context.
-inline void CheckCtx(
-    const DLContext& ctx,
-    const std::vector<NDArray>& arrays,
-    const std::vector<std::string>& names) {
-  for (size_t i = 0; i < arrays.size(); ++i) {
-    if (IsNullArray(arrays[i]))
-      continue;
-    CHECK_EQ(ctx, arrays[i]->ctx)
-      << "Expected device context " << ctx << ". But got "
-      << arrays[i]->ctx << " for " << names[i] << ".";
-  }
-}
-
-// Check whether input tensors are contiguous.
-inline void CheckContiguous(
-    const std::vector<NDArray>& arrays,
-    const std::vector<std::string>& names) {
-  for (size_t i = 0; i < arrays.size(); ++i) {
-    if (IsNullArray(arrays[i]))
-      continue;
-    CHECK(arrays[i].IsContiguous())
-      << "Expect " << names[i] << " to be a contiguous tensor";
-  }
-}
-
-// Check whether input tensors have valid shape.
-inline void CheckShape(
-    const std::vector<uint64_t>& gdim,
-    const std::vector<int>& uev_idx,
-    const std::vector<NDArray>& arrays,
-    const std::vector<std::string>& names) {
-  for (size_t i = 0; i < arrays.size(); ++i) {
-    if (IsNullArray(arrays[i]))
-      continue;
-    CHECK_GE(arrays[i]->ndim, 2)
-      << "Expect " << names[i] << " to have ndim >= 2, "
-      << "Note that for scalar feature we expand its "
-      << "dimension with an additional dimension of "
-      << "length one.";
-    CHECK_EQ(gdim[uev_idx[i]], arrays[i]->shape[0])
-      << "Expect " << names[i] << " to have size "
-      << gdim[uev_idx[i]] << " on the first dimension, "
-      << "but got " << arrays[i]->shape[0];
-  }
-}
 
 }  // namespace
 
@@ -153,6 +107,17 @@ void SegmentReduceDispatch(const std::string& op,
   });
 }
 
+/*! \brief Scatter Add (on first dimension) dispatch function. */
+void ScatterAddDispatch(NDArray feat, NDArray idx, NDArray out) {
+  ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "ScatterAdd", {
+    ATEN_ID_TYPE_SWITCH(idx->dtype, IdType, {
+      ATEN_FLOAT_BITS_SWITCH(feat->dtype, bits, "Feature data", {
+        ScatterAdd<XPU, IdType, bits>(feat, idx, out);
+      });
+    });
+  });
+}
+
 /*! \brief Backward segment cmp dispatch function.*/
 void BackwardSegmentCmpDispatch(NDArray feat, NDArray arg, NDArray out) {
   ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "BackwardSegmentCmp", {
@@ -223,6 +188,16 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSegmentReduce")
     CheckCtx(feat->ctx, {feat, offsets, out}, {"feat", "offsets", "out"});
     CheckContiguous({feat, offsets, out}, {"feat", "offsets", "out"});
     SegmentReduceDispatch(op, feat, offsets, out, arg);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelScatterAdd")
+.set_body([](DGLArgs args, DGLRetValue *rv) {
+    NDArray feat = args[0];
+    NDArray idx = args[1];
+    NDArray out = args[2];
+    CheckCtx(feat->ctx, {feat, idx, out}, {"feat", "idx", "out"});
+    CheckContiguous({feat, idx, out}, {"feat", "idx", "out"});
+    ScatterAddDispatch(feat, idx, out);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelBwdSegmentCmp")

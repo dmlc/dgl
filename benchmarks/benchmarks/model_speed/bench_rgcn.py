@@ -38,7 +38,7 @@ class RGCN(nn.Module):
             h = layer(g, h, r, norm)
         return h
 
-@utils.benchmark('time', 3600)
+@utils.benchmark('time', 300)
 @utils.parametrize('data', ['aifb'])
 @utils.parametrize('lowmem', [True, False])
 @utils.parametrize('use_type_count', [True, False])

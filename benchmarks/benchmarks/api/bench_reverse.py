@@ -20,7 +20,7 @@ def track_time(graph_name, format):
 
     # timing
     with utils.Timer() as t:
-        for i in range(10):
+        for i in range(100):
             gg = dgl.reverse(graph)
 
-    return t.elapsed_secs / 10
+    return t.elapsed_secs / 100

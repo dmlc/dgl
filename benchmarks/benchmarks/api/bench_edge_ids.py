@@ -29,7 +29,7 @@ def track_time(graph_name, format, fraction, return_uv):
         out = graph.edge_ids(u[0], v[0])
 
     # timing
-    
+
     with utils.Timer() as t:
         for i in range(3):
             edges = graph.edge_ids(u, v, return_uv=return_uv)

@@ -8,7 +8,7 @@ from .. import utils
 
 
 @utils.benchmark('time', timeout=600)
-@utils.parametrize('graph_name', ['cora', 'reddit'])
+@utils.parametrize('graph_name', ['cora', 'ogbn-arxiv'])
 @utils.parametrize('format', ['coo', 'csr'])
 @utils.parametrize('feat_size', [8, 128, 512])
 @utils.parametrize('reduce_type', ['u->e', 'u+v'])
@@ -25,12 +25,13 @@ def track_time(graph_name, format, feat_size, reduce_type):
     }
 
     # dry run
-    graph.apply_edges(reduce_builtin_dict[reduce_type])
+    for i in range(3):
+        graph.apply_edges(reduce_builtin_dict[reduce_type])
 
     # timing
     
     with utils.Timer() as t:
-        for i in range(3):
+        for i in range(10):
             graph.apply_edges(reduce_builtin_dict[reduce_type])
 
-    return t.elapsed_secs / 3
+    return t.elapsed_secs / 10
