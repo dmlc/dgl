@@ -1,4 +1,4 @@
-''' Credit: https://github.com/fanyun-sun/InfoGraph '''
+''' Code adapted from https://github.com/fanyun-sun/InfoGraph '''
 import torch as th
 import torch.nn.functional as F
 

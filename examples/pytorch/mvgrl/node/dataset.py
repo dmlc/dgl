@@ -1,3 +1,4 @@
+''' Code adapted from https://github.com/kavehhassani/mvgrl '''
 import numpy as np
 import torch as th
 import scipy.sparse as sp
