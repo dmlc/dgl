@@ -2,7 +2,6 @@
 # pylint: disable= no-member, arguments-differ, invalid-name
 import tensorflow as tf
 from tensorflow.keras import layers
-import numpy as np
 
 from .... import function as fn
 from ....base import DGLError
@@ -54,7 +53,6 @@ class EdgeConv(layers.Layer):
     after conv.
     """
     def __init__(self,
-                 in_feats,
                  out_feats,
                  batch_norm=False,
                  allow_zero_in_degree=False):
