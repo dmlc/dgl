@@ -10,7 +10,7 @@ from ....utils import expand_as_pair
 
 
 class EdgeConv(layers.Layer):
-        r"""
+    r"""
     Description
     -----------
     EdgeConv layer.
@@ -58,14 +58,14 @@ class EdgeConv(layers.Layer):
                  out_feats,
                  batch_norm=False,
                  allow_zero_in_degree=False):
-    super(EdgeConv, self).__init__()
-    self.batch_norm = batch_norm
-    self._allow_zero_in_degree = allow_zero_in_degree
-    
-    self.theta = layers.Dense( out_feats)
-    self.phi = layers.Dense( out_feats)
-    if batch_norm:
-        self.bn = layers.BatchNormalization()
+        super(EdgeConv, self).__init__()
+        self.batch_norm = batch_norm
+        self._allow_zero_in_degree = allow_zero_in_degree
+
+        self.theta = layers.Dense(out_feats)
+        self.phi = layers.Dense(out_feats)
+        if batch_norm:
+            self.bn = layers.BatchNormalization()
 
     def set_allow_zero_in_degree(self, set_value):
         r"""
@@ -78,7 +78,7 @@ class EdgeConv(layers.Layer):
             The value to be set to the flag.
         """
         self._allow_zero_in_degree = set_value
-        
+
     def call(self, graph, feat):
         """
         Description
@@ -124,7 +124,7 @@ class EdgeConv(layers.Layer):
         g.edata['theta'] = self.theta(g.edata['theta'])
         g.dstdata['phi'] = self.phi(g.dstdata['x'])
         if not self.batch_norm:
-            g.update_all(fn.e_add_v('theta','phi','e'),fn.max('e', 'x'))
+            g.update_all(fn.e_add_v('theta', 'phi', 'e'), fn.max('e', 'x'))
         else:
             g.apply_edges(fn.e_add_v('theta', 'phi', 'e'))
             # for more comments on why global batch norm instead
@@ -133,6 +133,3 @@ class EdgeConv(layers.Layer):
             g.edata['e'] = self.bn(g.edata['e'])
             g.update_all(fn.copy_e('e', 'e'), fn.max('e', 'x'))
         return g.dstdata['x']
-            
-            
-    
