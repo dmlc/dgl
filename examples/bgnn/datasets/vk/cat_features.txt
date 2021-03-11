@@ -1,0 +1,11 @@
+country
+city
+has_mobile
+last_seen_platform
+political
+religion_id
+alcohol
+smoking
+relation
+sex
+university
