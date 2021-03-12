@@ -505,31 +505,25 @@ class Frame(MutableMapping):
 
     def _append(self, other):
         """Append ``other`` frame to ``self`` frame."""
-        # NOTE: `other` can be empty.
-        if self.num_rows == 0:
-            # if no rows in current frame; append is equivalent to
-            # directly updating columns.
-            self._columns = {key: Column.create(data) for key, data in other.items()}
-        else:
-            # pad columns that are not provided in the other frame with initial values
-            for key, col in self._columns.items():
-                if key in other:
-                    continue
-                scheme = col.scheme
-                ctx = F.context(col.data)
-                if self.get_initializer(key) is None:
-                    self._set_zero_default_initializer()
-                initializer = self.get_initializer(key)
-                new_data = initializer((other.num_rows,) + scheme.shape,
-                                       scheme.dtype, ctx,
-                                       slice(self._num_rows, self._num_rows + other.num_rows))
-                other[key] = new_data
-            # append other to self
-            for key, col in other._columns.items():
-                if key not in self._columns:
-                    # the column does not exist; init a new column
-                    self.add_column(key, col.scheme, F.context(col.data))
-                self._columns[key].extend(col.data, col.scheme)
+        # pad columns that are not provided in the other frame with initial values
+        for key, col in self._columns.items():
+            if key in other:
+                continue
+            scheme = col.scheme
+            ctx = F.context(col.data)
+            if self.get_initializer(key) is None:
+                self._set_zero_default_initializer()
+            initializer = self.get_initializer(key)
+            new_data = initializer((other.num_rows,) + scheme.shape,
+                                   scheme.dtype, ctx,
+                                   slice(self._num_rows, self._num_rows + other.num_rows))
+            other[key] = new_data
+        # append other to self
+        for key, col in other._columns.items():
+            if key not in self._columns:
+                # the column does not exist; init a new column
+                self.add_column(key, col.scheme, F.context(col.data))
+            self._columns[key].extend(col.data, col.scheme)
 
     def append(self, other):
         """Append another frame's data into this frame.

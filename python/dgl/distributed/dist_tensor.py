@@ -8,17 +8,10 @@ from .role import get_role
 from .. import utils
 from .. import backend as F
 
-def _get_data_name(name, part_policy):
-    ''' This is to get the name of data in the kvstore.
-
-    KVStore doesn't understand node data or edge data. We'll use a prefix to distinguish them.
-    '''
-    return part_policy + ':' + name
-
 def _default_init_data(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
 
-# These Ids can identify the anonymous distributed tensors.
+# These IDs can identify the anonymous distributed tensors.
 DIST_TENSOR_ID = 0
 
 class DistTensor:
@@ -34,11 +27,13 @@ class DistTensor:
     graph. Therefore, their first dimensions have to be the number of nodes or edges in the graph.
     The tensors are sharded in the first dimension based on the partition policy of nodes
     or edges. When a distributed tensor is created, the partition policy is automatically
-    determined based on the first dimension if the partition policy is not provided: if the first
-    dimension matches the number of nodes, ``DistTensor`` will use the node partition policy;
-    if the first dimension matches the number of edges, ``DistTensor`` wll use the edge partition
-    policy. To determine the partition policy automatically, a DistGraph object has to be created.
-    Users can overwrite the rule by providing a partition policy directly.
+    determined based on the first dimension if the partition policy is not provided. If the first
+    dimension matches the number of nodes of a node type, ``DistTensor`` will use the partition
+    policy for this particular node type; if the first dimension matches the number of edges of
+    an edge type, ``DistTensor`` will use the partition policy for this particular edge type.
+    If DGL cannot determine the partition policy automatically (e.g., multiple node types or
+    edge types have the same number of nodes or edges), users have to explicity provide
+    the partition policy.
 
     A distributed tensor can be ether named or anonymous.
     When a distributed tensor has a name, the tensor can be persistent if ``persistent=True``.
@@ -144,10 +139,12 @@ class DistTensor:
             assert not persistent, 'We cannot generate anonymous persistent distributed tensors'
             global DIST_TENSOR_ID
             # All processes of the same role should create DistTensor synchronously.
-            # Thus, all of them should have the same Ids.
+            # Thus, all of them should have the same IDs.
             name = 'anonymous-' + get_role() + '-' + str(DIST_TENSOR_ID)
             DIST_TENSOR_ID += 1
-        self._name = _get_data_name(name, part_policy.policy_str)
+        assert isinstance(name, str), 'name {} is type {}'.format(name, type(name))
+        data_name = part_policy.get_data_name(name)
+        self._name = str(data_name)
         self._persistent = persistent
         if self._name not in exist_names:
             self.kvstore.init_data(self._name, shape, dtype, part_policy, init_func)
