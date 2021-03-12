@@ -66,7 +66,7 @@ This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang9
 --lr1              float   Learning rate of main model.           Default is 0.001.
 --lr2              float   Learning rate of linear classifer.     Default is 0.01.
 --wd1              float   Weight decay of main model.            Default is 0.0.
---wd2			   float   Weight decay of linear classifier.     Default is 0.0.
+--wd2              float   Weight decay of linear classifier.     Default is 0.0.
 --hid_dim          float   Embedding dimension.                   Default is 512.
 ```
 
