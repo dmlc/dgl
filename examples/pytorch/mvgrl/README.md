@@ -49,8 +49,8 @@ This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang9
 --epochs           int     Number of training periods.            Default is 200.
 --batch_size       int     Size of a training batch.              Default is 64.
 --patience         int     Early stopping steps.                  Default is 20.
---lr               float   Learning rate.           			  Default is 0.001.
---wd               float   Weight decay.            			  Default is 0.0.
+--lr               float   Learning rate.                         Default is 0.001.
+--wd               float   Weight decay.                          Default is 0.0.
 --hid_dim          float   Embedding dimension.                   Default is 32.
 --n_layers         int     Number of GNN layers.                  Default is 4
 ```
