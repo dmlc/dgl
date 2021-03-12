@@ -295,7 +295,7 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Global Attention Improves Graph Networks Generalization**](https://arxiv.org/abs/2006.07846), *Omri Puny, Heli Ben-Hamu, and Yaron Lipman*
 
-1. [**Learning over Families of Sets -- Hypergraph Representation Learning for Higher Order Tasks**](https://arxiv.org/abs/2101.07773), SDM 2021, *Balasubramaniam Srinivasan, Da Zheng, George Karypis*
+1. [**Learning over Families of Sets -- Hypergraph Representation Learning for Higher Order Tasks**](https://arxiv.org/abs/2101.07773), SDM 2021, *Balasubramaniam Srinivasan, Da Zheng, and George Karypis*
 
 </details>
 
