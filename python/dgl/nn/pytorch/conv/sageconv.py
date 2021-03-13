@@ -208,7 +208,7 @@ class SAGEConv(nn.Module):
 
             # Determine whether to apply linear transformation before message passing A(XW)
             lin_before_mp = self._in_src_feats > self._out_feats
-            
+
             # Message Passing
             if self._aggre_type == 'mean':
                 graph.srcdata['h'] = self.fc_neigh(feat_src) if lin_before_mp else feat_src
@@ -241,12 +241,12 @@ class SAGEConv(nn.Module):
             if self._aggre_type == 'gcn':
                 rst = h_neigh
             else:
-                rst = self.fc_self(h_self) + h_neigh 
+                rst = self.fc_self(h_self) + h_neigh
 
             # bias term
             if self.bias is not None:
                 rst = rst + self.bias
-            
+
             # activation
             if self.activation is not None:
                 rst = self.activation(rst)
