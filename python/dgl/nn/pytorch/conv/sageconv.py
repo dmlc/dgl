@@ -219,7 +219,10 @@ class SAGEConv(nn.Module):
             elif self._aggre_type == 'gcn':
                 check_eq_shape(feat)
                 graph.srcdata['h'] = self.fc_neigh(feat_src) if lin_before_mp else feat_src
-                graph.dstdata['h'] = graph.srcdata['h']     # same as above if homogeneous
+                if isinstance(feat, tuple):  # heterogeneous
+                    graph.dstdata['h'] = self.fc_neigh(feat_dst) if lin_before_mp else feat_dst
+                else:
+                    graph.dstdata['h'] = graph.srcdata['h']
                 graph.update_all(msg_fn, fn.sum('m', 'neigh'))
                 # divide in_degrees
                 degs = graph.in_degrees().to(feat_dst)
