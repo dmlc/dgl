@@ -762,7 +762,7 @@ def test_dense_sage_conv(g, idtype, out_dim):
     sage = nn.SAGEConv(5, out_dim, 'gcn')
     dense_sage = nn.DenseSAGEConv(5, out_dim)
     dense_sage.fc.weight.data = sage.fc_neigh.weight.data
-    dense_sage.fc.bias.data = sage.fc_neigh.bias.data
+    dense_sage.fc.bias.data = sage.bias.data
     if len(g.ntypes) == 2:
         feat = (
             F.randn((g.number_of_src_nodes(), 5)),
