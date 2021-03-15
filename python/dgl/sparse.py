@@ -1,7 +1,6 @@
 """Module for sparse matrix operators."""
 # pylint: disable= invalid-name
 from __future__ import absolute_import
-
 import dgl.ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
@@ -120,6 +119,11 @@ def _gspmm(gidx, op, reduce_op, u, e):
         raise DGLError("We only support gspmm on graph with one edge type")
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
+    if use_u and use_e:
+        if F.dtype(u) != F.dtype(e):
+            raise DGLError("The node features' data type {} doesn't match edge"
+                           " features' data type {}, please convert them to the"
+                           " same type.".format(F.dtype(u), F.dtype(e)))
     # deal with scalar features.
     expand_u, expand_e = False, False
     if use_u:
@@ -130,6 +134,7 @@ def _gspmm(gidx, op, reduce_op, u, e):
         if F.ndim(e) == 1:
             e = F.unsqueeze(e, -1)
             expand_e = True
+
     ctx = F.context(u) if use_u else F.context(e)
     dtype = F.dtype(u) if use_u else F.dtype(e)
     u_shp = F.shape(u) if use_u else (0,)
@@ -218,6 +223,10 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
         raise DGLError("We only support gsddmm on graph with one edge type")
     use_lhs = op != 'copy_rhs'
     use_rhs = op != 'copy_lhs'
+    if use_lhs and use_rhs:
+        if F.dtype(lhs) != F.dtype(rhs):
+            raise DGLError("The operands data type don't match: {} and {}, please convert them"
+                           " to the same type.".format(F.dtype(lhs), F.dtype(rhs)))
     # deal with scalar features.
     expand_lhs, expand_rhs = False, False
     if use_lhs:
@@ -297,6 +306,35 @@ def _segment_reduce(op, feat, offsets):
                                  arg_nd)
     arg = None if arg is None else F.zerocopy_from_dgl_ndarray(arg_nd)
     return out, arg
+
+
+def _scatter_add(x, idx, m):
+    r""" Scatter add operator (on first dimension) implementation.
+
+    Math: y[idx[i], *] += x[i, *]
+
+    Parameters
+    ----------
+    x : Tensor
+        The input feature.
+    idx : Tensor
+        The indices array.
+    m : int
+        The length of output.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    out_shp = (m,) + F.shape(x)[1:]
+    ctx = F.context(x)
+    dtype = F.dtype(x)
+    out = F.zeros(out_shp, dtype, ctx)
+    _CAPI_DGLKernelScatterAdd(to_dgl_nd(x),
+                              to_dgl_nd(idx),
+                              to_dgl_nd_for_write(out))
+    return out
 
 
 def _bwd_segment_cmp(feat, arg, m):

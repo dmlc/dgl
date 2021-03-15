@@ -56,6 +56,14 @@ def graph1():
     g.edata['w'] = F.copy_to(F.randn((g.number_of_edges(), 3)), F.cpu())
     return g
 
+@register_case(['homo', 'has_scalar_e_feature'])
+def graph1():
+    g = dgl.graph(([0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 6, 6, 7, 8, 9],
+                   [4, 5, 1, 2, 4, 7, 9, 8 ,6, 4, 1, 0, 1, 0, 2, 3, 5]), device=F.cpu())
+    g.ndata['h'] = F.copy_to(F.randn((g.number_of_nodes(), 2)), F.cpu())
+    g.edata['scalar_w'] = F.copy_to(F.abs(F.randn((g.number_of_edges(),))), F.cpu())
+    return g
+
 @register_case(['hetero', 'has_feature'])
 def heterograph0():
     g = dgl.heterograph({

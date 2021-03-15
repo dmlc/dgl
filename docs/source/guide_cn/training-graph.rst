@@ -42,6 +42,9 @@
 
    批次化的图
 
+需要注意，DGL里对图进行变换的函数会去掉图上的批次信息。用户可以通过 :func:`dgl.DGLGraph.set_batch_num_nodes`
+和 :func:`dgl.DGLGraph.set_batch_num_edges` 两个函数在变换后的图上重新加入批次信息。
+
 图读出
 ^^^^^^^^^^^^^
 
@@ -143,25 +146,14 @@ DGL内置了常见的图读出函数，例如 :func:`dgl.readout_nodes` 就实�
     dataset = dgl.data.GINDataset('MUTAG', False)
 
 整图分类数据集里的每个数据点是一个图和它对应标签的元组。为提升数据加载速度，
-用户可以在DataLoader里自定义collate函数。
+用户可以调用GraphDataLoader，从而以小批次遍历整个图数据集。
 
 .. code:: python
 
-    def collate(samples):
-        graphs, labels = map(list, zip(*samples))
-        batched_graph = dgl.batch(graphs)
-        batched_labels = torch.tensor(labels)
-        return batched_graph, batched_labels
-
-随后用户可以创建一个以小批次遍历整个图数据集的DataLoader。
-
-.. code:: python
-
-    from torch.utils.data import DataLoader
-    dataloader = DataLoader(
+    from dgl.dataloading import GraphDataLoader
+    dataloader = GraphDataLoader(
         dataset,
         batch_size=1024,
-        collate_fn=collate,
         drop_last=False,
         shuffle=True)
 
@@ -176,7 +168,7 @@ DGL内置了常见的图读出函数，例如 :func:`dgl.readout_nodes` 就实�
     opt = torch.optim.Adam(model.parameters())
     for epoch in range(20):
         for batched_graph, labels in dataloader:
-            feats = batched_graph.ndata['attr'].float()
+            feats = batched_graph.ndata['attr']
             logits = model(batched_graph, feats)
             loss = F.cross_entropy(logits, labels)
             opt.zero_grad()

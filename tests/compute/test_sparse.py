@@ -261,7 +261,7 @@ def test_segment_reduce(reducer):
     value = F.tensor(np.random.rand(10, 5))
     v1 = F.attach_grad(F.clone(value))
     v2 = F.attach_grad(F.clone(value))
-    seglen = F.tensor([2, 3, 0, 4, 1])
+    seglen = F.tensor([2, 3, 0, 4, 1, 0, 0])
     u = F.copy_to(F.arange(0, F.shape(value)[0], F.int32), ctx)
     v = F.repeat(F.copy_to(F.arange(0, len(seglen), F.int32), ctx),
                  seglen, dim=0)

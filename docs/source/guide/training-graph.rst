@@ -80,6 +80,10 @@ about the list.
     bg.edges()
     # (tensor([0, 1, 2, 4, 4, 4, 5], tensor([1, 2, 3, 4, 5, 6, 4]))
 
+Please note that most dgl transformation functions will discard the batch information.
+In order to maintain such information, please use :func:`dgl.DGLGraph.set_batch_num_nodes`
+and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph.
+
 Graph Readout
 ^^^^^^^^^^^^^
 
@@ -193,27 +197,15 @@ Assuming that one have a graph classification dataset as introduced in
 
 Each item in the graph classification dataset is a pair of a graph and
 its label. One can speed up the data loading process by taking advantage
-of the DataLoader, by customizing the collate function to batch the
-graphs:
-
-.. code:: python
-
-    def collate(samples):
-        graphs, labels = map(list, zip(*samples))
-        batched_graph = dgl.batch(graphs)
-        batched_labels = torch.tensor(labels)
-        return batched_graph, batched_labels
-
-Then one can create a DataLoader that iterates over the dataset of
+of the GraphDataLoader to iterate over the dataset of
 graphs in mini-batches.
 
 .. code:: python
 
-    from torch.utils.data import DataLoader
-    dataloader = DataLoader(
+    from dgl.dataloading import GraphDataLoader
+    dataloader = GraphDataLoader(
         dataset,
         batch_size=1024,
-        collate_fn=collate,
         drop_last=False,
         shuffle=True)
 
@@ -229,7 +221,7 @@ updating the model.
     opt = torch.optim.Adam(model.parameters())
     for epoch in range(20):
         for batched_graph, labels in dataloader:
-            feats = batched_graph.ndata['attr'].float()
+            feats = batched_graph.ndata['attr']
             logits = model(batched_graph, feats)
             loss = F.cross_entropy(logits, labels)
             opt.zero_grad()

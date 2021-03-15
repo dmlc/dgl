@@ -16,8 +16,10 @@ and an ``EdgeDataLoader`` for edge/link prediction task.
 
 .. autoclass:: NodeDataLoader
 .. autoclass:: EdgeDataLoader
+.. autoclass:: GraphDataLoader
 
 .. _api-dataloading-neighbor-sampling:
+
 Neighbor Sampler
 -----------------------------
 .. currentmodule:: dgl.dataloading.neighbor
@@ -36,6 +38,19 @@ the ``sample_blocks`` methods.
 
 .. autoclass:: MultiLayerFullNeighborSampler
     :show-inheritance:
+
+.. _api-dataloading-collators:
+
+Collators
+---------
+.. currentmodule:: dgl.dataloading
+
+Collators are platform-agnostic classes that generates the mini-batches
+given the graphs and indices to sample from.
+
+.. autoclass:: NodeCollator
+.. autoclass:: EdgeCollator
+.. autoclass:: GraphCollator
 
 .. _api-dataloading-negative-sampling:
 

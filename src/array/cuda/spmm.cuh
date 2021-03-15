@@ -8,6 +8,7 @@
 
 #include <dgl/bcast.h>
 #include "macro.cuh"
+#include "fp16.cuh"
 #include "atomic.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
@@ -19,20 +20,6 @@ using namespace cuda;
 namespace aten {
 namespace cuda {
 
-/*!
- * \brief CUDA Kernel of filling the vector started from ptr of size length
- *        with val.
- * \note internal use only.
- */
-template <typename DType>
-__global__ void _FillKernel(DType* ptr, size_t length, DType val) {
-  int tx = blockIdx.x * blockDim.x + threadIdx.x;
-  int stride_x = gridDim.x * blockDim.x;
-  while (tx < length) {
-    ptr[tx] = val;
-    tx += stride_x;
-  }
-}
 
 /*!
  * \brief CUDA kernel of g-SpMM on Coo format.
@@ -132,7 +119,7 @@ __global__ void ArgSpMMCooKernel(
 }
 
 /*!
- * \brief CUDA kernel of g-SpMM on Coo format.
+ * \brief CUDA kernel of g-SpMM on Csr format.
  * \note it uses node parallel strategy, different threadblocks (on y-axis)
  *       is responsible for the computation on different destination nodes.
  *       Threadblocks on the x-axis are responsible for the computation on
@@ -161,7 +148,7 @@ __global__ void SpMMCsrKernel(
   while (ty < num_rows) {
     int tx = blockIdx.x * blockDim.x + threadIdx.x;
     while (tx < out_len) {
-      DType local_accum = ReduceOp::zero;
+      DType local_accum = ReduceOp::zero();
       Idx local_argu = 0, local_arge = 0;
       const int lhs_add = UseBcast ? ubcast_off[tx] : tx;
       const int rhs_add = UseBcast ? ebcast_off[tx] : tx;
@@ -205,6 +192,12 @@ void SpMMCoo(
     const COOMatrix& coo,
     NDArray ufeat, NDArray efeat,
     NDArray out, NDArray argu, NDArray arge) {
+#if defined(CUDART_VERSION) && CUDART_VERSION <= 10000
+  if (std::is_same<DType, half>::value)
+    LOG(FATAL) << "SpMMCoo requires atomicCAS, which is not supported "
+               << "for float16 in CUDA 10.0. Please upgrade your CUDA "
+               << "to later versions.";
+#endif
   const Idx *row = coo.row.Ptr<Idx>(),
             *col = coo.col.Ptr<Idx>(),
             *edge_map = coo.data.Ptr<Idx>();
@@ -225,7 +218,7 @@ void SpMMCoo(
   const int nt = FindNumThreads(out_size);
   const int nb = (out_size + nt - 1) / nt;
   CUDA_KERNEL_CALL(_FillKernel, nb, nt, 0, thr_entry->stream,
-      out_data, out_size, ReduceOp::zero);
+      out_data, out_size, ReduceOp::zero());
 
   const int ntx = FindNumThreads(len);
   const int nty = CUDA_MAX_NUM_THREADS / ntx;

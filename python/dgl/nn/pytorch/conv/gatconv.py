@@ -4,7 +4,7 @@ import torch as th
 from torch import nn
 
 from .... import function as fn
-from ....ops import edge_softmax
+from ...functional import edge_softmax
 from ....base import DGLError
 from ..utils import Identity
 from ....utils import expand_as_pair
@@ -73,8 +73,8 @@ class GATConv(nn.Module):
 
     Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
     since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree``
-    to ``True`` for those cases to unblock the code and handle zere-in-degree nodes manually.
-    A common practise to handle this is to filter out the nodes with zere-in-degree when use
+    to ``True`` for those cases to unblock the code and handle zero-in-degree nodes manually.
+    A common practise to handle this is to filter out the nodes with zero-in-degree when use
     after conv.
 
     Examples
@@ -260,9 +260,11 @@ class GATConv(nn.Module):
                 h_src = self.feat_drop(feat[0])
                 h_dst = self.feat_drop(feat[1])
                 if not hasattr(self, 'fc_src'):
-                    self.fc_src, self.fc_dst = self.fc, self.fc
-                feat_src = self.fc_src(h_src).view(-1, self._num_heads, self._out_feats)
-                feat_dst = self.fc_dst(h_dst).view(-1, self._num_heads, self._out_feats)
+                    feat_src = self.fc(h_src).view(-1, self._num_heads, self._out_feats)
+                    feat_dst = self.fc(h_dst).view(-1, self._num_heads, self._out_feats)
+                else:
+                    feat_src = self.fc_src(h_src).view(-1, self._num_heads, self._out_feats)
+                    feat_dst = self.fc_dst(h_dst).view(-1, self._num_heads, self._out_feats)
             else:
                 h_src = h_dst = self.feat_drop(feat)
                 feat_src = feat_dst = self.fc(h_src).view(
