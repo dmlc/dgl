@@ -32,25 +32,28 @@ NDArray CSRMask(
   const IdType* B_eids = B_has_eid ? B.data.Ptr<IdType>() : nullptr;
   const DType* A_data = A_weights.Ptr<DType>();
   const int64_t M = A.num_rows;
+  const int64_t N = A.num_cols;
 
   NDArray C_weights = NDArray::Empty({B.indices->shape[0]}, A_weights->dtype, A_weights->ctx);
   DType* C_data = C_weights.Ptr<DType>();
 
-  phmap::flat_hash_map<IdType, DType> map;
+  std::vector<bool> has_value(N);
+  std::vector<DType> values(N);
 
   for (IdType i = 0; i < M; ++i) {
-    map.clear();
-    map.reserve(A_indptr[i + 1] - A_indptr[i]);
     for (IdType u = A_indptr[i]; u < A_indptr[i + 1]; ++u) {
       IdType kA = A_indices[u];
-      map.insert({kA, A_data[A_eids ? A_eids[u] : u]});
+      has_value[kA] = true;
+      values[kA] = A_data[A_eids ? A_eids[u] : u];
     }
 
     for (IdType v = B_indptr[i]; v < B_indptr[i + 1]; ++v) {
       IdType kB = B_indices[v];
-      const auto it = map.find(kB);
-      C_data[B_eids ? B_eids[v] : v] = (it != map.end()) ? it->second : 0;
+      C_data[B_eids ? B_eids[v] : v] = has_value[kB] ? values[kB] : 0;
     }
+
+    for (IdType u = A_indptr[i]; u < A_indptr[i + 1]; ++u)
+      has_value[A_indices[u]] = false;
   }
 
   return C_weights;

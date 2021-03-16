@@ -41,47 +41,42 @@ std::pair<CSRMatrix, NDArray> CSRSum(
     A_data[i] = data.Ptr<DType>();
   }
 
-  std::vector<IdType> C_indptr, C_indices;
+  IdArray C_indptr = IdArray::Empty({M + 1}, A[0].indptr->dtype, A[0].indptr->ctx);
+  IdType* C_indptr_data = C_indptr.Ptr<IdType>();
+  std::vector<IdType> C_indices;
   std::vector<DType> C_weights;
-
-  C_indptr.reserve(M + 1);
-  C_indptr.push_back(0);
   IdType nnz = 0;
+  C_indptr_data[0] = 0;
 
-  phmap::flat_hash_map<IdType, DType> map;
+  std::vector<bool> has_value(N);
+  std::vector<DType> values(N);
 
   for (IdType i = 0; i < M; ++i) {
-    map.clear();
-
-    int64_t nelems = 0;
-    for (int64_t k = 0; k < n; ++k)
-      nelems += A_indptr[k][i + 1] - A_indptr[k][i];
-    map.reserve(nelems);
-
     for (int64_t k = 0; k < n; ++k) {
       for (IdType u = A_indptr[k][i]; u < A_indptr[k][i + 1]; ++u) {
         IdType kA = A_indices[k][u];
         DType vA = A_data[k][A_eids[k] ? A_eids[k][u] : u];
-        auto it = map.insert({kA, vA});
-        if (!it.second)
-          it.first->second += vA;
+        has_value[kA] = true;
+        values[kA] += vA;
       }
     }
 
-    nnz += map.size();
-    C_indptr.push_back(nnz);
-    C_indices.reserve(nnz);
-    C_weights.reserve(nnz);
-    for (auto kv : map) {
-      C_indices.push_back(kv.first);
-      C_weights.push_back(kv.second);
+    for (IdType j = 0; j < N; ++j) {
+      if (has_value[j]) {
+        C_indices.push_back(j);
+        C_weights.push_back(values[j]);
+        ++nnz;
+        has_value[j] = false;
+        values[j] = 0;
+      }
     }
+
+    C_indptr_data[i + 1] = nnz;
   }
 
   return {
       CSRMatrix(
-        M, N, NDArray::FromVector(C_indptr), NDArray::FromVector(C_indices),
-        NullArray(), true),
+        M, N, C_indptr, NDArray::FromVector(C_indices), NullArray(), true),
       NDArray::FromVector(C_weights)};
 }
 
