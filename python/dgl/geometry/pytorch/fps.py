@@ -31,8 +31,8 @@ class FarthestPointSampler(nn.Module):
         pos : tensor
             The positional tensor of shape (B, N, C)
         random_start : bool
-            If `True`, randomly select a node as the
-            start node, else use the first node.
+            If `True`, randomly select a point as the
+            start point, otherwise use the first point.
 
         Returns
         -------
