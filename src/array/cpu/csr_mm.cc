@@ -15,7 +15,7 @@ using dgl::runtime::NDArray;
 
 namespace aten {
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <int XPU, typename IdType, typename DType>
 std::pair<CSRMatrix, NDArray> CSRMM(
     const CSRMatrix& A,
     NDArray A_weights,
@@ -55,12 +55,12 @@ std::pair<CSRMatrix, NDArray> CSRMM(
     for (IdType j = 0; j < P; ++j) {
       bool has_entry = false;
       DType value = 0;
-      for (IdType v = B_indptr[j]; v < B_indptr[j + 1]; ++j) {
+      for (IdType v = B_indptr[j]; v < B_indptr[j + 1]; ++v) {
         IdType kB = B_indices[v];
         const auto it = map.find(kB);
         if (it != map.end()) {
           has_entry = true;
-          DType vA = it->first;
+          DType vA = it->second;
           DType vB = B_data[B_eids ? B_eids[v] : v];
           value += vA * vB;
         }

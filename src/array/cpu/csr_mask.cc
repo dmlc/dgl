@@ -15,7 +15,7 @@ using dgl::runtime::NDArray;
 
 namespace aten {
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <int XPU, typename IdType, typename DType>
 NDArray CSRMask(
     const CSRMatrix& A,
     NDArray A_weights,
