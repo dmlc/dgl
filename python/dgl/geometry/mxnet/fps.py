@@ -24,13 +24,16 @@ class FarthestPointSampler(nn.Block):
         super(FarthestPointSampler, self).__init__()
         self.npoints = npoints
 
-    def forward(self, pos):
+    def forward(self, pos, random_start=True):
         r"""Memory allocation and sampling
 
         Parameters
         ----------
         pos : tensor
             The positional tensor of shape (B, N, C)
+        random_start : bool
+            If `True`, randomly select a node as the
+            start node, else use the first node.
 
         Returns
         -------
@@ -41,7 +44,10 @@ class FarthestPointSampler(nn.Block):
         B, N, C = pos.shape
         pos = pos.reshape(-1, C)
         dist = nd.zeros((B * N), dtype=pos.dtype, ctx=ctx)
-        start_idx = nd.random.randint(0, N - 1, (B, ), dtype=np.int, ctx=ctx)
+        if random_start:
+            start_idx = nd.random.randint(0, N - 1, (B, ), dtype=np.int, ctx=ctx)
+        else:
+            start_idx = nd.zeros((B, ), dtype=np.int, ctx=ctx)
         result = nd.zeros((self.npoints * B), dtype=np.int, ctx=ctx)
         farthest_point_sampler(pos, B, self.npoints, dist, start_idx, result)
         return result.reshape(B, self.npoints)
