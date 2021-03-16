@@ -19,7 +19,7 @@ namespace aten {
 /*!
  * \brief Generalized Sparse Matrix Dense Matrix Multiplication on Csr format.
  */
-template <int XPU, typename IdType, int bits>
+template <DLDeviceType XPU, typename IdType, int bits>
 void SpMMCsr(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
              const aten::CSRMatrix& csr,
@@ -31,7 +31,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
 /*!
  * \brief Generalized Sparse Matrix Dense Matrix Multiplication on Coo format.
  */
-template <int XPU, typename IdType, int bits>
+template <DLDeviceType XPU, typename IdType, int bits>
 void SpMMCoo(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
              const aten::COOMatrix& coo,
@@ -43,7 +43,7 @@ void SpMMCoo(const std::string& op, const std::string& reduce,
 /*!
  * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Csr format.
  */
-template <int XPU, typename IdType, int bits>
+template <DLDeviceType XPU, typename IdType, int bits>
 void SDDMMCsr(const std::string& op,
               const BcastOff& bcast,
               const aten::CSRMatrix& csr,
@@ -56,7 +56,7 @@ void SDDMMCsr(const std::string& op,
 /*!
  * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Coo format.
  */
-template <int XPU, typename IdType, int bits>
+template <DLDeviceType XPU, typename IdType, int bits>
 void SDDMMCoo(const std::string& op,
               const BcastOff& bcast,
               const aten::COOMatrix& coo,
@@ -69,7 +69,7 @@ void SDDMMCoo(const std::string& op,
 /*!
  * \brief Segment reduce.
  */
-template <int XPU, typename IdType, int bits>
+template <DLDeviceType XPU, typename IdType, int bits>
 void SegmentReduce(const std::string& op,
                    NDArray feat,
                    NDArray offsets,
@@ -87,10 +87,36 @@ void ScatterAdd(NDArray feat,
 /*!
  * \brief Backward function of segment cmp.
  */
-template <int XPU, typename IdType, int bits>
+template <DLDeviceType XPU, typename IdType, int bits>
 void BackwardSegmentCmp(NDArray feat,
                         NDArray arg,
                         NDArray out);
+
+/*!
+ * \brief Sparse-sparse matrix multiplication
+ *
+ * \note B is transposed (i.e. in CSC format).
+ */
+template <DLDeviceType XPU, typename IdType, typename DType>
+std::pair<CSRMatrix, NDArray> CSRMM(
+    CSRMatrix A,
+    NDArray A_weights,
+    CSRMatrix B,
+    NDArray B_weights);
+
+/*!
+ * \brief Sparse-sparse matrix summation.
+ */
+template <DLDeviceType XPU, typename IdType, typename DType>
+std::pair<CSRMatrix, NDArray> CSRSum(
+    const std::vector<CSRMatrix>& A,
+    const std::vector<NDArray>& A_weights);
+
+/*!
+ * \brief Return a sparse matrix with the values of A but nonzero entry locations of B.
+ */
+template <DLDeviceType XPU, typename IdType, typename DType>
+NDArray CSRMask(const CSRMatrix& A, NDArray A_weights, const CSRMatrix& B);
 
 }  // namespace aten
 }  // namespace dgl
