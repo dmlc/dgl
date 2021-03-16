@@ -21,7 +21,7 @@ std::pair<CSRMatrix, NDArray> CSRMM(
     NDArray A_weights,
     const CSRMatrix& B,
     NDArray B_weights) {
-  CHECK_EQ(A.num_cols, B.num_cols) << "A's number of columns must equal to B's number of rows";
+  CHECK_EQ(A.num_cols, B.num_rows) << "A's number of columns must equal to B's number of rows";
   const bool A_has_eid = !IsNullArray(A.data);
   const bool B_has_eid = !IsNullArray(B.data);
   const IdType* A_indptr = A.indptr.Ptr<IdType>();
@@ -33,51 +33,44 @@ std::pair<CSRMatrix, NDArray> CSRMM(
   const DType* A_data = A_weights.Ptr<DType>();
   const DType* B_data = B_weights.Ptr<DType>();
   const int64_t M = A.num_rows;
-  const int64_t P = B.num_rows;
+  const int64_t P = B.num_cols;
 
-  std::vector<IdType> C_indptr, C_indices;
+  IdArray C_indptr = IdArray::Empty({M + 1}, A.indptr->dtype, A.indptr->ctx);
+  IdType* C_indptr_data = C_indptr.Ptr<IdType>();
+  std::vector<IdType> C_indices;
   std::vector<DType> C_weights;
-
-  C_indptr.reserve(M + 1);
-  C_indptr.push_back(0);
   IdType nnz = 0;
+  C_indptr_data[0] = 0;
 
-  phmap::flat_hash_map<IdType, DType> map;
+  std::vector<bool> has_value(P);
+  std::vector<DType> values(P);
 
   for (IdType i = 0; i < M; ++i) {
-    map.clear();
-    map.reserve(A_indptr[i + 1] - A_indptr[i]);
     for (IdType u = A_indptr[i]; u < A_indptr[i + 1]; ++u) {
-      IdType kA = A_indices[u];
-      map.insert({kA, A_data[A_eids ? A_eids[u] : u]});
+      IdType w = A_indices[u];
+      DType vA = A_data[A_eids ? A_eids[u] : u];
+      for (IdType v = B_indptr[w]; v < B_indptr[w + 1]; ++v) {
+        IdType t = B_indices[v];
+        DType vB = B_data[B_eids ? B_eids[v] : v];
+        has_value[t] = true;
+        values[t] += vA * vB;
+      }
     }
 
     for (IdType j = 0; j < P; ++j) {
-      bool has_entry = false;
-      DType value = 0;
-      for (IdType v = B_indptr[j]; v < B_indptr[j + 1]; ++v) {
-        IdType kB = B_indices[v];
-        const auto it = map.find(kB);
-        if (it != map.end()) {
-          has_entry = true;
-          DType vA = it->second;
-          DType vB = B_data[B_eids ? B_eids[v] : v];
-          value += vA * vB;
-        }
-      }
-      if (has_entry) {
-        ++nnz;
+      if (has_value[j]) {
         C_indices.push_back(j);
-        C_weights.push_back(value);
+        C_weights.push_back(values[j]);
+        ++nnz;
+        has_value[j] = false;
+        values[j] = 0;
       }
     }
-    C_indptr.push_back(nnz);
+    C_indptr_data[i + 1] = nnz;
   }
 
   return {
-      CSRMatrix(
-        M, P, NDArray::FromVector(C_indptr), NDArray::FromVector(C_indices),
-        NullArray(), true),
+      CSRMatrix(M, P, C_indptr, NDArray::FromVector(C_indices), NullArray(), true),
       NDArray::FromVector(C_weights)};
 }
 

@@ -141,9 +141,7 @@ template <typename IdType, typename DType>
 void _TestCsrmm(DLContext ctx = CTX) {
   auto A = CSR_A<IdType, DType>(ctx);
   auto B = CSR_B<IdType, DType>(ctx);
-  auto B_mat = aten::CSRTranspose(B.first);
-  auto B_weights = B.second;
-  auto A_mm_B = aten::CSRMM(A.first, A.second, B_mat, B_weights);
+  auto A_mm_B = aten::CSRMM(A.first, A.second, B.first, B.second);
   auto A_mm_B2 = CSR_A_mm_B<IdType, DType>(ctx);
   bool result = CSRIsClose<IdType, DType>(A_mm_B.first, A_mm_B2.first, A_mm_B.second, A_mm_B2.second, 1e-4, 1e-4);
   ASSERT_TRUE(result);
