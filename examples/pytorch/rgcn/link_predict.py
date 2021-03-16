@@ -193,8 +193,7 @@ def main(args):
             # save best model
             if best_mrr < mrr:
                 best_mrr = mrr
-                torch.save({'state_dict': model.state_dict(), 'epoch': epoch},
-                        model_state_file)
+                torch.save({'state_dict': model.state_dict(), 'epoch': epoch}, model_state_file)
             
             if epoch >= args.n_epochs:
                 break
