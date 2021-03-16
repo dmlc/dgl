@@ -2,6 +2,7 @@
 This DGL example implements the model proposed in the paper [Contrastive Multi-View Representation Learning on Graphs](https://arxiv.org/abs/2006.05582).
 
 Paper link: https://arxiv.org/abs/2006.05582
+
 Author's code: https://github.com/kavehhassani/mvgrl
 
 ## Example Implementor

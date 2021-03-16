@@ -10,8 +10,8 @@ class LogReg(nn.Module):
 
         self.fc = nn.Linear(hid_dim, n_classes)
 
-    def forward(self, seq):
-        ret = self.fc(seq)
+    def forward(self, x):
+        ret = self.fc(x)
         return ret
 
 
