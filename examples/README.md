@@ -87,7 +87,7 @@ The folder contains example implementations of selected research papers related 
 
 ## 2021
 
-- <a name="bgnn"></a> Ivanov et al. Boost then Convolve: Gradient Boosting Meets Graph Neural Networks [Paper link](https://openreview.net/forum?id=ebS5NUfoMKL). 
+- <a name="bgnn"></a> Ivanov et al. Boost then Convolve: Gradient Boosting Meets Graph Neural Networks. [Paper link](https://openreview.net/forum?id=ebS5NUfoMKL). 
     - Example code: [PyTorch](../examples/pytorch/bgnn)
     - Tags: semi-supervised node classification, tabular data, GBDT
 
