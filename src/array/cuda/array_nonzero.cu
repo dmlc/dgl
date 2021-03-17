@@ -15,10 +15,15 @@ namespace aten {
 namespace impl {
 
 template <typename IdType>
-struct IsNonZero {
-  __device__ bool operator() (const IdType val) {
-    return val != 0;
+struct IsNonZeroIndex {
+  explicit IsNonZeroIndex(const IdType * array) : array_(array) {
   }
+
+  __device__ bool operator() (const int64_t index) {
+    return array_[index] != 0;
+  }
+
+  const IdType * array_;
 };
 
 template <DLDeviceType XPU, typename IdType>
@@ -34,16 +39,19 @@ IdArray NonZero(IdArray array) {
   const IdType * const in_data = static_cast<const IdType*>(array->data);
   int64_t * const out_data = static_cast<int64_t*>(ret->data);
 
+  IsNonZeroIndex<IdType> comp(in_data);
+  cub::CountingInputIterator<int64_t> counter(0);
+
   // room for cub to output on GPU
   int64_t * d_num_nonzeros = static_cast<int64_t*>(
       device->AllocWorkspace(ctx, sizeof(int64_t)));
 
   size_t temp_size = 0;
-  cub::DeviceSelect::If(nullptr, temp_size, in_data, out_data,
-      d_num_nonzeros, len, IsNonZero<IdType>());
+  cub::DeviceSelect::If(nullptr, temp_size, counter, out_data,
+      d_num_nonzeros, len, comp, stream);
   void * temp = device->AllocWorkspace(ctx, temp_size);
-  cub::DeviceSelect::If(temp, temp_size, in_data, out_data,
-      d_num_nonzeros, len, IsNonZero<IdType>(), stream);
+  cub::DeviceSelect::If(temp, temp_size, counter, out_data,
+      d_num_nonzeros, len, comp, stream);
   device->FreeWorkspace(ctx, temp);
 
   // copy number of selected elements from GPU to CPU
