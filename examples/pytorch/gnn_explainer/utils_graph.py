@@ -1,5 +1,3 @@
-#-*- coding:utf-8 -*-
-
 # Utility file for graph queries
 
 import tkinter
@@ -11,8 +9,6 @@ import matplotlib.pylab as plt
 import torch as th
 import dgl
 from dgl.sampling import sample_neighbors
-
-from dgl import load_graphs
 
 def extract_subgraph(graph, seed_nodes, hops=2):
     """
@@ -28,7 +24,7 @@ def extract_subgraph(graph, seed_nodes, hops=2):
     -------
     sub_graph: DGLGraph, a sub graph
     origin_nodes: List, list of node ids in the origin graph, sorted from small to large, whose order is the new id. e.g
-               [2, 51, 53, 79] means in the new sug_graph, whose node id is [0,1,2,3], the mapping is 2<>0, 51<>1, 53<>2,
+               [2, 51, 53, 79] means in the new sug_graph, their new node id is [0,1,2,3], the mapping is 2<>0, 51<>1, 53<>2,
                and 79 <> 3.
     new_seed_node: Scalar, the node index of seed_nodes
     """
@@ -69,8 +65,6 @@ def visualize_sub_graph(sub_graph, edge_weights=None, origin_nodes=None, center_
 
     """
     # Extract original idx and map to the new networkx graph
-
-
     # Convert to networkx graph
     g = dgl.to_networkx(sub_graph)
     nx_edges = g.edges(data=True)
@@ -90,7 +84,6 @@ def visualize_sub_graph(sub_graph, edge_weights=None, origin_nodes=None, center_
     else:
 
         ec = [edge_weights[e[2]['id']][0] for e in nx_edges]
-        #print(ec)
         options = {"node_size": 1000,
                    "alpha": 0.3,
                    "font_size": 12,
@@ -106,10 +99,3 @@ def visualize_sub_graph(sub_graph, edge_weights=None, origin_nodes=None, center_
         nx.draw(g, pos, nodelist=center_node.tolist(), with_labels=True, node_color='r', **options)
 
     plt.show()
-
-
-if __name__ == '__main__':
-    """
-    Only for debugging purpose
-    """
-

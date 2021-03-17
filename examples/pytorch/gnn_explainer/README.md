@@ -3,7 +3,7 @@
 This DGL example implements the GNN Explainer model proposed in the paper [GNNExplainer: Generating Explanations for Graph Neural Networks](https://arxiv.org/abs/1903.03894). 
 The author's codes of implementation is in [here](https://github.com/RexYing/gnn-model-explainer).
 
-The author's implementation is kind of experimental with unclean codes. So this implementation focuses on a subset of
+The author's implementation is kind of experimental with experimental codes. So this implementation focuses on a subset of
 GNN Explainer's functions, node classification, and later on extend to edge classification.
 
 Example implementor
@@ -41,11 +41,11 @@ This command trains a GNN model and save it to the "dummy_model_syn1.pth" file.
 ``` python
 python explain_main.py --dataset syn1 --target_class 1 --hop 2
 ```
-Replace the dataset argument value and the target class you want to explain. The code will pick the first node in the specified class to explain. The --hop argument corresponds to the maximum hop number of the computation sub-graph.
+Replace the dataset argument value and the target class you want to explain. The code will pick the first node in the specified class to explain. The --hop argument corresponds to the maximum hop number of the computation sub-graph. (For syn1 and syn2, hop=2. For syn3, syn4, and syn5, hop=4.)
 
 Notice
 ----------------------
-Because DGL does not support masked adjacency matrix as an input for the forward function of a module.
+Because DGL does not support masked adjacency matrix as an input to the forward function of a module.
 To use this Explainer, you need to add an edge_weight as the **edge mask** argument to your forward function just like 
 the dummy model in the models.py file. And you need to change your forward function whenever uses `.update_all` function. 
 Please use `dgl.function.u_mul_e` to compute the src nodes' features to the edge_weights as the mask method proposed by the 

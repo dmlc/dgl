@@ -1,8 +1,4 @@
-#-*- coding:utf-8 -*-
-
-
 # The major idea of the overall GNN model explanation
-
 
 import argparse
 import os
@@ -72,15 +68,8 @@ def main(args):
         loss.backward()
         optim.step()
 
-        #print("In epoch: {:03d}, Loss: {:.6f}, Pred: {}".format(epoch, loss.item(), model_predict[new_n_idx]))
-
     # visualize the importance of edges
     edge_weights = explainer.edge_mask.sigmoid().detach()
-    '''
-    src, dst = sub_graph.egdes()
-    total_t = th.cat([th.stack([src,dst], dim=-1), edge_weights], dim=-1)
-    print(total_t)
-    '''
     visualize_sub_graph(sub_graph, edge_weights.numpy(), ori_n_idxes, n_idx)
 
 
@@ -92,7 +81,7 @@ if __name__ == '__main__':
                         help='The class to be explained. In the synthetic 1 dataset, Valid option is from 0 to 4'
                              'Will choose the first node in this class to explain')
     parser.add_argument('--hop', type=int, default='2',
-                        help='The hop number of the computation sub-graph. For syn1 ans syn2, k=2. For syn3, syn4, and syn5, k=4.')
+                        help='The hop number of the computation sub-graph. For syn1 and syn2, k=2. For syn3, syn4, and syn5, k=4.')
     parser.add_argument('--epochs', type=int, default=200, help='The number of epochs.')
     parser.add_argument('--lr', type=float, default=0.01, help='The learning rate.')
     parser.add_argument('--wd', type=float, default=0.0, help='Weight decay.')

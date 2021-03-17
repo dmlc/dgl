@@ -1,5 +1,3 @@
-#-*- coding:utf-8 -*-
-
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
@@ -57,3 +55,4 @@ class dummy_gnn_model(nn.Module):
         h = self.out_layer(graph, h, edge_weights)
 
         return h
+        

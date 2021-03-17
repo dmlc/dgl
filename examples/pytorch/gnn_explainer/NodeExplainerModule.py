@@ -1,6 +1,3 @@
-#-*- coding:utf-8 -*-
-
-
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,7 +12,7 @@ class NodeExplainerModule(nn.Module):
     So far due to the limit of DGL on edge mask operation, this explainer need the to-be-explained models to
     accept an additional input argument, edge mask, and apply this mask in their inner message parse operation.
 
-    !!!!!!......This is the current walk_around......!!!!!!
+    This is current walk_around to use edge masks.
     """
 
     # Class inner variables
@@ -25,8 +22,6 @@ class NodeExplainerModule(nn.Module):
         "g_ent": 0.1,
         "feat_ent": 0.1
     }
-
-    # Variables of results for calling
 
     def __init__(self,
                  model,
@@ -58,7 +53,7 @@ class NodeExplainerModule(nn.Module):
         Parameters
         ----------
         num_edges: Integer N, specify the number of edges.
-        init_strategy: String, specify the parameter initializati　on method
+        init_strategy: String, specify the parameter initialization method
         const: Float, a value for constant initialization
 
         Returns
@@ -111,40 +106,26 @@ class NodeExplainerModule(nn.Module):
         return mask
 
 
-    def reset(self):
-        """
-        Reset inner parameters for retrain.
-
-        Returns
-        -------
-
-        """
-        pass
-
     def forward(self, graph, n_feats):
         """
-        Calculate predict results after masking input of the given model.
-
-        This version will
+        Calculate prediction results after masking input of the given model.
 
         Parameters
         ----------
         graph: DGLGraph, Should be a sub_graph of the target node to be explained.
         n_idx: Tensor, an integer, index of the node to be explained.
-        pred_logits:
 
         Returns
         -------
+        new_logits: Tensor, in shape of N * Num_Classes
 
         """
-        # Extract related features
-        # num_nodes = graph.num_of_nodes()
 
         # Step 1: Mask node feature with the inner feature mask
         new_n_feats = n_feats * self.node_feat_mask.sigmoid()
         edge_mask = self.edge_mask.sigmoid()
 
-        # Step 2:
+        # Step 2: Add compute logits after mask node features and edges
         new_logits = self.model(graph, new_n_feats, edge_mask)
 
         return new_logits

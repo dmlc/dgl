@@ -1,6 +1,3 @@
-#-*- coding:utf-8 -*-
-
-
 # The training codes of the dummy model
 
 
@@ -29,7 +26,7 @@ def main(args):
     elif args.dataset == 'syn5':
         g, labels, name = gen_syn5()
     else:
-        raise ValueError()
+        raise NotImplementedError
     
     #Transform to dgl graph. 
     graph = dgl.from_networkx(g) 
@@ -84,3 +81,4 @@ if __name__ == '__main__':
     print(args)
 
     main(args)
+    
