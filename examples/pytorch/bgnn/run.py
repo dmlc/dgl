@@ -91,8 +91,11 @@ def read_input(input_folder):
     with open(f'{input_folder}/masks.json') as f:
         masks = json.load(f)
 
+    return graph, X, y, cat_features, masks
+
 
 if __name__ == '__main__':
+    # datasets can be found here: https://www.dropbox.com/s/verx1evkykzli88/datasets.zip
     # Read dataset
     input_folder = 'datasets/avazu'
     graph, X, y, cat_features, masks = read_input(input_folder)
