@@ -1,0 +1,115 @@
+/*!
+ *  Copyright (c) 2021 by Contributors
+ * \file graph/transform/kdtree_ndarray_adaptor.h
+ * \brief NDArray adaptor for nanoflann, without
+ *        duplicating the storage 
+ */
+#ifndef DGL_GRAPH_TRANSFORM_KDTREE_NDARRAY_ADAPTOR_H_
+#define DGL_GRAPH_TRANSFORM_KDTREE_NDARRAY_ADAPTOR_H_
+
+#include <dgl/array.h>
+#include "../../c_api_common.h"
+#include <nanoflann.hpp>
+#include <dmlc/logging.h>
+
+namespace dgl {
+namespace transform {
+
+using runtime::NDArray;
+
+/*! 
+ * \brief A simple 2D NDArray adaptor for nanoflann, without duplicating the storage.
+ *
+ * \tparam FloatType: The type of the point coordinates (typically, double or float).
+ * \tparam IdType: The type for indices in the KD-tree index (typically, size_t of int)
+ * \tparam FeatureDim: If set to > 0, it specifies a compile-time fixed dimensionality
+ *         for the points in the data set, allowing more compiler optimizations.
+ * \tparam Dist: The distance metric to use: nanoflann::metric_L1, nanoflann::metric_L2,
+ *         nanoflann::metric_L2_Simple, etc.
+ */
+template <typename FloatType, typename IdType, int FeatureDim = -1, typename Dist = nanoflann::metric_L2>
+class KDTreeNDArrayAdaptor {
+public:
+  using self_type = KDTreeNDArrayAdaptor<FloatType, IdType, FeatureDim, Dist>;
+  using metric_type = typename Dist::template traits<FloatType, self_type>::distance_t;
+  using index_type = nanoflann::KDTreeSingleIndexAdaptor<metric_type, self_type, FeatureDim, IdType>;
+
+  KDTreeNDArrayAdaptor(const size_t, const NDArray data_points, const int leaf_max_size=10)
+      : m_data(data_points) {
+    CHECK(data_points->shape[0] != 0 && data_points->shape[1] != 0)
+      << "Tensor containing input data point set must be 2D.";
+    const size_t dims = data_points->shape[1];
+    CHECK(!(FeatureDim > 0 && static_cast<int>(dims) != FeatureDim))
+      << "Data set feature dimension does not match the 'FeatureDim' "
+      << "template argument.";
+    m_index = new index_t(static_cast<int>(dims), *this, nanoflann::KDTreeSingleIndexAdaptorParams(leaf_max_size));
+    m_index->buildIndex();
+  }
+
+  ~KDTreeNDArrayAdaptor() {
+    delete m_index;
+  }
+
+  index_type * GetIndex() {
+    return m_index;
+  }
+  
+  /*!
+   * \brief Query for the \a num_closest points to a given point
+   *  Note that this is a short-cut method for GetIndex()->findNeighbors().
+   * \note nChecks_IGNORED is ignored but kept for compatibility with the
+   *  original FLANN interface.
+   */
+  void query(const FloatType * query_pt, const size_t num_closest,
+             IdType * out_idxs, FloatType * out_dists, const int nChecks_IGNORED=10) const {
+    nanoflann::KNNResultSet<FloatType, IdType> resultSet(num_closest);
+    resultSet.init(out_idxs, out_dists);
+    m_index->findNeighbors(resultSet, query_pt, nanoflann::SearchParams());
+  }
+
+  /*! \brief Interface expected by KDTreeSingleIndexAdaptor */
+  const self_t & derived() const {
+    return *this;
+  }
+
+  /*! \brief Interface expected by KDTreeSingleIndexAdaptor */
+  self_t & derived() {
+    return *this;
+  }
+
+  /*! 
+   * \brief Interface expected by KDTreeSingleIndexAdaptor,
+   *  return the number of data points
+   */
+  size_t kdtree_get_point_count() const {
+    return m_data->shape[0];
+  }
+
+  /*! 
+   * \brief Interface expected by KDTreeSingleIndexAdaptor,
+   *  return the dim'th component of the idx'th point
+   */
+  FloatType kdtree_get_pt(const size_t idx, const size_t dim) const {
+    return static_cast<FloatType*>(m_data->data)[idx * m_data->shape[1] + dim];
+  }
+
+  /*! 
+   * \brief Interface expected by KDTreeSingleIndexAdaptor.
+   *  Optional bounding-box computation: return false to
+   *  default to a standard bbox computation loop.
+   * 
+   */
+  template <typename BBOX>
+  bool kdtree_get_bbox(BBOX & /* bb */) const {
+    return false;
+  }
+
+private:
+  index_type * m_index;    // The kd tree index
+  const NDArray m_data;  // data points
+};
+
+} // namespace transform
+} // namespace dgl
+
+#endif  // DGL_GRAPH_TRANSFORM_KDTREE_NDARRAY_ADAPTOR_H_
