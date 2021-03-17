@@ -175,6 +175,13 @@ QM9 dataset
 .. autoclass:: QM9Dataset
     :members: __getitem__, __len__
 
+.. _qm9edgedata:
+
+QM9Edge dataset
+```````````````````````````````````
+.. autoclass:: QM9EdgeDataset
+    :members: __getitem__, __len__
+
 .. _minigcdataset:
 
 Mini graph classification dataset

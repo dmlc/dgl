@@ -12,59 +12,13 @@
 
 #include "kernel_decl.h"
 #include "../c_api_common.h"
+#include "./check.h"
 
 using namespace dgl::runtime;
 
 namespace dgl {
 namespace aten {
 namespace {
-
-// Check whether the given arguments have the same context.
-inline void CheckCtx(
-    const DLContext& ctx,
-    const std::vector<NDArray>& arrays,
-    const std::vector<std::string>& names) {
-  for (size_t i = 0; i < arrays.size(); ++i) {
-    if (IsNullArray(arrays[i]))
-      continue;
-    CHECK_EQ(ctx, arrays[i]->ctx)
-      << "Expected device context " << ctx << ". But got "
-      << arrays[i]->ctx << " for " << names[i] << ".";
-  }
-}
-
-// Check whether input tensors are contiguous.
-inline void CheckContiguous(
-    const std::vector<NDArray>& arrays,
-    const std::vector<std::string>& names) {
-  for (size_t i = 0; i < arrays.size(); ++i) {
-    if (IsNullArray(arrays[i]))
-      continue;
-    CHECK(arrays[i].IsContiguous())
-      << "Expect " << names[i] << " to be a contiguous tensor";
-  }
-}
-
-// Check whether input tensors have valid shape.
-inline void CheckShape(
-    const std::vector<uint64_t>& gdim,
-    const std::vector<int>& uev_idx,
-    const std::vector<NDArray>& arrays,
-    const std::vector<std::string>& names) {
-  for (size_t i = 0; i < arrays.size(); ++i) {
-    if (IsNullArray(arrays[i]))
-      continue;
-    CHECK_GE(arrays[i]->ndim, 2)
-      << "Expect " << names[i] << " to have ndim >= 2, "
-      << "Note that for scalar feature we expand its "
-      << "dimension with an additional dimension of "
-      << "length one.";
-    CHECK_EQ(gdim[uev_idx[i]], arrays[i]->shape[0])
-      << "Expect " << names[i] << " to have size "
-      << gdim[uev_idx[i]] << " on the first dimension, "
-      << "but got " << arrays[i]->shape[0];
-  }
-}
 
 }  // namespace
 
