@@ -245,7 +245,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
         th.distributed.init_process_group(backend=backend,
                                           init_method=dist_init_method,
                                           world_size=world_size,
-                                          rank=dev_id)
+                                          rank=proc_id)
 
     nccl_comm = nccl.Communicator(n_gpus, proc_id, nccl_id)
 
@@ -310,7 +310,9 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
             dgl_emb = embed_layer.module.dgl_emb
         else:
             dgl_emb = embed_layer.dgl_emb
-        emb_optimizer = dgl.optim.SparseAdam(params=dgl_emb, lr=args.sparse_lr, eps=1e-8) if len(dgl_emb) > 0 else None
+        emb_optimizer = dgl.optim.SparseAdam(
+                params=dgl_emb, lr=args.sparse_lr, eps=1e-8,
+                comm=None) if len(dgl_emb) > 0 else None
     else:
         if n_gpus > 1:
             embs = list(embed_layer.module.node_embeds.parameters())
@@ -646,5 +648,6 @@ def config():
 if __name__ == '__main__':
     args = config()
     devices = list(map(int, args.gpu.split(',')))
+    print("devices = {}".format(devices))
     print(args)
     main(args, devices)

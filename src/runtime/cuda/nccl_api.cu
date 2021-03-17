@@ -6,6 +6,7 @@
 
 #include "nccl_api.h"
 #include "cuda_common.h"
+#include "../../kernel/cuda/atomic.cuh"
 #include "cub/cub.cuh"
 
 #include <cuda_runtime.h>
@@ -13,19 +14,23 @@
 #include <cmath>
 
 #include <dgl/array.h>
+#include <dgl/aten/array_ops.h>
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/device_api.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/registry.h>
 
 namespace dgl {
+
+using namespace kernel::cuda;
+
 namespace runtime {
 namespace cuda {
 
 namespace {
 
 enum class AllToAllMode : int {
-  REMAINDER
+  REMAINDER = 0
 };
 
 template<typename T> ncclDataType_t NCCLType();
@@ -46,8 +51,7 @@ template<> ncclDataType_t NCCLType<double>() {
 }
 
 
-template<typename IdType>
-__global__ void _MapProcByRemainder(
+template<typename IdType> __global__ void _MapProcByRemainder(
     const IdType * const index,
     const int64_t num_index,
     const int64_t num_proc,
@@ -74,11 +78,29 @@ __global__ void _MapProcByMaskRemainder(
   }
 }
 
+template<typename IdType, typename DType>
+__global__ void _DualPermKernel(
+    const IdType * const in_idx,
+    const DType * const in_value,
+    const IdType * const perm,
+    const int64_t num_in,
+    IdType * const out_idx,
+    DType * const out_value)
+{
+  const int64_t idx = blockDim.x*static_cast<int64_t>(blockIdx.x)+threadIdx.x;
+
+  if (idx < num_in) {
+    const IdType perm_idx = perm[idx];
+    out_idx[perm_idx] = in_idx[idx];
+    out_value[perm_idx] = in_value[idx];
+  }
+}
+
 template<typename IdType, int MAX_BINS, int BLOCK_SIZE, int TILE_SIZE>
-__global__ void countIndexByRemainder(
+__global__ void _CountIndexByRemainder(
     const IdType * const items,
     const int64_t num_items,
-    IdType * const counts,
+    int64_t * const counts,
     const int num_counts)
 {
   constexpr const int VALS_PER_THREAD = TILE_SIZE/BLOCK_SIZE;
@@ -88,6 +110,8 @@ __global__ void countIndexByRemainder(
   __shared__ IdType local_counts[MAX_BINS+1];
   __shared__ typename BlockHistogram::TempStorage temp_storage;
   IdType thread_vals[VALS_PER_THREAD];
+
+  const int64_t offset = TILE_SIZE*blockIdx.x;
 
   assert(num_counts <= MAX_BINS);
 
@@ -101,7 +125,7 @@ __global__ void countIndexByRemainder(
 
   // write local histogram back to global memory
   for (int i = threadIdx.x; i < num_counts; i+=threadIdx.x) {
-    const IdType val = local_counts[i];
+    const int64_t val = local_counts[i];
     if (val > 0) {
       AtomicAdd(counts+i, val);
     }
@@ -153,40 +177,6 @@ ncclComm_t NCCLCommunicator::Get()
   return comm_;
 }
 
-template<typename T>
-void NCCLCommunicator::AllToAll(
-    const T * const send,
-    T * const recv,
-    const int64_t count,
-    cudaStream_t stream)
-{
-  const uint8_t * const send_data = static_cast<const uint8_t*>(send);
-  uint8_t * const recv_data = static_cast<uint8_t*>(recv);
-
-  const int type = NCCLType<T>();
-
-  ncclGroupStart();
-  for (int r = 0; r < size_; ++r) {
-    ncclSend(send_data+(r*count), count, type, r, comm_, stream);
-    ncclRecv(recv_data+(r*count), count, type, r, comm_, stream);
-  }
-  ncclGroupEnd();
-}
-
-template<>
-void NCCLCommunicator::AllToAll<int32_t>(
-    const int32_t * const send,
-    int32_t * const recv,
-    const int64_t count,
-    cudaStream_t stream);
-template<>
-void NCCLCommunicator::AllToAll<int64_t>(
-    const int64_t * const send,
-    int64_t * const recv,
-    const int64_t count,
-    cudaStream_t stream);
-
-
 void NCCLCommunicator::AllToAllV(
     const void * const * const send,
     const int64_t * send_size,
@@ -207,6 +197,37 @@ void NCCLCommunicator::AllToAllV(
   ncclGroupEnd();
 }
 
+template<typename IdType>
+void NCCLCommunicator::AllToAll(
+    const IdType * const send,
+    IdType * const recv,
+    const int64_t count,
+    cudaStream_t stream)
+{
+  const ncclDataType_t type = NCCLType<IdType>();
+
+  ncclGroupStart();
+  for (int r = 0; r < size_; ++r) {
+    ncclSend(send+(r*count), count, type, r, comm_, stream);
+    ncclRecv(recv+(r*count), count, type, r, comm_, stream);
+  }
+  ncclGroupEnd();
+}
+
+template
+void NCCLCommunicator::AllToAll<int32_t>(
+    const int32_t * const send,
+    int32_t * const recv,
+    const int64_t count,
+    cudaStream_t stream);
+template
+void NCCLCommunicator::AllToAll<int64_t>(
+    const int64_t * const send,
+    int64_t * const recv,
+    const int64_t count,
+    cudaStream_t stream);
+
+
 template<typename IdType, typename DType>
 void NCCLCommunicator::SparseAllToAll(
       const IdType * const send_idx,
@@ -217,8 +238,8 @@ void NCCLCommunicator::SparseAllToAll(
       const int64_t * const recv_prefix,
       cudaStream_t stream)
 {
-  const ncclDataType_t idx_type = NCCLType<IdType>;
-  const ncclDataType_t value_type = NCCLType<IdType>;
+  const ncclDataType_t idx_type = NCCLType<IdType>();
+  const ncclDataType_t value_type = NCCLType<DType>();
 
   ncclGroupStart();
   for (int r = 0; r < size_; ++r) {
@@ -236,7 +257,7 @@ void NCCLCommunicator::SparseAllToAll(
   ncclGroupEnd();
 }
 
-template<>
+template
 void NCCLCommunicator::SparseAllToAll<int32_t, __half>(
       const int32_t * const send_idx,
       const __half * const send_value,
@@ -246,7 +267,7 @@ void NCCLCommunicator::SparseAllToAll<int32_t, __half>(
       const int64_t * const recv_prefix,
       cudaStream_t stream);
 
-template<>
+template
 void NCCLCommunicator::SparseAllToAll<int64_t, __half>(
       const int64_t * const send_idx,
       const __half * const send_value,
@@ -257,24 +278,23 @@ void NCCLCommunicator::SparseAllToAll<int64_t, __half>(
       cudaStream_t stream);
 
 template<typename IdType, typename DType>
-GenerateSparseBuffersFromRemainder(
+void GenerateSparseBuffersFromRemainder(
+    DeviceAPI* const device,
+    const DGLContext& ctx,
     const int64_t comm_size,
     const int64_t num_in,
     const IdType * const in_idx,
-    const DType * const in_values,
+    const DType * const in_value,
     IdType * const out_idx,
-    DType * const out_values,
-    IdType * const out_counts)
+    DType * const out_value,
+    int64_t * const out_counts,
+    cudaStream_t stream)
 {
   const int64_t comm_bits =
-      static_cast<int64_t>(std::ceil(std::log2(comm_size)))k;
+      static_cast<int64_t>(std::ceil(std::log2(comm_size)));
 
-  CHECK_GT(comm_size, 0);
-
-  if (comm_size == 1) {
-    // nothing to do, just return original arrays
-    return std::pair<IdArray, NDArray>(in_idx, in_values);
-  }
+  // this should only run when we have things to send
+  CHECK_GT(comm_size, 1);
 
   // First, generate a mapping of indexes to processors
   IdType * proc_id_in = static_cast<IdType*>(
@@ -285,17 +305,17 @@ GenerateSparseBuffersFromRemainder(
 
     if (comm_size < (1 << comm_bits)) {
       // comm_size is not a power of 2
-      MapProcByRemainder<<<grid, block, 0, stream>>>(
-          static_cast<const IdType*>(in_idx->data),
+      _MapProcByRemainder<<<grid, block, 0, stream>>>(
+          in_idx,
           num_in,
           comm_size,
           proc_id_in);
     } else {
       // comm_size is a power of 2
-      MapProcByRemainderPow2<<<grid, block, 0, stream>>>(
-          static_cast<const IdType*>(in_idx->data),
+      _MapProcByMaskRemainder<<<grid, block, 0, stream>>>(
+          in_idx,
           num_in,
-          comm_size-1, // bit mask
+          static_cast<IdType>(comm_size-1), // bit mask
           proc_id_in);
     }
   }
@@ -311,13 +331,13 @@ GenerateSparseBuffersFromRemainder(
 
     size_t sort_workspace_size;
     cub::DeviceRadixSort::SortPairs(nullptr, sort_workspace_size,
-        proc_id_in, proc_id_out, perm_in->data, perm_out,
-        num_in, 0, comm_bits);
+        proc_id_in, proc_id_out, static_cast<IdType*>(perm_in->data), perm_out,
+        num_in, 0, comm_bits, stream);
 
     void * sort_workspace = device->AllocWorkspace(ctx, sort_workspace_size);
     cub::DeviceRadixSort::SortPairs(sort_workspace, sort_workspace_size,
-        proc_id_in, proc_id_out, perm_in->data, perm_out,
-        num_in, 0, comm_bits);
+        proc_id_in, proc_id_out, static_cast<IdType*>(perm_in->data), perm_out,
+        num_in, 0, comm_bits, stream);
     device->FreeWorkspace(ctx, sort_workspace);
   }
   device->FreeWorkspace(ctx, proc_id_in);
@@ -327,9 +347,9 @@ GenerateSparseBuffersFromRemainder(
   // finally, permute the input arrays
   // sort the data into continuous buffers for sending
   IdType * in_idx_buffer =
-      static_cast<IdType>(device->AllocWorkspace(ctx, sizeof(IdType)*num_in));
-  IdType * in_value_buffer =
-      static_cast<DType>(device->AllocWorkspace(ctx, sizeof(DType)*num_in));
+      static_cast<IdType*>(device->AllocWorkspace(ctx, sizeof(IdType)*num_in));
+  DType * in_value_buffer =
+      static_cast<DType*>(device->AllocWorkspace(ctx, sizeof(DType)*num_in));
   {
     const dim3 block(256);
     const dim3 grid((num_in+block.x-1)/block.x);
@@ -343,10 +363,8 @@ GenerateSparseBuffersFromRemainder(
         in_value_buffer);
   }
 
-  IdType * send_sum = static_cast<IdType*>(
-      device->AllocWorkspace(ctx, sizeof(IdType)*(comm_size+1)));
   CUDA_CALL(cudaMemsetAsync(
-      send_sum, 0, sizeof(*send_sum)*(comm_size+1), stream));
+      out_counts, 0, sizeof(*out_counts)*(comm_size+1), stream));
 
   // Count the number of values to be sent to each processor 
   {
@@ -356,37 +374,35 @@ GenerateSparseBuffersFromRemainder(
     const dim3 grid((num_in+TILE_SIZE-1)/TILE_SIZE);
 
     if (comm_size <= 128) {
-      countIndexByRemainder<IdType, 128, BLOCK_SIZE, TILE_SIZE><<<
+      _CountIndexByRemainder<IdType, 128, BLOCK_SIZE, TILE_SIZE><<<
           grid, block, 0, stream>>>(
-          static_cast<IdType*>(in_idx->data),
-          num_in,
-          send_sum,
-          comm_size);
+            in_idx,
+            num_in,
+            out_counts,
+            comm_size);
     } else {
-      CHECK_LE(comm->size(), 1024) << "_CAPI_DGLNCCLSparseAllToAll() is not "
+      CHECK_LE(comm_size, 1024) << "_CAPI_DGLNCCLSparseAllToAll() is not "
           "implemented for comms greater than 1024 ranks.";
-      countIndexByRemainder<IdType, 1024, BLOCK_SIZE, TILE_SIZE><<<
+      _CountIndexByRemainder<IdType, 1024, BLOCK_SIZE, TILE_SIZE><<<
           grid, block, 0, stream>>>(
-          static_cast<IdType*>(in_idx->data),
-          num_in,
-          send_sum,
-          comm_size);
+            in_idx,
+            num_in,
+            out_counts,
+            comm_size);
     }
   }
-
-
 }
 
 template<typename IdType, typename DType>
 std::pair<IdArray, NDArray> SparseExchange(
     NCCLCommunicatorRef comm,
     IdArray in_idx,
-    NDArray in_values,
+    NDArray in_value,
     const int mode_id) {
-  CHECK_EQ(in_idx->shape[0], in_values->shape[0]);
+  CHECK_EQ(in_idx->shape[0], in_value->shape[0]);
 
   const auto& ctx = in_idx->ctx;
-  CHECK_EQ(ctx, in_values->ctx);
+  CHECK_EQ(ctx, in_value->ctx);
   auto device = DeviceAPI::Get(ctx);
 
   // TODO(dlasalle): Get the stream from the device context.
@@ -395,24 +411,39 @@ std::pair<IdArray, NDArray> SparseExchange(
   const int64_t num_in = in_idx->shape[0];
   const int64_t comm_size = comm->size();
 
-  CHECK_EQ(mode_id, AllToAllMode::REMAINDER);
-  GenerateSparseBUffersFromRemainder(
+  if (comm_size == 1) {
+    // nothing to do, just return original arrays
+    return std::pair<IdArray, NDArray>(in_idx, in_value);
+  }
+
+  IdType * send_idx = static_cast<IdType*>(device->AllocWorkspace(ctx,
+      num_in*sizeof(IdType)));
+  DType * send_value = static_cast<DType*>(device->AllocWorkspace(ctx,
+      num_in*sizeof(DType)));
+  int64_t * send_sum = static_cast<int64_t*>(device->AllocWorkspace(ctx,
+      comm_size*sizeof(int64_t)));
+
+  CHECK_EQ(mode_id, static_cast<int>(AllToAllMode::REMAINDER));
+  GenerateSparseBuffersFromRemainder(
+      device,
+      ctx,
       comm_size,
       num_in,
       static_cast<const IdType*>(in_idx->data),
-      static_cast<const DType*>(in_values->data),
+      static_cast<const DType*>(in_value->data),
       send_idx,
-      send_values,
-      send_sum);
+      send_value,
+      send_sum,
+      stream);
 
   // communicate the amount to send
-  IdType * recv_sum = static_cast<IdType*>(
-      device->AllocWorkspace(ctx, sizeof(IdType)*(comm_size+1)));
+  int64_t * recv_sum = static_cast<int64_t*>(
+      device->AllocWorkspace(ctx, sizeof(int64_t)*(comm_size+1)));
   comm->AllToAll(send_sum, recv_sum, 1, stream);
 
   // compute the prefix sum of the send values
-  IdType * send_prefix = static_cast<IdType*>(
-      device->AllocWorkspace(ctx, sizeof(IdType)*(comm_size+1)));
+  int64_t * send_prefix = static_cast<int64_t*>(
+      device->AllocWorkspace(ctx, sizeof(int64_t)*(comm_size+1)));
   {
     size_t prefix_workspace_size;
     cub::DeviceScan::ExclusiveSum(nullptr, prefix_workspace_size,
@@ -426,8 +457,8 @@ std::pair<IdArray, NDArray> SparseExchange(
   }
 
   // compute the prefix sum of the recv values
-  IdType * recv_prefix = static_cast<IdType*>(
-      device->AllocWorkspace(ctx, sizeof(IdType)*(comm_size+1)));
+  int64_t * recv_prefix = static_cast<int64_t*>(
+      device->AllocWorkspace(ctx, sizeof(int64_t)*(comm_size+1)));
   {
     size_t prefix_workspace_size;
     cub::DeviceScan::ExclusiveSum(nullptr, prefix_workspace_size,
@@ -441,8 +472,8 @@ std::pair<IdArray, NDArray> SparseExchange(
   }
 
   // finally copy the prefixsum sum down to the host
-  std::vector<IdType> send_prefix_host(comm_size+1);
-  std::vector<IdType> recv_prefix_host(comm_size+1);
+  std::vector<int64_t> send_prefix_host(comm_size+1);
+  std::vector<int64_t> recv_prefix_host(comm_size+1);
   device->CopyDataFromTo(
       send_prefix,
       0,
@@ -472,26 +503,34 @@ std::pair<IdArray, NDArray> SparseExchange(
   cudaEventRecord(d2h, stream);
 
   // allocate output space
-  cudaEventWait(d2h);
+  cudaEventSynchronize(d2h);
   cudaEventDestroy(d2h);
 
-  IdArray recv_idxs = NewIdArray(recv_prefix.back(), ctx, sizeof(IdType)*8);
-  NDArray recv_values = NDArray::Empty(
-      {recv_prefix.back()}, in_values->dtype, ctx);
+  IdArray recv_idx = aten::NewIdArray(recv_prefix_host.back(), ctx, sizeof(IdType)*8);
+  NDArray recv_value = NDArray::Empty(
+      {recv_prefix_host.back()}, in_value->dtype, ctx);
 
   // send data
   comm->SparseAllToAll(
       send_idx,
       send_value,
       send_prefix_host.data(),
-      static_cast<IdType*>(recv_idx.data()),
-      static_cast<DType*>(recv_values.data()),
+      static_cast<IdType*>(recv_idx->data),
+      static_cast<DType*>(recv_value->data),
       recv_prefix_host.data(),
       stream);
   device->FreeWorkspace(ctx, send_idx);
   device->FreeWorkspace(ctx, send_value);
 
-  return std::pair<IdArray, DType>(recv_idx, recv_values);
+  return std::pair<IdArray, NDArray>(recv_idx, recv_value);
+}
+
+int NCCLCommunicator::size() const {
+  return size_;
+}
+
+int NCCLCommunicator::rank() const {
+  return rank_;
 }
 
 /* CAPI **********************************************************************/
@@ -521,7 +560,7 @@ DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLSparseAllToAll")
   List<ObjectRef> ret;
   ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
     ATEN_DTYPE_SWITCH(in_values->dtype, DType, "values", {
-      auto result = SparseExchange<IdType, NDArray>(comm, in_idx, in_values, mode_id);
+      auto result = SparseExchange<IdType, DType>(comm, in_idx, in_values, mode_id);
       ret.push_back(Value(MakeValue(result.first)));
       ret.push_back(Value(MakeValue(result.second)));
     });

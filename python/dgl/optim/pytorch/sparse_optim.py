@@ -33,7 +33,7 @@ class SparseGradOptimizer(abc.ABC):
 
         if self._comm:
             # get the rank and world size from the communicator
-            self._rank = self._comm._rank()
+            self._rank = self._comm.rank()
             self._world_size = self._comm.size()
         else:
             # if we are using shared memory for communication
@@ -88,8 +88,8 @@ class SparseGradOptimizer(abc.ABC):
                 for i, data in emb._trace:
                     idx.append(i)
                     grad.append(data.grad.data)
-                idx_out = th.cat(idx, dim=0)
-                grad_out = th.cat(grad, dim=0)
+                idx = th.cat(idx, dim=0)
+                grad = th.cat(grad, dim=0)
 
                 idx_in[emb_name], grad_in[emb_name] = self._comm.sparse_all_to_all(
                     idx, grad, mode='remainder')
@@ -101,8 +101,9 @@ class SparseGradOptimizer(abc.ABC):
                 self._clean_grad = False
 
             for emb in self._params:
+                emb_name = emb.name
                 idx = idx_in[emb_name] 
-                grad = grad_in{emb_name] 
+                grad = grad_in[emb_name] 
                 self.update(idx, grad, emb)
 
 
@@ -414,8 +415,8 @@ class SparseAdam(SparseGradOptimizer):
     ...     loss.backward()
     ...     optimizer.step()
     '''
-    def __init__(self, params, lr, betas=(0.9, 0.999), eps=1e-08):
-        super(SparseAdam, self).__init__(params, lr)
+    def __init__(self, params, lr, betas=(0.9, 0.999), eps=1e-08, comm=None):
+        super(SparseAdam, self).__init__(params, lr, comm)
         self._lr = lr
         self._beta1 = betas[0]
         self._beta2 = betas[1]

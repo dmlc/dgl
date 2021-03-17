@@ -51,10 +51,10 @@ class NCCLCommunicator : public runtime::Object {
    * @param count The size of data to send to each rank.
    * @param stream The stream to operate on.
    */
-  template<typename T>
+  template<typename IdType>
   void AllToAll(
-      const T * send,
-      T * recv,
+      const IdType * send,
+      IdType * recv,
       int64_t count,
       cudaStream_t stream);
 
