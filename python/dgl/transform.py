@@ -225,6 +225,63 @@ def segmented_knn_graph(x, k, segs):
 
     return convert.from_scipy(adj)
 
+def knn(x, x_segs, y, y_segs, k, dist:str="euclidean"):
+    r"""For each element in each point set in :attr:`y`, find :attr:`k` nearest
+    points in the same point set in :attr:`x`.
+
+    Parameters
+    ----------
+    x : Tensor
+        The point coordinates in x. It can be either on CPU or GPU (must be the
+        same as :attr:`y`). Must be 2D.
+    x_segs : Union[List[int], Tensor]
+        Number of points in each point set in :attr:`x`. The numbers in :attr:`x_segs`
+        must sum up to the number of rows in :attr:`x`.
+    y : Tensor
+        The point coordinates in y. It can be either on CPU or GPU (must be the
+        same as :attr:`x`). Must be 2D.
+    y_segs : Union[List[int], Tensor]
+        Number of points in each point set in :attr:`y`. The numbers in :attr:`y_segs`
+        must sum up to the number of rows in :attr:`y`.
+    k : int
+        The number of nearest neighbors per node.
+    dist : str, optional
+        The distance metric used to compute distance between points. It can be the following
+        metrics:
+        * "euclidean": Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+        * "manhattan": Use Manhattan distance (L1 norm) :math:`\sum_{i} |x_{i} - y_{i}|`.
+        * "cosine": Use cosine distance.
+        (Default: "euclidean")
+    
+    Returns
+    -------
+    (Tensor, Tensor)
+        The first tensor contains point indexs in :attr:`y`. The second tensor contains
+        point indexs in :attr:`x`
+    """
+    # k must less than or equal to min(x_segs)
+    if k > F.min(x_segs, dim=0):
+        raise DGLError("'k' must be less than or equal to the number of points in 'x'"
+                       "expect k <= {}, got k = {}".format(F.min(x_segs, dim=0), k))
+    dist = dist.lower()
+    dist_metric_list = ["euclidean", "manhattan", "cosine"]
+    if dist not in dist_metric_list:
+        raise DGLError("Only {} are supported for distance"
+                       "computation, got {}".format(dist_metric_list, dist))
+    
+    if isinstance(x_segs, (tuple, list)):
+        x_segs = F.copy_to(F.tensor(x_segs), F.context(x))
+    if isinstance(y_segs, (tuple, list)):
+        y_segs = F.copy_to(F.tensor(y_segs), F.context(y))
+    x_offset = F.zeros((F.shape(x_segs)[0] + 1,), F.dtype(x_segs), F.context(x_segs))
+    x_offset[1:] = F.cumsum(x_segs, dim=0)
+    y_offset = F.zeros((F.shape(y_segs)[0] + 1,), F.dtype(y_segs), F.context(y_segs))
+    y_offset[1:] = F.cumsum(y_segs, dim=0)
+
+    out = F.zeros((F.shape(y)[0] * k, 2), F.dtype(x_segs), F.context(x_segs))
+    # call CAPI
+    return None
+
 def to_bidirected(g, copy_ndata=False, readonly=None):
     r"""Convert the graph to a bi-directional simple graph and return.
 
