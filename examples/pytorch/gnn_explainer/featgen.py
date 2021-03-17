@@ -74,4 +74,5 @@ class GridFeatureGen(FeatureGen):
 
         nx.set_node_attributes(G, feat_dict)
         return community_dict
+        
 

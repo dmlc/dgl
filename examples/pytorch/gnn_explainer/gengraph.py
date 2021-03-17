@@ -245,3 +245,4 @@ def gen_syn5(nb_shapes=80, width_basis=8, feature_generator=None, m=3):
     name = basis_type + "_" + str(width_basis) + "_" + str(nb_shapes)
 
     return G, role_id, name
+    
