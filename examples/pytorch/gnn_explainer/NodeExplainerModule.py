@@ -200,3 +200,4 @@ class NodeExplainerModule(nn.Module):
         total_loss = pred_loss + edge_mask_loss + edge_ent_loss + node_feat_mask_loss + node_feat_ent_loss
 
         return total_loss
+        
