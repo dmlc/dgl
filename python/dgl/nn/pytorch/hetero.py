@@ -15,6 +15,8 @@ class HeteroGraphConv(nn.Module):
 
     Pseudo-code:
 
+    .. code::
+
         outputs = {nty : [] for nty in g.dsttypes}
         # Apply sub-modules on their associating relation graphs in parallel
         for relation in g.canonical_etypes:
