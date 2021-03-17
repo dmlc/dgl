@@ -9,6 +9,8 @@ import time
 import argparse
 import tqdm
 
+from torch.cuda import nvtx
+
 from load_graph import load_reddit, inductive_split, load_ogb
 
 class SAGE(nn.Module):
@@ -158,7 +160,9 @@ def run(args, device, data):
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
         tic_step = time.time()
+        nvtx.range_push("dataloader")
         for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
+            nvtx.range_pop()
             # Load the input features as well as output labels
             batch_inputs, batch_labels = load_subtensor(train_nfeat, train_labels,
                                                         seeds, input_nodes, device)
@@ -178,6 +182,8 @@ def run(args, device, data):
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB'.format(
                     epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc))
             tic_step = time.time()
+            nvtx.range_push("dataloader")
+        nvtx.range_pop()
 
         toc = time.time()
         print('Epoch Time(s): {:.4f}'.format(toc - tic))
@@ -225,7 +231,7 @@ if __name__ == '__main__':
 
     if args.dataset == 'reddit':
         g, n_classes = load_reddit()
-    elif args.dataset == 'ogb-products':
+    elif args.dataset == 'ogbn-products':
         g, n_classes = load_ogb('ogbn-products')
     else:
         raise Exception('unknown dataset')
