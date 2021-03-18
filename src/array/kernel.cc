@@ -143,7 +143,8 @@ std::pair<CSRMatrix, NDArray> CSRMM(
   CHECK_EQ(A_weights->dtype, B_weights->dtype) << "Data types of two edge weights must match.";
 
   std::pair<CSRMatrix, NDArray> ret;
-  ATEN_XPU_SWITCH_CUDA(A.indptr->ctx.device_type, XPU, "CSRMM", {
+  // TODO(BarclayII): change to ATEN_XPU_SWITCH_CUDA once the GPU kernels are implemented
+  ATEN_XPU_SWITCH(A.indptr->ctx.device_type, XPU, "CSRMM", {
     ATEN_ID_TYPE_SWITCH(A.indptr->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH(A_weights->dtype, DType, "Edge weights", {
         ret = CSRMM<XPU, IdType, DType>(A, A_weights, B, B_weights);
@@ -174,7 +175,8 @@ std::pair<CSRMatrix, NDArray> CSRSum(
   }
 
   std::pair<CSRMatrix, NDArray> ret;
-  ATEN_XPU_SWITCH_CUDA(ctx.device_type, XPU, "CSRSum", {
+  // TODO(BarclayII): change to ATEN_XPU_SWITCH_CUDA once the GPU kernels are implemented
+  ATEN_XPU_SWITCH(ctx.device_type, XPU, "CSRSum", {
     ATEN_ID_TYPE_SWITCH(idtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH(dtype, DType, "Edge weights", {
         ret = CSRSum<XPU, IdType, DType>(A, A_weights);
@@ -196,7 +198,8 @@ NDArray CSRMask(const CSRMatrix& A, NDArray A_weights, const CSRMatrix& B) {
   auto dtype = A_weights->dtype;
 
   NDArray ret;
-  ATEN_XPU_SWITCH_CUDA(ctx.device_type, XPU, "CSRMask", {
+  // TODO(BarclayII): change to ATEN_XPU_SWITCH_CUDA once the GPU kernels are implemented
+  ATEN_XPU_SWITCH(ctx.device_type, XPU, "CSRMask", {
     ATEN_ID_TYPE_SWITCH(idtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH(dtype, DType, "Edge weights", {
         ret = CSRMask<XPU, IdType, DType>(A, A_weights, B);
