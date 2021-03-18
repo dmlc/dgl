@@ -587,7 +587,7 @@ def main(args, devices):
                                          (proc_id + 1) * tstseeds_per_proc \
                                          if (proc_id + 1) * tstseeds_per_proc < num_test_seeds \
                                          else num_test_seeds]
-            p = mp.Process(target=run, args=(proc_id, n_gpus, n_cpus // n_gpus, args, devices,
+            p = mp.Process(target=run, args=(proc_id, n_gpus, n_cpus // n_gpus, args, devices, nccl_id,
                                              (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
                                              train_idx, val_idx, test_idx, labels),
                                              (proc_train_seeds, proc_valid_seeds, proc_test_seeds),
