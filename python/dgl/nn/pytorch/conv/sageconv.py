@@ -151,12 +151,14 @@ class SAGEConv(nn.Module):
     def _compatibility_check(self):
         """Address the backward compatibility issue brought by #2747"""
         if not hasattr(self, 'bias'):
-            dgl_warning("You are loading a GraphSAGE model trained from a old version of DGL, whose "
-                        "parameters may not compatible with latest version of DGL.")
+            dgl_warning("You are loading a GraphSAGE model trained from a old version of DGL, "
+                        "whose parameters may not compatible with latest version of DGL.")
             bias = self.fc_neigh.bias
+            self.fc_neigh.bias = None
             if hasattr(self, 'fc_self'):
                 if bias is not None:
                     bias = bias + self.fc_self.bias
+                    self.fc_self.bias = None
             self.bias = bias
 
     def _lstm_reducer(self, nodes):
