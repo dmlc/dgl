@@ -8,6 +8,7 @@ import pytest
 from test_utils.graph_cases import get_cases, random_graph, random_bipartite, random_dglgraph
 from test_utils import parametrize_dtype
 from copy import deepcopy
+import pickle
 
 import scipy as sp
 
@@ -25,6 +26,11 @@ def test_graph_conv0(out_dim):
     conv = nn.GraphConv(5, out_dim, norm='none', bias=True)
     conv = conv.to(ctx)
     print(conv)
+
+    # test pickle
+    pickle.dumps(conv)
+
+
     # test#1: basic
     h0 = F.ones((3, 5))
     h1 = conv(g, h0)
@@ -119,6 +125,10 @@ def test_graph_conv_e_weight(idtype, g, norm, weight, bias, out_dim):
 def test_graph_conv_e_weight_norm(idtype, g, norm, weight, bias, out_dim):
     g = g.astype(idtype).to(F.ctx())
     conv = nn.GraphConv(5, out_dim, norm=norm, weight=weight, bias=bias).to(F.ctx())
+
+    # test pickle
+    pickle.dumps(conv)
+
     ext_w = F.randn((5, out_dim)).to(F.ctx())
     nsrc = g.number_of_src_nodes()
     ndst = g.number_of_dst_nodes()
@@ -141,6 +151,10 @@ def test_graph_conv_bi(idtype, g, norm, weight, bias, out_dim):
     # Test a pair of tensor inputs
     g = g.astype(idtype).to(F.ctx())
     conv = nn.GraphConv(5, out_dim, norm=norm, weight=weight, bias=bias).to(F.ctx())
+    
+    # test pickle
+    pickle.dumps(conv)
+
     ext_w = F.randn((5, out_dim)).to(F.ctx())
     nsrc = g.number_of_src_nodes()
     ndst = g.number_of_dst_nodes()
@@ -175,6 +189,9 @@ def test_tagconv(out_dim):
     conv = nn.TAGConv(5, out_dim, bias=True)
     conv = conv.to(ctx)
     print(conv)
+    
+    # test pickle
+    pickle.dumps(conv)
 
     # test#1: basic
     h0 = F.ones((3, 5))
@@ -230,6 +247,9 @@ def test_glob_att_pool():
     gap = nn.GlobalAttentionPooling(th.nn.Linear(5, 1), th.nn.Linear(5, 10))
     gap = gap.to(ctx)
     print(gap)
+
+    # test pickle
+    pickle.dumps(gap)
 
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
@@ -347,6 +367,10 @@ def test_rgcn(O):
     I = 10
 
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
+
+    # test pickle
+    pickle.dumps(rgc_basis)
+
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
     rgc_basis_low.weight = rgc_basis.weight
     rgc_basis_low.w_comp = rgc_basis.w_comp
@@ -509,6 +533,10 @@ def test_gat_conv(g, idtype, out_dim, num_heads):
     feat = F.randn((g.number_of_nodes(), 5))
     gat = gat.to(ctx)
     h = gat(g, feat)
+
+    # test pickle
+    pickle.dumps(gat)
+
     assert h.shape == (g.number_of_nodes(), num_heads, out_dim)
     _, a = gat(g, feat, get_attention=True)
     assert a.shape == (g.number_of_edges(), num_heads, 1)
@@ -536,6 +564,8 @@ def test_sage_conv(idtype, g, aggre_type):
     sage = nn.SAGEConv(5, 10, aggre_type)
     feat = F.randn((g.number_of_nodes(), 5))
     sage = sage.to(F.ctx())
+    # test pickle
+    pickle.dumps(sage)
     h = sage(g, feat)
     assert h.shape[-1] == 10
 
@@ -583,6 +613,10 @@ def test_sgc_conv(g, idtype, out_dim):
     g = g.astype(idtype).to(ctx)
     # not cached
     sgc = nn.SGConv(5, out_dim, 3)
+
+    # test pickle
+    pickle.dumps(sgc)
+
     feat = F.randn((g.number_of_nodes(), 5))
     sgc = sgc.to(ctx)
 
@@ -605,6 +639,9 @@ def test_appnp_conv(g, idtype):
     appnp = nn.APPNPConv(10, 0.1)
     feat = F.randn((g.number_of_nodes(), 5))
     appnp = appnp.to(ctx)
+    
+    # test pickle
+    pickle.dumps(appnp)
 
     h = appnp(g, feat)
     assert h.shape[-1] == 5
@@ -622,6 +659,10 @@ def test_gin_conv(g, idtype, aggregator_type):
     feat = F.randn((g.number_of_nodes(), 5))
     gin = gin.to(ctx)
     h = gin(g, feat)
+
+    # test pickle
+    pickle.dumps(h)
+    
     assert h.shape == (g.number_of_nodes(), 12)
 
 @parametrize_dtype
@@ -784,6 +825,10 @@ def test_edge_conv(g, idtype, out_dim):
     ctx = F.ctx()
     edge_conv = nn.EdgeConv(5, out_dim).to(ctx)
     print(edge_conv)
+
+    # test pickle
+    pickle.dumps(edge_conv)
+    
     h0 = F.randn((g.number_of_nodes(), 5))
     h1 = edge_conv(g, h0)
     assert h1.shape == (g.number_of_nodes(), out_dim)
@@ -811,6 +856,10 @@ def test_dotgat_conv(g, idtype, out_dim, num_heads):
     dotgat = nn.DotGatConv(5, out_dim, num_heads)
     feat = F.randn((g.number_of_nodes(), 5))
     dotgat = dotgat.to(ctx)
+    
+    # test pickle
+    pickle.dumps(dotgat)
+    
     h = dotgat(g, feat)
     assert h.shape == (g.number_of_nodes(), num_heads, out_dim)
     _, a = dotgat(g, feat, get_attention=True)
@@ -919,6 +968,7 @@ def test_atomic_conv(g, idtype):
     dist = F.randn((g.number_of_edges(), 1))
 
     h = aconv(g, feat, dist)
+
     # current we only do shape check
     assert h.shape[-1] == 4
 
@@ -968,6 +1018,10 @@ def test_hetero_conv(agg, idtype):
         'sells': nn.GraphConv(3, 4, allow_zero_in_degree=True)},
         agg)
     conv = conv.to(F.ctx())
+
+    # test pickle
+    pickle.dumps(conv)
+
     uf = F.randn((4, 2))
     gf = F.randn((4, 4))
     sf = F.randn((2, 3))
