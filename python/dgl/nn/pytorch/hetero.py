@@ -204,6 +204,12 @@ def _max_reduce_func(inputs, dim):
 def _min_reduce_func(inputs, dim):
     return th.min(inputs, dim=dim)[0]
 
+def _sum_reduce_func(inputs, dim):
+    return th.sum(inputs, dim=dim)
+
+def _mean_reduce_func(inputs, dim):
+    return th.mean(inputs, dim=dim)
+
 def _stack_agg_func(inputs, dsttype): # pylint: disable=unused-argument
     if len(inputs) == 0:
         return None
@@ -232,13 +238,13 @@ def get_aggregate_fn(agg):
         and returns one aggregated tensor.
     """
     if agg == 'sum':
-        fn = th.sum
+        fn = _sum_reduce_func
     elif agg == 'max':
         fn = _max_reduce_func
     elif agg == 'min':
         fn = _min_reduce_func
     elif agg == 'mean':
-        fn = th.mean
+        fn = _mean_reduce_func
     elif agg == 'stack':
         fn = None  # will not be called
     else:
