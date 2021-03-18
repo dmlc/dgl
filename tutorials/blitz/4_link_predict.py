@@ -97,7 +97,7 @@ adj = sp.coo_matrix((np.ones(len(u)), (u.numpy(), v.numpy())))
 adj_neg = 1 - adj.todense() - np.eye(g.number_of_nodes())
 neg_u, neg_v = np.where(adj_neg != 0)
 
-neg_eids = np.random.choice(len(neg_u), g.number_of_edges() // 2)
+neg_eids = np.random.choice(len(neg_u), g.number_of_edges())
 test_neg_u, test_neg_v = neg_u[neg_eids[:test_size]], neg_v[neg_eids[:test_size]]
 train_neg_u, train_neg_v = neg_u[neg_eids[test_size:]], neg_v[neg_eids[test_size:]]
 
