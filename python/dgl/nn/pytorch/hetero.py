@@ -1,6 +1,8 @@
 """Heterograph NN modules"""
 import torch as th
 import torch.nn as nn
+from ...base import DGLError
+from functools import partial
 
 __all__ = ['HeteroGraphConv']
 
@@ -196,6 +198,23 @@ class HeteroGraphConv(nn.Module):
                 rsts[nty] = self.agg_fn(alist, nty)
         return rsts
 
+def _max_reduce_func(inputs, dim):
+    return th.max(inputs, dim=dim)[0]
+
+def _min_reduce_func(inputs, dim):
+    return th.min(inputs, dim=dim)[0]
+
+def _stack_agg_func(inputs, dsttype):
+    if len(inputs) == 0:
+        return None
+    return th.stack(inputs, dim=1)
+
+def _agg_func(inputs, dsttype, fn):
+    if len(inputs) == 0:
+        return None
+    stacked = th.stack(inputs, dim=0)
+    return fn(stacked, dim=0)
+
 def get_aggregate_fn(agg):
     """Internal function to get the aggregation function for node data
     generated from different relations.
@@ -215,9 +234,9 @@ def get_aggregate_fn(agg):
     if agg == 'sum':
         fn = th.sum
     elif agg == 'max':
-        fn = lambda inputs, dim: th.max(inputs, dim=dim)[0]
+        fn = _max_reduce_func
     elif agg == 'min':
-        fn = lambda inputs, dim: th.min(inputs, dim=dim)[0]
+        fn = _min_reduce_func
     elif agg == 'mean':
         fn = th.mean
     elif agg == 'stack':
@@ -226,15 +245,6 @@ def get_aggregate_fn(agg):
         raise DGLError('Invalid cross type aggregator. Must be one of '
                        '"sum", "max", "min", "mean" or "stack". But got "%s"' % agg)
     if agg == 'stack':
-        def stack_agg(inputs, dsttype):  # pylint: disable=unused-argument
-            if len(inputs) == 0:
-                return None
-            return th.stack(inputs, dim=1)
-        return stack_agg
+        return _stack_agg_func
     else:
-        def aggfn(inputs, dsttype):  # pylint: disable=unused-argument
-            if len(inputs) == 0:
-                return None
-            stacked = th.stack(inputs, dim=0)
-            return fn(stacked, dim=0)
-        return aggfn
+        return partial(_agg_func, fn=fn)
