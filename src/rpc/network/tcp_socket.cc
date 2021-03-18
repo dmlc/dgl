@@ -100,7 +100,8 @@ bool TCPSocket::Accept(TCPSocket * socket, std::string * ip, int * port) {
 
   if (sock_client < 0) {
     LOG(ERROR) << "Failed accept connection on " << *ip << ":" << *port
-               << ", error: " << strerror(errno) << (errno == EAGAIN ? " SO_RCVTIMEO timeout reached" : "");
+               << ", error: " << strerror(errno)
+               << (errno == EAGAIN ? " SO_RCVTIMEO timeout reached" : "");
     return false;
   }
 
