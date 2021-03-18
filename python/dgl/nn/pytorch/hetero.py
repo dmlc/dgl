@@ -1,8 +1,8 @@
 """Heterograph NN modules"""
+from functools import partial
 import torch as th
 import torch.nn as nn
 from ...base import DGLError
-from functools import partial
 
 __all__ = ['HeteroGraphConv']
 
@@ -204,12 +204,12 @@ def _max_reduce_func(inputs, dim):
 def _min_reduce_func(inputs, dim):
     return th.min(inputs, dim=dim)[0]
 
-def _stack_agg_func(inputs, dsttype):
+def _stack_agg_func(inputs, dsttype): # pylint: disable=unused-argument
     if len(inputs) == 0:
         return None
     return th.stack(inputs, dim=1)
 
-def _agg_func(inputs, dsttype, fn):
+def _agg_func(inputs, dsttype, fn): # pylint: disable=unused-argument
     if len(inputs) == 0:
         return None
     stacked = th.stack(inputs, dim=0)
