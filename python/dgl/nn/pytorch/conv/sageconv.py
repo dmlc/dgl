@@ -5,7 +5,7 @@ from torch import nn
 from torch.nn import functional as F
 
 from .... import function as fn
-from ....utils import expand_as_pair, check_eq_shape
+from ....utils import expand_as_pair, check_eq_shape, dgl_warning
 
 
 class SAGEConv(nn.Module):
@@ -123,6 +123,8 @@ class SAGEConv(nn.Module):
         self.fc_neigh = nn.Linear(self._in_src_feats, out_feats, bias=False)
         if bias:
             self.bias = nn.parameter.Parameter(torch.zeros(self._out_feats))
+        else:
+            self.register_buffer('bias', None)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -145,6 +147,17 @@ class SAGEConv(nn.Module):
         if self._aggre_type != 'gcn':
             nn.init.xavier_uniform_(self.fc_self.weight, gain=gain)
         nn.init.xavier_uniform_(self.fc_neigh.weight, gain=gain)
+
+    def _compatibility_check(self):
+        """Address the backward compatibility issue brought by #2747"""
+        if not hasattr(self, 'bias'):
+            dgl_warning("You are loading a GraphSAGE model trained from a old version of DGL, whose "
+                        "parameters may not compatible with latest version of DGL.")
+            bias = self.fc_neigh.bias
+            if hasattr(self, 'fc_self'):
+                if bias is not None:
+                    bias = bias + self.fc_self.bias
+            self.bias = bias
 
     def _lstm_reducer(self, nodes):
         """LSTM reducer
@@ -185,6 +198,7 @@ class SAGEConv(nn.Module):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
+        self._compatibility_check()
         with graph.local_scope():
             if isinstance(feat, tuple):
                 feat_src = self.feat_drop(feat[0])
