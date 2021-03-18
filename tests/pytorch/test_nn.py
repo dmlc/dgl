@@ -28,7 +28,7 @@ def test_graph_conv0(out_dim):
     print(conv)
 
     # test pickle
-    torch.save(conv)
+    th.save(conv)
 
 
     # test#1: basic
@@ -127,7 +127,7 @@ def test_graph_conv_e_weight_norm(idtype, g, norm, weight, bias, out_dim):
     conv = nn.GraphConv(5, out_dim, norm=norm, weight=weight, bias=bias).to(F.ctx())
 
     # test pickle
-    torch.save(conv)
+    th.save(conv)
 
     ext_w = F.randn((5, out_dim)).to(F.ctx())
     nsrc = g.number_of_src_nodes()
@@ -153,7 +153,7 @@ def test_graph_conv_bi(idtype, g, norm, weight, bias, out_dim):
     conv = nn.GraphConv(5, out_dim, norm=norm, weight=weight, bias=bias).to(F.ctx())
     
     # test pickle
-    torch.save(conv)
+    th.save(conv)
 
     ext_w = F.randn((5, out_dim)).to(F.ctx())
     nsrc = g.number_of_src_nodes()
@@ -191,7 +191,7 @@ def test_tagconv(out_dim):
     print(conv)
     
     # test pickle
-    torch.save(conv)
+    th.save(conv)
 
     # test#1: basic
     h0 = F.ones((3, 5))
@@ -249,7 +249,7 @@ def test_glob_att_pool():
     print(gap)
 
     # test pickle
-    torch.save(gap)
+    th.save(gap)
 
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
@@ -369,7 +369,7 @@ def test_rgcn(O):
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
 
     # test pickle
-    torch.save(rgc_basis)
+    th.save(rgc_basis)
 
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
     rgc_basis_low.weight = rgc_basis.weight
@@ -535,7 +535,7 @@ def test_gat_conv(g, idtype, out_dim, num_heads):
     h = gat(g, feat)
 
     # test pickle
-    torch.save(gat)
+    th.save(gat)
 
     assert h.shape == (g.number_of_nodes(), num_heads, out_dim)
     _, a = gat(g, feat, get_attention=True)
@@ -565,7 +565,7 @@ def test_sage_conv(idtype, g, aggre_type):
     feat = F.randn((g.number_of_nodes(), 5))
     sage = sage.to(F.ctx())
     # test pickle
-    torch.save(sage)
+    th.save(sage)
     h = sage(g, feat)
     assert h.shape[-1] == 10
 
@@ -615,7 +615,7 @@ def test_sgc_conv(g, idtype, out_dim):
     sgc = nn.SGConv(5, out_dim, 3)
 
     # test pickle
-    torch.save(sgc)
+    th.save(sgc)
 
     feat = F.randn((g.number_of_nodes(), 5))
     sgc = sgc.to(ctx)
@@ -641,7 +641,7 @@ def test_appnp_conv(g, idtype):
     appnp = appnp.to(ctx)
     
     # test pickle
-    torch.save(appnp)
+    th.save(appnp)
 
     h = appnp(g, feat)
     assert h.shape[-1] == 5
@@ -661,7 +661,7 @@ def test_gin_conv(g, idtype, aggregator_type):
     h = gin(g, feat)
 
     # test pickle
-    torch.save(h)
+    th.save(h)
     
     assert h.shape == (g.number_of_nodes(), 12)
 
@@ -827,7 +827,7 @@ def test_edge_conv(g, idtype, out_dim):
     print(edge_conv)
 
     # test pickle
-    torch.save(edge_conv)
+    th.save(edge_conv)
     
     h0 = F.randn((g.number_of_nodes(), 5))
     h1 = edge_conv(g, h0)
@@ -858,7 +858,7 @@ def test_dotgat_conv(g, idtype, out_dim, num_heads):
     dotgat = dotgat.to(ctx)
     
     # test pickle
-    torch.save(dotgat)
+    th.save(dotgat)
     
     h = dotgat(g, feat)
     assert h.shape == (g.number_of_nodes(), num_heads, out_dim)
@@ -1020,7 +1020,7 @@ def test_hetero_conv(agg, idtype):
     conv = conv.to(F.ctx())
 
     # test pickle
-    torch.save(conv)
+    th.save(conv)
 
     uf = F.randn((4, 2))
     gf = F.randn((4, 4))
