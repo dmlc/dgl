@@ -297,6 +297,16 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Learning over Families of Sets -- Hypergraph Representation Learning for Higher Order Tasks**](https://arxiv.org/abs/2101.07773), SDM 2021, *Balasubramaniam Srinivasan, Da Zheng, and George Karypis*
 
+1. [**SSFG: Stochastically Scaling Features and Gradients for Regularizing Graph Convolution Networks**](https://arxiv.org/abs/2102.10338), *Haimin Zhang, Min Xu*
+
+1. [**Application and evaluation of knowledge graph embeddings in biomedical data**](https://peerj.com/articles/cs-341/), PeerJ Computer Science 7:e341, *Mona Alshahrani​, Maha A. Thafar, Magbubah Essack*
+
+1. [**MoTSE: an interpretable task similarity estimator for small molecular property prediction tasks**](https://www.biorxiv.org/content/10.1101/2021.01.13.426608v2), bioRxiv 2021.01.13.426608, *Han Li, Xinyi Zhao, Shuya Li, Fangping Wan, Dan Zhao, Jianyang Zeng*
+
+1. [**Reinforcement Learning For Data Poisoning on Graph Neural Networks**](https://arxiv.org/abs/2102.06800), *Jacob Dineen, A S M Ahsan-Ul Haque, Matthew Bielskas*
+
+1. [**GraphGallery: A Platform for Fast Benchmarking and Easy Development of Graph Neural Networks Based Intelligent Software**](https://arxiv.org/pdf/2102.07933.pdf), [Github](https://github.com/EdisonLeeeee/GraphGallery), *Jintang Li, Kun Xu, Liang Chen, Zibin Zheng, Xiao Liu*
+
 </details>
 
 ## Installation
