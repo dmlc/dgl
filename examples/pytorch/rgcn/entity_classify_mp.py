@@ -247,6 +247,9 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
                                           world_size=world_size,
                                           rank=proc_id)
 
+
+    th.cuda.set_device(dev_id)
+    print("Creating comm {}/{} with {}".format(proc_id, n_gpus, nccl_id))
     nccl_comm = nccl.Communicator(n_gpus, proc_id, nccl_id)
 
     # node features
@@ -312,7 +315,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
             dgl_emb = embed_layer.dgl_emb
         emb_optimizer = dgl.optim.SparseAdam(
                 params=dgl_emb, lr=args.sparse_lr, eps=1e-8,
-                comm=None) if len(dgl_emb) > 0 else None
+                comm=nccl_comm) if len(dgl_emb) > 0 else None
     else:
         if n_gpus > 1:
             embs = list(embed_layer.module.node_embeds.parameters())
