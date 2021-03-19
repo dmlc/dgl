@@ -59,7 +59,7 @@ def pairwise_squared_distance(x):
     return x2s + F.swapaxes(x2s, -1, -2) - 2 * x @ F.swapaxes(x, -1, -2)
 
 #pylint: disable=invalid-name
-def knn_graph(x, k):
+def knn_graph(x, k, use_dgl_impl=False):
     """Construct a graph from a set of points according to k-nearest-neighbor (KNN)
     and return.
 
@@ -86,6 +86,9 @@ def knn_graph(x, k):
           ``x[i][j]`` corresponds to the j-th node in the i-th KNN graph.
     k : int
         The number of nearest neighbors per node.
+    use_dgl_impl : bool, optional
+        If True, use dgl's C/C++ implementation of KNN
+        (default: False)
 
     Returns
     -------
@@ -129,29 +132,37 @@ def knn_graph(x, k):
     (tensor([0, 1, 2, 2, 2, 3, 3, 3, 4, 5, 5, 5, 6, 6, 7, 7]),
      tensor([0, 1, 1, 2, 3, 0, 2, 3, 4, 5, 6, 7, 4, 6, 5, 7]))
     """
-    if F.ndim(x) == 2:
-        x = F.unsqueeze(x, 0)
-    n_samples, n_points, _ = F.shape(x)
+    if use_dgl_impl:
+        if F.ndim(x) == 3:
+            x_size = tuple(F.shape(x))
+            x = F.reshape(x, (x_size[0] * x_size[1], x_size[2]))
+            x_seg = x_size[0] * [x_size[1]]
+        else:
+            x_seg = [F.shape(x)[0]]
+        return segmented_knn_graph(x, k, x_seg, use_dgl_impl=True)
+    else:
+        if F.ndim(x) == 2:
+            x = F.unsqueeze(x, 0)
+        n_samples, n_points, _ = F.shape(x)
 
-    dist = pairwise_squared_distance(x)
-    k_indices = F.argtopk(dist, k, 2, descending=False)
-    dst = F.copy_to(k_indices, F.cpu())
+        dist = pairwise_squared_distance(x)
+        k_indices = F.argtopk(dist, k, 2, descending=False)
+        dst = F.copy_to(k_indices, F.cpu())
 
-    src = F.zeros_like(dst) + F.reshape(F.arange(0, n_points), (1, -1, 1))
+        src = F.zeros_like(dst) + F.reshape(F.arange(0, n_points), (1, -1, 1))
 
-    per_sample_offset = F.reshape(F.arange(0, n_samples) * n_points, (-1, 1, 1))
-    dst += per_sample_offset
-    src += per_sample_offset
-    dst = F.reshape(dst, (-1,))
-    src = F.reshape(src, (-1,))
-    adj = sparse.csr_matrix(
-        (F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))),
-        shape=(n_samples * n_points, n_samples * n_points))
-
-    return convert.from_scipy(adj)
+        per_sample_offset = F.reshape(F.arange(0, n_samples) * n_points, (-1, 1, 1))
+        dst += per_sample_offset
+        src += per_sample_offset
+        dst = F.reshape(dst, (-1,))
+        src = F.reshape(src, (-1,))
+        adj = sparse.csr_matrix(
+            (F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))),
+            shape=(n_samples * n_points, n_samples * n_points))
+        return convert.from_scipy(adj)
 
 #pylint: disable=invalid-name
-def segmented_knn_graph(x, k, segs):
+def segmented_knn_graph(x, k, segs, use_dgl_impl=False):
     """Construct multiple graphs from multiple sets of points according to
     k-nearest-neighbor (KNN) and return.
 
@@ -173,6 +184,9 @@ def segmented_knn_graph(x, k, segs):
     segs : list[int]
         Number of points in each point set. The numbers in :attr:`segs`
         must sum up to the number of rows in :attr:`x`.
+    use_dgl_impl : bool, optional
+        If True, use dgl's C/C++ implementation of KNN
+        (default: False)
 
     Returns
     -------
@@ -208,26 +222,35 @@ def segmented_knn_graph(x, k, segs):
     (tensor([0, 0, 1, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6]),
      tensor([0, 1, 0, 1, 2, 2, 3, 5, 4, 6, 3, 5, 4, 6]))
     """
-    n_total_points, _ = F.shape(x)
-    offset = np.insert(np.cumsum(segs), 0, 0)
+    if use_dgl_impl:
+        out = knn(x, segs, x, segs, k).t().contiguous()
+        row, col = out[1], out[0]
+        return convert.graph((row, col))
+    else:
+        n_total_points, _ = F.shape(x)
+        offset = np.insert(np.cumsum(segs), 0, 0)
 
-    h_list = F.split(x, segs, 0)
-    dst = [
-        F.argtopk(pairwise_squared_distance(h_g), k, 1, descending=False) +
-        int(offset[i])
-        for i, h_g in enumerate(h_list)]
-    dst = F.cat(dst, 0)
-    src = F.arange(0, n_total_points).unsqueeze(1).expand(n_total_points, k)
+        h_list = F.split(x, segs, 0)
+        dst = [
+            F.argtopk(pairwise_squared_distance(h_g), k, 1, descending=False) +
+            int(offset[i])
+            for i, h_g in enumerate(h_list)]
+        dst = F.cat(dst, 0)
+        src = F.arange(0, n_total_points).unsqueeze(1).expand(n_total_points, k)
 
-    dst = F.reshape(dst, (-1,))
-    src = F.reshape(src, (-1,))
-    adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
+        dst = F.reshape(dst, (-1,))
+        src = F.reshape(src, (-1,))
+        adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
 
-    return convert.from_scipy(adj)
+        return convert.from_scipy(adj)
 
 def knn(x, x_segs, y, y_segs, k, dist:str="euclidean"):
-    r"""For each element in each point set in :attr:`y`, find :attr:`k` nearest
-    points in the same point set in :attr:`x`.
+    r"""For each element in each segment in :attr:`y`, find :attr:`k` nearest
+    points in the same segment in :attr:`x`.
+
+    This function allows multiple point sets with different capacity. The points
+    from different sets are stored contiguously in the :attr:`x` and :attr:`y` tensor.
+    :attr:`x_segs` and :attr:`y_segs` specifies the number of points in each point set.
 
     Parameters
     ----------
@@ -249,38 +272,52 @@ def knn(x, x_segs, y, y_segs, k, dist:str="euclidean"):
         The distance metric used to compute distance between points. It can be the following
         metrics:
         * "euclidean": Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
-        * "manhattan": Use Manhattan distance (L1 norm) :math:`\sum_{i} |x_{i} - y_{i}|`.
         * "cosine": Use cosine distance.
         (Default: "euclidean")
-    
+
     Returns
     -------
     (Tensor, Tensor)
         The first tensor contains point indexs in :attr:`y`. The second tensor contains
         point indexs in :attr:`x`
     """
+    if isinstance(x_segs, (tuple, list)):
+        x_segs = F.copy_to(F.tensor(x_segs), F.context(x))
+    if isinstance(y_segs, (tuple, list)):
+        y_segs = F.copy_to(F.tensor(y_segs), F.context(y))
+
     # k must less than or equal to min(x_segs)
     if k > F.min(x_segs, dim=0):
         raise DGLError("'k' must be less than or equal to the number of points in 'x'"
                        "expect k <= {}, got k = {}".format(F.min(x_segs, dim=0), k))
     dist = dist.lower()
-    dist_metric_list = ["euclidean", "manhattan", "cosine"]
+    dist_metric_list = ["euclidean", "cosine"]
     if dist not in dist_metric_list:
         raise DGLError("Only {} are supported for distance"
                        "computation, got {}".format(dist_metric_list, dist))
-    
-    if isinstance(x_segs, (tuple, list)):
-        x_segs = F.copy_to(F.tensor(x_segs), F.context(x))
-    if isinstance(y_segs, (tuple, list)):
-        y_segs = F.copy_to(F.tensor(y_segs), F.context(y))
+
     x_offset = F.zeros((F.shape(x_segs)[0] + 1,), F.dtype(x_segs), F.context(x_segs))
     x_offset[1:] = F.cumsum(x_segs, dim=0)
     y_offset = F.zeros((F.shape(y_segs)[0] + 1,), F.dtype(y_segs), F.context(y_segs))
     y_offset[1:] = F.cumsum(y_segs, dim=0)
 
     out = F.zeros((F.shape(y)[0] * k, 2), F.dtype(x_segs), F.context(x_segs))
-    # call CAPI
-    return None
+
+    # if use cosine distance, normalize input points first
+    # thus we can use euclidean distance to find knn equivalently.
+    if dist == "cosine":
+        l2_norm = lambda v : F.sqrt(F.sum(v * v, dim=1, keepdims=True))
+        x = x / (l2_norm(x) + 1e-5)
+        y = y / (l2_norm(y) + 1e-5)
+
+    _CAPI_DGLKNN(F.zerocopy_to_dgl_ndarray(x),
+                 F.zerocopy_to_dgl_ndarray(x_offset),
+                 F.zerocopy_to_dgl_ndarray(y),
+                 F.zerocopy_to_dgl_ndarray(y_offset),
+                 k,
+                 F.zerocopy_to_dgl_ndarray_for_write(out))
+    return out
+
 
 def to_bidirected(g, copy_ndata=False, readonly=None):
     r"""Convert the graph to a bi-directional simple graph and return.

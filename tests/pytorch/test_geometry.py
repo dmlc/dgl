@@ -24,7 +24,9 @@ def test_fps():
     assert res.shape[1] == sample_points
     assert res.sum() > 0
 
-def test_knn():
+
+@pytest.mark.parametrize('use_dgl_impl', [True, False])
+def test_knn(use_dgl_impl):
     x = th.randn(8, 3)
     kg = dgl.nn.KNNGraph(3)
     d = th.cdist(x, x)
@@ -37,15 +39,15 @@ def test_knn():
             src_ans = set(th.topk(d[start:end, start:end][i], 3, largest=False)[1].numpy() + start)
             assert src == src_ans
 
-    g = kg(x)
+    g = kg(x, use_dgl_impl)
     check_knn(g, x, 0, 8)
 
-    g = kg(x.view(2, 4, 3))
+    g = kg(x.view(2, 4, 3), use_dgl_impl)
     check_knn(g, x, 0, 4)
     check_knn(g, x, 4, 8)
 
     kg = dgl.nn.SegmentedKNNGraph(3)
-    g = kg(x, [3, 5])
+    g = kg(x, [3, 5], use_dgl_impl)
     check_knn(g, x, 0, 3)
     check_knn(g, x, 3, 8)
 

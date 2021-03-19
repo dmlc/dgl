@@ -2,7 +2,7 @@
  *  Copyright (c) 2021 by Contributors
  * \file graph/transform/kdtree_ndarray_adaptor.h
  * \brief NDArray adaptor for nanoflann, without
- *        duplicating the storage 
+ *        duplicating the storage
  */
 #ifndef DGL_GRAPH_TRANSFORM_KDTREE_NDARRAY_ADAPTOR_H_
 #define DGL_GRAPH_TRANSFORM_KDTREE_NDARRAY_ADAPTOR_H_
@@ -14,10 +14,9 @@
 
 namespace dgl {
 namespace transform {
+namespace knn_utils {
 
-using runtime::NDArray;
-
-/*! 
+/*!
  * \brief A simple 2D NDArray adaptor for nanoflann, without duplicating the storage.
  *
  * \tparam FloatType: The type of the point coordinates (typically, double or float).
@@ -34,7 +33,7 @@ public:
   using metric_type = typename Dist::template traits<FloatType, self_type>::distance_t;
   using index_type = nanoflann::KDTreeSingleIndexAdaptor<metric_type, self_type, FeatureDim, IdType>;
 
-  KDTreeNDArrayAdaptor(const size_t, const NDArray data_points, const int leaf_max_size=10)
+  KDTreeNDArrayAdaptor(const size_t /* dims */, const NDArray data_points, const int leaf_max_size=10)
       : m_data(data_points) {
     CHECK(data_points->shape[0] != 0 && data_points->shape[1] != 0)
       << "Tensor containing input data point set must be 2D.";
@@ -42,7 +41,7 @@ public:
     CHECK(!(FeatureDim > 0 && static_cast<int>(dims) != FeatureDim))
       << "Data set feature dimension does not match the 'FeatureDim' "
       << "template argument.";
-    m_index = new index_t(static_cast<int>(dims), *this, nanoflann::KDTreeSingleIndexAdaptorParams(leaf_max_size));
+    m_index = new index_type(static_cast<int>(dims), *this, nanoflann::KDTreeSingleIndexAdaptorParams(leaf_max_size));
     m_index->buildIndex();
   }
 
@@ -53,7 +52,7 @@ public:
   index_type * GetIndex() {
     return m_index;
   }
-  
+
   /*!
    * \brief Query for the \a num_closest points to a given point
    *  Note that this is a short-cut method for GetIndex()->findNeighbors().
@@ -68,16 +67,16 @@ public:
   }
 
   /*! \brief Interface expected by KDTreeSingleIndexAdaptor */
-  const self_t & derived() const {
+  const self_type & derived() const {
     return *this;
   }
 
   /*! \brief Interface expected by KDTreeSingleIndexAdaptor */
-  self_t & derived() {
+  self_type & derived() {
     return *this;
   }
 
-  /*! 
+  /*!
    * \brief Interface expected by KDTreeSingleIndexAdaptor,
    *  return the number of data points
    */
@@ -85,7 +84,7 @@ public:
     return m_data->shape[0];
   }
 
-  /*! 
+  /*!
    * \brief Interface expected by KDTreeSingleIndexAdaptor,
    *  return the dim'th component of the idx'th point
    */
@@ -93,11 +92,11 @@ public:
     return static_cast<FloatType*>(m_data->data)[idx * m_data->shape[1] + dim];
   }
 
-  /*! 
+  /*!
    * \brief Interface expected by KDTreeSingleIndexAdaptor.
    *  Optional bounding-box computation: return false to
    *  default to a standard bbox computation loop.
-   * 
+   *
    */
   template <typename BBOX>
   bool kdtree_get_bbox(BBOX & /* bb */) const {
@@ -109,7 +108,8 @@ private:
   const NDArray m_data;  // data points
 };
 
-} // namespace transform
-} // namespace dgl
+}  // namespace knn_utils
+}  // namespace transform
+}  // namespace dgl
 
 #endif  // DGL_GRAPH_TRANSFORM_KDTREE_NDARRAY_ADAPTOR_H_

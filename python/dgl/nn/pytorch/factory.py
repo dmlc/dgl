@@ -67,7 +67,7 @@ class KNNGraph(nn.Module):
         self.k = k
 
     #pylint: disable=invalid-name
-    def forward(self, x):
+    def forward(self, x, use_dgl_impl=False):
         """
 
         Forward computation.
@@ -78,13 +78,16 @@ class KNNGraph(nn.Module):
             :math:`(M, D)` or :math:`(N, M, D)` where :math:`N` means the
             number of point sets, :math:`M` means the number of points in
             each point set, and :math:`D` means the size of features.
+        use_dgl_impl : bool, optional
+            If True, use dgl's C/C++ implementation of KNN
+            (default: False)
 
         Returns
         -------
         DGLGraph
             A DGLGraph without features.
         """
-        return knn_graph(x, self.k)
+        return knn_graph(x, self.k, use_dgl_impl)
 
 
 class SegmentedKNNGraph(nn.Module):
@@ -140,7 +143,7 @@ class SegmentedKNNGraph(nn.Module):
         self.k = k
 
     #pylint: disable=invalid-name
-    def forward(self, x, segs):
+    def forward(self, x, segs, use_dgl_impl=False):
         r"""Forward computation.
 
         Parameters
@@ -152,6 +155,9 @@ class SegmentedKNNGraph(nn.Module):
             :math:`(N)` integers where :math:`N` means the number of point
             sets.  The number of elements must sum up to :math:`M`. And any
             :math:`N` should :math:`\ge k`
+        use_dgl_impl : bool, optional
+            If True, use dgl's C/C++ implementation of KNN
+            (default: False)
 
         Returns
         -------
@@ -159,4 +165,4 @@ class SegmentedKNNGraph(nn.Module):
             A DGLGraph without features.
         """
 
-        return segmented_knn_graph(x, self.k, segs)
+        return segmented_knn_graph(x, self.k, segs, use_dgl_impl)
