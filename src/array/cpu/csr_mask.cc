@@ -37,23 +37,21 @@ NDArray CSRMask(
   NDArray C_weights = NDArray::Empty({B.indices->shape[0]}, A_weights->dtype, A_weights->ctx);
   DType* C_data = C_weights.Ptr<DType>();
 
-  std::vector<bool> has_value(N);
-  std::vector<DType> values(N);
-
+  phmap::flat_hash_map<IdType, DType> map;
+#pragma omp parallel for firstprivate(map)
   for (IdType i = 0; i < M; ++i) {
+    map.clear();
+
     for (IdType u = A_indptr[i]; u < A_indptr[i + 1]; ++u) {
       IdType kA = A_indices[u];
-      has_value[kA] = true;
-      values[kA] = A_data[A_eids ? A_eids[u] : u];
+      map[kA] = A_data[A_eids ? A_eids[u] : u];
     }
 
     for (IdType v = B_indptr[i]; v < B_indptr[i + 1]; ++v) {
       IdType kB = B_indices[v];
-      C_data[B_eids ? B_eids[v] : v] = has_value[kB] ? values[kB] : 0;
+      auto it = map.find(kB);
+      C_data[B_eids ? B_eids[v] : v] = (it != map.end()) ? it->second : 0;
     }
-
-    for (IdType u = A_indptr[i]; u < A_indptr[i + 1]; ++u)
-      has_value[A_indices[u]] = false;
   }
 
   return C_weights;

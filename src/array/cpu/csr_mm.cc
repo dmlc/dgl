@@ -37,41 +37,58 @@ std::pair<CSRMatrix, NDArray> CSRMM(
 
   IdArray C_indptr = IdArray::Empty({M + 1}, A.indptr->dtype, A.indptr->ctx);
   IdType* C_indptr_data = C_indptr.Ptr<IdType>();
-  std::vector<IdType> C_indices;
-  std::vector<DType> C_weights;
   IdType nnz = 0;
-  C_indptr_data[0] = 0;
 
-  std::vector<bool> has_value(P);
-  std::vector<DType> values(P);
-
+  // Compute indptr first in parallel
+  phmap::flat_hash_set<IdType> set;
+#pragma omp parallel for firstprivate(set)
   for (IdType i = 0; i < M; ++i) {
+    set.clear();
+    for (IdType u = A_indptr[i]; u < A_indptr[i + 1]; ++u) {
+      IdType w = A_indices[u];
+      for (IdType v = B_indptr[w]; v < B_indptr[w + 1]; ++v)
+        set.insert(B_indices[v]);
+    }
+    C_indptr_data[i] = set.size();
+  }
+
+  IdType len = 0;
+  for (IdType i = 0; i < M; ++i) {
+    len = C_indptr_data[i];
+    C_indptr_data[i] = nnz;
+    nnz += len;
+  }
+  C_indptr_data[M] = nnz;
+
+  IdArray C_indices = IdArray::Empty({nnz}, A.indices->dtype, A.indices->ctx);
+  NDArray C_weights = NDArray::Empty({nnz}, A_weights->dtype, A_weights->ctx);
+  IdType* C_indices_data = C_indices.Ptr<IdType>();
+  DType* C_weights_data = C_weights.Ptr<DType>();
+
+  // Compute indices and data in parallel
+  phmap::flat_hash_map<IdType, DType> map;
+#pragma omp parallel for firstprivate(map)
+  for (IdType i = 0; i < M; ++i) {
+    map.clear();
     for (IdType u = A_indptr[i]; u < A_indptr[i + 1]; ++u) {
       IdType w = A_indices[u];
       DType vA = A_data[A_eids ? A_eids[u] : u];
       for (IdType v = B_indptr[w]; v < B_indptr[w + 1]; ++v) {
         IdType t = B_indices[v];
         DType vB = B_data[B_eids ? B_eids[v] : v];
-        has_value[t] = true;
-        values[t] += vA * vB;
+        map[t] += vA * vB;
       }
     }
 
-    for (IdType j = 0; j < P; ++j) {
-      if (has_value[j]) {
-        C_indices.push_back(j);
-        C_weights.push_back(values[j]);
-        ++nnz;
-        has_value[j] = false;
-        values[j] = 0;
-      }
+    IdType v = C_indptr_data[i];
+    for (auto it : map) {
+      C_indices_data[v] = it.first;
+      C_weights_data[v] = it.second;
+      ++v;
     }
-    C_indptr_data[i + 1] = nnz;
   }
 
-  return {
-      CSRMatrix(M, P, C_indptr, NDArray::FromVector(C_indices), NullArray(), true),
-      NDArray::FromVector(C_weights)};
+  return {CSRMatrix(M, P, C_indptr, C_indices), C_weights};
 }
 
 template std::pair<CSRMatrix, NDArray> CSRMM<kDLCPU, int32_t, float>(

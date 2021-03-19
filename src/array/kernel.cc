@@ -296,6 +296,64 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGetEdgeMapping")
     *rv = GetEdgeMapping(graph);
   });
 
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLCSRMM")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    int M = args[0];
+    int N = args[1];
+    int P = args[2];
+    NDArray A_indptr = args[3];
+    NDArray A_indices = args[4];
+    NDArray A_data = args[5];
+    NDArray B_indptr = args[6];
+    NDArray B_indices = args[7];
+    NDArray B_data = args[8];
+    auto result = CSRMM(
+        CSRMatrix(M, N, A_indptr, A_indices),
+        A_data,
+        CSRMatrix(N, P, B_indptr, B_indices),
+        B_data);
+    List<Value> ret;
+    ret.push_back(Value(MakeValue(result.first.indptr)));
+    ret.push_back(Value(MakeValue(result.first.indices)));
+    ret.push_back(Value(MakeValue(result.second)));
+    *rv = ret;
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLCSRSum")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    int M = args[0];
+    int N = args[1];
+    List<Value> A_indptr = args[2];
+    List<Value> A_indices = args[3];
+    List<Value> A_data = args[4];
+    std::vector<NDArray> weights = ListValueToVector<NDArray>(A_data);
+    std::vector<CSRMatrix> mats(A_indptr.size());
+    for (int i = 0; i < A_indptr.size(); ++i)
+      mats[i] = CSRMatrix(M, N, A_indptr[i]->data, A_indices[i]->data);
+    auto result = CSRSum(mats, weights);
+    List<Value> ret;
+    ret.push_back(Value(MakeValue(result.first.indptr)));
+    ret.push_back(Value(MakeValue(result.first.indices)));
+    ret.push_back(Value(MakeValue(result.second)));
+    *rv = ret;
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLCSRMask")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    int M = args[0];
+    int N = args[1];
+    NDArray A_indptr = args[2];
+    NDArray A_indices = args[3];
+    NDArray A_data = args[4];
+    NDArray B_indptr = args[5];
+    NDArray B_indices = args[6];
+    auto result = CSRMask(
+        CSRMatrix(M, N, A_indptr, A_indices),
+        A_data,
+        CSRMatrix(M, N, B_indptr, B_indices));
+    *rv = result;
+  });
+
 #ifdef USE_TVM
 DGL_REGISTER_GLOBAL("sparse._CAPI_FG_LoadModule")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {

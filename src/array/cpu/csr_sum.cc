@@ -43,41 +43,55 @@ std::pair<CSRMatrix, NDArray> CSRSum(
 
   IdArray C_indptr = IdArray::Empty({M + 1}, A[0].indptr->dtype, A[0].indptr->ctx);
   IdType* C_indptr_data = C_indptr.Ptr<IdType>();
-  std::vector<IdType> C_indices;
-  std::vector<DType> C_weights;
   IdType nnz = 0;
-  C_indptr_data[0] = 0;
 
-  std::vector<bool> has_value(N);
-  std::vector<DType> values(N);
-
+  // Compute indptr first in parallel
+  phmap::flat_hash_set<IdType> set;
+#pragma omp parallel for firstprivate(set)
   for (IdType i = 0; i < M; ++i) {
+    set.clear();
+    for (int64_t k = 0; k < n; ++k) {
+      for (IdType u = A_indptr[k][i]; u < A_indptr[k][i + 1]; ++u)
+        set.insert(A_indices[k][u]);
+    }
+    C_indptr_data[i] = set.size();
+  }
+
+  IdType len = 0;
+  for (IdType i = 0; i < M; ++i) {
+    len = C_indptr_data[i];
+    C_indptr_data[i] = nnz;
+    nnz += len;
+  }
+  C_indptr_data[M] = nnz;
+
+  IdArray C_indices = IdArray::Empty({nnz}, A[0].indices->dtype, A[0].indices->ctx);
+  NDArray C_weights = NDArray::Empty({nnz}, A_weights[0]->dtype, A_weights[0]->ctx);
+  IdType* C_indices_data = C_indices.Ptr<IdType>();
+  DType* C_weights_data = C_weights.Ptr<DType>();
+
+  // Compute indices and data in parallel
+  phmap::flat_hash_map<IdType, DType> map;
+#pragma omp parallel for firstprivate(map)
+  for (IdType i = 0; i < M; ++i) {
+    map.clear();
     for (int64_t k = 0; k < n; ++k) {
       for (IdType u = A_indptr[k][i]; u < A_indptr[k][i + 1]; ++u) {
         IdType kA = A_indices[k][u];
         DType vA = A_data[k][A_eids[k] ? A_eids[k][u] : u];
-        has_value[kA] = true;
-        values[kA] += vA;
+        map[kA] += vA;
       }
     }
 
-    for (IdType j = 0; j < N; ++j) {
-      if (has_value[j]) {
-        C_indices.push_back(j);
-        C_weights.push_back(values[j]);
-        ++nnz;
-        has_value[j] = false;
-        values[j] = 0;
-      }
+    IdType j = C_indptr_data[i];
+    for (auto it : map) {
+      C_indices_data[j] = it.first;
+      C_weights_data[j] = it.second;
+      ++j;
     }
-
-    C_indptr_data[i + 1] = nnz;
   }
 
-  return {
-      CSRMatrix(
-        M, N, C_indptr, NDArray::FromVector(C_indices), NullArray(), true),
-      NDArray::FromVector(C_weights)};
+  return {CSRMatrix(M, N, C_indptr, C_indices), C_weights};
 }
 
 template std::pair<CSRMatrix, NDArray> CSRSum<kDLCPU, int32_t, float>(
