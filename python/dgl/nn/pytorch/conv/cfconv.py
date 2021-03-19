@@ -123,15 +123,23 @@ class CFConv(nn.Module):
         ----------
         g : DGLGraph
             The graph.
-        node_feats : float32 tensor of shape (V, node_in_feats)
-            Input node features, V for the number of nodes.
-        edge_feats : float32 tensor of shape (E, edge_in_feats)
-            Input edge features, E for the number of edges.
+        node_feats : torch.Tensor or pair of torch.Tensor
+            The input node features. If a torch.Tensor is given, it represents the input
+            node feature of shape :math:`(N, D_{in})` where :math:`D_{in}` is size of
+            input feature, :math:`N` is the number of nodes.
+            If a pair of torch.Tensor is given, which is the case for bipartite graph,
+            the pair must contain two tensors of shape :math:`(N_{src}, D_{in_{src}})` and
+            :math:`(N_{dst}, D_{in_{dst}})` separately for the source and destination nodes.
+
+        edge_feats : torch.Tensor
+            The input edge feature of shape :math:`(E, edge_in_feats)`
+            where :math:`E` is the number of edges.
 
         Returns
         -------
-        float32 tensor of shape (V, out_feats)
-            Updated node representations.
+        torch.Tensor
+            The output node feature of shape :math:`(N_{out}, out_feats)`
+            where :math:`N_{out}` is the number of destination nodes.
         """
         with g.local_scope():
             if isinstance(node_feats, tuple):
