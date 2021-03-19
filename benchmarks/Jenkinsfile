@@ -3,7 +3,7 @@ pipeline{
     //     issueCommentTrigger('@dgl-bot *')
     // }
     agent{
-        label "node"
+        label "linux-c52x-node"
     }
     stages{
         stage("A"){
