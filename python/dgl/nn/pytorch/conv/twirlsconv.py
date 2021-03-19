@@ -7,6 +7,7 @@ import torch as tc
 from torch.nn import init
 from .... import function as fn
 
+
 class TWIRLSConv(nn.Module):
     r"""
 
@@ -83,58 +84,58 @@ class TWIRLSConv(nn.Module):
             [ 0.8844, -5.1814]], grad_fn=<AddmmBackward>)
     """
 
-    def __init__( self , 
-        input_d     , 
-        output_d    , 
-        hidden_d    , 
-        prop_step   , 
-        num_mlp_before = 1,
-        num_mlp_after  = 1, 
-        norm        = 'none' , 
-        precond     = True  ,
-        alp         = 0     , 
-        lam         = 1     , 
-        attention   = False , 
-        tau         = 0.2   , 
-        T           = -1    , 
-        p           = 1     , 
-        use_eta     = False ,
-        attn_bef    = False , 
-        dropout     = 0.0   ,
-        attn_dropout= 0.0   , 
-        inp_dropout = 0.0   ,
-    ):
+    def __init__(self,
+                 input_d,
+                 output_d,
+                 hidden_d,
+                 prop_step,
+                 num_mlp_before=1,
+                 num_mlp_after=1,
+                 norm='none',
+                 precond=True,
+                 alp=0,
+                 lam=1,
+                 attention=False,
+                 tau=0.2,
+                 T=-1,
+                 p=1,
+                 use_eta=False,
+                 attn_bef=False,
+                 dropout=0.0,
+                 attn_dropout=0.0,
+                 inp_dropout=0.0,
+                 ):
 
         super().__init__()
-        self.input_d        = input_d
-        self.output_d       = output_d
-        self.hidden_d       = hidden_d
-        self.prop_step      = prop_step
+        self.input_d = input_d
+        self.output_d = output_d
+        self.hidden_d = hidden_d
+        self.prop_step = prop_step
         self.num_mlp_before = num_mlp_before
-        self.num_mlp_after  = num_mlp_after
-        self.norm           = norm
-        self.precond        = precond
-        self.attention      = attention
-        self.alp            = alp
-        self.lam            = lam
-        self.tau            = tau
-        self.T              = T
-        self.p              = p
-        self.use_eta        = use_eta
-        self.init_att       = attn_bef
-        self.dropout        = dropout
-        self.attn_dropout   = attn_dropout
-        self.inp_dropout    = inp_dropout
+        self.num_mlp_after = num_mlp_after
+        self.norm = norm
+        self.precond = precond
+        self.attention = attention
+        self.alp = alp
+        self.lam = lam
+        self.tau = tau
+        self.T = T
+        self.p = p
+        self.use_eta = use_eta
+        self.init_att = attn_bef
+        self.dropout = dropout
+        self.attn_dropout = attn_dropout
+        self.inp_dropout = inp_dropout
 
         # ----- initialization of some variables -----
         # where to put attention
-        self.attn_aft = prop_step // 2 if attention else -1 
-            
+        self.attn_aft = prop_step // 2 if attention else -1
+
         # whether we can cache unfolding result
-        self.cacheable = (not self.attention) and self.num_mlp_before == 0 and self.inp_dropout <= 0
+        self.cacheable = (
+            not self.attention) and self.num_mlp_before == 0 and self.inp_dropout <= 0
         if self.cacheable:
             self.cached_unfolding = None
-
 
         # if only one layer, then no hidden size
         self.size_bef_unf = self.hidden_d
@@ -142,23 +143,23 @@ class TWIRLSConv(nn.Module):
         if self.num_mlp_before == 0:
             self.size_aft_unf = self.input_d  # as the input  of mlp_aft
         if self.num_mlp_after == 0:
-            self.size_bef_unf = self.output_d # as the output of mlp_bef
-
+            self.size_bef_unf = self.output_d  # as the output of mlp_bef
 
         # ----- computational modules -----
-        self.mlp_bef = MLP(self.input_d , self.hidden_d , self.size_bef_unf , self.num_mlp_before , 
-                self.dropout , self.norm , init_activate = False)
+        self.mlp_bef = MLP(self.input_d, self.hidden_d, self.size_bef_unf, self.num_mlp_before,
+                           self.dropout, self.norm, init_activate=False)
 
-        self.unfolding = UnfoldindAndAttention(self.hidden_d, self.alp, self.lam, self.prop_step, self.attn_aft, 
-                self.tau, self.T, self.p, self.use_eta, self.init_att, self.attn_dropout, self.precond)
+        self.unfolding = UnfoldindAndAttention(self.hidden_d, self.alp, self.lam, self.prop_step, self.attn_aft,
+                                               self.tau, self.T, self.p, self.use_eta, self.init_att, self.attn_dropout, self.precond)
 
         # if there are really transformations before unfolding, then do init_activate in mlp_aft
-        self.mlp_aft = MLP(self.size_aft_unf , self.hidden_d , self.output_d , self.num_mlp_after  , 
-            self.dropout , self.norm , 
-            init_activate = (self.num_mlp_before > 0) and (self.num_mlp_after > 0) 
-        )
+        self.mlp_aft = MLP(self.size_aft_unf, self.hidden_d, self.output_d, self.num_mlp_after,
+                           self.dropout, self.norm,
+                           init_activate=(self.num_mlp_before > 0) and (
+                               self.num_mlp_after > 0)
+                           )
 
-    def forward(self , graph , feat):
+    def forward(self, graph, feat):
 
         # ensure self loop
         graph = graph.remove_self_loop()
@@ -166,17 +167,17 @@ class TWIRLSConv(nn.Module):
 
         x = feat
 
-        if self.cacheable: 
+        if self.cacheable:
             # to cache unfolding result becase there is no paramaters before it
             if self.cached_unfolding is None:
-                self.cached_unfolding = self.unfolding(graph , x)
+                self.cached_unfolding = self.unfolding(graph, x)
 
             x = self.cached_unfolding
         else:
             if self.inp_dropout > 0:
-                x = F.dropout(x, self.inp_dropout, training = self.training)
+                x = F.dropout(x, self.inp_dropout, training=self.training)
             x = self.mlp_bef(x)
-            x = self.unfolding(graph , x)
+            x = self.unfolding(graph, x)
 
         x = self.mlp_aft(x)
 
@@ -207,8 +208,9 @@ class PropagateNoPrecond(nn.Module):
 
         return (1 - alp * lam - alp) * Y + alp * lam * normalized_AX(graph, Y) + alp * X
 
+
 class Attention(nn.Module):
-    def __init__(self, tau, T, p, attn_dropout = 0.0):
+    def __init__(self, tau, T, p, attn_dropout=0.0):
         super().__init__()
 
         self.tau = tau
@@ -228,16 +230,16 @@ class Attention(nn.Module):
 
         w[(w < self.tau)] = self.tau
         if self.T > 0:
-            w[(w > self.T  )] = float("inf")
+            w[(w > self.T)] = float("inf")
 
         w = 1 / w
 
         if not (w == w).all():
             raise "nan occured!"
 
-        graph.edata["w"] = w + 1e-9 # avoid 0 degree
+        graph.edata["w"] = w + 1e-9  # avoid 0 degree
 
-    def forward(self, graph, Y, etas = None):
+    def forward(self, graph, Y, etas=None):
 
         if etas is not None:
             Y = Y * etas.view(-1)
@@ -247,10 +249,10 @@ class Attention(nn.Module):
         graph.srcdata["h_norm"] = (Y ** 2).sum(-1)
         graph.apply_edges(fn.u_dot_v("h", "h", "dot_"))
         graph.apply_edges(fn.u_add_v("h_norm", "h_norm", "norm_"))
-        graph.edata["dot_"]  = graph.edata["dot_"].view(-1)
+        graph.edata["dot_"] = graph.edata["dot_"].view(-1)
         graph.edata["norm_"] = graph.edata["norm_"].view(-1)
-        graph.edata["w"]     = graph.edata["norm_"] - 2 * graph.edata["dot_"]
-        
+        graph.edata["w"] = graph.edata["norm_"] - 2 * graph.edata["dot_"]
+
         # apply edge distance to get edge weight
         self.reweighting(graph, etas)
 
@@ -261,7 +263,8 @@ class Attention(nn.Module):
         # attention dropout. the implementation can ensure the degrees do not change in expectation.
         # FIXME: consider if there is a better way
         if self.attn_dropout > 0:
-            graph.edata["w"] = F.dropout(graph.edata["w"], self.attn_dropout, training = self.training)
+            graph.edata["w"] = F.dropout(
+                graph.edata["w"], self.attn_dropout, training=self.training)
 
         return graph
 
@@ -296,6 +299,7 @@ def D_power_X(graph, X, power):
     Y = X * norm.view(X.size(0), 1)
     return Y
 
+
 def D_power_bias_X(graph, X, power, coeff, bias):
     """Y = (coeff*D + bias*I)^{power} X"""
     degs = graph.ndata["deg"]
@@ -306,34 +310,36 @@ def D_power_bias_X(graph, X, power, coeff, bias):
 
 
 class UnfoldindAndAttention(nn.Module):
-    def __init__(self, d, alp, lam, prop_step, attn_aft, tau, T, p, use_eta, init_att , attn_dropout, precond):
+    def __init__(self, d, alp, lam, prop_step, attn_aft, tau, T, p, use_eta, init_att, attn_dropout, precond):
 
         super().__init__()
 
-        self.d      = d
-        self.alp    = alp if alp > 0 else 1 / (lam + 1) # automatic set alpha
-        self.lam    = lam
-        self.tau    = tau
-        self.p      = p
+        self.d = d
+        self.alp = alp if alp > 0 else 1 / (lam + 1)  # automatic set alpha
+        self.lam = lam
+        self.tau = tau
+        self.p = p
         self.prop_step = prop_step
-        self.attn_aft  = attn_aft
-        self.use_eta   = use_eta
-        self.init_att  = init_att
+        self.attn_aft = attn_aft
+        self.use_eta = use_eta
+        self.init_att = init_att
 
-        prop_method      = Propagate if precond else PropagateNoPrecond
-        self.prop_layers = nn.ModuleList([prop_method() for _ in range(prop_step)])
+        prop_method = Propagate if precond else PropagateNoPrecond
+        self.prop_layers = nn.ModuleList(
+            [prop_method() for _ in range(prop_step)])
 
-        self.init_attn   = Attention(tau, T, p, attn_dropout) if self.init_att      else None
-        self.attn_layer  = Attention(tau, T, p, attn_dropout) if self.attn_aft >= 0 else None
-        self.etas        = nn.Parameter(tc.ones(d)) if self.use_eta else None
+        self.init_attn = Attention(
+            tau, T, p, attn_dropout) if self.init_att else None
+        self.attn_layer = Attention(
+            tau, T, p, attn_dropout) if self.attn_aft >= 0 else None
+        self.etas = nn.Parameter(tc.ones(d)) if self.use_eta else None
 
-    def forward(self , g , X):
-        
+    def forward(self, g, X):
+
         Y = X
 
-
-        g.edata["w"]    = tc.ones(g.number_of_edges(), 1, device = g.device)
-        g.ndata["deg"]  = g.in_degrees().float()
+        g.edata["w"] = tc.ones(g.number_of_edges(), 1, device=g.device)
+        g.ndata["deg"] = g.in_degrees().float()
 
         if self.init_att:
             g = self.init_attn(g, Y, self.etas)
@@ -349,13 +355,14 @@ class UnfoldindAndAttention(nn.Module):
 
         return Y
 
+
 class MLP(nn.Module):
-    def __init__(self, input_d, hidden_d, output_d, num_layers, dropout, norm, init_activate) :
+    def __init__(self, input_d, hidden_d, output_d, num_layers, dropout, norm, init_activate):
         super().__init__()
 
-        self.init_activate  = init_activate
-        self.norm           = norm
-        self.dropout        = dropout
+        self.init_activate = init_activate
+        self.norm = norm
+        self.dropout = dropout
 
         self.layers = nn.ModuleList([])
 
@@ -367,28 +374,29 @@ class MLP(nn.Module):
                 self.layers.append(nn.Linear(hidden_d, hidden_d))
             self.layers.append(nn.Linear(hidden_d, output_d))
 
-        self.norm_cnt = num_layers-1+int(init_activate) # how many norm layers we have
+        # how many norm layers we have
+        self.norm_cnt = num_layers-1+int(init_activate)
         if norm == "batch":
-            self.norms = nn.ModuleList([nn.BatchNorm1d(hidden_d) for _ in range(self.norm_cnt)])
+            self.norms = nn.ModuleList(
+                [nn.BatchNorm1d(hidden_d) for _ in range(self.norm_cnt)])
         elif norm == "layer":
-            self.norms = nn.ModuleList([nn.LayerNorm  (hidden_d) for _ in range(self.norm_cnt)])
-
+            self.norms = nn.ModuleList(
+                [nn.LayerNorm(hidden_d) for _ in range(self.norm_cnt)])
 
         self.reset_params()
 
     def reset_params(self):
         for layer in self.layers:
             nn.init.xavier_normal_(layer.weight.data)
-            nn.init.constant_     (layer.bias.data, 0)
+            nn.init.constant_(layer.bias.data, 0)
 
     def activate(self, x):
         if self.norm != "none":
-            x = self.norms[self.cur_norm_idx](x) # use the last norm layer
+            x = self.norms[self.cur_norm_idx](x)  # use the last norm layer
             self.cur_norm_idx += 1
         x = F.relu(x)
-        x = F.dropout(x , self.dropout , training = self.training)
-        return x 
-
+        x = F.dropout(x, self.dropout, training=self.training)
+        return x
 
     def forward(self, x):
         self.cur_norm_idx = 0
@@ -396,9 +404,9 @@ class MLP(nn.Module):
         if self.init_activate:
             x = self.activate(x)
 
-        for i , layer in enumerate( self.layers ):
+        for i, layer in enumerate(self.layers):
             x = layer(x)
-            if i != len(self.layers) - 1: # do not activate in the last layer
+            if i != len(self.layers) - 1:  # do not activate in the last layer
                 x = self.activate(x)
 
         return x
