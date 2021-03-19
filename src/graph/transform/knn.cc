@@ -44,16 +44,18 @@ void KdTreeKNN(const NDArray data_points, const IdArray data_offsets,
     KDTreeNDArrayAdaptor<FloatType, IdType> kdtree(feature_size, current_data_points);
 
     // query
-    std::vector<IdType> out_buffer(k);
-    std::vector<FloatType> out_dist_buffer(k);
+#pragma omp parallel for
     for (int64_t q = 0; q < q_length; ++q) {
+      std::vector<IdType> out_buffer(k);
+      std::vector<FloatType> out_dist_buffer(k);
+      auto curr_out_offset = 2 * k * q + out_offset;
       FloatType * q_point = current_query_pts_data + q * feature_size;
       size_t num_matches = kdtree.GetIndex()->knnSearch(
         q_point, k, out_buffer.data(), out_dist_buffer.data());
 
       for (size_t i = 0; i < num_matches; ++i) {
-        result_data[out_offset] = q + q_offset; out_offset++;
-        result_data[out_offset] = out_buffer[i] + d_offset; out_offset++;
+        result_data[curr_out_offset] = q + q_offset; curr_out_offset++;
+        result_data[curr_out_offset] = out_buffer[i] + d_offset; curr_out_offset++;
       }
     }
   }
