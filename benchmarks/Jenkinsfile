@@ -11,7 +11,7 @@ pipeline{
                 sh 'env'
             script {
                def triggerCause = currentBuild.getBuildCauses()
-                echo("BUILD CAUSE: ${triggerCause.ToString()}")
+                echo("BUILD CAUSE: ${triggerCause.toString()}")
                 if (triggerCause) {
                     echo("Build was started by ${triggerCause.userLogin}, who wrote: " +
                         "\"${triggerCause.comment}\", which matches the " +
