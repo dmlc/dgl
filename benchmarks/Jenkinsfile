@@ -1,6 +1,6 @@
 pipeline{
     triggers {
-        issueCommentTrigger('*')
+        issueCommentTrigger('.*')
     }
     agent{
         label "linux-c52x-node"
