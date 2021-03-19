@@ -5,7 +5,6 @@ import dgl.ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
-import scipy.sparse
 
 
 def infer_broadcast_shape(op, shp1, shp2):
@@ -366,53 +365,5 @@ def _bwd_segment_cmp(feat, arg, m):
                                  to_dgl_nd(arg),
                                  to_dgl_nd_for_write(out))
     return out
-
-
-def csrmm(A, B):
-    A_indptr = F.zerocopy_from_numpy(A.indptr)
-    A_indices = F.zerocopy_from_numpy(A.indices)
-    A_data = F.zerocopy_from_numpy(A.data)
-    B_indptr = F.zerocopy_from_numpy(B.indptr)
-    B_indices = F.zerocopy_from_numpy(B.indices)
-    B_data = F.zerocopy_from_numpy(B.data)
-    C_indptr, C_indices, C_data = _CAPI_DGLCSRMM(
-        A.shape[0], A.shape[1], B.shape[1],
-        F.to_dgl_nd(A_indptr),
-        F.to_dgl_nd(A_indices),
-        F.to_dgl_nd(A_data),
-        F.to_dgl_nd(B_indptr),
-        F.to_dgl_nd(B_indices),
-        F.to_dgl_nd(B_data))
-    return scipy.sparse.csr_matrix(
-        (F.asnumpy(F.from_dgl_nd(C_data)), F.asnumpy(F.from_dgl_nd(C_indices)), F.asnumpy(F.from_dgl_nd(C_indptr))),
-        shape=(A.shape[0], B.shape[1]))
-
-def csrsum(As):
-    A_indptr = [F.zerocopy_from_numpy(x.indptr) for x in As]
-    A_indices = [F.zerocopy_from_numpy(x.indices) for x in As]
-    A_data = [F.zerocopy_from_numpy(x.data) for x in As]
-    C_indptr, C_indices, C_data = _CAPI_DGLCSRSum(
-        As[0].shape[0], As[0].shape[1],
-        [F.to_dgl_nd(x) for x in A_indptr],
-        [F.to_dgl_nd(x) for x in A_indices],
-        [F.to_dgl_nd(x) for x in A_data])
-    return scipy.sparse.csr_matrix(
-        (F.asnumpy(F.from_dgl_nd(C_data)), F.asnumpy(F.from_dgl_nd(C_indices)), F.asnumpy(F.from_dgl_nd(C_indptr))),
-        shape=(As[0].shape[0], As[0].shape[1]))
-
-def csrmask(A, B):
-    A_indptr = F.zerocopy_from_numpy(A.indptr)
-    A_indices = F.zerocopy_from_numpy(A.indices)
-    A_data = F.zerocopy_from_numpy(A.data)
-    B_indptr = F.zerocopy_from_numpy(B.indptr)
-    B_indices = F.zerocopy_from_numpy(B.indices)
-    B_data = _CAPI_DGLCSRMask(
-        A.shape[0], A.shape[1],
-        F.to_dgl_nd(A_indptr),
-        F.to_dgl_nd(A_indices),
-        F.to_dgl_nd(A_data),
-        F.to_dgl_nd(B_indptr),
-        F.to_dgl_nd(B_indices))
-    return F.asnumpy(F.from_dgl_nd(B_data))
 
 _init_api("dgl.sparse")
