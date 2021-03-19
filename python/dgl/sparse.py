@@ -1,11 +1,11 @@
 """Module for sparse matrix operators."""
 # pylint: disable= invalid-name
 from __future__ import absolute_import
-import dgl.ndarray as nd
+import scipy.sparse
+import .ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
-import scipy.sparse
 
 
 def infer_broadcast_shape(op, shp1, shp2):
