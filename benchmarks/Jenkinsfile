@@ -1,13 +1,14 @@
 pipeline{
-    triggers {
-        issueCommentTrigger('@dgl-bot *')
-    }
+    // triggers {
+    //     issueCommentTrigger('@dgl-bot *')
+    // }
     agent{
         label "node"
     }
     stages{
         stage("A"){
             steps{
+            script {
                def triggerCause = currentBuild.rawBuild.getCause(org.jenkinsci.plugins.pipeline.github.trigger.IssueCommentCause)
 
                 if (triggerCause) {
@@ -17,6 +18,7 @@ pipeline{
                 } else {
                     echo('Build was not started by a trigger')
                 }
+            }
             }
             post{
                 always{
