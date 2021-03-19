@@ -1,7 +1,7 @@
 pipeline{
-    // triggers {
-    //     issueCommentTrigger('@dgl-bot *')
-    // }
+    triggers {
+        issueCommentTrigger('@dgl-bot *')
+    }
     agent{
         label "linux-c52x-node"
     }
@@ -9,17 +9,17 @@ pipeline{
         stage("A"){
             steps{
                 sh 'env'
-            // script {
-            //    def triggerCause = currentBuild.getBuildCauses("org.jenkinsci.plugins.pipeline.github.trigger.IssueCommentCause")
+            script {
+               def triggerCause = currentBuild.getBuildCauses("org.jenkinsci.plugins.pipeline.github.trigger.IssueCommentCause")
 
-            //     if (triggerCause) {
-            //         echo("Build was started by ${triggerCause.userLogin}, who wrote: " +
-            //             "\"${triggerCause.comment}\", which matches the " +
-            //             "\"${triggerCause.triggerPattern}\" trigger pattern.")
-            //     } else {
-            //         echo('Build was not started by a trigger')
-            //     }
-            // }
+                if (triggerCause) {
+                    echo("Build was started by ${triggerCause.userLogin}, who wrote: " +
+                        "\"${triggerCause.comment}\", which matches the " +
+                        "\"${triggerCause.triggerPattern}\" trigger pattern.")
+                } else {
+                    echo('Build was not started by a trigger')
+                }
+            }
             }
             post{
                 always{
