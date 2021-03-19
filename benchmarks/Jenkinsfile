@@ -10,8 +10,8 @@ pipeline{
             steps{
                 sh 'env'
             script {
-               def triggerCause = currentBuild.getBuildCauses(org.jenkinsci.plugins.pipeline.github.trigger.IssueCommentCause)
-
+               def triggerCause = currentBuild.getBuildCauses()
+                echo("BUILD CAUSE: ${triggerCause.ToString()}")
                 if (triggerCause) {
                     echo("Build was started by ${triggerCause.userLogin}, who wrote: " +
                         "\"${triggerCause.comment}\", which matches the " +
