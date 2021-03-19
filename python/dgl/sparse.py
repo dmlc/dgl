@@ -2,7 +2,7 @@
 # pylint: disable= invalid-name
 from __future__ import absolute_import
 import scipy.sparse
-import .ndarray as nd
+from . import ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
