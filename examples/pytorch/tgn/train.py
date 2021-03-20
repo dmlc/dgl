@@ -150,7 +150,7 @@ if __name__ == "__main__":
 
     # Sampler Initialization
     if args.fast_mode:
-        sampler = FastTemporalSampler(data, k=args.n_neighbors)
+        sampler = FastTemporalSampler(graph_no_new_node, k=args.n_neighbors)
         new_node_sampler = FastTemporalSampler(data, k=args.n_neighbors)
         edge_collator = FastTemporalEdgeCollator
     else:

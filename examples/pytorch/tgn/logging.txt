@@ -1,1 +1,13 @@
+Epoch: 0; Training Loss: 43824.699464440346 | Validation AP: 0.977 AUC: 0.984
+Epoch: 0; Test AP: 0.977 AUC: 0.984
+Epoch: 0; Test New Node AP: 0.976 AUC: 0.980
+Epoch: 1; Training Loss: 30909.392419457436 | Validation AP: 0.980 AUC: 0.986
+Epoch: 1; Test AP: 0.981 AUC: 0.986
+Epoch: 1; Test New Node AP: 0.975 AUC: 0.981
+Epoch: 2; Training Loss: 29846.32487371564 | Validation AP: 0.981 AUC: 0.986
+Epoch: 2; Test AP: 0.981 AUC: 0.987
+Epoch: 2; Test New Node AP: 0.977 AUC: 0.983
+Epoch: 3; Training Loss: 28551.316210627556 | Validation AP: 0.982 AUC: 0.986
+Epoch: 3; Test AP: 0.982 AUC: 0.987
+Epoch: 3; Test New Node AP: 0.980 AUC: 0.984
 Training Interreputed!
