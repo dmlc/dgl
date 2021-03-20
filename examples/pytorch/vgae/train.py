@@ -24,9 +24,13 @@ parser.add_argument('--hidden2', '-h2', type=int, default=16, help='Number of un
 parser.add_argument('--datasrc', '-s', type=str, default='dgl',
                     help='Dataset download from dgl Dataset or website.')
 parser.add_argument('--dataset', '-d', type=str, default='cora', help='Dataset string.')
-# parser.add_argument('--gpu_id', type=int, default=0, help='GPU id to use.')
+parser.add_argument('--gpu_id', type=int, default=0, help='GPU id to use.')
 args = parser.parse_args()
 
+
+# check device
+device = torch.device("cuda:{}".format(args.gpu_id) if torch.cuda.is_available() else "cpu")
+# device = "cpu"
 
 # roc_means = []
 # ap_means = []
@@ -35,7 +39,7 @@ def compute_loss_para(adj):
     pos_weight = ((adj.shape[0] * adj.shape[0] - adj.sum()) / adj.sum())
     norm = adj.shape[0] * adj.shape[0] / float((adj.shape[0] * adj.shape[0] - adj.sum()) * 2)
     weight_mask = adj.view(-1) == 1
-    weight_tensor = torch.ones(weight_mask.size(0))
+    weight_tensor = torch.ones(weight_mask.size(0)).to(device)
     weight_tensor[weight_mask] = pos_weight
     return weight_tensor, norm
 
@@ -51,6 +55,7 @@ def get_scores(edges_pos, edges_neg, adj_rec):
     def sigmoid(x):
         return 1 / (1 + np.exp(-x))
 
+    adj_rec = adj_rec.cpu()
     # Predict on test set of edges
     preds = []
     for e in edges_pos:
@@ -80,14 +85,9 @@ def dgl_main():
         raise NotImplementedError
     graph = dataset[0]
 
-    # check device
-    # device = torch.device("cuda:{}".format(args.gpu_id) if torch.cuda.is_available() else "cpu")
-
     # Extract node features
-    feats = graph.ndata.pop('feat')
+    feats = graph.ndata.pop('feat').to(device)
     in_dim = feats.shape[-1]
-
-    # graph = graph.to(device)
 
     # generate input
     adj_orig = graph.adjacency_matrix().to_dense()
@@ -95,18 +95,20 @@ def dgl_main():
     # build test set with 10% positive links
     train_edge_idx, val_edges, val_edges_false, test_edges, test_edges_false = mask_test_edges_dgl(graph, adj_orig)
 
+    graph = graph.to(device)
+
     # create train graph
-    train_edge_idx = torch.tensor(train_edge_idx)
+    train_edge_idx = torch.tensor(train_edge_idx).to(device)
     train_graph = dgl.edge_subgraph(graph, train_edge_idx, preserve_nodes=True)
-    # train_graph = train_graph.to(device)
-    adj = train_graph.adjacency_matrix().to_dense()
+    train_graph = train_graph.to(device)
+    adj = train_graph.adjacency_matrix().to_dense().to(device)
 
     # compute loss parameters
     weight_tensor, norm = compute_loss_para(adj)
 
     # create model
     vgae_model = model.VGAEModel(in_dim, args.hidden1, args.hidden2)
-#     vgae_model = vgae_model.to(device)
+    vgae_model = vgae_model.to(device)
 
     # create training component
     optimizer = torch.optim.Adam(vgae_model.parameters(), lr=args.learning_rate)
@@ -119,7 +121,7 @@ def dgl_main():
         # Training and validation using a full graph
         vgae_model.train()
 
-        logits = vgae_model.forward(train_graph, feats)
+        logits = vgae_model.forward(graph, feats)
 
         # compute loss
         loss = norm * F.binary_cross_entropy(logits.view(-1), adj.view(-1), weight=weight_tensor)
