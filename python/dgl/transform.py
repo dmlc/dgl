@@ -59,7 +59,7 @@ def pairwise_squared_distance(x):
     return x2s + F.swapaxes(x2s, -1, -2) - 2 * x @ F.swapaxes(x, -1, -2)
 
 #pylint: disable=invalid-name
-def knn_graph(x, k, use_dgl_impl=False):
+def knn_graph(x, k, algorithm='topk'):
     """Construct a graph from a set of points according to k-nearest-neighbor (KNN)
     and return.
 
@@ -86,9 +86,14 @@ def knn_graph(x, k, use_dgl_impl=False):
           ``x[i][j]`` corresponds to the j-th node in the i-th KNN graph.
     k : int
         The number of nearest neighbors per node.
-    use_dgl_impl : bool, optional
-        If True, use dgl's C/C++ implementation of KNN
-        (default: False)
+    algorithm : str, optional
+        Algorithm used to compute the k-nearest neighbors.
+
+        * 'topk' will use topk algorithm (quick-select or sorting,
+          depending on backend implementation)
+        * 'kd-tree' will use kd-tree algorithm (cpu version)
+
+        (default: 'topk')
 
     Returns
     -------
@@ -132,37 +137,57 @@ def knn_graph(x, k, use_dgl_impl=False):
     (tensor([0, 1, 2, 2, 2, 3, 3, 3, 4, 5, 5, 5, 6, 6, 7, 7]),
      tensor([0, 1, 1, 2, 3, 0, 2, 3, 4, 5, 6, 7, 4, 6, 5, 7]))
     """
-    if use_dgl_impl:
+    if algorithm == 'topk':
+        return _knn_graph_topk(x, k)
+    else:
         if F.ndim(x) == 3:
             x_size = tuple(F.shape(x))
             x = F.reshape(x, (x_size[0] * x_size[1], x_size[2]))
             x_seg = x_size[0] * [x_size[1]]
         else:
             x_seg = [F.shape(x)[0]]
-        return segmented_knn_graph(x, k, x_seg, use_dgl_impl=True)
-    else:
-        if F.ndim(x) == 2:
-            x = F.unsqueeze(x, 0)
-        n_samples, n_points, _ = F.shape(x)
+        out = knn(x, x_seg, x, x_seg, k, algorithm=algorithm).t().contiguous()
+        row, col = out[1], out[0]
+        return convert.graph((row, col))
 
-        dist = pairwise_squared_distance(x)
-        k_indices = F.argtopk(dist, k, 2, descending=False)
-        dst = F.copy_to(k_indices, F.cpu())
+def _knn_graph_topk(x, k):
+    """Construct a graph from a set of points according to k-nearest-neighbor (KNN)
+    via topk method.
 
-        src = F.zeros_like(dst) + F.reshape(F.arange(0, n_points), (1, -1, 1))
+    Parameters
+    ----------
+    x : Tensor
+        The point coordinates. It can be either on CPU or GPU.
 
-        per_sample_offset = F.reshape(F.arange(0, n_samples) * n_points, (-1, 1, 1))
-        dst += per_sample_offset
-        src += per_sample_offset
-        dst = F.reshape(dst, (-1,))
-        src = F.reshape(src, (-1,))
-        adj = sparse.csr_matrix(
-            (F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))),
-            shape=(n_samples * n_points, n_samples * n_points))
-        return convert.from_scipy(adj)
+        * If is 2D, ``x[i]`` corresponds to the i-th node in the KNN graph.
+
+        * If is 3D, ``x[i]`` corresponds to the i-th KNN graph and
+          ``x[i][j]`` corresponds to the j-th node in the i-th KNN graph.
+    k : int
+        The number of nearest neighbors per node.
+    """
+    if F.ndim(x) == 2:
+        x = F.unsqueeze(x, 0)
+    n_samples, n_points, _ = F.shape(x)
+
+    dist = pairwise_squared_distance(x)
+    k_indices = F.argtopk(dist, k, 2, descending=False)
+    dst = F.copy_to(k_indices, F.cpu())
+
+    src = F.zeros_like(dst) + F.reshape(F.arange(0, n_points), (1, -1, 1))
+
+    per_sample_offset = F.reshape(F.arange(0, n_samples) * n_points, (-1, 1, 1))
+    dst += per_sample_offset
+    src += per_sample_offset
+    dst = F.reshape(dst, (-1,))
+    src = F.reshape(src, (-1,))
+    adj = sparse.csr_matrix(
+        (F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))),
+        shape=(n_samples * n_points, n_samples * n_points))
+    return convert.from_scipy(adj)
 
 #pylint: disable=invalid-name
-def segmented_knn_graph(x, k, segs, use_dgl_impl=False):
+def segmented_knn_graph(x, k, segs, algorithm='topk'):
     """Construct multiple graphs from multiple sets of points according to
     k-nearest-neighbor (KNN) and return.
 
@@ -184,9 +209,14 @@ def segmented_knn_graph(x, k, segs, use_dgl_impl=False):
     segs : list[int]
         Number of points in each point set. The numbers in :attr:`segs`
         must sum up to the number of rows in :attr:`x`.
-    use_dgl_impl : bool, optional
-        If True, use dgl's C/C++ implementation of KNN
-        (default: False)
+    algorithm : str, optional
+        Algorithm used to compute the k-nearest neighbors.
+
+        * 'topk' will use topk algorithm (quick-select or sorting,
+          depending on backend implementation)
+        * 'kd-tree' will use kd-tree algorithm (cpu version)
+
+        (default: 'topk')
 
     Returns
     -------
@@ -222,29 +252,45 @@ def segmented_knn_graph(x, k, segs, use_dgl_impl=False):
     (tensor([0, 0, 1, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6]),
      tensor([0, 1, 0, 1, 2, 2, 3, 5, 4, 6, 3, 5, 4, 6]))
     """
-    if use_dgl_impl:
-        out = knn(x, segs, x, segs, k).t().contiguous()
+    if algorithm == 'topk':
+        return _segmented_knn_graph_topk(x, k, segs)
+    else:
+        out = knn(x, segs, x, segs, k, algorithm=algorithm).t().contiguous()
         row, col = out[1], out[0]
         return convert.graph((row, col))
-    else:
-        n_total_points, _ = F.shape(x)
-        offset = np.insert(np.cumsum(segs), 0, 0)
 
-        h_list = F.split(x, segs, 0)
-        dst = [
-            F.argtopk(pairwise_squared_distance(h_g), k, 1, descending=False) +
-            int(offset[i])
-            for i, h_g in enumerate(h_list)]
-        dst = F.cat(dst, 0)
-        src = F.arange(0, n_total_points).unsqueeze(1).expand(n_total_points, k)
+def _segmented_knn_graph_topk(x, k, segs):
+    """Construct multiple graphs from multiple sets of points according to
+    k-nearest-neighbor (KNN) via topk method.
 
-        dst = F.reshape(dst, (-1,))
-        src = F.reshape(src, (-1,))
-        adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
+    Parameters
+    ----------
+    x : Tensor
+        Coordinates/features of points. Must be 2D. It can be either on CPU or GPU.
+    k : int
+        The number of nearest neighbors per node.
+    segs : list[int]
+        Number of points in each point set. The numbers in :attr:`segs`
+        must sum up to the number of rows in :attr:`x`.
+    """
+    n_total_points, _ = F.shape(x)
+    offset = np.insert(np.cumsum(segs), 0, 0)
 
-        return convert.from_scipy(adj)
+    h_list = F.split(x, segs, 0)
+    dst = [
+        F.argtopk(pairwise_squared_distance(h_g), k, 1, descending=False) +
+        int(offset[i])
+        for i, h_g in enumerate(h_list)]
+    dst = F.cat(dst, 0)
+    src = F.arange(0, n_total_points).unsqueeze(1).expand(n_total_points, k)
 
-def knn(x, x_segs, y, y_segs, k, dist:str="euclidean"):
+    dst = F.reshape(dst, (-1,))
+    src = F.reshape(src, (-1,))
+    adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
+
+    return convert.from_scipy(adj)
+
+def knn(x, x_segs, y, y_segs, k, algorithm="kd-tree", dist:str="euclidean"):
     r"""For each element in each segment in :attr:`y`, find :attr:`k` nearest
     points in the same segment in :attr:`x`.
 
@@ -268,6 +314,10 @@ def knn(x, x_segs, y, y_segs, k, dist:str="euclidean"):
         must sum up to the number of rows in :attr:`y`.
     k : int
         The number of nearest neighbors per node.
+    algorithm : str, optional
+        Algorithm used to compute the k-nearest neighbors.
+        Currently only cpu version kdtree is supported.
+        (default: 'kd-tree')
     dist : str, optional
         The distance metric used to compute distance between points. It can be the following
         metrics:
@@ -281,10 +331,21 @@ def knn(x, x_segs, y, y_segs, k, dist:str="euclidean"):
         The first tensor contains point indexs in :attr:`y`. The second tensor contains
         point indexs in :attr:`x`
     """
+    # currently only cpu implementation is supported.
+    x = F.copy_to(x, F.cpu())
+    y = F.copy_to(y, F.cpu())
     if isinstance(x_segs, (tuple, list)):
-        x_segs = F.copy_to(F.tensor(x_segs), F.context(x))
+        x_segs = F.tensor(x_segs)
     if isinstance(y_segs, (tuple, list)):
-        y_segs = F.copy_to(F.tensor(y_segs), F.context(y))
+        y_segs = F.tensor(y_segs)
+    x_segs = F.copy_to(x_segs, F.context(x))
+    y_segs = F.copy_to(y_segs, F.context(y))
+
+    # supported algorithms
+    algorithm_list = ['kd-tree']
+    if algorithm not in algorithm_list:
+        raise DGLError("only {} algorithms are supported, get '{}'".format(
+            algorithm_list, algorithm))
 
     # k must less than or equal to min(x_segs)
     if k > F.min(x_segs, dim=0):
@@ -310,14 +371,11 @@ def knn(x, x_segs, y, y_segs, k, dist:str="euclidean"):
         x = x / (l2_norm(x) + 1e-5)
         y = y / (l2_norm(y) + 1e-5)
 
-    _CAPI_DGLKNN(F.zerocopy_to_dgl_ndarray(x),
-                 F.zerocopy_to_dgl_ndarray(x_offset),
-                 F.zerocopy_to_dgl_ndarray(y),
-                 F.zerocopy_to_dgl_ndarray(y_offset),
-                 k,
-                 F.zerocopy_to_dgl_ndarray_for_write(out))
+    _CAPI_DGLKNN(F.to_dgl_nd(x), F.to_dgl_nd(x_offset),
+                 F.to_dgl_nd(y), F.to_dgl_nd(y_offset),
+                 k, F.zerocopy_to_dgl_ndarray_for_write(out),
+                 algorithm)
     return out
-
 
 def to_bidirected(g, copy_ndata=False, readonly=None):
     r"""Convert the graph to a bi-directional simple graph and return.

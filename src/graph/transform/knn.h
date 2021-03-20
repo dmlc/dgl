@@ -8,6 +8,7 @@
 #define DGL_GRAPH_TRANSFORM_KNN_H_
 
 #include <dgl/array.h>
+#include <string>
 
 namespace dgl {
 namespace transform {
@@ -23,13 +24,14 @@ namespace transform {
  * \param query_offsets offsets of point index in \a query_points
  * \param k the number of nearest points
  * \param result output array
+ * \param algorithm algorithm used to compute the k-nearest neighbors
  *
  * \return A 2D tensor indicating the index relation between \a query_points and \a data_points.
  */
 template <DLDeviceType XPU, typename FloatType, typename IdType>
-void KNN(const NDArray data_points, const IdArray data_offsets,
-         const NDArray query_points, const IdArray query_offsets,
-         const int k, IdArray result);
+void KNN(const NDArray& data_points, const IdArray& data_offsets,
+         const NDArray& query_points, const IdArray& query_offsets,
+         const int k, IdArray& result, const std::string & algorithm);
 
 }  // namespace transform
 }  // namespace dgl
