@@ -37,7 +37,7 @@ void KdTreeKNN(const NDArray& data_points, const IdArray& data_offsets,
     auto out_offset = 2 * k * q_offset;
 
     // create view for each segment
-    NDArray current_data_points = const_cast<NDArray*>(&data_points)->CreateView(
+    const NDArray current_data_points = const_cast<NDArray*>(&data_points)->CreateView(
       {d_length, feature_size}, data_points->dtype, d_offset * feature_size * sizeof(FloatType));
     const FloatType* current_query_pts_data = query_points_data + q_offset * feature_size;
 
