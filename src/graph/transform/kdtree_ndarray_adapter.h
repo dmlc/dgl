@@ -38,7 +38,9 @@ class KDTreeNDArrayAdapter {
   using index_type = nanoflann::KDTreeSingleIndexAdaptor<
     metric_type, self_type, FeatureDim, IdType>;
 
-  KDTreeNDArrayAdapter(const size_t /* dims */, const NDArray data_points, const int leaf_max_size = 10)
+  KDTreeNDArrayAdapter(const size_t /* dims */,
+                       const NDArray data_points,
+                       const int leaf_max_size = 10)
       : data_(data_points) {
     CHECK(data_points->shape[0] != 0 && data_points->shape[1] != 0)
       << "Tensor containing input data point set must be 2D.";
@@ -46,7 +48,8 @@ class KDTreeNDArrayAdapter {
     CHECK(!(FeatureDim > 0 && static_cast<int>(dims) != FeatureDim))
       << "Data set feature dimension does not match the 'FeatureDim' "
       << "template argument.";
-    index_ = new index_type(static_cast<int>(dims), *this, nanoflann::KDTreeSingleIndexAdaptorParams(leaf_max_size));
+    index_ = new index_type(
+      static_cast<int>(dims), *this, nanoflann::KDTreeSingleIndexAdaptorParams(leaf_max_size));
     index_->buildIndex();
   }
 

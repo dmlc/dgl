@@ -21,7 +21,7 @@ namespace impl {
 template <typename FloatType, typename IdType>
 void KdTreeKNN(const NDArray& data_points, const IdArray& data_offsets,
                const NDArray& query_points, const IdArray& query_offsets,
-               const int k, IdArray& result) {
+               const int k, IdArray result) {
   int64_t batch_size = data_offsets->shape[0] - 1;
   int64_t feature_size = data_points->shape[1];
   const IdType* data_offsets_data = data_offsets.Ptr<IdType>();
@@ -65,7 +65,7 @@ void KdTreeKNN(const NDArray& data_points, const IdArray& data_offsets,
 template <DLDeviceType XPU, typename FloatType, typename IdType>
 void KNN(const NDArray& data_points, const IdArray& data_offsets,
          const NDArray& query_points, const IdArray& query_offsets,
-         const int k, IdArray& result, const std::string& algorithm) {
+         const int k, IdArray result, const std::string& algorithm) {
   if (algorithm == std::string("kd-tree")) {
     impl::KdTreeKNN<FloatType, IdType>(
       data_points, data_offsets, query_points, query_offsets, k, result);
@@ -77,19 +77,19 @@ void KNN(const NDArray& data_points, const IdArray& data_offsets,
 template void KNN<kDLCPU, float, int32_t>(
   const NDArray& data_points, const IdArray& data_offsets,
   const NDArray& query_points, const IdArray& query_offsets,
-  const int k, IdArray& result, const std::string& algorithm);
+  const int k, IdArray result, const std::string& algorithm);
 template void KNN<kDLCPU, float, int64_t>(
   const NDArray& data_points, const IdArray& data_offsets,
   const NDArray& query_points, const IdArray& query_offsets,
-  const int k, IdArray& result, const std::string& algorithm);
+  const int k, IdArray result, const std::string& algorithm);
 template void KNN<kDLCPU, double, int32_t>(
   const NDArray& data_points, const IdArray& data_offsets,
   const NDArray& query_points, const IdArray& query_offsets,
-  const int k, IdArray& result, const std::string& algorithm);
+  const int k, IdArray result, const std::string& algorithm);
 template void KNN<kDLCPU, double, int64_t>(
   const NDArray& data_points, const IdArray& data_offsets,
   const NDArray& query_points, const IdArray& query_offsets,
-  const int k, IdArray& result, const std::string& algorithm);
+  const int k, IdArray result, const std::string& algorithm);
 
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLKNN")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
