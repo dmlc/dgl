@@ -290,7 +290,7 @@ def _segmented_knn_graph_topk(x, k, segs):
 
     return convert.from_scipy(adj)
 
-def knn(x, x_segs, y, y_segs, k, algorithm="kd-tree", dist:str="euclidean"):
+def knn(x, x_segs, y, y_segs, k, algorithm='kd-tree', dist='euclidean'):
     r"""For each element in each segment in :attr:`y`, find :attr:`k` nearest
     points in the same segment in :attr:`x`.
 
@@ -321,8 +321,8 @@ def knn(x, x_segs, y, y_segs, k, algorithm="kd-tree", dist:str="euclidean"):
     dist : str, optional
         The distance metric used to compute distance between points. It can be the following
         metrics:
-        * "euclidean": Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
-        * "cosine": Use cosine distance.
+        * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+        * 'cosine': Use cosine distance.
         (Default: "euclidean")
 
     Returns
@@ -352,10 +352,10 @@ def knn(x, x_segs, y, y_segs, k, algorithm="kd-tree", dist:str="euclidean"):
         raise DGLError("'k' must be less than or equal to the number of points in 'x'"
                        "expect k <= {}, got k = {}".format(F.min(x_segs, dim=0), k))
     dist = dist.lower()
-    dist_metric_list = ["euclidean", "cosine"]
+    dist_metric_list = ['euclidean', 'cosine']
     if dist not in dist_metric_list:
-        raise DGLError("Only {} are supported for distance"
-                       "computation, got {}".format(dist_metric_list, dist))
+        raise DGLError('Only {} are supported for distance'
+                       'computation, got {}'.format(dist_metric_list, dist))
 
     x_offset = F.zeros((F.shape(x_segs)[0] + 1,), F.dtype(x_segs), F.context(x_segs))
     x_offset[1:] = F.cumsum(x_segs, dim=0)
@@ -366,8 +366,8 @@ def knn(x, x_segs, y, y_segs, k, algorithm="kd-tree", dist:str="euclidean"):
 
     # if use cosine distance, normalize input points first
     # thus we can use euclidean distance to find knn equivalently.
-    if dist == "cosine":
-        l2_norm = lambda v : F.sqrt(F.sum(v * v, dim=1, keepdims=True))
+    if dist == 'cosine':
+        l2_norm = lambda v: F.sqrt(F.sum(v * v, dim=1, keepdims=True))
         x = x / (l2_norm(x) + 1e-5)
         y = y / (l2_norm(y) + 1e-5)
 
