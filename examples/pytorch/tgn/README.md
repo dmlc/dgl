@@ -60,17 +60,26 @@ python train.py --dataset wikipedia --memory_updater [rnn/gru]
 
 #### Without New Node in test set
 
-| Models/Datasets | Wikipedia         | Reddit          |
-| --------------- | ----------------- | --------------- |
-| TGN fast mode   | AP:98.2 AUC: 98.6 | AP:N/A AUC: N/A |
-| TGN             | AP:98.9 AUC:98.5  | AP:N/A AUC: N/A |
+| Models/Datasets | Wikipedia          | Reddit           |
+| --------------- | ------------------ | ---------------- |
+| TGN simple mode | AP: 98.5 AUC: 98.9 | AP: N/A AUC: N/A |
+| TGN fast mode   | AP: 98.2 AUC: 98.6 | AP: N/A AUC: N/A |
+| TGN             | AP: 98.9 AUC: 98.5 | AP: N/A AUC: N/A |
 
 #### With New Node in test set
 
-| Models/Datasets | Wikipedia          | Reddit           |
-| --------------- | ------------------ | ---------------- |
-| TGN fast mode   | AP: 98.0 AUC:98.4  | AP: N/A AUC: N/A |
-| TGN             | AP:98.2  AUC: 98.1 | AP: N/A AUC: N/A |
+| Models/Datasets | Wikipedia           | Reddit           |
+| --------------- | ------------------- | ---------------- |
+| TGN simple mode | AP: 98.2  AUC: 98.6 | AP: N/A AUC: N/A |
+| TGN fast mode   | AP: 98.0  AUC: 98.4 | AP: N/A AUC: N/A |
+| TGN             | AP: 98.2  AUC: 98.1 | AP: N/A AUC: N/A |
+
+## Training Speed
+Intel E5, Telas K80, Wikipedia Dataset
+TGN simple mode: 0.3s per batch
+TGN fast mode: 0.28s per batch
+TGN: 1.3s per batch
+
 
 ### Details explained
 

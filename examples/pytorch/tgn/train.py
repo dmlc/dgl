@@ -10,6 +10,7 @@ import torch
 from tgn import TGN
 from data_preprocess import TemporalWikipediaDataset, TemporalRedditDataset, TemporalDataset
 from dataloading import (FastTemporalEdgeCollator, FastTemporalSampler,
+                         SimpleTemporalEdgeCollator, SimpleTemporalSampler,
                          TemporalEdgeDataLoader, TemporalSampler, TemporalEdgeCollator)
 
 from sklearn.metrics import average_precision_score, roc_auc_score
@@ -98,12 +99,21 @@ if __name__ == "__main__":
                         help="Number of heads for multihead attention mechanism")
     parser.add_argument("--fast_mode", action="store_true", default=False,
                         help="Fast Mode uses batch temporal sampling, history within same batch cannot be obtained")
+    parser.add_argument("--simple_mode", action="store_true", default=False,
+                        help="Simple Mode directly delete the temporal edges from the original static graph")
     parser.add_argument("--num_negative_samples", type=int, default=1,
                         help="number of negative samplers per positive samples")
     parser.add_argument("--dataset", type=str, default="wikipedia",
                         help="dataset selection wikipedia/reddit")
+    parser.add_argument("--k_hop", type=int, default=1,
+                        help="sampling k-hop neighborhood")                        
 
     args = parser.parse_args()
+
+    assert not (args.fast_mode and args.simple_mode), "you can only choose one sampling mode"
+    if args.k_hop != 1:
+        assert args.simple_mode, "this k-hop parameter only support simple mode"
+
     if args.dataset == 'wikipedia':
         data = TemporalWikipediaDataset()
     elif args.dataset == 'reddit':
@@ -149,7 +159,12 @@ if __name__ == "__main__":
     # graph_no_new_node and graph_new_node should have same set of nid
 
     # Sampler Initialization
-    if args.fast_mode:
+    if args.simple_mode:
+        fan_out = [args.n_neighbors for _ in range(args.k_hop)]
+        sampler = SimpleTemporalSampler(graph_no_new_node, fan_out)
+        new_node_sampler = SimpleTemporalSampler(data, fan_out)
+        edge_collator = SimpleTemporalEdgeCollator
+    elif args.fast_mode:
         sampler = FastTemporalSampler(graph_no_new_node, k=args.n_neighbors)
         new_node_sampler = FastTemporalSampler(data, k=args.n_neighbors)
         edge_collator = FastTemporalEdgeCollator
@@ -176,6 +191,7 @@ if __name__ == "__main__":
         new_node_g_sampling.ndata[dgl.NID] = new_node_g_sampling.nodes()
         g_sampling.ndata[dgl.NID] = new_node_g_sampling.nodes()
 
+    # we highly recommend that you always set the num_workers=0, otherwise the sampled subgraph may not be correct.
     train_dataloader = TemporalEdgeDataLoader(graph_no_new_node,
                                               train_seed,
                                               sampler,
@@ -241,7 +257,7 @@ if __name__ == "__main__":
     try:
         for i in range(args.epochs):
             train_loss = train(model, train_dataloader, sampler,
-                               criterion, optimizer, args.batch_size, args.fast_mode)
+                                criterion, optimizer, args.batch_size, args.fast_mode)
             val_ap, val_auc = test_val(
                 model, valid_dataloader, sampler, criterion, args.batch_size, args.fast_mode)
             memory_checkpoint = model.store_memory()
