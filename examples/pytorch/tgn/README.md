@@ -50,6 +50,12 @@ If you want to run in fast mode:
 python train.py --dataset wikipedia --fast_mode
 ```
 
+If you want to run in simple mode:
+
+```python
+python train.py --dataset wikipedia --simple_mode
+```
+
 If you want to change memory updating module:
 
 ```python
@@ -75,13 +81,21 @@ python train.py --dataset wikipedia --memory_updater [rnn/gru]
 | TGN             | AP: 98.2  AUC: 98.1 | AP: N/A AUC: N/A |
 
 ## Training Speed
-Intel E5, Telas K80, Wikipedia Dataset
+Intel E5 2cores, Telas K80, Wikipedia Dataset
+
 TGN simple mode: 0.3s per batch
+
 TGN fast mode: 0.28s per batch
+
 TGN: 1.3s per batch
 
 
 ### Details explained
+
+**What is Simple Mode**
+
+Simple Temporal Sampler just choose the edges that happen before the current timestamp and build the subgraph of the corresponding nodes. 
+And then the simple sampler uses the static graph neighborhood sampling methods.
 
 **What is Fast Mode**
 
