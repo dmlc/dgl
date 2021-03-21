@@ -99,5 +99,5 @@ For a more explict view, we conduct explaination on both the hop-3 computation s
 <p align="center">
   <img src="https://github.com/KounianhuaDu/gnn-explainer-dgl-pics/blob/master/imgs/syn5.png"  width="600">
   <br>
-  <b>Figure</b>: Visualization of syn5 dataset (hop=5).
+  <b>Figure</b>: Visualization of syn5 dataset (hop=4).
 </p>
