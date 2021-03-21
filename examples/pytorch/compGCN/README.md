@@ -52,13 +52,13 @@ to get the data, or refer to [here](https://github.com/malllabiisc/CompGCN) to d
 Then for FB15k-237, run
 
 ```python
-python main.py -score_func conve -opn ccorr -gpu 0 -data FB15k-237
+python main.py --score_func conve --opn ccorr --gpu 0 --data FB15k-237
 ```
 
 For WN18RR, run
 
 ```python
-python main.py -score_func conve -opn ccorr -gpu 0 -data WN18RR
+python main.py --score_func conve --opn ccorr --gpu 0 --data WN18RR
 ```
 
 

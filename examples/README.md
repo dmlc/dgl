@@ -81,6 +81,7 @@ The folder contains example implementations of selected research papers related 
 | [Text Generation from Knowledge Graphs with Graph Transformers](#graphwriter) |  |                                  |                           |                    |                    |
 |  [Link Prediction Based on Graph Neural Networks](#seal) | | :heavy_check_mark: | | :heavy_check_mark: | :heavy_check_mark: |
 | [Variational Graph Auto-Encoders](#vgae) |  | :heavy_check_mark: | | | |
+| [Composition-based Multi-Relational Graph Convolutional Networks](#compgcn)|  |  :heavy_check_mark: | | | |
 
 ## 2020
 
@@ -115,6 +116,10 @@ The folder contains example implementations of selected research papers related 
 - <a name="dagnn"></a> Liu et al. Towards Deeper Graph Neural Networks. [Paper link](https://arxiv.org/abs/2007.09296).
     - Example code: [Pytorch](../examples/pytorch/dagnn)
     - Tags: over-smoothing, node classification
+
+- <a name="compgcn"></a> Vashishth, Shikhar, et al. Composition-based Multi-Relational Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1911.03082).
+    - Example code: [Pytorch](../examples/pytorch/compGCN)
+    - Tags: multi-relational graphs, graph neural network
 
 ## 2019
 
