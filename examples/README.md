@@ -87,7 +87,7 @@ The folder contains example implementations of selected research papers related 
 
 ## 2020
 
-- <a name="mvgrl"></a> Hassani and Khasahmadi. Contrastive Multi-View Representation Learning on Graphs. [Paper link](https://arxiv.org/abs/2006.05821). 
+- <a name="mvgrl"></a> Hassani and Khasahmadi. Contrastive Multi-View Representation Learning on Graphs. [Paper link](https://arxiv.org/abs/2006.05582). 
     - Example code: [PyTorch](../examples/pytorch/mvgrl)
     - Tags: graph diffusion, self-supervised learning on graphs.
 - <a name="grand"></a> Feng et al. Graph Random Neural Network for Semi-Supervised Learning on Graphs. [Paper link](https://arxiv.org/abs/2005.11079). 
