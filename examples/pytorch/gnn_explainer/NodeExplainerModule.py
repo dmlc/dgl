@@ -148,9 +148,6 @@ class NodeExplainerModule(nn.Module):
         4. Sum loss of node feature mask weights;
         5. Loss of node feature mask entropy, which tries to put the mask value to either 0 or 1;
 
-        In this implementation, will use the PyG's version, but set the aggregation function of weights
-        to be optional.
-
         Parameters
         ----------
         pred_logits：Tensor, N-dim logits output of model
