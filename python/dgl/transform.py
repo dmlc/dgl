@@ -91,7 +91,7 @@ def knn_graph(x, k, algorithm='topk'):
 
         * 'topk' will use topk algorithm (quick-select or sorting,
           depending on backend implementation)
-        * 'kd-tree' will use kd-tree algorithm (cpu version)
+        * 'kd-tree' will use kd-tree algorithm (only on cpu)
 
         (default: 'topk')
 
@@ -214,7 +214,7 @@ def segmented_knn_graph(x, k, segs, algorithm='topk'):
 
         * 'topk' will use topk algorithm (quick-select or sorting,
           depending on backend implementation)
-        * 'kd-tree' will use kd-tree algorithm (cpu version)
+        * 'kd-tree' will use kd-tree algorithm (only on cpu)
 
         (default: 'topk')
 
@@ -332,6 +332,9 @@ def knn(x, x_segs, y, y_segs, k, algorithm='kd-tree', dist='euclidean'):
         point indexs in :attr:`x`
     """
     # currently only cpu implementation is supported.
+    if (F.context(x) != F.cpu() or F.context(y) != F.cpu()):
+        dgl_warning("Currently only cpu implementation is supported," \
+            "copy input tensors to cpu.")
     x = F.copy_to(x, F.cpu())
     y = F.copy_to(y, F.cpu())
     if isinstance(x_segs, (tuple, list)):
