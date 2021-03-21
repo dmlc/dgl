@@ -30,7 +30,6 @@ def train(model, dataloader, sampler, criterion, optimizer, batch_size, fast_mod
     batch_cnt = 0
     last_t = time.time()
     for _, positive_pair_g, negative_pair_g, blocks in dataloader:
-        
         optimizer.zero_grad()
         pred_pos, pred_neg = model.embed(
             positive_pair_g, negative_pair_g, blocks)
@@ -255,41 +254,41 @@ if __name__ == "__main__":
     f = open("logging.txt", 'w')
     if args.fast_mode:
         sampler.reset()
-    # try:
-    for i in range(args.epochs):
-        train_loss = train(model, train_dataloader, sampler,
-                            criterion, optimizer, args.batch_size, args.fast_mode)
-        val_ap, val_auc = test_val(
-            model, valid_dataloader, sampler, criterion, args.batch_size, args.fast_mode)
-        memory_checkpoint = model.store_memory()
-        if args.fast_mode:
-            new_node_sampler.sync(sampler)
-        test_ap, test_auc = test_val(
-            model, test_dataloader, sampler, criterion, args.batch_size, args.fast_mode)
-        model.restore_memory(memory_checkpoint)
-        if args.fast_mode:
-            sample_nn = new_node_sampler
-        else:
-            sample_nn = sampler
-        nn_test_ap, nn_test_auc = test_val(
-            model, test_new_node_dataloader, sample_nn, criterion, args.batch_size, args.fast_mode)
-        log_content = []
-        log_content.append("Epoch: {}; Training Loss: {} | Validation AP: {:.3f} AUC: {:.3f}\n".format(
-            i, train_loss, val_ap, val_auc))
-        log_content.append(
-            "Epoch: {}; Test AP: {:.3f} AUC: {:.3f}\n".format(i, test_ap, test_auc))
-        log_content.append("Epoch: {}; Test New Node AP: {:.3f} AUC: {:.3f}\n".format(
-            i, nn_test_ap, nn_test_auc))
+    try:
+        for i in range(args.epochs):
+            train_loss = train(model, train_dataloader, sampler,
+                                criterion, optimizer, args.batch_size, args.fast_mode)
+            val_ap, val_auc = test_val(
+                model, valid_dataloader, sampler, criterion, args.batch_size, args.fast_mode)
+            memory_checkpoint = model.store_memory()
+            if args.fast_mode:
+                new_node_sampler.sync(sampler)
+            test_ap, test_auc = test_val(
+                model, test_dataloader, sampler, criterion, args.batch_size, args.fast_mode)
+            model.restore_memory(memory_checkpoint)
+            if args.fast_mode:
+                sample_nn = new_node_sampler
+            else:
+                sample_nn = sampler
+            nn_test_ap, nn_test_auc = test_val(
+                model, test_new_node_dataloader, sample_nn, criterion, args.batch_size, args.fast_mode)
+            log_content = []
+            log_content.append("Epoch: {}; Training Loss: {} | Validation AP: {:.3f} AUC: {:.3f}\n".format(
+                i, train_loss, val_ap, val_auc))
+            log_content.append(
+                "Epoch: {}; Test AP: {:.3f} AUC: {:.3f}\n".format(i, test_ap, test_auc))
+            log_content.append("Epoch: {}; Test New Node AP: {:.3f} AUC: {:.3f}\n".format(
+                i, nn_test_ap, nn_test_auc))
 
-        f.writelines(log_content)
-        model.reset_memory()
-        if i < args.epochs-1 and args.fast_mode:
-            sampler.reset()
-        print(log_content[0], log_content[1], log_content[2])
-    # except:
-    #     traceback.print_exc()
-    #     error_content = "Training Interreputed!"
-    #     f.writelines(error_content)
-    #     f.close()
-    #     # exit(-1)
+            f.writelines(log_content)
+            model.reset_memory()
+            if i < args.epochs-1 and args.fast_mode:
+                sampler.reset()
+            print(log_content[0], log_content[1], log_content[2])
+    except:
+        traceback.print_exc()
+        error_content = "Training Interreputed!"
+        f.writelines(error_content)
+        f.close()
+        # exit(-1)
     print("========Training is Done========")
