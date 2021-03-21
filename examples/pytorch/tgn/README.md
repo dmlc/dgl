@@ -74,6 +74,13 @@ python train.py --dataset wikipedia --memory_updater [rnn/gru]
 | TGN fast mode   | AP: 98.0  AUC: 98.4 | AP: N/A AUC: N/A |
 | TGN             | AP: 98.2  AUC: 98.1 | AP: N/A AUC: N/A |
 
+## Training Speed
+Intel E5, Telas K80, Wikipedia Dataset
+TGN simple mode: 0.3s per batch
+TGN fast mode: 0.28s per batch
+TGN: 1.3s per batch
+
+
 ### Details explained
 
 **What is Fast Mode**
