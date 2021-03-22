@@ -32,7 +32,7 @@ Jodie Reddit Temporal dataset. Dataset summary:
 
 In tgn folder, run
 
-** please use `train.py` **
+**please use `train.py`**
 
 ```python
 python train.py --dataset wikipedia
