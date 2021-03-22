@@ -196,7 +196,6 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
 
     return eval_logits, eval_seeds
 
-@thread_wrapped_func
 def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=None):
     dev_id = devices[proc_id] if devices[proc_id] != 'cpu' else -1
     g, node_feats, num_of_ntype, num_classes, num_rels, target_idx, \
@@ -239,7 +238,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
         backend = 'nccl'
 
         # using sparse embedding or usig mix_cpu_gpu model (embedding model can not be stored in GPU)
-        if args.dgl_sparse is False:
+        if dev_id < 0 or args.dgl_sparse is False:
             backend = 'gloo'
         print("backend using {}".format(backend))
         th.distributed.init_process_group(backend=backend,
@@ -248,9 +247,11 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
                                           rank=proc_id)
 
 
-    th.cuda.set_device(dev_id)
-    print("Creating comm {}/{} with {}".format(proc_id, n_gpus, nccl_id))
-    nccl_comm = nccl.Communicator(n_gpus, proc_id, nccl_id)
+    if dev_id >= 0:
+        th.cuda.set_device(dev_id)
+        print("Creating comm {}/{} with {}".format(proc_id, n_gpus, nccl_id))
+        #nccl_comm = nccl.Communicator(n_gpus, proc_id, nccl_id)
+    nccl_comm = None
 
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
@@ -287,7 +288,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
 
     if n_gpus > 1:
         labels = labels.to(dev_id)
-        model.cuda(dev_id)
+        if dev_id >= 0:
+            model.cuda(dev_id)
         model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
         if args.dgl_sparse:
             embed_layer.cuda(dev_id)
@@ -363,9 +365,9 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
             forward_time.append(t1 - t0)
             backward_time.append(t2 - t1)
             train_acc = th.sum(logits.argmax(dim=1) == labels[seeds]).item() / len(seeds)
-            if i % 100 and proc_id == 0:
-                print("Train Accuracy: {:.4f} | Train Loss: {:.4f}".
-                    format(train_acc, loss.item()))
+            if proc_id == 0:
+                print("Train Accuracy: {:.4f} | {} | Train Loss: {:.4f}".
+                    format(train_acc, i, loss.item()))
         gc.collect()
         print("Epoch {:05d}:{:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".
             format(epoch, args.n_epochs, forward_time[-1], backward_time[-1]))
@@ -551,9 +553,11 @@ def main(args, devices):
     g.create_formats_()
 
     n_gpus = len(devices)
+    #mp.set_start_method('spawn')
+
     n_cpus = mp.cpu_count()
     # cpu
-    if devices[0] == -1:
+    if devices[0] == -1 and n_gpus == 1:
         run(0, 0, n_cpus, args, ['cpu'], nccl_id,
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
              train_idx, val_idx, test_idx, labels), None, None)
