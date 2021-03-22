@@ -38,12 +38,6 @@ In tgn folder, run
 python train.py --dataset wikipedia
 ```
 
-If you want to use GPU, run:
-
-```python
-python train.py --dataset wikipedia
-```
-
 If you want to run in fast mode:
 
 ```python
