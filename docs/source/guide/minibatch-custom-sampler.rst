@@ -361,10 +361,9 @@ nodes with a probability, one can simply define the sampler as follows:
 .. code:: python
 
     class MultiLayerDropoutSampler(dgl.dataloading.BlockSampler):
-        def __init__(self, p, n_layers):
-            super().__init__()
+        def __init__(self, p, num_layers):
+            super().__init__(num_layers)
     
-            self.n_layers = n_layers
             self.p = p
     
         def sample_frontier(self, block_id, g, seed_nodes, *args, **kwargs):
@@ -380,7 +379,7 @@ nodes with a probability, one can simply define the sampler as follows:
             return frontier
     
         def __len__(self):
-            return self.n_layers
+            return self.num_layers
 
 After implementing your sampler, you can create a data loader that takes
 in your sampler and it will keep generating lists of MFGs while
@@ -422,10 +421,9 @@ all edge types, so that it can work on heterogeneous graphs as well.
 .. code:: python
 
     class MultiLayerDropoutSampler(dgl.dataloading.BlockSampler):
-        def __init__(self, p, n_layers):
-            super().__init__()
+        def __init__(self, p, num_layers):
+            super().__init__(num_layers)
     
-            self.n_layers = n_layers
             self.p = p
     
         def sample_frontier(self, block_id, g, seed_nodes, *args, **kwargs):
@@ -445,7 +443,4 @@ all edge types, so that it can work on heterogeneous graphs as well.
             return frontier
     
         def __len__(self):
-            return self.n_layers
-
-
-
+            return self.num_layers

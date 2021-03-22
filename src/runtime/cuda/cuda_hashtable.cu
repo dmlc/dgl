@@ -4,11 +4,11 @@
  * \brief Device level functions for within cuda kernels.
  */
 
-#include <cub/cub.cuh>
 #include <cassert>
 
 #include "cuda_hashtable.cuh"
 #include "../../kernel/cuda/atomic.cuh"
+#include "../../array/cuda/dgl_cub.cuh"
 
 using namespace dgl::kernel::cuda;
 
