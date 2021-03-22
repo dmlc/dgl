@@ -19,7 +19,7 @@ class TemporalSampler(BlockSampler):
     """ Temporal Sampler builds computational and temporal dependency of node representations via
     temporal neighbors selection and screening.
 
-    The sampler expect input node to have same time stamps, in the case of TGN, it should be 
+    The sampler expects input node to have same time stamps, in the case of TGN, it should be 
     either positive [src,dst] pair or negative samples. It will first take in-subgraph of seed
     nodes and then screening out edges which happen after that timestamp. Finally it will sample
     a fixed number of neighbor edges using random or topk sampling.
@@ -235,7 +235,7 @@ class TemporalEdgeCollator(EdgeCollator):
 
 
 class TemporalEdgeDataLoader(dgl.dataloading.EdgeDataLoader):
-    """ TemporalEdgeDataLoader is a iteratable object to generate blocks for temporal embedding
+    """ TemporalEdgeDataLoader is an iteratable object to generate blocks for temporal embedding
     as well as pos and neg pair graph for memory update.
 
     The batch generated will follow temporal order
@@ -288,13 +288,13 @@ class TemporalEdgeDataLoader(dgl.dataloading.EdgeDataLoader):
 
 # ====== Fast Mode ======
 
-# Part of code comes from PyG library
-# https://github.com/rusty1s/pytorch_geometric
+# Part of code in reservoir sampling comes from PyG library
+# https://github.com/rusty1s/pytorch_geometric/nn/models/tgn.py
 
 
 class FastTemporalSampler(BlockSampler):
     """Temporal Sampler which implemented with a fast query lookup table. Sample
-    Temporal and computationally depending subgraph.
+    temporal and computationally depending subgraph.
 
     The sampler maintains a lookup table of most current k neighbors of each node
     each time, the sampler need to be updated with new edges from incoming batch to

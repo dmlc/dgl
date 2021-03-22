@@ -92,7 +92,7 @@ And then the simple sampler uses the static graph neighborhood sampling methods.
 
 **What is Fast Mode**
 
-Normally temporal encoding need each node uses incoming time frame as current time which might lead to two nodes have multiple interactions within the same batch need to maintain multiple embedding features which slow down the batching process to avoid feature duplication, fast mode enable fast batching since it uses last memory update time in last batch as temporal encoding benchmark for each node. Also within each batch, all interaction between two nodes are predicted using same set of enbedding feature
+Normally temporal encoding needs each node to use incoming time frame as current time which might lead to two nodes have multiple interactions within the same batch need to maintain multiple embedding features which slow down the batching process to avoid feature duplication, fast mode enables fast batching since it uses last memory update time in the last batch as temporal encoding benchmark for each node. Also within each batch, all interaction between two nodes are predicted using the same set of embedding feature
 
 **What is New Node test**
 

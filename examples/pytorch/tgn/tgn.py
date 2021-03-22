@@ -1,12 +1,7 @@
+import copy
 import torch.nn as nn
 import dgl
-
 from modules import MemoryModule, MemoryOperation, TemporalGATConv, MsgLinkPredictor
-import copy
-
-# The TGN Model will take two different types of subgraphs as input
-# Any thing related to dataloader should not appear here
-
 
 class TGN(nn.Module):
     def __init__(self,
@@ -36,7 +31,7 @@ class TGN(nn.Module):
                                           self.edge_feat_dim,
                                           self.temporal_dim)
 
-        # print(self.edge_feat_dim,self.memory_dim,self.temporal_dim,self.embedding_dim,self.num_heads)
+        
         self.embedding_attn = TemporalGATConv(self.edge_feat_dim,
                                               self.memory_dim,
                                               self.temporal_dim,
@@ -50,7 +45,6 @@ class TGN(nn.Module):
         emb_graph = blocks[0]
         emb_memory = self.memory.memory[emb_graph.ndata[dgl.NID], :]
         emb_t = emb_graph.ndata['timestamp']
-        # print(emb_t.shape)
         embedding = self.embedding_attn(emb_graph, emb_memory, emb_t)
         emb2pred = dict(
             zip(emb_graph.ndata[dgl.NID].tolist(), emb_graph.nodes().tolist()))
