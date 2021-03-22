@@ -49,7 +49,7 @@ class FarthestPointSampler(nn.Block):
         if start_idx is None:
             start_idx = nd.random.randint(0, N - 1, (B, ), dtype=np.int, ctx=ctx)
         else:
-            if start_idx > N:
+            if start_idx >= N or start_idx < 0:
                 raise DGLError("Invalid start_idx, expected index <= {}, got {}".format(
                     N, start_idx))
             start_idx = nd.full((B, ), start_idx, dtype=np.int, ctx=ctx)

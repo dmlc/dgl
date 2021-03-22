@@ -48,7 +48,7 @@ class FarthestPointSampler(nn.Module):
         if start_idx is None:
             start_idx = th.randint(0, N - 1, (B, ), dtype=th.long, device=device)
         else:
-            if start_idx > N:
+            if start_idx >= N or start_idx < 0:
                 raise DGLError("Invalid start_idx, expected index <= {}, got {}".format(
                     N, start_idx))
             start_idx = th.full((B, ), start_idx, dtype=th.long, device=device)
