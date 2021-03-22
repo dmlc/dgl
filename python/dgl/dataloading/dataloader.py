@@ -15,7 +15,7 @@ from ..distributed.dist_graph import DistGraph
 
 # pylint: disable=unused-argument
 def assign_block_eids(block, frontier):
-    """Assigns edge IDs from the original graph to the block.
+    """Assigns edge IDs from the original graph to the message flow graph (MFG).
 
     See also
     --------
@@ -117,8 +117,8 @@ class BlockSampler(object):
     """Abstract class specifying the neighborhood sampling strategy for DGL data loaders.
 
     The main method for BlockSampler is :meth:`sample_blocks`,
-    which generates a list of blocks for a multi-layer GNN given a set of seed nodes to
-    have their outputs computed.
+    which generates a list of message flow graphs (MFGs) for a multi-layer GNN given a set of
+    seed nodes to have their outputs computed.
 
     The default implementation of :meth:`sample_blocks` is
     to repeat :attr:`num_layers` times the following procedure from the last layer to the first
@@ -133,13 +133,13 @@ class BlockSampler(object):
       reverse edges.  This is controlled by the argument :attr:`exclude_eids` in
       :meth:`sample_blocks` method.
 
-    * Convert the frontier into a block.
+    * Convert the frontier into a MFG.
 
     * Optionally assign the IDs of the edges in the original graph selected in the first step
-      to the block, controlled by the argument ``return_eids`` in
+      to the MFG, controlled by the argument ``return_eids`` in
       :meth:`sample_blocks` method.
 
-    * Prepend the block to the block list to be returned.
+    * Prepend the MFG to the MFG list to be returned.
 
     All subclasses should override :meth:`sample_frontier`
     method while specifying the number of layers to sample in :attr:`num_layers` argument.
@@ -149,19 +149,21 @@ class BlockSampler(object):
     num_layers : int
         The number of layers to sample.
     return_eids : bool, default False
-        Whether to return the edge IDs involved in message passing in the block.
+        Whether to return the edge IDs involved in message passing in the MFG.
         If True, the edge IDs will be stored as an edge feature named ``dgl.EID``.
 
     Notes
     -----
-    For the concept of frontiers and blocks, please refer to User Guide Section 6 [TODO].
+    For the concept of frontiers and MFGs, please refer to
+    :ref:`User Guide Section 6 <guide-minibatch>` and
+    :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
-    def __init__(self, num_layers, return_eids):
+    def __init__(self, num_layers, return_eids=False):
         self.num_layers = num_layers
         self.return_eids = return_eids
 
     def sample_frontier(self, block_id, g, seed_nodes):
-        """Generate the frontier given the output nodes.
+        """Generate the frontier given the destination nodes.
 
         The subclasses should override this function.
 
@@ -172,7 +174,7 @@ class BlockSampler(object):
         g : DGLGraph
             The original graph.
         seed_nodes : Tensor or dict[ntype, Tensor]
-            The output nodes by node type.
+            The destination nodes by node type.
 
             If the graph only has one node type, one can just specify a single tensor
             of node IDs.
@@ -184,19 +186,21 @@ class BlockSampler(object):
 
         Notes
         -----
-        For the concept of frontiers and blocks, please refer to User Guide Section 6 [TODO].
+        For the concept of frontiers and MFGs, please refer to
+        :ref:`User Guide Section 6 <guide-minibatch>` and
+        :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
         """
         raise NotImplementedError
 
     def sample_blocks(self, g, seed_nodes, exclude_eids=None):
-        """Generate the a list of blocks given the output nodes.
+        """Generate the a list of MFGs given the destination nodes.
 
         Parameters
         ----------
         g : DGLGraph
             The original graph.
         seed_nodes : Tensor or dict[ntype, Tensor]
-            The output nodes by node type.
+            The destination nodes by node type.
 
             If the graph only has one node type, one can just specify a single tensor
             of node IDs.
@@ -206,11 +210,13 @@ class BlockSampler(object):
         Returns
         -------
         list[DGLGraph]
-            The blocks generated for computing the multi-layer GNN output.
+            The MFGs generated for computing the multi-layer GNN output.
 
         Notes
         -----
-        For the concept of frontiers and blocks, please refer to User Guide Section 6 [TODO].
+        For the concept of frontiers and MFGs, please refer to
+        :ref:`User Guide Section 6 <guide-minibatch>` and
+        :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
         """
         blocks = []
         exclude_eids = (
@@ -259,11 +265,13 @@ class Collator(ABC):
 
     Provides a :attr:`dataset` object containing the collection of all nodes or edges,
     as well as a :attr:`collate` method that combines a set of items from
-    :attr:`dataset` and obtains the blocks.
+    :attr:`dataset` and obtains the message flow graphs (MFGs).
 
     Notes
     -----
-    For the concept of blocks, please refer to User Guide Section 6 [TODO].
+    For the concept of MFGs, please refer to
+    :ref:`User Guide Section 6 <guide-minibatch>` and
+    :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
     @abstractproperty
     def dataset(self):
@@ -272,7 +280,7 @@ class Collator(ABC):
 
     @abstractmethod
     def collate(self, items):
-        """Combines the items from the dataset object and obtains the list of blocks.
+        """Combines the items from the dataset object and obtains the list of MFGs.
 
         Parameters
         ----------
@@ -281,7 +289,9 @@ class Collator(ABC):
 
         Notes
         -----
-        For the concept of blocks, please refer to User Guide Section 6 [TODO].
+        For the concept of MFGs, please refer to
+        :ref:`User Guide Section 6 <guide-minibatch>` and
+        :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
         """
         raise NotImplementedError
 
@@ -330,6 +340,12 @@ class NodeCollator(Collator):
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, output_nodes, blocks in dataloader:
     ...     train_on(input_nodes, output_nodes, blocks)
+
+    Notes
+    -----
+    For the concept of MFGs, please refer to
+    :ref:`User Guide Section 6 <guide-minibatch>` and
+    :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
     def __init__(self, g, nids, block_sampler):
         self.g = g
@@ -351,7 +367,7 @@ class NodeCollator(Collator):
         return self._dataset
 
     def collate(self, items):
-        """Find the list of blocks necessary for computing the representation of given
+        """Find the list of MFGs necessary for computing the representation of given
         nodes for a node classification/regression task.
 
         Parameters
@@ -372,8 +388,8 @@ class NodeCollator(Collator):
 
             If the original graph has multiple node types, return a dictionary of
             node type names and node ID tensors.  Otherwise, return a single tensor.
-        blocks : list[DGLGraph]
-            The list of blocks necessary for computing the representation.
+        MFGs : list[DGLGraph]
+            The list of MFGs necessary for computing the representation.
         """
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
@@ -404,7 +420,7 @@ class EdgeCollator(Collator):
     * If a negative sampler is given, another graph that contains the "negative edges",
       connecting the source and destination nodes yielded from the given negative sampler.
 
-    * A list of blocks necessary for computing the representation of the incident nodes
+    * A list of MFGs necessary for computing the representation of the incident nodes
       of the edges in the minibatch.
 
     Parameters
@@ -552,6 +568,12 @@ class EdgeCollator(Collator):
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
     ...     train_on(input_nodes, pair_graph, neg_pair_graph, blocks)
+
+    Notes
+    -----
+    For the concept of MFGs, please refer to
+    :ref:`User Guide Section 6 <guide-minibatch>` and
+    :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
     def __init__(self, g, eids, block_sampler, g_sampling=None, exclude=None,
                  reverse_eids=None, reverse_etypes=None, negative_sampler=None):
@@ -690,7 +712,7 @@ class EdgeCollator(Collator):
             Note that the metagraph of this graph will be identical to that of the original
             graph.
         blocks : list[DGLGraph]
-            The list of blocks necessary for computing the representation of the edges.
+            The list of MFGs necessary for computing the representation of the edges.
         """
         if self.negative_sampler is None:
             return self._collate(items)

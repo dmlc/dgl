@@ -148,40 +148,47 @@ Since the number of nodes
 for input and output is different, we need to perform message passing on
 a small, bipartite-structured graph instead. We call such a
 bipartite-structured graph that only contains the necessary input nodes
-and output nodes a *block*. The following figure shows the block of the
-second GNN layer for node 8.
+(referred as *source* nodes) and output nodes (referred as *destination* nodes)
+of a *message flow graph* (MFG).
+
+The following figure shows the MFG of the second GNN layer for node 8.
 
 .. figure:: https://data.dgl.ai/asset/image/guide_6_4_4.png
    :alt: Imgur
 
+.. note::
 
-Note that the output nodes also appear in the input nodes. The reason is
-that representations of output nodes from the previous layer are needed
+   See the :doc:`Stochastic Training Tutorial
+   <tutorials/large/L0_neighbor_sampling_overview>` for the concept of
+   message flow graph.
+
+Note that the destination nodes also appear in the source nodes. The reason is
+that representations of destination nodes from the previous layer are needed
 for feature combination after message passing (i.e. :math:`\phi^{(2)}`).
 
 DGL provides :func:`dgl.to_block` to convert any frontier
-to a block where the first argument specifies the frontier and the
-second argument specifies the output nodes. For instance, the frontier
-above can be converted to a block with output node 8 with the code as
+to a MFG where the first argument specifies the frontier and the
+second argument specifies the destination nodes. For instance, the frontier
+above can be converted to a MFG with destination node 8 with the code as
 follows.
 
 .. code:: python
 
-    output_nodes = torch.LongTensor([8])
-    block = dgl.to_block(frontier, output_nodes)
+    dst_nodes = torch.LongTensor([8])
+    block = dgl.to_block(frontier, dst_nodes)
 
-To find the number of input nodes and output nodes of a given node type,
+To find the number of source nodes and destination nodes of a given node type,
 one can use :meth:`dgl.DGLHeteroGraph.number_of_src_nodes` and
 :meth:`dgl.DGLHeteroGraph.number_of_dst_nodes` methods.
 
 .. code:: python
 
-    num_input_nodes, num_output_nodes = block.number_of_src_nodes(), block.number_of_dst_nodes()
-    print(num_input_nodes, num_output_nodes)
+    num_src_nodes, num_dst_nodes = block.number_of_src_nodes(), block.number_of_dst_nodes()
+    print(num_src_nodes, num_dst_nodes)
 
-The block’s input node features can be accessed via member
+The MFG’s source node features can be accessed via member
 :attr:`dgl.DGLHeteroGraph.srcdata` and :attr:`dgl.DGLHeteroGraph.srcnodes`, and
-its output node features can be accessed via member
+its destination node features can be accessed via member
 :attr:`dgl.DGLHeteroGraph.dstdata` and :attr:`dgl.DGLHeteroGraph.dstnodes`. The
 syntax of ``srcdata``/``dstdata`` and ``srcnodes``/``dstnodes`` are
 identical to :attr:`dgl.DGLHeteroGraph.ndata` and
@@ -189,46 +196,36 @@ identical to :attr:`dgl.DGLHeteroGraph.ndata` and
 
 .. code:: python
 
-    block.srcdata['h'] = torch.randn(num_input_nodes, 5)
-    block.dstdata['h'] = torch.randn(num_output_nodes, 5)
+    block.srcdata['h'] = torch.randn(num_src_nodes, 5)
+    block.dstdata['h'] = torch.randn(num_dst_nodes, 5)
 
-If a block is converted from a frontier, which is in turn converted from
-a graph, one can directly read the feature of the block’s input and
-output nodes via
+If a MFG is converted from a frontier, which is in turn converted from
+a graph, one can directly read the feature of the MFG’s source and
+destination nodes via
 
 .. code:: python
 
     print(block.srcdata['x'])
     print(block.dstdata['y'])
 
-.. raw:: html
+.. note::
 
-   <div class="alert alert-info">
+   The original node IDs of the source nodes and destination nodes in the MFG
+   can be found as the feature ``dgl.NID``, and the mapping from the
+   MFG’s edge IDs to the input frontier’s edge IDs can be found as the
+   feature ``dgl.EID``.
 
-::
-
-The original node IDs of the input nodes and output nodes in the block
-can be found as the feature ``dgl.NID``, and the mapping from the
-block’s edge IDs to the input frontier’s edge IDs can be found as the
-feature ``dgl.EID``.
-
-.. raw:: html
-
-   </div>
-
-**Output Nodes**
-
-DGL ensures that the output nodes of a block will always appear in the
-input nodes. The output nodes will always index firstly in the input
+DGL ensures that the destination nodes of a MFG will always appear in the
+source nodes. The destination nodes will always index firstly in the source
 nodes.
 
 .. code:: python
 
-    input_nodes = block.srcdata[dgl.NID]
-    output_nodes = block.dstdata[dgl.NID]
-    assert torch.equal(input_nodes[:len(output_nodes)], output_nodes)
+    src_nodes = block.srcdata[dgl.NID]
+    dst_nodes = block.dstdata[dgl.NID]
+    assert torch.equal(src_nodes[:len(dst_nodes)], dst_nodes)
 
-As a result, the output nodes must cover all nodes that are the
+As a result, the destination nodes must cover all nodes that are the
 destination of an edge in the frontier.
 
 For example, consider the following frontier
@@ -240,15 +237,15 @@ For example, consider the following frontier
 
 where the red and green nodes (i.e. node 4, 5, 7, 8, and 11) are all
 nodes that is a destination of an edge. Then the following code will
-raise an error because the output nodes did not cover all those nodes.
+raise an error because the destination nodes did not cover all those nodes.
 
 .. code:: python
 
     dgl.to_block(frontier2, torch.LongTensor([4, 5]))   # ERROR
 
-However, the output nodes can have more nodes than above. In this case,
+However, the destination nodes can have more nodes than above. In this case,
 we will have isolated nodes that do not have any edge connecting to it.
-The isolated nodes will be included in both input nodes and output
+The isolated nodes will be included in both source nodes and destination
 nodes.
 
 .. code:: python
@@ -261,7 +258,7 @@ nodes.
 Heterogeneous Graphs
 ^^^^^^^^^^^^^^^^^^^^
 
-Blocks also work on heterogeneous graphs. Let’s say that we have the
+MFGs also work on heterogeneous graphs. Let’s say that we have the
 following frontier:
 
 .. code:: python
@@ -272,20 +269,20 @@ following frontier:
         ('game', 'played-by', 'user'): ([2], [6])
     }, num_nodes_dict={'user': 10, 'game': 10})
 
-One can also create a block with output nodes User #3, #6, and #8, as
+One can also create a MFG with destination nodes User #3, #6, and #8, as
 well as Game #2 and #6.
 
 .. code:: python
 
-    hetero_block = dgl.to_block(hetero_frontier, {'user': [3, 6, 8], 'block': [2, 6]})
+    hetero_block = dgl.to_block(hetero_frontier, {'user': [3, 6, 8], 'game': [2, 6]})
 
-One can also get the input nodes and output nodes by type:
+One can also get the source nodes and destination nodes by type:
 
 .. code:: python
 
-    # input users and games
+    # source users and games
     print(hetero_block.srcnodes['user'].data[dgl.NID], hetero_block.srcnodes['game'].data[dgl.NID])
-    # output users and games
+    # destination users and games
     print(hetero_block.dstnodes['user'].data[dgl.NID], hetero_block.dstnodes['game'].data[dgl.NID])
 
 
@@ -307,10 +304,10 @@ see what :class:`~dgl.dataloading.dataloader.BlockSampler`, the parent class of
 :class:`~dgl.dataloading.neighbor.MultiLayerFullNeighborSampler`, is.
 
 :class:`~dgl.dataloading.dataloader.BlockSampler` is responsible for
-generating the list of blocks starting from the last layer, with method
+generating the list of MFGs starting from the last layer, with method
 :meth:`~dgl.dataloading.dataloader.BlockSampler.sample_blocks`. The default implementation of
 ``sample_blocks`` is to iterate backwards, generating the frontiers and
-converting them to blocks.
+converting them to MFGs.
 
 Therefore, for neighborhood sampling, **you only need to implement
 the**\ :meth:`~dgl.dataloading.dataloader.BlockSampler.sample_frontier`\ **method**. Given which
@@ -364,10 +361,9 @@ nodes with a probability, one can simply define the sampler as follows:
 .. code:: python
 
     class MultiLayerDropoutSampler(dgl.dataloading.BlockSampler):
-        def __init__(self, p, n_layers):
-            super().__init__()
+        def __init__(self, p, num_layers):
+            super().__init__(num_layers)
     
-            self.n_layers = n_layers
             self.p = p
     
         def sample_frontier(self, block_id, g, seed_nodes, *args, **kwargs):
@@ -383,10 +379,10 @@ nodes with a probability, one can simply define the sampler as follows:
             return frontier
     
         def __len__(self):
-            return self.n_layers
+            return self.num_layers
 
 After implementing your sampler, you can create a data loader that takes
-in your sampler and it will keep generating lists of blocks while
+in your sampler and it will keep generating lists of MFGs while
 iterating over the seed nodes as usual.
 
 .. code:: python
@@ -425,10 +421,9 @@ all edge types, so that it can work on heterogeneous graphs as well.
 .. code:: python
 
     class MultiLayerDropoutSampler(dgl.dataloading.BlockSampler):
-        def __init__(self, p, n_layers):
-            super().__init__()
+        def __init__(self, p, num_layers):
+            super().__init__(num_layers)
     
-            self.n_layers = n_layers
             self.p = p
     
         def sample_frontier(self, block_id, g, seed_nodes, *args, **kwargs):
@@ -448,7 +443,4 @@ all edge types, so that it can work on heterogeneous graphs as well.
             return frontier
     
         def __len__(self):
-            return self.n_layers
-
-
-
+            return self.num_layers

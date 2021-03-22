@@ -21,7 +21,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.multiprocessing as mp
 from dgl.distributed import DistDataLoader
-#from pyinstrument import Profiler
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -328,8 +327,6 @@ def run(args, device, data):
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     # Training loop
-    #profiler = Profiler()
-    #profiler.start()
     epoch = 0
     for epoch in range(args.num_epochs):
         sample_time = 0
