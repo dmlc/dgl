@@ -112,6 +112,7 @@ if __name__ == '__main__':
             cnt_wait += 1
 
         if cnt_wait == args.patience:
+            print('Early stopping')
             break
 
     model.load_state_dict(th.load('model.pkl'))

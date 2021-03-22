@@ -19,13 +19,14 @@ This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang9
 
 ##### Unsupervised Graph Classification Datasets:
 
- 'MUTAG', 'PTC_MR', 'IMDB-BINARY', 'IMDB-MULTI', 'REDDIT-BINARY', 'REDDIT-MULTI-5K' of dgl.data.GINDataset.
+ 'MUTAG', 'PTC_MR', 'REDDIT-BINARY', 'IMDB-BINARY', 'IMDB-MULTI'.
 
 | Dataset         | MUTAG | PTC_MR | RDT-B  | IMDB-B | IMDB-M |
 | --------------- | ----- | ------ | ------ | ------ | ------ |
 | # Graphs        | 188   | 344    | 2000   | 1000   | 1500   |
 | # Classes       | 2     | 2      | 2      | 2      | 3      |
 | Avg. Graph Size | 17.93 | 14.29  | 429.63 | 19.77  | 13.00  |
+* RDT-B, IMDB-B, IMDB-M are short for REDDIT-BINARY, IMDB-BINARY and IMDB-MULTI respectively.
 
 ##### Unsupervised Node Classification Datasets:
 
@@ -45,13 +46,13 @@ This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang9
 ```
 --dataname         str     The graph dataset name.                Default is 'MUTAG'.
 --gpu              int     GPU index.                             Default is -1, using cpu.
---epochs           int     Number of training periods.            Default is 200.
---batch_size       int     Size of a training batch.              Default is 64.
 --patience         int     Early stopping steps.                  Default is 20.
 --lr               float   Learning rate.                         Default is 0.001.
 --wd               float   Weight decay.                          Default is 0.0.
---hid_dim          float   Embedding dimension.                   Default is 32.
---n_layers         int     Number of GNN layers.                  Default is 4
+--epochs           int     Number of training periods.            Default is 200.
+--batch_size       int     Size of a training batch.              Default is 64.
+--n_layers         int     Number of GNN layers.                  Default is 4.
+--hid_dim          int     Embedding dimension.                   Default is 32.
 ```
 
 ##### 	Node Classification:

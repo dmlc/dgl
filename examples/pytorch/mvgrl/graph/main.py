@@ -20,7 +20,7 @@ parser.add_argument('--patience', type=int, default=20, help='Early stopping ste
 parser.add_argument('--lr', type=float, default=0.001, help='Learning rate of mvgrl.')
 parser.add_argument('--wd', type=float, default=0., help='Weight decay of mvgrl.')
 parser.add_argument('--batch_size', type=int, default=64, help='Batch size.')
-parser.add_argument('--n_layers', type=int, default=4, help='Number of GNN layers')
+parser.add_argument('--n_layers', type=int, default=4, help='Number of GNN layers.')
 parser.add_argument("--hid_dim", type=int, default=32, help='Hidden layer dim.')
 
 args = parser.parse_args()
@@ -81,8 +81,8 @@ if __name__ == '__main__':
 
     wholegraph = wholegraph.to(args.device)
     whole_dg = whole_dg.to(args.device)
-    wholefeat = wholegraph.ndata.pop('feat').to(args.device)
-    whole_weight = whole_dg.edata.pop('edge_weight').to(args.device)
+    wholefeat = wholegraph.ndata.pop('feat')
+    whole_weight = whole_dg.edata.pop('edge_weight')
 
     embs = model.get_embedding(wholegraph, whole_dg, wholefeat, whole_weight)
     lbls = th.LongTensor(labels)
@@ -121,6 +121,10 @@ if __name__ == '__main__':
         else:
             cnt_wait += 1
 
+        if cnt_wait == args.patience:
+            print('Early stopping')
+            break
+
     print('Training End')
 
     # Step 5:  Linear evaluation ========================================================== #
@@ -129,8 +133,3 @@ if __name__ == '__main__':
 
     acc_mean, acc_std = linearsvc(embs, lbls)
     print('accuracy_mean, {:.4f}'.format(acc_mean))
-
-
-
-
-

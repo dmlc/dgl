@@ -20,27 +20,24 @@ def compute_ppr(graph: nx.Graph, alpha=0.2, self_loop=True):
     return alpha * inv((np.eye(a.shape[0]) - (1 - alpha) * at))   # a(I_n-(1-a)A~)^-1
 
 
-def download(dataset):
-    basedir = os.path.dirname(os.path.abspath(__file__))
-    datadir = os.path.join(basedir, 'data', dataset)
-    if not os.path.exists(datadir):
-        os.makedirs(datadir)
-        url = 'https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{0}.zip'.format(dataset)
-        zipfile = os.path.basename(url)
-        os.system('wget {0}; unzip {1}'.format(url, zipfile))
-        os.system('mv {0}/* {1}'.format(dataset, datadir))
-        os.system('rm -r {0}'.format(dataset))
-        os.system('rm {0}'.format(zipfile))
+def download(dataset, datadir):
+    os.makedirs(datadir)
+    url = 'https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{0}.zip'.format(dataset)
+    zipfile = os.path.basename(url)
+    os.system('wget {0}; unzip {1}'.format(url, zipfile))
+    os.system('mv {0}/* {1}'.format(dataset, datadir))
+    os.system('rm -r {0}'.format(dataset))
+    os.system('rm {0}'.format(zipfile))
 
 def process(dataset):
     src = os.path.join(os.path.dirname(__file__), 'data')
     prefix = os.path.join(src, dataset, dataset)
 
+    # assign each node to the corresponding graph
     graph_node_dict = {}
     with open('{0}_graph_indicator.txt'.format(prefix), 'r') as f:
         for idx, line in enumerate(f):
             graph_node_dict[idx + 1] = int(line.strip('\n'))
-    max_nodes = Counter(graph_node_dict.values()).most_common(1)[0][1]
 
     node_labels = []
     if os.path.exists('{0}_node_labels.txt'.format(prefix)):
@@ -86,8 +83,6 @@ def process(dataset):
     graphs, pprs = [], []
     for idx in range(1, 1 + len(adj_list)):
         graph = nx.from_edgelist(adj_list[idx])
-        if max_nodes is not None and graph.number_of_nodes() > max_nodes:
-            continue
 
         graph.graph['label'] = graph_labels[idx - 1]
         for u in graph.nodes():
@@ -128,7 +123,7 @@ def load(dataset):
     datadir = os.path.join(basedir, 'data', dataset)
 
     if not os.path.exists(datadir):
-        download(dataset)
+        download(dataset, datadir)
         graphs, diff = process(dataset)
         feat, adj, labels = [], [], []
 
