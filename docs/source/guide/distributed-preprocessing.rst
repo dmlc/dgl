@@ -22,9 +22,11 @@ in a format that is easy to load during the training.
 
 By default, the partition API assigns new IDs to the nodes and edges in the input graph to help locate
 nodes/edges during distributed training/inference. After assigning IDs, the partition API shuffles
-all node data and edge data accordingly. During the training, users just use the new node/edge IDs.
-However, the original IDs are still accessible through ``g.ndata['orig_id']`` and ``g.edata['orig_id']``,
-where ``g`` is a DistGraph object (see the section of DistGraph).
+all node data and edge data accordingly. After generating partitioned subgraphs, each subgraph is stored
+as a ``DGLGraph`` object. The original node/edge IDs before reshuffling are stored in the field of
+'orig_id' in the node/edge data of the subgraphs. The node data `dgl.NID` and the edge data `dgl.EID`
+of the subgraphs store new node/edge IDs of the full graph after nodes/edges reshuffle.
+During the training, users just use the new node/edge IDs.
 
 The partitioned results are stored in multiple files in the output directory. It always contains
 a JSON file called xxx.json, where xxx is the graph name provided to the partition API. The JSON file

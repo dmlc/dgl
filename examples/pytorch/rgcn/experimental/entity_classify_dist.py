@@ -29,7 +29,6 @@ from dgl.nn import RelGraphConv
 import tqdm
 
 from ogb.nodeproppred import DglNodePropPredDataset
-from pyinstrument import Profiler
 
 class EntityClassify(nn.Module):
     """ Entity classification class for RGCN
