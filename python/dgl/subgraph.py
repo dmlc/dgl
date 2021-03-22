@@ -593,7 +593,8 @@ def edge_type_subgraph(graph, etypes):
     """Return the subgraph induced on given edge types.
 
     An edge-type-induced subgraph contains all the edges of the given subset of
-    the edge types of a graph and the nodes incident by those edges.
+    the edge types of a graph. It also contains all nodes of a particular type
+    if some nodes of the type are incident to these edges.
     In addition to extracting the subgraph, DGL also copies the features of the
     extracted nodes and edges to the resulting graph.
     The copy is *lazy* and incurs data movement only when needed.

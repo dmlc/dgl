@@ -7,7 +7,6 @@ import dgl
 import torch as th
 import pyarrow
 from pyarrow import csv
-from pyinstrument import Profiler
 
 parser = argparse.ArgumentParser(description='Construct graph partitions')
 parser.add_argument('--input-dir', required=True, type=str,
@@ -57,9 +56,6 @@ etypes.sort(key=lambda e: e[1])
 etype_offset_np = np.array([e[1] for e in etypes])
 etypes = [e[0] for e in etypes]
 etypes_map = {e:i for i, e in enumerate(etypes)}
-
-profiler = Profiler()
-profiler.start()
 
 def read_feats(file_name):
     attrs = csv.read_csv(file_name, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True),
@@ -227,6 +223,3 @@ for part_id in range(num_parts):
                                                 'part_graph': part_graph_file}
 with open('{}/{}.json'.format(output_dir, graph_name), 'w') as outfile:
     json.dump(part_metadata, outfile, sort_keys=True, indent=4)
-
-profiler.stop()
-print(profiler.output_text(unicode=True, color=True))

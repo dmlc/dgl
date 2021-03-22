@@ -4,7 +4,6 @@ This is an example of training GraphSage in a distributed fashion. Before traini
 
 ```bash
 sudo pip3 install ogb
-sudo pip3 install pyinstrument
 ```
 
 To train GraphSage, it has five steps:
