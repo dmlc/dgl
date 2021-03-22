@@ -1,14 +1,14 @@
 # MPM-MLS in 88 lines of Taichi code, originally created by @yuanming-hu
 import taichi as ti
 import numpy as np
-ti.init(arch=ti.cpu)
+ti.init(arch=ti.gpu)
 
 dim = 2
 n_particles = 2048
 n_grid = 64
 dx = 1 / n_grid
 dt = 2e-4
-boundary = np.array([0.966,0.0325,0.966,0.325])
+boundary = np.array([0.966,0.0325,0.966,0.0325])
 
 
 p_rho = 1
@@ -96,6 +96,10 @@ def step():
         substep()
     pos = x.to_numpy()
     return pos
+
+# Should be used after each step
+def get_v():
+    return v.to_numpy()
 
 def render(pos,gui):
     gui.clear(0x112F41)

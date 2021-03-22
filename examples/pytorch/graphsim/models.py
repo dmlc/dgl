@@ -15,14 +15,16 @@ class MLP(nn.Module):
         self.layers = nn.ModuleList()
         if num_layers > 1:
             for i in range(num_layers-1):
-                self.layers.append(nn.Linear(in_feats,in_feats))
-        self.layers.append(nn.Linear(in_feats,out_feats))
+                self.layers.append(nn.Linear(in_feats,128))
+        self.layers.append(nn.Linear(128,out_feats))
 
     # Input is expected to be: Size(n_particles,n_feats)
     # What if I want to do batch training ? Need to be considered
     def forward(self,x):
-        for layer in self.layers:
-            x = layer(x)
+        for l in range(len(self.layers)-1):
+            x = self.layers[l](x)
+            x = F.relu(x)
+        x = self.layers[-1](x)
         return x
 
 class OnlinePrepareLayer(nn.Module):
@@ -54,7 +56,8 @@ class OnlinePrepareLayer(nn.Module):
                  hist_len,
                  boundary_info,
                  particle_stats,
-                 radius):
+                 radius,
+                 noise_scale):
         super(OnlinePrepareLayer,self).__init__()
         self.num_particles = num_particles
         self.env_dim = env_dim
@@ -65,10 +68,12 @@ class OnlinePrepareLayer(nn.Module):
         # Personally feels the boundary handling is bit wired
         self.p_stats = particle_stats
         self.radius = radius
+        self.noise_scale = noise_scale
         self.reset()
 
     def forward(self,g,pos):
         with g.local_scope():
+            pos = pos + torch.randn_like(pos)*self.noise_scale
             if self.init:
                 for i in range(self.hist_len):
                     self.pos_hist[i] = copy.deepcopy(pos)
@@ -117,7 +122,8 @@ class OfflinePrepareLayer(nn.Module):
                  env_dim,
                  boundary_info,
                  particle_stats,
-                 radius):
+                 radius,
+                 noise_scale):
         super(OfflinePrepareLayer,self).__init__()
         self.num_particles = num_particles
         self.env_dim = env_dim
@@ -125,17 +131,23 @@ class OfflinePrepareLayer(nn.Module):
         self.p_stats = particle_stats
         self.radius = radius
         self.batch_size = batch_size
+        self.noise_scale = noise_scale
 
     # Assume v is a [num_particles,dim*hist_length]
     def normalize_velocity(self,v):
         normalized_v = copy.deepcopy(v)
-        normalized_v = (normalized_v-self.p_stats['vel_mean'])/self.p_stats['vel_std']
+        repeat_len = int(v.shape[1]//2)
+        normalized_v = (normalized_v-self.p_stats['vel_mean'].repeat_interleave(repeat_len))/self.p_stats['vel_std'].repeat_interleave(repeat_len)
         return normalized_v
     
     # It can handle arbitrary baycjed graph
     def forward(self,g,pos,hist_v):
         with g.local_scope():
+            # Add noise for more robust training
+            pos = pos + torch.randn_like(pos)*self.noise_scale
+            hist_v = hist_v + torch.randn_like(hist_v)*self.noise_scale
             current_v = hist_v[:,torch.arange(self.env_dim)] # Select last velocity
+            
             normalized_v = self.normalize_velocity(hist_v)
             pos2bound = pos.repeat_interleave(2,dim=1) - self.boundary_info.repeat(pos.shape[0]).view(pos.shape[0],-1)
             normalized_pos2bound = torch.clamp(pos2bound/self.radius,-1,1)
@@ -171,12 +183,12 @@ class InteractionLayer(nn.Module):
     # Should be done by apply edge
     def update_edge_fn(self,edges):
         x = torch.cat([edges.src['feat'],edges.dst['feat'],edges.data['feat']],dim=1)
-        return {'e':self.edge_fc(x)}
+        return {'e':F.relu(self.edge_fc(x))}
 
     # Assume agg comes from build in reduce
     def update_node_fn(self,nodes):
         x = torch.cat([nodes.data['feat'],nodes.data['agg']],dim=1)
-        return {'n':self.node_fc(x)}
+        return {'n':F.relu(self.node_fc(x))}
 
     def forward(self,g,node_feats,edge_feats):
         g.ndata['feat'] = node_feats
@@ -247,11 +259,11 @@ class InputLayer(nn.Module):
     def forward(self,node_feature,edge_feature,global_context=None):
         if global_context!= None:
             node_feature = torch.hstack([node_feature,global_context])
-        n_out = self.fc_node(node_feature)
+        n_out = F.relu(self.fc_node(node_feature))
         if self.layer_norm:
             n_out = self.ln_node(n_out)
 
-        e_out = self.fc_edge(edge_feature)
+        e_out = F.relu(self.fc_edge(edge_feature))
         if self.layer_norm:
             e_out = self.ln_edge(e_out)
 
@@ -289,6 +301,7 @@ class OutputLayer(nn.Module):
 
     def forward(self,node_feature):
         out = self.fc(node_feature)
+        out = torch.clamp(out,-50,+50)
         return out
 
 class InteractionGNN(nn.Module):

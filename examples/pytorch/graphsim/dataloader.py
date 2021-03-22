@@ -15,6 +15,11 @@ class TaichiDataset(Dataset):
         self.node_state    = zipfile['node_state']
         self.node_velocity = zipfile['node_velocity']
         self.label_state   = zipfile['label_state']
+        self.vel_mean = torch.from_numpy(zipfile['vel_mean'])
+        self.vel_std  = torch.from_numpy(zipfile['vel_std'])
+        self.target_acc = zipfile['target_acc']
+        self.acc_mean = torch.from_numpy(zipfile['acc_mean'])
+        self.acc_std  = torch.from_numpy(zipfile['acc_std'])
 
     def __len__(self):
         return self.node_state.shape[0]
@@ -26,7 +31,8 @@ class TaichiDataset(Dataset):
         src_frame = self.node_state[idx,:,:]
         src_vels  = self.node_velocity[idx,:,:]
         tar_frame = self.label_state[idx,:,:]
-        return (src_frame,src_vels,tar_frame)
+        target_acc= self.target_acc[idx,:,:]
+        return (src_frame,src_vels,tar_frame,target_acc)
 
 class TaichiTrainDataset(TaichiDataset):
     def __init__(self):
@@ -35,7 +41,7 @@ class TaichiTrainDataset(TaichiDataset):
         self.dim = 2
         self.dt = 2e-4
         self.substeps = 50
-        self.boundary = np.array([0.966,0.0325,0.966,0.325])
+        self.boundary = np.array([0.966,0.0325,0.966,0.0325])
 
 class TaichiValidDataset(TaichiDataset):
     def __init__(self):
@@ -56,6 +62,7 @@ class GraphCollator:
         src_vels  = [] 
         src_coord = []
         dst_coord = []
+        dst_acc   = []
         for frame in batch:
             src_graph = radius_neighbors_graph(frame[0],
                                            radius=self.radius,
@@ -64,23 +71,26 @@ class GraphCollator:
             src_graph = dgl.from_scipy(src_graph)
             src_graph_list.append(src_graph)
             src_coord.append(torch.from_numpy(frame[0]))
-            dst_coord.append(torch.from_numpy(frame[2]))
             src_vels.append(torch.from_numpy(frame[1]))
+            dst_coord.append(torch.from_numpy(frame[2]))
+            dst_acc.append(torch.from_numpy(frame[3]))
 
         src_batch_g = dgl.batch(src_graph_list)
         src_coord = torch.vstack(src_coord)
         src_vels  = torch.vstack(src_vels)
         tar_coord = torch.vstack(dst_coord)
-        return src_batch_g,src_coord,src_vels,tar_coord
+        dst_acc   = torch.vstack(dst_acc)
+        return src_batch_g, src_coord, src_vels, tar_coord, dst_acc
 
 if __name__ == '__main__':
     ds = TaichiTrainDataset()
     collator = GraphCollator(radius=0.03)
     dataloader = DataLoader(ds,batch_size=4,shuffle=True,num_workers=1,collate_fn=collator)
-    for src_batch_g,src_coord,src_vels,tar_coord in dataloader:
+    for src_batch_g,src_coord,src_vels,tar_coord,target_acc in dataloader:
         print(src_batch_g)
         print(src_coord.shape)
         print(tar_coord.shape)
         print(src_vels.shape)
+        print(target_acc.shape)
         break
         
