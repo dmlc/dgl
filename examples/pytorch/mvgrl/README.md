@@ -46,10 +46,10 @@ This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang9
 ```
 --dataname         str     The graph dataset name.                Default is 'MUTAG'.
 --gpu              int     GPU index.                             Default is -1, using cpu.
+--epochs           int     Number of training periods.            Default is 200.
 --patience         int     Early stopping steps.                  Default is 20.
 --lr               float   Learning rate.                         Default is 0.001.
 --wd               float   Weight decay.                          Default is 0.0.
---epochs           int     Number of training periods.            Default is 200.
 --batch_size       int     Size of a training batch.              Default is 64.
 --n_layers         int     Number of GNN layers.                  Default is 4.
 --hid_dim          int     Embedding dimension.                   Default is 32.
@@ -60,14 +60,14 @@ This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang9
 ```
 --dataname         str     The graph dataset name.                Default is 'cora'.
 --gpu              int     GPU index.                             Default is -1, using cpu.
---epochs           int     Number of training periods.            Default is 20.
---batch_size       int     Size of a training batch.              Default is 128.
+--epochs           int     Number of training periods.            Default is 500.
 --patience         int     Early stopping steps.                  Default is 20.
 --lr1              float   Learning rate of main model.           Default is 0.001.
 --lr2              float   Learning rate of linear classifer.     Default is 0.01.
 --wd1              float   Weight decay of main model.            Default is 0.0.
 --wd2              float   Weight decay of linear classifier.     Default is 0.0.
---hid_dim          float   Embedding dimension.                   Default is 512.
+--epsilon          float   Edge mask threshold.                   Default is 0.01.
+--hid_dim          int     Embedding dimension.                   Default is 512.
 ```
 
 ## How to run examples
@@ -92,12 +92,12 @@ python main.py --dataname IMDB-MULTI --epochs 20 --hid_dim 512 --n_layers 2
 ```
 ###### Node Classification
 
-For semi-supervised node classification on 'Cora', 'Citeseer' and 'Pubmed', we provide 2 implementions:
+For semi-supervised node classification on 'Cora', 'Citeseer' and 'Pubmed', we provide 2 implementations:
 
 1. full-graph training, see 'main.py', where we contrast the local and global representations of the whole graph.
 2. subgraph training, see 'main_sample.py', where we contrast the local and global representations of a sampled subgraph with fixed number of nodes.
 
-For larger graphs(e.g. Pubmed), it would be hard to calculate the graph diffusion matrix(i.e, PPR matrix), so we try to approximate it with [APPNP](https://arxiv.org/abs/1810.05997), see funtion 'process_dataset_appnp'  in 'node/dataset.py' for details.
+For larger graphs(e.g. Pubmed), it would be hard to calculate the graph diffusion matrix(i.e., PPR matrix), so we try to approximate it with [APPNP](https://arxiv.org/abs/1810.05997), see funtion 'process_dataset_appnp'  in 'node/dataset.py' for details.
 
 ```python
 # Enter the 'node' directory
@@ -141,5 +141,5 @@ We use the same  hyper-parameter settings as stated in the original paper.
 |    DGL-sample     | 83.2 |   72.6   |  79.8  |
 |     DGL-full      | 83.5 |   73.7   |  OOM   |
 
-* We faied to reproduce the reported accuracy on 'Cora', even with the authors' codes.
+* We failed to reproduce the reported accuracy on 'Cora', even with the authors' codes.
 
