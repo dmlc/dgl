@@ -622,14 +622,14 @@ class SimpleTemporalSampler(dgl.dataloading.BlockSampler):
         '''
         fanout = self.fanouts[block_id]
         # List of neighbors to sample per edge type for each GNN layer, starting from the first layer.
-        g = dgl.in_subgraph(g, seed_nodes)  # 只包含seed_node的g（不考虑邻居吗？）
-        g.remove_edges(torch.where(g.edata['timestamp'] > self.ts)[0])  # 去掉ts之后的edge
-        # torch.where(条件，符合条件设置为；不符合条件设置为)
-        if fanout is None:  # 不采样就取全图
+        g = dgl.in_subgraph(g, seed_nodes)  
+        g.remove_edges(torch.where(g.edata['timestamp'] > self.ts)[0])  # Deleting the the edges that happen after the current timestamp
+
+        if fanout is None:  # full neighborhood sampling
             frontier = g
         else:
-            frontier = dgl.sampling.select_topk(g, fanout, 'timestamp', seed_nodes)  # 选timestamp最大的【fanout】个点
-        self.frontiers[block_id] = frontier  # 每层blocks采样的点存在frontier里面
+            frontier = dgl.sampling.select_topk(g, fanout, 'timestamp', seed_nodes)  # most recent timestamp edge sampling
+        self.frontiers[block_id] = frontier  # save frontier
         return frontier
 
 
@@ -713,15 +713,20 @@ class SimpleTemporalEdgeCollator(dgl.dataloading.EdgeCollator):
         We sample iteratively k-times and batch them into one single subgraph.
         '''
         current_ts = self.g.edata['timestamp'][items[0]]     #only sample edges before current timestamp
-        self.block_sampler.ts = current_ts    #当前block的最后一个ts，给下面的MultiLayerTemporalNeighborSampler定义的
-        neg_pair_graph = None
+        self.block_sampler.ts = current_ts    # restore the current timestamp to the graph sampler.
+
+        # if link prefiction, we use a negative_sampler to generate neg-graph for loss computing.
         if self.negative_sampler is None:
+            neg_pair_graph = None
             input_nodes, pair_graph, blocks = self._collate(items)
         else:
             input_nodes, pair_graph, neg_pair_graph, blocks = self._collate_with_negative_sampling(items)
+
+        # we sampling k-hop subgraph and batch them into one graph
         for i in range(self.n_layer-1):
             self.block_sampler.frontiers[0].add_edges(*self.block_sampler.frontiers[i+1].edges())
         frontier = self.block_sampler.frontiers[0]
+        # computing node last-update timestamp
         frontier.update_all(fn.copy_e('timestamp','ts'), fn.max('ts','timestamp'))
     
         return input_nodes, pair_graph, neg_pair_graph, [frontier]
