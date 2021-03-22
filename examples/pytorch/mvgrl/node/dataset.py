@@ -124,4 +124,3 @@ def process_dataset_appnp(epsilon):
     diff_graph = dgl.graph(diff_edges)
 
     return graph, diff_graph, feat, label, train_idx, val_idx, test_idx, diff_weight
-

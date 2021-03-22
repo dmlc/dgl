@@ -67,5 +67,3 @@ class MVGRL(nn.Module):
         out = self.disc(h1, h2, h3, h4, c1, c2)
 
         return out
-
-

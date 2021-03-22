@@ -154,6 +154,3 @@ if __name__ == '__main__':
 
     accs = th.stack(accs)
     print(accs.mean().item(), accs.std().item())
-
-
-

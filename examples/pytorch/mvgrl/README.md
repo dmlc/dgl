@@ -133,7 +133,7 @@ We use the same  hyper-parameter settings as stated in the original paper.
 | Accuracy Reported | 89.7  |  62.5  |   84.5   |  74.2  |  51.2  |
 |        DGL        | 89.4  |  62.2  |   85.0   |  73.8  |  51.1  |
 
-* The datasets that the authors used are slightly different from standard TUDataset (see dgl.data.GINDataset) in the nodes' features(e.g. The node features of 'MUTAG' dataset are 11 dimensional vectors rather than 7)
+* The datasets that the authors used are slightly different from standard TUDataset (see dgl.data.GINDataset) in the nodes' features(e.g. The node features of 'MUTAG' dataset are of dimensionality 11 rather than 7")
 
 ##### Node classification:
 
