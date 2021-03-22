@@ -102,6 +102,7 @@ def initialize(ip_config, num_servers=1, num_workers=0,
         sys.exit()
     else:
         num_workers = int(os.environ.get('DGL_NUM_SAMPLER'))
+        num_servers = int(os.environ.get('DGL_NUM_SERVER'))
         rpc.reset()
         ctx = mp.get_context("spawn")
         global SAMPLER_POOL

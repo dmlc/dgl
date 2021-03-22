@@ -421,7 +421,7 @@ def run(args, device, data):
         th.save(pred, 'emb.pt')
 
 def main(args):
-    dgl.distributed.initialize(args.ip_config, args.num_servers)
+    dgl.distributed.initialize(args.ip_config)
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
     g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
@@ -458,7 +458,6 @@ if __name__ == '__main__':
     parser.add_argument('--id', type=int, help='the partition id')
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
     parser.add_argument('--part_config', type=str, help='The path to the partition config file')
-    parser.add_argument('--num_servers', type=int, default=1, help='Server count on each machine.')
     parser.add_argument('--n_classes', type=int, help='the number of classes')
     parser.add_argument('--num_gpus', type=int, default=-1, 
                         help="the number of GPU device. Use -1 for CPU training")
@@ -480,8 +479,6 @@ if __name__ == '__main__':
     parser.add_argument('--remove_edge', default=False, action='store_true',
         help="whether to remove edges during sampling")
     args = parser.parse_args()
-    assert args.num_servers == int(os.environ.get('DGL_NUM_SERVER')), \
-    'The num_servers should be the same value with DGL_NUM_SERVER.'
     
     print(args)
     main(args)
