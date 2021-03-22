@@ -367,6 +367,28 @@ def _bwd_segment_cmp(feat, arg, m):
                                  to_dgl_nd_for_write(out))
     return out
 
+class CSRMatrix(object):
+    """Device- and backend-agnostic sparse matrix in CSR format.
+
+    Parameters
+    ----------
+    data : Tensor
+        The data array.
+    indices : Tensor
+        The column indices array.
+    indptr : Tensor
+        The row index pointer array.
+    num_rows : int
+        The number of rows.
+    num_cols : int
+        The number of columns.
+    """
+    def __init__(self, data, indices, indptr, num_rows, num_cols):
+        self.indptr = indptr
+        self.indices = indices
+        self.data = data
+        self.shape = (num_rows, num_cols)
+
 def csrmm(A, B):
     """Sparse-sparse matrix multiplication.
 
@@ -374,14 +396,14 @@ def csrmm(A, B):
 
     Parameters
     ----------
-    A : scipy.sparse.csr_matrix
+    A : dgl.sparse.CSRMatrix
         The left operand
-    B : scipy.sparse.csr_matrix
+    B : dgl.sparse.CSRMatrix
         The right operand
 
     Returns
     -------
-    scipy.sparse.csr_matrix
+    dgl.sparse.CSRMatrix
         The result
     """
     A_indptr = F.zerocopy_from_numpy(A.indptr)
@@ -398,11 +420,12 @@ def csrmm(A, B):
         F.to_dgl_nd(B_indptr),
         F.to_dgl_nd(B_indices),
         F.to_dgl_nd(B_data))
-    return scipy.sparse.csr_matrix(
-        (F.asnumpy(F.from_dgl_nd(C_data)),
-         F.asnumpy(F.from_dgl_nd(C_indices)),
-         F.asnumpy(F.from_dgl_nd(C_indptr))),
-        shape=(A.shape[0], B.shape[1]))
+    return CSRMatrix(
+        F.from_dgl_nd(C_data),
+        F.from_dgl_nd(C_indices),
+        F.from_dgl_nd(C_indptr),
+        A.shape[0],
+        B.shape[1])
 
 def csrsum(As):
     """Sparse-sparse matrix summation.
@@ -411,12 +434,12 @@ def csrsum(As):
 
     Parameters
     ----------
-    As : List[scipy.sparse.csr_matrix]
+    As : List[dgl.sparse.CSRMatrix]
         List of scipy sparse matrices in CSR format.
 
     Returns
     -------
-    scipy.sparse.csr_matrix
+    dgl.sparse.CSRMatrix
         The result
     """
     A_indptr = [F.zerocopy_from_numpy(x.indptr) for x in As]
@@ -427,11 +450,11 @@ def csrsum(As):
         [F.to_dgl_nd(x) for x in A_indptr],
         [F.to_dgl_nd(x) for x in A_indices],
         [F.to_dgl_nd(x) for x in A_data])
-    return scipy.sparse.csr_matrix(
-        (F.asnumpy(F.from_dgl_nd(C_data)),
-         F.asnumpy(F.from_dgl_nd(C_indices)),
-         F.asnumpy(F.from_dgl_nd(C_indptr))),
-        shape=(As[0].shape[0], As[0].shape[1]))
+    return CSRMatrix(
+        F.from_dgl_nd(C_data),
+        F.from_dgl_nd(C_indices),
+        F.from_dgl_nd(C_indptr),
+        As[0].shape[0], As[0].shape[1])
 
 def csrmask(A, B):
     """Sparse-sparse matrix masking operation that computes ``A[B != 0]``.
@@ -440,14 +463,14 @@ def csrmask(A, B):
 
     Parameters
     ----------
-    A : scipy.sparse.csr_matrix
+    A : dgl.sparse.CSRMatrix
         The left operand
-    B : scipy.sparse.csr_matrix
+    B : dgl.sparse.CSRMatrix
         The right operand
 
     Returns
     -------
-    scipy.sparse.csr_matrix
+    Tensor
         The result
     """
     A_indptr = F.zerocopy_from_numpy(A.indptr)
@@ -462,6 +485,6 @@ def csrmask(A, B):
         F.to_dgl_nd(A_data),
         F.to_dgl_nd(B_indptr),
         F.to_dgl_nd(B_indices))
-    return F.asnumpy(F.from_dgl_nd(B_data))
+    return F.from_dgl_nd(B_data)
 
 _init_api("dgl.sparse")
