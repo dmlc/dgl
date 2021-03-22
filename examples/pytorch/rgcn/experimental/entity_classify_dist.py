@@ -497,7 +497,7 @@ def run(args, device, data):
                                                                          time.time() - start))
 
 def main(args):
-    dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
+    dgl.distributed.initialize(args.ip_config, args.num_servers)
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
 
@@ -569,8 +569,6 @@ if __name__ == '__main__':
     parser.add_argument("--eval-batch-size", type=int, default=128,
             help="Mini-batch size. ")
     parser.add_argument('--log-every', type=int, default=20)
-    parser.add_argument("--num-workers", type=int, default=1,
-            help="Number of workers for distributed dataloader.")
     parser.add_argument("--low-mem", default=False, action='store_true',
             help="Whether use low mem RelGraphCov")
     parser.add_argument("--sparse-embedding", action='store_true',
