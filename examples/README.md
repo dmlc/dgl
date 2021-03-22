@@ -83,7 +83,7 @@ The folder contains example implementations of selected research papers related 
 | [Directional Message Passing for Molecular Graphs](#dimenet) |  |                                  | :heavy_check_mark: |                           |                    |
 |  [Link Prediction Based on Graph Neural Networks](#seal) | | :heavy_check_mark: | | :heavy_check_mark: | :heavy_check_mark: |
 | [Variational Graph Auto-Encoders](#vgae) |  | :heavy_check_mark: | | | |
-
+| [GNNExplainer: Generating Explanations for Graph Neural Networks](#gnnexplainer) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
 ## 2020
 
 - <a name="grand"></a> Feng et al. Graph Random Neural Network for Semi-Supervised Learning on Graphs. [Paper link](https://arxiv.org/abs/2005.11079). 
@@ -190,6 +190,9 @@ The folder contains example implementations of selected research papers related 
 - <a name='ngcf'></a> Wang, Xiang, et al. Neural Graph Collaborative Filtering. [Paper link](https://arxiv.org/abs/1905.08108).
     - Example code: [PyTorch](../examples/pytorch/NGCF)
     - Tags: Collaborative Filtering, Recommendation, Graph Neural Network 
+- <a name='gnnexplainer'></a> Ying, Rex, et al. GNNExplainer: Generating Explanations for Graph Neural Networks. [Paper link](https://arxiv.org/abs/1903.03894).
+    - Example code: [PyTorch](../examples/pytorch/gnn_explainer)
+    - Tags: Graph Neural Network, Explainability
 
 
 ## 2018
