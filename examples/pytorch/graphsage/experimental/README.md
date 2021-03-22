@@ -124,7 +124,7 @@ python3 ~/workspace/dgl/tools/launch.py \
 --num_servers 1 \
 --part_config data/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 train_dist.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 30 --batch_size 1000 --num_workers 4"
+"python3 train_dist.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 30 --batch_size 1000"
 ```
 
 To run unsupervised training:
@@ -137,7 +137,7 @@ python3 ~/workspace/dgl/tools/launch.py \
 --num_servers 1 \
 --part_config data/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 train_dist_unsupervised.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 3 --batch_size 1000 --num_workers 4"
+"python3 train_dist_unsupervised.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 3 --batch_size 1000"
 ```
 
 By default, this code will run on CPU. If you have GPU support, you can just add a `--num_gpus` argument in user command:
@@ -150,7 +150,7 @@ python3 ~/workspace/dgl/tools/launch.py \
 --num_servers 1 \
 --part_config data/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 train_dist.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 30 --batch_size 1000 --num_workers 4 --num_gpus 4"
+"python3 train_dist.py --graph_name ogb-product --ip_config ip_config.txt --num_servers 1 --num_epochs 30 --batch_size 1000 --num_gpus 4"
 ```
 
 **Note:** if you are using conda or other virtual environments on the remote machines, you need to replace `python3` in the command string (i.e. the last argument) with the path to the Python interpreter in that environment.
