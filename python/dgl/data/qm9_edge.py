@@ -20,7 +20,7 @@ class QM9EdgeDataset(DGLDataset):
         2. It provides edge features, and node features in addition to the atoms' coordinates and atomic numbers.
         3. It provides another 7 regression tasks(from 12 to 19).
 
-    This class is built based on a preprocessed dataset version, and we provide the preprocessing datails `here <https://gist.github.com/hengruizhang98/a2da30213b2356fff18b25385c9d3cd2>`_
+    This class is built based on a preprocessed version of the dataset, and we provide the preprocessing datails `here <https://gist.github.com/hengruizhang98/a2da30213b2356fff18b25385c9d3cd2>`_.
     
     Reference:
 
@@ -84,7 +84,7 @@ class QM9EdgeDataset(DGLDataset):
     | B      | :math:`B`                        | Rotational constant                                                               | :math:`\textrm{GHz}`                        |
     +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
     | C      | :math:`C`                        | Rotational constant                                                               | :math:`\textrm{GHz}`                        |
-    +--------+----------------------------------+---------------------------------------------------------------------------------------------------------------------------------+
+    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
     
     Parameters
     ----------
