@@ -3,10 +3,16 @@ import dgl
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
 import os
+import copy
 from sklearn.neighbors import radius_neighbors_graph
-
+import networkx as nx
 # Need to define the pytorch data loader for point cloud data
 # Since this can enable GPU training, significant acceleration is expected
+
+# The graph on the graph net should be bidirectional
+def build_dense_graph(n_particles):
+    g = nx.complete_graph(n_particles)
+    return dgl.from_networkx(g)
 
 class TaichiDataset(Dataset):
     def __init__(self,path):
@@ -51,8 +57,50 @@ class TaichiTestDataset(TaichiDataset):
     def __init__(self):
         super(TaichiTestDataset,self).__init__('data/mpm2d_water_test.npz')
 
+class MultiBodyDataset(Dataset):
+    def __init__(self,path):
+        self.path = path
+        self.zipfile = np.load(self.path)
+        self.node_state = self.zipfile['data']
+        self.node_label = self.zipfile['label']
+        self.n_particles= self.zipfile['n_particles']
+
+    def __len__(self):
+        return self.node_state.shape[0]
+
+    def __getitem__(self,idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        node_state = self.node_state[idx,:,:]
+        node_label = self.node_label[idx,:,:]
+        return (node_state,node_label)
+
+class MultiBodyTrainDataset(MultiBodyDataset):
+    def __init__(self):
+        super(MultiBodyTrainDataset,self).__init__('./data/n_body_train.npz')
+        self.stat_median = self.zipfile['median']
+        self.stat_max    = self.zipfile['max']
+        self.stat_min    = self.zipfile['min']
+
+class MultiBodyValidDataset(MultiBodyDataset):
+    def __init__(self):
+        super(MultiBodyValidDataset,self).__init__('./data/n_body_valid.npz')
+
+class MultiBodyTestHalfDataset(MultiBodyDataset):
+    def __init__(self):
+        super(MultiBodyTestHalfDataset,self).__init__('./data/n_body_halftest.npz')
+
+class MultiBodyTestFullDataset(MultiBodyDataset):
+    def __init__(self):
+        super(MultiBodyTestFullDataset,self).__init__('./data/n_body_fulltest.npz')
+
+class MultiBodyTestDoubDataset(MultiBodyDataset):
+    def __init__(self):
+        super(MultiBodyTestDoubDataset,self).__init__('./data/n_body_doubtest.npz')
+
 # Input idx and numpy array, output 
-class GraphCollator:
+class TaichiGraphCollator:
     def __init__(self,radius,self_loop=True):
         self.radius = radius
         self.self_loop = self_loop
@@ -82,15 +130,35 @@ class GraphCollator:
         dst_acc   = torch.vstack(dst_acc)
         return src_batch_g, src_coord, src_vels, tar_coord, dst_acc
 
+# Construct fully connected graph
+class MultiBodyGraphCollator:
+    def __init__(self,n_particles):
+        self.n_particles = n_particles
+        self.graph = dgl.from_networkx(nx.complete_graph(self.n_particles))
+
+    def __call__(self,batch):
+        graph_list = [] # Actually we don't need to build a graph each time, for API uniform
+        data_list = []
+        label_list = []
+        for frame in batch:
+            #graph_list.append(build_dense_graph(n_particles))
+            graph_list.append(copy.deepcopy(self.graph))
+            data_list.append(torch.from_numpy(frame[0]))
+            label_list.append(torch.from_numpy(frame[1]))
+
+        graph_batch = dgl.batch(graph_list)
+        data_batch  = torch.vstack(data_list)
+        label_batch = torch.vstack(label_list)
+        return graph_batch, data_batch, label_batch
+
+
 if __name__ == '__main__':
-    ds = TaichiTrainDataset()
-    collator = GraphCollator(radius=0.03)
-    dataloader = DataLoader(ds,batch_size=4,shuffle=True,num_workers=1,collate_fn=collator)
-    for src_batch_g,src_coord,src_vels,tar_coord,target_acc in dataloader:
-        print(src_batch_g)
-        print(src_coord.shape)
-        print(tar_coord.shape)
-        print(src_vels.shape)
-        print(target_acc.shape)
+    ds = MultiBodyTrainDataset()
+    collator = MultiBodyGraphCollator(ds.n_particles)
+    dataloader = DataLoader(ds,batch_size=4,shuffle=True,num_workers=0,collate_fn=collator)
+    for graph_b,data_b,label_b in dataloader:
+        print(graph_b)
+        print(data_b.shape)
+        print(label_b.shape)
         break
         

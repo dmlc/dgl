@@ -1,4 +1,4 @@
-from dataloader import GraphCollator
+from dataloader import TaichiGraphCollator
 from models import OfflinePrepareLayer,InteractionGNN
 from dataloader import TaichiTrainDataset,TaichiValidDataset,TaichiTestDataset
 import torch
@@ -55,7 +55,7 @@ ignn = InteractionGNN(10,
 if args.load_model != 'None':
     ignn.load_state_dict(torch.load('saved_models/{}'.format(args.load_model)))
 
-collator = GraphCollator(radius = radius)
+collator = TaichiGraphCollator(radius = radius)
 train_dataloader = DataLoader(train_dataset,batch_size=batch_size,shuffle=True,num_workers=num_workers,collate_fn=collator)
 valid_dataloader = DataLoader(valid_dataset,batch_size=batch_size,shuffle=False,num_workers=num_workers,collate_fn=collator)
 test_dataloader = DataLoader(test_dataset,batch_size=batch_size,shuffle=False,num_workers=num_workers,collate_fn=collator)

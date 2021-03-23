@@ -10,13 +10,14 @@ import copy
 # Assume Global context has been merged to node feature initially
 # Use Relu as default
 class MLP(nn.Module):
-    def __init__(self,in_feats,out_feats,num_layers):
+    def __init__(self,in_feats,out_feats,num_layers=2,hidden=128):
         super(MLP,self).__init__()
         self.layers = nn.ModuleList()
-        if num_layers > 1:
-            for i in range(num_layers-1):
-                self.layers.append(nn.Linear(in_feats,128))
-        self.layers.append(nn.Linear(128,out_feats))
+        self.layers.append(nn.Linear(in_feats,hidden))
+        if num_layers > 2:
+            for i in range(1,num_layers-1):
+                self.layers.append(nn.Linear(hidden,hidden))
+        self.layers.append(nn.Linear(hidden,out_feats))
 
     # Input is expected to be: Size(n_particles,n_feats)
     # What if I want to do batch training ? Need to be considered
@@ -162,22 +163,27 @@ class OfflinePrepareLayer(nn.Module):
             
             return node_feature.float(),edge_feature.float(),current_v.float()
 
+# Partially complete function can be treat as input
 class InteractionLayer(nn.Module):
     def __init__(self,in_node_feats,
                       in_edge_feats,
                       out_node_feats,
-                      out_edge_feats):
+                      out_edge_feats,
+                      edge_fc=nn.Linear,
+                      node_fc=nn.Linear,
+                      mode='nne'): # 'e'
         super(InteractionLayer,self).__init__()
         self.in_node_feats   = in_node_feats
         self.in_edge_feats   = in_edge_feats
         self.out_edge_feats  = out_edge_feats
         self.out_node_feats  = out_node_feats
-
+        self.mode = mode
         # MLP for message passing
-        self.edge_fc = nn.Linear(2*self.in_node_feats+self.in_edge_feats,
-                                 self.out_edge_feats)
+        input_shape = 2*self.in_node_feats+self.in_edge_feats if mode== 'nne' else self.in_edge_feats
+        self.edge_fc = edge_fc(input_shape,
+                               self.out_edge_feats) # 50 in IN paper
 
-        self.node_fc = nn.Linear(self.in_node_feats+self.out_edge_feats,
+        self.node_fc = node_fc(self.in_node_feats+self.out_edge_feats,
                                  self.out_node_feats)
 
     # Should be done by apply edge
@@ -193,7 +199,11 @@ class InteractionLayer(nn.Module):
     def forward(self,g,node_feats,edge_feats):
         g.ndata['feat'] = node_feats
         g.edata['feat'] = edge_feats
-        g.apply_edges(self.update_edge_fn)
+        if self.mode == 'nne':
+            g.apply_edges(self.update_edge_fn)
+        else:
+            g.edata['e'] = self.edge_fc(g.edata['feat'])
+
         g.update_all(fn.copy_e('e','msg'),
                      fn.mean('msg','agg'),
                      self.update_node_fn)
