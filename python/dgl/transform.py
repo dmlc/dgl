@@ -146,7 +146,7 @@ def knn_graph(x, k, algorithm='topk'):
             x_seg = x_size[0] * [x_size[1]]
         else:
             x_seg = [F.shape(x)[0]]
-        out = knn(x, x_seg, x, x_seg, k, algorithm=algorithm).t().contiguous()
+        out = knn(x, x_seg, x, x_seg, k, algorithm=algorithm)
         row, col = out[1], out[0]
         return convert.graph((row, col))
 
@@ -255,7 +255,7 @@ def segmented_knn_graph(x, k, segs, algorithm='topk'):
     if algorithm == 'topk':
         return _segmented_knn_graph_topk(x, k, segs)
     else:
-        out = knn(x, segs, x, segs, k, algorithm=algorithm).t().contiguous()
+        out = knn(x, segs, x, segs, k, algorithm=algorithm)
         row, col = out[1], out[0]
         return convert.graph((row, col))
 
@@ -327,8 +327,9 @@ def knn(x, x_segs, y, y_segs, k, algorithm='kd-tree', dist='euclidean'):
 
     Returns
     -------
-    (Tensor, Tensor)
-        The first tensor contains point indexs in :attr:`y`. The second tensor contains
+    Tensor
+        Tensor with size `(2, k * num_points(y))`
+        The first subtensor contains point indexs in :attr:`y`. The second subtensor contains
         point indexs in :attr:`x`
     """
     # currently only cpu implementation is supported.
@@ -365,7 +366,7 @@ def knn(x, x_segs, y, y_segs, k, algorithm='kd-tree', dist='euclidean'):
     y_offset = F.zeros((F.shape(y_segs)[0] + 1,), F.dtype(y_segs), F.context(y_segs))
     y_offset[1:] = F.cumsum(y_segs, dim=0)
 
-    out = F.zeros((F.shape(y)[0] * k, 2), F.dtype(x_segs), F.context(x_segs))
+    out = F.zeros((2, F.shape(y)[0] * k), F.dtype(x_segs), F.context(x_segs))
 
     # if use cosine distance, normalize input points first
     # thus we can use euclidean distance to find knn equivalently.

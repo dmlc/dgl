@@ -27,14 +27,15 @@ void KdTreeKNN(const NDArray& data_points, const IdArray& data_offsets,
   const IdType* data_offsets_data = data_offsets.Ptr<IdType>();
   const IdType* query_offsets_data = query_offsets.Ptr<IdType>();
   const FloatType* query_points_data = query_points.Ptr<FloatType>();
-  IdType* result_data = result.Ptr<IdType>();
+  IdType* query_out = result.Ptr<IdType>();
+  IdType* data_out = query_out + k * query_points->shape[0];
 
   for (int64_t b = 0; b < batch_size; ++b) {
     auto d_offset = data_offsets_data[b];
     auto d_length = data_offsets_data[b + 1] - d_offset;
     auto q_offset = query_offsets_data[b];
     auto q_length = query_offsets_data[b + 1] - q_offset;
-    auto out_offset = 2 * k * q_offset;
+    auto out_offset = k * q_offset;
 
     // create view for each segment
     const NDArray current_data_points = const_cast<NDArray*>(&data_points)->CreateView(
@@ -48,14 +49,15 @@ void KdTreeKNN(const NDArray& data_points, const IdArray& data_offsets,
     std::vector<FloatType> out_dist_buffer(k);
 #pragma omp parallel for firstprivate(out_buffer) firstprivate(out_dist_buffer)
     for (int64_t q = 0; q < q_length; ++q) {
-      auto curr_out_offset = 2 * k * q + out_offset;
+      auto curr_out_offset = k * q + out_offset;
       const FloatType* q_point = current_query_pts_data + q * feature_size;
       size_t num_matches = kdtree.GetIndex()->knnSearch(
         q_point, k, out_buffer.data(), out_dist_buffer.data());
 
       for (size_t i = 0; i < num_matches; ++i) {
-        result_data[curr_out_offset] = q + q_offset; curr_out_offset++;
-        result_data[curr_out_offset] = out_buffer[i] + d_offset; curr_out_offset++;
+        query_out[curr_out_offset] = q + q_offset;
+        data_out[curr_out_offset] = out_buffer[i] + d_offset;
+        curr_out_offset++;
       }
     }
   }
