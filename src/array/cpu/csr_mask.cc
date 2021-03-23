@@ -15,6 +15,39 @@ using dgl::runtime::NDArray;
 
 namespace aten {
 
+namespace {
+
+template <typename IdType, typename DType>
+void ComputeValues(
+    const IdType* A_indptr,
+    const IdType* A_indices,
+    const IdType* A_eids,
+    const DType* A_data,
+    const IdType* B_indptr,
+    const IdType* B_indices,
+    const IdType* B_eids,
+    DType* C_data,\
+    int64_t M) {
+  phmap::flat_hash_map<IdType, DType> map;
+#pragma omp parallel for firstprivate(map)
+  for (IdType i = 0; i < M; ++i) {
+    map.clear();
+
+    for (IdType u = A_indptr[i]; u < A_indptr[i + 1]; ++u) {
+      IdType kA = A_indices[u];
+      map[kA] = A_data[A_eids ? A_eids[u] : u];
+    }
+
+    for (IdType v = B_indptr[i]; v < B_indptr[i + 1]; ++v) {
+      IdType kB = B_indices[v];
+      auto it = map.find(kB);
+      C_data[B_eids ? B_eids[v] : v] = (it != map.end()) ? it->second : 0;
+    }
+  }
+}
+
+};  // namespace
+
 template <int XPU, typename IdType, typename DType>
 NDArray CSRMask(
     const CSRMatrix& A,
@@ -36,23 +69,7 @@ NDArray CSRMask(
 
   NDArray C_weights = NDArray::Empty({B.indices->shape[0]}, A_weights->dtype, A_weights->ctx);
   DType* C_data = C_weights.Ptr<DType>();
-
-  phmap::flat_hash_map<IdType, DType> map;
-#pragma omp parallel for firstprivate(map)
-  for (IdType i = 0; i < M; ++i) {
-    map.clear();
-
-    for (IdType u = A_indptr[i]; u < A_indptr[i + 1]; ++u) {
-      IdType kA = A_indices[u];
-      map[kA] = A_data[A_eids ? A_eids[u] : u];
-    }
-
-    for (IdType v = B_indptr[i]; v < B_indptr[i + 1]; ++v) {
-      IdType kB = B_indices[v];
-      auto it = map.find(kB);
-      C_data[B_eids ? B_eids[v] : v] = (it != map.end()) ? it->second : 0;
-    }
-  }
+  ComputeValues(A_indptr, A_indices, A_eids, A_data, B_indptr, B_indices, B_eids, C_data, M);
 
   return C_weights;
 }
