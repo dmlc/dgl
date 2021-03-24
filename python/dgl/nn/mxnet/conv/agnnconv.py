@@ -4,7 +4,7 @@ import mxnet as mx
 from mxnet.gluon import nn
 
 from .... import function as fn
-from ....ops import edge_softmax
+from ...functional import edge_softmax
 from ..utils import normalize
 from ....base import DGLError
 from ....utils import expand_as_pair
@@ -54,8 +54,8 @@ class AGNNConv(nn.Block):
 
     Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
     since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree``
-    to ``True`` for those cases to unblock the code and handle zere-in-degree nodes manually.
-    A common practise to handle this is to filter out the nodes with zere-in-degree when use
+    to ``True`` for those cases to unblock the code and handle zero-in-degree nodes manually.
+    A common practise to handle this is to filter out the nodes with zero-in-degree when use
     after conv.
 
     Example

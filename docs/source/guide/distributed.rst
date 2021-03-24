@@ -1,5 +1,9 @@
+.. _guide-distributed:
+
 Chapter 7: Distributed Training
 =====================================
+
+:ref:`(中文版) <guide_cn-distributed>`
 
 DGL adopts a fully distributed approach that distributes both data and computation
 across a collection of computation resources. In the context of this section, we
@@ -94,6 +98,7 @@ the following distributed components:
 
 * :ref:`guide-distributed-preprocessing`
 * :ref:`guide-distributed-apis`
+* :ref:`guide-distributed-hetero`
 * :ref:`guide-distributed-tools`
 
 .. toctree::
@@ -103,4 +108,5 @@ the following distributed components:
 
     distributed-preprocessing
     distributed-apis
+    distributed-hetero
     distributed-tools

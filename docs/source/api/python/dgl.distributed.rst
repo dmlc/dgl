@@ -17,7 +17,7 @@ Distributed Graph
 -----------------
 
 .. autoclass:: DistGraph
-    :members: ndata, edata, idtype, device, ntypes, etypes, number_of_nodes, number_of_edges, node_attr_schemes, edge_attr_schemes, rank, find_edges, get_partition_book, barrier, local_partition, num_nodes, num_edges
+    :members: ndata, edata, idtype, device, ntypes, etypes, number_of_nodes, number_of_edges, node_attr_schemes, edge_attr_schemes, rank, find_edges, get_partition_book, barrier, local_partition, num_nodes, num_edges, get_node_partition_policy, get_edge_partition_policy, get_etype_id, get_ntype_id, nodes, edges
 
 Distributed Tensor
 ------------------
@@ -73,7 +73,7 @@ Graph partition book
 .. currentmodule:: dgl.distributed.graph_partition_book
 
 .. autoclass:: GraphPartitionBook
-    :members: shared_memory, num_partitions, metadata, nid2partid, eid2partid, partid2nids, partid2eids, nid2localnid, eid2localeid, partid
+    :members: shared_memory, num_partitions, metadata, nid2partid, eid2partid, partid2nids, partid2eids, nid2localnid, eid2localeid, partid, map_to_per_ntype, map_to_per_etype, map_to_homo_nid, map_to_homo_eid
 
 .. autoclass:: PartitionPolicy
     :members: policy_str, part_id, partition_book, to_local, to_partid, get_part_size, get_size

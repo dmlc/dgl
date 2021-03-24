@@ -4,17 +4,10 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
-from torch.utils.data import DataLoader
-import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
-from _thread import start_new_thread
-from functools import wraps
-from dgl.data import RedditDataset
 import tqdm
-import traceback
 from ogb.nodeproppred import DglNodePropPredDataset
 
 class SAGE(nn.Module):
@@ -44,7 +37,7 @@ class SAGE(nn.Module):
             # appropriate nodes on the LHS.
             # Note that the shape of h is (num_nodes_LHS, D) and the shape of h_dst
             # would be (num_nodes_RHS, D)
-            h_dst = h[:block.number_of_dst_nodes()]
+            h_dst = h[:block.num_dst_nodes()]
             # Then we compute the updated representation on the RHS.
             # The shape of h now becomes (num_nodes_RHS, D)
             h = layer(block, (h, h_dst))
@@ -53,7 +46,7 @@ class SAGE(nn.Module):
                 h = self.dropout(h)
         return h
 
-    def inference(self, g, x, batch_size, device):
+    def inference(self, g, x, device):
         """
         Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
         g : the entire graph.
@@ -66,14 +59,13 @@ class SAGE(nn.Module):
         # Therefore, we compute the representation of all nodes layer by layer.  The nodes
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
-        nodes = th.arange(g.number_of_nodes())
         for l, layer in enumerate(self.layers):
-            y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
+            y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes).to(device)
 
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.NodeDataLoader(
                 g,
-                th.arange(g.number_of_nodes()),
+                th.arange(g.num_nodes()),
                 sampler,
                 batch_size=args.batch_size,
                 shuffle=True,
@@ -83,14 +75,14 @@ class SAGE(nn.Module):
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0].int().to(device)
 
-                h = x[input_nodes].to(device)
-                h_dst = h[:block.number_of_dst_nodes()]
+                h = x[input_nodes]
+                h_dst = h[:block.num_dst_nodes()]
                 h = layer(block, (h, h_dst))
                 if l != len(self.layers) - 1:
                     h = self.activation(h)
                     h = self.dropout(h)
 
-                y[output_nodes] = h.cpu()
+                y[output_nodes] = h
 
             x = y
         return y
@@ -101,35 +93,33 @@ def compute_acc(pred, labels):
     """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, labels, val_nid, test_nid, batch_size, device):
+def evaluate(model, g, nfeat, labels, val_nid, test_nid, device):
     """
     Evaluate the model on the validation set specified by ``val_mask``.
     g : The entire graph.
     inputs : The features of all the nodes.
     labels : The labels of all the nodes.
     val_mask : A 0-1 mask indicating which nodes do we actually compute the accuracy for.
-    batch_size : Number of nodes to compute at the same time.
     device : The GPU device to evaluate on.
     """
     model.eval()
     with th.no_grad():
-        inputs = g.ndata['feat']
-        pred = model.inference(g, inputs, batch_size, device)
+        pred = model.inference(g, nfeat, device)
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid]), compute_acc(pred[test_nid], labels[test_nid]), pred
 
-def load_subtensor(g, labels, seeds, input_nodes, device):
+def load_subtensor(nfeat, labels, seeds, input_nodes):
     """
-    Copys features and labels of a set of nodes onto GPU.
+    Extracts features and labels for a set of nodes.
     """
-    batch_inputs = g.ndata['feat'][input_nodes].to(device)
-    batch_labels = labels[seeds].to(device)
+    batch_inputs = nfeat[input_nodes]
+    batch_labels = labels[seeds]
     return batch_inputs, batch_labels
 
 #### Entry point
 def run(args, device, data):
     # Unpack data
-    train_nid, val_nid, test_nid, in_feats, labels, n_classes, g = data
+    train_nid, val_nid, test_nid, in_feats, labels, n_classes, nfeat, g = data
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
@@ -147,7 +137,6 @@ def run(args, device, data):
     model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
     loss_fcn = nn.CrossEntropyLoss()
-    loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)
 
     # Training loop
@@ -167,7 +156,7 @@ def run(args, device, data):
             blocks = [blk.int().to(device) for blk in blocks]
 
             # Load the input features as well as output labels
-            batch_inputs, batch_labels = load_subtensor(g, labels, seeds, input_nodes, device)
+            batch_inputs, batch_labels = load_subtensor(nfeat, labels, seeds, input_nodes)
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -188,7 +177,7 @@ def run(args, device, data):
         if epoch >= 5:
             avg += toc - tic
         if epoch % args.eval_every == 0 and epoch != 0:
-            eval_acc, test_acc, pred = evaluate(model, g, labels, val_nid, test_nid, args.val_batch_size, device)
+            eval_acc, test_acc, pred = evaluate(model, g, nfeat, labels, val_nid, test_nid, device)
             if args.save_pred:
                 np.savetxt(args.save_pred + '%02d' % epoch, pred.argmax(1).cpu().numpy(), '%d')
             print('Eval Acc {:.4f}'.format(eval_acc))
@@ -225,23 +214,24 @@ if __name__ == '__main__':
     else:
         device = th.device('cpu')
 
-    # load reddit data
+    # load ogbn-products data
     data = DglNodePropPredDataset(name='ogbn-products')
     splitted_idx = data.get_idx_split()
     train_idx, val_idx, test_idx = splitted_idx['train'], splitted_idx['valid'], splitted_idx['test']
     graph, labels = data[0]
-    labels = labels[:, 0]
+    nfeat = graph.ndata.pop('feat').to(device)
+    labels = labels[:, 0].to(device)
 
-    in_feats = graph.ndata['feat'].shape[1]
+    in_feats = nfeat.shape[1]
     n_classes = (labels.max() + 1).item()
     # Create csr/coo/csc formats before launching sampling processes
     # This avoids creating certain formats in each data loader process, which saves momory and CPU.
     graph.create_formats_()
     # Pack data
-    data = train_idx, val_idx, test_idx, in_feats, labels, n_classes, graph
+    data = train_idx, val_idx, test_idx, in_feats, labels, n_classes, nfeat, graph
 
     # Run 10 times
     test_accs = []
     for i in range(10):
-        test_accs.append(run(args, device, data))
+        test_accs.append(run(args, device, data).cpu().numpy())
         print('Average test accuracy:', np.mean(test_accs), '±', np.std(test_accs))
