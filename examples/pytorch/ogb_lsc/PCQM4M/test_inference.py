@@ -6,6 +6,7 @@ import random
 import torch
 
 from ogb.lsc import PCQM4MDataset, PCQM4MEvaluator
+from ogb.utils import smiles2graph
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
