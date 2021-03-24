@@ -89,7 +89,7 @@ class DistSparseGradOptimizer(abc.ABC):
 
                     # use scatter to sync across trainers about the p2p tensor size
                     # Note: If we have GPU nccl support, we can use all_to_all to sync information here
-                    gather_list = list(th.empty([2], dtype=th.int64).chunk(self._world_size))
+                    gather_list = list(th.empty([self._world_size], dtype=th.int64).chunk(self._world_size))
                     alltoall_cpu(self._rank, self._world_size, gather_list, idx_split_size)
                     # use cpu until we have GPU alltoallv
                     idx_gather_list = [th.empty((int(num_emb),), dtype=idics.dtype) for num_emb in gather_list]
