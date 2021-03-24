@@ -396,8 +396,7 @@ def test_gin_conv_bi(g, idtype, aggregator_type):
 @pytest.mark.parametrize('out_dim', [1, 2])
 def test_edge_conv(g, idtype, out_dim):
     g = g.astype(idtype).to(F.ctx())
-    ctx = F.ctx()
-    edge_conv = nn.EdgeConv(5, out_dim).to(ctx)
+    edge_conv = nn.EdgeConv(5, out_dim)
 
     h0 = F.randn((g.number_of_nodes(), 5))
     h1 = edge_conv(g, h0)
@@ -409,7 +408,7 @@ def test_edge_conv(g, idtype, out_dim):
 def test_edge_conv_bi(g, idtype, out_dim):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    edge_conv = nn.EdgeConv(5, out_dim).to(ctx)
+    edge_conv = nn.EdgeConv(5, out_dim)
 
     h0 = F.randn((g.number_of_src_nodes(), 5))
     x0 = F.randn((g.number_of_dst_nodes(), 5))
