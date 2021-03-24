@@ -115,9 +115,6 @@ def main():
     ### automatic evaluator.
     evaluator = PCQM4MEvaluator()
 
-    if args.checkpoint_dir is not '':
-        os.makedirs(args.checkpoint_dir, exist_ok=True)
-
     shared_params = {
         'num_layers': args.num_layers,
         'emb_dim': args.emb_dim,
