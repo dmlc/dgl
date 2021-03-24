@@ -27,7 +27,7 @@ void ComputeValues(
     const IdType* B_indptr,
     const IdType* B_indices,
     const IdType* B_eids,
-    DType* C_data,\
+    DType* C_data,
     int64_t M) {
   phmap::flat_hash_map<IdType, DType> map;
 #pragma omp parallel for firstprivate(map)
