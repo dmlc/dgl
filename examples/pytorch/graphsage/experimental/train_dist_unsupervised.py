@@ -22,6 +22,24 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 from dgl.distributed import DistDataLoader
 #from pyinstrument import Profiler
+from dgl.distributed import DistEmbedding
+from dgl.distributed.optim import DistSparseAdagrad
+
+def initializer(shape, dtype):
+    arr = th.zeros(shape, dtype=dtype)
+    arr.uniform_(-1, 1)
+    return arr
+
+class DistEmb(nn.Module):
+    def __init__(self, num_nodes, emb_size, dgl_emb=True):
+        super().__init__()
+        if dgl_emb:
+            self.emb = DistEmbedding(num_nodes, emb_size, name='sage', init_func=initializer)
+        else:
+            self.emb = nn.Embedding(num_nodes, emb_size, sparse=True)
+
+    def forward(self, idx):
+        return self.emb(idx)
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -271,7 +289,7 @@ def generate_emb(model, g, inputs, batch_size, device):
 def compute_acc(emb, labels, train_nids, val_nids, test_nids):
     """
     Compute the accuracy of prediction given the labels.
-    
+
     We will fist train a LogisticRegression model using the trained embeddings,
     the training set, validation set and test set is provided as the arguments.
 
@@ -315,17 +333,24 @@ def run(args, device, data):
         drop_last=False)
 
     # Define model and optimizer
-    model = DistSAGE(in_feats, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
+    emb_layer = DistEmb(g.num_nodes(), args.num_hidden, args.dgl_emb)
+    model = DistSAGE(args.num_hidden, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
     if not args.standalone:
         if args.num_gpus == -1:
             model = th.nn.parallel.DistributedDataParallel(model)
+            if args.dgl_emb is False:
+                emb_layer = th.nn.parallel.DistributedDataParallel(emb_layer)
         else:
             dev_id = g.rank() % args.num_gpus
             model = th.nn.parallel.DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
     loss_fcn = CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    if args.dgl_emb:
+        sparse_optimizer = DistSparseAdagrad([emb_layer.emb], lr=args.lr)
+    else:
+        sparse_optimizer = th.optim.SparseAdam(emb_layer.module.emb.parameters())
 
     # Training loop
     #profiler = Profiler()
@@ -363,14 +388,16 @@ def run(args, device, data):
             # The nodes for output lies at the RHS side of the last block.
 
             # Load the input features as well as output labels
-            batch_inputs = blocks[0].srcdata['features']
+            batch_inputs = blocks[0].srcdata[dgl.NID]
             copy_time = time.time()
             feat_copy_t.append(copy_time - tic_step)
 
             # Compute loss and prediction
+            batch_inputs = emb_layer(batch_inputs)
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, pos_graph, neg_graph)
             forward_end = time.time()
+            sparse_optimizer.zero_grad()
             optimizer.zero_grad()
             loss.backward()
             compute_end = time.time()
@@ -378,6 +405,7 @@ def run(args, device, data):
             backward_t.append(compute_end - forward_end)
 
             # Aggregate gradients in multiple nodes.
+            sparse_optimizer.step()
             optimizer.step()
             update_t.append(time.time() - compute_end)
 
@@ -463,7 +491,7 @@ if __name__ == '__main__':
     parser.add_argument('--part_config', type=str, help='The path to the partition config file')
     parser.add_argument('--num_servers', type=int, default=1, help='Server count on each machine.')
     parser.add_argument('--n_classes', type=int, help='the number of classes')
-    parser.add_argument('--num_gpus', type=int, default=-1, 
+    parser.add_argument('--num_gpus', type=int, default=-1,
                         help="the number of GPU device. Use -1 for CPU training")
     parser.add_argument('--num_epochs', type=int, default=20)
     parser.add_argument('--num_hidden', type=int, default=16)
@@ -484,11 +512,13 @@ if __name__ == '__main__':
         help="sharing neg nodes for positive nodes")
     parser.add_argument('--remove_edge', default=False, action='store_true',
         help="whether to remove edges during sampling")
+    parser.add_argument('--dgl_emb', default=False, action='store_true',
+        help='whether to use dgl sparse embedding')
     args = parser.parse_args()
     assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')), \
     'The num_workers should be the same value with DGL_NUM_SAMPLER.'
     assert args.num_servers == int(os.environ.get('DGL_NUM_SERVER')), \
     'The num_servers should be the same value with DGL_NUM_SERVER.'
-    
+
     print(args)
     main(args)
