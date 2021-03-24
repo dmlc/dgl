@@ -28,13 +28,13 @@ TCPSocket::TCPSocket() {
   // init socket
   socket_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (socket_ < 0) {
-    LOG(FATAL) << "Can't create new socket. Errno=" << errno;
+    LOG(FATAL) << "Can't create new socket. Error: " << strerror(errno);
   }
 #ifndef _WIN32
   // This is to make sure the same port can be reused right after the socket is closed.
   int enable = 1;
   if (setsockopt(socket_, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
-    LOG(WARNING) << "cannot make the socket reusable. Errno=" << errno;
+    LOG(WARNING) << "cannot make the socket reusable. Error: " << strerror(errno);
   }
 #endif  // _WIN32
 }
@@ -73,7 +73,7 @@ bool TCPSocket::Bind(const char * ip, int port) {
     }
   } while (retval == -1 && errno == EINTR);
 
-  LOG(ERROR) << "Failed bind on " << ip << ":" << port << " ,errno=" << errno;
+  LOG(ERROR) << "Failed bind on " << ip << ":" << port << " , error: " << strerror(errno);
   return false;
 }
 
@@ -85,7 +85,7 @@ bool TCPSocket::Listen(int max_connection) {
     }
   } while (retval == -1 && errno == EINTR);
 
-  LOG(ERROR) << "Failed listen on socket fd: " << socket_ << " ,errno=" << errno;
+  LOG(ERROR) << "Failed listen on socket fd: " << socket_ << " , error: " << strerror(errno);
   return false;
 }
 
@@ -100,7 +100,8 @@ bool TCPSocket::Accept(TCPSocket * socket, std::string * ip, int * port) {
 
   if (sock_client < 0) {
     LOG(ERROR) << "Failed accept connection on " << *ip << ":" << *port
-               << " ,errno=" << errno << (errno == EAGAIN ? " SO_RCVTIMEO timeout reached" : "");
+               << ", error: " << strerror(errno)
+               << (errno == EAGAIN ? " SO_RCVTIMEO timeout reached" : "");
     return false;
   }
 

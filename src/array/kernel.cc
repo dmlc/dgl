@@ -30,7 +30,7 @@ void SpMM(const std::string& op, const std::string& reduce,
           NDArray out,
           std::vector<NDArray> out_aux) {
   // TODO(zihao): format tuning
-  SparseFormat format = graph->SelectFormat(0, csc_code);
+  SparseFormat format = graph->SelectFormat(0, CSC_CODE);
   const auto& bcast = CalcBcastOff(op, ufeat, efeat);
 
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SpMM", {
@@ -61,7 +61,7 @@ void SDDMM(const std::string& op,
            int lhs_target,
            int rhs_target) {
   // TODO(zihao): format tuning
-  SparseFormat format = graph->SelectFormat(0, coo_code);
+  SparseFormat format = graph->SelectFormat(0, COO_CODE);
   const auto &bcast = CalcBcastOff(op, lhs, rhs);
 
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SDDMM", {
@@ -84,7 +84,7 @@ void SDDMM(const std::string& op,
 }
 
 NDArray GetEdgeMapping(HeteroGraphRef graph) {
-  SparseFormat format = graph->SelectFormat(0, csc_code);
+  SparseFormat format = graph->SelectFormat(0, CSC_CODE);
   if (format == SparseFormat::kCSC) {
     return graph.sptr()->GetCSCMatrix(0).data;
   } else {
@@ -127,6 +127,86 @@ void BackwardSegmentCmpDispatch(NDArray feat, NDArray arg, NDArray out) {
       });
     });
   });
+}
+
+std::pair<CSRMatrix, NDArray> CSRMM(
+    CSRMatrix A,
+    NDArray A_weights,
+    CSRMatrix B,
+    NDArray B_weights) {
+  CheckCtx(
+      A.indptr->ctx,
+      {A_weights, B_weights},
+      {"A's edge weights", "B's edge weights"});
+  CHECK_EQ(A.indptr->ctx, B.indptr->ctx) << "Device of two graphs must match.";
+  CHECK_EQ(A.indptr->dtype, B.indptr->dtype) << "ID types of two graphs must match.";
+  CHECK_EQ(A_weights->dtype, B_weights->dtype) << "Data types of two edge weights must match.";
+
+  std::pair<CSRMatrix, NDArray> ret;
+  // TODO(BarclayII): change to ATEN_XPU_SWITCH_CUDA once the GPU kernels are implemented
+  ATEN_XPU_SWITCH(A.indptr->ctx.device_type, XPU, "CSRMM", {
+    ATEN_ID_TYPE_SWITCH(A.indptr->dtype, IdType, {
+      ATEN_FLOAT_TYPE_SWITCH(A_weights->dtype, DType, "Edge weights", {
+        ret = CSRMM<XPU, IdType, DType>(A, A_weights, B, B_weights);
+      });
+    });
+  });
+  return ret;
+}
+
+std::pair<CSRMatrix, NDArray> CSRSum(
+    const std::vector<CSRMatrix>& A,
+    const std::vector<NDArray>& A_weights) {
+  CHECK(A.size() > 0) << "The list of graphs must not be empty.";
+  CHECK_EQ(A.size(), A_weights.size()) <<
+    "The list of edge weights must have the same length as the list of graphs.";
+  auto ctx = A[0].indptr->ctx;
+  auto idtype = A[0].indptr->dtype;
+  auto dtype = A_weights[0]->dtype;
+  for (size_t i = 0; i < A.size(); ++i) {
+    CHECK_EQ(A[i].indptr->ctx, ctx) << "The devices of all graphs must be equal.";
+    CHECK_EQ(A[i].indptr->dtype, idtype) << "The ID types of all graphs must be equal.";
+    CHECK_EQ(A[i].indices->shape[0], A_weights[i]->shape[0]) <<
+      "Shape of edge weights does not match the number of edges.";
+    CHECK_EQ(A_weights[i]->ctx, ctx) <<
+      "The devices of edge weights must be the same as that of the graphs.";
+    CHECK_EQ(A_weights[i]->dtype, dtype) <<
+      "The data types of all edge weights must be equal.";
+  }
+
+  std::pair<CSRMatrix, NDArray> ret;
+  // TODO(BarclayII): change to ATEN_XPU_SWITCH_CUDA once the GPU kernels are implemented
+  ATEN_XPU_SWITCH(ctx.device_type, XPU, "CSRSum", {
+    ATEN_ID_TYPE_SWITCH(idtype, IdType, {
+      ATEN_FLOAT_TYPE_SWITCH(dtype, DType, "Edge weights", {
+        ret = CSRSum<XPU, IdType, DType>(A, A_weights);
+      });
+    });
+  });
+  return ret;
+}
+
+NDArray CSRMask(const CSRMatrix& A, NDArray A_weights, const CSRMatrix& B) {
+  CHECK_EQ(A.indptr->ctx, A_weights->ctx) <<
+    "Device of the graph and the edge weights must match.";
+  CHECK_EQ(A.indptr->ctx, B.indptr->ctx) << "Device of two graphs must match.";
+  CHECK_EQ(A.indptr->dtype, B.indptr->dtype) << "ID types of two graphs must match.";
+  CHECK_EQ(A_weights->shape[0], A.indices->shape[0]) <<
+    "Shape of edge weights does not match the number of edges.";
+  auto ctx = A.indptr->ctx;
+  auto idtype = A.indptr->dtype;
+  auto dtype = A_weights->dtype;
+
+  NDArray ret;
+  // TODO(BarclayII): change to ATEN_XPU_SWITCH_CUDA once the GPU kernels are implemented
+  ATEN_XPU_SWITCH(ctx.device_type, XPU, "CSRMask", {
+    ATEN_ID_TYPE_SWITCH(idtype, IdType, {
+      ATEN_FLOAT_TYPE_SWITCH(dtype, DType, "Edge weights", {
+        ret = CSRMask<XPU, IdType, DType>(A, A_weights, B);
+      });
+    });
+  });
+  return ret;
 }
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
@@ -214,6 +294,64 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGetEdgeMapping")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef graph = args[0];
     *rv = GetEdgeMapping(graph);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLCSRMM")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    int M = args[0];
+    int N = args[1];
+    int P = args[2];
+    NDArray A_indptr = args[3];
+    NDArray A_indices = args[4];
+    NDArray A_data = args[5];
+    NDArray B_indptr = args[6];
+    NDArray B_indices = args[7];
+    NDArray B_data = args[8];
+    auto result = CSRMM(
+        CSRMatrix(M, N, A_indptr, A_indices),
+        A_data,
+        CSRMatrix(N, P, B_indptr, B_indices),
+        B_data);
+    List<Value> ret;
+    ret.push_back(Value(MakeValue(result.first.indptr)));
+    ret.push_back(Value(MakeValue(result.first.indices)));
+    ret.push_back(Value(MakeValue(result.second)));
+    *rv = ret;
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLCSRSum")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    int M = args[0];
+    int N = args[1];
+    List<Value> A_indptr = args[2];
+    List<Value> A_indices = args[3];
+    List<Value> A_data = args[4];
+    std::vector<NDArray> weights = ListValueToVector<NDArray>(A_data);
+    std::vector<CSRMatrix> mats(A_indptr.size());
+    for (int i = 0; i < A_indptr.size(); ++i)
+      mats[i] = CSRMatrix(M, N, A_indptr[i]->data, A_indices[i]->data);
+    auto result = CSRSum(mats, weights);
+    List<Value> ret;
+    ret.push_back(Value(MakeValue(result.first.indptr)));
+    ret.push_back(Value(MakeValue(result.first.indices)));
+    ret.push_back(Value(MakeValue(result.second)));
+    *rv = ret;
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLCSRMask")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    int M = args[0];
+    int N = args[1];
+    NDArray A_indptr = args[2];
+    NDArray A_indices = args[3];
+    NDArray A_data = args[4];
+    NDArray B_indptr = args[5];
+    NDArray B_indices = args[6];
+    auto result = CSRMask(
+        CSRMatrix(M, N, A_indptr, A_indices),
+        A_data,
+        CSRMatrix(M, N, B_indptr, B_indices));
+    *rv = result;
   });
 
 #ifdef USE_TVM

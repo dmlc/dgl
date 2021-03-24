@@ -5,6 +5,7 @@ from mxnet import nd
 from mxnet.gluon import nn
 import numpy as np
 
+from ...base import DGLError
 from ..capi import farthest_point_sampler
 
 class FarthestPointSampler(nn.Block):
@@ -24,13 +25,17 @@ class FarthestPointSampler(nn.Block):
         super(FarthestPointSampler, self).__init__()
         self.npoints = npoints
 
-    def forward(self, pos):
+    def forward(self, pos, start_idx=None):
         r"""Memory allocation and sampling
 
         Parameters
         ----------
         pos : tensor
             The positional tensor of shape (B, N, C)
+        start_idx : int, optional
+            If given, appoint the index of the starting point,
+            otherwise randomly select a point as the start point.
+            (default: None)
 
         Returns
         -------
@@ -41,7 +46,13 @@ class FarthestPointSampler(nn.Block):
         B, N, C = pos.shape
         pos = pos.reshape(-1, C)
         dist = nd.zeros((B * N), dtype=pos.dtype, ctx=ctx)
-        start_idx = nd.random.randint(0, N - 1, (B, ), dtype=np.int, ctx=ctx)
+        if start_idx is None:
+            start_idx = nd.random.randint(0, N - 1, (B, ), dtype=np.int, ctx=ctx)
+        else:
+            if start_idx >= N or start_idx < 0:
+                raise DGLError("Invalid start_idx, expected 0 <= start_idx < {}, got {}".format(
+                    N, start_idx))
+            start_idx = nd.full((B, ), start_idx, dtype=np.int, ctx=ctx)
         result = nd.zeros((self.npoints * B), dtype=np.int, ctx=ctx)
         farthest_point_sampler(pos, B, self.npoints, dist, start_idx, result)
         return result.reshape(B, self.npoints)
