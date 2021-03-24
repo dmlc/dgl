@@ -3,7 +3,6 @@ import json
 import torch as th
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
-from pyinstrument import Profiler
 
 # Load OGB-MAG.
 dataset = DglNodePropPredDataset(name='ogbn-mag')
@@ -20,9 +19,6 @@ print(hg)
 #for ntype in hg.ntypes:
 #    subg_nodes[ntype] = np.random.choice(hg.number_of_nodes(ntype), int(hg.number_of_nodes(ntype) / 5), replace=False)
 #hg = dgl.compact_graphs(dgl.node_subgraph(hg, subg_nodes))
-
-profiler = Profiler()
-profiler.start()
 
 # OGB-MAG is stored in heterogeneous format. We need to convert it into homogeneous format.
 g = dgl.to_homogeneous(hg)
@@ -85,6 +81,3 @@ for etype in hg.etypes:
     eid_ranges[etype] = [int(eid[0]), int(eid[-1] + 1)]
 with open('mag.json', 'w') as outfile:
     json.dump({'nid': nid_ranges, 'eid': eid_ranges}, outfile, indent=4)
-
-profiler.stop()
-print(profiler.output_text(unicode=True, color=True))
