@@ -21,6 +21,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.multiprocessing as mp
 from dgl.distributed import DistDataLoader
+
 #from pyinstrument import Profiler
 from dgl.distributed import DistEmbedding
 from dgl.distributed.optim import DistSparseAdagrad
@@ -40,6 +41,7 @@ class DistEmb(nn.Module):
 
     def forward(self, idx):
         return self.emb(idx)
+
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -353,8 +355,6 @@ def run(args, device, data):
         sparse_optimizer = th.optim.SparseAdam(emb_layer.module.emb.parameters())
 
     # Training loop
-    #profiler = Profiler()
-    #profiler.start()
     epoch = 0
     for epoch in range(args.num_epochs):
         sample_time = 0
