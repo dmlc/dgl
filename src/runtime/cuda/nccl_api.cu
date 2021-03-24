@@ -20,6 +20,15 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/registry.h>
 
+#define NCCL_CALL(func) \
+{ \
+  ncclResult_t result = func; \
+  if (result != ncclSuccess) { \
+      LOG(FATAL)                                                        \
+          << "NCCLError: " #func " failed with error: " << result;            \
+  } \
+}
+
 namespace dgl {
 
 using namespace kernel::cuda;
@@ -32,6 +41,7 @@ namespace {
 enum class AllToAllMode : int {
   REMAINDER = 0
 };
+
 
 template<typename T> ncclDataType_t NCCLType();
 template<> ncclDataType_t NCCLType<int32_t>() {
@@ -140,8 +150,7 @@ NCCLUniqueId::NCCLUniqueId() :
   id_()
 {
   // this ID is unique to the process, not to each call of this function
-  auto r = ncclGetUniqueId(&id_);
-  CHECK_EQ(r, ncclSuccess);
+  NCCL_CALL(ncclGetUniqueId(&id_));
 }
 
 ncclUniqueId NCCLUniqueId::Get() const
@@ -163,8 +172,7 @@ NCCLCommunicator::NCCLCommunicator(
   CHECK_LT(rank, size);
   CHECK_GE(rank, 0);
 
-  auto r = ncclCommInitRank(&comm_, size_, id, rank_);
-  CHECK_EQ(r, ncclSuccess);
+  NCCL_CALL(ncclCommInitRank(&comm_, size_, id, rank_));
 }
 
 NCCLCommunicator::~NCCLCommunicator()
@@ -185,16 +193,16 @@ void NCCLCommunicator::AllToAllV(
     const ncclDataType_t type,
     cudaStream_t stream)
 { 
-  ncclGroupStart();
+  NCCL_CALL(ncclGroupStart());
   for (int r = 0; r < size_; ++r) {
     if (send_size[r] > 0) {
-      ncclSend(send[r], send_size[r], type, r, comm_, stream);
+      NCCL_CALL(ncclSend(send[r], send_size[r], type, r, comm_, stream));
     }
     if (recv_size[r] > 0) {
-      ncclRecv(recv[r], recv_size[r], type, r, comm_, stream);
+      NCCL_CALL(ncclRecv(recv[r], recv_size[r], type, r, comm_, stream));
     }
   }
-  ncclGroupEnd();
+  NCCL_CALL(ncclGroupEnd());
 }
 
 template<typename IdType>
@@ -310,6 +318,7 @@ void GenerateSparseBuffersFromRemainder(
           num_in,
           comm_size,
           proc_id_in);
+      CUDA_CALL(cudaGetLastError());
     } else {
       // comm_size is a power of 2
       _MapProcByMaskRemainder<<<grid, block, 0, stream>>>(
@@ -317,6 +326,7 @@ void GenerateSparseBuffersFromRemainder(
           num_in,
           static_cast<IdType>(comm_size-1), // bit mask
           proc_id_in);
+      CUDA_CALL(cudaGetLastError());
     }
   }
 
@@ -361,6 +371,7 @@ void GenerateSparseBuffersFromRemainder(
         num_in,
         in_idx_buffer,
         in_value_buffer);
+    CUDA_CALL(cudaGetLastError());
   }
 
   CUDA_CALL(cudaMemsetAsync(
@@ -380,6 +391,7 @@ void GenerateSparseBuffersFromRemainder(
             num_in,
             out_counts,
             comm_size);
+      CUDA_CALL(cudaGetLastError());
     } else {
       CHECK_LE(comm_size, 1024) << "_CAPI_DGLNCCLSparseAllToAll() is not "
           "implemented for comms greater than 1024 ranks.";
@@ -389,6 +401,7 @@ void GenerateSparseBuffersFromRemainder(
             num_in,
             out_counts,
             comm_size);
+      CUDA_CALL(cudaGetLastError());
     }
   }
 }
@@ -446,13 +459,13 @@ std::pair<IdArray, NDArray> SparseExchange(
       device->AllocWorkspace(ctx, sizeof(int64_t)*(comm_size+1)));
   {
     size_t prefix_workspace_size;
-    cub::DeviceScan::ExclusiveSum(nullptr, prefix_workspace_size,
-        send_prefix, send_prefix, comm_size+1);
+    CUDA_CALL(cub::DeviceScan::ExclusiveSum(nullptr, prefix_workspace_size,
+        send_sum, send_prefix, comm_size+1));
 
     void * prefix_workspace = device->AllocWorkspace(
         ctx, prefix_workspace_size);
-    cub::DeviceScan::ExclusiveSum(prefix_workspace, prefix_workspace_size,
-        send_prefix, send_prefix, comm_size+1);
+    CUDA_CALL(cub::DeviceScan::ExclusiveSum(prefix_workspace, prefix_workspace_size,
+        send_sum, send_prefix, comm_size+1));
     device->FreeWorkspace(ctx, prefix_workspace);
   }
 
@@ -461,13 +474,13 @@ std::pair<IdArray, NDArray> SparseExchange(
       device->AllocWorkspace(ctx, sizeof(int64_t)*(comm_size+1)));
   {
     size_t prefix_workspace_size;
-    cub::DeviceScan::ExclusiveSum(nullptr, prefix_workspace_size,
-        recv_prefix, recv_prefix, comm_size+1);
+    CUDA_CALL(cub::DeviceScan::ExclusiveSum(nullptr, prefix_workspace_size,
+        recv_sum, recv_prefix, comm_size+1));
 
     void * prefix_workspace = device->AllocWorkspace(
         ctx, prefix_workspace_size);
-    cub::DeviceScan::ExclusiveSum(prefix_workspace, prefix_workspace_size,
-        recv_prefix, recv_prefix, comm_size+1);
+    CUDA_CALL(cub::DeviceScan::ExclusiveSum(prefix_workspace, prefix_workspace_size,
+        recv_sum, recv_prefix, comm_size+1));
     device->FreeWorkspace(ctx, prefix_workspace);
   }
 
@@ -482,7 +495,7 @@ std::pair<IdArray, NDArray> SparseExchange(
       send_prefix_host.size()*sizeof(*send_prefix),
       ctx,
       DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, sizeof(IdType)*8, 1},
+      DGLType{kDLInt, sizeof(*send_prefix)*8, 1},
       stream);
   device->FreeWorkspace(ctx, send_prefix);
   device->CopyDataFromTo(
@@ -493,7 +506,7 @@ std::pair<IdArray, NDArray> SparseExchange(
       recv_prefix_host.size()*sizeof(*recv_prefix),
       ctx,
       DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, sizeof(IdType)*8, 1},
+      DGLType{kDLInt, sizeof(*recv_prefix)*8, 1},
       stream);
   device->FreeWorkspace(ctx, recv_prefix);
 
