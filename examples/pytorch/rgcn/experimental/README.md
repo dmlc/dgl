@@ -5,7 +5,7 @@ This is an example of training RGCN node classification in a distributed fashion
 Before training, install python libs by pip:
 
 ```bash
-pip3 install ogb pyinstrument pyarrow
+pip3 install ogb pyarrow
 ```
 
 To train RGCN, it has four steps:
