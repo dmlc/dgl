@@ -4,6 +4,10 @@
  * \brief Implementation of wrapper around NCCL routines. 
  */
 
+
+#ifndef DGL_RUNTIME_CUDA_NCCL_API_H_
+#define DGL_RUNTIME_CUDA_NCCL_API_H_
+
 #include "nccl_api.h"
 #include "cuda_common.h"
 #include "../../kernel/cuda/atomic.cuh"
@@ -585,3 +589,5 @@ DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLSparseAllToAll")
 }
 }
 }
+
+#endif
