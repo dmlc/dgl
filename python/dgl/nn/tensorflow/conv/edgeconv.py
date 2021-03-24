@@ -77,7 +77,7 @@ class EdgeConv(layers.Layer):
         """
         self._allow_zero_in_degree = set_value
 
-    def call(self, graph, feat):
+    def call(self, g, feat):
         """
         Description
         -----------
@@ -103,9 +103,9 @@ class EdgeConv(layers.Layer):
             since no message will be passed to those nodes. This will cause invalid output.
             The error can be ignored by setting ``allow_zero_in_degree`` parameter to ``True``.
         """
-        with graph.local_scope():
+        with g.local_scope():
             if not self._allow_zero_in_degree:
-                if  tf.math.count_nonzero(graph.in_degrees() == 0) > 0:
+                if  tf.math.count_nonzero(g.in_degrees() == 0) > 0:
                     raise DGLError('There are 0-in-degree nodes in the graph, '
                                    'output for those nodes will be invalid. '
                                    'This is harmful for some applications, '
@@ -115,19 +115,19 @@ class EdgeConv(layers.Layer):
                                    'the issue. Setting ``allow_zero_in_degree`` '
                                    'to be `True` when constructing this module will '
                                    'suppress the check and let the code run.')
-        h_src, h_dst = expand_as_pair(feat, g)
-        g.srcdata['x'] = h_src
-        g.dstdata['x'] = h_dst
-        g.apply_edges(fn.v_sub_u('x', 'x', 'theta'))
-        g.edata['theta'] = self.theta(g.edata['theta'])
-        g.dstdata['phi'] = self.phi(g.dstdata['x'])
-        if not self.batch_norm:
-            g.update_all(fn.e_add_v('theta', 'phi', 'e'), fn.max('e', 'x'))
-        else:
-            g.apply_edges(fn.e_add_v('theta', 'phi', 'e'))
-            # for more comments on why global batch norm instead
-            # of batch norm within EdgeConv go to
-            # https://github.com/dmlc/dgl/blob/master/python/dgl/nn/pytorch/conv/edgeconv.py
-            g.edata['e'] = self.bn(g.edata['e'])
-            g.update_all(fn.copy_e('e', 'e'), fn.max('e', 'x'))
-        return g.dstdata['x']
+            h_src, h_dst = expand_as_pair(feat, g)
+            g.srcdata['x'] = h_src
+            g.dstdata['x'] = h_dst
+            g.apply_edges(fn.v_sub_u('x', 'x', 'theta'))
+            g.edata['theta'] = self.theta(g.edata['theta'])
+            g.dstdata['phi'] = self.phi(g.dstdata['x'])
+            if not self.batch_norm:
+                g.update_all(fn.e_add_v('theta', 'phi', 'e'), fn.max('e', 'x'))
+            else:
+                g.apply_edges(fn.e_add_v('theta', 'phi', 'e'))
+                # for more comments on why global batch norm instead
+                # of batch norm within EdgeConv go to
+                # https://github.com/dmlc/dgl/blob/master/python/dgl/nn/pytorch/conv/edgeconv.py
+                g.edata['e'] = self.bn(g.edata['e'])
+                g.update_all(fn.copy_e('e', 'e'), fn.max('e', 'x'))
+            return g.dstdata['x']
