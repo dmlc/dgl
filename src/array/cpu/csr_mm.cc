@@ -17,6 +17,7 @@ namespace aten {
 
 namespace {
 
+// TODO(BarclayII): avoid using map for sorted CSRs
 template <typename IdType>
 void CountNNZPerRow(
     const IdType* A_indptr,

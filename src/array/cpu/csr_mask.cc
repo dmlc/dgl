@@ -17,6 +17,7 @@ namespace aten {
 
 namespace {
 
+// TODO(BarclayII): avoid using map for sorted CSRs
 template <typename IdType, typename DType>
 void ComputeValues(
     const IdType* A_indptr,
