@@ -111,7 +111,8 @@ def main():
 
     test_smiles_dataset = [smiles_dataset[i] for i in split_idx['test']]
     onthefly_dataset = OnTheFlyPCQMDataset(test_smiles_dataset)
-    test_loader = DataLoader(onthefly_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+    test_loader = DataLoader(onthefly_dataset, batch_size=args.batch_size, shuffle=False,
+                             num_workers=args.num_workers, collate_fn=collate_dgl)
 
     ### automatic evaluator.
     evaluator = PCQM4MEvaluator()
