@@ -132,7 +132,7 @@ __global__ void _CountIndexByRemainder(
   #pragma unroll
   for (int i = 0; i < VALS_PER_THREAD; ++i) {
     const int64_t in_idx = offset+threadIdx.x+(i*BLOCK_SIZE);
-    local_counts[i] = in_idx < num_items ? (items[in_idx] % num_counts): MAX_BINS;
+    thread_vals[i] = in_idx < num_items ? (items[in_idx] % num_counts): MAX_BINS;
   }
 
   BlockHistogram(temp_storage).Histogram(thread_vals, local_counts);
