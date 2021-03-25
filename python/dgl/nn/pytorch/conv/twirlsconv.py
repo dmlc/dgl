@@ -1,10 +1,8 @@
+# pylint: disable=trailing-whitespace, line-too-long, missing-docstring, invalid-name, useless-super-delegation, comparison-with-itself, no-member
+
+import torch as tc
 import torch.nn as nn
 import torch.nn.functional as F
-import random
-import dgl
-from functools import partial
-import torch as tc
-from torch.nn import init
 from .... import function as fn
 
 
@@ -218,7 +216,7 @@ class Attention(nn.Module):
         self.p = p
         self.attn_dropout = attn_dropout
 
-    def reweighting(self, graph, etas):
+    def reweighting(self, graph):
 
         w = graph.edata["w"]
 
@@ -254,7 +252,7 @@ class Attention(nn.Module):
         graph.edata["w"] = graph.edata["norm_"] - 2 * graph.edata["dot_"]
 
         # apply edge distance to get edge weight
-        self.reweighting(graph, etas)
+        self.reweighting(graph)
 
         # update node degrees
         graph.update_all(fn.copy_e("w", "m"), fn.sum("m", "deg"))
