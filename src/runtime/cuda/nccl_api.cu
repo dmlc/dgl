@@ -138,7 +138,7 @@ __global__ void _CountIndexByRemainder(
   BlockHistogram(temp_storage).Histogram(thread_vals, local_counts);
 
   // write local histogram back to global memory
-  for (int i = threadIdx.x; i < num_counts; i+=threadIdx.x) {
+  for (int i = threadIdx.x; i < num_counts; i+=BLOCK_SIZE) {
     const int64_t val = local_counts[i];
     if (val > 0) {
       AtomicAdd(counts+i, val);
