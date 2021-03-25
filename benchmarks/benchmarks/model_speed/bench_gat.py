@@ -122,10 +122,4 @@ def track_time(data):
         epoch_times >= low_boundary) & (epoch_times <= high_boundary)]
     avg_valid_epoch_time = np.mean(valid_epoch_times)
 
-    # TODO: delete logging for final version
-    print(f'Number of epoch times: {len(epoch_times)}')
-    print(f'Number of valid epoch times: {len(valid_epoch_times)}')
-    print(f'Avg epoch times: {avg_epoch_time}')
-    print(f'Avg valid epoch times: {avg_valid_epoch_time}')
-
     return avg_valid_epoch_time

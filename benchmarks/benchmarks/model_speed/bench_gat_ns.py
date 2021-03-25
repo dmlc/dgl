@@ -1,15 +1,12 @@
 import time
-import traceback
 
 import dgl
 import dgl.nn.pytorch as dglnn
 import numpy as np
 import torch as th
-import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data import DataLoader
 
 from .. import utils
 
@@ -177,11 +174,5 @@ def track_time(data):
     valid_epoch_times = np.array(epoch_times)[(
         epoch_times >= low_boundary) & (epoch_times <= high_boundary)]
     avg_valid_epoch_time = np.mean(valid_epoch_times)
-
-    # TODO: delete logging for final version
-    print(f'Number of epoch times: {len(epoch_times)}')
-    print(f'Number of valid epoch times: {len(valid_epoch_times)}')
-    print(f'Avg epoch times: {avg_epoch_time}')
-    print(f'Avg valid epoch times: {avg_valid_epoch_time}')
 
     return avg_valid_epoch_time
