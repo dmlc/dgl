@@ -106,6 +106,10 @@ __global__ void _DualPermKernel(
   const int64_t tidx = blockDim.x*static_cast<int64_t>(blockIdx.x)+threadIdx.x;
   if (tidx < num_in) {
     const IdType perm_idx = perm[tidx];
+    if (perm_idx >= num_in) {
+      printf("%d/%d\n", (int)perm_idx, (int)num_in);
+    }
+    assert(perm_idx < num_in);
     out_idx[perm_idx] = in_idx[tidx];
   }
 
@@ -326,8 +330,9 @@ void GenerateSparseBuffersFromRemainder(
   const int64_t comm_bits =
       static_cast<int64_t>(std::ceil(std::log2(comm_size)));
 
-  // this should only run when we have things to send
-  CHECK_GE(comm_size, 1);
+  // this should only run when we have things to send, otherwise comm_bits
+  // will be zero, and several operations will fail
+  CHECK_GT(comm_size, 1);
 
   CUDA_CALL(cudaMemsetAsync(
       out_counts, 0, sizeof(*out_counts)*(comm_size+1), stream));
@@ -385,6 +390,7 @@ void GenerateSparseBuffersFromRemainder(
         num_in, 0, comm_bits, stream));
     device->FreeWorkspace(ctx, sort_workspace);
   }
+  device->FreeWorkspace(ctx, proc_id_out);
   device->FreeWorkspace(ctx, proc_id_in);
 
   // perform a histogram and then prefixsum on the sorted proc_id vector
@@ -461,7 +467,7 @@ std::pair<IdArray, NDArray> SparseExchange(
 
   const int64_t comm_size = comm->size();
 
-  if (false && comm_size == 1) {
+  if (comm_size == 1) {
     // nothing to do, just return original arrays
     return std::pair<IdArray, NDArray>(in_idx, in_value);
   }
