@@ -201,18 +201,19 @@ class DistSparseAdagrad(DistSparseGradOptimizer):
         """
         eps = self._eps
         clr = self._lr
+        exec_dev = grad.device
 
         # the update is non-linear so indices must be unique
         grad_indices, inverse, cnt = th.unique(idx, return_inverse=True, return_counts=True)
-        grad_values = th.zeros((grad_indices.shape[0], grad.shape[1]), device=grad.device)
+        grad_values = th.zeros((grad_indices.shape[0], grad.shape[1]), device=exec_dev)
         grad_values.index_add_(0, inverse, grad)
         grad_values = grad_values / cnt.unsqueeze(1)
         grad_sum = (grad_values * grad_values)
 
         # update grad state
-        grad_state = self._state[grad_indices]
-        grad_state += grad_sum.to(th.device('cpu'))
-        self._state[grad_indices] = grad_state
+        grad_state = self._state[grad_indices].to(exec_dev, non_blocking=True)
+        grad_state += grad_sum
+        self._state[grad_indices] = grad_state.to(th.device('cpu', non_blocking=True))
 
         # update emb
         std_values = grad_state.add_(eps).sqrt_()
