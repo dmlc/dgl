@@ -1,10 +1,13 @@
 import time
+
 import dgl
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from .. import utils
+
 
 class GraphConv(nn.Module):
     def __init__(self, in_dim, out_dim, activation=None):
@@ -19,8 +22,10 @@ class GraphConv(nn.Module):
 
     def forward(self, graph, feat):
         with graph.local_scope():
-            graph.ndata['ci'] = torch.pow(graph.out_degrees().float().clamp(min=1), -0.5)
-            graph.ndata['cj'] = torch.pow(graph.in_degrees().float().clamp(min=1), -0.5)
+            graph.ndata['ci'] = torch.pow(
+                graph.out_degrees().float().clamp(min=1), -0.5)
+            graph.ndata['cj'] = torch.pow(
+                graph.in_degrees().float().clamp(min=1), -0.5)
             graph.ndata['h'] = feat
             graph.update_all(self.mfunc, self.rfunc)
             h = graph.ndata['h']
@@ -30,12 +35,13 @@ class GraphConv(nn.Module):
             return h
 
     def mfunc(self, edges):
-        return {'m' : edges.src['h'], 'ci' : edges.src['ci']}
-    
+        return {'m': edges.src['h'], 'ci': edges.src['ci']}
+
     def rfunc(self, nodes):
         ci = nodes.mailbox['ci'].unsqueeze(2)
         newh = (nodes.mailbox['m'] * ci).sum(1) * nodes.data['cj'].unsqueeze(1)
-        return {'h' : newh}
+        return {'h': newh}
+
 
 class GCN(nn.Module):
     def __init__(self,
@@ -48,10 +54,12 @@ class GCN(nn.Module):
         super(GCN, self).__init__()
         self.layers = nn.ModuleList()
         # input layer
-        self.layers.append(GraphConv(in_feats, n_hidden, activation=activation))
+        self.layers.append(
+            GraphConv(in_feats, n_hidden, activation=activation))
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.append(GraphConv(n_hidden, n_hidden, activation=activation))
+            self.layers.append(
+                GraphConv(n_hidden, n_hidden, activation=activation))
         # output layer
         self.layers.append(GraphConv(n_hidden, n_classes))
         self.dropout = nn.Dropout(p=dropout)
@@ -64,13 +72,17 @@ class GCN(nn.Module):
             h = layer(g, h)
         return h
 
+
 @utils.benchmark('time', timeout=300)
 @utils.parametrize('data', ['cora', 'pubmed'])
 def track_time(data):
-    data = utils.process_data(data)
+    dataset = utils.process_data(data)
     device = utils.get_bench_device()
 
-    g = data[0].to(device).int()
+    g = dataset[0].to(device).int()
+
+    num_runs = 3
+    num_epochs = 200
 
     features = g.ndata['feat']
     labels = g.ndata['label']
@@ -79,7 +91,7 @@ def track_time(data):
     test_mask = g.ndata['test_mask']
 
     in_feats = features.shape[1]
-    n_classes = data.num_classes
+    n_classes = dataset.num_classes
 
     g = dgl.remove_self_loop(g)
     g = dgl.add_self_loop(g)
@@ -90,31 +102,57 @@ def track_time(data):
     norm[torch.isinf(norm)] = 0
     g.ndata['norm'] = norm.unsqueeze(1)
 
-    # create GCN model
-    model = GCN(in_feats, 16, n_classes, 1, F.relu, 0.5)
-    loss_fcn = torch.nn.CrossEntropyLoss()
+    epoch_times = []
 
-    model = model.to(device)
-    model.train()
+    for run in range(num_runs):
+        # create GCN model
+        model = GCN(in_feats, 16, n_classes, 1, F.relu, 0.5)
+        loss_fcn = torch.nn.CrossEntropyLoss()
 
-    # optimizer
-    optimizer = torch.optim.Adam(model.parameters(),
-                                 lr=1e-2,
-                                 weight_decay=5e-4)
-    # dry run
-    for epoch in range(5):
-        logits = model(g, features)
-        loss = loss_fcn(logits[train_mask], labels[train_mask])
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        model = model.to(device)
+        model.train()
 
-    with utils.Timer(device) as t:
-        for epoch in range(200):
+        # optimizer
+        optimizer = torch.optim.Adam(model.parameters(),
+                                     lr=1e-2,
+                                     weight_decay=5e-4)
+        # dry run
+        for epoch in range(5):
             logits = model(g, features)
             loss = loss_fcn(logits[train_mask], labels[train_mask])
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-    return t.elapsed_secs / 200
+        # timing
+        for epoch in range(num_epochs):
+            t0 = time.time()
+
+            logits = model(g, features)
+            loss = loss_fcn(logits[train_mask], labels[train_mask])
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            t1 = time.time()
+
+            epoch_times.append(t1 - t0)
+
+    avg_epoch_time = np.mean(epoch_times)
+    std_epoch_time = np.std(epoch_times)
+
+    std_const = 1.5
+    low_boundary = avg_epoch_time - std_epoch_time * std_const
+    high_boundary = avg_epoch_time + std_epoch_time * std_const
+
+    valid_epoch_times = np.array(epoch_times)[(
+        epoch_times >= low_boundary) & (epoch_times <= high_boundary)]
+    avg_valid_epoch_time = np.mean(valid_epoch_times)
+
+    # TODO: delete logging for final version
+    print(f'Number of epoch times: {len(epoch_times)}')
+    print(f'Number of valid epoch times: {len(valid_epoch_times)}')
+    print(f'Avg epoch times: {avg_epoch_time}')
+    print(f'Avg valid epoch times: {avg_valid_epoch_time}')
+
+    return avg_valid_epoch_time

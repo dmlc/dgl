@@ -1,16 +1,15 @@
-import dgl
 import itertools
+import time
+
+import dgl
+import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
-import torch.multiprocessing as mp
-from torch.utils.data import DataLoader
-import dgl.nn.pytorch as dglnn
 from dgl.nn import RelGraphConv
-import time
 
 from .. import utils
+
 
 class EntityClassify(nn.Module):
     """ Entity classification class for RGCN
@@ -38,6 +37,7 @@ class EntityClassify(nn.Module):
         True to use low memory implementation of relation message passing function
         trade speed with memory consumption
     """
+
     def __init__(self,
                  device,
                  num_nodes,
@@ -68,19 +68,19 @@ class EntityClassify(nn.Module):
         self.layers.append(RelGraphConv(
             self.h_dim, self.h_dim, self.num_rels, "basis",
             self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-            low_mem=self.low_mem, dropout=self.dropout, layer_norm = layer_norm))
+            low_mem=self.low_mem, dropout=self.dropout, layer_norm=layer_norm))
         # h2h
         for idx in range(self.num_hidden_layers):
             self.layers.append(RelGraphConv(
                 self.h_dim, self.h_dim, self.num_rels, "basis",
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-                low_mem=self.low_mem, dropout=self.dropout, layer_norm = layer_norm))
+                low_mem=self.low_mem, dropout=self.dropout, layer_norm=layer_norm))
         # h2o
         self.layers.append(RelGraphConv(
             self.h_dim, self.out_dim, self.num_rels, "basis",
             self.num_bases, activation=None,
             self_loop=self.use_self_loop,
-            low_mem=self.low_mem, layer_norm = layer_norm))
+            low_mem=self.low_mem, layer_norm=layer_norm))
 
     def forward(self, blocks, feats, norm=None):
         if blocks is None:
@@ -91,6 +91,7 @@ class EntityClassify(nn.Module):
             block = block.to(self.device)
             h = layer(block, h, block.edata['etype'], block.edata['norm'])
         return h
+
 
 class RelGraphEmbedLayer(nn.Module):
     r"""Embedding layer for featureless heterograph.
@@ -112,6 +113,7 @@ class RelGraphEmbedLayer(nn.Module):
     embed_name : str, optional
         Embed name
     """
+
     def __init__(self,
                  device,
                  num_nodes,
@@ -136,11 +138,13 @@ class RelGraphEmbedLayer(nn.Module):
         for ntype in range(num_of_ntype):
             if input_size[ntype] is not None:
                 input_emb_size = input_size[ntype].shape[1]
-                embed = nn.Parameter(th.Tensor(input_emb_size, self.embed_size))
+                embed = nn.Parameter(
+                    th.Tensor(input_emb_size, self.embed_size))
                 nn.init.xavier_uniform_(embed)
                 self.embeds[str(ntype)] = embed
 
-        self.node_embeds = th.nn.Embedding(node_tids.shape[0], self.embed_size, sparse=self.sparse_emb)
+        self.node_embeds = th.nn.Embedding(
+            node_tids.shape[0], self.embed_size, sparse=self.sparse_emb)
         nn.init.uniform_(self.node_embeds.weight, -1.0, 1.0)
 
     def forward(self, node_ids, node_tids, type_ids, features):
@@ -162,16 +166,19 @@ class RelGraphEmbedLayer(nn.Module):
             embeddings as the input of the next layer
         """
         tsd_ids = node_ids.to(self.node_embeds.weight.device)
-        embeds = th.empty(node_ids.shape[0], self.embed_size, device=self.device)
+        embeds = th.empty(node_ids.shape[0],
+                          self.embed_size, device=self.device)
         for ntype in range(self.num_of_ntype):
             if features[ntype] is not None:
                 loc = node_tids == ntype
-                embeds[loc] = features[ntype][type_ids[loc]].to(self.device) @ self.embeds[str(ntype)].to(self.device)
+                embeds[loc] = features[ntype][type_ids[loc]].to(
+                    self.device) @ self.embeds[str(ntype)].to(self.device)
             else:
                 loc = node_tids == ntype
                 embeds[loc] = self.node_embeds(tsd_ids[loc]).to(self.device)
 
         return embeds
+
 
 @utils.benchmark('time', 600)
 @utils.parametrize('data', ['am', 'ogbn-mag'])
@@ -188,9 +195,10 @@ def track_time(data):
     else:
         raise ValueError()
 
-    fanouts = [25,15]
+    num_runs = 3
+    fanouts = [25, 15]
     n_layers = 2
-    batch_size = 1024
+    batch_size = 64 if data == 'am' else 1024
     n_hidden = 64
     dropout = 0.5
     use_self_loop = True
@@ -224,7 +232,8 @@ def track_time(data):
     u, v, eid = g.all_edges(form='all')
 
     # global norm
-    _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
+    _, inverse_index, count = th.unique(
+        v, return_inverse=True, return_counts=True)
     degrees = count[inverse_index]
     norm = th.ones(eid.shape[0]) / degrees
     norm = norm.unsqueeze(1)
@@ -253,79 +262,105 @@ def track_time(data):
 
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
-    #
-    embed_layer = RelGraphEmbedLayer(device,
-                                     g.number_of_nodes(),
-                                     node_tids,
-                                     num_of_ntype,
-                                     node_feats,
-                                     n_hidden,
-                                     sparse_emb=True)
 
-    # create model
-    # all model params are in device.
-    model = EntityClassify(device,
-                           g.number_of_nodes(),
-                           n_hidden,
-                           num_classes,
-                           num_rels,
-                           num_bases=n_bases,
-                           num_hidden_layers=n_layers - 2,
-                           dropout=dropout,
-                           use_self_loop=use_self_loop,
-                           low_mem=low_mem,
-                           layer_norm=False)
+    epoch_times = []
 
-    embed_layer = embed_layer.to(device)
-    model = model.to(device)
+    for run in range(num_runs):
+        embed_layer = RelGraphEmbedLayer(device,
+                                         g.number_of_nodes(),
+                                         node_tids,
+                                         num_of_ntype,
+                                         node_feats,
+                                         n_hidden,
+                                         sparse_emb=True)
 
-    all_params = itertools.chain(model.parameters(), embed_layer.embeds.parameters())
-    optimizer = th.optim.Adam(all_params, lr=lr, weight_decay=l2norm)
-    emb_optimizer = th.optim.SparseAdam(list(embed_layer.node_embeds.parameters()), lr=lr)
+        # create model
+        # all model params are in device.
+        model = EntityClassify(device,
+                               g.number_of_nodes(),
+                               n_hidden,
+                               num_classes,
+                               num_rels,
+                               num_bases=n_bases,
+                               num_hidden_layers=n_layers - 2,
+                               dropout=dropout,
+                               use_self_loop=use_self_loop,
+                               low_mem=low_mem,
+                               layer_norm=False)
 
-    # dry run
-    for i, sample_data in enumerate(loader):
-        input_nodes, output_nodes, blocks = sample_data
-        feats = embed_layer(input_nodes,
-                            blocks[0].srcdata['ntype'],
-                            blocks[0].srcdata['type_id'],
-                            node_feats)
-        logits = model(blocks, feats)
-        seed_idx = blocks[-1].dstdata['type_id']
-        loss = F.cross_entropy(logits, labels[seed_idx])
-        optimizer.zero_grad()
-        emb_optimizer.zero_grad()
+        embed_layer = embed_layer.to(device)
+        model = model.to(device)
 
-        loss.backward()
-        optimizer.step()
-        emb_optimizer.step()
+        all_params = itertools.chain(
+            model.parameters(), embed_layer.embeds.parameters())
+        optimizer = th.optim.Adam(all_params, lr=lr, weight_decay=l2norm)
+        emb_optimizer = th.optim.SparseAdam(
+            list(embed_layer.node_embeds.parameters()), lr=lr)
 
-        if i >= 3:
-            break
+        # dry run
+        for i, sample_data in enumerate(loader):
+            input_nodes, output_nodes, blocks = sample_data
+            feats = embed_layer(input_nodes,
+                                blocks[0].srcdata['ntype'],
+                                blocks[0].srcdata['type_id'],
+                                node_feats)
+            logits = model(blocks, feats)
+            seed_idx = blocks[-1].dstdata['type_id']
+            loss = F.cross_entropy(logits, labels[seed_idx])
+            optimizer.zero_grad()
+            emb_optimizer.zero_grad()
 
-    print("start training...")
-    model.train()
-    embed_layer.train()
+            loss.backward()
+            optimizer.step()
+            emb_optimizer.step()
 
-    t0 = time.time()
-    for i, sample_data in enumerate(loader):
-        input_nodes, output_nodes, blocks = sample_data
-        feats = embed_layer(input_nodes,
-                            blocks[0].srcdata['ntype'],
-                            blocks[0].srcdata['type_id'],
-                            node_feats)
-        logits = model(blocks, feats)
-        seed_idx = blocks[-1].dstdata['type_id']
-        loss = F.cross_entropy(logits, labels[seed_idx])
-        optimizer.zero_grad()
-        emb_optimizer.zero_grad()
+            if i >= 4:
+                break
 
-        loss.backward()
-        optimizer.step()
-        emb_optimizer.step()
-        
-        if i >= 9:  # time 10 loops
-            break
-    t1 = time.time()
+        print("start training...")
+        model.train()
+        embed_layer.train()
 
-    return (t1 - t0) / (i + 1)
+        for i, sample_data in enumerate(loader):
+            t0 = time.time()
+
+            input_nodes, output_nodes, blocks = sample_data
+            feats = embed_layer(input_nodes,
+                                blocks[0].srcdata['ntype'],
+                                blocks[0].srcdata['type_id'],
+                                node_feats)
+            logits = model(blocks, feats)
+            seed_idx = blocks[-1].dstdata['type_id']
+            loss = F.cross_entropy(logits, labels[seed_idx])
+            optimizer.zero_grad()
+            emb_optimizer.zero_grad()
+
+            loss.backward()
+            optimizer.step()
+            emb_optimizer.step()
+
+            t1 = time.time()
+
+            epoch_times.append(t1 - t0)
+
+            if i >= 9:  # time 10 loops
+                break
+
+    avg_epoch_time = np.mean(epoch_times)
+    std_epoch_time = np.std(epoch_times)
+
+    std_const = 1.5
+    low_boundary = avg_epoch_time - std_epoch_time * std_const
+    high_boundary = avg_epoch_time + std_epoch_time * std_const
+
+    valid_epoch_times = np.array(epoch_times)[(
+        epoch_times >= low_boundary) & (epoch_times <= high_boundary)]
+    avg_valid_epoch_time = np.mean(valid_epoch_times)
+
+    # TODO: delete logging for final version
+    print(f'Number of epoch times: {len(epoch_times)}')
+    print(f'Number of valid epoch times: {len(valid_epoch_times)}')
+    print(f'Avg epoch times: {avg_epoch_time}')
+    print(f'Avg valid epoch times: {avg_valid_epoch_time}')
+
+    return avg_valid_epoch_time
