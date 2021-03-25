@@ -827,13 +827,13 @@ uint8_t UnitGraph::NumBits() const {
 }
 
 bool UnitGraph::IsMultigraph() const {
-  const SparseFormat fmt = SelectFormat(csc_code);
+  const SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
   return ptr->IsMultigraph();
 }
 
 uint64_t UnitGraph::NumVertices(dgl_type_t vtype) const {
-  const SparseFormat fmt = SelectFormat(all_code);
+  const SparseFormat fmt = SelectFormat(ALL_CODE);
   const auto ptr = GetFormat(fmt);
   // TODO(BarclayII): we have a lot of special handling for CSC.
   // Need to have a UnitGraph::CSC backend instead.
@@ -847,7 +847,7 @@ uint64_t UnitGraph::NumEdges(dgl_type_t etype) const {
 }
 
 bool UnitGraph::HasVertex(dgl_type_t vtype, dgl_id_t vid) const {
-  const SparseFormat fmt = SelectFormat(all_code);
+  const SparseFormat fmt = SelectFormat(ALL_CODE);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC)
     vtype = (vtype == SrcType()) ? DstType() : SrcType();
@@ -860,7 +860,7 @@ BoolArray UnitGraph::HasVertices(dgl_type_t vtype, IdArray vids) const {
 }
 
 bool UnitGraph::HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
-  const SparseFormat fmt = SelectFormat(csc_code);
+  const SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC)
     return ptr->HasEdgeBetween(etype, dst, src);
@@ -870,7 +870,7 @@ bool UnitGraph::HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) con
 
 BoolArray UnitGraph::HasEdgesBetween(
     dgl_type_t etype, IdArray src, IdArray dst) const {
-  const SparseFormat fmt = SelectFormat(csc_code);
+  const SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC)
     return ptr->HasEdgesBetween(etype, dst, src);
@@ -879,7 +879,7 @@ BoolArray UnitGraph::HasEdgesBetween(
 }
 
 IdArray UnitGraph::Predecessors(dgl_type_t etype, dgl_id_t dst) const {
-  const SparseFormat fmt = SelectFormat(csc_code);
+  const SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC)
     return ptr->Successors(etype, dst);
@@ -888,13 +888,13 @@ IdArray UnitGraph::Predecessors(dgl_type_t etype, dgl_id_t dst) const {
 }
 
 IdArray UnitGraph::Successors(dgl_type_t etype, dgl_id_t src) const {
-  const SparseFormat fmt = SelectFormat(csr_code);
+  const SparseFormat fmt = SelectFormat(CSR_CODE);
   const auto ptr = GetFormat(fmt);
   return ptr->Successors(etype, src);
 }
 
 IdArray UnitGraph::EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
-  const SparseFormat fmt = SelectFormat(csr_code);
+  const SparseFormat fmt = SelectFormat(CSR_CODE);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC)
     return ptr->EdgeId(etype, dst, src);
@@ -903,7 +903,7 @@ IdArray UnitGraph::EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
 }
 
 EdgeArray UnitGraph::EdgeIdsAll(dgl_type_t etype, IdArray src, IdArray dst) const {
-  const SparseFormat fmt = SelectFormat(csr_code);
+  const SparseFormat fmt = SelectFormat(CSR_CODE);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC) {
     EdgeArray edges = ptr->EdgeIdsAll(etype, dst, src);
@@ -914,7 +914,7 @@ EdgeArray UnitGraph::EdgeIdsAll(dgl_type_t etype, IdArray src, IdArray dst) cons
 }
 
 IdArray UnitGraph::EdgeIdsOne(dgl_type_t etype, IdArray src, IdArray dst) const {
-  const SparseFormat fmt = SelectFormat(csr_code);
+  const SparseFormat fmt = SelectFormat(CSR_CODE);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC) {
     return ptr->EdgeIdsOne(etype, dst, src);
@@ -924,19 +924,19 @@ IdArray UnitGraph::EdgeIdsOne(dgl_type_t etype, IdArray src, IdArray dst) const 
 }
 
 std::pair<dgl_id_t, dgl_id_t> UnitGraph::FindEdge(dgl_type_t etype, dgl_id_t eid) const {
-  const SparseFormat fmt = SelectFormat(coo_code);
+  const SparseFormat fmt = SelectFormat(COO_CODE);
   const auto ptr = GetFormat(fmt);
   return ptr->FindEdge(etype, eid);
 }
 
 EdgeArray UnitGraph::FindEdges(dgl_type_t etype, IdArray eids) const {
-  const SparseFormat fmt = SelectFormat(coo_code);
+  const SparseFormat fmt = SelectFormat(COO_CODE);
   const auto ptr = GetFormat(fmt);
   return ptr->FindEdges(etype, eids);
 }
 
 EdgeArray UnitGraph::InEdges(dgl_type_t etype, dgl_id_t vid) const {
-  const SparseFormat fmt = SelectFormat(csc_code);
+  const SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC) {
     const EdgeArray& ret = ptr->OutEdges(etype, vid);
@@ -947,7 +947,7 @@ EdgeArray UnitGraph::InEdges(dgl_type_t etype, dgl_id_t vid) const {
 }
 
 EdgeArray UnitGraph::InEdges(dgl_type_t etype, IdArray vids) const {
-  const SparseFormat fmt = SelectFormat(csc_code);
+  const SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC) {
     const EdgeArray& ret = ptr->OutEdges(etype, vids);
@@ -958,13 +958,13 @@ EdgeArray UnitGraph::InEdges(dgl_type_t etype, IdArray vids) const {
 }
 
 EdgeArray UnitGraph::OutEdges(dgl_type_t etype, dgl_id_t vid) const {
-  const SparseFormat fmt = SelectFormat(csr_code);
+  const SparseFormat fmt = SelectFormat(CSR_CODE);
   const auto ptr = GetFormat(fmt);
   return ptr->OutEdges(etype, vid);
 }
 
 EdgeArray UnitGraph::OutEdges(dgl_type_t etype, IdArray vids) const {
-  const SparseFormat fmt = SelectFormat(csr_code);
+  const SparseFormat fmt = SelectFormat(CSR_CODE);
   const auto ptr = GetFormat(fmt);
   return ptr->OutEdges(etype, vids);
 }
@@ -972,12 +972,12 @@ EdgeArray UnitGraph::OutEdges(dgl_type_t etype, IdArray vids) const {
 EdgeArray UnitGraph::Edges(dgl_type_t etype, const std::string &order) const {
   SparseFormat fmt;
   if (order == std::string("eid")) {
-    fmt = SelectFormat(coo_code);
+    fmt = SelectFormat(COO_CODE);
   } else if (order.empty()) {
     // arbitrary order
-    fmt = SelectFormat(all_code);
+    fmt = SelectFormat(ALL_CODE);
   } else if (order == std::string("srcdst")) {
-    fmt = SelectFormat(csr_code);
+    fmt = SelectFormat(CSR_CODE);
   } else {
     LOG(FATAL) << "Unsupported order request: " << order;
     return {};
@@ -991,7 +991,7 @@ EdgeArray UnitGraph::Edges(dgl_type_t etype, const std::string &order) const {
 }
 
 uint64_t UnitGraph::InDegree(dgl_type_t etype, dgl_id_t vid) const {
-  SparseFormat fmt = SelectFormat(csc_code);
+  SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC)
     return ptr->OutDegree(etype, vid);
@@ -1000,7 +1000,7 @@ uint64_t UnitGraph::InDegree(dgl_type_t etype, dgl_id_t vid) const {
 }
 
 DegreeArray UnitGraph::InDegrees(dgl_type_t etype, IdArray vids) const {
-  SparseFormat fmt = SelectFormat(csc_code);
+  SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC)
     return ptr->OutDegrees(etype, vids);
@@ -1009,38 +1009,38 @@ DegreeArray UnitGraph::InDegrees(dgl_type_t etype, IdArray vids) const {
 }
 
 uint64_t UnitGraph::OutDegree(dgl_type_t etype, dgl_id_t vid) const {
-  SparseFormat fmt = SelectFormat(csr_code);
+  SparseFormat fmt = SelectFormat(CSR_CODE);
   const auto ptr = GetFormat(fmt);
   return ptr->OutDegree(etype, vid);
 }
 
 DegreeArray UnitGraph::OutDegrees(dgl_type_t etype, IdArray vids) const {
-  SparseFormat fmt = SelectFormat(csr_code);
+  SparseFormat fmt = SelectFormat(CSR_CODE);
   const auto ptr = GetFormat(fmt);
   return ptr->OutDegrees(etype, vids);
 }
 
 DGLIdIters UnitGraph::SuccVec(dgl_type_t etype, dgl_id_t vid) const {
-  SparseFormat fmt = SelectFormat(csr_code);
+  SparseFormat fmt = SelectFormat(CSR_CODE);
   const auto ptr = GetFormat(fmt);
   return ptr->SuccVec(etype, vid);
 }
 
 DGLIdIters32 UnitGraph::SuccVec32(dgl_type_t etype, dgl_id_t vid) const {
-  SparseFormat fmt = SelectFormat(csr_code);
+  SparseFormat fmt = SelectFormat(CSR_CODE);
   const auto ptr = std::dynamic_pointer_cast<CSR>(GetFormat(fmt));
   CHECK_NOTNULL(ptr);
   return ptr->SuccVec32(etype, vid);
 }
 
 DGLIdIters UnitGraph::OutEdgeVec(dgl_type_t etype, dgl_id_t vid) const {
-  SparseFormat fmt = SelectFormat(csr_code);
+  SparseFormat fmt = SelectFormat(CSR_CODE);
   const auto ptr = GetFormat(fmt);
   return ptr->OutEdgeVec(etype, vid);
 }
 
 DGLIdIters UnitGraph::PredVec(dgl_type_t etype, dgl_id_t vid) const {
-  SparseFormat fmt = SelectFormat(csc_code);
+  SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC)
     return ptr->SuccVec(etype, vid);
@@ -1049,7 +1049,7 @@ DGLIdIters UnitGraph::PredVec(dgl_type_t etype, dgl_id_t vid) const {
 }
 
 DGLIdIters UnitGraph::InEdgeVec(dgl_type_t etype, dgl_id_t vid) const {
-  SparseFormat fmt = SelectFormat(csc_code);
+  SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::kCSC)
     return ptr->OutEdgeVec(etype, vid);
@@ -1079,7 +1079,7 @@ std::vector<IdArray> UnitGraph::GetAdj(
 
 HeteroSubgraph UnitGraph::VertexSubgraph(const std::vector<IdArray>& vids) const {
   // We prefer to generate a subgraph from out-csr.
-  SparseFormat fmt = SelectFormat(csr_code);
+  SparseFormat fmt = SelectFormat(CSR_CODE);
   HeteroSubgraph sg = GetFormat(fmt)->VertexSubgraph(vids);
   HeteroSubgraph ret;
 
@@ -1109,7 +1109,7 @@ HeteroSubgraph UnitGraph::VertexSubgraph(const std::vector<IdArray>& vids) const
 
 HeteroSubgraph UnitGraph::EdgeSubgraph(
     const std::vector<IdArray>& eids, bool preserve_nodes) const {
-  SparseFormat fmt = SelectFormat(coo_code);
+  SparseFormat fmt = SelectFormat(COO_CODE);
   auto sg = GetFormat(fmt)->EdgeSubgraph(eids, preserve_nodes);
   HeteroSubgraph ret;
 
@@ -1306,7 +1306,7 @@ HeteroGraphPtr UnitGraph::CreateHomographFrom(
 
 UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
   if (inplace)
-    if (!(formats_ & csc_code))
+    if (!(formats_ & CSC_CODE))
       LOG(FATAL) << "The graph have restricted sparse format " <<
         CodeToStr(formats_) << ", cannot create CSC matrix.";
   CSRPtr ret = in_csr_;
@@ -1335,7 +1335,7 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
 /* !\brief Return out csr. If not exist, transpose the other one.*/
 UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
   if (inplace)
-    if (!(formats_ & csr_code))
+    if (!(formats_ & CSR_CODE))
       LOG(FATAL) << "The graph have restricted sparse format " <<
         CodeToStr(formats_) << ", cannot create CSR matrix.";
   CSRPtr ret = out_csr_;
@@ -1363,7 +1363,7 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
 /* !\brief Return coo. If not exist, create from csr.*/
 UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
   if (inplace)
-    if (!(formats_ & coo_code))
+    if (!(formats_ & COO_CODE))
       LOG(FATAL) << "The graph have restricted sparse format " <<
         CodeToStr(formats_) << ", cannot create COO matrix.";
   COOPtr ret = coo_;
@@ -1413,11 +1413,11 @@ HeteroGraphPtr UnitGraph::GetAny() const {
 dgl_format_code_t UnitGraph::GetCreatedFormats() const {
   dgl_format_code_t ret = 0;
   if (in_csr_->defined())
-    ret |= csc_code;
+    ret |= CSC_CODE;
   if (out_csr_->defined())
-    ret |= csr_code;
+    ret |= CSR_CODE;
   if (coo_->defined())
-    ret |= coo_code;
+    ret |= COO_CODE;
   return ret;
 }
 
@@ -1437,7 +1437,7 @@ HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
 }
 
 HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats) const {
-  if (formats == all_code)
+  if (formats == ALL_CODE)
     return HeteroGraphPtr(
         // TODO(xiangsx) Make it as graph storage.Clone()
         new UnitGraph(meta_graph_,
@@ -1452,9 +1452,9 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats) const {
                           : nullptr,
                       formats));
   int64_t num_vtypes = NumVertexTypes();
-  if (formats & coo_code)
+  if (formats & COO_CODE)
     return CreateFromCOO(num_vtypes, GetCOO(false)->adj(), formats);
-  if (formats & csr_code)
+  if (formats & CSR_CODE)
     return CreateFromCSR(num_vtypes, GetOutCSR(false)->adj(), formats);
   return CreateFromCSC(num_vtypes, GetInCSR(false)->adj(), formats);
 }
@@ -1501,7 +1501,7 @@ GraphPtr UnitGraph::AsImmutableGraph() const {
 
 HeteroGraphPtr UnitGraph::LineGraph(bool backtracking) const {
   // TODO(xiangsx) currently we only support homogeneous graph
-  auto fmt = SelectFormat(all_code);
+  auto fmt = SelectFormat(ALL_CODE);
   switch (fmt) {
     case SparseFormat::kCOO: {
       return CreateFromCOO(1, aten::COOLineGraph(coo_->adj(), backtracking));
@@ -1541,16 +1541,16 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
     // NOTE(zihao): to be compatible with old formats.
     switch (formats_code & 0xffffffff) {
     case 0:
-      formats_ = all_code;
+      formats_ = ALL_CODE;
       break;
     case 1:
-      formats_ = coo_code;
+      formats_ = COO_CODE;
       break;
     case 2:
-      formats_ = csr_code;
+      formats_ = CSR_CODE;
       break;
     case 3:
-      formats_ = csc_code;
+      formats_ = CSC_CODE;
       break;
     default:
       LOG(FATAL) << "Load graph failed, formats code " << formats_code <<
@@ -1593,7 +1593,7 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
   fs->Write(kDGLSerialize_UnitGraphMagic);
   // Didn't write UnitGraph::meta_graph_, since it's included in the underlying
   // sparse matrix
-  auto avail_fmt = SelectFormat(all_code);
+  auto avail_fmt = SelectFormat(ALL_CODE);
   fs->Write(static_cast<int64_t>(avail_fmt));
   fs->Write(static_cast<int64_t>(formats_ | 0x100000000));
   switch (avail_fmt) {
@@ -1629,7 +1629,7 @@ UnitGraph::ToSimple() const {
   IdArray count;
   IdArray edge_map;
 
-  auto avail_fmt = SelectFormat(all_code);
+  auto avail_fmt = SelectFormat(ALL_CODE);
   switch (avail_fmt) {
     case SparseFormat::kCOO: {
       auto ret = aten::COOToSimple(GetCOO()->adj());

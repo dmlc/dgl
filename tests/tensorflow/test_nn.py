@@ -391,6 +391,30 @@ def test_gin_conv_bi(g, idtype, aggregator_type):
     h = gin(g, feat)
     assert h.shape == (g.number_of_dst_nodes(), 12)
 
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
+@pytest.mark.parametrize('out_dim', [1, 2])
+def test_edge_conv(g, idtype, out_dim):
+    g = g.astype(idtype).to(F.ctx())
+    edge_conv = nn.EdgeConv(out_dim)
+
+    h0 = F.randn((g.number_of_nodes(), 5))
+    h1 = edge_conv(g, h0)
+    assert h1.shape == (g.number_of_nodes(), out_dim)
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
+@pytest.mark.parametrize('out_dim', [1, 2])
+def test_edge_conv_bi(g, idtype, out_dim):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    edge_conv = nn.EdgeConv(out_dim)
+
+    h0 = F.randn((g.number_of_src_nodes(), 5))
+    x0 = F.randn((g.number_of_dst_nodes(), 5))
+    h1 = edge_conv(g, (h0, x0))
+    assert h1.shape == (g.number_of_dst_nodes(), out_dim)
+
 def myagg(alist, dsttype):
     rst = alist[0]
     for i in range(1, len(alist)):
@@ -512,6 +536,7 @@ if __name__ == '__main__':
     test_sgc_conv()
     test_appnp_conv()
     test_gin_conv()
+    test_edge_conv()
     # test_agnn_conv()
     # test_gated_graph_conv()
     # test_nn_conv()
