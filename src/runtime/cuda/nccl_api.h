@@ -84,6 +84,7 @@ class NCCLCommunicator : public runtime::Object {
    * @tparam DType The type of value.
    * @param send_idx The set of indexes to send on the device.
    * @param send_value The set of values to send on the device.
+   * @param num_feat The number of values per index.
    * @param send_prefix The exclusive prefix sum of elements to send on the
    * host.
    * @param recv_idx The set of indexes to recieve on the device.
@@ -96,6 +97,7 @@ class NCCLCommunicator : public runtime::Object {
   void SparseAllToAll(
           const IdType * send_idx,
           const DType * send_value,
+          const int64_t num_feat,
           const int64_t * send_prefix,
           IdType * recv_idx,
           DType * recv_value,
