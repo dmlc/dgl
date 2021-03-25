@@ -250,8 +250,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
     if dev_id >= 0:
         th.cuda.set_device(dev_id)
         print("Creating comm {}/{} with {}".format(proc_id, n_gpus, nccl_id))
-        #nccl_comm = nccl.Communicator(n_gpus, proc_id, nccl_id)
-    nccl_comm = None
+        nccl_comm = nccl.Communicator(n_gpus, proc_id, nccl_id)
+    #nccl_comm = None
 
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.

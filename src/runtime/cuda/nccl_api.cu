@@ -327,7 +327,7 @@ void GenerateSparseBuffersFromRemainder(
       static_cast<int64_t>(std::ceil(std::log2(comm_size)));
 
   // this should only run when we have things to send
-  CHECK_GT(comm_size, 1);
+  CHECK_GE(comm_size, 1);
 
   CUDA_CALL(cudaMemsetAsync(
       out_counts, 0, sizeof(*out_counts)*(comm_size+1), stream));
@@ -391,10 +391,6 @@ void GenerateSparseBuffersFromRemainder(
 
   // finally, permute the input arrays
   // sort the data into continuous buffers for sending
-  IdType * in_idx_buffer =
-      static_cast<IdType*>(device->AllocWorkspace(ctx, sizeof(IdType)*num_in));
-  DType * in_value_buffer =
-      static_cast<DType*>(device->AllocWorkspace(ctx, sizeof(DType)*num_feat*num_in));
   {
     const dim3 block(256);
     const dim3 grid((num_in+block.x-1)/block.x);
@@ -405,8 +401,8 @@ void GenerateSparseBuffersFromRemainder(
         perm_out,
         num_in,
         num_feat,
-        in_idx_buffer,
-        in_value_buffer);
+        out_idx,
+        out_value);
     CUDA_CALL(cudaGetLastError());
     CUDA_CALL(cudaStreamSynchronize(stream)); // delete me
   }
@@ -421,7 +417,7 @@ void GenerateSparseBuffersFromRemainder(
     if (comm_size <= 128) {
       _CountIndexByRemainder<IdType, 128, BLOCK_SIZE, TILE_SIZE><<<
           grid, block, 0, stream>>>(
-            in_idx,
+            out_idx,
             num_in,
             out_counts,
             comm_size);
@@ -432,7 +428,7 @@ void GenerateSparseBuffersFromRemainder(
           "implemented for comms greater than 1024 ranks.";
       _CountIndexByRemainder<IdType, 1024, BLOCK_SIZE, TILE_SIZE><<<
           grid, block, 0, stream>>>(
-            in_idx,
+            out_idx,
             num_in,
             out_counts,
             comm_size);
@@ -465,7 +461,7 @@ std::pair<IdArray, NDArray> SparseExchange(
 
   const int64_t comm_size = comm->size();
 
-  if (comm_size == 1) {
+  if (false && comm_size == 1) {
     // nothing to do, just return original arrays
     return std::pair<IdArray, NDArray>(in_idx, in_value);
   }
@@ -562,9 +558,6 @@ std::pair<IdArray, NDArray> SparseExchange(
   // allocate output space
   cudaEventSynchronize(d2h);
   cudaEventDestroy(d2h);
-
-  std::cerr << "recv_prefix_host.back() = " << recv_prefix_host.back() << std::endl;
-  std::cerr << "send_prefix_host.back() = " << send_prefix_host.back() << std::endl;
 
   IdArray recv_idx = aten::NewIdArray(recv_prefix_host.back(), ctx, sizeof(IdType)*8);
 
