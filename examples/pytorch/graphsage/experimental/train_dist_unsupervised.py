@@ -23,7 +23,7 @@ import torch.multiprocessing as mp
 from dgl.distributed import DistDataLoader
 
 #from pyinstrument import Profiler
-from dgl.distributed import DistEmbedding
+from dgl.distributed import NodeEmbedding
 from dgl.distributed.optim import DistSparseAdagrad
 
 def initializer(shape, dtype):
@@ -32,12 +32,9 @@ def initializer(shape, dtype):
     return arr
 
 class DistEmb(nn.Module):
-    def __init__(self, num_nodes, emb_size, dgl_emb=True):
+    def __init__(self, num_nodes, emb_size):
         super().__init__()
-        if dgl_emb:
-            self.emb = DistEmbedding(num_nodes, emb_size, name='sage', init_func=initializer)
-        else:
-            self.emb = nn.Embedding(num_nodes, emb_size, sparse=True)
+        self.emb = NodeEmbedding(num_nodes, emb_size, name='sage', init_func=initializer)
 
     def forward(self, idx):
         return self.emb(idx)
@@ -335,24 +332,19 @@ def run(args, device, data):
         drop_last=False)
 
     # Define model and optimizer
-    emb_layer = DistEmb(g.num_nodes(), args.num_hidden, args.dgl_emb)
+    emb_layer = DistEmb(g.num_nodes(), args.num_hidden)
     model = DistSAGE(args.num_hidden, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
     if not args.standalone:
         if args.num_gpus == -1:
             model = th.nn.parallel.DistributedDataParallel(model)
-            if args.dgl_emb is False:
-                emb_layer = th.nn.parallel.DistributedDataParallel(emb_layer)
         else:
             dev_id = g.rank() % args.num_gpus
             model = th.nn.parallel.DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
     loss_fcn = CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    if args.dgl_emb:
-        sparse_optimizer = DistSparseAdagrad([emb_layer.emb], lr=args.lr)
-    else:
-        sparse_optimizer = th.optim.SparseAdam(emb_layer.module.emb.parameters())
+    sparse_optimizer = DistSparseAdagrad([emb_layer.emb], lr=args.lr)
 
     # Training loop
     epoch = 0
@@ -512,8 +504,6 @@ if __name__ == '__main__':
         help="sharing neg nodes for positive nodes")
     parser.add_argument('--remove_edge', default=False, action='store_true',
         help="whether to remove edges during sampling")
-    parser.add_argument('--dgl_emb', default=False, action='store_true',
-        help='whether to use dgl sparse embedding')
     args = parser.parse_args()
     assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')), \
     'The num_workers should be the same value with DGL_NUM_SAMPLER.'

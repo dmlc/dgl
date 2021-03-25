@@ -5,18 +5,18 @@ import torch as th
 import torch.distributed as dist
 
 from ...dist_tensor import DistTensor
-from ...sparse_emb import DistEmbedding
+from ...sparse_emb import NodeEmbedding
 from .utils import alltoallv_cpu, alltoall_cpu
 
 class DistSparseGradOptimizer(abc.ABC):
     r''' The abstract dist sparse optimizer.
 
-    Note: dgl dist sparse optimizer only work with dgl.distributed.DistEmbedding
+    Note: dgl dist sparse optimizer only work with dgl.distributed.NodeEmbedding
 
     Parameters
     ----------
-    params : list of DistEmbedding
-        The list of DistEmbedding.
+    params : list of NodeEmbedding
+        The list of NodeEmbedding.
     lr : float
         The learning rate.
     '''
@@ -30,8 +30,8 @@ class DistSparseGradOptimizer(abc.ABC):
         self._opt_meta = {}
 
         for emb in params:
-            assert isinstance(emb, DistEmbedding), \
-                'DGL DistSparseOptimizer only supports dgl.distributed.DistEmbedding'
+            assert isinstance(emb, NodeEmbedding), \
+                'DGL DistSparseOptimizer only supports dgl.distributed.NodeEmbedding'
 
             if self._rank is None:
                 self._rank = emb.rank
@@ -51,6 +51,7 @@ class DistSparseGradOptimizer(abc.ABC):
         with th.no_grad():
             local_indics = {emb.name: [] for emb in self._params}
             local_grads = {emb.name: [] for emb in self._params}
+            device = th.device('cpu')
             for emb in self._params:
                 name = emb._tensor.name
                 kvstore = emb._tensor.kvstore
@@ -61,6 +62,7 @@ class DistSparseGradOptimizer(abc.ABC):
                 grads = [t[1].grad.data for t in trace]
                 idics = th.cat(idics, dim=0)
                 grads = th.cat(grads, dim=0)
+                device = grads.device
 
                 # will send grad to each corresponding trainer
                 if self._world_size > 1:
@@ -93,10 +95,10 @@ class DistSparseGradOptimizer(abc.ABC):
                     alltoall_cpu(self._rank, self._world_size, gather_list, idx_split_size)
                     # use cpu until we have GPU alltoallv
                     idx_gather_list = [th.empty((int(num_emb),), dtype=idics.dtype) for num_emb in gather_list]
-                    alltoallv_cpu(self._rank, self._world_size, idics_list, idx_gather_list, idics.dtype)
+                    alltoallv_cpu(self._rank, self._world_size, idx_gather_list, idics_list, idics.dtype)
                     local_indics[name] = idx_gather_list
                     grad_gather_list = [th.empty((int(num_emb), grads.shape[1]), dtype=grads.dtype) for num_emb in gather_list]
-                    alltoallv_cpu(self._rank, self._world_size, grad_list, grad_gather_list, idics.dtype)
+                    alltoallv_cpu(self._rank, self._world_size, grad_gather_list, grad_list, idics.dtype)
                     local_grads[name] = grad_gather_list
                 else:
                     local_indics[name] = [idics]
@@ -114,7 +116,8 @@ class DistSparseGradOptimizer(abc.ABC):
 
                 idx = th.cat(local_indics[name], dim=0)
                 grad = th.cat(local_grads[name], dim=0)
-                self.update(idx, grad, emb)
+                self.update(idx.to(device, non_blocking=True),
+                            grad.to(device, non_blocking=True), emb)
 
         # synchronized gradient update
         if self._world_size > 1:
@@ -132,7 +135,7 @@ class DistSparseGradOptimizer(abc.ABC):
             Index of the embeddings to be updated.
         grad : tensor
             Gradient of each embedding.
-        emb : dgl.distributed.DistEmbedding
+        emb : dgl.distributed.NodeEmbedding
             Sparse node embedding to update.
         """
 
@@ -149,7 +152,7 @@ class DistSparseAdagrad(DistSparseGradOptimizer):
     r''' Distributed Node embedding optimizer using the Adagrad algorithm.
 
     This optimizer implements a distributed sparse version of Adagrad algorithm for
-    optimizing :class:`dgl.distributed.DistEmbedding`. Being sparse means it only updates
+    optimizing :class:`dgl.distributed.NodeEmbedding`. Being sparse means it only updates
     the embeddings whose gradients have updates, which are usually a very
     small portion of the total embeddings.
 
@@ -161,8 +164,8 @@ class DistSparseAdagrad(DistSparseGradOptimizer):
 
     Parameters
     ----------
-    params : list[dgl.distributed.DistEmbedding]
-        The list of dgl.distributed.DistEmbedding.
+    params : list[dgl.distributed.NodeEmbedding]
+        The list of dgl.distributed.NodeEmbedding.
     lr : float
         The learning rate.
     eps : float, Optional
@@ -174,8 +177,8 @@ class DistSparseAdagrad(DistSparseGradOptimizer):
         self._eps = eps
         # We need to register a state sum for each embedding in the kvstore.
         for emb in params:
-            assert isinstance(emb, DistEmbedding), \
-                'SparseAdagrad only supports dgl.distributed.DistEmbedding'
+            assert isinstance(emb, NodeEmbedding), \
+                'SparseAdagrad only supports dgl.distributed.NodeEmbedding'
 
             name = emb.name + "_sum"
             self._state = DistTensor((emb.num_embeddings, emb.embedding_dim), th.float32, name,
@@ -208,10 +211,10 @@ class DistSparseAdagrad(DistSparseGradOptimizer):
 
         # update grad state
         grad_state = self._state[grad_indices]
-        grad_state += grad_sum
+        grad_state += grad_sum.to(th.device('cpu'))
         self._state[grad_indices] = grad_state
 
         # update emb
         std_values = grad_state.add_(eps).sqrt_()
         tmp = clr * grad_values / std_values
-        emb._tensor[grad_indices] -= tmp
+        emb._tensor[grad_indices] -= tmp.to(th.device('cpu'))
