@@ -1,7 +1,7 @@
 """Module for sparse matrix operators."""
 # pylint: disable= invalid-name
 from __future__ import absolute_import
-import dgl.ndarray as nd
+from . import ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
@@ -366,5 +366,124 @@ def _bwd_segment_cmp(feat, arg, m):
                                  to_dgl_nd_for_write(out))
     return out
 
+class CSRMatrix(object):
+    """Device- and backend-agnostic sparse matrix in CSR format.
+
+    Parameters
+    ----------
+    data : Tensor
+        The data array.
+    indices : Tensor
+        The column indices array.
+    indptr : Tensor
+        The row index pointer array.
+    num_rows : int
+        The number of rows.
+    num_cols : int
+        The number of columns.
+    """
+    def __init__(self, data, indices, indptr, num_rows, num_cols):
+        self.indptr = indptr
+        self.indices = indices
+        self.data = data
+        self.shape = (num_rows, num_cols)
+
+def csrmm(A, B):
+    """Sparse-sparse matrix multiplication.
+
+    This is an internal function whose interface is subject to changes.
+
+    Parameters
+    ----------
+    A : dgl.sparse.CSRMatrix
+        The left operand
+    B : dgl.sparse.CSRMatrix
+        The right operand
+
+    Returns
+    -------
+    dgl.sparse.CSRMatrix
+        The result
+    """
+    A_indptr = F.zerocopy_from_numpy(A.indptr)
+    A_indices = F.zerocopy_from_numpy(A.indices)
+    A_data = F.zerocopy_from_numpy(A.data)
+    B_indptr = F.zerocopy_from_numpy(B.indptr)
+    B_indices = F.zerocopy_from_numpy(B.indices)
+    B_data = F.zerocopy_from_numpy(B.data)
+    C_indptr, C_indices, C_data = _CAPI_DGLCSRMM(
+        A.shape[0], A.shape[1], B.shape[1],
+        F.to_dgl_nd(A_indptr),
+        F.to_dgl_nd(A_indices),
+        F.to_dgl_nd(A_data),
+        F.to_dgl_nd(B_indptr),
+        F.to_dgl_nd(B_indices),
+        F.to_dgl_nd(B_data))
+    return CSRMatrix(
+        F.from_dgl_nd(C_data),
+        F.from_dgl_nd(C_indices),
+        F.from_dgl_nd(C_indptr),
+        A.shape[0],
+        B.shape[1])
+
+def csrsum(As):
+    """Sparse-sparse matrix summation.
+
+    This is an internal function whose interface is subject to changes.
+
+    Parameters
+    ----------
+    As : List[dgl.sparse.CSRMatrix]
+        List of scipy sparse matrices in CSR format.
+
+    Returns
+    -------
+    dgl.sparse.CSRMatrix
+        The result
+    """
+    A_indptr = [F.zerocopy_from_numpy(x.indptr) for x in As]
+    A_indices = [F.zerocopy_from_numpy(x.indices) for x in As]
+    A_data = [F.zerocopy_from_numpy(x.data) for x in As]
+    C_indptr, C_indices, C_data = _CAPI_DGLCSRSum(
+        As[0].shape[0], As[0].shape[1],
+        [F.to_dgl_nd(x) for x in A_indptr],
+        [F.to_dgl_nd(x) for x in A_indices],
+        [F.to_dgl_nd(x) for x in A_data])
+    return CSRMatrix(
+        F.from_dgl_nd(C_data),
+        F.from_dgl_nd(C_indices),
+        F.from_dgl_nd(C_indptr),
+        As[0].shape[0], As[0].shape[1])
+
+def csrmask(A, B):
+    """Sparse-sparse matrix masking operation that computes ``A[B != 0]``.
+
+    This is an internal function whose interface is subject to changes.
+
+    Parameters
+    ----------
+    A : dgl.sparse.CSRMatrix
+        The left operand
+    B : dgl.sparse.CSRMatrix
+        The right operand
+
+    Returns
+    -------
+    Tensor
+        The result
+    """
+    A_indptr = F.zerocopy_from_numpy(A.indptr)
+    A_indices = F.zerocopy_from_numpy(A.indices)
+    A_data = F.zerocopy_from_numpy(A.data)
+    B_indptr = F.zerocopy_from_numpy(B.indptr)
+    B_indices = F.zerocopy_from_numpy(B.indices)
+    B_data = _CAPI_DGLCSRMask(
+        A.shape[0], A.shape[1],
+        F.to_dgl_nd(A_indptr),
+        F.to_dgl_nd(A_indices),
+        F.to_dgl_nd(A_data),
+        F.to_dgl_nd(B_indptr),
+        F.to_dgl_nd(B_indices))
+    return F.from_dgl_nd(B_data)
 
 _init_api("dgl.sparse")
