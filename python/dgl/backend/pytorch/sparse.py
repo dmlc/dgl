@@ -1,8 +1,30 @@
 import torch as th
+from distutils.version import LooseVersion
 from ...base import is_all, ALL
-from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp
+from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp, _scatter_add
 
-__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce']
+if LooseVersion(th.__version__) >= LooseVersion("1.6.0"):
+    from torch.cuda.amp import custom_fwd, custom_bwd
+else:
+    import functools
+    """PyTorch natively supports automatic mixed precision in DGL 1.6, we redefine
+    the custom_fwd and custom_bwd function to be compatible with DGL 1.5.
+    """
+    def custom_fwd(**kwargs):
+        def custom_fwd_inner(fwd):
+            @functools.wraps(fwd)
+            def decorate_fwd(*args, **kwargs):
+                return fwd(*args, **kwargs)
+            return decorate_fwd
+        return custom_fwd_inner
+
+    def custom_bwd(bwd):
+        @functools.wraps(bwd)
+        def decorate_bwd(*args, **kwargs):
+            return bwd(*args, **kwargs)
+        return decorate_bwd
+
+__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce', 'scatter_add']
 
 
 def _reduce_grad(grad, shape):
@@ -60,6 +82,7 @@ def _expand(x, shape):
 
 class GSpMM(th.autograd.Function):
     @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, op, reduce_op, X, Y):
         out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
         ctx.backward_cache = gidx, op, reduce_op
@@ -67,6 +90,7 @@ class GSpMM(th.autograd.Function):
         return out
 
     @staticmethod
+    @custom_bwd
     def backward(ctx, dZ):
         gidx, op, reduce_op = ctx.backward_cache
         X, Y, argX, argY = ctx.saved_tensors
@@ -120,6 +144,7 @@ class GSpMM(th.autograd.Function):
 
 class GSDDMM(th.autograd.Function):
     @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, op, X, Y, lhs_target, rhs_target):
         out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
         ctx.backward_cache = gidx, op, lhs_target, rhs_target
@@ -127,6 +152,7 @@ class GSDDMM(th.autograd.Function):
         return out
 
     @staticmethod
+    @custom_bwd
     def backward(ctx, dZ):
         gidx, op, lhs_target, rhs_target = ctx.backward_cache
         X, Y = ctx.saved_tensors
@@ -179,6 +205,7 @@ class GSDDMM(th.autograd.Function):
 
 class EdgeSoftmax(th.autograd.Function):
     @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, score, eids, norm_by):
         """Forward function.
 
@@ -208,6 +235,7 @@ class EdgeSoftmax(th.autograd.Function):
         return out
 
     @staticmethod
+    @custom_bwd
     def backward(ctx, grad_out):
         """Backward function.
 
@@ -233,6 +261,7 @@ class EdgeSoftmax(th.autograd.Function):
 
 class SegmentReduce(th.autograd.Function):
     @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, op, x, offsets):
         y, arg = _segment_reduce(op, x, offsets)
         ctx.save_for_backward(arg, offsets)
@@ -240,20 +269,38 @@ class SegmentReduce(th.autograd.Function):
         return y
 
     @staticmethod
+    @custom_bwd
     def backward(ctx, dy):
         op = ctx.backward_cache
         arg, offsets = ctx.saved_tensors
         m = offsets[-1].item()
         if op == 'sum':
-            offsets = offsets[1:-1]
+            offsets = offsets[1:]
+            # To address the issue of trailing zeros, related issue:
+            # https://github.com/dmlc/dgl/pull/2610
             indices = th.zeros(
-                (m,), device=offsets.device, dtype=offsets.dtype)
+                (m + 1,), device=offsets.device, dtype=offsets.dtype)
             indices.scatter_add_(0, offsets, th.ones_like(offsets))
-            indices = th.cumsum(indices, -1)
+            indices = th.cumsum(indices, -1)[:-1]
             dx = dy[indices]
         else:
             dx = _bwd_segment_cmp(dy, arg, m)
         return None, dx, None
+
+
+class ScatterAdd(th.autograd.Function):
+    @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
+    def forward(ctx, x, idx, m):
+        y = _scatter_add(x, idx, m)
+        ctx.save_for_backward(idx)
+        return y
+
+    @staticmethod
+    @custom_bwd
+    def backward(ctx, dy):
+        idx = ctx.saved_tensors
+        return dy[idx], None, None
 
 
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
@@ -270,3 +317,6 @@ def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
 
 def segment_reduce(op, x, offsets):
     return SegmentReduce.apply(op, x, offsets)
+
+def scatter_add(x, idx, m):
+    return ScatterAdd.apply(x, idx, m)

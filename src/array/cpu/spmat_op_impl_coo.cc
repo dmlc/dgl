@@ -3,6 +3,7 @@
  * \file array/cpu/spmat_op_impl.cc
  * \brief CPU implementation of COO sparse matrix operators
  */
+#include <dmlc/omp.h>
 #include <vector>
 #include <unordered_set>
 #include <unordered_map>
@@ -296,14 +297,16 @@ template COOMatrix COOTranspose<kDLCPU, int64_t>(COOMatrix coo);
 
 ///////////////////////////// COOToCSR /////////////////////////////
 
-// complexity: time O(NNZ), space O(1)
+// complexity: time O(NNZ), space O(1) if the coo is row sorted,
+// time O(NNZ/p + N), space O(NNZ + N*p) otherwise, where p is the number of
+// threads.
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix COOToCSR(COOMatrix coo) {
   const int64_t N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
-  const IdType* row_data = static_cast<IdType*>(coo.row->data);
-  const IdType* col_data = static_cast<IdType*>(coo.col->data);
-  const IdType* data = COOHasData(coo)? static_cast<IdType*>(coo.data->data) : nullptr;
+  const IdType* const row_data = static_cast<IdType*>(coo.row->data);
+  const IdType* const col_data = static_cast<IdType*>(coo.col->data);
+  const IdType* const data = COOHasData(coo)? static_cast<IdType*>(coo.data->data) : nullptr;
 
   NDArray ret_indptr = NDArray::Empty({N + 1}, coo.row->dtype, coo.row->ctx);
   NDArray ret_indices;
@@ -311,11 +314,6 @@ CSRMatrix COOToCSR(COOMatrix coo) {
 
   bool row_sorted = coo.row_sorted;
   bool col_sorted = coo.col_sorted;
-  if (!row_sorted) {
-    // It is possible that the flag is simply not set (default value is false),
-    // so we still perform a linear scan to check the flag.
-    std::tie(row_sorted, col_sorted) = COOIsSorted(coo);
-  }
 
   if (row_sorted) {
     // compute indptr
@@ -340,32 +338,84 @@ CSRMatrix COOToCSR(COOMatrix coo) {
     ret_data = coo.data;
   } else {
     // compute indptr
-    IdType* Bp = static_cast<IdType*>(ret_indptr->data);
-    *(Bp++) = 0;
-    std::fill(Bp, Bp + N, 0);
-    for (int64_t i = 0; i < NNZ; ++i) {
-      Bp[row_data[i]]++;
-    }
-
-    // cumsum
-    for (int64_t i = 0, cumsum = 0; i < N; ++i) {
-      const IdType temp = Bp[i];
-      Bp[i] = cumsum;
-      cumsum += temp;
-    }
+    IdType* const Bp = static_cast<IdType*>(ret_indptr->data);
+    Bp[0] = 0;
 
     // compute indices and data
     ret_indices = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
     ret_data = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
-    IdType* Bi = static_cast<IdType*>(ret_indices->data);
-    IdType* Bx = static_cast<IdType*>(ret_data->data);
+    IdType* const Bi = static_cast<IdType*>(ret_indices->data);
+    IdType* const Bx = static_cast<IdType*>(ret_data->data);
 
-    for (int64_t i = 0; i < NNZ; ++i) {
-      const IdType r = row_data[i];
-      Bi[Bp[r]] = col_data[i];
-      Bx[Bp[r]] = data? data[i] : i;
-      Bp[r]++;
+    // the offset within each row, that each thread will write to
+    std::vector<std::vector<IdType>> local_ptrs;
+    std::vector<int64_t> thread_prefixsum;
+
+#pragma omp parallel
+    {
+      const int num_threads = omp_get_num_threads();
+      const int thread_id = omp_get_thread_num();
+      CHECK_LT(thread_id, num_threads);
+
+      const int64_t nz_chunk = (NNZ+num_threads-1)/num_threads;
+      const int64_t nz_start = thread_id*nz_chunk;
+      const int64_t nz_end = std::min(NNZ, nz_start+nz_chunk);
+
+      const int64_t n_chunk = (N+num_threads-1)/num_threads;
+      const int64_t n_start = thread_id*n_chunk;
+      const int64_t n_end = std::min(N, n_start+n_chunk);
+
+#pragma omp master
+      {
+        local_ptrs.resize(num_threads);
+        thread_prefixsum.resize(num_threads+1);
+      }
+
+#pragma omp barrier
+      local_ptrs[thread_id].resize(N, 0);
+
+      for (int64_t i = nz_start; i < nz_end; ++i) {
+        ++local_ptrs[thread_id][row_data[i]];
+      }
+
+#pragma omp barrier
+      // compute prefixsum in parallel
+      int64_t sum = 0;
+      for (int64_t i = n_start; i < n_end; ++i) {
+        IdType tmp = 0;
+        for (int j = 0; j < num_threads; ++j) {
+          std::swap(tmp, local_ptrs[j][i]);
+          tmp += local_ptrs[j][i];
+        }
+        sum += tmp;
+        Bp[i+1] = sum;
+      }
+      thread_prefixsum[thread_id+1] = sum;
+
+#pragma omp barrier
+#pragma omp master
+      {
+        for (int64_t i = 0; i < num_threads; ++i) {
+          thread_prefixsum[i+1] += thread_prefixsum[i];
+        }
+        CHECK_EQ(thread_prefixsum[num_threads], NNZ);
+      }
+#pragma omp barrier
+
+      sum = thread_prefixsum[thread_id];
+      for (int64_t i = n_start; i < n_end; ++i) {
+        Bp[i+1] += sum;
+      }
+
+#pragma omp barrier
+      for (int64_t i = nz_start; i < nz_end; ++i) {
+        const IdType r = row_data[i];
+        const int64_t index = Bp[r] + local_ptrs[thread_id][r]++;
+        Bi[index] = col_data[i];
+        Bx[index] = data ? data[i] : i;
+      }
     }
+    CHECK_EQ(Bp[N], NNZ);
   }
 
   return CSRMatrix(coo.num_rows, coo.num_cols,

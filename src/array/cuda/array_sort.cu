@@ -4,9 +4,9 @@
  * \brief Array sort GPU implementation
  */
 #include <dgl/array.h>
-#include <cub/cub.cuh>
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
+#include "./dgl_cub.cuh"
 
 namespace dgl {
 using runtime::NDArray;
@@ -14,7 +14,7 @@ namespace aten {
 namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
-std::pair<IdArray, IdArray> Sort(IdArray array) {
+std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits) {
   const auto& ctx = array->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
   const int64_t nitems = array->shape[0];
@@ -27,23 +27,27 @@ std::pair<IdArray, IdArray> Sort(IdArray array) {
   IdType* keys_out = sorted_array.Ptr<IdType>();
   int64_t* values_out = sorted_idx.Ptr<int64_t>();
 
+  if (num_bits == 0) {
+    num_bits = sizeof(IdType)*8;
+  }
+
   // Allocate workspace
   size_t workspace_size = 0;
   cub::DeviceRadixSort::SortPairs(nullptr, workspace_size,
-      keys_in, keys_out, values_in, values_out, nitems);
+      keys_in, keys_out, values_in, values_out, nitems, 0, num_bits);
   void* workspace = device->AllocWorkspace(ctx, workspace_size);
 
   // Compute
   cub::DeviceRadixSort::SortPairs(workspace, workspace_size,
-      keys_in, keys_out, values_in, values_out, nitems);
+      keys_in, keys_out, values_in, values_out, nitems, 0, num_bits);
 
   device->FreeWorkspace(ctx, workspace);
 
   return std::make_pair(sorted_array, sorted_idx);
 }
 
-template std::pair<IdArray, IdArray> Sort<kDLGPU, int32_t>(IdArray);
-template std::pair<IdArray, IdArray> Sort<kDLGPU, int64_t>(IdArray);
+template std::pair<IdArray, IdArray> Sort<kDLGPU, int32_t>(IdArray, int num_bits);
+template std::pair<IdArray, IdArray> Sort<kDLGPU, int64_t>(IdArray, int num_bits);
 
 }  // namespace impl
 }  // namespace aten

@@ -11,7 +11,8 @@ from . import utils
 
 __all__ = ['batch', 'unbatch', 'batch_hetero', 'unbatch_hetero']
 
-def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
+def batch(graphs, ndata=ALL, edata=ALL, *,
+          node_attrs=None, edge_attrs=None):
     r"""Batch a collection of :class:`DGLGraph` s into one graph for more efficient
     graph computation.
 
@@ -165,7 +166,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
         raise DGLError('Invalid argument edata: must be a string list but got {}.'.format(
             type(edata)))
     if any(g.is_block for g in graphs):
-        raise DGLError("Batching a block is not supported.")
+        raise DGLError("Batching a MFG is not supported.")
 
     relations = list(sorted(graphs[0].canonical_etypes))
     relation_ids = [graphs[0].get_etype_id(r) for r in relations]
@@ -191,9 +192,10 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     # Batch node feature
     if ndata is not None:
         for ntype_id, ntype in zip(ntype_ids, ntypes):
+            all_empty = all(g._graph.number_of_nodes(ntype_id) == 0 for g in graphs)
             frames = [
                 g._node_frames[ntype_id] for g in graphs
-                if g._graph.number_of_nodes(ntype_id) > 0]
+                if g._graph.number_of_nodes(ntype_id) > 0 or all_empty]
             # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently
             # we allow empty graphs to have no features during batching.
             ret_feat = _batch_feat_dicts(frames, ndata, 'nodes["{}"].data'.format(ntype))
@@ -202,9 +204,10 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     # Batch edge feature
     if edata is not None:
         for etype_id, etype in zip(relation_ids, relations):
+            all_empty = all(g._graph.number_of_edges(etype_id) == 0 for g in graphs)
             frames = [
                 g._edge_frames[etype_id] for g in graphs
-                if g._graph.number_of_edges(etype_id) > 0]
+                if g._graph.number_of_edges(etype_id) > 0 or all_empty]
             # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently
             # we allow empty graphs to have no features during batching.
             ret_feat = _batch_feat_dicts(frames, edata, 'edges[{}].data'.format(etype))
@@ -425,4 +428,4 @@ def unbatch_hetero(*args, **kwargs):
     """DEPREACTED: please use dgl.unbatch """
     dgl_warning('From v0.5, DGLHeteroGraph is merged into DGLGraph. You can safely'
                 ' replace dgl.unbatch_hetero with dgl.unbatch')
-    return batch(*args, **kwargs)
+    return unbatch(*args, **kwargs)

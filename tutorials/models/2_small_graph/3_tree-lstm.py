@@ -1,12 +1,20 @@
 """
 .. _model-tree-lstm:
 
-Tutorial: Tree-LSTM in DGL
+Tree-LSTM in DGL
 ==========================
 
 **Author**: Zihao Ye, Qipeng Guo, `Minjie Wang
 <https://jermainewang.github.io/>`_, `Jake Zhao
 <https://cs.nyu.edu/~jakezhao/>`_, Zheng Zhang
+
+.. warning::
+
+    The tutorial aims at gaining insights into the paper, with code as a mean
+    of explanation. The implementation thus is NOT optimized for running
+    efficiency. For recommended implementation, please refer to the `official
+    examples <https://github.com/dmlc/dgl/tree/master/examples>`_.
+
 """
  
 ##############################################################################

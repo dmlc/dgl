@@ -96,21 +96,14 @@ follows:
     import dgl
     import torch
 
-    from torch.utils.data import DataLoader
+    from dgl.dataloading import GraphDataLoader
     
     # load data
     dataset = QM7bDataset()
     num_labels = dataset.num_labels
     
-    # create collate_fn
-    def _collate_fn(batch):
-        graphs, labels = batch
-        g = dgl.batch(graphs)
-        labels = torch.tensor(labels, dtype=torch.long)
-        return g, labels
-    
     # create dataloaders
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=_collate_fn)
+    dataloader = GraphDataLoader(dataset, batch_size=1, shuffle=True)
     
     # training
     for epoch in range(100):
