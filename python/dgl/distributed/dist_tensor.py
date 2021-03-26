@@ -126,6 +126,7 @@ class DistTensor:
                     + 'its first dimension does not match the number of nodes or edges ' \
                     + 'of a distributed graph or there does not exist a distributed graph.'
 
+        self._tensor_name = name
         self._part_policy = part_policy
         assert part_policy.get_size() == shape[0], \
                 'The partition policy does not match the input shape.'
@@ -218,3 +219,14 @@ class DistTensor:
             The name of the tensor.
         '''
         return self._name
+
+    @property
+    def tensor_name(self):
+        '''Return the tensor name
+
+        Returns
+        -------
+        str
+            The name of the tensor.
+        '''
+        return self._tensor_name

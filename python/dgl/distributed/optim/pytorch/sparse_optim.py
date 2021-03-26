@@ -53,7 +53,7 @@ class DistSparseGradOptimizer(abc.ABC):
             local_grads = {emb.name: [] for emb in self._params}
             device = th.device('cpu')
             for emb in self._params:
-                name = emb._tensor.name
+                name = emb._tensor.tensor_name
                 kvstore = emb._tensor.kvstore
                 trace = emb._trace
                 trainers_per_server = self._world_size // kvstore.num_servers
@@ -112,7 +112,7 @@ class DistSparseGradOptimizer(abc.ABC):
 
             # do local update
             for emb in self._params:
-                name = emb._tensor.name
+                name = emb._tensor.tensor_name
 
                 idx = th.cat(local_indics[name], dim=0)
                 grad = th.cat(local_grads[name], dim=0)
