@@ -136,4 +136,7 @@ def track_time(data):
                 loss.backward()
                 optimizer.step()
 
+            if step >= 9:  # time 10 loops
+                break
+
     return timer.average_epoch_time
