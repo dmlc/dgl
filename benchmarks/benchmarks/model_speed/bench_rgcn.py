@@ -105,7 +105,7 @@ def track_time(data, lowmem, use_type_count):
     # since the nodes are featureless, the input feature is then the node id.
     feats = torch.arange(num_nodes, device=device)
 
-    timer = utils.ModelSpeedTimer(std_const=1.5)
+    timer = utils.ModelSpeedTimer()
 
     for run in range(num_runs):
         # create model

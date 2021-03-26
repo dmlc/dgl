@@ -417,7 +417,7 @@ def track_time(data):
         collate_fn=collator.collate_test,
         num_workers=num_workers)
 
-    timer = utils.ModelSpeedTimer(std_const=1.5)
+    timer = utils.ModelSpeedTimer()
 
     for run in range(num_runs):
         # Model

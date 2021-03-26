@@ -63,7 +63,7 @@ def track_time(data):
     g = dgl.remove_self_loop(g)
     g = dgl.add_self_loop(g)
 
-    timer = utils.ModelSpeedTimer(std_const=1.5)
+    timer = utils.ModelSpeedTimer()
 
     for run in range(num_runs):
         # create model

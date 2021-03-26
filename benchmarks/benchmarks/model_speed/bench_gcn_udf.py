@@ -99,7 +99,7 @@ def track_time(data):
     norm[torch.isinf(norm)] = 0
     g.ndata['norm'] = norm.unsqueeze(1)
 
-    timer = utils.ModelSpeedTimer(std_const=1.5)
+    timer = utils.ModelSpeedTimer()
 
     for run in range(num_runs):
         # create GCN model

@@ -85,7 +85,7 @@ def track_time(data):
         drop_last=False,
         num_workers=num_workers)
 
-    timer = utils.ModelSpeedTimer(std_const=1.5)
+    timer = utils.ModelSpeedTimer()
 
     for run in range(num_runs):
         # Define model and optimizer
