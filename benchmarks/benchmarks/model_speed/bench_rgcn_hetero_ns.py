@@ -282,7 +282,7 @@ def track_time(data):
         hg, {category: train_idx}, sampler,
         batch_size=batch_size, shuffle=True, num_workers=4)
 
-    epoch_times = []
+    timer = utils.ModelSpeedTimer()
 
     for run in range(num_runs):
         embed_layer = RelGraphEmbed(
@@ -328,36 +328,20 @@ def track_time(data):
         sparse_optimizer.zero_grad()
 
         for i, (input_nodes, seeds, blocks) in enumerate(loader):
-            t0 = time.time()
-
-            blocks = [blk.to(device) for blk in blocks]
-            # we only predict the nodes with type "category"
-            seeds = seeds[category]
-            emb = embed_layer(blocks[0])
-            lbl = labels[seeds].to(device)
-            emb = {k: e.to(device) for k, e in emb.items()}
-            logits = model(emb, blocks)[category]
-            loss = F.cross_entropy(logits, lbl)
-            loss.backward()
-            optimizer.step()
-            sparse_optimizer.step()
-
-            t1 = time.time()
-
-            epoch_times.append(t1 - t0)
+            with timer as t:
+                blocks = [blk.to(device) for blk in blocks]
+                # we only predict the nodes with type "category"
+                seeds = seeds[category]
+                emb = embed_layer(blocks[0])
+                lbl = labels[seeds].to(device)
+                emb = {k: e.to(device) for k, e in emb.items()}
+                logits = model(emb, blocks)[category]
+                loss = F.cross_entropy(logits, lbl)
+                loss.backward()
+                optimizer.step()
+                sparse_optimizer.step()
 
             if i >= 9:  # time 10 loops
                 break
 
-    avg_epoch_time = np.mean(epoch_times)
-    std_epoch_time = np.std(epoch_times)
-
-    std_const = 1.5
-    low_boundary = avg_epoch_time - std_epoch_time * std_const
-    high_boundary = avg_epoch_time + std_epoch_time * std_const
-
-    valid_epoch_times = np.array(epoch_times)[(
-        epoch_times >= low_boundary) & (epoch_times <= high_boundary)]
-    avg_valid_epoch_time = np.mean(valid_epoch_times)
-
-    return avg_valid_epoch_time
+    return timer.average_epoch_time

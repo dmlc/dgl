@@ -263,7 +263,7 @@ def track_time(data):
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
 
-    epoch_times = []
+    timer = utils.ModelSpeedTimer()
 
     for run in range(num_runs):
         embed_layer = RelGraphEmbedLayer(device,
@@ -322,39 +322,23 @@ def track_time(data):
         embed_layer.train()
 
         for i, sample_data in enumerate(loader):
-            t0 = time.time()
+            with timer as t:
+                input_nodes, output_nodes, blocks = sample_data
+                feats = embed_layer(input_nodes,
+                                    blocks[0].srcdata['ntype'],
+                                    blocks[0].srcdata['type_id'],
+                                    node_feats)
+                logits = model(blocks, feats)
+                seed_idx = blocks[-1].dstdata['type_id']
+                loss = F.cross_entropy(logits, labels[seed_idx])
+                optimizer.zero_grad()
+                emb_optimizer.zero_grad()
 
-            input_nodes, output_nodes, blocks = sample_data
-            feats = embed_layer(input_nodes,
-                                blocks[0].srcdata['ntype'],
-                                blocks[0].srcdata['type_id'],
-                                node_feats)
-            logits = model(blocks, feats)
-            seed_idx = blocks[-1].dstdata['type_id']
-            loss = F.cross_entropy(logits, labels[seed_idx])
-            optimizer.zero_grad()
-            emb_optimizer.zero_grad()
-
-            loss.backward()
-            optimizer.step()
-            emb_optimizer.step()
-
-            t1 = time.time()
-
-            epoch_times.append(t1 - t0)
+                loss.backward()
+                optimizer.step()
+                emb_optimizer.step()
 
             if i >= 9:  # time 10 loops
                 break
 
-    avg_epoch_time = np.mean(epoch_times)
-    std_epoch_time = np.std(epoch_times)
-
-    std_const = 1.5
-    low_boundary = avg_epoch_time - std_epoch_time * std_const
-    high_boundary = avg_epoch_time + std_epoch_time * std_const
-
-    valid_epoch_times = np.array(epoch_times)[(
-        epoch_times >= low_boundary) & (epoch_times <= high_boundary)]
-    avg_valid_epoch_time = np.mean(valid_epoch_times)
-
-    return avg_valid_epoch_time
+    return timer.average_epoch_time

@@ -139,7 +139,7 @@ def track_time(data, num_negs, batch_size):
         pin_memory=True,
         num_workers=num_workers)
 
-    epoch_times = []
+    timer = utils.ModelSpeedTimer()
 
     for run in range(num_runs):
         # Define model and optimizer
@@ -173,37 +173,21 @@ def track_time(data, num_negs, batch_size):
         iter_tput = []
 
         for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
-            t0 = time.time()
+            with timer as t:
+                # Load the input features as well as output labels
+                batch_inputs = load_subtensor(g, input_nodes, device)
 
-            # Load the input features as well as output labels
-            batch_inputs = load_subtensor(g, input_nodes, device)
-
-            pos_graph = pos_graph.to(device)
-            neg_graph = neg_graph.to(device)
-            blocks = [block.int().to(device) for block in blocks]
-            # Compute loss and prediction
-            batch_pred = model(blocks, batch_inputs)
-            loss = loss_fcn(batch_pred, pos_graph, neg_graph)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            t1 = time.time()
-
-            epoch_times.append(t1 - t0)
+                pos_graph = pos_graph.to(device)
+                neg_graph = neg_graph.to(device)
+                blocks = [block.int().to(device) for block in blocks]
+                # Compute loss and prediction
+                batch_pred = model(blocks, batch_inputs)
+                loss = loss_fcn(batch_pred, pos_graph, neg_graph)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
             if step >= 9:  # time 10 loops
                 break
 
-    avg_epoch_time = np.mean(epoch_times)
-    std_epoch_time = np.std(epoch_times)
-
-    std_const = 1.5
-    low_boundary = avg_epoch_time - std_epoch_time * std_const
-    high_boundary = avg_epoch_time + std_epoch_time * std_const
-
-    valid_epoch_times = np.array(epoch_times)[(
-        epoch_times >= low_boundary) & (epoch_times <= high_boundary)]
-    avg_valid_epoch_time = np.mean(valid_epoch_times)
-
-    return avg_valid_epoch_time
+    return timer.average_epoch_time

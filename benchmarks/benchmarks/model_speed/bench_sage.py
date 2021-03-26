@@ -66,7 +66,7 @@ def track_time(data):
     g = dgl.remove_self_loop(g)
     g = dgl.add_self_loop(g)
 
-    epoch_times = []
+    timer = utils.ModelSpeedTimer()
 
     for run in range(num_runs):
         # create model
@@ -91,27 +91,11 @@ def track_time(data):
 
         # timing
         for epoch in range(num_epochs):
-            t0 = time.time()
+            with timer as t:
+                logits = model(g, features)
+                loss = loss_fcn(logits[train_mask], labels[train_mask])
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
-            logits = model(g, features)
-            loss = loss_fcn(logits[train_mask], labels[train_mask])
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            t1 = time.time()
-
-            epoch_times.append(t1 - t0)
-
-    avg_epoch_time = np.mean(epoch_times)
-    std_epoch_time = np.std(epoch_times)
-
-    std_const = 1.5
-    low_boundary = avg_epoch_time - std_epoch_time * std_const
-    high_boundary = avg_epoch_time + std_epoch_time * std_const
-
-    valid_epoch_times = np.array(epoch_times)[(
-        epoch_times >= low_boundary) & (epoch_times <= high_boundary)]
-    avg_valid_epoch_time = np.mean(valid_epoch_times)
-
-    return avg_valid_epoch_time
+    return timer.average_epoch_time

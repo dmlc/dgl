@@ -420,7 +420,7 @@ def track_time(data):
         collate_fn=collator.collate_test,
         num_workers=num_workers)
 
-    epoch_times = []
+    timer = utils.ModelSpeedTimer()
 
     for run in range(num_runs):
         # Model
@@ -449,35 +449,19 @@ def track_time(data):
 
         # For each batch of head-tail-negative triplets...
         for batch_id, (pos_graph, neg_graph, blocks) in enumerate(dataloader):
-            t0 = time.time()
+            with timer as t:
+                # Copy to GPU
+                for i in range(len(blocks)):
+                    blocks[i] = blocks[i].to(device)
+                pos_graph = pos_graph.to(device)
+                neg_graph = neg_graph.to(device)
 
-            # Copy to GPU
-            for i in range(len(blocks)):
-                blocks[i] = blocks[i].to(device)
-            pos_graph = pos_graph.to(device)
-            neg_graph = neg_graph.to(device)
-
-            loss = model(pos_graph, neg_graph, blocks).mean()
-            opt.zero_grad()
-            loss.backward()
-            opt.step()
-
-            t1 = time.time()
-
-            epoch_times.append(t1 - t0)
+                loss = model(pos_graph, neg_graph, blocks).mean()
+                opt.zero_grad()
+                loss.backward()
+                opt.step()
 
             if batch_id >= 9:  # time 10 loops
                 break
 
-    avg_epoch_time = np.mean(epoch_times)
-    std_epoch_time = np.std(epoch_times)
-
-    std_const = 1.5
-    low_boundary = avg_epoch_time - std_epoch_time * std_const
-    high_boundary = avg_epoch_time + std_epoch_time * std_const
-
-    valid_epoch_times = np.array(epoch_times)[(
-        epoch_times >= low_boundary) & (epoch_times <= high_boundary)]
-    avg_valid_epoch_time = np.mean(valid_epoch_times)
-
-    return avg_valid_epoch_time
+    return timer.average_epoch_time

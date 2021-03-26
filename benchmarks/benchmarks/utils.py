@@ -527,6 +527,46 @@ def benchmark(track_type, timeout=60):
 # Timer
 #####################################
 
+class ModelSpeedTimer:
+    def __init__(self, std_const: float) -> None:
+        self._std_const = std_const
+        self._start = 0
+        self._stop = 0
+        self._epoch_times = []
+
+    def __enter__(self):
+        self._start = default_timer()
+
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self._stop = default_timer()
+
+        self._epoch_times.append(self._stop - self._start)
+
+    @property
+    def average_epoch_time(self) -> float:
+        avg_epoch_time = np.mean(self._epoch_times)
+        std_epoch_time = np.std(self._epoch_times)
+
+        low_boundary = avg_epoch_time - std_epoch_time * self._std_const
+        high_boundary = avg_epoch_time + std_epoch_time * self._std_const
+
+        valid_epoch_times = np.array(self._epoch_times)[(
+            self._epoch_times >= low_boundary) & (self._epoch_times <= high_boundary)]
+
+        avg_valid_epoch_time = np.mean(valid_epoch_times)
+        std_valid_epoch_time = np.std(valid_epoch_times)
+
+        print(
+            f'Number of epoch times: {len(self._epoch_times)}\n'
+            f'Number of valid epoch times: {len(valid_epoch_times)}\n'
+            f'Standard deviation of epoch times: {std_epoch_time}\n'
+            f'Standard deviation of valid epoch times: {std_valid_epoch_time}'
+        )
+
+        return avg_valid_epoch_time
+
 
 class Timer:
     def __init__(self, device=None):
