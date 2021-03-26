@@ -263,7 +263,7 @@ def track_time(data):
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
 
-    timer = utils.ModelSpeedTimer()
+    timer = utils.ModelSpeedTimer(std_const=1.5)
 
     for run in range(num_runs):
         embed_layer = RelGraphEmbedLayer(device,

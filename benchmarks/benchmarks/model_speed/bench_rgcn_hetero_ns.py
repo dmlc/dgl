@@ -282,7 +282,7 @@ def track_time(data):
         hg, {category: train_idx}, sampler,
         batch_size=batch_size, shuffle=True, num_workers=4)
 
-    timer = utils.ModelSpeedTimer()
+    timer = utils.ModelSpeedTimer(std_const=1.5)
 
     for run in range(num_runs):
         embed_layer = RelGraphEmbed(

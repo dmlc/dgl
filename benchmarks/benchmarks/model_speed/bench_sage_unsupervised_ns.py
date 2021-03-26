@@ -139,7 +139,7 @@ def track_time(data, num_negs, batch_size):
         pin_memory=True,
         num_workers=num_workers)
 
-    timer = utils.ModelSpeedTimer()
+    timer = utils.ModelSpeedTimer(std_const=1.5)
 
     for run in range(num_runs):
         # Define model and optimizer
