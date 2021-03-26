@@ -527,9 +527,46 @@ def benchmark(track_type, timeout=60):
 # Timer
 #####################################
 
+
 class ModelSpeedTimer:
-    def __init__(self, std_const: float) -> None:
-        self._std_const = std_const
+    """Timer context manager for model_speed benchmarks.
+
+    Timer records epoch times and calculates the final average epoch time
+    taking into account only the values laying in the boundaries.
+
+    .. math::
+        low_boundary = avg_epoch_time - std_epoch_time * std_const
+        high_boundary = avg_epoch_time + std_epoch_time * std_const
+
+        low_boundary <= epoch_time <= high_boundary
+
+    Attributes
+    ----------
+    standard_deviation_constant : float, default=1.5
+        Value of the standard deviation factor for calculation of boundaries.
+
+    Methods
+    -------
+    average_epoch_time : property
+        Calculates and returns the final average epoch time.
+
+    Examples
+    --------
+
+    .. code::
+        timer = utils.ModelSpeedTimer()
+
+        for epoch in range(num_epochs):
+            with timer as t:
+                model_forward_pass()
+                model_backpropagation()
+
+        return timer.average_epoch_time
+
+    """
+
+    def __init__(self, standard_deviation_constant: float = 1.5) -> None:
+        self._std_const = standard_deviation_constant
         self._start = 0
         self._stop = 0
         self._epoch_times = []
