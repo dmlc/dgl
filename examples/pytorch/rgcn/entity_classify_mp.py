@@ -27,6 +27,8 @@ from dgl.nn import RelGraphConv
 from utils import thread_wrapped_func
 import tqdm
 
+from torch.cuda import nvtx
+
 from ogb.nodeproppred import DglNodePropPredDataset
 
 class EntityClassify(nn.Module):
@@ -247,6 +249,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
                                           rank=proc_id)
 
 
+    nccl_comm = None
     if dev_id >= 0:
         th.cuda.set_device(dev_id)
         print("Creating comm {}/{} with {}".format(proc_id, n_gpus, nccl_id))
@@ -335,8 +338,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
     test_time = 0
     last_val_acc = 0.0
     do_test = False
-    if n_gpus > 1 and n_cpus - args.num_workers > 0:
-        th.set_num_threads(n_cpus-args.num_workers)
+    #if n_gpus > 1 and n_cpus - args.num_workers > 0:
+    #    th.set_num_threads(n_cpus-args.num_workers)
     for epoch in range(args.n_epochs):
         tstart = time.time()
         model.train()
@@ -357,8 +360,10 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
                 emb_optimizer.zero_grad()
 
             loss.backward()
+            nvtx.range_push("emb_optimizer")
             if emb_optimizer is not None:
                 emb_optimizer.step()
+            nvtx.range_pop()
             optimizer.step()
             t2 = time.time()
 
@@ -441,9 +446,6 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
                                                   np.mean(forward_time[len(forward_time) // 4:])))
     print("{}/{} Mean backward time: {:4f}".format(proc_id, n_gpus,
                                                    np.mean(backward_time[len(backward_time) // 4:])))
-    if proc_id == 0:
-        print("Final Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss))
-        print("Train {}s, valid {}s, test {}s".format(train_time, validation_time, test_time))
 
 def main(args, devices):
     # load graph data

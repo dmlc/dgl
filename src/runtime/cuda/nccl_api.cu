@@ -106,9 +106,6 @@ __global__ void _DualPermKernel(
   const int64_t tidx = blockDim.x*static_cast<int64_t>(blockIdx.x)+threadIdx.x;
   if (tidx < num_in) {
     const IdType perm_idx = perm[tidx];
-    if (perm_idx >= num_in) {
-      printf("%d/%d\n", (int)perm_idx, (int)num_in);
-    }
     assert(perm_idx < num_in);
     out_idx[perm_idx] = in_idx[tidx];
   }
@@ -142,21 +139,23 @@ __global__ void _CountIndexByRemainder(
 
   typedef cub::BlockHistogram<IdType, BLOCK_SIZE, VALS_PER_THREAD, MAX_BINS> BlockHistogram;
 
-  __shared__ IdType local_counts[MAX_BINS+1];
+  __shared__ IdType local_counts[MAX_BINS];
   __shared__ typename BlockHistogram::TempStorage temp_storage;
   IdType thread_vals[VALS_PER_THREAD];
 
   const int64_t offset = TILE_SIZE*blockIdx.x;
 
-  assert(num_counts <= MAX_BINS);
+  assert(num_counts < MAX_BINS);
 
   #pragma unroll
   for (int i = 0; i < VALS_PER_THREAD; ++i) {
     const int64_t in_idx = offset+threadIdx.x+(i*BLOCK_SIZE);
-    thread_vals[i] = in_idx < num_items ? (items[in_idx] % num_counts): MAX_BINS;
+    thread_vals[i] = in_idx < num_items ? (items[in_idx] % num_counts): MAX_BINS-1;
   }
 
   BlockHistogram(temp_storage).Histogram(thread_vals, local_counts);
+
+  __syncthreads();
 
   // write local histogram back to global memory
   for (int i = threadIdx.x; i < num_counts; i+=BLOCK_SIZE) {
@@ -357,7 +356,6 @@ void GenerateSparseBuffersFromRemainder(
           comm_size,
           proc_id_in);
       CUDA_CALL(cudaGetLastError());
-      CUDA_CALL(cudaStreamSynchronize(stream)); // delete me
     } else {
       // comm_size is a power of 2
       _MapProcByMaskRemainder<<<grid, block, 0, stream>>>(
@@ -366,7 +364,6 @@ void GenerateSparseBuffersFromRemainder(
           static_cast<IdType>(comm_size-1), // bit mask
           proc_id_in);
       CUDA_CALL(cudaGetLastError());
-      CUDA_CALL(cudaStreamSynchronize(stream)); // delete me
     }
   }
 
@@ -410,7 +407,6 @@ void GenerateSparseBuffersFromRemainder(
         out_idx,
         out_value);
     CUDA_CALL(cudaGetLastError());
-    CUDA_CALL(cudaStreamSynchronize(stream)); // delete me
   }
 
   // Count the number of values to be sent to each processor 
@@ -420,7 +416,7 @@ void GenerateSparseBuffersFromRemainder(
     const dim3 block(BLOCK_SIZE);
     const dim3 grid((num_in+TILE_SIZE-1)/TILE_SIZE);
 
-    if (comm_size <= 128) {
+    if (comm_size < 128) {
       _CountIndexByRemainder<IdType, 128, BLOCK_SIZE, TILE_SIZE><<<
           grid, block, 0, stream>>>(
             out_idx,
@@ -428,7 +424,6 @@ void GenerateSparseBuffersFromRemainder(
             out_counts,
             comm_size);
       CUDA_CALL(cudaGetLastError());
-    CUDA_CALL(cudaStreamSynchronize(stream)); // delete me
     } else {
       CHECK_LE(comm_size, 1024) << "_CAPI_DGLNCCLSparseAllToAll() is not "
           "implemented for comms greater than 1024 ranks.";
@@ -439,7 +434,6 @@ void GenerateSparseBuffersFromRemainder(
             out_counts,
             comm_size);
       CUDA_CALL(cudaGetLastError());
-    CUDA_CALL(cudaStreamSynchronize(stream)); // delete me
     }
   }
 }
@@ -459,6 +453,8 @@ std::pair<IdArray, NDArray> SparseExchange(
   // TODO(dlasalle): Get the stream from the device context.
   cudaStream_t stream = 0;
 
+  CHECK_EQ(in_idx->ndim, 1);
+
   const int64_t num_in = in_idx->shape[0];
   int64_t num_feat = 1;
   for (int d = 1; d < in_value->ndim; ++d) {
@@ -472,14 +468,12 @@ std::pair<IdArray, NDArray> SparseExchange(
     return std::pair<IdArray, NDArray>(in_idx, in_value);
   }
 
-  CUDA_CALL(cudaStreamSynchronize(stream)); // delete me
-
   IdType * send_idx = static_cast<IdType*>(device->AllocWorkspace(ctx,
       num_in*sizeof(IdType)));
   DType * send_value = static_cast<DType*>(device->AllocWorkspace(ctx,
       num_in*num_feat*sizeof(DType)));
   int64_t * send_sum = static_cast<int64_t*>(device->AllocWorkspace(ctx,
-      comm_size*sizeof(int64_t)));
+      (comm_size+1)*sizeof(int64_t)));
 
   CHECK_EQ(mode_id, static_cast<int>(AllToAllMode::REMAINDER));
   GenerateSparseBuffersFromRemainder(
@@ -495,11 +489,6 @@ std::pair<IdArray, NDArray> SparseExchange(
       send_sum,
       stream);
 
-  // communicate the amount to send
-  int64_t * recv_sum = static_cast<int64_t*>(
-      device->AllocWorkspace(ctx, sizeof(int64_t)*(comm_size+1)));
-  comm->AllToAll(send_sum, recv_sum, 1, stream);
-
   // compute the prefix sum of the send values
   int64_t * send_prefix = static_cast<int64_t*>(
       device->AllocWorkspace(ctx, sizeof(int64_t)*(comm_size+1)));
@@ -514,6 +503,25 @@ std::pair<IdArray, NDArray> SparseExchange(
         send_sum, send_prefix, comm_size+1));
     device->FreeWorkspace(ctx, prefix_workspace);
   }
+
+  std::vector<int64_t> send_prefix_host(comm_size+1);
+  device->CopyDataFromTo(
+      send_prefix,
+      0,
+      send_prefix_host.data(),
+      0,
+      send_prefix_host.size()*sizeof(*send_prefix),
+      ctx,
+      DGLContext{kDLCPU, 0},
+      DGLType{kDLInt, sizeof(*send_prefix)*8, 1},
+      stream);
+  device->FreeWorkspace(ctx, send_prefix);
+  CHECK_EQ(send_prefix_host.back(), num_in);
+
+  // communicate the amount to send
+  int64_t * recv_sum = static_cast<int64_t*>(
+      device->AllocWorkspace(ctx, sizeof(int64_t)*(comm_size+1)));
+  comm->AllToAll(send_sum, recv_sum, 1, stream);
 
   // compute the prefix sum of the recv values
   int64_t * recv_prefix = static_cast<int64_t*>(
@@ -531,19 +539,7 @@ std::pair<IdArray, NDArray> SparseExchange(
   }
 
   // finally copy the prefixsum sum down to the host
-  std::vector<int64_t> send_prefix_host(comm_size+1);
   std::vector<int64_t> recv_prefix_host(comm_size+1);
-  device->CopyDataFromTo(
-      send_prefix,
-      0,
-      send_prefix_host.data(),
-      0,
-      send_prefix_host.size()*sizeof(*send_prefix),
-      ctx,
-      DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, sizeof(*send_prefix)*8, 1},
-      stream);
-  device->FreeWorkspace(ctx, send_prefix);
   device->CopyDataFromTo(
       recv_prefix,
       0,
