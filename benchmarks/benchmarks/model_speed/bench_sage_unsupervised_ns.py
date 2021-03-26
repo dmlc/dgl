@@ -1,5 +1,3 @@
-import time
-
 import dgl
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn

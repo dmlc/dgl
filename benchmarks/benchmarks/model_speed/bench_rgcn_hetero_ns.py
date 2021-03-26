@@ -1,9 +1,7 @@
 import itertools
-import time
 
 import dgl
 import dgl.nn.pytorch as dglnn
-import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
@@ -308,7 +306,6 @@ def track_time(data):
             blocks = [blk.to(device) for blk in blocks]
             # we only predict the nodes with type "category"
             seeds = seeds[category]
-            batch_tic = time.time()
             emb = embed_layer(blocks[0])
             lbl = labels[seeds].to(device)
             emb = {k: e.to(device) for k, e in emb.items()}

@@ -1,8 +1,6 @@
 import itertools
-import time
 
 import dgl
-import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
