@@ -213,9 +213,9 @@ class DistSparseAdagrad(DistSparseGradOptimizer):
         # update grad state
         grad_state = self._state[grad_indices].to(exec_dev, non_blocking=True)
         grad_state += grad_sum
-        self._state[grad_indices] = grad_state.to(th.device('cpu', non_blocking=True))
+        self._state[grad_indices] = grad_state.to(th.device('cpu'), non_blocking=True)
 
         # update emb
         std_values = grad_state.add_(eps).sqrt_()
         tmp = clr * grad_values / std_values
-        emb._tensor[grad_indices] -= tmp.to(th.device('cpu'))
+        emb._tensor[grad_indices] -= tmp.to(th.device('cpu'), non_blocking=True)

@@ -82,12 +82,12 @@ class NodeEmbedding:
         self._optm_state = None # track optimizer state
         self._part_policy = part_policy
 
-    def __call__(self, idx):
+    def __call__(self, idx, device=th.device('cpu')):
         idx = utils.toindex(idx).tousertensor()
-        emb = self._tensor[idx]
+        emb = self._tensor[idx].to(device, non_blocking=True)
         if F.is_recording():
             emb = F.attach_grad(emb)
-            self._trace.append((idx, emb))
+            self._trace.append((idx.to(device, non_blocking=True), emb))
         return emb
 
     def reset_trace(self):
