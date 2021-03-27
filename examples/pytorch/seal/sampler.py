@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, Dataset
 from dgl import DGLGraph, NID
 from dgl.dataloading.negative_sampler import Uniform
 from dgl import add_self_loop
-from utils import drnl_node_labeling, coalesce_graph
+from utils import drnl_node_labeling
 
 
 class GraphDataSet(Dataset):
