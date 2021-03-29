@@ -305,6 +305,7 @@ def test_kv_store():
     ctx = mp.get_context('spawn')
     pserver_list = []
     pclient_list = []
+    os.environ['DGL_NUM_SERVER'] = str(num_servers)
     for i in range(num_servers):
         pserver = ctx.Process(target=start_server, args=(i, num_clients, num_servers))
         pserver.start()
@@ -332,12 +333,14 @@ def test_kv_multi_role():
     ctx = mp.get_context('spawn')
     pserver_list = []
     pclient_list = []
+    os.environ['DGL_NUM_SAMPLER'] = str(num_samplers)
+    os.environ['DGL_NUM_SERVER'] = str(num_servers)
     for i in range(num_servers):
         pserver = ctx.Process(target=start_server_mul_role, args=(i, num_clients, num_servers))
         pserver.start()
         pserver_list.append(pserver)
     for i in range(num_trainers):
-        pclient = ctx.Process(target=start_client_mul_role, args=(i))
+        pclient = ctx.Process(target=start_client_mul_role, args=(i,))
         pclient.start()
         pclient_list.append(pclient)
     for i in range(num_trainers):

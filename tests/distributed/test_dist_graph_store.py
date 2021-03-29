@@ -224,6 +224,7 @@ def check_server_client(shared_mem, num_servers, num_clients):
     cli_ps = []
     for cli_id in range(num_clients):
         print('start client', cli_id)
+        os.environ['DGL_NUM_SERVER'] = str(num_servers)
         p = ctx.Process(target=run_client, args=(graph_name, 0, num_clients, g.number_of_nodes(),
                                                  g.number_of_edges()))
         p.start()
@@ -361,6 +362,7 @@ def check_server_client_hetero(shared_mem, num_servers, num_clients):
     num_edges = {etype: g.number_of_edges(etype) for etype in g.etypes}
     for cli_id in range(num_clients):
         print('start client', cli_id)
+        os.environ['DGL_NUM_SERVER'] = str(num_servers)
         p = ctx.Process(target=run_client_hetero, args=(graph_name, 0, num_clients, num_nodes,
                                                         num_edges))
         p.start()

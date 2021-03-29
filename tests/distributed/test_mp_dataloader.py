@@ -159,6 +159,7 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle):
 
     time.sleep(3)
     os.environ['DGL_DIST_MODE'] = 'distributed'
+    os.environ['DGL_NUM_SAMPLER'] = str(num_workers)
     ptrainer = ctx.Process(target=start_dist_dataloader, args=(
         0, tmpdir, num_server, drop_last))
     ptrainer.start()
