@@ -137,17 +137,17 @@ def track_time(data, num_negs, batch_size):
         pin_memory=True,
         num_workers=num_workers)
 
+    # Define model and optimizer
+    model = SAGE(in_feats, num_hidden, n_classes,
+                 num_layers, F.relu, dropout)
+    model = model.to(device)
+    loss_fcn = CrossEntropyLoss()
+    loss_fcn = loss_fcn.to(device)
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+
     timer = utils.ModelSpeedTimer()
 
     for run in range(num_runs):
-        # Define model and optimizer
-        model = SAGE(in_feats, num_hidden, n_classes,
-                     num_layers, F.relu, dropout)
-        model = model.to(device)
-        loss_fcn = CrossEntropyLoss()
-        loss_fcn = loss_fcn.to(device)
-        optimizer = optim.Adam(model.parameters(), lr=lr)
-
         # dry run
         for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
             # Load the input features as well as output labels

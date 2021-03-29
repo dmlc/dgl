@@ -105,25 +105,25 @@ def track_time(data, lowmem, use_type_count):
     # since the nodes are featureless, the input feature is then the node id.
     feats = torch.arange(num_nodes, device=device)
 
+    # create model
+    model = RGCN(num_nodes,
+                 16,
+                 num_classes,
+                 num_rels,
+                 num_bases,
+                 0,
+                 0,
+                 lowmem).to(device)
+
+    optimizer = torch.optim.Adam(model.parameters(),
+                                 lr=1e-2,
+                                 weight_decay=l2norm)
+
+    model.train()
+
     timer = utils.ModelSpeedTimer()
 
     for run in range(num_runs):
-        # create model
-        model = RGCN(num_nodes,
-                     16,
-                     num_classes,
-                     num_rels,
-                     num_bases,
-                     0,
-                     0,
-                     lowmem).to(device)
-
-        optimizer = torch.optim.Adam(model.parameters(),
-                                     lr=1e-2,
-                                     weight_decay=l2norm)
-
-        model.train()
-
         # dry run
         for epoch in range(10):
             logits = model(g, feats, edge_type, edge_norm)

@@ -99,20 +99,21 @@ def track_time(data):
     norm[torch.isinf(norm)] = 0
     g.ndata['norm'] = norm.unsqueeze(1)
 
+    # create GCN model
+    model = GCN(in_feats, 16, n_classes, 1, F.relu, 0.5)
+    loss_fcn = torch.nn.CrossEntropyLoss()
+
+    model = model.to(device)
+    model.train()
+
+    # optimizer
+    optimizer = torch.optim.Adam(model.parameters(),
+                                 lr=1e-2,
+                                 weight_decay=5e-4)
+
     timer = utils.ModelSpeedTimer()
 
     for run in range(num_runs):
-        # create GCN model
-        model = GCN(in_feats, 16, n_classes, 1, F.relu, 0.5)
-        loss_fcn = torch.nn.CrossEntropyLoss()
-
-        model = model.to(device)
-        model.train()
-
-        # optimizer
-        optimizer = torch.optim.Adam(model.parameters(),
-                                     lr=1e-2,
-                                     weight_decay=5e-4)
         # dry run
         for epoch in range(5):
             logits = model(g, features)

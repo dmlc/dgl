@@ -417,16 +417,17 @@ def track_time(data):
         collate_fn=collator.collate_test,
         num_workers=num_workers)
 
+    # Model
+    model = PinSAGEModel(g, item_ntype, textset,
+                         hidden_dims, num_layers).to(device)
+    # Optimizer
+    opt = torch.optim.Adam(model.parameters(), lr=lr)
+
+    model.train()
+
     timer = utils.ModelSpeedTimer()
 
     for run in range(num_runs):
-        # Model
-        model = PinSAGEModel(g, item_ntype, textset,
-                             hidden_dims, num_layers).to(device)
-        # Optimizer
-        opt = torch.optim.Adam(model.parameters(), lr=lr)
-
-        model.train()
         for batch_id, (pos_graph, neg_graph, blocks) in enumerate(dataloader):
             # Copy to GPU
             for i in range(len(blocks)):

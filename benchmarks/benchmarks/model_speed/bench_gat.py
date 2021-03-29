@@ -70,22 +70,22 @@ def track_time(data):
     g = dgl.remove_self_loop(g)
     g = dgl.add_self_loop(g)
 
+    # create model
+    model = GAT(1, in_feats, 8, n_classes, [8, 1], F.elu,
+                0.6, 0.6, 0.2, False)
+    loss_fcn = torch.nn.CrossEntropyLoss()
+
+    model = model.to(device)
+    model.train()
+
+    # optimizer
+    optimizer = torch.optim.Adam(model.parameters(),
+                                 lr=1e-2,
+                                 weight_decay=5e-4)
+
     timer = utils.ModelSpeedTimer()
 
     for run in range(num_runs):
-        # create model
-        model = GAT(1, in_feats, 8, n_classes, [8, 1], F.elu,
-                    0.6, 0.6, 0.2, False)
-        loss_fcn = torch.nn.CrossEntropyLoss()
-
-        model = model.to(device)
-        model.train()
-
-        # optimizer
-        optimizer = torch.optim.Adam(model.parameters(),
-                                     lr=1e-2,
-                                     weight_decay=5e-4)
-
         # dry run
         for epoch in range(10):
             logits = model(g, features)

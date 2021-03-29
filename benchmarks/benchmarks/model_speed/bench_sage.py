@@ -63,21 +63,21 @@ def track_time(data):
     g = dgl.remove_self_loop(g)
     g = dgl.add_self_loop(g)
 
+    # create model
+    model = GraphSAGE(in_feats, 16, n_classes, 1, F.relu, 0.5, 'gcn')
+    loss_fcn = torch.nn.CrossEntropyLoss()
+
+    model = model.to(device)
+    model.train()
+
+    # optimizer
+    optimizer = torch.optim.Adam(model.parameters(),
+                                 lr=1e-2,
+                                 weight_decay=5e-4)
+
     timer = utils.ModelSpeedTimer()
 
     for run in range(num_runs):
-        # create model
-        model = GraphSAGE(in_feats, 16, n_classes, 1, F.relu, 0.5, 'gcn')
-        loss_fcn = torch.nn.CrossEntropyLoss()
-
-        model = model.to(device)
-        model.train()
-
-        # optimizer
-        optimizer = torch.optim.Adam(model.parameters(),
-                                     lr=1e-2,
-                                     weight_decay=5e-4)
-
         # dry run
         for epoch in range(10):
             logits = model(g, features)

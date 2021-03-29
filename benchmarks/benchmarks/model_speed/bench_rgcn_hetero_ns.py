@@ -280,27 +280,27 @@ def track_time(data):
         hg, {category: train_idx}, sampler,
         batch_size=batch_size, shuffle=True, num_workers=4)
 
+    embed_layer = RelGraphEmbed(
+        hg, device, n_hidden, num_nodes, node_feats)
+    model = EntityClassify(hg,
+                           n_hidden,
+                           num_classes,
+                           num_bases=n_bases,
+                           num_hidden_layers=n_layers - 2,
+                           dropout=dropout,
+                           use_self_loop=use_self_loop)
+    embed_layer = embed_layer.to(device)
+    model = model.to(device)
+
+    all_params = itertools.chain(
+        model.parameters(), embed_layer.embeds.parameters())
+    optimizer = th.optim.Adam(all_params, lr=lr, weight_decay=l2norm)
+    sparse_optimizer = th.optim.SparseAdam(
+        list(embed_layer.node_embeds.parameters()), lr=lr)
+
     timer = utils.ModelSpeedTimer()
 
     for run in range(num_runs):
-        embed_layer = RelGraphEmbed(
-            hg, device, n_hidden, num_nodes, node_feats)
-        model = EntityClassify(hg,
-                               n_hidden,
-                               num_classes,
-                               num_bases=n_bases,
-                               num_hidden_layers=n_layers - 2,
-                               dropout=dropout,
-                               use_self_loop=use_self_loop)
-        embed_layer = embed_layer.to(device)
-        model = model.to(device)
-
-        all_params = itertools.chain(
-            model.parameters(), embed_layer.embeds.parameters())
-        optimizer = th.optim.Adam(all_params, lr=lr, weight_decay=l2norm)
-        sparse_optimizer = th.optim.SparseAdam(
-            list(embed_layer.node_embeds.parameters()), lr=lr)
-
         # dry run
         for i, (input_nodes, seeds, blocks) in enumerate(loader):
             blocks = [blk.to(device) for blk in blocks]
