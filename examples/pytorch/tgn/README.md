@@ -32,13 +32,7 @@ Jodie Reddit Temporal dataset. Dataset summary:
 
 In tgn folder, run
 
-**please use `train.py` **
-
-```python
-python train.py --dataset wikipedia
-```
-
-If you want to use GPU, run:
+**please use `train.py`**
 
 ```python
 python train.py --dataset wikipedia
@@ -48,6 +42,12 @@ If you want to run in fast mode:
 
 ```python
 python train.py --dataset wikipedia --fast_mode
+```
+
+If you want to run in simple mode:
+
+```python
+python train.py --dataset wikipedia --simple_mode
 ```
 
 If you want to change memory updating module:
@@ -60,23 +60,39 @@ python train.py --dataset wikipedia --memory_updater [rnn/gru]
 
 #### Without New Node in test set
 
-| Models/Datasets | Wikipedia         | Reddit          |
-| --------------- | ----------------- | --------------- |
-| TGN fast mode   | AP:96.3 AUC: 96.5 | AP:N/A AUC: N/A |
-| TGN             | AP:98.9 AUC:98.5  | AP:N/A AUC: N/A |
+| Models/Datasets | Wikipedia          | Reddit           |
+| --------------- | ------------------ | ---------------- |
+| TGN simple mode | AP: 98.5 AUC: 98.9 | AP: N/A AUC: N/A |
+| TGN fast mode   | AP: 98.2 AUC: 98.6 | AP: N/A AUC: N/A |
+| TGN             | AP: 98.9 AUC: 98.5 | AP: N/A AUC: N/A |
 
 #### With New Node in test set
 
-| Models/Datasets | Wikipedia          | Reddit           |
-| --------------- | ------------------ | ---------------- |
-| TGN fast mode   | AP: 94.1 AUC:94.1  | AP: N/A AUC: N/A |
-| TGN             | AP:98.2  AUC: 98.1 | AP: N/A AUC: N/A |
+| Models/Datasets | Wikipedia           | Reddit           |
+| --------------- | ------------------- | ---------------- |
+| TGN simple mode | AP: 98.2  AUC: 98.6 | AP: N/A AUC: N/A |
+| TGN fast mode   | AP: 98.0  AUC: 98.4 | AP: N/A AUC: N/A |
+| TGN             | AP: 98.2  AUC: 98.1 | AP: N/A AUC: N/A |
+
+## Training Speed / Batch
+Intel E5 2cores, Tesla K80, Wikipedia Dataset
+
+| Models/Datasets | Wikipedia | Reddit   |
+| --------------- | --------- | -------- |
+| TGN simple mode | 0.3s      | N/A      |
+| TGN fast mode   | 0.28s     | N/A      |
+| TGN             | 1.3s      | N/A      |
 
 ### Details explained
 
+**What is Simple Mode**
+
+Simple Temporal Sampler just choose the edges that happen before the current timestamp and build the subgraph of the corresponding nodes. 
+And then the simple sampler uses the static graph neighborhood sampling methods.
+
 **What is Fast Mode**
 
-Normally temporal encoding need each node uses incoming time frame as current time which might lead to two nodes have multiple interactions within the same batch need to maintain multiple embedding features which slow down the batching process to avoid feature duplication, fast mode enable fast batching since it uses last memory update time in last batch as temporal encoding benchmark for each node. Also within each batch, all interaction between two nodes are predicted using same set of enbedding feature
+Normally temporal encoding needs each node to use incoming time frame as current time which might lead to two nodes have multiple interactions within the same batch need to maintain multiple embedding features which slow down the batching process to avoid feature duplication, fast mode enables fast batching since it uses last memory update time in the last batch as temporal encoding benchmark for each node. Also within each batch, all interaction between two nodes are predicted using the same set of embedding feature
 
 **What is New Node test**
 

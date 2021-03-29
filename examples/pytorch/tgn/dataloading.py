@@ -8,6 +8,7 @@ from dgl.base import DGLError
 
 from functools import partial
 import copy
+import dgl.function as fn
 
 
 def _prepare_tensor(g, data, name, is_distributed):
@@ -18,7 +19,7 @@ class TemporalSampler(BlockSampler):
     """ Temporal Sampler builds computational and temporal dependency of node representations via
     temporal neighbors selection and screening.
 
-    The sampler expect input node to have same time stamps, in the case of TGN, it should be 
+    The sampler expects input node to have same time stamps, in the case of TGN, it should be 
     either positive [src,dst] pair or negative samples. It will first take in-subgraph of seed
     nodes and then screening out edges which happen after that timestamp. Finally it will sample
     a fixed number of neighbor edges using random or topk sampling.
@@ -234,7 +235,7 @@ class TemporalEdgeCollator(EdgeCollator):
 
 
 class TemporalEdgeDataLoader(dgl.dataloading.EdgeDataLoader):
-    """ TemporalEdgeDataLoader is a iteratable object to generate blocks for temporal embedding
+    """ TemporalEdgeDataLoader is an iteratable object to generate blocks for temporal embedding
     as well as pos and neg pair graph for memory update.
 
     The batch generated will follow temporal order
@@ -287,13 +288,13 @@ class TemporalEdgeDataLoader(dgl.dataloading.EdgeDataLoader):
 
 # ====== Fast Mode ======
 
-# Part of code comes from PyG library
-# https://github.com/rusty1s/pytorch_geometric
+# Part of code in reservoir sampling comes from PyG library
+# https://github.com/rusty1s/pytorch_geometric/nn/models/tgn.py
 
 
 class FastTemporalSampler(BlockSampler):
     """Temporal Sampler which implemented with a fast query lookup table. Sample
-    Temporal and computationally depending subgraph.
+    temporal and computationally depending subgraph.
 
     The sampler maintains a lookup table of most current k neighbors of each node
     each time, the sampler need to be updated with new edges from incoming batch to
@@ -587,3 +588,149 @@ class FastTemporalEdgeCollator(EdgeCollator):
         _pop_subgraph_storage(result[2], self.g)
         _pop_blocks_storage(result[-1], self.g_sampling)
         return result
+
+
+# ====== Simple Mode ======
+
+# Part of code comes from paper
+# "APAN: Asynchronous Propagation Attention Network for Real-time Temporal Graph Embedding"
+# that will be appeared in SIGMOD 21, code repo https://github.com/WangXuhongCN/APAN
+
+class SimpleTemporalSampler(dgl.dataloading.BlockSampler):
+    '''
+    Simple Temporal Sampler just choose the edges that happen before the current timestamp, to build the subgraph of the corresponding nodes. 
+    And then the sampler uses the simplest static graph neighborhood sampling methods.
+
+    Parameters
+    ----------
+
+    fanouts : [int, ..., int] int list
+        The neighbors sampling strategy 
+
+    '''
+
+    def __init__(self, g, fanouts, return_eids=False):
+        super().__init__(len(fanouts), return_eids)
+
+        self.fanouts = fanouts  
+        self.ts = 0
+        self.frontiers = [None for _ in range(len(fanouts))]
+
+    def sample_frontier(self, block_id, g, seed_nodes):
+        '''
+        Deleting the the edges that happen after the current timestamp, then use a simple topk edge sampling by timestamp.
+        '''
+        fanout = self.fanouts[block_id]
+        # List of neighbors to sample per edge type for each GNN layer, starting from the first layer.
+        g = dgl.in_subgraph(g, seed_nodes)  
+        g.remove_edges(torch.where(g.edata['timestamp'] > self.ts)[0])  # Deleting the the edges that happen after the current timestamp
+
+        if fanout is None:  # full neighborhood sampling
+            frontier = g
+        else:
+            frontier = dgl.sampling.select_topk(g, fanout, 'timestamp', seed_nodes)  # most recent timestamp edge sampling
+        self.frontiers[block_id] = frontier  # save frontier
+        return frontier
+
+
+class SimpleTemporalEdgeCollator(dgl.dataloading.EdgeCollator):
+    '''
+    Temporal Edge collator merge the edges specified by eid: items
+
+    
+
+    Parameters
+    ----------
+
+    g : DGLGraph
+        The graph from which the edges are iterated in minibatches and the subgraphs
+        are generated.
+
+    eids : Tensor or dict[etype, Tensor]
+        The edge set in graph :attr:`g` to compute outputs.
+
+    block_sampler : dgl.dataloading.BlockSampler
+        The neighborhood sampler.
+
+    g_sampling : DGLGraph, optional
+        The graph where neighborhood sampling and message passing is performed.
+        Note that this is not necessarily the same as :attr:`g`.
+        If None, assume to be the same as :attr:`g`.
+
+    exclude : str, optional
+        Whether and how to exclude dependencies related to the sampled edges in the
+        minibatch.  Possible values are
+
+        * None, which excludes nothing.
+
+        * ``'reverse_id'``, which excludes the reverse edges of the sampled edges.  The said
+          reverse edges have the same edge type as the sampled edges.  Only works
+          on edge types whose source node type is the same as its destination node type.
+
+        * ``'reverse_types'``, which excludes the reverse edges of the sampled edges.  The
+          said reverse edges have different edge types from the sampled edges.
+
+        If ``g_sampling`` is given, ``exclude`` is ignored and will be always ``None``.
+
+    reverse_eids : Tensor or dict[etype, Tensor], optional
+        The mapping from original edge ID to its reverse edge ID.
+        Required and only used when ``exclude`` is set to ``reverse_id``.
+        For heterogeneous graph this will be a dict of edge type and edge IDs.  Note that
+        only the edge types whose source node type is the same as destination node type
+        are needed.
+
+    reverse_etypes : dict[etype, etype], optional
+        The mapping from the edge type to its reverse edge type.
+        Required and only used when ``exclude`` is set to ``reverse_types``.
+
+    negative_sampler : callable, optional
+        The negative sampler.  Can be omitted if no negative sampling is needed.
+        The negative sampler must be a callable that takes in the following arguments:
+
+        * The original (heterogeneous) graph.
+
+        * The ID array of sampled edges in the minibatch, or the dictionary of edge
+          types and ID array of sampled edges in the minibatch if the graph is
+          heterogeneous.
+
+        It should return
+
+        * A pair of source and destination node ID arrays as negative samples,
+          or a dictionary of edge types and such pairs if the graph is heterogenenous.
+
+        A set of builtin negative samplers are provided in
+        :ref:`the negative sampling module <api-dataloading-negative-sampling>`.
+    '''
+    def __init__(self, g, eids, block_sampler, g_sampling=None, exclude=None,
+                reverse_eids=None, reverse_etypes=None, negative_sampler=None):
+        super(SimpleTemporalEdgeCollator,self).__init__(g,eids,block_sampler,
+                                                 g_sampling,exclude,reverse_eids,reverse_etypes,negative_sampler)
+        self.n_layer = len(self.block_sampler.fanouts)
+
+    def collate(self,items): 
+        '''
+        items: edge id in graph g.
+        We sample iteratively k-times and batch them into one single subgraph.
+        '''
+        current_ts = self.g.edata['timestamp'][items[0]]     #only sample edges before current timestamp
+        self.block_sampler.ts = current_ts    # restore the current timestamp to the graph sampler.
+
+        # if link prefiction, we use a negative_sampler to generate neg-graph for loss computing.
+        if self.negative_sampler is None:
+            neg_pair_graph = None
+            input_nodes, pair_graph, blocks = self._collate(items)
+        else:
+            input_nodes, pair_graph, neg_pair_graph, blocks = self._collate_with_negative_sampling(items)
+
+        # we sampling k-hop subgraph and batch them into one graph
+        for i in range(self.n_layer-1):
+            self.block_sampler.frontiers[0].add_edges(*self.block_sampler.frontiers[i+1].edges())
+        frontier = self.block_sampler.frontiers[0]
+        # computing node last-update timestamp
+        frontier.update_all(fn.copy_e('timestamp','ts'), fn.max('ts','timestamp'))
+    
+        return input_nodes, pair_graph, neg_pair_graph, [frontier]
+
+
+
+

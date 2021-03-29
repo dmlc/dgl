@@ -34,14 +34,16 @@ def track_time(graph_name, format, feat_size, msg_type, reduce_type):
     }
 
     # dry run
-    graph.update_all(msg_builtin_dict[msg_type],
-                     reduce_builtin_dict[reduce_type])
+    
+    for i in range(3):
+        graph.update_all(msg_builtin_dict[msg_type],
+                         reduce_builtin_dict[reduce_type])
 
     # timing
 
     with utils.Timer() as t:
-        for i in range(3):
+        for i in range(10):
             graph.update_all(
                 msg_builtin_dict[msg_type], reduce_builtin_dict[reduce_type])
 
-    return t.elapsed_secs / 3
+    return t.elapsed_secs / 10

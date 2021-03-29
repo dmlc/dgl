@@ -1,4 +1,6 @@
 import os
+import ssl
+from six.moves import urllib
 
 import pandas as pd
 import numpy as np
@@ -6,14 +8,10 @@ import numpy as np
 import torch
 import dgl
 
-import ssl
-from six.moves import urllib
-
 # === Below data preprocessing code are based on
 # https://github.com/twitter-research/tgn
 
 # Preprocess the raw data split each features
-
 
 def preprocess(data_name):
     u_list, i_list, ts_list, label_list = [], [], [], []
@@ -45,7 +43,6 @@ def preprocess(data_name):
                          'label': label_list,
                          'idx': idx_list}), np.array(feat_l)
 
-
 # Re index nodes for DGL convience
 def reindex(df, bipartite=True):
     new_df = df.copy()
@@ -68,10 +65,7 @@ def reindex(df, bipartite=True):
     return new_df
 
 # Save edge list, features in different file for data easy process data
-
-
 def run(data_name, bipartite=True):
-    #Path("data/").mkdir(parents=True, exist_ok=True)
     PATH = './data/{}.csv'.format(data_name)
     OUT_DF = './data/ml_{}.csv'.format(data_name)
     OUT_FEAT = './data/ml_{}.npy'.format(data_name)
@@ -94,7 +88,6 @@ def run(data_name, bipartite=True):
 
 # If you have new dataset follow by same format in Jodie,
 # you can directly use name to retrieve dataset
-
 
 def TemporalDataset(dataset):
     if not os.path.exists('./data/{}.bin'.format(dataset)):
@@ -129,11 +122,9 @@ def TemporalDataset(dataset):
         g = gs[0]
     return g
 
-
 def TemporalWikipediaDataset():
     # Download the dataset
     return TemporalDataset('wikipedia')
-
 
 def TemporalRedditDataset():
     return TemporalDataset('reddit')
