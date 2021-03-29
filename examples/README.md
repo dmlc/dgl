@@ -86,6 +86,7 @@ The folder contains example implementations of selected research papers related 
 | [Link Prediction Based on Graph Neural Networks](#seal) | | :heavy_check_mark: | | :heavy_check_mark: | :heavy_check_mark: |
 | [Variational Graph Auto-Encoders](#vgae) |  | :heavy_check_mark: | | | |
 | [GNNExplainer: Generating Explanations for Graph Neural Networks](#gnnexplainer) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
+| [Representation Learning on Graphs with Jumping Knowledge Networks](#jknet) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
 
 ## 2020
 
@@ -241,6 +242,10 @@ The folder contains example implementations of selected research papers related 
 - <a name="seal"></a>  Zhang et al. Link Prediction Based on Graph Neural Networks. [Paper link](https://papers.nips.cc/paper/2018/file/53f0d7c537d99b3824f0f99d62ea2428-Paper.pdf).
     - Example code: [pytorch](../examples/pytorch/seal)
     - Tags: link prediction, sampling
+
+- <a name="jknet"></a>  Xu et al. Representation Learning on Graphs with Jumping Knowledge Networks. [Paper link](https://arxiv.org/abs/1806.03536).
+    - Example code: [pytorch](../examples/pytorch/jknet)
+    - Tags: message passing, neighborhood
 
 
 ## 2017
