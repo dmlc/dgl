@@ -1,0 +1,1 @@
+# Baselines for OGB Large-Scale Challenge (LSC) at KDD Cup 2021
