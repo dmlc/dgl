@@ -1,7 +1,7 @@
 # GraphParticleSim
-## DGL Implementation of Learning-to-simulate paper.
+## DGL Implementation of Interaction-Network paper.
 
-This DGL example implements the GNN model proposed in the paper [Learning-to-simulate](https://arxiv.org/abs/2002.09405.pdf). 
+This DGL example implements the GNN model proposed in the paper [Interaction Network](https://arxiv.org/abs/1612.00222.pdf). 
 
 GraphParticleSim implementor
 ----------------------
@@ -9,69 +9,64 @@ This example was implemented by [Ericcsr](https://github.com/Ericcsr) during his
 
 The graph dataset used in this example 
 ---------------------------------------
-This Example uses Datasets Generate By Taichi-MPM Simulator
+This Example uses Datasets Generate By Physics N-Body Simulator adapted from [This Repo](https://github.com/jsikyoon/Interaction-networks_tensorflow)
 
-MPM2d:
-    - 2048 Particles/Nodes
-    - Edges are determined Dynamically by radius r nearest neighbor in 2d
-    - 100 trajectories should be generated
-    - 400 steps of simulation per trajectory
-
-MPM3d:
-    - 8192 Particles/Nodes
-    - Edges are determined Dynamically by radius r nearest neighbor in 3d
-    - 100 trajectories should be generated
-    - 400 steps of simulation per trajectory
+n_body:
+    - n Particles/Nodes
+    - Complete Bidirectional Graph
+    - 10 trajectories should be generated
+    - 1000 steps of simulation per trajectory
 
 Dependency
 --------------------------------
 ```
-pip install taichi
+sudo apt install ffmpeg
+pip install opencv-python
 ```
 
 
 How to run example files
 --------------------------------
 In the graphsim folder, run
-**Please first run `data_gen.py`**
+**Please first run `n_body_sim.py` to generate some data**
 
 Using Ground Truth Velocity From Simulator Directly.
 
 ```python
-python data_gen.py --num_traj 100 --steps 400 --order first
+python n_body_sim.py
 ```
 
-Using Finite Difference Velocity from position.
+Generate Longer trajectory or more trajectories.
 
 ```python
-python data_gen.py --num_traj 100 --steps 400 --order second
+python n_body_sim.py --num_traj <num_traj> --steps <num_steps>
 ```
 
-**Please use `train_datasets.py`**
+**Please use `train.py`**
 
 
 ```python
-python train_datasets.py --gpu 0 --number_workers 15 --radius 0.015
+python train.py --number_workers 15
 ```
 
-It is highly suggested to run on GPU due to the gigantic simulation graph,if you want to run on CPU
-
+Training with GPU
 ```python
-python train_datasets.py --gpu -1 --number_workers 15 --radius 0.015
+python train.py --gpu 0 --number_workers 15
 ```
 
-One Step Loss Performance
+Training with visualization: for valid visualization, it might take full 40000 epoch of training
+```python
+python train.py --gpu 0 --number_workers 15 --visualize
+```
+
+One Step Loss Performance, Loss of test data after 40000 training epochs.
 -------------------------
-| Models/Dataset | Water |
+| Models/Dataset | 6 Body |
 | :-------------- | -----: |
-| GraphSim in DGL | 81.5% |
-| GraphSim | 81.8% |
+| Interaction Network in DGL | 80(100) |
+| Interaction Network in Tensorflow | 60 |
+| Interaction Network in Paper | 0.25 |
 
-Speed Performance Time/Steps
 -------------------------
-| Models/Dataset | Water |
-| :-------------- | -----: |
-| GraphSim in DGL | |
-
-Notice that The datasets are generate dataset directly from Taichi Simulator to prevent using Tensorflow to handle the original dataset.
+Notice that The datasets are generate dataset directly from Simulator to prevent using Tensorflow to handle the original dataset. The training it very unstable, the even if the minimum loss is achieved from time to time, there are chance that loss will suddenly increase, both in auther's model and out model. The Since the original model hasn't been released, the implementation of this model refers from Tensorflow version implemented in: https://github.com/jsikyoon/Interaction-networks_tensorflow which has consult the first author for some implementation details.
 
