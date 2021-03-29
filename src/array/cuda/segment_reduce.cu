@@ -6,6 +6,7 @@
 #include <dgl/array.h>
 #include "./segment_reduce.cuh"
 #include "./functor.cuh"
+#include "./utils.h"
 
 namespace dgl {
 
@@ -13,70 +14,131 @@ using namespace cuda;
 
 namespace aten {
 
-template <int XPU, typename IdType, typename DType>
+
+template <int XPU, typename IdType, int bits>
 void SegmentReduce(const std::string& op,
                    NDArray feat,
                    NDArray offsets,
                    NDArray out,
                    NDArray arg) {
-  if (op == "sum") {
-    cuda::SegmentReduce<IdType, DType, cuda::reduce::Sum<IdType, DType>>(
-        feat, offsets, out, arg);
-  } else if (op == "max") {
-    cuda::SegmentReduce<IdType, DType, cuda::reduce::Max<IdType, DType>>(
-        feat, offsets, out, arg);
-  } else if (op == "min") {
-    cuda::SegmentReduce<IdType, DType, cuda::reduce::Min<IdType, DType>>(
-        feat, offsets, out, arg);
-  } else {
-    LOG(FATAL) << "Not implemented";
-  }
+  SWITCH_BITS(bits, DType, {
+    if (op == "sum") {
+      cuda::SegmentReduce<IdType, DType, cuda::reduce::Sum<IdType, DType>>(
+          feat, offsets, out, arg);
+    } else if (op == "max") {
+      cuda::SegmentReduce<IdType, DType, cuda::reduce::Max<IdType, DType>>(
+          feat, offsets, out, arg);
+    } else if (op == "min") {
+      cuda::SegmentReduce<IdType, DType, cuda::reduce::Min<IdType, DType>>(
+          feat, offsets, out, arg);
+    } else {
+      LOG(FATAL) << "Not implemented";
+    }
+  });
 }
 
-template <int XPU, typename IdType, typename DType>
+
+template <int XPU, typename IdType, int bits>
+void ScatterAdd(NDArray feat,
+                NDArray idx,
+                NDArray out) {
+  SWITCH_BITS(bits, DType, {
+    cuda::ScatterAdd<IdType, DType>(feat, idx, out);
+  });
+}
+
+
+template <int XPU, typename IdType, int bits>
 void BackwardSegmentCmp(NDArray feat,
                         NDArray arg,
                         NDArray out) {
-  cuda::BackwardSegmentCmp<IdType, DType>(feat, arg, out);
+  SWITCH_BITS(bits, DType, {
+    cuda::BackwardSegmentCmp<IdType, DType>(feat, arg, out);
+  });
 }
 
-template void SegmentReduce<kDLGPU, int32_t, float>(
+
+template void SegmentReduce<kDLGPU, int32_t, 16>(
     const std::string& op,
     NDArray feat,
     NDArray offsets,
     NDArray out,
     NDArray arg);
-template void SegmentReduce<kDLGPU, int64_t, float>(
+template void SegmentReduce<kDLGPU, int64_t, 16>(
     const std::string &op,
     NDArray feat,
     NDArray offsets,
     NDArray out,
     NDArray arg);
-template void SegmentReduce<kDLGPU, int32_t, double>(
+template void SegmentReduce<kDLGPU, int32_t, 32>(
+    const std::string& op,
+    NDArray feat,
+    NDArray offsets,
+    NDArray out,
+    NDArray arg);
+template void SegmentReduce<kDLGPU, int64_t, 32>(
     const std::string &op,
     NDArray feat,
     NDArray offsets,
     NDArray out,
     NDArray arg);
-template void SegmentReduce<kDLGPU, int64_t, double>(
+template void SegmentReduce<kDLGPU, int32_t, 64>(
     const std::string &op,
     NDArray feat,
     NDArray offsets,
     NDArray out,
     NDArray arg);
-template void BackwardSegmentCmp<kDLGPU, int32_t, float>(
+template void SegmentReduce<kDLGPU, int64_t, 64>(
+    const std::string &op,
+    NDArray feat,
+    NDArray offsets,
+    NDArray out,
+    NDArray arg);
+template void ScatterAdd<kDLGPU, int32_t, 16>(
+    NDArray feat,
+    NDArray idx,
+    NDArray out);
+template void ScatterAdd<kDLGPU, int64_t, 16>(
+    NDArray feat,
+    NDArray idx,
+    NDArray out);
+template void ScatterAdd<kDLGPU, int32_t, 32>(
+    NDArray feat,
+    NDArray idx,
+    NDArray out);
+template void ScatterAdd<kDLGPU, int64_t, 32>(
+    NDArray feat,
+    NDArray idx,
+    NDArray out);
+template void ScatterAdd<kDLGPU, int32_t, 64>(
+    NDArray feat,
+    NDArray idx,
+    NDArray out);
+template void ScatterAdd<kDLGPU, int64_t, 64>(
+    NDArray feat,
+    NDArray idx,
+    NDArray out);
+template void BackwardSegmentCmp<kDLGPU, int32_t, 16>(
     NDArray feat,
     NDArray arg,
     NDArray out);
-template void BackwardSegmentCmp<kDLGPU, int64_t, float>(
+template void BackwardSegmentCmp<kDLGPU, int64_t, 16>(
     NDArray feat,
     NDArray arg,
     NDArray out);
-template void BackwardSegmentCmp<kDLGPU, int32_t, double>(
+template void BackwardSegmentCmp<kDLGPU, int32_t, 32>(
     NDArray feat,
     NDArray arg,
     NDArray out);
-template void BackwardSegmentCmp<kDLGPU, int64_t, double>(
+template void BackwardSegmentCmp<kDLGPU, int64_t, 32>(
+    NDArray feat,
+    NDArray arg,
+    NDArray out);
+template void BackwardSegmentCmp<kDLGPU, int32_t, 64>(
+    NDArray feat,
+    NDArray arg,
+    NDArray out);
+template void BackwardSegmentCmp<kDLGPU, int64_t, 64>(
     NDArray feat,
     NDArray arg,
     NDArray out);

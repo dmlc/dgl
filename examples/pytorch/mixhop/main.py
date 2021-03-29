@@ -1,6 +1,7 @@
 """ The main file to train a MixHop model using a full graph """
 
 import argparse
+import copy
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -207,6 +208,7 @@ def main(args):
                    batchnorm=True)
     
     model = model.to(device)
+    best_model = copy.deepcopy(model)
 
     # Step 3: Create training components ===================================================== #
     loss_fn = nn.CrossEntropyLoss()
@@ -252,11 +254,12 @@ def main(args):
         else:
             no_improvement = 0
             acc = valid_acc
+            best_model = copy.deepcopy(model)
         
         scheduler.step()
 
-    model.eval()
-    logits = model(graph, feats)
+    best_model.eval()
+    logits = best_model(graph, feats)
     test_acc = torch.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
 
     print("Test Acc {:.4f}".format(test_acc))

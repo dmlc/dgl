@@ -227,7 +227,7 @@ class EntityClassify(nn.Module):
             h = layer(block, h)
         return h
 
-@utils.benchmark('time', 3600)
+@utils.benchmark('time', 600)
 @utils.parametrize('data', ['am', 'ogbn-mag'])
 def track_time(data):
     dataset = utils.process_data(data)
@@ -249,7 +249,6 @@ def track_time(data):
     dropout = 0.5
     use_self_loop = True
     lr = 0.01
-    n_epochs = 5
 
     hg = dataset[0]
     category = dataset.predict_category
@@ -284,46 +283,46 @@ def track_time(data):
         hg, {category: train_idx}, sampler,
         batch_size=batch_size, shuffle=True, num_workers=4)
 
-    for epoch in range(1):
-        model.train()
-        embed_layer.train()
-        optimizer.zero_grad()
-        sparse_optimizer.zero_grad()
+    # dry run
+    for i, (input_nodes, seeds, blocks) in enumerate(loader):
+        blocks = [blk.to(device) for blk in blocks]
+        seeds = seeds[category]     # we only predict the nodes with type "category"
+        batch_tic = time.time()
+        emb = embed_layer(blocks[0])
+        lbl = labels[seeds].to(device)
+        emb = {k : e.to(device) for k, e in emb.items()}
+        logits = model(emb, blocks)[category]
+        loss = F.cross_entropy(logits, lbl)
+        loss.backward()
+        optimizer.step()
+        sparse_optimizer.step()
 
-        for i, (input_nodes, seeds, blocks) in enumerate(loader):
-            blocks = [blk.to(device) for blk in blocks]
-            seeds = seeds[category]     # we only predict the nodes with type "category"
-            batch_tic = time.time()
-            emb = embed_layer(blocks[0])
-            lbl = labels[seeds].to(device)
-            emb = {k : e.to(device) for k, e in emb.items()}
-            logits = model(emb, blocks)[category]
-            loss = F.cross_entropy(logits, lbl)
-            loss.backward()
-            optimizer.step()
-            sparse_optimizer.step()
+        if i >= 3:
+            break
 
     print("start training...")
-    t0 = time.time()
-    for epoch in range(n_epochs):
-        model.train()
-        embed_layer.train()
-        optimizer.zero_grad()
-        sparse_optimizer.zero_grad()
+    model.train()
+    embed_layer.train()
+    optimizer.zero_grad()
+    sparse_optimizer.zero_grad()
 
-        for i, (input_nodes, seeds, blocks) in enumerate(loader):
-            blocks = [blk.to(device) for blk in blocks]
-            seeds = seeds[category]     # we only predict the nodes with type "category"
-            batch_tic = time.time()
-            emb = embed_layer(blocks[0])
-            lbl = labels[seeds].to(device)
-            emb = {k : e.to(device) for k, e in emb.items()}
-            logits = model(emb, blocks)[category]
-            loss = F.cross_entropy(logits, lbl)
-            loss.backward()
-            optimizer.step()
-            sparse_optimizer.step()
+    t0 = time.time()
+    for i, (input_nodes, seeds, blocks) in enumerate(loader):
+        blocks = [blk.to(device) for blk in blocks]
+        seeds = seeds[category]     # we only predict the nodes with type "category"
+        batch_tic = time.time()
+        emb = embed_layer(blocks[0])
+        lbl = labels[seeds].to(device)
+        emb = {k : e.to(device) for k, e in emb.items()}
+        logits = model(emb, blocks)[category]
+        loss = F.cross_entropy(logits, lbl)
+        loss.backward()
+        optimizer.step()
+        sparse_optimizer.step()
+
+        if i >= 9:  # time 10 loops
+            break
 
     t1 = time.time()
 
-    return (t1 - t0) / n_epochs
+    return (t1 - t0) / (i + 1)

@@ -73,7 +73,7 @@ namespace aten {
 /*!
  * \brief CUDA implementation of g-SDDMM on Csr format.
  */
-template <int XPU, typename IdType, typename DType>
+template <int XPU, typename IdType, int bits>
 void SDDMMCsr(const std::string& op,
               const BcastOff& bcast,
               const CSRMatrix& csr,
@@ -82,9 +82,11 @@ void SDDMMCsr(const std::string& op,
               NDArray out,
               int lhs_target,
               int rhs_target) {
-  SWITCH_OP(op, Op, {
-    SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, {
-      cuda::SDDMMCsr<IdType, DType, Op, LhsTarget, RhsTarget>(bcast, csr, lhs, rhs, out);
+  SWITCH_BITS(bits, DType, {
+    SWITCH_OP(op, Op, {
+      SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, {
+        cuda::SDDMMCsr<IdType, DType, Op, LhsTarget, RhsTarget>(bcast, csr, lhs, rhs, out);
+      });
     });
   });
 }
@@ -92,7 +94,7 @@ void SDDMMCsr(const std::string& op,
 /*!
  * \brief CUDA implementation of g-SDDMM on Coo format.
  */
-template <int XPU, typename IdType, typename DType>
+template <int XPU, typename IdType, int bits>
 void SDDMMCoo(const std::string& op,
               const BcastOff& bcast,
               const COOMatrix& coo,
@@ -101,43 +103,61 @@ void SDDMMCoo(const std::string& op,
               NDArray out,
               int lhs_target,
               int rhs_target) {
-  SWITCH_OP(op, Op, {
-    SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, {
-      cuda::SDDMMCoo<IdType, DType, Op, LhsTarget, RhsTarget>(bcast, coo, lhs, rhs, out);
+  SWITCH_BITS(bits, DType, {
+    SWITCH_OP(op, Op, {
+      SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, {
+        cuda::SDDMMCoo<IdType, DType, Op, LhsTarget, RhsTarget>(bcast, coo, lhs, rhs, out);
+      });
     });
   });
 }
 
-template void SDDMMCsr<kDLGPU, int32_t, float>(
+template void SDDMMCsr<kDLGPU, int32_t, 16>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
-template void SDDMMCsr<kDLGPU, int64_t, float>(
+template void SDDMMCsr<kDLGPU, int64_t, 16>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
-template void SDDMMCsr<kDLGPU, int32_t, double>(
+template void SDDMMCsr<kDLGPU, int32_t, 32>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
-template void SDDMMCsr<kDLGPU, int64_t, double>(
+template void SDDMMCsr<kDLGPU, int64_t, 32>(
+    const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
+    NDArray lhs, NDArray rhs, NDArray out,
+    int lhs_target, int rhs_target);
+template void SDDMMCsr<kDLGPU, int32_t, 64>(
+    const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
+    NDArray lhs, NDArray rhs, NDArray out,
+    int lhs_target, int rhs_target);
+template void SDDMMCsr<kDLGPU, int64_t, 64>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
 
-template void SDDMMCoo<kDLGPU, int32_t, float>(
+template void SDDMMCoo<kDLGPU, int32_t, 16>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
-template void SDDMMCoo<kDLGPU, int64_t, float>(
+template void SDDMMCoo<kDLGPU, int64_t, 16>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
-template void SDDMMCoo<kDLGPU, int32_t, double>(
+template void SDDMMCoo<kDLGPU, int32_t, 32>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
-template void SDDMMCoo<kDLGPU, int64_t, double>(
+template void SDDMMCoo<kDLGPU, int64_t, 32>(
+    const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
+    NDArray lhs, NDArray rhs, NDArray out,
+    int lhs_target, int rhs_target);
+template void SDDMMCoo<kDLGPU, int32_t, 64>(
+    const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
+    NDArray lhs, NDArray rhs, NDArray out,
+    int lhs_target, int rhs_target);
+template void SDDMMCoo<kDLGPU, int64_t, 64>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);

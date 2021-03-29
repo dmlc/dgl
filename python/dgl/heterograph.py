@@ -216,11 +216,15 @@ class DGLHeteroGraph(object):
 
         * Inplace update is applied to the current graph.
         * If the key of ``data`` does not contain some existing feature fields,
-        those features for the new nodes will be created by initializers
-        defined with :func:`set_n_initializer` (default initializer fills zeros).
+          those features for the new nodes will be created by initializers
+          defined with :func:`set_n_initializer` (default initializer fills zeros).
         * If the key of ``data`` contains new feature fields, those features for
-        the old nodes will be created by initializers defined with
-        :func:`set_n_initializer` (default initializer fills zeros).
+          the old nodes will be created by initializers defined with
+          :func:`set_n_initializer` (default initializer fills zeros).
+        * This function discards the batch information. Please use
+          :func:`dgl.DGLGraph.set_batch_num_nodes`
+          and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+          to maintain the information.
 
         Examples
         --------
@@ -366,16 +370,20 @@ class DGLHeteroGraph(object):
 
         * Inplace update is applied to the current graph.
         * If end nodes of adding edges does not exists, add_nodes is invoked
-        to add new nodes. The node features of the new nodes will be created
-        by initializers defined with :func:`set_n_initializer` (default
-        initializer fills zeros). In certain cases, it is recommanded to
-        add_nodes first and then add_edges.
+          to add new nodes. The node features of the new nodes will be created
+          by initializers defined with :func:`set_n_initializer` (default
+          initializer fills zeros). In certain cases, it is recommanded to
+          add_nodes first and then add_edges.
         * If the key of ``data`` does not contain some existing feature fields,
-        those features for the new edges will be created by initializers
-        defined with :func:`set_n_initializer` (default initializer fills zeros).
+          those features for the new edges will be created by initializers
+          defined with :func:`set_n_initializer` (default initializer fills zeros).
         * If the key of ``data`` contains new feature fields, those features for
-        the old edges will be created by initializers defined with
-        :func:`set_n_initializer` (default initializer fills zeros).
+          the old edges will be created by initializers defined with
+          :func:`set_n_initializer` (default initializer fills zeros).
+        * This function discards the batch information. Please use
+          :func:`dgl.DGLGraph.set_batch_num_nodes`
+          and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+          to maintain the information.
 
         Examples
         --------
@@ -541,6 +549,14 @@ class DGLHeteroGraph(object):
             and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
             respectively.
 
+        Notes
+        -----
+
+        This function discards the batch information. Please use
+        :func:`dgl.DGLGraph.set_batch_num_nodes`
+        and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+        to maintain the information.
+
         Examples
         --------
 
@@ -631,6 +647,14 @@ class DGLHeteroGraph(object):
             If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata``
             and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
             respectively.
+
+        Notes
+        -----
+
+        This function discards the batch information. Please use
+        :func:`dgl.DGLGraph.set_batch_num_nodes`
+        and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+        to maintain the information.
 
         Examples
         --------
@@ -1291,13 +1315,16 @@ class DGLHeteroGraph(object):
         >>> import torch
 
         Create a homogeneous graph.
+
         >>> g = dgl.graph(([0, 1, 2, 3, 4, 5], [1, 2, 0, 4, 5, 3]))
 
         Manually set batch information
-        >>> g.set_batch_num_nodes(torch.tensor([3, 3])
-        >>> g.set_batch_num_edges(torch.tensor([3, 3])
+
+        >>> g.set_batch_num_nodes(torch.tensor([3, 3]))
+        >>> g.set_batch_num_edges(torch.tensor([3, 3]))
 
         Unbatch the graph.
+
         >>> dgl.unbatch(g)
         [Graph(num_nodes=3, num_edges=3,
               ndata_schemes={}
@@ -1433,19 +1460,22 @@ class DGLHeteroGraph(object):
         >>> import torch
 
         Create a homogeneous graph.
+
         >>> g = dgl.graph(([0, 1, 2, 3, 4, 5], [1, 2, 0, 4, 5, 3]))
 
         Manually set batch information
-        >>> g.set_batch_num_nodes(torch.tensor([3, 3])
-        >>> g.set_batch_num_edges(torch.tensor([3, 3])
+
+        >>> g.set_batch_num_nodes(torch.tensor([3, 3]))
+        >>> g.set_batch_num_edges(torch.tensor([3, 3]))
 
         Unbatch the graph.
+
         >>> dgl.unbatch(g)
-            [Graph(num_nodes=3, num_edges=3,
-                  ndata_schemes={}
-                  edata_schemes={}), Graph(num_nodes=3, num_edges=3,
-                  ndata_schemes={}
-                  edata_schemes={})]
+        [Graph(num_nodes=3, num_edges=3,
+              ndata_schemes={}
+              edata_schemes={}), Graph(num_nodes=3, num_edges=3,
+              ndata_schemes={}
+              edata_schemes={})]
 
         Create a heterogeneous graph.
 
@@ -5390,7 +5420,7 @@ class DGLHeteroGraph(object):
 
             * If formats is None, return the usage status of sparse formats
             * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of
-            them, specifying the sparse formats to use.
+              them, specifying the sparse formats to use.
 
         Returns
         -------
