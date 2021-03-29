@@ -45,10 +45,10 @@ def start_server(rank, tmpdir, disable_shared_mem, num_clients):
     g.start()
 
 
-def start_dist_dataloader(rank, tmpdir, num_server, num_workers, drop_last):
+def start_dist_dataloader(rank, tmpdir, num_server, drop_last):
     import dgl
     import torch as th
-    dgl.distributed.initialize("mp_ip_config.txt", 1, num_workers=num_workers)
+    dgl.distributed.initialize("mp_ip_config.txt")
     gpb = None
     disable_shared_mem = num_server > 0
     if disable_shared_mem:
@@ -122,7 +122,7 @@ def test_standalone(tmpdir):
 
     os.environ['DGL_DIST_MODE'] = 'standalone'
     try:
-        start_dist_dataloader(0, tmpdir, 1, 2, True)
+        start_dist_dataloader(0, tmpdir, 1, True)
     except Exception as e:
         print(e)
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
@@ -160,7 +160,7 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle):
     time.sleep(3)
     os.environ['DGL_DIST_MODE'] = 'distributed'
     ptrainer = ctx.Process(target=start_dist_dataloader, args=(
-        0, tmpdir, num_server, num_workers, drop_last))
+        0, tmpdir, num_server, drop_last))
     ptrainer.start()
     time.sleep(1)
 
@@ -171,7 +171,7 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle):
 def start_node_dataloader(rank, tmpdir, num_server, num_workers):
     import dgl
     import torch as th
-    dgl.distributed.initialize("mp_ip_config.txt", 1, num_workers=num_workers)
+    dgl.distributed.initialize("mp_ip_config.txt")
     gpb = None
     disable_shared_mem = num_server > 1
     if disable_shared_mem:
