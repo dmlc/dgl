@@ -22,157 +22,24 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 from dgl.distributed import DistDataLoader
 
-class SAGE(nn.Module):
-    def __init__(self,
-                 in_feats,
-                 n_hidden,
-                 n_classes,
-                 n_layers,
-                 activation,
-                 dropout):
+from pyinstrument import Profiler
+from dgl.distributed import NodeEmbedding
+from dgl.distributed.optim import DistSparseAdagrad
+from train_dist_unsupervised import SAGE, NeighborSampler, PosNeighborSampler, CrossEntropyLoss, compute_acc
+
+def initializer(shape, dtype):
+    arr = th.zeros(shape, dtype=dtype)
+    arr.uniform_(-1, 1)
+    return arr
+
+class DistEmb(nn.Module):
+    def __init__(self, num_nodes, emb_size, dev_id='cpu'):
         super().__init__()
-        self.n_layers = n_layers
-        self.n_hidden = n_hidden
-        self.n_classes = n_classes
-        self.layers = nn.ModuleList()
-        self.layers.append(dglnn.SAGEConv(in_feats, n_hidden, 'mean'))
-        for i in range(1, n_layers - 1):
-            self.layers.append(dglnn.SAGEConv(n_hidden, n_hidden, 'mean'))
-        self.layers.append(dglnn.SAGEConv(n_hidden, n_classes, 'mean'))
-        self.dropout = nn.Dropout(dropout)
-        self.activation = activation
+        self.dev_id = dev_id
+        self.emb = NodeEmbedding(num_nodes, emb_size, name='sage', init_func=initializer)
 
-    def forward(self, blocks, x):
-        h = x
-        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
-            h = layer(block, h)
-            if l != len(self.layers) - 1:
-                h = self.activation(h)
-                h = self.dropout(h)
-        return h
-
-    def inference(self, g, x, batch_size, device):
-        """
-        Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
-        g : the entire graph.
-        x : the input of entire node set.
-
-        The inference code is written in a fashion that it could handle any number of nodes and
-        layers.
-        """
-        # During inference with sampling, multi-layer blocks are very inefficient because
-        # lots of computations in the first few layers are repeated.
-        # Therefore, we compute the representation of all nodes layer by layer.  The nodes
-        # on each layer are of course splitted in batches.
-        # TODO: can we standardize this?
-        for l, layer in enumerate(self.layers):
-            y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
-
-            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
-            dataloader = dgl.sampling.NodeDataLoader(
-                g,
-                th.arange(g.number_of_nodes()),
-                sampler,
-                batch_size=args.batch_size,
-                shuffle=True,
-                drop_last=False,
-                num_workers=args.num_workers)
-
-            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
-                block = blocks[0]
-
-                block = block.int().to(device)
-                h = x[input_nodes].to(device)
-                h = layer(block, h)
-                if l != len(self.layers) - 1:
-                    h = self.activation(h)
-                    h = self.dropout(h)
-
-                y[output_nodes] = h.cpu()
-
-            x = y
-        return y
-
-
-class NegativeSampler(object):
-    def __init__(self, g, neg_nseeds):
-        self.neg_nseeds = neg_nseeds
-
-    def __call__(self, num_samples):
-        # select local neg nodes as seeds
-        return self.neg_nseeds[th.randint(self.neg_nseeds.shape[0], (num_samples,))]
-
-class NeighborSampler(object):
-    def __init__(self, g, fanouts, neg_nseeds, sample_neighbors, num_negs, remove_edge):
-        self.g = g
-        self.fanouts = fanouts
-        self.sample_neighbors = sample_neighbors
-        self.neg_sampler = NegativeSampler(g, neg_nseeds)
-        self.num_negs = num_negs
-        self.remove_edge = remove_edge
-
-    def sample_blocks(self, seed_edges):
-        n_edges = len(seed_edges)
-        seed_edges = th.LongTensor(np.asarray(seed_edges))
-        heads, tails = self.g.find_edges(seed_edges)
-
-        neg_tails = self.neg_sampler(self.num_negs * n_edges)
-        neg_heads = heads.view(-1, 1).expand(n_edges, self.num_negs).flatten()
-
-        # Maintain the correspondence between heads, tails and negative tails as two
-        # graphs.
-        # pos_graph contains the correspondence between each head and its positive tail.
-        # neg_graph contains the correspondence between each head and its negative tails.
-        # Both pos_graph and neg_graph are first constructed with the same node space as
-        # the original graph.  Then they are compacted together with dgl.compact_graphs.
-        pos_graph = dgl.graph((heads, tails), num_nodes=self.g.number_of_nodes())
-        neg_graph = dgl.graph((neg_heads, neg_tails), num_nodes=self.g.number_of_nodes())
-        pos_graph, neg_graph = dgl.compact_graphs([pos_graph, neg_graph])
-
-        seeds = pos_graph.ndata[dgl.NID]
-        blocks = []
-        for fanout in self.fanouts:
-            # For each seed node, sample ``fanout`` neighbors.
-            frontier = self.sample_neighbors(self.g, seeds, fanout, replace=True)
-            if self.remove_edge:
-                # Remove all edges between heads and tails, as well as heads and neg_tails.
-                _, _, edge_ids = frontier.edge_ids(
-                    th.cat([heads, tails, neg_heads, neg_tails]),
-                    th.cat([tails, heads, neg_tails, neg_heads]),
-                    return_uv=True)
-                frontier = dgl.remove_edges(frontier, edge_ids)
-            # Then we compact the frontier into a bipartite graph for message passing.
-            block = dgl.to_block(frontier, seeds)
-
-            # Obtain the seed nodes for next layer.
-            seeds = block.srcdata[dgl.NID]
-
-            blocks.insert(0, block)
-
-        input_nodes = blocks[0].srcdata[dgl.NID]
-        blocks[0].srcdata['features'] = load_subtensor(self.g, input_nodes, 'cpu')
-        # Pre-generate CSR format that it can be used in training directly
-        return pos_graph, neg_graph, blocks
-
-class PosNeighborSampler(object):
-    def __init__(self, g, fanouts, sample_neighbors):
-        self.g = g
-        self.fanouts = fanouts
-        self.sample_neighbors = sample_neighbors
-
-    def sample_blocks(self, seeds):
-        seeds = th.LongTensor(np.asarray(seeds))
-        blocks = []
-        for fanout in self.fanouts:
-            # For each seed node, sample ``fanout`` neighbors.
-            frontier = self.sample_neighbors(self.g, seeds, fanout, replace=True)
-            # Then we compact the frontier into a bipartite graph for message passing.
-            block = dgl.to_block(frontier, seeds)
-            # Obtain the seed nodes for next layer.
-            seeds = block.srcdata[dgl.NID]
-
-            blocks.insert(0, block)
-        return blocks
+    def forward(self, idx):
+        return self.emb(idx, device=self.dev_id)
 
 class DistSAGE(SAGE):
     def __init__(self, in_feats, n_hidden, n_classes, n_layers,
@@ -180,7 +47,7 @@ class DistSAGE(SAGE):
         super(DistSAGE, self).__init__(in_feats, n_hidden, n_classes, n_layers,
                                        activation, dropout)
 
-    def inference(self, g, x, batch_size, device):
+    def inference(self, g, emb_layer, batch_size, device):
         """
         Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
         g : the entire graph.
@@ -217,7 +84,10 @@ class DistSAGE(SAGE):
                 block = blocks[0].to(device)
                 input_nodes = block.srcdata[dgl.NID]
                 output_nodes = block.dstdata[dgl.NID]
-                h = x[input_nodes].to(device)
+                if l == 0:
+                    h = emb_layer(batch_inputs)
+                else:
+                    h = x[input_nodes].to(device)
                 h_dst = h[:block.number_of_dst_nodes()]
                 h = layer(block, (h, h_dst))
                 if l != len(self.layers) - 1:
@@ -237,23 +107,7 @@ def load_subtensor(g, input_nodes, device):
     batch_inputs = g.ndata['features'][input_nodes].to(device)
     return batch_inputs
 
-class CrossEntropyLoss(nn.Module):
-    def forward(self, block_outputs, pos_graph, neg_graph):
-        with pos_graph.local_scope():
-            pos_graph.ndata['h'] = block_outputs
-            pos_graph.apply_edges(fn.u_dot_v('h', 'h', 'score'))
-            pos_score = pos_graph.edata['score']
-        with neg_graph.local_scope():
-            neg_graph.ndata['h'] = block_outputs
-            neg_graph.apply_edges(fn.u_dot_v('h', 'h', 'score'))
-            neg_score = neg_graph.edata['score']
-
-        score = th.cat([pos_score, neg_score])
-        label = th.cat([th.ones_like(pos_score), th.zeros_like(neg_score)]).long()
-        loss = F.binary_cross_entropy_with_logits(score, label.float())
-        return loss
-
-def generate_emb(model, g, inputs, batch_size, device):
+def generate_emb(model, emb_layer, g, batch_size, device):
     """
     Generate embeddings for each node
     g : The entire graph.
@@ -262,45 +116,15 @@ def generate_emb(model, g, inputs, batch_size, device):
     device : The GPU device to evaluate on.
     """
     model.eval()
+    emb_layer.eval()
     with th.no_grad():
-        pred = model.inference(g, inputs, batch_size, device)
+        pred = model.inference(g, emb_layer, batch_size, device)
 
     return pred
 
-def compute_acc(emb, labels, train_nids, val_nids, test_nids):
-    """
-    Compute the accuracy of prediction given the labels.
-
-    We will fist train a LogisticRegression model using the trained embeddings,
-    the training set, validation set and test set is provided as the arguments.
-
-    The final result is predicted by the lr model.
-
-    emb: The pretrained embeddings
-    labels: The ground truth
-    train_nids: The training set node ids
-    val_nids: The validation set node ids
-    test_nids: The test set node ids
-    """
-
-    emb = emb[np.arange(labels.shape[0])].cpu().numpy()
-    train_nids = train_nids.cpu().numpy()
-    val_nids = val_nids.cpu().numpy()
-    test_nids = test_nids.cpu().numpy()
-    labels = labels.cpu().numpy()
-
-    emb = (emb - emb.mean(0, keepdims=True)) / emb.std(0, keepdims=True)
-    lr = lm.LogisticRegression(multi_class='multinomial', max_iter=10000)
-    lr.fit(emb[train_nids], labels[train_nids])
-
-    pred = lr.predict(emb)
-    eval_acc = skm.accuracy_score(labels[val_nids], pred[val_nids])
-    test_acc = skm.accuracy_score(labels[test_nids], pred[test_nids])
-    return eval_acc, test_acc
-
 def run(args, device, data):
     # Unpack data
-    train_eids, train_nids, in_feats, g, global_train_nid, global_valid_nid, global_test_nid, labels = data
+    train_eids, train_nids, g, global_train_nid, global_valid_nid, global_test_nid, labels = data
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], train_nids,
                               dgl.distributed.sample_neighbors, args.num_negs, args.remove_edge)
@@ -314,7 +138,8 @@ def run(args, device, data):
         drop_last=False)
 
     # Define model and optimizer
-    model = DistSAGE(in_feats, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
+    emb_layer = DistEmb(g.num_nodes(), args.num_hidden, device)
+    model = DistSAGE(args.num_hidden, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
     if not args.standalone:
         if args.num_gpus == -1:
@@ -325,9 +150,13 @@ def run(args, device, data):
     loss_fcn = CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    sparse_optimizer = DistSparseAdagrad([emb_layer.emb], lr=args.lr)
 
     # Training loop
     epoch = 0
+    #profiler = Profiler()
+    #if g.rank() == 0:
+    #    profiler.start()
     for epoch in range(args.num_epochs):
         sample_time = 0
         copy_time = 0
@@ -360,14 +189,16 @@ def run(args, device, data):
             # The nodes for output lies at the RHS side of the last block.
 
             # Load the input features as well as output labels
-            batch_inputs = blocks[0].srcdata['features']
+            batch_inputs = blocks[0].srcdata[dgl.NID]
             copy_time = time.time()
             feat_copy_t.append(copy_time - tic_step)
 
             # Compute loss and prediction
+            batch_inputs = emb_layer(batch_inputs)
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, pos_graph, neg_graph)
             forward_end = time.time()
+            sparse_optimizer.zero_grad()
             optimizer.zero_grad()
             loss.backward()
             compute_end = time.time()
@@ -375,6 +206,7 @@ def run(args, device, data):
             backward_t.append(compute_end - forward_end)
 
             # Aggregate gradients in multiple nodes.
+            sparse_optimizer.step()
             optimizer.step()
             update_t.append(time.time() - compute_end)
 
@@ -391,7 +223,15 @@ def run(args, device, data):
                     g.rank(), epoch, step, loss.item(), np.mean(iter_tput[3:]), np.sum(step_time[-args.log_every:]),
                     np.sum(sample_t[-args.log_every:]), np.sum(feat_copy_t[-args.log_every:]), np.sum(forward_t[-args.log_every:]),
                     np.sum(backward_t[-args.log_every:]), np.sum(update_t[-args.log_every:])))
+
+                #if g.rank() == 0:
+                #    profiler.stop()
+                #    print(profiler.output_text(unicode=True, color=True, show_all=True))
+                #    profiler.start()
+
             start = time.time()
+            if step > 1000:
+                break
 
         print('[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
             g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), num_seeds, num_inputs))
@@ -399,9 +239,9 @@ def run(args, device, data):
 
     # evaluate the embedding using LogisticRegression
     if args.standalone:
-        pred = generate_emb(model,g, g.ndata['features'], args.batch_size_eval, device)
+        pred = generate_emb(model, emb_layer, g, args.batch_size_eval, device)
     else:
-        pred = generate_emb(model.module, g, g.ndata['features'], args.batch_size_eval, device)
+        pred = generate_emb(model.module, emb_layer, g, args.batch_size_eval, device)
     if g.rank() == 0:
         eval_acc, test_acc = compute_acc(pred, labels, global_train_nid, global_valid_nid, global_test_nid)
         print('eval acc {:.4f}; test acc {:.4f}'.format(eval_acc, test_acc))
@@ -440,14 +280,13 @@ def main(args):
         device = th.device('cuda:'+str(g.rank() % args.num_gpus))
 
     # Pack data
-    in_feats = g.ndata['features'].shape[1]
     global_train_nid = global_train_nid.squeeze()
     global_valid_nid = global_valid_nid.squeeze()
     global_test_nid = global_test_nid.squeeze()
     print("number of train {}".format(global_train_nid.shape[0]))
     print("number of valid {}".format(global_valid_nid.shape[0]))
     print("number of test {}".format(global_test_nid.shape[0]))
-    data = train_eids, train_nids, in_feats, g, global_train_nid, global_valid_nid, global_test_nid, labels
+    data = train_eids, train_nids, g, global_train_nid, global_valid_nid, global_test_nid, labels
     run(args, device, data)
     print("parent ends")
 
