@@ -22,7 +22,7 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 from dgl.distributed import DistDataLoader
 
-#from pyinstrument import Profiler
+from pyinstrument import Profiler
 from dgl.distributed import NodeEmbedding
 from dgl.distributed.optim import DistSparseAdagrad
 
@@ -32,12 +32,13 @@ def initializer(shape, dtype):
     return arr
 
 class DistEmb(nn.Module):
-    def __init__(self, num_nodes, emb_size):
+    def __init__(self, num_nodes, emb_size, dev_id='cpu'):
         super().__init__()
+        self.dev_id = dev_id
         self.emb = NodeEmbedding(num_nodes, emb_size, name='sage', init_func=initializer)
 
     def forward(self, idx):
-        return self.emb(idx)
+        return self.emb(idx, device=self.dev_id)
 
 
 class SAGE(nn.Module):
@@ -332,7 +333,7 @@ def run(args, device, data):
         drop_last=False)
 
     # Define model and optimizer
-    emb_layer = DistEmb(g.num_nodes(), args.num_hidden)
+    emb_layer = DistEmb(g.num_nodes(), args.num_hidden, device)
     model = DistSAGE(args.num_hidden, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
     if not args.standalone:
@@ -348,6 +349,9 @@ def run(args, device, data):
 
     # Training loop
     epoch = 0
+    #profiler = Profiler()
+    #if g.rank() == 0:
+    #    profiler.start()
     for epoch in range(args.num_epochs):
         sample_time = 0
         copy_time = 0
@@ -414,7 +418,15 @@ def run(args, device, data):
                     g.rank(), epoch, step, loss.item(), np.mean(iter_tput[3:]), np.sum(step_time[-args.log_every:]),
                     np.sum(sample_t[-args.log_every:]), np.sum(feat_copy_t[-args.log_every:]), np.sum(forward_t[-args.log_every:]),
                     np.sum(backward_t[-args.log_every:]), np.sum(update_t[-args.log_every:])))
+
+                #if g.rank() == 0:
+                #    profiler.stop()
+                #    print(profiler.output_text(unicode=True, color=True, show_all=True))
+                #    profiler.start()
+
             start = time.time()
+            if step > 1000:
+                break
 
         print('[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
             g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), num_seeds, num_inputs))
