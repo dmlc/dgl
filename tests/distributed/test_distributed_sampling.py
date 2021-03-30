@@ -26,7 +26,7 @@ def start_sample_client(rank, tmpdir, disable_shared_mem):
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _, _, _ = load_partition(tmpdir / 'test_sampling.json', rank)
-    dgl.distributed.initialize("rpc_ip_config.txt", 1)
+    dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_sampling", gpb=gpb)
     try:
         sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
@@ -40,7 +40,7 @@ def start_find_edges_client(rank, tmpdir, disable_shared_mem, eids):
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _, _, _ = load_partition(tmpdir / 'test_find_edges.json', rank)
-    dgl.distributed.initialize("rpc_ip_config.txt", 1)
+    dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_find_edges", gpb=gpb)
     try:
         u, v = find_edges(dist_graph, eids)
@@ -195,7 +195,7 @@ def start_hetero_sample_client(rank, tmpdir, disable_shared_mem):
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _, _, _ = load_partition(tmpdir / 'test_sampling.json', rank)
-    dgl.distributed.initialize("rpc_ip_config.txt", 1)
+    dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_sampling", gpb=gpb)
     assert 'feat' in dist_graph.nodes['n1'].data
     assert 'feat' not in dist_graph.nodes['n2'].data
@@ -302,7 +302,7 @@ def check_standalone_sampling(tmpdir, reshuffle):
                     num_hops=num_hops, part_method='metis', reshuffle=reshuffle)
 
     os.environ['DGL_DIST_MODE'] = 'standalone'
-    dgl.distributed.initialize("rpc_ip_config.txt", 1)
+    dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_sampling", part_config=tmpdir / 'test_sampling.json')
     sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
 
@@ -325,7 +325,7 @@ def test_standalone_sampling():
 
 def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
     gpb = None
-    dgl.distributed.initialize("rpc_ip_config.txt", 1)
+    dgl.distributed.initialize("rpc_ip_config.txt")
     if disable_shared_mem:
         _, _, _, gpb, _, _, _ = load_partition(tmpdir / 'test_in_subgraph.json', rank)
     dist_graph = DistGraph("test_in_subgraph", gpb=gpb)

@@ -5,7 +5,7 @@
  */
 
 #include "./utils.h"
-#include <cub/cub.cuh>
+#include "./dgl_cub.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 
 namespace dgl {
