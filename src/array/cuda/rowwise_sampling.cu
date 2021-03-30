@@ -125,9 +125,7 @@ __global__ void _CSRRowWiseSampleKernel(
     IdType * const out_idxs) {
   // we assign one warp per row
   assert(blockDim.x == WARP_SIZE);
-
-  __shared__ int swap_buffer[WARP_SIZE*BLOCK_ROWS];
-  __shared__ int index_buffer[WARP_SIZE*BLOCK_ROWS];
+  assert(blockDim.y == BLOCK_ROWS);
 
   // we need one state per 256 threads
   constexpr int NUM_RNG = ((WARP_SIZE*BLOCK_ROWS)+255)/256;
@@ -139,7 +137,7 @@ __global__ void _CSRRowWiseSampleKernel(
   __syncthreads();
   curandState * const rng = rng_array+((threadIdx.x+WARP_SIZE*threadIdx.y)/256);
 
-  int64_t out_row = blockIdx.x*blockDim.y+threadIdx.y;
+  int64_t out_row = blockIdx.x*BLOCK_ROWS+threadIdx.y;
   while (out_row < num_rows) {
     const int64_t row = in_rows[out_row];
 
@@ -157,64 +155,34 @@ __global__ void _CSRRowWiseSampleKernel(
         out_idxs[out_row_start+idx] = data ? data[in_idx] : in_idx;
       }
     } else {
-      // each thread needs to initialize it's random state
-      if (deg <= WARP_SIZE) {
-        // in this case, each thread generates an index to swap with which occurs
-        // at or after it's current index
-        swap_buffer[WARP_SIZE*threadIdx.y+threadIdx.x] = threadIdx.x +
-            (curand(rng) % (num_picks-threadIdx.x));
-        index_buffer[WARP_SIZE*threadIdx.y+threadIdx.x] = threadIdx.x;
+      // generate permutation list via reservoir algorithm
+      for (int idx = threadIdx.x; idx < num_picks; idx+=WARP_SIZE) {
+        out_idxs[out_row_start+idx] = idx;
+      }
+      __syncwarp();
 
-        __syncwarp();
-        // then the lead thread performs swap up until num_picks on the buffer
-        if (threadIdx.x == 0) {
-          for (int i = 0; i < num_picks; ++i) {
-            const int swap_idx = swap_buffer[WARP_SIZE*threadIdx.y+i];
-            const int tmp = index_buffer[WARP_SIZE*threadIdx.y+i];
-            index_buffer[WARP_SIZE*threadIdx.y+i] =
-                index_buffer[WARP_SIZE*threadIdx.y+swap_idx];
-            index_buffer[WARP_SIZE*threadIdx.y+swap_idx] = tmp;
-          }
+      for (int idx = num_picks+threadIdx.x; idx < deg; idx+=WARP_SIZE) {
+        const int num = curand(rng)%(idx+1);
+        if (num < num_picks) {
+          // use max so as to achieve the replacement order the serial
+          // algorithm would have
+          AtomicMax(out_idxs+out_row_start+num, idx);
         }
-        __syncwarp();
+      }
+      __syncwarp();
 
-        // finally, all threads copy the permutation
-        if (threadIdx.x < num_picks) {
-          const int perm_idx = index_buffer[WARP_SIZE*threadIdx.y+threadIdx.x];
-          assert(perm_idx < deg);
-          const int64_t in_idx = in_row_start+perm_idx;
-          const int64_t out_idx = out_row_start+threadIdx.x;
-          out_rows[out_idx] = row;
-          out_cols[out_idx] = in_index[in_idx];
-          out_idxs[out_idx] = data ? data[in_idx] : in_idx;
-        }
-      } else {
-        // generate permutation list via reservoir algorithm
-        for (int idx = threadIdx.x; idx < num_picks; idx+=WARP_SIZE) {
-          out_idxs[out_row_start+idx] = in_row_start+idx;
-        }
-        for (int idx = num_picks+threadIdx.x; idx < deg; idx+=WARP_SIZE) {
-          const int num = curand(rng)%(idx+1);
-          if (num < num_picks) {
-            // use max so as to achieve the replacement order the serial
-            // algorithm would have
-            AtomicMax(out_idxs+out_row_start+num, idx);
-          }
-        }
-
-        // copy permutation over
-        for (int idx = threadIdx.x; idx < num_picks; idx += WARP_SIZE) {
-          const IdType perm_idx = out_idxs[out_row_start+idx];
-          out_rows[out_row_start+idx] = row;
-          out_cols[out_row_start+idx] = in_index[perm_idx];
-          if (data) {
-            out_idxs[out_row_start+idx] = data[perm_idx];
-          }
+      // copy permutation over
+      for (int idx = threadIdx.x; idx < num_picks; idx += WARP_SIZE) {
+        const IdType perm_idx = out_idxs[out_row_start+idx]+in_row_start;
+        out_rows[out_row_start+idx] = row;
+        out_cols[out_row_start+idx] = in_index[perm_idx];
+        if (data) {
+          out_idxs[out_row_start+idx] = data[perm_idx];
         }
       }
     }
 
-    out_row += gridDim.x*blockDim.y;
+    out_row += gridDim.x*BLOCK_ROWS;
   }
 }
 
