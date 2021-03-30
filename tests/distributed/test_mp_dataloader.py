@@ -253,6 +253,7 @@ def test_dataloader(tmpdir, num_server, num_workers, dataloader_type):
 
     time.sleep(3)
     os.environ['DGL_DIST_MODE'] = 'distributed'
+    os.environ['DGL_NUM_SAMPLER'] = str(num_workers)
     ptrainer_list = []
     if dataloader_type == 'node':
         p = ctx.Process(target=start_node_dataloader, args=(
