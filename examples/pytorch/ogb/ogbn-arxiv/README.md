@@ -1,5 +1,7 @@
 # DGL examples for ogbn-arxiv
 
+DGL implementation of GCN and GAT for ogbn-arxiv. Some of the techniques is available at https://arxiv.org/abs/2103.13355.
+
 Requires DGL 0.5 or later versions.
 
 ### GCN
