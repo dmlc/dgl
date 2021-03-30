@@ -10,7 +10,7 @@ Pytorch implementation: https://github.com/Diego999/pyGAT
 import tensorflow as tf
 from tensorflow.keras import layers
 import dgl.function as fn
-from dgl.nn.tensorflow import edge_softmax, GATConv
+from dgl.nn import GATConv
 
 
 class GAT(tf.keras.Model):

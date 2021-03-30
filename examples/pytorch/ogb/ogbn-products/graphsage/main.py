@@ -214,7 +214,7 @@ if __name__ == '__main__':
     else:
         device = th.device('cpu')
 
-    # load reddit data
+    # load ogbn-products data
     data = DglNodePropPredDataset(name='ogbn-products')
     splitted_idx = data.get_idx_split()
     train_idx, val_idx, test_idx = splitted_idx['train'], splitted_idx['valid'], splitted_idx['test']
@@ -233,5 +233,5 @@ if __name__ == '__main__':
     # Run 10 times
     test_accs = []
     for i in range(10):
-        test_accs.append(run(args, device, data))
+        test_accs.append(run(args, device, data).cpu().numpy())
         print('Average test accuracy:', np.mean(test_accs), '±', np.std(test_accs))

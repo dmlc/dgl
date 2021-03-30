@@ -23,16 +23,23 @@ to disk. It does not support specifying branches and commits either. They are on
 available under ASV's managed environment.**
 
 To change the device for benchmarking, set the `DGL_BENCH_DEVICE` environment variable.
-Any valid PyTorch device strings are allowed.
+Allowed values are `"cpu"` or `"gpu"`.
 
 ```bash
-export DGL_BENCH_DEVICE=cuda:0
+export DGL_BENCH_DEVICE=gpu
 ```
 
 To select which benchmark to run, use the `--bench` flag. For example,
 
 ```bash
-asv run -n -e --python=save --verbose --bench model_acc.bench_gat
+asv run -n -e --python=same --verbose --bench model_acc.bench_gat
+```
+
+Note that OGB dataset need to be download manually to `/tmp/dataset` folder (i.e. `/tmp/dataset/ogbn-products/`) beforehand. 
+You can do it by runnnig the code below in this folder
+```python
+from benchmarks.utils import get_ogb_graph
+get_ogb_graph("ogbn-product")
 ```
 
 Run in docker locally
@@ -49,7 +56,7 @@ DGL runs all benchmarks automatically in docker container. To run bencmarks in d
 * Use the `publish.sh` script. It accepts two arguments, a name specifying the identity of
   the test machine and a device name. For example,
   ```bash
-  bash publish.sh dev-machine cuda:0
+  bash publish.sh dev-machine gpu
   ```
 
 The script will output two folders `results` and `html`. The `html` folder contains the

@@ -133,7 +133,7 @@ class DistDataLoader:
         if not self.drop_last and len(dataset) % self.batch_size != 0:
             self.expected_idxs += 1
 
-        # We need to have a unique Id for each data loader to identify itself
+        # We need to have a unique ID for each data loader to identify itself
         # in the sampler processes.
         global DATALOADER_ID
         self.name = "dataloader-" + str(DATALOADER_ID)
@@ -148,6 +148,9 @@ class DistDataLoader:
                 res.get()
 
     def __del__(self):
+        # When the process exits, the process pool may have been closed. We should try
+        # and get the process pool again and see if we need to clean up the process pool.
+        self.pool, self.num_workers = get_sampler_pool()
         if self.pool is not None:
             results = []
             for _ in range(self.num_workers):

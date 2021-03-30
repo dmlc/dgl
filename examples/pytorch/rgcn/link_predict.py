@@ -191,13 +191,13 @@ def main(args):
                                  valid_data, test_data, hits=[1, 3, 10], eval_bz=args.eval_batch_size,
                                  eval_p=args.eval_protocol)
             # save best model
-            if mrr < best_mrr:
-                if epoch >= args.n_epochs:
-                    break
-            else:
+            if best_mrr < mrr:
                 best_mrr = mrr
-                torch.save({'state_dict': model.state_dict(), 'epoch': epoch},
-                           model_state_file)
+                torch.save({'state_dict': model.state_dict(), 'epoch': epoch}, model_state_file)
+            
+            if epoch >= args.n_epochs:
+                break
+            
             if use_cuda:
                 model.cuda()
 

@@ -1,5 +1,9 @@
+.. _guide-distributed:
+
 Chapter 7: Distributed Training
 =====================================
+
+:ref:`(中文版) <guide_cn-distributed>`
 
 DGL adopts a fully distributed approach that distributes both data and computation
 across a collection of computation resources. In the context of this section, we
@@ -22,7 +26,7 @@ are the same as :ref:`mini-batch training <guide-minibatch>`.
     import dgl
     import torch as th
 
-    dgl.distributed.initialize('ip_config.txt', num_servers, num_workers)
+    dgl.distributed.initialize('ip_config.txt')
     th.distributed.init_process_group(backend='gloo')
     g = dgl.distributed.DistGraph('graph_name', 'part_config.json')
     pb = g.get_partition_book()
@@ -94,6 +98,7 @@ the following distributed components:
 
 * :ref:`guide-distributed-preprocessing`
 * :ref:`guide-distributed-apis`
+* :ref:`guide-distributed-hetero`
 * :ref:`guide-distributed-tools`
 
 .. toctree::
@@ -103,4 +108,5 @@ the following distributed components:
 
     distributed-preprocessing
     distributed-apis
+    distributed-hetero
     distributed-tools

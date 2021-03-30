@@ -3,6 +3,8 @@
 7.2 Distributed APIs
 --------------------
 
+:ref:`(中文版) <guide_cn-distributed-apis>`
+
 This section covers the distributed APIs used in the training script. DGL provides three distributed
 data structures and various APIs for initialization, distributed sampling and workload split.
 For distributed training/inference, DGL provides three distributed data structures:
@@ -21,7 +23,7 @@ Typically, the initialization APIs should be invoked in the following order:
 
 .. code:: python
 
-    dgl.distributed.initialize('ip_config.txt', num_workers=4)
+    dgl.distributed.initialize('ip_config.txt')
     th.distributed.init_process_group(backend='gloo')
 
 **Note**: If the training script contains user-defined functions (UDFs) that have to be invoked on
@@ -99,13 +101,11 @@ Users can also assign a new :class:`~dgl.distributed.DistTensor` to
 
 .. code:: python
 
-    g.ndata['train_mask']
-    <dgl.distributed.dist_graph.DistTensor at 0x7fec820937b8>
-    g.ndata['train_mask'][0]
-    tensor([1], dtype=torch.uint8)
+    g.ndata['train_mask']  # <dgl.distributed.dist_graph.DistTensor at 0x7fec820937b8>
+    g.ndata['train_mask'][0]  # tensor([1], dtype=torch.uint8)
 
 Distributed Tensor
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 
 As mentioned earlier, DGL shards node/edge features and stores them in a cluster of machines.
 DGL provides distributed tensors with a tensor-like interface to access the partitioned
@@ -122,7 +122,7 @@ in the cluster even if the :class:`~dgl.distributed.DistTensor` object disappear
 
 .. code:: python
 
-    tensor = dgl.distributed.DistTensor((g.number_of_nodes(), 10), th.float32, name=’test’)
+    tensor = dgl.distributed.DistTensor((g.number_of_nodes(), 10), th.float32, name='test')
 
 **Note**: :class:`~dgl.distributed.DistTensor` creation is a synchronized operation. All trainers
 have to invoke the creation and the creation succeeds only when all trainers call it. 
@@ -218,12 +218,6 @@ the sampler cannot run in Pytorch Dataloader with multiple worker processes. The
 Pytorch Dataloader creates new sampling worker processes in every epoch, which leads to creating and
 destroying :class:`~dgl.distributed.DistGraph` objects many times.
 
-The same high-level sampling APIs (:class:`~dgl.dataloading.pytorch.NodeDataloader` and
-:class:`~dgl.dataloading.pytorch.EdgeDataloader` ) work for both :class:`~dgl.DGLGraph`
-and :class:`~dgl.distributed.DistGraph`. When using :class:`~dgl.dataloading.pytorch.NodeDataloader`
-and :class:`~dgl.dataloading.pytorch.EdgeDataloader`, the distributed sampling code is exactly
-the same as single-process sampling.
-
 When using the low-level API, the sampling code is similar to single-process sampling. The only
 difference is that users need to use :func:`dgl.distributed.sample_neighbors` and
 :class:`~dgl.distributed.DistDataLoader`.
@@ -246,7 +240,11 @@ difference is that users need to use :func:`dgl.distributed.sample_neighbors` an
         for batch in dataloader:
             ...
 
-When using the high-level API, the distributed sampling code is identical to the single-machine sampling:
+The same high-level sampling APIs (:class:`~dgl.dataloading.pytorch.NodeDataloader` and
+:class:`~dgl.dataloading.pytorch.EdgeDataloader` ) work for both :class:`~dgl.DGLGraph`
+and :class:`~dgl.distributed.DistGraph`. When using :class:`~dgl.dataloading.pytorch.NodeDataloader`
+and :class:`~dgl.dataloading.pytorch.EdgeDataloader`, the distributed sampling code is exactly
+the same as single-process sampling.
 
 .. code:: python
 

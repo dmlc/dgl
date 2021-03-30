@@ -84,7 +84,7 @@ def bmm_maybe_select(A, B, index):
         return B[index, A, :]
     else:
         BB = nd.take(B, index, axis=0)
-        return nd.batch_dot(A.expand_dims(1), BB).squeeze()
+        return nd.batch_dot(A.expand_dims(1), BB).squeeze(1)
 
 def normalize(x, p=2, axis=1, eps=1e-12):
     r"""Performs :math:`L_p` normalization of inputs over specified dimension.

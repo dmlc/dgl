@@ -238,7 +238,7 @@ class RelGraphConv(nn.Module):
                 etypes = th.repeat_interleave(th.arange(len(etypes), device=device),
                                               th.tensor(etypes, device=device))
             weight = weight.index_select(0, etypes)
-            msg = th.bmm(h.unsqueeze(1), weight).squeeze()
+            msg = th.bmm(h.unsqueeze(1), weight).squeeze(1)
 
         if 'norm' in edges.data:
             msg = msg * edges.data['norm']
@@ -347,6 +347,8 @@ class RelGraphConv(nn.Module):
                 pos = _searchsorted(sorted_etypes, th.arange(self.num_rels, device=g.device))
                 num = th.tensor([len(etypes)], device=g.device)
                 etypes = (th.cat([pos[1:], num]) - pos).tolist()
+                if norm is not None:
+                    norm = norm[index]
 
         with g.local_scope():
             g.srcdata['h'] = feat
