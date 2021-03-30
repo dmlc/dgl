@@ -305,6 +305,8 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Reinforcement Learning For Data Poisoning on Graph Neural Networks**](https://arxiv.org/abs/2102.06800), *Jacob Dineen, A S M Ahsan-Ul Haque, Matthew Bielskas*
 
+1. [**GraphGallery: A Platform for Fast Benchmarking and Easy Development of Graph Neural Networks Based Intelligent Software**](https://arxiv.org/pdf/2102.07933.pdf), [Github](https://github.com/EdisonLeeeee/GraphGallery), *Jintang Li, Kun Xu, Liang Chen, Zibin Zheng, Xiao Liu*
+
 </details>
 
 ## Installation
