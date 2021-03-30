@@ -323,8 +323,10 @@ class TUDataset(DGLBuiltinDataset):
 
         for filename, field_name in self.attr_dict.items():
             try:
+                # data = loadtxt(self._file_path(filename),
+                #                delimiter=',').astype(int)
                 data = loadtxt(self._file_path(filename),
-                               delimiter=',').astype(int)
+                               delimiter=',')
                 if 'label' in filename:
                     data = F.tensor(self._idx_from_zero(data))
                 else:
