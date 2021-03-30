@@ -323,8 +323,6 @@ class TUDataset(DGLBuiltinDataset):
 
         for filename, field_name in self.attr_dict.items():
             try:
-                # data = loadtxt(self._file_path(filename),
-                #                delimiter=',').astype(int)
                 data = loadtxt(self._file_path(filename),
                                delimiter=',')
                 if 'label' in filename:
