@@ -66,8 +66,9 @@ def emb_init(shape, dtype):
 def rand_init(shape, dtype):
     return F.tensor(np.random.normal(size=shape), F.float32)
 
-def run_client(graph_name, part_id, num_clients, num_nodes, num_edges):
+def run_client(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
     time.sleep(5)
+    os.environ['DGL_NUM_SERVER'] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                                                 part_id, None)
@@ -224,8 +225,7 @@ def check_server_client(shared_mem, num_servers, num_clients):
     cli_ps = []
     for cli_id in range(num_clients):
         print('start client', cli_id)
-        os.environ['DGL_NUM_SERVER'] = str(num_servers)
-        p = ctx.Process(target=run_client, args=(graph_name, 0, num_clients, g.number_of_nodes(),
+        p = ctx.Process(target=run_client, args=(graph_name, 0, num_servers, num_clients, g.number_of_nodes(),
                                                  g.number_of_edges()))
         p.start()
         cli_ps.append(p)
@@ -239,8 +239,9 @@ def check_server_client(shared_mem, num_servers, num_clients):
     print('clients have terminated')
 
 
-def run_client_hetero(graph_name, part_id, num_clients, num_nodes, num_edges):
+def run_client_hetero(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
     time.sleep(5)
+    os.environ['DGL_NUM_SERVER'] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                                                 part_id, None)
@@ -362,8 +363,7 @@ def check_server_client_hetero(shared_mem, num_servers, num_clients):
     num_edges = {etype: g.number_of_edges(etype) for etype in g.etypes}
     for cli_id in range(num_clients):
         print('start client', cli_id)
-        os.environ['DGL_NUM_SERVER'] = str(num_servers)
-        p = ctx.Process(target=run_client_hetero, args=(graph_name, 0, num_clients, num_nodes,
+        p = ctx.Process(target=run_client_hetero, args=(graph_name, 0, num_servers, num_clients, num_nodes,
                                                         num_edges))
         p.start()
         cli_ps.append(p)
