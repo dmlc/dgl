@@ -58,7 +58,7 @@ class NodeEmbedding: # NodeEmbedding
     '''
 
     def __init__(self, num_embeddings, embedding_dim, name,
-                 init_func=None):
+                 init_func=None, nccl_comm=None, partition='remainder'):
         global _STORE
 
         # Check whether it is multi-gpu training or not.
@@ -70,32 +70,56 @@ class NodeEmbedding: # NodeEmbedding
             world_size = 0
         self._rank = rank
         self._world_size = world_size
-        host_name = '127.0.0.1'
-        port = 12346
+        self._comm = nccl_comm
 
-        if rank <= 0:
-            emb = create_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
-            if init_func is not None:
+        if not self._comm:
+            host_name = '127.0.0.1'
+            port = 12346
+
+            if rank <= 0:
+                emb = create_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
+                if init_func is not None:
+                    emb = init_func(emb)
+            if rank == 0: # the master gpu process
+                # for multi-gpu training, setup a TCPStore for
+                # embeding status synchronization across GPU processes
+                if _STORE is None:
+                    _STORE = th.distributed.TCPStore(
+                        host_name, port, world_size, True, timedelta(seconds=30))
+                for _ in range(1, world_size):
+                    # send embs
+                    _STORE.set(name, name)
+            elif rank > 0:
+                # receive
+                if _STORE is None:
+                    _STORE = th.distributed.TCPStore(
+                        host_name, port, world_size, False, timedelta(seconds=30))
+                _STORE.wait([name])
+                emb = get_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
+            self._store = _STORE
+            self._tensor = emb
+        else:
+            assert partition=='remainder', \
+                    "Only 'remainder' partition scheme is currently supported."
+            self._partition=partition
+
+            # create local tensors for the weights
+            local_size = num_embeddings
+            device = th.device(0)
+            if rank >= 0:
+                assert self._rank == self._comm.rank()
+                assert self._world_size == self._comm.size()
+
+                local_size = (num_embeddings / world_size) + \
+                    (rank > (num_embeddings % world_size))
+                device = th.device(rank)
+            # TODO(dlasalle): support 16-bit/half embeddings
+            emb = th.empty([local_size, embedding_dim], dtype=th.float32,
+                requires_grad=False, device=device)
+            if init_func:
                 emb = init_func(emb)
-        if rank == 0: # the master gpu process
-            # for multi-gpu training, setup a TCPStore for
-            # embeding status synchronization across GPU processes
-            if _STORE is None:
-                _STORE = th.distributed.TCPStore(
-                    host_name, port, world_size, True, timedelta(seconds=30))
-            for _ in range(1, world_size):
-                # send embs
-                _STORE.set(name, name)
-        elif rank > 0:
-            # receive
-            if _STORE is None:
-                _STORE = th.distributed.TCPStore(
-                    host_name, port, world_size, False, timedelta(seconds=30))
-            _STORE.wait([name])
-            emb = get_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
+            self._tensor = emb
 
-        self._store = _STORE
-        self._tensor = emb
         self._num_embeddings = num_embeddings
         self._embedding_dim = embedding_dim
         self._name = name
@@ -109,10 +133,19 @@ class NodeEmbedding: # NodeEmbedding
         device : th.device
             Target device to put the collected embeddings.
         """
-        emb = self._tensor[node_ids].to(device)
+        if not self._comm:
+            emb = self._tensor[node_ids].to(device)
+        else:
+            if self.world_size > 0:
+                emb = self._comm.sparse_request(
+                    node_ids, self._tensor, self._partition)
+            else:
+                emb = self._tensor[node_ids]
+            emb = emb.to(device)
         if F.is_recording():
             emb = F.attach_grad(emb)
             self._trace.append((node_ids.to(device, non_blocking=True), emb))
+            
         return emb
 
     @property

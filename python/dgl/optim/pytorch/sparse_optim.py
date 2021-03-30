@@ -428,33 +428,43 @@ class SparseAdam(SparseGradOptimizer):
         self._beta1 = betas[0]
         self._beta2 = betas[1]
         self._eps = eps
+
         # We need to register a state sum for each embedding in the kvstore.
         for emb in params:
             assert isinstance(emb, NodeEmbedding), \
                 'SparseAdam only supports dgl.nn.NodeEmbedding'
-
-            if self._rank <= 0:
+            if not comm:
+                if self._rank <= 0:
+                    emb_name = emb.name
+                    state_step = create_shared_mem_array(emb_name+'_step', \
+                        (emb.emb_tensor.shape[0],), th.float32).zero_()
+                    state_mem = create_shared_mem_array(emb_name+'_mem', \
+                        emb.emb_tensor.shape, th.float32).zero_()
+                    state_power = create_shared_mem_array(emb_name+'_power', \
+                        emb.emb_tensor.shape, th.float32).zero_()
+                if self._rank == 0:
+                    emb_name = emb.name
+                    if self._world_size > 1:
+                        emb.store.set(emb_name+'_opt', emb_name)
+                elif self._rank > 0:
+                    # receive
+                    emb_name = emb.name
+                    emb.store.wait([emb_name+'_opt'])
+                    state_step = get_shared_mem_array(emb_name+'_step', \
+                        (emb.emb_tensor.shape[0],), th.float32)
+                    state_mem = get_shared_mem_array(emb_name+'_mem', \
+                        emb.emb_tensor.shape, th.float32)
+                    state_power = get_shared_mem_array(emb_name+'_power', \
+                        emb.emb_tensor.shape, th.float32)
+            else:
+                # on gpu
                 emb_name = emb.name
-                state_step = create_shared_mem_array(emb_name+'_step', \
-                    (emb.emb_tensor.shape[0],), th.float32).zero_()
-                state_mem = create_shared_mem_array(emb_name+'_mem', \
-                    emb.emb_tensor.shape, th.float32).zero_()
-                state_power = create_shared_mem_array(emb_name+'_power', \
-                    emb.emb_tensor.shape, th.float32).zero_()
-            if self._rank == 0:
-                emb_name = emb.name
-                if self._world_size > 1:
-                    emb.store.set(emb_name+'_opt', emb_name)
-            elif self._rank > 0:
-                # receive
-                emb_name = emb.name
-                emb.store.wait([emb_name+'_opt'])
-                state_step = get_shared_mem_array(emb_name+'_step', \
-                    (emb.emb_tensor.shape[0],), th.float32)
-                state_mem = get_shared_mem_array(emb_name+'_mem', \
-                    emb.emb_tensor.shape, th.float32)
-                state_power = get_shared_mem_array(emb_name+'_power', \
-                    emb.emb_tensor.shape, th.float32)
+                state_step = th.empty([emb.emb_tensor.shape[0]],
+                    dtype=th.float32, device=emb.emb_tensor.device).zero_()
+                state_mem = th.empty(emb.emb_tensor.shape,
+                    dtype=th.float32, device=emb.emb_tensor.device).zero_()
+                state_power = th.empty(emb.emb_tensor.shape,
+                    dtype=th.float32, device=emb.emb_tensor.device).zero_()
 
             state = (state_step, state_mem, state_power)
             emb.set_optm_state(state)

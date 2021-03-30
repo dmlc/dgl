@@ -81,7 +81,8 @@ class RelGraphEmbedLayer(nn.Module):
                  num_of_ntype,
                  input_size,
                  embed_size,
-                 dgl_sparse=False):
+                 dgl_sparse=False,
+                 nccl_comm=None):
         super(RelGraphEmbedLayer, self).__init__()
         self.dev_id = th.device(dev_id if dev_id >= 0 else 'cpu')
         self.embed_size = embed_size
@@ -97,7 +98,7 @@ class RelGraphEmbedLayer(nn.Module):
             if isinstance(input_size[ntype], int):
                 if dgl_sparse:
                     self.node_embeds[str(ntype)] = dgl.nn.NodeEmbedding(input_size[ntype], embed_size, name=str(ntype),
-                        init_func=initializer)
+                        init_func=initializer, nccl_comm=nccl_comm)
                 else:
                     sparse_emb = th.nn.Embedding(input_size[ntype], embed_size, sparse=True)
                     nn.init.uniform_(sparse_emb.weight, -1.0, 1.0)
@@ -136,7 +137,7 @@ class RelGraphEmbedLayer(nn.Module):
         tensor
             embeddings as the input of the next layer
         """
-        tsd_ids = node_ids.to(self.dev_id)
+        #tsd_ids = node_ids.to(self.dev_id)
         embeds = th.empty(node_ids.shape[0], self.embed_size, device=self.dev_id)
         for ntype in range(self.num_of_ntype):
             loc = node_tids == ntype

@@ -265,7 +265,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
                                      num_of_ntype,
                                      node_feats,
                                      args.n_hidden,
-                                     dgl_sparse=args.dgl_sparse)
+                                     dgl_sparse=args.dgl_sparse,
+                                     nccl_comm=nccl_comm)
 
     # create model
     # all model params are in device.
@@ -349,7 +350,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
             seeds, blocks = sample_data
             t0 = time.time()
             feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                                blocks[0].srcdata['ntype'],
+                                blocks[0].srcdata['ntype'].to(dev_id),
                                 blocks[0].srcdata['type_id'],
                                 node_feats)
             logits = model(blocks, feats)
@@ -370,7 +371,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
             forward_time.append(t1 - t0)
             backward_time.append(t2 - t1)
             train_acc = th.sum(logits.argmax(dim=1) == labels[seeds]).item() / len(seeds)
-            if proc_id == 0:
+            if proc_id == 0 and i % 20 == 0:
                 print("Train Accuracy: {:.4f} | {} | Train Loss: {:.4f}".
                     format(train_acc, i, loss.item()))
         gc.collect()
