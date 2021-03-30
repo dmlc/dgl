@@ -349,10 +349,12 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
         for i, sample_data in enumerate(loader):
             seeds, blocks = sample_data
             t0 = time.time()
+            nvtx.range_push("emb_layer")
             feats = embed_layer(blocks[0].srcdata[dgl.NID],
                                 blocks[0].srcdata['ntype'].to(dev_id),
-                                blocks[0].srcdata['type_id'],
+                                blocks[0].srcdata['type_id'].to(dev_id),
                                 node_feats)
+            nvtx.range_pop()
             logits = model(blocks, feats)
             loss = F.cross_entropy(logits, labels[seeds])
             t1 = time.time()
