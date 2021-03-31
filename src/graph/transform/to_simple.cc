@@ -9,10 +9,10 @@
 #include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/heterograph.h>
-#include <vector>
-#include <utility>
 #include <dgl/unit_graph.h>
 #include <dgl/c_api_common.h>
+#include <vector>
+#include <utility>
 
 namespace dgl {
 

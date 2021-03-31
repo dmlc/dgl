@@ -4,8 +4,8 @@
  * \brief Heterograph
  */
 
-#ifndef DGL_GRAPH_HETEROGRAPH_H_
-#define DGL_GRAPH_HETEROGRAPH_H_
+#ifndef DGL_HETEROGRAPH_H_
+#define DGL_HETEROGRAPH_H_
 
 #include <dgl/runtime/shared_mem.h>
 #include <dgl/base_heterograph.h>
@@ -285,4 +285,4 @@ DMLC_DECLARE_TRAITS(has_saveload, dgl::HeteroGraph, true);
 }  // namespace dmlc
 
 
-#endif  // DGL_GRAPH_HETEROGRAPH_H_
+#endif /* DGL_HETEROGRAPH_H_ */

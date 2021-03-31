@@ -4,8 +4,8 @@
  * \brief UnitGraph graph
  */
 
-#ifndef DGL_UNIT_GRAPH_H
-#define DGL_UNIT_GRAPH_H
+#ifndef DGL_UNIT_GRAPH_H_
+#define DGL_UNIT_GRAPH_H_
 
 #include <dgl/base_heterograph.h>
 #include <dgl/lazy.h>
@@ -360,4 +360,4 @@ DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph::CSR, true);
 DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph::COO, true);
 }  // namespace dmlc
 
-#endif /* DGL_UNIT_GRAPH_H */
+#endif /* DGL_UNIT_GRAPH_H_ */

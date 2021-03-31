@@ -10,6 +10,7 @@
 #include <dgl/base_heterograph.h>
 #include <dgl/heterograph.h>
 #include <dgl/unit_graph.h>
+#include <dgl/c_api_common.h>
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
 #include <string.h>
@@ -17,7 +18,6 @@
 #include <numeric>
 #include <tuple>
 
-#include <dgl/c_api_common.h>
 
 using namespace dgl::runtime;
 

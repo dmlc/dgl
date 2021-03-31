@@ -9,8 +9,8 @@
 #include <dgl/runtime/container.h>
 #include <dgl/heterograph.h>
 #include <dgl/unit_graph.h>
-#include <set>
 #include <dgl/c_api_common.h>
+#include <set>
 
 using namespace dgl::runtime;
 
