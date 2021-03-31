@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 from distutils.version import LooseVersion
+from typing import List
 
 import scipy # Weird bug in new pytorch when import scipy after import torch
 import torch as th
@@ -201,7 +202,7 @@ def scatter_row_inplace(data, row_index, value):
 def squeeze(input, dim):
     return th.squeeze(input, dim)
 
-def unsqueeze(input, dim):
+def unsqueeze(input, dim: int):
     return th.unsqueeze(input, dim)
 
 def reshape(input, shape):
@@ -210,7 +211,7 @@ def reshape(input, shape):
 def swapaxes(input, axis1, axis2):
     return th.transpose(input, axis1, axis2)
 
-def zeros(shape, dtype, ctx):
+def zeros(shape: List[int], dtype: th.dtype, ctx: th.device):
     return th.zeros(shape, dtype=dtype, device=ctx)
 
 def zeros_like(input):

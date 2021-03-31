@@ -1,13 +1,23 @@
 """Module for sparse matrix operators."""
 # pylint: disable= invalid-name
 from __future__ import absolute_import
+from typing import List, Optional
 from . import ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
 
 
-def infer_broadcast_shape(op, shp1, shp2):
+USE_TORCH = True
+
+from torch import Tensor
+import torch
+torch.classes.load_library("/home/ubuntu/dev/torchdgl/build/libTorchDGLGraph.so")
+TorchDGLGraph = torch.classes.my_classes.TorchDGLGraph
+TorchDGLMetaGraph = torch.classes.my_classes.TorchDGLMetaGraph
+
+
+def infer_broadcast_shape(op: str, shp1: List[int], shp2: List[int]):
     r"""Check the shape validity, and infer the output shape given input shape and operator.
     Note the both :attr:`shp1`, :attr:`shp2` and the returned shape are feature
     shapes (i.e. we remove the first dimension, which correspond to graph statistics
@@ -50,18 +60,24 @@ def infer_broadcast_shape(op, shp1, shp2):
         if d1 != d2 and d1 != 1 and d2 != 1:
             raise DGLError("Feature shapes {} and {} are not valid for broadcasting."
                            .format(shp1, shp2))
-    rst = tuple(max(d1, d2) for d1, d2 in zip(pad_shp1, pad_shp2))
+    rst = [max(d1, d2) for d1, d2 in zip(pad_shp1, pad_shp2)]
     return rst[:-1] + (1,) if op == "dot" else rst
 
 
 def to_dgl_nd(x):
     """Convert framework-specific tensor/None to dgl ndarray."""
-    return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray(x)
+    if True:
+        return x
+    else:
+        return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray(x)
 
 
 def to_dgl_nd_for_write(x):
     """Convert framework-specific tensor/None to dgl ndarray for write."""
-    return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
+    if True:
+        return x
+    else:
+        return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
 
 
 target_mapping = {
@@ -73,8 +89,7 @@ target_mapping = {
     'dst': 2
 }
 
-
-def _gspmm(gidx, op, reduce_op, u, e):
+def _gspmm(gidx: TorchDGLGraph, op: str, reduce_op: str, u: Tensor, e:Tensor):
     r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
     :attr:`op` on source node feature and edge feature, leads to a message on edge.
     Then aggregates the message by :attr:`reduce_op` on destination nodes.
@@ -137,15 +152,20 @@ def _gspmm(gidx, op, reduce_op, u, e):
 
     ctx = F.context(u) if use_u else F.context(e)
     dtype = F.dtype(u) if use_u else F.dtype(e)
-    u_shp = F.shape(u) if use_u else (0,)
-    e_shp = F.shape(e) if use_e else (0,)
+    u_shp = F.shape(u) if use_u else [0,]
+    e_shp = F.shape(e) if use_e else [0,]
     _, dsttype = gidx.metagraph.find_edge(0)
     v_shp = (gidx.number_of_nodes(dsttype), ) +\
         infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
     v = F.zeros(v_shp, dtype, ctx)
     use_cmp = reduce_op in ['max', 'min']
-    arg_u, arg_e = None, None
-    idtype = getattr(F, gidx.dtype)
+    arg_u: Optional[torch.Tensor] = None
+    arg_e: Optional[torch.Tensor] = None
+    if gidx.dtype == "int64":
+        idtype = F.int64
+    else:
+        idtype = F.int32
+    # idtype = getattr(F, gidx.dtype)
     if use_cmp:
         if use_u:
             arg_u = F.zeros(v_shp, idtype, ctx)
