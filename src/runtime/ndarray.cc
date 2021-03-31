@@ -251,7 +251,7 @@ template<typename T>
 NDArray NDArray::FromVector(const std::vector<T>& vec, DLContext ctx) {
   const DLDataType dtype = DLDataTypeTraits<T>::dtype;
   int64_t size = static_cast<int64_t>(vec.size());
-  NDArray ret = NDArray::Empty({size}, dtype, DLContext{kDLCPU, 0});
+  NDArray ret = NDArray::Empty({size}, dtype, ctx);
   DeviceAPI::Get(ctx)->CopyDataFromTo(
       vec.data(),
       0,

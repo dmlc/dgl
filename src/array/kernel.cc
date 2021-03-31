@@ -144,7 +144,7 @@ std::pair<CSRMatrix, NDArray> CSRMM(
 
   std::pair<CSRMatrix, NDArray> ret;
   // TODO(BarclayII): change to ATEN_XPU_SWITCH_CUDA once the GPU kernels are implemented
-  ATEN_XPU_SWITCH(A.indptr->ctx.device_type, XPU, "CSRMM", {
+  ATEN_XPU_SWITCH_CUDA(A.indptr->ctx.device_type, XPU, "CSRMM", {
     ATEN_ID_TYPE_SWITCH(A.indptr->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH(A_weights->dtype, DType, "Edge weights", {
         ret = CSRMM<XPU, IdType, DType>(A, A_weights, B, B_weights);
