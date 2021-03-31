@@ -85,7 +85,7 @@ class DistSAGE(SAGE):
                 input_nodes = block.srcdata[dgl.NID]
                 output_nodes = block.dstdata[dgl.NID]
                 if l == 0:
-                    h = emb_layer(batch_inputs)
+                    h = emb_layer(input_nodes)
                 else:
                     h = x[input_nodes].to(device)
                 h_dst = h[:block.number_of_dst_nodes()]
@@ -230,8 +230,6 @@ def run(args, device, data):
                 #    profiler.start()
 
             start = time.time()
-            if step > 1000:
-                break
 
         print('[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
             g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), num_seeds, num_inputs))
