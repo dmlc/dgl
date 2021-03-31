@@ -4,8 +4,8 @@
  * \brief Sort COO index
  */
 #include <dgl/array.h>
+#include <dgl/c_api_common.h>
 #include "../../runtime/cuda/cuda_common.h"
-#include "../../c_api_common.h"
 #include "./utils.h"
 
 namespace dgl {
