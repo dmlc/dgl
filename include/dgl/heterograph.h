@@ -285,4 +285,4 @@ DMLC_DECLARE_TRAITS(has_saveload, dgl::HeteroGraph, true);
 }  // namespace dmlc
 
 
-#endif // DGL_HETEROGRAPH_H_
+#endif  // DGL_HETEROGRAPH_H_

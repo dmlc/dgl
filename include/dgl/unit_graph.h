@@ -360,4 +360,4 @@ DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph::CSR, true);
 DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph::COO, true);
 }  // namespace dmlc
 
-#endif // DGL_UNIT_GRAPH_H_
+#endif  // DGL_UNIT_GRAPH_H_
