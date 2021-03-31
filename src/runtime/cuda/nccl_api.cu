@@ -312,6 +312,16 @@ void NCCLCommunicator::SparseAllToAll<int64_t, __half>(
       const int64_t * const recv_prefix,
       cudaStream_t stream);
 
+int NCCLCommunicator::size() const {
+  return size_;
+}
+
+int NCCLCommunicator::rank() const {
+  return rank_;
+}
+
+
+
 template<typename IdType, typename DType>
 void GenerateSparseBuffersFromRemainder(
     DeviceAPI* const device,
@@ -439,7 +449,7 @@ void GenerateSparseBuffersFromRemainder(
 }
 
 template<typename IdType, typename DType>
-std::pair<IdArray, NDArray> SparseExchange(
+std::pair<IdArray, NDArray> SparsePush(
     NCCLCommunicatorRef comm,
     IdArray in_idx,
     NDArray in_value,
@@ -586,12 +596,171 @@ std::pair<IdArray, NDArray> SparseExchange(
   return std::pair<IdArray, NDArray>(recv_idx, recv_value);
 }
 
-int NCCLCommunicator::size() const {
-  return size_;
-}
+template<typename IdType, typename DType>
+NDArray SparsePull(
+    NCCLCommunicatorRef comm,
+    IdArray req_idx,
+    NDArray tensor,
+    const int mode_id) {
+  CHECK_EQ(in_idx->shape[0], in_value->shape[0]);
 
-int NCCLCommunicator::rank() const {
-  return rank_;
+  const auto& ctx = in_idx->ctx;
+  CHECK_EQ(ctx, in_value->ctx);
+  auto device = DeviceAPI::Get(ctx);
+
+  // TODO(dlasalle): Get the stream from the device context.
+  cudaStream_t stream = 0;
+
+  CHECK_EQ(in_idx->ndim, 1);
+
+  const int64_t num_in = in_idx->shape[0];
+  int64_t num_feat = 1;
+  for (int d = 1; d < in_value->ndim; ++d) {
+    num_feat *= in_value->shape[d];
+  }
+
+  const int64_t comm_size = comm->size();
+
+  if (comm_size == 1) {
+    // Just return index selection from current tensor
+    return IndexSelect(tensor, req_idx);
+  }
+
+  // First we need to send our requests to other processors. This means
+  // re-ordering our index array to be contiguous among processors, and
+  // counting the number of indices we are sending each processor. For now,
+  // we assume a poorly partitioned graph, and that there exists the
+  // possibility that each processor could request data from this one.
+
+
+
+  // the buffer for us to re-order our requests in
+  IdType * send_idx = static_cast<IdType*>(device->AllocWorkspace(ctx,
+      num_in*sizeof(IdType)));
+  // the number of indexes we need to send to each processor 
+  int64_t * send_sum = static_cast<int64_t*>(device->AllocWorkspace(ctx,
+      (comm_size+1)*sizeof(int64_t)));
+
+  CHECK_EQ(mode_id, static_cast<int>(AllToAllMode::REMAINDER));
+  GenerateSparseBufferFromRemainder(
+      device,
+      ctx,
+      comm_size,
+      num_in,
+      static_cast<const IdType*>(in_idx->data),
+      send_idx,
+      send_sum,
+      stream);
+
+  // compute the prefix sum of the indexes this process is requesting
+  int64_t * send_prefix = static_cast<int64_t*>(
+      device->AllocWorkspace(ctx, sizeof(int64_t)*(comm_size+1)));
+  {
+    size_t prefix_workspace_size;
+    CUDA_CALL(cub::DeviceScan::ExclusiveSum(nullptr, prefix_workspace_size,
+        send_sum, send_prefix, comm_size+1));
+
+    void * prefix_workspace = device->AllocWorkspace(
+        ctx, prefix_workspace_size);
+    CUDA_CALL(cub::DeviceScan::ExclusiveSum(prefix_workspace, prefix_workspace_size,
+        send_sum, send_prefix, comm_size+1));
+    device->FreeWorkspace(ctx, prefix_workspace);
+  }
+
+  std::vector<int64_t> send_prefix_host(comm_size+1);
+  device->CopyDataFromTo(
+      send_prefix,
+      0,
+      send_prefix_host.data(),
+      0,
+      send_prefix_host.size()*sizeof(*send_prefix),
+      ctx,
+      DGLContext{kDLCPU, 0},
+      DGLType{kDLInt, sizeof(*send_prefix)*8, 1},
+      stream);
+  device->FreeWorkspace(ctx, send_prefix);
+  CHECK_EQ(send_prefix_host.back(), num_in);
+
+  // communicate the amount requested
+  int64_t * recv_sum = static_cast<int64_t*>(
+      device->AllocWorkspace(ctx, sizeof(int64_t)*(comm_size+1)));
+  comm->AllToAll(send_sum, recv_sum, 1, stream);
+
+  // compute the prefix sum of the requested indexes
+  int64_t * recv_prefix = static_cast<int64_t*>(
+      device->AllocWorkspace(ctx, sizeof(int64_t)*(comm_size+1)));
+  {
+    size_t prefix_workspace_size;
+    CUDA_CALL(cub::DeviceScan::ExclusiveSum(nullptr, prefix_workspace_size,
+        recv_sum, recv_prefix, comm_size+1));
+
+    void * prefix_workspace = device->AllocWorkspace(
+        ctx, prefix_workspace_size);
+    CUDA_CALL(cub::DeviceScan::ExclusiveSum(prefix_workspace, prefix_workspace_size,
+        recv_sum, recv_prefix, comm_size+1));
+    device->FreeWorkspace(ctx, prefix_workspace);
+  }
+
+  // finally copy the prefixsum sum down to the host
+  std::vector<int64_t> recv_prefix_host(comm_size+1);
+  device->CopyDataFromTo(
+      recv_prefix,
+      0,
+      recv_prefix_host.data(),
+      0,
+      recv_prefix_host.size()*sizeof(*recv_prefix),
+      ctx,
+      DGLContext{kDLCPU, 0},
+      DGLType{kDLInt, sizeof(*recv_prefix)*8, 1},
+      stream);
+  device->FreeWorkspace(ctx, recv_prefix);
+
+  // use an event to track when copying is done
+  cudaEvent_t d2h;
+  cudaEventCreate(&d2h);
+  cudaEventRecord(d2h, stream);
+
+  // allocate output space
+  cudaEventSynchronize(d2h);
+  cudaEventDestroy(d2h);
+
+  // gather requested indexes
+  comm->AllToAllV(
+      send_idx,
+      send_prefix_host.data(),
+      static_cast<IdType*>(recv_idx->data),
+      recv_prefix_host.data(),
+      stream);
+
+  // convert requested indices to local indices depending on partition 
+  _ConvertToLocal<<<>>>(recv_idx->data);
+
+  // and then index select them into place
+  NDArray send_value = IndexSelect(tensor, local_idxs);
+
+  // we will collect recieved values in this array
+  std::vector<int64_t> value_shape(tensor->ndim, 0);
+  value_shape[0] = send_prefix_host.back();
+  for (int d = 1; d < in_value->ndim; ++d) {
+    value_shape[d] = in_value->shape[d];
+  }
+  NDArray recv_value = NDArray::Empty(value_shape, in_value->dtype, ctx);
+
+  // send the values 
+  comm->SparseAllToAll(
+      send_idx,
+      send_value,
+      num_feat,
+      send_prefix_host.data(),
+      static_cast<IdType*>(recv_idx->data),
+      static_cast<DType*>(recv_value->data),
+      recv_prefix_host.data(),
+      stream);
+  device->FreeWorkspace(ctx, send_idx);
+  device->FreeWorkspace(ctx, send_value);
+
+  // finally, we need to permute the values back into the requested order
+  return IndexSelect(recv_value, inv_perm);
 }
 
 /* CAPI **********************************************************************/
@@ -611,7 +780,7 @@ DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLCreateComm")
         idObj->Get()));
 });
 
-DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLSparseAllToAll")
+DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLSparseAllToAllPush")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   NCCLCommunicatorRef comm = args[0];
   IdArray in_idx = args[1];
@@ -621,7 +790,7 @@ DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLSparseAllToAll")
   List<ObjectRef> ret;
   ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
     ATEN_DTYPE_SWITCH(in_values->dtype, DType, "values", {
-      auto result = SparseExchange<IdType, DType>(comm, in_idx, in_values, mode_id);
+      auto result = SparsePush<IdType, DType>(comm, in_idx, in_values, mode_id);
       ret.push_back(Value(MakeValue(result.first)));
       ret.push_back(Value(MakeValue(result.second)));
     });
@@ -629,6 +798,30 @@ DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLSparseAllToAll")
 
   *rv = ret;
 });
+
+DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLSparseAllToAllPull")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  NCCLCommunicatorRef comm = args[0];
+  // the indexes this process is requesting from others
+  IdArray req_idx = args[1];
+
+  // the tensor this process has to fulfill other requests
+  NDArray tensor = args[2];
+  const int mode_id = args[3];
+
+  List<ObjectRef> ret;
+  ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
+    ATEN_DTYPE_SWITCH(tensor->dtype, DType, "values", {
+      auto result = SparsePull<IdType, DType>(comm, in_idx, in_values, mode_id);
+      ret.push_back(Value(MakeValue(result.first)));
+      ret.push_back(Value(MakeValue(result.second)));
+    });
+  });
+
+  *rv = ret;
+});
+
+
 
 }
 }

@@ -38,7 +38,7 @@ class Communicator(object):
     def sparse_all_to_all(self, idx, value, mode):
         mode_id = _COMM_MODES_MAP[mode]
 
-        out_idx, out_value = _CAPI_DGLNCCLSparseAllToAll(
+        out_idx, out_value = _CAPI_DGLNCCLSparseAllToAllPush(
             self.get(), F.zerocopy_to_dgl_ndarray(idx),
             F.zerocopy_to_dgl_ndarray(value),
             mode_id)
