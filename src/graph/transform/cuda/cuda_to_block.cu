@@ -8,6 +8,7 @@
 
 #include <dgl/runtime/device_api.h>
 #include <dgl/immutable_graph.h>
+#include <dgl/heterograph.h>
 #include <cuda_runtime.h>
 #include <utility>
 #include <algorithm>
@@ -15,7 +16,6 @@
 
 #include "../../../runtime/cuda/cuda_common.h"
 #include "../../../runtime/cuda/cuda_hashtable.cuh"
-#include "../../heterograph.h"
 #include "../to_bipartite.h"
 
 using namespace dgl::aten;
