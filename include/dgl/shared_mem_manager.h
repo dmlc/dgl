@@ -52,4 +52,4 @@ class SharedMemManager : public dmlc::Stream {
 
 }  // namespace dgl
 
-#endif /* DGL_SHARED_MEM_MANAGER_H_ */
+#endif // DGL_SHARED_MEM_MANAGER_H_

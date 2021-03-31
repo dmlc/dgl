@@ -64,4 +64,4 @@ inline void CheckShape(
 }  // namespace aten
 }  // namespace dgl
 
-#endif /* ATEN_CHECK_H_ */
+#endif // ATEN_CHECK_H_
