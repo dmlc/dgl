@@ -137,7 +137,7 @@ class NodeEmbedding: # NodeEmbedding
             emb = self._tensor[node_ids].to(device)
         else:
             if self.world_size > 0:
-                emb = self._comm.sparse_request(
+                emb = self._comm.sparse_all_to_all_pull(
                     node_ids, self._tensor, self._partition)
             else:
                 emb = self._tensor[node_ids]

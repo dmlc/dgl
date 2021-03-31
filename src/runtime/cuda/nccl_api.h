@@ -61,19 +61,20 @@ class NCCLCommunicator : public runtime::Object {
   /**
    * @brief Perform an all-to-all variable sized communication.
    *
+   * @tparam DType The type of value to send.
    * @param send The arrays of data to send.
-   * @param send_size The size of each array to send.
+   * @param send_prefix The prefix of each array to send.
    * @param recv The arrays of data to recieve.
-   * @param recv_size The size of each array to recieve.
+   * @param recv_prefix The prefix of each array to recieve.
    * @param type The type of data to send.
    * @param stream The stream to operate on.
    */
+  template<typename DType>
   void AllToAllV(
-      const void * const * const send,
-      const int64_t * send_size,
-      void * const * const recv,
-      const int64_t * recv_size,
-      ncclDataType_t type,
+      const DType * const send,
+      const int64_t * send_prefix,
+      DType * const recv,
+      const int64_t * recv_prefix,
       cudaStream_t stream);
 
   /**

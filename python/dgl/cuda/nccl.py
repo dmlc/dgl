@@ -35,7 +35,7 @@ class Communicator(object):
         self._rank = rank
         self._size = size
 
-    def sparse_all_to_all(self, idx, value, mode):
+    def sparse_all_to_all_push(self, idx, value, mode):
         mode_id = _COMM_MODES_MAP[mode]
 
         out_idx, out_value = _CAPI_DGLNCCLSparseAllToAllPush(
@@ -44,6 +44,15 @@ class Communicator(object):
             mode_id)
         return (F.zerocopy_from_dgl_ndarray(out_idx),
             F.zerocopy_from_dgl_ndarray(out_value))
+
+    def sparse_all_to_all_pull(self, req_idx, value, mode):
+        mode_id = _COMM_MODES_MAP[mode]
+
+        out_value = _CAPI_DGLNCCLSparseAllToAllPull(
+            self.get(), F.zerocopy_to_dgl_ndarray(idx),
+            F.zerocopy_to_dgl_ndarray(value),
+            mode_id)
+        return F.zerocopy_from_dgl_ndarray(out_value)
 
     def get(self):
         return self._handle

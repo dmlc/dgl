@@ -12,6 +12,7 @@
 #include "cuda_common.h"
 #include "../../kernel/cuda/atomic.cuh"
 #include "../../array/cuda/dgl_cub.cuh"
+#include "../../array/cuda/array_index_select.cuh"
 
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
@@ -107,7 +108,7 @@ __global__ void _DualPermKernel(
   if (tidx < num_in) {
     const IdType perm_idx = perm[tidx];
     assert(perm_idx < num_in);
-    out_idx[perm_idx] = in_idx[tidx];
+    out_idx[tidx] = in_idx[perm_idx];
   }
 
   if (num_feat > 1) {
@@ -116,14 +117,14 @@ __global__ void _DualPermKernel(
       if (bidx < num_in) {
         const IdType perm_idx = perm[bidx];
         for (int64_t f = threadIdx.x; f < num_feat; f+=blockDim.x) {
-          out_value[perm_idx*num_feat+f] = in_value[bidx*num_feat+f];
+          out_value[bidx*num_feat+f] = in_value[perm_idx*num_feat+f];
         }
       }
     }
   } else {
     if (tidx < num_in) {
       const IdType perm_idx = perm[tidx];
-      out_value[perm_idx] = in_value[tidx];
+      out_value[tidx] = in_value[perm_idx];
     }
   }
 }
@@ -165,6 +166,43 @@ __global__ void _CountIndexByRemainder(
     }
   }
 }
+
+template<typename IdType>
+__global__ void _ConvertToLocalByRemainder(
+    IdType * const items,
+    const int64_t num_items,
+    const int comm_size)
+{
+  const int64_t idx = threadIdx.x+blockDim.x*blockIdx.x;
+
+  if (idx < num_items) {
+    items[idx] = items[idx] / comm_size;
+  }
+}
+
+template <typename DType, typename IdType>
+__global__ void _InversePermKernel(
+        const DType* const array, 
+        const int64_t num_feat,
+        int64_t length,
+        const IdType* const perm,
+        DType* const out) {
+  int64_t in_row = blockIdx.x*blockDim.y+threadIdx.y;
+
+  const int64_t stride = blockDim.y*gridDim.x;
+
+  while (in_row < length) {
+    int64_t col = threadIdx.x;
+    const int64_t out_row = perm[in_row];
+    while (col < num_feat) {
+      out[out_row*num_feat+col] = array[in_row*num_feat+col];
+      col += blockDim.x;
+    }
+    in_row += stride;
+  }
+}
+
+
 
 }
 
@@ -209,25 +247,62 @@ ncclComm_t NCCLCommunicator::Get()
   return comm_;
 }
 
+template<typename DType>
 void NCCLCommunicator::AllToAllV(
-    const void * const * const send,
-    const int64_t * send_size,
-    void * const * const recv,
-    const int64_t * recv_size,
-    const ncclDataType_t type,
+    const DType * const send,
+    const int64_t * const send_prefix,
+    DType * const recv,
+    const int64_t * const recv_prefix,
     cudaStream_t stream)
 { 
+  const ncclDataType_t type = NCCLType<DType>();
+
   NCCL_CALL(ncclGroupStart());
   for (int r = 0; r < size_; ++r) {
-    if (send_size[r] > 0) {
-      NCCL_CALL(ncclSend(send[r], send_size[r], type, r, comm_, stream));
+    const int64_t send_size = send_prefix[r+1]-send_prefix[r];
+    if (send_size > 0) {
+      NCCL_CALL(ncclSend(send+send_prefix[r], send_size, type, r, comm_, stream));
     }
-    if (recv_size[r] > 0) {
-      NCCL_CALL(ncclRecv(recv[r], recv_size[r], type, r, comm_, stream));
+    const int64_t recv_size = recv_prefix[r+1]-recv_prefix[r];
+    if (recv_size > 0) {
+      NCCL_CALL(ncclRecv(recv+recv_prefix[r], recv_size, type, r, comm_, stream));
     }
   }
   NCCL_CALL(ncclGroupEnd());
 }
+
+template
+void NCCLCommunicator::AllToAllV<int32_t>(
+    const int32_t * const send,
+    const int64_t * send_prefix,
+    int32_t * const recv,
+    const int64_t * recv_prefix,
+    cudaStream_t stream);
+template
+void NCCLCommunicator::AllToAllV<int64_t>(
+    const int64_t * const send,
+    const int64_t * send_prefix,
+    int64_t * const recv,
+    const int64_t * recv_prefix,
+    cudaStream_t stream);
+template
+void NCCLCommunicator::AllToAllV<float>(
+    const float * const send,
+    const int64_t * send_prefix,
+    float * const recv,
+    const int64_t * recv_prefix,
+    cudaStream_t stream);
+template
+void NCCLCommunicator::AllToAllV<__half>(
+    const __half * const send,
+    const int64_t * send_prefix,
+    __half * const recv,
+    const int64_t * recv_prefix,
+    cudaStream_t stream);
+
+
+
+
 
 template<typename IdType>
 void NCCLCommunicator::AllToAll(
@@ -300,7 +375,6 @@ void NCCLCommunicator::SparseAllToAll<int32_t, __half>(
       __half * const recv_value,
       const int64_t * const recv_prefix,
       cudaStream_t stream);
-
 template
 void NCCLCommunicator::SparseAllToAll<int64_t, __half>(
       const int64_t * const send_idx,
@@ -321,6 +395,122 @@ int NCCLCommunicator::rank() const {
 }
 
 
+template<typename IdType>
+void GenerateSparseBufferFromRemainder(
+    DeviceAPI* const device,
+    const DGLContext& ctx,
+    const int64_t comm_size,
+    const int64_t num_in,
+    const IdType * const in_idx,
+    IdType * const out_idx,
+    IdType * const out_perm,
+    int64_t * const out_counts,
+    cudaStream_t stream)
+{
+  const int64_t comm_bits =
+      static_cast<int64_t>(std::ceil(std::log2(comm_size)));
+
+  // this should only run when we have things to send, otherwise comm_bits
+  // will be zero, and several operations will fail
+  CHECK_GT(comm_size, 1);
+
+  CUDA_CALL(cudaMemsetAsync(
+      out_counts, 0, sizeof(*out_counts)*(comm_size+1), stream));
+
+  if (num_in == 0) {
+    // now that we've zero'd out_counts, nothing left to do
+    return;
+  }
+
+  // First, generate a mapping of indexes to processors
+  IdType * proc_id_in = static_cast<IdType*>(
+      device->AllocWorkspace(ctx, sizeof(IdType)*num_in));
+  {
+    const dim3 block(256);
+    const dim3 grid((num_in+block.x-1)/block.x);
+
+    if (comm_size < (1 << comm_bits)) {
+      // comm_size is not a power of 2
+      _MapProcByRemainder<<<grid, block, 0, stream>>>(
+          in_idx,
+          num_in,
+          comm_size,
+          proc_id_in);
+      CUDA_CALL(cudaGetLastError());
+    } else {
+      // comm_size is a power of 2
+      _MapProcByMaskRemainder<<<grid, block, 0, stream>>>(
+          in_idx,
+          num_in,
+          static_cast<IdType>(comm_size-1), // bit mask
+          proc_id_in);
+      CUDA_CALL(cudaGetLastError());
+    }
+  }
+
+  // then create a permutation array that groups processors together by
+  // performing a radix sort
+  IdType * proc_id_out = static_cast<IdType*>(
+      device->AllocWorkspace(ctx, sizeof(IdType)*num_in));
+  {
+    IdArray perm_in = aten::Range(0, num_in, sizeof(IdType)*8, ctx);
+
+    size_t sort_workspace_size;
+    CUDA_CALL(cub::DeviceRadixSort::SortPairs(nullptr, sort_workspace_size,
+        proc_id_in, proc_id_out, static_cast<IdType*>(perm_in->data), out_perm,
+        num_in, 0, comm_bits, stream));
+
+    void * sort_workspace = device->AllocWorkspace(ctx, sort_workspace_size);
+    CUDA_CALL(cub::DeviceRadixSort::SortPairs(sort_workspace, sort_workspace_size,
+        proc_id_in, proc_id_out, static_cast<IdType*>(perm_in->data), out_perm,
+        num_in, 0, comm_bits, stream));
+    device->FreeWorkspace(ctx, sort_workspace);
+  }
+  device->FreeWorkspace(ctx, proc_id_out);
+  device->FreeWorkspace(ctx, proc_id_in);
+
+  // finally, permute the input arrays
+  // sort the data into continuous buffers for sending
+  {
+    const dim3 block(256);
+    const dim3 grid((num_in+block.x-1)/block.x);
+
+    aten::impl::IndexSelectSingleKernel<<<grid, block, 0, stream>>>(
+        in_idx,
+        out_perm,
+        num_in,
+        out_idx);
+    CUDA_CALL(cudaGetLastError());
+  }
+
+  // Count the number of values to be sent to each processor 
+  {
+    constexpr const int BLOCK_SIZE = 256;
+    constexpr const int TILE_SIZE = 1024;
+    const dim3 block(BLOCK_SIZE);
+    const dim3 grid((num_in+TILE_SIZE-1)/TILE_SIZE);
+
+    if (comm_size < 128) {
+      _CountIndexByRemainder<IdType, 128, BLOCK_SIZE, TILE_SIZE><<<
+          grid, block, 0, stream>>>(
+            out_idx,
+            num_in,
+            out_counts,
+            comm_size);
+      CUDA_CALL(cudaGetLastError());
+    } else {
+      CHECK_LE(comm_size, 1024) << "_CAPI_DGLNCCLSparseAllToAll() is not "
+          "implemented for comms greater than 1024 ranks.";
+      _CountIndexByRemainder<IdType, 1024, BLOCK_SIZE, TILE_SIZE><<<
+          grid, block, 0, stream>>>(
+            out_idx,
+            num_in,
+            out_counts,
+            comm_size);
+      CUDA_CALL(cudaGetLastError());
+    }
+  }
+}
 
 template<typename IdType, typename DType>
 void GenerateSparseBuffersFromRemainder(
@@ -418,6 +608,7 @@ void GenerateSparseBuffersFromRemainder(
         out_value);
     CUDA_CALL(cudaGetLastError());
   }
+  device->FreeWorkspace(ctx, perm_out);
 
   // Count the number of values to be sent to each processor 
   {
@@ -600,30 +791,28 @@ template<typename IdType, typename DType>
 NDArray SparsePull(
     NCCLCommunicatorRef comm,
     IdArray req_idx,
-    NDArray tensor,
+    NDArray local_tensor,
     const int mode_id) {
-  CHECK_EQ(in_idx->shape[0], in_value->shape[0]);
-
-  const auto& ctx = in_idx->ctx;
-  CHECK_EQ(ctx, in_value->ctx);
+  const auto& ctx = req_idx->ctx;
+  CHECK_EQ(ctx, local_tensor->ctx);
   auto device = DeviceAPI::Get(ctx);
 
   // TODO(dlasalle): Get the stream from the device context.
   cudaStream_t stream = 0;
 
-  CHECK_EQ(in_idx->ndim, 1);
+  CHECK_EQ(req_idx->ndim, 1);
 
-  const int64_t num_in = in_idx->shape[0];
+  const int64_t num_in = req_idx->shape[0];
   int64_t num_feat = 1;
-  for (int d = 1; d < in_value->ndim; ++d) {
-    num_feat *= in_value->shape[d];
+  for (int d = 1; d < local_tensor->ndim; ++d) {
+    num_feat *= local_tensor->shape[d];
   }
 
   const int64_t comm_size = comm->size();
 
   if (comm_size == 1) {
-    // Just return index selection from current tensor
-    return IndexSelect(tensor, req_idx);
+    // Just return index selection from current local_tensor
+    return aten::IndexSelect(local_tensor, req_idx);
   }
 
   // First we need to send our requests to other processors. This means
@@ -632,11 +821,13 @@ NDArray SparsePull(
   // we assume a poorly partitioned graph, and that there exists the
   // possibility that each processor could request data from this one.
 
-
-
   // the buffer for us to re-order our requests in
   IdType * send_idx = static_cast<IdType*>(device->AllocWorkspace(ctx,
       num_in*sizeof(IdType)));
+
+  IdType * perm = static_cast<IdType*>(
+      device->AllocWorkspace(ctx, sizeof(IdType)*num_in));
+
   // the number of indexes we need to send to each processor 
   int64_t * send_sum = static_cast<int64_t*>(device->AllocWorkspace(ctx,
       (comm_size+1)*sizeof(int64_t)));
@@ -647,8 +838,9 @@ NDArray SparsePull(
       ctx,
       comm_size,
       num_in,
-      static_cast<const IdType*>(in_idx->data),
+      static_cast<const IdType*>(req_idx->data),
       send_idx,
+      perm,
       send_sum,
       stream);
 
@@ -725,42 +917,87 @@ NDArray SparsePull(
   cudaEventDestroy(d2h);
 
   // gather requested indexes
+  IdType * recv_idx = static_cast<IdType*>(
+      device->AllocWorkspace(ctx, recv_prefix_host.back()*sizeof(IdType)));
   comm->AllToAllV(
       send_idx,
       send_prefix_host.data(),
-      static_cast<IdType*>(recv_idx->data),
+      recv_idx,
       recv_prefix_host.data(),
       stream);
 
   // convert requested indices to local indices depending on partition 
-  _ConvertToLocal<<<>>>(recv_idx->data);
+  {
+    const dim3 block(128);
+    const dim3 grid((recv_prefix_host.back()+block.x-1)/block.x);
+    _ConvertToLocalByRemainder<<<grid,block,0,stream>>>(
+        recv_idx, recv_prefix_host.back(), comm_size);
+  }
 
   // and then index select them into place
-  NDArray send_value = IndexSelect(tensor, local_idxs);
+  DType * send_value = static_cast<DType*>(device->AllocWorkspace(ctx,
+      send_prefix_host.back()*num_feat*sizeof(DType)));
+  {
+    dim3 block(256,1);
+    while (block.x >= 2*num_feat) {
+        block.x /= 2;
+        block.y *= 2;
+    }
+    const dim3 grid((send_prefix_host.back()+block.y-1)/block.y);
+    aten::impl::IndexSelectMultiKernel<<<grid, block, 0, stream>>>(
+        static_cast<const DType*>(local_tensor->data),
+        num_feat,
+        recv_idx,
+        recv_prefix_host.back(),
+        send_value);
+  }
 
   // we will collect recieved values in this array
-  std::vector<int64_t> value_shape(tensor->ndim, 0);
+  std::vector<int64_t> value_shape(local_tensor->ndim, 0);
   value_shape[0] = send_prefix_host.back();
-  for (int d = 1; d < in_value->ndim; ++d) {
-    value_shape[d] = in_value->shape[d];
+  for (int d = 1; d < local_tensor->ndim; ++d) {
+    value_shape[d] = local_tensor->shape[d];
   }
-  NDArray recv_value = NDArray::Empty(value_shape, in_value->dtype, ctx);
+  DType* recv_value = static_cast<DType*>(device->AllocWorkspace(ctx,
+      send_prefix_host.back()*num_feat*sizeof(DType)));
+
+  // multiply the prefixes by the number of features being sent
+  for (auto& v : send_prefix_host) {
+    v *= num_feat;
+  }
+  for (auto& v : recv_prefix_host) {
+    v *= num_feat;
+  }
 
   // send the values 
-  comm->SparseAllToAll(
-      send_idx,
+  comm->AllToAllV(
       send_value,
-      num_feat,
-      send_prefix_host.data(),
-      static_cast<IdType*>(recv_idx->data),
-      static_cast<DType*>(recv_value->data),
       recv_prefix_host.data(),
+      recv_value,
+      send_prefix_host.data(),
       stream);
-  device->FreeWorkspace(ctx, send_idx);
-  device->FreeWorkspace(ctx, send_value);
 
   // finally, we need to permute the values back into the requested order
-  return IndexSelect(recv_value, inv_perm);
+  NDArray result = NDArray::Empty(value_shape, local_tensor->dtype, ctx);
+  {
+    dim3 block(256,1);
+    while (block.x >= 2*num_feat) {
+        block.x /= 2;
+        block.y *= 2;
+    }
+    const dim3 grid((num_in+block.y-1)/block.y);
+
+    _InversePermKernel<<<grid, block, 0, stream>>>(
+        recv_value,
+        num_feat,
+        num_in,
+        perm,
+        static_cast<DType*>(result->data));
+  }
+  device->FreeWorkspace(ctx, recv_value);
+  device->FreeWorkspace(ctx, perm);
+
+  return result;
 }
 
 /* CAPI **********************************************************************/
@@ -809,16 +1046,11 @@ DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLSparseAllToAllPull")
   NDArray tensor = args[2];
   const int mode_id = args[3];
 
-  List<ObjectRef> ret;
-  ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
+  ATEN_ID_TYPE_SWITCH(req_idx->dtype, IdType, {
     ATEN_DTYPE_SWITCH(tensor->dtype, DType, "values", {
-      auto result = SparsePull<IdType, DType>(comm, in_idx, in_values, mode_id);
-      ret.push_back(Value(MakeValue(result.first)));
-      ret.push_back(Value(MakeValue(result.second)));
+      *rv = SparsePull<IdType, DType>(comm, req_idx, tensor, mode_id);
     });
   });
-
-  *rv = ret;
 });
 
 

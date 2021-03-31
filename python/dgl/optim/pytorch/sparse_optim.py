@@ -94,8 +94,11 @@ class SparseGradOptimizer(abc.ABC):
                 idx = th.cat(idx, dim=0)
                 grad = th.cat(grad, dim=0)
 
-                idx_in[emb_name], grad_in[emb_name] = self._comm.sparse_all_to_all(
-                    idx, grad, mode='remainder')
+                idx_in[emb_name], grad_in[emb_name] = \
+                    self._comm.sparse_all_to_all_push(
+                        idx, grad, mode='remainder')
+                # convert idx to local indices via 'remainder'
+                idx_in[emb_name] /= self._comm.size()
             nvtx.range_pop()
 
             if self._clean_grad:
