@@ -8,12 +8,12 @@
 
 #include <dmlc/logging.h>
 #include <dgl/runtime/ndarray.h>
+#include <dgl/c_api_common.h>
 
 #include <string.h>
 #include <vector>
 #include <string>
 
-#include "../c_api_common.h"
 #include "../rpc/network/msg_queue.h"
 
 using dgl::runtime::NDArray;
