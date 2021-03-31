@@ -7,7 +7,7 @@ np.random.seed(12345)
 class DataReader:
     NEGATIVE_TABLE_SIZE = 1e8
 
-    def __init__(self, download, min_count, care_type):
+    def __init__(self, dataset, min_count, care_type):
 
         self.negatives = []
         self.discards = []
@@ -18,9 +18,7 @@ class DataReader:
         self.sentences_count = 0
         self.token_count = 0
         self.word_frequency = dict()
-        self.download = download
-        FB = AminerDataset(self.download)
-        self.inputFileName = FB.fn
+        self.inputFileName = dataset.fn
         self.read_words(min_count)
         self.initTableNegatives()
         self.initTableDiscards()

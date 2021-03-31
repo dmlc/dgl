@@ -10,6 +10,7 @@
 #include "./binary_reduce_impl_decl.h"
 #include "./utils.h"
 #include "../c_api_common.h"
+#include "../array/check.h"
 #include "../graph/unit_graph.h"
 #include "./csr_interface.h"
 
@@ -175,27 +176,13 @@ std::string IdArrayToStr(IdArray arr) {
   return oss.str();
 }
 
-// Check whether the given arguments have the same context.
-inline void CheckCtx(
-    const DLContext& ctx,
-    const std::vector<NDArray>& arrays,
-    const std::vector<std::string>& names) {
-  for (size_t i = 0; i < arrays.size(); ++i) {
-    if (utils::IsNoneArray(arrays[i]))
-      continue;
-    CHECK_EQ(ctx, arrays[i]->ctx)
-      << "Expected device context " << ctx << ". But got "
-      << arrays[i]->ctx << " for " << names[i] << ".";
-  }
-}
-
 // Check whether the given arguments use the same number of bits.
 inline void CheckIdArray(
     const uint8_t bits,
     const std::vector<NDArray>& arrays,
     const std::vector<std::string>& names) {
   for (size_t i = 0; i < arrays.size(); ++i) {
-    if (utils::IsNoneArray(arrays[i]))
+    if (aten::IsNullArray(arrays[i]))
       continue;
     CHECK(arrays[i]->dtype.code == kDLInt);
     CHECK_EQ(arrays[i]->ndim, 1);
@@ -249,11 +236,11 @@ class UnitGraphCSRWrapper : public CSRWrapper {
     gptr_(graph) { }
 
   aten::CSRMatrix GetInCSRMatrix() const override {
-    return gptr_->GetInCSRMatrix();
+    return gptr_->GetCSCMatrix(0);
   }
 
   aten::CSRMatrix GetOutCSRMatrix() const override {
-    return gptr_->GetOutCSRMatrix();
+    return gptr_->GetCSRMatrix(0);
   }
 
   DGLContext Context() const override {
@@ -278,7 +265,7 @@ std::vector<int64_t> InferBinaryFeatureShape(
   return CalcBcastInfo(op, lhs, rhs).real_out_shape;
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelInferBinaryFeatureShape")
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelInferBinaryFeatureShape")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string op = args[0];
     NDArray lhs = args[1];
@@ -303,7 +290,7 @@ void BinaryOpReduce(
     NDArray out_mapping) {
   const auto& ctx = graph.Context();
   // sanity check
-  CheckCtx(ctx,
+  aten::CheckCtx(ctx,
       {lhs_data, rhs_data, out_data, lhs_mapping, rhs_mapping, out_mapping},
       {"lhs_data", "rhs_data", "out_data", "lhs_mapping", "rhs_mapping", "out_mapping"});
   CheckIdArray(graph.NumBits(),
@@ -335,29 +322,26 @@ void BinaryOpReduce(
   }
 }
 
-// Comes from DGLArgValue::AsObjectRef() that allows argvalue to be either a GraphRef
-// or a HeteroGraphRef
-#define CSRWRAPPER_SWITCH(argvalue, wrapper, ...) do {            \
-  DGLArgValue argval = (argvalue);                                \
-  DGL_CHECK_TYPE_CODE(argval.type_code(), kObjectHandle);         \
-  std::shared_ptr<Object>& sptr =                                 \
-      *argval.ptr<std::shared_ptr<Object>>();                     \
-  if (ObjectTypeChecker<GraphRef>::Check(sptr.get())) {           \
-    GraphRef g = argval;                                          \
-    auto igptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr()); \
-    CHECK_NOTNULL(igptr);                                         \
-    ImmutableGraphCSRWrapper wrapper(igptr.get());                \
-    {__VA_ARGS__}                                                 \
-  } else if (ObjectTypeChecker<HeteroGraphRef>::Check(sptr.get())) { \
-    HeteroGraphRef g = argval;                                    \
-    auto bgptr = std::dynamic_pointer_cast<UnitGraph>(g.sptr());  \
-    CHECK_NOTNULL(bgptr);                                         \
-    UnitGraphCSRWrapper wrapper(bgptr.get());                     \
-    {__VA_ARGS__}                                                 \
-  }                                                               \
-} while (0)
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce")
+void csrwrapper_switch(DGLArgValue argval,
+                       std::function<void(const CSRWrapper&)> fn) {
+  DGL_CHECK_TYPE_CODE(argval.type_code(), kObjectHandle);
+  if (argval.IsObjectType<GraphRef>()) {
+    GraphRef g = argval;
+    auto igptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
+    CHECK_NOTNULL(igptr);
+    ImmutableGraphCSRWrapper wrapper(igptr.get());
+    fn(wrapper);
+  } else if (argval.IsObjectType<HeteroGraphRef>()) {
+    HeteroGraphRef g = argval;
+    auto bgptr = std::dynamic_pointer_cast<UnitGraph>(g->GetRelationGraph(0));
+    CHECK_NOTNULL(bgptr);
+    UnitGraphCSRWrapper wrapper(bgptr.get());
+    fn(wrapper);
+  }
+}
+
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
@@ -370,12 +354,14 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce")
     NDArray rhs_mapping = args[9];
     NDArray out_mapping = args[10];
 
-    CSRWRAPPER_SWITCH(args[2], wrapper, {
-      BinaryOpReduce(reducer, op, wrapper,
-          static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
-          lhs_data, rhs_data, out_data,
-          lhs_mapping, rhs_mapping, out_mapping);
-      });
+    auto f = [&reducer, &op, &lhs, &rhs, &lhs_data, &rhs_data, &out_data,
+              &lhs_mapping, &rhs_mapping,
+              &out_mapping](const CSRWrapper& wrapper) {
+      BinaryOpReduce(reducer, op, wrapper, static_cast<binary_op::Target>(lhs),
+                     static_cast<binary_op::Target>(rhs), lhs_data, rhs_data,
+                     out_data, lhs_mapping, rhs_mapping, out_mapping);
+    };
+    csrwrapper_switch(args[2], f);
   });
 
 void BackwardLhsBinaryOpReduce(
@@ -393,7 +379,7 @@ void BackwardLhsBinaryOpReduce(
     NDArray grad_lhs_data) {
   const auto& ctx = graph.Context();
   // sanity check
-  CheckCtx(ctx,
+  aten::CheckCtx(ctx,
       {lhs_data, rhs_data, out_data, grad_out_data, grad_lhs_data,
        lhs_mapping, rhs_mapping, out_mapping},
       {"lhs_data", "rhs_data", "out_data", "grad_out_data", "grad_lhs_data",
@@ -416,19 +402,19 @@ void BackwardLhsBinaryOpReduce(
           lhs, rhs,
           lhs_mapping, rhs_mapping, out_mapping,
           lhs_data, rhs_data, out_data, grad_out_data,
-          grad_lhs_data, utils::NoneArray());
+          grad_lhs_data, aten::NullArray());
     } else {
       DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceImpl,
           reducer, op, graph,
           lhs, rhs,
           lhs_mapping, rhs_mapping, out_mapping,
           lhs_data, rhs_data, out_data, grad_out_data,
-          grad_lhs_data, utils::NoneArray());
+          grad_lhs_data, aten::NullArray());
     }
   }
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
@@ -443,14 +429,16 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
     NDArray grad_out_data = args[11];
     NDArray grad_lhs_data = args[12];
 
-    CSRWRAPPER_SWITCH(args[2], wrapper, {
+    auto f = [&reducer, &op, &lhs, &rhs, &lhs_mapping, &rhs_mapping,
+              &out_mapping, &lhs_data, &rhs_data, &out_data, &grad_out_data,
+              &grad_lhs_data](const CSRWrapper& wrapper) {
       BackwardLhsBinaryOpReduce(
-          reducer, op, wrapper,
-          static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
-          lhs_mapping, rhs_mapping, out_mapping,
-          lhs_data, rhs_data, out_data, grad_out_data,
+          reducer, op, wrapper, static_cast<binary_op::Target>(lhs),
+          static_cast<binary_op::Target>(rhs), lhs_mapping, rhs_mapping,
+          out_mapping, lhs_data, rhs_data, out_data, grad_out_data,
           grad_lhs_data);
-    });
+    };
+    csrwrapper_switch(args[2], f);
   });
 
 void BackwardRhsBinaryOpReduce(
@@ -468,7 +456,7 @@ void BackwardRhsBinaryOpReduce(
     NDArray grad_rhs_data) {
   const auto& ctx = graph.Context();
   // sanity check
-  CheckCtx(ctx,
+  aten::CheckCtx(ctx,
       {lhs_data, rhs_data, out_data, grad_out_data, grad_rhs_data,
        lhs_mapping, rhs_mapping, out_mapping},
       {"lhs_data", "rhs_data", "out_data", "grad_out_data", "grad_rhs_data",
@@ -490,19 +478,19 @@ void BackwardRhsBinaryOpReduce(
           lhs, rhs,
           lhs_mapping, rhs_mapping, out_mapping,
           lhs_data, rhs_data, out_data, grad_out_data,
-          utils::NoneArray(), grad_rhs_data);
+          aten::NullArray(), grad_rhs_data);
     } else {
       DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceImpl,
           reducer, op, graph,
           lhs, rhs,
           lhs_mapping, rhs_mapping, out_mapping,
           lhs_data, rhs_data, out_data, grad_out_data,
-          utils::NoneArray(), grad_rhs_data);
+          aten::NullArray(), grad_rhs_data);
     }
   }
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
@@ -517,14 +505,17 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
     NDArray grad_out_data = args[11];
     NDArray grad_rhs_data = args[12];
 
-    CSRWRAPPER_SWITCH(args[2], wrapper, {
+    auto f = [&reducer, &op, &lhs, &rhs, &lhs_mapping, &rhs_mapping,
+              &out_mapping, &lhs_data, &rhs_data, out_data, &grad_out_data,
+              &grad_rhs_data](const CSRWrapper& wrapper) {
       BackwardRhsBinaryOpReduce(
-          reducer, op, wrapper,
-          static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
-          lhs_mapping, rhs_mapping, out_mapping,
-          lhs_data, rhs_data, out_data, grad_out_data,
+          reducer, op, wrapper, static_cast<binary_op::Target>(lhs),
+          static_cast<binary_op::Target>(rhs), lhs_mapping, rhs_mapping,
+          out_mapping, lhs_data, rhs_data, out_data, grad_out_data,
           grad_rhs_data);
-    });
+    };
+
+    csrwrapper_switch(args[2], f);
   });
 
 void CopyReduce(
@@ -535,7 +526,7 @@ void CopyReduce(
     NDArray in_mapping, NDArray out_mapping) {
   const auto& ctx = graph.Context();
   // sanity check
-  CheckCtx(ctx,
+  aten::CheckCtx(ctx,
       {in_data, out_data, in_mapping, out_mapping},
       {"in_data", "out_data", "in_mapping", "out_mapping"});
   CheckIdArray(graph.NumBits(),
@@ -544,11 +535,11 @@ void CopyReduce(
   DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
       reducer, binary_op::kUseLhs, graph,
       target, binary_op::kNone,
-      in_data, utils::NoneArray(), out_data,
-      in_mapping, utils::NoneArray(), out_mapping);
+      in_data, aten::NullArray(), out_data,
+      in_mapping, aten::NullArray(), out_mapping);
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyReduce")
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelCopyReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     int target = args[2];
@@ -557,12 +548,13 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyReduce")
     NDArray in_mapping = args[5];
     NDArray out_mapping = args[6];
 
-    CSRWRAPPER_SWITCH(args[1], wrapper, {
-      CopyReduce(reducer, wrapper,
-          static_cast<binary_op::Target>(target),
-          in_data, out_data,
-          in_mapping, out_mapping);
-    });
+    auto f = [&reducer, &target, &in_data, &out_data, &in_mapping,
+              &out_mapping](const CSRWrapper& wrapper) {
+      CopyReduce(reducer, wrapper, static_cast<binary_op::Target>(target),
+                 in_data, out_data, in_mapping, out_mapping);
+    };
+
+    csrwrapper_switch(args[1], f);
   });
 
 void BackwardCopyReduce(
@@ -577,25 +569,25 @@ void BackwardCopyReduce(
     NDArray grad_in_data) {
   const auto& ctx = graph.Context();
   // sanity check
-  CheckCtx(ctx,
+  aten::CheckCtx(ctx,
       {in_data, out_data, grad_out_data, grad_in_data, in_mapping, out_mapping},
       {"in_data", "out_data", "grad_out_data", "grad_in_data", "in_mapping", "out_mapping"});
   CheckIdArray(graph.NumBits(),
       {in_mapping, out_mapping},
       {"in_mapping", "out_mapping"});
-  if (!utils::IsNoneArray(out_mapping)) {
+  if (!aten::IsNullArray(out_mapping)) {
     CHECK_EQ(ctx, out_mapping->ctx) << "Expected device context " << ctx
       << ". But got " << out_mapping->ctx << " for rhs_data.";
   }
   DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceImpl,
       reducer, binary_op::kUseLhs, graph,
       target, binary_op::kNone,
-      in_mapping, utils::NoneArray(), out_mapping,
-      in_data, utils::NoneArray(), out_data, grad_out_data,
-      grad_in_data, utils::NoneArray());
+      in_mapping, aten::NullArray(), out_mapping,
+      in_data, aten::NullArray(), out_data, grad_out_data,
+      grad_in_data, aten::NullArray());
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyReduce")
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelBackwardCopyReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     int target = args[2];
@@ -606,13 +598,14 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyReduce")
     NDArray in_mapping = args[7];
     NDArray out_mapping = args[8];
 
-    CSRWRAPPER_SWITCH(args[1], wrapper, {
+    auto f = [&reducer, &target, &in_mapping, &out_mapping, &in_data, &out_data,
+              &grad_out_data, &grad_in_data](const CSRWrapper& wrapper) {
       BackwardCopyReduce(
-          reducer, wrapper, static_cast<binary_op::Target>(target),
-          in_mapping, out_mapping,
-          in_data, out_data, grad_out_data,
-          grad_in_data);
-    });
+          reducer, wrapper, static_cast<binary_op::Target>(target), in_mapping,
+          out_mapping, in_data, out_data, grad_out_data, grad_in_data);
+    };
+
+    csrwrapper_switch(args[1], f);
   });
 
 }  // namespace kernel

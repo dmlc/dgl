@@ -8,6 +8,9 @@
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/device_api.h>
+#include <dgl/runtime/shared_mem.h>
+#include <dgl/zerocopy_serializer.h>
+#include <dgl/runtime/tensordispatch.h>
 #include "runtime_base.h"
 
 // deleter for arrays used by DLPack exporter
@@ -121,16 +124,32 @@ size_t NDArray::GetSize() const {
   return GetDataSize(data_->dl_tensor);
 }
 
+int64_t NDArray::NumElements() const {
+  if (data_->dl_tensor.ndim == 0)
+    return 0;
+  int64_t size = 1;
+  for (int i = 0; i < data_->dl_tensor.ndim; ++i) {
+    size *= data_->dl_tensor.shape[i];
+  }
+  return size;
+}
+
 bool NDArray::IsContiguous() const {
   CHECK(data_ != nullptr);
   if (data_->dl_tensor.strides == nullptr)
     return true;
-  for (int i = 0; i < data_->dl_tensor.ndim - 1; ++i) {
-    if (data_->dl_tensor.strides[i] !=
-        data_->dl_tensor.shape[i+1] * data_->dl_tensor.strides[i+1])
-      return false;
+
+  // See https://github.com/dmlc/dgl/issues/2118 and PyTorch's compute_contiguous() implementation
+  int64_t z = 1;
+  for (int64_t i = data_->dl_tensor.ndim - 1; i >= 0; --i) {
+    if (data_->dl_tensor.shape[i] != 1) {
+      if (data_->dl_tensor.strides[i] == z)
+        z *= data_->dl_tensor.shape[i];
+      else
+        return false;
+    }
   }
-  return data_->dl_tensor.strides[data_->dl_tensor.ndim - 1] == 1;
+  return true;
 }
 
 NDArray NDArray::CreateView(std::vector<int64_t> shape,
@@ -167,9 +186,9 @@ NDArray NDArray::EmptyShared(const std::string &name,
 #ifndef _WIN32
   auto mem = std::make_shared<SharedMemory>(name);
   if (is_create) {
-    ret.data_->dl_tensor.data = mem->create_new(size);
+    ret.data_->dl_tensor.data = mem->CreateNew(size);
   } else {
-    ret.data_->dl_tensor.data = mem->open(size);
+    ret.data_->dl_tensor.data = mem->Open(size);
   }
 
   ret.data_->mem = mem;
@@ -182,13 +201,18 @@ NDArray NDArray::EmptyShared(const std::string &name,
 NDArray NDArray::Empty(std::vector<int64_t> shape,
                        DLDataType dtype,
                        DLContext ctx) {
+  TensorDispatcher* td = TensorDispatcher::Global();
+  if (td->IsAvailable())
+    return td->Empty(shape, dtype, ctx);
+
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
   size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
-  ret.data_->dl_tensor.data =
-      DeviceAPI::Get(ret->ctx)->AllocDataSpace(
-          ret->ctx, size, alignment, ret->dtype);
+  if (size > 0)
+    ret.data_->dl_tensor.data =
+        DeviceAPI::Get(ret->ctx)->AllocDataSpace(
+            ret->ctx, size, alignment, ret->dtype);
   return ret;
 }
 
@@ -222,6 +246,131 @@ void NDArray::CopyFromTo(DLTensor* from,
     to->data, static_cast<size_t>(to->byte_offset),
     from_size, from->ctx, to->ctx, from->dtype, stream);
 }
+
+template<typename T>
+NDArray NDArray::FromVector(const std::vector<T>& vec, DLContext ctx) {
+  const DLDataType dtype = DLDataTypeTraits<T>::dtype;
+  int64_t size = static_cast<int64_t>(vec.size());
+  NDArray ret = NDArray::Empty({size}, dtype, DLContext{kDLCPU, 0});
+  DeviceAPI::Get(ctx)->CopyDataFromTo(
+      vec.data(),
+      0,
+      static_cast<T*>(ret->data),
+      0,
+      size * sizeof(T),
+      DLContext{kDLCPU, 0},
+      ctx,
+      dtype,
+      nullptr);
+  return ret;
+}
+
+// export specializations
+template NDArray NDArray::FromVector<int32_t>(const std::vector<int32_t>&, DLContext);
+template NDArray NDArray::FromVector<int64_t>(const std::vector<int64_t>&, DLContext);
+template NDArray NDArray::FromVector<uint32_t>(const std::vector<uint32_t>&, DLContext);
+template NDArray NDArray::FromVector<uint64_t>(const std::vector<uint64_t>&, DLContext);
+template NDArray NDArray::FromVector<float>(const std::vector<float>&, DLContext);
+template NDArray NDArray::FromVector<double>(const std::vector<double>&, DLContext);
+
+template<typename T>
+std::vector<T> NDArray::ToVector() const {
+  const DLDataType dtype = DLDataTypeTraits<T>::dtype;
+  CHECK(data_->dl_tensor.ndim == 1) << "ToVector() only supported for 1D arrays";
+  CHECK(data_->dl_tensor.dtype == dtype) << "dtype mismatch";
+
+  int64_t size = data_->dl_tensor.shape[0];
+  std::vector<T> vec(size);
+  const DLContext &ctx = data_->dl_tensor.ctx;
+  DeviceAPI::Get(ctx)->CopyDataFromTo(
+      static_cast<T*>(data_->dl_tensor.data),
+      0,
+      vec.data(),
+      0,
+      size * sizeof(T),
+      ctx,
+      DLContext{kDLCPU, 0},
+      dtype,
+      nullptr);
+  return vec;
+}
+
+template std::vector<int32_t> NDArray::ToVector<int32_t>() const;
+template std::vector<int64_t> NDArray::ToVector<int64_t>() const;
+template std::vector<uint32_t> NDArray::ToVector<uint32_t>() const;
+template std::vector<uint64_t> NDArray::ToVector<uint64_t>() const;
+template std::vector<float> NDArray::ToVector<float>() const;
+template std::vector<double> NDArray::ToVector<double>() const;
+
+#ifndef _WIN32
+std::shared_ptr<SharedMemory> NDArray::GetSharedMem() const {
+  return this->data_->mem;
+}
+#endif  // _WIN32
+
+
+void NDArray::Save(dmlc::Stream* strm) const {
+  auto zc_strm = dynamic_cast<StreamWithBuffer*>(strm);
+  if (zc_strm) {
+    zc_strm->PushNDArray(*this);
+    return;
+  }
+  SaveDLTensor(strm, const_cast<DLTensor*>(operator->()));
+}
+
+bool NDArray::Load(dmlc::Stream* strm) {
+  auto zc_strm = dynamic_cast<StreamWithBuffer*>(strm);
+  if (zc_strm) {
+    *this = zc_strm->PopNDArray();
+    return true;
+  }
+  uint64_t header, reserved;
+  CHECK(strm->Read(&header))
+      << "Invalid DLTensor file format";
+  CHECK(strm->Read(&reserved))
+      << "Invalid DLTensor file format";
+  CHECK(header == kDGLNDArrayMagic)
+      << "Invalid DLTensor file format";
+  DLContext ctx;
+  int ndim;
+  DLDataType dtype;
+  CHECK(strm->Read(&ctx))
+      << "Invalid DLTensor file format";
+  CHECK(strm->Read(&ndim))
+      << "Invalid DLTensor file format";
+  CHECK(strm->Read(&dtype))
+      << "Invalid DLTensor file format";
+  CHECK_EQ(ctx.device_type, kDLCPU)
+      << "Invalid DLTensor context: can only save as CPU tensor";
+  std::vector<int64_t> shape(ndim);
+  if (ndim != 0) {
+    CHECK(strm->ReadArray(&shape[0], ndim))
+        << "Invalid DLTensor file format";
+  }
+  NDArray ret = NDArray::Empty(shape, dtype, ctx);
+  int64_t num_elems = 1;
+  int elem_bytes = (ret->dtype.bits + 7) / 8;
+  for (int i = 0; i < ret->ndim; ++i) {
+    num_elems *= ret->shape[i];
+  }
+  int64_t data_byte_size;
+  CHECK(strm->Read(&data_byte_size))
+      << "Invalid DLTensor file format";
+  CHECK(data_byte_size == num_elems * elem_bytes)
+      << "Invalid DLTensor file format";
+  if (data_byte_size != 0)  {
+    // strm->Read will return the total number of elements successfully read.
+    // Therefore if data_byte_size is zero, the CHECK below would fail.
+    CHECK(strm->Read(ret->data, data_byte_size))
+        << "Invalid DLTensor file format";
+  }
+  if (!DMLC_IO_NO_ENDIAN_SWAP) {
+    dmlc::ByteSwap(ret->data, elem_bytes, num_elems);
+  }
+  *this = ret;
+  return true;
+}
+
 
 }  // namespace runtime
 }  // namespace dgl
@@ -295,10 +444,24 @@ int DGLArrayFromDLPack(DLManagedTensor* from,
   API_END();
 }
 
-int DGLArrayToDLPack(DGLArrayHandle from,
-                     DLManagedTensor** out) {
+inline bool is_aligned(const void* ptr, std::uintptr_t alignment) noexcept {
+  auto iptr = reinterpret_cast<std::uintptr_t>(ptr);
+  return !(iptr % alignment);
+}
+
+int DGLArrayToDLPack(DGLArrayHandle from, DLManagedTensor** out,
+                     int alignment) {
   API_BEGIN();
-  *out = NDArray::Internal::ToDLPack(reinterpret_cast<NDArray::Container*>(from));
+  auto* nd_container = reinterpret_cast<NDArray::Container*>(from);
+  DLTensor* nd = &(nd_container->dl_tensor);
+  if (alignment != 0 && !is_aligned(nd->data, alignment)) {
+    std::vector<int64_t> shape_vec(nd->shape, nd->shape + nd->ndim);
+    NDArray copy_ndarray = NDArray::Empty(shape_vec, nd->dtype, nd->ctx);
+    copy_ndarray.CopyFrom(nd);
+    *out = copy_ndarray.ToDLPack();
+  } else {
+    *out = NDArray::Internal::ToDLPack(nd_container);
+  }
   API_END();
 }
 

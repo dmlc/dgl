@@ -1,3 +1,22 @@
+# -*- coding: utf-8 -*-
+#
+# setup.py
+#
+# Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 import os
 import scipy as sp
 import dgl
@@ -5,7 +24,7 @@ import numpy as np
 import dgl.backend as F
 import dgl
 
-backend = os.environ.get('DGLBACKEND')
+backend = os.environ.get('DGLBACKEND', 'pytorch')
 if backend.lower() == 'mxnet':
     import mxnet as mx
     mx.random.seed(42)
@@ -137,14 +156,20 @@ def check_score_func(func_name):
     EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
     sampler = EdgeSampler(g, batch_size=batch_size,
                           neg_sample_size=neg_sample_size,
-                          negative_mode='PBG-head',
+                          negative_mode='chunk-head',
                           num_workers=1,
                           shuffle=False,
                           exclude_positive=False,
                           return_false_neg=False)
 
     for pos_g, neg_g in sampler:
-        neg_g = create_neg_subgraph(pos_g, neg_g, True, True, g.number_of_nodes())
+        neg_g = create_neg_subgraph(pos_g,
+                                    neg_g,
+                                    neg_sample_size,
+                                    neg_sample_size,
+                                    True,
+                                    True,
+                                    g.number_of_nodes())
         pos_g.copy_from_parent()
         neg_g.copy_from_parent()
         score1 = F.reshape(model.predict_score(neg_g), (batch_size, -1))

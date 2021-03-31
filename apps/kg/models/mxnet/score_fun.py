@@ -1,3 +1,22 @@
+# -*- coding: utf-8 -*-
+#
+# setup.py
+#
+# Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 import numpy as np
 import mxnet as mx
 from mxnet import gluon
@@ -21,6 +40,9 @@ def batched_l1_dist(a, b):
     return res
 
 class TransEScore(nn.Block):
+    """ TransE score function
+    Paper link: https://papers.nips.cc/paper/5071-translating-embeddings-for-modeling-multi-relational-data
+    """
     def __init__(self, gamma, dist_func='l2'):
         super(TransEScore, self).__init__()
         self.gamma = gamma
@@ -46,7 +68,7 @@ class TransEScore(nn.Block):
             return head, tail
         return fn
 
-    def update(self):
+    def update(self, gpu_id=-1):
         pass
 
     def reset_parameters(self):
@@ -81,6 +103,9 @@ class TransEScore(nn.Block):
             return fn
 
 class TransRScore(nn.Block):
+    """TransR score function
+    Paper link: https://www.aaai.org/ocs/index.php/AAAI/AAAI15/paper/download/9571/9523
+    """
     def __init__(self, gamma, projection_emb, relation_dim, entity_dim):
         super(TransRScore, self).__init__()
         self.gamma = gamma
@@ -171,14 +196,26 @@ class TransRScore(nn.Block):
     def reset_parameters(self):
         self.projection_emb.init(1.0)
 
-    def update(self):
-        self.projection_emb.update()
+    def update(self, gpu_id=-1):
+        self.projection_emb.update(gpu_id)
 
     def save(self, path, name):
         self.projection_emb.save(path, name+'projection')
 
     def load(self, path, name):
         self.projection_emb.load(path, name+'projection')
+
+    def prepare_local_emb(self, projection_emb):
+        self.global_projection_emb = self.projection_emb
+        self.projection_emb = projection_emb
+
+    def writeback_local_emb(self, idx):
+        self.global_projection_emb.emb[idx] = self.projection_emb.emb.as_in_context(mx.cpu())[idx]
+
+    def load_local_emb(self, projection_emb):
+        context = projection_emb.emb.context
+        projection_emb.emb = self.projection_emb.emb.as_in_context(context)
+        self.projection_emb = projection_emb
 
     def create_neg(self, neg_head):
         gamma = self.gamma
@@ -200,6 +237,9 @@ class TransRScore(nn.Block):
             return fn
 
 class DistMultScore(nn.Block):
+    """DistMult score function
+    Paper link: https://arxiv.org/abs/1412.6575
+    """
     def __init__(self):
         super(DistMultScore, self).__init__()
 
@@ -219,7 +259,7 @@ class DistMultScore(nn.Block):
             return head, tail
         return fn
 
-    def update(self):
+    def update(self, gpu_id=-1):
         pass
 
     def reset_parameters(self):
@@ -253,6 +293,9 @@ class DistMultScore(nn.Block):
             return fn
 
 class ComplExScore(nn.Block):
+    """ComplEx score function
+    Paper link: https://arxiv.org/abs/1606.06357
+    """
     def __init__(self):
         super(ComplExScore, self).__init__()
 
@@ -276,7 +319,7 @@ class ComplExScore(nn.Block):
             return head, tail
         return fn
 
-    def update(self):
+    def update(self, gpu_id=-1):
         pass
 
     def reset_parameters(self):
@@ -321,6 +364,9 @@ class ComplExScore(nn.Block):
             return fn
 
 class RESCALScore(nn.Block):
+    """RESCAL score function
+    Paper link: http://www.icml-2011.org/papers/438_icmlpaper.pdf
+    """
     def __init__(self, relation_dim, entity_dim):
         super(RESCALScore, self).__init__()
         self.relation_dim = relation_dim
@@ -344,7 +390,7 @@ class RESCALScore(nn.Block):
             return head, tail
         return fn
 
-    def update(self):
+    def update(self, gpu_id=-1):
         pass
 
     def reset_parameters(self):
@@ -384,6 +430,9 @@ class RESCALScore(nn.Block):
             return fn
 
 class RotatEScore(nn.Block):
+    """RotatE score function
+    Paper link: https://arxiv.org/abs/1902.10197
+    """
     def __init__(self, gamma, emb_init, eps=1e-10):
         super(RotatEScore, self).__init__()
         self.gamma = gamma
@@ -412,7 +461,7 @@ class RotatEScore(nn.Block):
             return head, tail
         return fn
 
-    def update(self):
+    def update(self, gpu_id=-1):
         pass
 
     def reset_parameters(self):

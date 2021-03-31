@@ -14,16 +14,12 @@
 #include <string>
 
 #include "../c_api_common.h"
-#include "./network/msg_queue.h"
+#include "../rpc/network/msg_queue.h"
 
 using dgl::runtime::NDArray;
 
 namespace dgl {
 namespace network {
-
-// Max size of message queue for communicator is 200 MB
-// TODO(chao): Make this number configurable
-const int64_t kQueueSize = 200 * 1024 * 1024;
 
 /*!
  * \brief Create NDArray from raw data
@@ -64,8 +60,21 @@ enum MessageType {
   /*!
    * \brief Barrier msg for KVStore
    */
-  kBarrierMsg = 6
+  kBarrierMsg = 6,
+  /*!
+   * \brief IP and ID msg for KVStore
+   */  
+  kIPIDMsg = 7,
+  /*!
+   * \brief Get data shape msg for KVStore
+   */  
+  kGetShapeMsg = 8,
+  /*!
+   * \brief Get data shape back msg for KVStore
+   */ 
+  kGetShapeBackMsg = 9
 };
+
 
 /*!
  * \brief Meta data for NDArray message
@@ -134,6 +143,11 @@ class ArrayMeta {
   int ndarray_count_;
 
   /*!
+   * \brief DataType for each NDArray
+   */
+  std::vector<DLDataType> data_type_;
+
+  /*!
    * \brief We first write the ndim to data_shape_ 
    * and then write the data shape. 
    */
@@ -194,6 +208,10 @@ class KVStoreMsg {
   * \brief data matrix
   */
   NDArray data;
+  /*!
+  * \brief data shape
+  */
+  NDArray shape;
 };
 
 }  // namespace network

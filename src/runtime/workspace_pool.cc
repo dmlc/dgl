@@ -4,6 +4,7 @@
  * \brief Workspace pool utility.
  */
 #include "workspace_pool.h"
+#include <memory>
 
 namespace dgl {
 namespace runtime {
@@ -117,15 +118,20 @@ WorkspacePool::WorkspacePool(DLDeviceType device_type, std::shared_ptr<DeviceAPI
 }
 
 WorkspacePool::~WorkspacePool() {
-  for (size_t i = 0; i < array_.size(); ++i) {
-    if (array_[i] != nullptr) {
-      DGLContext ctx;
-      ctx.device_type = device_type_;
-      ctx.device_id = static_cast<int>(i);
-      array_[i]->Release(ctx, device_.get());
-      delete array_[i];
-    }
-  }
+  /*
+   Comment out the destruct of WorkspacePool, due to Segmentation fault with MXNet
+   Since this will be only called at the termination of process,
+   not manually wiping out should not cause problems.
+  */
+  // for (size_t i = 0; i < array_.size(); ++i) {
+  //   if (array_[i] != nullptr) {
+  //     DGLContext ctx;
+  //     ctx.device_type = device_type_;
+  //     ctx.device_id = static_cast<int>(i);
+  //     array_[i]->Release(ctx, device_.get());
+  //     delete array_[i];
+  //   }
+  // }
 }
 
 void* WorkspacePool::AllocWorkspace(DGLContext ctx, size_t size) {

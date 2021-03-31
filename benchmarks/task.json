@@ -1,0 +1,18 @@
+{
+    "r5.16xlarge": {
+        "tests": [
+            ""
+        ],
+        "env": {
+            "DEVICE": "cpu"
+        }
+    },
+    "g4dn.2xlarge": {
+        "tests": [
+            ""
+        ],
+        "env": {
+            "DEVICE": "gpu"
+        }
+    }
+}

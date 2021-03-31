@@ -19,6 +19,8 @@ namespace kernel {
 template <typename DType>
 struct ReduceSum<kDLCPU, DType> {
   static void Call(DType* addr, DType val) {
+    if (0 == val)
+      return;
 #pragma omp atomic
     *addr += val;
   }

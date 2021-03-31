@@ -1,11 +1,19 @@
 """
 .. _model-dgmg:
 
-Tutorial: Generative models of graphs
+Generative Models of Graphs
 ===========================================
 
 **Author**: `Mufei Li <https://github.com/mufeili>`_,
 `Lingfan Yu <https://github.com/ylfdq1118>`_, Zheng Zhang
+
+.. warning::
+
+    The tutorial aims at gaining insights into the paper, with code as a mean
+    of explanation. The implementation thus is NOT optimized for running
+    efficiency. For recommended implementation, please refer to the `official
+    examples <https://github.com/dmlc/dgl/tree/master/examples>`_.
+
 """
 
 ##############################################################################
@@ -715,7 +723,7 @@ class DGMG(DGMGSkeleton):
 import torch.utils.model_zoo as model_zoo
 
 # Download a pre-trained model state dict for generating cycles with 10-20 nodes.
-state_dict = model_zoo.load_url('https://s3.us-east-2.amazonaws.com/dgl.ai/model/dgmg_cycles-5a0c40be.pth')
+state_dict = model_zoo.load_url('https://data.dgl.ai/model/dgmg_cycles-5a0c40be.pth')
 model = DGMG(v_max=20, node_hidden_size=16, num_prop_rounds=2)
 model.load_state_dict(state_dict)
 model.eval()
@@ -765,78 +773,3 @@ print('Among 100 graphs generated, {}% are valid.'.format(num_valid))
 # For the complete implementation, see the `DGL DGMG example
 # <https://github.com/dmlc/dgl/tree/master/examples/pytorch/dgmg>`__.
 #
-# Batched graph generation
-# ---------------------------
-#
-# Speeding up DGMG is hard because each graph can be generated with a
-# unique sequence of actions. One way to explore parallelism is to adopt
-# asynchronous gradient descent with multiple processes. Each of them
-# works on one graph at a time and the processes are loosely coordinated
-# by a parameter server.
-#
-# DGL explores parallelism in the message-passing framework, on top of
-# the framework-provided tensor operation. The earlier tutorial already
-# does that in the message propagation and graph embedding phases, but
-# only within one graph. For a batch of graphs, a for loop is then needed:
-#
-# ::
-#
-#     for g in g_list:
-#     self.graph_prop(g)
-#
-# Modify the code to work on a batch of graphs at once by replacing
-# these lines with the following. On CPU with a macOS, you instantly
-# enjoy a six to seven-time reduction for the graph propagation part.
-# ::
-#
-#     bg = dgl.batch(g_list)
-#     self.graph_prop(bg)
-#     g_list = dgl.unbatch(bg)
-#
-# You have already used this trick of calling ``dgl.batch`` in the
-# `Tree-LSTM tutorial
-# <http://docs.dgl.ai/tutorials/models/3_tree-lstm.html#sphx-glr-tutorials-models-3-tree-lstm-py>`__
-# , and it is worth explaining one more time why this is so.
-#
-# By batching many small graphs, DGL internally maintains a large *container*
-# graph (``BatchedDGLGraph``) over which ``update_all`` propels message-passing
-# on all the edges and nodes.
-#
-# With ``dgl.batch``, you merge ``g_{1}, ..., g_{N}`` into one single giant
-# graph consisting of :math:`N` isolated small graphs. For example, if we
-# have two graphs with adjacency matrices
-#
-# ::
-#
-#     [0, 1]
-#     [1, 0]
-#
-#     [0, 1, 0]
-#     [1, 0, 0]
-#     [0, 1, 0]
-#
-# ``dgl.batch`` simply gives a graph whose adjacency matrix is
-#
-# ::
-#
-#     [0, 1, 0, 0, 0]
-#     [1, 0, 0, 0, 0]
-#     [0, 1, 0, 0, 0]
-#     [1, 0, 0, 0, 0]
-#     [0, 1, 0, 0, 0]
-#
-# In DGL, the message function is defined on the edges, thus batching scales
-# the processing of edge user-defined functions (UDFs) linearly.
-#
-# The reduce UDFs or ``dgmg_reduce``, work on nodes. Each of them may
-# have different numbers of incoming edges. Using ``degree bucketing``, DGL
-# internally groups nodes with the same in-degrees and calls reduce UDF once
-# for each group. Thus, batching also reduces number of calls to these UDFs.
-#
-# The modification of the node/edge features of a ``BatchedDGLGraph`` object
-# does not take effect on the features of the original small graphs, so we
-# need to replace the old graph list with the new graph list
-# ``g_list = dgl.unbatch(bg)``.
-#
-# The complete code to the batched version can also be found in the example.
-# On a testbed, you get roughly double the speed when compared to the previous implementation.

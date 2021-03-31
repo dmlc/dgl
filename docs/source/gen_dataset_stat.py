@@ -10,11 +10,11 @@ from dgl.data.gdelt import GDELT
 from dgl.data.icews18 import ICEWS18
 from dgl.data.qm7b import QM7b
 # from dgl.data.qm9 import QM9
-from dgl.data import CitationGraphDataset, CoraDataset, PPIDataset, RedditDataset, TUDataset
+from dgl.data import CitationGraphDataset, PPIDataset, RedditDataset, TUDataset
 
 ds_list = {
     "BitcoinOTC": "BitcoinOTC()",
-    "Cora": "CoraDataset()",
+    "Cora": "CitationGraphDataset('cora')",
     "Citeseer": "CitationGraphDataset('citeseer')",
     "PubMed": "CitationGraphDataset('pubmed')",
     "QM7b": "QM7b()",

@@ -9,6 +9,7 @@
 #include <dgl/runtime/ndarray.h>
 
 #include <cstdint>
+#include "../c_api_common.h"
 
 namespace dgl {
 namespace kernel {
@@ -45,13 +46,12 @@ namespace kernel {
 
 // Macro for dispatch dtype flag to template argument. Currently only
 // support float32.
-#define DGL_DTYPE_SWITCH(val, DType, ...)                   \
-  if (val.code == kDLFloat && val.bits == 32) {             \
-    typedef float DType;                                    \
-    {__VA_ARGS__}                                           \
-  } else {                                                  \
-    LOG(FATAL) << "Unsupported dtype: " << val.code << "_"  \
-               << val.bits;                                 \
+#define DGL_DTYPE_SWITCH(val, DType, ...)       \
+  if (val.code == kDLFloat && val.bits == 32) { \
+    typedef float DType;                        \
+    { __VA_ARGS__ }                             \
+  } else {                                      \
+    LOG(FATAL) << "Unsupported dtype: " << val; \
   }
 
 // Macro for unrolling with data type arguments.

@@ -10,6 +10,7 @@
 #include <vector>
 #include <utility>
 #include <algorithm>
+#include <memory>
 
 #include "./runtime/object.h"
 #include "array.h"
@@ -48,6 +49,36 @@ class DGLIdIters {
  private:
   const dgl_id_t *begin_{nullptr}, *end_{nullptr};
 };
+
+/*!
+ * \brief int32 version for DGLIdIters
+ *
+ */
+class DGLIdIters32 {
+ public:
+  /* !\brief default constructor to create an empty range */
+  DGLIdIters32() {}
+  /* !\brief constructor with given begin and end */
+  DGLIdIters32(const int32_t *begin, const int32_t *end) {
+    this->begin_ = begin;
+    this->end_ = end;
+  }
+  const int32_t *begin() const {
+    return this->begin_;
+  }
+  const int32_t *end() const {
+    return this->end_;
+  }
+  int32_t operator[](int32_t i) const {
+    return *(this->begin_ + i);
+  }
+  size_t size() const {
+    return this->end_ - this->begin_;
+  }
+ private:
+  const int32_t *begin_{nullptr}, *end_{nullptr};
+};
+
 
 /* \brief structure used to represent a list of edges */
 typedef struct {
@@ -391,6 +422,12 @@ struct NegSubgraph: public Subgraph {
 
   /*! \brief The Ids of tail nodes */
   IdArray tail_nid;
+};
+
+/*! \brief Subgraph data structure for halo subgraph */
+struct HaloSubgraph: public Subgraph {
+  /*! \brief Indicate if a node belongs to the partition. */
+  IdArray inner_nodes;
 };
 
 // Define SubgraphRef

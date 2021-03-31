@@ -10,6 +10,7 @@
 #include <dgl/runtime/module.h>
 #include <dgl/runtime/registry.h>
 #include <dgl/runtime/device_api.h>
+#include <dgl/runtime/tensordispatch.h>
 #include <array>
 #include <algorithm>
 #include <string>
@@ -85,7 +86,7 @@ class DeviceAPIManager {
     auto* f = Registry::Get(factory);
     if (f == nullptr) {
       CHECK(allow_missing)
-          << "Device API " << name << " is not enabled.";
+          << "Device API " << name << " is not enabled. Please install the cuda version of dgl.";
       return nullptr;
     }
     void* ptr = (*f)();
@@ -378,6 +379,10 @@ int DGLCbArgToReturn(DGLValue* value, int code) {
   API_END();
 }
 
+void DGLLoadTensorAdapter(const char *path) {
+  TensorDispatcher::Global()->Load(path);
+}
+
 // set device api
 DGL_REGISTER_GLOBAL(dgl::runtime::symbol::dgl_set_device)
 .set_body([](DGLArgs args, DGLRetValue *ret) {
@@ -406,3 +411,4 @@ DGL_REGISTER_GLOBAL("_GetDeviceAttr")
       DeviceAPIManager::Get(ctx)->GetAttr(ctx, kind, ret);
     }
   });
+

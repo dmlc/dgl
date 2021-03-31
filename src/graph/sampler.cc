@@ -4,6 +4,7 @@
  * \brief DGL sampler implementation
  */
 #include <dgl/sampler.h>
+#include <dgl/array.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
@@ -14,7 +15,6 @@
 #include <cmath>
 #include <numeric>
 #include "../c_api_common.h"
-#include "../array/common.h"  // for ATEN_FLOAT_TYPE_SWITCH
 
 using namespace dgl::runtime;
 
@@ -30,16 +30,16 @@ class ArrayHeap {
   explicit ArrayHeap(const std::vector<ValueType>& prob) {
     vec_size_ = prob.size();
     bit_len_ = ceil(log2(vec_size_));
-    limit_ = 1 << bit_len_;
+    limit_ = 1UL << bit_len_;
     // allocate twice the size
     heap_.resize(limit_ << 1, 0);
     // allocate the leaves
-    for (int i = limit_; i < vec_size_+limit_; ++i) {
+    for (size_t i = limit_; i < vec_size_+limit_; ++i) {
       heap_[i] = prob[i-limit_];
     }
     // iterate up the tree (this is O(m))
     for (int i = bit_len_-1; i >= 0; --i) {
-      for (int j = (1 << i); j < (1 << (i + 1)); ++j) {
+      for (size_t j = (1UL << i); j < (1UL << (i + 1)); ++j) {
         heap_[j] = heap_[j << 1] + heap_[(j << 1) + 1];
       }
     }
@@ -51,10 +51,13 @@ class ArrayHeap {
    */
   void Delete(size_t index) {
     size_t i = index + limit_;
-    ValueType w = heap_[i];
-    for (int j = bit_len_; j >= 0; --j) {
-      heap_[i] -= w;
-      i = i >> 1;
+    heap_[i] = 0;
+    i /= 2;
+    for (int j = bit_len_-1; j >= 0; --j) {
+      // Using heap_[i] = heap_[i] - w will loss some precision in float.
+      // Using addition to re-calculate the weight layer by layer.
+      heap_[i] = heap_[i << 1] + heap_[(i << 1) + 1];
+      i /= 2;
     }
   }
 
@@ -73,8 +76,9 @@ class ArrayHeap {
    * Sample from arrayHeap
    */
   size_t Sample() {
+    // heap_ is empty
     ValueType xi = heap_[1] * RandomEngine::ThreadLocal()->Uniform<float>();
-    int i = 1;
+    size_t i = 1;
     while (i < limit_) {
       i = i << 1;
       if (xi >= heap_[i]) {
@@ -88,19 +92,92 @@ class ArrayHeap {
   /*
    * Sample a vector by given the size n
    */
-  void SampleWithoutReplacement(size_t n, std::vector<size_t>* samples) {
+  size_t SampleWithoutReplacement(size_t n, std::vector<size_t>* samples) {
     // sample n elements
-    for (size_t i = 0; i < n; ++i) {
+    size_t i = 0;
+    for (; i < n; ++i) {
+      // heap is empty
+      if (heap_[1] == 0) {
+        break;
+      }
       samples->at(i) = this->Sample();
       this->Delete(samples->at(i));
     }
+
+    return i;
   }
 
  private:
-  int vec_size_;  // sample size
+  size_t vec_size_;  // sample size
   int bit_len_;   // bit size
-  int limit_;
+  size_t limit_;
   std::vector<ValueType> heap_;
+};
+
+///////////////////////// Samplers //////////////////////////
+class EdgeSamplerObject: public Object {
+ public:
+  EdgeSamplerObject(const GraphPtr gptr,
+                    IdArray seed_edges,
+                    const int64_t batch_size,
+                    const int64_t num_workers,
+                    const bool replacement,
+                    const bool reset,
+                    const std::string neg_mode,
+                    const int64_t neg_sample_size,
+                    const int64_t chunk_size,
+                    const bool exclude_positive,
+                    const bool check_false_neg,
+                    IdArray relations) {
+    gptr_ = gptr;
+    seed_edges_ = seed_edges;
+    relations_ = relations;
+
+    batch_size_ = batch_size;
+    num_workers_ = num_workers;
+    replacement_ = replacement;
+    reset_ = reset;
+    neg_mode_ = neg_mode;
+    neg_sample_size_ = neg_sample_size;
+    exclude_positive_ = exclude_positive;
+    check_false_neg_ = check_false_neg;
+    chunk_size_ = chunk_size;
+  }
+
+  ~EdgeSamplerObject() {}
+
+  virtual void Fetch(DGLRetValue* rv) = 0;
+  virtual void Reset() = 0;
+
+ protected:
+  virtual void randomSample(size_t set_size, size_t num, std::vector<size_t>* out) = 0;
+  virtual void randomSample(size_t set_size, size_t num, const std::vector<size_t> &exclude,
+                    std::vector<size_t>* out) = 0;
+
+  NegSubgraph genNegEdgeSubgraph(const Subgraph &pos_subg,
+                                 const std::string &neg_mode,
+                                 int64_t neg_sample_size,
+                                 bool exclude_positive,
+                                 bool check_false_neg);
+  NegSubgraph genChunkedNegEdgeSubgraph(const Subgraph &pos_subg,
+                                        const std::string &neg_mode,
+                                        int64_t neg_sample_size,
+                                        bool exclude_positive,
+                                        bool check_false_neg);
+
+  GraphPtr gptr_;
+  IdArray seed_edges_;
+  IdArray relations_;
+
+  int64_t batch_size_;
+  int64_t num_workers_;
+  bool replacement_;
+  int64_t reset_;
+  std::string neg_mode_;
+  int64_t neg_sample_size_;
+  bool exclude_positive_;
+  bool check_false_neg_;
+  int64_t chunk_size_;
 };
 
 /*
@@ -278,7 +355,7 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
                            std::vector<std::pair<dgl_id_t, int> > *sub_vers,
                            std::vector<neighbor_info> *neigh_pos,
                            const std::string &edge_type,
-                           int64_t num_edges, int num_hops, bool is_multigraph) {
+                           int64_t num_edges, int num_hops) {
   NodeFlow nf = NodeFlow::Create();
   uint64_t num_vertices = sub_vers->size();
   nf->node_mapping = aten::NewIdArray(num_vertices);
@@ -291,9 +368,8 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   dgl_id_t *flow_off_data = static_cast<dgl_id_t *>(nf->flow_offsets->data);
   dgl_id_t *edge_map_data = static_cast<dgl_id_t *>(nf->edge_mapping->data);
 
-  // Construct sub_csr_graph
-  // TODO(minjie): is nodeflow a multigraph?
-  auto subg_csr = CSRPtr(new CSR(num_vertices, num_edges, is_multigraph));
+  // Construct sub_csr_graph, we treat nodeflow as multigraph by default
+  auto subg_csr = CSRPtr(new CSR(num_vertices, num_edges));
   dgl_id_t* indptr_out = static_cast<dgl_id_t*>(subg_csr->indptr()->data);
   dgl_id_t* col_list_out = static_cast<dgl_id_t*>(subg_csr->indices()->data);
   dgl_id_t* eid_out = static_cast<dgl_id_t*>(subg_csr->edge_ids()->data);
@@ -515,36 +591,36 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
   }
 
   return ConstructNodeFlow(neighbor_list, edge_list, layer_offsets, &sub_vers, &neigh_pos,
-                           edge_type, num_edges, num_hops, graph->IsMultigraph());
+                           edge_type, num_edges, num_hops);
 }
 
 }  // namespace
 
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetGraph")
+DGL_REGISTER_GLOBAL("_deprecate.nodeflow._CAPI_NodeFlowGetGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     NodeFlow nflow = args[0];
     *rv = nflow->graph;
   });
 
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetNodeMapping")
+DGL_REGISTER_GLOBAL("_deprecate.nodeflow._CAPI_NodeFlowGetNodeMapping")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     NodeFlow nflow = args[0];
     *rv = nflow->node_mapping;
   });
 
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetEdgeMapping")
+DGL_REGISTER_GLOBAL("_deprecate.nodeflow._CAPI_NodeFlowGetEdgeMapping")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     NodeFlow nflow = args[0];
     *rv = nflow->edge_mapping;
   });
 
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetLayerOffsets")
+DGL_REGISTER_GLOBAL("_deprecate.nodeflow._CAPI_NodeFlowGetLayerOffsets")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     NodeFlow nflow = args[0];
     *rv = nflow->layer_offsets;
   });
 
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetBlockOffsets")
+DGL_REGISTER_GLOBAL("_deprecate.nodeflow._CAPI_NodeFlowGetBlockOffsets")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     NodeFlow nflow = args[0];
     *rv = nflow->flow_offsets;
@@ -806,6 +882,10 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
     auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
 
+    CHECK(aten::IsValidIdArray(seed_nodes));
+    CHECK_EQ(seed_nodes->ctx.device_type, kDLCPU)
+      << "UniformSampler only support CPU sampling";
+
     std::vector<NodeFlow> nflows = NeighborSamplingImpl<float>(
         gptr, seed_nodes, batch_start_id, batch_size, max_num_workers,
         expand_factor, num_hops, neigh_type, add_self_loop, nullptr);
@@ -830,12 +910,18 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_NeighborSampling")
     auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
 
+    CHECK(aten::IsValidIdArray(seed_nodes));
+    CHECK_EQ(seed_nodes->ctx.device_type, kDLCPU)
+      << "NeighborSampler only support CPU sampling";
+
     std::vector<NodeFlow> nflows;
 
     CHECK(probability->dtype.code == kDLFloat)
       << "transition probability must be float";
     CHECK(probability->ndim == 1)
       << "transition probability must be a 1-dimensional vector";
+    CHECK_EQ(probability->ctx.device_type, kDLCPU)
+      << "NeighborSampling only support CPU sampling";
 
     ATEN_FLOAT_TYPE_SWITCH(
       probability->dtype,
@@ -844,7 +930,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_NeighborSampling")
       {
         const FloatType *prob;
 
-        if (probability->ndim == 1 && probability->shape[0] == 0) {
+        if (aten::IsNullArray(probability)) {
           prob = nullptr;
         } else {
           CHECK(probability->shape[0] == gptr->NumEdges())
@@ -876,6 +962,13 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
     auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
     CHECK(aten::IsValidIdArray(seed_nodes));
+    CHECK_EQ(seed_nodes->ctx.device_type, kDLCPU)
+      << "LayerSampler only support CPU sampling";
+
+    CHECK(aten::IsValidIdArray(layer_sizes));
+    CHECK_EQ(layer_sizes->ctx.device_type, kDLCPU)
+      << "LayerSampler only support CPU sampling";
+
     const dgl_id_t* seed_nodes_data = static_cast<dgl_id_t*>(seed_nodes->data);
     const int64_t num_seeds = seed_nodes->shape[0];
     const int64_t num_workers = std::min(max_num_workers,
@@ -988,34 +1081,34 @@ std::vector<dgl_id_t> Global2Local(const std::vector<size_t> &ids,
   return local_ids;
 }
 
-NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &pos_subg,
-                            const std::string &neg_mode,
-                            int neg_sample_size, bool exclude_positive,
-                            bool check_false_neg) {
-  int64_t num_tot_nodes = gptr->NumVertices();
+NegSubgraph EdgeSamplerObject::genNegEdgeSubgraph(const Subgraph &pos_subg,
+                                                  const std::string &neg_mode,
+                                                  int64_t neg_sample_size,
+                                                  bool exclude_positive,
+                                                  bool check_false_neg) {
+  int64_t num_tot_nodes = gptr_->NumVertices();
   if (neg_sample_size > num_tot_nodes)
     neg_sample_size = num_tot_nodes;
-  bool is_multigraph = gptr->IsMultigraph();
   std::vector<IdArray> adj = pos_subg.graph->GetAdj(false, "coo");
   IdArray coo = adj[0];
   int64_t num_pos_edges = coo->shape[0] / 2;
   int64_t num_neg_edges = num_pos_edges * neg_sample_size;
   IdArray neg_dst = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
   IdArray neg_src = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
-  IdArray neg_eid = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
   IdArray induced_neg_eid = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
 
   // These are vids in the positive subgraph.
   const dgl_id_t *dst_data = static_cast<const dgl_id_t *>(coo->data);
   const dgl_id_t *src_data = static_cast<const dgl_id_t *>(coo->data) + num_pos_edges;
-  const dgl_id_t *induced_vid_data = static_cast<const dgl_id_t *>(pos_subg.induced_vertices->data);
-  const dgl_id_t *induced_eid_data = static_cast<const dgl_id_t *>(pos_subg.induced_edges->data);
+  const dgl_id_t *induced_vid_data =
+      static_cast<const dgl_id_t *>(pos_subg.induced_vertices->data);
+  const dgl_id_t *induced_eid_data =
+      static_cast<const dgl_id_t *>(pos_subg.induced_edges->data);
   size_t num_pos_nodes = pos_subg.graph->NumVertices();
   std::vector<size_t> pos_nodes(induced_vid_data, induced_vid_data + num_pos_nodes);
 
   dgl_id_t *neg_dst_data = static_cast<dgl_id_t *>(neg_dst->data);
   dgl_id_t *neg_src_data = static_cast<dgl_id_t *>(neg_src->data);
-  dgl_id_t *neg_eid_data = static_cast<dgl_id_t *>(neg_eid->data);
   dgl_id_t *induced_neg_eid_data = static_cast<dgl_id_t *>(induced_neg_eid->data);
 
   const dgl_id_t *unchanged;
@@ -1035,7 +1128,6 @@ NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &po
   std::vector<dgl_id_t> local_pos_vids;
   local_pos_vids.reserve(num_pos_edges);
 
-  dgl_id_t curr_eid = 0;
   std::vector<size_t> neg_vids;
   neg_vids.reserve(neg_sample_size);
   // If we don't exclude positive edges, we are actually sampling more than
@@ -1076,9 +1168,9 @@ NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &po
     std::vector<size_t> neighbors;
     DGLIdIters neigh_it;
     if (IsNegativeHeadMode(neg_mode)) {
-      neigh_it = gptr->PredVec(induced_vid_data[unchanged[i]]);
+      neigh_it = gptr_->PredVec(induced_vid_data[unchanged[i]]);
     } else {
-      neigh_it = gptr->SuccVec(induced_vid_data[unchanged[i]]);
+      neigh_it = gptr_->SuccVec(induced_vid_data[unchanged[i]]);
     }
 
     // If the number of negative nodes is smaller than the number of total nodes
@@ -1090,14 +1182,15 @@ NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &po
         exclude.push_back(global_vid);
       }
       prev_neg_offset = neg_vids.size();
-      RandomSample(num_tot_nodes, neg_sample_size, exclude, &neg_vids);
+      randomSample(num_tot_nodes, neg_sample_size, exclude, &neg_vids);
       assert(prev_neg_offset + neg_sample_size == neg_vids.size());
     } else if (neg_sample_size < num_tot_nodes) {
       prev_neg_offset = neg_vids.size();
-      RandomSample(num_tot_nodes, neg_sample_size, &neg_vids);
+      randomSample(num_tot_nodes, neg_sample_size, &neg_vids);
       assert(prev_neg_offset + neg_sample_size == neg_vids.size());
     } else if (exclude_positive) {
-      LOG(FATAL) << "We can't exclude positive edges when sampling negative edges with all nodes.";
+      LOG(FATAL) << "We can't exclude positive edges"
+                    "when sampling negative edges with all nodes.";
     } else {
       // We don't need to do anything here.
       // In this case, every edge has the same negative edges. That is,
@@ -1110,7 +1203,6 @@ NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &po
 
     for (int64_t j = 0; j < neg_sample_size; j++) {
       neg_unchanged[neg_idx + j] = local_unchanged;
-      neg_eid_data[neg_idx + j] = curr_eid++;
       dgl_id_t local_changed = global2local_map(neg_vids[j + prev_neg_offset], &neg_map);
       neg_changed[neg_idx + j] = local_changed;
       // induced negative eid references to the positive one.
@@ -1129,17 +1221,11 @@ NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &po
   NegSubgraph neg_subg;
   // We sample negative vertices without replacement.
   // There shouldn't be duplicated edges.
-  COOPtr neg_coo(new COO(num_neg_nodes, neg_src, neg_dst, is_multigraph));
+  COOPtr neg_coo(new COO(num_neg_nodes, neg_src, neg_dst));
   neg_subg.graph = GraphPtr(new ImmutableGraph(neg_coo));
   neg_subg.induced_vertices = induced_neg_vid;
   neg_subg.induced_edges = induced_neg_eid;
-  // If we didn't sample all nodes to form negative edges, some of the nodes
-  // in the vector might be redundant.
-  if (neg_sample_size < num_tot_nodes) {
-    std::sort(neg_vids.begin(), neg_vids.end());
-    auto it = std::unique(neg_vids.begin(), neg_vids.end());
-    neg_vids.resize(it - neg_vids.begin());
-  }
+
   if (IsNegativeHeadMode(neg_mode)) {
     neg_subg.head_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
     neg_subg.tail_nid = aten::VecToIdArray(local_pos_vids);
@@ -1149,28 +1235,30 @@ NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &po
   }
   // TODO(zhengda) we should provide an array of 1s if exclude_positive
   if (check_false_neg) {
-    if (relations->shape[0] == 0) {
-      neg_subg.exist = CheckExistence(gptr, neg_src, neg_dst, induced_neg_vid);
+    if (aten::IsNullArray(relations_)) {
+      neg_subg.exist = CheckExistence(gptr_, neg_src, neg_dst, induced_neg_vid);
     } else {
-      neg_subg.exist = CheckExistence(gptr, relations, neg_src, neg_dst,
+      neg_subg.exist = CheckExistence(gptr_, relations_, neg_src, neg_dst,
                                       induced_neg_vid, induced_neg_eid);
     }
   }
   return neg_subg;
 }
 
-NegSubgraph PBGNegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &pos_subg,
-                            const std::string &neg_mode,
-                            int neg_sample_size, bool is_multigraph,
-                            bool exclude_positive, bool check_false_neg) {
-  int64_t num_tot_nodes = gptr->NumVertices();
+NegSubgraph EdgeSamplerObject::genChunkedNegEdgeSubgraph(const Subgraph &pos_subg,
+                                                         const std::string &neg_mode,
+                                                         int64_t neg_sample_size,
+                                                         bool exclude_positive,
+                                                         bool check_false_neg) {
+  int64_t num_tot_nodes = gptr_->NumVertices();
   std::vector<IdArray> adj = pos_subg.graph->GetAdj(false, "coo");
   IdArray coo = adj[0];
   int64_t num_pos_edges = coo->shape[0] / 2;
   if (neg_sample_size > num_tot_nodes)
     neg_sample_size = num_tot_nodes;
 
-  int64_t chunk_size = neg_sample_size;
+  int64_t chunk_size = chunk_size_;
+  CHECK_GT(chunk_size, 0) << "chunk size has to be positive";
   // If num_pos_edges isn't divisible by chunk_size, the actual number of chunks
   // is num_chunks + 1 and the last chunk size is last_chunk_size.
   // Otherwise, the actual number of chunks is num_chunks, the last chunk size
@@ -1189,47 +1277,46 @@ NegSubgraph PBGNegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph 
 
   IdArray neg_dst = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
   IdArray neg_src = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
-  IdArray neg_eid = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
   IdArray induced_neg_eid = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
 
   // These are vids in the positive subgraph.
   const dgl_id_t *dst_data = static_cast<const dgl_id_t *>(coo->data);
   const dgl_id_t *src_data = static_cast<const dgl_id_t *>(coo->data) + num_pos_edges;
-  const dgl_id_t *induced_vid_data = static_cast<const dgl_id_t *>(pos_subg.induced_vertices->data);
-  const dgl_id_t *induced_eid_data = static_cast<const dgl_id_t *>(pos_subg.induced_edges->data);
-  size_t num_pos_nodes = pos_subg.graph->NumVertices();
-  std::vector<size_t> pos_nodes(induced_vid_data, induced_vid_data + num_pos_nodes);
+  const dgl_id_t *induced_vid_data =
+      static_cast<const dgl_id_t *>(pos_subg.induced_vertices->data);
+  const dgl_id_t *induced_eid_data =
+      static_cast<const dgl_id_t *>(pos_subg.induced_edges->data);
+  int64_t num_pos_nodes = pos_subg.graph->NumVertices();
+  std::vector<dgl_id_t> pos_nodes(induced_vid_data, induced_vid_data + num_pos_nodes);
 
   dgl_id_t *neg_dst_data = static_cast<dgl_id_t *>(neg_dst->data);
   dgl_id_t *neg_src_data = static_cast<dgl_id_t *>(neg_src->data);
-  dgl_id_t *neg_eid_data = static_cast<dgl_id_t *>(neg_eid->data);
   dgl_id_t *induced_neg_eid_data = static_cast<dgl_id_t *>(induced_neg_eid->data);
 
   const dgl_id_t *unchanged;
   dgl_id_t *neg_unchanged;
   dgl_id_t *neg_changed;
-
-  // corrupt head nodes.
   if (IsNegativeHeadMode(neg_mode)) {
     unchanged = dst_data;
     neg_unchanged = neg_dst_data;
     neg_changed = neg_src_data;
   } else {
-    // corrupt tail nodes.
     unchanged = src_data;
     neg_unchanged = neg_src_data;
     neg_changed = neg_dst_data;
   }
 
   // We first sample all negative edges.
-  std::vector<size_t> neg_vids;
-  RandomSample(num_tot_nodes,
+  std::vector<size_t> global_neg_vids;
+  std::vector<size_t> local_neg_vids;
+  randomSample(num_tot_nodes,
                num_chunks * neg_sample_size,
-               &neg_vids);
+               &global_neg_vids);
+  CHECK_EQ(num_chunks * neg_sample_size, global_neg_vids.size());
 
-  dgl_id_t curr_eid = 0;
   std::unordered_map<dgl_id_t, dgl_id_t> neg_map;
   dgl_id_t local_vid = 0;
+
   // Collect nodes in the positive side.
   std::vector<dgl_id_t> local_pos_vids;
   local_pos_vids.reserve(num_pos_edges);
@@ -1240,6 +1327,13 @@ NegSubgraph PBGNegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph 
       local_pos_vids.push_back(local_vid);
       neg_map.insert(std::pair<dgl_id_t, dgl_id_t>(vid, local_vid++));
     }
+  }
+
+  // We should map the global negative nodes to local Ids in advance
+  // to reduce computation overhead.
+  local_neg_vids.resize(global_neg_vids.size());
+  for (size_t i = 0; i < global_neg_vids.size(); i++) {
+    local_neg_vids[i] = global2local_map(global_neg_vids[i], &neg_map);;
   }
 
   for (int64_t i_chunk = 0; i_chunk < num_chunks; i_chunk++) {
@@ -1256,17 +1350,11 @@ NegSubgraph PBGNegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph 
 
     for (int64_t in_chunk = 0; in_chunk != chunk_size1; ++in_chunk) {
       // For each positive node in a chunk.
-
       dgl_id_t global_unchanged = induced_vid_data[unchanged[pos_edge_idx + in_chunk]];
       dgl_id_t local_unchanged = global2local_map(global_unchanged, &neg_map);
       for (int64_t j = 0; j < neg_sample_size; ++j) {
         neg_unchanged[neg_idx] = local_unchanged;
-        neg_eid_data[neg_idx] = curr_eid++;
-        dgl_id_t global_changed_vid = neg_vids[neg_node_idx + j];
-
-        // TODO(zhengda) we can avoid the hashtable lookup here.
-        dgl_id_t local_changed = global2local_map(global_changed_vid, &neg_map);
-        neg_changed[neg_idx] = local_changed;
+        neg_changed[neg_idx] = local_neg_vids[neg_node_idx + j];
         induced_neg_eid_data[neg_idx] = induced_eid_data[pos_edge_idx + in_chunk];
         neg_idx++;
       }
@@ -1284,22 +1372,22 @@ NegSubgraph PBGNegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph 
   NegSubgraph neg_subg;
   // We sample negative vertices without replacement.
   // There shouldn't be duplicated edges.
-  COOPtr neg_coo(new COO(num_neg_nodes, neg_src, neg_dst, is_multigraph));
+  COOPtr neg_coo(new COO(num_neg_nodes, neg_src, neg_dst));
   neg_subg.graph = GraphPtr(new ImmutableGraph(neg_coo));
   neg_subg.induced_vertices = induced_neg_vid;
   neg_subg.induced_edges = induced_neg_eid;
   if (IsNegativeHeadMode(neg_mode)) {
-    neg_subg.head_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
+    neg_subg.head_nid = aten::VecToIdArray(Global2Local(global_neg_vids, neg_map));
     neg_subg.tail_nid = aten::VecToIdArray(local_pos_vids);
   } else {
     neg_subg.head_nid = aten::VecToIdArray(local_pos_vids);
-    neg_subg.tail_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
+    neg_subg.tail_nid = aten::VecToIdArray(Global2Local(global_neg_vids, neg_map));
   }
   if (check_false_neg) {
-    if (relations->shape[0] == 0) {
-      neg_subg.exist = CheckExistence(gptr, neg_src, neg_dst, induced_neg_vid);
+    if (aten::IsNullArray(relations_)) {
+      neg_subg.exist = CheckExistence(gptr_, neg_src, neg_dst, induced_neg_vid);
     } else {
-      neg_subg.exist = CheckExistence(gptr, relations, neg_src, neg_dst,
+      neg_subg.exist = CheckExistence(gptr_, relations_, neg_src, neg_dst,
                                       induced_neg_vid, induced_neg_eid);
     }
   }
@@ -1315,68 +1403,6 @@ inline SubgraphRef ConvertRef(const NegSubgraph &subg) {
 }
 
 }  // namespace
-
-DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    // arguments
-    GraphRef g = args[0];
-    IdArray seed_edges = args[1];
-    const int64_t batch_start_id = args[2];
-    const int64_t batch_size = args[3];
-    const int64_t max_num_workers = args[4];
-    const std::string neg_mode = args[5];
-    const int neg_sample_size = args[6];
-    const bool exclude_positive = args[7];
-    const bool check_false_neg = args[8];
-    IdArray relations = args[9];
-    // process args
-    auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
-    CHECK(gptr) << "sampling isn't implemented in mutable graph";
-    CHECK(aten::IsValidIdArray(seed_edges));
-    BuildCoo(*gptr);
-
-    const int64_t num_seeds = seed_edges->shape[0];
-    const int64_t num_workers = std::min(max_num_workers,
-        (num_seeds + batch_size - 1) / batch_size - batch_start_id);
-    // generate subgraphs.
-    std::vector<SubgraphRef> positive_subgs(num_workers);
-    std::vector<SubgraphRef> negative_subgs(num_workers);
-#pragma omp parallel for
-    for (int i = 0; i < num_workers; i++) {
-      const int64_t start = (batch_start_id + i) * batch_size;
-      const int64_t end = std::min(start + batch_size, num_seeds);
-      const int64_t num_edges = end - start;
-      IdArray worker_seeds = seed_edges.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
-                                                   sizeof(dgl_id_t) * start);
-      EdgeArray arr = gptr->FindEdges(worker_seeds);
-      const dgl_id_t *src_ids = static_cast<const dgl_id_t *>(arr.src->data);
-      const dgl_id_t *dst_ids = static_cast<const dgl_id_t *>(arr.dst->data);
-      std::vector<dgl_id_t> src_vec(src_ids, src_ids + num_edges);
-      std::vector<dgl_id_t> dst_vec(dst_ids, dst_ids + num_edges);
-      // TODO(zhengda) what if there are duplicates in the src and dst vectors.
-
-      Subgraph subg = gptr->EdgeSubgraph(worker_seeds, false);
-      positive_subgs[i] = ConvertRef(subg);
-      // For PBG negative sampling, we accept "PBG-head" for corrupting head
-      // nodes and "PBG-tail" for corrupting tail nodes.
-      if (neg_mode.substr(0, 3) == "PBG") {
-        NegSubgraph neg_subg = PBGNegEdgeSubgraph(gptr, relations, subg,
-                                                  neg_mode.substr(4), neg_sample_size,
-                                                  gptr->IsMultigraph(), exclude_positive,
-                                                  check_false_neg);
-        negative_subgs[i] = ConvertRef(neg_subg);
-      } else if (neg_mode.size() > 0) {
-        NegSubgraph neg_subg = NegEdgeSubgraph(gptr, relations, subg, neg_mode, neg_sample_size,
-                                               exclude_positive, check_false_neg);
-        negative_subgs[i] = ConvertRef(neg_subg);
-      }
-    }
-    if (neg_mode.size() > 0) {
-      positive_subgs.insert(positive_subgs.end(), negative_subgs.begin(), negative_subgs.end());
-    }
-    *rv = List<SubgraphRef>(positive_subgs);
-  });
-
 
 DGL_REGISTER_GLOBAL("sampling._CAPI_GetNegEdgeExistence")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
@@ -1397,6 +1423,508 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_GetEdgeSubgraphTail")
   SubgraphRef g = args[0];
   auto gptr = std::dynamic_pointer_cast<NegSubgraph>(g.sptr());
   *rv = gptr->tail_nid;
+});
+
+class UniformEdgeSamplerObject: public EdgeSamplerObject {
+public:
+  explicit UniformEdgeSamplerObject(const GraphPtr gptr,
+                                    IdArray seed_edges,
+                                    const int64_t batch_size,
+                                    const int64_t num_workers,
+                                    const bool replacement,
+                                    const bool reset,
+                                    const std::string neg_mode,
+                                    const int64_t neg_sample_size,
+                                    const int64_t chunk_size,
+                                    const bool exclude_positive,
+                                    const bool check_false_neg,
+                                    IdArray relations)
+                                    : EdgeSamplerObject(gptr,
+                                        seed_edges,
+                                        batch_size,
+                                        num_workers,
+                                        replacement,
+                                        reset,
+                                        neg_mode,
+                                        neg_sample_size,
+                                        chunk_size,
+                                        exclude_positive,
+                                        check_false_neg,
+                                        relations) {
+    batch_curr_id_ = 0;
+    num_seeds_ = seed_edges->shape[0];
+    max_batch_id_ = (num_seeds_ + batch_size - 1) / batch_size;
+
+    // TODO(song): Tricky thing here to make sure gptr_ has coo cache
+    gptr_->FindEdge(0);
+  }
+  ~UniformEdgeSamplerObject() {}
+
+  void Fetch(DGLRetValue* rv) {
+    const int64_t num_workers = std::min(num_workers_, max_batch_id_ - batch_curr_id_);
+    // generate subgraphs.
+    std::vector<SubgraphRef> positive_subgs(num_workers);
+    std::vector<SubgraphRef> negative_subgs(num_workers);
+
+#pragma omp parallel for
+    for (int64_t i = 0; i < num_workers; i++) {
+      const int64_t start = (batch_curr_id_ + i) * batch_size_;
+      const int64_t end = std::min(start + batch_size_, num_seeds_);
+      const int64_t num_edges = end - start;
+      IdArray worker_seeds;
+
+      if (replacement_ == false) {
+        worker_seeds = seed_edges_.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
+                                              sizeof(dgl_id_t) * start);
+      } else {
+        std::vector<dgl_id_t> seeds;
+        const dgl_id_t *seed_edge_ids = static_cast<const dgl_id_t *>(seed_edges_->data);
+        // sampling of each edge is a standalone event
+        for (int64_t i = 0; i < num_edges; ++i) {
+          int64_t seed = static_cast<const int64_t>(
+              RandomEngine::ThreadLocal()->RandInt(num_seeds_));
+          seeds.push_back(seed_edge_ids[seed]);
+        }
+
+        worker_seeds = aten::VecToIdArray(seeds, seed_edges_->dtype.bits);
+      }
+
+      EdgeArray arr = gptr_->FindEdges(worker_seeds);
+      const dgl_id_t *src_ids = static_cast<const dgl_id_t *>(arr.src->data);
+      const dgl_id_t *dst_ids = static_cast<const dgl_id_t *>(arr.dst->data);
+      std::vector<dgl_id_t> src_vec(src_ids, src_ids + num_edges);
+      std::vector<dgl_id_t> dst_vec(dst_ids, dst_ids + num_edges);
+      // TODO(zhengda) what if there are duplicates in the src and dst vectors.
+
+      Subgraph subg = gptr_->EdgeSubgraph(worker_seeds, false);
+      positive_subgs[i] = ConvertRef(subg);
+      // For chunked negative sampling, we accept "chunk-head" for corrupting head
+      // nodes and "chunk-tail" for corrupting tail nodes.
+      if (neg_mode_.substr(0, 5) == "chunk") {
+        NegSubgraph neg_subg = genChunkedNegEdgeSubgraph(subg, neg_mode_.substr(6),
+                                                         neg_sample_size_,
+                                                         exclude_positive_,
+                                                         check_false_neg_);
+        negative_subgs[i] = ConvertRef(neg_subg);
+      } else if (neg_mode_ == "head" || neg_mode_ == "tail") {
+        NegSubgraph neg_subg = genNegEdgeSubgraph(subg, neg_mode_,
+                                                  neg_sample_size_,
+                                                  exclude_positive_,
+                                                  check_false_neg_);
+        negative_subgs[i] = ConvertRef(neg_subg);
+      }
+    }
+    if (neg_mode_.size() > 0) {
+      positive_subgs.insert(positive_subgs.end(), negative_subgs.begin(), negative_subgs.end());
+    }
+    batch_curr_id_ += num_workers;
+
+    if (batch_curr_id_ >= max_batch_id_ && reset_ == true) {
+      Reset();
+    }
+
+    *rv = List<SubgraphRef>(positive_subgs);
+  }
+
+  void Reset() {
+    batch_curr_id_ = 0;
+    if (replacement_ == false) {
+      // Now we should shuffle the data and reset the sampler.
+      dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seed_edges_->data);
+      std::shuffle(seed_ids, seed_ids + seed_edges_->shape[0],
+                   std::default_random_engine());
+    }
+  }
+
+  DGL_DECLARE_OBJECT_TYPE_INFO(UniformEdgeSamplerObject, Object);
+
+private:
+  void randomSample(size_t set_size, size_t num, std::vector<size_t>* out) {
+    RandomSample(set_size, num, out);
+  }
+
+  void randomSample(size_t set_size, size_t num, const std::vector<size_t> &exclude,
+                    std::vector<size_t>* out) {
+    RandomSample(set_size, num, exclude, out);
+  }
+
+  int64_t batch_curr_id_;
+  int64_t max_batch_id_;
+  int64_t num_seeds_;
+};
+
+class UniformEdgeSampler: public ObjectRef {
+ public:
+  UniformEdgeSampler() {}
+  explicit UniformEdgeSampler(std::shared_ptr<runtime::Object> obj): ObjectRef(obj) {}
+
+  UniformEdgeSamplerObject* operator->() const {
+    return static_cast<UniformEdgeSamplerObject*>(obj_.get());
+  }
+
+  std::shared_ptr<UniformEdgeSamplerObject> sptr() const {
+    return CHECK_NOTNULL(std::dynamic_pointer_cast<UniformEdgeSamplerObject>(obj_));
+  }
+
+  operator bool() const { return this->defined(); }
+  using ContainerType = UniformEdgeSamplerObject;
+};
+
+DGL_REGISTER_GLOBAL("sampling._CAPI_CreateUniformEdgeSampler")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    // arguments
+    GraphRef g = args[0];
+    IdArray seed_edges = args[1];
+    const int64_t batch_size = args[2];
+    const int64_t max_num_workers = args[3];
+    const bool replacement = args[4];
+    const bool reset = args[5];
+    const std::string neg_mode = args[6];
+    const int neg_sample_size = args[7];
+    const bool exclude_positive = args[8];
+    const bool check_false_neg = args[9];
+    IdArray relations = args[10];
+    const int64_t chunk_size = args[11];
+    // process args
+    auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
+    CHECK(gptr) << "sampling isn't implemented in mutable graph";
+    CHECK(aten::IsValidIdArray(seed_edges));
+    CHECK_EQ(seed_edges->ctx.device_type, kDLCPU)
+      << "UniformEdgeSampler only support CPU sampling";
+
+    if (relations->shape[0] > 0) {
+      CHECK(aten::IsValidIdArray(relations));
+      CHECK_EQ(relations->ctx.device_type, kDLCPU)
+        << "WeightedEdgeSampler only support CPU sampling";
+    }
+    BuildCoo(*gptr);
+
+    auto o = std::make_shared<UniformEdgeSamplerObject>(gptr,
+                                                        seed_edges,
+                                                        batch_size,
+                                                        max_num_workers,
+                                                        replacement,
+                                                        reset,
+                                                        neg_mode,
+                                                        neg_sample_size,
+                                                        chunk_size,
+                                                        exclude_positive,
+                                                        check_false_neg,
+                                                        relations);
+    *rv = o;
+});
+
+DGL_REGISTER_GLOBAL("sampling._CAPI_FetchUniformEdgeSample")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  UniformEdgeSampler sampler = args[0];
+  sampler->Fetch(rv);
+});
+
+DGL_REGISTER_GLOBAL("sampling._CAPI_ResetUniformEdgeSample")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  UniformEdgeSampler sampler = args[0];
+  sampler->Reset();
+});
+
+template<typename ValueType>
+class WeightedEdgeSamplerObject: public EdgeSamplerObject {
+ public:
+  explicit WeightedEdgeSamplerObject(const GraphPtr gptr,
+                                     IdArray seed_edges,
+                                     NDArray edge_weight,
+                                     NDArray node_weight,
+                                     const int64_t batch_size,
+                                     const int64_t num_workers,
+                                     const bool replacement,
+                                     const bool reset,
+                                     const std::string neg_mode,
+                                     const int64_t neg_sample_size,
+                                     const int64_t chunk_size,
+                                     const bool exclude_positive,
+                                     const bool check_false_neg,
+                                     IdArray relations)
+                                     : EdgeSamplerObject(gptr,
+                                        seed_edges,
+                                        batch_size,
+                                        num_workers,
+                                        replacement,
+                                        reset,
+                                        neg_mode,
+                                        neg_sample_size,
+                                        chunk_size,
+                                        exclude_positive,
+                                        check_false_neg,
+                                        relations) {
+    const int64_t num_edges = edge_weight->shape[0];
+    const ValueType *edge_prob = static_cast<const ValueType*>(edge_weight->data);
+    std::vector<ValueType> eprob(num_edges);
+    for (int64_t i = 0; i < num_edges; ++i) {
+      eprob[i] = edge_prob[i];
+    }
+    edge_selector_ = std::make_shared<ArrayHeap<ValueType>>(eprob);
+    edge_weight_ = edge_weight;
+
+    const size_t num_nodes = node_weight->shape[0];
+    if (num_nodes == 0) {
+      node_selector_ = nullptr;
+    } else {
+      const ValueType *node_prob = static_cast<const ValueType*>(node_weight->data);
+      std::vector<ValueType> nprob(num_nodes);
+      for (size_t i = 0; i < num_nodes; ++i) {
+        nprob[i] = node_prob[i];
+      }
+      node_selector_ = std::make_shared<ArrayHeap<ValueType>>(nprob);
+    }
+
+    curr_batch_id_ = 0;
+    // handle int64 overflow here
+    max_batch_id_ = (num_edges + batch_size - 1) / batch_size;
+    // TODO(song): Tricky thing here to make sure gptr_ has coo cache
+    gptr_->FindEdge(0);
+  }
+
+  ~WeightedEdgeSamplerObject() {
+  }
+
+  void Fetch(DGLRetValue* rv) {
+    const int64_t num_workers = std::min(num_workers_, max_batch_id_ - curr_batch_id_);
+    // generate subgraphs.
+    std::vector<SubgraphRef> positive_subgs(num_workers);
+    std::vector<SubgraphRef> negative_subgs(num_workers);
+
+#pragma omp parallel for
+    for (int i = 0; i < num_workers; i++) {
+      const dgl_id_t *seed_edge_ids = static_cast<const dgl_id_t *>(seed_edges_->data);
+      std::vector<size_t> edge_ids(batch_size_);
+
+      if (replacement_ == false) {
+        size_t n = batch_size_;
+        size_t num_ids = 0;
+#pragma omp critical
+        {
+          num_ids = edge_selector_->SampleWithoutReplacement(n, &edge_ids);
+        }
+        edge_ids.resize(num_ids);
+        for (size_t i = 0; i < num_ids; ++i) {
+          edge_ids[i] = seed_edge_ids[edge_ids[i]];
+        }
+      } else {
+        // sampling of each edge is a standalone event
+        for (int i = 0; i < batch_size_; ++i) {
+          size_t edge_id = edge_selector_->Sample();
+          edge_ids[i] = seed_edge_ids[edge_id];
+        }
+      }
+
+      auto worker_seeds = aten::VecToIdArray(edge_ids, seed_edges_->dtype.bits);
+
+      EdgeArray arr = gptr_->FindEdges(worker_seeds);
+      const dgl_id_t *src_ids = static_cast<const dgl_id_t *>(arr.src->data);
+      const dgl_id_t *dst_ids = static_cast<const dgl_id_t *>(arr.dst->data);
+      std::vector<dgl_id_t> src_vec(src_ids, src_ids + batch_size_);
+      std::vector<dgl_id_t> dst_vec(dst_ids, dst_ids + batch_size_);
+      // TODO(zhengda) what if there are duplicates in the src and dst vectors.
+      Subgraph subg = gptr_->EdgeSubgraph(worker_seeds, false);
+      positive_subgs[i] = ConvertRef(subg);
+      // For chunked negative sampling, we accept "chunk-head" for corrupting head
+      // nodes and "chunk-tail" for corrupting tail nodes.
+      if (neg_mode_.substr(0, 5) == "chunk") {
+        NegSubgraph neg_subg = genChunkedNegEdgeSubgraph(subg, neg_mode_.substr(6),
+                                                         neg_sample_size_,
+                                                         exclude_positive_,
+                                                         check_false_neg_);
+        negative_subgs[i] = ConvertRef(neg_subg);
+      } else if (neg_mode_ == "head" || neg_mode_ == "tail") {
+        NegSubgraph neg_subg = genNegEdgeSubgraph(subg, neg_mode_,
+                                                  neg_sample_size_,
+                                                  exclude_positive_,
+                                                  check_false_neg_);
+        negative_subgs[i] = ConvertRef(neg_subg);
+      }
+    }
+    curr_batch_id_ += num_workers;
+
+    if (curr_batch_id_ >= max_batch_id_ && reset_ == true) {
+      Reset();
+    }
+
+    if (neg_mode_.size() > 0) {
+      positive_subgs.insert(positive_subgs.end(), negative_subgs.begin(), negative_subgs.end());
+    }
+    *rv = List<SubgraphRef>(positive_subgs);
+  }
+
+  void Reset() {
+    curr_batch_id_ = 0;
+    if (replacement_ == false) {
+      const int64_t num_edges = edge_weight_->shape[0];
+      const ValueType *edge_prob = static_cast<const ValueType*>(edge_weight_->data);
+      std::vector<ValueType> eprob(num_edges);
+      for (int64_t i = 0; i < num_edges; ++i) {
+        eprob[i] = edge_prob[i];
+      }
+
+      // rebuild the edge_selector_
+      edge_selector_ = std::make_shared<ArrayHeap<ValueType>>(eprob);
+    }
+  }
+
+  DGL_DECLARE_OBJECT_TYPE_INFO(WeightedEdgeSamplerObject<ValueType>, Object);
+
+private:
+  void randomSample(size_t set_size, size_t num, std::vector<size_t>* out) {
+    if (num < set_size) {
+      std::unordered_set<size_t> sampled_idxs;
+      while (sampled_idxs.size() < num) {
+        if (node_selector_ == nullptr) {
+          sampled_idxs.insert(RandomEngine::ThreadLocal()->RandInt(set_size));
+        } else {
+          size_t id = node_selector_->Sample();
+          sampled_idxs.insert(id);
+        }
+      }
+
+      out->insert(out->end(), sampled_idxs.begin(), sampled_idxs.end());
+    } else {
+      // If we need to sample all elements in the set, we don't need to
+      // generate random numbers.
+      for (size_t i = 0; i < set_size; i++)
+        out->push_back(i);
+    }
+  }
+
+  void randomSample(size_t set_size, size_t num, const std::vector<size_t> &exclude,
+                    std::vector<size_t>* out) {
+    std::unordered_map<size_t, int> sampled_idxs;
+    for (auto v : exclude) {
+      sampled_idxs.insert(std::pair<size_t, int>(v, 0));
+    }
+    if (num + exclude.size() < set_size) {
+      while (sampled_idxs.size() < num + exclude.size()) {
+        size_t rand;
+        if (node_selector_ == nullptr) {
+          rand =  RandomEngine::ThreadLocal()->RandInt(set_size);
+        } else {
+          rand = node_selector_->Sample();
+        }
+        sampled_idxs.insert(std::pair<size_t, int>(rand, 1));
+      }
+      for (auto it = sampled_idxs.begin(); it != sampled_idxs.end(); it++) {
+        if (it->second) {
+          out->push_back(it->first);
+        }
+      }
+    } else {
+      // If we need to sample all elements in the set, we don't need to
+      // generate random numbers.
+      for (size_t i = 0; i < set_size; i++) {
+        // If the element doesn't exist in exclude.
+        if (sampled_idxs.find(i) == sampled_idxs.end()) {
+          out->push_back(i);
+        }
+      }
+    }
+  }
+
+private:
+  std::shared_ptr<ArrayHeap<ValueType>> edge_selector_;
+  std::shared_ptr<ArrayHeap<ValueType>> node_selector_;
+
+  NDArray edge_weight_;
+  int64_t curr_batch_id_;
+  int64_t max_batch_id_;
+};
+
+template class WeightedEdgeSamplerObject<float>;
+
+class FloatWeightedEdgeSampler: public ObjectRef {
+ public:
+  FloatWeightedEdgeSampler() {}
+  explicit FloatWeightedEdgeSampler(std::shared_ptr<runtime::Object> obj): ObjectRef(obj) {}
+
+  WeightedEdgeSamplerObject<float>* operator->() const {
+    return static_cast<WeightedEdgeSamplerObject<float>*>(obj_.get());
+  }
+
+  std::shared_ptr<WeightedEdgeSamplerObject<float>> sptr() const {
+    return CHECK_NOTNULL(std::dynamic_pointer_cast<WeightedEdgeSamplerObject<float>>(obj_));
+  }
+
+  operator bool() const { return this->defined(); }
+  using ContainerType = WeightedEdgeSamplerObject<float>;
+};
+
+DGL_REGISTER_GLOBAL("sampling._CAPI_CreateWeightedEdgeSampler")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    // arguments
+    GraphRef g = args[0];
+    IdArray seed_edges = args[1];
+    NDArray edge_weight = args[2];
+    NDArray node_weight = args[3];
+    const int64_t batch_size = args[4];
+    const int64_t max_num_workers = args[5];
+    const bool replacement = args[6];
+    const bool reset = args[7];
+    const std::string neg_mode = args[8];
+    const int64_t neg_sample_size = args[9];
+    const bool exclude_positive = args[10];
+    const bool check_false_neg = args[11];
+    IdArray relations = args[12];
+    const int64_t chunk_size = args[13];
+
+    auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
+    CHECK(gptr) << "sampling isn't implemented in mutable graph";
+    CHECK(aten::IsValidIdArray(seed_edges));
+    CHECK_EQ(seed_edges->ctx.device_type, kDLCPU)
+      << "WeightedEdgeSampler only support CPU sampling";
+    CHECK(edge_weight->dtype.code == kDLFloat) << "edge_weight should be FloatType";
+    CHECK(edge_weight->dtype.bits == 32) << "WeightedEdgeSampler only support float weight";
+    CHECK_EQ(edge_weight->ctx.device_type, kDLCPU)
+      << "WeightedEdgeSampler only support CPU sampling";
+    if (node_weight->shape[0] > 0) {
+      CHECK(node_weight->dtype.code == kDLFloat) << "node_weight should be FloatType";
+      CHECK(node_weight->dtype.bits == 32) << "WeightedEdgeSampler only support float weight";
+      CHECK_EQ(node_weight->ctx.device_type, kDLCPU)
+        << "WeightedEdgeSampler only support CPU sampling";
+    }
+    if (relations->shape[0] > 0) {
+      CHECK(aten::IsValidIdArray(relations));
+      CHECK_EQ(relations->ctx.device_type, kDLCPU)
+        << "WeightedEdgeSampler only support CPU sampling";
+    }
+    BuildCoo(*gptr);
+
+    const int64_t num_seeds = seed_edges->shape[0];
+    const int64_t num_workers = std::min(max_num_workers,
+        (num_seeds + batch_size - 1) / batch_size);
+
+    auto o = std::make_shared<WeightedEdgeSamplerObject<float>>(gptr,
+                                                                seed_edges,
+                                                                edge_weight,
+                                                                node_weight,
+                                                                batch_size,
+                                                                num_workers,
+                                                                replacement,
+                                                                reset,
+                                                                neg_mode,
+                                                                neg_sample_size,
+                                                                chunk_size,
+                                                                exclude_positive,
+                                                                check_false_neg,
+                                                                relations);
+    *rv = o;
+});
+
+DGL_REGISTER_GLOBAL("sampling._CAPI_FetchWeightedEdgeSample")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  FloatWeightedEdgeSampler sampler = args[0];
+  sampler->Fetch(rv);
+});
+
+DGL_REGISTER_GLOBAL("sampling._CAPI_ResetWeightedEdgeSample")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  FloatWeightedEdgeSampler sampler = args[0];
+  sampler->Reset();
 });
 
 }  // namespace dgl

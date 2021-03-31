@@ -9,6 +9,7 @@
 #include <dgl/runtime/module.h>
 #include <dgl/runtime/registry.h>
 #include <string>
+#include <memory>
 #include "module_util.h"
 
 namespace dgl {

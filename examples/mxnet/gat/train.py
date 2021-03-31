@@ -14,8 +14,10 @@ import time
 import mxnet as mx
 from mxnet import gluon
 import numpy as np
-from dgl import DGLGraph
-from dgl.data import register_data_args, load_data
+
+import dgl
+from dgl.data import register_data_args
+from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 from gat import GAT
 from utils import EarlyStopping
 
@@ -34,32 +36,38 @@ def evaluate(model, features, labels, mask):
 
 def main(args):
     # load and preprocess dataset
-    data = load_data(args)
+    if args.dataset == 'cora':
+        data = CoraGraphDataset()
+    elif args.dataset == 'citeseer':
+        data = CiteseerGraphDataset()
+    elif args.dataset == 'pubmed':
+        data = PubmedGraphDataset()
+    else:
+        raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
-    features = mx.nd.array(data.features)
-    labels = mx.nd.array(data.labels)
-    mask = mx.nd.array(np.where(data.train_mask == 1))
-    test_mask = mx.nd.array(np.where(data.test_mask == 1))
-    val_mask = mx.nd.array(np.where(data.val_mask == 1))
+    g = data[0]
+    if args.gpu < 0:
+        cuda = False
+        ctx = mx.cpu(0)
+    else:
+        cuda = True
+        ctx = mx.gpu(args.gpu)
+        g = g.to(ctx)
+
+    features = g.ndata['feat']
+    labels = mx.nd.array(g.ndata['label'], dtype="float32", ctx=ctx)
+    mask = g.ndata['train_mask']
+    mask = mx.nd.array(np.nonzero(mask.asnumpy())[0], ctx=ctx)
+    val_mask = g.ndata['val_mask']
+    val_mask =  mx.nd.array(np.nonzero(val_mask.asnumpy())[0], ctx=ctx)
+    test_mask = g.ndata['test_mask']
+    test_mask =  mx.nd.array(np.nonzero(test_mask.asnumpy())[0], ctx=ctx)
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
 
-    if args.gpu < 0:
-        ctx = mx.cpu()
-    else:
-        ctx = mx.gpu(args.gpu)
-        features = features.as_in_context(ctx)
-        labels = labels.as_in_context(ctx)
-        mask = mask.as_in_context(ctx)
-        test_mask = test_mask.as_in_context(ctx)
-        val_mask = val_mask.as_in_context(ctx)
-    # create graph
-    g = data.graph
-    # add self-loop
-    g.remove_edges_from(nx.selfloop_edges(g))
-    g = DGLGraph(g)
-    g.add_edges(g.nodes(), g.nodes())
+    g = dgl.remove_self_loop(g)
+    g = dgl.add_self_loop(g)
     # create model
     heads = ([args.num_heads] * args.num_layers) + [args.num_out_heads]
     model = GAT(g,
@@ -99,7 +107,7 @@ def main(args):
         val_accuracy = evaluate(model, features, labels, val_mask)
         print("Validation Accuracy {:.4f}".format(val_accuracy))
         if args.early_stop:
-            if stopper.step(val_accuracy, model): 
+            if stopper.step(val_accuracy, model):
                 break
     print()
 

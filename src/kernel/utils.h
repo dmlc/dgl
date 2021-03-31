@@ -9,7 +9,7 @@
 #include <minigun/csr.h>
 #include <dlpack/dlpack.h>
 #include <dgl/runtime/ndarray.h>
-
+#include <dgl/array.h>
 #include <cstdlib>
 #include <vector>
 
@@ -17,21 +17,16 @@ namespace dgl {
 namespace kernel {
 namespace utils {
 
-/* !\brief Return an NDArray that represents none value. */
-inline runtime::NDArray NoneArray() {
-  return runtime::NDArray::Empty({}, DLDataType{kDLInt, 32, 1}, DLContext{kDLCPU, 0});
-}
-
-/* !\brief Return true if the NDArray is none. */
-inline bool IsNoneArray(runtime::NDArray array) {
-  return array->ndim == 0;
-}
-
 /*
  * !\brief Find number of threads is smaller than dim and max_nthrs
  * and is also the power of two.
  */
 int FindNumThreads(int dim, int max_nthrs);
+
+/*
+ * !\brief Find number of blocks is smaller than nblks and max_nblks
+ */
+int FindNumBlocks(int nblks, int max_nblks);
 
 /*
  * !\brief Compute the total number of feature elements.

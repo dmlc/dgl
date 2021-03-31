@@ -7,7 +7,9 @@ The authors' implementation can be found [here](https://github.com/Jhy1993/HAN).
 
 `python main.py` for reproducing HAN's work on their dataset.
 
-`python main.py --hetero` for reproducing HAN's work on DGL's own dataset.
+`python main.py --hetero` for reproducing HAN's work on DGL's own dataset from
+[here](https://github.com/Jhy1993/HAN/tree/master/data/acm).  The dataset is noisy
+because there are same author occurring multiple times as different nodes.
 
 ## Performance
 

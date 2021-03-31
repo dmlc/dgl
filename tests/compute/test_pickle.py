@@ -1,20 +1,22 @@
 import networkx as nx
+import scipy.sparse as ssp
 import dgl
 import dgl.contrib as contrib
-from dgl.frame import Frame, FrameRef, Column
 from dgl.graph_index import create_graph_index
 from dgl.utils import toindex
 import backend as F
 import dgl.function as fn
 import pickle
 import io
+import unittest, pytest
+import test_utils
+from test_utils import parametrize_dtype, get_cases
 
 def _assert_is_identical(g, g2):
-    assert g.is_multigraph == g2.is_multigraph
     assert g.is_readonly == g2.is_readonly
     assert g.number_of_nodes() == g2.number_of_nodes()
-    src, dst = g.all_edges()
-    src2, dst2 = g2.all_edges()
+    src, dst = g.all_edges(order='eid')
+    src2, dst2 = g2.all_edges(order='eid')
     assert F.array_equal(src, src2)
     assert F.array_equal(dst, dst2)
 
@@ -25,8 +27,32 @@ def _assert_is_identical(g, g2):
     for k in g.edata:
         assert F.allclose(g.edata[k], g2.edata[k])
 
+def _assert_is_identical_hetero(g, g2):
+    assert g.is_readonly == g2.is_readonly
+    assert g.ntypes == g2.ntypes
+    assert g.canonical_etypes == g2.canonical_etypes
+
+    # check if two metagraphs are identical
+    for edges, features in g.metagraph().edges(keys=True).items():
+        assert g2.metagraph().edges(keys=True)[edges] == features
+
+    # check if node ID spaces and feature spaces are equal
+    for ntype in g.ntypes:
+        assert g.number_of_nodes(ntype) == g2.number_of_nodes(ntype)
+        assert len(g.nodes[ntype].data) == len(g2.nodes[ntype].data)
+        for k in g.nodes[ntype].data:
+            assert F.allclose(g.nodes[ntype].data[k], g2.nodes[ntype].data[k])
+
+    # check if edge ID spaces and feature spaces are equal
+    for etype in g.canonical_etypes:
+        src, dst = g.all_edges(etype=etype, order='eid')
+        src2, dst2 = g2.all_edges(etype=etype, order='eid')
+        assert F.array_equal(src, src2)
+        assert F.array_equal(dst, dst2)
+        for k in g.edges[etype].data:
+            assert F.allclose(g.edges[etype].data[k], g2.edges[etype].data[k])
+
 def _assert_is_identical_nodeflow(nf1, nf2):
-    assert nf1.is_multigraph == nf2.is_multigraph
     assert nf1.is_readonly == nf2.is_readonly
     assert nf1.number_of_nodes() == nf2.number_of_nodes()
     src, dst = nf1.all_edges()
@@ -52,6 +78,13 @@ def _assert_is_identical_batchedgraph(bg1, bg2):
     assert bg1.batch_size == bg2.batch_size
     assert bg1.batch_num_nodes == bg2.batch_num_nodes
     assert bg1.batch_num_edges == bg2.batch_num_edges
+
+def _assert_is_identical_batchedhetero(bg1, bg2):
+    _assert_is_identical_hetero(bg1, bg2)
+    for ntype in bg1.ntypes:
+        assert bg1.batch_num_nodes(ntype) == bg2.batch_num_nodes(ntype)
+    for canonical_etype in bg1.canonical_etypes:
+        assert bg1.batch_num_edges(canonical_etype) == bg2.batch_num_edges(canonical_etype)
 
 def _assert_is_identical_index(i1, i2):
     assert i1.slice_data() == i2.slice_data()
@@ -80,7 +113,7 @@ def test_pickling_index():
     _assert_is_identical_index(i, i2)
 
 def test_pickling_graph_index():
-    gi = create_graph_index(None, False, False)
+    gi = create_graph_index(None, False)
     gi.add_nodes(3)
     src_idx = toindex([0, 0])
     dst_idx = toindex([1, 2])
@@ -94,122 +127,80 @@ def test_pickling_graph_index():
     assert F.array_equal(dst_idx.tousertensor(), dst_idx2.tousertensor())
 
 
-def test_pickling_frame():
-    x = F.randn((3, 7))
-    y = F.randn((3, 5))
-
-    c = Column(x)
-
-    c2 = _reconstruct_pickle(c)
-    assert F.allclose(c.data, c2.data)
-
-    fr = Frame({'x': x, 'y': y})
-
-    fr2 = _reconstruct_pickle(fr)
-    assert F.allclose(fr2['x'].data, x)
-    assert F.allclose(fr2['y'].data, y)
-
-    fr = Frame()
-
-
 def _global_message_func(nodes):
     return {'x': nodes.data['x']}
 
-def test_pickling_graph():
-    # graph structures and frames are pickled
-    g = dgl.DGLGraph()
-    g.add_nodes(3)
-    src = F.tensor([0, 0])
-    dst = F.tensor([1, 2])
-    g.add_edges(src, dst)
-
-    x = F.randn((3, 7))
-    y = F.randn((3, 5))
-    a = F.randn((2, 6))
-    b = F.randn((2, 4))
-
-    g.ndata['x'] = x
-    g.ndata['y'] = y
-    g.edata['a'] = a
-    g.edata['b'] = b
-
-    # registered functions are pickled
-    g.register_message_func(_global_message_func)
-    reduce_func = fn.sum('x', 'x')
-    g.register_reduce_func(reduce_func)
-
-    # custom attributes should be pickled
-    g.foo = 2
-
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(exclude=['dglgraph', 'two_hetero_batch']))
+def test_pickling_graph(g, idtype):
+    g = g.astype(idtype)
     new_g = _reconstruct_pickle(g)
+    test_utils.check_graph_equal(g, new_g, check_feature=True)
 
-    _assert_is_identical(g, new_g)
-    assert new_g.foo == 2
-    assert new_g._message_func == _global_message_func
-    assert isinstance(new_g._reduce_func, type(reduce_func))
-    assert new_g._reduce_func._name == 'sum'
-    assert new_g._reduce_func.msg_field == 'x'
-    assert new_g._reduce_func.out_field == 'x'
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+def test_pickling_batched_heterograph():
+    # copied from test_heterograph.create_test_heterograph()
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2, 1], [0, 0, 1, 1]),
+        ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
+        ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+    })
+    g2 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2, 1], [0, 0, 1, 1]),
+        ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
+        ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+    })
 
-    # test batched graph with partial set case
-    g2 = dgl.DGLGraph()
-    g2.add_nodes(4)
-    src2 = F.tensor([0, 1])
-    dst2 = F.tensor([2, 3])
-    g2.add_edges(src2, dst2)
+    g.nodes['user'].data['u_h'] = F.randn((3, 4))
+    g.nodes['game'].data['g_h'] = F.randn((2, 5))
+    g.edges['plays'].data['p_h'] = F.randn((4, 6))
+    g2.nodes['user'].data['u_h'] = F.randn((3, 4))
+    g2.nodes['game'].data['g_h'] = F.randn((2, 5))
+    g2.edges['plays'].data['p_h'] = F.randn((4, 6))
 
-    x2 = F.randn((4, 7))
-    y2 = F.randn((3, 5))
-    a2 = F.randn((2, 6))
-    b2 = F.randn((2, 4))
-
-    g2.ndata['x'] = x2
-    g2.nodes[[0, 1, 3]].data['y'] = y2
-    g2.edata['a'] = a2
-    g2.edata['b'] = b2
-
-    bg = dgl.batch([g, g2])
-
-    bg2 = _reconstruct_pickle(bg)
-
-    _assert_is_identical(bg, bg2)
-    new_g, new_g2 = dgl.unbatch(bg2)
-    _assert_is_identical(g, new_g)
-    _assert_is_identical(g2, new_g2)
-
-    # readonly graph
-    g = dgl.DGLGraph([(0, 1), (1, 2)], readonly=True)
-    new_g = _reconstruct_pickle(g)
-    _assert_is_identical(g, new_g)
-
-    # multigraph
-    g = dgl.DGLGraph([(0, 1), (0, 1), (1, 2)], multigraph=True)
-    new_g = _reconstruct_pickle(g)
-    _assert_is_identical(g, new_g)
-
-    # readonly multigraph
-    g = dgl.DGLGraph([(0, 1), (0, 1), (1, 2)], multigraph=True, readonly=True)
-    new_g = _reconstruct_pickle(g)
-    _assert_is_identical(g, new_g)
-
-def test_pickling_nodeflow():
-    elist = [(0, 1), (1, 2), (2, 3), (3, 0)]
-    g = dgl.DGLGraph(elist, readonly=True)
-    g.ndata['x'] = F.randn((4, 5))
-    g.edata['y'] = F.randn((4, 3))
-    nf = contrib.sampling.sampler.create_full_nodeflow(g, 5)
-    nf.copy_from_parent()  # add features
-    new_nf = _reconstruct_pickle(nf)
-    _assert_is_identical_nodeflow(nf, new_nf)
-
-def test_pickling_batched_graph():
-    glist = [nx.path_graph(i + 5) for i in range(5)]
-    glist = [dgl.DGLGraph(g) for g in glist]
-    bg = dgl.batch(glist)
-    bg.ndata['x'] = F.randn((35, 5))
-    bg.edata['y'] = F.randn((60, 3))
+    bg = dgl.batch_hetero([g, g2])
     new_bg = _reconstruct_pickle(bg)
-    _assert_is_identical_batchedgraph(bg, new_bg)
+    test_utils.check_graph_equal(bg, new_bg)
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU edge_subgraph w/ relabeling not implemented")
+def test_pickling_subgraph():
+    f1 = io.BytesIO()
+    f2 = io.BytesIO()
+    g = dgl.rand_graph(10000, 100000)
+    g.ndata['x'] = F.randn((10000, 4))
+    g.edata['x'] = F.randn((100000, 5))
+    pickle.dump(g, f1)
+    sg = g.subgraph([0, 1])
+    sgx = sg.ndata['x'] # materialize
+    pickle.dump(sg, f2)
+    # TODO(BarclayII): How should I test that the size of the subgraph pickle file should not
+    # be as large as the size of the original pickle file?
+    assert f1.tell() > f2.tell() * 50
+
+    f2.seek(0)
+    f2.truncate()
+    sgx = sg.edata['x'] # materialize
+    pickle.dump(sg, f2)
+    assert f1.tell() > f2.tell() * 50
+
+    f2.seek(0)
+    f2.truncate()
+    sg = g.edge_subgraph([0])
+    sgx = sg.edata['x'] # materialize
+    pickle.dump(sg, f2)
+    assert f1.tell() > f2.tell() * 50
+
+    f2.seek(0)
+    f2.truncate()
+    sgx = sg.ndata['x'] # materialize
+    pickle.dump(sg, f2)
+    assert f1.tell() > f2.tell() * 50
+
+    f1.close()
+    f2.close()
 
 if __name__ == '__main__':
     test_pickling_index()
@@ -218,3 +209,5 @@ if __name__ == '__main__':
     test_pickling_graph()
     test_pickling_nodeflow()
     test_pickling_batched_graph()
+    test_pickling_heterograph()
+    test_pickling_batched_heterograph()

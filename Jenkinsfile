@@ -1,8 +1,8 @@
 #!/usr/bin/env groovy
 
-dgl_linux_libs = "build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-35m-x86_64-linux-gnu.so"
+dgl_linux_libs = "build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-36m-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so"
 // Currently DGL on Windows is not working with Cython yet
-dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe"
+dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe, build\\tensoradapter\\pytorch\\*.dll"
 
 def init_git() {
   sh "rm -rf *"
@@ -30,6 +30,7 @@ def unpack_lib(name, libs) {
 def build_dgl_linux(dev) {
   init_git()
   sh "bash tests/scripts/build_dgl.sh ${dev}"
+  sh "ls -lh /usr/lib/x86_64-linux-gnu/"
   pack_lib("dgl-${dev}-linux", dgl_linux_libs)
 }
 
@@ -56,7 +57,7 @@ def cpp_unit_test_win64() {
 def unit_test_linux(backend, dev) {
   init_git()
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
-  timeout(time: 5, unit: 'MINUTES') {
+  timeout(time: 15, unit: 'MINUTES') {
     sh "bash tests/scripts/task_unit_test.sh ${backend} ${dev}"
   }
 }
@@ -64,16 +65,8 @@ def unit_test_linux(backend, dev) {
 def unit_test_win64(backend, dev) {
   init_git_win64()
   unpack_lib("dgl-${dev}-win64", dgl_win64_libs)
-  timeout(time: 2, unit: 'MINUTES') {
+  timeout(time: 10, unit: 'MINUTES') {
     bat "CALL tests\\scripts\\task_unit_test.bat ${backend}"
-  }
-}
-
-def kg_test_linux(backend, dev) {
-  init_git()
-  unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
-  timeout(time: 20, unit: 'MINUTES') {
-    sh "bash tests/scripts/task_kg_test.sh ${backend} ${dev}"
   }
 }
 
@@ -101,11 +94,18 @@ def tutorial_test_linux(backend) {
   }
 }
 
+
 pipeline {
   agent any
   stages {
     stage("Lint Check") {
-      agent { docker { image "dgllib/dgl-ci-lint" } }
+      agent { 
+        docker {
+          label "linux-c52x-node"
+          image "dgllib/dgl-ci-lint"  
+          alwaysPull true
+        }
+      }
       steps {
         init_git()
         sh "bash tests/scripts/task_lint.sh"
@@ -119,7 +119,13 @@ pipeline {
     stage("Build") {
       parallel {
         stage("CPU Build") {
-          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          agent { 
+            docker {
+              label "linux-c52x-node"
+              image "dgllib/dgl-ci-cpu:conda" 
+              alwaysPull true
+            }
+          }
           steps {
             build_dgl_linux("cpu")
           }
@@ -132,12 +138,14 @@ pipeline {
         stage("GPU Build") {
           agent {
             docker {
-              image "dgllib/dgl-ci-gpu"
-              args "--runtime nvidia"
+              label "linux-c52x-node"
+              image "dgllib/dgl-ci-gpu:conda"
+              args "-u root"
+              alwaysPull true
             }
           }
           steps {
-            sh "nvidia-smi"
+            // sh "nvidia-smi"
             build_dgl_linux("gpu")
           }
           post {
@@ -165,7 +173,13 @@ pipeline {
     stage("Test") {
       parallel {
         stage("C++ CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          agent { 
+            docker { 
+              label "linux-c52x-node"
+              image "dgllib/dgl-ci-cpu:conda"
+              alwaysPull true
+            }
+          }
           steps {
             cpp_unit_test_linux()
           }
@@ -186,8 +200,57 @@ pipeline {
             }
           }
         }
+        stage("Tensorflow CPU") {
+          agent { 
+            docker {
+              label "linux-c52x-node"
+              image "dgllib/dgl-ci-cpu:conda" 
+              alwaysPull true
+            }
+          }
+          stages {
+            stage("Unit test") {
+              steps {
+                unit_test_linux("tensorflow", "cpu")
+              }
+            }
+          }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
+          }
+        }
+        stage("Tensorflow GPU") {
+          agent { 
+            docker { 
+              label "linux-gpu-node"
+              image "dgllib/dgl-ci-gpu:conda" 
+              args "--runtime nvidia"
+              alwaysPull true
+            }
+          }
+          stages {
+            stage("Unit test") {
+              steps {
+                unit_test_linux("tensorflow", "gpu")
+              }
+            }
+          }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
+          }
+        }
         stage("Torch CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          agent { 
+            docker {
+              label "linux-c52x-node"
+              image "dgllib/dgl-ci-cpu:conda" 
+              alwaysPull true
+            }
+          }
           stages {
             stage("Unit test") {
               steps {
@@ -234,8 +297,10 @@ pipeline {
         stage("Torch GPU") {
           agent {
             docker {
-              image "dgllib/dgl-ci-gpu"
+              label "linux-gpu-node"
+              image "dgllib/dgl-ci-gpu:conda"
               args "--runtime nvidia"
+              alwaysPull true
             }
           }
           stages {
@@ -258,7 +323,13 @@ pipeline {
           }
         }
         stage("MXNet CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          agent { 
+            docker {
+              label "linux-c52x-node"
+              image "dgllib/dgl-ci-cpu:conda" 
+              alwaysPull true
+            }
+          }
           stages {
             stage("Unit test") {
               steps {
@@ -280,8 +351,10 @@ pipeline {
         stage("MXNet GPU") {
           agent {
             docker {
-              image "dgllib/dgl-ci-gpu"
+              label "linux-gpu-node" 
+              image "dgllib/dgl-ci-gpu:conda"
               args "--runtime nvidia"
+              alwaysPull true
             }
           }
           stages {
@@ -289,55 +362,6 @@ pipeline {
               steps {
                 sh "nvidia-smi"
                 unit_test_linux("mxnet", "gpu")
-              }
-            }
-          }
-          post {
-            always {
-              cleanWs disableDeferredWipeout: true, deleteDirs: true
-            }
-          }
-        }
-      }
-    }
-    stage("App") {
-      parallel {
-        stage("Knowledge Graph CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu:torch-1.2.0" } }
-          stages {
-            stage("Torch test") {
-              steps {
-                kg_test_linux("pytorch", "cpu")
-              }
-            }
-            stage("MXNet test") {
-              steps {
-                kg_test_linux("mxnet", "cpu")
-              }
-            }
-          }
-          post {
-            always {
-              cleanWs disableDeferredWipeout: true, deleteDirs: true
-            }
-          }
-        }
-        stage("Knowledge Graph GPU") {
-          agent {
-            docker {
-              image "dgllib/dgl-ci-gpu:torch-1.2.0"
-              args "--runtime nvidia"
-            }
-          }
-          stages {
-            stage("Torch test") {
-              steps {
-                kg_test_linux("pytorch", "gpu")
-              }
-            }
-            stage("MXNet test") {
-              steps {
-                kg_test_linux("mxnet", "gpu")
               }
             }
           }

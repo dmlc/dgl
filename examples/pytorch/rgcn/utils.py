@@ -4,9 +4,13 @@ Most code is adapted from authors' implementation of RGCN link prediction:
 https://github.com/MichSchli/RelationPrediction
 
 """
+import traceback
+from _thread import start_new_thread
+from functools import wraps
 
 import numpy as np
 import torch
+from torch.multiprocessing import Queue
 import dgl
 
 #######################################################################
@@ -131,7 +135,7 @@ def build_graph_from_triplets(num_nodes, num_rels, triplets):
         This function also generates edge type and normalization factor
         (reciprocal of node incoming degree)
     """
-    g = dgl.DGLGraph()
+    g = dgl.graph(([], []))
     g.add_nodes(num_nodes)
     src, rel, dst = triplets
     src, dst = np.concatenate((src, dst)), np.concatenate((dst, src))
@@ -141,7 +145,7 @@ def build_graph_from_triplets(num_nodes, num_rels, triplets):
     g.add_edges(src, dst)
     norm = comp_deg_norm(g)
     print("# nodes: {}, # edges: {}".format(num_nodes, len(src)))
-    return g, rel, norm
+    return g, rel.astype('int64'), norm.astype('int64')
 
 def build_test_graph(num_nodes, num_rels, edges):
     src, rel, dst = edges.transpose()
@@ -165,17 +169,17 @@ def negative_sampling(pos_samples, num_entity, negative_rate):
 
 #######################################################################
 #
-# Utility function for evaluations
+# Utility functions for evaluations (raw)
 #
 #######################################################################
 
 def sort_and_rank(score, target):
     _, indices = torch.sort(score, dim=1, descending=True)
-    indices = torch.nonzero(indices == target.view(-1, 1))
+    indices = torch.nonzero(indices == target.view(-1, 1), as_tuple=False)
     indices = indices[:, 1].view(-1)
     return indices
 
-def perturb_and_get_rank(embedding, w, a, r, b, test_size, batch_size=100):
+def perturb_and_get_raw_rank(embedding, w, a, r, b, test_size, batch_size=100):
     """ Perturb one element in the triplets
     """
     n_batch = (test_size + batch_size - 1) // batch_size
@@ -197,9 +201,8 @@ def perturb_and_get_rank(embedding, w, a, r, b, test_size, batch_size=100):
         ranks.append(sort_and_rank(score, target))
     return torch.cat(ranks)
 
-# TODO (lingfan): implement filtered metrics
 # return MRR (raw), and Hits @ (1, 3, 10)
-def calc_mrr(embedding, w, test_triplets, hits=[], eval_bz=100):
+def calc_raw_mrr(embedding, w, test_triplets, hits=[], eval_bz=100):
     with torch.no_grad():
         s = test_triplets[:, 0]
         r = test_triplets[:, 1]
@@ -207,9 +210,9 @@ def calc_mrr(embedding, w, test_triplets, hits=[], eval_bz=100):
         test_size = test_triplets.shape[0]
 
         # perturb subject
-        ranks_s = perturb_and_get_rank(embedding, w, o, r, s, test_size, eval_bz)
+        ranks_s = perturb_and_get_raw_rank(embedding, w, o, r, s, test_size, eval_bz)
         # perturb object
-        ranks_o = perturb_and_get_rank(embedding, w, s, r, o, test_size, eval_bz)
+        ranks_o = perturb_and_get_raw_rank(embedding, w, s, r, o, test_size, eval_bz)
 
         ranks = torch.cat([ranks_s, ranks_o])
         ranks += 1 # change to 1-indexed
@@ -221,3 +224,151 @@ def calc_mrr(embedding, w, test_triplets, hits=[], eval_bz=100):
             avg_count = torch.mean((ranks <= hit).float())
             print("Hits (raw) @ {}: {:.6f}".format(hit, avg_count.item()))
     return mrr.item()
+
+#######################################################################
+#
+# Utility functions for evaluations (filtered)
+#
+#######################################################################
+
+def filter_o(triplets_to_filter, target_s, target_r, target_o, num_entities):
+    target_s, target_r, target_o = int(target_s), int(target_r), int(target_o)
+    filtered_o = []
+    # Do not filter out the test triplet, since we want to predict on it
+    if (target_s, target_r, target_o) in triplets_to_filter:
+        triplets_to_filter.remove((target_s, target_r, target_o))
+    # Do not consider an object if it is part of a triplet to filter
+    for o in range(num_entities):
+        if (target_s, target_r, o) not in triplets_to_filter:
+            filtered_o.append(o)
+    return torch.LongTensor(filtered_o)
+
+def filter_s(triplets_to_filter, target_s, target_r, target_o, num_entities):
+    target_s, target_r, target_o = int(target_s), int(target_r), int(target_o)
+    filtered_s = []
+    # Do not filter out the test triplet, since we want to predict on it
+    if (target_s, target_r, target_o) in triplets_to_filter:
+        triplets_to_filter.remove((target_s, target_r, target_o))
+    # Do not consider a subject if it is part of a triplet to filter
+    for s in range(num_entities):
+        if (s, target_r, target_o) not in triplets_to_filter:
+            filtered_s.append(s)
+    return torch.LongTensor(filtered_s)
+
+def perturb_o_and_get_filtered_rank(embedding, w, s, r, o, test_size, triplets_to_filter):
+    """ Perturb object in the triplets
+    """
+    num_entities = embedding.shape[0]
+    ranks = []
+    for idx in range(test_size):
+        if idx % 100 == 0:
+            print("test triplet {} / {}".format(idx, test_size))
+        target_s = s[idx]
+        target_r = r[idx]
+        target_o = o[idx]
+        filtered_o = filter_o(triplets_to_filter, target_s, target_r, target_o, num_entities)
+        target_o_idx = int((filtered_o == target_o).nonzero())
+        emb_s = embedding[target_s]
+        emb_r = w[target_r]
+        emb_o = embedding[filtered_o]
+        emb_triplet = emb_s * emb_r * emb_o
+        scores = torch.sigmoid(torch.sum(emb_triplet, dim=1))
+        _, indices = torch.sort(scores, descending=True)
+        rank = int((indices == target_o_idx).nonzero())
+        ranks.append(rank)
+    return torch.LongTensor(ranks)
+
+def perturb_s_and_get_filtered_rank(embedding, w, s, r, o, test_size, triplets_to_filter):
+    """ Perturb subject in the triplets
+    """
+    num_entities = embedding.shape[0]
+    ranks = []
+    for idx in range(test_size):
+        if idx % 100 == 0:
+            print("test triplet {} / {}".format(idx, test_size))
+        target_s = s[idx]
+        target_r = r[idx]
+        target_o = o[idx]
+        filtered_s = filter_s(triplets_to_filter, target_s, target_r, target_o, num_entities)
+        target_s_idx = int((filtered_s == target_s).nonzero())
+        emb_s = embedding[filtered_s]
+        emb_r = w[target_r]
+        emb_o = embedding[target_o]
+        emb_triplet = emb_s * emb_r * emb_o
+        scores = torch.sigmoid(torch.sum(emb_triplet, dim=1))
+        _, indices = torch.sort(scores, descending=True)
+        rank = int((indices == target_s_idx).nonzero())
+        ranks.append(rank)
+    return torch.LongTensor(ranks)
+
+def calc_filtered_mrr(embedding, w, train_triplets, valid_triplets, test_triplets, hits=[]):
+    with torch.no_grad():
+        s = test_triplets[:, 0]
+        r = test_triplets[:, 1]
+        o = test_triplets[:, 2]
+        test_size = test_triplets.shape[0]
+
+        triplets_to_filter = torch.cat([train_triplets, valid_triplets, test_triplets]).tolist()
+        triplets_to_filter = {tuple(triplet) for triplet in triplets_to_filter}
+        print('Perturbing subject...')
+        ranks_s = perturb_s_and_get_filtered_rank(embedding, w, s, r, o, test_size, triplets_to_filter)
+        print('Perturbing object...')
+        ranks_o = perturb_o_and_get_filtered_rank(embedding, w, s, r, o, test_size, triplets_to_filter)
+
+        ranks = torch.cat([ranks_s, ranks_o])
+        ranks += 1 # change to 1-indexed
+
+        mrr = torch.mean(1.0 / ranks.float())
+        print("MRR (filtered): {:.6f}".format(mrr.item()))
+
+        for hit in hits:
+            avg_count = torch.mean((ranks <= hit).float())
+            print("Hits (filtered) @ {}: {:.6f}".format(hit, avg_count.item()))
+    return mrr.item()
+
+#######################################################################
+#
+# Main evaluation function
+#
+#######################################################################
+
+def calc_mrr(embedding, w, train_triplets, valid_triplets, test_triplets, hits=[], eval_bz=100, eval_p="filtered"):
+    if eval_p == "filtered":
+        mrr = calc_filtered_mrr(embedding, w, train_triplets, valid_triplets, test_triplets, hits)
+    else:
+        mrr = calc_raw_mrr(embedding, w, test_triplets, hits, eval_bz)
+    return mrr
+
+
+#######################################################################
+#
+# Multithread wrapper
+#
+#######################################################################
+
+# According to https://github.com/pytorch/pytorch/issues/17199, this decorator
+# is necessary to make fork() and openmp work together.
+def thread_wrapped_func(func):
+    """
+    Wraps a process entry point to make it work with OpenMP.
+    """
+    @wraps(func)
+    def decorated_function(*args, **kwargs):
+        queue = Queue()
+        def _queue_result():
+            exception, trace, res = None, None, None
+            try:
+                res = func(*args, **kwargs)
+            except Exception as e:
+                exception = e
+                trace = traceback.format_exc()
+            queue.put((res, exception, trace))
+
+        start_new_thread(_queue_result, ())
+        result, exception, trace = queue.get()
+        if exception is None:
+            return result
+        else:
+            assert isinstance(exception, Exception)
+            raise exception.__class__(trace)
+    return decorated_function

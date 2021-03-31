@@ -1,22 +1,26 @@
 """Torch Module for DenseSAGEConv"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 from torch import nn
+from ....utils import check_eq_shape
 
 
 class DenseSAGEConv(nn.Module):
-    """GraphSAGE layer where the graph structure is given by an
+    """
+
+    Description
+    -----------
+    GraphSAGE layer where the graph structure is given by an
     adjacency matrix.
-    We recommend to use this module when inducing GraphSAGE operations
-    on dense graphs / k-hop graphs.
+    We recommend to use this module when appying GraphSAGE on dense graphs.
 
     Note that we only support gcn aggregator in DenseSAGEConv.
 
     Parameters
     ----------
     in_feats : int
-        Input feature size.
+        Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
     out_feats : int
-        Output feature size.
+        Output feature size; i.e, the number of dimensions of :math:`h_i^{(l+1)}`.
     feat_drop : float, optional
         Dropout rate on features. Default: 0.
     bias : bool
@@ -27,9 +31,33 @@ class DenseSAGEConv(nn.Module):
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
 
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> from dgl.nn import DenseSAGEConv
+    >>>
+    >>> feat = th.ones(6, 10)
+    >>> adj = th.tensor([[0., 0., 1., 0., 0., 0.],
+    ...         [1., 0., 0., 0., 0., 0.],
+    ...         [0., 1., 0., 0., 0., 0.],
+    ...         [0., 0., 1., 0., 0., 1.],
+    ...         [0., 0., 0., 1., 0., 0.],
+    ...         [0., 0., 0., 0., 0., 0.]])
+    >>> conv = DenseSAGEConv(10, 2)
+    >>> res = conv(adj, feat)
+    >>> res
+    tensor([[1.0401, 2.1008],
+            [1.0401, 2.1008],
+            [1.0401, 2.1008],
+            [1.0401, 2.1008],
+            [1.0401, 2.1008],
+            [1.0401, 2.1008]], grad_fn=<AddmmBackward>)
+
     See also
     --------
-    SAGEConv
+    `SAGEConv <https://docs.dgl.ai/api/python/nn.pytorch.html#sageconv>`__
     """
     def __init__(self,
                  in_feats,
@@ -48,22 +76,40 @@ class DenseSAGEConv(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        """Reinitialize learnable parameters."""
+        r"""
+
+        Description
+        -----------
+        Reinitialize learnable parameters.
+
+        Notes
+        -----
+        The linear weights :math:`W^{(l)}` are initialized using Glorot uniform initialization.
+        """
         gain = nn.init.calculate_gain('relu')
         nn.init.xavier_uniform_(self.fc.weight, gain=gain)
 
     def forward(self, adj, feat):
-        r"""Compute (Dense) Graph SAGE layer.
+        r"""
+
+        Description
+        -----------
+        Compute (Dense) Graph SAGE layer.
 
         Parameters
         ----------
         adj : torch.Tensor
-            The adjacency matrix of the graph to apply Graph Convolution on,
-            should be of shape :math:`(N, N)`, where a row represents the destination
-            and a column represents the source.
-        feat : torch.Tensor
-            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
-            is size of input feature, :math:`N` is the number of nodes.
+            The adjacency matrix of the graph to apply SAGE Convolution on, when
+            applied to a unidirectional bipartite graph, ``adj`` should be of shape
+            should be of shape :math:`(N_{out}, N_{in})`; when applied to a homo
+            graph, ``adj`` should be of shape :math:`(N, N)`. In both cases,
+            a row represents a destination node while a column represents a source
+            node.
+        feat : torch.Tensor or a pair of torch.Tensor
+            If a torch.Tensor is given, the input feature of shape :math:`(N, D_{in})` where
+            :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+            If a pair of torch.Tensor is given, the pair must contain two tensors of shape
+            :math:`(N_{in}, D_{in})` and :math:`(N_{out}, D_{in})`.
 
         Returns
         -------
@@ -71,10 +117,15 @@ class DenseSAGEConv(nn.Module):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
-        adj = adj.float().to(feat.device)
-        feat = self.feat_drop(feat)
+        check_eq_shape(feat)
+        if isinstance(feat, tuple):
+            feat_src = self.feat_drop(feat[0])
+            feat_dst = self.feat_drop(feat[1])
+        else:
+            feat_src = feat_dst = self.feat_drop(feat)
+        adj = adj.float().to(feat_src.device)
         in_degrees = adj.sum(dim=1, keepdim=True)
-        h_neigh = (adj @ feat + feat) / (in_degrees + 1)
+        h_neigh = (adj @ feat_src + feat_dst) / (in_degrees + 1)
         rst = self.fc(h_neigh)
         # activation
         if self.activation is not None:

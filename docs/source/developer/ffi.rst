@@ -217,4 +217,5 @@ out their price:
 Please note that containers are NOT meant for passing a large collection of
 items from/to C APIs. It will be quite slow in these cases. It is recommended
 to benchmark first. As an alternative, use NDArray for a large collection of
-numerical values and use BatchedDGLGraph for a lot of graphs.
+numerical values and use ``dgl.batch`` to batch a lot of ``DGLGraph``'s into 
+a single ``DGLGraph``.

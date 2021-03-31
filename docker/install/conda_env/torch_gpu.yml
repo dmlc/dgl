@@ -1,0 +1,7 @@
+name: pytorch-ci
+dependencies:
+  - python=3.6.9
+  - pip
+  - pip:
+    - --find-links https://download.pytorch.org/whl/torch_stable.html
+    - --requirement torch_gpu_pip.txt

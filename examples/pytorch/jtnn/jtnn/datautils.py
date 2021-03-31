@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import Dataset
 
 import dgl
-from dgl.data.utils import download, extract_archive, get_download_dir
+from dgl.data.utils import download, extract_archive, get_download_dir, _get_dgl_url
 from .mol_tree_nx import DGLMolTree
 from .mol_tree import Vocab
 
@@ -10,8 +10,6 @@ from .mpn import mol2dgl_single as mol2dgl_enc
 from .jtmpn import mol2dgl_single as mol2dgl_dec
 from .jtmpn import ATOM_FDIM as ATOM_FDIM_DEC
 from .jtmpn import BOND_FDIM as BOND_FDIM_DEC
-
-_url = 'https://s3-ap-southeast-1.amazonaws.com/dgl-data-cn/dataset/jtnn.zip'
 
 def _unpack_field(examples, field):
     return [e[field] for e in examples]
@@ -28,7 +26,8 @@ class JTNNDataset(Dataset):
     def __init__(self, data, vocab, training=True):
         self.dir = get_download_dir()
         self.zip_file_path='{}/jtnn.zip'.format(self.dir)
-        download(_url, path=self.zip_file_path)
+
+        download(_get_dgl_url('dgllife/jtnn.zip'), path=self.zip_file_path)
         extract_archive(self.zip_file_path, '{}/jtnn'.format(self.dir))
         print('Loading data...')
         data_file = '{}/jtnn/{}.txt'.format(self.dir, data)
@@ -144,7 +143,7 @@ class JTNNCollator(object):
         mol_trees = _unpack_field(examples, 'mol_tree')
         wid = _unpack_field(examples, 'wid')
         for _wid, mol_tree in zip(wid, mol_trees):
-            mol_tree.ndata['wid'] = torch.LongTensor(_wid)
+            mol_tree.graph.ndata['wid'] = torch.LongTensor(_wid)
 
         # TODO: either support pickling or get around ctypes pointers using scipy
         # batch molecule graphs
@@ -177,7 +176,7 @@ class JTNNCollator(object):
             tree_mess_src_e[i] += n_tree_nodes
             tree_mess_tgt_n[i] += n_graph_nodes
             n_graph_nodes += sum(g.number_of_nodes() for g in cand_graphs[i])
-            n_tree_nodes += mol_trees[i].number_of_nodes()
+            n_tree_nodes += mol_trees[i].graph.number_of_nodes()
             cand_batch_idx.extend([i] * len(cand_graphs[i]))
         tree_mess_tgt_e = torch.cat(tree_mess_tgt_e)
         tree_mess_src_e = torch.cat(tree_mess_src_e)

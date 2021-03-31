@@ -213,6 +213,10 @@ DGL_REGISTER_GLOBAL("sampler.randomwalk._CAPI_DGLRandomWalk")
     const int num_traces = args[2];
     const int num_hops = args[3];
 
+    CHECK(aten::IsValidIdArray(seeds));
+    CHECK_EQ(seeds->ctx.device_type, kDLCPU)
+      << "RandomWalk only support CPU sampling";
+
     *rv = RandomWalk(g.sptr().get(), seeds, num_traces, num_hops);
   });
 
@@ -224,6 +228,10 @@ DGL_REGISTER_GLOBAL("sampler.randomwalk._CAPI_DGLRandomWalkWithRestart")
     const uint64_t visit_threshold_per_seed = args[3];
     const uint64_t max_visit_counts = args[4];
     const uint64_t max_frequent_visited_nodes = args[5];
+
+    CHECK(aten::IsValidIdArray(seeds));
+    CHECK_EQ(seeds->ctx.device_type, kDLCPU)
+      << "RandomWalkWithRestart only support CPU sampling";
 
     *rv = RandomWalkTracesRef(
         RandomWalkWithRestart(g.sptr().get(), seeds, restart_prob, visit_threshold_per_seed,
@@ -238,6 +246,10 @@ DGL_REGISTER_GLOBAL("sampler.randomwalk._CAPI_DGLBipartiteSingleSidedRandomWalkW
     const uint64_t visit_threshold_per_seed = args[3];
     const uint64_t max_visit_counts = args[4];
     const uint64_t max_frequent_visited_nodes = args[5];
+
+    CHECK(aten::IsValidIdArray(seeds));
+    CHECK_EQ(seeds->ctx.device_type, kDLCPU)
+      << "BipartiteSingleSidedRandomWalkWithRestart only support CPU sampling";
 
     *rv = RandomWalkTracesRef(
         BipartiteSingleSidedRandomWalkWithRestart(

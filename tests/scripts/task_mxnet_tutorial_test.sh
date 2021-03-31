@@ -1,6 +1,8 @@
 #!/bin/bash
 # The working directory for this script will be "tests/scripts"
 
+. /opt/conda/etc/profile.d/conda.sh
+conda activate mxnet-ci
 TUTORIAL_ROOT="./tutorials"
 
 function fail {

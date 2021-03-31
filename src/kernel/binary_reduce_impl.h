@@ -39,13 +39,13 @@ GData<Idx, DType> AllocGData(const std::string& op,
   gdata.lhs_data = static_cast<DType*>(lhs_data->data);
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
-  if (!utils::IsNoneArray(lhs_mapping)) {
+  if (!aten::IsNullArray(lhs_mapping)) {
     gdata.lhs_mapping = static_cast<Idx*>(lhs_mapping->data);
   }
-  if (!utils::IsNoneArray(rhs_mapping)) {
+  if (!aten::IsNullArray(rhs_mapping)) {
     gdata.rhs_mapping = static_cast<Idx*>(rhs_mapping->data);
   }
-  if (!utils::IsNoneArray(out_mapping)) {
+  if (!aten::IsNullArray(out_mapping)) {
     gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
 
@@ -130,25 +130,25 @@ BackwardGData<Idx, DType> AllocBackwardGData(
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
   gdata.grad_out_data = static_cast<DType*>(grad_out_data->data);
-  if (!utils::IsNoneArray(grad_lhs_data)) {
+  if (!aten::IsNullArray(grad_lhs_data)) {
     gdata.grad_lhs_data = static_cast<DType*>(grad_lhs_data->data);
     // fill out data with zero values
     utils::Fill<XPU>(ctx, gdata.grad_lhs_data, utils::NElements(grad_lhs_data),
                 static_cast<DType>(0));
   }
-  if (!utils::IsNoneArray(grad_rhs_data)) {
+  if (!aten::IsNullArray(grad_rhs_data)) {
     gdata.grad_rhs_data = static_cast<DType*>(grad_rhs_data->data);
     // fill out data with zero values
     utils::Fill<XPU>(ctx, gdata.grad_rhs_data, utils::NElements(grad_rhs_data),
                 static_cast<DType>(0));
   }
-  if (!utils::IsNoneArray(lhs_mapping)) {
+  if (!aten::IsNullArray(lhs_mapping)) {
     gdata.lhs_mapping = static_cast<Idx*>(lhs_mapping->data);
   }
-  if (!utils::IsNoneArray(rhs_mapping)) {
+  if (!aten::IsNullArray(rhs_mapping)) {
     gdata.rhs_mapping = static_cast<Idx*>(rhs_mapping->data);
   }
-  if (!utils::IsNoneArray(out_mapping)) {
+  if (!aten::IsNullArray(out_mapping)) {
     gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
 
@@ -194,8 +194,8 @@ void BackwardBinaryReduceImpl(
 #endif
 
   const DLDataType& dtype = out_data->dtype;
-  const bool req_lhs = !utils::IsNoneArray(grad_lhs_data);
-  const bool req_rhs = !utils::IsNoneArray(grad_rhs_data);
+  const bool req_lhs = !aten::IsNullArray(grad_lhs_data);
+  const bool req_rhs = !aten::IsNullArray(grad_rhs_data);
   const auto bits = graph.NumBits();
 
   if (reducer == binary_op::kReduceMean) {
@@ -247,13 +247,13 @@ BcastGData<NDim, Idx, DType> AllocBcastGData(
   gdata.lhs_data = static_cast<DType*>(lhs_data->data);
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
-  if (!utils::IsNoneArray(lhs_mapping)) {
+  if (!aten::IsNullArray(lhs_mapping)) {
     gdata.lhs_mapping = static_cast<Idx*>(lhs_mapping->data);
   }
-  if (!utils::IsNoneArray(rhs_mapping)) {
+  if (!aten::IsNullArray(rhs_mapping)) {
     gdata.rhs_mapping = static_cast<Idx*>(rhs_mapping->data);
   }
-  if (!utils::IsNoneArray(out_mapping)) {
+  if (!aten::IsNullArray(out_mapping)) {
     gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
   gdata.data_len = info.data_len;
@@ -344,13 +344,13 @@ BackwardBcastGData<NDim, Idx, DType> AllocBackwardBcastGData(
   std::copy(info.out_shape.begin(), info.out_shape.end(), gdata.out_shape);
   std::copy(info.out_stride.begin(), info.out_stride.end(), gdata.out_stride);
   // mappings
-  if (!utils::IsNoneArray(lhs_mapping)) {
+  if (!aten::IsNullArray(lhs_mapping)) {
     gdata.lhs_mapping = static_cast<Idx*>(lhs_mapping->data);
   }
-  if (!utils::IsNoneArray(rhs_mapping)) {
+  if (!aten::IsNullArray(rhs_mapping)) {
     gdata.rhs_mapping = static_cast<Idx*>(rhs_mapping->data);
   }
-  if (!utils::IsNoneArray(out_mapping)) {
+  if (!aten::IsNullArray(out_mapping)) {
     gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
   gdata.data_len = info.data_len;
@@ -360,13 +360,13 @@ BackwardBcastGData<NDim, Idx, DType> AllocBackwardBcastGData(
   gdata.rhs_data = static_cast<DType*>(rhs->data);
   gdata.out_data = static_cast<DType*>(out->data);
   gdata.grad_out_data = static_cast<DType*>(grad_out->data);
-  if (!utils::IsNoneArray(grad_lhs)) {
+  if (!aten::IsNullArray(grad_lhs)) {
     gdata.grad_lhs_data = static_cast<DType*>(grad_lhs->data);
     // fill out data with zero values
     utils::Fill<XPU>(ctx, gdata.grad_lhs_data, utils::NElements(grad_lhs),
                 static_cast<DType>(0));
   }
-  if (!utils::IsNoneArray(grad_rhs)) {
+  if (!aten::IsNullArray(grad_rhs)) {
     gdata.grad_rhs_data = static_cast<DType*>(grad_rhs->data);
     // fill out data with zero values
     utils::Fill<XPU>(ctx, gdata.grad_rhs_data, utils::NElements(grad_rhs),
@@ -405,8 +405,8 @@ void BackwardBinaryReduceBcastImpl(
 
   const DLDataType& dtype = out->dtype;
   const int bcast_ndim = info.out_shape.size();
-  const bool req_lhs = !utils::IsNoneArray(grad_lhs);
-  const bool req_rhs = !utils::IsNoneArray(grad_rhs);
+  const bool req_lhs = !aten::IsNullArray(grad_lhs);
+  const bool req_rhs = !aten::IsNullArray(grad_rhs);
   const auto bits = graph.NumBits();
 
   if (reducer == binary_op::kReduceMean) {

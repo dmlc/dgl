@@ -1,10 +1,17 @@
 """
 .. _model-rgcn:
 
-Relational graph convolutional network
+Relational Graph Convolutional Network
 ================================================
 
 **Author:** Lingfan Yu, Mufei Li, Zheng Zhang
+
+.. warning::
+
+    The tutorial aims at gaining insights into the paper, with code as a mean
+    of explanation. The implementation thus is NOT optimized for running
+    efficiency. For recommended implementation, please refer to the `official
+    examples <https://github.com/dmlc/dgl/tree/master/examples>`_.
 
 In this tutorial, you learn how to implement a relational graph convolutional
 network (R-GCN). This type of network is one effort to generalize GCN 
@@ -123,6 +130,11 @@ multiple edges among any given pair.
 #    Each relation type is associated with a different weight. Therefore,
 #    the full weight matrix has three dimensions: relation, input_feature,
 #    output_feature.
+#
+# .. note::
+#
+#    This is showing how to implement an R-GCN from scratch.  DGL provides a more
+#    efficient :class:`builtin R-GCN layer module <dgl.nn.pytorch.conv.RelGraphConv>`.
 #
 
 import torch
@@ -268,7 +280,6 @@ class Model(nn.Module):
 
 # load graph data
 from dgl.contrib.data import load_data
-import numpy as np
 data = load_data(dataset='aifb')
 num_nodes = data.num_nodes
 num_rels = data.num_rels
@@ -298,9 +309,7 @@ lr = 0.01 # learning rate
 l2norm = 0 # L2 norm coefficient
 
 # create graph
-g = DGLGraph()
-g.add_nodes(num_nodes)
-g.add_edges(data.edge_src, data.edge_dst)
+g = DGLGraph((data.edge_src, data.edge_dst))
 g.edata.update({'rel_type': edge_type, 'norm': edge_norm})
 
 # create model

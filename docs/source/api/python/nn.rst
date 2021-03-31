@@ -1,6 +1,6 @@
 .. _apinn:
 
-NN Modules
+dgl.nn
 ==========
 
 .. automodule:: dgl.nn
@@ -9,3 +9,4 @@ NN Modules
 
    nn.pytorch
    nn.mxnet
+   nn.tensorflow
