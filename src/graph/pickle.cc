@@ -8,9 +8,9 @@
 #include <dgl/immutable_graph.h>
 #include <dgl/graph_serializer.h>
 #include <dmlc/memory_io.h>
-#include "./heterograph.h"
-#include "../c_api_common.h"
-#include "unit_graph.h"
+#include <dgl/heterograph.h>
+#include <dgl/unit_graph.h>
+#include <dgl/c_api_common.h>
 
 using namespace dgl::runtime;
 

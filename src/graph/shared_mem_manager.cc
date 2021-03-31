@@ -3,7 +3,7 @@
  * \file graph/shared_mem_manager.cc
  * \brief DGL sampler implementation
  */
-#include "shared_mem_manager.h"
+#include <dgl/shared_mem_manager.h>
 
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
@@ -12,6 +12,8 @@
 #include <dgl/random.h>
 #include <dgl/runtime/container.h>
 #include <dgl/sampler.h>
+#include <dgl/heterograph.h>
+#include <dgl/c_api_common.h>
 #include <dmlc/io.h>
 #include <dmlc/memory_io.h>
 
@@ -21,9 +23,6 @@
 #include <cstdlib>
 #include <numeric>
 #include <vector>
-
-#include "../c_api_common.h"
-#include "heterograph.h"
 
 using namespace dgl::runtime;
 using namespace dgl::aten;

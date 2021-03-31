@@ -4,12 +4,13 @@
  * \brief UnitGraph graph
  */
 
-#ifndef DGL_GRAPH_UNIT_GRAPH_H_
-#define DGL_GRAPH_UNIT_GRAPH_H_
+#ifndef DGL_UNIT_GRAPH_H
+#define DGL_UNIT_GRAPH_H
 
 #include <dgl/base_heterograph.h>
 #include <dgl/lazy.h>
 #include <dgl/array.h>
+#include <dgl/c_api_common.h>
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
 #include <utility>
@@ -18,7 +19,6 @@
 #include <memory>
 #include <tuple>
 
-#include "../c_api_common.h"
 
 namespace dgl {
 
@@ -360,4 +360,4 @@ DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph::CSR, true);
 DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph::COO, true);
 }  // namespace dmlc
 
-#endif  // DGL_GRAPH_UNIT_GRAPH_H_
+#endif /* DGL_UNIT_GRAPH_H */

@@ -3,10 +3,10 @@
  * \file graph/heterograph.cc
  * \brief Heterograph implementation
  */
-#include "./heterograph.h"
 #include <dgl/array.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/graph_serializer.h>
+#include <dgl/heterograph.h>
 #include <dmlc/memory_io.h>
 #include <memory>
 #include <vector>

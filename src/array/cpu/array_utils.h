@@ -7,11 +7,11 @@
 #define DGL_ARRAY_CPU_ARRAY_UTILS_H_
 
 #include <dgl/aten/types.h>
+#include <dgl/c_api_common.h>
 #include <parallel_hashmap/phmap.h>
 #include <vector>
 #include <unordered_map>
 #include <utility>
-#include "../../c_api_common.h"
 
 namespace dgl {
 namespace aten {

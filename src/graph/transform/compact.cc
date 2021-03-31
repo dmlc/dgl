@@ -8,10 +8,10 @@
 #include <dgl/transform.h>
 #include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/c_api_common.h>
+#include <dgl/unit_graph.h>
 #include <vector>
 #include <utility>
-#include "../../c_api_common.h"
-#include "../unit_graph.h"
 // TODO(BarclayII): currently CompactGraphs depend on IdHashMap implementation which
 // only works on CPU.  Should fix later to make it device agnostic.
 #include "../../array/cpu/array_utils.h"

@@ -8,10 +8,10 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
 #include <dgl/sampling/randomwalks.h>
+#include <dgl/c_api_common.h>
 #include <utility>
 #include <tuple>
 #include <vector>
-#include "../../../c_api_common.h"
 #include "randomwalks_impl.h"
 
 using namespace dgl::runtime;

@@ -10,14 +10,14 @@
 #include <dgl/runtime/shared_mem.h>
 #include <dgl/base_heterograph.h>
 #include <dgl/lazy.h>
+#include <dgl/shared_mem_manager.h>
+#include <dgl/unit_graph.h>
 #include <utility>
 #include <string>
 #include <vector>
 #include <set>
 #include <tuple>
 #include <memory>
-#include "./unit_graph.h"
-#include "shared_mem_manager.h"
 
 namespace dgl {
 

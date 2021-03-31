@@ -15,13 +15,13 @@
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/object.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/c_api_common.h>
 #include <iostream>
 #include <string>
 #include <vector>
 #include <algorithm>
 #include <utility>
 #include <memory>
-#include "../../c_api_common.h"
 
 using dgl::runtime::NDArray;
 using dgl::ImmutableGraph;

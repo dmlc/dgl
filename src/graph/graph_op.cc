@@ -8,8 +8,8 @@
 #include <dgl/immutable_graph.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
+#include <dgl/c_api_common.h>
 #include <algorithm>
-#include "../c_api_common.h"
 
 using namespace dgl::runtime;
 

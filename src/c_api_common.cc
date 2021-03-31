@@ -4,7 +4,7 @@
  * \brief DGL C API common implementations
  */
 #include <dgl/graph_interface.h>
-#include "c_api_common.h"
+#include <dgl/c_api_common.h>
 
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;

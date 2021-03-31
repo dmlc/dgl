@@ -8,6 +8,7 @@
 #include <dgl/immutable_graph.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/random.h>
+#include <dgl/c_api_common.h>
 #include <algorithm>
 #include <cstdlib>
 #include <cmath>
@@ -15,7 +16,6 @@
 #include <functional>
 #include <vector>
 #include "randomwalk.h"
-#include "../../c_api_common.h"
 
 using namespace dgl::runtime;
 

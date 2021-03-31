@@ -10,7 +10,7 @@
 #include <set>
 #include <functional>
 #include <tuple>
-#include "../c_api_common.h"
+#include <dgl/c_api_common.h>
 
 namespace dgl {
 

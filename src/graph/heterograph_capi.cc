@@ -7,11 +7,10 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
+#include <dgl/heterograph.h>
+#include <dgl/unit_graph.h>
 #include <set>
-
-#include "../c_api_common.h"
-#include "./heterograph.h"
-#include "unit_graph.h"
+#include <dgl/c_api_common.h>
 
 using namespace dgl::runtime;
 

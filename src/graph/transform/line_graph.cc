@@ -8,10 +8,10 @@
 #include <dgl/transform.h>
 #include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/heterograph.h>
+#include <dgl/c_api_common.h>
 #include <vector>
 #include <utility>
-#include "../../c_api_common.h"
-#include "../heterograph.h"
 
 namespace dgl {
 

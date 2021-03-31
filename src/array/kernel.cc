@@ -5,14 +5,14 @@
  */
 #include <dgl/packed_func_ext.h>
 #include <dgl/base_heterograph.h>
+#include <dgl/c_api_common.h>
 
 #ifdef USE_TVM
 #include <featgraph.h>
 #endif  // USE_TVM
 
 #include "kernel_decl.h"
-#include "../c_api_common.h"
-#include "./check.h"
+#include <dgl/aten/check.h>
 
 using namespace dgl::runtime;
 

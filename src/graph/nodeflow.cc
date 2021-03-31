@@ -7,10 +7,10 @@
 #include <dgl/immutable_graph.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/nodeflow.h>
+#include <dgl/c_api_common.h>
 
 #include <string>
 
-#include "../c_api_common.h"
 
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;

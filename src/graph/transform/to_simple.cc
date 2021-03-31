@@ -8,11 +8,11 @@
 #include <dgl/transform.h>
 #include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/heterograph.h>
 #include <vector>
 #include <utility>
-#include "../heterograph.h"
-#include "../unit_graph.h"
-#include "../../c_api_common.h"
+#include <dgl/unit_graph.h>
+#include <dgl/c_api_common.h>
 
 namespace dgl {
 
