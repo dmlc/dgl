@@ -49,7 +49,7 @@ class Communicator(object):
         mode_id = _COMM_MODES_MAP[mode]
 
         out_value = _CAPI_DGLNCCLSparseAllToAllPull(
-            self.get(), F.zerocopy_to_dgl_ndarray(idx),
+            self.get(), F.zerocopy_to_dgl_ndarray(req_idx),
             F.zerocopy_to_dgl_ndarray(value),
             mode_id)
         return F.zerocopy_from_dgl_ndarray(out_value)

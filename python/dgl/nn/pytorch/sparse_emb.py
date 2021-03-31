@@ -110,7 +110,7 @@ class NodeEmbedding: # NodeEmbedding
                 assert self._rank == self._comm.rank()
                 assert self._world_size == self._comm.size()
 
-                local_size = (num_embeddings / world_size) + \
+                local_size = (num_embeddings // world_size) + \
                     (rank > (num_embeddings % world_size))
                 device = th.device(rank)
             # TODO(dlasalle): support 16-bit/half embeddings
