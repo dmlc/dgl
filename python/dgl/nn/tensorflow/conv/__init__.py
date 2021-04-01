@@ -8,3 +8,4 @@ from .sgconv import SGConv
 from .appnpconv import APPNPConv
 from .chebconv import ChebConv
 from .densechebconv import DenseChebConv
+from .edgeconv import EdgeConv
