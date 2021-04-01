@@ -1,3 +1,9 @@
+def init_git() {
+  sh "rm -rf *"
+  checkout scm
+  sh "git submodule update --recursive --init"
+}
+
 pipeline {
     triggers {
         issueCommentTrigger('@dgl-bot .*')
@@ -9,6 +15,7 @@ pipeline {
         stage('A') {
             steps {
                 sh 'env'
+                init_git()
                 script {
                     def triggerCause = currentBuild.getBuildCauses('org.jenkinsci.plugins.pipeline.github.trigger.IssueCommentCause')
 
