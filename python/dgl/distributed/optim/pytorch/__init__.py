@@ -1,2 +1,2 @@
 """dgl distributed sparse optimizer for pytorch."""
-from .sparse_optim import DistSparseAdagrad
+from .sparse_optim import SparseAdagrad

@@ -67,13 +67,13 @@ class NodeEmbedding:
     def __init__(self, num_embeddings, embedding_dim, name=None,
                  init_func=None, part_policy=None):
         self._tensor = DistTensor((num_embeddings, embedding_dim), F.float32, name,
-                                  init_func=init_func)
+                                  init_func=init_func, part_policy=part_policy)
         self._trace = []
         self._name = name
         self._num_embeddings = num_embeddings
         self._embedding_dim = embedding_dim
 
-        # Check whether it is multi-gpu training or not.
+        # Check whether it is multi-gpu/distributed training or not
         if th.distributed.is_initialized():
             self._rank = th.distributed.get_rank()
             self._world_size = th.distributed.get_world_size()

@@ -38,9 +38,9 @@ class DistSparseGradOptimizer(abc.ABC):
                 self._world_size = emb.world_size
             else:
                 assert self._rank == emb.rank, \
-                    'MultiGPU rank for each embedding should be same.'
+                    'Distributed rank for each embedding should be same.'
                 assert self._world_size == emb.world_size, \
-                    'MultiGPU world_size for each embedding should be same.'
+                    'Distributed world_size for each embedding should be same.'
 
     def step(self):
         ''' The step function.
@@ -148,7 +148,7 @@ def initializer(shape, dtype):
     arr = th.zeros(shape, dtype=dtype)
     return arr
 
-class DistSparseAdagrad(DistSparseGradOptimizer):
+class SparseAdagrad(DistSparseGradOptimizer):
     r''' Distributed Node embedding optimizer using the Adagrad algorithm.
 
     This optimizer implements a distributed sparse version of Adagrad algorithm for
@@ -173,7 +173,7 @@ class DistSparseAdagrad(DistSparseGradOptimizer):
         Default: 1e-10
     '''
     def __init__(self, params, lr, eps=1e-10):
-        super(DistSparseAdagrad, self).__init__(params, lr)
+        super(SparseAdagrad, self).__init__(params, lr)
         self._eps = eps
         # We need to register a state sum for each embedding in the kvstore.
         for emb in params:
