@@ -36,6 +36,7 @@ pipeline {
                         sh('cp benchmark_scripts_repo/benchmark/* benchmarks/scripts/')
                         pullRequest.comment('Started the Regression test')
                         dir('benchmarks/scripts') {
+                            sh('python3 -m pip install boto3')
                             sh("PYTHONUNBUFFERED=1 GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT}")
                         }
                         pullRequest.comment('Finished the Regression test')
