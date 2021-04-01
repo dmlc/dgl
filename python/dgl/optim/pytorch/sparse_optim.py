@@ -20,7 +20,7 @@ class SparseGradOptimizer(abc.ABC):
     lr : float
         The learning rate.
     '''
-    def __init__(self, params, lr, comm=None):
+    def __init__(self, params, lr):
         self._params = params
         self._lr = lr
         self._rank = None
@@ -28,31 +28,35 @@ class SparseGradOptimizer(abc.ABC):
         self._shared_cache = {}
         self._clean_grad = False
         self._opt_meta = {}
-        self._comm = comm
+        self._comm = None 
         # hold released shared memory to let other process to munmap it first
         # otherwise it will crash the training
         self.shmem_buffer_holder = []
 
-        if self._comm:
-            # get the rank and world size from the communicator
-            self._rank = self._comm.rank()
-            self._world_size = self._comm.size()
-        else:
-            # if we are using shared memory for communication
-            for emb in params:
-                assert isinstance(emb, NodeEmbedding), \
-                    'DGL SparseOptimizer only supports dgl.nn.NodeEmbedding'
+        # if we are using shared memory for communication
+        for emb in params:
+            assert isinstance(emb, NodeEmbedding), \
+                'DGL SparseOptimizer only supports dgl.nn.NodeEmbedding'
 
-                if self._rank is None:
-                    self._rank = emb.rank
-                    self._world_size = emb.world_size
+            if self._rank is None:
+                self._rank = emb.rank
+                self._world_size = emb.world_size
+            else:
+                assert self._rank == emb.rank, \
+                    'MultiGPU rank for each embedding should be same.'
+                assert self._world_size == emb.world_size, \
+                    'MultiGPU world_size for each embedding should be same.'
+
+            emb_name = emb.name
+
+            if emb.comm:
+                # nccl
+                if self._comm is None:
+                    self._comm = emb.comm
                 else:
-                    assert self._rank == emb.rank, \
-                        'MultiGPU rank for each embedding should be same.'
-                    assert self._world_size == emb.world_size, \
-                        'MultiGPU world_size for each embedding should be same.'
-
-                emb_name = emb.name
+                    assert not emb.comm is None 
+            else:
+                # shared memory
                 if self._rank == 0: # the master gpu process
                     opt_meta = create_shared_mem_array(emb_name+'_opt_meta', \
                         (self._world_size, self._world_size), th.int32).zero_()
@@ -85,6 +89,9 @@ class SparseGradOptimizer(abc.ABC):
             for emb in self._params: # pylint: disable=too-many-nested-blocks
                 emb_name = emb.name
 
+                # use the comm of the embedding
+                comm = emb.comm
+
                 # we need to combine gradients from multiple forward paths
                 idx = []
                 grad = []
@@ -95,9 +102,10 @@ class SparseGradOptimizer(abc.ABC):
                 grad = th.cat(grad, dim=0)
 
                 idx_in[emb_name], grad_in[emb_name] = \
-                    self._comm.sparse_all_to_all_push(
-                        idx, grad, mode='remainder')
+                    comm.sparse_all_to_all_push(
+                        idx, grad, mode=emb.partition_mode)
                 # convert idx to local indices via 'remainder'
+                assert emb.partition_mode == 'remainder'
                 idx_in[emb_name] = idx_in[emb_name] // self._comm.size()
             nvtx.range_pop()
 
@@ -425,8 +433,8 @@ class SparseAdam(SparseGradOptimizer):
     ...     loss.backward()
     ...     optimizer.step()
     '''
-    def __init__(self, params, lr, betas=(0.9, 0.999), eps=1e-08, comm=None):
-        super(SparseAdam, self).__init__(params, lr, comm)
+    def __init__(self, params, lr, betas=(0.9, 0.999), eps=1e-08):
+        super(SparseAdam, self).__init__(params, lr)
         self._lr = lr
         self._beta1 = betas[0]
         self._beta2 = betas[1]
@@ -436,7 +444,7 @@ class SparseAdam(SparseGradOptimizer):
         for emb in params:
             assert isinstance(emb, NodeEmbedding), \
                 'SparseAdam only supports dgl.nn.NodeEmbedding'
-            if not comm:
+            if not emb.comm:
                 if self._rank <= 0:
                     emb_name = emb.name
                     state_step = create_shared_mem_array(emb_name+'_step', \
@@ -460,7 +468,7 @@ class SparseAdam(SparseGradOptimizer):
                     state_power = get_shared_mem_array(emb_name+'_power', \
                         emb.emb_tensor.shape, th.float32)
             else:
-                # on gpu
+                # distributed state on on gpu
                 emb_name = emb.name
                 state_step = th.empty([emb.emb_tensor.shape[0]],
                     dtype=th.float32, device=emb.emb_tensor.device).zero_()

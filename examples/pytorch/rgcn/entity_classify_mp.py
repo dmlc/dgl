@@ -249,24 +249,17 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
                                           rank=proc_id)
 
 
-    nccl_comm = None
-    if dev_id >= 0:
-        th.cuda.set_device(dev_id)
-        print("Creating comm {}/{} with {}".format(proc_id, n_gpus, nccl_id))
-        nccl_comm = nccl.Communicator(n_gpus, proc_id, nccl_id)
-    #nccl_comm = None
-
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
     #
-    embed_layer = RelGraphEmbedLayer(dev_id,
+    embed_layer = RelGraphEmbedLayer(dev_id if args.embedding_gpu else -1,
+                                     dev_id,
                                      g.number_of_nodes(),
                                      node_tids,
                                      num_of_ntype,
                                      node_feats,
                                      args.n_hidden,
-                                     dgl_sparse=args.dgl_sparse,
-                                     nccl_comm=nccl_comm)
+                                     dgl_sparse=args.dgl_sparse)
 
     # create model
     # all model params are in device.
@@ -320,8 +313,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
         else:
             dgl_emb = embed_layer.dgl_emb
         emb_optimizer = dgl.optim.SparseAdam(
-                params=dgl_emb, lr=args.sparse_lr, eps=1e-8,
-                comm=nccl_comm) if len(dgl_emb) > 0 else None
+                params=dgl_emb, lr=args.sparse_lr, eps=1e-8) if len(dgl_emb) > 0 else None
     else:
         if n_gpus > 1:
             embs = list(embed_layer.module.node_embeds.parameters())
@@ -351,8 +343,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
             t0 = time.time()
             nvtx.range_push("emb_layer")
             feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                                blocks[0].srcdata['ntype'].to(dev_id),
-                                blocks[0].srcdata['type_id'].to(dev_id),
+                                blocks[0].srcdata['ntype'],
+                                blocks[0].srcdata['type_id'],
                                 node_feats)
             nvtx.range_pop()
             logits = model(blocks, feats)
@@ -374,8 +366,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
             backward_time.append(t2 - t1)
             train_acc = th.sum(logits.argmax(dim=1) == labels[seeds]).item() / len(seeds)
             if proc_id == 0 and i % 20 == 0:
-                print("Train Accuracy: {:.4f} | {} | Train Loss: {:.4f}".
-                    format(train_acc, i, loss.item()))
+                print("Train Accuracy: {:.4f} | {:04d} | Train Loss: {:.4f} | {:.4f}s".
+                    format(train_acc, i, loss.item(), t2-t0))
         gc.collect()
         print("Epoch {:05d}:{:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".
             format(epoch, args.n_epochs, forward_time[-1], backward_time[-1]))
@@ -649,6 +641,8 @@ def config():
             help="Whether use low mem RelGraphCov")
     parser.add_argument("--dgl-sparse", default=False, action='store_true',
             help='Use sparse embedding for node embeddings.')
+    parser.add_argument("--embedding-gpu", default=False, action='store_true',
+            help='Store the node embeddings on the GPU.')
     parser.add_argument('--node-feats', default=False, action='store_true',
             help='Whether use node features')
     parser.add_argument('--layer-norm', default=False, action='store_true',
