@@ -845,33 +845,33 @@ NDArray SparsePull(
       stream);
 
   // compute the prefix sum of the indexes this process is requesting
-  int64_t * send_prefix = static_cast<int64_t*>(
+  int64_t * request_prefix = static_cast<int64_t*>(
       device->AllocWorkspace(ctx, sizeof(int64_t)*(comm_size+1)));
   {
     size_t prefix_workspace_size;
     CUDA_CALL(cub::DeviceScan::ExclusiveSum(nullptr, prefix_workspace_size,
-        send_sum, send_prefix, comm_size+1));
+        send_sum, request_prefix, comm_size+1));
 
     void * prefix_workspace = device->AllocWorkspace(
         ctx, prefix_workspace_size);
     CUDA_CALL(cub::DeviceScan::ExclusiveSum(prefix_workspace, prefix_workspace_size,
-        send_sum, send_prefix, comm_size+1));
+        send_sum, request_prefix, comm_size+1));
     device->FreeWorkspace(ctx, prefix_workspace);
   }
 
-  std::vector<int64_t> send_prefix_host(comm_size+1);
+  std::vector<int64_t> request_prefix_host(comm_size+1);
   device->CopyDataFromTo(
-      send_prefix,
+      request_prefix,
       0,
-      send_prefix_host.data(),
+      request_prefix_host.data(),
       0,
-      send_prefix_host.size()*sizeof(*send_prefix),
+      request_prefix_host.size()*sizeof(*request_prefix),
       ctx,
       DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, sizeof(*send_prefix)*8, 1},
+      DGLType{kDLInt, sizeof(*request_prefix)*8, 1},
       stream);
-  device->FreeWorkspace(ctx, send_prefix);
-  CHECK_EQ(send_prefix_host.back(), num_in);
+  device->FreeWorkspace(ctx, request_prefix);
+  CHECK_EQ(request_prefix_host.back(), num_in);
 
   // communicate the amount requested
   int64_t * recv_sum = static_cast<int64_t*>(
@@ -879,33 +879,33 @@ NDArray SparsePull(
   comm->AllToAll(send_sum, recv_sum, 1, stream);
 
   // compute the prefix sum of the requested indexes
-  int64_t * recv_prefix = static_cast<int64_t*>(
+  int64_t * response_prefix = static_cast<int64_t*>(
       device->AllocWorkspace(ctx, sizeof(int64_t)*(comm_size+1)));
   {
     size_t prefix_workspace_size;
     CUDA_CALL(cub::DeviceScan::ExclusiveSum(nullptr, prefix_workspace_size,
-        recv_sum, recv_prefix, comm_size+1));
+        recv_sum, response_prefix, comm_size+1));
 
     void * prefix_workspace = device->AllocWorkspace(
         ctx, prefix_workspace_size);
     CUDA_CALL(cub::DeviceScan::ExclusiveSum(prefix_workspace, prefix_workspace_size,
-        recv_sum, recv_prefix, comm_size+1));
+        recv_sum, response_prefix, comm_size+1));
     device->FreeWorkspace(ctx, prefix_workspace);
   }
 
   // finally copy the prefixsum sum down to the host
-  std::vector<int64_t> recv_prefix_host(comm_size+1);
+  std::vector<int64_t> response_prefix_host(comm_size+1);
   device->CopyDataFromTo(
-      recv_prefix,
+      response_prefix,
       0,
-      recv_prefix_host.data(),
+      response_prefix_host.data(),
       0,
-      recv_prefix_host.size()*sizeof(*recv_prefix),
+      response_prefix_host.size()*sizeof(*response_prefix),
       ctx,
       DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, sizeof(*recv_prefix)*8, 1},
+      DGLType{kDLInt, sizeof(*response_prefix)*8, 1},
       stream);
-  device->FreeWorkspace(ctx, recv_prefix);
+  device->FreeWorkspace(ctx, response_prefix);
 
   // use an event to track when copying is done
   cudaEvent_t d2h;
@@ -918,63 +918,63 @@ NDArray SparsePull(
 
   // gather requested indexes
   IdType * recv_idx = static_cast<IdType*>(
-      device->AllocWorkspace(ctx, recv_prefix_host.back()*sizeof(IdType)));
+      device->AllocWorkspace(ctx, response_prefix_host.back()*sizeof(IdType)));
   comm->AllToAllV(
       send_idx,
-      send_prefix_host.data(),
+      request_prefix_host.data(),
       recv_idx,
-      recv_prefix_host.data(),
+      response_prefix_host.data(),
       stream);
 
   // convert requested indices to local indices depending on partition 
   {
     const dim3 block(128);
-    const dim3 grid((recv_prefix_host.back()+block.x-1)/block.x);
+    const dim3 grid((response_prefix_host.back()+block.x-1)/block.x);
     _ConvertToLocalByRemainder<<<grid,block,0,stream>>>(
-        recv_idx, recv_prefix_host.back(), comm_size);
+        recv_idx, response_prefix_host.back(), comm_size);
   }
 
   // and then index select them into place
-  DType * send_value = static_cast<DType*>(device->AllocWorkspace(ctx,
-      send_prefix_host.back()*num_feat*sizeof(DType)));
+  DType * filled_response_value = static_cast<DType*>(device->AllocWorkspace(ctx,
+      response_prefix_host.back()*num_feat*sizeof(DType)));
   {
     dim3 block(256,1);
     while (block.x >= 2*num_feat) {
         block.x /= 2;
         block.y *= 2;
     }
-    const dim3 grid((send_prefix_host.back()+block.y-1)/block.y);
+    const dim3 grid((request_prefix_host.back()+block.y-1)/block.y);
     aten::impl::IndexSelectMultiKernel<<<grid, block, 0, stream>>>(
         static_cast<const DType*>(local_tensor->data),
         num_feat,
         recv_idx,
-        recv_prefix_host.back(),
-        send_value);
+        response_prefix_host.back(),
+        filled_response_value);
   }
 
   // we will collect recieved values in this array
   std::vector<int64_t> value_shape(local_tensor->ndim, 0);
-  value_shape[0] = send_prefix_host.back();
+  value_shape[0] = request_prefix_host.back();
   for (int d = 1; d < local_tensor->ndim; ++d) {
     value_shape[d] = local_tensor->shape[d];
   }
-  DType* recv_value = static_cast<DType*>(device->AllocWorkspace(ctx,
-      send_prefix_host.back()*num_feat*sizeof(DType)));
+  DType* filled_request_value = static_cast<DType*>(device->AllocWorkspace(ctx,
+      request_prefix_host.back()*num_feat*sizeof(DType)));
 
   // multiply the prefixes by the number of features being sent
-  for (auto& v : send_prefix_host) {
+  for (auto& v : request_prefix_host) {
     v *= num_feat;
   }
-  for (auto& v : recv_prefix_host) {
+  for (auto& v : response_prefix_host) {
     v *= num_feat;
   }
 
   // send the values 
   comm->AllToAllV(
-      send_value,
-      recv_prefix_host.data(),
-      recv_value,
-      send_prefix_host.data(),
+      filled_response_value,
+      response_prefix_host.data(),
+      filled_request_value,
+      request_prefix_host.data(),
       stream);
 
   // finally, we need to permute the values back into the requested order
@@ -988,13 +988,13 @@ NDArray SparsePull(
     const dim3 grid((num_in+block.y-1)/block.y);
 
     _InversePermKernel<<<grid, block, 0, stream>>>(
-        recv_value,
+        filled_request_value,
         num_feat,
         num_in,
         perm,
         static_cast<DType*>(result->data));
   }
-  device->FreeWorkspace(ctx, recv_value);
+  device->FreeWorkspace(ctx, filled_request_value);
   device->FreeWorkspace(ctx, perm);
 
   return result;
