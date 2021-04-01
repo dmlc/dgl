@@ -9,7 +9,11 @@ pipeline {
         issueCommentTrigger('@dgl-bot .*')
     }
     agent {
-        label 'linux-c52x-node'
+        docker {
+            label 'linux-benchmark-node'
+            image 'dgllib/dgl-ci-lint'
+            alwaysPull true
+        }
     }
     stages {
         stage('A') {
@@ -29,10 +33,12 @@ pipeline {
                             checkout([$class: 'GitSCM', branches: [[name: '*/master']],
                                 userRemoteConfigs: [[credentialsId: 'github', url: 'https://github.com/dglai/DGL_scripts.git']]])
                         }
-                        sh('pwd')
-                        sh('ls')
-                        // sh("cp DGL_scripts/benchmark/* dgl/benchmarks/scripts/")
-                        def comment = pullRequest.comment('Started the Regression test')
+                        sh('cp benchmark_scripts_repo/benchmark/* benchmarks/scripts/')
+                        pullRequest.comment('Started the Regression test')
+                        dir('benchmarks/scripts') {
+                            sh("PYTHONUNBUFFERED=1 GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT}")
+                        }
+                        pullRequest.comment('Finished the Regression test')
                     } else {
                         echo('Build was not started by a trigger')
                     }
