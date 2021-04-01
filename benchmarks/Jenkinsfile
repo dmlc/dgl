@@ -10,7 +10,7 @@ pipeline {
             steps {
                 sh 'env'
                 script {
-                    def triggerCause = currentBuild.getBuildCause("org.jenkinsci.plugins.pipeline.github.trigger.PullRequestReviewCause")
+                    def triggerCause = currentBuild.getBuildCauses("org.jenkinsci.plugins.pipeline.github.trigger.PullRequestReviewCause")
 
                     echo("BUILD CAUSE: ${triggerCause.toString()}")
                     env.GITHUB_COMMENT
