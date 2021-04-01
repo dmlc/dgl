@@ -15,7 +15,10 @@ pipeline {
         stage('A') {
             steps {
                 sh 'env'
-                init_git()
+                checkout scm
+                sh "ls"
+                sh "pwd"
+                // init_git()
                 script {
                     def triggerCause = currentBuild.getBuildCauses('org.jenkinsci.plugins.pipeline.github.trigger.IssueCommentCause')
 
@@ -26,7 +29,7 @@ pipeline {
                                 userRemoteConfigs: [[credentialsId: 'github', url: 'https://github.com/dglai/DGL_scripts.git']]])
                         sh("pwd")
                         sh("ls")
-                        sh("cp DGL_scripts/benchmark/* dgl/benchmarks/scripts/")
+                        // sh("cp DGL_scripts/benchmark/* dgl/benchmarks/scripts/")
                         def comment = pullRequest.comment('Started the Regression test')
                     } else {
                         echo('Build was not started by a trigger')
