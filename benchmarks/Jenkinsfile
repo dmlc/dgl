@@ -14,7 +14,7 @@ pipeline {
 
                     echo("BUILD CAUSE: ${triggerCause.toString()}")
                     env.GITHUB_COMMENT
-                    if (env.GITHUB_COMMENT) {
+                    if (triggerCause) {
                         echo("Build was started by ${triggerCause.userLogin}, who wrote: " +
                         "\"${triggerCause.comment}\", which matches the " +
                         "\"${triggerCause.triggerPattern}\" trigger pattern.")
