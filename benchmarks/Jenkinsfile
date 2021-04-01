@@ -1,48 +1,49 @@
-pipeline{
+pipeline {
     triggers {
         issueCommentTrigger('.*')
     }
-    agent{
-        label "linux-c52x-node"
+    agent {
+        label 'linux-c52x-node'
     }
-    stages{
-        stage("A"){
-            steps{
+    stages {
+        stage('A') {
+            steps {
                 sh 'env'
-            script {
-               def triggerCause = currentBuild.getBuildCauses()
-                echo("BUILD CAUSE: ${triggerCause.toString()}")
-                if (triggerCause) {
-                    echo("Build was started by ${triggerCause.userLogin}, who wrote: " +
+                script {
+                    def triggerCause = currentBuild.getBuildCauses()
+                    echo("BUILD CAUSE: ${triggerCause.toString()}")
+                    if (triggerCause) {
+                        echo("Build was started by ${triggerCause.userLogin}, who wrote: " +
                         "\"${triggerCause.comment}\", which matches the " +
                         "\"${triggerCause.triggerPattern}\" trigger pattern.")
-                } else {
-                    echo('Build was not started by a trigger')
+                    } else {
+                        echo('Build was not started by a trigger')
+                    }
+                    def comment = pullRequest.comment('Started the Regression test')
                 }
             }
-            }
-            post{
-                always{
-                    echo "========always========"
+            post {
+                always {
+                    echo '========always========'
                 }
-                success{
-                    echo "========A executed successfully========"
+                success {
+                    echo '========A executed successfully========'
                 }
-                failure{
-                    echo "========A execution failed========"
+                failure {
+                    echo '========A execution failed========'
                 }
             }
         }
     }
-    post{
-        always{
-            echo "========always========"
+    post {
+        always {
+            echo '========always========'
         }
-        success{
-            echo "========pipeline executed successfully ========"
+        success {
+            echo '========pipeline executed successfully ========'
         }
-        failure{
-            echo "========pipeline execution failed========"
+        failure {
+            echo '========pipeline execution failed========'
         }
     }
 }
