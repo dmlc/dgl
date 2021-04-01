@@ -247,7 +247,7 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**AttnIO: Knowledge Graph Exploration with In-and-Out Attention Flow for Knowledge-Grounded Dialogue**](https://www.aclweb.org/anthology/2020.emnlp-main.280/), EMNLP'20, *Jaehun Jung, Bokyung Son, Sungwon Lyu*
 
-1. [**Learning from Non-Binary Constituency Trees via Tensor Decomposition**](https://arxiv.org/abs/2011.00860), COLING'20, *Daniele Castellana, Davide Bacciu*
+1. [**Learning from Non-Binary Constituency Trees via Tensor Decomposition**](https://github.com/danielecastellana22/tensor-tree-nn), COLING'20, *Daniele Castellana, Davide Bacciu*
 
 1. [**Inducing Alignment Structure with Gated Graph Attention Networks for Sentence Matching**](https://arxiv.org/abs/2010.07668), *Peng Cui, Le Hu, Yuanchao Liu*
 
@@ -305,7 +305,9 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Reinforcement Learning For Data Poisoning on Graph Neural Networks**](https://arxiv.org/abs/2102.06800), *Jacob Dineen, A S M Ahsan-Ul Haque, Matthew Bielskas*
 
-1. [**GraphGallery: A Platform for Fast Benchmarking and Easy Development of Graph Neural Networks Based Intelligent Software**](https://arxiv.org/pdf/2102.07933.pdf), [Github](https://github.com/EdisonLeeeee/GraphGallery), *Jintang Li, Kun Xu, Liang Chen, Zibin Zheng, Xiao Liu*
+1. [**Generalising Recursive Neural Models by Tensor Decomposition**](https://github.com/danielecastellana22/tensor-tree-nn), IJCNN'20, *Daniele Castellana, Davide Bacciu*
+
+1. [**Tensor Decompositions in Recursive Neural Networks for Tree-Structured Data**](https://github.com/danielecastellana22/tensor-tree-nn), ESANN'20, *Daniele Castellana, Davide Bacciu*
 
 </details>
 
