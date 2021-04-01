@@ -1,7 +1,7 @@
 def init_git() {
-  sh "rm -rf *"
-  checkout scm
-  sh "git submodule update --recursive --init"
+    sh 'rm -rf *'
+    checkout scm
+    sh 'git submodule update --recursive --init'
 }
 
 pipeline {
@@ -16,8 +16,8 @@ pipeline {
             steps {
                 sh 'env'
                 checkout scm
-                sh "ls"
-                sh "pwd"
+                sh 'ls'
+                sh 'pwd'
                 // init_git()
                 script {
                     def triggerCause = currentBuild.getBuildCauses('org.jenkinsci.plugins.pipeline.github.trigger.IssueCommentCause')
@@ -25,10 +25,12 @@ pipeline {
                     echo("BUILD CAUSE: ${triggerCause.toString()}")
                     env.GITHUB_COMMENT
                     if (triggerCause) {
-                        checkout([$class: 'GitSCM', branches: [[name: '*/master']],
+                        dir('benchmark_scripts_repo') {
+                            checkout([$class: 'GitSCM', branches: [[name: '*/master']],
                                 userRemoteConfigs: [[credentialsId: 'github', url: 'https://github.com/dglai/DGL_scripts.git']]])
-                        sh("pwd")
-                        sh("ls")
+                        }
+                        sh('pwd')
+                        sh('ls')
                         // sh("cp DGL_scripts/benchmark/* dgl/benchmarks/scripts/")
                         def comment = pullRequest.comment('Started the Regression test')
                     } else {
