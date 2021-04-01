@@ -1,6 +1,6 @@
 pipeline {
     triggers {
-        issueCommentTrigger('.*')
+        issueCommentTrigger('@dgl-bot .*')
     }
     agent {
         label 'linux-c52x-node'
@@ -18,8 +18,9 @@ pipeline {
                         "\"${triggerCause.triggerPattern}\" trigger pattern.")
                     } else {
                         echo('Build was not started by a trigger')
-                    }
-                    def comment = pullRequest.comment('Started the Regression test')
+                    }                 
+                    echo("Comment: ${triggerCause.getComment()}")
+                    // def comment = pullRequest.comment('Started the Regression test')
                 }
             }
             post {
