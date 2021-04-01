@@ -1,9 +1,3 @@
-def init_git() {
-    sh 'rm -rf *'
-    checkout scm
-    sh 'git submodule update --recursive --init'
-}
-
 pipeline {
     triggers {
         issueCommentTrigger('@dgl-bot .*')
