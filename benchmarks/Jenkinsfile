@@ -1,6 +1,6 @@
 pipeline {
     triggers {
-        issueCommentTrigger('@dgl-bot .*')
+        issueCommentTrigger('.*')
     }
     agent {
         docker {
@@ -33,7 +33,7 @@ pipeline {
                             sh('python3 -m pip install boto3')
                             sh("PYTHONUNBUFFERED=1 GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT}")
                         }
-                        pullRequest.comment('Finished the Regression test')
+                        // pullRequest.comment('Finished the Regression test')
                     } else {
                         echo('Build was not started by a trigger')
                     }
