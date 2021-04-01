@@ -59,10 +59,10 @@ def initialize(ip_config, num_servers=1, num_workers=0,
     ip_config: str
         File path of ip_config file
     num_servers : int
-        The number of server processes on each machine
+        The number of server processes on each machine. This argument is deprecated in DGL 0.7.0.
     num_workers: int
         Number of worker process on each machine. The worker processes are used
-        for distributed sampling.
+        for distributed sampling. This argument is deprecated in DGL 0.7.0.
     max_queue_size : int
         Maximal size (bytes) of client queue buffer (~20 GB on default).
 
@@ -101,6 +101,15 @@ def initialize(ip_config, num_servers=1, num_workers=0,
         serv.start()
         sys.exit()
     else:
+        if os.environ.get('DGL_NUM_SAMPLER') is not None:
+            num_workers = int(os.environ.get('DGL_NUM_SAMPLER'))
+        else:
+            num_workers = 0
+        if os.environ.get('DGL_NUM_SERVER') is not None:
+            num_servers = int(os.environ.get('DGL_NUM_SERVER'))
+        else:
+            num_servers = 1
+
         rpc.reset()
         ctx = mp.get_context("spawn")
         global SAMPLER_POOL
