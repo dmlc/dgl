@@ -3,7 +3,7 @@
 # It implements the operation of circular convolution in the ccorr function and an additional in_out_norm function for norm computation.
 
 import torch as th
-
+import dgl
 
 def com_mult(a, b):
 	r1, i1 = a[..., 0], a[..., 1]
@@ -34,7 +34,7 @@ def ccorr(a, b):
 	"""
 	return th.irfft(com_mult(conj(th.rfft(a, 1)), th.rfft(b, 1)), 1, signal_sizes=(a.shape[-1],))
 
-
+#identify in/out edges, compute edge norm for each and store in edata
 def in_out_norm(graph):
 	src, dst, EID = graph.edges(form='all')
 	graph.edata['norm'] = th.ones(EID.shape[0]).to(graph.device)
@@ -54,3 +54,4 @@ def in_out_norm(graph):
 	graph.edata['norm'] = graph.edata['norm'].unsqueeze(1)
 
 	return graph
+	

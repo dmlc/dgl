@@ -1,4 +1,3 @@
-import argparse
 import torch as th
 import torch.optim as optim
 import torch.nn.functional as F
@@ -52,6 +51,7 @@ class CompGraphConv(nn.Module):
             # Assign values to source nodes. In a homogeneous graph, this is equal to
             # assigning them to all nodes.
             g.srcdata['h'] = n_in_feats
+            #append loop_rel embedding to r_feats
             r_feats = th.cat((r_feats, self.loop_rel), 0)
             # Assign features to all edges with the corresponding relation embeddings
             g.edata['h'] = r_feats[g.edata['etype']] * g.edata['norm']
@@ -114,8 +114,8 @@ class CompGraphConv(nn.Module):
 
 class CompGCN(nn.Module):
     def __init__(self,
-                 B,
-                 R,
+                 num_bases,
+                 num_rel,
                  num_ent,
                  in_dim=100,
                  layer_size=[200],
@@ -125,8 +125,8 @@ class CompGCN(nn.Module):
                  layer_dropout=[0.3]):
         super(CompGCN, self).__init__()
 
-        self.B = B
-        self.R = R
+        self.num_bases = num_bases
+        self.num_rel = num_rel
         self.num_ent = num_ent
         self.in_dim = in_dim
         self.layer_size = layer_size
@@ -147,13 +147,13 @@ class CompGCN(nn.Module):
             )
 
         #Initial relation embeddings
-        if self.B > 0:
-            self.basis = nn.Parameter(th.Tensor(self.B, self.in_dim))
-            self.weights = nn.Parameter(th.Tensor(self.R, self.B))
+        if self.num_bases > 0:
+            self.basis = nn.Parameter(th.Tensor(self.num_bases, self.in_dim))
+            self.weights = nn.Parameter(th.Tensor(self.num_rel, self.num_bases))
             nn.init.xavier_normal_(self.basis)
             nn.init.xavier_normal_(self.weights)
         else:
-            self.rel_embds = nn.Parameter(th.Tensor(self.R, self.in_dim))
+            self.rel_embds = nn.Parameter(th.Tensor(self.num_rel, self.in_dim))
             nn.init.xavier_normal_(self.rel_embds)
 
         #Node embeddings
@@ -171,7 +171,7 @@ class CompGCN(nn.Module):
     def forward(self, graph):
         #node and relation features
         n_feats = self.n_embds
-        if self.B > 0:
+        if self.num_bases > 0:
             r_embds = th.mm(self.weights, self.basis)
             r_feats = r_embds
         else:
@@ -186,8 +186,8 @@ class CompGCN(nn.Module):
 #Use convE as the score function
 class CompGCN_ConvE(nn.Module):
     def __init__(self,
-                 B,
-                 R,
+                 num_bases,
+                 num_rel,
                  num_ent,
                  in_dim,
                  layer_size,
@@ -212,38 +212,44 @@ class CompGCN_ConvE(nn.Module):
         self.k_h=k_h
         self.num_filt=num_filt
 
-        self.compGCN_Model = CompGCN(B, R, num_ent, in_dim, layer_size, comp_fn, batchnorm, dropout, layer_dropout)
+        #compGCN model to get sub/rel embs
+        self.compGCN_Model = CompGCN(num_bases, num_rel, num_ent, in_dim, layer_size, comp_fn, batchnorm, dropout, layer_dropout)
         
+        #batchnorms to the combined (sub+rel) emb
         self.bn0 = th.nn.BatchNorm2d(1)
         self.bn1 = th.nn.BatchNorm2d(self.num_filt)
         self.bn2 = th.nn.BatchNorm1d(self.embed_dim)
-
+        
+        #dropouts and conv module to the combined (sub+rel) emb
         self.hidden_drop = th.nn.Dropout(self.hid_drop)
         self.feature_drop = th.nn.Dropout(self.feat_drop)
         self.m_conv1 = th.nn.Conv2d(1, out_channels=self.num_filt, kernel_size=(self.ker_sz, self.ker_sz), stride=1, padding=0, bias=False)
         
-        flat_sz_h = int(2*self.k_w) - self.ker_sz + 1
+        flat_sz_h = int(2 * self.k_w) - self.ker_sz + 1
         flat_sz_w = self.k_h - self.ker_sz + 1
-        self.flat_sz = flat_sz_h*flat_sz_w*self.num_filt
+        self.flat_sz = flat_sz_h * flat_sz_w * self.num_filt
         self.fc = th.nn.Linear(self.flat_sz, self.embed_dim) 
 
+        #bias to the score
         self.bias = nn.Parameter(th.zeros(num_ent))
         
-    
+    #combine entity embeddings and relation embeddings
     def concat(self, e1_embed, rel_embed):
-        e1_embed = e1_embed. view(-1, 1, self.embed_dim)
+        e1_embed = e1_embed.view(-1, 1, self.embed_dim)
         rel_embed = rel_embed.view(-1, 1, self.embed_dim)
         stack_inp = th.cat([e1_embed, rel_embed], 1)
-        stack_inp = th.transpose(stack_inp, 2, 1).reshape((-1, 1, 2*self.k_w, self.k_h))
+        stack_inp = th.transpose(stack_inp, 2, 1).reshape((-1, 1, 2 * self.k_w, self.k_h))
         return stack_inp
     
     def forward(self, graph, sub, rel):
-        
+        #get sub_emb and rel_emb via compGCN
         n_feats, r_feats = self.compGCN_Model(graph)
         sub_emb = n_feats[sub, :]
         rel_emb = r_feats[rel, :]
 
+        #combine the sub_emb and rel_emb
         stk_inp = self.concat(sub_emb, rel_emb)
+        #use convE to score the combined emb
         x = self.bn0(stk_inp)
         x = self.m_conv1(x)
         x = self.bn1(x)
@@ -254,10 +260,11 @@ class CompGCN_ConvE(nn.Module):
         x = self.hidden_drop(x)
         x = self.bn2(x)
         x = F.relu(x)
-
+        #compute score
         x = th.mm(x, n_feats.transpose(1,0))
+        #add in bias
         x += self.bias.expand_as(x)
-        
         score = th.sigmoid(x)
         return score
+        
 

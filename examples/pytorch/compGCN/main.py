@@ -14,21 +14,23 @@ import numpy as np
 from time import time
 
 
-#predict for the tail or head
-def predict(model, graph, device, data_iter, split='valid', mode='tail_batch'):
+#predict the tail for (head, rel, -1) or head for (-1, rel, tail)
+def predict(model, graph, device, data_iter, split='valid', mode='tail'):
     model.eval()
     with th.no_grad():
         results = {}
-        train_iter = iter(data_iter['{}_{}'.format(split, mode.split('_')[0])])
+        train_iter = iter(data_iter['{}_{}'.format(split, mode)])
         
         for step, batch in enumerate(train_iter):
-            triple, label = [_.to(device) for _ in batch]
+            triple, label = batch[0].to(device), batch[1].to(device)
             sub, rel, obj, label = triple[:, 0], triple[:, 1], triple[:, 2], label
-            pred = model.forward(graph, sub, rel)
+            pred = model(graph, sub, rel)
             b_range = th.arange(pred.size()[0], device = device)
             target_pred = pred[b_range, obj]
             pred = th.where(label.byte(), -th.ones_like(pred) * 10000000, pred)
             pred[b_range, obj] = target_pred
+
+            #compute metrics
             ranks = 1 + th.argsort(th.argsort(pred, dim=1, descending=True), dim =1, descending=False)[b_range, obj]
             ranks = ranks.float()
             results['count'] = th.numel(ranks) + results.get('count', 0.0)
@@ -41,11 +43,14 @@ def predict(model, graph, device, data_iter, split='valid', mode='tail_batch'):
 
 #evaluation function, evaluate the head and tail prediction and then combine the results
 def evaluate(model, graph, device, data_iter, split='valid'):
-    left_results = predict(model, graph, device, data_iter, split, mode='tail_batch')
-    right_results = predict(model, graph, device, data_iter, split, mode='head_batch')
+    #predict for head and tail
+    left_results = predict(model, graph, device, data_iter, split, mode='tail')
+    right_results = predict(model, graph, device, data_iter, split, mode='head')
     results = {}
     count = float(left_results['count'])
 
+    #combine the head and tail prediction results
+    #Metrics: MRR, MR, and Hit@k
     results['left_mr'] = round(left_results['mr']/count, 5)
     results['left_mrr'] = round(left_results['mrr']/count, 5)
     results['right_mr'] = round(right_results['mr']/count, 5)
@@ -69,7 +74,7 @@ def main(args):
         device = 'cpu'
     
     #construct graph, split in/out edges and prepare train/validation/test data_loader
-    data = Data(args)
+    data = Data(args.dataset, args.lbl_smooth, args.num_workers, args.batch_size)
     data_iter = data.data_iter #train/validation/test data_loader
     graph = data.g.to(device)
     num_rel = th.max(graph.edata['etype']).item() + 1
@@ -78,22 +83,22 @@ def main(args):
     graph = in_out_norm(graph)
 
     # Step 2: Create model =================================================================== #
-    compgcn_model = CompGCN_ConvE(B=args.num_bases,
-                 R=num_rel,
-                 num_ent=graph.num_nodes(),
-                 in_dim=args.init_dim,
-                 layer_size=args.layer_size,
-                 comp_fn=args.opn,
-                 batchnorm=True,
-                 dropout=args.dropout,
-                 layer_dropout=args.layer_dropout,
-                 num_filt=args.num_filt,
-                 hid_drop=args.hid_drop,
-                 feat_drop=args.feat_drop,
-                 ker_sz=args.ker_sz,
-                 k_w=args.k_w,
-                 k_h=args.k_h
-                 )
+    compgcn_model=CompGCN_ConvE(num_bases=args.num_bases,
+                                num_rel=num_rel,
+                                num_ent=graph.num_nodes(),
+                                in_dim=args.init_dim,
+                                layer_size=args.layer_size,
+                                comp_fn=args.opn,
+                                batchnorm=True,
+                                dropout=args.dropout,
+                                layer_dropout=args.layer_dropout,
+                                num_filt=args.num_filt,
+                                hid_drop=args.hid_drop,
+                                feat_drop=args.feat_drop,
+                                ker_sz=args.ker_sz,
+                                k_w=args.k_w,
+                                k_h=args.k_h
+                                )
     compgcn_model = compgcn_model.to(device)
 
     # Step 3: Create training components ===================================================== #
@@ -109,9 +114,9 @@ def main(args):
         train_loss=[]
         t0 = time()
         for step, batch in enumerate(data_iter['train']):
-            triple, label = [_.to(device) for _ in batch]
+            triple, label = batch[0].to(device), batch[1].to(device)
             sub, rel, obj, label = triple[:, 0], triple[:, 1], triple[:, 2], label
-            logits = compgcn_model.forward(graph, sub, rel)
+            logits = compgcn_model(graph, sub, rel)
 		
             # compute loss
             tr_loss = loss_fn(logits, label)
@@ -121,7 +126,7 @@ def main(args):
             optimizer.zero_grad()
             tr_loss.backward()
             optimizer.step()
-            #print("In epoch {}, step {}, Train Loss: {:.4f}".format(epoch, step, tr_loss))
+
         train_loss = np.sum(train_loss)
 
         t1 = time()  
@@ -140,13 +145,15 @@ def main(args):
             if kill_cnt > 25:
                 print('early stop.')
                 break
-        print("In epoch {}, Train Loss: {:.4f}, Valid MRR: {:.5}\n, Train time: {}, Valid time: {}".format(epoch, train_loss, val_results['mrr'], t1-t0, t2-t1))
+        print("In epoch {}, Train Loss: {:.4f}, Valid MRR: {:.5}\n, Train time: {}, Valid time: {}"\
+                .format(epoch, train_loss, val_results['mrr'], t1-t0, t2-t1))
     
     #test use the best model
     compgcn_model.eval()
     compgcn_model.load_state_dict(th.load('comp_link'+'_'+args.dataset))
     test_results = evaluate(compgcn_model, graph, device, data_iter, split='test')
-    print("Test MRR: {:.5}\n, MR: {:.10}\n, H@10: {:.5}\n, H@3: {:.5}\n, H@1: {:.5}\n".format(test_results['mrr'], test_results['mr'], test_results['hits@10'], test_results['hits@3'], test_results['hits@1']))
+    print("Test MRR: {:.5}\n, MR: {:.10}\n, H@10: {:.5}\n, H@3: {:.5}\n, H@1: {:.5}\n"\
+            .format(test_results['mrr'], test_results['mr'], test_results['hits@10'], test_results['hits@3'], test_results['hits@1']))
     
 
 if __name__ == '__main__':
@@ -191,3 +198,4 @@ if __name__ == '__main__':
     args.layer_dropout = eval(args.layer_dropout)
 
     main(args)
+    

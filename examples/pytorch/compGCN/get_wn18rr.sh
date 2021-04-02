@@ -1,2 +1,2 @@
-wget https://s3.us-west-2.amazonaws.com/dgl-data/dataset/WN18RR.zip
-unzip WN18RR.zip
+wget https://dgl-data.s3.cn-north-1.amazonaws.com.cn/dataset/wn18rr.zip
+unzip wn18rr.zip
