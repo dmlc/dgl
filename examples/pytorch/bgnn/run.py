@@ -9,6 +9,8 @@ from dgl.nn.pytorch import GATConv as GATConvDGL, GraphConv, ChebConv as ChebCon
     AGNNConv as AGNNConvDGL, APPNPConv
 from torch.nn import Dropout, ELU, Sequential, Linear, ReLU
 import torch.nn.functional as F
+from category_encoders import CatBoostEncoder
+from sklearn import preprocessing
 
 class GNNModelDGL(torch.nn.Module):
     def __init__(self, in_dim, hidden_dim, out_dim,
@@ -93,6 +95,26 @@ def read_input(input_folder):
 
     return graph, X, y, cat_features, masks
 
+def normalize_features(X, train_mask, val_mask, test_mask):
+    min_max_scaler = preprocessing.MinMaxScaler()
+    A = X.to_numpy(copy=True)
+    A[train_mask] = min_max_scaler.fit_transform(A[train_mask])
+    A[val_mask + test_mask] = min_max_scaler.transform(A[val_mask + test_mask])
+    return pd.DataFrame(A, columns=X.columns).astype(float)
+
+def replace_na(X, train_mask):
+    if X.isna().any().any():
+        return X.fillna(X.iloc[train_mask].min() - 1)
+    return X
+
+def encode_cat_features(X, y, cat_features, train_mask, val_mask, test_mask):
+    enc = CatBoostEncoder()
+    A = X.to_numpy(copy=True)
+    b = y.to_numpy(copy=True)
+    A[np.ix_(train_mask, cat_features)] = enc.fit_transform(A[np.ix_(train_mask, cat_features)], b[train_mask])
+    A[np.ix_(val_mask + test_mask, cat_features)] = enc.transform(A[np.ix_(val_mask + test_mask, cat_features)])
+    A = A.astype(float)
+    return pd.DataFrame(A, columns=X.columns)
 
 if __name__ == '__main__':
     # datasets can be found here: https://www.dropbox.com/s/verx1evkykzli88/datasets.zip
@@ -100,6 +122,19 @@ if __name__ == '__main__':
     input_folder = 'datasets/avazu'
     graph, X, y, cat_features, masks = read_input(input_folder)
     train_mask, val_mask, test_mask = masks['0']['train'], masks['0']['val'], masks['0']['test']
+
+    encoded_X = X.copy()
+    normalizeFeatures = False
+    replaceNa = True
+
+    if len(cat_features):
+        encoded_X = encode_cat_features(encoded_X, y, cat_features, train_mask, val_mask, test_mask)
+    if normalizeFeatures:
+        encoded_X = normalize_features(encoded_X, train_mask, val_mask, test_mask)
+    if replaceNa:
+        encoded_X = replace_na(encoded_X, train_mask)
+
+
 
     # specify parameters
     task = 'regression'
@@ -118,6 +153,7 @@ if __name__ == '__main__':
     # specify GNN model
     gnn_model = GNNModelDGL(in_dim, hidden_dim, out_dim)
 
+
     # initialize BGNN model
     bgnn = BGNNPredictor(gnn_model, task=task,
                          loss_fn=None,
@@ -130,8 +166,8 @@ if __name__ == '__main__':
                          gbdt_lr=gbdt_lr)
 
     # train
-    metrics = bgnn.fit(graph, X, y, train_mask, val_mask, test_mask, cat_features,
-                       num_epochs=100, patience=10, metric_name='loss',
-                       normalize_features=True)
+    metrics = bgnn.fit(graph, encoded_X, y, train_mask, val_mask, test_mask,
+                       original_X = X, cat_features=cat_features,
+                       num_epochs=100, patience=10, metric_name='loss')
 
     bgnn.plot_interactive(metrics, legend=['train', 'valid', 'test'], title='Avazu', metric_name='loss')

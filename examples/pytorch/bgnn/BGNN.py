@@ -12,6 +12,45 @@ import torch.nn.functional as F
 from sklearn.metrics import r2_score
 
 class BGNNPredictor:
+    '''
+    Description
+    -----------
+    Boost GNN predictor for semi-supervised node classification or regression problems.
+    Publication: https://arxiv.org/abs/2101.08543
+
+    Parameters
+    ----------
+    gnn_model : nn.Module
+        DGL implementation of GNN model.
+    task: str, optional
+        Regression or classification task.
+    loss_fn : callable, optional
+        Function that takes torch tensors, pred and true, and returns a scalar.
+    trees_per_epoch : int, optional
+        Number of GBDT trees to build each epoch.
+    backprop_per_epoch : int, optional
+        Number of backpropagation steps to make each epoch.
+    lr : float, optional
+        Learning rate of gradient descent optimizer.
+    append_gbdt_pred : bool, optional
+        Append GBDT predictions or replace original input node features.
+    train_input_features : bool, optional
+        Train original input node features.
+    gbdt_depth : int, optional
+        Depth of each tree in GBDT model.
+    gbdt_lr : float, optional
+        Learning rate of GBDT model.
+    gbdt_alpha : int, optional
+        Weight to combine previous and new GBDT trees.
+    random_seed : int, optional
+        random seed for GNN and GBDT models.
+
+    Examples
+    ----------
+    gnn_model = GAT(10, 20, num_heads=5),
+    bgnn = BGNNPredictor(gnn_model)
+    metrics = bgnn.fit(graph, X, y, train_mask, val_mask, test_mask, cat_features)
+    '''
     def __init__(self,
                  gnn_model,
                  task = 'regression',
@@ -22,7 +61,10 @@ class BGNNPredictor:
                  append_gbdt_pred = True,
                  train_input_features = False,
                  gbdt_depth=6,
-                 gbdt_lr=0.1):
+                 gbdt_lr=0.1,
+                 gbdt_alpha = 1,
+                 random_seed = 0
+                 ):
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
         self.model = gnn_model.to(self.device)
@@ -35,8 +77,10 @@ class BGNNPredictor:
         self.train_input_features = train_input_features
         self.gbdt_depth = gbdt_depth
         self.gbdt_lr = gbdt_lr
-
-
+        self.gbdt_alpha = gbdt_alpha
+        self.random_seed = random_seed
+        torch.manual_seed(random_seed)
+        np.random.seed(random_seed)
 
     def init_gbdt_model(self, num_epochs, epoch):
         if self.task == 'regression':
@@ -54,7 +98,7 @@ class BGNNPredictor:
                                   depth=self.gbdt_depth,
                                   learning_rate=self.gbdt_lr,
                                   loss_function=catboost_loss_fn,
-                                  random_seed=0,
+                                  random_seed=self.random_seed,
                                   nan_mode='Min')
 
     def fit_gbdt(self, pool, trees_per_epoch, epoch):
@@ -76,14 +120,14 @@ class BGNNPredictor:
         else:
             self.gbdt_model = self.append_gbdt_model(epoch_gbdt_model, weights=[1, gbdt_alpha])
 
-    def update_node_features(self, node_features, X, encoded_X):
+    def update_node_features(self, node_features, X, original_X):
         # get predictions from gbdt model
         if self.task == 'regression':
-            predictions = np.expand_dims(self.gbdt_model.predict(X), axis=1)
+            predictions = np.expand_dims(self.gbdt_model.predict(original_X), axis=1)
         else:
-            predictions = self.base_gbdt.predict_proba(X)
+            predictions = self.base_gbdt.predict_proba(original_X)
             if self.gbdt_model is not None:
-                predictions_after_one = self.gbdt_model.predict(X)
+                predictions_after_one = self.gbdt_model.predict(original_X)
                 predictions += predictions_after_one
 
         # update node features with predictions
@@ -93,7 +137,7 @@ class BGNNPredictor:
                                         predictions,
                                         axis=1)  # replace old predictions with new predictions
             else:
-                predictions = np.append(encoded_X, predictions, axis=1)  # append original features with new predictions
+                predictions = np.append(X, predictions, axis=1)  # append original features with new predictions
 
         predictions = torch.from_numpy(predictions).to(self.device)
 
@@ -107,28 +151,6 @@ class BGNNPredictor:
         if self.append_gbdt_pred:
             node_features.data[:, :-self.out_dim] = torch.from_numpy(X.to_numpy(copy=True))
         return node_features
-
-    def normalize_features(self, X, train_mask, val_mask, test_mask):
-        min_max_scaler = preprocessing.MinMaxScaler()
-        A = X.to_numpy(copy=True)
-        A[train_mask] = min_max_scaler.fit_transform(A[train_mask])
-        A[val_mask + test_mask] = min_max_scaler.transform(A[val_mask + test_mask])
-        return pd.DataFrame(A, columns=X.columns).astype(float)
-
-    def replace_na(self, X, train_mask):
-        if X.isna().any().any():
-            return X.fillna(X.iloc[train_mask].min() - 1)
-        return X
-
-    def encode_cat_features(self, X, y, cat_features, train_mask, val_mask, test_mask):
-        from category_encoders import CatBoostEncoder
-        enc = CatBoostEncoder()
-        A = X.to_numpy(copy=True)
-        b = y.to_numpy(copy=True)
-        A[np.ix_(train_mask, cat_features)] = enc.fit_transform(A[np.ix_(train_mask, cat_features)], b[train_mask])
-        A[np.ix_(val_mask + test_mask, cat_features)] = enc.transform(A[np.ix_(val_mask + test_mask, cat_features)])
-        A = A.astype(float)
-        return pd.DataFrame(A, columns=X.columns)
 
     def init_optimizer(self, node_features, optimize_node_features, learning_rate):
 
@@ -219,29 +241,47 @@ class BGNNPredictor:
 
     def fit(self, graph, X, y,
             train_mask, val_mask, test_mask,
+            original_X = None,
             cat_features = None,
             num_epochs=100,
             patience=10,
             logging_epochs=1,
             metric_name='loss',
-            normalize_features=False,
-            replace_na=True,
             ):
         '''
 
-        :param graph: dgl graph
-        :param X: numpy matrix of input features. Can be composed of categorical features with missing values.
-        :param y: numpy matrix of target labels. Can be multidimensional targets.
-        :param train_mask: list of integers (rows in X that correspond to train set)
-        :param val_mask: list of integers (rows in X that correspond to valid set)
-        :param test_mask: list of integers (rows in X that correspond to test set)
-        :param cat_features: list of integers (columns in X that correspond to categorical features)
-        :param num_epochs: number of epochs to run
-        :param patience: number of epochs to wait until early stopping
-        :param logging_epochs: log every n epoch
-        :param metric_name: metric to use for early stopping
-        :param normalize_features: normalize original input features X (column wise)
-        :param replace_na: replace NA in X
+        :param graph : dgl.DGLGraph
+            Input graph
+        :param X : pd.DataFrame
+            Input node features. Each column represents one input feature. Each row is a node.
+            Values in dataframe are numerical, after preprocessing.
+        :param y : pd.DataFrame
+            Input node targets. Each column represents one target. Each row is a node
+            (order of nodes should be the same as in X).
+        :param train_mask : list[int]
+            Node indexes (rows) that belong to train set.
+        :param val_mask : list[int]
+            Node indexes (rows) that belong to validation set.
+        :param test_mask : list[int]
+            Node indexes (rows) that belong to test set.
+        :param original_X : pd.DataFrame, optional
+            Input node features before preprocessing. Each column represents one input feature. Each row is a node.
+            Values in dataframe can be of any type, including categorical (e.g. string, bool) or
+            missing values (None). This is useful if you want to preprocess X with GBDT model.
+        :param cat_features: list[int]
+            Feature indexes (columns) which are categorical features.
+        :param num_epochs : int
+            Number of epochs to run.
+        :param patience : int
+            Number of epochs to wait until early stopping.
+        :param logging_epochs : int
+            Log every n epoch.
+        :param metric_name : str
+            Metric to use for early stopping.
+        :param normalize_features : bool
+            If to normalize original input features X (column wise).
+        :param replace_na: bool
+            If to replace missing values (None) in X.
         :return: metrics evaluated during training
         '''
 
@@ -263,21 +303,16 @@ class BGNNPredictor:
             self.out_dim = len(set(y.iloc[test_mask, 0]))
         self.in_dim = self.out_dim + X.shape[1] if self.append_gbdt_pred else self.out_dim
 
-        gbdt_X_train = X.iloc[train_mask]
+        if original_X is None:
+            original_X = X.copy()
+            cat_features = []
+
+        gbdt_X_train = original_X.iloc[train_mask]
         gbdt_y_train = y.iloc[train_mask]
-        gbdt_alpha = 1
+        gbdt_alpha = self.gbdt_alpha
         self.gbdt_model = None
 
-        encoded_X = X.copy()
-        if self.append_gbdt_pred:
-            if len(cat_features):
-                encoded_X = self.encode_cat_features(encoded_X, y, cat_features, train_mask, val_mask, test_mask)
-            if normalize_features:
-                encoded_X = self.normalize_features(encoded_X, train_mask, val_mask, test_mask)
-            if replace_na:
-                encoded_X = self.replace_na(encoded_X, train_mask)
-
-        node_features = self.init_node_features(encoded_X)
+        node_features = self.init_node_features(X)
         optimizer = self.init_optimizer(node_features, optimize_node_features=True, learning_rate=self.lr)
 
         y = torch.from_numpy(y.to_numpy(copy=True)).float().squeeze().to(self.device)
@@ -291,7 +326,7 @@ class BGNNPredictor:
             self.train_gbdt(gbdt_X_train, gbdt_y_train, cat_features, epoch,
                             self.trees_per_epoch, gbdt_alpha)
 
-            self.update_node_features(node_features, X, encoded_X)
+            self.update_node_features(node_features, X, original_X)
             node_features_before = node_features.clone()
             model_in=(graph, node_features)
             loss = self.train_and_evaluate(model_in, y, train_mask, val_mask, test_mask,
