@@ -131,9 +131,9 @@ class NodeEmbedding: # NodeEmbedding
                     if rank == 0:
                         # root process broadcasts nccl id
                         nccl_id = nccl.UniqueId()
-                        self._store.set('nccl_root_id', nccl_id)
+                        self._store.set('nccl_root_id', str(nccl_id))
                     else:
-                        nccl_id = self._store.wait(['nccl_root_id'])
+                        nccl_id = nccl.UniqueId(self._store.wait(['nccl_root_id']))
                     _COMM = nccl.Communicator(self._world_size, self._rank,
                         nccl_id)
             self._comm = _COMM

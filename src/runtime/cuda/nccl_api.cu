@@ -17,6 +17,8 @@
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
 #include <cmath>
+#include <sstream>
+#include <iomanip>
 
 #include <dgl/array.h>
 #include <dgl/aten/array_ops.h>
@@ -220,6 +222,35 @@ ncclUniqueId NCCLUniqueId::Get() const
   return id_;
 }
 
+std::string NCCLUniqueId::ToString() const
+{
+  std::ostringstream oss;
+
+  oss << std::hex;
+
+  for (size_t b = 0; b < NCCL_UNIQUE_ID_BYTES; ++b) {
+    const int num = static_cast<uint8_t>(id_.internal[b]);
+    oss << std::setw(2) << std::setfill('0') << num;
+  }
+
+  std::string result = oss.str();
+  CHECK_EQ(result.length(), NCCL_UNIQUE_ID_BYTES*2) <<
+    "Invalid NCCL ID format: '" << result << "'";
+
+  return result;
+}
+
+void NCCLUniqueId::FromString(
+    const std::string& str)
+{
+  // must be exactly 256 hex characters
+  CHECK_EQ(str.length(), NCCL_UNIQUE_ID_BYTES * 2) <<
+        "Invalid NCCL ID format: '" << str << "'";
+
+  for (size_t b = 0; b < NCCL_UNIQUE_ID_BYTES; ++b) {
+    id_.internal[b] = std::strtol(str.substr(b*2, 2).c_str(), nullptr, 16);
+  }
+}
 
 /* NCCLCommunicator **********************************************************/
 
@@ -1005,6 +1036,21 @@ NDArray SparsePull(
 DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLGetUniqueId")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   *rv = NCCLUniqueIdRef(std::make_shared<NCCLUniqueId>());
+});
+
+DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLUniqueIdToString")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  NCCLUniqueIdRef idObj = args[0];
+  *rv = idObj->ToString();
+});
+
+DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLUniqueIdFromString")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  const std::string str = args[0];
+
+  NCCLUniqueIdRef ref(std::make_shared<NCCLUniqueId>());
+  ref->FromString(str);
+  *rv = ref;
 });
 
 DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLCreateComm")

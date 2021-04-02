@@ -10,13 +10,19 @@ _COMM_MODES_MAP = {
 }
 
 class UniqueId(object):
-    def __init__(self):
+    def __init__(self, id_str=None):
         """ Create an object reference the current NCCL unique id.
         """
-        self._handle = _CAPI_DGLNCCLGetUniqueId()
+        if id_str:
+            self._handle = _CAPI_DGLNCCLUniqueIdFromString(id_str);
+        else:
+            self._handle = _CAPI_DGLNCCLGetUniqueId()
 
     def get(self):
         return self._handle
+
+    def __str__(self):
+        return _CAPI_DGLNCCLUniqueIdToString(self._handle)
     
 class Communicator(object):
     def __init__(self, size, rank, unique_id):
@@ -32,6 +38,7 @@ class Communicator(object):
                 The unique id of the root process (rank=0).
         """
         self._handle = _CAPI_DGLNCCLCreateComm(size, rank, unique_id.get())
+        assert rank < size
         self._rank = rank
         self._size = size
 

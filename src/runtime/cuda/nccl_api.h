@@ -21,6 +21,10 @@ class NCCLUniqueId : public runtime::Object {
 
   ncclUniqueId Get() const;
 
+  std::string ToString() const;
+
+  void FromString(const std::string& str);
+
  private:
   ncclUniqueId id_;
 };
