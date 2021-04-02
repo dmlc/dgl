@@ -10,13 +10,9 @@ pipeline {
         }
     }
     stages {
-        stage('A') {
+        stage('Regression Test') {
             steps {
-                sh 'env'
                 checkout scm
-                sh 'ls'
-                sh 'pwd'
-                // init_git()
                 script {
                     def triggerCause = currentBuild.getBuildCauses('org.jenkinsci.plugins.pipeline.github.trigger.IssueCommentCause')
 
@@ -31,7 +27,7 @@ pipeline {
                         pullRequest.comment('Started the Regression test')
                         dir('benchmarks/scripts') {
                             sh('python3 -m pip install boto3')
-                            sh("PYTHONUNBUFFERED=1 GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT}")
+                            sh("PYTHONUNBUFFERED=1 GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT} --compare-branch dmlc/master")
                         }
                         pullRequest.comment('Finished the Regression test')
                     } else {
@@ -41,27 +37,10 @@ pipeline {
                 }
             }
             post {
-                always {
-                    echo '========always========'
-                }
-                success {
-                    echo '========A executed successfully========'
-                }
                 failure {
-                    echo '========A execution failed========'
+                    echo '========Regression execution failed========'
                 }
             }
-        }
-    }
-    post {
-        always {
-            echo '========always========'
-        }
-        success {
-            echo '========pipeline executed successfully ========'
-        }
-        failure {
-            echo '========pipeline execution failed========'
         }
     }
 }
