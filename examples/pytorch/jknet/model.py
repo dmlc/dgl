@@ -14,9 +14,7 @@ class JKNet(nn.Module):
                  dropout=0.):
         super(JKNet, self).__init__()
         
-        self.mode = mode.lower()
-        assert mode in ['cat', 'max', 'lstm']
-
+        self.mode = mode
         self.dropout = nn.Dropout(dropout)
         self.layers = nn.ModuleList()
         self.layers.append(GraphConv(in_dim, hid_dim, activation=F.relu))

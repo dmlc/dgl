@@ -39,13 +39,14 @@ The DGL's built-in Cora, Citeseer datasets. Dataset summary:
 
 ###### Model options
 ```
---epochs           int     Number of training epochs.          Default is 500.
---lr               float   Adam optimizer learning rate.       Default is 0.01.
---lamb             float   L2 regularization coefficient.      Default is 0.0005.
---hid-dim          int     Hidden layer dimensionalities.      Default is 32.
---num-layers       int     Number of T.                        Default is 1.
---mode             str     Type of aggregation.                Default is 'cat'.
---dropout          float   Dropout applied at all layers.      Default is 0.5.
+--run              int     Number of running times.                    Default is 10.
+--epochs           int     Number of training epochs.                  Default is 500.
+--lr               float   Adam optimizer learning rate.               Default is 0.01.
+--lamb             float   L2 regularization coefficient.              Default is 0.0005.
+--hid-dim          int     Hidden layer dimensionalities.              Default is 32.
+--num-layers       int     Number of T.                                Default is 5.
+--mode             str     Type of aggregation ['cat', 'max', 'lstm']. Default is 'cat'.
+--dropout          float   Dropout applied at all layers.              Default is 0.5.
 ```
 
 ###### Examples

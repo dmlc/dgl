@@ -60,7 +60,7 @@ def main(args):
     loss_fn = nn.CrossEntropyLoss()
     opt = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.lamb)
 
-    # Step 4: training epoches =============================================================== #
+    # Step 4: training epochs =============================================================== #
     acc = 0
     epochs = trange(args.epochs, desc='Accuracy & Loss')
 
@@ -112,13 +112,14 @@ if __name__ == "__main__":
     # cuda params
     parser.add_argument('--gpu', type=int, default=-1, help='GPU index. Default: -1, using CPU.')
     # training params
+    parser.add_argument('--run', type=int, default=10, help='Running times.')
     parser.add_argument('--epochs', type=int, default=500, help='Training epochs.')
     parser.add_argument('--lr', type=float, default=0.005, help='Learning rate.')
     parser.add_argument('--lamb', type=float, default=0.0005, help='L2 reg.')
     # model params
     parser.add_argument("--hid-dim", type=int, default=32, help='Hidden layer dimensionalities.')
     parser.add_argument("--num-layers", type=int, default=5, help='Number of GCN layers.')
-    parser.add_argument("--mode", type=str, default='cat', help='Type of aggregation.')
+    parser.add_argument("--mode", type=str, default='cat', help="Type of aggregation ['cat', 'max', 'lstm'].")
     parser.add_argument("--dropout", type=float, default=0.5, help='Dropout applied at all layers.')
 
     args = parser.parse_args()
@@ -126,11 +127,11 @@ if __name__ == "__main__":
 
     acc_lists = []
 
-    for _ in range(10):
+    for _ in range(args.run):
         acc_lists.append(main(args))
 
     mean = np.around(np.mean(acc_lists, axis=0), decimals=3)
     std = np.around(np.std(acc_lists, axis=0), decimals=3)
-    print('Total acc: ', acc_lists)
+    print('total acc: ', acc_lists)
     print('mean', mean)
     print('std', std)
