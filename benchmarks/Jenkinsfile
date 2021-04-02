@@ -40,7 +40,9 @@ pipeline {
                         pullRequest.comment('Finished the Regression test')
                     } else {
                         if (prOpenTriggerCause) {
-                            pullRequest.comment('To trigger all jobs: `@dgl-bot run [instance-type] [which tests] [compare-with-branch]`; \n For example: `@dgl-bot run g4dn.4xlarge all dmlc/master`')
+                            if (env.BUILD_ID == "1") {
+                                pullRequest.comment('To trigger all jobs: `@dgl-bot run [instance-type] [which tests] [compare-with-branch]`; \n For example: `@dgl-bot run g4dn.4xlarge all dmlc/master`')
+                            }
                         }
                         echo('Build was not started by a trigger')
                     }
