@@ -240,7 +240,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
         backend = 'nccl'
 
         # using sparse embedding or usig mix_cpu_gpu model (embedding model can not be stored in GPU)
-        if dev_id < 0 or args.dgl_sparse is False:
+        if dev_id < 0 or args.embedding_gpu is False:
             backend = 'gloo'
         print("backend using {}".format(backend))
         th.distributed.init_process_group(backend=backend,
