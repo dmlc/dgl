@@ -47,8 +47,6 @@ sh get_fb15k-237.sh
 sh get_wn18rr.sh
 ```
 
-to get the data.
-
 Then for FB15k-237, run
 
 ```python
