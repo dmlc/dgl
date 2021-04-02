@@ -14,29 +14,37 @@ pipeline {
             steps {
                 checkout scm
                 script {
-                    def triggerCause = currentBuild.getBuildCauses('org.jenkinsci.plugins.pipeline.github.trigger.IssueCommentCause')
-                    def realtriggerCause = currentBuild.getBuildCauses()
-                    echo("BUILD CAUSE: ${realtriggerCause.toString()}")
+                    def commentTriggerCause = currentBuild.getBuildCauses('org.jenkinsci.plugins.pipeline.github.trigger.IssueCommentCause')
+                    def prOpenTriggerCause = currentBuild.getBuildCauses('jenkins.branch.BranchEventCause')
+                    def realTriggerCause = currentBuild.getBuildCauses()
+                    echo("BUILD CAUSE: ${realTriggerCause.toString()}")
 
-                    if (triggerCause) {
+                    if (commentTriggerCause) {
                         dir('benchmark_scripts_repo') {
                             checkout([$class: 'GitSCM', branches: [[name: '*/master']],
                                 userRemoteConfigs: [[credentialsId: 'github', url: 'https://github.com/dglai/DGL_scripts.git']]])
                         }
                         sh('cp benchmark_scripts_repo/benchmark/* benchmarks/scripts/')
-                        pullRequest.comment('Started the Regression test')
+                        def comment = env.GITHUB_COMMENT
+                        def command_lists = comment.split(' ')
+                        if (command_lists.size() != 5) {
+                            pullRequest.comment('Cannot run the regression test due to unknown command')
+                            error('Unknown command')
+                        } else {
+                            pullRequest.comment('Start the Regression test')
+                        }
                         dir('benchmarks/scripts') {
                             sh('python3 -m pip install boto3')
-                            sh("PYTHONUNBUFFERED=1 GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT} --compare-branch dmlc/master")
+                            sh("PYTHONUNBUFFERED=1 GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT} --run-cmd ${comment}")
                         }
                         pullRequest.comment('Finished the Regression test')
                     } else {
-                        if (env.BUILD_ID == '1') {
-                            pullRequest.comment('To trigger all jobs: @dgl-bot run [instance-type] [which tests] [compare-with-branch]; \n For example: @dgl-bot run g4dn.4xlarge all dmlc/master')
+                        if (prOpenTriggerCause) {
+                            pullRequest.comment('To trigger all jobs: `@dgl-bot run [instance-type] [which tests] [compare-with-branch]`; \n For example: `@dgl-bot run g4dn.4xlarge all dmlc/master`')
                         }
                         echo('Build was not started by a trigger')
                     }
-                // echo("Comment: ${triggerCause.getComment()}")
+                // echo("Comment: ${commentTriggerCause.getComment()}")
                 }
             }
             post {
