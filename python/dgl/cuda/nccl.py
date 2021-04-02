@@ -14,6 +14,8 @@ class UniqueId(object):
         """ Create an object reference the current NCCL unique id.
         """
         if id_str:
+            if isinstance(id_str, bytes):
+                id_str = id_str.decode('utf-8')
             self._handle = _CAPI_DGLNCCLUniqueIdFromString(id_str);
         else:
             self._handle = _CAPI_DGLNCCLGetUniqueId()
@@ -23,6 +25,13 @@ class UniqueId(object):
 
     def __str__(self):
         return _CAPI_DGLNCCLUniqueIdToString(self._handle)
+
+    def __repr__(self):
+        return "UniqueId[{}]".format(str(self))
+
+    def __eq__(self, other):
+        return str(self) == str(other)
+
     
 class Communicator(object):
     def __init__(self, size, rank, unique_id):
@@ -37,8 +46,8 @@ class Communicator(object):
             unique_id : NCCLUniqueId
                 The unique id of the root process (rank=0).
         """
-        self._handle = _CAPI_DGLNCCLCreateComm(size, rank, unique_id.get())
         assert rank < size
+        self._handle = _CAPI_DGLNCCLCreateComm(size, rank, unique_id.get())
         self._rank = rank
         self._size = size
 
