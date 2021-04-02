@@ -31,7 +31,7 @@ pipeline {
                             pullRequest.comment('Cannot run the regression test due to unknown command')
                             error('Unknown command')
                         } else {
-                            pullRequest.comment('Start the Regression test')
+                            pullRequest.comment("Start the Regression test. View at ${RUN_DISPLAY_URL}")
                         }
                         dir('benchmarks/scripts') {
                             sh('python3 -m pip install boto3')
