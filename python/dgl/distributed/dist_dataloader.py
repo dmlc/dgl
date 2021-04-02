@@ -148,6 +148,9 @@ class DistDataLoader:
                 res.get()
 
     def __del__(self):
+        # When the process exits, the process pool may have been closed. We should try
+        # and get the process pool again and see if we need to clean up the process pool.
+        self.pool, self.num_workers = get_sampler_pool()
         if self.pool is not None:
             results = []
             for _ in range(self.num_workers):
