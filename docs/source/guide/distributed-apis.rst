@@ -23,7 +23,7 @@ Typically, the initialization APIs should be invoked in the following order:
 
 .. code:: python
 
-    dgl.distributed.initialize('ip_config.txt', num_workers=4)
+    dgl.distributed.initialize('ip_config.txt')
     th.distributed.init_process_group(backend='gloo')
 
 **Note**: If the training script contains user-defined functions (UDFs) that have to be invoked on
