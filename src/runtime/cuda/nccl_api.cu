@@ -754,6 +754,7 @@ std::pair<IdArray, NDArray> SparsePush(
   int64_t * recv_sum = static_cast<int64_t*>(
       device->AllocWorkspace(ctx, sizeof(int64_t)*(comm_size+1)));
   comm->AllToAll(send_sum, recv_sum, 1, stream);
+  device->FreeWorkspace(ctx, send_sum);
 
   // compute the prefix sum of the recv values
   int64_t * recv_prefix = static_cast<int64_t*>(
@@ -769,6 +770,7 @@ std::pair<IdArray, NDArray> SparsePush(
         recv_sum, recv_prefix, comm_size+1));
     device->FreeWorkspace(ctx, prefix_workspace);
   }
+  device->FreeWorkspace(ctx, recv_sum);
 
   // finally copy the prefixsum sum down to the host
   std::vector<int64_t> recv_prefix_host(comm_size+1);
@@ -855,7 +857,6 @@ NDArray SparsePull(
   // the buffer for us to re-order our requests in
   IdType * send_idx = static_cast<IdType*>(device->AllocWorkspace(ctx,
       num_in*sizeof(IdType)));
-
   IdType * perm = static_cast<IdType*>(
       device->AllocWorkspace(ctx, sizeof(IdType)*num_in));
 
@@ -908,6 +909,7 @@ NDArray SparsePull(
   int64_t * recv_sum = static_cast<int64_t*>(
       device->AllocWorkspace(ctx, sizeof(int64_t)*(comm_size+1)));
   comm->AllToAll(send_sum, recv_sum, 1, stream);
+  device->FreeWorkspace(ctx, send_sum);
 
   // compute the prefix sum of the requested indexes
   int64_t * response_prefix = static_cast<int64_t*>(
@@ -923,6 +925,7 @@ NDArray SparsePull(
         recv_sum, response_prefix, comm_size+1));
     device->FreeWorkspace(ctx, prefix_workspace);
   }
+  device->FreeWorkspace(ctx, recv_sum);
 
   // finally copy the prefixsum sum down to the host
   std::vector<int64_t> response_prefix_host(comm_size+1);
@@ -956,6 +959,7 @@ NDArray SparsePull(
       recv_idx,
       response_prefix_host.data(),
       stream);
+  device->FreeWorkspace(ctx, send_idx);
 
   // convert requested indices to local indices depending on partition 
   {
@@ -982,6 +986,7 @@ NDArray SparsePull(
         response_prefix_host.back(),
         filled_response_value);
   }
+  device->FreeWorkspace(ctx, recv_idx);
 
   // we will collect recieved values in this array
   std::vector<int64_t> value_shape(local_tensor->ndim, 0);
