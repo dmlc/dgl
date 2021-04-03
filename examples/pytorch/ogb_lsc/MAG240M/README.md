@@ -26,7 +26,8 @@ This will give you the following files:
 * `author.npy`: The author features, preprocessed by averaging the neighboring paper features.
 * `inst.npy`: The institution features, preprocessed by averaging the neighboring author features.
 * `graph.dgl`: The *homogenized* DGL graph stored in CSC format, which is friendly for neighbor sampling.
-  Edge types are stored on the edges as an `int8` feature.
+  Edge types are stored on the edges as an `int8` feature.  Nodes are in the order of author, institution,
+  and paper.
 * `full.npy`: The concatenated author, institution, and paper features.
 
 Since that will usually take a long time, we also offer the above files for download:
@@ -40,8 +41,8 @@ In addition, we offer
 
 * [`full_feat.npy`](https://data.dgl.ai/dataset/OGB-LSC/full_feat.npy): The preprocessed full feature matrix
   for running OGB's own baseline. Note that the features are concatenated in the order of paper, author, and
-  institution, unlike the one in our baseline code.
-
+  institution, unlike the one in our baseline code.  It is also preprocessed in float32 arithmetics instead
+  of float16 arithmetics.
 
 ## Running Training Script
 
