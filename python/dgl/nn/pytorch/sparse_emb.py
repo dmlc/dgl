@@ -134,20 +134,20 @@ class NodeEmbedding: # NodeEmbedding
                         self._store.set('nccl_root_id', str(nccl_id))
                     else:
                         nccl_id = nccl.UniqueId(self._store.get('nccl_root_id'))
+                    # needs to be set for nccl to work
+                    th.cuda.set_device(device)
                     _COMM = nccl.Communicator(self._world_size, self._rank,
                         nccl_id)
             self._comm = _COMM
 
             # create local tensors for the weights
             local_size = num_embeddings
-            device = th.device(0)
             if rank >= 0:
                 assert self._rank == self._comm.rank()
                 assert self._world_size == self._comm.size()
 
                 local_size = (num_embeddings // world_size) + \
-                    (rank > (num_embeddings % world_size))
-                device = th.device(rank)
+                    (rank < (num_embeddings % world_size))
             # TODO(dlasalle): support 16-bit/half embeddings
             emb = th.empty([local_size, embedding_dim], dtype=th.float32,
                 requires_grad=False, device=device)
