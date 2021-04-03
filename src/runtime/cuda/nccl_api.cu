@@ -1012,6 +1012,7 @@ NDArray SparsePull(
       filled_request_value,
       request_prefix_host.data(),
       stream);
+  device->FreeWorkspace(ctx, filled_response_value);
 
   // finally, we need to permute the values back into the requested order
   NDArray result = NDArray::Empty(value_shape, local_tensor->dtype, ctx);
