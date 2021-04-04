@@ -57,7 +57,7 @@ python train.py \
 
 We successfully run 8 experiments in parallel on an AWS p4d.24x large instance with the preprocessed feature
 matrices stored on an NVMe SSD to enable fast disk read.  Each experiment requires less than 128GB CPU
-memory and less than 16GB GPU memory to run.  Every epoch takes around 6 minutes 30 seconds to train and
+memory and less than 12GB GPU memory to run.  Every epoch takes around 6 minutes 30 seconds to train and
 1 minutes 40 seconds to validate.
 
 If your hard drive is slow, it is best to load all the features into memory for a reasonable training speed.
