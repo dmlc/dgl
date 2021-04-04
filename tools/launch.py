@@ -145,7 +145,7 @@ def main():
     if args.num_omp_threads is None:
         # Here we assume all machines have the same number of CPU cores as the machine
         # where the launch script runs.
-        args.num_omp_threads = multiprocessing.cpu_count() // 2 // args.num_trainers
+        args.num_omp_threads = max(multiprocessing.cpu_count() // 2 // args.num_trainers, 1)
         print('The number of OMP threads per trainer is set to', args.num_omp_threads)
 
     udf_command = str(udf_command[0])
