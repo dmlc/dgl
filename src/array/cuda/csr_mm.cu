@@ -1,10 +1,11 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/spmm.cu
- * \brief SPMM C APIs and definitions.
+ * \file array/cuda/csr_mm.cu
+ * \brief SpSpMM/SpGEMM C APIs and definitions.
  */
 #include <dgl/array.h>
 #include "./csr_mm.cuh"
+#include <inttypes.h>
 // #include "./ge_spmm.cuh"
 #include "./functor.cuh"
 #include "../../runtime/cuda/cuda_common.h"
@@ -23,10 +24,11 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
     const CSRMatrix& A,
     const DType* A_weights, 
     const CSRMatrix& B,
-    const DType* B_weights) {
-  const int m = A.num_rows;
-  const int n = A.num_cols;
-  const int p = B.num_cols;
+    const DType* B_weights,
+    const DLDataType C_idtype,
+    const DLDataType C_dtype) {
+  // We use Spgemm (SpSpMM) to perform following operation:
+  // C = A x B, where A, B and C are sparse matrices in csr format.
   const int nnzA = A.indices->shape[0];
   const int nnzB = B.indices->shape[0];
   const DType alpha = 1.0;
@@ -54,19 +56,19 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   }
 #if CUDART_VERSION >= 11000
   cusparseSpMatDescr_t matA, matB, matC;
-  IdArray dC_csrOffsets = IdArray::Empty({A.num_rows+1}, A.indptr->dtype, A.indptr->ctx);
+  IdArray dC_csrOffsets = IdArray::Empty({A.num_rows+1}, C_idtype, A.indptr->ctx);
   IdType* dC_csrOffsets_data = dC_csrOffsets.Ptr<IdType>();
   constexpr auto dtype = cuda_dtype<DType>::value;
   constexpr auto idtype = cusparse_idtype<IdType>::value;
   // Create sparse matrix A, B and C in CSR format
   CUSPARSE_CALL(cusparseCreateCsr(&matA,
-      A.num_rows, A.num_cols, A.indices->shape[0],
+      A.num_rows, A.num_cols, nnzA,
       static_cast<IdType*>(A.indptr->data),
       static_cast<IdType*>(A.indices->data),
       const_cast<DType*>(valptrA? valptrA : A_weights), 
       idtype, idtype, CUSPARSE_INDEX_BASE_ZERO, dtype));
   CUSPARSE_CALL(cusparseCreateCsr(&matB,
-      B.num_rows, B.num_cols, B.indices->shape[0],
+      B.num_rows, B.num_cols, nnzB,
       static_cast<IdType*>(B.indptr->data),
       static_cast<IdType*>(B.indices->data),
       const_cast<DType*>(valptrB? valptrB : B_weights), 
@@ -75,7 +77,6 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
       A.num_rows, B.num_cols, 0,
       NULL, NULL, NULL, idtype, idtype,
       CUSPARSE_INDEX_BASE_ZERO, dtype));
-  
   // SpGEMM Computation
   cusparseSpGEMMDescr_t spgemmDesc;
   CUSPARSE_CALL( cusparseSpGEMM_createDescr(&spgemmDesc) )
@@ -100,7 +101,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
       dtype, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &workspace_size2,
       NULL));
   void* workspace2 = device->AllocWorkspace(ctx, workspace_size2);
-  // // compute the intermediate product of A * B
+  // compute the intermediate product of A * B
   CUSPARSE_CALL(cusparseSpGEMM_compute(thr_entry->cusparse_handle,
       transA, transB, &alpha, matA, matB, &beta, matC,
       dtype, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &workspace_size2,
@@ -109,12 +110,10 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   int64_t C_num_rows1, C_num_cols1, C_nnz1;
   CUSPARSE_CALL( cusparseSpMatGetSize(matC, &C_num_rows1, 
     &C_num_cols1, &C_nnz1));
-
-  IdArray dC_columns = IdArray::Empty({C_nnz1}, A.indices->dtype, ctx);
-  NDArray dC_weights = NDArray::Empty({C_nnz1}, A.data->dtype, ctx);
+  IdArray dC_columns = IdArray::Empty({C_nnz1}, C_idtype, A.indptr->ctx);
+  NDArray dC_weights = NDArray::Empty({C_nnz1}, C_dtype, A.indptr->ctx);
   IdType* dC_columns_data = dC_columns.Ptr<IdType>();
   DType* dC_weights_data = dC_weights.Ptr<DType>();
-
   // update matC with the new pointers
   CUSPARSE_CALL(cusparseCsrSetPointers(matC, dC_csrOffsets_data, 
      dC_columns_data, dC_weights_data));
@@ -130,7 +129,6 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   CUSPARSE_CALL( cusparseDestroySpMat(matA));
   CUSPARSE_CALL( cusparseDestroySpMat(matB));
   CUSPARSE_CALL( cusparseDestroySpMat(matC));
-  // CUSPARSE_CALL( cusparseDestroy(thr_entry->cusparse_handle));
 #else
   LOG(FATAL) << "Not tested on CUDA < 11.0";
 #endif
@@ -138,7 +136,6 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
     device->FreeWorkspace(ctx, valptrA);
   if (valptrB)
     device->FreeWorkspace(ctx, valptrB);
-
   return {CSRMatrix(A.num_rows, B.num_cols, dC_csrOffsets, dC_columns), dC_weights};
 }
 }  // namespace cusparse
@@ -146,24 +143,15 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
 /*!
  * \brief Determine whether cusparse SpGEMM function is applicable.
  */
-template <int bits, typename IdType>
+template <typename IdType>
 inline bool cusparse_available() {
-#if CUDART_VERSION < 11000
-  if (std::is_same<IdType, int>::value)
-    if (bits > 16)
-      return true;
-  return false;
-#else
-  if (bits == 16)
-    return false;  // cusparse's SpMM on fp16 is slow, temporally disabled.
+  if (std::is_same<IdType, int64_t>::value)
+    return false; // cusparse's SpGEMM does not allow 64 bits index type.
   return true;
-#endif
 }
 
 /*!
- * \brief CUDA implementation of g-SpMM on Csr format.
- * \note use cusparse if the reduce operator is `sum` and there is
- *       no broadcast, use dgl's kernel in other cases.
+ * \brief CUDA implementation of SpSpMM/SpGEMM on Csr format.
  */
 template <int XPU, typename IdType, typename DType>
 std::pair<CSRMatrix, NDArray> CSRMM(
@@ -171,16 +159,14 @@ std::pair<CSRMatrix, NDArray> CSRMM(
     NDArray A_weights,
     const CSRMatrix& B,
     NDArray B_weights) {
-  const int M = A.num_rows;
-  const int P = B.num_cols;
-  
-  if (cusparse_available<32, IdType>()) {  // cusparse
+  if (cusparse_available<IdType>()) { 
     return cusparse::CusparseSpgemm<DType, IdType>(
-      A_weights->ctx, 
+      A.indptr->ctx, 
       A, static_cast<DType*>(A_weights->data),
-      B, static_cast<DType*>(B_weights->data));
+      B, static_cast<DType*>(B_weights->data),
+      A.indices->dtype, A_weights->dtype);
   } else {  
-    LOG(FATAL) << "cuSPARSE not available";
+    LOG(FATAL) << "cuSPARSE SpGEMM does not support int64_t.";
   }
 }
 
