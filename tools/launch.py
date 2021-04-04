@@ -143,6 +143,8 @@ def main():
     assert args.ip_config is not None, \
             'A user has to specify an IP configuration file with --ip_config.'
     if args.num_omp_threads is None:
+        # Here we assume all machines have the same number of CPU cores as the machine
+        # where the launch script runs.
         args.num_omp_threads = multiprocessing.cpu_count() // 2 // args.num_trainers
         print('The number of OMP threads per trainer is set to', args.num_omp_threads)
 
