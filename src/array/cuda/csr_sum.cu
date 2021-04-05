@@ -114,7 +114,7 @@ cusparseStatus_t cusparseXcsrgeam2<double>(
     csrColIndC, workspace);
 }
 
-/*! Cusparse implementation of SpGEMM on Csr format. */
+/*! Cusparse implementation of SpSum on Csr format. */
 template <typename DType, typename IdType>
 void CusparseCsrgeam2(
     const DLContext& ctx,
@@ -122,16 +122,17 @@ void CusparseCsrgeam2(
     const DType* A_weights, 
     const CSRMatrix& B,
     const DType* B_weights,
-    int& nnzC) {
+    const DLDataType C_idtype,
+    const DLDataType C_dtype) {
   const int m = A.num_rows;
   const int n = A.num_cols;
   const int nnzA = A.indices->shape[0];
   const int nnzB = B.indices->shape[0];
-  int baseC;
+  int baseC, nnzC;
   int *nnzTotalDevHostPtr = &nnzC;
   const DType alpha = 1.0;
   const DType beta = 0.0;
-  // device
+  //device
   auto device = runtime::DeviceAPI::Get(ctx);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   // allocate cusparse handle if needed
@@ -141,91 +142,110 @@ void CusparseCsrgeam2(
   CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
   cusparseMatDescr_t matA, matB, matC;
   // all one data array
-  DType* valptr = nullptr;
-  // if (!A_data) {
-  //   valptr = static_cast<DType*>(device->AllocWorkspace(ctx, nnz * sizeof(DType)));
-  //   _Fill(valptr, nnz, static_cast<DType>(1.));
-  // }
+  DType* valptrA = nullptr;
+  if (!A_weights) {
+    // valptrA = static_cast<DType*>(device->AllocWorkspace(ctx, nnzA * sizeof(DType)));
+    CUDA_CALL( cudaMalloc((void**) &valptrA, (nnzA) * sizeof(DType)) );
+    _Fill(valptrA, nnzA, static_cast<DType>(1.));
+  }
+  DType* valptrB = nullptr;
+  if (!B_weights) {
+     CUDA_CALL( cudaMalloc((void**) &valptrB, (nnzB) * sizeof(DType)) );
+    // valptrB = static_cast<DType*>(device->AllocWorkspace(ctx, nnzB * sizeof(DType)));
+    _Fill(valptrB, nnzB, static_cast<DType>(1.));
+  }
 #if CUDART_VERSION >= 11000
   constexpr auto dtype = cuda_dtype<DType>::value;
   constexpr auto idtype = cusparse_idtype<IdType>::value;
-  // Create sparse matrix A, B and C in CSR format 
   cusparseSetPointerMode(thr_entry->cusparse_handle, 
     CUSPARSE_POINTER_MODE_HOST);
-  size_t workspace_size;
-  IdType* dC_csrOffsets, *dC_columns; 
+  size_t workspace_size = 0;
+  IdType *dC_columns, *dC_csrOffsets; 
   DType *dC_values;
-  dC_csrOffsets = (IdType*)(device->AllocWorkspace(ctx, 
-    (A.num_rows+1) * sizeof(IdType)));
-  /* prepare buffer */
+  // IdArray dC_csrOffsets = IdArray::Empty({A.num_rows+1}, C_idtype, A.indptr->ctx);
+  // IdType* dC_csrOffsets_data = dC_csrOffsets.Ptr<IdType>();
+  // /* prepare buffer */
+  
+  CUDA_CALL( cudaMalloc((void**) &dC_csrOffsets,
+    (m + 1) * sizeof(IdType)) );
   CUSPARSE_CALL(cusparseXcsrgeam2_bufferSizeExt<DType>(
      thr_entry->cusparse_handle, m, n, &alpha,
-     matA, nnzA, static_cast<DType*>(A.data->data), 
+     matA, nnzA, const_cast<DType*>(valptrA? valptrA : A_weights), 
      static_cast<IdType*>(A.indptr->data), 
      static_cast<IdType*>(A.indices->data), 
-     &beta, matB, nnzB, static_cast<DType*>(B.data->data), 
+     &beta, matB, nnzB, const_cast<DType*>(valptrB? valptrB : B_weights), 
      static_cast<IdType*>(B.indptr->data), 
      static_cast<IdType*>(B.indices->data),
      matC, dC_values, dC_csrOffsets, dC_columns,
      &workspace_size));
-  void* workspace = device->AllocWorkspace(ctx, workspace_size);
-  CUSPARSE_CALL(cusparseXcsrgeam2Nnz(thr_entry->cusparse_handle, m, n,     
-     matA, nnzA, static_cast<IdType*>(A.indptr->data), 
-     static_cast<IdType*>(A.indices->data), matB, nnzB,
+  
+  char *workspace = NULL;
+  CUDA_CALL(cudaMalloc((void**) &workspace, sizeof(char) * workspace_size) );
+    // = device->AllocWorkspace(ctx, workspace_size);
+  CUSPARSE_CALL(cusparseXcsrgeam2Nnz(thr_entry->cusparse_handle, 
+     m, n, matA, nnzA, 
+     static_cast<IdType*>(A.indptr->data), 
+     static_cast<IdType*>(A.indices->data), 
+     matB, nnzB,
      static_cast<IdType*>(B.indptr->data), 
-     static_cast<IdType*>(B.indices->data), matC, 
-     static_cast<IdType*>(dC_csrOffsets), 
-     nnzTotalDevHostPtr, workspace)); 
+     static_cast<IdType*>(B.indices->data), 
+     matC, dC_csrOffsets, nnzTotalDevHostPtr, workspace)); 
+  
   if(NULL != nnzTotalDevHostPtr){
       nnzC = *nnzTotalDevHostPtr;
   }else{
-      cudaMemcpy(&nnzC, dC_csrOffsets + m, sizeof(int), cudaMemcpyDeviceToHost);
-      cudaMemcpy(&baseC, dC_csrOffsets, sizeof(int), cudaMemcpyDeviceToHost);
+      cudaMemcpy(&nnzC, dC_csrOffsets + m, sizeof(IdType), cudaMemcpyDeviceToHost);
+      cudaMemcpy(&baseC, dC_csrOffsets, sizeof(IdType), cudaMemcpyDeviceToHost);
       nnzC -= baseC;
   }
-  dC_columns = (IdType*)(device->AllocWorkspace(ctx, nnzC * sizeof(IdType)));
-  dC_values = (DType*)device->AllocWorkspace(ctx, nnzC * sizeof(dtype));
+  // IdArray dC_columns = IdArray::Empty({nnzC}, C_idtype, A.indptr->ctx);
+  // NDArray dC_weights = NDArray::Empty({nnzC}, C_dtype, A.indptr->ctx);
+  // IdType* dC_columns_data = dC_columns.Ptr<IdType>();
+  // DType* dC_weights_data = dC_weights.Ptr<DType>();
+
+  // dC_columns = (IdType*)(device->AllocWorkspace(ctx, nnzC * sizeof(IdType)));
+  // dC_values = (DType*)device->AllocWorkspace(ctx, nnzC * sizeof(dtype));
   // //TODO:: cudamalloc for outcsr inds, vals
-  CUSPARSE_CALL(cusparseXcsrgeam2<DType>(
-     thr_entry->cusparse_handle, m, n, &alpha,
-     matA, nnzA, static_cast<DType*>(A.data->data), 
-     static_cast<IdType*>(A.indptr->data), 
-     static_cast<IdType*>(A.indices->data), 
-     &beta, matB, nnzB, static_cast<DType*>(B.data->data), 
-     static_cast<IdType*>(B.indptr->data), 
-     static_cast<IdType*>(B.indices->data),
-     matC, dC_values, dC_csrOffsets, dC_columns,
-     workspace));
+  // CUSPARSE_CALL(cusparseXcsrgeam2<DType>(
+  //    thr_entry->cusparse_handle, m, n, &alpha,
+  //    matA, nnzA, const_cast<DType*>(valptrA? valptrA : A_weights),  
+  //    static_cast<IdType*>(A.indptr->data), 
+  //    static_cast<IdType*>(A.indices->data), 
+  //    &beta, matB, nnzB, const_cast<DType*>(valptrB? valptrB : B_weights),  
+  //    static_cast<IdType*>(B.indptr->data), 
+  //    static_cast<IdType*>(B.indices->data),
+  //    matC, dC_values, dC_csrOffsets_data, dC_columns,
+  //    workspace));
  
-  device->FreeWorkspace(ctx, workspace);
+  // device->FreeWorkspace(ctx, workspace);
   // destroy matrix/vector descriptors
   CUSPARSE_CALL( cusparseDestroyMatDescr(matA));
   CUSPARSE_CALL( cusparseDestroyMatDescr(matB));
   CUSPARSE_CALL( cusparseDestroyMatDescr(matC));
-  CUSPARSE_CALL( cusparseDestroy(thr_entry->cusparse_handle));
+  cudaFree(workspace);
+  cudaFree(dC_csrOffsets);
+  // cudaFree(dC_columns);
+  // cudaFree(dC_values);
 #else
   LOG(FATAL) << "Not tested on CUDA < 11.2.1";
 #endif
-  if (valptr)
-    device->FreeWorkspace(ctx, valptr);
+    cudaFree(valptrA);
+    cudaFree(valptrB);
+  // if (valptrA)
+  //   device->FreeWorkspace(ctx, valptrA);
+  // if (valptrB)
+  //   device->FreeWorkspace(ctx, valptrB);
 }
 }  // namespace cusparse
 
 /*!
- * \brief Determine whether cusparse SpGEMM function is applicable.
+ * \brief Determine whether cusparse CSRGEAM function is applicable.
  */
-template <int bits, typename IdType>
+template <typename IdType>
 inline bool cusparse_available() {
-#if CUDART_VERSION < 11000
-  if (std::is_same<IdType, int>::value)
-    if (bits > 16)
-      return true;
-  return false;
-#else
-  if (bits == 16)
-    return false;  // cusparse's SpMM on fp16 is slow, temporally disabled.
+  if (std::is_same<IdType, int64_t>::value)
+    return false; // cusparse's SpGEMM does not allow 64 bits index type.
   return true;
-#endif
 }
 
 /*!
@@ -244,22 +264,90 @@ std::pair<CSRMatrix, NDArray> CSRSum(
   const int64_t n = list_A.size();
   int nnz = 0;
   //Make it a for loop
-  CHECK(list_A.size() == 2) << "CuSPASR csrgeam supports 2 matrices at a time.";
+  CHECK(list_A.size() == 2) << "CuSPARSE csrgeam supports 2 matrices at a time.";
   const CSRMatrix& A = list_A[0];
   const NDArray& A_weights = list_A_weights[0];
   const CSRMatrix& B = list_A[1];
   const NDArray& B_weights = list_A_weights[1];
+  
+  //created hard coded matrices for debugging
+  const int A_num_rows = 4;
+  const int A_num_cols = 4;
+  const int A_nnz      = 9;
+  const int B_num_rows = 4;
+  const int B_num_cols = 4;
+  const int B_nnz      = 9;
+  
+  IdType   hA_csrOffsets[] = { 0, 3, 4, 7, 9 };
+  IdType   hA_columns[]    = { 0, 2, 3, 1, 0, 2, 3, 1, 3 };
+  DType hA_values[]     = { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f,
+                            6.0f, 7.0f, 8.0f, 9.0f };
+  IdType   hB_csrOffsets[] = { 0, 2, 4, 7, 8 };
+  IdType   hB_columns[]    = { 0, 3, 1, 3, 0, 1, 2, 1 };
+  DType hB_values[]     = { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f,
+                            6.0f, 7.0f, 8.0f };
+  IdType   hC_csrOffsets[] = { 0, 4, 6, 10, 12 };
+  IdType   hC_columns[]    = { 0, 1, 2, 3, 1, 3, 0, 1, 2, 3, 1, 3 };
+  DType hC_values[]     = { 11.0f, 36.0f, 14.0f, 2.0f,  12.0f,
+                            16.0f, 35.0f, 92.0f, 42.0f, 10.0f,
+                            96.0f, 32.0f };
+
+  IdArray dA_csrOffsets = IdArray::Empty({M + 1}, list_A[0].indptr->dtype, list_A[0].indptr->ctx);
+  IdType* dA_csrOffsets_data = dA_csrOffsets.Ptr<IdType>();
+  IdArray dA_columns = IdArray::Empty({A_nnz}, list_A[0].indices->dtype, list_A[0].indices->ctx);
+  IdType* dA_columns_data = dA_columns.Ptr<IdType>();
+  NDArray dA_values = NDArray::Empty({A_nnz}, list_A_weights[0]->dtype, list_A_weights[0]->ctx);
+  DType* dA_values_data = dA_values.Ptr<DType>(); 
+  
+  IdArray dB_csrOffsets = IdArray::Empty({M + 1}, list_A[1].indptr->dtype, list_A[0].indptr->ctx);
+  IdType* dB_csrOffsets_data = dB_csrOffsets.Ptr<IdType>();
+  IdArray dB_columns = IdArray::Empty({B_nnz}, list_A[0].indices->dtype, list_A[0].indices->ctx);
+  IdType* dB_columns_data = dB_columns.Ptr<IdType>(); 
+  NDArray dB_values = NDArray::Empty({B_nnz}, list_A_weights[0]->dtype, list_A_weights[0]->ctx);
+  DType* dB_values_data = dB_values.Ptr<DType>(); 
+
+  // copy A
+  CUDA_CALL( cudaMemcpy(dA_csrOffsets_data, hA_csrOffsets,
+                         (A_num_rows + 1) * sizeof(IdType),
+                         cudaMemcpyHostToDevice) );
+  CUDA_CALL( cudaMemcpy(dA_columns_data, hA_columns, A_nnz * sizeof(IdType),
+                         cudaMemcpyHostToDevice) );
+  CUDA_CALL( cudaMemcpy(dA_values_data, hA_values,
+                         A_nnz * sizeof(DType), cudaMemcpyHostToDevice) );
+  // copy B
+  CUDA_CALL( cudaMemcpy(dB_csrOffsets_data, hB_csrOffsets,
+                         (B_num_rows + 1) * sizeof(IdType),
+                         cudaMemcpyHostToDevice) );
+  CUDA_CALL( cudaMemcpy(dB_columns_data, hB_columns, B_nnz * sizeof(IdType),
+                         cudaMemcpyHostToDevice) );
+  CUDA_CALL( cudaMemcpy(dB_values_data, hB_values,
+                         B_nnz * sizeof(DType), cudaMemcpyHostToDevice) );
+  
+  CSRMatrix tmpA = CSRMatrix(M, N, dA_csrOffsets, dA_columns);
+  CSRMatrix tmpB = CSRMatrix(M, N, dB_csrOffsets, dB_columns);
 
   IdArray C_indptr = IdArray::Empty({M + 1}, list_A[0].indptr->dtype, list_A[0].indptr->ctx);
   IdType* C_indptr_data = C_indptr.Ptr<IdType>();
-  
-  if (cusparse_available<32, IdType>()) {  // cusparse
-    cusparse::CusparseCsrgeam2<DType, IdType>(
+ 
+  // if (cusparse_available<IdType>()) { // cusparse
+  //   std::cout << "DTPE check " << B.indices->dtype << std::endl;
+  //   cusparse::CusparseCsrgeam2<DType, int32_t>(
+  //     A_weights->ctx, 
+  //     A, static_cast<DType*>(A_weights->data),
+  //     A, static_cast<DType*>(A_weights->data),
+  //     A.indices->dtype, A_weights->dtype);
+  // } else {  
+  //     LOG(FATAL) << "DOBULECHECK!! cuSPARSE SpGEMM does not support int64_t.";
+  // }
+  if (cusparse_available<IdType>()) { // cusparse
+    std::cout << "DTYPE check " << B.indices->dtype << " " <<  A_weights->dtype <<std::endl;
+    cusparse::CusparseCsrgeam2<DType, int32_t>(
       A_weights->ctx, 
-      A, static_cast<DType*>(A_weights->data),
-      B, static_cast<DType*>(B_weights->data),
-      nnz);
+      tmpA, dA_values_data,
+      tmpB, dB_values_data,
+      A.indices->dtype, A_weights->dtype);
   } else {  
+      LOG(FATAL) << "Not supported";
   }
 
   IdArray C_indices = IdArray::Empty({nnz}, list_A[0].indices->dtype, list_A[0].indices->ctx);
@@ -270,12 +358,12 @@ std::pair<CSRMatrix, NDArray> CSRSum(
 
 template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int32_t, float>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
-// template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int64_t, float>(
-    // const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
+template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int64_t, float>(
+    const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
 template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int32_t, double>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
-// template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int64_t, double>(
-    // const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
+template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int64_t, double>(
+    const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
 
 }  // namespace aten
 }  // namespace dgl
