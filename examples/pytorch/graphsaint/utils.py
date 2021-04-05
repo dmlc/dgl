@@ -2,13 +2,10 @@ import json
 import os
 from functools import namedtuple
 import scipy.sparse
-import scipy.sparse as sp
 from sklearn.preprocessing import StandardScaler
 import dgl
 import numpy as np
 import torch
-from dgl.data import PPIDataset
-from dgl.data import load_data as _load_data
 from sklearn.metrics import f1_score
 
 class Logger(object):
@@ -101,4 +98,3 @@ def load_data(args, multitask):
 
     data = DataType(g=g, num_classes=num_classes)
     return data
-
