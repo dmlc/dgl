@@ -60,6 +60,8 @@ class GATConv(nn.Module):
         causing silent performance regression. This module will raise a DGLError if it detects
         0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
         and let the users handle it by themselves. Defaults: ``False``.
+    bias : bool, optional
+        If True, learns a bias term. Defaults: ``True``.
 
     Note
     ----
@@ -302,11 +304,11 @@ class GATConv(nn.Module):
             rst = graph.dstdata['ft']
             # residual
             if self.res_fc is not None:
-                resval = self.res_fc(h_dst).view(h_dst.shape[0], -1, self._out_feats)
+                resval = self.res_fc(h_dst).view(h_dst.shape[0], self._num_heads, self._out_feats)
                 rst = rst + resval
             # bias
             if self.bias is not None:
-                rst = rst + self.bias.view(1, -1, self._out_feats)
+                rst = rst + self.bias.view(1, self._num_heads, self._out_feats)
             # activation
             if self.activation:
                 rst = self.activation(rst)

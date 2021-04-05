@@ -43,7 +43,7 @@ paper_feat = dataset.paper_feat
 author_feat = np.memmap(args.author_output_path, mode='w+', dtype='float16', shape=(dataset.num_authors, dataset.num_paper_features))
 inst_feat = np.memmap(args.inst_output_path, mode='w+', dtype='float16', shape=(dataset.num_institutions, dataset.num_paper_features))
 
-# Iteratively rocess author features along the feature dimension.
+# Iteratively process author features along the feature dimension.
 BLOCK_COLS = 16
 with tqdm.trange(0, dataset.num_paper_features, BLOCK_COLS) as tq:
     for start in tq:

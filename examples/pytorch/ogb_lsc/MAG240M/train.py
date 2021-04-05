@@ -2,18 +2,14 @@
 # coding: utf-8
 
 import ogb
-from ogb.lsc import MAG240MDataset
+from ogb.lsc import MAG240MDataset, MAG240MEvaluator
 import dgl
 import torch
 import numpy as np
 import time
-import psutil
-
-
 import tqdm
 import dgl.function as fn
 import numpy as np
-
 import dgl.nn as dglnn
 import torch.nn as nn
 import torch.nn.functional as F
@@ -157,16 +153,26 @@ def train(args, dataset, g, feats, paper_offset):
 
 def test(args, dataset, g, feats, paper_offset):
     print('Loading masks and labels...')
+    valid_idx = torch.LongTensor(dataset.get_idx_split('valid')) + paper_offset
     test_idx = torch.LongTensor(dataset.get_idx_split('test')) + paper_offset
     label = dataset.paper_label
 
     print('Initializing data loader...')
     sampler = dgl.dataloading.MultiLayerNeighborSampler([160, 160])
+    valid_collator = ExternalNodeCollator(g, valid_idx, sampler, paper_offset, feats, label)
+    valid_dataloader = torch.utils.data.DataLoader(
+        valid_collator.dataset,
+        batch_size=16,
+        shuffle=False,
+        drop_last=False,
+        collate_fn=valid_collator.collate,
+        num_workers=2
+    )
     test_collator = ExternalNodeCollator(g, test_idx, sampler, paper_offset, feats, label)
     test_dataloader = torch.utils.data.DataLoader(
         test_collator.dataset,
-        batch_size=1024,
-        shuffle=True,
+        batch_size=16,
+        shuffle=False,
         drop_last=False,
         collate_fn=test_collator.collate,
         num_workers=4
@@ -178,7 +184,7 @@ def test(args, dataset, g, feats, paper_offset):
 
     model.eval()
     correct = total = 0
-    for i, (input_nodes, output_nodes, mfgs) in enumerate(tqdm.tqdm(test_dataloader)):
+    for i, (input_nodes, output_nodes, mfgs) in enumerate(tqdm.tqdm(valid_dataloader)):
         with torch.no_grad():
             mfgs = [g.to('cuda') for g in mfgs]
             x = mfgs[0].srcdata['x']
@@ -187,7 +193,17 @@ def test(args, dataset, g, feats, paper_offset):
             correct += (y_hat.argmax(1) == y).sum().item()
             total += y_hat.shape[0]
     acc = correct / total
-    print('Test accuracy:', acc)
+    print('Validation accuracy:', acc)
+    evaluator = MAG240MEvaluator()
+    y_preds = []
+    for i, (input_nodes, output_nodes, mfgs) in enumerate(tqdm.tqdm(test_dataloader)):
+        with torch.no_grad():
+            mfgs = [g.to('cuda') for g in mfgs]
+            x = mfgs[0].srcdata['x']
+            y = mfgs[-1].dstdata['y']
+            y_hat = model(mfgs, x)
+            y_preds.append(y_hat.argmax(1).cpu())
+    evaluator.save_test_submission({'y_pred': torch.cat(y_preds)}, args.submission_path)
 
 
 if __name__ == '__main__':
@@ -198,6 +214,7 @@ if __name__ == '__main__':
                         help='Path to the features of all nodes.')
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs.')
     parser.add_argument('--model-path', type=str, default='./model.pt', help='Path to store the best model.')
+    parser.add_argument('--submission-path', type=str, default='./results', help='Submission directory.')
     args = parser.parse_args()
 
     dataset = MAG240MDataset(root=args.rootdir)
@@ -212,5 +229,6 @@ if __name__ == '__main__':
     num_features = dataset.num_paper_features
     feats = np.memmap(args.full_feature_path, mode='r', dtype='float16', shape=(num_nodes, num_features))
 
-    train(args, dataset, g, feats, paper_offset)
+    if args.epochs != 0:
+        train(args, dataset, g, feats, paper_offset)
     test(args, dataset, g, feats, paper_offset)

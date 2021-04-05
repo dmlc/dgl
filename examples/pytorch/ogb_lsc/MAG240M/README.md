@@ -53,6 +53,9 @@ python train.py \
     --full-preprocess-path ./full.npy
 ```
 
+The validation accuracy is 0.701.  We do not have ground truth test labels so we do not report
+test accuracy.
+
 ## Hardware configurations
 
 We successfully run 8 experiments in parallel on an AWS p4d.24x large instance with the preprocessed feature
