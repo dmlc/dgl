@@ -1310,6 +1310,8 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
       LOG(FATAL) << "The graph have restricted sparse format " <<
         CodeToStr(formats_) << ", cannot create CSC matrix.";
   CSRPtr ret = in_csr_;
+  // Prefers converting from COO since it is parallelized.
+  // TODO(BarclayII): need benchmarking.
   if (!in_csr_->defined()) {
     if (coo_->defined()) {
       const auto& newadj = aten::COOToCSR(
@@ -1339,6 +1341,8 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
       LOG(FATAL) << "The graph have restricted sparse format " <<
         CodeToStr(formats_) << ", cannot create CSR matrix.";
   CSRPtr ret = out_csr_;
+  // Prefers converting from COO since it is parallelized.
+  // TODO(BarclayII): need benchmarking.
   if (!out_csr_->defined()) {
     if (coo_->defined()) {
       const auto& newadj = aten::COOToCSR(coo_->adj());
