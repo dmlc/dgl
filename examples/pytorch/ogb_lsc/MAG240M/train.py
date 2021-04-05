@@ -149,8 +149,6 @@ def train(args, dataset, g, feats, paper_offset):
             print('Updating best model...')
             torch.save(model.state_dict(), args.model_path)
 
-        torch.cuda.empty_cache()
-
 def test(args, dataset, g, feats, paper_offset):
     print('Loading masks and labels...')
     valid_idx = torch.LongTensor(dataset.get_idx_split('valid')) + paper_offset
