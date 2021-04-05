@@ -32,14 +32,14 @@ This will give you the following files:
 
 Since that will usually take a long time, we also offer the above files for download:
 
-* [`author.npy`](https://data.dgl.ai/dataset/OGB-LSC/author.npy)
-* [`inst.npy`](https://data.dgl.ai/dataset/OGB-LSC/inst.npy)
-* [`graph.dgl`](https://data.dgl.ai/dataset/OGB-LSC/graph.dgl)
-* [`full.npy`](https://data.dgl.ai/dataset/OGB-LSC/full.npy)
+* [`author.npy`](https://dgl-data.s3accelerate.amazonaws.com/dataset/OGB-LSC/author.npy)
+* [`inst.npy`](https://dgl-data.s3accelerate.amazonaws.com/dataset/OGB-LSC/inst.npy)
+* [`graph.dgl`](https://dgl-data.s3accelerate.amazonaws.com/dataset/OGB-LSC/graph.dgl)
+* [`full.npy`](https://dgl-data.s3accelerate.amazonaws.com/dataset/OGB-LSC/full.npy)
 
 In addition, we offer
 
-* [`full_feat.npy`](https://data.dgl.ai/dataset/OGB-LSC/full_feat.npy): The preprocessed full feature matrix
+* [`full_feat.npy`](https://dgl-data.s3accelerate.amazonaws.com/dataset/OGB-LSC/full_feat.npy): The preprocessed full feature matrix
   for running OGB's own baseline. Note that the features are concatenated in the order of paper, author, and
   institution, unlike the one in our baseline code.  It is also preprocessed in float32 arithmetics instead
   of float16 arithmetics.
