@@ -1,12 +1,10 @@
 import math
 import os
 import time
-
 import torch as th
 import random
 import numpy as np
 import dgl.function as fn
-import torch
 import dgl
 from dgl.sampling import random_walk, pack_traces
 
@@ -14,7 +12,6 @@ from dgl.sampling import random_walk, pack_traces
 class SAINTSampler(object):
     def __init__(self, dn, g, train_nid, node_budget, num_repeat=50):
         """
-
         :param dn: name of dataset
         :param g: full graph
         :param train_nid: ids of training nodes
@@ -96,8 +93,7 @@ class SAINTSampler(object):
         return aggr_norm.numpy(), loss_norm.numpy()
 
     def __compute__degree(self):
-        self.train_g.ndata['D_in'] = 1. / self.train_g.in_degrees().float().sqrt().unsqueeze(1)
-        self.train_g.ndata['D_out'] = 1. / self.train_g.out_degrees().float().sqrt().unsqueeze(1)
+        self.train_g.ndata['D_in'] = 1. / self.train_g.in_degrees().float().clamp(min=1).unsqueeze(1)
 
     def __sample__(self):
         raise NotImplementedError
@@ -133,8 +129,12 @@ class SAINTNodeSampler(SAINTSampler):
 
     def __sample__(self):
         if self.prob is None:
-            degrees = self.train_g.in_degrees().float()
-            self.prob = degrees
+            self.train_g.ndata['D_in'] = 1. / self.train_g.in_degrees().float().clamp(min=1).square()
+            self.train_g.update_all(fn.copy_src('D_in', 'd'),
+                                    fn.sum('d', 'prop'))
+            self.train_g.ndata.pop('D_in')
+            self.prob = self.train_g.ndata.pop('prop')
+
         sampled_nodes = th.multinomial(self.prob, num_samples=self.node_budget, replacement=True).unique()
         self.__counter__(sampled_nodes)
 
@@ -156,8 +156,9 @@ class SAINTEdgeSampler(SAINTSampler):
     def __sample__(self):
         if self.prob is None:
             src, dst = self.train_g.edges()
-            src_degrees, dst_degrees = self.train_g.in_degrees(src).float(), self.train_g.in_degrees(dst).float()
-            self.prob = 1. / src_degrees + 1. /dst_degrees
+            src_degrees, dst_degrees = self.train_g.in_degrees(src).float().clamp(min=1),\
+                                       self.train_g.in_degrees(dst).float().clamp(min=1)
+            self.prob = 1. / src_degrees + 1. / dst_degrees
         sampled_edges = th.multinomial(self.prob, num_samples=self.edge_budget, replacement=True).unique()
         sampled_src, sampled_dst = self.train_g.find_edges(sampled_edges)
         sampled_nodes = th.cat([sampled_src, sampled_dst]).unique()
@@ -181,8 +182,8 @@ class SAINTRandomWalkSampler(SAINTSampler):
         sampled_roots = th.randint(0, self.train_g.num_nodes(), (self.num_roots, )).unique()
         traces, types = random_walk(self.train_g, nodes=sampled_roots, length=self.length)
         sampled_nodes, _, _, _ = pack_traces(traces, types)
-        self.__counter__(sampled_nodes.unique())
+        sampled_nodes = sampled_nodes.unique()
+        self.__counter__(sampled_nodes)
         return sampled_nodes.numpy()
-
 
 

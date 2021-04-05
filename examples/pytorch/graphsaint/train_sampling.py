@@ -1,28 +1,15 @@
 import argparse
 import os
 import time
-import random
-
 import numpy as np
-import networkx as nx
-import sklearn.preprocessing
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-import dgl
-from dgl.data import register_data_args
-
 from sampler import SAINTNodeSampler, SAINTEdgeSampler, SAINTRandomWalkSampler
 from modules import GCNNet
 from utils import Logger, evaluate, save_log_dir, load_data
 
 
 def main(args):
-    # torch.manual_seed(args.rnd_seed)
-    # np.random.seed(args.rnd_seed)
-    # random.seed(args.rnd_seed)
-    # torch.backends.cudnn.deterministic = True
-    # torch.backends.cudnn.benchmark = False
 
     multitask_data = set(['ppi', 'yelp', 'amazon'])
     multitask = args.dataset in multitask_data
@@ -57,7 +44,7 @@ def main(args):
            n_train_samples,
            n_val_samples,
            n_test_samples))
-
+    # load sampler
     if args.sampler == "node":
         subg_iter = SAINTNodeSampler(args.node_budget, args.dataset, g,
                                      train_nid, args.num_repeat)
@@ -85,7 +72,9 @@ def main(args):
         in_dim=in_feats,
         hid_dim=args.n_hidden,
         out_dim=n_classes,
-        n_layers=args.n_layers,
+        arch=args.arch,
+        dropout=args.dropout,
+        batch_norm=args.batch_norm
     )
 
     if cuda:
@@ -159,38 +148,48 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
-    parser.add_argument("--gpu", type=int, default=0,
-                        help="gpu")
-    parser.add_argument("--dataset", type=str, default='flickr')
-    parser.add_argument("--sampler", type=str, default='rw')
-    parser.add_argument("--node_budget", type=int, default=6000,
-                        help="expected number of sampled nodes when using node sampler")
-    parser.add_argument("--edge_budget", type=int, default=4000,
-                        help="expected number of sampled edges when using edge sampler")
-    parser.add_argument("--num_roots", type=int, default=6000,
-                        help="expected number of sampled root nodes when using random walk sampler")
+    # data source params
+    parser.add_argument("--dataset", type=str, choices=['ppi', 'flickr', 'reddit', 'yelp', 'amazon'], default='ppi',
+                        help="Name of dataset.")
+    # cuda params
+    parser.add_argument("--gpu", type=int, default=-1,
+                        help="GPU index. Default: -1, using CPU.")
+    # sampler params
+    parser.add_argument("--sampler", type=str, default="node",
+                        help="Type of sampler")
+    parser.add_argument("--node-budget", type=int, default=6000,
+                        help="Expected number of sampled nodes when using node sampler")
+    parser.add_argument("--edge-budget", type=int, default=4000,
+                        help="Expected number of sampled edges when using edge sampler")
+    parser.add_argument("--num-roots", type=int, default=3000,
+                        help="Expected number of sampled root nodes when using random walk sampler")
     parser.add_argument("--length", type=int, default=2,
-                        help="the length of random walk when using random walk sampler")
-    parser.add_argument("--num_repeat", type=int, default=25,
-                        help="number of repeating sampling one node")
+                        help="The length of random walk when using random walk sampler")
+    parser.add_argument("--num-repeat", type=int, default=50,
+                        help="Number of repeating sampling one node to estimate edge / node probability")
+    # model params
+    parser.add_argument("--n-hidden", type=int, default=512,
+                        help="Number of hidden gcn units")
+    parser.add_argument("--arch", type=str, default="1-0-1-0",
+                        help="Network architecture. 1 means an order 1 layer (self feature plus 1-hop neighbor "
+                             "feature), and 0 means an order 0 layer (self feature only)")
+    parser.add_argument("--dropout", type=float, default=0,
+                        help="Dropout rate")
+    parser.add_argument("--batch-norm", action='store_true',
+                        help="Whether to use batch norm")
+    # training params
+    parser.add_argument("--n-epochs", type=int, default=100,
+                        help="Number of training epochs")
     parser.add_argument("--lr", type=float, default=0.01,
-                        help="learning rate")
-    parser.add_argument("--n-epochs", type=int, default=50,
-                        help="number of training epochs")
-    parser.add_argument("--n-hidden", type=int, default=256,
-                        help="number of hidden gcn units")
-    parser.add_argument("--n-layers", type=int, default=2,
-                        help="number of hidden gcn layers")
-    parser.add_argument("--val-every", type=int, default=1,
-                        help="number of epoch of doing inference on validation")
-    parser.add_argument("--rnd-seed", type=int, default=3,
-                        help="random seed")
-    parser.add_argument("--use-val", action='store_true',
-                        help="whether to use validated best model to test")
+                        help="Learning rate")
     parser.add_argument("--weight-decay", type=float, default=0,
-                        help="Weight for L2 loss")
+                        help="Weight for L2 reg")
+    parser.add_argument("--val-every", type=int, default=1,
+                        help="Number of epoch of doing inference on validation")
+    parser.add_argument("--use-val", action='store_true',
+                        help="Whether to use validated best model to test")
     parser.add_argument("--note", type=str, default='none',
-                        help="note for log dir")
+                        help="Note for log dir")
 
     args = parser.parse_args()
 
