@@ -4,7 +4,7 @@
 
 - dask
 - pandas
-- torchtext
+- torchtext=0.5
 
 ## Prepare datasets
 
