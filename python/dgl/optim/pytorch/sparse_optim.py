@@ -331,19 +331,27 @@ class SparseAdagrad(SparseGradOptimizer):
             assert isinstance(emb, NodeEmbedding), \
                 'SparseAdagrad only supports dgl.nn.NodeEmbedding'
 
-            if self._rank <= 0:
+            if not emb.comm:
+                if self._rank <= 0:
+                    emb_name = emb.name
+                    state = create_shared_mem_array(emb_name+'_state', \
+                        emb.emb_tensor.shape, th.float32).zero_()
+                if self._rank == 0:
+                    if self._world_size > 1:
+                        emb.store.set(emb_name+'_opt', emb_name)
+                elif self._rank > 0:
+                    # receive
+                    emb_name = emb.name
+                    emb.store.wait([emb_name+'_opt'])
+                    state = get_shared_mem_array(emb_name+'_state', \
+                        emb.emb_tensor.shape, th.float32)
+            else:
+                # distributed state on on gpu
                 emb_name = emb.name
-                state = create_shared_mem_array(emb_name+'_state', \
-                    emb.emb_tensor.shape, th.float32).zero_()
-            if self._rank == 0:
-                if self._world_size > 1:
-                    emb.store.set(emb_name+'_opt', emb_name)
-            elif self._rank > 0:
-                # receive
-                emb_name = emb.name
-                emb.store.wait([emb_name+'_opt'])
-                state = get_shared_mem_array(emb_name+'_state', \
-                    emb.emb_tensor.shape, th.float32)
+                state = th.empty(
+                    emb.emb_tensor.shape,
+                    dtype=th.float32,
+                    device=emb.emb_tensor.device).zero_()
             emb.set_optm_state(state)
 
     def update(self, idx, grad, emb):
