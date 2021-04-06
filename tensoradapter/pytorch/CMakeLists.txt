@@ -5,7 +5,7 @@ project(tensoradapter_pytorch C CXX)
 # (or "python" if empty)
 file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/find_cmake.py FIND_CMAKE_PY)
 if(NOT PYTHON_INTERP)
-  set(PYTHON_INTERP python3)
+  set(PYTHON_INTERP python)
 endif()
 message(STATUS "Using Python interpreter: ${PYTHON_INTERP}")
 execute_process(
