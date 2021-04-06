@@ -4,9 +4,14 @@
  * \brief Wrapper around NCCL routines. 
  */
 
+
+#ifndef DGL_RUNTIME_CUDA_NCCL_API_H_
+#define DGL_RUNTIME_CUDA_NCCL_API_H_
+
 #include "nccl.h"
 
 #include <dgl/runtime/object.h>
+#include <string>
 
 namespace dgl {
 namespace runtime {
@@ -124,6 +129,8 @@ class NCCLCommunicator : public runtime::Object {
 
 DGL_DEFINE_OBJECT_REF(NCCLCommunicatorRef, NCCLCommunicator);
 
-}
-}
-}
+}  // namespace cuda
+}  // namespace runtime
+}  // namespace dgl
+
+#endif  // DGL_RUNTIME_CUDA_NCCL_API_H_

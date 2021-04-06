@@ -20,7 +20,7 @@ NDArray IndexSelect(NDArray array, IdArray index) {
   const IdType* idx_data = static_cast<IdType*>(index->data);
   const int64_t arr_len = array->shape[0];
   const int64_t len = index->shape[0];
-  int num_feat = 1;
+  int64_t num_feat = 1;
   std::vector<int64_t> shape{len};
   for (int d = 1; d < array->ndim; ++d) {
     num_feat *= array->shape[d];
@@ -38,8 +38,8 @@ NDArray IndexSelect(NDArray array, IdArray index) {
       CUDA_KERNEL_CALL(IndexSelectSingleKernel, nb, nt, 0, thr_entry->stream,
           array_data, idx_data, len, ret_data);
   } else {
-      dim3 block(256,1);
-      while (block.x >= 2*num_feat) {
+      dim3 block(256, 1);
+      while (static_cast<int64_t>(block.x) >= 2*num_feat) {
           block.x /= 2;
           block.y *= 2;
       }

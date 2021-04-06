@@ -1,24 +1,11 @@
 /*!
  *  Copyright (c) 2021 by Contributors
  * \file nccl_api.cc
- * \brief Implementation of wrapper around NCCL routines. 
+ * \brief Implementation of wrapper around NCCL routines.
  */
 
 
-#ifndef DGL_RUNTIME_CUDA_NCCL_API_H_
-#define DGL_RUNTIME_CUDA_NCCL_API_H_
-
 #include "nccl_api.h"
-#include "cuda_common.h"
-#include "../../kernel/cuda/atomic.cuh"
-#include "../../array/cuda/dgl_cub.cuh"
-#include "../../array/cuda/array_index_select.cuh"
-
-#include <cuda_runtime.h>
-#include <cuda_fp16.h>
-#include <cmath>
-#include <sstream>
-#include <iomanip>
 
 #include <dgl/array.h>
 #include <dgl/aten/array_ops.h>
@@ -26,6 +13,21 @@
 #include <dgl/runtime/device_api.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/registry.h>
+#include <cuda_runtime.h>
+#include <cuda_fp16.h>
+
+#include <cmath>
+#include <sstream>
+#include <iomanip>
+#include <utility>
+#include <vector>
+#include <memory>
+#include <string>
+
+#include "cuda_common.h"
+#include "../../kernel/cuda/atomic.cuh"
+#include "../../array/cuda/dgl_cub.cuh"
+#include "../../array/cuda/array_index_select.cuh"
 
 #define NCCL_CALL(func) \
 { \
@@ -52,19 +54,19 @@ enum class AllToAllMode : int {
 
 template<typename T> ncclDataType_t NCCLType();
 template<> ncclDataType_t NCCLType<int32_t>() {
-    return ncclInt32; 
+    return ncclInt32;
 }
 template<> ncclDataType_t NCCLType<int64_t>() {
-    return ncclInt64; 
+    return ncclInt64;
 }
 template<> ncclDataType_t NCCLType<__half>() {
-    return ncclHalf; 
+    return ncclHalf;
 }
 template<> ncclDataType_t NCCLType<float>() {
-    return ncclFloat32; 
+    return ncclFloat32;
 }
 template<> ncclDataType_t NCCLType<double>() {
-    return ncclFloat64; 
+    return ncclFloat64;
 }
 
 
@@ -72,8 +74,7 @@ template<typename IdType> __global__ void _MapProcByRemainder(
     const IdType * const index,
     const int64_t num_index,
     const int64_t num_proc,
-    IdType * const proc_id)
-{
+    IdType * const proc_id) {
   const int64_t idx = blockDim.x*static_cast<int64_t>(blockIdx.x)+threadIdx.x;
 
   if (idx < num_index) {
@@ -86,8 +87,7 @@ __global__ void _MapProcByMaskRemainder(
     const IdType * const index,
     const int64_t num_index,
     const IdType mask,
-    IdType * const proc_id)
-{
+    IdType * const proc_id) {
   const int64_t idx = blockDim.x*static_cast<int64_t>(blockIdx.x)+threadIdx.x;
 
   if (idx < num_index) {
@@ -103,8 +103,7 @@ __global__ void _DualPermKernel(
     const int64_t num_in,
     const int64_t num_feat,
     IdType * const out_idx,
-    DType * const out_value)
-{
+    DType * const out_value) {
   // set index permutation
   const int64_t tidx = blockDim.x*static_cast<int64_t>(blockIdx.x)+threadIdx.x;
   if (tidx < num_in) {
@@ -136,8 +135,7 @@ __global__ void _CountIndexByRemainder(
     const IdType * const items,
     const int64_t num_items,
     int64_t * const counts,
-    const int num_counts)
-{
+    const int num_counts) {
   constexpr const int VALS_PER_THREAD = TILE_SIZE/BLOCK_SIZE;
 
   typedef cub::BlockHistogram<IdType, BLOCK_SIZE, VALS_PER_THREAD, MAX_BINS> BlockHistogram;
@@ -173,8 +171,7 @@ template<typename IdType>
 __global__ void _ConvertToLocalByRemainder(
     IdType * const items,
     const int64_t num_items,
-    const int comm_size)
-{
+    const int comm_size) {
   const int64_t idx = threadIdx.x+blockDim.x*blockIdx.x;
 
   if (idx < num_items) {
@@ -184,7 +181,7 @@ __global__ void _ConvertToLocalByRemainder(
 
 template <typename DType, typename IdType>
 __global__ void _InversePermKernel(
-        const DType* const array, 
+        const DType* const array,
         const int64_t num_feat,
         int64_t length,
         const IdType* const perm,
@@ -205,25 +202,21 @@ __global__ void _InversePermKernel(
 }
 
 
-
-}
+}  // namespace
 
 /* NCCLUniqueId **************************************************************/
 
 NCCLUniqueId::NCCLUniqueId() :
-  id_()
-{
+  id_() {
   // this ID is unique to the process, not to each call of this function
   NCCL_CALL(ncclGetUniqueId(&id_));
 }
 
-ncclUniqueId NCCLUniqueId::Get() const
-{
+ncclUniqueId NCCLUniqueId::Get() const {
   return id_;
 }
 
-std::string NCCLUniqueId::ToString() const
-{
+std::string NCCLUniqueId::ToString() const {
   std::ostringstream oss;
 
   oss << std::hex;
@@ -241,8 +234,7 @@ std::string NCCLUniqueId::ToString() const
 }
 
 void NCCLUniqueId::FromString(
-    const std::string& str)
-{
+    const std::string& str) {
   // must be exactly 256 hex characters
   CHECK_EQ(str.length(), NCCL_UNIQUE_ID_BYTES * 2) <<
         "Invalid NCCL ID format: '" << str << "'";
@@ -251,180 +243,6 @@ void NCCLUniqueId::FromString(
     id_.internal[b] = std::strtol(str.substr(b*2, 2).c_str(), nullptr, 16);
   }
 }
-
-/* NCCLCommunicator **********************************************************/
-
-NCCLCommunicator::NCCLCommunicator(
-    const int size,
-    const int rank,
-    ncclUniqueId id) :
-  comm_(),
-  size_(size),
-  rank_(rank)
-{
-  CHECK_LT(rank, size);
-  CHECK_GE(rank, 0);
-
-  NCCL_CALL(ncclCommInitRank(&comm_, size_, id, rank_));
-}
-
-NCCLCommunicator::~NCCLCommunicator()
-{
-  ncclCommDestroy(comm_);
-}
-
-ncclComm_t NCCLCommunicator::Get()
-{
-  return comm_;
-}
-
-template<typename DType>
-void NCCLCommunicator::AllToAllV(
-    const DType * const send,
-    const int64_t * const send_prefix,
-    DType * const recv,
-    const int64_t * const recv_prefix,
-    cudaStream_t stream)
-{ 
-  const ncclDataType_t type = NCCLType<DType>();
-
-  NCCL_CALL(ncclGroupStart());
-  for (int r = 0; r < size_; ++r) {
-    const int64_t send_size = send_prefix[r+1]-send_prefix[r];
-    if (send_size > 0) {
-      NCCL_CALL(ncclSend(send+send_prefix[r], send_size, type, r, comm_, stream));
-    }
-    const int64_t recv_size = recv_prefix[r+1]-recv_prefix[r];
-    if (recv_size > 0) {
-      NCCL_CALL(ncclRecv(recv+recv_prefix[r], recv_size, type, r, comm_, stream));
-    }
-  }
-  NCCL_CALL(ncclGroupEnd());
-}
-
-template
-void NCCLCommunicator::AllToAllV<int32_t>(
-    const int32_t * const send,
-    const int64_t * send_prefix,
-    int32_t * const recv,
-    const int64_t * recv_prefix,
-    cudaStream_t stream);
-template
-void NCCLCommunicator::AllToAllV<int64_t>(
-    const int64_t * const send,
-    const int64_t * send_prefix,
-    int64_t * const recv,
-    const int64_t * recv_prefix,
-    cudaStream_t stream);
-template
-void NCCLCommunicator::AllToAllV<float>(
-    const float * const send,
-    const int64_t * send_prefix,
-    float * const recv,
-    const int64_t * recv_prefix,
-    cudaStream_t stream);
-template
-void NCCLCommunicator::AllToAllV<__half>(
-    const __half * const send,
-    const int64_t * send_prefix,
-    __half * const recv,
-    const int64_t * recv_prefix,
-    cudaStream_t stream);
-
-
-
-
-
-template<typename IdType>
-void NCCLCommunicator::AllToAll(
-    const IdType * const send,
-    IdType * const recv,
-    const int64_t count,
-    cudaStream_t stream)
-{
-  const ncclDataType_t type = NCCLType<IdType>();
-
-  ncclGroupStart();
-  for (int r = 0; r < size_; ++r) {
-    ncclSend(send+(r*count), count, type, r, comm_, stream);
-    ncclRecv(recv+(r*count), count, type, r, comm_, stream);
-  }
-  ncclGroupEnd();
-}
-
-template
-void NCCLCommunicator::AllToAll<int32_t>(
-    const int32_t * const send,
-    int32_t * const recv,
-    const int64_t count,
-    cudaStream_t stream);
-template
-void NCCLCommunicator::AllToAll<int64_t>(
-    const int64_t * const send,
-    int64_t * const recv,
-    const int64_t count,
-    cudaStream_t stream);
-
-
-template<typename IdType, typename DType>
-void NCCLCommunicator::SparseAllToAll(
-      const IdType * const send_idx,
-      const DType * const send_value,
-      const int64_t num_feat,
-      const int64_t * const send_prefix,
-      IdType * const recv_idx,
-      DType * const recv_value,
-      const int64_t * const recv_prefix,
-      cudaStream_t stream)
-{
-  const ncclDataType_t idx_type = NCCLType<IdType>();
-  const ncclDataType_t value_type = NCCLType<DType>();
-
-  ncclGroupStart();
-  for (int r = 0; r < size_; ++r) {
-    const int64_t send_size = send_prefix[r+1]-send_prefix[r];
-    if (send_size > 0) {
-      ncclSend(send_idx+send_prefix[r], send_size, idx_type, r, comm_, stream);
-      ncclSend(send_value+send_prefix[r]*num_feat, send_size*num_feat, value_type, r, comm_, stream);
-    }
-    const int64_t recv_size = recv_prefix[r+1]-recv_prefix[r];
-    if (recv_size > 0) {
-      ncclRecv(recv_idx+recv_prefix[r], recv_size, idx_type, r, comm_, stream);
-      ncclRecv(recv_value+recv_prefix[r]*num_feat, recv_size*num_feat, value_type, r, comm_, stream);
-    }
-  }
-  ncclGroupEnd();
-}
-
-template
-void NCCLCommunicator::SparseAllToAll<int32_t, __half>(
-      const int32_t * const send_idx,
-      const __half * const send_value,
-      const int64_t num_feat,
-      const int64_t * const send_prefix,
-      int32_t * const recv_idx,
-      __half * const recv_value,
-      const int64_t * const recv_prefix,
-      cudaStream_t stream);
-template
-void NCCLCommunicator::SparseAllToAll<int64_t, __half>(
-      const int64_t * const send_idx,
-      const __half * const send_value,
-      const int64_t num_feat,
-      const int64_t * const send_prefix,
-      int64_t * const recv_idx,
-      __half * const recv_value,
-      const int64_t * const recv_prefix,
-      cudaStream_t stream);
-
-int NCCLCommunicator::size() const {
-  return size_;
-}
-
-int NCCLCommunicator::rank() const {
-  return rank_;
-}
-
 
 template<typename IdType>
 void GenerateSparseBufferFromRemainder(
@@ -436,8 +254,7 @@ void GenerateSparseBufferFromRemainder(
     IdType * const out_idx,
     IdType * const out_perm,
     int64_t * const out_counts,
-    cudaStream_t stream)
-{
+    cudaStream_t stream) {
   const int64_t comm_bits =
       static_cast<int64_t>(std::ceil(std::log2(comm_size)));
 
@@ -473,7 +290,7 @@ void GenerateSparseBufferFromRemainder(
       _MapProcByMaskRemainder<<<grid, block, 0, stream>>>(
           in_idx,
           num_in,
-          static_cast<IdType>(comm_size-1), // bit mask
+          static_cast<IdType>(comm_size-1),  // bit mask
           proc_id_in);
       CUDA_CALL(cudaGetLastError());
     }
@@ -514,7 +331,7 @@ void GenerateSparseBufferFromRemainder(
     CUDA_CALL(cudaGetLastError());
   }
 
-  // Count the number of values to be sent to each processor 
+  // Count the number of values to be sent to each processor
   {
     constexpr const int BLOCK_SIZE = 256;
     constexpr const int TILE_SIZE = 1024;
@@ -555,8 +372,7 @@ void GenerateSparseBuffersFromRemainder(
     IdType * const out_idx,
     DType * const out_value,
     int64_t * const out_counts,
-    cudaStream_t stream)
-{
+    cudaStream_t stream) {
   const int64_t comm_bits =
       static_cast<int64_t>(std::ceil(std::log2(comm_size)));
 
@@ -592,7 +408,7 @@ void GenerateSparseBuffersFromRemainder(
       _MapProcByMaskRemainder<<<grid, block, 0, stream>>>(
           in_idx,
           num_in,
-          static_cast<IdType>(comm_size-1), // bit mask
+          static_cast<IdType>(comm_size-1),  // bit mask
           proc_id_in);
       CUDA_CALL(cudaGetLastError());
     }
@@ -603,7 +419,7 @@ void GenerateSparseBuffersFromRemainder(
   IdType * proc_id_out = static_cast<IdType*>(
       device->AllocWorkspace(ctx, sizeof(IdType)*num_in));
   IdType * perm_out = static_cast<IdType*>(device->AllocWorkspace(ctx,
-          sizeof(IdType)*num_in)); 
+          sizeof(IdType)*num_in));
   {
     IdArray perm_in = aten::Range(0, num_in, sizeof(IdType)*8, ctx);
 
@@ -641,7 +457,7 @@ void GenerateSparseBuffersFromRemainder(
   }
   device->FreeWorkspace(ctx, perm_out);
 
-  // Count the number of values to be sent to each processor 
+  // Count the number of values to be sent to each processor
   {
     constexpr const int BLOCK_SIZE = 256;
     constexpr const int TILE_SIZE = 1024;
@@ -860,7 +676,7 @@ NDArray SparsePull(
   IdType * perm = static_cast<IdType*>(
       device->AllocWorkspace(ctx, sizeof(IdType)*num_in));
 
-  // the number of indexes we need to send to each processor 
+  // the number of indexes we need to send to each processor
   int64_t * send_sum = static_cast<int64_t*>(device->AllocWorkspace(ctx,
       (comm_size+1)*sizeof(int64_t)));
 
@@ -961,11 +777,11 @@ NDArray SparsePull(
       stream);
   device->FreeWorkspace(ctx, send_idx);
 
-  // convert requested indices to local indices depending on partition 
+  // convert requested indices to local indices depending on partition
   {
     const dim3 block(128);
     const dim3 grid((response_prefix_host.back()+block.x-1)/block.x);
-    _ConvertToLocalByRemainder<<<grid,block,0,stream>>>(
+    _ConvertToLocalByRemainder<<<grid, block, 0, stream>>>(
         recv_idx, response_prefix_host.back(), comm_size);
   }
 
@@ -973,7 +789,7 @@ NDArray SparsePull(
   DType * filled_response_value = static_cast<DType*>(device->AllocWorkspace(ctx,
       response_prefix_host.back()*num_feat*sizeof(DType)));
   {
-    dim3 block(256,1);
+    dim3 block(256, 1);
     while (block.x >= 2*num_feat) {
         block.x /= 2;
         block.y *= 2;
@@ -1005,7 +821,7 @@ NDArray SparsePull(
     v *= num_feat;
   }
 
-  // send the values 
+  // send the values
   comm->AllToAllV(
       filled_response_value,
       response_prefix_host.data(),
@@ -1017,7 +833,7 @@ NDArray SparsePull(
   // finally, we need to permute the values back into the requested order
   NDArray result = NDArray::Empty(value_shape, local_tensor->dtype, ctx);
   {
-    dim3 block(256,1);
+    dim3 block(256, 1);
     while (block.x >= 2*num_feat) {
         block.x /= 2;
         block.y *= 2;
@@ -1036,6 +852,178 @@ NDArray SparsePull(
 
   return result;
 }
+
+
+
+/* NCCLCommunicator **********************************************************/
+
+NCCLCommunicator::NCCLCommunicator(
+    const int size,
+    const int rank,
+    ncclUniqueId id) :
+  comm_(),
+  size_(size),
+  rank_(rank) {
+  CHECK_LT(rank, size);
+  CHECK_GE(rank, 0);
+
+  NCCL_CALL(ncclCommInitRank(&comm_, size_, id, rank_));
+}
+
+NCCLCommunicator::~NCCLCommunicator() {
+  ncclCommDestroy(comm_);
+}
+
+ncclComm_t NCCLCommunicator::Get() {
+  return comm_;
+}
+
+template<typename DType>
+void NCCLCommunicator::AllToAllV(
+    const DType * const send,
+    const int64_t * const send_prefix,
+    DType * const recv,
+    const int64_t * const recv_prefix,
+    cudaStream_t stream) {
+  const ncclDataType_t type = NCCLType<DType>();
+
+  NCCL_CALL(ncclGroupStart());
+  for (int r = 0; r < size_; ++r) {
+    const int64_t send_size = send_prefix[r+1]-send_prefix[r];
+    if (send_size > 0) {
+      NCCL_CALL(ncclSend(send+send_prefix[r], send_size, type, r, comm_, stream));
+    }
+    const int64_t recv_size = recv_prefix[r+1]-recv_prefix[r];
+    if (recv_size > 0) {
+      NCCL_CALL(ncclRecv(recv+recv_prefix[r], recv_size, type, r, comm_, stream));
+    }
+  }
+  NCCL_CALL(ncclGroupEnd());
+}
+
+template
+void NCCLCommunicator::AllToAllV<int32_t>(
+    const int32_t * const send,
+    const int64_t * send_prefix,
+    int32_t * const recv,
+    const int64_t * recv_prefix,
+    cudaStream_t stream);
+template
+void NCCLCommunicator::AllToAllV<int64_t>(
+    const int64_t * const send,
+    const int64_t * send_prefix,
+    int64_t * const recv,
+    const int64_t * recv_prefix,
+    cudaStream_t stream);
+template
+void NCCLCommunicator::AllToAllV<float>(
+    const float * const send,
+    const int64_t * send_prefix,
+    float * const recv,
+    const int64_t * recv_prefix,
+    cudaStream_t stream);
+template
+void NCCLCommunicator::AllToAllV<__half>(
+    const __half * const send,
+    const int64_t * send_prefix,
+    __half * const recv,
+    const int64_t * recv_prefix,
+    cudaStream_t stream);
+
+
+
+
+
+template<typename IdType>
+void NCCLCommunicator::AllToAll(
+    const IdType * const send,
+    IdType * const recv,
+    const int64_t count,
+    cudaStream_t stream) {
+  const ncclDataType_t type = NCCLType<IdType>();
+
+  ncclGroupStart();
+  for (int r = 0; r < size_; ++r) {
+    ncclSend(send+(r*count), count, type, r, comm_, stream);
+    ncclRecv(recv+(r*count), count, type, r, comm_, stream);
+  }
+  ncclGroupEnd();
+}
+
+template
+void NCCLCommunicator::AllToAll<int32_t>(
+    const int32_t * const send,
+    int32_t * const recv,
+    const int64_t count,
+    cudaStream_t stream);
+template
+void NCCLCommunicator::AllToAll<int64_t>(
+    const int64_t * const send,
+    int64_t * const recv,
+    const int64_t count,
+    cudaStream_t stream);
+
+
+template<typename IdType, typename DType>
+void NCCLCommunicator::SparseAllToAll(
+      const IdType * const send_idx,
+      const DType * const send_value,
+      const int64_t num_feat,
+      const int64_t * const send_prefix,
+      IdType * const recv_idx,
+      DType * const recv_value,
+      const int64_t * const recv_prefix,
+      cudaStream_t stream) {
+  const ncclDataType_t idx_type = NCCLType<IdType>();
+  const ncclDataType_t value_type = NCCLType<DType>();
+
+  ncclGroupStart();
+  for (int r = 0; r < size_; ++r) {
+    const int64_t send_size = send_prefix[r+1]-send_prefix[r];
+    if (send_size > 0) {
+      ncclSend(send_idx+send_prefix[r], send_size, idx_type, r, comm_, stream);
+      ncclSend(send_value+send_prefix[r]*num_feat, send_size*num_feat,
+               value_type, r, comm_, stream);
+    }
+    const int64_t recv_size = recv_prefix[r+1]-recv_prefix[r];
+    if (recv_size > 0) {
+      ncclRecv(recv_idx+recv_prefix[r], recv_size, idx_type, r, comm_, stream);
+      ncclRecv(recv_value+recv_prefix[r]*num_feat, recv_size*num_feat,
+               value_type, r, comm_, stream);
+    }
+  }
+  ncclGroupEnd();
+}
+
+template
+void NCCLCommunicator::SparseAllToAll<int32_t, __half>(
+      const int32_t * const send_idx,
+      const __half * const send_value,
+      const int64_t num_feat,
+      const int64_t * const send_prefix,
+      int32_t * const recv_idx,
+      __half * const recv_value,
+      const int64_t * const recv_prefix,
+      cudaStream_t stream);
+template
+void NCCLCommunicator::SparseAllToAll<int64_t, __half>(
+      const int64_t * const send_idx,
+      const __half * const send_value,
+      const int64_t num_feat,
+      const int64_t * const send_prefix,
+      int64_t * const recv_idx,
+      __half * const recv_value,
+      const int64_t * const recv_prefix,
+      cudaStream_t stream);
+
+int NCCLCommunicator::size() const {
+  return size_;
+}
+
+int NCCLCommunicator::rank() const {
+  return rank_;
+}
+
 
 /* CAPI **********************************************************************/
 
@@ -1106,9 +1094,9 @@ DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLSparseAllToAllPull")
 });
 
 
+}  // namespace cuda
+}  // namespace runtime
+}  // namespace dgl
 
-}
-}
-}
 
-#endif
+
