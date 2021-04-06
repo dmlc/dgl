@@ -27,7 +27,7 @@ pipeline {
                         sh('cp benchmark_scripts_repo/benchmark/* benchmarks/scripts/')
                         def comment = env.GITHUB_COMMENT
                         def command_lists = comment.split(' ')
-                        def instance_type = command_lists[2].replace("\.", "")
+                        def instance_type = command_lists[2].replace('.', "")
                         if (command_lists.size() != 5) {
                             pullRequest.comment('Cannot run the regression test due to unknown command')
                             error('Unknown command')
