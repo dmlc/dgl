@@ -26,7 +26,7 @@ class SparseGradOptimizer(abc.ABC):
         self._shared_cache = {}
         self._clean_grad = False
         self._opt_meta = {}
-        self._comm = None 
+        self._comm = None
         # hold released shared memory to let other process to munmap it first
         # otherwise it will crash the training
         self.shmem_buffer_holder = []
@@ -52,7 +52,7 @@ class SparseGradOptimizer(abc.ABC):
                 if self._comm is None:
                     self._comm = emb.comm
                 else:
-                    assert not emb.comm is None 
+                    assert not emb.comm is None
             else:
                 # shared memory
                 if self._rank == 0: # the master gpu process
@@ -113,8 +113,8 @@ class SparseGradOptimizer(abc.ABC):
 
             for emb in self._params:
                 emb_name = emb.name
-                idx = idx_in[emb_name] 
-                grad = grad_in[emb_name] 
+                idx = idx_in[emb_name]
+                grad = grad_in[emb_name]
                 self.update(idx, grad, emb)
 
 
@@ -463,12 +463,18 @@ class SparseAdam(SparseGradOptimizer):
             else:
                 # distributed state on on gpu
                 emb_name = emb.name
-                state_step = th.empty([emb.emb_tensor.shape[0]],
-                    dtype=th.float32, device=emb.emb_tensor.device).zero_()
-                state_mem = th.empty(emb.emb_tensor.shape,
-                    dtype=th.float32, device=emb.emb_tensor.device).zero_()
-                state_power = th.empty(emb.emb_tensor.shape,
-                    dtype=th.float32, device=emb.emb_tensor.device).zero_()
+                state_step = th.empty(
+                    [emb.emb_tensor.shape[0]],
+                    dtype=th.float32,
+                    device=emb.emb_tensor.device).zero_()
+                state_mem = th.empty(
+                    emb.emb_tensor.shape,
+                    dtype=th.float32,
+                    device=emb.emb_tensor.device).zero_()
+                state_power = th.empty(
+                    emb.emb_tensor.shape,
+                    dtype=th.float32,
+                    device=emb.emb_tensor.device).zero_()
 
             state = (state_step, state_mem, state_power)
             emb.set_optm_state(state)

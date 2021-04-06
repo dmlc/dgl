@@ -83,6 +83,7 @@ class NodeEmbedding: # NodeEmbedding
         self._world_size = world_size
         self._store = None
         self._comm = None
+        self._partition = None
 
         host_name = '127.0.0.1'
         port = 12346
@@ -117,7 +118,7 @@ class NodeEmbedding: # NodeEmbedding
             self._tensor = emb
         else:
             if partition:
-                assert self._partition=='remainder', \
+                assert self._partition == 'remainder', \
                         "Only 'remainder' partition scheme is currently supported."
             else:
                 partition = 'remainder'
@@ -137,7 +138,7 @@ class NodeEmbedding: # NodeEmbedding
                     # needs to be set for nccl to work
                     th.cuda.set_device(device)
                     _COMM = nccl.Communicator(self._world_size, self._rank,
-                        nccl_id)
+                                              nccl_id)
             self._comm = _COMM
 
             # create local tensors for the weights
@@ -150,7 +151,7 @@ class NodeEmbedding: # NodeEmbedding
                     (rank < (num_embeddings % world_size))
             # TODO(dlasalle): support 16-bit/half embeddings
             emb = th.empty([local_size, embedding_dim], dtype=th.float32,
-                requires_grad=False, device=device)
+                           requires_grad=False, device=device)
             if init_func:
                 emb = init_func(emb)
             self._tensor = emb
@@ -180,7 +181,7 @@ class NodeEmbedding: # NodeEmbedding
         if F.is_recording():
             emb = F.attach_grad(emb)
             self._trace.append((node_ids.to(device, non_blocking=True), emb))
-            
+
         return emb
 
     @property
@@ -214,7 +215,7 @@ class NodeEmbedding: # NodeEmbedding
 
         Returns
         -------
-        String 
+        String
             The mode.
         """
 
