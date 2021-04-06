@@ -44,12 +44,8 @@ __global__ void IndexSelectMultiKernel(
   }
 }
 
-}
-}
-}
-
-
+}  // namespace impl
+}  // namespace aten
+}  // namespace dgl
 
 #endif
-
-

@@ -195,6 +195,7 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
 
     return eval_logits, eval_seeds
 
+@thread_wrapped_func
 def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
     dev_id = devices[proc_id] if devices[proc_id] != 'cpu' else -1
     g, node_feats, num_of_ntype, num_classes, num_rels, target_idx, \
@@ -244,7 +245,6 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
                                           init_method=dist_init_method,
                                           world_size=world_size,
                                           rank=proc_id)
-
 
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
@@ -309,8 +309,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
             dgl_emb = embed_layer.module.dgl_emb
         else:
             dgl_emb = embed_layer.dgl_emb
-        emb_optimizer = dgl.optim.SparseAdam(
-                params=dgl_emb, lr=args.sparse_lr, eps=1e-8) if len(dgl_emb) > 0 else None
+        emb_optimizer = dgl.optim.SparseAdam(params=dgl_emb, lr=args.sparse_lr, eps=1e-8) if len(dgl_emb) > 0 else None
     else:
         if n_gpus > 1:
             embs = list(embed_layer.module.node_embeds.parameters())
@@ -328,8 +327,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
     test_time = 0
     last_val_acc = 0.0
     do_test = False
-    #if n_gpus > 1 and n_cpus - args.num_workers > 0:
-    #    th.set_num_threads(n_cpus-args.num_workers)
+    if n_gpus > 1 and n_cpus - args.num_workers > 0:
+        th.set_num_threads(n_cpus-args.num_workers)
     for epoch in range(args.n_epochs):
         tstart = time.time()
         model.train()
@@ -358,9 +357,9 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
             forward_time.append(t1 - t0)
             backward_time.append(t2 - t1)
             train_acc = th.sum(logits.argmax(dim=1) == labels[seeds]).item() / len(seeds)
-            if proc_id == 0 and i % 20 == 0:
-                print("Train Accuracy: {:.4f} | {:04d} | Train Loss: {:.4f} | {:.4f}s".
-                    format(train_acc, i, loss.item(), t2-t0))
+            if i % 100 == 0 and proc_id == 0:
+                print("Train Accuracy: {:.4f} | Train Loss: {:.4f}".
+                    format(train_acc, loss.item()))
         gc.collect()
         print("Epoch {:05d}:{:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".
             format(epoch, args.n_epochs, forward_time[-1], backward_time[-1]))
@@ -434,6 +433,9 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
                                                   np.mean(forward_time[len(forward_time) // 4:])))
     print("{}/{} Mean backward time: {:4f}".format(proc_id, n_gpus,
                                                    np.mean(backward_time[len(backward_time) // 4:])))
+    if proc_id == 0:
+        print("Final Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss))
+        print("Train {}s, valid {}s, test {}s".format(train_time, validation_time, test_time))
 
 def main(args, devices):
     # load graph data
@@ -534,14 +536,11 @@ def main(args, devices):
     train_idx.share_memory_()
     val_idx.share_memory_()
     test_idx.share_memory_()
-
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
     g.create_formats_()
 
     n_gpus = len(devices)
-    #mp.set_start_method('spawn')
-
     n_cpus = mp.cpu_count()
     # cpu
     if devices[0] == -1 and n_gpus == 1:
@@ -644,6 +643,5 @@ def config():
 if __name__ == '__main__':
     args = config()
     devices = list(map(int, args.gpu.split(',')))
-    print("devices = {}".format(devices))
     print(args)
     main(args, devices)

@@ -3,8 +3,6 @@ import torch.nn as nn
 
 import dgl
 
-from torch.cuda import nvtx
-
 class BaseRGCN(nn.Module):
     def __init__(self, num_nodes, h_dim, out_dim, num_rels, num_bases,
                  num_hidden_layers=1, dropout=0,
@@ -157,12 +155,10 @@ class RelGraphEmbedLayer(nn.Module):
             loc = locs[ntype]
             if isinstance(features[ntype], int):
                 if self.dgl_sparse:
-                    nvtx.range_push("dgl_sparse_embedding")
                     embeds[loc] = self.node_embeds[str(ntype)](type_ids[loc], self.out_dev_id)
-                    nvtx.range_pop()
                 else:
                     embeds[loc] = self.node_embeds[str(ntype)](type_ids[loc]).to(self.out_dev_id)
             else:
-                embeds[loc] = features[ntype][type_ids[loc]].to(self.dev_id) @ self.embeds[str(ntype)].to(self.out_dev_id)
+                embeds[loc] = features[ntype][type_ids[loc]].to(self.out_dev_id) @ self.embeds[str(ntype)].to(self.out_dev_id)
 
         return embeds
