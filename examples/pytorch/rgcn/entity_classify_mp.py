@@ -18,7 +18,6 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 import dgl
 from dgl import DGLGraph
-from dgl.cuda import nccl
 from functools import partial
 
 from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
@@ -26,8 +25,6 @@ from model import RelGraphEmbedLayer
 from dgl.nn import RelGraphConv
 from utils import thread_wrapped_func
 import tqdm
-
-from torch.cuda import nvtx
 
 from ogb.nodeproppred import DglNodePropPredDataset
 
@@ -198,7 +195,7 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
 
     return eval_logits, eval_seeds
 
-def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=None):
+def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
     dev_id = devices[proc_id] if devices[proc_id] != 'cpu' else -1
     g, node_feats, num_of_ntype, num_classes, num_rels, target_idx, \
         train_idx, val_idx, test_idx, labels = dataset
@@ -240,7 +237,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
         backend = 'nccl'
 
         # using sparse embedding or usig mix_cpu_gpu model (embedding model can not be stored in GPU)
-        if dev_id < 0 or args.embedding_gpu is False:
+        if dev_id < 0 or args.dgl_sparse is False:
             backend = 'gloo'
         print("backend using {}".format(backend))
         th.distributed.init_process_group(backend=backend,
@@ -341,12 +338,10 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
         for i, sample_data in enumerate(loader):
             seeds, blocks = sample_data
             t0 = time.time()
-            nvtx.range_push("emb_layer")
             feats = embed_layer(blocks[0].srcdata[dgl.NID],
                                 blocks[0].srcdata['ntype'],
                                 blocks[0].srcdata['type_id'],
                                 node_feats)
-            nvtx.range_pop()
             logits = model(blocks, feats)
             loss = F.cross_entropy(logits, labels[seeds])
             t1 = time.time()
@@ -355,10 +350,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, nccl_id, dataset, split, queue=N
                 emb_optimizer.zero_grad()
 
             loss.backward()
-            nvtx.range_push("emb_optimizer")
             if emb_optimizer is not None:
                 emb_optimizer.step()
-            nvtx.range_pop()
             optimizer.step()
             t2 = time.time()
 
@@ -542,9 +535,6 @@ def main(args, devices):
     val_idx.share_memory_()
     test_idx.share_memory_()
 
-    # get nccl unique id before spawning processes
-    nccl_id = nccl.UniqueId()
-
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
     g.create_formats_()
@@ -555,12 +545,12 @@ def main(args, devices):
     n_cpus = mp.cpu_count()
     # cpu
     if devices[0] == -1 and n_gpus == 1:
-        run(0, 0, n_cpus, args, ['cpu'], nccl_id,
+        run(0, 0, n_cpus, args, ['cpu'],
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
              train_idx, val_idx, test_idx, labels), None, None)
     # gpu
     elif n_gpus == 1:
-        run(0, n_gpus, n_cpus, args, devices, nccl_id,
+        run(0, n_gpus, n_cpus, args, devices,
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
             train_idx, val_idx, test_idx, labels), None, None)
     # multi gpu
@@ -591,7 +581,7 @@ def main(args, devices):
                                          (proc_id + 1) * tstseeds_per_proc \
                                          if (proc_id + 1) * tstseeds_per_proc < num_test_seeds \
                                          else num_test_seeds]
-            p = mp.Process(target=run, args=(proc_id, n_gpus, n_cpus // n_gpus, args, devices, nccl_id,
+            p = mp.Process(target=run, args=(proc_id, n_gpus, n_cpus // n_gpus, args, devices,
                                              (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
                                              train_idx, val_idx, test_idx, labels),
                                              (proc_train_seeds, proc_valid_seeds, proc_test_seeds),
