@@ -119,7 +119,7 @@ if __name__ == "__main__":
     # model params
     parser.add_argument("--hid-dim", type=int, default=32, help='Hidden layer dimensionalities.')
     parser.add_argument("--num-layers", type=int, default=5, help='Number of GCN layers.')
-    parser.add_argument("--mode", type=str, default='cat', help="Type of aggregation ['cat', 'max', 'lstm'].")
+    parser.add_argument("--mode", type=str, default='cat', help="Type of aggregation.", choices=['cat', 'max', 'lstm'])
     parser.add_argument("--dropout", type=float, default=0.5, help='Dropout applied at all layers.')
 
     args = parser.parse_args()
