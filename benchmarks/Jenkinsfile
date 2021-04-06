@@ -27,6 +27,7 @@ pipeline {
                         sh('cp benchmark_scripts_repo/benchmark/* benchmarks/scripts/')
                         def comment = env.GITHUB_COMMENT
                         def command_lists = comment.split(' ')
+                        def instance_type = command_lists[2].replace("\.", "")
                         if (command_lists.size() != 5) {
                             pullRequest.comment('Cannot run the regression test due to unknown command')
                             error('Unknown command')
@@ -35,9 +36,9 @@ pipeline {
                         }
                         dir('benchmarks/scripts') {
                             sh('python3 -m pip install boto3')
-                            sh("PYTHONUNBUFFERED=1 GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT} --run-cmd '${comment}'")
+                            sh("PYTHONUNBUFFERED=1 GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT}_${instance_type} --run-cmd '${comment}'")
                         }
-                        pullRequest.comment("Finished the Regression test. View at ${RUN_DISPLAY_URL}")
+                        pullRequest.comment("Finished the Regression test. Result table is at https://dgl-asv-data.s3-us-west-2.amazonaws.com/${env.GIT_COMMIT}_${instance_type}/results.xlsx. Jenkins job link is ${RUN_DISPLAY_URL}. ")
                     } else {
                         if (prOpenTriggerCause) {
                             if (env.BUILD_ID == "1") {
