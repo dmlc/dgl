@@ -158,7 +158,7 @@ class BlockSampler(object):
     :ref:`User Guide Section 6 <guide-minibatch>` and
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
-    def __init__(self, num_layers, return_eids):
+    def __init__(self, num_layers, return_eids=False):
         self.num_layers = num_layers
         self.return_eids = return_eids
 
