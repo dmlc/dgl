@@ -6,8 +6,6 @@ import torch as th
 from ...utils import get_shared_mem_array, create_shared_mem_array
 from ...nn.pytorch import NodeEmbedding
 
-from torch.cuda import nvtx
-
 class SparseGradOptimizer(abc.ABC):
     r''' The abstract sparse optimizer.
 
@@ -85,7 +83,6 @@ class SparseGradOptimizer(abc.ABC):
         with th.no_grad():
             idx_in = {}
             grad_in = {}
-            nvtx.range_push("nccl_param_gather")
             for emb in self._params: # pylint: disable=too-many-nested-blocks
                 emb_name = emb.name
 
@@ -107,7 +104,6 @@ class SparseGradOptimizer(abc.ABC):
                 # convert idx to local indices via 'remainder'
                 assert emb.partition_mode == 'remainder'
                 idx_in[emb_name] = idx_in[emb_name] // self._comm.size()
-            nvtx.range_pop()
 
             if self._clean_grad:
                 # clean gradient track
@@ -128,7 +124,6 @@ class SparseGradOptimizer(abc.ABC):
             # We cache shared memory buffers in shared_emb.
             shared_emb = {emb.name: ([], []) for emb in self._params}
 
-            nvtx.range_push("shared_param_gather")
             # Go through all sparse embeddings
             for emb in self._params: # pylint: disable=too-many-nested-blocks
                 emb_name = emb.name
@@ -251,8 +246,6 @@ class SparseGradOptimizer(abc.ABC):
                                                                     non_blocking=True))
                             shared_emb[emb_name][1].append(grad_i.to(device,
                                                                      non_blocking=True))
-
-            nvtx.range_pop()
 
             if self._clean_grad:
                 # clean gradient track
