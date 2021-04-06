@@ -1310,18 +1310,20 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
       LOG(FATAL) << "The graph have restricted sparse format " <<
         CodeToStr(formats_) << ", cannot create CSC matrix.";
   CSRPtr ret = in_csr_;
+  // Prefers converting from COO since it is parallelized.
+  // TODO(BarclayII): need benchmarking.
   if (!in_csr_->defined()) {
-    if (out_csr_->defined()) {
-      const auto& newadj = aten::CSRTranspose(out_csr_->adj());
+    if (coo_->defined()) {
+      const auto& newadj = aten::COOToCSR(
+            aten::COOTranspose(coo_->adj()));
 
       if (inplace)
         *(const_cast<UnitGraph*>(this)->in_csr_) = CSR(meta_graph(), newadj);
       else
         ret = std::make_shared<CSR>(meta_graph(), newadj);
     } else {
-      CHECK(coo_->defined()) << "None of CSR, COO exist";
-      const auto& newadj = aten::COOToCSR(
-            aten::COOTranspose(coo_->adj()));
+      CHECK(out_csr_->defined()) << "None of CSR, COO exist";
+      const auto& newadj = aten::CSRTranspose(out_csr_->adj());
 
       if (inplace)
         *(const_cast<UnitGraph*>(this)->in_csr_) = CSR(meta_graph(), newadj);
@@ -1339,17 +1341,19 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
       LOG(FATAL) << "The graph have restricted sparse format " <<
         CodeToStr(formats_) << ", cannot create CSR matrix.";
   CSRPtr ret = out_csr_;
+  // Prefers converting from COO since it is parallelized.
+  // TODO(BarclayII): need benchmarking.
   if (!out_csr_->defined()) {
-    if (in_csr_->defined()) {
-      const auto& newadj = aten::CSRTranspose(in_csr_->adj());
+    if (coo_->defined()) {
+      const auto& newadj = aten::COOToCSR(coo_->adj());
 
       if (inplace)
         *(const_cast<UnitGraph*>(this)->out_csr_) = CSR(meta_graph(), newadj);
       else
         ret = std::make_shared<CSR>(meta_graph(), newadj);
     } else {
-      CHECK(coo_->defined()) << "None of CSR, COO exist";
-      const auto& newadj = aten::COOToCSR(coo_->adj());
+      CHECK(in_csr_->defined()) << "None of CSR, COO exist";
+      const auto& newadj = aten::CSRTranspose(in_csr_->adj());
 
       if (inplace)
         *(const_cast<UnitGraph*>(this)->out_csr_) = CSR(meta_graph(), newadj);
