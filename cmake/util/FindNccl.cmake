@@ -34,6 +34,9 @@
 #                     switching between static and shared.
 #
 # This module assumes that the user has already called find_package(CUDA)
+#
+# This file is from https://github.com/dmlc/xgboost, with modifications to
+# check the version.
 
 if (NCCL_LIBRARY)
   if(NOT USE_NCCL_LIB_PATH)
