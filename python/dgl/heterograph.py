@@ -4373,10 +4373,10 @@ class DGLHeteroGraph(object):
         >>> g.ndata['x'] = th.tensor([[1.], [2.], [3.]])
 
         >>> # Define the function for sending node features as messages.
-        >>> def send_source(edges): 
+        >>> def send_source(edges):
         >>>     return {'m': edges.src['x']}
         >>> # Sum the messages received and use this to replace the original node feature.
-        >>> def simple_reduce(nodes): 
+        >>> def simple_reduce(nodes):
         >>>     return {'x': nodes.mailbox['m'].sum(1)}
 
         Send and receive messages.
