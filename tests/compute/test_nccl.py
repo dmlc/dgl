@@ -44,7 +44,7 @@ def test_nccl_sparse_pull_single():
     value = F.uniform([100000, 100], F.float32, F.ctx(), -1.0, 1.0)
 
     rv = comm.sparse_all_to_all_pull(req_index, value, 'remainder')
-    exp_rv = value[req_index]
+    exp_rv = F.gather_row(value, req_index)
     assert F.array_equal(rv, exp_rv)
 
 
