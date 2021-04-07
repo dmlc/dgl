@@ -318,7 +318,11 @@ class EdgeDataLoader:
         See the description of the argument with the same name in the docstring of
         :class:`~dgl.dataloading.EdgeCollator` for more details.
     reverse_eids : Tensor or dict[etype, Tensor], optional
-        The mapping from the original edge IDs to the ID of their reverse edges.
+        A tensor of reverse edge ID mapping.  The i-th element indicates the ID of
+        the i-th edge's reverse edge.
+
+        If the graph is heterogeneous, this argument requires a dictionary of edge
+        types and the reverse edge ID mapping tensors.
 
         See the description of the argument with the same name in the docstring of
         :class:`~dgl.dataloading.EdgeCollator` for more details.
