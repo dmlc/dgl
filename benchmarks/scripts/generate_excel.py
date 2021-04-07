@@ -84,4 +84,4 @@ def side_by_side_view(df):
 output_results_dict = main()
 df = dict_to_csv(output_results_dict)
 sbs_df = side_by_side_view(df)
-sbs_df.to_excel("result.xlsx")
+sbs_df.to_csv("result.csv")
