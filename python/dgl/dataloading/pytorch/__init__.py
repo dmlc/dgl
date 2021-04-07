@@ -317,7 +317,7 @@ class EdgeDataLoader:
 
         See the description of the argument with the same name in the docstring of
         :class:`~dgl.dataloading.EdgeCollator` for more details.
-    reverse_edge_ids : Tensor or dict[etype, Tensor], optional
+    reverse_eids : Tensor or dict[etype, Tensor], optional
         The mapping from the original edge IDs to the ID of their reverse edges.
 
         See the description of the argument with the same name in the docstring of
