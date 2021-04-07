@@ -67,6 +67,8 @@ python main.py --gpu 0 --dataset Citeseer --mode lstm --num-layers 2
 
 ### Performance
 
+**As the author does not release the code, we don't have the access to the data splits they used.**
+
 ###### Node Classification
 
 * Cora
