@@ -8,7 +8,7 @@
 本节介绍了在训练脚本中使用的分布式计算API。DGL提供了三种分布式数据结构和多种API，用于初始化、分布式采样和数据分割。
 对于分布式训练/推断，DGL提供了三种分布式数据结构：用于分布式图的 :class:`~dgl.distributed.DistGraph`、
 用于分布式张量的 :class:`~dgl.distributed.DistTensor` 和用于分布式可学习嵌入的
-:class:`~dgl.distributed.DistEmbedding`。
+:class:`~dgl.distributed.NodeEmbedding`。
 
 DGL分布式模块的初始化
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -24,7 +24,7 @@ DGL分布式模块的初始化
     dgl.distributed.initialize('ip_config.txt', num_workers=4)
     th.distributed.init_process_group(backend='gloo')
 
-**Note**: 如果训练脚本里包含需要在服务器(细节内容可以在下面的DistTensor和DistEmbedding章节里查看)上调用的用户自定义函数(UDF)，
+**Note**: 如果训练脚本里包含需要在服务器(细节内容可以在下面的DistTensor和NodeEmbedding章节里查看)上调用的用户自定义函数(UDF)，
 这些UDF必须在 :func:`~dgl.distributed.initialize` 之前被声明。
 
 分布式图
@@ -138,7 +138,7 @@ DGL为分布式张量提供了类似于单机普通张量的接口，以访问�
 分布式嵌入
 ~~~~~~~~~~~~~~~~~~~~~
 
-DGL提供 :class:`~dgl.distributed.DistEmbedding` 以支持需要节点嵌入的直推(transductive)模型。
+DGL提供 :class:`~dgl.distributed.NodeEmbedding` 以支持需要节点嵌入的直推(transductive)模型。
 分布式嵌入的创建与分布式张量的创建非常相似。
 
 .. code:: python
@@ -147,7 +147,7 @@ DGL提供 :class:`~dgl.distributed.DistEmbedding` 以支持需要节点嵌入的
         arr = th.zeros(shape, dtype=dtype)
         arr.uniform_(-1, 1)
         return arr
-    emb = dgl.distributed.DistEmbedding(g.number_of_nodes(), 10, init_func=initializer)
+    emb = dgl.distributed.NodeEmbedding(g.number_of_nodes(), 10, init_func=initializer)
 
 在内部，分布式嵌入建立在分布式张量之上，因此，其行为与分布式张量非常相似。
 例如，创建嵌入时，DGL会将它们分片并存储在集群中的所有计算机上。(分布式嵌入)可以通过名称唯一标识。
@@ -169,7 +169,7 @@ DGL提供了一个稀疏的Adagrad优化器 :class:`~dgl.distributed.SparseAdagr
     optimizer.step()
     sparse_optimizer.step()
 
-**Note**: :class:`~dgl.distributed.DistEmbedding` 不是PyTorch的nn模块，因此用户无法从nn模块的参数访问它。
+**Note**: :class:`~dgl.distributed.NodeEmbedding` 不是PyTorch的nn模块，因此用户无法从nn模块的参数访问它。
 
 分布式采样
 ~~~~~~~~~~~~~~~~~~~~
@@ -228,7 +228,7 @@ DGL提供了两个级别的API，用于对节点和边进行采样以生成小�
     dataloader = dgl.sampling.NodeDataLoader(g, train_nid, sampler,
                                              batch_size=batch_size, shuffle=True)
     for batch in dataloader:
-        ... 
+        ...
 
 
 分割数据集

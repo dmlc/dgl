@@ -162,7 +162,7 @@ class DistEmbedLayer(nn.Module):
                     # We only create embeddings for nodes without node features.
                     if feat_name not in g.nodes[ntype].data:
                         part_policy = g.get_node_partition_policy(ntype)
-                        self.node_embeds[ntype] = dgl.distributed.DistEmbedding(g.number_of_nodes(ntype),
+                        self.node_embeds[ntype] = dgl.distributed.NodeEmbedding(g.number_of_nodes(ntype),
                                 self.embed_size,
                                 embed_name + '_' + ntype,
                                 init_emb,
@@ -536,7 +536,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-servers', type=int, default=1, help='Server count on each machine.')
 
     # rgcn related
-    parser.add_argument('--num_gpus', type=int, default=-1, 
+    parser.add_argument('--num_gpus', type=int, default=-1,
                         help="the number of GPU device. Use -1 for CPU training")
     parser.add_argument("--dropout", type=float, default=0,
             help="dropout probability")

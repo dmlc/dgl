@@ -28,7 +28,12 @@ Distributed Tensor
 Distributed Embedding
 ---------------------
 
-.. autoclass:: DistEmbedding
+.. autoclass:: NodeEmbedding
+
+
+Distributed embedding optimizer
+-------------------------
+.. currentmodule:: dgl.distributed.optim.pytorch
 
 .. autoclass:: SparseAdagrad
     :members: step

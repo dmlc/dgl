@@ -78,6 +78,8 @@ class DistTensor:
         The system determines the right partition policy automatically.
     persistent : bool
         Whether the created tensor lives after the ``DistTensor`` object is destroyed.
+    is_gdata : bool
+        Whether the created tensor is a ndata/edata or not.
 
     Examples
     --------
@@ -100,7 +102,7 @@ class DistTensor:
     do the same.
     '''
     def __init__(self, shape, dtype, name=None, init_func=None, part_policy=None,
-                 persistent=False):
+                 persistent=False, is_gdata=True):
         self.kvstore = get_kvstore()
         assert self.kvstore is not None, \
                 'Distributed module is not initialized. Please call dgl.distributed.initialize.'
@@ -148,7 +150,7 @@ class DistTensor:
         self._name = str(data_name)
         self._persistent = persistent
         if self._name not in exist_names:
-            self.kvstore.init_data(self._name, shape, dtype, part_policy, init_func)
+            self.kvstore.init_data(self._name, shape, dtype, part_policy, init_func, is_gdata)
             self._owner = True
         else:
             self._owner = False

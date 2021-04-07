@@ -29,18 +29,11 @@ class DistSparseGradOptimizer(abc.ABC):
         self._clean_grad = False
         self._opt_meta = {}
 
-        for emb in params:
-            assert isinstance(emb, NodeEmbedding), \
-                'DGL DistSparseOptimizer only supports dgl.distributed.NodeEmbedding'
-
-            if self._rank is None:
-                self._rank = emb.rank
-                self._world_size = emb.world_size
-            else:
-                assert self._rank == emb.rank, \
-                    'MultiGPU rank for each embedding should be same.'
-                assert self._world_size == emb.world_size, \
-                    'MultiGPU world_size for each embedding should be same.'
+        if th.distributed.is_initialized():
+            self._rank = th.distributed.get_rank()
+            self._world_size = th.distributed.get_world_size()
+        else:
+            assert 'th.distributed shoud be initialized'
 
     def step(self):
         ''' The step function.
@@ -77,14 +70,19 @@ class DistSparseGradOptimizer(abc.ABC):
                         idx_i = idics[mask]
                         grad_i = grads[mask]
 
-                        kv_idx_split = th.remainder(idx_i, trainers_per_server).long()
-                        for j in range(trainers_per_server):
-                            mask = kv_idx_split == j
-                            idx_j = idx_i[mask]
-                            grad_j = grad_i[mask]
-                            idx_split_size.append(th.tensor([idx_j.shape[0]], dtype=th.int64))
-                            idics_list.append(idx_j)
-                            grad_list.append(grad_j)
+                        if trainers_per_server <= 1:
+                            idx_split_size.append(th.tensor([idx_i.shape[0]], dtype=th.int64))
+                            idics_list.append(idx_i)
+                            grad_list.append(grad_i)
+                        else:
+                            kv_idx_split = th.remainder(idx_i, trainers_per_server).long()
+                            for j in range(trainers_per_server):
+                                mask = kv_idx_split == j
+                                idx_j = idx_i[mask]
+                                grad_j = grad_i[mask]
+                                idx_split_size.append(th.tensor([idx_j.shape[0]], dtype=th.int64))
+                                idics_list.append(idx_j)
+                                grad_list.append(grad_j)
 
                     # if one machine launch multiple KVServer, they share the same storage.
                     # For each machine, the pytorch rank is num_trainers * machine_id + i
@@ -148,7 +146,7 @@ def initializer(shape, dtype):
     arr = th.zeros(shape, dtype=dtype)
     return arr
 
-class DistSparseAdagrad(DistSparseGradOptimizer):
+class SparseAdagrad(DistSparseGradOptimizer):
     r''' Distributed Node embedding optimizer using the Adagrad algorithm.
 
     This optimizer implements a distributed sparse version of Adagrad algorithm for
@@ -173,7 +171,7 @@ class DistSparseAdagrad(DistSparseGradOptimizer):
         Default: 1e-10
     '''
     def __init__(self, params, lr, eps=1e-10):
-        super(DistSparseAdagrad, self).__init__(params, lr)
+        super(SparseAdagrad, self).__init__(params, lr)
         self._eps = eps
         # We need to register a state sum for each embedding in the kvstore.
         for emb in params:
@@ -181,8 +179,9 @@ class DistSparseAdagrad(DistSparseGradOptimizer):
                 'SparseAdagrad only supports dgl.distributed.NodeEmbedding'
 
             name = emb.name + "_sum"
+            print(name)
             self._state = DistTensor((emb.num_embeddings, emb.embedding_dim), th.float32, name,
-                                      init_func=initializer, part_policy=emb.part_policy)
+                                      init_func=initializer, part_policy=emb.part_policy, is_gdata=False)
             emb.set_optm_state(self._state)
 
     def update(self, idx, grad, emb):

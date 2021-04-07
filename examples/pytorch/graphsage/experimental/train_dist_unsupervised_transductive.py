@@ -24,7 +24,7 @@ from dgl.distributed import DistDataLoader
 
 from pyinstrument import Profiler
 from dgl.distributed import NodeEmbedding
-from dgl.distributed.optim import DistSparseAdagrad
+from dgl.distributed.optim import SparseAdagrad
 from train_dist_unsupervised import SAGE, NeighborSampler, PosNeighborSampler, CrossEntropyLoss, compute_acc
 
 def initializer(shape, dtype):
@@ -150,7 +150,7 @@ def run(args, device, data):
     loss_fcn = CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    sparse_optimizer = DistSparseAdagrad([emb_layer.emb], lr=args.lr)
+    sparse_optimizer = SparseAdagrad([emb_layer.emb], lr=args.lr)
 
     # Training loop
     epoch = 0

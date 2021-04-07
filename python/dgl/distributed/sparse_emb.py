@@ -67,7 +67,7 @@ class NodeEmbedding:
     def __init__(self, num_embeddings, embedding_dim, name=None,
                  init_func=None, part_policy=None):
         self._tensor = DistTensor((num_embeddings, embedding_dim), F.float32, name,
-                                  init_func=init_func)
+                                  init_func=init_func, part_policy=part_policy)
         self._trace = []
         self._name = name
         self._num_embeddings = num_embeddings
@@ -123,7 +123,7 @@ class NodeEmbedding:
 
     @property
     def name(self):
-        return self._tensor._name
+        return self._tensor.tensor_name
 
     @property
     def kvstore(self):

@@ -827,6 +827,8 @@ class KVClient(object):
         self._full_data_shape = {}
         # Store all the data name
         self._data_name_list = set()
+        # Store all graph data name
+        self._gdata_name_list = set()
         # Basic information
         self._server_namebook = rpc.read_ip_config(ip_config, num_servers)
         self._server_count = len(self._server_namebook)
@@ -942,7 +944,7 @@ class KVClient(object):
         self._pull_handlers[name] = func
         self.barrier()
 
-    def init_data(self, name, shape, dtype, part_policy, init_func):
+    def init_data(self, name, shape, dtype, part_policy, init_func, is_gdata=True):
         """Send message to kvserver to initialize new data tensor and mapping this
         data from server side to client side.
 
@@ -958,6 +960,8 @@ class KVClient(object):
             partition policy.
         init_func : func
             UDF init function
+        is_gdata : bool
+            Whether the created tensor is a ndata/edata or not.
         """
         assert len(name) > 0, 'name cannot be empty.'
         assert len(shape) > 0, 'shape cannot be empty'
@@ -999,6 +1003,8 @@ class KVClient(object):
         dlpack = shared_data.to_dlpack()
         self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
         self._data_name_list.add(name)
+        if is_gdata:
+            self._gdata_name_list.add(name)
         self._full_data_shape[name] = tuple(shape)
         self._pull_handlers[name] = default_pull_handler
         self._push_handlers[name] = default_push_handler
@@ -1042,6 +1048,7 @@ class KVClient(object):
 
         self.barrier()
         self._data_name_list.remove(name)
+        self._gdata_name_list.remove(name)
         # TODO(chao) : remove the delete log print
         del self._data_store[name]
         del self._full_data_shape[name]
@@ -1104,11 +1111,14 @@ class KVClient(object):
                 response = rpc.recv_response()
                 assert response.msg == SEND_META_TO_BACKUP_MSG
             self._data_name_list.add(name)
+            # map_shared_data happens only at DistGraph initialization
+            # TODO(xiangsx): We assume there is no non-graph data initialized at this time
+            self._gdata_name_list.add(name)
         self.barrier()
 
     def data_name_list(self):
         """Get all the data name"""
-        return list(self._data_name_list)
+        return list(self._gdata_name_list)
 
     def get_data_meta(self, name):
         """Get meta data (data_type, data_shape, partition_policy)
@@ -1207,7 +1217,9 @@ class KVClient(object):
         id_tensor = id_tensor.tousertensor()
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
         if self._pull_handlers[name] is default_pull_handler: # Use fast-pull
+            print(name)
             part_id = self._part_policy[name].to_partid(id_tensor)
+            print(F.max(part_id, dim=0))
             return rpc.fast_pull(name, id_tensor, part_id, KVSTORE_PULL,
                                  self._machine_count,
                                  self._group_count,
