@@ -38,7 +38,7 @@ pipeline {
                             sh('python3 -m pip install boto3')
                             sh("PYTHONUNBUFFERED=1 GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT}_${instance_type} --run-cmd '${comment}'")
                         }
-                        pullRequest.comment("Finished the Regression test. Result table is at https://dgl-asv-data.s3-us-west-2.amazonaws.com/${env.GIT_COMMIT}_${instance_type}/results/results.csv. Jenkins job link is ${RUN_DISPLAY_URL}. ")
+                        pullRequest.comment("Finished the Regression test. Result table is at https://dgl-asv-data.s3-us-west-2.amazonaws.com/${env.GIT_COMMIT}_${instance_type}/results/result.csv. Jenkins job link is ${RUN_DISPLAY_URL}. ")
                     } else {
                         if (prOpenTriggerCause) {
                             if (env.BUILD_ID == "1") {
