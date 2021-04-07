@@ -1048,7 +1048,8 @@ class KVClient(object):
 
         self.barrier()
         self._data_name_list.remove(name)
-        self._gdata_name_list.remove(name)
+        if name in self._gdata_name_list:
+            self._gdata_name_list.remove(name)
         # TODO(chao) : remove the delete log print
         del self._data_store[name]
         del self._full_data_shape[name]
@@ -1217,9 +1218,7 @@ class KVClient(object):
         id_tensor = id_tensor.tousertensor()
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
         if self._pull_handlers[name] is default_pull_handler: # Use fast-pull
-            print(name)
             part_id = self._part_policy[name].to_partid(id_tensor)
-            print(F.max(part_id, dim=0))
             return rpc.fast_pull(name, id_tensor, part_id, KVSTORE_PULL,
                                  self._machine_count,
                                  self._group_count,

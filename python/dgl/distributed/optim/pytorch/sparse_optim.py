@@ -174,15 +174,16 @@ class SparseAdagrad(DistSparseGradOptimizer):
         super(SparseAdagrad, self).__init__(params, lr)
         self._eps = eps
         # We need to register a state sum for each embedding in the kvstore.
+        self._state = {}
         for emb in params:
             assert isinstance(emb, NodeEmbedding), \
                 'SparseAdagrad only supports dgl.distributed.NodeEmbedding'
 
             name = emb.name + "_sum"
-            print(name)
-            self._state = DistTensor((emb.num_embeddings, emb.embedding_dim), th.float32, name,
-                                      init_func=initializer, part_policy=emb.part_policy, is_gdata=False)
-            emb.set_optm_state(self._state)
+            state = DistTensor((emb.num_embeddings, emb.embedding_dim), th.float32, name,
+                                init_func=initializer, part_policy=emb.part_policy, is_gdata=False)
+            emb.set_optm_state(state)
+            self._state[emb.name] = state
 
     def update(self, idx, grad, emb):
         """ Update embeddings in a sparse manner
@@ -210,9 +211,9 @@ class SparseAdagrad(DistSparseGradOptimizer):
         grad_sum = (grad_values * grad_values)
 
         # update grad state
-        grad_state = self._state[grad_indices].to(exec_dev, non_blocking=True)
+        grad_state = self._state[emb.name][grad_indices].to(exec_dev, non_blocking=True)
         grad_state += grad_sum
-        self._state[grad_indices] = grad_state.to(th.device('cpu'), non_blocking=True)
+        self._state[emb.name][grad_indices] = grad_state.to(th.device('cpu'), non_blocking=True)
 
         # update emb
         std_values = grad_state.add_(eps).sqrt_()

@@ -68,7 +68,8 @@ def rand_init(shape, dtype):
 
 def run_client(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
     time.sleep(5)
-    dgl.distributed.initialize("kv_ip_config.txt", server_count)
+    os.environ['DGL_NUM_SERVER'] = str(server_count)
+    dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                                                 part_id, None)
     g = DistGraph(graph_name, gpb=gpb)
@@ -240,7 +241,8 @@ def check_server_client(shared_mem, num_servers, num_clients):
 
 def run_client_hetero(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
     time.sleep(5)
-    dgl.distributed.initialize("kv_ip_config.txt", server_count)
+    os.environ['DGL_NUM_SERVER'] = str(server_count)
+    dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                                                 part_id, None)
     g = DistGraph(graph_name, gpb=gpb)

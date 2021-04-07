@@ -21,7 +21,7 @@ DGL分布式模块的初始化
 
 .. code:: python
 
-    dgl.distributed.initialize('ip_config.txt', num_workers=4)
+    dgl.distributed.initialize('ip_config.txt')
     th.distributed.init_process_group(backend='gloo')
 
 **Note**: 如果训练脚本里包含需要在服务器(细节内容可以在下面的DistTensor和NodeEmbedding章节里查看)上调用的用户自定义函数(UDF)，

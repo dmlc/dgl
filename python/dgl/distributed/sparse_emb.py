@@ -73,7 +73,7 @@ class NodeEmbedding:
         self._num_embeddings = num_embeddings
         self._embedding_dim = embedding_dim
 
-        # Check whether it is multi-gpu training or not.
+        # Check whether it is multi-gpu/distributed training or not
         if th.distributed.is_initialized():
             self._rank = th.distributed.get_rank()
             self._world_size = th.distributed.get_world_size()

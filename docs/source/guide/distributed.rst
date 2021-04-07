@@ -26,7 +26,7 @@ are the same as :ref:`mini-batch training <guide-minibatch>`.
     import dgl
     import torch as th
 
-    dgl.distributed.initialize('ip_config.txt', num_servers, num_workers)
+    dgl.distributed.initialize('ip_config.txt')
     th.distributed.init_process_group(backend='gloo')
     g = dgl.distributed.DistGraph('graph_name', 'part_config.json')
     pb = g.get_partition_book()
