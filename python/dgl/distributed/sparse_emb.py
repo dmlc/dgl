@@ -61,8 +61,9 @@ class NodeEmbedding:
     Note
     ----
     When a ``NodeEmbedding``  object is used when the deep learning framework is recording
-    the forward computation, users have to invoke py:meth:`~dgl.distributed.optim.SparseAdagrad.step`
-    afterwards. Otherwise, there will be some memory leak.
+    the forward computation, users have to invoke
+    py:meth:`~dgl.distributed.optim.SparseAdagrad.step` afterwards. Otherwise, there will be
+    some memory leak.
     '''
     def __init__(self, num_embeddings, embedding_dim, name=None,
                  init_func=None, part_policy=None):
@@ -83,6 +84,17 @@ class NodeEmbedding:
         self._part_policy = part_policy
 
     def __call__(self, idx, device=th.device('cpu')):
+        """
+        node_ids : th.tensor
+            Index of the embeddings to collect.
+        device : th.device
+            Target device to put the collected embeddings.
+
+        Returns
+        -------
+        Tensor
+            The requested node embeddings
+        """
         idx = utils.toindex(idx).tousertensor()
         emb = self._tensor[idx].to(device, non_blocking=True)
         if F.is_recording():
@@ -97,6 +109,13 @@ class NodeEmbedding:
 
     @property
     def part_policy(self):
+        """Return the partition policy
+
+        Returns
+        -------
+        PartitionPolicy
+            partition policy
+        """
         return self._part_policy
 
     @property
@@ -123,18 +142,46 @@ class NodeEmbedding:
 
     @property
     def name(self):
+        """Return the name of the embeddings
+
+        Returns
+        -------
+        str
+            The name of the embeddings
+        """
         return self._tensor.tensor_name
 
     @property
     def kvstore(self):
+        """Return the kvstore client
+
+        Returns
+        -------
+        KVClient
+            The kvstore client
+        """
         return self._tensor.kvstore
 
     @property
     def num_embeddings(self):
+        """Return the number of embeddings
+
+        Returns
+        -------
+        int
+            The number of embeddings
+        """
         return self._num_embeddings
 
     @property
     def embedding_dim(self):
+        """Return the dimension of embeddings
+
+        Returns
+        -------
+        int
+            The dimension of embeddings
+        """
         return self._embedding_dim
 
     def set_optm_state(self, state):
@@ -157,4 +204,3 @@ class NodeEmbedding:
             The optimizer related state.
         """
         return self._optm_state
-

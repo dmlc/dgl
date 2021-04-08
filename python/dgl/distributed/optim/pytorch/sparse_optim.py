@@ -2,7 +2,6 @@
 import abc
 from abc import abstractmethod
 import torch as th
-import torch.distributed as dist
 
 from ...dist_tensor import DistTensor
 from ...sparse_emb import NodeEmbedding
@@ -88,15 +87,19 @@ class DistSparseGradOptimizer(abc.ABC):
                     # For each machine, the pytorch rank is num_trainers * machine_id + i
 
                     # use scatter to sync across trainers about the p2p tensor size
-                    # Note: If we have GPU nccl support, we can use all_to_all to sync information here
-                    gather_list = list(th.empty([self._world_size], dtype=th.int64).chunk(self._world_size))
+                    # Note: If we have GPU nccl support, we can use all_to_all to
+                    # sync information here
+                    gather_list = list(th.empty([self._world_size],
+                                                 dtype=th.int64).chunk(self._world_size))
                     alltoall_cpu(self._rank, self._world_size, gather_list, idx_split_size)
                     # use cpu until we have GPU alltoallv
-                    idx_gather_list = [th.empty((int(num_emb),), dtype=idics.dtype) for num_emb in gather_list]
-                    alltoallv_cpu(self._rank, self._world_size, idx_gather_list, idics_list, idics.dtype)
+                    idx_gather_list = [th.empty((int(num_emb),),
+                                                 dtype=idics.dtype) for num_emb in gather_list]
+                    alltoallv_cpu(self._rank, self._world_size, idx_gather_list, idics_list)
                     local_indics[name] = idx_gather_list
-                    grad_gather_list = [th.empty((int(num_emb), grads.shape[1]), dtype=grads.dtype) for num_emb in gather_list]
-                    alltoallv_cpu(self._rank, self._world_size, grad_gather_list, grad_list, idics.dtype)
+                    grad_gather_list = [th.empty((int(num_emb), grads.shape[1]),
+                                                 dtype=grads.dtype) for num_emb in gather_list]
+                    alltoallv_cpu(self._rank, self._world_size, grad_gather_list, grad_list)
                     local_grads[name] = grad_gather_list
                 else:
                     local_indics[name] = [idics]
@@ -143,6 +146,15 @@ class DistSparseGradOptimizer(abc.ABC):
         self._clean_grad = True
 
 def initializer(shape, dtype):
+    """ Sparse optimizer state initializer
+
+    Parameters
+    ----------
+    shape : tuple of ints
+        The shape of the state tensor
+    dtype : torch dtype
+        The data type of the state tensor
+    """
     arr = th.zeros(shape, dtype=dtype)
     return arr
 
@@ -181,7 +193,7 @@ class SparseAdagrad(DistSparseGradOptimizer):
 
             name = emb.name + "_sum"
             state = DistTensor((emb.num_embeddings, emb.embedding_dim), th.float32, name,
-                                init_func=initializer, part_policy=emb.part_policy, is_gdata=False)
+                               init_func=initializer, part_policy=emb.part_policy, is_gdata=False)
             emb.set_optm_state(state)
             self._state[emb.name] = state
 
