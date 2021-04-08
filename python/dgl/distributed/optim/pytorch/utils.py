@@ -1,3 +1,5 @@
+"""Provide utils for distributed sparse optimizers
+"""
 import torch as th
 import torch.distributed as dist
 
@@ -35,7 +37,6 @@ def alltoallv_cpu(rank, world_size, output_tensor_list, input_tensor_list):
     input_tensor_list : List of tensor
         The tensors to exchange
     """
-    ret_list = [None] * world_size
     # send tensor to each target trainer using torch.distributed.isend
     # isend is async
     senders = []

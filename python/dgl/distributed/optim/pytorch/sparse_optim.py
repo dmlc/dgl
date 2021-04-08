@@ -90,11 +90,11 @@ class DistSparseGradOptimizer(abc.ABC):
                     # Note: If we have GPU nccl support, we can use all_to_all to
                     # sync information here
                     gather_list = list(th.empty([self._world_size],
-                                                 dtype=th.int64).chunk(self._world_size))
+                                                dtype=th.int64).chunk(self._world_size))
                     alltoall_cpu(self._rank, self._world_size, gather_list, idx_split_size)
                     # use cpu until we have GPU alltoallv
                     idx_gather_list = [th.empty((int(num_emb),),
-                                                 dtype=idics.dtype) for num_emb in gather_list]
+                                                dtype=idics.dtype) for num_emb in gather_list]
                     alltoallv_cpu(self._rank, self._world_size, idx_gather_list, idics_list)
                     local_indics[name] = idx_gather_list
                     grad_gather_list = [th.empty((int(num_emb), grads.shape[1]),

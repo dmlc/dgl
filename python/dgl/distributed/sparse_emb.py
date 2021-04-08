@@ -3,7 +3,6 @@
 from .. import backend as F
 from .. import utils
 from .dist_tensor import DistTensor
-import torch.distributed as dist
 import torch as th
 
 class NodeEmbedding:
