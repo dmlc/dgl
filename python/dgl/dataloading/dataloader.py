@@ -158,7 +158,7 @@ class BlockSampler(object):
     :ref:`User Guide Section 6 <guide-minibatch>` and
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
-    def __init__(self, num_layers, return_eids):
+    def __init__(self, num_layers, return_eids=False):
         self.num_layers = num_layers
         self.return_eids = return_eids
 
@@ -453,7 +453,11 @@ class EdgeCollator(Collator):
 
         If ``g_sampling`` is given, ``exclude`` is ignored and will be always ``None``.
     reverse_eids : Tensor or dict[etype, Tensor], optional
-        The mapping from original edge ID to its reverse edge ID.
+        A tensor of reverse edge ID mapping.  The i-th element indicates the ID of
+        the i-th edge's reverse edge.
+
+        If the graph is heterogeneous, this argument requires a dictionary of edge
+        types and the reverse edge ID mapping tensors.
 
         Required and only used when ``exclude`` is set to ``reverse_id``.
 

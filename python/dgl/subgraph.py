@@ -181,7 +181,7 @@ def edge_subgraph(graph, edges, preserve_nodes=False, store_ids=True):
 
         If the graph is homogeneous, one can directly pass the above formats.
         Otherwise, the argument must be a dictionary with keys being edge types
-        and values being the nodes.
+        and values being the edge IDs.
     preserve_nodes : bool, optional
         If True, do not relabel the incident nodes and remove the isolated nodes
         in the extracted subgraph. (Default: False)

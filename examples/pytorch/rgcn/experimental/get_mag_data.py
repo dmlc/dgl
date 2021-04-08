@@ -4,8 +4,6 @@ import torch as th
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
-from pyinstrument import Profiler
-
 # Load OGB-MAG.
 dataset = DglNodePropPredDataset(name='ogbn-mag')
 hg_orig, labels = dataset[0]
