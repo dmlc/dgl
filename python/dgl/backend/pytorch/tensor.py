@@ -199,7 +199,7 @@ def scatter_row(data, row_index, value):
 def scatter_row_inplace(data, row_index, value):
     data[row_index.long()] = value
 
-def squeeze(input, dim):
+def squeeze(input, dim: int):
     return th.squeeze(input, dim)
 
 def unsqueeze(input, dim: int):

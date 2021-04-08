@@ -1,6 +1,8 @@
 """Module for sparse matrix operators."""
 # pylint: disable= invalid-name
 from __future__ import absolute_import
+import torch
+from torch import Tensor
 from typing import List, Optional
 from . import ndarray as nd
 from ._ffi.function import _init_api
@@ -10,9 +12,8 @@ from . import backend as F
 
 USE_TORCH = True
 
-from torch import Tensor
-import torch
-torch.classes.load_library("/home/ubuntu/dev/torchdgl/build/libTorchDGLGraph.so")
+torch.classes.load_library(
+    "/home/ubuntu/dev/torchdgl/build/libTorchDGLGraph.so")
 TorchDGLGraph = torch.classes.my_classes.TorchDGLGraph
 TorchDGLMetaGraph = torch.classes.my_classes.TorchDGLMetaGraph
 
@@ -64,20 +65,40 @@ def infer_broadcast_shape(op: str, shp1: List[int], shp2: List[int]):
     return rst[:-1] + (1,) if op == "dot" else rst
 
 
-def to_dgl_nd(x):
-    """Convert framework-specific tensor/None to dgl ndarray."""
-    if True:
+if USE_TORCH:
+    def to_dgl_nd(x: Optional[Tensor]) -> Tensor:
+        if x is None:
+            return torch.empty(0)
+        else:
+            return x
+
+    def to_dgl_nd_for_write(x: Optional[Tensor]) -> Tensor:
+        if x is None:
+            return torch.empty(0)
+        else:
+            return x
+
+    def zerocopy_from_dgl_ndarray(x: Tensor):
         return x
-    else:
+    
+    def spmm(gidx: TorchDGLGraph, op: str, reduce_op: str, u: Optional[Tensor], e: Optional[Tensor], v: Optional[Tensor], arg_u: Optional[Tensor], arg_e: Optional[Tensor]):
+        torch.ops.my_classes._CAPI_DGLKernelSpMM(
+            gidx, op, reduce_op, u, e, v, arg_u, arg_e)
+
+else:
+    def to_dgl_nd(x):
+        """Convert framework-specific tensor/None to dgl ndarray."""
         return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray(x)
 
-
-def to_dgl_nd_for_write(x):
-    """Convert framework-specific tensor/None to dgl ndarray for write."""
-    if True:
-        return x
-    else:
+    def to_dgl_nd_for_write(x):
+        """Convert framework-specific tensor/None to dgl ndarray for write."""
         return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
+
+    def zerocopy_from_dgl_ndarray(x):
+        return F.zerocopy_from_dgl_ndarray(x)
+    
+    def spmm(*args):
+        _CAPI_DGLKernelSpMM(args);
 
 
 target_mapping = {
@@ -89,7 +110,8 @@ target_mapping = {
     'dst': 2
 }
 
-def _gspmm(gidx: TorchDGLGraph, op: str, reduce_op: str, u: Tensor, e:Tensor):
+
+def _gspmm(gidx: TorchDGLGraph, op: str, reduce_op: str, u: Tensor, e: Tensor):
     r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
     :attr:`op` on source node feature and edge feature, leads to a message on edge.
     Then aggregates the message by :attr:`reduce_op` on destination nodes.
@@ -152,8 +174,8 @@ def _gspmm(gidx: TorchDGLGraph, op: str, reduce_op: str, u: Tensor, e:Tensor):
 
     ctx = F.context(u) if use_u else F.context(e)
     dtype = F.dtype(u) if use_u else F.dtype(e)
-    u_shp = F.shape(u) if use_u else [0,]
-    e_shp = F.shape(e) if use_e else [0,]
+    u_shp = F.shape(u) if use_u else [0, ]
+    e_shp = F.shape(e) if use_e else [0, ]
     _, dsttype = gidx.metagraph.find_edge(0)
     v_shp = (gidx.number_of_nodes(dsttype), ) +\
         infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
@@ -174,12 +196,15 @@ def _gspmm(gidx: TorchDGLGraph, op: str, reduce_op: str, u: Tensor, e:Tensor):
     arg_u_nd = to_dgl_nd_for_write(arg_u)
     arg_e_nd = to_dgl_nd_for_write(arg_e)
     if gidx.number_of_edges(0) > 0:
-        _CAPI_DGLKernelSpMM(gidx, op, reduce_op,
-                            to_dgl_nd(u if use_u else None),
-                            to_dgl_nd(e if use_e else None),
-                            to_dgl_nd_for_write(v),
-                            arg_u_nd,
-                            arg_e_nd)
+        # torch.ops.my_classes._CAPI_DGLKernelSpMM(gidx, op, reduce_op,
+        spmm(gidx, op, reduce_op,
+             to_dgl_nd(
+                 u if use_u else None),
+             to_dgl_nd(
+                 e if use_e else None),
+             to_dgl_nd_for_write(v),
+             arg_u_nd,
+             arg_e_nd)
     # NOTE(zihao): actually we can avoid the following step, because arg_*_nd
     # refers to the data that stores arg_*. After we call _CAPI_DGLKernelSpMM,
     # arg_* should have already been changed. But we found this doesn't work
@@ -187,8 +212,8 @@ def _gspmm(gidx: TorchDGLGraph, op: str, reduce_op: str, u: Tensor, e:Tensor):
     # all zero).
     # The workaround is proposed by Jinjing, and we still need to investigate
     # where the problem is.
-    arg_u = None if arg_u is None else F.zerocopy_from_dgl_ndarray(arg_u_nd)
-    arg_e = None if arg_e is None else F.zerocopy_from_dgl_ndarray(arg_e_nd)
+    arg_u = torch.empty(0) if arg_u is None else zerocopy_from_dgl_ndarray(arg_u_nd)
+    arg_e = torch.empty(0) if arg_e is None else zerocopy_from_dgl_ndarray(arg_e_nd)
     # To deal with scalar node/edge features.
     if (expand_u or not use_u) and (expand_e or not use_e):
         v = F.squeeze(v, -1)
@@ -386,6 +411,7 @@ def _bwd_segment_cmp(feat, arg, m):
                                  to_dgl_nd_for_write(out))
     return out
 
+
 class CSRMatrix(object):
     """Device- and backend-agnostic sparse matrix in CSR format.
 
@@ -402,11 +428,13 @@ class CSRMatrix(object):
     num_cols : int
         The number of columns.
     """
+
     def __init__(self, data, indices, indptr, num_rows, num_cols):
         self.indptr = indptr
         self.indices = indices
         self.data = data
         self.shape = (num_rows, num_cols)
+
 
 def csrmm(A, B):
     """Sparse-sparse matrix multiplication.
@@ -446,6 +474,7 @@ def csrmm(A, B):
         A.shape[0],
         B.shape[1])
 
+
 def csrsum(As):
     """Sparse-sparse matrix summation.
 
@@ -474,6 +503,7 @@ def csrsum(As):
         F.from_dgl_nd(C_indices),
         F.from_dgl_nd(C_indptr),
         As[0].shape[0], As[0].shape[1])
+
 
 def csrmask(A, B):
     """Sparse-sparse matrix masking operation that computes ``A[B != 0]``.
@@ -505,5 +535,6 @@ def csrmask(A, B):
         F.to_dgl_nd(B_indptr),
         F.to_dgl_nd(B_indices))
     return F.from_dgl_nd(B_data)
+
 
 _init_api("dgl.sparse")
