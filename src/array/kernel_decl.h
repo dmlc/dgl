@@ -12,6 +12,7 @@
 
 #include <string>
 #include <vector>
+#include <utility>
 
 namespace dgl {
 namespace aten {
@@ -91,6 +92,32 @@ template <int XPU, typename IdType, int bits>
 void BackwardSegmentCmp(NDArray feat,
                         NDArray arg,
                         NDArray out);
+
+/*!
+ * \brief Sparse-sparse matrix multiplication
+ *
+ * \note B is transposed (i.e. in CSC format).
+ */
+template <int XPU, typename IdType, typename DType>
+std::pair<CSRMatrix, NDArray> CSRMM(
+    const CSRMatrix& A,
+    NDArray A_weights,
+    const CSRMatrix& B,
+    NDArray B_weights);
+
+/*!
+ * \brief Sparse-sparse matrix summation.
+ */
+template <int XPU, typename IdType, typename DType>
+std::pair<CSRMatrix, NDArray> CSRSum(
+    const std::vector<CSRMatrix>& A,
+    const std::vector<NDArray>& A_weights);
+
+/*!
+ * \brief Return a sparse matrix with the values of A but nonzero entry locations of B.
+ */
+template <int XPU, typename IdType, typename DType>
+NDArray CSRMask(const CSRMatrix& A, NDArray A_weights, const CSRMatrix& B);
 
 }  // namespace aten
 }  // namespace dgl

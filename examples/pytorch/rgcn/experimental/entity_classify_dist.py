@@ -29,7 +29,6 @@ from dgl.nn import RelGraphConv
 import tqdm
 
 from ogb.nodeproppred import DglNodePropPredDataset
-from pyinstrument import Profiler
 
 class EntityClassify(nn.Module):
     """ Entity classification class for RGCN
@@ -498,7 +497,7 @@ def run(args, device, data):
                                                                          time.time() - start))
 
 def main(args):
-    dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
+    dgl.distributed.initialize(args.ip_config)
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
 
@@ -533,8 +532,6 @@ if __name__ == '__main__':
     parser.add_argument('--id', type=int, help='the partition id')
     parser.add_argument('--ip-config', type=str, help='The file for IP configuration')
     parser.add_argument('--conf-path', type=str, help='The path to the partition config file')
-    parser.add_argument('--num-client', type=int, help='The number of clients')
-    parser.add_argument('--num-servers', type=int, default=1, help='Server count on each machine.')
 
     # rgcn related
     parser.add_argument('--num_gpus', type=int, default=-1, 
@@ -570,8 +567,6 @@ if __name__ == '__main__':
     parser.add_argument("--eval-batch-size", type=int, default=128,
             help="Mini-batch size. ")
     parser.add_argument('--log-every', type=int, default=20)
-    parser.add_argument("--num-workers", type=int, default=1,
-            help="Number of workers for distributed dataloader.")
     parser.add_argument("--low-mem", default=False, action='store_true',
             help="Whether use low mem RelGraphCov")
     parser.add_argument("--sparse-embedding", action='store_true',
