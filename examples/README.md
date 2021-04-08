@@ -10,6 +10,7 @@ The folder contains example implementations of selected research papers related 
 | ------------------------------------------------------------ | ------------------- | -------------------------------- | ------------------------- | ------------------ | ------------------ |
 | [Boost then Convolve: Gradient Boosting Meets Graph Neural Networks](#bgnn) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Contrastive Multi-View Representation Learning on Graphs](#mvgrl) | :heavy_check_mark: |  | :heavy_check_mark: |  |  |
+| [Deep Graph Contrastive Representation Learning](#grace) | :heavy_check_mark: | |  | | |
 | [Graph Random Neural Network for Semi-Supervised Learning on Graphs](#grand) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Heterogeneous Graph Transformer](#hgt)                      | :heavy_check_mark:  | :heavy_check_mark:               |                           |                    |                    |
 | [Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges](#mwe) | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
@@ -101,6 +102,9 @@ The folder contains example implementations of selected research papers related 
 - <a name="mvgrl"></a> Hassani and Khasahmadi. Contrastive Multi-View Representation Learning on Graphs. [Paper link](https://arxiv.org/abs/2006.05582). 
     - Example code: [PyTorch](../examples/pytorch/mvgrl)
     - Tags: graph diffusion, self-supervised learning on graphs.
+- <a name="grace"></a> Zhu et al. Deep Graph Contrastive Representation Learning. [Paper link](https://arxiv.org/abs/2006.04131). 
+    - Example code: [PyTorch](../examples/pytorch/grace)
+    - Tags: contrastive learning for node classification.
 - <a name="grand"></a> Feng et al. Graph Random Neural Network for Semi-Supervised Learning on Graphs. [Paper link](https://arxiv.org/abs/2005.11079). 
     - Example code: [PyTorch](../examples/pytorch/grand)
     - Tags: semi-supervised node classification, simplifying graph convolution, data augmentation
@@ -128,11 +132,9 @@ The folder contains example implementations of selected research papers related 
 - <a name="dimenet"></a> Klicpera et al. Directional Message Passing for Molecular Graphs. [Paper link](https://arxiv.org/abs/2003.03123).
     - Example code: [PyTorch](../examples/pytorch/dimenet)
     - Tags: molecules, molecular property prediction, quantum chemistry
-
 - <a name="dagnn"></a> Rossi et al. Temporal Graph Networks For Deep Learning on Dynamic Graphs. [Paper link](https://arxiv.org/abs/2006.10637).
     - Example code: [Pytorch](../examples/pytorch/tgn)
     - Tags: over-smoothing, node classification 
-
 - <a name="compgcn"></a> Vashishth, Shikhar, et al. Composition-based Multi-Relational Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1911.03082).
     - Example code: [Pytorch](../examples/pytorch/compGCN)
     - Tags: multi-relational graphs, graph neural network
