@@ -16,6 +16,7 @@ from utils import make_video
 
 def train(optimizer, loss_fn,reg_fn, model, prep, dataloader, lambda_reg, device):
     total_loss = 0
+    model.train()
     for i, (graph_batch, data_batch, label_batch) in enumerate(dataloader):
         graph_batch = graph_batch.to(device)
         data_batch = data_batch.to(device)
