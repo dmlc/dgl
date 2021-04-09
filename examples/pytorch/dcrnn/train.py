@@ -20,6 +20,7 @@ def train(model,graph,dataloader,optimizer,scheduler,normalizer,loss_fn,device,m
     # The batch size is fixed as well as how should we use the graph hence we need to 
     # Do dynamic padding.
     graph = graph.to(device)
+    model.train()
     for i,(x,y) in enumerate(dataloader):
         optimizer.zero_grad()
         x_norm = normalizer.normalize(x).view(x.shape[1],-1,x.shape[3]).float().to(device)
@@ -44,18 +45,18 @@ def train(model,graph,dataloader,optimizer,scheduler,normalizer,loss_fn,device,m
 def eval(model,graph,dataloader,normalizer,loss_fn,device):
     total_loss = []
     graph = graph.to(device)
-    with torch.no_grad():
-        for i,(x,y) in enumerate(dataloader):
-            x_norm = normalizer.normalize(x).view(x.shape[1],-1,x.shape[3]).float().to(device)
-            y_norm = normalizer.normalize(y).view(x.shape[1],-1,x.shape[3]).float().to(device)
-            y = y.view(x.shape[1],-1,x.shape[3]).to(device)
-            batch_size = x.shape[0]
-            batch_graph = dgl.batch([graph]*batch_size)
-            output = model(batch_graph,x_norm,y_norm,i,device)
-            y_pred = normalizer.denormalize(output)
-            loss = loss_fn(y_pred,y)
-            total_loss.append(float(loss))
-        return np.mean(total_loss)
+    model.eval()
+    for i,(x,y) in enumerate(dataloader):
+        x_norm = normalizer.normalize(x).view(x.shape[1],-1,x.shape[3]).float().to(device)
+        y_norm = normalizer.normalize(y).view(x.shape[1],-1,x.shape[3]).float().to(device)
+        y = y.view(x.shape[1],-1,x.shape[3]).to(device)
+        batch_size = x.shape[0]
+        batch_graph = dgl.batch([graph]*batch_size)
+        output = model(batch_graph,x_norm,y_norm,i,device)
+        y_pred = normalizer.denormalize(output)
+        loss = loss_fn(y_pred,y)
+        total_loss.append(float(loss))
+    return np.mean(total_loss)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
