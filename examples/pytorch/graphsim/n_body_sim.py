@@ -10,7 +10,7 @@ import argparse
 
 '''
 This adapted from comes from https://github.com/jsikyoon/Interaction-networks_tensorflow
-Which generate Multi-body Dynamic simulation data used for Interaction network
+which generates multi-body dynamic simulation data for Interaction network
 '''
 
 # 5 features on the state [mass,x,y,x_vel,y_vel]
@@ -63,12 +63,14 @@ def get_f(reciever, sender):
     return G*reciever[0]*sender[0]/(distance**3)*diff
 
 # Compute stat according to the paper for normalization
+
+
 def compute_stats(train_curr):
-    data = np.vstack(train_curr).reshape(-1,fea_num)
-    stat_median = np.median(data,axis=0)
-    stat_max    = np.quantile(data,0.95,axis=0)
-    stat_min    = np.quantile(data,0.05,axis=0)
-    return stat_median,stat_max,stat_min
+    data = np.vstack(train_curr).reshape(-1, fea_num)
+    stat_median = np.median(data, axis=0)
+    stat_max = np.quantile(data, 0.95, axis=0)
+    stat_min = np.quantile(data, 0.05, axis=0)
+    return stat_median, stat_max, stat_min
 
 
 def calc(cur_state, n_body):
@@ -90,9 +92,7 @@ def calc(cur_state, n_body):
     return next_state
 
 # The state is [mass,pos_x,pos_y,vel_x,vel_y]* n_body
-
-
-def gen(n_body, num_steps,orbit):
+def gen(n_body, num_steps, orbit):
     # initialization on just first state
     data = init(num_steps, n_body, fea_num, orbit)
     for i in range(1, num_steps):
@@ -101,10 +101,10 @@ def gen(n_body, num_steps,orbit):
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--num_bodies',type=int,default=6)
-    argparser.add_argument('--num_traj',type=int,default=10)
-    argparser.add_argument('--steps',type=int,default=1000)
-    argparser.add_argument('--data_path',type=str,default='data')
+    argparser.add_argument('--num_bodies', type=int, default=6)
+    argparser.add_argument('--num_traj', type=int, default=10)
+    argparser.add_argument('--steps', type=int, default=1000)
+    argparser.add_argument('--data_path', type=str, default='data')
 
     args = argparser.parse_args()
     if not os.path.exists(args.data_path):
@@ -115,50 +115,49 @@ if __name__ == '__main__':
     data_next = []
 
     for i in range(args.num_traj):
-        raw_traj = gen(args.num_bodies,args.steps,True)
+        raw_traj = gen(args.num_bodies, args.steps, True)
         data_curr.append(raw_traj[:-1])
         data_next.append(raw_traj[1:])
-        print("Train Traj: ",i)
-    
+        print("Train Traj: ", i)
+
     # Compute normalization statistic from data
-    stat_median,stat_max,stat_min = compute_stats(data_curr)
+    stat_median, stat_max, stat_min = compute_stats(data_curr)
     data = np.vstack(data_curr)
-    label= np.vstack(data_next)[:,:,3:5]
+    label = np.vstack(data_next)[:, :, 3:5]
     shuffle_idx = np.arange(data.shape[0])
     np.random.shuffle(shuffle_idx)
     train_split = int(0.9*data.shape[0])
     valid_split = train_split+300
     data = data[shuffle_idx]
-    label= label[shuffle_idx]
+    label = label[shuffle_idx]
 
     train_data = data[:train_split]
-    train_label= label[:train_split]
+    train_label = label[:train_split]
 
     valid_data = data[train_split:valid_split]
-    valid_label= label[train_split:valid_split]
+    valid_label = label[train_split:valid_split]
 
     test_data = data[valid_split:]
-    test_label= label[valid_split:]
+    test_label = label[valid_split:]
 
     np.savez(args.data_path+'/n_body_train.npz',
              data=train_data,
              label=train_label,
-             n_particles = args.num_bodies,
+             n_particles=args.num_bodies,
              median=stat_median,
-             max = stat_max,
-             min = stat_min)
+             max=stat_max,
+             min=stat_min)
 
     np.savez(args.data_path+'/n_body_valid.npz',
-             data = valid_data,
-             label= valid_label,
-             n_particles = args.num_bodies)
+             data=valid_data,
+             label=valid_label,
+             n_particles=args.num_bodies)
 
-    test_traj = gen(args.num_bodies,args.steps,True)
+    test_traj = gen(args.num_bodies, args.steps, True)
 
     np.savez(args.data_path+'/n_body_test.npz',
-             data = test_data,
-             label= test_label,
-             n_particles = args.num_bodies,
+             data=test_data,
+             label=test_label,
+             n_particles=args.num_bodies,
              first_frame=test_traj[0],
-             test_traj = test_traj)
-
+             test_traj=test_traj)

@@ -8,6 +8,8 @@ import matplotlib.animation as manimation
 matplotlib.use('agg')
 
 # Make video can be used to visualize test data
+
+
 def make_video(xy, filename):
     os.system("rm -rf pics/*")
     FFMpegWriter = manimation.writers['ffmpeg']
