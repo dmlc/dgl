@@ -29,6 +29,6 @@ from .server_state import ServerState
 from .dist_dataloader import DistDataLoader
 from .graph_services import sample_neighbors, in_subgraph, find_edges
 from . import optim
-from .optim import SparseAdagrad
 
+SparseAdagrad = optim.SparseAdagrad
 DistEmbedding = NodeEmbedding

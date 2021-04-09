@@ -1,9 +1,9 @@
 """Define sparse embedding and optimizer."""
 
+import torch as th
 from .. import backend as F
 from .. import utils
 from .dist_tensor import DistTensor
-import torch as th
 
 class NodeEmbedding:
     '''Distributed node embeddings.
