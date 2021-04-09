@@ -7,7 +7,8 @@ import dgl
 from torch.utils.data import Dataset, DataLoader
 
 def download_file(dataset):
-    url = "https://s3.us-west-2/dgl-data/dataset/{}".format(dataset)
+    print("Start Downloading data: {}".format(dataset))
+    url = "https://s3.us-west-2.amazonaws.com/dgl-data/dataset/{}".format(dataset)
     print("Start Downloading File....")
     context = ssl._create_unverified_context()
     data = urllib.request.urlopen(url, context=context)

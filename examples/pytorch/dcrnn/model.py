@@ -27,16 +27,20 @@ class DiffConv(nn.Module):
 
     @staticmethod
     def attach_graph(g,k): # g need preprocess for weight adjustment
+        device  = g.device
+        # Idempotent
+        DiffConv.out_graph_list = []
+        DiffConv.in_graph_list = []
         wadj,ind,outd = DiffConv.get_weight_matrix(g)
-        adj = sparse.coo_matrix(wadj/outd.numpy())
-        outg = dgl.from_scipy(adj,eweight_name='weight')
-        outg.edata['weight'] = outg.edata['weight'].float()
+        adj = sparse.coo_matrix(wadj/outd.cpu().numpy())
+        outg = dgl.from_scipy(adj,eweight_name='weight').to(device)
+        outg.edata['weight'] = outg.edata['weight'].float().to(device)
         DiffConv.out_graph_list.append(outg)
         for i in range(k-1):
             DiffConv.out_graph_list.append(DiffConv.diffuse(DiffConv.out_graph_list[-1],wadj,outd))
-        adj = sparse.coo_matrix(wadj.T/ind.numpy())
-        ing = dgl.from_scipy(adj,eweight_name='weight')
-        ing.edata['weight'] = ing.edata['weight'].float()
+        adj = sparse.coo_matrix(wadj.T/ind.cpu().numpy())
+        ing = dgl.from_scipy(adj,eweight_name='weight').to(device)
+        ing.edata['weight'] = ing.edata['weight'].float().to(device)
         DiffConv.in_graph_list.append(ing)
         for i in range(k-1):
             DiffConv.in_graph_list.append(DiffConv.diffuse(DiffConv.in_graph_list[-1],wadj.T,ind))
@@ -47,22 +51,25 @@ class DiffConv(nn.Module):
         ind = g.in_degrees()
         outd = g.out_degrees()
         weight = g.edata['weight']
-        adj.data = weight.numpy()
+        adj.data = weight.cpu().numpy()
         return adj,ind,outd
 
     @staticmethod
     def diffuse(progress_g,weighted_adj,degree):
+        device = progress_g.device
         progress_adj = progress_g.adj(scipy_fmt='coo')
-        progress_adj.data = progress_g.edata['weight'].numpy()
-        ret_adj = sparse.coo_matrix(progress_adj@(weighted_adj/degree.numpy()))
-        ret_graph = dgl.from_scipy(ret_adj,eweight_name='weight')
-        ret_graph.edata['weight'] = ret_graph.edata['weight'].float()
+        progress_adj.data = progress_g.edata['weight'].cpu().numpy()
+        ret_adj = sparse.coo_matrix(progress_adj@(weighted_adj/degree.cpu().numpy()))
+        ret_graph = dgl.from_scipy(ret_adj,eweight_name='weight').to(device)
+        ret_graph.edata['weight'] = ret_graph.edata['weight'].float().to(device)
         return ret_graph
 
     def forward(self,g,x):
         if DiffConv.init == True:
             DiffConv.attach_graph(g,self.k)
             DiffConv.init = False
+        if g.num_nodes()!=DiffConv.in_graph_list[0].num_nodes():
+            DiffConv.attach_graph(g,self.k)
         feat_list = [] # Each element in the feature list should be [N,out_feats]
         if self.dir == 'both':
             graph_list = DiffConv.in_graph_list+DiffConv.out_graph_list
@@ -296,28 +303,28 @@ class DCRNN(nn.Module):
     def compute_thresh(self,batch_cnt):
         return self.decay_steps/(self.decay_steps + np.exp(batch_cnt / self.decay_steps))
 
-    def encode(self,g,inputs):
-        hidden_states = [torch.zeros(g.num_nodes(),self.out_feats) for _ in range(self.num_layers)]
+    def encode(self,g,inputs,device):
+        hidden_states = [torch.zeros(g.num_nodes(),self.out_feats).to(device) for _ in range(self.num_layers)]
         for i in range(self.seq_len):
             _,hidden_states = self.encoder(g,inputs[i],hidden_states)
 
         return hidden_states
 
-    def decode(self,g,teacher_states,hidden_states,batch_cnt):
+    def decode(self,g,teacher_states,hidden_states,batch_cnt,device):
         outputs = []
-        inputs = torch.zeros(g.num_nodes(),self.in_feats)
+        inputs = torch.zeros(g.num_nodes(),self.in_feats).to(device)
         for i in range(self.seq_len):
-            if np.random.random() < self.compute_thresh(batch_cnt):
+            if np.random.random() < self.compute_thresh(batch_cnt) and self.training:
                 inputs,hidden_states = self.decoder(g,teacher_states[i],hidden_states)
             else:
-                inputs,hidden_states = self.decoder(g,x,hidden_states)
+                inputs,hidden_states = self.decoder(g,inputs,hidden_states)
             outputs.append(inputs)
         outputs = torch.stack(outputs) # Skeptical about shape
         return outputs
 
-    def forward(self,g,inputs,teacher_states,batch_cnt):
-        hidden = self.encode(g,inputs)
-        outputs = self.decode(g,teacher_states,hidden,batch_cnt)
+    def forward(self,g,inputs,teacher_states,batch_cnt,device):
+        hidden = self.encode(g,inputs,device)
+        outputs = self.decode(g,teacher_states,hidden,batch_cnt,device)
         return outputs
         
 # need to define the Unit test of the model
