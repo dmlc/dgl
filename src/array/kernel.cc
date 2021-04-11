@@ -196,7 +196,6 @@ NDArray CSRMask(const CSRMatrix& A, NDArray A_weights, const CSRMatrix& B) {
   auto dtype = A_weights->dtype;
 
   NDArray ret;
-  // TODO(BarclayII): change to ATEN_XPU_SWITCH_CUDA once the GPU kernels are implemented
   ATEN_XPU_SWITCH_CUDA(ctx.device_type, XPU, "CSRMask", {
     ATEN_ID_TYPE_SWITCH(idtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH(dtype, DType, "Edge weights", {
