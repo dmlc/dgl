@@ -64,9 +64,10 @@ std::pair<aten::CSRMatrix, NDArray> CSR_A(DLContext ctx = CTX) {
   auto csr = aten::CSRMatrix(
       4, 5,
       NDArray::FromVector(std::vector<IdType>({0, 2, 4, 7, 8}), ctx),
-      NDArray::FromVector(std::vector<IdType>({2, 3, 2, 3, 0, 1, 3, 4}), ctx));
+      NDArray::FromVector(std::vector<IdType>({2, 3, 2, 3, 0, 1, 3, 4}), ctx),
+      NDArray::FromVector(std::vector<IdType>({1, 0, 2, 3, 4, 5, 6, 7}), ctx));
   auto weights = NDArray::FromVector(
-      std::vector<DType>({1.0, 0.7, 0.5, 0.0, 0.4, 0.7, 0.2, 0.2}), ctx);
+      std::vector<DType>({0.7, 1.0, 0.5, 0.0, 0.4, 0.7, 0.2, 0.2}), ctx);
   return {csr, weights};
 }
 
@@ -175,8 +176,8 @@ TEST(CsrmmTest, TestCsrmm) {
 #ifdef DGL_USE_CUDA
   _TestCsrmm<int32_t, float>(GPU);
   _TestCsrmm<int32_t, double>(GPU);
-  // _TestCsrmm<int64_t, float>(GPU);
-  // _TestCsrmm<int64_t, double>(GPU);
+  _TestCsrmm<int64_t, float>(GPU);
+  _TestCsrmm<int64_t, double>(GPU);
 #endif
 }
 
@@ -188,8 +189,8 @@ TEST(CsrmmTest, TestCsrsum) {
 #ifdef DGL_USE_CUDA
   _TestCsrsum<int32_t, float>(GPU);
   _TestCsrsum<int32_t, double>(GPU);
-  // _TestCsrsum<int64_t, float>(GPU);
-  // _TestCsrsum<int64_t, double>(GPU);
+  _TestCsrsum<int64_t, float>(GPU);
+  _TestCsrsum<int64_t, double>(GPU);
 #endif
 }
 
@@ -199,10 +200,10 @@ TEST(CsrmmTest, TestCsrmask) {
   _TestCsrmask<int64_t, float>(CPU);
   _TestCsrmask<int64_t, double>(CPU);
 #ifdef DGL_USE_CUDA
-  // _TestCsrmask<int32_t, float>(GPU);
-  // _TestCsrmask<int32_t, double>(GPU);
-  // _TestCsrmask<int64_t, float>(GPU);
-  // _TestCsrmask<int64_t, double>(GPU);
+  _TestCsrmask<int32_t, float>(GPU);
+  _TestCsrmask<int32_t, double>(GPU);
+  _TestCsrmask<int64_t, float>(GPU);
+  _TestCsrmask<int64_t, double>(GPU);
 #endif
 }
 
