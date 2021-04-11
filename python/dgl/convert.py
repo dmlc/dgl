@@ -158,7 +158,7 @@ def graph(data,
                            ' but got {} and {}.'.format(num_nodes, max(urange, vrange) - 1))
         urange, vrange = num_nodes, num_nodes
 
-    g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange)
+    g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange, validate=False)
 
     return g.to(device)
 

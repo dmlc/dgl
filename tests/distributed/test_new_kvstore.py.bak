@@ -151,7 +151,7 @@ def start_server_mul_role(server_id, num_clients, num_servers):
 def start_client(num_clients, num_servers):
     os.environ['DGL_DIST_MODE'] = 'distributed'
     # Note: connect to server first !
-    dgl.distributed.initialize(ip_config='kv_ip_config.txt', num_servers=num_servers)
+    dgl.distributed.initialize(ip_config='kv_ip_config.txt')
     # Init kvclient
     kvclient = dgl.distributed.KVClient(ip_config='kv_ip_config.txt', num_servers=num_servers)
     kvclient.map_shared_data(partition_book=gpb)
@@ -278,10 +278,10 @@ def start_client(num_clients, num_servers):
     data_tensor = data_tensor * num_clients
     assert_array_equal(F.asnumpy(res), F.asnumpy(data_tensor))
 
-def start_client_mul_role(i, num_workers, num_servers):
+def start_client_mul_role(i):
     os.environ['DGL_DIST_MODE'] = 'distributed'
     # Initialize creates kvstore !
-    dgl.distributed.initialize(ip_config='kv_ip_mul_config.txt', num_servers=num_servers, num_workers=num_workers)
+    dgl.distributed.initialize(ip_config='kv_ip_mul_config.txt')
     if i == 0: # block one trainer
         time.sleep(5)
     kvclient = dgl.distributed.kvstore.get_kvstore()
@@ -305,6 +305,7 @@ def test_kv_store():
     ctx = mp.get_context('spawn')
     pserver_list = []
     pclient_list = []
+    os.environ['DGL_NUM_SERVER'] = str(num_servers)
     for i in range(num_servers):
         pserver = ctx.Process(target=start_server, args=(i, num_clients, num_servers))
         pserver.start()
@@ -332,12 +333,14 @@ def test_kv_multi_role():
     ctx = mp.get_context('spawn')
     pserver_list = []
     pclient_list = []
+    os.environ['DGL_NUM_SAMPLER'] = str(num_samplers)
+    os.environ['DGL_NUM_SERVER'] = str(num_servers)
     for i in range(num_servers):
         pserver = ctx.Process(target=start_server_mul_role, args=(i, num_clients, num_servers))
         pserver.start()
         pserver_list.append(pserver)
     for i in range(num_trainers):
-        pclient = ctx.Process(target=start_client_mul_role, args=(i, num_samplers, num_servers))
+        pclient = ctx.Process(target=start_client_mul_role, args=(i,))
         pclient.start()
         pclient_list.append(pclient)
     for i in range(num_trainers):
