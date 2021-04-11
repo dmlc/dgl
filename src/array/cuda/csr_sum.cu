@@ -45,35 +45,34 @@ std::pair<CSRMatrix, NDArray> CusparseCsrgeam2(
   CUSPARSE_CALL(cusparseCreateMatDescr(&matB));
   CUSPARSE_CALL(cusparseCreateMatDescr(&matC));
 
-  cusparseSetPointerMode(thr_entry->cusparse_handle, 
-    CUSPARSE_POINTER_MODE_HOST);
+  cusparseSetPointerMode(thr_entry->cusparse_handle, CUSPARSE_POINTER_MODE_HOST);
   size_t workspace_size = 0;
   /* prepare output C */
   IdArray dC_csrOffsets = IdArray::Empty({A.num_rows+1}, A.indptr->dtype, ctx);
   IdType* dC_csrOffsets_data = dC_csrOffsets.Ptr<IdType>();
-  IdArray dC_columns; 
-  NDArray dC_weights; 
+  IdArray dC_columns;
+  NDArray dC_weights;
   IdType* dC_columns_data = dC_columns.Ptr<IdType>();
   DType* dC_weights_data = dC_weights.Ptr<DType>();
   /* prepare buffer */
   CUSPARSE_CALL(CSRGEAM<DType>::bufferSizeExt(
       thr_entry->cusparse_handle, m, n, &alpha,
-      matA, nnzA, A_weights, 
+      matA, nnzA, A_weights,
       A.indptr.Ptr<IdType>(),
       A.indices.Ptr<IdType>(),
-      &beta, matB, nnzB, B_weights, 
+      &beta, matB, nnzB, B_weights,
       B.indptr.Ptr<IdType>(),
       B.indices.Ptr<IdType>(),
       matC, dC_weights_data, dC_csrOffsets_data, dC_columns_data,
       &workspace_size));
-  
-  void *workspace = device->AllocWorkspace(ctx, workspace_size); //sizeof(char)
-  CUSPARSE_CALL(CSRGEAM<DType>::nnz(thr_entry->cusparse_handle, 
+
+  void *workspace = device->AllocWorkspace(ctx, workspace_size);
+  CUSPARSE_CALL(CSRGEAM<DType>::nnz(thr_entry->cusparse_handle,
       m, n, matA, nnzA,
       A.indptr.Ptr<IdType>(),
       A.indices.Ptr<IdType>(),
       matB, nnzB,
-      B.indptr.Ptr<IdType>(), 
+      B.indptr.Ptr<IdType>(),
       B.indices.Ptr<IdType>(),
       matC, dC_csrOffsets_data, &nnzC, workspace));
 
@@ -98,7 +97,7 @@ std::pair<CSRMatrix, NDArray> CusparseCsrgeam2(
   CUSPARSE_CALL(cusparseDestroyMatDescr(matA));
   CUSPARSE_CALL(cusparseDestroyMatDescr(matB));
   CUSPARSE_CALL(cusparseDestroyMatDescr(matC));
-  return {CSRMatrix(A.num_rows, A.num_cols, dC_csrOffsets, dC_columns), 
+  return {CSRMatrix(A.num_rows, A.num_cols, dC_csrOffsets, dC_columns),
     dC_weights};
 }
 }  // namespace cusparse

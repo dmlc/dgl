@@ -74,16 +74,16 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   // ask bufferSize1 bytes for external memory
   CUSPARSE_CALL(cusparseSpGEMM_workEstimation(
       thr_entry->cusparse_handle, transA, transB,
-      &alpha, matA, matB, &beta, matC, dtype, 
-      CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &workspace_size1, 
+      &alpha, matA, matB, &beta, matC, dtype,
+      CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &workspace_size1,
       NULL));
   void* workspace1 = (device->AllocWorkspace(ctx, workspace_size1));
   // inspect the matrices A and B to understand the memory requiremnent
   // for the next step
   CUSPARSE_CALL(cusparseSpGEMM_workEstimation(
       thr_entry->cusparse_handle, transA, transB,
-      &alpha, matA, matB, &beta, matC, dtype, 
-      CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &workspace_size1, 
+      &alpha, matA, matB, &beta, matC, dtype,
+      CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &workspace_size1,
       workspace1));
   // ask bufferSize2 bytes for external memory
   CUSPARSE_CALL(cusparseSpGEMM_compute(thr_entry->cusparse_handle,
@@ -104,7 +104,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   IdType* dC_columns_data = dC_columns.Ptr<IdType>();
   DType* dC_weights_data = dC_weights.Ptr<DType>();
   // update matC with the new pointers
-  CUSPARSE_CALL(cusparseCsrSetPointers(matC, dC_csrOffsets_data, 
+  CUSPARSE_CALL(cusparseCsrSetPointers(matC, dC_csrOffsets_data,
      dC_columns_data, dC_weights_data));
   // copy the final products to the matrix C
   CUSPARSE_CALL(cusparseSpGEMM_copy(thr_entry->cusparse_handle,
@@ -121,13 +121,13 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   return {CSRMatrix(A.num_rows, B.num_cols, dC_csrOffsets, dC_columns), dC_weights};
 }
 
-#else // __CUDACC_VER_MAJOR__ != 11
+#else   // __CUDACC_VER_MAJOR__ != 11
 
 /*! \brief Cusparse implementation of SpGEMM on Csr format for older CUDA versions */
 template <typename DType, typename IdType>
 std::pair<CSRMatrix, NDArray> CusparseSpgemm(
     const CSRMatrix& A,
-    const NDArray A_weights_array, 
+    const NDArray A_weights_array,
     const CSRMatrix& B,
     const NDArray B_weights_array) {
   int nnzC;
@@ -159,7 +159,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   CUSPARSE_CALL(cusparseCreateMatDescr(&matA));
   CUSPARSE_CALL(cusparseCreateMatDescr(&matB));
   CUSPARSE_CALL(cusparseCreateMatDescr(&matC));
-  CUSPARSE_CALL(cusparseCreateMatDescr(&matD)); // needed even if D is null
+  CUSPARSE_CALL(cusparseCreateMatDescr(&matD));   // needed even if D is null
 
   CUSPARSE_CALL(CSRGEMM<DType>::bufferSizeExt(thr_entry->cusparse_handle,
       m, n, k, &alpha,
