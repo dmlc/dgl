@@ -84,55 +84,6 @@ def check_dist_graph_empty(g, num_clients, num_nodes, num_edges):
     test3 = dgl.distributed.DistTensor((g.number_of_nodes(), 3), F.float32, 'test3')
     del test3
 
-    # Test sparse emb
-    try:
-        emb = DistEmbedding(g.number_of_nodes(), 1, 'emb1', emb_init)
-        lr = 0.001
-        optimizer = SparseAdagrad([emb], lr=lr)
-        with F.record_grad():
-            feats = emb(nids)
-            assert np.all(F.asnumpy(feats) == np.zeros((len(nids), 1)))
-            loss = F.sum(feats + 1, 0)
-        loss.backward()
-        optimizer.step()
-        feats = emb(nids)
-        if num_clients == 1:
-            assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * -lr)
-        rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
-        feats1 = emb(rest)
-        assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
-
-        policy = dgl.distributed.PartitionPolicy('node', g.get_partition_book())
-        grad_sum = dgl.distributed.DistTensor((g.number_of_nodes(),), F.float32,
-                                              'emb1_sum', policy)
-        if num_clients == 1:
-            assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)) * num_clients)
-        assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
-
-        emb = DistEmbedding(g.number_of_nodes(), 1, 'emb2', emb_init)
-        with F.no_grad():
-            feats1 = emb(nids)
-        assert np.all(F.asnumpy(feats1) == 0)
-
-        optimizer = SparseAdagrad([emb], lr=lr)
-        with F.record_grad():
-            feats1 = emb(nids)
-            feats2 = emb(nids)
-            feats = F.cat([feats1, feats2], 0)
-            assert np.all(F.asnumpy(feats) == np.zeros((len(nids) * 2, 1)))
-            loss = F.sum(feats + 1, 0)
-        loss.backward()
-        optimizer.step()
-        with F.no_grad():
-            feats = emb(nids)
-        if num_clients == 1:
-            assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * math.sqrt(2) * -lr)
-        rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
-        feats1 = emb(rest)
-        assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
-    except NotImplementedError as e:
-        pass
-
     # Test write data
     new_feats = F.ones((len(nids), 2), F.int32, F.cpu())
     g.ndata['test1'][nids] = new_feats
