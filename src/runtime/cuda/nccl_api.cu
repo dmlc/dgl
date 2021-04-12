@@ -331,32 +331,33 @@ void GenerateSparseBufferFromRemainder(
     CUDA_CALL(cudaGetLastError());
   }
 
-  // Count the number of values to be sent to each processor
+  // Count the number of values to be sent to each processor, as things are
+  // sorted at this point, we can just use run-length encoding
   {
-    constexpr const int BLOCK_SIZE = 256;
-    constexpr const int TILE_SIZE = 1024;
-    const dim3 block(BLOCK_SIZE);
-    const dim3 grid((num_in+TILE_SIZE-1)/TILE_SIZE);
+    size_t hist_workspace_size;
+    CUDA_CALL(cub::DeviceHistogram::HistogramEven(
+        nullptr,
+        hist_workspace_size,
+        out_idx,
+        out_counts,
+        comm_size+1,
+        static_cast<IdType>(0),
+        static_cast<IdType>(comm_size+1),
+        num_in,
+        stream));
 
-    if (comm_size < 128) {
-      _CountIndexByRemainder<IdType, 128, BLOCK_SIZE, TILE_SIZE><<<
-          grid, block, 0, stream>>>(
-            out_idx,
-            num_in,
-            out_counts,
-            comm_size);
-      CUDA_CALL(cudaGetLastError());
-    } else {
-      CHECK_LE(comm_size, 1024) << "_CAPI_DGLNCCLSparseAllToAll() is not "
-          "implemented for comms greater than 1024 ranks.";
-      _CountIndexByRemainder<IdType, 1024, BLOCK_SIZE, TILE_SIZE><<<
-          grid, block, 0, stream>>>(
-            out_idx,
-            num_in,
-            out_counts,
-            comm_size);
-      CUDA_CALL(cudaGetLastError());
-    }
+    void * hist_workspace = device->AllocWorkspace(ctx, hist_workspace_size);
+    CUDA_CALL(cub::DeviceHistogram::HistogramEven(
+        hist_workspace,
+        hist_workspace_size,
+        out_idx,
+        out_counts,
+        comm_size+1,
+        static_cast<IdType>(0),
+        static_cast<IdType>(comm_size+1),
+        num_in,
+        stream));
+    device->FreeWorkspace(ctx, hist_workspace);
   }
 }
 
