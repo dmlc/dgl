@@ -39,8 +39,8 @@ def train(model,graph,dataloader,optimizer,scheduler,normalizer,loss_fn,device,m
         if get_learning_rate(optimizer) > minimum_lr:
             scheduler.step()
         total_loss.append(float(loss))
-        print("Batch {}".format(i))
-    return total_loss
+        #print("Batch {}".format(i))
+    return np.mean(total_loss)
 
 def eval(model,graph,dataloader,normalizer,loss_fn,device):
     total_loss = []
@@ -115,7 +115,7 @@ if __name__ == "__main__":
         valid_loss = eval(dcrnn,g,valid_loader,normalizer,loss_fn,device)
         test_loss = eval(dcrnn,g,test_loader,normalizer,loss_fn,device)
         print("Epoch: {} Train Loss: {} Valid Loss: {} Test Loss: {}".format(e,
-                                                                             train_loss/len(train_data),
-                                                                             valid_loss/len(valid_data),
-                                                                             test_loss/len(test_data)))
+                                                                             train_loss,
+                                                                             valid_loss,
+                                                                             test_loss))
 
