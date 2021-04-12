@@ -64,5 +64,5 @@ One Step Loss Performance, Loss of test data after 40000 training epochs.
 | Interaction Network in Tensorflow | 60 |
 
 -------------------------
-Notice that The datasets are generate dataset directly from Simulator to prevent using Tensorflow to handle the original dataset. The training it very unstable, the even if the minimum loss is achieved from time to time, there are chance that loss will suddenly increase, both in auther's model and out model. The Since the original model hasn't been released, the implementation of this model refers from Tensorflow version implemented in: https://github.com/jsikyoon/Interaction-networks_tensorflow which has consult the first author for some implementation details.
+Notice that The datasets are generated directly from simulator to prevent using Tensorflow to handle the original dataset. The training is very unstable, the even if the minimum loss is achieved from time to time, there are chances that loss will suddenly increase,in both auther's model and our model. Since the original model hasn't been released, the implementation of this model refers to Tensorflow version implemented in: https://github.com/jsikyoon/Interaction-networks_tensorflow which had consulted the first author for some implementation details.
 

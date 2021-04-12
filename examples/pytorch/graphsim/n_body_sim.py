@@ -20,7 +20,6 @@ G = 10**5
 # time step
 diff_t = 0.001
 
-
 def init(total_state, n_body, fea_num, orbit):
     data = np.zeros((total_state, n_body, fea_num), dtype=float)
     if(orbit):
@@ -50,10 +49,8 @@ def init(total_state, n_body, fea_num, orbit):
             data[0][i][4] = np.random.rand()*6.0-3.0
     return data
 
-
 def norm(x):
     return np.sqrt(np.sum(x**2))
-
 
 def get_f(reciever, sender):
     diff = sender[1:3]-reciever[1:3]
@@ -63,15 +60,12 @@ def get_f(reciever, sender):
     return G*reciever[0]*sender[0]/(distance**3)*diff
 
 # Compute stat according to the paper for normalization
-
-
 def compute_stats(train_curr):
     data = np.vstack(train_curr).reshape(-1, fea_num)
     stat_median = np.median(data, axis=0)
     stat_max = np.quantile(data, 0.95, axis=0)
     stat_min = np.quantile(data, 0.05, axis=0)
     return stat_median, stat_max, stat_min
-
 
 def calc(cur_state, n_body):
     next_state = np.zeros((n_body, fea_num), dtype=float)
