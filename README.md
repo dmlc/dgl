@@ -340,6 +340,7 @@ conda install -c dglteam dgl-cuda9.2   # CUDA 9.2
 conda install -c dglteam dgl-cuda10.1  # CUDA 10.1
 conda install -c dglteam dgl-cuda10.2  # CUDA 10.2
 conda install -c dglteam dgl-cuda11.0  # CUDA 11.0
+conda install -c dglteam dgl-cuda11.1  # CUDA 11.1
 ```
 
 ### Using pip
@@ -352,6 +353,7 @@ conda install -c dglteam dgl-cuda11.0  # CUDA 11.0
 | CUDA 10.1 | `pip install --pre dgl-cu101` | `pip install dgl-cu101` |
 | CUDA 10.2 | `pip install --pre dgl-cu102` | `pip install dgl-cu102` |
 | CUDA 11.0 | `pip install --pre dgl-cu110` | `pip install dgl-cu110` |
+| CUDA 11.1 | `pip install --pre dgl-cu111` | `pip install dgl-cu111` |
 
 ### Built from source code
 
