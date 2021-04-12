@@ -4,7 +4,7 @@ import os
 import numpy as np
 
 from . import rpc
-from .graph_partition_book import PartitionPolicy, NodePartitionPolicy, EdgePartitionPolicy
+from .graph_partition_book import NodePartitionPolicy, EdgePartitionPolicy
 from .standalone_kvstore import KVClient as SA_KVClient
 
 from .. import backend as F
