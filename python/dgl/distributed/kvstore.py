@@ -365,8 +365,6 @@ class GetSharedDataRequest(rpc.Request):
             meta[name] = (F.shape(data),
                           F.reverse_data_type_dict[F.dtype(data)],
                           kv_store.part_policy[name].policy_str)
-        if len(meta) == 0:
-            raise RuntimeError('There is no data on kvserver.')
         res = GetSharedDataResponse(meta)
         return res
 
