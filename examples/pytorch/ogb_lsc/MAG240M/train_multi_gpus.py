@@ -109,13 +109,18 @@ def train(proc_id, n_gpus, args, dataset, g, feats, paper_offset):
     sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 25])
     train_collator = ExternalNodeCollator(g, train_idx, sampler, paper_offset, feats, label)
     valid_collator = ExternalNodeCollator(g, valid_idx, sampler, paper_offset, feats, label)
+    # Necessary according to https://yangkky.github.io/2019/07/08/distributed-pytorch-tutorial.html
+    train_sampler = torch.utils.data.distributed.DistributedSampler(
+        train_collator.dataset, num_replicas=world_size, rank=proc_id)
+
     train_dataloader = torch.utils.data.DataLoader(
         train_collator.dataset,
         batch_size=1024,
         shuffle=True,
         drop_last=False,
         collate_fn=train_collator.collate,
-        num_workers=4
+        num_workers=4,
+        sampler=train_sampler
     )
     valid_dataloader = torch.utils.data.DataLoader(
         valid_collator.dataset,
