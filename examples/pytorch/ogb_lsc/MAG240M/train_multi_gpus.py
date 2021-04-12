@@ -85,13 +85,6 @@ class ExternalNodeCollator(dgl.dataloading.NodeCollator):
         return input_nodes, output_nodes, mfgs
 
 
-def print_memory_usage():
-    import os
-    import psutil
-    process = psutil.Process(os.getpid())
-    print("memory usage is {} GB".format(process.memory_info()[0] / 1024 / 1024 / 1024))
-
-
 def train(proc_id, n_gpus, args, dataset, g, feats, paper_offset):
     dev_id = devices[proc_id]
     if n_gpus > 1:
