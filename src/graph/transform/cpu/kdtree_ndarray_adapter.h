@@ -10,7 +10,7 @@
 #include <dgl/array.h>
 #include <dmlc/logging.h>
 #include <nanoflann.hpp>
-#include "../../c_api_common.h"
+#include "../../../c_api_common.h"
 
 namespace dgl {
 namespace transform {
