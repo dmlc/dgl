@@ -294,12 +294,12 @@ class NodeDataLoader:
             if device != 'cpu':
                 assert not 'num_workers' in dataloader_kwargs or \
                     dataloader_kwargs['num_workers'] == 0, \
-                    'When performing dataloading from the GPU, num_workers '
+                    'When performing dataloading from the GPU, num_workers ' \
                     'must be zero'
 
             if isinstance(dataset, th.Tensor):
                 # manually batch into tensors
-                dataset = _ScalarDataBatcher(dataset, **datalaoder_kwargs)
+                dataset = _ScalarDataBatcher(dataset, **dataloader_kwargs)
 
             self.dataloader = DataLoader(
                 self.collator.dataset,
