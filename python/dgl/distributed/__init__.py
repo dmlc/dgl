@@ -30,4 +30,4 @@ from .dist_dataloader import DistDataLoader
 from .graph_services import sample_neighbors, in_subgraph, find_edges
 from .sparse_emb import NodeEmbedding, DistEmbedding
 
-from .optim import SparseAdagrad as SparseAdagrad
+from .optim import SparseAdagrad
