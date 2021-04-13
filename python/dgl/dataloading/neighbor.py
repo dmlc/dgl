@@ -66,7 +66,7 @@ class MultiLayerNeighborSampler(BlockSampler):
         self.replace = replace
 
         # used to cache computations and memory allocations
-        self.fanout_arrays = []
+        self.fanout_arrays = [] # list[dgl.nd.NDArray]; each array stores the fan-outs of all edge types
         self.prob_arrays = None
 
     def sample_frontier(self, block_id, g, seed_nodes):
@@ -96,6 +96,8 @@ class MultiLayerNeighborSampler(BlockSampler):
             self.prob_arrays = [nd.array([], ctx=nd.cpu())] * len(g.etypes)
 
     def _build_fanout(self, block_id, g):
+        assert not self.fanouts is None, \
+            "_build_fanout() should only be called when fanouts is not None"
         # build fanout_arrays only once for each layer
         while block_id >= len(self.fanout_arrays):
             for i in range(len(self.fanouts)):
