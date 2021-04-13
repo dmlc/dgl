@@ -31,4 +31,4 @@ from .graph_services import sample_neighbors, in_subgraph, find_edges
 from .sparse_emb import NodeEmbedding, DistEmbedding
 
 # This is only for backward compatibility
-from .optim import SparseAdagrad # pylint: disable=import-error
+from .optim import SparseAdagrad # pylint: disable=no-name-in-module
