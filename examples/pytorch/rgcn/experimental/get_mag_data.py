@@ -4,8 +4,6 @@ import torch as th
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
-from pyinstrument import Profiler
-
 # Load OGB-MAG.
 dataset = DglNodePropPredDataset(name='ogbn-mag')
 hg_orig, labels = dataset[0]
@@ -48,7 +46,7 @@ for part_id in range(metadata['num_parts']):
         for name in hg.nodes[ntype].data:
             node_data[ntype + '/' + name] = hg.nodes[ntype].data[name][local_nodes]
     print('node features:', node_data.keys())
-    dgl.data.utils.save_tensors(metadata['part-{}'.format(part_id)]['node_feats'], node_data)
+    dgl.data.utils.save_tensors('outputs/' + metadata['part-{}'.format(part_id)]['node_feats'], node_data)
 
     edge_data = {}
     for etype in hg.etypes:
@@ -56,4 +54,4 @@ for part_id in range(metadata['num_parts']):
         for name in hg.edges[etype].data:
             edge_data[etype + '/' + name] = hg.edges[etype].data[name][local_edges]
     print('edge features:', edge_data.keys())
-    dgl.data.utils.save_tensors(metadata['part-{}'.format(part_id)]['edge_feats'], edge_data)
+    dgl.data.utils.save_tensors('outputs/' + metadata['part-{}'.format(part_id)]['edge_feats'], edge_data)

@@ -2,16 +2,15 @@
 
 This DGL example implements the GNN model proposed in the paper [Graph Random Neural Network for Semi-Supervised Learning on Graphs]( https://arxiv.org/abs/2005.11079).
 
-Paper link: https://arxiv.org/abs/2005.11079
-
 Author's code: https://github.com/THUDM/GRAND
 
-Contributor: Hengrui Zhang ([@hengruizhang98](https://github.com/hengruizhang98))
+## Example Implementor
 
-## Dependecies
+This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang98) when he was an applied scientist intern at AWS Shanghai AI Lab.
+
+## Dependencies
 - Python 3.7
 - PyTorch 1.7.1
-- numpy
 - dgl 0.5.3
 
 ## Dataset

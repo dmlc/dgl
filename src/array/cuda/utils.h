@@ -31,7 +31,7 @@ namespace cuda {
       typedef double DType;                                     \
       { __VA_ARGS__ }                                           \
     } else {                                                    \
-      LOG(FATAL) << "Data type not renogized with bits " << bits; \
+      LOG(FATAL) << "Data type not recognized with bits " << bits; \
     }                                                           \
   } while (0)
 #else  // USE_FP16
@@ -44,7 +44,7 @@ namespace cuda {
       typedef double DType;                                     \
       { __VA_ARGS__ }                                           \
     } else {                                                    \
-      LOG(FATAL) << "Data type not renogized with bits " << bits; \
+      LOG(FATAL) << "Data type not recognized with bits " << bits; \
     }                                                           \
   } while (0)
 #endif  // USE_FP16
