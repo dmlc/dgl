@@ -6,11 +6,10 @@ from ..dataloader import NodeCollator, EdgeCollator, GraphCollator
 from ...distributed import DistGraph
 from ...distributed import DistDataLoader
 
-class _ScalarDataLoaderIter:
+class _ScalarDataBatcherIter:
     def __init__(self, dataset, batch_size, collate_fn, drop_last):
         self.dataset = dataset
         self.batch_size = batch_size
-        self.collate_fn = collate_fn
         self.index = 0
         self.drop_last = drop_last
 
@@ -24,13 +23,11 @@ class _ScalarDataLoaderIter:
                 raise StopIteration
             end_idx = num_items
         batch = self.dataset[self.index:end_idx]
-        if self.collate_fn:
-            batch = self.collate_fn(batch)
         self.index += self.batch_size
 
         return batch
 
-class _ScalarDataLoader:
+class _ScalarDataBatcher:
     """Custom DataLoader to return mini-batches as tensors, rather than as
     lists. When used inside of the NodeDataLoader, this significantly reduces
     the overhead. For the case of a batch size of 1024, instead of giving a
@@ -38,16 +35,12 @@ class _ScalarDataLoader:
     is passed in.
     This implementation supports only minimum set of features.
     """
-    def __init__(self, dataset, collate_fn=None, shuffle=False, batch_size=1,
-                 drop_last=False, num_workers=0):
+    def __init__(self, dataset, shuffle=False, batch_size=1,
+                 drop_last=False, **kwargs):
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle = shuffle
-        self.collate_fn = collate_fn
         self.drop_last = drop_last
-
-        if num_workers != 0:
-            raise ValueError("_ScaleDataLoader does not support workers")
 
     def __iter__(self):
         if self.shuffle:
@@ -57,8 +50,7 @@ class _ScalarDataLoader:
         else:
             dataset = self.dataset
 
-        return _ScalarDataLoaderIter(dataset, self.batch_size,
-                                     self.collate_fn, self.drop_last)
+        return _ScalarDataBatcherIter(dataset, self.batch_size, self.drop_last)
 
 def _remove_kwargs_dist(kwargs):
     if 'num_workers' in kwargs:
@@ -297,25 +289,22 @@ class NodeDataLoader:
             self.is_distributed = True
         else:
             self.collator = _NodeCollator(g, nids, block_sampler, **collator_kwargs)
-            if "num_workers" in dataloader_kwargs and dataloader_kwargs["num_workers"] > 0:
-                assert g.device == th.device('cpu'), \
-                    'Only graphs on the cpu are supported for NodeDataLoader ' \
-                    'in the case of num_workers > 0.'
-                self.dataloader = DataLoader(
-                    self.collator.dataset,
-                    collate_fn=self.collator.collate,
-                    **dataloader_kwargs)
-            else:
-                if isinstance(self.collator.dataset, th.Tensor):
-                    self.dataloader = _ScalarDataLoader(
-                        self.collator.dataset,
-                        collate_fn=self.collator.collate,
-                        **dataloader_kwargs)
-                else:
-                    self.dataloader = DataLoader(
-                        self.collator.dataset,
-                        collate_fn=self.collator.collate,
-                        **dataloader_kwargs)
+            dataset = self.collator.dataset
+
+            if device != 'cpu':
+                assert not 'num_workers' in dataloader_kwargs or \
+                    dataloader_kwargs['num_workers'] == 0, \
+                    'When performing dataloading from the GPU, num_workers '
+                    'must be zero'
+
+            if isinstance(dataset, th.Tensor):
+                # manually batch into tensors
+                dataset = _ScalarDataBatcher(dataset, **datalaoder_kwargs)
+
+            self.dataloader = DataLoader(
+                self.collator.dataset,
+                collate_fn=self.collator.collate,
+                **dataloader_kwargs)
             self.is_distributed = False
 
             # Precompute the CSR and CSC representations so each subprocess does not
