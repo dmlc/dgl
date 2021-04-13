@@ -103,15 +103,16 @@ def train(proc_id, n_gpus, args, dataset, g, feats, paper_offset):
     valid_idx = torch.LongTensor(dataset.get_idx_split('valid')) + paper_offset
     label = dataset.paper_label
 
-    train_idx = torch.split(train_idx, math.ceil(len(train_idx) / n_gpus))[proc_id]
-
     print('Initializing dataloader...')
     sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 25])
+
     train_collator = ExternalNodeCollator(g, train_idx, sampler, paper_offset, feats, label)
     valid_collator = ExternalNodeCollator(g, valid_idx, sampler, paper_offset, feats, label)
     # Necessary according to https://yangkky.github.io/2019/07/08/distributed-pytorch-tutorial.html
     train_sampler = torch.utils.data.distributed.DistributedSampler(
         train_collator.dataset, num_replicas=world_size, rank=proc_id, shuffle=True, drop_last=False)
+    valid_sampler = torch.utils.data.distributed.DistributedSampler(
+        valid_collator.dataset, num_replicas=world_size, rank=proc_id, shuffle=True, drop_last=False)
 
     train_dataloader = torch.utils.data.DataLoader(
         train_collator.dataset,
@@ -120,17 +121,20 @@ def train(proc_id, n_gpus, args, dataset, g, feats, paper_offset):
         num_workers=4,
         sampler=train_sampler
     )
+
     valid_dataloader = torch.utils.data.DataLoader(
         valid_collator.dataset,
         batch_size=1024,
-        shuffle=True,
-        drop_last=False,
         collate_fn=valid_collator.collate,
-        num_workers=2
+        num_workers=2,
+        sampler=valid_sampler
     )
 
     print('Initializing model...')
     model = RGAT(dataset.num_paper_features, dataset.num_classes, 1024, 5, 2, 4, 0.5, 'paper').to(dev_id)
+
+    # convert BN to SyncBatchNorm. see https://pytorch.org/docs/stable/generated/torch.nn.SyncBatchNorm.html
+    model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
     model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
     opt = torch.optim.Adam(model.parameters(), lr=0.001)
@@ -138,7 +142,10 @@ def train(proc_id, n_gpus, args, dataset, g, feats, paper_offset):
 
     best_acc = 0
 
-    for _ in range(args.epochs):
+    for i in range(args.epochs):
+        # make shuffling work properly across multiple epochs.
+        # see https://pytorch.org/docs/stable/data.html#torch.utils.data.distributed.DistributedSampler
+        train_sampler.set_epoch(i)
         model.train()
         with tqdm.tqdm(train_dataloader) as tq:
             for i, (input_nodes, output_nodes, mfgs) in enumerate(tq):
@@ -153,21 +160,29 @@ def train(proc_id, n_gpus, args, dataset, g, feats, paper_offset):
                 acc = (y_hat.argmax(1) == y).float().mean()
                 tq.set_postfix({'loss': '%.4f' % loss.item(), 'acc': '%.4f' % acc.item()}, refresh=False)
 
-        if proc_id == 0:
-            model.eval()
-            correct = total = 0
-            for i, (input_nodes, output_nodes, mfgs) in enumerate(tqdm.tqdm(valid_dataloader)):
-                with torch.no_grad():
-                    mfgs = [g.to(dev_id) for g in mfgs]
-                    x = mfgs[0].srcdata['x']
-                    y = mfgs[-1].dstdata['y']
-                    y_hat = model(mfgs, x)
-                    correct += (y_hat.argmax(1) == y).sum().item()
-                    total += y_hat.shape[0]
-            acc = correct / total
-            print('Validation accuracy:', acc)
+        # eval in each process
+        model.eval()
+        correct = torch.LongTensor([0]).to(dev_id)
+        total = torch.LongTensor([0]).to(dev_id)
+        for i, (input_nodes, output_nodes, mfgs) in enumerate(tqdm.tqdm(valid_dataloader)):
+            with torch.no_grad():
+                mfgs = [g.to(dev_id) for g in mfgs]
+                x = mfgs[0].srcdata['x']
+                y = mfgs[-1].dstdata['y']
+                y_hat = model(mfgs, x)
+                correct += (y_hat.argmax(1) == y).sum().item()
+                total += y_hat.shape[0]
 
-            sched.step()
+        # `reduce` data into process 0
+        torch.distributed.reduce(correct, dst=0, op=torch.distributed.ReduceOp.SUM)
+        torch.distributed.reduce(total, dst=0, op=torch.distributed.ReduceOp.SUM)
+        acc = (correct / total).item()
+
+        sched.step()
+
+        # process 0 print accuracy and save model
+        if proc_id == 0:
+            print('Validation accuracy:', acc)
 
             if best_acc < acc:
                 best_acc = acc
