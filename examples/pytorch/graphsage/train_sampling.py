@@ -127,7 +127,7 @@ def run(args, device, data):
     dataloader_device = th.device('cpu')
     if args.sample_gpu:
         train_nid = train_nid.to(device)
-        # copy only the csr to the GPU
+        # copy only the csc to the GPU
         train_g = train_g.formats(['csc'])
         train_g = train_g.to(device)
         dataloader_device = device

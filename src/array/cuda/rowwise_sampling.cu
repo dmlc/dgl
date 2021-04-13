@@ -188,7 +188,7 @@ __global__ void _CSRRowWiseSampleKernel(
 
 /**
 * @brief Perform row-wise sampling on a CSR matrix, and generate a COO matrix,
-* without replacement.
+* with replacement.
 *
 * @tparam IdType The ID type used for matrices.
 * @tparam BLOCK_ROWS The number of rows covered by each threadblock.
