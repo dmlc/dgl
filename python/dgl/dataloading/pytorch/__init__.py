@@ -5,9 +5,11 @@ from torch.utils.data import DataLoader
 from ..dataloader import NodeCollator, EdgeCollator, GraphCollator
 from ...distributed import DistGraph
 from ...distributed import DistDataLoader
+from ...ndarray import NDArray as DGLNDArray
+from ... import backend as F
 
 class _ScalarDataBatcherIter:
-    def __init__(self, dataset, batch_size, collate_fn, drop_last):
+    def __init__(self, dataset, batch_size, drop_last):
         self.dataset = dataset
         self.batch_size = batch_size
         self.index = 0
@@ -27,7 +29,7 @@ class _ScalarDataBatcherIter:
 
         return batch
 
-class _ScalarDataBatcher:
+class _ScalarDataBatcher(th.utils.data.IterableDataset):
     """Custom DataLoader to return mini-batches as tensors, rather than as
     lists. When used inside of the NodeDataLoader, this significantly reduces
     the overhead. For the case of a batch size of 1024, instead of giving a
@@ -36,19 +38,33 @@ class _ScalarDataBatcher:
     This implementation supports only minimum set of features.
     """
     def __init__(self, dataset, shuffle=False, batch_size=1,
-                 drop_last=False, **kwargs):
+                 drop_last=False):
         self.dataset = dataset
+        if isinstance(self.dataset, DGLNDArray):
+            self.dataset = F.zerocopy_from_dgl_ndarray(self.dataset)
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.drop_last = drop_last
 
     def __iter__(self):
+        worker_info = th.utils.data.get_worker_info()
+        if worker_info is None:
+            # worker gets the whole dataset
+            dataset = self.dataset
+        else:
+            # worker gets only a fraction of the dataset
+            chunk_size = dataset.shape[0] // worker_info.num_workers
+            left_over = dataset.shape[0] % worker_info.num_workers
+            start = (chunk_size + min(left_over, worker_info.id)) * worker_info.id
+            end = start + chunk_size + (worker_info.id < left_over)
+            assert worker_info.id < worker_info.num_workers-1 or \
+                end == dataset.shape[0]
+            dataset = dataset[start:end]
+
         if self.shuffle:
             # permute the dataset
-            perm = th.randperm(self.dataset.shape[0], device=self.dataset.device)
-            dataset = self.dataset[perm]
-        else:
-            dataset = self.dataset
+            perm = th.randperm(dataset.shape[0], device=dataset.device)
+            dataset = dataset[perm]
 
         return _ScalarDataBatcherIter(dataset, self.batch_size, self.drop_last)
 
@@ -297,12 +313,22 @@ class NodeDataLoader:
                     'When performing dataloading from the GPU, num_workers ' \
                     'must be zero'
 
-            if isinstance(dataset, th.Tensor):
+            batch_size = dataloader_kwargs.get('batch_size', 0)
+            if isinstance(dataset, th.Tensor) and batch_size > 1:
+                shuffle = dataloader_kwargs.get('shuffle', False)
+                drop_last = dataloader_kwargs.get('drop_last', False)
                 # manually batch into tensors
-                dataset = _ScalarDataBatcher(dataset, **dataloader_kwargs)
+                dataset = _ScalarDataBatcher(dataset,
+                    batch_size=batch_size,
+                    shuffle=shuffle,
+                    drop_last=drop_last)
+                # need to overwrite things that will be handled by the batcher
+                dataloader_kwargs['batch_size'] = None
+                dataloader_kwargs['shuffle'] = False
+                dataloader_kwargs['drop_last'] = False
 
             self.dataloader = DataLoader(
-                self.collator.dataset,
+                dataset,
                 collate_fn=self.collator.collate,
                 **dataloader_kwargs)
             self.is_distributed = False
