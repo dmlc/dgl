@@ -4,7 +4,7 @@ from abc import abstractmethod
 import torch as th
 
 from ...dist_tensor import DistTensor
-from ...sparse_emb import NodeEmbedding
+from ...sparse_emb.pytorch import NodeEmbedding
 from .utils import alltoallv_cpu, alltoall_cpu
 
 class DistSparseGradOptimizer(abc.ABC):

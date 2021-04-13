@@ -28,7 +28,8 @@ from .kvstore import KVServer, KVClient
 from .server_state import ServerState
 from .dist_dataloader import DistDataLoader
 from .graph_services import sample_neighbors, in_subgraph, find_edges
-from .sparse_emb import NodeEmbedding, DistEmbedding
+# pylint cannot deal with dynamic module
+from .sparse_emb import NodeEmbedding, DistEmbedding # pylint: disable=no-name-in-module
 
 # This is only for backward compatibility
 from .optim import SparseAdagrad # pylint: disable=no-name-in-module
