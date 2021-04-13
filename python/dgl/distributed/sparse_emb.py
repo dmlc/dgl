@@ -203,3 +203,6 @@ class NodeEmbedding:
             The optimizer related state.
         """
         return self._optm_state
+
+# for backward compatibility
+DistEmbedding = NodeEmbedding
