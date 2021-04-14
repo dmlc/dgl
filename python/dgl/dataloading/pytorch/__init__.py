@@ -30,12 +30,11 @@ class _ScalarDataBatcherIter:
         return batch
 
 class _ScalarDataBatcher(th.utils.data.IterableDataset):
-    """Custom DataLoader to return mini-batches as tensors, rather than as
-    lists. When used inside of the NodeDataLoader, this significantly reduces
+    """Custom Dataset wrapper to return mini-batches as tensors, rather than as
+    lists. When the dataset is on the GPU, this significantly reduces
     the overhead. For the case of a batch size of 1024, instead of giving a
     list of 1024 tensors to the collator, a single tensor of 1024 dimensions
     is passed in.
-    This implementation supports only minimum set of features.
     """
     def __init__(self, dataset, shuffle=False, batch_size=1,
                  drop_last=False):
@@ -307,24 +306,26 @@ class NodeDataLoader:
             dataset = self.collator.dataset
 
             if th.device(device) != th.device('cpu'):
+                # Only use the '_ScalarDataBatcher' when for the GPU, as it
+                # doens't seem to have a performance benefit on the CPU.
                 assert 'num_workers' not in dataloader_kwargs or \
                     dataloader_kwargs['num_workers'] == 0, \
                     'When performing dataloading from the GPU, num_workers ' \
-                    'must be zero'
+                    'must be zero.'
 
-            batch_size = dataloader_kwargs.get('batch_size', 0)
-            if isinstance(dataset, th.Tensor) and batch_size > 1:
-                shuffle = dataloader_kwargs.get('shuffle', False)
-                drop_last = dataloader_kwargs.get('drop_last', False)
-                # manually batch into tensors
-                dataset = _ScalarDataBatcher(dataset,
-                                             batch_size=batch_size,
-                                             shuffle=shuffle,
-                                             drop_last=drop_last)
-                # need to overwrite things that will be handled by the batcher
-                dataloader_kwargs['batch_size'] = None
-                dataloader_kwargs['shuffle'] = False
-                dataloader_kwargs['drop_last'] = False
+                batch_size = dataloader_kwargs.get('batch_size', 0)
+                if isinstance(dataset, th.Tensor) and batch_size > 1:
+                    shuffle = dataloader_kwargs.get('shuffle', False)
+                    drop_last = dataloader_kwargs.get('drop_last', False)
+                    # manually batch into tensors
+                    dataset = _ScalarDataBatcher(dataset,
+                                                 batch_size=batch_size,
+                                                 shuffle=shuffle,
+                                                 drop_last=drop_last)
+                    # need to overwrite things that will be handled by the batcher
+                    dataloader_kwargs['batch_size'] = None
+                    dataloader_kwargs['shuffle'] = False
+                    dataloader_kwargs['drop_last'] = False
 
             self.dataloader = DataLoader(
                 dataset,
