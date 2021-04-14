@@ -106,7 +106,8 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, default="wikipedia",
                         help="dataset selection wikipedia/reddit")
     parser.add_argument("--k_hop", type=int, default=1,
-                        help="sampling k-hop neighborhood")                        
+                        help="sampling k-hop neighborhood")
+    parser.add_argument("--model",type=str,default='original',help='attention model [add/dot/original]')                     
 
     args = parser.parse_args()
 
@@ -246,18 +247,22 @@ if __name__ == "__main__":
                 num_heads=args.num_heads,
                 num_nodes=num_node,
                 n_neighbors=args.n_neighbors,
-                memory_updater_type=args.memory_updater)
+                memory_updater_type=args.memory_updater,
+                model=args.model)
 
     criterion = torch.nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
     # Implement Logging mechanism
     f = open("logging.txt", 'w')
+    freq = []
     if args.fast_mode:
         sampler.reset()
     try:
         for i in range(args.epochs):
             train_loss = train(model, train_dataloader, sampler,
                                 criterion, optimizer, args.batch_size, args.fast_mode)
+            freq.append(model.get_temporal_weight())
+
             val_ap, val_auc = test_val(
                 model, valid_dataloader, sampler, criterion, args.batch_size, args.fast_mode)
             memory_checkpoint = model.store_memory()
@@ -291,4 +296,6 @@ if __name__ == "__main__":
         f.writelines(error_content)
         f.close()
         # exit(-1)
+    freq = np.vstack(freq)
+    np.save('frequency.npy',freq)
     print("========Training is Done========")

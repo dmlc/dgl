@@ -8,6 +8,17 @@ from dgl.base import DGLError
 from dgl.ops import edge_softmax
 import dgl.function as fn
 
+class Identity(nn.Module):
+    """A placeholder identity operator that is argument-insensitive.
+    (Identity has already been supported by PyTorch 1.2, we will directly
+    import torch.nn.Identity in the future)
+    """
+    def __init__(self):
+        super(Identity, self).__init__()
+
+    def forward(self, x):
+        """Return input"""
+        return x
 
 class MergeLayer(nn.Module):
     """Merge two tensor into one
@@ -266,16 +277,16 @@ class MemoryOperation(nn.Module):
     Please refers to examples/pytorch/tgn/tgn.py
     """
 
-    def __init__(self, updater_type, memory, e_feat_dim, temporal_dim):
+    def __init__(self, updater_type, memory, e_feat_dim, temporal_encoder):
         super(MemoryOperation, self).__init__()
         updater_dict = {'gru': nn.GRUCell, 'rnn': nn.RNNCell}
         self.memory = memory
         memory_dim = self.memory.hidden_dim
-        self.message_dim = memory_dim+memory_dim+e_feat_dim+temporal_dim
+        self.temporal_encoder = temporal_encoder
+        self.message_dim = memory_dim+memory_dim+e_feat_dim+self.temporal_encoder.dimension
         self.updater = updater_dict[updater_type](input_size=self.message_dim,
                                                   hidden_size=memory_dim)
         self.memory = memory
-        self.temporal_encoder = TimeEncode(temporal_dim)
 
     # Here assume g is a subgraph from each iteration
     def stick_feat_to_graph(self, g):
@@ -365,27 +376,26 @@ class TemporalGATConv(nn.Module):
     def __init__(self,
                  edge_feats,
                  memory_feats,
-                 temporal_feats,
+                 temporal_encoder,
                  out_feats,
                  num_heads,
                  allow_zero_in_degree=False):
         super(TemporalGATConv, self).__init__()
         self._edge_feats = edge_feats
         self._memory_feats = memory_feats
-        self._temporal_feats = temporal_feats
         self._out_feats = out_feats
         self._allow_zero_in_degree = allow_zero_in_degree
         self._num_heads = num_heads
+        self.temporal_encoder = temporal_encoder
 
-        self.fc_Q = nn.Linear(self._memory_feats+self._temporal_feats,
+        self.fc_Q = nn.Linear(self._memory_feats+self.temporal_encoder.dimension,
                               self._out_feats*self._num_heads, bias=False)
         self.fc_K = nn.Linear(self._memory_feats+self._edge_feats +
-                              self._temporal_feats, self._out_feats*self._num_heads, bias=False)
+                              self.temporal_encoder.dimension, self._out_feats*self._num_heads, bias=False)
         self.fc_V = nn.Linear(self._memory_feats+self._edge_feats +
-                              self._temporal_feats, self._out_feats*self._num_heads, bias=False)
+                              self.temporal_encoder.dimension, self._out_feats*self._num_heads, bias=False)
         self.merge = MergeLayer(
             self._memory_feats, self._out_feats*self._num_heads, 512, self._out_feats)
-        self.temporal_encoder = TimeEncode(self._temporal_feats)
 
     def weight_fn(self, edges):
         t0 = torch.zeros_like(edges.dst['timestamp'])
@@ -440,3 +450,265 @@ class TemporalGATConv(nn.Module):
         rst = self.merge(rst.view(-1, self._num_heads *
                                   self._out_feats), graph.dstdata['s'])
         return rst
+
+
+class EdgeDotGATConv(nn.Module):
+    def __init__(self,
+                 node_feats,
+                 edge_feats,
+                 out_feats,
+                 num_heads,
+                 residual=False,
+                 allow_zero_in_degree=False):
+        super(EdgeDotGATConv,self).__init__()
+        self._node_feats = node_feats
+        self._edge_feats = edge_feats
+        self._out_feats = out_feats
+        self._num_heads = num_heads
+        self._allow_zero_in_degree = allow_zero_in_degree
+
+        self.fc_node = nn.Linear(self._node_feats,self._out_feats*self._num_heads,bias=False)
+        self.fc_edge = nn.Linear(self._edge_feats,self._out_feats*self._num_heads,bias=False)
+        self.residual = residual
+        if residual:
+            if self._node_feats != self._out_feats:
+                self.res_fc = nn.Linear(self._node_feats,self._out_feats*self._num_heads,bias=False)
+            else:
+                self.res_fc = Identity()
+
+    def msg_fn(self,edges):
+        ret = edges.data['sa'].view(-1, self._num_heads, 1)*edges.data['eft']
+        return {'attn': ret}
+
+    def forward(self,graph,nfeat,efeat,get_attention=False):
+        graph = graph.local_var()
+        if not self._allow_zero_in_degree:
+            if (graph.in_degrees() == 0).any():
+                raise DGLError('There are 0-in-degree nodes in the graph, '
+                               'output for those nodes will be invalid. '
+                               'This is harmful for some applications, '
+                               'causing silent performance regression. '
+                               'Adding self-loop on the input graph by '
+                               'calling `g = dgl.add_self_loop(g)` will resolve '
+                               'the issue. Setting ``allow_zero_in_degree`` '
+                               'to be `True` when constructing this module will '
+                               'suppress the check and let the code run.')
+        
+        node_feats = self.fc_node(nfeat).view(-1,self._num_heads,self._out_feats)
+        edge_feats = self.fc_edge(efeat).view(-1,self._num_heads,self._out_feats)
+        graph.ndata['ft'] = node_feats
+        graph.edata['eft'] = edge_feats
+        graph.apply_edges(fn.u_add_e('ft','eft','ft_prime'))
+        graph.apply_edges(fn.e_dot_v('ft_prime','ft','a'))
+        graph.edata['sa'] = edge_softmax(graph,graph.edata['a'])/(self._out_feats**0.5)
+
+        graph.update_all(self.msg_fn,fn.sum('attn','agg_u'))    
+        #graph.update_all(fn.u_mul_e('ft','sa','attn'),fn.sum('attn','agg_u'))
+        rst = graph.dstdata['agg_u']
+        if self.residual:
+            resval = self.res_fc(nfeat).view(nfeat.shape[0],-1,self._out_feats)
+            rst = rst + resval
+
+        if get_attention:
+            return rst, graph.edata['sa']
+        else:
+            return rst
+
+class EdgeGATConv(nn.Module):
+    def __init__(self,
+                 node_feats,
+                 edge_feats,
+                 out_feats,
+                 num_heads,
+                 feat_drop=0.,
+                 attn_drop=0.,
+                 negative_slope=0.2,
+                 residual=False,
+                 activation=None,
+                 allow_zero_in_degree=False):
+        super(EdgeGATConv,self).__init__()
+        self._num_heads = num_heads
+        self._node_feats = node_feats
+        self._edge_feats = edge_feats
+        self._out_feats = out_feats
+        self._allow_zero_in_degree = allow_zero_in_degree
+        self.fc_node = nn.Linear(self._node_feats,self._out_feats*self._num_heads)
+        self.fc_edge = nn.Linear(self._edge_feats,self._out_feats*self._num_heads)
+        self.attn_l = nn.Parameter(torch.FloatTensor(size=(1,self._num_heads,self._out_feats)))
+        self.attn_r = nn.Parameter(torch.FloatTensor(size=(1,self._num_heads,self._out_feats)))
+        self.attn_e = nn.Parameter(torch.FloatTensor(size=(1,self._num_heads,self._out_feats)))
+        self.feat_drop = nn.Dropout(feat_drop)
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.leaky_relu = nn.LeakyReLU(negative_slope)
+        self.residual = residual
+        if residual:
+            if self._node_feats != self._out_feats:
+                self.res_fc = nn.Linear(self._node_feats,self._out_feats*self._num_heads,bias = False)
+            else:
+                self.res_fc = Identity()
+        self.reset_parameters()
+        self.activation = activation
+
+    def reset_parameters(self):
+        gain = nn.init.calculate_gain('relu')
+        nn.init.xavier_normal_(self.fc_node.weight,gain=gain)
+        nn.init.xavier_normal_(self.fc_edge.weight,gain=gain)
+        nn.init.xavier_normal_(self.attn_l,gain=gain)
+        nn.init.xavier_normal_(self.attn_r,gain=gain)
+        nn.init.xavier_normal_(self.attn_e,gain=gain)
+        if self.residual and isinstance(self.res_fc,nn.Linear):
+            nn.init.xavier_normal_(self.res_fc.weight,gain=gain)
+
+    def msg_fn(self,edges):
+        ret = edges.data['a'].view(-1, self._num_heads, 1)*edges.data['efeat']
+        return {'m': ret}
+
+    def forward(self,graph,nfeat,efeat,get_attention=False):
+        with graph.local_scope():
+            if not self._allow_zero_in_degree:
+                if (graph.in_degrees()==0).any():
+                    raise DGLError('There are 0-in-degree nodes in the graph, '
+                                   'output for those nodes will be invalid. '
+                                   'This is harmful for some applications, '
+                                   'causing silent performance regression. '
+                                   'Adding self-loop on the input graph by '
+                                   'calling `g = dgl.add_self_loop(g)` will resolve '
+                                   'the issue. Setting ``allow_zero_in_degree`` '
+                                   'to be `True` when constructing this module will '
+                                   'suppress the check and let the code run.')
+            
+            nfeat = self.feat_drop(nfeat)
+            efeat = self.feat_drop(efeat)
+
+            node_feat = self.fc_node(nfeat).view(-1,self._num_heads,self._out_feats)
+            edge_feat = self.fc_edge(efeat).view(-1,self._num_heads,self._out_feats)
+
+            el = (node_feat*self.attn_l).sum(dim=-1).unsqueeze(-1)
+            er = (node_feat*self.attn_r).sum(dim=-1).unsqueeze(-1)
+            ee = (edge_feat*self.attn_e).sum(dim=-1).unsqueeze(-1)
+            graph.ndata['ft'] = node_feat
+            graph.ndata['el'] = el
+            graph.ndata['er'] = er
+            graph.edata['ee'] = ee
+            graph.apply_edges(fn.u_add_e('el','ee','el_prime'))
+            graph.apply_edges(fn.e_add_v('el_prime','er','e'))
+            e = self.leaky_relu(graph.edata['e'])
+            graph.edata['a'] = self.attn_drop(edge_softmax(graph,e))
+            graph.edata['efeat'] = edge_feat
+            '''
+            graph.update_all(fn.u_mul_e('ft','a','m'),
+                             fn.sum('m','ft'))
+            '''
+            graph.update_all(self.msg_fn,fn.sum('m','ft'))
+            rst = graph.ndata['ft']
+            if self.residual:
+                resval = self.res_fc(nfeat).view(nfeat.shape[0],-1,self._out_feats)
+                rst = rst + resval
+
+            if self.activation:
+                rst = self.activation(rst)
+
+            if get_attention:
+                return rst,graph.edata['a']
+            else:
+                return rst
+
+# TODO: Temporal Encoding and egde feature generation
+# Which simply concatenate temporal encoding with edge feature
+class TemporalEdgePreprocess(nn.Module):
+    def __init__(self,edge_feats,temporal_encoder):
+        super(TemporalEdgePreprocess,self).__init__()
+        self.edge_feats = edge_feats
+        self.temporal_encoder = temporal_encoder
+
+    def edge_fn(self,edges):
+        t0 = torch.zeros_like(edges.dst['timestamp'])
+        time_diff = edges.data['timestamp'] - edges.src['timestamp']
+        time_encode = self.temporal_encoder(
+            time_diff.unsqueeze(dim=1)).view(t0.shape[0],-1)
+        edge_feat = torch.cat([edges.data['feats'],time_encode],dim=1)
+        return {'efeat':edge_feat}
+    
+    def forward(self,graph):
+        graph.apply_edges(self.edge_fn)
+        efeat = graph.edata['efeat']
+        return efeat
+
+# TODO: Add Temporal edge wrapping module which can replace TemporalGATConv
+# Float and double problem is expected
+class TemporalTransformerConv(nn.Module):
+    def __init__(self,
+                 edge_feats,
+                 memory_feats,
+                 temporal_encoder,
+                 out_feats,
+                 num_heads,
+                 allow_zero_in_degree=False,
+                 attn_model = 'add'):
+        super(TemporalTransformerConv,self).__init__()
+        self._edge_feats = edge_feats
+        self._memory_feats = memory_feats
+        self.temporal_encoder = temporal_encoder
+        self._out_feats = out_feats
+        self._allow_zero_in_degree = allow_zero_in_degree
+        self._num_heads = num_heads
+
+        self.preprocessor = TemporalEdgePreprocess(self._edge_feats,self.temporal_encoder)
+        if attn_model == 'add':
+            self.transformer = EdgeGATConv(node_feats = self._memory_feats,
+                                           edge_feats = self._edge_feats+self.temporal_encoder.dimension,
+                                           out_feats = self._out_feats,
+                                           num_heads = self._num_heads,
+                                           feat_drop = 0.6,
+                                           attn_drop = 0.6,
+                                           residual = True,
+                                           allow_zero_in_degree = allow_zero_in_degree)
+        if attn_model == 'dot':
+            self.transformer = EdgeDotGATConv(node_feats = self._memory_feats,
+                                              edge_feats = self._edge_feats+self.temporal_encoder.dimension,
+                                              out_feats = self._out_feats,
+                                              num_heads = self._num_heads,
+                                              residual = True,
+                                              allow_zero_in_degree=allow_zero_in_degree)
+
+    def forward(self,graph,memory,ts):
+        graph = graph.local_var()
+        graph.ndata['timestamp'] = ts
+        efeat = self.preprocessor(graph).float()
+        rst = self.transformer(graph,memory,efeat).mean(1)
+        return rst
+
+# Unit test of edge conv
+if __name__ == "__main__":
+    graph = dgl.graph(([0,1,2,3,4],[1,2,3,4,0]))
+    nfeat = torch.rand(5,10)
+    efeat = torch.rand(5,10)
+
+    egat = EdgeGATConv(10,10,5,num_heads=8)
+    out = egat(graph,nfeat,efeat)
+    print(out.shape)
+
+    egat_res = EdgeGATConv(10,10,5,num_heads=8,residual=True)
+    out = egat_res(graph,nfeat,efeat)
+    print(out.shape)
+
+    edot = EdgeDotGATConv(10,10,5,num_heads=8)
+    out = edot(graph,nfeat,efeat)
+    print(out.shape)
+
+    edot_res = EdgeDotGATConv(10,10,5,num_heads=8,residual=True)
+    out = edot_res(graph,nfeat,efeat)
+    print(out.shape)
+
+    graph.edata['feats'] = efeat
+    graph.ndata['timestamp'] = torch.tensor([1,2,3,4,5]).double()
+    graph.edata['timestamp'] = torch.tensor([1,0,1,0,1]).double()
+    preprocessor = TemporalEdgePreprocess(10,5)
+    out = preprocessor(graph)
+    print(out.shape)
+
+    temp_tf = TemporalTransformerConv(10,10,8,4,8)
+    ts = graph.ndata.pop('timestamp')
+    out = temp_tf(graph,nfeat,ts)
+    print(out.shape)
+

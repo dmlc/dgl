@@ -1,7 +1,7 @@
 import copy
 import torch.nn as nn
 import dgl
-from modules import MemoryModule, MemoryOperation, TemporalGATConv, MsgLinkPredictor
+from modules import MemoryModule, MemoryOperation, TemporalGATConv, MsgLinkPredictor,TemporalTransformerConv,TimeEncode
 
 class TGN(nn.Module):
     def __init__(self,
@@ -12,7 +12,8 @@ class TGN(nn.Module):
                  num_heads,
                  num_nodes,  # entire graph
                  n_neighbors=10,
-                 memory_updater_type='gru'):
+                 memory_updater_type='gru',
+                 model='original'): # dot / original / additive
         super(TGN, self).__init__()
         self.memory_dim = memory_dim
         self.edge_feat_dim = edge_feat_dim
@@ -23,21 +24,30 @@ class TGN(nn.Module):
         self.memory_updater_type = memory_updater_type
         self.num_nodes = num_nodes
 
+        self.temporal_encoder = TimeEncode(self.temporal_dim)
+
         self.memory = MemoryModule(self.num_nodes,
                                    self.memory_dim)
 
         self.memory_ops = MemoryOperation(self.memory_updater_type,
                                           self.memory,
                                           self.edge_feat_dim,
-                                          self.temporal_dim)
+                                          self.temporal_encoder)
 
-        
-        self.embedding_attn = TemporalGATConv(self.edge_feat_dim,
+        if model in ['dot','add']:
+            self.embedding_attn = TemporalTransformerConv(self.edge_feat_dim,
                                               self.memory_dim,
-                                              self.temporal_dim,
+                                              self.temporal_encoder,
                                               self.embedding_dim,
                                               self.num_heads,
-                                              allow_zero_in_degree=True)
+                                              allow_zero_in_degree=True,attn_model=model)
+        elif model == 'original':
+            self.embedding_attn = TemporalGATConv(self.edge_feat_dim,
+                                                  self.memory_dim,
+                                                  self.temporal_encoder,
+                                                  self.embedding_dim,
+                                                  self.num_heads,
+                                                  allow_zero_in_degree = True)
 
         self.msg_linkpredictor = MsgLinkPredictor(embedding_dim)
 
@@ -77,3 +87,9 @@ class TGN(nn.Module):
     def restore_memory(self, memory_checkpoint):
         self.memory.memory = memory_checkpoint['memory']
         self.memory.last_update_time = memory_checkpoint['last_t']
+
+    def get_temporal_weight(self):
+        weight = copy.deepcopy(self.temporal_encoder.w.weight.detach().numpy().reshape(-1))
+        return weight
+
+
