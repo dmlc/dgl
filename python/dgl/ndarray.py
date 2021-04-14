@@ -14,7 +14,7 @@ import numpy as _np
 from ._ffi.object import register_object, ObjectBase
 from ._ffi.function import _init_api
 from ._ffi.ndarray import DGLContext, DGLType, NDArrayBase
-from ._ffi.ndarray import context, empty, from_dlpack, numpyasarray
+from ._ffi.ndarray import context, empty, empty_shared_mem, from_dlpack, numpyasarray
 from ._ffi.ndarray import _set_class_ndarray
 from . import backend as F
 
@@ -22,6 +22,20 @@ class NDArray(NDArrayBase):
     """Lightweight NDArray class for DGL framework."""
     def __len__(self):
         return functools.reduce(operator.mul, self.shape, 1)
+
+    def shared_memory(self, name):
+        """Return a copy of the ndarray in shared memory
+
+        Parameters
+        ----------
+        name : str
+            The name of the shared memory
+
+        Returns
+        -------
+        NDArray
+        """
+        return empty_shared_mem(name, True, self.shape, self.dtype).copyfrom(self)
 
 def cpu(dev_id=0):
     """Construct a CPU device
@@ -89,6 +103,26 @@ def zerocopy_from_numpy(np_data):
     arr, _ = numpyasarray(np_data)
     handle = ctypes.pointer(arr)
     return NDArray(handle, is_view=True)
+
+def cast_to_signed(arr):
+    """Cast this NDArray from unsigned integer to signed one.
+
+    uint64 -> int64
+    uint32 -> int32
+
+    Useful for backends with poor signed integer support (e.g., TensorFlow).
+
+    Parameters
+    ----------
+    arr : NDArray
+        Input array
+
+    Returns
+    -------
+    NDArray
+        Cased array
+    """
+    return _CAPI_DGLArrayCastToSigned(arr)
 
 def exist_shared_mem_array(name):
     """ Check the existence of shared-memory array.
@@ -162,7 +196,6 @@ class SparseMatrix(ObjectBase):
         """
         ret = [_CAPI_DGLSparseMatrixGetIndices(self, i) for i in range(3)]
         return [F.zerocopy_from_dgl_ndarray(arr) for arr in ret]
-        #return [F.zerocopy_from_dgl_ndarray(v.data) for v in ret]
 
     @property
     def flags(self):
@@ -172,7 +205,7 @@ class SparseMatrix(ObjectBase):
         -------
         list of boolean
         """
-        return [v.data for v in _CAPI_DGLSparseMatrixGetFlags(self)]
+        return _CAPI_DGLSparseMatrixGetFlags(self)
 
     def __getstate__(self):
         return self.format, self.num_rows, self.num_cols, self.indices, self.flags

@@ -8,24 +8,30 @@ from ....utils import expand_as_pair, check_eq_shape
 
 
 class SAGEConv(layers.Layer):
-    r"""GraphSAGE layer from paper `Inductive Representation Learning on
+    r"""
+
+    Description
+    -----------
+    GraphSAGE layer from paper `Inductive Representation Learning on
     Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__.
 
     .. math::
-        h_{\mathcal{N}(i)}^{(l+1)} & = \mathrm{aggregate}
+        h_{\mathcal{N}(i)}^{(l+1)} &= \mathrm{aggregate}
         \left(\{h_{j}^{l}, \forall j \in \mathcal{N}(i) \}\right)
 
-        h_{i}^{(l+1)} & = \sigma \left(W \cdot \mathrm{concat}
-        (h_{i}^{l}, h_{\mathcal{N}(i)}^{l+1} + b) \right)
+        h_{i}^{(l+1)} &= \sigma \left(W \cdot \mathrm{concat}
+        (h_{i}^{l}, h_{\mathcal{N}(i)}^{l+1}) \right)
 
-        h_{i}^{(l+1)} & = \mathrm{norm}(h_{i}^{l})
+        h_{i}^{(l+1)} &= \mathrm{norm}(h_{i}^{l})
 
     Parameters
     ----------
     in_feats : int, or pair of ints
-        Input feature size.
+        Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
 
-        If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
+        GATConv can be applied on homogeneous graph and unidirectional
+        `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`__.
+        If the layer applies on a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
         a scalar is given, the source and destination node feature size would take the
         same value.
@@ -33,7 +39,7 @@ class SAGEConv(layers.Layer):
         If aggregator type is ``gcn``, the feature size of source and destination nodes
         are required to be the same.
     out_feats : int
-        Output feature size.
+        Output feature size; i.e, the number of dimensions of :math:`h_i^{(l+1)}`.
     feat_drop : float
         Dropout rate on features, default: ``0``.
     aggregator_type : str
@@ -45,8 +51,46 @@ class SAGEConv(layers.Layer):
     activation : callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
-    """
 
+    Examples
+    --------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import tensorflow as tf
+    >>> from dgl.nn import SAGEConv
+    >>>
+    >>> # Case 1: Homogeneous graph
+    >>> with tf.device("CPU:0"):
+    >>>     g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>>     g = dgl.add_self_loop(g)
+    >>>     feat = tf.ones((6, 10))
+    >>>     conv = SAGEConv(10, 2, 'pool')
+    >>>     res = conv(g, feat)
+    >>>     res
+    <tf.Tensor: shape=(6, 2), dtype=float32, numpy=
+    array([[-3.6633523 , -0.90711546],
+        [-3.6633523 , -0.90711546],
+        [-3.6633523 , -0.90711546],
+        [-3.6633523 , -0.90711546],
+        [-3.6633523 , -0.90711546],
+        [-3.6633523 , -0.90711546]], dtype=float32)>
+
+    >>> # Case 2: Unidirectional bipartite graph
+    >>> with tf.device("CPU:0"):
+    >>>     u = [0, 1, 0, 0, 1]
+    >>>     v = [0, 1, 2, 3, 2]
+    >>>     g = dgl.bipartite((u, v))
+    >>>     u_fea = tf.convert_to_tensor(np.random.rand(2, 5))
+    >>>     v_fea = tf.convert_to_tensor(np.random.rand(4, 5))
+    >>>     conv = SAGEConv((5, 10), 2, 'mean')
+    >>>     res = conv(g, (u_fea, v_fea))
+    >>>     res
+    <tf.Tensor: shape=(4, 2), dtype=float32, numpy=
+    array([[-0.59453356, -0.4055441 ],
+        [-0.47459763, -0.717764  ],
+        [ 0.3221837 , -0.29876417],
+        [-0.63356155,  0.09390211]], dtype=float32)>
+    """
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -82,16 +126,21 @@ class SAGEConv(layers.Layer):
         return {'neigh': rst}
 
     def call(self, graph, feat):
-        r"""Compute GraphSAGE layer.
+        r"""
+
+        Description
+        -----------
+        Compute GraphSAGE layer.
 
         Parameters
         ----------
         graph : DGLGraph
             The graph.
         feat : tf.Tensor or pair of tf.Tensor
-            If a single tensor is given, the input feature of shape :math:`(N, D_{in})` where
-            :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
-            If a pair of tensors are given, the pair must contain two tensors of shape
+            If a tf.Tensor is given, it represents the input feature of shape
+            :math:`(N, D_{in})`
+            where :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+            If a pair of tf.Tensor is given, the pair must contain two tensors of shape
             :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
 
         Returns
@@ -106,8 +155,15 @@ class SAGEConv(layers.Layer):
                 feat_dst = self.feat_drop(feat[1])
             else:
                 feat_src = feat_dst = self.feat_drop(feat)
+                if graph.is_block:
+                    feat_dst = feat_src[:graph.number_of_dst_nodes()]
 
             h_self = feat_dst
+
+            # Handle the case of graphs without edges
+            if graph.number_of_edges() == 0:
+                graph.dstdata['neigh'] = tf.cast(tf.zeros(
+                    (graph.number_of_dst_nodes(), self._in_src_feats)), tf.float32)
 
             if self._aggre_type == 'mean':
                 graph.srcdata['h'] = feat_src

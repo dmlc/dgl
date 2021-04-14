@@ -11,6 +11,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <memory>
 
 #include "c_runtime_api.h"
 #include "dlpack/dlpack.h"
@@ -138,11 +139,15 @@ class NDArray {
   /*!
    * \brief Copy data content from another array.
    * \param other The source array to be copied from.
+   * \param stream The stream to perform the copy on if it involves a GPU
+   *        context, otherwise this parameter is ignored.
    * \note The copy may happen asynchrously if it involves a GPU context.
    *       DGLSynchronize is necessary.
    */
-  inline void CopyFrom(DLTensor* other);
-  inline void CopyFrom(const NDArray& other);
+  inline void CopyFrom(DLTensor* other,
+      DGLStreamHandle stream = nullptr);
+  inline void CopyFrom(const NDArray& other,
+      DGLStreamHandle stream = nullptr);
   /*!
    * \brief Copy data content into another array.
    * \param other The source array to be copied from.
@@ -157,6 +162,10 @@ class NDArray {
    * \return The array under another context.
    */
   inline NDArray CopyTo(const DLContext& ctx) const;
+  /*!
+   * \brief Return a new array with a copy of the content.
+   */
+  inline NDArray Clone() const;
   /*!
    * \brief Load NDArray from stream
    * \param stream The input data stream
@@ -379,15 +388,17 @@ inline void NDArray::reset() {
   }
 }
 
-inline void NDArray::CopyFrom(DLTensor* other) {
+inline void NDArray::CopyFrom(DLTensor* other,
+                              DGLStreamHandle stream) {
   CHECK(data_ != nullptr);
-  CopyFromTo(other, &(data_->dl_tensor));
+  CopyFromTo(other, &(data_->dl_tensor), stream);
 }
 
-inline void NDArray::CopyFrom(const NDArray& other) {
+inline void NDArray::CopyFrom(const NDArray& other,
+                              DGLStreamHandle stream) {
   CHECK(data_ != nullptr);
   CHECK(other.data_ != nullptr);
-  CopyFromTo(&(other.data_->dl_tensor), &(data_->dl_tensor));
+  CopyFromTo(&(other.data_->dl_tensor), &(data_->dl_tensor), stream);
 }
 
 inline void NDArray::CopyTo(DLTensor* other) const {
@@ -408,6 +419,12 @@ inline NDArray NDArray::CopyTo(const DLContext& ctx) const {
                       dptr->dtype, ctx);
   this->CopyTo(ret);
   return ret;
+}
+
+inline NDArray NDArray::Clone() const {
+  CHECK(data_ != nullptr);
+  const DLTensor* dptr = operator->();
+  return this->CopyTo(dptr->ctx);
 }
 
 inline int NDArray::use_count() const {
@@ -592,14 +609,18 @@ dgl::runtime::NDArray operator * (const dgl::runtime::NDArray& a1,
                                   const dgl::runtime::NDArray& a2);
 dgl::runtime::NDArray operator / (const dgl::runtime::NDArray& a1,
                                   const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator % (const dgl::runtime::NDArray& a1,
+                                  const dgl::runtime::NDArray& a2);
 dgl::runtime::NDArray operator + (const dgl::runtime::NDArray& a1, int64_t rhs);
 dgl::runtime::NDArray operator - (const dgl::runtime::NDArray& a1, int64_t rhs);
 dgl::runtime::NDArray operator * (const dgl::runtime::NDArray& a1, int64_t rhs);
 dgl::runtime::NDArray operator / (const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator % (const dgl::runtime::NDArray& a1, int64_t rhs);
 dgl::runtime::NDArray operator + (int64_t lhs, const dgl::runtime::NDArray& a2);
 dgl::runtime::NDArray operator - (int64_t lhs, const dgl::runtime::NDArray& a2);
 dgl::runtime::NDArray operator * (int64_t lhs, const dgl::runtime::NDArray& a2);
 dgl::runtime::NDArray operator / (int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator % (int64_t lhs, const dgl::runtime::NDArray& a2);
 dgl::runtime::NDArray operator - (const dgl::runtime::NDArray& array);
 
 dgl::runtime::NDArray operator > (const dgl::runtime::NDArray& a1,
@@ -626,6 +647,8 @@ dgl::runtime::NDArray operator >= (int64_t lhs, const dgl::runtime::NDArray& a2)
 dgl::runtime::NDArray operator <= (int64_t lhs, const dgl::runtime::NDArray& a2);
 dgl::runtime::NDArray operator == (int64_t lhs, const dgl::runtime::NDArray& a2);
 dgl::runtime::NDArray operator != (int64_t lhs, const dgl::runtime::NDArray& a2);
+
+std::ostream& operator << (std::ostream& os, dgl::runtime::NDArray array);
 
 ///////////////// Operator overloading for DLDataType /////////////////
 

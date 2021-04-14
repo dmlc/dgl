@@ -5,11 +5,12 @@ import sys
 from itertools import product
 
 from .base import BuiltinFunction, TargetCode
-from ..runtime import ir
-from ..runtime.ir import var
+from .._deprecate.runtime import ir
+from .._deprecate.runtime.ir import var
 
 
-__all__ = ["src_mul_edge", "copy_src", "copy_edge", "copy_u", "copy_e"]
+__all__ = ["src_mul_edge", "copy_src", "copy_edge", "copy_u", "copy_e",
+           "BinaryMessageFunction", "CopyMessageFunction"]
 
 
 class MessageFunction(BuiltinFunction):
@@ -234,15 +235,15 @@ def src_mul_edge(src, edge, out):
     ----------
     src : str
         The source feature field.
-    dst : str
-        The destination feature field.
+    edge : str
+        The edge feature field.
     out : str
         The output message field.
 
     Examples
     --------
     >>> import dgl
-    >>> message_func = dgl.function.src_mul_edge('h', 'h', 'm')
+    >>> message_func = dgl.function.src_mul_edge('h', 'e', 'm')
     """
     return getattr(sys.modules[__name__], "u_mul_e")(src, edge, out)
 

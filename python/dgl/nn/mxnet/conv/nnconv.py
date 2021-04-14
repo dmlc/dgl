@@ -9,24 +9,32 @@ from ....utils import expand_as_pair
 
 
 class NNConv(nn.Block):
-    r"""Graph Convolution layer introduced in `Neural Message Passing
+    r"""
+
+    Description
+    -----------
+    Graph Convolution layer introduced in `Neural Message Passing
     for Quantum Chemistry <https://arxiv.org/pdf/1704.01212.pdf>`__.
 
     .. math::
         h_{i}^{l+1} = h_{i}^{l} + \mathrm{aggregate}\left(\left\{
         f_\Theta (e_{ij}) \cdot h_j^{l}, j\in \mathcal{N}(i) \right\}\right)
 
+    where :math:`e_{ij}` is the edge feature, :math:`f_\Theta` is a function
+    with learnable parameters.
+
     Parameters
     ----------
-    in_feats : int or pair of ints
-        Input feature size.
-
+    in_feats : int
+        Input feature size; i.e, the number of dimensions of :math:`h_j^{(l)}`.
+        NN can be applied on homogeneous graph and unidirectional
+        `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`__.
         If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
         a scalar is given, the source and destination node feature size would take the
         same value.
     out_feats : int
-        Output feature size.
+        Output feature size; i.e., the number of dimensions of :math:`h_i^{(l+1)}`.
     edge_func : callable activation function/layer
         Maps each edge feature to a vector of shape
         ``(in_feats * out_feats)`` as weight to compute
@@ -38,6 +46,52 @@ class NNConv(nn.Block):
         If True, use residual connection. Default: ``False``.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import mxnet as mx
+    >>> from mxnet import gluon
+    >>> from dgl.nn import NNConv
+    >>>
+    >>> # Case 1: Homogeneous graph
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> g = dgl.add_self_loop(g)
+    >>> feat = mx.nd.ones((6, 10))
+    >>> lin = gluon.nn.Dense(20)
+    >>> lin.initialize(ctx=mx.cpu(0))
+    >>> def edge_func(efeat):
+    >>>      return lin(efeat)
+    >>> efeat = mx.nd.ones((12, 5))
+    >>> conv = NNConv(10, 2, edge_func, 'mean')
+    >>> conv.initialize(ctx=mx.cpu(0))
+    >>> res = conv(g, feat, efeat)
+    >>> res
+    [[0.39946803 0.32098457]
+    [0.39946803 0.32098457]
+    [0.39946803 0.32098457]
+    [0.39946803 0.32098457]
+    [0.39946803 0.32098457]
+    [0.39946803 0.32098457]]
+    <NDArray 6x2 @cpu(0)>
+
+    >>> # Case 2: Unidirectional bipartite graph
+    >>> u = [0, 1, 0, 0, 1]
+    >>> v = [0, 1, 2, 3, 2]
+    >>> g = dgl.bipartite((u, v))
+    >>> u_feat = mx.nd.random.randn(2, 10)
+    >>> v_feat = mx.nd.random.randn(4, 10)
+    >>> conv = NNConv(10, 2, edge_func, 'mean')
+    >>> conv.initialize(ctx=mx.cpu(0))
+    >>> efeat = mx.nd.ones((5, 5))
+    >>> res = conv(g, (u_feat, v_feat), efeat)
+    >>> res
+    [[ 0.24425688  0.3238042 ]
+    [-0.11651017 -0.01738572]
+    [ 0.06387337  0.15320925]
+    [ 0.24425688  0.3238042 ]]
+    <NDArray 4x2 @cpu(0)>
     """
     def __init__(self,
                  in_feats,
@@ -100,7 +154,7 @@ class NNConv(nn.Block):
             is the output feature size.
         """
         with graph.local_scope():
-            feat_src, feat_dst = expand_as_pair(feat)
+            feat_src, feat_dst = expand_as_pair(feat, graph)
 
             # (n, d_in, 1)
             graph.srcdata['h'] = feat_src.expand_dims(-1)

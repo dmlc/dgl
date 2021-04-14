@@ -302,15 +302,15 @@ class ChebNet(nn.Module):
         self.g = g
         self.layers = nn.ModuleList()
         self.layers.append(
-            ChebConv(in_feats, n_hidden, k, bias)
+            ChebConv(in_feats, n_hidden, k, bias=bias)
         )
         for _ in range(n_layers - 1):
             self.layers.append(
-                ChebConv(n_hidden, n_hidden, k, bias)
+                ChebConv(n_hidden, n_hidden, k, bias=bias)
             )
 
         self.layers.append(
-            ChebConv(n_hidden, n_classes, k, bias)
+            ChebConv(n_hidden, n_classes, k, bias=bias)
         )
 
     def forward(self, features):

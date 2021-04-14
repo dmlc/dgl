@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <vector>
 #include <string>
+#include <utility>
 
 namespace dgl {
 

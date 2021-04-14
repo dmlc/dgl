@@ -16,8 +16,8 @@ class ItemToItemBatchSampler(IterableDataset):
         self.g = g
         self.user_type = user_type
         self.item_type = item_type
-        self.user_to_item_etype = list(g.metagraph[user_type][item_type])[0]
-        self.item_to_user_etype = list(g.metagraph[item_type][user_type])[0]
+        self.user_to_item_etype = list(g.metagraph()[user_type][item_type])[0]
+        self.item_to_user_etype = list(g.metagraph()[item_type][user_type])[0]
         self.batch_size = batch_size
 
     def __iter__(self):
@@ -38,8 +38,8 @@ class NeighborSampler(object):
         self.g = g
         self.user_type = user_type
         self.item_type = item_type
-        self.user_to_item_etype = list(g.metagraph[user_type][item_type])[0]
-        self.item_to_user_etype = list(g.metagraph[item_type][user_type])[0]
+        self.user_to_item_etype = list(g.metagraph()[user_type][item_type])[0]
+        self.item_to_user_etype = list(g.metagraph()[item_type][user_type])[0]
         self.samplers = [
             dgl.sampling.PinSAGESampler(g, item_type, user_type, random_walk_length,
                 random_walk_restart_prob, num_random_walks, num_neighbors)
@@ -54,7 +54,10 @@ class NeighborSampler(object):
                 if len(eids) > 0:
                     old_frontier = frontier
                     frontier = dgl.remove_edges(old_frontier, eids)
-                    frontier.edata['weights'] = old_frontier.edata['weights'][frontier.edata[dgl.EID]]
+                    #print(old_frontier)
+                    #print(frontier)
+                    #print(frontier.edata['weights'])
+                    #frontier.edata['weights'] = old_frontier.edata['weights'][frontier.edata[dgl.EID]]
             block = compact_and_copy(frontier, seeds)
             seeds = block.srcdata[dgl.NID]
             blocks.insert(0, block)
@@ -65,12 +68,10 @@ class NeighborSampler(object):
         # connections only.
         pos_graph = dgl.graph(
             (heads, tails),
-            num_nodes=self.g.number_of_nodes(self.item_type),
-            ntype=self.item_type)
+            num_nodes=self.g.number_of_nodes(self.item_type))
         neg_graph = dgl.graph(
             (heads, neg_tails),
-            num_nodes=self.g.number_of_nodes(self.item_type),
-            ntype=self.item_type)
+            num_nodes=self.g.number_of_nodes(self.item_type))
         pos_graph, neg_graph = dgl.compact_graphs([pos_graph, neg_graph])
         seeds = pos_graph.ndata[dgl.NID]
 

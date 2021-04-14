@@ -12,6 +12,8 @@ Credit: Jiani Zhang ([@jennyzhang0215](https://github.com/jennyzhang0215))
 * PyTorch 1.2+
 * pandas
 * torchtext 0.4+ (if using user and item contents as node features)
+* spacy (if using user and item contents as node features)
+    - You will also need to run `python -m spacy download en_core_web_sm`
 
 ## Data
 
@@ -24,7 +26,6 @@ ml-100k, no feature
 python3 train.py --data_name=ml-100k --use_one_hot_fea --gcn_agg_accum=stack
 ```
 Results: RMSE=0.9088 (0.910 reported)
-Speed: 0.0410s/epoch (vanilla implementation: 0.1008s/epoch)
 
 ml-100k, with feature
 ```bash
@@ -37,7 +38,6 @@ ml-1m, no feature
 python3 train.py --data_name=ml-1m --gcn_agg_accum=sum --use_one_hot_fea
 ```
 Results: RMSE=0.8377 (0.832 reported)
-Speed: 0.0844s/epoch (vanilla implementation: 1.538s/epoch)
 
 ml-10m, no feature
 ```bash
@@ -46,7 +46,6 @@ python3 train.py --data_name=ml-10m --gcn_agg_accum=stack --gcn_dropout=0.3 \
                                  --use_one_hot_fea --gen_r_num_basis_func=4
 ```
 Results: RMSE=0.7800 (0.777 reported)
-Speed: 1.1982/epoch (vanilla implementation: OOM)
 Testbed: EC2 p3.2xlarge instance(Amazon Linux 2)
 
 ### Train with minibatch on a single GPU
@@ -67,8 +66,6 @@ python3 train_sampling.py --data_name=ml-100k \
                           --gpu 0 
 ```
 Results: RMSE=0.9380
-Speed: 1.059s/epoch (Run with 70 epoches)
-Speed: 1.046s/epoch (mix_cpu_gpu)
 
 ml-100k, with feature
 ```bash
@@ -97,8 +94,6 @@ python3 train_sampling.py --data_name=ml-1m \
                           --gpu 0
 ```
 Results: RMSE=0.8632
-Speed: 7.852s/epoch (Run with 60 epoches)
-Speed: 7.788s/epoch (mix_cpu_gpu)
 
 ml-10m, no feature
 ```bash
@@ -126,8 +121,6 @@ python3 train_sampling.py --data_name=ml-10m \
                           --gpu 0
 ```
 Results: RMSE=0.8050
-Speed: 394.304s/epoch (Run with 60 epoches)
-Speed: 408.749s/epoch (mix_cpu_gpu)
 Testbed: EC2 p3.2xlarge instance
 
 ### Train with minibatch on multi-GPU
@@ -151,8 +144,6 @@ python train_sampling.py --data_name=ml-100k \
                          --gpu 0,1,2,3,4,5,6,7
 ```
 Result: RMSE=0.9397
-Speed: 1.202s/epoch (Run with only 30 epoches) 
-Speed: 1.245/epoch (mix_cpu_gpu)
 
 ml-100k, with feature
 ```bash
@@ -162,7 +153,6 @@ python train_sampling.py --data_name=ml-100k \
                          --gpu 0,1,2,3,4,5,6,7
 ```
 Result: RMSE=0.9655
-Speed:  1.265/epoch (Run with 30 epoches)
 
 ml-1m, no feature
 ```bash
@@ -182,8 +172,6 @@ python train_sampling.py --data_name=ml-1m \
                          --gpu 0,1,2,3,4,5,6,7
 ```
 Results: RMSE=0.8621
-Speed: 11.612s/epoch (Run with 40 epoches)
-Speed: 12.483s/epoch (mix_cpu_gpu)
 
 ml-10m, no feature
 ```bash
@@ -211,8 +199,6 @@ python train_sampling.py --data_name=ml-10m \
                          --gpu 0,1,2,3,4,5,6,7
 ```
 Results: RMSE=0.8084
-Speed: 632.868s/epoch (Run with 30 epoches)
-Speed: 633.397s/epoch (mix_cpu_gpu)
 Testbed: EC2 p3.16xlarge instance
 
 ### Train with minibatch on CPU
@@ -223,5 +209,4 @@ python3 train_sampling.py --data_name=ml-100k \
                           --gcn_agg_accum=stack \
                           --gpu -1
 ```
-Speed 1.591s/epoch
 Testbed: EC2 r5.xlarge instance

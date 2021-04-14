@@ -7,33 +7,39 @@ from mxnet.gluon import nn
 from mxnet.gluon.contrib.nn import Identity
 
 from .... import function as fn
+from ....base import DGLError
 from ....utils import expand_as_pair
 
 
 class GMMConv(nn.Block):
-    r"""The Gaussian Mixture Model Convolution layer from `Geometric Deep
+    r"""
+
+    Description
+    -----------
+    The Gaussian Mixture Model Convolution layer from `Geometric Deep
     Learning on Graphs and Manifolds using Mixture Model CNNs
     <http://openaccess.thecvf.com/content_cvpr_2017/papers/Monti_Geometric_Deep_Learning_CVPR_2017_paper.pdf>`__.
 
     .. math::
-        h_i^{l+1} & = \mathrm{aggregate}\left(\left\{\frac{1}{K}
+        u_{ij} &= f(x_i, x_j), x_j \in \mathcal{N}(i)
+
+        w_k(u) &= \exp\left(-\frac{1}{2}(u-\mu_k)^T \Sigma_k^{-1} (u - \mu_k)\right)
+
+        h_i^{l+1} &= \mathrm{aggregate}\left(\left\{\frac{1}{K}
          \sum_{k}^{K} w_k(u_{ij}), \forall j\in \mathcal{N}(i)\right\}\right)
 
-        w_k(u) & = \exp\left(-\frac{1}{2}(u-\mu_k)^T \Sigma_k^{-1} (u - \mu_k)\right)
+    where :math:`u` denotes the pseudo-coordinates between a vertex and one of its neighbor,
+    computed using function :math:`f`, :math:`\Sigma_k^{-1}` and :math:`\mu_k` are
+    learnable parameters representing the covariance matrix and mean vector of a Gaussian kernel.
 
     Parameters
     ----------
-    in_feats : int, or pair of ints
-        Number of input features.
-
-        If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
-        specifies the input feature size on both the source and destination nodes.  If
-        a scalar is given, the source and destination node feature size would take the
-        same value.
+    in_feats : int
+        Number of input features; i.e., the number of dimensions of :math:`x_i`.
     out_feats : int
-        Number of output features.
+        Number of output features; i.e., the number of dimensions of :math:`h_i^{(l+1)}`.
     dim : int
-        Dimensionality of pseudo-coordinte.
+        Dimensionality of pseudo-coordinte; i.e, the number of dimensions of :math:`u_{ij}`.
     n_kernels : int
         Number of kernels :math:`K`.
     aggregator_type : str
@@ -42,6 +48,69 @@ class GMMConv(nn.Block):
         If True, use residual connection inside this layer. Default: ``False``.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
+    allow_zero_in_degree : bool, optional
+        If there are 0-in-degree nodes in the graph, output for those nodes will be invalid
+        since no message will be passed to those nodes. This is harmful for some applications
+        causing silent performance regression. This module will raise a DGLError if it detects
+        0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
+        and let the users handle it by themselves. Default: ``False``.
+
+    Note
+    ----
+    Zero in-degree nodes will lead to invalid output value. This is because no message
+    will be passed to those nodes, the aggregation function will be appied on empty input.
+    A common practice to avoid this is to add a self-loop for each node in the graph if
+    it is homogeneous, which can be achieved by:
+
+    >>> g = ... # a DGLGraph
+    >>> g = dgl.add_self_loop(g)
+
+    Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
+    since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree``
+    to ``True`` for those cases to unblock the code and handle zero-in-degree nodes manually.
+    A common practise to handle this is to filter out the nodes with zero-in-degree when use
+    after conv.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import mxnet as mx
+    >>> from dgl.nn import GMMConv
+    >>>
+    >>> # Case 1: Homogeneous graph
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> g = dgl.add_self_loop(g)
+    >>> feat = mx.nd.ones((6, 10))
+    >>> conv = GMMConv(10, 2, 3, 2, 'mean')
+    >>> conv.initialize(ctx=mx.cpu(0))
+    >>> pseudo = mx.nd.ones((12, 3))
+    >>> res = conv(g, feat, pseudo)
+    >>> res
+    [[-0.05083769 -0.1567954 ]
+    [-0.05083769 -0.1567954 ]
+    [-0.05083769 -0.1567954 ]
+    [-0.05083769 -0.1567954 ]
+    [-0.05083769 -0.1567954 ]
+    [-0.05083769 -0.1567954 ]]
+    <NDArray 6x2 @cpu(0)>
+
+    >>> # Case 2: Unidirectional bipartite graph
+    >>> u = [0, 1, 0, 0, 1]
+    >>> v = [0, 1, 2, 3, 2]
+    >>> g = dgl.bipartite((u, v))
+    >>> u_fea = mx.nd.random.randn(2, 5)
+    >>> v_fea = mx.nd.random.randn(4, 10)
+    >>> pseudo = mx.nd.ones((5, 3))
+    >>> conv = GMMConv((5, 10), 2, 3, 2, 'mean')
+    >>> conv.initialize(ctx=mx.cpu(0))
+    >>> res = conv(g, (u_fea, v_fea), pseudo)
+    >>> res
+    [[-0.1005067  -0.09494358]
+    [-0.0023314  -0.07597432]
+    [-0.05141905 -0.08545895]
+    [-0.1005067  -0.09494358]]
+    <NDArray 4x2 @cpu(0)>
     """
     def __init__(self,
                  in_feats,
@@ -50,13 +119,15 @@ class GMMConv(nn.Block):
                  n_kernels,
                  aggregator_type='sum',
                  residual=False,
-                 bias=True):
+                 bias=True,
+                 allow_zero_in_degree=False):
         super(GMMConv, self).__init__()
 
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         self._dim = dim
         self._n_kernels = n_kernels
+        self._allow_zero_in_degree = allow_zero_in_degree
         if aggregator_type == 'sum':
             self._reducer = fn.sum
         elif aggregator_type == 'mean':
@@ -92,8 +163,26 @@ class GMMConv(nn.Block):
             else:
                 self.bias = None
 
+    def set_allow_zero_in_degree(self, set_value):
+        r"""
+
+        Description
+        -----------
+        Set allow_zero_in_degree flag.
+
+        Parameters
+        ----------
+        set_value : bool
+            The value to be set to the flag.
+        """
+        self._allow_zero_in_degree = set_value
+
     def forward(self, graph, feat, pseudo):
-        """Compute Gaussian Mixture Model Convolution layer.
+        """
+
+        Description
+        -----------
+        Compute Gaussian Mixture Model Convolution layer.
 
         Parameters
         ----------
@@ -114,8 +203,27 @@ class GMMConv(nn.Block):
         mxnet.NDArray
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is the output feature size.
+
+        Raises
+        ------
+        DGLError
+            If there are 0-in-degree nodes in the input graph, it will raise DGLError
+            since no message will be passed to those nodes. This will cause invalid output.
+            The error can be ignored by setting ``allow_zero_in_degree`` parameter to ``True``.
         """
-        feat_src, feat_dst = expand_as_pair(feat)
+        if not self._allow_zero_in_degree:
+            if graph.in_degrees().min() == 0:
+                raise DGLError('There are 0-in-degree nodes in the graph, '
+                               'output for those nodes will be invalid. '
+                               'This is harmful for some applications, '
+                               'causing silent performance regression. '
+                               'Adding self-loop on the input graph by '
+                               'calling `g = dgl.add_self_loop(g)` will resolve '
+                               'the issue. Setting ``allow_zero_in_degree`` '
+                               'to be `True` when constructing this module will '
+                               'suppress the check and let the code run.')
+
+        feat_src, feat_dst = expand_as_pair(feat, graph)
         with graph.local_scope():
             graph.srcdata['h'] = self.fc(feat_src).reshape(
                 -1, self._n_kernels, self._out_feats)

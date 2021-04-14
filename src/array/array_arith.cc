@@ -3,8 +3,8 @@
  * \file array/array_aritch.cc
  * \brief DGL array arithmetic operations
  */
-#include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/container.h>
 #include "../c_api_common.h"
 #include "./array_op.h"
@@ -70,6 +70,7 @@ BINARY_ELEMENT_OP(Add, Add)
 BINARY_ELEMENT_OP(Sub, Sub)
 BINARY_ELEMENT_OP(Mul, Mul)
 BINARY_ELEMENT_OP(Div, Div)
+BINARY_ELEMENT_OP(Mod, Mod)
 BINARY_ELEMENT_OP(GT, GT)
 BINARY_ELEMENT_OP(LT, LT)
 BINARY_ELEMENT_OP(GE, GE)
@@ -81,6 +82,7 @@ BINARY_ELEMENT_OP_L(Add, Add)
 BINARY_ELEMENT_OP_L(Sub, Sub)
 BINARY_ELEMENT_OP_L(Mul, Mul)
 BINARY_ELEMENT_OP_L(Div, Div)
+BINARY_ELEMENT_OP_L(Mod, Mod)
 BINARY_ELEMENT_OP_L(GT, GT)
 BINARY_ELEMENT_OP_L(LT, LT)
 BINARY_ELEMENT_OP_L(GE, GE)
@@ -92,6 +94,7 @@ BINARY_ELEMENT_OP_R(Add, Add)
 BINARY_ELEMENT_OP_R(Sub, Sub)
 BINARY_ELEMENT_OP_R(Mul, Mul)
 BINARY_ELEMENT_OP_R(Div, Div)
+BINARY_ELEMENT_OP_R(Mod, Mod)
 BINARY_ELEMENT_OP_R(GT, GT)
 BINARY_ELEMENT_OP_R(LT, LT)
 BINARY_ELEMENT_OP_R(GE, GE)
@@ -117,6 +120,9 @@ NDArray operator * (const NDArray& lhs, const NDArray& rhs) {
 NDArray operator / (const NDArray& lhs, const NDArray& rhs) {
   return dgl::aten::Div(lhs, rhs);
 }
+NDArray operator % (const NDArray& lhs, const NDArray& rhs) {
+  return dgl::aten::Mod(lhs, rhs);
+}
 NDArray operator + (const NDArray& lhs, int64_t rhs) {
   return dgl::aten::Add(lhs, rhs);
 }
@@ -129,6 +135,9 @@ NDArray operator * (const NDArray& lhs, int64_t rhs) {
 NDArray operator / (const NDArray& lhs, int64_t rhs) {
   return dgl::aten::Div(lhs, rhs);
 }
+NDArray operator % (const NDArray& lhs, int64_t rhs) {
+  return dgl::aten::Mod(lhs, rhs);
+}
 NDArray operator + (int64_t lhs, const NDArray& rhs) {
   return dgl::aten::Add(lhs, rhs);
 }
@@ -140,6 +149,9 @@ NDArray operator * (int64_t lhs, const NDArray& rhs) {
 }
 NDArray operator / (int64_t lhs, const NDArray& rhs) {
   return dgl::aten::Div(lhs, rhs);
+}
+NDArray operator % (int64_t lhs, const NDArray& rhs) {
+  return dgl::aten::Mod(lhs, rhs);
 }
 NDArray operator - (const NDArray& array) {
   return dgl::aten::Neg(array);

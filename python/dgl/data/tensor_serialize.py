@@ -61,7 +61,7 @@ def load_tensors(filename, return_dgl_ndarray=False):
     tensor_dict = {}
     for key, value in nd_dict.items():
         if return_dgl_ndarray:
-            tensor_dict[key] = value.data
+            tensor_dict[key] = value
         else:
-            tensor_dict[key] = F.zerocopy_from_dgl_ndarray(value.data)
+            tensor_dict[key] = F.zerocopy_from_dgl_ndarray(value)
     return tensor_dict

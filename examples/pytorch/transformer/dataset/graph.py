@@ -19,7 +19,7 @@ class GraphPool:
         print('start creating graph pool...')
         tic = time.time()
         self.n, self.m = n, m
-        g_pool = [[dgl.DGLGraph() for _ in range(m)] for _ in range(n)]
+        g_pool = [[dgl.graph(([], [])) for _ in range(m)] for _ in range(n)]
         num_edges = {
             'ee': np.zeros((n, n)).astype(int),
             'ed': np.zeros((n, m)).astype(int),
@@ -103,6 +103,7 @@ class GraphPool:
 
         g.set_n_initializer(dgl.init.zero_initializer)
         g.set_e_initializer(dgl.init.zero_initializer)
+        g = g.to(device).long()
 
         return Graph(g=g,
                      src=(th.cat(src), th.cat(src_pos)),
@@ -160,6 +161,7 @@ class GraphPool:
 
         g.set_n_initializer(dgl.init.zero_initializer)
         g.set_e_initializer(dgl.init.zero_initializer)
+        g = g.to(device).long()
 
         return Graph(g=g,
                      src=(th.cat(src), th.cat(src_pos)),

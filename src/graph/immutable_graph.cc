@@ -200,7 +200,7 @@ IdArray CSR::Successors(dgl_id_t vid, uint64_t radius) const {
 IdArray CSR::EdgeId(dgl_id_t src, dgl_id_t dst) const {
   CHECK(HasVertex(src)) << "invalid vertex: " << src;
   CHECK(HasVertex(dst)) << "invalid vertex: " << dst;
-  return aten::CSRGetData(adj_, src, dst);
+  return aten::CSRGetAllData(adj_, src, dst);
 }
 
 EdgeArray CSR::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
@@ -325,6 +325,8 @@ std::pair<dgl_id_t, dgl_id_t> COO::FindEdge(dgl_id_t eid) const {
 
 EdgeArray COO::FindEdges(IdArray eids) const {
   CHECK(aten::IsValidIdArray(eids)) << "Invalid edge id array";
+  BUG_ON(aten::IsNullArray(adj_.data)) <<
+    "FindEdges requires the internal COO matrix not having EIDs.";
   return EdgeArray{aten::IndexSelect(adj_.row, eids),
                    aten::IndexSelect(adj_.col, eids),
                    eids};

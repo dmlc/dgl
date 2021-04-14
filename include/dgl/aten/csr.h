@@ -9,6 +9,8 @@
 #include <dmlc/io.h>
 #include <dmlc/serializer.h>
 #include <vector>
+#include <tuple>
+#include <string>
 #include "./types.h"
 #include "./array_ops.h"
 #include "./spmat.h"
@@ -106,6 +108,17 @@ struct CSRMatrix {
     }
     CHECK_NO_OVERFLOW(indptr->dtype, num_rows);
     CHECK_NO_OVERFLOW(indptr->dtype, num_cols);
+    CHECK_EQ(indptr->shape[0], num_rows + 1);
+  }
+
+  /*! \brief Return a copy of this matrix on the give device context. */
+  inline CSRMatrix CopyTo(const DLContext& ctx) const {
+    if (ctx == indptr->ctx)
+      return *this;
+    return CSRMatrix(num_rows, num_cols,
+                     indptr.CopyTo(ctx), indices.CopyTo(ctx),
+                     aten::IsNullArray(data)? data : data.CopyTo(ctx),
+                     sorted);
   }
 };
 
@@ -134,27 +147,71 @@ inline bool CSRHasData(CSRMatrix csr) {
   return !IsNullArray(csr.data);
 }
 
-/* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
-runtime::NDArray CSRGetData(CSRMatrix , int64_t row, int64_t col);
-/*!
- * \brief Batched implementation of CSRGetData.
- * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
- */
-
-runtime::NDArray CSRGetData(CSRMatrix, runtime::NDArray rows, runtime::NDArray cols);
+/*! \brief Whether the column indices of each row is sorted. */
+bool CSRIsSorted(CSRMatrix csr);
 
 /*!
  * \brief Get the data and the row,col indices for each returned entries.
+ *
+ * The operator supports matrix with duplicate entries and all the matched entries
+ * will be returned. The operator assumes there is NO duplicate (row, col) pair
+ * in the given input. Otherwise, the returned result is undefined.
+ *
+ * If some (row, col) pairs do not contain a valid non-zero elements,
+ * they will not be included in the return arrays.
+ *
  * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ * \param mat Sparse matrix
+ * \param rows Row index
+ * \param cols Column index
+ * \return Three arrays {rows, cols, data}
  */
 std::vector<runtime::NDArray> CSRGetDataAndIndices(
     CSRMatrix , runtime::NDArray rows, runtime::NDArray cols);
+
+/* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
+inline runtime::NDArray CSRGetAllData(CSRMatrix mat, int64_t row, int64_t col) {
+  const auto& nbits = mat.indptr->dtype.bits;
+  const auto& ctx = mat.indptr->ctx;
+  IdArray rows = VecToIdArray<int64_t>({row}, nbits, ctx);
+  IdArray cols = VecToIdArray<int64_t>({col}, nbits, ctx);
+  const auto& rst = CSRGetDataAndIndices(mat, rows, cols);
+  return rst[2];
+}
+
+/*!
+ * \brief Get the data for each (row, col) pair.
+ *
+ * The operator supports matrix with duplicate entries but only one matched entry
+ * will be returned for each (row, col) pair. Support duplicate input (row, col)
+ * pairs.
+ *
+ * If some (row, col) pairs do not contain a valid non-zero elements,
+ * their data values are filled with -1.
+ *
+ * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ *
+ * \param mat Sparse matrix.
+ * \param rows Row index.
+ * \param cols Column index.
+ * \return Data array. The i^th element is the data of (rows[i], cols[i])
+ */
+runtime::NDArray CSRGetData(CSRMatrix, runtime::NDArray rows, runtime::NDArray cols);
 
 /*! \brief Return a transposed CSR matrix */
 CSRMatrix CSRTranspose(CSRMatrix csr);
 
 /*!
  * \brief Convert CSR matrix to COO matrix.
+ *
+ * Complexity: O(nnz)
+ * 
+ * - If data_as_order is false, the column and data arrays of the
+ *   result COO are equal to the indices and data arrays of the
+ *   input CSR. The result COO is also row sorted.
+ * - If the input CSR is further sorted, the result COO is also
+ *   column sorted.
+ *
  * \param csr Input csr matrix
  * \param data_as_order If true, the data array in the input csr matrix contains the order
  *                      by which the resulting COO tuples are stored. In this case, the
@@ -166,9 +223,8 @@ COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order);
 
 /*!
  * \brief Slice rows of the given matrix and return.
- * \param csr CSR matrix
- * \param start Start row id (inclusive)
- * \param end End row id (exclusive)
+ *
+ * The sliced row IDs are relabeled to starting from zero.
  *
  * Examples:
  * num_rows = 4
@@ -182,6 +238,11 @@ COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order);
  * num_cols = 4
  * indptr = [0, 1, 1]
  * indices = [2]
+ *
+ * \param csr CSR matrix
+ * \param start Start row id (inclusive)
+ * \param end End row id (exclusive)
+ * \return sliced rows stored in a CSR matrix
  */
 CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end);
 CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
@@ -190,7 +251,13 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
  * \brief Get the submatrix specified by the row and col ids.
  *
  * In numpy notation, given matrix M, row index array I, col index array J
- * This function returns the submatrix M[I, J].
+ * This function returns the submatrix M[I, J]. It assumes that there is no
+ * duplicate (row, col) pair in the given indices. M could have duplicate
+ * entries.
+ *
+ * The sliced row and column IDs are relabeled according to the given
+ * rows and cols (i.e., row #0 in the new matrix corresponds to rows[0] in
+ * the original matrix).
  *
  * \param csr The input csr matrix
  * \param rows The row index to select
@@ -203,7 +270,10 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
 bool CSRHasDuplicate(CSRMatrix csr);
 
 /*!
- * \brief Sort the column index at each row in the ascending order.
+ * \brief Sort the column index at each row in ascending order in-place.
+ *
+ * Only the indices and data arrays (if available) will be mutated. The indptr array
+ * stays the same.
  *
  * Examples:
  * num_rows = 4
@@ -217,6 +287,22 @@ bool CSRHasDuplicate(CSRMatrix csr);
  * indices = [0, 1, 1, 2, 3]
  */
 void CSRSort_(CSRMatrix* csr);
+
+/*!
+ * \brief Sort the column index at each row in ascending order.
+ *
+ * Return a new CSR matrix with sorted column indices and data arrays.
+ */
+inline CSRMatrix CSRSort(CSRMatrix csr) {
+  if (csr.sorted)
+    return csr;
+  CSRMatrix ret(csr.num_rows, csr.num_cols,
+                csr.indptr, csr.indices.Clone(),
+                CSRHasData(csr)? csr.data.Clone() : csr.data,
+                csr.sorted);
+  CSRSort_(&ret);
+  return ret;
+}
 
 /*!
  * \brief Reorder the rows and colmns according to the new row and column order.
@@ -317,6 +403,148 @@ COOMatrix CSRRowWiseTopk(
     int64_t k,
     FloatArray weight,
     bool ascending = false);
+
+/*!
+ * \brief Union two CSRMatrix into one CSRMatrix.
+ * 
+ * Two Matrix must have the same shape.
+ *
+ * Example:
+ *
+ * A = [[0, 0, 1, 0],
+ *      [1, 0, 1, 1],
+ *      [0, 1, 0, 0]]
+ *
+ * B = [[0, 1, 1, 0],
+ *      [0, 0, 0, 1],
+ *      [0, 0, 1, 0]]
+ *
+ * CSRMatrix_A.num_rows : 3
+ * CSRMatrix_A.num_cols : 4
+ * CSRMatrix_B.num_rows : 3
+ * CSRMatrix_B.num_cols : 4
+ *
+ * C = UnionCsr({A, B});
+ *
+ * C = [[0, 1, 2, 0],
+ *      [1, 0, 1, 2],
+ *      [0, 1, 1, 0]]
+ *
+ * CSRMatrix_C.num_rows : 3
+ * CSRMatrix_C.num_cols : 4
+ */
+CSRMatrix UnionCsr(
+  const std::vector<CSRMatrix>& csrs);
+
+/*!
+ * \brief Union a list CSRMatrix into one CSRMatrix.
+ *
+ * Examples:
+ *
+ * A = [[0, 0, 1],
+ *      [1, 0, 1],
+ *      [0, 1, 0]]
+ *
+ * B = [[0, 0],
+ *      [1, 0]]
+ *
+ * CSRMatrix_A.num_rows : 3
+ * CSRMatrix_A.num_cols : 3
+ * CSRMatrix_B.num_rows : 2
+ * CSRMatrix_B.num_cols : 2
+ *
+ * C = DisjointUnionCsr({A, B});
+ *
+ * C = [[0, 0, 1, 0, 0],
+ *      [1, 0, 1, 0, 0],
+ *      [0, 1, 0, 0, 0],
+ *      [0, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 0]]
+ * CSRMatrix_C.num_rows : 5
+ * CSRMatrix_C.num_cols : 5
+ *
+ * \param csrs The input list of csr matrix.
+ * \param src_offset A list of integers recording src vertix id offset of each Matrix in csrs
+ * \param src_offset A list of integers recording dst vertix id offset of each Matrix in csrs
+ * \return The combined CSRMatrix.
+ */
+CSRMatrix DisjointUnionCsr(
+  const std::vector<CSRMatrix>& csrs);
+
+/*!
+ * \brief CSRMatrix toSimple.
+ *
+ * A = [[0, 0, 0],
+ *      [3, 0, 2],
+ *      [1, 1, 0],
+ *      [0, 0, 4]]
+ * 
+ * B, cnt, edge_map = CSRToSimple(A)
+ *
+ * B = [[0, 0, 0],
+ *      [1, 0, 1],
+ *      [1, 1, 0],
+ *      [0, 0, 1]]
+ * cnt = [3, 2, 1, 1, 4]
+ * edge_map = [0, 0, 0, 1, 1, 2, 3, 4, 4, 4, 4]
+ *
+ * \return The simplified CSRMatrix
+ *         The count recording the number of duplicated edges from the original graph.
+ *         The edge mapping from the edge IDs of original graph to those of the
+ *         returned graph.
+ */
+std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple(const CSRMatrix& csr);
+
+/*!
+ * \brief Split a CSRMatrix into multiple disjoin components.
+ *
+ * Examples:
+ *
+ * C = [[0, 0, 1, 0, 0],
+ *      [1, 0, 1, 0, 0],
+ *      [0, 1, 0, 0, 0],
+ *      [0, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 0],
+ *      [0, 0, 0, 0, 1]]
+ * CSRMatrix_C.num_rows : 6
+ * CSRMatrix_C.num_cols : 5
+ *
+ * batch_size : 2
+ * edge_cumsum : [0, 4, 6]
+ * src_vertex_cumsum : [0, 3, 6]
+ * dst_vertex_cumsum : [0, 3, 5]
+ *
+ * ret = DisjointPartitionCsrBySizes(C,
+ *                                   batch_size,
+ *                                   edge_cumsum,
+ *                                   src_vertex_cumsum,
+ *                                   dst_vertex_cumsum)
+ *
+ * A = [[0, 0, 1],
+ *      [1, 0, 1],
+ *      [0, 1, 0]]
+ * CSRMatrix_A.num_rows : 3
+ * CSRMatrix_A.num_cols : 3
+ *
+ * B = [[0, 0],
+ *      [1, 0],
+ *      [0, 1]]
+ * CSRMatrix_B.num_rows : 3
+ * CSRMatrix_B.num_cols : 2
+ *
+ * \param csr CSRMatrix to split.
+ * \param batch_size Number of disjoin components (Sub CSRMatrix)
+ * \param edge_cumsum Number of edges of each components
+ * \param src_vertex_cumsum Number of src vertices of each component.
+ * \param dst_vertex_cumsum Number of dst vertices of each component.
+ * \return A list of CSRMatrixes representing each disjoint components.
+ */
+std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
+  const CSRMatrix &csrs,
+  const uint64_t batch_size,
+  const std::vector<uint64_t> &edge_cumsum,
+  const std::vector<uint64_t> &src_vertex_cumsum,
+  const std::vector<uint64_t> &dst_vertex_cumsum);
 
 }  // namespace aten
 }  // namespace dgl

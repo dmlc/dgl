@@ -57,6 +57,16 @@ struct RPCContext {
   int32_t num_servers = 0;
 
   /*!
+   * \brief Total number of client.
+   */
+  int32_t num_clients = 0;
+
+  /*!
+   * \brief Current barrier count
+   */
+  int32_t barrier_count = 0;
+
+  /*!
    * \brief Total number of server per machine.
    */
   int32_t num_servers_per_machine = 0;
@@ -85,6 +95,19 @@ struct RPCContext {
   /*! \brief Get the thread-local RPC context structure */
   static RPCContext *ThreadLocal() {
     return dmlc::ThreadLocalStore<RPCContext>::Get();
+  }
+
+  /*! \brief Reset the RPC context */
+  static void Reset() {
+    auto* t = ThreadLocal();
+    t->rank = -1;
+    t->machine_id = -1;
+    t->num_machines = 0;
+    t->num_clients = 0;
+    t->barrier_count = 0;
+    t->num_servers_per_machine = 0;
+    t->sender = std::shared_ptr<network::Sender>();
+    t->receiver = std::shared_ptr<network::Receiver>();
   }
 };
 

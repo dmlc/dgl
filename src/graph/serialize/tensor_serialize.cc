@@ -24,7 +24,8 @@ constexpr uint64_t kDGLSerialize_Tensors = 0xDD5A9FBE3FA2443F;
 DGL_REGISTER_GLOBAL("data.tensor_serialize._CAPI_SaveNDArrayDict")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];
-    auto *fs = dmlc::Stream::Create(filename.c_str(), "w");
+    auto fs = std::unique_ptr<dmlc::Stream>(
+      dmlc::Stream::Create(filename.c_str(), "w"));
     CHECK(fs) << "Filename is invalid";
     fs->Write(kDGLSerialize_Tensors);
     bool empty_dict = args[2];
@@ -40,13 +41,13 @@ DGL_REGISTER_GLOBAL("data.tensor_serialize._CAPI_SaveNDArrayDict")
     }
     fs->Write(namedTensors);
     *rv = true;
-    delete fs;
   });
 
 DGL_REGISTER_GLOBAL("data.tensor_serialize._CAPI_LoadNDArrayDict")
   .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];
-    auto *fs = dmlc::Stream::Create(filename.c_str(), "r");
+    auto fs = std::unique_ptr<dmlc::Stream>(
+      dmlc::Stream::Create(filename.c_str(), "r"));
     CHECK(fs) << "Filename is invalid or file doesn't exists";
     uint64_t magincNum, num_elements;
     CHECK(fs->Read(&magincNum)) << "Invalid file";
@@ -60,7 +61,6 @@ DGL_REGISTER_GLOBAL("data.tensor_serialize._CAPI_LoadNDArrayDict")
       nd_dict.Set(kv.first, ndarray);
     }
     *rv = nd_dict;
-    delete fs;
   });
 
 }  // namespace serialize

@@ -33,7 +33,9 @@ python3 train_full.py --dataset cora --gpu 0    # full graph
 Train w/ mini-batch sampling (on the Reddit dataset)
 ```bash
 python3 train_sampling.py --num-epochs 30       # neighbor sampling
+python3 train_sampling.py --num-epochs 30 --inductive  # inductive learning with neighbor sampling
 python3 train_sampling_multi_gpu.py --num-epochs 30    # neighbor sampling with multi GPU
+python3 train_sampling_multi_gpu.py --num-epochs 30 --inductive  # inductive learning with neighbor sampling, multi GPU
 python3 train_cv.py --num-epochs 30             # control variate sampling
 python3 train_cv_multi_gpu.py --num-epochs 30   # control variate sampling with multi GPU
 ```
@@ -44,6 +46,7 @@ Accuracy:
 |:---------------------:|:--------:|
 | Full Graph            | 0.9504   |
 | Neighbor Sampling     | 0.9495   |
+| N.S. (Inductive)      | 0.9460   |
 | Control Variate       | 0.9490   |
 
 ### Unsupervised training

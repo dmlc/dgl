@@ -8,7 +8,11 @@ from .. import utils
 
 
 class RelGraphConv(layers.Layer):
-    r"""Relational graph convolution layer.
+    r"""
+
+    Description
+    -----------
+    Relational graph convolution layer.
 
     Relational graph convolution is introduced in "`Modeling Relational Data with Graph
     Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
@@ -30,37 +34,85 @@ class RelGraphConv(layers.Layer):
 
        W_r^{(l)} = \sum_{b=1}^B a_{rb}^{(l)}V_b^{(l)}
 
-    where :math:`B` is the number of bases.
+    where :math:`B` is the number of bases, :math:`V_b^{(l)}` are linearly combined
+    with coefficients :math:`a_{rb}^{(l)}`.
 
     The block-diagonal-decomposition regularization decomposes :math:`W_r` into :math:`B`
     number of block diagonal matrices. We refer :math:`B` as the number of bases.
 
+    The block regularization decomposes :math:`W_r` by:
+
+    .. math::
+
+       W_r^{(l)} = \oplus_{b=1}^B Q_{rb}^{(l)}
+
+    where :math:`B` is the number of bases, :math:`Q_{rb}^{(l)}` are block
+    bases with shape :math:`R^{(d^{(l+1)}/B)*(d^{l}/B)}`.
+
     Parameters
     ----------
     in_feat : int
-        Input feature size.
+        Input feature size; i.e, the number of dimensions of :math:`h_j^{(l)}`.
     out_feat : int
-        Output feature size.
+        Output feature size; i.e., the number of dimensions of :math:`h_i^{(l+1)}`.
     num_rels : int
-        Number of relations.
+        Number of relations. .
     regularizer : str
-        Which weight regularizer to use "basis" or "bdd"
+        Which weight regularizer to use "basis" or "bdd".
+        "basis" is short for basis-diagonal-decomposition.
+        "bdd" is short for block-diagonal-decomposition.
     num_bases : int, optional
-        Number of bases. If is none, use number of relations. Default: None.
+        Number of bases. If is none, use number of relations. Default: ``None``.
     bias : bool, optional
-        True if bias is added. Default: True
+        True if bias is added. Default: ``True``.
     activation : callable, optional
-        Activation function. Default: None
+        Activation function. Default: ``None``.
     self_loop : bool, optional
-        True to include self loop message. Default: False
+        True to include self loop message. Default: ``True``.
     low_mem : bool, optional
-        True to use low memory implementation of relation message passing function. Default: False
-        This option trade speed with memory consumption, and will slowdown the forward/backward.
-        Turn it on when you encounter OOM problem during training or evaluation.
+        True to use low memory implementation of relation message passing function. Default: False.
+        This option trades speed with memory consumption, and will slowdown the forward/backward.
+        Turn it on when you encounter OOM problem during training or evaluation. Default: ``False``.
     dropout : float, optional
-        Dropout rate. Default: 0.0
-    """
+        Dropout rate. Default: ``0.0``
+    layer_norm: float, optional
+        Add layer norm. Default: ``False``
 
+    Examples
+    --------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import tensorflow as tf
+    >>> from dgl.nn import RelGraphConv
+    >>>
+    >>> with tf.device("CPU:0"):
+    >>>     g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>>     feat = tf.ones((6, 10))
+    >>>     conv = RelGraphConv(10, 2, 3, regularizer='basis', num_bases=2)
+    >>>     etype = tf.convert_to_tensor(np.array([0,1,2,0,1,2]).astype(np.int64))
+    >>>     res = conv(g, feat, etype)
+    >>>     res
+    <tf.Tensor: shape=(6, 2), dtype=float32, numpy=
+    array([[-0.02938664,  1.7932655 ],
+        [ 0.1146394 ,  0.48319   ],
+        [-0.02938664,  1.7932655 ],
+        [ 1.2054908 , -0.26098895],
+        [ 0.1146394 ,  0.48319   ],
+        [ 0.75915515,  1.1454091 ]], dtype=float32)>
+
+    >>> # One-hot input
+    >>> with tf.device("CPU:0"):
+    >>>     one_hot_feat = tf.convert_to_tensor(np.array([0,1,2,3,4,5]).astype(np.int64))
+    >>>     res = conv(g, one_hot_feat, etype)
+    >>>     res
+    <tf.Tensor: shape=(6, 2), dtype=float32, numpy=
+    array([[-0.24205256, -0.7922753 ],
+        [ 0.62085056,  0.4893622 ],
+        [-0.9484881 , -0.26546806],
+        [-0.2163915 , -0.12585883],
+        [-0.14293689,  0.77483284],
+        [ 0.091169  , -0.06761569]], dtype=float32)>
+    """
     def __init__(self,
                  in_feat,
                  out_feat,
@@ -69,9 +121,10 @@ class RelGraphConv(layers.Layer):
                  num_bases=None,
                  bias=True,
                  activation=None,
-                 self_loop=False,
+                 self_loop=True,
                  low_mem=False,
-                 dropout=0.0):
+                 dropout=0.0,
+                 layer_norm=False):
         super(RelGraphConv, self).__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
@@ -84,6 +137,8 @@ class RelGraphConv(layers.Layer):
         self.activation = activation
         self.self_loop = self_loop
         self.low_mem = low_mem
+
+        assert layer_norm is False, 'TensorFlow currently does not support layer norm.'
 
         xinit = tf.keras.initializers.glorot_uniform()
         zeroinit = tf.keras.initializers.zeros()
@@ -201,6 +256,7 @@ class RelGraphConv(layers.Layer):
             The graph.
         x : tf.Tensor
             Input node features. Could be either
+
                 * :math:`(|V|, D)` dense tensor
                 * :math:`(|V|,)` int64 vector, representing the categorical values of each
                   node. We then treat the input feature as an one-hot encoding feature.
@@ -214,8 +270,9 @@ class RelGraphConv(layers.Layer):
         tf.Tensor
             New node features.
         """
-        assert g.is_homograph(), \
-            "not a homograph; convert it with to_homo and pass in the edge type as argument"
+        assert g.is_homogeneous, \
+            "not a homogeneous graph; convert it with to_homogeneous " \
+            "and pass in the edge type as argument"
         with g.local_scope():
             g.ndata['h'] = x
             g.edata['type'] = tf.cast(etypes, tf.int64)

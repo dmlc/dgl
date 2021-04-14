@@ -9,23 +9,28 @@ from .... import function as fn
 
 
 class TAGConv(gluon.Block):
-    r"""Apply Topology Adaptive Graph Convolutional Network
+    r"""
+
+    Description
+    -----------
+    Topology Adaptive Graph Convolutional layer from paper `Topology
+    Adaptive Graph Convolutional Networks <https://arxiv.org/pdf/1710.10370.pdf>`__.
 
     .. math::
-        \mathbf{X}^{\prime} = \sum_{k=0}^K \mathbf{D}^{-1/2} \mathbf{A}
-        \mathbf{D}^{-1/2}\mathbf{X} \mathbf{\Theta}_{k},
+        H^{K} = {\sum}_{k=0}^K (D^{-1/2} A D^{-1/2})^{k} X {\Theta}_{k},
 
-    where :math:`\mathbf{A}` denotes the adjacency matrix and
-    :math:`D_{ii} = \sum_{j=0} A_{ij}` its diagonal degree matrix.
+    where :math:`A` denotes the adjacency matrix,
+    :math:`D_{ii} = \sum_{j=0} A_{ij}` its diagonal degree matrix,
+    :math:`{\Theta}_{k}` denotes the linear weights to sum the results of different hops together.
 
     Parameters
     ----------
     in_feats : int
-        Number of input features.
+        Input feature size. i.e, the number of dimensions of :math:`X`.
     out_feats : int
-        Number of output features.
+        Output feature size.  i.e, the number of dimensions of :math:`H^{K}`.
     k: int, optional
-        Number of hops :math: `k`. (default: 2)
+        Number of hops :math:`K`. Default: ``2``.
     bias: bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
     activation: callable activation function/layer or None, optional
@@ -34,10 +39,30 @@ class TAGConv(gluon.Block):
 
     Attributes
     ----------
-    lin : mxnet.gluon.parameter.Parameter
-        The learnable weight tensor.
-    bias : mxnet.gluon.parameter.Parameter
-        The learnable bias tensor.
+    lin : torch.Module
+        The learnable linear module.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import mxnet as mx
+    >>> from mxnet import gluon
+    >>> from dgl.nn import TAGConv
+    >>>
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = mx.nd.ones((6, 10))
+    >>> conv = TAGConv(10, 2, k=2)
+    >>> conv.initialize(ctx=mx.cpu(0))
+    >>> res = conv(g, feat)
+    >>> res
+    [[-0.86147034  0.10089529]
+    [-0.86147034  0.10089529]
+    [-0.86147034  0.10089529]
+    [-0.9707841   0.0360311 ]
+    [-0.6716844   0.02247889]
+    [ 0.32964635 -0.7669234 ]]
+    <NDArray 6x2 @cpu(0)>
     """
     def __init__(self,
                  in_feats,
@@ -60,7 +85,11 @@ class TAGConv(gluon.Block):
                                           init=mx.init.Zero())
 
     def forward(self, graph, feat):
-        r"""Compute graph convolution
+        r"""
+
+        Description
+        -----------
+        Compute topology adaptive graph convolution.
 
         Parameters
         ----------
@@ -77,7 +106,7 @@ class TAGConv(gluon.Block):
             is size of output feature.
         """
         with graph.local_scope():
-            assert graph.is_homograph(), 'Graph is not homogeneous'
+            assert graph.is_homogeneous, 'Graph is not homogeneous'
 
             degs = graph.in_degrees().astype('float32')
             norm = mx.nd.power(mx.nd.clip(degs, a_min=1, a_max=float("inf")), -0.5)

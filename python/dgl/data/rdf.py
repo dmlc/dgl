@@ -1,5 +1,4 @@
 """RDF datasets
-
 Datasets from "A Collection of Benchmark Datasets for
 Systematic Evaluations of Machine Learning on
 the Semantic Web"
@@ -7,19 +6,23 @@ the Semantic Web"
 import os
 from collections import OrderedDict
 import itertools
-import rdflib as rdf
 import abc
 import re
+try:
+    import rdflib as rdf
+except ImportError:
+    pass
 
 import networkx as nx
 import numpy as np
 
 import dgl
 import dgl.backend as F
-from .utils import download, extract_archive, get_download_dir, _get_dgl_url
-from ..utils import retry_method_with_fix
+from .dgl_dataset import DGLBuiltinDataset
+from .utils import save_graphs, load_graphs, save_info, load_info, _get_dgl_url
+from .utils import generate_mask_tensor, idx2mask, deprecate_property, deprecate_class
 
-__all__ = ['AIFB', 'MUTAG', 'BGS', 'AM']
+__all__ = ['AIFB', 'MUTAG', 'BGS', 'AM', 'AIFBDataset', 'MUTAGDataset', 'BGSDataset', 'AMDataset']
 
 # Dictionary for renaming reserved node/edge type names to the ones
 # that are allowed by nn.Module.
@@ -30,7 +33,6 @@ RENAME_DICT = {
 
 class Entity:
     """Class for entities
-
     Parameters
     ----------
     id : str
@@ -38,8 +40,8 @@ class Entity:
     cls : str
         Type of this entity
     """
-    def __init__(self, id, cls):
-        self.id = id
+    def __init__(self, e_id, cls):
+        self.id = e_id
         self.cls = cls
 
     def __str__(self):
@@ -47,7 +49,6 @@ class Entity:
 
 class Relation:
     """Class for relations
-
     Parameters
     ----------
     cls : str
@@ -59,7 +60,7 @@ class Relation:
     def __str__(self):
         return str(self.cls)
 
-class RDFGraphDataset:
+class RDFGraphDataset(DGLBuiltinDataset):
     """Base graph dataset class from RDF tuples.
 
     To derive from this, implement the following abstract methods:
@@ -68,16 +69,14 @@ class RDFGraphDataset:
     * ``process_tuple``
     * ``process_idx_file_line``
     * ``predict_category``
-
     Preprocessed graph and other data will be cached in the download folder
     to speedup data loading.
-
     The dataset should contain a "trainingSet.tsv" and a "testSet.tsv" file
     for training and testing samples.
 
     Attributes
     ----------
-    graph : dgl.DGLHeteroGraph
+    graph : dgl.DGLraph
         Graph structure
     num_classes : int
         Number of classes to predict
@@ -92,50 +91,58 @@ class RDFGraphDataset:
 
     Parameters
     ----------
-    url : str or path
-        URL to download the raw dataset.
     name : str
         Name of the dataset
-    force_reload : bool, optional
-        If true, force load and process from raw data. Ignore cached pre-processed data.
+    url : str or path
+        URL to download the raw dataset.
+    predict_category : str
+        Predict category.
     print_every : int, optional
-        Log for every X tuples.
+        Preprocessing log for every X tuples.
     insert_reverse : bool, optional
         If true, add reverse edge and reverse relations to the final graph.
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool, optional
+        If true, force load and process from raw data. Ignore cached pre-processed data.
+    verbose: bool
+        Whether to print out progress information. Default: True.
     """
-    def __init__(self, url, name,
-                 force_reload=False,
+    def __init__(self, name, url, predict_category,
                  print_every=10000,
-                 insert_reverse=True):
-        download_dir = get_download_dir()
-        zip_file_path = os.path.join(download_dir, '{}.zip'.format(name))
-        self._dir = os.path.join(download_dir, name)
-        self._url = url
-        self._zip_file_path = zip_file_path
-        self._load(print_every, insert_reverse, force_reload)
-
-    def _download(self):
-        download(self._url, path=self._zip_file_path)
-        extract_archive(self._zip_file_path, self._dir)
-
-    @retry_method_with_fix(_download)
-    def _load(self, print_every, insert_reverse, force_reload):
-        self._print_every = print_every
+                 insert_reverse=True,
+                 raw_dir=None,
+                 force_reload=False,
+                 verbose=True):
+        import rdflib as rdf
         self._insert_reverse = insert_reverse
-        if not force_reload and self.has_cache():
-            print('Found cached graph. Load cache ...')
-            self.load_cache()
-        else:
-            raw_tuples = self.load_raw_tuples()
-            self.process_raw_tuples(raw_tuples)
-        print('#Training samples:', len(self.train_idx))
-        print('#Testing samples:', len(self.test_idx))
-        print('#Classes:', self.num_classes)
-        print('Predict category:', self.predict_category)
+        self._print_every = print_every
+        self._predict_category = predict_category
 
-    def load_raw_tuples(self):
+        super(RDFGraphDataset, self).__init__(name, url,
+                                              raw_dir=raw_dir,
+                                              force_reload=force_reload,
+                                              verbose=verbose)
+
+    def process(self):
+        raw_tuples = self.load_raw_tuples(self.raw_path)
+        self.process_raw_tuples(raw_tuples, self.raw_path)
+
+    def load_raw_tuples(self, root_path):
+        """Loading raw RDF dataset
+
+        Parameters
+        ----------
+        root_path : str
+            Root path containing the data
+
+        Returns
+        -------
+            Loaded rdf data
+        """
         raw_rdf_graphs = []
-        for i, filename in enumerate(os.listdir(self._dir)):
+        for _, filename in enumerate(os.listdir(root_path)):
             fmt = None
             if filename.endswith('nt'):
                 fmt = 'nt'
@@ -145,11 +152,20 @@ class RDFGraphDataset:
                 continue
             g = rdf.Graph()
             print('Parsing file %s ...' % filename)
-            g.parse(os.path.join(self._dir, filename), format=fmt)
+            g.parse(os.path.join(root_path, filename), format=fmt)
             raw_rdf_graphs.append(g)
         return itertools.chain(*raw_rdf_graphs)
 
-    def process_raw_tuples(self, raw_tuples):
+    def process_raw_tuples(self, raw_tuples, root_path):
+        """Processing raw RDF dataset
+
+        Parameters
+        ----------
+        raw_tuples:
+            Raw rdf tuples
+        root_path: str
+            Root path containing the data
+        """
         mg = nx.MultiDiGraph()
         ent_classes = OrderedDict()
         rel_classes = OrderedDict()
@@ -164,7 +180,7 @@ class RDFGraphDataset:
         sorted_tuples.sort()
 
         for i, (sbj, pred, obj) in enumerate(sorted_tuples):
-            if i % self._print_every == 0:
+            if self.verbose and i % self._print_every == 0:
                 print('Processed %d tuples, found %d valid tuples.' % (i, len(src)))
             sbjent = self.parse_entity(sbj)
             rel = self.parse_relation(pred)
@@ -200,7 +216,8 @@ class RDFGraphDataset:
 
         # add reverse edge with reverse relation
         if self._insert_reverse:
-            print('Adding reverse edges ...')
+            if self.verbose:
+                print('Adding reverse edges ...')
             newsrc = np.hstack([src, dst])
             newdst = np.hstack([dst, src])
             src = newsrc
@@ -208,28 +225,69 @@ class RDFGraphDataset:
             etid = np.hstack([etid, etid + len(etypes)])
             etypes.extend(['rev-%s' % t for t in etypes])
 
-        self.build_graph(mg, src, dst, ntid, etid, ntypes, etypes)
+        hg = self.build_graph(mg, src, dst, ntid, etid, ntypes, etypes)
 
-        print('Load training/validation/testing split ...')
-        idmap = F.asnumpy(self.graph.nodes[self.predict_category].data[dgl.NID])
+        if self.verbose:
+            print('Load training/validation/testing split ...')
+        idmap = F.asnumpy(hg.nodes[self.predict_category].data[dgl.NID])
         glb2lcl = {glbid : lclid for lclid, glbid in enumerate(idmap)}
         def findidfn(ent):
             if ent not in entities:
                 return None
             else:
                 return glb2lcl[entities[ent]]
-        self.load_data_split(findidfn)
+        self._hg = hg
+        train_idx, test_idx, labels, num_classes = self.load_data_split(findidfn, root_path)
 
-        self.save_cache(mg, src, dst, ntid, etid, ntypes, etypes)
+        train_mask = idx2mask(train_idx, self._hg.number_of_nodes(self.predict_category))
+        test_mask = idx2mask(test_idx, self._hg.number_of_nodes(self.predict_category))
+        labels = F.tensor(labels, F.data_type_dict['int64'])
+
+        train_mask = generate_mask_tensor(train_mask)
+        test_mask = generate_mask_tensor(test_mask)
+        self._hg.nodes[self.predict_category].data['train_mask'] = train_mask
+        self._hg.nodes[self.predict_category].data['test_mask'] = test_mask
+        self._hg.nodes[self.predict_category].data['labels'] = labels
+        self._num_classes = num_classes
+
+        # save for compatability
+        self._train_idx = F.tensor(train_idx)
+        self._test_idx = F.tensor(test_idx)
+        self._labels = labels
 
     def build_graph(self, mg, src, dst, ntid, etid, ntypes, etypes):
+        """Build the graphs
+
+        Parameters
+        ----------
+        mg: MultiDiGraph
+            Input graph
+        src: Numpy array
+            Source nodes
+        dst: Numpy array
+            Destination nodes
+        ntid: Numpy array
+            Node types for each node
+        etid: Numpy array
+            Edge types for each edge
+        ntypes: list
+            Node types
+        etypes: list
+            Edge types
+
+        Returns
+        -------
+        g: DGLGraph
+        """
         # create homo graph
-        print('Creating one whole graph ...')
+        if self.verbose:
+            print('Creating one whole graph ...')
         g = dgl.graph((src, dst))
         g.ndata[dgl.NTYPE] = F.tensor(ntid)
         g.edata[dgl.ETYPE] = F.tensor(etid)
-        print('Total #nodes:', g.number_of_nodes())
-        print('Total #edges:', g.number_of_edges())
+        if self.verbose:
+            print('Total #nodes:', g.number_of_nodes())
+            print('Total #edges:', g.number_of_edges())
 
         # rename names such as 'type' so that they an be used as keys
         # to nn.ModuleDict
@@ -240,71 +298,72 @@ class RDFGraphDataset:
             mg.add_edge(sty, dty, key=RENAME_DICT.get(ety, ety))
 
         # convert to heterograph
-        print('Convert to heterograph ...')
-        hg = dgl.to_hetero(g,
-                           ntypes,
-                           etypes,
-                           metagraph=mg)
-        print('#Node types:', len(hg.ntypes))
-        print('#Canonical edge types:', len(hg.etypes))
-        print('#Unique edge type names:', len(set(hg.etypes)))
-        self.graph = hg
+        if self.verbose:
+            print('Convert to heterograph ...')
+        hg = dgl.to_heterogeneous(g,
+                                  ntypes,
+                                  etypes,
+                                  metagraph=mg)
+        if self.verbose:
+            print('#Node types:', len(hg.ntypes))
+            print('#Canonical edge types:', len(hg.etypes))
+            print('#Unique edge type names:', len(set(hg.etypes)))
+        return hg
 
-    def save_cache(self, mg, src, dst, ntid, etid, ntypes, etypes):
-        nx.write_gpickle(mg, os.path.join(self._dir, 'cached_mg.gpickle'))
-        np.save(os.path.join(self._dir, 'cached_src.npy'), src)
-        np.save(os.path.join(self._dir, 'cached_dst.npy'), dst)
-        np.save(os.path.join(self._dir, 'cached_ntid.npy'), ntid)
-        np.save(os.path.join(self._dir, 'cached_etid.npy'), etid)
-        save_strlist(os.path.join(self._dir, 'cached_ntypes.txt'), ntypes)
-        save_strlist(os.path.join(self._dir, 'cached_etypes.txt'), etypes)
-        np.save(os.path.join(self._dir, 'cached_train_idx.npy'), F.asnumpy(self.train_idx))
-        np.save(os.path.join(self._dir, 'cached_test_idx.npy'), F.asnumpy(self.test_idx))
-        np.save(os.path.join(self._dir, 'cached_labels.npy'), F.asnumpy(self.labels))
+    def load_data_split(self, ent2id, root_path):
+        """Load data split
 
-    def has_cache(self):
-        return (os.path.exists(os.path.join(self._dir, 'cached_mg.gpickle'))
-            and os.path.exists(os.path.join(self._dir, 'cached_src.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_dst.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_ntid.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_etid.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_ntypes.txt'))
-            and os.path.exists(os.path.join(self._dir, 'cached_etypes.txt'))
-            and os.path.exists(os.path.join(self._dir, 'cached_train_idx.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_test_idx.npy'))
-            and os.path.exists(os.path.join(self._dir, 'cached_labels.npy')))
+        Parameters
+        ----------
+        ent2id: func
+            A function mapping entity to id
+        root_path: str
+            Root path containing the data
 
-    def load_cache(self):
-        mg = nx.read_gpickle(os.path.join(self._dir, 'cached_mg.gpickle'))
-        src = np.load(os.path.join(self._dir, 'cached_src.npy'))
-        dst = np.load(os.path.join(self._dir, 'cached_dst.npy'))
-        ntid = np.load(os.path.join(self._dir, 'cached_ntid.npy'))
-        etid = np.load(os.path.join(self._dir, 'cached_etid.npy'))
-        ntypes = load_strlist(os.path.join(self._dir, 'cached_ntypes.txt'))
-        etypes = load_strlist(os.path.join(self._dir, 'cached_etypes.txt'))
-        self.train_idx = F.tensor(np.load(os.path.join(self._dir, 'cached_train_idx.npy')))
-        self.test_idx = F.tensor(np.load(os.path.join(self._dir, 'cached_test_idx.npy')))
-        labels = np.load(os.path.join(self._dir, 'cached_labels.npy'))
-        self.num_classes = labels.max() + 1
-        self.labels = F.tensor(labels)
-
-        self.build_graph(mg, src, dst, ntid, etid, ntypes, etypes)
-
-    def load_data_split(self, ent2id):
+        Return
+        ------
+        train_idx: Numpy array
+            Training set
+        test_idx: Numpy array
+            Testing set
+        labels: Numpy array
+            Labels
+        num_classes: int
+            Number of classes
+        """
         label_dict = {}
-        labels = np.zeros((self.graph.number_of_nodes(self.predict_category),)) - 1
+        labels = np.zeros((self._hg.number_of_nodes(self.predict_category),)) - 1
         train_idx = self.parse_idx_file(
-            os.path.join(self._dir, 'trainingSet.tsv'),
+            os.path.join(root_path, 'trainingSet.tsv'),
             ent2id, label_dict, labels)
         test_idx = self.parse_idx_file(
-            os.path.join(self._dir, 'testSet.tsv'),
+            os.path.join(root_path, 'testSet.tsv'),
             ent2id, label_dict, labels)
-        self.train_idx = F.tensor(train_idx)
-        self.test_idx = F.tensor(test_idx)
-        self.labels = F.tensor(labels).long()
-        self.num_classes = len(label_dict)
+        train_idx = np.array(train_idx)
+        test_idx = np.array(test_idx)
+        labels = np.array(labels)
+        num_classes = len(label_dict)
+        return train_idx, test_idx, labels, num_classes
 
     def parse_idx_file(self, filename, ent2id, label_dict, labels):
+        """Parse idx files
+
+        Parameters
+        ----------
+        filename: str
+            File to parse
+        ent2id: func
+            A function mapping entity to id
+        label_dict: dict
+            Map label to label id
+        labels: dict
+            Map entity id to label id
+
+        Return
+        ------
+        idx: list
+            Entity idss
+        """
         idx = []
         with open(filename, 'r') as f:
             for i, line in enumerate(f):
@@ -322,18 +381,100 @@ class RDFGraphDataset:
                     labels[entid] = lblid
         return idx
 
+    def has_cache(self):
+        """check if there is a processed data"""
+        graph_path = os.path.join(self.save_path,
+                                  self.save_name + '.bin')
+        info_path = os.path.join(self.save_path,
+                                 self.save_name + '.pkl')
+        if os.path.exists(graph_path) and \
+            os.path.exists(info_path):
+            return True
+
+        return False
+
+    def save(self):
+        """save the graph list and the labels"""
+        graph_path = os.path.join(self.save_path,
+                                  self.save_name + '.bin')
+        info_path = os.path.join(self.save_path,
+                                 self.save_name + '.pkl')
+        save_graphs(str(graph_path), self._hg)
+        save_info(str(info_path), {'num_classes': self.num_classes,
+                                   'predict_category': self.predict_category})
+
+    def load(self):
+        """load the graph list and the labels from disk"""
+        graph_path = os.path.join(self.save_path,
+                                  self.save_name + '.bin')
+        info_path = os.path.join(self.save_path,
+                                 self.save_name + '.pkl')
+        graphs, _ = load_graphs(str(graph_path))
+
+        info = load_info(str(info_path))
+        self._num_classes = info['num_classes']
+        self._predict_category = info['predict_category']
+        self._hg = graphs[0]
+        train_mask = self._hg.nodes[self.predict_category].data['train_mask']
+        test_mask = self._hg.nodes[self.predict_category].data['test_mask']
+        self._labels = self._hg.nodes[self.predict_category].data['labels']
+
+        train_idx = F.nonzero_1d(train_mask)
+        test_idx = F.nonzero_1d(test_mask)
+        self._train_idx = train_idx
+        self._test_idx = test_idx
+
+    def __getitem__(self, idx):
+        r"""Gets the graph object
+        """
+        g = self._hg
+        return g
+
+    def __len__(self):
+        r"""The number of graphs in the dataset."""
+        return 1
+
+    @property
+    def save_name(self):
+        return self.name + '_dgl_graph'
+
+    @property
+    def graph(self):
+        deprecate_property('dataset.graph', 'hg = dataset[0]')
+        return self._hg
+
+    @property
+    def predict_category(self):
+        return self._predict_category
+
+    @property
+    def num_classes(self):
+        return self._num_classes
+
+    @property
+    def train_idx(self):
+        deprecate_property('dataset.train_idx', 'train_mask = g.ndata[\'train_mask\']')
+        return self._train_idx
+
+    @property
+    def test_idx(self):
+        deprecate_property('dataset.test_idx', 'train_mask = g.ndata[\'test_mask\']')
+        return self._test_idx
+
+    @property
+    def labels(self):
+        deprecate_property('dataset.labels', 'train_mask = g.ndata[\'labels\']')
+        return self._labels
+
     @abc.abstractmethod
     def parse_entity(self, term):
         """Parse one entity from an RDF term.
-
         Return None if the term does not represent a valid entity and the
         whole tuple should be ignored.
-
         Parameters
         ----------
         term : rdflib.term.Identifier
             RDF term
-
         Returns
         -------
         Entity or None
@@ -344,15 +485,12 @@ class RDFGraphDataset:
     @abc.abstractmethod
     def parse_relation(self, term):
         """Parse one relation from an RDF term.
-
         Return None if the term does not represent a valid relation and the
         whole tuple should be ignored.
-
         Parameters
         ----------
         term : rdflib.term.Identifier
             RDF term
-
         Returns
         -------
         Relation or None
@@ -363,10 +501,9 @@ class RDFGraphDataset:
     @abc.abstractmethod
     def process_tuple(self, raw_tuple, sbj, rel, obj):
         """Process the tuple.
-
         Return (Entity, Relation, Entity) tuple for as the final tuple.
         Return None if the tuple should be ignored.
-        
+
         Parameters
         ----------
         raw_tuple : tuple of rdflib.term.Identifier
@@ -377,7 +514,6 @@ class RDFGraphDataset:
             Relation
         obj : Entity
             Object entity
-
         Returns
         -------
         (Entity, Relation, Entity)
@@ -388,23 +524,15 @@ class RDFGraphDataset:
     @abc.abstractmethod
     def process_idx_file_line(self, line):
         """Process one line of ``trainingSet.tsv`` or ``testSet.tsv``.
-
         Parameters
         ----------
         line : str
             One line of the file
-
         Returns
         -------
         (str, str)
             One sample and its label
         """
-        pass
-
-    @property
-    @abc.abstractmethod
-    def predict_category(self):
-        """Return the category name that has labels."""
         pass
 
 def _get_id(dict, key):
@@ -414,52 +542,146 @@ def _get_id(dict, key):
         dict[key] = id
     return id
 
-def save_strlist(filename, strlist):
-    with open(filename, 'w') as f:
-        for s in strlist:
-            f.write(s + '\n')
+class AIFBDataset(RDFGraphDataset):
+    r"""AIFB dataset for node classification task
 
-def load_strlist(filename):
-    with open(filename, 'r') as f:
-        ret = []
-        for line in f:
-            ret.append(line.strip())
-        return ret
+    .. deprecated:: 0.5.0
 
-class AIFB(RDFGraphDataset):
-    """AIFB dataset.
-    
+        - ``graph`` is deprecated, it is replaced by:
+
+            >>> dataset = AIFBDataset()
+            >>> graph = dataset[0]
+
+        - ``train_idx`` is deprecated, it can be replaced by:
+
+            >>> dataset = AIFBDataset()
+            >>> graph = dataset[0]
+            >>> train_mask = graph.nodes[dataset.category].data['train_mask']
+            >>> train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
+
+        - ``test_idx`` is deprecated, it can be replaced by:
+
+            >>> dataset = AIFBDataset()
+            >>> graph = dataset[0]
+            >>> test_mask = graph.nodes[dataset.category].data['test_mask']
+            >>> test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
+
+    AIFB DataSet is a Semantic Web (RDF) dataset used as a benchmark in
+    data mining.  It records the organizational structure of AIFB at the
+    University of Karlsruhe.
+
+    AIFB dataset statistics:
+
+    - Nodes: 7262
+    - Edges: 48810 (including reverse edges)
+    - Target Category: Personen
+    - Number of Classes: 4
+    - Label Split:
+
+        - Train: 140
+        - Test: 36
+
+    Parameters
+    -----------
+    print_every: int
+        Preprocessing log for every X tuples. Default: 10000.
+    insert_reverse: bool
+        If true, add reverse edge and reverse relations to the final graph. Default: True.
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
+
+    Attributes
+    ----------
+    num_classes : int
+        Number of classes to predict
+    predict_category : str
+        The entity category (node type) that has labels for prediction
+    labels : Tensor
+        All the labels of the entities in ``predict_category``
+    graph : :class:`dgl.DGLGraph`
+        Graph structure
+    train_idx : Tensor
+        Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
+    test_idx : Tensor
+        Entity IDs for testing. All IDs are local IDs w.r.t. to ``predict_category``.
+
     Examples
     --------
-    >>> dataset = dgl.data.rdf.AIFB()
-    >>> print(dataset.graph)
+    >>> dataset = dgl.data.rdf.AIFBDataset()
+    >>> graph = dataset[0]
+    >>> category = dataset.predict_category
+    >>> num_classes = dataset.num_classes
+    >>>
+    >>> train_mask = g.nodes[category].data.pop('train_mask')
+    >>> test_mask = g.nodes[category].data.pop('test_mask')
+    >>> labels = g.nodes[category].data.pop('labels')
     """
 
-    employs = rdf.term.URIRef("http://swrc.ontoware.org/ontology#employs")
-    affiliation = rdf.term.URIRef("http://swrc.ontoware.org/ontology#affiliation")
     entity_prefix = 'http://www.aifb.uni-karlsruhe.de/'
     relation_prefix = 'http://swrc.ontoware.org/'
 
     def __init__(self,
-                 force_reload=False,
                  print_every=10000,
-                 insert_reverse=True):
+                 insert_reverse=True,
+                 raw_dir=None,
+                 force_reload=False,
+                 verbose=True):
+        import rdflib as rdf
+        self.employs = rdf.term.URIRef("http://swrc.ontoware.org/ontology#employs")
+        self.affiliation = rdf.term.URIRef("http://swrc.ontoware.org/ontology#affiliation")
         url = _get_dgl_url('dataset/rdf/aifb-hetero.zip')
         name = 'aifb-hetero'
-        super(AIFB, self).__init__(url, name,
-                                   force_reload=force_reload,
-                                   print_every=print_every,
-                                   insert_reverse=insert_reverse)
+        predict_category = 'Personen'
+        super(AIFBDataset, self).__init__(name, url, predict_category,
+                                          print_every=print_every,
+                                          insert_reverse=insert_reverse,
+                                          raw_dir=raw_dir,
+                                          force_reload=force_reload,
+                                          verbose=verbose)
+
+    def __getitem__(self, idx):
+        r"""Gets the graph object
+
+        Parameters
+        -----------
+        idx: int
+            Item index, AIFBDataset has only one graph object
+
+        Return
+        -------
+        :class:`dgl.DGLGraph`
+
+            The graph contains:
+
+            - ``ndata['train_mask']``: mask for training node set
+            - ``ndata['test_mask']``: mask for testing node set
+            - ``ndata['labels']``: mask for labels
+        """
+        return super(AIFBDataset, self).__getitem__(idx)
+
+    def __len__(self):
+        r"""The number of graphs in the dataset.
+
+        Return
+        -------
+        int
+        """
+        return super(AIFBDataset, self).__len__()
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
-            return Entity(id=str(term), cls="_Literal")
+            return Entity(e_id=str(term), cls="_Literal")
         if isinstance(term, rdf.BNode):
             return None
         entstr = str(term)
         if entstr.startswith(self.entity_prefix):
             sp = entstr.split('/')
-            return Entity(id=sp[5], cls=sp[3])
+            return Entity(e_id=sp[5], cls=sp[3])
         else:
             return None
 
@@ -482,44 +704,159 @@ class AIFB(RDFGraphDataset):
         person, _, label = line.strip().split('\t')
         return person, label
 
-    @property
-    def predict_category(self):
-        return 'Personen'
+class AIFB(AIFBDataset):
+    """AIFB dataset. Same as AIFBDataset.
+    """
+    def __init__(self,
+                 print_every=10000,
+                 insert_reverse=True,
+                 raw_dir=None,
+                 force_reload=False,
+                 verbose=True):
+        deprecate_class('AIFB', 'AIFBDataset')
+        super(AIFB, self).__init__(print_every,
+                                   insert_reverse,
+                                   raw_dir,
+                                   force_reload,
+                                   verbose)
 
-class MUTAG(RDFGraphDataset):
-    """MUTAG dataset.
-    
+
+class MUTAGDataset(RDFGraphDataset):
+    r"""MUTAG dataset for node classification task
+
+    .. deprecated:: 0.5.0
+
+        - ``graph`` is deprecated, it is replaced by:
+
+            >>> dataset = MUTAGDataset()
+            >>> graph = dataset[0]
+
+        - ``train_idx`` is deprecated, it can be replaced by:
+
+            >>> dataset = MUTAGDataset()
+            >>> graph = dataset[0]
+            >>> train_mask = graph.nodes[dataset.category].data['train_mask']
+            >>> train_idx = th.nonzero(train_mask).squeeze()
+
+        - ``test_idx`` is deprecated, it can be replaced by:
+
+            >>> dataset = MUTAGDataset()
+            >>> graph = dataset[0]
+            >>> test_mask = graph.nodes[dataset.category].data['test_mask']
+            >>> test_idx = th.nonzero(test_mask).squeeze()
+
+    Mutag dataset statistics:
+
+    - Nodes: 27163
+    - Edges: 148100 (including reverse edges)
+    - Target Category: d
+    - Number of Classes: 2
+    - Label Split:
+
+        - Train: 272
+        - Test: 68
+
+    Parameters
+    -----------
+    print_every: int
+        Preprocessing log for every X tuples. Default: 10000.
+    insert_reverse: bool
+        If true, add reverse edge and reverse relations to the final graph. Default: True.
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
+
+    Attributes
+    ----------
+    num_classes : int
+        Number of classes to predict
+    predict_category : str
+        The entity category (node type) that has labels for prediction
+    labels : Tensor
+        All the labels of the entities in ``predict_category``
+    graph : :class:`dgl.DGLGraph`
+        Graph structure
+    train_idx : Tensor
+        Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
+    test_idx : Tensor
+        Entity IDs for testing. All IDs are local IDs w.r.t. to ``predict_category``.
+
     Examples
     --------
-    >>> dataset = dgl.data.rdf.MUTAG()
-    >>> print(dataset.graph)
+    >>> dataset = dgl.data.rdf.MUTAGDataset()
+    >>> graph = dataset[0]
+    >>> category = dataset.predict_category
+    >>> num_classes = dataset.num_classes
+    >>>
+    >>> train_mask = g.nodes[category].data.pop('train_mask')
+    >>> test_mask = g.nodes[category].data.pop('test_mask')
+    >>> labels = g.nodes[category].data.pop('labels')
     """
 
     d_entity = re.compile("d[0-9]")
     bond_entity = re.compile("bond[0-9]")
 
-    is_mutagenic = rdf.term.URIRef("http://dl-learner.org/carcinogenesis#isMutagenic")
-    rdf_type = rdf.term.URIRef("http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
-    rdf_subclassof = rdf.term.URIRef("http://www.w3.org/2000/01/rdf-schema#subClassOf")
-    rdf_domain = rdf.term.URIRef("http://www.w3.org/2000/01/rdf-schema#domain")
-
     entity_prefix = 'http://dl-learner.org/carcinogenesis#'
     relation_prefix = entity_prefix
 
     def __init__(self,
-                 force_reload=False,
                  print_every=10000,
-                 insert_reverse=True):
+                 insert_reverse=True,
+                 raw_dir=None,
+                 force_reload=False,
+                 verbose=True):
+        import rdflib as rdf
+        self.is_mutagenic = rdf.term.URIRef("http://dl-learner.org/carcinogenesis#isMutagenic")
+        self.rdf_type = rdf.term.URIRef("http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+        self.rdf_subclassof = rdf.term.URIRef("http://www.w3.org/2000/01/rdf-schema#subClassOf")
+        self.rdf_domain = rdf.term.URIRef("http://www.w3.org/2000/01/rdf-schema#domain")
+
         url = _get_dgl_url('dataset/rdf/mutag-hetero.zip')
         name = 'mutag-hetero'
-        super(MUTAG, self).__init__(url, name,
-                                   force_reload=force_reload,
-                                   print_every=print_every,
-                                   insert_reverse=insert_reverse)
+        predict_category = 'd'
+        super(MUTAGDataset, self).__init__(name, url, predict_category,
+                                           print_every=print_every,
+                                           insert_reverse=insert_reverse,
+                                           raw_dir=raw_dir,
+                                           force_reload=force_reload,
+                                           verbose=verbose)
+
+    def __getitem__(self, idx):
+        r"""Gets the graph object
+
+        Parameters
+        -----------
+        idx: int
+            Item index, MUTAGDataset has only one graph object
+
+        Return
+        -------
+        :class:`dgl.DGLGraph`
+
+            The graph contains:
+
+            - ``ndata['train_mask']``: mask for training node set
+            - ``ndata['test_mask']``: mask for testing node set
+            - ``ndata['labels']``: mask for labels
+        """
+        return super(MUTAGDataset, self).__getitem__(idx)
+
+    def __len__(self):
+        r"""The number of graphs in the dataset.
+
+        Return
+        -------
+        int
+        """
+        return super(MUTAGDataset, self).__len__()
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
-            return Entity(id=str(term), cls="_Literal")
+            return Entity(e_id=str(term), cls="_Literal")
         elif isinstance(term, rdf.BNode):
             return None
         entstr = str(term)
@@ -531,7 +868,7 @@ class MUTAG(RDFGraphDataset):
                 cls = 'bond'
             else:
                 cls = None
-            return Entity(id=inst, cls=cls)
+            return Entity(e_id=inst, cls=cls)
         else:
             return None
 
@@ -558,48 +895,161 @@ class MUTAG(RDFGraphDataset):
             obj.cls = rel.cls
 
         assert sbj.cls is not None and obj.cls is not None
-        
+
         return (sbj, rel, obj)
 
     def process_idx_file_line(self, line):
         bond, _, label = line.strip().split('\t')
         return bond, label
 
-    @property
-    def predict_category(self):
-        return 'd'
+class MUTAG(MUTAGDataset):
+    """MUTAG dataset. Same as MUTAGDataset.
+    """
+    def __init__(self,
+                 print_every=10000,
+                 insert_reverse=True,
+                 raw_dir=None,
+                 force_reload=False,
+                 verbose=True):
+        deprecate_class('MUTAG', 'MUTAGDataset')
+        super(MUTAG, self).__init__(print_every,
+                                    insert_reverse,
+                                    raw_dir,
+                                    force_reload,
+                                    verbose)
 
-class BGS(RDFGraphDataset):
-    """BGS dataset.
+class BGSDataset(RDFGraphDataset):
+    r"""BGS dataset for node classification task
+
+    .. deprecated:: 0.5.0
+
+        - ``graph`` is deprecated, it is replaced by:
+
+            >>> dataset = BGSDataset()
+            >>> graph = dataset[0]
+
+        - ``train_idx`` is deprecated, it can be replaced by:
+
+            >>> dataset = BGSDataset()
+            >>> graph = dataset[0]
+            >>> train_mask = graph.nodes[dataset.category].data['train_mask']
+            >>> train_idx = th.nonzero(train_mask).squeeze()
+
+        - ``test_idx`` is deprecated, it can be replaced by:
+
+            >>> dataset = BGSDataset()
+            >>> graph = dataset[0]
+            >>> test_mask = graph.nodes[dataset.category].data['test_mask']
+            >>> test_idx = th.nonzero(test_mask).squeeze()
 
     BGS namespace convention:
-    http://data.bgs.ac.uk/(ref|id)/<Major Concept>/<Sub Concept>/INSTANCE
-
+    ``http://data.bgs.ac.uk/(ref|id)/<Major Concept>/<Sub Concept>/INSTANCE``.
     We ignored all literal nodes and the relations connecting them in the
     output graph. We also ignored the relation used to mark whether a
     term is CURRENT or DEPRECATED.
 
+    BGS dataset statistics:
+
+    - Nodes: 94806
+    - Edges: 672884 (including reverse edges)
+    - Target Category: Lexicon/NamedRockUnit
+    - Number of Classes: 2
+    - Label Split:
+
+        - Train: 117
+        - Test: 29
+
+    Parameters
+    -----------
+    print_every: int
+        Preprocessing log for every X tuples. Default: 10000.
+    insert_reverse: bool
+        If true, add reverse edge and reverse relations to the final graph. Default: True.
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
+
+    Attributes
+    ----------
+    num_classes : int
+        Number of classes to predict
+    predict_category : str
+        The entity category (node type) that has labels for prediction
+    labels : Tensor
+        All the labels of the entities in ``predict_category``
+    graph : :class:`dgl.DGLGraph`
+        Graph structure
+    train_idx : Tensor
+        Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
+    test_idx : Tensor
+        Entity IDs for testing. All IDs are local IDs w.r.t. to ``predict_category``.
+
     Examples
     --------
-    >>> dataset = dgl.data.rdf.BGS()
-    >>> print(dataset.graph)
+    >>> dataset = dgl.data.rdf.BGSDataset()
+    >>> graph = dataset[0]
+    >>> category = dataset.predict_category
+    >>> num_classes = dataset.num_classes
+    >>>
+    >>> train_mask = g.nodes[category].data.pop('train_mask')
+    >>> test_mask = g.nodes[category].data.pop('test_mask')
+    >>> labels = g.nodes[category].data.pop('labels')
     """
 
-    lith = rdf.term.URIRef("http://data.bgs.ac.uk/ref/Lexicon/hasLithogenesis")
     entity_prefix = 'http://data.bgs.ac.uk/'
     status_prefix = 'http://data.bgs.ac.uk/ref/CurrentStatus'
     relation_prefix = 'http://data.bgs.ac.uk/ref'
 
     def __init__(self,
-                 force_reload=False,
                  print_every=10000,
-                 insert_reverse=True):
+                 insert_reverse=True,
+                 raw_dir=None,
+                 force_reload=False,
+                 verbose=True):
+        import rdflib as rdf
         url = _get_dgl_url('dataset/rdf/bgs-hetero.zip')
         name = 'bgs-hetero'
-        super(BGS, self).__init__(url, name,
-                                   force_reload=force_reload,
-                                   print_every=print_every,
-                                   insert_reverse=insert_reverse)
+        predict_category = 'Lexicon/NamedRockUnit'
+        self.lith = rdf.term.URIRef("http://data.bgs.ac.uk/ref/Lexicon/hasLithogenesis")
+        super(BGSDataset, self).__init__(name, url, predict_category,
+                                         print_every=print_every,
+                                         insert_reverse=insert_reverse,
+                                         raw_dir=raw_dir,
+                                         force_reload=force_reload,
+                                         verbose=verbose)
+
+    def __getitem__(self, idx):
+        r"""Gets the graph object
+
+        Parameters
+        -----------
+        idx: int
+            Item index, BGSDataset has only one graph object
+
+        Return
+        -------
+        :class:`dgl.DGLGraph`
+
+            The graph contains:
+
+            - ``ndata['train_mask']``: mask for training node set
+            - ``ndata['test_mask']``: mask for testing node set
+            - ``ndata['labels']``: mask for labels
+        """
+        return super(BGSDataset, self).__getitem__(idx)
+
+    def __len__(self):
+        r"""The number of graphs in the dataset.
+
+        Return
+        -------
+        int
+        """
+        return super(BGSDataset, self).__len__()
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
@@ -616,7 +1066,7 @@ class BGS(RDFGraphDataset):
             # instance
             cls = '%s/%s' % (sp[4], sp[5])
             inst = sp[6]
-            return Entity(id=inst, cls=cls)
+            return Entity(e_id=inst, cls=cls)
         else:
             return None
 
@@ -644,47 +1094,163 @@ class BGS(RDFGraphDataset):
         _, rock, label = line.strip().split('\t')
         return rock, label
 
-    @property
-    def predict_category(self):
-        return 'Lexicon/NamedRockUnit'
+class BGS(BGSDataset):
+    """BGS dataset. Same as BGSDataset.
+    """
+    def __init__(self,
+                 print_every=10000,
+                 insert_reverse=True,
+                 raw_dir=None,
+                 force_reload=False,
+                 verbose=True):
+        deprecate_class('BGS', 'BGSDataset')
+        super(BGS, self).__init__(print_every,
+                                  insert_reverse,
+                                  raw_dir,
+                                  force_reload,
+                                  verbose)
 
-class AM(RDFGraphDataset):
-    """AM dataset.
+
+class AMDataset(RDFGraphDataset):
+    """AM dataset. for node classification task
+
+    .. deprecated:: 0.5.0
+
+        - ``graph`` is deprecated, it is replaced by:
+
+            >>> dataset = AMDataset()
+            >>> graph = dataset[0]
+
+        - ``train_idx`` is deprecated, it can be replaced by:
+
+            >>> dataset = AMDataset()
+            >>> graph = dataset[0]
+            >>> train_mask = graph.nodes[dataset.category].data['train_mask']
+            >>> train_idx = th.nonzero(train_mask).squeeze()
+
+        - ``test_idx`` is deprecated, it can be replaced by:
+
+            >>> dataset = AMDataset()
+            >>> graph = dataset[0]
+            >>> test_mask = graph.nodes[dataset.category].data['test_mask']
+            >>> test_idx = th.nonzero(test_mask).squeeze()
 
     Namespace convention:
-    Instance: http://purl.org/collections/nl/am/<type>-<id>
-    Relation: http://purl.org/collections/nl/am/<name>
+
+    - Instance: ``http://purl.org/collections/nl/am/<type>-<id>``
+    - Relation: ``http://purl.org/collections/nl/am/<name>``
 
     We ignored all literal nodes and the relations connecting them in the
     output graph.
 
+    AM dataset statistics:
+
+    - Nodes: 881680
+    - Edges: 5668682 (including reverse edges)
+    - Target Category: proxy
+    - Number of Classes: 11
+    - Label Split:
+
+        - Train: 802
+        - Test: 198
+
+    Parameters
+    -----------
+    print_every: int
+        Preprocessing log for every X tuples. Default: 10000.
+    insert_reverse: bool
+        If true, add reverse edge and reverse relations to the final graph. Default: True.
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+      Whether to print out progress information. Default: True.
+
+    Attributes
+    ----------
+    num_classes : int
+        Number of classes to predict
+    predict_category : str
+        The entity category (node type) that has labels for prediction
+    labels : Tensor
+        All the labels of the entities in ``predict_category``
+    graph : :class:`dgl.DGLGraph`
+        Graph structure
+    train_idx : Tensor
+        Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
+    test_idx : Tensor
+        Entity IDs for testing. All IDs are local IDs w.r.t. to ``predict_category``.
+
     Examples
     --------
-    >>> dataset = dgl.data.rdf.AM()
-    >>> print(dataset.graph)
+    >>> dataset = dgl.data.rdf.AMDataset()
+    >>> graph = dataset[0]
+    >>> category = dataset.predict_category
+    >>> num_classes = dataset.num_classes
+    >>>
+    >>> train_mask = g.nodes[category].data.pop('train_mask')
+    >>> test_mask = g.nodes[category].data.pop('test_mask')
+    >>> labels = g.nodes[category].data.pop('labels')
     """
 
-    objectCategory = rdf.term.URIRef("http://purl.org/collections/nl/am/objectCategory")
-    material = rdf.term.URIRef("http://purl.org/collections/nl/am/material")
     entity_prefix = 'http://purl.org/collections/nl/am/'
     relation_prefix = entity_prefix
 
     def __init__(self,
-                 force_reload=False,
                  print_every=10000,
-                 insert_reverse=True):
+                 insert_reverse=True,
+                 raw_dir=None,
+                 force_reload=False,
+                 verbose=True):
+        import rdflib as rdf
+        self.objectCategory = rdf.term.URIRef("http://purl.org/collections/nl/am/objectCategory")
+        self.material = rdf.term.URIRef("http://purl.org/collections/nl/am/material")
         url = _get_dgl_url('dataset/rdf/am-hetero.zip')
         name = 'am-hetero'
-        super(AM, self).__init__(url, name,
-                                   force_reload=force_reload,
-                                   print_every=print_every,
-                                   insert_reverse=insert_reverse)
+        predict_category = 'proxy'
+        super(AMDataset, self).__init__(name, url, predict_category,
+                                        print_every=print_every,
+                                        insert_reverse=insert_reverse,
+                                        raw_dir=raw_dir,
+                                        force_reload=force_reload,
+                                        verbose=verbose)
+
+    def __getitem__(self, idx):
+        r"""Gets the graph object
+
+        Parameters
+        -----------
+        idx: int
+            Item index, AMDataset has only one graph object
+
+        Return
+        -------
+        :class:`dgl.DGLGraph`
+
+            The graph contains:
+
+            - ``ndata['train_mask']``: mask for training node set
+            - ``ndata['test_mask']``: mask for testing node set
+            - ``ndata['labels']``: mask for labels
+        """
+        return super(AMDataset, self).__getitem__(idx)
+
+    def __len__(self):
+        r"""The number of graphs in the dataset.
+
+        Return
+        -------
+        int
+        """
+        return super(AMDataset, self).__len__()
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
             return None
         elif isinstance(term, rdf.BNode):
-            return Entity(id=str(term), cls='_BNode')
+            return Entity(e_id=str(term), cls='_BNode')
         entstr = str(term)
         if entstr.startswith(self.entity_prefix):
             sp = entstr.split('/')
@@ -696,7 +1262,7 @@ class AM(RDFGraphDataset):
             else:
                 cls = 'TYPE'
                 inst = spp
-            return Entity(id=inst, cls=cls)
+            return Entity(e_id=inst, cls=cls)
         else:
             return None
 
@@ -722,9 +1288,21 @@ class AM(RDFGraphDataset):
         proxy, _, label = line.strip().split('\t')
         return proxy, label
 
-    @property
-    def predict_category(self):
-        return 'proxy'
+class AM(AMDataset):
+    """AM dataset. Same as AMDataset.
+    """
+    def __init__(self,
+                 print_every=10000,
+                 insert_reverse=True,
+                 raw_dir=None,
+                 force_reload=False,
+                 verbose=True):
+        deprecate_class('AM', 'AMDataset')
+        super(AM, self).__init__(print_every,
+                                 insert_reverse,
+                                 raw_dir,
+                                 force_reload,
+                                 verbose)
 
 if __name__ == '__main__':
-    AIFB()
+    dataset = AIFB()

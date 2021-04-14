@@ -18,25 +18,6 @@ def allclose(a, b, rtol=1e-4, atol=1e-4):
 def randn(shape):
     return th.randn(*shape)
 
-def attach_grad(x):
-    if x.grad is not None:
-        x.grad.zero_()
-        return x
-    else:
-        return x.requires_grad_()
-
-def backward(x, head_gradient=None):
-    if head_gradient is not None and head_gradient.shape[0] == 1 and len(head_gradient.shape) == 1:
-        # Fix for torch 1.3.1
-        head_gradient = th.tensor(head_gradient.item()).to(head_gradient.device)
-    x.backward(head_gradient)
-
-def grad(x):
-    return x.grad
-
-def is_no_grad(x):
-    return x.grad is None or (x.grad == 0).all()
-
 def full(shape, fill_value, dtype, ctx):
     return th.full(shape, fill_value, dtype=dtype, device=ctx)
 
@@ -70,8 +51,8 @@ def mul(a, b):
 def div(a, b):
     return a / b
 
-def sum(x, dim):
-    return x.sum(dim)
+def sum(x, dim, keepdims=False):
+    return x.sum(dim, keepdims=keepdims)
 
 def max(x, dim):
     return x.max(dim)[0]
@@ -88,14 +69,5 @@ def matmul(a, b):
 def dot(a, b):
     return sum(mul(a, b), dim=-1)
 
-class record_grad(object):
-    def __init__(self):
-        pass
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        pass
-
-no_grad = th.no_grad
+def abs(a):
+    return a.abs()

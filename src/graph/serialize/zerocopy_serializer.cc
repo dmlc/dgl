@@ -69,7 +69,10 @@ void StreamWithBuffer::PushNDArray(const NDArray& tensor) {
     // If the stream is for remote communication or the data is not stored in
     // shared memory, serialize the data content as a buffer.
     this->Write<bool>(false);
-    buffer_list_.emplace_back(tensor, tensor->data, data_byte_size);
+    // If this is a null ndarray, we will not push it into the underlying buffer_list
+    if (data_byte_size != 0) {
+      buffer_list_.emplace_back(tensor, tensor->data, data_byte_size);
+    }
   } else {
     CHECK(mem) << "Tried to send non-shared-memroy tensor to local "
                   "StreamWithBuffer";
@@ -111,9 +114,15 @@ NDArray StreamWithBuffer::PopNDArray() {
   } else {
     CHECK(send_to_remote_) << "Invalid attempt to deserialize from raw data "
                               "pointer with send_to_remote=false";
-    auto ret = CreateNDArrayFromRawData(shape, dtype, cpu_ctx,
-                                        buffer_list_.front().data);
-    buffer_list_.pop_front();
+    NDArray ret;
+    if (ndim == 0 || shape[0] == 0) {
+      // Mean this is a null ndarray
+      ret = CreateNDArrayFromRawData(shape, dtype, cpu_ctx, nullptr);
+    } else {
+      ret = CreateNDArrayFromRawData(shape, dtype, cpu_ctx,
+                                     buffer_list_.front().data);
+      buffer_list_.pop_front();
+    }
     return ret;
   }
 #else

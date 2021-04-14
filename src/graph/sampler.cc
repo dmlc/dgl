@@ -596,31 +596,31 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
 
 }  // namespace
 
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetGraph")
+DGL_REGISTER_GLOBAL("_deprecate.nodeflow._CAPI_NodeFlowGetGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     NodeFlow nflow = args[0];
     *rv = nflow->graph;
   });
 
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetNodeMapping")
+DGL_REGISTER_GLOBAL("_deprecate.nodeflow._CAPI_NodeFlowGetNodeMapping")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     NodeFlow nflow = args[0];
     *rv = nflow->node_mapping;
   });
 
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetEdgeMapping")
+DGL_REGISTER_GLOBAL("_deprecate.nodeflow._CAPI_NodeFlowGetEdgeMapping")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     NodeFlow nflow = args[0];
     *rv = nflow->edge_mapping;
   });
 
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetLayerOffsets")
+DGL_REGISTER_GLOBAL("_deprecate.nodeflow._CAPI_NodeFlowGetLayerOffsets")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     NodeFlow nflow = args[0];
     *rv = nflow->layer_offsets;
   });
 
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetBlockOffsets")
+DGL_REGISTER_GLOBAL("_deprecate.nodeflow._CAPI_NodeFlowGetBlockOffsets")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     NodeFlow nflow = args[0];
     *rv = nflow->flow_offsets;

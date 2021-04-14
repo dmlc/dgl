@@ -4,6 +4,8 @@
  * \brief Convert a graph to a bipartite-structured graph.
  */
 
+#include "to_bipartite.h"
+
 #include <dgl/base_heterograph.h>
 #include <dgl/transform.h>
 #include <dgl/array.h>
@@ -26,9 +28,11 @@ namespace transform {
 
 namespace {
 
+// Since partial specialization is not allowed for functions, use this as an
+// intermediate for ToBlock where XPU = kDLCPU.
 template<typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
-ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes, bool include_rhs_in_lhs) {
+ToBlockCPU(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes, bool include_rhs_in_lhs) {
   const int64_t num_etypes = graph->NumEdgeTypes();
   const int64_t num_ntypes = graph->NumVertexTypes();
   std::vector<EdgeArray> edge_arrays(num_etypes);
@@ -51,9 +55,11 @@ ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes, bool includ
     const auto src_dst_types = graph->GetEndpointTypes(etype);
     const dgl_type_t srctype = src_dst_types.first;
     const dgl_type_t dsttype = src_dst_types.second;
-    const EdgeArray edges = graph->InEdges(etype, rhs_nodes[dsttype]);
-    lhs_node_mappings[srctype].Update(edges.src);
-    edge_arrays[etype] = edges;
+    if (!aten::IsNullArray(rhs_nodes[dsttype])) {
+      const EdgeArray& edges = graph->Edges(etype);
+      lhs_node_mappings[srctype].Update(edges.src);
+      edge_arrays[etype] = edges;
+    }
   }
 
   const auto meta_graph = graph->meta_graph();
@@ -75,11 +81,26 @@ ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes, bool includ
     const dgl_type_t dsttype = src_dst_types.second;
     const IdHashMap<IdType> &lhs_map = lhs_node_mappings[srctype];
     const IdHashMap<IdType> &rhs_map = rhs_node_mappings[dsttype];
-    rel_graphs.push_back(CreateFromCOO(
-        2, lhs_map.Size(), rhs_map.Size(),
-        lhs_map.Map(edge_arrays[etype].src, -1),
-        rhs_map.Map(edge_arrays[etype].dst, -1)));
-    induced_edges.push_back(edge_arrays[etype].id);
+    if (rhs_map.Size() == 0) {
+      // No rhs nodes are given for this edge type. Create an empty graph.
+      rel_graphs.push_back(CreateFromCOO(
+          2, lhs_map.Size(), rhs_map.Size(),
+          aten::NullArray(), aten::NullArray()));
+      induced_edges.push_back(aten::NullArray());
+    } else {
+      IdArray new_src = lhs_map.Map(edge_arrays[etype].src, -1);
+      IdArray new_dst = rhs_map.Map(edge_arrays[etype].dst, -1);
+      // Check whether there are unmapped IDs and raise error.
+      for (int64_t i = 0; i < new_dst->shape[0]; ++i)
+        CHECK_NE(new_dst.Ptr<IdType>()[i], -1)
+          << "Node " << edge_arrays[etype].dst.Ptr<IdType>()[i] << " does not exist"
+          << " in `rhs_nodes`. Argument `rhs_nodes` must contain all the edge"
+          << " destination nodes.";
+      rel_graphs.push_back(CreateFromCOO(
+          2, lhs_map.Size(), rhs_map.Size(),
+          new_src, new_dst));
+      induced_edges.push_back(edge_arrays[etype].id);
+    }
   }
 
   const HeteroGraphPtr new_graph = CreateHeteroGraph(
@@ -90,15 +111,22 @@ ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes, bool includ
   return std::make_tuple(new_graph, lhs_nodes, induced_edges);
 }
 
-};  // namespace
+}  // namespace
 
+template<>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
-ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes, bool include_rhs_in_lhs) {
-  std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>> ret;
-  ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
-    ret = ToBlock<IdType>(graph, rhs_nodes, include_rhs_in_lhs);
-  });
-  return ret;
+ToBlock<kDLCPU, int32_t>(HeteroGraphPtr graph,
+                         const std::vector<IdArray> &rhs_nodes,
+                         bool include_rhs_in_lhs) {
+  return ToBlockCPU<int32_t>(graph, rhs_nodes, include_rhs_in_lhs);
+}
+
+template<>
+std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
+ToBlock<kDLCPU, int64_t>(HeteroGraphPtr graph,
+                         const std::vector<IdArray> &rhs_nodes,
+                         bool include_rhs_in_lhs) {
+  return ToBlockCPU<int64_t>(graph, rhs_nodes, include_rhs_in_lhs);
 }
 
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBlock")
@@ -110,8 +138,13 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBlock")
     HeteroGraphPtr new_graph;
     std::vector<IdArray> lhs_nodes;
     std::vector<IdArray> induced_edges;
-    std::tie(new_graph, lhs_nodes, induced_edges) = ToBlock(
-        graph_ref.sptr(), rhs_nodes, include_rhs_in_lhs);
+
+    ATEN_XPU_SWITCH_CUDA(graph_ref->Context().device_type, XPU, "ToBlock", {
+      ATEN_ID_TYPE_SWITCH(graph_ref->DataType(), IdType, {
+      std::tie(new_graph, lhs_nodes, induced_edges) = ToBlock<XPU, IdType>(
+          graph_ref.sptr(), rhs_nodes, include_rhs_in_lhs);
+      });
+    });
 
     List<Value> lhs_nodes_ref;
     for (IdArray &array : lhs_nodes)

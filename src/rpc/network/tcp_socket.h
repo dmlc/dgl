@@ -79,7 +79,7 @@ class TCPSocket {
 
   /*!
    * \brief Set timeout for socket
-   * \param timeout millsec timeout
+   * \param timeout seconds timeout
    */
   void SetTimeout(int timeout);
 

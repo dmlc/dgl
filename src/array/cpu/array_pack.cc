@@ -76,8 +76,6 @@ template std::tuple<NDArray, IdArray, IdArray> Pack<kDLCPU, int64_t>(NDArray, in
 template std::tuple<NDArray, IdArray, IdArray> Pack<kDLCPU, float>(NDArray, float);
 template std::tuple<NDArray, IdArray, IdArray> Pack<kDLCPU, double>(NDArray, double);
 
-};  // namespace impl
-
-};  // namespace aten
-
-};  // namespace dgl
+}  // namespace impl
+}  // namespace aten
+}  // namespace dgl

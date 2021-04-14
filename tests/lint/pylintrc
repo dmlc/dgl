@@ -7,7 +7,7 @@ extension-pkg-whitelist=
 
 # Add files or directories to the blacklist. They should be base names, not
 # paths.
-ignore=CVS,_cy2,_cy3,backend,data,contrib
+ignore=CVS,_cy2,_cy3,backend,data,contrib,_deprecate
 
 # Add files or directories matching the regex patterns to the blacklist. The
 # regex matches against base names, not paths.
@@ -192,7 +192,7 @@ function-naming-style=snake_case
 #function-rgx=
 
 # Good variable names which should always be accepted, separated by a comma.
-good-names=i,j,k,u,v,e,n,m,w,x,y,g,G,hg,fn,ex,Run,_
+good-names=i,j,k,u,v,e,n,m,w,x,y,z,g,G,hg,fn,ex,Run,_,us,vs,gs,op,ty
 
 # Include a hint for the correct naming format with invalid-name.
 include-naming-hint=no
@@ -389,7 +389,7 @@ ignored-classes=optparse.Values,thread._local,_thread._local
 # (useful for modules/projects where namespaces are manipulated during runtime
 # and thus existing member attributes cannot be deduced by static analysis. It
 # supports qualified module names, as well as Unix pattern matching.
-ignored-modules=dgl.backend,dgl._api_internal
+ignored-modules=dgl.backend,dgl._api_internal,dgl._deprecate
 
 # Show a hint with possible names when a member name was not found. The aspect
 # of finding the hint is based on edit distance.

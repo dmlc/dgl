@@ -166,15 +166,6 @@ class GraphOp {
    * \return the graph with reordered node Ids
    */
   static GraphPtr ReorderImmutableGraph(ImmutableGraphPtr ig, IdArray new_order);
-
-  /*!
-   * \brief Partition a graph with Metis.
-   * The partitioning algorithm assigns each vertex to a partition.
-   * \param graph The input graph
-   * \param k The number of partitions.
-   * \return The partition assignments of all vertices.
-   */
-  static IdArray MetisPartition(GraphPtr graph, int32_t k);
 };
 
 }  // namespace dgl

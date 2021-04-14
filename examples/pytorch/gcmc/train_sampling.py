@@ -11,6 +11,7 @@ import random
 import string
 import traceback
 import numpy as np
+import tqdm
 import torch as th
 import torch.nn as nn
 import torch.multiprocessing as mp
@@ -20,103 +21,9 @@ from torch.nn.parallel import DistributedDataParallel
 from _thread import start_new_thread
 from functools import wraps
 from data import MovieLens
-from model import GCMCLayer, DenseBiDecoder
-from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
+from model import GCMCLayer, DenseBiDecoder, BiDecoder
+from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger, to_etype_name
 import dgl
-
-class GCMCSampler:
-    """Neighbor sampler in GCMC mini-batch training."""
-    def __init__(self, dataset, segment='train'):
-        self.dataset = dataset
-        if segment == 'train':
-            self.truths = dataset.train_truths
-            self.labels = dataset.train_labels
-            self.enc_graph = dataset.train_enc_graph
-            self.dec_graph = dataset.train_dec_graph
-        elif segment == 'valid':
-            self.truths = dataset.valid_truths
-            self.labels = None
-            self.enc_graph = dataset.valid_enc_graph
-            self.dec_graph = dataset.valid_dec_graph
-        elif segment == 'test':
-            self.truths = dataset.test_truths
-            self.labels = None
-            self.enc_graph = dataset.test_enc_graph
-            self.dec_graph = dataset.test_dec_graph
-        else:
-            assert False, "Unknow dataset {}".format(segment)
-
-    def sample_blocks(self, seeds):
-        """Sample subgraphs from the entire graph.
-
-        The input ``seeds`` represents the edges to compute prediction for. The sampling
-        algorithm works as follows:
-        
-          1. Get the head and tail nodes of the provided seed edges.
-          2. For each head and tail node, extract the entire in-coming neighborhood.
-          3. Copy the node features/embeddings from the full graph to the sampled subgraphs.
-        """
-        dataset = self.dataset
-        enc_graph = self.enc_graph
-        dec_graph = self.dec_graph
-        edge_ids = th.stack(seeds)
-        # generate frontiers for user and item
-        possible_rating_values = dataset.possible_rating_values
-        true_relation_ratings = self.truths[edge_ids]
-        true_relation_labels = None if self.labels is None else self.labels[edge_ids]
-
-        # 1. Get the head and tail nodes from both the decoder and encoder graphs.
-        head_id, tail_id = dec_graph.find_edges(edge_ids)
-        utype, _, vtype = enc_graph.canonical_etypes[0]
-        subg = []
-        true_rel_ratings = []
-        true_rel_labels = []
-        for possible_rating_value in possible_rating_values:
-            idx_loc = (true_relation_ratings == possible_rating_value)
-            head = head_id[idx_loc]
-            tail = tail_id[idx_loc]
-            true_rel_ratings.append(true_relation_ratings[idx_loc])
-            if self.labels is not None:
-                true_rel_labels.append(true_relation_labels[idx_loc])
-            subg.append(dgl.bipartite((head, tail),
-                                        utype=utype,
-                                        etype=str(possible_rating_value),
-                                        vtype=vtype,
-                                        num_nodes=(enc_graph.number_of_nodes(utype),
-                                                   enc_graph.number_of_nodes(vtype))))
-        # Convert the encoder subgraph to a more compact one by removing nodes that covered
-        # by the seed edges.
-        g = dgl.hetero_from_relations(subg)
-        g = dgl.compact_graphs(g)
-
-        # 2. For each head and tail node, extract the entire in-coming neighborhood.
-        seed_nodes = {}
-        for ntype in g.ntypes:
-            seed_nodes[ntype] = g.nodes[ntype].data[dgl.NID]
-        frontier = dgl.in_subgraph(enc_graph, seed_nodes)
-        frontier = dgl.to_block(frontier, seed_nodes)
-
-        # 3. Copy the node features/embeddings from the full graph to the sampled subgraphs.
-        frontier.dstnodes['user'].data['ci'] = \
-            enc_graph.nodes['user'].data['ci'][frontier.dstnodes['user'].data[dgl.NID]]
-        frontier.srcnodes['movie'].data['cj'] = \
-            enc_graph.nodes['movie'].data['cj'][frontier.srcnodes['movie'].data[dgl.NID]]
-        frontier.srcnodes['user'].data['cj'] = \
-            enc_graph.nodes['user'].data['cj'][frontier.srcnodes['user'].data[dgl.NID]]
-        frontier.dstnodes['movie'].data['ci'] = \
-            enc_graph.nodes['movie'].data['ci'][frontier.dstnodes['movie'].data[dgl.NID]]
-
-        # handle features
-        head_feat = frontier.srcnodes['user'].data[dgl.NID].long() \
-                    if dataset.user_feature is None else \
-                       dataset.user_feature[frontier.srcnodes['user'].data[dgl.NID]]
-        tail_feat = frontier.srcnodes['movie'].data[dgl.NID].long()\
-                    if dataset.movie_feature is None else \
-                       dataset.movie_feature[frontier.srcnodes['movie'].data[dgl.NID]]
-
-        true_rel_labels = None if self.labels is None else th.cat(true_rel_labels, dim=0)
-        true_rel_ratings = th.cat(true_rel_ratings, dim=0)
-        return (g, frontier, head_feat, tail_feat, true_rel_labels, true_rel_ratings)
 
 class Net(nn.Module):
     def __init__(self, args, dev_id):
@@ -139,26 +46,62 @@ class Net(nn.Module):
         else:
             self.encoder.to(dev_id)
 
-        self.decoder = DenseBiDecoder(in_units=args.gcn_out_units,
-                                      num_classes=len(args.rating_vals),
-                                      num_basis=args.gen_r_num_basis_func)
+        self.decoder = BiDecoder(in_units=args.gcn_out_units,
+                                 num_classes=len(args.rating_vals),
+                                 num_basis=args.gen_r_num_basis_func)
         self.decoder.to(dev_id)
 
     def forward(self, compact_g, frontier, ufeat, ifeat, possible_rating_values):
         user_out, movie_out = self.encoder(frontier, ufeat, ifeat)
-
-        head_emb = []
-        tail_emb = []
-        for possible_rating_value in possible_rating_values:
-            head, tail = compact_g.all_edges(etype=str(possible_rating_value))
-            head_emb.append(user_out[head])
-            tail_emb.append(movie_out[tail])
-
-        head_emb = th.cat(head_emb, dim=0)
-        tail_emb = th.cat(tail_emb, dim=0)
-
-        pred_ratings = self.decoder(head_emb, tail_emb)
+        pred_ratings = self.decoder(compact_g, user_out, movie_out)
         return pred_ratings
+
+def load_subtensor(input_nodes, pair_graph, blocks, dataset, parent_graph):
+    output_nodes = pair_graph.ndata[dgl.NID]
+    head_feat = input_nodes['user'] if dataset.user_feature is None else \
+                dataset.user_feature[input_nodes['user']]
+    tail_feat = input_nodes['movie'] if dataset.movie_feature is None else \
+                dataset.movie_feature[input_nodes['movie']]
+
+    for block in blocks:
+        block.dstnodes['user'].data['ci'] = \
+            parent_graph.nodes['user'].data['ci'][block.dstnodes['user'].data[dgl.NID]]
+        block.srcnodes['user'].data['cj'] = \
+            parent_graph.nodes['user'].data['cj'][block.srcnodes['user'].data[dgl.NID]]
+        block.dstnodes['movie'].data['ci'] = \
+            parent_graph.nodes['movie'].data['ci'][block.dstnodes['movie'].data[dgl.NID]]
+        block.srcnodes['movie'].data['cj'] = \
+            parent_graph.nodes['movie'].data['cj'][block.srcnodes['movie'].data[dgl.NID]]
+
+    return head_feat, tail_feat, blocks
+
+def flatten_etypes(pair_graph, dataset, segment):
+    n_users = pair_graph.number_of_nodes('user')
+    n_movies = pair_graph.number_of_nodes('movie')
+    src = []
+    dst = []
+    labels = []
+    ratings = []
+
+    for rating in dataset.possible_rating_values:
+        src_etype, dst_etype = pair_graph.edges(order='eid', etype=to_etype_name(rating))
+        src.append(src_etype)
+        dst.append(dst_etype)
+        label = np.searchsorted(dataset.possible_rating_values, rating)
+        ratings.append(th.LongTensor(np.full_like(src_etype, rating)))
+        labels.append(th.LongTensor(np.full_like(src_etype, label)))
+    src = th.cat(src)
+    dst = th.cat(dst)
+    ratings = th.cat(ratings)
+    labels = th.cat(labels)
+
+    flattened_pair_graph = dgl.heterograph({
+        ('user', 'rate', 'movie'): (src, dst)},
+        num_nodes_dict={'user': n_users, 'movie': n_movies})
+    flattened_pair_graph.edata['rating'] = ratings
+    flattened_pair_graph.edata['label'] = labels
+
+    return flattened_pair_graph
 
 def evaluate(args, dev_id, net, dataset, dataloader, segment='valid'):
     possible_rating_values = dataset.possible_rating_values
@@ -166,14 +109,21 @@ def evaluate(args, dev_id, net, dataset, dataloader, segment='valid'):
 
     real_pred_ratings = []
     true_rel_ratings = []
-    for sample_data in dataloader:
-        compact_g, frontier, head_feat, tail_feat, \
-                _, true_relation_ratings = sample_data
+    for input_nodes, pair_graph, blocks in dataloader:
+        head_feat, tail_feat, blocks = load_subtensor(
+            input_nodes, pair_graph, blocks, dataset,
+            dataset.valid_enc_graph if segment == 'valid' else dataset.test_enc_graph)
+        frontier = blocks[0]
+        true_relation_ratings = \
+            dataset.valid_truths[pair_graph.edata[dgl.EID]] if segment == 'valid' else \
+            dataset.test_truths[pair_graph.edata[dgl.EID]]
 
+        frontier = frontier.to(dev_id)
         head_feat = head_feat.to(dev_id)
         tail_feat = tail_feat.to(dev_id)
+        pair_graph = pair_graph.to(dev_id)
         with th.no_grad():
-            pred_ratings = net(compact_g, frontier,
+            pred_ratings = net(pair_graph, frontier,
                                head_feat, tail_feat, possible_rating_values)
         batch_pred_ratings = (th.softmax(pred_ratings, dim=1) *
                          nd_possible_rating_values.view(1, -1)).sum(dim=1)
@@ -212,18 +162,6 @@ def thread_wrapped_func(func):
             assert isinstance(exception, Exception)
             raise exception.__class__(trace)
     return decorated_function
-
-def prepare_mp(g):
-    """
-    Explicitly materialize the CSR, CSC and COO representation of the given graph
-    so that they could be shared via copy-on-write to sampler workers and GPU
-    trainers.
-    This is a workaround before full shared memory support on heterogeneous graphs.
-    """
-    for etype in g.canonical_etypes:
-        g.in_degree(0, etype=etype)
-        g.out_degree(0, etype=etype)
-        g.find_edges([0], etype=etype)
 
 def config():
     parser = argparse.ArgumentParser(description='GCMC')
@@ -271,47 +209,43 @@ def config():
 
     return args
 
-@thread_wrapped_func
 def run(proc_id, n_gpus, args, devices, dataset):
     dev_id = devices[proc_id]
     train_labels = dataset.train_labels
     train_truths = dataset.train_truths
     num_edges = train_truths.shape[0]
-    sampler = GCMCSampler(dataset,
-                          'train')
 
-    seeds = th.arange(num_edges)
-    dataloader = DataLoader(
-        dataset=seeds,
+    reverse_types = {to_etype_name(k): 'rev-' + to_etype_name(k)
+                     for k in dataset.possible_rating_values}
+    reverse_types.update({v: k for k, v in reverse_types.items()})
+    sampler = dgl.dataloading.MultiLayerNeighborSampler([None], return_eids=True)
+    dataloader = dgl.dataloading.EdgeDataLoader(
+        dataset.train_enc_graph,
+        {to_etype_name(k): th.arange(
+            dataset.train_enc_graph.number_of_edges(etype=to_etype_name(k)))
+         for k in dataset.possible_rating_values},
+        sampler,
         batch_size=args.minibatch_size,
-        collate_fn=sampler.sample_blocks,
         shuffle=True,
-        pin_memory=True,
-        drop_last=False,
-        num_workers=args.num_workers_per_gpu)
+        drop_last=False)
 
     if proc_id == 0:
-        valid_sampler = GCMCSampler(dataset,
-                                    'valid')
-        valid_seeds = th.arange(dataset.valid_truths.shape[0])
-        valid_dataloader = DataLoader(dataset=valid_seeds,
-                                      batch_size=args.minibatch_size,
-                                      collate_fn=valid_sampler.sample_blocks,
-                                      shuffle=False,
-                                      pin_memory=True,
-                                      drop_last=False,
-                                      num_workers=args.num_workers_per_gpu)
-
-        test_sampler = GCMCSampler(dataset,
-                                   'test')
-        test_seeds = th.arange(dataset.test_truths.shape[0])
-        test_dataloader = DataLoader(dataset=test_seeds,
-                                     batch_size=args.minibatch_size,
-                                     collate_fn=test_sampler.sample_blocks,
-                                     shuffle=False,
-                                     pin_memory=True,
-                                     drop_last=False,
-                                     num_workers=args.num_workers_per_gpu)
+        valid_dataloader = dgl.dataloading.EdgeDataLoader(
+            dataset.valid_dec_graph,
+            th.arange(dataset.valid_dec_graph.number_of_edges()),
+            sampler,
+            g_sampling=dataset.valid_enc_graph,
+            batch_size=args.minibatch_size,
+            shuffle=False,
+            drop_last=False)
+        test_dataloader = dgl.dataloading.EdgeDataLoader(
+            dataset.test_dec_graph,
+            th.arange(dataset.test_dec_graph.number_of_edges()),
+            sampler,
+            g_sampling=dataset.test_enc_graph,
+            batch_size=args.minibatch_size,
+            shuffle=False,
+            drop_last=False)
 
     if n_gpus > 1:
         dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
@@ -352,39 +286,42 @@ def run(proc_id, n_gpus, args, devices, dataset):
         if epoch > 1:
             t0 = time.time()
         net.train()
-        for step, sample_data in enumerate(dataloader):           
-            compact_g, frontier, head_feat, tail_feat, \
-                true_relation_labels, true_relation_ratings = sample_data
-            head_feat = head_feat.to(dev_id)
-            tail_feat = tail_feat.to(dev_id)
+        with tqdm.tqdm(dataloader) as tq:
+            for step, (input_nodes, pair_graph, blocks) in enumerate(tq):
+                head_feat, tail_feat, blocks = load_subtensor(
+                    input_nodes, pair_graph, blocks, dataset, dataset.train_enc_graph)
+                frontier = blocks[0]
+                compact_g = flatten_etypes(pair_graph, dataset, 'train').to(dev_id)
+                true_relation_labels = compact_g.edata['label']
+                true_relation_ratings = compact_g.edata['rating']
 
-            pred_ratings = net(compact_g, frontier, head_feat, tail_feat, dataset.possible_rating_values)
-            loss = rating_loss_net(pred_ratings, true_relation_labels.to(dev_id)).mean()
-            count_loss += loss.item()
-            optimizer.zero_grad()
-            loss.backward()
-            nn.utils.clip_grad_norm_(net.parameters(), args.train_grad_clip)
-            optimizer.step()
+                head_feat = head_feat.to(dev_id)
+                tail_feat = tail_feat.to(dev_id)
+                frontier = frontier.to(dev_id)
 
-            if proc_id == 0 and iter_idx == 1:
-                print("Total #Param of net: %d" % (torch_total_param_num(net)))
+                pred_ratings = net(compact_g, frontier, head_feat, tail_feat, dataset.possible_rating_values)
+                loss = rating_loss_net(pred_ratings, true_relation_labels.to(dev_id)).mean()
+                count_loss += loss.item()
+                optimizer.zero_grad()
+                loss.backward()
+                nn.utils.clip_grad_norm_(net.parameters(), args.train_grad_clip)
+                optimizer.step()
 
-            real_pred_ratings = (th.softmax(pred_ratings, dim=1) *
-                                nd_possible_rating_values.view(1, -1)).sum(dim=1)
-            rmse = ((real_pred_ratings - true_relation_ratings.to(dev_id)) ** 2).sum()
-            count_rmse += rmse.item()
-            count_num += pred_ratings.shape[0]
+                if proc_id == 0 and iter_idx == 1:
+                    print("Total #Param of net: %d" % (torch_total_param_num(net)))
 
-            if iter_idx % args.train_log_interval == 0:
-                logging_str = "Iter={}, loss={:.4f}, rmse={:.4f}".format(
-                    iter_idx, count_loss/iter_idx, count_rmse/count_num)
-                count_rmse = 0
-                count_num = 0
+                real_pred_ratings = (th.softmax(pred_ratings, dim=1) *
+                                    nd_possible_rating_values.view(1, -1)).sum(dim=1)
+                rmse = ((real_pred_ratings - true_relation_ratings.to(dev_id)) ** 2).sum()
+                count_rmse += rmse.item()
+                count_num += pred_ratings.shape[0]
 
-            if iter_idx % args.train_log_interval == 0:
-                print("[{}] {}".format(proc_id, logging_str))
+                tq.set_postfix({'loss': '{:.4f}'.format(count_loss / iter_idx),
+                                'rmse': '{:.4f}'.format(count_rmse / count_num)},
+                               refresh=False)
 
-            iter_idx += 1
+                iter_idx += 1
+
         if epoch > 1:
             epoch_time = time.time() - t0
             print("Epoch {} time {}".format(epoch, epoch_time))
@@ -399,7 +336,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
                                       dataset=dataset,
                                       dataloader=valid_dataloader,
                                       segment='valid')
-                logging_str += ',\tVal RMSE={:.4f}'.format(valid_rmse)
+                logging_str = 'Val RMSE={:.4f}'.format(valid_rmse)
 
                 if valid_rmse < best_valid_rmse:
                     best_valid_rmse = valid_rmse
@@ -466,11 +403,13 @@ if __name__ == '__main__':
         run(0, n_gpus, args, devices, dataset)
     # multi gpu
     else:
-        prepare_mp(dataset.train_enc_graph)
-        prepare_mp(dataset.train_dec_graph)
+        # Create csr/coo/csc formats before launching training processes with multi-gpu.
+        # This avoids creating certain formats in each sub-process, which saves momory and CPU.
+        dataset.train_enc_graph.create_formats_()
+        dataset.train_dec_graph.create_formats_()
         procs = []
         for proc_id in range(n_gpus):
-            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, dataset))
+            p = mp.Process(target=thread_wrapped_func(run), args=(proc_id, n_gpus, args, devices, dataset))
             p.start()
             procs.append(p)
         for p in procs:

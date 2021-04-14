@@ -15,7 +15,12 @@ namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRTranspose(CSRMatrix csr) {
-  CHECK(sizeof(IdType) == 4) << "CUDA CSR2CSC does not support int64.";
+  LOG(FATAL) << "Unreachable codes";
+  return {};
+}
+
+template <>
+CSRMatrix CSRTranspose<kDLGPU, int32_t>(CSRMatrix csr) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   // allocate cusparse handle if needed
   if (!thr_entry->cusparse_handle) {
@@ -33,14 +38,16 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
   const int32_t* indices_ptr = static_cast<int32_t*>(indices->data);
   const void* data_ptr = data->data;
 
-  NDArray t_indptr = aten::NewIdArray(csr.num_cols + 1, ctx, bits);
+  // (BarclayII) csr2csc doesn't seem to clear the content of cscColPtr if nnz == 0.
+  // We need to do it ourselves.
+  NDArray t_indptr = aten::Full(0, csr.num_cols + 1, bits, ctx);
   NDArray t_indices = aten::NewIdArray(nnz, ctx, bits);
   NDArray t_data = aten::NewIdArray(nnz, ctx, bits);
   int32_t* t_indptr_ptr = static_cast<int32_t*>(t_indptr->data);
   int32_t* t_indices_ptr = static_cast<int32_t*>(t_indices->data);
   void* t_data_ptr = t_data->data;
 
-#if __CUDA_API_VERSION >= 10010
+#if CUDART_VERSION >= 10010
   auto device = runtime::DeviceAPI::Get(csr.indptr->ctx);
   // workspace
   size_t workspace_size;
@@ -60,6 +67,7 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
       csr.num_rows, csr.num_cols, nnz,
       data_ptr, indptr_ptr, indices_ptr,
       t_data_ptr, t_indptr_ptr, t_indices_ptr,
+      CUDA_R_32F,
       CUSPARSE_ACTION_NUMERIC,
       CUSPARSE_INDEX_BASE_ZERO,
       CUSPARSE_CSR2CSC_ALG1,  // see cusparse doc for reference
@@ -78,6 +86,11 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
   return CSRMatrix(csr.num_cols, csr.num_rows,
                    t_indptr, t_indices, t_data,
                    false);
+}
+
+template <>
+CSRMatrix CSRTranspose<kDLGPU, int64_t>(CSRMatrix csr) {
+  return COOToCSR(COOTranspose(CSRToCOO(csr, false)));
 }
 
 template CSRMatrix CSRTranspose<kDLGPU, int32_t>(CSRMatrix csr);

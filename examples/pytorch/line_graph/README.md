@@ -1,9 +1,9 @@
 Community Detection with Graph Neural Networks (CDGNN)
 ============
 
-Paper link: [https://arxiv.org/abs/1705.08415](https://arxiv.org/abs/1705.08415)
+Paper link: [https://openreview.net/pdf?id=H1g0Z3A9Fm](https://openreview.net/pdf?id=H1g0Z3A9Fm)
 
-Author's code repo: [https://github.com/joanbruna/GNN_community](https://github.com/joanbruna/GNN_community)
+Author's code repo: [https://github.com/zhengdao-chen/GNN4CD](https://github.com/zhengdao-chen/GNN4CD)
 
 This folder contains a DGL implementation of the CDGNN model.
 

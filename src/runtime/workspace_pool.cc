@@ -4,6 +4,7 @@
  * \brief Workspace pool utility.
  */
 #include "workspace_pool.h"
+#include <memory>
 
 namespace dgl {
 namespace runtime {

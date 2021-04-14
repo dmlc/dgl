@@ -12,6 +12,7 @@
 #include <utility>
 #include <tuple>
 #include <algorithm>
+#include <memory>
 #include "runtime/ndarray.h"
 #include "graph_interface.h"
 #include "lazy.h"

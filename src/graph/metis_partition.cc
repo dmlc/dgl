@@ -4,19 +4,18 @@
  * \brief Call Metis partitioning
  */
 
-#include <dgl/packed_func_ext.h>
-#include "../c_api_common.h"
-
-#if !defined(_WIN32)
-
 #include <metis.h>
 #include <dgl/graph_op.h>
+#include <dgl/packed_func_ext.h>
+#include "../c_api_common.h"
 
 using namespace dgl::runtime;
 
 namespace dgl {
 
-IdArray GraphOp::MetisPartition(GraphPtr g, int k) {
+#if !defined(_WIN32)
+
+IdArray MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
   // The index type of Metis needs to be compatible with DGL index type.
   CHECK_EQ(sizeof(idx_t), sizeof(dgl_id_t));
   ImmutableGraphPtr ig = std::dynamic_pointer_cast<ImmutableGraph>(g);
@@ -32,18 +31,37 @@ IdArray GraphOp::MetisPartition(GraphPtr g, int k) {
   IdArray part_arr = aten::NewIdArray(nvtxs);
   idx_t objval = 0;
   idx_t *part = static_cast<idx_t*>(part_arr->data);
+
+  int64_t vwgt_len = vwgt_arr->shape[0];
+  CHECK_EQ(sizeof(idx_t), vwgt_arr->dtype.bits / 8)
+      << "The vertex weight array doesn't have right type";
+  CHECK(vwgt_len % g->NumVertices() == 0)
+      << "The vertex weight array doesn't have right number of elements";
+  idx_t *vwgt = NULL;
+  if (vwgt_len > 0) {
+    ncon = vwgt_len / g->NumVertices();
+    vwgt = static_cast<idx_t*>(vwgt_arr->data);
+  }
+
+  idx_t options[METIS_NOPTIONS];
+  METIS_SetDefaultOptions(options);
+  options[METIS_OPTION_ONDISK] = 1;
+  options[METIS_OPTION_NITER] = 1;
+  options[METIS_OPTION_NIPARTS] = 1;
+  options[METIS_OPTION_DROPEDGES] = 1;
+
   int ret = METIS_PartGraphKway(&nvtxs,      // The number of vertices
                                 &ncon,       // The number of balancing constraints.
                                 xadj,        // indptr
                                 adjncy,      // indices
-                                NULL,        // the weights of the vertices
+                                vwgt,        // the weights of the vertices
                                 NULL,        // The size of the vertices for computing
                                 // the total communication volume
                                 NULL,        // The weights of the edges
                                 &nparts,     // The number of partitions.
                                 NULL,        // the desired weight for each partition and constraint
                                 NULL,        // the allowed load imbalance tolerance
-                                NULL,        // the array of options
+                                options,     // the array of options
                                 &objval,      // the edge-cut or the total communication volume of
                                 // the partitioning solution
                                 part);
@@ -65,29 +83,18 @@ IdArray GraphOp::MetisPartition(GraphPtr g, int k) {
   return aten::NullArray();
 }
 
+#endif  // !defined(_WIN32)
+
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLMetisPartition")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
     int k = args[1];
-    *rv = GraphOp::MetisPartition(g.sptr(), k);
+    NDArray vwgt = args[2];
+#if !defined(_WIN32)
+    *rv = MetisPartition(g.sptr(), k, vwgt);
+#else
+    LOG(FATAL) << "Metis partition does not support Windows.";
+#endif  // !defined(_WIN32)
   });
 
 }   // namespace dgl
-
-#else   // defined(_WIN32)
-
-using namespace dgl::runtime;
-
-namespace dgl {
-
-DGL_REGISTER_GLOBAL("transform._CAPI_DGLMetisPartition")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphRef g = args[0];
-    int k = args[1];
-    LOG(WARNING) << "DGL doesn't support METIS partitioning in Windows";
-    *rv = aten::NullArray();
-  });
-
-
-}  // namespace dgl
-#endif  // !defined(_WIN32)
