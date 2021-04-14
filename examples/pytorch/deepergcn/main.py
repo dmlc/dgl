@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 import copy
 import dgl
+import time
 
 from ogb.graphproppred import DglGraphPropPredDataset, collate_dgl
 from torch.utils.data import DataLoader
@@ -94,10 +95,17 @@ def main():
     # training & validation & testing
     best_auc = 0
     best_model = copy.deepcopy(model)
+    times = []
 
     print('---------- Training ----------')
     for i in range(args.epochs):
-        train_loss = train(model, device, train_loader, opt, loss_fn, args.grad_clip)
+        t1 = time.time()
+        train_loss = train(model, device, train_loader, opt, loss_fn)
+        t2 = time.time()
+
+        if i >= 5:
+            times.append(t2 - t1)
+
         train_auc = test(model, device, train_loader, evaluator)
         valid_auc = test(model, device, valid_loader, evaluator)
 
@@ -110,7 +118,7 @@ def main():
     print('---------- Testing ----------')
     test_auc = test(best_model, device, test_loader, evaluator)
     print(f'Test Auc: {test_auc}')
-
+    print('Times/epoch: ', sum(times) / len(times))
 
 if __name__ == '__main__':
     """

@@ -33,8 +33,15 @@ python main.py --gpu 0 --learn-beta --batch-size 2048 --dropout 0.2
 
 ### Performance
 
-|     Dataset      | ogbg-molhiv  |
-| :--------------: | :----------: |
-| Results(Table 6) | 0.786±0.0117 |
-| Results(Author)  |    0.781     |
-|   Results(DGL)   |    0.778     |
+|     Dataset      | ogbg-molhiv |
+| :--------------: | :---------: |
+| Results(Table 6) |    0.786    |
+| Results(Author)  |    0.781    |
+|   Results(DGL)   |    0.778    |
+
+### Speed
+
+|     Dataset     | ogbg-molhiv |
+| :-------------: | :---------: |
+| Results(Author) |   11.833    |
+|  Results(DGL)   |    8.965    |
