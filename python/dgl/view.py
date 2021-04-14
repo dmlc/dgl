@@ -1,7 +1,7 @@
 """Views of DGLGraph."""
 from __future__ import absolute_import
 
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from collections.abc import MutableMapping
 
 from .base import ALL, DGLError
@@ -109,12 +109,11 @@ class HeteroNodeDataView(MutableMapping):
 
     def __repr__(self):
         if isinstance(self._ntype, list):
-            ret = {}
+            ret = defaultdict(dict)
             for (i, ntype) in enumerate(self._ntype):
                 data = self._graph._get_n_repr(self._ntid[i], self._nodes)
-                value = {key : data[key]
-                         for key in self._graph._node_frames[self._ntid[i]]}
-                ret[ntype] = value
+                for key in self._graph._node_frames[self._ntid[i]]:
+                    ret[key][ntype] = data[key]
             return repr(ret)
         else:
             data = self._graph._get_n_repr(self._ntid, self._nodes)
@@ -225,12 +224,11 @@ class HeteroEdgeDataView(MutableMapping):
 
     def __repr__(self):
         if isinstance(self._etype, list):
-            ret = {}
+            ret = defaultdict(dict)
             for (i, etype) in enumerate(self._etype):
                 data = self._graph._get_e_repr(self._etid[i], self._edges)
-                value = {key : data[key]
-                         for key in self._graph._edge_frames[self._etid[i]]}
-                ret[etype] = value
+                for key in self._graph._edge_frames[self._etid[i]]:
+                    ret[key][etype] = data[key]
             return repr(ret)
         else:
             data = self._graph._get_e_repr(self._etid, self._edges)

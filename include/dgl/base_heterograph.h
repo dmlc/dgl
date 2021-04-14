@@ -614,7 +614,7 @@ HeteroGraphPtr CreateHeteroGraph(
 HeteroGraphPtr CreateFromCOO(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray row, IdArray col, bool row_sorted = false, bool col_sorted = false,
-    dgl_format_code_t formats = all_code);
+    dgl_format_code_t formats = ALL_CODE);
 
 /*!
  * \brief Create a heterograph from COO input.
@@ -625,7 +625,7 @@ HeteroGraphPtr CreateFromCOO(
  */
 HeteroGraphPtr CreateFromCOO(
     int64_t num_vtypes, const aten::COOMatrix& mat,
-    dgl_format_code_t formats = all_code);
+    dgl_format_code_t formats = ALL_CODE);
 
 /*!
  * \brief Create a heterograph from CSR input.
@@ -641,7 +641,7 @@ HeteroGraphPtr CreateFromCOO(
 HeteroGraphPtr CreateFromCSR(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray indptr, IdArray indices, IdArray edge_ids,
-    dgl_format_code_t formats = all_code);
+    dgl_format_code_t formats = ALL_CODE);
 
 /*!
  * \brief Create a heterograph from CSR input.
@@ -652,7 +652,7 @@ HeteroGraphPtr CreateFromCSR(
  */
 HeteroGraphPtr CreateFromCSR(
     int64_t num_vtypes, const aten::CSRMatrix& mat,
-    dgl_format_code_t formats = all_code);
+    dgl_format_code_t formats = ALL_CODE);
 
 /*!
  * \brief Create a heterograph from CSC input.
@@ -668,7 +668,7 @@ HeteroGraphPtr CreateFromCSR(
 HeteroGraphPtr CreateFromCSC(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray indptr, IdArray indices, IdArray edge_ids,
-    dgl_format_code_t formats = all_code);
+    dgl_format_code_t formats = ALL_CODE);
 
 /*!
  * \brief Create a heterograph from CSC input.
@@ -679,7 +679,7 @@ HeteroGraphPtr CreateFromCSC(
  */
 HeteroGraphPtr CreateFromCSC(
     int64_t num_vtypes, const aten::CSRMatrix& mat,
-    dgl_format_code_t formats = all_code);
+    dgl_format_code_t formats = ALL_CODE);
 
 /*!
  * \brief Extract the subgraph of the in edges of the given nodes.
@@ -835,13 +835,13 @@ HeteroPickleStates HeteroPickle(HeteroGraphPtr graph);
 HeteroGraphPtr HeteroUnpickleOld(const HeteroPickleStates& states);
 
 #define FORMAT_HAS_CSC(format) \
-  ((format) & csc_code)
+  ((format) & CSC_CODE)
 
 #define FORMAT_HAS_CSR(format) \
-  ((format) & csr_code)
+  ((format) & CSR_CODE)
 
 #define FORMAT_HAS_COO(format) \
-  ((format) & coo_code)
+  ((format) & COO_CODE)
 
 }  // namespace dgl
 

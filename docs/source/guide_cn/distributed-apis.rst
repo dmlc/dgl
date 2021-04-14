@@ -21,7 +21,7 @@ DGL分布式模块的初始化
 
 .. code:: python
 
-    dgl.distributed.initialize('ip_config.txt', num_workers=4)
+    dgl.distributed.initialize('ip_config.txt')
     th.distributed.init_process_group(backend='gloo')
 
 **Note**: 如果训练脚本里包含需要在服务器(细节内容可以在下面的DistTensor和DistEmbedding章节里查看)上调用的用户自定义函数(UDF)，
@@ -107,7 +107,7 @@ DGL为分布式张量提供了类似于单机普通张量的接口，以访问�
 
 .. code:: python
 
-    tensor = dgl.distributed.DistTensor((g.number_of_nodes(), 10), th.float32, name=’test’)
+    tensor = dgl.distributed.DistTensor((g.number_of_nodes(), 10), th.float32, name='test')
 
 **Note**: :class:`~dgl.distributed.DistTensor` 的创建是一个同步操作。所有训练器都必须调用创建，
 并且只有当所有训练器都调用它时，此创建过程才能成功。
