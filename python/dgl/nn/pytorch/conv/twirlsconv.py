@@ -148,7 +148,7 @@ class TWIRLSConv(nn.Module):
         self.mlp_bef = MLP(self.input_d, self.hidden_d, self.size_bef_unf, self.num_mlp_before,
                            self.dropout, self.norm, init_activate=False)
 
-        self.unfolding = UnfoldindAndAttention(self.hidden_d, self.alp, self.lam, self.prop_step,
+        self.unfolding = UnfoldingAndAttention(self.hidden_d, self.alp, self.lam, self.prop_step,
                                                self.attn_aft, self.tau, self.T, self.p,
                                                self.use_eta, self.init_att, self.attn_dropout,
                                                self.precond)
@@ -184,7 +184,6 @@ class TWIRLSConv(nn.Module):
         * Output shape: :math:`(N, \text{output_d})`.
         """
 
-
         # ensure self loop
         graph = graph.remove_self_loop()
         graph = graph.add_self_loop()
@@ -217,6 +216,7 @@ class Propagate(nn.Module):
     eq.28 in the paper.
 
     """
+
     def __init__(self):
         super().__init__()
 
@@ -376,7 +376,6 @@ class Attention(nn.Module):
             The graph.
         """
 
-
         if etas is not None:
             Y = Y * etas.view(-1)
 
@@ -445,7 +444,7 @@ def D_power_bias_X(graph, X, power, coeff, bias):
     return Y
 
 
-class UnfoldindAndAttention(nn.Module):
+class UnfoldingAndAttention(nn.Module):
     r"""
 
     Description
@@ -481,10 +480,40 @@ class UnfoldindAndAttention(nn.Module):
         If ``True``, use pre-conditioned & reparameterized version propagation (eq.28), else use
         normalized laplacian (eq.30).
 
+    Example
+    -------
+    >>> import dgl
+    >>> from dgl.nn import TWIRLSUnfoldingAndAttention
+    >>> import torch as th
+
+    >>> g = dgl.graph(([0, 1, 2, 3, 2, 5], [1, 2, 3, 4, 0, 3])).add_self_loop()
+    >>> feat = th.ones(6,5)
+    >>> prop = TWIRLSUnfoldingAndAttention(10, 1, 1, prop_step=3)
+    >>> res = prop(g,feat)
+    >>> res
+    tensor([[2.5000, 2.5000, 2.5000, 2.5000, 2.5000],
+            [2.5000, 2.5000, 2.5000, 2.5000, 2.5000],
+            [2.5000, 2.5000, 2.5000, 2.5000, 2.5000],
+            [3.7656, 3.7656, 3.7656, 3.7656, 3.7656],
+            [2.5217, 2.5217, 2.5217, 2.5217, 2.5217],
+            [4.0000, 4.0000, 4.0000, 4.0000, 4.0000]])
+
     """
 
-    def __init__(self, d, alp, lam, prop_step, attn_aft, tau, T, p,
-                 use_eta, init_att, attn_dropout, precond):
+    def __init__(self,
+                 d,
+                 alp,
+                 lam,
+                 prop_step,
+                 attn_aft=-1,
+                 tau=0.2,
+                 T=-1,
+                 p=1,
+                 use_eta=False,
+                 init_att=False,
+                 attn_dropout=0,
+                 precond=True,
+                 ):
 
         super().__init__()
 
