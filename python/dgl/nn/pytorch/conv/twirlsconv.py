@@ -1,4 +1,4 @@
-# pylint: disable=trailing-whitespace, line-too-long, missing-docstring, invalid-name, useless-super-delegation, comparison-with-itself, no-member
+# pylint: disable=invalid-name, no-member
 
 import torch as tc
 import torch.nn as nn
@@ -11,7 +11,7 @@ class TWIRLSConv(nn.Module):
 
     Description
     -----------
-    Together with iteratively reweighting least squre from paper `Graph Neural Networks Inspired 
+    Together with iteratively reweighting least squre from paper `Graph Neural Networks Inspired
     by Classical Iterative Algorithms <https://arxiv.org/pdf/2103.06064.pdf>`__.
 
     Parameters
@@ -28,29 +28,29 @@ class TWIRLSConv(nn.Module):
         Number of mlp layers before propagation. Default: ``1``.
     num_mlp_after : int
         Number of mlp layers after propagation.  Default: ``1``.
-    norm : str 
-        The type of norm layers inside mlp layers. Can be 'batch', 'layer' or 'none'.
+    norm : str
+        The type of norm layers inside mlp layers. Can be ``'batch'``, ``'layer'`` or ``'none'``.
         Default: ``'none'``
     precond : str
         If True, use pre conditioning and unormalized laplacian, else not use pre conditioning
         and use normalized laplacian. Default: ``True``
     alp : float
-        The :math:`\alpha` in paper. If equal to :math:`0`, will be automatically decided based 
+        The :math:`\alpha` in paper. If equal to :math:`0`, will be automatically decided based
         on other hyper prameters. Default: ``0``.
     lam : float
         The :math:`\lambda` in paper. Default: ``1``.
     attention : bool
-        If True, add an attention layer inside propagations. Default: ``False``.
+        If ``True``, add an attention layer inside propagations. Default: ``False``.
     tau : float
         The :math:`\tau` in paper. Default: ``0.2``.
     T : float
         The :math:`T` in paper. If < 0, :math:`T` will be set to `\infty`. Default: ``-1``.
-    p : float    
+    p : float
         The :math:`p` in paper. Default: ``1``.
     use_eta : bool
-        If True, add a learnable weight on each dimension in attention. Default: ``False``.
+        If ``True``, add a learnable weight on each dimension in attention. Default: ``False``.
     attn_bef : bool
-        If True, add another attention layer before propagation. Default: ``False``.
+        If ``True``, add another attention layer before propagation. Default: ``False``.
     dropout : float
         The dropout rate in mlp layers. Default: ``0.0``.
     attn_dropout : float
@@ -147,8 +147,10 @@ class TWIRLSConv(nn.Module):
         self.mlp_bef = MLP(self.input_d, self.hidden_d, self.size_bef_unf, self.num_mlp_before,
                            self.dropout, self.norm, init_activate=False)
 
-        self.unfolding = UnfoldindAndAttention(self.hidden_d, self.alp, self.lam, self.prop_step, self.attn_aft,
-                                               self.tau, self.T, self.p, self.use_eta, self.init_att, self.attn_dropout, self.precond)
+        self.unfolding = UnfoldindAndAttention(self.hidden_d, self.alp, self.lam, self.prop_step,
+                                               self.attn_aft, self.tau, self.T, self.p,
+                                               self.use_eta, self.init_att, self.attn_dropout,
+                                               self.precond)
 
         # if there are really transformations before unfolding, then do init_activate in mlp_aft
         self.mlp_aft = MLP(self.size_aft_unf, self.hidden_d, self.output_d, self.num_mlp_after,
@@ -158,6 +160,29 @@ class TWIRLSConv(nn.Module):
                            )
 
     def forward(self, graph, feat):
+        r"""
+
+        Description
+        -----------
+        Run TWIRLS forward.
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            The graph.
+        feat : torch.Tensor
+            The initial node features.
+        Returns
+        -------
+        torch.Tensor
+            The output feature
+
+        Note
+        ----
+        * Input shape: :math:`(N, \text{input_d})` where :math:`N` is the number of nodes.
+        * Output shape: :math:`(N, \text{output_d})`.
+        """
+
 
         # ensure self loop
         graph = graph.remove_self_loop()
@@ -183,11 +208,20 @@ class TWIRLSConv(nn.Module):
 
 
 class Propagate(nn.Module):
+    r"""
+
+    Description
+    -----------
+    The propagation method which is with pre-conditioning and reparameterizing. Correspond to
+    eq.28 in the paper.
+
+    """
     def __init__(self):
         super().__init__()
 
-    def prop(self, graph, Y, lam):
-
+    def _prop(self, graph, Y, lam):
+        """propagation part.
+        """
         Y = D_power_bias_X(graph, Y, -0.5, lam, 1 - lam)
         Y = AX(graph, Y)
         Y = D_power_bias_X(graph, Y, -0.5, lam, 1 - lam)
@@ -195,19 +229,99 @@ class Propagate(nn.Module):
         return Y
 
     def forward(self, graph, Y, X, alp, lam):
-        return (1 - alp) * Y + alp * lam * self.prop(graph, Y, lam) + alp * D_power_bias_X(graph, X, -1, lam, 1 - lam)
+        r"""
+
+        Description
+        -----------
+        Propagation forward.
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            The graph.
+        Y : torch.Tensor
+            The feature under propagation. Corresponds to :math:`Z^{(k)}` in eq.28 in the paper.
+        X : torch.Tensor
+            The original feature. Corresponds to :math:`Z^{(0)}` in eq.28 in the paper.
+        alp : float
+            The step size. Corresponds to :math:`\alpha` in the paper.
+        lam : torch.Tensor
+            The coefficient of smoothing term. Corresponds to :math:`\lambda` in the paper.
+        Returns
+        -------
+        torch.Tensor
+            Propagated feature. :math:`Z^{(k+1)}` in eq.28 in the paper.
+        """
+
+        return (1 - alp) * Y + alp * lam * self._prop(graph, Y, lam) \
+            + alp * D_power_bias_X(graph, X, -1, lam, 1 - lam)
 
 
 class PropagateNoPrecond(nn.Module):
+    r"""
+
+    Description
+    -----------
+    The propagation method which is without pre-conditioning and reparameterizing and using
+    normalized laplacian.
+    Correspond to eq.30 in the paper.
+    """
+
     def __init__(self):
         super().__init__()
 
     def forward(self, graph, Y, X, alp, lam):
+        r"""
+
+        Description
+        -----------
+        Propagation forward.
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            The graph.
+        Y : torch.Tensor
+            The feature under propagation. Corresponds to :math:`Y^{(k)}` in eq.30 in the paper.
+        X : torch.Tensor
+            The original feature. Corresponds to :math:`Y^{(0)}` in eq.30 in the paper.
+        alp : float
+            The step size. Corresponds to :math:`\alpha` in the paper.
+        lam : torch.Tensor
+            The coefficient of smoothing term. Corresponds to :math:`\lambda` in the paper.
+        Returns
+        -------
+        torch.Tensor
+            Propagated feature. :math:`Y^{(k+1)}` in eq.30 in the paper.
+        """
 
         return (1 - alp * lam - alp) * Y + alp * lam * normalized_AX(graph, Y) + alp * X
 
 
 class Attention(nn.Module):
+    r"""
+
+    Description
+    -----------
+    The attention function. Correspond to :math:`s` in eq.27 the paper.
+
+    Parameters
+    ----------
+    tau : float
+        The lower thresholding parameter. Correspond to :math:`\tau` in the paper.
+    T : float
+        The upper thresholding parameter. Correspond to :math:`T` in the paper.
+    p : float
+        Correspond to :math:`\rho` in the paper..
+    attn_dropout : float
+        the dropout rate of attention value. Default: ``0.0``.
+
+    Returns
+    -------
+    torch.Tensor
+        The output feature
+    """
+
     def __init__(self, tau, T, p, attn_dropout=0.0):
         super().__init__()
 
@@ -217,6 +331,7 @@ class Attention(nn.Module):
         self.attn_dropout = attn_dropout
 
     def reweighting(self, graph):
+        """Compute graph edge weight. Would be stored in ``graph.edata['w']``"""
 
         w = graph.edata["w"]
 
@@ -232,12 +347,34 @@ class Attention(nn.Module):
 
         w = 1 / w
 
-        if not (w == w).all():
-            raise "nan occured!"
+        # if not (w == w).all():
+        #     raise "nan occured!"
 
         graph.edata["w"] = w + 1e-9  # avoid 0 degree
 
     def forward(self, graph, Y, etas=None):
+        r"""
+
+        Description
+        -----------
+        Attention forward. Will update ``graph.edata['w']`` and ``graph.ndata['deg']``.
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            The graph.
+        Y : torch.Tensor
+            The feature to compute attention.
+        etas : float
+            The weight of each dimension. If ``None``, then weight of each dimension is 1.
+            Default: ``None``.
+
+        Returns
+        -------
+        DGLGraph
+            The graph.
+        """
+
 
         if etas is not None:
             Y = Y * etas.view(-1)
@@ -308,7 +445,45 @@ def D_power_bias_X(graph, X, power, coeff, bias):
 
 
 class UnfoldindAndAttention(nn.Module):
-    def __init__(self, d, alp, lam, prop_step, attn_aft, tau, T, p, use_eta, init_att, attn_dropout, precond):
+    r"""
+
+    Description
+    -----------
+    Combine propagation and attention together.
+
+    Parameters
+    ----------
+    d : int
+        Size of graph feature.
+    alp : float
+        Step size. :math:`\alpha` in ther paper.
+    lam : int
+        Coefficient of graph smooth term. :math:`\lambda` in ther paper.
+    prop_step : int
+        Number of propagation steps
+    attn_aft : int
+        Where to put attention layer. i.e. number of propagation steps before attention.
+        If set to ``-1``, then no attention.
+    tau : float
+        The lower thresholding parameter. Correspond to :math:`\tau` in the paper.
+    T : float
+        The upper thresholding parameter. Correspond to :math:`T` in the paper.
+    p : float
+        Correspond to :math:`\rho` in the paper..
+    use_eta : bool
+        If `True`, learn a weight vector for each dimension when doing attention.
+    init_att : bool
+        If ``True``, add an extra attention layer before propagation.
+    attn_dropout : float
+        the dropout rate of attention value. Default: ``0.0``.
+    precond : bool
+        If ``True``, use pre-conditioned & reparameterized version propagation (eq.28), else use
+        normalized laplacian (eq.30).
+
+    """
+
+    def __init__(self, d, alp, lam, prop_step, attn_aft, tau, T, p,
+                 use_eta, init_att, attn_dropout, precond):
 
         super().__init__()
 
@@ -333,7 +508,24 @@ class UnfoldindAndAttention(nn.Module):
         self.etas = nn.Parameter(tc.ones(d)) if self.use_eta else None
 
     def forward(self, g, X):
+        r"""
 
+        Description
+        -----------
+        Compute forward pass of propagation & attention.
+
+        Parameters
+        ----------
+        g : DGLGraph
+            The graph.
+        X : torch.Tensor
+            Init features.
+
+        Returns
+        -------
+        torch.Tensor
+            The graph.
+        """
         Y = X
 
         g.edata["w"] = tc.ones(g.number_of_edges(), 1, device=g.device)
@@ -355,6 +547,31 @@ class UnfoldindAndAttention(nn.Module):
 
 
 class MLP(nn.Module):
+    r"""
+
+    Description
+    -----------
+    An MLP module.
+
+    Parameters
+    ----------
+    input_d : int
+        Number of input features.
+    output_d : int
+        Number of output features.
+    hidden_d : int
+        Size of hidden layers.
+    num_layers : int
+        Number of mlp layers.
+    dropout : float
+        The dropout rate in mlp layers.
+    norm : str
+        The type of norm layers inside mlp layers. Can be ``'batch'``, ``'layer'`` or ``'none'``.
+    init_activate : bool
+        If add a relu at the beginning.
+
+    """
+
     def __init__(self, input_d, hidden_d, output_d, num_layers, dropout, norm, init_activate):
         super().__init__()
 
@@ -368,7 +585,7 @@ class MLP(nn.Module):
             self.layers.append(nn.Linear(input_d, output_d))
         elif num_layers > 1:
             self.layers.append(nn.Linear(input_d, hidden_d))
-            for k in range(num_layers - 2):
+            for _ in range(num_layers - 2):
                 self.layers.append(nn.Linear(hidden_d, hidden_d))
             self.layers.append(nn.Linear(hidden_d, output_d))
 
@@ -384,11 +601,13 @@ class MLP(nn.Module):
         self.reset_params()
 
     def reset_params(self):
+        """reset mlp parameters using xavier_norm"""
         for layer in self.layers:
             nn.init.xavier_normal_(layer.weight.data)
             nn.init.constant_(layer.bias.data, 0)
 
     def activate(self, x):
+        """do normlaization and activation"""
         if self.norm != "none":
             x = self.norms[self.cur_norm_idx](x)  # use the last norm layer
             self.cur_norm_idx += 1
@@ -397,6 +616,7 @@ class MLP(nn.Module):
         return x
 
     def forward(self, x):
+        """The forward pass of mlp."""
         self.cur_norm_idx = 0
 
         if self.init_activate:
