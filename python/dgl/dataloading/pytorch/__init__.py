@@ -40,8 +40,6 @@ class _ScalarDataBatcher(th.utils.data.IterableDataset):
                  drop_last=False):
         super(_ScalarDataBatcher).__init__()
         self.dataset = dataset
-        if isinstance(self.dataset, DGLNDArray):
-            self.dataset = F.zerocopy_from_dgl_ndarray(self.dataset)
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.drop_last = drop_last
@@ -314,18 +312,24 @@ class NodeDataLoader:
                     'must be zero.'
 
                 batch_size = dataloader_kwargs.get('batch_size', 0)
-                if isinstance(dataset, th.Tensor) and batch_size > 1:
-                    shuffle = dataloader_kwargs.get('shuffle', False)
-                    drop_last = dataloader_kwargs.get('drop_last', False)
-                    # manually batch into tensors
-                    dataset = _ScalarDataBatcher(dataset,
-                                                 batch_size=batch_size,
-                                                 shuffle=shuffle,
-                                                 drop_last=drop_last)
-                    # need to overwrite things that will be handled by the batcher
-                    dataloader_kwargs['batch_size'] = None
-                    dataloader_kwargs['shuffle'] = False
-                    dataloader_kwargs['drop_last'] = False
+
+                if batch_size > 1:
+                    if isinstance(dataset, DGLNDArray):
+                        # the dataset needs to be a torch tensor for the
+                        # _ScalarDataBatcher
+                        dataset = F.zerocopy_from_dgl_ndarray(dataset)
+                    if isinstance(dataset, th.Tensor):
+                        shuffle = dataloader_kwargs.get('shuffle', False)
+                        drop_last = dataloader_kwargs.get('drop_last', False)
+                        # manually batch into tensors
+                        dataset = _ScalarDataBatcher(dataset,
+                                                     batch_size=batch_size,
+                                                     shuffle=shuffle,
+                                                     drop_last=drop_last)
+                        # need to overwrite things that will be handled by the batcher
+                        dataloader_kwargs['batch_size'] = None
+                        dataloader_kwargs['shuffle'] = False
+                        dataloader_kwargs['drop_last'] = False
 
             self.dataloader = DataLoader(
                 dataset,
