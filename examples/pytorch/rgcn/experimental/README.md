@@ -5,7 +5,7 @@ This is an example of training RGCN node classification in a distributed fashion
 Before training, install python libs by pip:
 
 ```bash
-pip3 install ogb pyinstrument pyarrow
+pip3 install ogb pyarrow
 ```
 
 To train RGCN, it has four steps:
@@ -109,8 +109,6 @@ DGL provides a script to launch the training job in the cluster. `part_config` a
 specify relative paths to the path of the workspace.
 
 The command below launches one training process on each machine and each training process has 4 sampling processes.
-**Note**: There is a known bug in Python 3.8. The training process hangs when running multiple sampling processes for each training process.
-Please set the number of sampling processes to 0 if you are using Python 3.8.
 
 ```bash
 python3 ~/workspace/dgl/tools/launch.py \
@@ -120,7 +118,7 @@ python3 ~/workspace/dgl/tools/launch.py \
 --num_samplers 4 \
 --part_config data/ogbn-mag.json \
 --ip_config ip_config.txt \
-"python3 entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 1024  --n-hidden 64 --lr 0.01 --eval-batch-size 1024  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt  --num-workers 4 --num-servers 1 --sparse-embedding --sparse-lr 0.06 --num_gpus 1"
+"python3 entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 1024  --n-hidden 64 --lr 0.01 --eval-batch-size 1024  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt  --sparse-embedding --sparse-lr 0.06 --num_gpus 1"
 ```
 
 We can get the performance score at the second epoch:

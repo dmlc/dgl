@@ -20,7 +20,7 @@ DGL采用完全分布式的方法，可将数据和计算同时分布在一组�
     import dgl
     import torch as th
 
-    dgl.distributed.initialize('ip_config.txt', num_servers, num_workers)
+    dgl.distributed.initialize('ip_config.txt')
     th.distributed.init_process_group(backend='gloo')
     g = dgl.distributed.DistGraph('graph_name', 'part_config.json')
     pb = g.get_partition_book()
