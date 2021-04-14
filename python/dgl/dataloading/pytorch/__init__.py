@@ -39,6 +39,7 @@ class _ScalarDataBatcher(th.utils.data.IterableDataset):
     """
     def __init__(self, dataset, shuffle=False, batch_size=1,
                  drop_last=False):
+        super(_ScalarDataBatcher).__init__()
         self.dataset = dataset
         if isinstance(self.dataset, DGLNDArray):
             self.dataset = F.zerocopy_from_dgl_ndarray(self.dataset)
@@ -48,14 +49,12 @@ class _ScalarDataBatcher(th.utils.data.IterableDataset):
 
     def __iter__(self):
         worker_info = th.utils.data.get_worker_info()
-        if worker_info is None:
-            # worker gets the whole dataset
-            dataset = self.dataset
-        else:
+        dataset = self.dataset
+        if worker_info:
             # worker gets only a fraction of the dataset
             chunk_size = dataset.shape[0] // worker_info.num_workers
             left_over = dataset.shape[0] % worker_info.num_workers
-            start = (chunk_size + min(left_over, worker_info.id)) * worker_info.id
+            start = (chunk_size*worker_info.id) + min(left_over, worker_info.id)
             end = start + chunk_size + (worker_info.id < left_over)
             assert worker_info.id < worker_info.num_workers-1 or \
                 end == dataset.shape[0]
@@ -307,8 +306,8 @@ class NodeDataLoader:
             self.collator = _NodeCollator(g, nids, block_sampler, **collator_kwargs)
             dataset = self.collator.dataset
 
-            if device != 'cpu':
-                assert not 'num_workers' in dataloader_kwargs or \
+            if th.device(device) != th.device('cpu'):
+                assert 'num_workers' not in dataloader_kwargs or \
                     dataloader_kwargs['num_workers'] == 0, \
                     'When performing dataloading from the GPU, num_workers ' \
                     'must be zero'
@@ -319,9 +318,9 @@ class NodeDataLoader:
                 drop_last = dataloader_kwargs.get('drop_last', False)
                 # manually batch into tensors
                 dataset = _ScalarDataBatcher(dataset,
-                    batch_size=batch_size,
-                    shuffle=shuffle,
-                    drop_last=drop_last)
+                                             batch_size=batch_size,
+                                             shuffle=shuffle,
+                                             drop_last=drop_last)
                 # need to overwrite things that will be handled by the batcher
                 dataloader_kwargs['batch_size'] = None
                 dataloader_kwargs['shuffle'] = False
