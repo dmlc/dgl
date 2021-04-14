@@ -1,4 +1,5 @@
-# pylint: disable=invalid-name, no-member
+"""Torch modules for TWIRLS"""
+# pylint: disable=invalid-name, useless-super-delegation, no-member
 
 import torch as tc
 import torch.nn as nn
