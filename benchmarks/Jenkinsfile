@@ -26,8 +26,14 @@ pipeline {
                         }
                         sh('cp benchmark_scripts_repo/benchmark/* benchmarks/scripts/')
                         def comment = env.GITHUB_COMMENT
+                        def author = env.GITHUB_COMMENT_AUTHOR
+                        def authorized_user = ['VoVAllen', 'BarclayII', 'jermainewang', 'zheng-da', 'mufeili']
+                        def isauthorized = author in authorized_user
                         def command_lists = comment.split(' ')
                         def instance_type = command_lists[2].replace('.', "")
+                        if (!isauthorized) {
+                            error("Not authorized to launch regression tests")
+                        }
                         if (command_lists.size() != 5) {
                             pullRequest.comment('Cannot run the regression test due to unknown command')
                             error('Unknown command')
