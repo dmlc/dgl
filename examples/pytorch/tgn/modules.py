@@ -477,7 +477,7 @@ class EdgeDotGATConv(nn.Module):
                 self.res_fc = Identity()
 
     def msg_fn(self,edges):
-        ret = edges.data['sa'].view(-1, self._num_heads, 1)*edges.data['eft']
+        ret = edges.data['sa'].view(-1, self._num_heads, 1)*edges.data['ft_prime']
         return {'attn': ret}
 
     def forward(self,graph,nfeat,efeat,get_attention=False):
@@ -560,7 +560,7 @@ class EdgeGATConv(nn.Module):
             nn.init.xavier_normal_(self.res_fc.weight,gain=gain)
 
     def msg_fn(self,edges):
-        ret = edges.data['a'].view(-1, self._num_heads, 1)*edges.data['efeat']
+        ret = edges.data['a'].view(-1, self._num_heads, 1)*edges.data['el_prime']
         return {'m': ret}
 
     def forward(self,graph,nfeat,efeat,get_attention=False):
@@ -644,7 +644,8 @@ class TemporalTransformerConv(nn.Module):
                  out_feats,
                  num_heads,
                  allow_zero_in_degree=False,
-                 attn_model = 'add'):
+                 attn_model = 'add',
+                 layers=1):
         super(TemporalTransformerConv,self).__init__()
         self._edge_feats = edge_feats
         self._memory_feats = memory_feats
@@ -652,30 +653,52 @@ class TemporalTransformerConv(nn.Module):
         self._out_feats = out_feats
         self._allow_zero_in_degree = allow_zero_in_degree
         self._num_heads = num_heads
+        self.layers = layers
 
         self.preprocessor = TemporalEdgePreprocess(self._edge_feats,self.temporal_encoder)
+        self.layer_list = nn.ModuleList()
         if attn_model == 'add':
-            self.transformer = EdgeGATConv(node_feats = self._memory_feats,
+            self.layer_list.append(EdgeGATConv(node_feats = self._memory_feats,
                                            edge_feats = self._edge_feats+self.temporal_encoder.dimension,
                                            out_feats = self._out_feats,
                                            num_heads = self._num_heads,
                                            feat_drop = 0.6,
                                            attn_drop = 0.6,
                                            residual = True,
-                                           allow_zero_in_degree = allow_zero_in_degree)
+                                           allow_zero_in_degree = allow_zero_in_degree))
+            for i in range(self.layers-1):
+                self.layer_list.append(EdgeGATConv(node_feats = self._out_feats*self._num_heads,
+                                                   edge_feats = self._edge_feats+self.temporal_encoder.dimension,
+                                                   out_feats = self._out_feats,
+                                                   num_heads = self._num_heads,
+                                                   feat_drop = 0.6,
+                                                   attn_drop = 0.6,
+                                                   residual = True,
+                                                   allow_zero_in_degree = allow_zero_in_degree))
+
         if attn_model == 'dot':
-            self.transformer = EdgeDotGATConv(node_feats = self._memory_feats,
-                                              edge_feats = self._edge_feats+self.temporal_encoder.dimension,
-                                              out_feats = self._out_feats,
-                                              num_heads = self._num_heads,
-                                              residual = True,
-                                              allow_zero_in_degree=allow_zero_in_degree)
+            self.layer_list.append(EdgeDotGATConv(node_feats = self._memory_feats,
+                                                  edge_feats = self._edge_feats+self.temporal_encoder.dimension,
+                                                  out_feats = self._out_feats,
+                                                  num_heads = self._num_heads,
+                                                  residual = True,
+                                                  allow_zero_in_degree=allow_zero_in_degree))
+            for i in range(self.layers-1):
+                self.layer_list.append(EdgeDotGATConv(node_feats = self._out_feats*self._num_heads,
+                                                      edge_feats = self._edge_feats+self.temporal_encoder.dimension,
+                                                      out_feats = self._out_feats,
+                                                      num_heads = self._num_heads,
+                                                      residual = True,
+                                                      allow_zero_in_degree = allow_zero_in_degree))
 
     def forward(self,graph,memory,ts):
         graph = graph.local_var()
         graph.ndata['timestamp'] = ts
         efeat = self.preprocessor(graph).float()
-        rst = self.transformer(graph,memory,efeat).mean(1)
+        rst = memory
+        for i in range(self.layers-1):
+            rst = self.layer_list[i](graph,rst,efeat).flatten(1)
+        rst = self.layer_list[-1](graph,rst,efeat).mean(1)
         return rst
 
 # Unit test of edge conv

@@ -40,7 +40,7 @@ def train(model, dataloader, sampler, criterion, optimizer, batch_size, fast_mod
         loss.backward(retain_graph=retain_graph)
         optimizer.step()
         model.detach_memory()
-        model.update_memory(positive_pair_g)
+        #model.update_memory(positive_pair_g)
         if fast_mode:
             sampler.attach_last_update(model.memory.last_update_t)
         print("Batch: ", batch_cnt, "Time: ", time.time()-last_t)
@@ -248,7 +248,8 @@ if __name__ == "__main__":
                 num_nodes=num_node,
                 n_neighbors=args.n_neighbors,
                 memory_updater_type=args.memory_updater,
-                model=args.model)
+                model=args.model,
+                layers=args.k_hop)
 
     criterion = torch.nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)

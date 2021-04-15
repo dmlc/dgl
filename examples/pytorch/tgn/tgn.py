@@ -13,7 +13,8 @@ class TGN(nn.Module):
                  num_nodes,  # entire graph
                  n_neighbors=10,
                  memory_updater_type='gru',
-                 model='original'): # dot / original / additive
+                 model='original',
+                 layers=1): # dot / original / additive
         super(TGN, self).__init__()
         self.memory_dim = memory_dim
         self.edge_feat_dim = edge_feat_dim
@@ -23,6 +24,7 @@ class TGN(nn.Module):
         self.n_neighbors = n_neighbors
         self.memory_updater_type = memory_updater_type
         self.num_nodes = num_nodes
+        self.layers = layers
 
         self.temporal_encoder = TimeEncode(self.temporal_dim)
 
@@ -40,22 +42,26 @@ class TGN(nn.Module):
                                               self.temporal_encoder,
                                               self.embedding_dim,
                                               self.num_heads,
-                                              allow_zero_in_degree=True,attn_model=model)
+                                              layers = self.layers,
+                                              allow_zero_in_degree=False,
+                                              attn_model=model)
         elif model == 'original':
             self.embedding_attn = TemporalGATConv(self.edge_feat_dim,
                                                   self.memory_dim,
                                                   self.temporal_encoder,
                                                   self.embedding_dim,
                                                   self.num_heads,
-                                                  allow_zero_in_degree = True)
+                                                  allow_zero_in_degree = False)
 
         self.msg_linkpredictor = MsgLinkPredictor(embedding_dim)
 
     def embed(self, postive_graph, negative_graph, blocks):
         emb_graph = blocks[0]
+        emb_graph = dgl.add_self_loop(emb_graph)
         emb_memory = self.memory.memory[emb_graph.ndata[dgl.NID], :]
         emb_t = emb_graph.ndata['timestamp']
         embedding = self.embedding_attn(emb_graph, emb_memory, emb_t)
+        # TODO: Implement Xuhong's embedding
         emb2pred = dict(
             zip(emb_graph.ndata[dgl.NID].tolist(), emb_graph.nodes().tolist()))
         # Since postive graph and negative graph has same is mapping
