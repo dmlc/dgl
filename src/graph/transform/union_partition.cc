@@ -3,7 +3,7 @@
  * \file graph/transform/union_partition.cc
  * \brief Functions for partition, union multiple graphs.
  */
-#include "../heterograph.h"
+#include <dgl/heterograph.h>
 using namespace dgl::runtime;
 
 namespace dgl {

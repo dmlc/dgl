@@ -3,7 +3,8 @@
  * \file graph/creators.cc
  * \brief Functions for constructing graphs.
  */
-#include "./heterograph.h"
+
+#include <dgl/heterograph.h>
 using namespace dgl::runtime;
 
 namespace dgl {

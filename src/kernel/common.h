@@ -7,9 +7,9 @@
 #define DGL_KERNEL_COMMON_H_
 
 #include <dgl/runtime/ndarray.h>
+#include <dgl/c_api_common.h>
 
 #include <cstdint>
-#include "../c_api_common.h"
 
 namespace dgl {
 namespace kernel {

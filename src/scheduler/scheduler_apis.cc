@@ -6,7 +6,7 @@
 #include <dgl/array.h>
 #include <dgl/graph.h>
 #include <dgl/scheduler.h>
-#include "../c_api_common.h"
+#include <dgl/c_api_common.h>
 #include "../array/cpu/array_utils.h"
 
 using dgl::runtime::DGLArgs;

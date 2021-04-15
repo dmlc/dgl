@@ -5,13 +5,13 @@
  */
 #include <dgl/packed_func_ext.h>
 #include <dgl/immutable_graph.h>
+#include <dgl/aten/check.h>
+#include <dgl/unit_graph.h>
+#include <dgl/c_api_common.h>
 #include "./binary_reduce.h"
 #include "./common.h"
 #include "./binary_reduce_impl_decl.h"
 #include "./utils.h"
-#include "../c_api_common.h"
-#include "../array/check.h"
-#include "../graph/unit_graph.h"
 #include "./csr_interface.h"
 
 using namespace dgl::runtime;

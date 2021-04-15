@@ -1,13 +1,13 @@
 #include <dgl/graph_serializer.h>
 #include <dgl/immutable_graph.h>
+#include <dgl/heterograph.h>
+#include <dgl/unit_graph.h>
 #include <dmlc/memory_io.h>
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <iostream>
 #include <memory>
 #include <vector>
-#include "../../src/graph/heterograph.h"
-#include "../../src/graph/unit_graph.h"
 #include "./common.h"
 
 using namespace dgl;

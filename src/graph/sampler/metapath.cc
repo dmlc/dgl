@@ -8,8 +8,8 @@
 #include <dgl/random.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
-#include "../../c_api_common.h"
-#include "../unit_graph.h"
+#include <dgl/unit_graph.h>
+#include <dgl/c_api_common.h>
 #include "randomwalk.h"
 
 using namespace dgl::runtime;

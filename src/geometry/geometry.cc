@@ -5,10 +5,11 @@
  */
 #include <dgl/array.h>
 #include <dgl/runtime/ndarray.h>
+#include <dgl/aten/check.h>
 #include <dgl/base_heterograph.h>
-#include "../c_api_common.h"
+#include <dgl/c_api_common.h>
 #include "./geometry_op.h"
-#include "../array/check.h"
+
 
 using namespace dgl::runtime;
 

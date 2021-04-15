@@ -9,8 +9,8 @@
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/shared_mem.h>
 #include <dgl/runtime/device_api.h>
+#include <dgl/c_api_common.h>
 #include <sstream>
-#include "../c_api_common.h"
 #include "./array_op.h"
 #include "./arith.h"
 

@@ -13,6 +13,7 @@
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/object.h>
+#include <dgl/c_api_common.h>
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
 
@@ -23,7 +24,6 @@
 #include <utility>
 #include <vector>
 
-#include "../../c_api_common.h"
 #include "dglgraph_data.h"
 #include "heterograph_data.h"
 

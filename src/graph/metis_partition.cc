@@ -7,7 +7,7 @@
 #include <metis.h>
 #include <dgl/graph_op.h>
 #include <dgl/packed_func_ext.h>
-#include "../c_api_common.h"
+#include <dgl/c_api_common.h>
 
 using namespace dgl::runtime;
 

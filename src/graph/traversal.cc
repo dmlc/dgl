@@ -4,10 +4,10 @@
  * \brief Graph traversal implementation
  */
 #include <dgl/packed_func_ext.h>
+#include <dgl/c_api_common.h>
 #include <algorithm>
 #include <queue>
 #include "./traversal.h"
-#include "../c_api_common.h"
 
 using namespace dgl::runtime;
 

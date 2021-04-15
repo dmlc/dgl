@@ -5,12 +5,12 @@
  */
 #include <dgl/graph.h>
 #include <dgl/sampler.h>
+#include <dgl/c_api_common.h>
 #include <algorithm>
 #include <unordered_map>
 #include <set>
 #include <functional>
 #include <tuple>
-#include "../c_api_common.h"
 
 namespace dgl {
 

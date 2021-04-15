@@ -1,6 +1,8 @@
 #include <dgl/array.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/zerocopy_serializer.h>
+#include <dgl/heterograph.h>
+#include <dgl/unit_graph.h>
 #include <dmlc/memory_io.h>
 #include <gtest/gtest.h>
 
@@ -8,8 +10,6 @@
 #include <iostream>
 #include <vector>
 
-#include "../../src/graph/heterograph.h"
-#include "../../src/graph/unit_graph.h"
 #include "./common.h"
 
 #ifndef _WIN32

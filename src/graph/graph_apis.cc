@@ -9,7 +9,7 @@
 #include <dgl/graph_op.h>
 #include <dgl/sampler.h>
 #include <dgl/nodeflow.h>
-#include "../c_api_common.h"
+#include <dgl/c_api_common.h>
 
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;

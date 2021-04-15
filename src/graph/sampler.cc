@@ -9,12 +9,12 @@
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/random.h>
+#include <dgl/c_api_common.h>
 #include <dmlc/omp.h>
 #include <algorithm>
 #include <cstdlib>
 #include <cmath>
 #include <numeric>
-#include "../c_api_common.h"
 
 using namespace dgl::runtime;
 

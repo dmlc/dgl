@@ -7,9 +7,9 @@
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/object.h>
+#include <dgl/c_api_common.h>
 #include <dmlc/io.h>
 
-#include "../../c_api_common.h"
 
 using namespace dgl::runtime;
 using dmlc::SeekStream;

@@ -37,6 +37,7 @@
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/object.h>
+#include <dgl/heterograph.h>
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
 
@@ -47,7 +48,6 @@
 #include <utility>
 #include <vector>
 
-#include "../heterograph.h"
 #include "./graph_serialize.h"
 #include "./streamwithcount.h"
 #include "dmlc/memory_io.h"

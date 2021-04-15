@@ -4,8 +4,8 @@
  * \brief DGL shared mem manager APIs
  */
 
-#ifndef DGL_GRAPH_SHARED_MEM_MANAGER_H_
-#define DGL_GRAPH_SHARED_MEM_MANAGER_H_
+#ifndef DGL_SHARED_MEM_MANAGER_H_
+#define DGL_SHARED_MEM_MANAGER_H_
 
 #include <dgl/array.h>
 #include <dmlc/io.h>
@@ -52,4 +52,4 @@ class SharedMemManager : public dmlc::Stream {
 
 }  // namespace dgl
 
-#endif  // DGL_GRAPH_SHARED_MEM_MANAGER_H_
+#endif  // DGL_SHARED_MEM_MANAGER_H_

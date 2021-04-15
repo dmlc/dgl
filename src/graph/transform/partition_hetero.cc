@@ -10,9 +10,8 @@
 
 #include <dgl/base_heterograph.h>
 #include <dgl/packed_func_ext.h>
-
-#include "../heterograph.h"
-#include "../unit_graph.h"
+#include <dgl/heterograph.h>
+#include <dgl/unit_graph.h>
 
 using namespace dgl::runtime;
 

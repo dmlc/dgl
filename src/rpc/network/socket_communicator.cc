@@ -4,14 +4,13 @@
  * \brief SocketCommunicator for DGL distributed training.
  */
 #include <dmlc/logging.h>
-
+#include <dgl/c_api_common.h>
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
 #include <memory>
 
 #include "socket_communicator.h"
-#include "../../c_api_common.h"
 
 #ifdef _WIN32
 #include <windows.h>

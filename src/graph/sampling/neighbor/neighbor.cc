@@ -8,8 +8,8 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
 #include <dgl/sampling/neighbor.h>
-#include "../../../c_api_common.h"
-#include "../../unit_graph.h"
+#include <dgl/c_api_common.h>
+#include <dgl/unit_graph.h>
 
 using namespace dgl::runtime;
 using namespace dgl::aten;

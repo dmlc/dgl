@@ -15,8 +15,8 @@
 #include <dgl/array.h>
 #include <dgl/random.h>
 #include <dgl/zerocopy_serializer.h>
+#include <dgl/c_api_common.h>
 #include "../runtime/resource_manager.h"
-#include "../c_api_common.h"
 
 using dgl::network::StringPrintf;
 using namespace dgl::runtime;

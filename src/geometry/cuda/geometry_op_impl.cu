@@ -4,9 +4,9 @@
  * \brief Geometry operator CUDA implementation
  */
 #include <dgl/array.h>
+#include <dgl/c_api_common.h>
 
 #include "../../runtime/cuda/cuda_common.h"
-#include "../../c_api_common.h"
 #include "../geometry_op.h"
 
 #define THREADS 1024

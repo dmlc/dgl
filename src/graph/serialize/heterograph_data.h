@@ -12,6 +12,8 @@
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/object.h>
+#include <dgl/heterograph.h>
+#include <dgl/c_api_common.h>
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
 
@@ -22,8 +24,6 @@
 #include <vector>
 #include <memory>
 
-#include "../../c_api_common.h"
-#include "../heterograph.h"
 
 using dgl::runtime::NDArray;
 using namespace dgl::runtime;

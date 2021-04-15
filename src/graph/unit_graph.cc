@@ -6,10 +6,9 @@
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
 #include <dgl/immutable_graph.h>
+#include <dgl/unit_graph.h>
 #include <dgl/lazy.h>
-
-#include "../c_api_common.h"
-#include "./unit_graph.h"
+#include <dgl/c_api_common.h>
 
 namespace dgl {
 

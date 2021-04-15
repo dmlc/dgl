@@ -8,9 +8,9 @@
 #include <memory>
 #include <vector>
 #include <dgl/immutable_graph.h>
+#include <dgl/heterograph.h>
+#include <dgl/unit_graph.h>
 #include "./common.h"
-#include "./../src/graph/heterograph.h"
-#include "../../src/graph/unit_graph.h"
 
 using namespace dgl;
 using namespace dgl::runtime;
