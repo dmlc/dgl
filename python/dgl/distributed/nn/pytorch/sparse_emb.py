@@ -49,7 +49,7 @@ class NodeEmbedding:
             arr = th.zeros(shape, dtype=dtype)
             arr.uniform_(-1, 1)
             return arr
-    >>> emb = dgl.distributed.NodeEmbedding(g.number_of_nodes(), 10, init_func=initializer)
+    >>> emb = dgl.distributed.nn.NodeEmbedding(g.number_of_nodes(), 10, init_func=initializer)
     >>> optimizer = dgl.distributed.optim.SparseAdagrad([emb], lr=0.001)
     >>> for blocks in dataloader:
     ...     feats = emb(nids)
@@ -118,28 +118,6 @@ class NodeEmbedding:
         return self._part_policy
 
     @property
-    def rank(self):
-        """Return rank of current process.
-
-        Returns
-        -------
-        int
-            The rank of current process.
-        """
-        return self._rank
-
-    @property
-    def world_size(self):
-        """Return world size of the pytorch distributed training env.
-
-        Returns
-        -------
-        int
-            The world size of the pytorch distributed training env.
-        """
-        return self._world_size
-
-    @property
     def name(self):
         """Return the name of the embeddings
 
@@ -203,6 +181,3 @@ class NodeEmbedding:
             The optimizer related state.
         """
         return self._optm_state
-
-# for backward compatibility
-DistEmbedding = NodeEmbedding

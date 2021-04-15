@@ -162,7 +162,7 @@ class DistEmbedLayer(nn.Module):
                     # We only create embeddings for nodes without node features.
                     if feat_name not in g.nodes[ntype].data:
                         part_policy = g.get_node_partition_policy(ntype)
-                        self.node_embeds[ntype] = dgl.distributed.NodeEmbedding(g.number_of_nodes(ntype),
+                        self.node_embeds[ntype] = dgl.distributed.nn.NodeEmbedding(g.number_of_nodes(ntype),
                                 self.embed_size,
                                 embed_name + '_' + ntype,
                                 init_emb,
@@ -389,10 +389,10 @@ def run(args, device, data):
 
     if args.sparse_embedding:
         if args.dgl_sparse and args.standalone:
-            emb_optimizer = dgl.distributed.SparseAdagrad(list(embed_layer.node_embeds.values()), lr=args.sparse_lr)
+            emb_optimizer = dgl.distributed.optim.SparseAdagrad(list(embed_layer.node_embeds.values()), lr=args.sparse_lr)
             print('optimize DGL sparse embedding:', embed_layer.node_embeds.keys())
         elif args.dgl_sparse:
-            emb_optimizer = dgl.distributed.SparseAdagrad(list(embed_layer.module.node_embeds.values()), lr=args.sparse_lr)
+            emb_optimizer = dgl.distributed.optim.SparseAdagrad(list(embed_layer.module.node_embeds.values()), lr=args.sparse_lr)
             print('optimize DGL sparse embedding:', embed_layer.module.node_embeds.keys())
         elif args.standalone:
             emb_optimizer = th.optim.SparseAdam(list(embed_layer.node_embeds.parameters()), lr=args.sparse_lr)

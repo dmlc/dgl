@@ -22,7 +22,7 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 from dgl.distributed import DistDataLoader
 
-from dgl.distributed import NodeEmbedding
+from dgl.distributed.nn import NodeEmbedding
 from dgl.distributed.optim import SparseAdagrad
 from train_dist_unsupervised import SAGE, NeighborSampler, PosNeighborSampler, CrossEntropyLoss, compute_acc
 

@@ -18,6 +18,8 @@ from .dist_graph import DistGraphServer, DistGraph, node_split, edge_split
 from .dist_tensor import DistTensor
 from .partition import partition_graph, load_partition, load_partition_book
 from .graph_partition_book import GraphPartitionBook, PartitionPolicy
+from .sparse_emb import SparseAdagrad, DistEmbedding
+from . import nn
 from . import optim
 
 from .rpc import *
@@ -28,8 +30,3 @@ from .kvstore import KVServer, KVClient
 from .server_state import ServerState
 from .dist_dataloader import DistDataLoader
 from .graph_services import sample_neighbors, in_subgraph, find_edges
-# pylint cannot deal with dynamic module
-from .sparse_emb import NodeEmbedding, DistEmbedding # pylint: disable=no-name-in-module
-
-# This is only for backward compatibility
-from .optim import SparseAdagrad # pylint: disable=no-name-in-module
