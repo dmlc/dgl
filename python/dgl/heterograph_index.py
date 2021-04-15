@@ -970,8 +970,7 @@ class HeteroSubgraphIndex(ObjectBase):
 #################################################################
 
 def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
-                              formats, row_sorted=False, col_sorted=False,
-                              check_sorted=False):
+                              formats, row_sorted=False, col_sorted=False):
     """Create a unitgraph graph index from COO format
 
     Parameters
@@ -993,10 +992,6 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
     col_sorted : bool, optional
         Whether or not the columns of the COO are in ascending order within
         each row. This only has an effect when ``row_sorted`` is True.
-    check_sorted : bool, optional
-        If this is ``True`` and ``row_sorted`` is ``False``, the edge list will
-        be scanned to see if it is in ascending order, and the resulting graph
-        will be marked accordingly.
 
     Returns
     -------
@@ -1007,7 +1002,7 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
     return _CAPI_DGLHeteroCreateUnitGraphFromCOO(
         int(num_ntypes), int(num_src), int(num_dst),
         F.to_dgl_nd(row), F.to_dgl_nd(col),
-        formats, row_sorted, col_sorted, check_sorted)
+        formats, row_sorted, col_sorted)
 
 def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edge_ids,
                               formats):

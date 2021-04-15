@@ -935,7 +935,7 @@ def to_homogeneous(G, ndata=None, edata=None, store_type=True, return_count=Fals
         eids.append(F.arange(0, num_edges, G.idtype, G.device))
 
     retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)), num_nodes=total_num_nodes,
-                 idtype=G.idtype, device=G.device, check_sorted=False)
+                 idtype=G.idtype, device=G.device)
 
     # copy features
     if ndata is None:
@@ -1601,8 +1601,7 @@ def create_from_edges(u, v,
                       urange, vrange,
                       validate=True,
                       row_sorted=False,
-                      col_sorted=False,
-                      check_sorted=False):
+                      col_sorted=False):
     """Internal function to create a graph from incident nodes with types.
 
     utype could be equal to vtype
@@ -1632,11 +1631,6 @@ def create_from_edges(u, v,
     col_sorted : bool, optional
         Whether or not the columns of the COO are in ascending order within
         each row. This only has an effect when ``row_sorted`` is True.
-    check_sorted : bool, optional
-        If this is ``True`` and ``row_sorted`` is ``False``, the edge list will
-        be scanned to see if it is in ascending order, and the resulting graph
-        will be marked accordingly.
-
 
 
     Returns
@@ -1660,7 +1654,7 @@ def create_from_edges(u, v,
 
     hgidx = heterograph_index.create_unitgraph_from_coo(
         num_ntypes, urange, vrange, u, v, ['coo', 'csr', 'csc'],
-        row_sorted, col_sorted, check_sorted)
+        row_sorted, col_sorted)
     if utype == vtype:
         return DGLHeteroGraph(hgidx, [utype], [etype])
     else:
