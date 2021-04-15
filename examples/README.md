@@ -8,6 +8,7 @@ The folder contains example implementations of selected research papers related 
 
 | Paper                                                        | node classification | link prediction / classification | graph property prediction | sampling           | OGB                |
 | ------------------------------------------------------------ | ------------------- | -------------------------------- | ------------------------- | ------------------ | ------------------ |
+| [Boost then Convolve: Gradient Boosting Meets Graph Neural Networks](#bgnn) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Contrastive Multi-View Representation Learning on Graphs](#mvgrl) | :heavy_check_mark: |  | :heavy_check_mark: |  |  |
 | [Graph Random Neural Network for Semi-Supervised Learning on Graphs](#grand) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Heterogeneous Graph Transformer](#hgt)                      | :heavy_check_mark:  | :heavy_check_mark:               |                           |                    |                    |
@@ -85,7 +86,16 @@ The folder contains example implementations of selected research papers related 
 | [Directional Message Passing for Molecular Graphs](#dimenet) |  |                                  | :heavy_check_mark: |                           |                    |
 | [Link Prediction Based on Graph Neural Networks](#seal) | | :heavy_check_mark: | | :heavy_check_mark: | :heavy_check_mark: |
 | [Variational Graph Auto-Encoders](#vgae) |  | :heavy_check_mark: | | | |
+| [Composition-based Multi-Relational Graph Convolutional Networks](#compgcn)|  |  :heavy_check_mark: | | | |
 | [GNNExplainer: Generating Explanations for Graph Neural Networks](#gnnexplainer) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
+| [Interaction Networks for Learning about Objects, Relations and Physics](#graphsim) |  |                                 |:heavy_check_mark:                 |                    |                    |
+| [Representation Learning on Graphs with Jumping Knowledge Networks](#jknet) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
+
+## 2021
+
+- <a name="bgnn"></a> Ivanov et al. Boost then Convolve: Gradient Boosting Meets Graph Neural Networks. [Paper link](https://openreview.net/forum?id=ebS5NUfoMKL). 
+    - Example code: [PyTorch](../examples/pytorch/bgnn)
+    - Tags: semi-supervised node classification, tabular data, GBDT
 
 ## 2020
 
@@ -123,6 +133,14 @@ The folder contains example implementations of selected research papers related 
 - <a name="dagnn"></a> Rossi et al. Temporal Graph Networks For Deep Learning on Dynamic Graphs. [Paper link](https://arxiv.org/abs/2006.10637).
     - Example code: [Pytorch](../examples/pytorch/tgn)
     - Tags: over-smoothing, node classification 
+
+- <a name="dagnn"></a> Rossi et al. Temporal Graph Networks For Deep Learning on Dynamic Graphs. [Paper link](https://arxiv.org/abs/2006.10637).
+    - Example code: [Pytorch](../examples/pytorch/tgn)
+    - Tags: over-smoothing, node classification 
+
+- <a name="compgcn"></a> Vashishth, Shikhar, et al. Composition-based Multi-Relational Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1911.03082).
+    - Example code: [Pytorch](../examples/pytorch/compGCN)
+    - Tags: multi-relational graphs, graph neural network
 
 ## 2019
 
@@ -241,6 +259,10 @@ The folder contains example implementations of selected research papers related 
 - <a name="seal"></a>  Zhang et al. Link Prediction Based on Graph Neural Networks. [Paper link](https://papers.nips.cc/paper/2018/file/53f0d7c537d99b3824f0f99d62ea2428-Paper.pdf).
     - Example code: [pytorch](../examples/pytorch/seal)
     - Tags: link prediction, sampling
+
+- <a name="jknet"></a>  Xu et al. Representation Learning on Graphs with Jumping Knowledge Networks. [Paper link](https://arxiv.org/abs/1806.03536).
+    - Example code: [pytorch](../examples/pytorch/jknet)
+    - Tags: message passing, neighborhood
 
 
 ## 2017
