@@ -8,6 +8,7 @@ import dgl.function as fn
 import dgl
 from dgl.sampling import random_walk, pack_traces
 
+
 # The base class of sampler
 class SAINTSampler(object):
     def __init__(self, dn, g, train_nid, node_budget, num_repeat=50):
@@ -33,7 +34,7 @@ class SAINTSampler(object):
             os.makedirs('./subgraphs/', exist_ok=True)
 
             self.subgraphs = []
-            self.N = sampled_nodes = 0
+            self.N, sampled_nodes = 0, 0
 
             start_time = time.time()
             while sampled_nodes < self.train_g.num_nodes() * num_repeat:
@@ -129,11 +130,12 @@ class SAINTNodeSampler(SAINTSampler):
 
     def __sample__(self):
         if self.prob is None:
-            self.train_g.ndata['D_in'] = 1. / self.train_g.in_degrees().float().clamp(min=1).square()
-            self.train_g.update_all(fn.copy_src('D_in', 'd'),
-                                    fn.sum('d', 'prop'))
-            self.train_g.ndata.pop('D_in')
-            self.prob = self.train_g.ndata.pop('prop')
+            # self.train_g.ndata['D_in'] = 1. / self.train_g.in_degrees().float().clamp(min=1).square()
+            # self.train_g.update_all(fn.copy_src('D_in', 'd'),
+            #                         fn.sum('d', 'prop'))
+            # self.train_g.ndata.pop('D_in')
+            # self.prob = self.train_g.ndata.pop('prop')
+            self.prob = self.train_g.in_degrees().float().clamp(min=1)
 
         sampled_nodes = th.multinomial(self.prob, num_samples=self.node_budget, replacement=True).unique()
         self.__counter__(sampled_nodes)
@@ -159,7 +161,15 @@ class SAINTEdgeSampler(SAINTSampler):
             src_degrees, dst_degrees = self.train_g.in_degrees(src).float().clamp(min=1),\
                                        self.train_g.in_degrees(dst).float().clamp(min=1)
             self.prob = 1. / src_degrees + 1. / dst_degrees
+
+            # self.prob = self.prob.numpy()
+            # self.prob = self.prob / self.prob.sum()
+
         sampled_edges = th.multinomial(self.prob, num_samples=self.edge_budget, replacement=True).unique()
+
+        # sampled_edges = np.random.choice(len(self.prob), self.edge_budget, replace=True, p=self.prob)
+        # sampled_edges = th.from_numpy(sampled_edges)
+
         sampled_src, sampled_dst = self.train_g.find_edges(sampled_edges)
         sampled_nodes = th.cat([sampled_src, sampled_dst]).unique()
         self.__counter__(sampled_nodes)

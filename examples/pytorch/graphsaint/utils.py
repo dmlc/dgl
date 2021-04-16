@@ -8,6 +8,7 @@ import numpy as np
 import torch
 from sklearn.metrics import f1_score
 
+
 class Logger(object):
     '''A custom logger to log stdout to a logging file.'''
     def __init__(self, path):
@@ -33,8 +34,8 @@ def save_log_dir(args):
     return log_dir
 
 
-def calc_f1(y_true, y_pred, multitask):
-    if multitask:
+def calc_f1(y_true, y_pred, multilabel):
+    if multilabel:
         y_pred[y_pred > 0] = 1
         y_pred[y_pred <= 0] = 0
     else:
@@ -43,19 +44,19 @@ def calc_f1(y_true, y_pred, multitask):
         f1_score(y_true, y_pred, average="macro")
 
 
-def evaluate(model, g, labels, mask, multitask=False):
+def evaluate(model, g, labels, mask, multilabel=False):
     model.eval()
     with torch.no_grad():
         logits = model(g)
         logits = logits[mask]
         labels = labels[mask]
         f1_mic, f1_mac = calc_f1(labels.cpu().numpy(),
-                                 logits.cpu().numpy(), multitask)
+                                 logits.cpu().numpy(), multilabel)
         return f1_mic, f1_mac
 
 
 # load data of GraphSaint and translate them to the format of dgl
-def load_data(args, multitask):
+def load_data(args, multilabel):
     prefix = "data/{}".format(args.dataset)
     DataType = namedtuple('Dataset', ['num_classes', 'g'])
 
@@ -74,7 +75,7 @@ def load_data(args, multitask):
 
     feats = np.load('./{}/feats.npy'.format(prefix))
     scaler = StandardScaler()
-    scaler.fit(feats)
+    scaler.fit(feats[train_mask])
     feats = scaler.transform(feats)
 
     class_map = json.load(open('./{}/class_map.json'.format(prefix)))
@@ -91,7 +92,7 @@ def load_data(args, multitask):
             class_arr[k] = v
 
     g.ndata['feat'] = torch.tensor(feats, dtype=torch.float)
-    g.ndata['label'] = torch.tensor(class_arr, dtype=torch.float if multitask else torch.long)
+    g.ndata['label'] = torch.tensor(class_arr, dtype=torch.float if multilabel else torch.long)
     g.ndata['train_mask'] = torch.tensor(train_mask, dtype=torch.bool)
     g.ndata['val_mask'] = torch.tensor(val_mask, dtype=torch.bool)
     g.ndata['test_mask'] = torch.tensor(test_mask, dtype=torch.bool)

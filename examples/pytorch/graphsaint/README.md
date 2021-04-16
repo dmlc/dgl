@@ -1,6 +1,6 @@
 # GraphSAINT
 
-This DGL example implements the sampling method proposed in the paper [GraphSAINT: Graph Sampling Based Inductive Learning Method](https://arxiv.org/abs/1907.04931).
+This DGL example implements the paper: Graph Sampling Based Inductive Learning Method.
 
 Paper link: https://arxiv.org/abs/1907.04931
 
@@ -8,23 +8,24 @@ Author's code: https://github.com/GraphSAINT/GraphSAINT
 
 Contributor: Liu Tang ([@lt610](https://github.com/lt610))
 
-## Dependecies
+## Dependencies
 
 - Python 3.7.0
 - PyTorch 1.6.0
-- numpy 1.19.2
-- dgl 0.5.3
+- NumPy 1.19.2
+- Scikit-learn 0.23.2
+- DGL 0.5.3
 
 ## Dataset
 
-All datasets used are provided by Author's [code](https://github.com/GraphSAINT/GraphSAINT). They are available on [Google Drive link](https://drive.google.com/drive/folders/1zycmmDES39zVlbVCYs88JTJ1Wm5FbfLz) (alternatively, [BaiduYun link (code: f1ao)](https://pan.baidu.com/s/1SOb0SiSAXavwAcNqkttwcg#list/path=%2F)). Dataset summary("m" stands for multi-class classifification, and "s" for single-class.):
+All datasets used are provided by Author's [code](https://github.com/GraphSAINT/GraphSAINT). They are available in [Google Drive](https://drive.google.com/drive/folders/1zycmmDES39zVlbVCYs88JTJ1Wm5FbfLz) (alternatively, [Baidu Wangpan (code: f1ao)](https://pan.baidu.com/s/1SOb0SiSAXavwAcNqkttwcg#list/path=%2F)). Dataset summary("m" stands for multi-class classification, and "s" for single-class.):
 | Dataset | Nodes | Edges | Degree | Feature | Classes | Train/Val/Test |
 | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
 | PPI | 14,755 | 225,270 | 15 | 50 | 121(m) | 0.66/0.12/0.22 |
-| Flickr | 89250 | 899756 | 10 | 500 | 7(s) | 0.50/0.25/0.25 |
-| Reddit | 232965 | 11606919 | 50 | 602 | 41(s) | 0.66/0.10/0.24 |
-| Yelp | 716847 | 6877410 | 10 | 300 | 100(m) | 0.75/0.10/0.15 |
-| Amazon | 1598960 | 132169734 | 83 | 200 | 107(m) | 0.85/0.05/0.10 |
+| Flickr | 89,250 | 899,756 | 10 | 500 | 7(s) | 0.50/0.25/0.25 |
+| Reddit | 232,965 | 11,606,919 | 50 | 602 | 41(s) | 0.66/0.10/0.24 |
+| Yelp | 716,847 | 6,877,410 | 10 | 300 | 100(m) | 0.75/0.10/0.15 |
+| Amazon | 1,598,960 | 132,169,734 | 83 | 200 | 107(m) | 0.85/0.05/0.10 |
 
 ## Full graph training
 
@@ -60,22 +61,23 @@ python train_sampling.py --gpu 0 --dataset amazon --sampler rw --num-roots 1500 
 
 ## Comparison
 
-"Paper" means the results reported in paper. "Running" means the results of runing author's code. DGL means the results of the DGL implementation.
+* Paper: results from the paper
+* Running: results from experiments with the authors' code
+* DGL: results from experiments with the DGL example
 
 ### F1-micro
 
 #### Full graph
 | Method | PPI | Flickr | Reddit | Yelp | Amazon |
 | --- | --- | --- | --- | --- | --- |
-| Full | 0.8765 | 0.5096 | 0.9456 | 0.4253 | 0.2373 |
+| Full | 0.9789 |  |  |  |  |
 #### Random node sampler
 
 | Method | PPI | Flickr | Reddit | Yelp | Amazon |
 | --- | --- | --- | --- | --- | --- |
 | Paper | 0.960±0.001 | 0.507±0.001 | 0.962±0.001 | 0.641±0.000 | 0.782±0.004 |
 | Running | 0.9628 | 0.5077 | 0.9622 | 0.6393 | error |
-| DGL | 0.5257 | 0.4943 | 0.8721 | 0.4265 | 0.3906 |
-| DGL(Full) | 0.8765 | 0.5096 | 0.9456 | 0.4253 | 0.2373 |
+| DGL | 0.9132 | 0.5037 | 0.8656 | 0.6460 | 0.7843 |
 
 #### Random edge sampler
 
@@ -83,16 +85,14 @@ python train_sampling.py --gpu 0 --dataset amazon --sampler rw --num-roots 1500 
 | --- | --- | --- | --- | --- | --- |
 | Paper | 0.981±0.007 | 0.510±0.002 | 0.966±0.001 | 0.653±0.003 | 0.807±0.001 |
 | Running | 0.9810 | 0.5066 | 0.9656 | 0.6531 | 0.8071 |
-| DGL | 0.9147 | 0.5013 | 0.9243 | 0.4121 | exceed |
-| DGL(Full) | 0.8765 | 0.5096 | 0.9456 | 0.4253 | 0.2373 |
+| DGL | 0.9722 | 0.5079 | 0.9605 | 0.6496 | exceed |
 
 #### Random walk sampler
 | Method | PPI | Flickr | Reddit | Yelp | Amazon |
 | --- | --- | --- | --- | --- | --- |
 | Paper | 0.981±0.004 | 0.511±0.001 | 0.966±0.001 | 0.653±0.003 | 0.815±0.001 |
 | Running | 0.9812 | 0.5104 | 0.9648 | 0.6527 | 0.8131 |
-| DGL | 0.9199 | 0.5045 | 0.8775 | 0.4078 | 0.3766 |
-| DGL(Full) | 0.8765 | 0.5096 | 0.9456 | 0.4253 | 0.2373 |
+| DGL | 0.9751 | 0.5080 | 0.9523 | 0.6517 | 0.8106 |
 
 ### Sampling time
 
@@ -100,7 +100,7 @@ python train_sampling.py --gpu 0 --dataset amazon --sampler rw --num-roots 1500 
 
 | Method | PPI | Flickr | Reddit | Yelp | Amazon |
 | --- | --- | --- | --- | --- | --- |
-| Running | 1.0139 | 0.9574 | 9.0769 | 30.7790 | error |
+| Running | 1.0139 | 0.9574 | 9.0769 | 30.7790 | 442.2065 |
 | DGL | 0.8725 | 1.1420 | 46.5929 | 68.4477 | 1030.8212 |
 
 #### Random edge sampler

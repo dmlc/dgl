@@ -11,11 +11,11 @@ from utils import Logger, evaluate, save_log_dir, load_data
 
 def main(args):
 
-    multitask_data = set(['ppi', 'yelp', 'amazon'])
-    multitask = args.dataset in multitask_data
+    multilabel_data = set(['ppi', 'yelp', 'amazon'])
+    multilabel = args.dataset in multilabel_data
 
     # load and preprocess dataset
-    data = load_data(args, multitask)
+    data = load_data(args, multilabel)
     g = data.g
     train_mask = g.ndata['train_mask']
     val_mask = g.ndata['val_mask']
@@ -97,7 +97,7 @@ def main(args):
               torch.cuda.memory_allocated(device=train_nid.device) / 1024 / 1024)
     start_time = time.time()
     best_f1 = -1
-    print("n tain nodes", n_train_samples)
+
     for epoch in range(args.n_epochs):
         for j, subg in enumerate(subg_iter):
             # sync with upper level training graph
@@ -108,7 +108,7 @@ def main(args):
             pred = model(subg)
             batch_labels = subg.ndata['label']
 
-            if multitask:
+            if multilabel:
                 loss = F.binary_cross_entropy_with_logits(pred, batch_labels, reduction='sum',
                                                           weight=subg.ndata['l_n'].unsqueeze(1))
             else:
@@ -117,6 +117,7 @@ def main(args):
 
             optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm(model.parameters(), 5)
             optimizer.step()
             if j == len(subg_iter) - 1:
                 print(f"epoch:{epoch+1}/{args.n_epochs}, Iteration {j+1}/"
@@ -125,7 +126,7 @@ def main(args):
         # evaluate
         if epoch % args.val_every == 0:
             val_f1_mic, val_f1_mac = evaluate(
-                model, g, labels, val_mask, multitask)
+                model, g, labels, val_mask, multilabel)
             print(
                 "Val F1-mic {:.4f}, Val F1-mac {:.4f}".format(val_f1_mic, val_f1_mac))
             if val_f1_mic > best_f1:
@@ -142,8 +143,8 @@ def main(args):
         model.load_state_dict(torch.load(os.path.join(
             log_dir, 'best_model.pkl')))
     test_f1_mic, test_f1_mac = evaluate(
-        model, g, labels, test_mask, multitask)
-    print("Test F1-mic{:.4f}, Test F1-mac{:.4f}".format(test_f1_mic, test_f1_mac))
+        model, g, labels, test_mask, multilabel)
+    print("Test F1-mic {:.4f}, Test F1-mac {:.4f}".format(test_f1_mic, test_f1_mac))
 
 
 if __name__ == '__main__':
@@ -155,7 +156,7 @@ if __name__ == '__main__':
     parser.add_argument("--gpu", type=int, default=-1,
                         help="GPU index. Default: -1, using CPU.")
     # sampler params
-    parser.add_argument("--sampler", type=str, default="node",
+    parser.add_argument("--sampler", type=str, default="node", choices=['node', 'edge', 'rw'],
                         help="Type of sampler")
     parser.add_argument("--node-budget", type=int, default=6000,
                         help="Expected number of sampled nodes when using node sampler")
@@ -171,8 +172,8 @@ if __name__ == '__main__':
     parser.add_argument("--n-hidden", type=int, default=512,
                         help="Number of hidden gcn units")
     parser.add_argument("--arch", type=str, default="1-0-1-0",
-                        help="Network architecture. 1 means an order 1 layer (self feature plus 1-hop neighbor "
-                             "feature), and 0 means an order 0 layer (self feature only)")
+                        help="Network architecture. 1 means an order-1 layer (self feature plus 1-hop neighbor "
+                             "feature), and 0 means an order-0 layer (self feature only)")
     parser.add_argument("--dropout", type=float, default=0,
                         help="Dropout rate")
     parser.add_argument("--batch-norm", action='store_true',
@@ -185,9 +186,7 @@ if __name__ == '__main__':
     parser.add_argument("--weight-decay", type=float, default=0,
                         help="Weight for L2 reg")
     parser.add_argument("--val-every", type=int, default=1,
-                        help="Number of epoch of doing inference on validation")
-    parser.add_argument("--use-val", action='store_true',
-                        help="Whether to use validated best model to test")
+                        help="Frequency of evaluation on the validation set in number of epochs")
     parser.add_argument("--note", type=str, default='none',
                         help="Note for log dir")
 
