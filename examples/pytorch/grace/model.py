@@ -106,4 +106,3 @@ class Grace(nn.Module):
         ret = (l1 + l2) * 0.5
 
         return ret.mean()
-

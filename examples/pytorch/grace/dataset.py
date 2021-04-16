@@ -19,9 +19,3 @@ def load(name):
     labels = graph.ndata.pop('label')
 
     return graph, feat, labels, num_class, train_mask, val_mask, test_mask
-
-
-
-
-
-
