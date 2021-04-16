@@ -37,6 +37,8 @@ def graph(data,
           num_nodes=None,
           idtype=None,
           device=None,
+          row_sorted=False,
+          col_sorted=False,
           **deprecated_kwargs):
     """Create a graph and return.
 
@@ -72,6 +74,11 @@ def graph(data,
         the :attr:`data` argument. If :attr:`data` is not a tuple of node-tensors, the
         returned graph is on CPU.  If the specified :attr:`device` differs from that of the
         provided tensors, it casts the given tensors to the specified device first.
+    row_sorted : bool, optional
+        Whether or not the rows of the COO are in ascending order.
+    col_sorted : bool, optional
+        Whether or not the columns of the COO are in ascending order within
+        each row. This only has an effect when ``row_sorted`` is True.
 
     Returns
     -------
@@ -158,7 +165,9 @@ def graph(data,
                            ' but got {} and {}.'.format(num_nodes, max(urange, vrange) - 1))
         urange, vrange = num_nodes, num_nodes
 
-    g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange)
+    g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange,
+                          row_sorted=row_sorted, col_sorted=col_sorted,
+                          validate=False)
 
     return g.to(device)
 
@@ -358,14 +367,14 @@ def heterograph(data_dict,
     return retg.to(device)
 
 def create_block(data_dict, num_src_nodes=None, num_dst_nodes=None, idtype=None, device=None):
-    """Create a :class:`DGLBlock` object.
+    """Create a message flow graph (MFG) as a :class:`DGLBlock` object.
 
     Parameters
     ----------
     data_dict : graph data
-        The dictionary data for constructing a block. The keys are in the form of
-        string triplets (src_type, edge_type, dst_type), specifying the input node type,
-        edge type, and output node type. The values are graph data in the form of
+        The dictionary data for constructing a MFG. The keys are in the form of
+        string triplets (src_type, edge_type, dst_type), specifying the source node type,
+        edge type, and destination node type. The values are graph data in the form of
         :math:`(U, V)`, where :math:`(U[i], V[i])` forms the edge with ID :math:`i`.
         The allowed graph data formats are:
 
@@ -376,35 +385,35 @@ def create_block(data_dict, num_src_nodes=None, num_dst_nodes=None, idtype=None,
         - ``(iterable[int], iterable[int])``: Similar to the tuple of node-tensors
           format, but stores node IDs in two sequences (e.g. list, tuple, numpy.ndarray).
 
-        If you would like to create a block with a single input node type, a single output
+        If you would like to create a MFG with a single source node type, a single destination
         node type, and a single edge type, then you can pass in the graph data directly
         without wrapping it as a dictionary.
     num_src_nodes : dict[str, int] or int, optional
-        The number of nodes for each input node type, which is a dictionary mapping a node type
-        :math:`T` to the number of :math:`T`-typed input nodes.
+        The number of nodes for each source node type, which is a dictionary mapping a node type
+        :math:`T` to the number of :math:`T`-typed source nodes.
 
         If not given for a node type :math:`T`, DGL finds the largest ID appearing in *every*
-        graph data whose input node type is :math:`T`, and sets the number of nodes to
+        graph data whose source node type is :math:`T`, and sets the number of nodes to
         be that ID plus one. If given and the value is no greater than the largest ID for some
-        input node type, DGL will raise an error. By default, DGL infers the number of nodes for
-        all input node types.
+        source node type, DGL will raise an error. By default, DGL infers the number of nodes for
+        all source node types.
 
-        If you would like to create a block with a single input node type, a single output
+        If you would like to create a MFG with a single source node type, a single destination
         node type, and a single edge type, then you can pass in an integer to directly
-        represent the number of input nodes.
+        represent the number of source nodes.
     num_dst_nodes : dict[str, int] or int, optional
-        The number of nodes for each output node type, which is a dictionary mapping a node type
-        :math:`T` to the number of :math:`T`-typed output nodes.
+        The number of nodes for each destination node type, which is a dictionary mapping a node
+        type :math:`T` to the number of :math:`T`-typed destination nodes.
 
         If not given for a node type :math:`T`, DGL finds the largest ID appearing in *every*
-        graph data whose output node type is :math:`T`, and sets the number of nodes to
+        graph data whose destination node type is :math:`T`, and sets the number of nodes to
         be that ID plus one. If given and the value is no greater than the largest ID for some
-        output node type, DGL will raise an error. By default, DGL infers the number of nodes for
-        all output node types.
+        destination node type, DGL will raise an error. By default, DGL infers the number of nodes
+        for all destination node types.
 
-        If you would like to create a block with a single output node type, a single output
-        node type, and a single edge type, then you can pass in an integer to directly
-        represent the number of output nodes.
+        If you would like to create a MFG with a single destination node type, a single
+        destination node type, and a single edge type, then you can pass in an integer to directly
+        represent the number of destination nodes.
     idtype : int32 or int64, optional
         The data type for storing the structure-related graph information such as node and
         edge IDs. It should be a framework-specific data type object (e.g., ``torch.int32``).
@@ -419,7 +428,7 @@ def create_block(data_dict, num_src_nodes=None, num_dst_nodes=None, idtype=None,
     Returns
     -------
     DGLBlock
-        The created block.
+        The created MFG.
 
     Notes
     -----
@@ -501,12 +510,12 @@ def create_block(data_dict, num_src_nodes=None, num_dst_nodes=None, idtype=None,
             num_dst_nodes[dty] = max(num_dst_nodes[dty], vrange)
         else:  # sanity check
             if num_src_nodes[sty] < urange:
-                raise DGLError('The given number of nodes of input node type {} must be larger'
+                raise DGLError('The given number of nodes of source node type {} must be larger'
                                ' than the max ID in the data, but got {} and {}.'.format(
                                    sty, num_src_nodes[sty], urange - 1))
             if num_dst_nodes[dty] < vrange:
-                raise DGLError('The given number of nodes of output node type {} must be larger'
-                               ' than the max ID in the data, but got {} and {}.'.format(
+                raise DGLError('The given number of nodes of destination node type {} must be'
+                               ' larger than the max ID in the data, but got {} and {}.'.format(
                                    dty, num_dst_nodes[dty], vrange - 1))
     # Create the graph
 
@@ -546,17 +555,17 @@ def create_block(data_dict, num_src_nodes=None, num_dst_nodes=None, idtype=None,
     return retg.to(device)
 
 def block_to_graph(block):
-    """Convert a :class:`DGLBlock` object to a :class:`DGLGraph`.
+    """Convert a message flow graph (MFG) as a :class:`DGLBlock` object to a :class:`DGLGraph`.
 
-    DGL will rename all the input node types by suffixing with ``_src``, and
-    all the output node types by suffixing with ``_dst``.
+    DGL will rename all the source node types by suffixing with ``_src``, and
+    all the destination node types by suffixing with ``_dst``.
 
     Features on the returned graph will be preserved.
 
     Parameters
     ----------
     block : DGLBlock
-        The block.
+        The MFG.
 
     Returns
     -------
@@ -1590,7 +1599,9 @@ DGLHeteroGraph.to_networkx = to_networkx
 def create_from_edges(u, v,
                       utype, etype, vtype,
                       urange, vrange,
-                      validate=True):
+                      validate=True,
+                      row_sorted=False,
+                      col_sorted=False):
     """Internal function to create a graph from incident nodes with types.
 
     utype could be equal to vtype
@@ -1615,6 +1626,12 @@ def create_from_edges(u, v,
         maximum of the destination node IDs in the edge list plus 1. (Default: None)
     validate : bool, optional
         If True, checks if node IDs are within range.
+    row_sorted : bool, optional
+        Whether or not the rows of the COO are in ascending order.
+    col_sorted : bool, optional
+        Whether or not the columns of the COO are in ascending order within
+        each row. This only has an effect when ``row_sorted`` is True.
+
 
     Returns
     -------
@@ -1636,7 +1653,8 @@ def create_from_edges(u, v,
         num_ntypes = 2
 
     hgidx = heterograph_index.create_unitgraph_from_coo(
-        num_ntypes, urange, vrange, u, v, ['coo', 'csr', 'csc'])
+        num_ntypes, urange, vrange, u, v, ['coo', 'csr', 'csc'],
+        row_sorted, col_sorted)
     if utype == vtype:
         return DGLHeteroGraph(hgidx, [utype], [etype])
     else:

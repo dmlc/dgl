@@ -119,7 +119,6 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")
         nodes = {g.ntypes[0] : nodes}
-    assert g.device == F.cpu(), "Graph must be on CPU."
 
     nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
     nodes_all_types = []
@@ -129,18 +128,24 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         else:
             nodes_all_types.append(nd.array([], ctx=nd.cpu()))
 
-    if not isinstance(fanout, dict):
-        fanout_array = [int(fanout)] * len(g.etypes)
+    if isinstance(fanout, nd.NDArray):
+        fanout_array = fanout
     else:
-        if len(fanout) != len(g.etypes):
-            raise DGLError('Fan-out must be specified for each edge type '
-                           'if a dict is provided.')
-        fanout_array = [None] * len(g.etypes)
-        for etype, value in fanout.items():
-            fanout_array[g.get_etype_id(etype)] = value
-    fanout_array = F.to_dgl_nd(F.tensor(fanout_array, dtype=F.int64))
+        if not isinstance(fanout, dict):
+            fanout_array = [int(fanout)] * len(g.etypes)
+        else:
+            if len(fanout) != len(g.etypes):
+                raise DGLError('Fan-out must be specified for each edge type '
+                               'if a dict is provided.')
+            fanout_array = [None] * len(g.etypes)
+            for etype, value in fanout.items():
+                fanout_array[g.get_etype_id(etype)] = value
+        fanout_array = F.to_dgl_nd(F.tensor(fanout_array, dtype=F.int64))
 
-    if prob is None:
+    if isinstance(prob, list) and len(prob) > 0 and \
+            isinstance(prob[0], nd.NDArray):
+        prob_arrays = prob
+    elif prob is None:
         prob_arrays = [nd.array([], ctx=nd.cpu())] * len(g.etypes)
     else:
         prob_arrays = []
@@ -252,7 +257,10 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
     """
     # Rectify nodes to a dictionary
     if nodes is None:
-        nodes = {ntype: F.arange(0, g.number_of_nodes(ntype)) for ntype in g.ntypes}
+        nodes = {
+            ntype: F.astype(F.arange(0, g.number_of_nodes(ntype)), g.idtype)
+            for ntype in g.ntypes
+        }
     elif not isinstance(nodes, dict):
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")

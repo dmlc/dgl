@@ -10,6 +10,10 @@
 #include <dgl/random.h>
 #include <dgl/array.h>
 
+#ifdef DGL_USE_CUDA
+#include "../runtime/cuda/cuda_common.h"
+#endif  // DGL_USE_CUDA
+
 using namespace dgl::runtime;
 
 namespace dgl {
@@ -18,8 +22,18 @@ DGL_REGISTER_GLOBAL("rng._CAPI_SetSeed")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     const int seed = args[0];
 #pragma omp parallel for
-    for (int i = 0; i < omp_get_max_threads(); ++i)
+    for (int i = 0; i < omp_get_max_threads(); ++i) {
       RandomEngine::ThreadLocal()->SetSeed(seed);
+#ifdef DGL_USE_CUDA
+      auto* thr_entry = CUDAThreadEntry::ThreadLocal();
+      if (!thr_entry->curand_gen) {
+        CURAND_CALL(curandCreateGenerator(&thr_entry->curand_gen, CURAND_RNG_PSEUDO_DEFAULT));
+      }
+      CURAND_CALL(curandSetPseudoRandomGeneratorSeed(
+          thr_entry->curand_gen,
+          static_cast<uint64_t>(seed + GetThreadId())));
+#endif  // DGL_USE_CUDA
+    }
   });
 
 DGL_REGISTER_GLOBAL("rng._CAPI_Choice")
