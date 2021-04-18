@@ -80,7 +80,7 @@ def load_data(args, multilabel):
 
     class_map = json.load(open('./{}/class_map.json'.format(prefix)))
     class_map = {int(k): v for k, v in class_map.items()}
-    if isinstance(list(class_map.values())[0], list):
+    if multilabel:
         num_classes = len(list(class_map.values())[0])
         class_arr = np.zeros((num_nodes, num_classes))
         for k, v in class_map.items():

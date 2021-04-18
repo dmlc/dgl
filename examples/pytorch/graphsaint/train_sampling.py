@@ -26,8 +26,8 @@ def main(args):
 
     in_feats = g.ndata['feat'].shape[1]
     n_classes = data.num_classes
-    n_nodes = g.number_of_nodes()
-    n_edges = g.number_of_edges()
+    n_nodes = g.num_nodes()
+    n_edges = g.num_edges()
 
     n_train_samples = train_mask.int().sum().item()
     n_val_samples = val_mask.int().sum().item()
@@ -74,7 +74,8 @@ def main(args):
         out_dim=n_classes,
         arch=args.arch,
         dropout=args.dropout,
-        batch_norm=args.batch_norm
+        batch_norm=args.batch_norm,
+        aggr=args.aggr
     )
 
     if cuda:
@@ -152,9 +153,11 @@ if __name__ == '__main__':
     # data source params
     parser.add_argument("--dataset", type=str, choices=['ppi', 'flickr', 'reddit', 'yelp', 'amazon'], default='ppi',
                         help="Name of dataset.")
+
     # cuda params
     parser.add_argument("--gpu", type=int, default=-1,
                         help="GPU index. Default: -1, using CPU.")
+
     # sampler params
     parser.add_argument("--sampler", type=str, default="node", choices=['node', 'edge', 'rw'],
                         help="Type of sampler")
@@ -168,6 +171,7 @@ if __name__ == '__main__':
                         help="The length of random walk when using random walk sampler")
     parser.add_argument("--num-repeat", type=int, default=50,
                         help="Number of repeating sampling one node to estimate edge / node probability")
+
     # model params
     parser.add_argument("--n-hidden", type=int, default=512,
                         help="Number of hidden gcn units")
@@ -178,6 +182,9 @@ if __name__ == '__main__':
                         help="Dropout rate")
     parser.add_argument("--batch-norm", action='store_true',
                         help="Whether to use batch norm")
+    parser.add_argument("--aggr", type=str, default="concat", choices=['mean', 'concat'],
+                        help="How to aggregate the self feature and neighbor features")
+
     # training params
     parser.add_argument("--n-epochs", type=int, default=100,
                         help="Number of training epochs")
