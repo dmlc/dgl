@@ -181,12 +181,27 @@ class RandomEngine {
   /*!
    * \brief Pick random integers with different probability for different segments.
    *
+   * For example, if split=[0, 4, 10] and bias=[1.5, 1], it means to pick some integers
+   * from 0 to 9, which is divided into two segments. 0-3 are in the first segment and the rest
+   * belongs to the second. The weight(bias) of each candidate in the first segment is upweighted
+   * to 1.5.
+   *
+   *  candidate | 0 1 2 3 | 4 5 6 7 8 9 |
+   *  split       ^         ^            ^
+   *  bias      |   1.5   |      1      |
+   *
+   *
+   * The complexity of this operator is O(k * log(T)) where k is the number of integers we want
+   * to pick, and T is the number of segments. It is much faster compared with assigning
+   * probability for each candidate, of which the complexity is O(k * log(N)) where N is the
+   * number of all candidates.
+   *
    * If replace is false, num must not be larger than population.
    *
    * \tparam IdxType Return integer type
    * \param num Number of integers to choose
-   * \param split Split positions of different segments
-   * \param bias Weights of different segments
+   * \param split Array of T+1 split positions of different segments(including start and end)
+   * \param bias Array of T weight of each segments
    * \param out The output buffer to write selected indices.
    * \param replace If true, choose with replacement.
    */

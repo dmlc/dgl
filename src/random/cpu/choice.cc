@@ -121,8 +121,8 @@ template void RandomEngine::UniformChoice<int64_t>(int64_t num,
 template <typename IdxType, typename FloatType>
 void RandomEngine::BiasedChoice(
     IdxType num, const IdxType *split, FloatArray bias, IdxType* out, bool replace) {
-  int64_t num_tags = bias->shape[0];
-  FloatType *bias_data = static_cast<FloatType *>(bias->data);
+  const int64_t num_tags = bias->shape[0];
+  const FloatType *bias_data = static_cast<FloatType *>(bias->data);
   IdxType total_node_num = 0;
   FloatArray prob = NDArray::Empty({num_tags}, bias->dtype, bias->ctx);
   FloatType *prob_data = static_cast<FloatType *>(prob->data);
