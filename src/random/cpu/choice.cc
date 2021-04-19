@@ -135,8 +135,8 @@ void RandomEngine::BiasedChoice(
   if (replace) {
     auto sampler = utils::TreeSampler<IdxType, FloatType, true>(this, prob);
     for (IdxType i = 0; i < num; ++i) {
-      int64_t tag = sampler.Draw();
-      IdxType tag_num_nodes = split[tag+1] - split[tag];
+      const int64_t tag = sampler.Draw();
+      const IdxType tag_num_nodes = split[tag+1] - split[tag];
       out[i] = RandInt(tag_num_nodes) + split[tag];
     }
   } else {
@@ -146,9 +146,9 @@ void RandomEngine::BiasedChoice(
     // we use hash set here. Maybe in the future we should support reservoir algorithm
     std::vector<std::unordered_set<IdxType>> selected(num_tags);
     for (IdxType i = 0 ; i < num ; ++i) {
-      int64_t tag = sampler.DrawAndUpdate(bias_data);
+      const int64_t tag = sampler.DrawAndUpdate(bias_data);
       bool inserted = false;
-      IdxType tag_num_nodes = split[tag+1] - split[tag];
+      const IdxType tag_num_nodes = split[tag+1] - split[tag];
       IdxType selected_node;
       while (!inserted) {
         CHECK_LT(selected[tag].size(), tag_num_nodes)
