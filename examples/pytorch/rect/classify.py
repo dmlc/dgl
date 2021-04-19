@@ -3,11 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from statistics import mean
 
-class logistic_regression_classifier(nn.Module):
+class LogisticRegressionClassifier(nn.Module):
     ''' Define a logistic regression classifier to evaluate the quality of embedding results
     '''
     def __init__(self, nfeat, nclass):
-        super(logistic_regression_classifier, self).__init__()
+        super(LogisticRegressionClassifier, self).__init__()
         self.lrc = nn.Linear(nfeat, nclass)
 
     def forward(self, x):
@@ -36,11 +36,11 @@ def _train_test_with_lrc(model, features, labels, train_mask, test_mask):
         optimizer.step()
     return _evaluate(model=model, features=features, labels=labels, test_mask=test_mask)
 
-def evaluate_embedds(features, labels, train_mask, test_mask, n_classes, cuda, test_times=10):
+def evaluate_embeds(features, labels, train_mask, test_mask, n_classes, cuda, test_times=10):
     print("Training a logistic regression classifier with the pre-defined train/test split setting ...")
     res_list = []
     for _ in range(test_times):
-        model = logistic_regression_classifier(nfeat=features.shape[1], nclass=n_classes)
+        model = LogisticRegressionClassifier(nfeat=features.shape[1], nclass=n_classes)
         if cuda:
             model.cuda()          
         res = _train_test_with_lrc(model=model, features=features, labels=labels, train_mask=train_mask, test_mask=test_mask)
