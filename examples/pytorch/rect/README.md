@@ -4,6 +4,12 @@ This DGL example implements the GNN model **RECT** (or more specifically its sup
 
 
 
+## Example Implementor
+
+This example was implemented by [Tingzhang Zhao](https://github.com/Fizyhsp) when he was an undergraduate at USTB.
+
+
+
 ## **Dataset and experimental setting**
 
 Two DGL's build-in datasets (Cora and Citeseer) with their default train/val/test settings are used in this example. In addition, as this paper considers the zero-shot (i.e., completely-imbalanced) label setting, those "unseen" classes should be removed from the training set, as suggested in the paper. In this example, in each dataset, we simply remove the 2-3 classes (i.e., these 2-3 classes are unseen classes) from the labeled training set. Then, we obtain graph embedding results by different models. Finally, with the obtained embedding results and the original balanced labels, we train a logistic regression classifier to evaluate the model performance.
