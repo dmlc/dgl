@@ -3,8 +3,7 @@ import numpy as np
 from collections import defaultdict
 
 def remove_unseen_classes_from_training(train_mask, labels, removed_class):
-    ''' Remove the unseen classes (the first three classes by default)
-            to get the zero-shot (i.e., completely imbalanced) label setting
+    ''' Remove the unseen classes (the first three classes by default) to get the zero-shot (i.e., completely imbalanced) label setting
         Input: train_mask, labels, removed_class
         Output: train_mask_zs: the bool list only containing seen classes
     '''
@@ -46,8 +45,8 @@ def get_label_attributes(train_mask_zs, nodeids, labellist, features):
 
 def get_labeled_nodes_label_attribute(train_mask_zs, labels, features, cuda):
     ''' Replace the original labels by their class-centers.
-            For each label c in the training set, the following operations will be performed:
-                Get label_attribute{} through function get_label_attributes, then res[i, :] = label_attribute[c]
+        For each label c in the training set, the following operations will be performed:
+        Get label_attribute{} through function get_label_attributes, then res[i, :] = label_attribute[c]
         Input: train_mask_zs, labels, features
         Output: Y_{semantic} [l, ft]: tensor
     '''
