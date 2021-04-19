@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from classify import evaluate_embedds
+from classify import evaluate_embeds
 from label_utils import remove_unseen_classes_from_training, get_labeled_nodes_label_attribute
 from utils import load_data, svd_feature, process_classids
 from model import GCN, RECT_L
@@ -66,7 +66,7 @@ def main(args):
         embeds = svd_feature(features)
         
     # evaluate the quality of embedding results with the original balanced labels, to assess the model performance (as suggested in the paper)
-    res = evaluate_embedds(features=embeds, labels=labels, train_mask=train_mask, test_mask=test_mask, n_classes=n_classes, cuda=cuda)
+    res = evaluate_embeds(features=embeds, labels=labels, train_mask=train_mask, test_mask=test_mask, n_classes=n_classes, cuda=cuda)
     print("Test Accuracy of {:s}: {:.4f}".format(args.model_opt, res))
     
 if __name__ == '__main__':
