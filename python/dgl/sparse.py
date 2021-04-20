@@ -1,7 +1,6 @@
 """Module for sparse matrix operators."""
 # pylint: disable= invalid-name
 from __future__ import absolute_import
-import scipy.sparse as ssp
 from . import ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
