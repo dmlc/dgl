@@ -17,6 +17,14 @@
 extern "C" void NDArrayDLPackDeleter(DLManagedTensor* tensor);
 
 namespace dgl {
+
+constexpr DLDataType DLDataTypeTraits<int32_t>::dtype;
+constexpr DLDataType DLDataTypeTraits<int64_t>::dtype;
+constexpr DLDataType DLDataTypeTraits<uint32_t>::dtype;
+constexpr DLDataType DLDataTypeTraits<uint64_t>::dtype;
+constexpr DLDataType DLDataTypeTraits<float>::dtype;
+constexpr DLDataType DLDataTypeTraits<double>::dtype;
+
 namespace runtime {
 
 inline void VerifyDataType(DLDataType dtype) {

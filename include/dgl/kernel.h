@@ -73,7 +73,7 @@ std::pair<CSRMatrix, NDArray> CSRSum(
 /*!
  * \brief Return a sparse matrix with the values of A but nonzero entry locations of B.
  */
-NDArray CSRMask(const CSRMatrix& A, NDArray A_weights, const CSRMatrix& B);
+NDArray CSRMask(const CSRMatrix& A, NDArray A_weights, const COOMatrix& B);
 
 }  // namespace aten
 }  // namespace dgl

@@ -198,6 +198,11 @@ inline runtime::NDArray CSRGetAllData(CSRMatrix mat, int64_t row, int64_t col) {
  */
 runtime::NDArray CSRGetData(CSRMatrix, runtime::NDArray rows, runtime::NDArray cols);
 
+template <typename DType>
+runtime::NDArray CSRGetData(
+    CSRMatrix, runtime::NDArray rows, runtime::NDArray cols, runtime::NDArray weights,
+    DType filler);
+
 /*! \brief Return a transposed CSR matrix */
 CSRMatrix CSRTranspose(CSRMatrix csr);
 

@@ -163,7 +163,8 @@ template <typename IdType, typename DType>
 void _TestCsrmask(DLContext ctx = CTX) {
   auto A = CSR_A<IdType, DType>(ctx);
   auto C = CSR_C<IdType, DType>(ctx);
-  auto A_mask_C = aten::CSRMask(A.first, A.second, C.first);
+  auto C_coo = CSRToCOO(C.first, false);
+  auto A_mask_C = aten::CSRGetData<DType>(A.first, C_coo.row, C_coo.col, A.second, 0);
   auto A_mask_C2 = CSR_A_mask_C<DType>(ctx);
   ASSERT_TRUE(ArrayEQ<DType>(A_mask_C, A_mask_C2));
 }
