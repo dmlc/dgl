@@ -50,7 +50,7 @@ def test_csrmask(idtype):
         b, B = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, 9000, 'A', 'B', 'AB')
         C = dgl.sparse.csrmask(A._graph, A.edata['w'], B._graph)
         c = F.tensor(a.tocsr()[b != 0], dtype)
-        assert np.allclose(C, c)
+        assert F.allclose(C, c)
 
 if __name__ == '__main__':
     test_csrmm(F.int32)
