@@ -8,6 +8,7 @@ The folder contains example implementations of selected research papers related 
 
 | Paper                                                        | node classification | link prediction / classification | graph property prediction | sampling           | OGB                |
 | ------------------------------------------------------------ | ------------------- | -------------------------------- | ------------------------- | ------------------ | ------------------ |
+| [Network Embedding with Completely-imbalanced Labels](#rect) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Boost then Convolve: Gradient Boosting Meets Graph Neural Networks](#bgnn) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Contrastive Multi-View Representation Learning on Graphs](#mvgrl) | :heavy_check_mark: |  | :heavy_check_mark: |  |  |
 | [Graph Random Neural Network for Semi-Supervised Learning on Graphs](#grand) | :heavy_check_mark:  |                                  |                           |                    |                    |
@@ -99,6 +100,9 @@ The folder contains example implementations of selected research papers related 
 
 ## 2020
 
+- <a name="rect"></a> Wang et al. Network Embedding with Completely-imbalanced Labels. [Paper link](https://ieeexplore.ieee.org/document/8979355). 
+    - Example code: [PyTorch](../examples/pytorch/rect)
+    - Tags:  node classification, network embedding, completely-imbalanced labels
 - <a name="mvgrl"></a> Hassani and Khasahmadi. Contrastive Multi-View Representation Learning on Graphs. [Paper link](https://arxiv.org/abs/2006.05582). 
     - Example code: [PyTorch](../examples/pytorch/mvgrl)
     - Tags: graph diffusion, self-supervised learning on graphs.
