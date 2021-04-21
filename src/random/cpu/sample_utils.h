@@ -290,7 +290,7 @@ class TreeSampler: public BaseSampler<Idx> {
    * directly set the weight of the chosen category as 0.
    *
    */
-  Idx Draw(const DType *decrease = nullptr) {
+  Idx DrawAndUpdate(const DType *decrease = nullptr) {
     int64_t cur = 1;
     DType p = re->Uniform<DType>(0, weight[cur]);
     DType accum = 0.;
@@ -314,6 +314,10 @@ class TreeSampler: public BaseSampler<Idx> {
       }
     }
     return rst;
+  }
+
+  Idx Draw() {
+    return DrawAndUpdate();
   }
 };
 
