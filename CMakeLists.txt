@@ -25,6 +25,7 @@ endif()
 dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(USE_AVX "Build with AVX optimization" ON)
+dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" ON)
 dgl_option(USE_FP16 "Build with fp16 support to enable mixed precision training" OFF)
 dgl_option(USE_TVM "Build with TVM kernels" OFF)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
@@ -87,10 +88,10 @@ if(MSVC)
 else(MSVC)
   include(CheckCXXCompilerFlag)
   check_cxx_compiler_flag("-std=c++11"    SUPPORT_CXX11)
-  set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
+  set(CMAKE_C_FLAGS "-O2 -Wall -fPIC -march=native ${CMAKE_C_FLAGS}")
   # We still use c++11 flag in CPU build because gcc5.4 (our default compiler) is
   # not fully compatible with c++14 feature.
-  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++11 ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++11 -march=native ${CMAKE_CXX_FLAGS}")
   if(NOT APPLE)
     set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--warn-common ${CMAKE_SHARED_LINKER_FLAGS}")
   endif(NOT APPLE)
@@ -176,6 +177,8 @@ target_include_directories(dgl PRIVATE "third_party/xbyak/")
 target_include_directories(dgl PRIVATE "third_party/METIS/include/")
 target_include_directories(dgl PRIVATE "tensoradapter/include")
 target_include_directories(dgl PRIVATE "third_party/nanoflann/include")
+target_include_directories(dgl PRIVATE "third_party/libxsmm/include")
+#include_directories("$ENV{LIBXSMM_ROOT}/include")
 
 # For serialization
 if (USE_HDFS)
@@ -194,6 +197,15 @@ if(NOT MSVC)
   add_subdirectory("third_party/METIS/libmetis/")
   list(APPEND DGL_LINKER_LIBS metis)
 endif(NOT MSVC)
+
+# Compile LIBXSMM
+if(USE_LIBXSMM)
+  add_custom_target(libxsmm COMMAND make
+                     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/libxsmm
+                     )
+  add_dependencies(dgl libxsmm)
+  list(APPEND DGL_LINKER_LIBS -L${CMAKE_SOURCE_DIR}/third_party/libxsmm/lib/ xsmm)
+endif(USE_LIBXSMM)
 
 # Compile TVM Runtime and Featgraph
 # (NOTE) We compile a dynamic library called featgraph_runtime, which the DGL library links to.
@@ -214,6 +226,7 @@ if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
 endif(LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
+
 if(MSVC)
   add_custom_command(
     TARGET dgl POST_BUILD COMMAND
