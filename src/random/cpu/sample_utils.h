@@ -283,8 +283,11 @@ class TreeSampler: public BaseSampler<Idx> {
    *
    * The parameter decrease is an array of which the length is the number of categories.
    * Every time an element in the category x is picked, the weight of this category is subtracted
-   * by decrease[x]. When decrease == nullptr, it will set the probability of the chosen category
-   * as 0, which represents the behavior of normal non-uniform sampling without replacement.
+   * by decrease[x]. It is used to support the case where a category might contains multiple
+   * candidates and decrease[x] is the weight of one candidate of the category x.
+   *
+   * When decrease == nullptr, it means there is only one candidate in each category and will
+   * directly set the weight of the chosen category as 0.
    *
    */
   Idx Draw(const DType *decrease = nullptr) {
