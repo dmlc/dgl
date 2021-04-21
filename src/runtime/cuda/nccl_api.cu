@@ -23,6 +23,7 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include <limits>
 
 #include "cuda_common.h"
 #include "../../kernel/cuda/atomic.cuh"
@@ -334,16 +335,28 @@ void GenerateSparseBufferFromRemainder(
   // Count the number of values to be sent to each processor, as things are
   // sorted at this point, we can just use run-length encoding
   {
+    using AtomicCount = unsigned long long; // NOLINT
+    static_assert(sizeof(AtomicCount) == sizeof(int64_t),
+        "AtomicCount must be the same width as int64_t for atomicAdd "
+        "in cub::DeviceHistogram::HistogramEven() to work");
+
+    // TODO(dlasalle): Once https://github.com/NVIDIA/cub/pull/287 is merged,
+    // add a compile time check against the cub version to allow
+    // num_in > (2 << 31).
+    CHECK(num_in < static_cast<int64_t>(std::numeric_limits<int>::max())) <<
+        "number of values to insert into histogram must be less than max "
+        "value of int.";
+
     size_t hist_workspace_size;
     CUDA_CALL(cub::DeviceHistogram::HistogramEven(
         nullptr,
         hist_workspace_size,
         out_idx,
-        out_counts,
+        reinterpret_cast<AtomicCount*>(out_counts),
         comm_size+1,
         static_cast<IdType>(0),
         static_cast<IdType>(comm_size+1),
-        num_in,
+        static_cast<int>(num_in),
         stream));
 
     void * hist_workspace = device->AllocWorkspace(ctx, hist_workspace_size);
@@ -351,11 +364,11 @@ void GenerateSparseBufferFromRemainder(
         hist_workspace,
         hist_workspace_size,
         out_idx,
-        out_counts,
+        reinterpret_cast<AtomicCount*>(out_counts),
         comm_size+1,
         static_cast<IdType>(0),
         static_cast<IdType>(comm_size+1),
-        num_in,
+        static_cast<int>(num_in),
         stream));
     device->FreeWorkspace(ctx, hist_workspace);
   }
