@@ -279,7 +279,7 @@ class TreeSampler: public BaseSampler<Idx> {
     ResetState(prob);
   }
 
-  Idx Draw() {
+  Idx Draw(const DType *decrease = nullptr) {
     int64_t cur = 1;
     DType p = re->Uniform<DType>(0, weight[cur]);
     DType accum = 0.;
@@ -296,33 +296,7 @@ class TreeSampler: public BaseSampler<Idx> {
     if (!replace) {
       while (cur >= 1) {
         if (cur >= num_leafs)
-          weight[cur] = 0.;
-        else
-          weight[cur] = weight[cur * 2] + weight[cur * 2 + 1];
-        cur /= 2;
-      }
-    }
-    return rst;
-  }
-
-  Idx DrawAndUpdate(const DType *decrease) {
-    int64_t cur = 1;
-    DType p = re->Uniform<DType>(0, weight[cur]);
-    DType accum = 0.;
-    while (cur < num_leafs) {
-      DType w_l = weight[cur * 2], w_r = weight[cur * 2 + 1];
-      DType pivot = accum + w_l;
-      // w_r > 0 can depress some numerical problems.
-      Idx shift = static_cast<Idx>(p > pivot && w_r > 0);
-      cur = cur * 2 + shift;
-      if (shift == 1)
-        accum = pivot;
-    }
-    Idx rst = cur - num_leafs;
-    if (!replace) {
-      while (cur >= 1) {
-        if (cur >= num_leafs)
-          weight[cur] -= decrease[rst];
+          weight[cur] = decrease ? weight[cur] - decrease[rst] : 0.;
         else
           weight[cur] = weight[cur * 2] + weight[cur * 2 + 1];
         cur /= 2;
