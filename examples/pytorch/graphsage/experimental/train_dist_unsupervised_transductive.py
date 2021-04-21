@@ -22,93 +22,30 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 from dgl.distributed import DistDataLoader
 
-from dgl.distributed.nn import NodeEmbedding
 from dgl.distributed.optim import SparseAdagrad
 from train_dist_unsupervised import SAGE, NeighborSampler, PosNeighborSampler, CrossEntropyLoss, compute_acc
+from train_dist_transductive import DistEmb
 
-def initializer(shape, dtype):
-    arr = th.zeros(shape, dtype=dtype)
-    arr.uniform_(-1, 1)
-    return arr
+def load_embs(emb_layer, g):
+    nodes = dgl.distributed.node_split(np.arange(g.number_of_nodes()),
+                                       g.get_partition_book(), force_even=True)
+    x = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_hidden), th.float32, 'inputs',
+                                    persistent=True,  is_gdata=False)
+    num_nodes = nodes.shape[0]
+    for i in range((num_nodes + 1023) // 1024):
+        idx = nodes[i * 1024: (i+1) * 1024 \
+                    if (i+1) * 1024 < num_nodes \
+                    else num_nodes]
+        embeds = embed_layer(idx).cpu()
+        x[idx] = embeds
+    g.barrier()
 
-class DistEmb(nn.Module):
-    def __init__(self, num_nodes, emb_size, dev_id='cpu'):
-        super().__init__()
-        self.dev_id = dev_id
-        self.emb = NodeEmbedding(num_nodes, emb_size, name='sage', init_func=initializer)
-
-    def forward(self, idx):
-        return self.emb(idx, device=self.dev_id)
-
-class DistSAGE(SAGE):
-    def __init__(self, in_feats, n_hidden, n_classes, n_layers,
-                 activation, dropout):
-        super(DistSAGE, self).__init__(in_feats, n_hidden, n_classes, n_layers,
-                                       activation, dropout)
-
-    def inference(self, g, emb_layer, batch_size, device):
-        """
-        Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
-        g : the entire graph.
-        x : the input of entire node set.
-
-        The inference code is written in a fashion that it could handle any number of nodes and
-        layers.
-        """
-        # During inference with sampling, multi-layer blocks are very inefficient because
-        # lots of computations in the first few layers are repeated.
-        # Therefore, we compute the representation of all nodes layer by layer.  The nodes
-        # on each layer are of course splitted in batches.
-        # TODO: can we standardize this?
-        nodes = dgl.distributed.node_split(np.arange(g.number_of_nodes()),
-                                           g.get_partition_book(), force_even=True)
-        y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_hidden), th.float32, 'h',
-                                       persistent=True)
-        for l, layer in enumerate(self.layers):
-            if l == len(self.layers) - 1:
-                y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_classes),
-                                               th.float32, 'h_last', persistent=True)
-
-            sampler = PosNeighborSampler(g, [-1], dgl.distributed.sample_neighbors)
-            print('|V|={}, eval batch size: {}'.format(g.number_of_nodes(), batch_size))
-            # Create PyTorch DataLoader for constructing blocks
-            dataloader = DistDataLoader(
-                dataset=nodes,
-                batch_size=batch_size,
-                collate_fn=sampler.sample_blocks,
-                shuffle=False,
-                drop_last=False)
-
-            for blocks in tqdm.tqdm(dataloader):
-                block = blocks[0].to(device)
-                input_nodes = block.srcdata[dgl.NID]
-                output_nodes = block.dstdata[dgl.NID]
-                if l == 0:
-                    h = emb_layer(input_nodes)
-                else:
-                    h = x[input_nodes].to(device)
-                h_dst = h[:block.number_of_dst_nodes()]
-                h = layer(block, (h, h_dst))
-                if l != len(self.layers) - 1:
-                    h = self.activation(h)
-                    h = self.dropout(h)
-
-                y[output_nodes] = h.cpu()
-
-            x = y
-            g.barrier()
-        return y
-
-def load_subtensor(g, input_nodes, device):
-    """
-    Copys features and labels of a set of nodes onto GPU.
-    """
-    batch_inputs = g.ndata['features'][input_nodes].to(device)
-    return batch_inputs
+    return x
 
 def generate_emb(model, emb_layer, g, batch_size, device):
     """
     Generate embeddings for each node
+    emb_layer : Embedding layer
     g : The entire graph.
     inputs : The features of all the nodes.
     batch_size : Number of nodes to compute at the same time.
@@ -117,8 +54,9 @@ def generate_emb(model, emb_layer, g, batch_size, device):
     model.eval()
     emb_layer.eval()
     with th.no_grad():
-        pred = model.inference(g, emb_layer, batch_size, device)
-
+        inputs = load_embs(emb_layer, g)
+        pred = model.inference(g, inputs, batch_size, device)
+    g.barrier()
     return pred
 
 def run(args, device, data):
@@ -137,8 +75,8 @@ def run(args, device, data):
         drop_last=False)
 
     # Define model and optimizer
-    emb_layer = DistEmb(g.num_nodes(), args.num_hidden, device)
-    model = DistSAGE(args.num_hidden, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
+    emb_layer = DistEmb(g.num_nodes(), args.num_hidden, dgl_sparse_emb=args.dgl_sparse, dev_id=device)
+    model = SAGE(args.num_hidden, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
     if not args.standalone:
         if args.num_gpus == -1:
@@ -146,10 +84,21 @@ def run(args, device, data):
         else:
             dev_id = g.rank() % args.num_gpus
             model = th.nn.parallel.DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
+            if not args.dgl_sparse:
+                emb_layer = th.nn.parallel.DistributedDataParallel(emb_layer)
     loss_fcn = CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    sparse_optimizer = SparseAdagrad([emb_layer.emb], lr=args.lr)
+
+    if args.dgl_sparse:
+        emb_optimizer = dgl.distributed.optim.SparseAdagrad([emb_layer.sparse_emb], lr=args.sparse_lr)
+        print('optimize DGL sparse embedding:', emb_layer.sparse_emb)
+    elif args.standalone:
+        emb_optimizer = th.optim.SparseAdam(list(emb_layer.sparse_emb.parameters()), lr=args.sparse_lr)
+        print('optimize Pytorch sparse embedding:', emb_layer.sparse_emb)
+    else:
+        emb_optimizer = th.optim.SparseAdam(list(emb_layer.module.sparse_emb.parameters()), lr=args.sparse_lr)
+        print('optimize Pytorch sparse embedding:', emb_layer.module.sparse_emb)
 
     # Training loop
     epoch = 0
@@ -194,7 +143,7 @@ def run(args, device, data):
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, pos_graph, neg_graph)
             forward_end = time.time()
-            sparse_optimizer.zero_grad()
+            emb_optimizer.zero_grad()
             optimizer.zero_grad()
             loss.backward()
             compute_end = time.time()
@@ -202,7 +151,7 @@ def run(args, device, data):
             backward_t.append(compute_end - forward_end)
 
             # Aggregate gradients in multiple nodes.
-            sparse_optimizer.step()
+            emb_optimizer.step()
             optimizer.step()
             update_t.append(time.time() - compute_end)
 
@@ -250,7 +199,7 @@ def run(args, device, data):
         th.save(pred, 'emb.pt')
 
 def main(args):
-    dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
+    dgl.distributed.initialize(args.ip_config)
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
     g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
@@ -286,11 +235,10 @@ if __name__ == '__main__':
     parser.add_argument('--id', type=int, help='the partition id')
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
     parser.add_argument('--part_config', type=str, help='The path to the partition config file')
-    parser.add_argument('--num_servers', type=int, default=1, help='Server count on each machine.')
     parser.add_argument('--n_classes', type=int, help='the number of classes')
     parser.add_argument('--num_gpus', type=int, default=-1,
                         help="the number of GPU device. Use -1 for CPU training")
-    parser.add_argument('--num_epochs', type=int, default=20)
+    parser.add_argument('--num_epochs', type=int, default=5)
     parser.add_argument('--num_hidden', type=int, default=16)
     parser.add_argument('--num-layers', type=int, default=2)
     parser.add_argument('--fan_out', type=str, default='10,25')
@@ -300,8 +248,6 @@ if __name__ == '__main__':
     parser.add_argument('--eval_every', type=int, default=5)
     parser.add_argument('--lr', type=float, default=0.003)
     parser.add_argument('--dropout', type=float, default=0.5)
-    parser.add_argument('--num_workers', type=int, default=0,
-        help="Number of sampling processes. Use 0 for no extra process.")
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
     parser.add_argument('--num_negs', type=int, default=1)
@@ -309,11 +255,10 @@ if __name__ == '__main__':
         help="sharing neg nodes for positive nodes")
     parser.add_argument('--remove_edge', default=False, action='store_true',
         help="whether to remove edges during sampling")
+    parser.add_argument("--dgl_sparse", action='store_true',
+            help='Whether to use DGL sparse embedding')
+    parser.add_argument("--sparse_lr", type=float, default=1e-2,
+            help="sparse lr rate")
     args = parser.parse_args()
-    assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')), \
-    'The num_workers should be the same value with DGL_NUM_SAMPLER.'
-    assert args.num_servers == int(os.environ.get('DGL_NUM_SERVER')), \
-    'The num_servers should be the same value with DGL_NUM_SERVER.'
-
     print(args)
     main(args)
