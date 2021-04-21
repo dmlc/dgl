@@ -279,6 +279,14 @@ class TreeSampler: public BaseSampler<Idx> {
     ResetState(prob);
   }
 
+  /* Pick an element from the given distribution and update the tree.
+   *
+   * The parameter decrease is an array of which the length is the number of categories.
+   * Every time an element in the category x is picked, the weight of this category is subtracted
+   * by decrease[x]. When decrease == nullptr, it will set the probability of the chosen category
+   * as 0, which represents the behavior of normal non-uniform sampling without replacement.
+   *
+   */
   Idx Draw(const DType *decrease = nullptr) {
     int64_t cur = 1;
     DType p = re->Uniform<DType>(0, weight[cur]);
