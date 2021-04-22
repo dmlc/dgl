@@ -370,6 +370,9 @@ def csrmm(A, A_weights, B, B_weights, num_vtypes):
     """Return a graph whose adjacency matrix is the sparse matrix multiplication
     of those of two given graphs.
 
+    Note that the edge weights of both graphs must be scalar, i.e. :attr:`A_weights`
+    and :attr:`B_weights` must be 1D vectors.
+
     Parameters
     ----------
     A : HeteroGraphIndex
@@ -398,6 +401,9 @@ def csrsum(As, A_weights):
     """Return a graph whose adjacency matrix is the sparse matrix summation
     of the given list of graphs.
 
+    Note that the edge weights of all graphs must be scalar, i.e. the arrays in 
+    :attr:`A_weights` must be 1D vectors.
+
     Parameters
     ----------
     As : list[HeteroGraphIndex]
@@ -418,6 +424,12 @@ def csrsum(As, A_weights):
 def csrmask(A, A_weights, B):
     """Return the weights of A at the locations identical to the sparsity pattern
     of B.
+
+    If a non-zero entry in B does not exist in A, DGL returns 0 for that location
+    instead.
+
+    Note that the edge weights of the graph must be scalar, i.e. :attr:`A_weights`
+    must be a 1D vector.
 
     In scipy notation this is identical to ``A[B != 0]``.
 

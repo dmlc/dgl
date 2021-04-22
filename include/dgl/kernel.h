@@ -55,7 +55,8 @@ void SDDMM(const std::string& op,
 /*!
  * \brief Sparse-sparse matrix multiplication.
  *
- * \note B is transposed (i.e. in CSC format).
+ * The sparse matrices must have scalar weights (i.e. \a A_weights and \a B_weights
+ * are 1D vectors.)
  */
 std::pair<CSRMatrix, NDArray> CSRMM(
     CSRMatrix A,
@@ -64,16 +65,14 @@ std::pair<CSRMatrix, NDArray> CSRMM(
     NDArray B_weights);
 
 /*!
- * \brief Sparse-sparse matrix summation.
+ * \brief Summing up a list of sparse matrices.
+ *
+ * The sparse matrices must have scalar weights (i.e. the arrays in \a A_weights
+ * are 1D vectors.)
  */
 std::pair<CSRMatrix, NDArray> CSRSum(
     const std::vector<CSRMatrix>& A,
     const std::vector<NDArray>& A_weights);
-
-/*!
- * \brief Return a sparse matrix with the values of A but nonzero entry locations of B.
- */
-NDArray CSRMask(const CSRMatrix& A, NDArray A_weights, const COOMatrix& B);
 
 }  // namespace aten
 }  // namespace dgl

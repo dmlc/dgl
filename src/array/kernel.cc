@@ -134,6 +134,9 @@ std::pair<CSRMatrix, NDArray> CSRMM(
     NDArray A_weights,
     CSRMatrix B,
     NDArray B_weights) {
+  CHECK_EQ(A_csr.num_cols, B_csr.num_rows) <<
+    "The number of nodes of destination node type of the first graph must be the "
+    "same as the number of nodes of source node type of the second graph.";
   CheckCtx(
       A.indptr->ctx,
       {A_weights, B_weights},
@@ -159,9 +162,11 @@ std::pair<CSRMatrix, NDArray> CSRSum(
   CHECK(A.size() > 0) << "The list of graphs must not be empty.";
   CHECK_EQ(A.size(), A_weights.size()) <<
     "The list of edge weights must have the same length as the list of graphs.";
-  auto ctx = A[0].indptr->ctx;
-  auto idtype = A[0].indptr->dtype;
-  auto dtype = A_weights[0]->dtype;
+  const auto ctx = A[0].indptr->ctx;
+  const auto idtype = A[0].indptr->dtype;
+  const auto dtype = A_weights[0]->dtype;
+  const auto num_rows = A[0].num_rows;
+  const auto num_cols = A[0].num_cols;
   for (size_t i = 0; i < A.size(); ++i) {
     CHECK_EQ(A[i].indptr->ctx, ctx) << "The devices of all graphs must be equal.";
     CHECK_EQ(A[i].indptr->dtype, idtype) << "The ID types of all graphs must be equal.";
@@ -171,6 +176,8 @@ std::pair<CSRMatrix, NDArray> CSRSum(
       "The devices of edge weights must be the same as that of the graphs.";
     CHECK_EQ(A_weights[i]->dtype, dtype) <<
       "The data types of all edge weights must be equal.";
+    CHECK_EQ(A[i].num_rows, num_rows) << "Graphs must have the same number of nodes.";
+    CHECK_EQ(A[i].num_cols, num_cols) << "Graphs must have the same number of nodes.";
   }
 
   std::pair<CSRMatrix, NDArray> ret;
@@ -291,13 +298,10 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLCSRMM")
 
     const HeteroGraphPtr A = A_ref.sptr();
     const HeteroGraphPtr B = B_ref.sptr();
-    CHECK_EQ(A->NumEdgeTypes(), 1) << "Graph must have one edge type.";
-    CHECK_EQ(A->NumEdgeTypes(), 1) << "Graph must have one edge type.";
-    CHECK_EQ(A->NumVertices(A->NumVertexTypes() - 1), B->NumVertices(0)) <<
-      "Number of vertices do not match.";
+    CHECK_EQ(A->NumEdgeTypes(), 1) << "The first graph must have only one edge type.";
+    CHECK_EQ(B->NumEdgeTypes(), 1) << "The second graph must have only one edge type.";
     const auto A_csr = A_ref.sptr()->GetCSRMatrix(0);
     const auto B_csr = B_ref.sptr()->GetCSRMatrix(0);
-    CHECK_EQ(A_csr.num_cols, B_csr.num_rows) << "Number of nodes mismatch.";
     auto result = CSRMM(A_csr, A_weights, B_csr, B_weights);
 
     List<ObjectRef> ret;
@@ -338,13 +342,18 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLCSRMask")
 
     const HeteroGraphPtr A = A_ref.sptr();
     const HeteroGraphPtr B = B_ref.sptr();
-    CHECK_EQ(A->NumEdgeTypes(), 1) << "Graph must have only one edge type.";
-    CHECK_EQ(B->NumEdgeTypes(), 1) << "Graph must have only one edge type.";
+    CHECK_EQ(A->NumEdgeTypes(), 1) << "Both graphs must have only one edge type.";
+    CHECK_EQ(B->NumEdgeTypes(), 1) << "Both graphs must have only one edge type.";
+    const CSRMatrix& A_csr = A->GetCSRMatrix(0);
+    const COOMatrix& B_coo = B->GetCOOMatrix(0);
+    CHECK_EQ(A_csr.num_rows, B_csr.num_rows) <<
+      "Both graphs must have the same number of nodes.";
+    CHECK_EQ(A_coo.num_cols, B_coo.num_cols) <<
+      "Both graphs must have the same number of nodes.";
 
     NDArray result;
     ATEN_FLOAT_TYPE_SWITCH(A_weights->dtype, DType, "Edge weights", {
-      auto B_coo = B->GetCOOMatrix(0);
-      result = aten::CSRGetData<DType>(A->GetCSRMatrix(0), B_coo.row, B_coo.col, A_weights, 0.);
+      result = aten::CSRGetData<DType>(A_csr, B_coo.row, B_coo.col, A_weights, 0.);
     });
     *rv = result;
   });

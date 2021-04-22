@@ -106,8 +106,6 @@ template <int XPU, typename IdType, typename DType>
 std::pair<CSRMatrix, NDArray> CSRSum(
     const std::vector<CSRMatrix>& As,
     const std::vector<NDArray>& A_weights) {
-  CHECK(As.size() > 0) << "List of matrices can't be empty.";
-  CHECK_EQ(As.size(), A_weights.size()) << "List of matrices and weights must have same length";
   const int64_t M = As[0].num_rows;
   const int64_t N = As[0].num_cols;
   const int64_t n = As.size();

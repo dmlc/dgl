@@ -57,14 +57,6 @@ template NDArray CSRGetData<kDLGPU, int32_t, double>(
 template NDArray CSRGetData<kDLGPU, int64_t, double>(
     CSRMatrix csr, NDArray rows, NDArray cols, NDArray weights, double filler);
 
-template <DLDeviceType XPU, typename IdType>
-NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
-  return CSRGetData<XPU, IdType, IdType>(csr, rows, cols, NullArray(rows->dtype), -1);
-}
-
-template NDArray CSRGetData<kDLGPU, int32_t>(CSRMatrix csr, NDArray rows, NDArray cols);
-template NDArray CSRGetData<kDLGPU, int64_t>(CSRMatrix csr, NDArray rows, NDArray cols);
-
 }  // namespace impl
 }  // namespace aten
 }  // namespace dgl
