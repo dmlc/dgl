@@ -1,7 +1,7 @@
 import copy
 import torch.nn as nn
 import dgl
-from modules import MemoryModule, MemoryOperation, TemporalGATConv, MsgLinkPredictor,TemporalTransformerConv,TimeEncode
+from modules import MemoryModule, MemoryOperation, TemporalGATConv, MsgLinkPredictor,TemporalTransformerConv,TimeEncode,TimeIntenseEncode
 
 class TGN(nn.Module):
     def __init__(self,
@@ -26,7 +26,7 @@ class TGN(nn.Module):
         self.num_nodes = num_nodes
         self.layers = layers
 
-        self.temporal_encoder = TimeEncode(self.temporal_dim)
+        self.temporal_encoder = TimeIntenseEncode(self.temporal_dim)
 
         self.memory = MemoryModule(self.num_nodes,
                                    self.memory_dim)
@@ -43,7 +43,7 @@ class TGN(nn.Module):
                                               self.embedding_dim,
                                               self.num_heads,
                                               layers = self.layers,
-                                              allow_zero_in_degree=False,
+                                              allow_zero_in_degree=True,
                                               attn_model=model)
         elif model == 'original':
             self.embedding_attn = TemporalGATConv(self.edge_feat_dim,
@@ -57,7 +57,7 @@ class TGN(nn.Module):
 
     def embed(self, postive_graph, negative_graph, blocks):
         emb_graph = blocks[0]
-        emb_graph = dgl.add_self_loop(emb_graph)
+        #emb_graph = dgl.add_self_loop(emb_graph)
         emb_memory = self.memory.memory[emb_graph.ndata[dgl.NID], :]
         emb_t = emb_graph.ndata['timestamp']
         embedding = self.embedding_attn(emb_graph, emb_memory, emb_t)

@@ -65,7 +65,6 @@ class MergeLayer(nn.Module):
         h = self.act(self.fc1(x))
         return self.fc2(h)
 
-
 class MsgLinkPredictor(nn.Module):
     """Predict Pair wise link from pos subg and neg subg
     use message passing.
@@ -121,7 +120,6 @@ class MsgLinkPredictor(nn.Module):
         neg_escore = neg_g.edata['score']
         return pos_escore, neg_escore
 
-
 class TimeEncode(nn.Module):
     """Use finite fourier series with different phase and frequency to encode
     time different between two event
@@ -149,17 +147,44 @@ class TimeEncode(nn.Module):
 
         self.dimension = dimension
         self.w = torch.nn.Linear(1, dimension)
+        #self.w2 = torch.nn.Linear(1,dimension//2)
+        #self.w2.weight = torch.nn.Parameter((torch.from_numpy(1 / 10 ** np.linspace(0, 9, dimension//2)))
+        #                                   .double().reshape(dimension//2, -1))
 
         self.w.weight = torch.nn.Parameter((torch.from_numpy(1 / 10 ** np.linspace(0, 9, dimension)))
                                            .double().reshape(dimension, -1))
+        
         self.w.bias = torch.nn.Parameter(torch.zeros(dimension).double())
+        #self.w2.bias = torch.nn.Parameter(torch.zeros(dimension//2).double())
+        #self.w.requires_grad_(False)
 
     def forward(self, t):
         t = t.unsqueeze(dim=2)
         output = torch.cos(self.w(t))
+        #output2 = torch.cos(self.w2(t))
+        #output = torch.cat([output1,output2],dim=1)
         return output
 
+class TimeIntenseEncode(nn.Module):
+    def __init__(self,dimension):
+        super(TimeIntenseEncode,self).__init__()
+        self.dimension = dimension
+        self.w = nn.Linear(1,dimension//2)
+        self.w_exp = nn.Linear(1,dimension//2,bias = False)
 
+        self.w.weight = torch.nn.Parameter((torch.from_numpy(1 / 10 ** np.linspace(0, 9, dimension//2)))
+                                           .double().reshape(dimension//2, -1))
+        self.w_exp.weight = torch.nn.Parameter((torch.from_numpy(-(1 / 10 ** np.linspace(0, 9, dimension//2))))
+                                           .double().reshape(dimension//2, -1))
+        self.w.bias = torch.nn.Parameter(torch.zeros(dimension//2).double())
+
+    def forward(self,t):
+        t = t.unsqueeze(dim=2)
+        output1 = torch.cos(self.w(t))
+        output2 = torch.exp(torch.clamp(self.w_exp(t),max=0)) # Don not allow exponential explosion
+        output = torch.cat([output1,output2],dim=1)
+        return output
+        
 class MemoryModule(nn.Module):
     """Memory module as well as update interface
 
@@ -233,7 +258,6 @@ class MemoryModule(nn.Module):
         times
         """
         self.memory.detach_()
-
 
 class MemoryOperation(nn.Module):
     """ Memory update using message passing manner, update memory based on positive
@@ -318,7 +342,6 @@ class MemoryOperation(nn.Module):
         self.stick_feat_to_graph(g)
         g.update_all(self.msg_fn_cat, self.agg_last, self.update_memory)
         return g
-
 
 class TemporalGATConv(nn.Module):
     """Dot Product based embedding with temporal encoding
@@ -450,7 +473,6 @@ class TemporalGATConv(nn.Module):
         rst = self.merge(rst.view(-1, self._num_heads *
                                   self._out_feats), graph.dstdata['s'])
         return rst
-
 
 class EdgeDotGATConv(nn.Module):
     def __init__(self,
@@ -636,6 +658,7 @@ class TemporalEdgePreprocess(nn.Module):
 
 # TODO: Add Temporal edge wrapping module which can replace TemporalGATConv
 # Float and double problem is expected
+
 class TemporalTransformerConv(nn.Module):
     def __init__(self,
                  edge_feats,
@@ -701,6 +724,50 @@ class TemporalTransformerConv(nn.Module):
         rst = self.layer_list[-1](graph,rst,efeat).mean(1)
         return rst
 
+'''
+class TemporalTransformerConv(nn.Module):
+    def __init__(self,
+                 edge_feats,
+                 memory_feats,
+                 temporal_encoder,
+                 out_feats,
+                 num_heads,
+                 allow_zero_in_degree=False,
+                 attn_model = 'add',
+                 layers = 1):
+        super(TemporalTransformerConv,self).__init__()
+        self._edge_feats = edge_feats
+        self._memory_feats = memory_feats
+        self.temporal_encoder = temporal_encoder
+        self._out_feats = out_feats
+        self._allow_zero_in_degree = allow_zero_in_degree
+        self._num_heads = num_heads
+        # which is the case that the named variabe
+        self.preprocessor = TemporalEdgePreprocess(self._edge_feats,self.temporal_encoder)
+        if attn_model == 'add':
+            self.transformer = EdgeGATConv(node_feats = self._memory_feats,
+                                           edge_feats = self._edge_feats+self.temporal_encoder.dimension,
+                                           out_feats = self._out_feats,
+                                           num_heads = self._num_heads,
+                                           feat_drop = 0.6,
+                                           attn_drop = 0.6,
+                                           residual = True,
+                                           allow_zero_in_degree = allow_zero_in_degree)
+        if attn_model == 'dot':
+            self.transformer = EdgeDotGATConv(node_feats = self._memory_feats,
+                                              edge_feats = self._edge_feats+self.temporal_encoder.dimension,
+                                              out_feats = self._out_feats,
+                                              num_heads = self._num_heads,
+                                              residual = True,
+                                              allow_zero_in_degree=allow_zero_in_degree)
+
+    def forward(self,graph,memory,ts):
+        graph = graph.local_var()
+        graph.ndata['timestamp'] = ts
+        efeat = self.preprocessor(graph).float()
+        rst = self.transformer(graph,memory,efeat).mean(1)
+        return rst
+'''
 # Unit test of edge conv
 if __name__ == "__main__":
     graph = dgl.graph(([0,1,2,3,4],[1,2,3,4,0]))

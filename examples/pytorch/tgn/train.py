@@ -24,7 +24,7 @@ np.random.seed(2021)
 torch.manual_seed(2021)
 
 
-def train(model, dataloader, sampler, criterion, optimizer, batch_size, fast_mode):
+def train(model, dataloader, sampler, criterion, optimizer, args):
     model.train()
     total_loss = 0
     batch_cnt = 0
@@ -36,12 +36,13 @@ def train(model, dataloader, sampler, criterion, optimizer, batch_size, fast_mod
         loss = criterion(pred_pos, torch.ones_like(pred_pos))
         loss += criterion(pred_neg, torch.zeros_like(pred_neg))
         total_loss += float(loss)*batch_size
-        retain_graph = True if batch_cnt == 0 and not fast_mode else False
+        retain_graph = True if batch_cnt == 0 and not args.fast_mode else False
         loss.backward(retain_graph=retain_graph)
         optimizer.step()
         model.detach_memory()
-        #model.update_memory(positive_pair_g)
-        if fast_mode:
+        if args.use_memory:
+            model.update_memory(positive_pair_g)
+        if args.fast_mode:
             sampler.attach_last_update(model.memory.last_update_t)
         print("Batch: ", batch_cnt, "Time: ", time.time()-last_t)
         last_t = time.time()
@@ -49,9 +50,9 @@ def train(model, dataloader, sampler, criterion, optimizer, batch_size, fast_mod
     return total_loss
 
 
-def test_val(model, dataloader, sampler, criterion, batch_size, fast_mode):
+def test_val(model, dataloader, sampler, criterion, args):
     model.eval()
-    batch_size = batch_size
+    batch_size = args.batch_size
     total_loss = 0
     aps, aucs = [], []
     batch_cnt = 0
@@ -65,8 +66,9 @@ def test_val(model, dataloader, sampler, criterion, batch_size, fast_mode):
             y_pred = torch.cat([pred_pos, pred_neg], dim=0).sigmoid().cpu()
             y_true = torch.cat(
                 [torch.ones(pred_pos.size(0)), torch.zeros(pred_neg.size(0))], dim=0)
-            model.update_memory(postive_pair_g)
-            if fast_mode:
+            if args.use_memory:
+                model.update_memory(postive_pair_g)
+            if args.fast_mode:
                 sampler.attach_last_update(model.memory.last_update_t)
             aps.append(average_precision_score(y_true, y_pred))
             aucs.append(roc_auc_score(y_true, y_pred))
@@ -107,7 +109,9 @@ if __name__ == "__main__":
                         help="dataset selection wikipedia/reddit")
     parser.add_argument("--k_hop", type=int, default=1,
                         help="sampling k-hop neighborhood")
-    parser.add_argument("--model",type=str,default='original',help='attention model [add/dot/original]')                     
+    parser.add_argument("--model",type=str,default='original',help='attention model [add/dot/original]')
+    parser.add_argument("--use_memory",action="store_true",default=False,
+                        help="Enable memory for TGN Model disable memory for TGN Model")                     
 
     args = parser.parse_args()
 
