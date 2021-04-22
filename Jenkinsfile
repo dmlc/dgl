@@ -153,12 +153,12 @@ pipeline {
         }
         script {
           def prOpenTriggerCause = currentBuild.getBuildCauses('jenkins.branch.BranchEventCause')
-              if (prOpenTriggerCause) {
+          if (prOpenTriggerCause) {
             if (env.BUILD_ID == '1') {
               pullRequest.comment('To trigger regression tests: \n - `@dgl-bot run [instance-type] [which tests] [compare-with-branch]`; \n For example: `@dgl-bot run g4dn.4xlarge all dmlc/master` or `@dgl-bot run c5.9xlarge kernel,api dmlc/master`')
             }
-              }
-              echo('Build was not started by a trigger')
+          }
+          echo('Not the first build')
         }
       }
     }
