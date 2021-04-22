@@ -1,7 +1,8 @@
 import copy
 import torch.nn as nn
 import dgl
-from modules import MemoryModule, MemoryOperation, TemporalGATConv, MsgLinkPredictor,TemporalTransformerConv,TimeEncode,TimeIntenseEncode
+from modules import MemoryModule, MemoryOperation, MsgLinkPredictor, TemporalTransformerConv, TimeEncode
+
 
 class TGN(nn.Module):
     def __init__(self,
@@ -10,11 +11,10 @@ class TGN(nn.Module):
                  temporal_dim,
                  embedding_dim,
                  num_heads,
-                 num_nodes,  # entire graph
+                 num_nodes,
                  n_neighbors=10,
                  memory_updater_type='gru',
-                 model='original',
-                 layers=1): # dot / original / additive
+                 layers=1):
         super(TGN, self).__init__()
         self.memory_dim = memory_dim
         self.edge_feat_dim = edge_feat_dim
@@ -26,7 +26,7 @@ class TGN(nn.Module):
         self.num_nodes = num_nodes
         self.layers = layers
 
-        self.temporal_encoder = TimeIntenseEncode(self.temporal_dim)
+        self.temporal_encoder = TimeEncode(self.temporal_dim)
 
         self.memory = MemoryModule(self.num_nodes,
                                    self.memory_dim)
@@ -36,32 +36,21 @@ class TGN(nn.Module):
                                           self.edge_feat_dim,
                                           self.temporal_encoder)
 
-        if model in ['dot','add']:
-            self.embedding_attn = TemporalTransformerConv(self.edge_feat_dim,
-                                              self.memory_dim,
-                                              self.temporal_encoder,
-                                              self.embedding_dim,
-                                              self.num_heads,
-                                              layers = self.layers,
-                                              allow_zero_in_degree=True,
-                                              attn_model=model)
-        elif model == 'original':
-            self.embedding_attn = TemporalGATConv(self.edge_feat_dim,
-                                                  self.memory_dim,
-                                                  self.temporal_encoder,
-                                                  self.embedding_dim,
-                                                  self.num_heads,
-                                                  allow_zero_in_degree = False)
+        self.embedding_attn = TemporalTransformerConv(self.edge_feat_dim,
+                                                      self.memory_dim,
+                                                      self.temporal_encoder,
+                                                      self.embedding_dim,
+                                                      self.num_heads,
+                                                      layers=self.layers,
+                                                      allow_zero_in_degree=True)
 
         self.msg_linkpredictor = MsgLinkPredictor(embedding_dim)
 
     def embed(self, postive_graph, negative_graph, blocks):
         emb_graph = blocks[0]
-        #emb_graph = dgl.add_self_loop(emb_graph)
         emb_memory = self.memory.memory[emb_graph.ndata[dgl.NID], :]
         emb_t = emb_graph.ndata['timestamp']
         embedding = self.embedding_attn(emb_graph, emb_memory, emb_t)
-        # TODO: Implement Xuhong's embedding
         emb2pred = dict(
             zip(emb_graph.ndata[dgl.NID].tolist(), emb_graph.nodes().tolist()))
         # Since postive graph and negative graph has same is mapping
@@ -95,7 +84,6 @@ class TGN(nn.Module):
         self.memory.last_update_time = memory_checkpoint['last_t']
 
     def get_temporal_weight(self):
-        weight = copy.deepcopy(self.temporal_encoder.w.weight.detach().numpy().reshape(-1))
+        weight = copy.deepcopy(
+            self.temporal_encoder.w.weight.detach().numpy().reshape(-1))
         return weight
-
-

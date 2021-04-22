@@ -35,12 +35,12 @@ def train(model, dataloader, sampler, criterion, optimizer, args):
             positive_pair_g, negative_pair_g, blocks)
         loss = criterion(pred_pos, torch.ones_like(pred_pos))
         loss += criterion(pred_neg, torch.zeros_like(pred_neg))
-        total_loss += float(loss)*batch_size
+        total_loss += float(loss)*args.batch_size
         retain_graph = True if batch_cnt == 0 and not args.fast_mode else False
         loss.backward(retain_graph=retain_graph)
         optimizer.step()
         model.detach_memory()
-        if args.use_memory:
+        if not args.not_use_memory:
             model.update_memory(positive_pair_g)
         if args.fast_mode:
             sampler.attach_last_update(model.memory.last_update_t)
@@ -66,7 +66,7 @@ def test_val(model, dataloader, sampler, criterion, args):
             y_pred = torch.cat([pred_pos, pred_neg], dim=0).sigmoid().cpu()
             y_true = torch.cat(
                 [torch.ones(pred_pos.size(0)), torch.zeros(pred_neg.size(0))], dim=0)
-            if args.use_memory:
+            if not args.not_use_memory:
                 model.update_memory(postive_pair_g)
             if args.fast_mode:
                 sampler.attach_last_update(model.memory.last_update_t)
@@ -109,13 +109,13 @@ if __name__ == "__main__":
                         help="dataset selection wikipedia/reddit")
     parser.add_argument("--k_hop", type=int, default=1,
                         help="sampling k-hop neighborhood")
-    parser.add_argument("--model",type=str,default='original',help='attention model [add/dot/original]')
-    parser.add_argument("--use_memory",action="store_true",default=False,
-                        help="Enable memory for TGN Model disable memory for TGN Model")                     
+    parser.add_argument("--not_use_memory", action="store_true", default=False,
+                        help="Enable memory for TGN Model disable memory for TGN Model")
 
     args = parser.parse_args()
 
-    assert not (args.fast_mode and args.simple_mode), "you can only choose one sampling mode"
+    assert not (
+        args.fast_mode and args.simple_mode), "you can only choose one sampling mode"
     if args.k_hop != 1:
         assert args.simple_mode, "this k-hop parameter only support simple mode"
 
@@ -252,36 +252,33 @@ if __name__ == "__main__":
                 num_nodes=num_node,
                 n_neighbors=args.n_neighbors,
                 memory_updater_type=args.memory_updater,
-                model=args.model,
                 layers=args.k_hop)
 
     criterion = torch.nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
     # Implement Logging mechanism
     f = open("logging.txt", 'w')
-    freq = []
     if args.fast_mode:
         sampler.reset()
     try:
         for i in range(args.epochs):
             train_loss = train(model, train_dataloader, sampler,
-                                criterion, optimizer, args.batch_size, args.fast_mode)
-            freq.append(model.get_temporal_weight())
+                               criterion, optimizer, args)
 
             val_ap, val_auc = test_val(
-                model, valid_dataloader, sampler, criterion, args.batch_size, args.fast_mode)
+                model, valid_dataloader, sampler, criterion, args)
             memory_checkpoint = model.store_memory()
             if args.fast_mode:
                 new_node_sampler.sync(sampler)
             test_ap, test_auc = test_val(
-                model, test_dataloader, sampler, criterion, args.batch_size, args.fast_mode)
+                model, test_dataloader, sampler, criterion, args)
             model.restore_memory(memory_checkpoint)
             if args.fast_mode:
                 sample_nn = new_node_sampler
             else:
                 sample_nn = sampler
             nn_test_ap, nn_test_auc = test_val(
-                model, test_new_node_dataloader, sample_nn, criterion, args.batch_size, args.fast_mode)
+                model, test_new_node_dataloader, sample_nn, criterion, args)
             log_content = []
             log_content.append("Epoch: {}; Training Loss: {} | Validation AP: {:.3f} AUC: {:.3f}\n".format(
                 i, train_loss, val_ap, val_auc))
@@ -300,7 +297,4 @@ if __name__ == "__main__":
         error_content = "Training Interreputed!"
         f.writelines(error_content)
         f.close()
-        # exit(-1)
-    freq = np.vstack(freq)
-    np.save('frequency.npy',freq)
     print("========Training is Done========")
