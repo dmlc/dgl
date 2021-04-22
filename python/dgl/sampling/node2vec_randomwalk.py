@@ -4,6 +4,7 @@ from .._ffi.function import _init_api
 from .. import backend as F
 from .. import ndarray as nd
 from .. import utils
+# pylint: disable=invalid-name
 
 
 def node2vec_randomwalk(g, nodes, p, q, walk_length, prob=None):
