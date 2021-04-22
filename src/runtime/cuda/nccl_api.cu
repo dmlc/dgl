@@ -131,43 +131,6 @@ __global__ void _DualPermKernel(
   }
 }
 
-template<typename IdType, int MAX_BINS, int BLOCK_SIZE, int TILE_SIZE>
-__global__ void _CountIndexByRemainder(
-    const IdType * const items,
-    const int64_t num_items,
-    int64_t * const counts,
-    const int num_counts) {
-  constexpr const int VALS_PER_THREAD = TILE_SIZE/BLOCK_SIZE;
-
-  typedef cub::BlockHistogram<IdType, BLOCK_SIZE, VALS_PER_THREAD, MAX_BINS> BlockHistogram;
-
-  __shared__ IdType local_counts[MAX_BINS];
-  __shared__ typename BlockHistogram::TempStorage temp_storage;
-  IdType thread_vals[VALS_PER_THREAD];
-
-  const int64_t offset = TILE_SIZE*blockIdx.x;
-
-  assert(num_counts < MAX_BINS);
-
-  #pragma unroll
-  for (int i = 0; i < VALS_PER_THREAD; ++i) {
-    const int64_t in_idx = offset+threadIdx.x+(i*BLOCK_SIZE);
-    thread_vals[i] = in_idx < num_items ? (items[in_idx] % num_counts): MAX_BINS-1;
-  }
-
-  BlockHistogram(temp_storage).Histogram(thread_vals, local_counts);
-
-  __syncthreads();
-
-  // write local histogram back to global memory
-  for (int i = threadIdx.x; i < num_counts; i+=BLOCK_SIZE) {
-    const int64_t val = local_counts[i];
-    if (val > 0) {
-      AtomicAdd(counts+i, val);
-    }
-  }
-}
-
 template<typename IdType>
 __global__ void _ConvertToLocalByRemainder(
     IdType * const items,
@@ -315,7 +278,6 @@ void GenerateSparseBufferFromRemainder(
         num_in, 0, comm_bits, stream));
     device->FreeWorkspace(ctx, sort_workspace);
   }
-  device->FreeWorkspace(ctx, proc_id_out);
   device->FreeWorkspace(ctx, proc_id_in);
 
   // finally, permute the input arrays
@@ -332,8 +294,7 @@ void GenerateSparseBufferFromRemainder(
     CUDA_CALL(cudaGetLastError());
   }
 
-  // Count the number of values to be sent to each processor, as things are
-  // sorted at this point, we can just use run-length encoding
+  // Count the number of values to be sent to each processor
   {
     using AtomicCount = unsigned long long; // NOLINT
     static_assert(sizeof(AtomicCount) == sizeof(int64_t),
@@ -351,7 +312,7 @@ void GenerateSparseBufferFromRemainder(
     CUDA_CALL(cub::DeviceHistogram::HistogramEven(
         nullptr,
         hist_workspace_size,
-        out_idx,
+        proc_id_out,
         reinterpret_cast<AtomicCount*>(out_counts),
         comm_size+1,
         static_cast<IdType>(0),
@@ -363,7 +324,7 @@ void GenerateSparseBufferFromRemainder(
     CUDA_CALL(cub::DeviceHistogram::HistogramEven(
         hist_workspace,
         hist_workspace_size,
-        out_idx,
+        proc_id_out,
         reinterpret_cast<AtomicCount*>(out_counts),
         comm_size+1,
         static_cast<IdType>(0),
@@ -372,6 +333,7 @@ void GenerateSparseBufferFromRemainder(
         stream));
     device->FreeWorkspace(ctx, hist_workspace);
   }
+  device->FreeWorkspace(ctx, proc_id_out);
 }
 
 template<typename IdType, typename DType>
@@ -448,7 +410,6 @@ void GenerateSparseBuffersFromRemainder(
         num_in, 0, comm_bits, stream));
     device->FreeWorkspace(ctx, sort_workspace);
   }
-  device->FreeWorkspace(ctx, proc_id_out);
   device->FreeWorkspace(ctx, proc_id_in);
 
   // perform a histogram and then prefixsum on the sorted proc_id vector
@@ -473,31 +434,44 @@ void GenerateSparseBuffersFromRemainder(
 
   // Count the number of values to be sent to each processor
   {
-    constexpr const int BLOCK_SIZE = 256;
-    constexpr const int TILE_SIZE = 1024;
-    const dim3 block(BLOCK_SIZE);
-    const dim3 grid((num_in+TILE_SIZE-1)/TILE_SIZE);
+    using AtomicCount = unsigned long long; // NOLINT
+    static_assert(sizeof(AtomicCount) == sizeof(int64_t),
+        "AtomicCount must be the same width as int64_t for atomicAdd "
+        "in cub::DeviceHistogram::HistogramEven() to work");
 
-    if (comm_size < 128) {
-      _CountIndexByRemainder<IdType, 128, BLOCK_SIZE, TILE_SIZE><<<
-          grid, block, 0, stream>>>(
-            out_idx,
-            num_in,
-            out_counts,
-            comm_size);
-      CUDA_CALL(cudaGetLastError());
-    } else {
-      CHECK_LE(comm_size, 1024) << "_CAPI_DGLNCCLSparseAllToAll() is not "
-          "implemented for comms greater than 1024 ranks.";
-      _CountIndexByRemainder<IdType, 1024, BLOCK_SIZE, TILE_SIZE><<<
-          grid, block, 0, stream>>>(
-            out_idx,
-            num_in,
-            out_counts,
-            comm_size);
-      CUDA_CALL(cudaGetLastError());
-    }
+    // TODO(dlasalle): Once https://github.com/NVIDIA/cub/pull/287 is merged,
+    // add a compile time check against the cub version to allow
+    // num_in > (2 << 31).
+    CHECK(num_in < static_cast<int64_t>(std::numeric_limits<int>::max())) <<
+        "number of values to insert into histogram must be less than max "
+        "value of int.";
+
+    size_t hist_workspace_size;
+    CUDA_CALL(cub::DeviceHistogram::HistogramEven(
+        nullptr,
+        hist_workspace_size,
+        proc_id_out,
+        reinterpret_cast<AtomicCount*>(out_counts),
+        comm_size+1,
+        static_cast<IdType>(0),
+        static_cast<IdType>(comm_size+1),
+        static_cast<int>(num_in),
+        stream));
+
+    void * hist_workspace = device->AllocWorkspace(ctx, hist_workspace_size);
+    CUDA_CALL(cub::DeviceHistogram::HistogramEven(
+        hist_workspace,
+        hist_workspace_size,
+        proc_id_out,
+        reinterpret_cast<AtomicCount*>(out_counts),
+        comm_size+1,
+        static_cast<IdType>(0),
+        static_cast<IdType>(comm_size+1),
+        static_cast<int>(num_in),
+        stream));
+    device->FreeWorkspace(ctx, hist_workspace);
   }
+  device->FreeWorkspace(ctx, proc_id_out);
 }
 
 template<typename IdType, typename DType>
@@ -557,12 +531,12 @@ std::pair<IdArray, NDArray> SparsePush(
   {
     size_t prefix_workspace_size;
     CUDA_CALL(cub::DeviceScan::ExclusiveSum(nullptr, prefix_workspace_size,
-        send_sum, send_prefix, comm_size+1));
+        send_sum, send_prefix, comm_size+1, stream));
 
     void * prefix_workspace = device->AllocWorkspace(
         ctx, prefix_workspace_size);
     CUDA_CALL(cub::DeviceScan::ExclusiveSum(prefix_workspace, prefix_workspace_size,
-        send_sum, send_prefix, comm_size+1));
+        send_sum, send_prefix, comm_size+1, stream));
     device->FreeWorkspace(ctx, prefix_workspace);
   }
 
@@ -578,6 +552,7 @@ std::pair<IdArray, NDArray> SparsePush(
       DGLType{kDLInt, sizeof(*send_prefix)*8, 1},
       stream);
   device->FreeWorkspace(ctx, send_prefix);
+
   CHECK_EQ(send_prefix_host.back(), num_in);
 
   // communicate the amount to send
@@ -712,12 +687,12 @@ NDArray SparsePull(
   {
     size_t prefix_workspace_size;
     CUDA_CALL(cub::DeviceScan::ExclusiveSum(nullptr, prefix_workspace_size,
-        send_sum, request_prefix, comm_size+1));
+        send_sum, request_prefix, comm_size+1, stream));
 
     void * prefix_workspace = device->AllocWorkspace(
         ctx, prefix_workspace_size);
     CUDA_CALL(cub::DeviceScan::ExclusiveSum(prefix_workspace, prefix_workspace_size,
-        send_sum, request_prefix, comm_size+1));
+        send_sum, request_prefix, comm_size+1, stream));
     device->FreeWorkspace(ctx, prefix_workspace);
   }
 
@@ -747,12 +722,12 @@ NDArray SparsePull(
   {
     size_t prefix_workspace_size;
     CUDA_CALL(cub::DeviceScan::ExclusiveSum(nullptr, prefix_workspace_size,
-        recv_sum, response_prefix, comm_size+1));
+        recv_sum, response_prefix, comm_size+1, stream));
 
     void * prefix_workspace = device->AllocWorkspace(
         ctx, prefix_workspace_size);
     CUDA_CALL(cub::DeviceScan::ExclusiveSum(prefix_workspace, prefix_workspace_size,
-        recv_sum, response_prefix, comm_size+1));
+        recv_sum, response_prefix, comm_size+1, stream));
     device->FreeWorkspace(ctx, prefix_workspace);
   }
   device->FreeWorkspace(ctx, recv_sum);
