@@ -8,6 +8,7 @@ The folder contains example implementations of selected research papers related 
 
 | Paper                                                        | node classification | link prediction / classification | graph property prediction | sampling           | OGB                |
 | ------------------------------------------------------------ | ------------------- | -------------------------------- | ------------------------- | ------------------ | ------------------ |
+| [Network Embedding with Completely-imbalanced Labels](#rect) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Boost then Convolve: Gradient Boosting Meets Graph Neural Networks](#bgnn) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Contrastive Multi-View Representation Learning on Graphs](#mvgrl) | :heavy_check_mark: |  | :heavy_check_mark: |  |  |
 | [Graph Random Neural Network for Semi-Supervised Learning on Graphs](#grand) | :heavy_check_mark:  |                                  |                           |                    |                    |
@@ -88,6 +89,7 @@ The folder contains example implementations of selected research papers related 
 | [Variational Graph Auto-Encoders](#vgae) |  | :heavy_check_mark: | | | |
 | [Composition-based Multi-Relational Graph Convolutional Networks](#compgcn)|  |  :heavy_check_mark: | | | |
 | [GNNExplainer: Generating Explanations for Graph Neural Networks](#gnnexplainer) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
+| [Interaction Networks for Learning about Objects, Relations and Physics](#graphsim) |  |                                 |:heavy_check_mark:                 |                    |                    |
 | [Representation Learning on Graphs with Jumping Knowledge Networks](#jknet) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
 | [DeeperGCN: All You Need to Train Deeper GCNs](#deepergcn)                                                                        | :heavy_check_mark:  |                                  | :heavy_check_mark:        |                    | :heavy_check_mark: |
 
@@ -99,6 +101,9 @@ The folder contains example implementations of selected research papers related 
 
 ## 2020
 
+- <a name="rect"></a> Wang et al. Network Embedding with Completely-imbalanced Labels. [Paper link](https://ieeexplore.ieee.org/document/8979355). 
+    - Example code: [PyTorch](../examples/pytorch/rect)
+    - Tags:  node classification, network embedding, completely-imbalanced labels
 - <a name="mvgrl"></a> Hassani and Khasahmadi. Contrastive Multi-View Representation Learning on Graphs. [Paper link](https://arxiv.org/abs/2006.05582). 
     - Example code: [PyTorch](../examples/pytorch/mvgrl)
     - Tags: graph diffusion, self-supervised learning on graphs.
@@ -129,6 +134,10 @@ The folder contains example implementations of selected research papers related 
 - <a name="dimenet"></a> Klicpera et al. Directional Message Passing for Molecular Graphs. [Paper link](https://arxiv.org/abs/2003.03123).
     - Example code: [PyTorch](../examples/pytorch/dimenet)
     - Tags: molecules, molecular property prediction, quantum chemistry
+
+- <a name="dagnn"></a> Rossi et al. Temporal Graph Networks For Deep Learning on Dynamic Graphs. [Paper link](https://arxiv.org/abs/2006.10637).
+    - Example code: [Pytorch](../examples/pytorch/tgn)
+    - Tags: over-smoothing, node classification 
 
 - <a name="dagnn"></a> Rossi et al. Temporal Graph Networks For Deep Learning on Dynamic Graphs. [Paper link](https://arxiv.org/abs/2006.10637).
     - Example code: [Pytorch](../examples/pytorch/tgn)
