@@ -178,6 +178,7 @@ def start_sparse_adam_worker_zero_step(rank, world_size, num_embs=128, emb_dim=1
     th.distributed.barrier()
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@pytest.mark.parametrize("num_workers", [2, 4, 8])
 def test_multiprocess_sparse_adam(num_workers):
     worker_list = []
 
@@ -191,6 +192,7 @@ def test_multiprocess_sparse_adam(num_workers):
         p.join()
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@pytest.mark.parametrize("num_workers", [2, 4, 8])
 def test_multiprocess_sparse_adam_zero_step(num_workers):
     worker_list = []
 
