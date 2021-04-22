@@ -1,11 +1,11 @@
 /*!
- *  Copyright (c) 2018 by Contributors
+ *  Copyright (c) 2021 by Contributors
  * \file graph/sampling/node2vec_impl.h
  * \brief DGL sampler - templated implementation definition of node2vec random walks
  */
 
-#ifndef DGL_NODE2VEC_IMPL_H_
-#define DGL_NODE2VEC_IMPL_H_
+#ifndef DGL_GRAPH_SAMPLING_RANDOMWALKS_NODE2VEC_IMPL_H_
+#define DGL_GRAPH_SAMPLING_RANDOMWALKS_NODE2VEC_IMPL_H_
 
 #include <dgl/base_heterograph.h>
 #include <dgl/array.h>
@@ -61,4 +61,4 @@ IdArray Node2vec(
 
 };  // namespace dgl
 
-#endif //DGL_NODE2VEC_IMPL_H_
+#endif  // DGL_GRAPH_SAMPLING_RANDOMWALKS_NODE2VEC_IMPL_H_

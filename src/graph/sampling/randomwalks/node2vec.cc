@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2018 by Contributors
+ *  Copyright (c) 2021 by Contributors
  * \file graph/sampling/node2vec.cc
  * \brief Dispatcher of DGL node2vec random walks
  */
