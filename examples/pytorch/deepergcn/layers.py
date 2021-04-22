@@ -13,18 +13,16 @@ class GENConv(nn.Module):
     
     Description
     -----------
-    Generalized Message Aggregator was introduced in `DeeperGCN: All You Need to Train Deeper GCNs <https://arxiv.org/abs/2006.07739>`_
+    Generalized Message Aggregator was introduced in "DeeperGCN: All You Need to Train Deeper GCNs <https://arxiv.org/abs/2006.07739>"
 
     Parameters
     ----------
-    dataset: str
-        Name of ogb dataset.
     in_dim: int
-        Size of input dimension.
+        Input size.
     out_dim: int
-        Size of output dimension.
+        Output size.
     aggregator: str
-        Type of aggregator scheme ('softmax', 'power'), default is 'softmax'.
+        Type of aggregation. Default is 'softmax'.
     beta: float
         A continuous variable called an inverse temperature. Default is 1.0.
     learn_beta: bool
@@ -37,15 +35,12 @@ class GENConv(nn.Module):
         Whether message normalization is used. Default is False.
     learn_msg_scale: bool
         Whether s is a learnable scaling factor or not in message normalization. Default is False.
-    norm: str
-        Type of ('batch', 'layer', 'instance') norm layer in MLP layers. Default is 'batch'.
     mlp_layers: int
         The number of MLP layers. Default is 1.
     eps: float
         A small positive constant in message construction function. Default is 1e-7.
     """
     def __init__(self,
-                 dataset,
                  in_dim,
                  out_dim,
                  aggregator='softmax',
@@ -55,7 +50,6 @@ class GENConv(nn.Module):
                  learn_p=False,
                  msg_norm=False,
                  learn_msg_scale=False,
-                 norm='batch',
                  mlp_layers=1,
                  eps=1e-7):
         super(GENConv, self).__init__()
@@ -64,26 +58,21 @@ class GENConv(nn.Module):
         self.eps = eps
 
         channels = [in_dim]
-        for i in range(mlp_layers - 1):
+        for _ in range(mlp_layers - 1):
             channels.append(in_dim * 2)
         channels.append(out_dim)
 
-        self.mlp = MLP(channels, norm=norm)
+        self.mlp = MLP(channels)
         self.msg_norm = MessageNorm(learn_msg_scale) if msg_norm else None
 
         self.beta = nn.Parameter(torch.Tensor([beta]), requires_grad=True) if learn_beta and self.aggr == 'softmax' else beta
         self.p = nn.Parameter(torch.Tensor([p]), requires_grad=True) if learn_p else p
 
-        if dataset == 'ogbg-molhiv':
-            self.edge_encoder = BondEncoder(in_dim)
-        elif dataset == 'ogbg-ppa':
-            self.edge_encoder = nn.Linear(in_dim, in_dim)
-        else:
-            raise ValueError(f'Dataset {dataset} is not supported.')
+        self.edge_encoder = BondEncoder(in_dim)
 
     def forward(self, g, node_feats, edge_feats):
         with g.local_scope():
-            # Node and edge feature dimension need to match.
+            # Node and edge feature size need to match.
             g.ndata['h'] = node_feats
             g.edata['h'] = self.edge_encoder(edge_feats)
             g.apply_edges(fn.u_add_e('h', 'h', 'm'))

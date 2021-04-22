@@ -11,7 +11,7 @@ from ogb.graphproppred import Evaluator
 from models import DeeperGCN
 
 
-def train(model, device, data_loader, opt, loss_fn, grad_clip=0.):
+def train(model, device, data_loader, opt, loss_fn):
     model.train()
     
     train_loss = []
@@ -54,8 +54,8 @@ def main():
     device = f'cuda:{args.gpu}' if args.gpu >= 0 and torch.cuda.is_available() else 'cpu'
 
     # load ogb dataset & evaluator
-    dataset = DglGraphPropPredDataset(name=args.dataset)
-    evaluator = Evaluator(name=args.dataset)
+    dataset = DglGraphPropPredDataset(name='ogbg-molhiv')
+    evaluator = Evaluator(name='ogbg-molhiv')
 
     g, _ = dataset[0]
     node_feat_dim = g.ndata['feat'].size()[-1]
@@ -77,8 +77,7 @@ def main():
                              collate_fn=collate_dgl)
 
     # load model
-    model = DeeperGCN(dataset=args.dataset,
-                      node_feat_dim=node_feat_dim,
+    model = DeeperGCN(node_feat_dim=node_feat_dim,
                       edge_feat_dim=edge_feat_dim,
                       hid_dim=args.hid_dim,
                       out_dim=n_classes,
@@ -117,15 +116,15 @@ def main():
     print('---------- Testing ----------')
     test_auc = test(best_model, device, test_loader, evaluator)
     print(f'Test Auc: {test_auc}')
-    print('Times/epoch: ', sum(times) / len(times))
+    if len(times) > 0:
+        print('Times/epoch: ', sum(times) / len(times))
+
 
 if __name__ == '__main__':
     """
     DeeperGCN Hyperparameters
     """
     parser = argparse.ArgumentParser(description='DeeperGCN')
-    # dataset
-    parser.add_argument('--dataset', type=str, default='ogbg-molhiv', help='Name of OGB dataset.')
     # training
     parser.add_argument('--gpu', type=int, default=-1, help='GPU index, -1 for CPU.')
     parser.add_argument('--epochs', type=int, default=300, help='Number of epochs to train.')
