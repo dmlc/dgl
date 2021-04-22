@@ -130,18 +130,19 @@ pipeline {
               def command_lists = comment.split(' ')
               def instance_type = command_lists[2].replace('.', '')
               if (command_lists.size() != 5) {
-            pullRequest.comment('Cannot run the regression test due to unknown command')
-            error('Unknown command')
+                pullRequest.comment('Cannot run the regression test due to unknown command')
+                error('Unknown command')
               } else {
-            pullRequest.comment("Start the Regression test. View at ${RUN_DISPLAY_URL}")
+                pullRequest.comment("Start the Regression test. View at ${RUN_DISPLAY_URL}")
               }
               dir('benchmarks/scripts') {
-            sh('python3 -m pip install boto3')
-            sh("PYTHONUNBUFFERED=1 GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT}_${instance_type} --run-cmd '${comment}'")
+                sh('python3 -m pip install boto3')
+                sh("PYTHONUNBUFFERED=1 GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT}_${instance_type} --run-cmd '${comment}'")
               }
               pullRequest.comment("Finished the Regression test. Result table is at https://dgl-asv-data.s3-us-west-2.amazonaws.com/${env.GIT_COMMIT}_${instance_type}/results/result.csv. Jenkins job link is ${RUN_DISPLAY_URL}. ")
+              currentBuild.result = 'SUCCESS'
+              return
         }
-        return
       }
       stage('Bot Instruction') {
         agent {
@@ -151,14 +152,16 @@ pipeline {
               alwaysPull true
           }
         }
-        script {
-          def prOpenTriggerCause = currentBuild.getBuildCauses('jenkins.branch.BranchEventCause')
-          if (prOpenTriggerCause) {
-            if (env.BUILD_ID == '1') {
-              pullRequest.comment('To trigger regression tests: \n - `@dgl-bot run [instance-type] [which tests] [compare-with-branch]`; \n For example: `@dgl-bot run g4dn.4xlarge all dmlc/master` or `@dgl-bot run c5.9xlarge kernel,api dmlc/master`')
+        steps {
+          script {
+            def prOpenTriggerCause = currentBuild.getBuildCauses('jenkins.branch.BranchEventCause')
+            if (prOpenTriggerCause) {
+              if (env.BUILD_ID == '1') {
+                pullRequest.comment('To trigger regression tests: \n - `@dgl-bot run [instance-type] [which tests] [compare-with-branch]`; \n For example: `@dgl-bot run g4dn.4xlarge all dmlc/master` or `@dgl-bot run c5.9xlarge kernel,api dmlc/master`')
+              }
             }
+            echo('Not the first build')
           }
-          echo('Not the first build')
         }
       }
     }
