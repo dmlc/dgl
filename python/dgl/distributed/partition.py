@@ -389,12 +389,16 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
 
     Returns
     -------
-    Tensor, optional
-        1D tensor that indicates the mapping between shuffled node IDs and the original node IDs
-        if `return_mapping=True`.
-    Tensor, optional
-        1D tensor that indicates the mapping between shuffled edge IDs and the original edge IDs
-        if `return_mapping=True`.
+    Tensor or dict of tensors, optional
+        If `return_mapping=True`, return a 1D tensor that indicates the mapping between shuffled
+        node IDs and the original node IDs for a homogeneous graph; return a dict of 1D tensors
+        whose key is the node type and value is a 1D tensor mapping between shuffled node IDs and
+        the original node IDs for each node type for a heterogeneous graph.
+    Tensor or dict of tensors, optional
+        If `return_mapping=True`, return a 1D tensor that indicates the mapping between shuffled
+        edge IDs and the original edge IDs for a homogeneous graph; return a dict of 1D tensors
+        whose key is the edge type and value is a 1D tensor mapping between shuffled edge IDs and
+        the original edge IDs for each edge type for a heterogeneous graph.
 
     Examples
     --------
@@ -470,9 +474,21 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             node_parts = random_choice(num_parts, sim_g.number_of_nodes())
         parts, orig_nids, orig_eids = partition_graph_with_halo(sim_g, node_parts, num_hops,
                                                                 reshuffle=reshuffle)
-        if not reshuffle:
+        if reshuffle and return_mapping and len(g.etypes) > 1:
+            # Get the type IDs
+            orig_ntype = sim_g.ndata[NTYPE][orig_nids]
+            orig_etype = sim_g.edata[ETYPE][orig_eids]
+            # Mapping between shuffled global IDs to original per-type IDs
+            orig_nids = sim_g.ndata[NID][orig_nids]
+            orig_eids = sim_g.edata[EID][orig_eids]
+            orig_nids = {ntype: orig_nids[orig_ntype == g.get_ntype_id(ntype)] for ntype in g.ntypes}
+            orig_eids = {etype: orig_eids[orig_etype == g.get_etype_id(etype)] for etype in g.etypes}
+        elif not reshuffle and len(g.etypes) == 1:
             orig_nids = F.arange(0, sim_g.number_of_nodes())
             orig_eids = F.arange(0, sim_g.number_of_edges())
+        elif not reshuffle:
+            orig_nids = {ntype: F.arange(0, g.number_of_nodes(ntype)) for ntype in g.ntypes}
+            orig_eids = {etype: F.arange(0, g.number_of_edges(etype)) for etype in g.etypes}
     else:
         raise Exception('Unknown partitioning method: ' + part_method)
 
