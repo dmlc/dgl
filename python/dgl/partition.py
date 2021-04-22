@@ -146,6 +146,12 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     --------
     a dict of DGLGraphs
         The key is the partition ID and the value is the DGLGraph of the partition.
+    Tensor
+        1D tensor that stores the mapping between the reshuffled node IDs and
+        the original node IDs if 'reshuffle=True'. Otherwise, return None.
+    Tensor
+        1D tensor that stores the mapping between the reshuffled edge IDs and
+        the original edge IDs if 'reshuffle=True'. Otherwise, return None.
     '''
     assert len(node_part) == g.number_of_nodes()
     if reshuffle:
@@ -194,7 +200,10 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
         subg.edata['inner_edge'] = inner_edge
         subg_dict[i] = subg
     print('Construct subgraphs: {:.3f} seconds'.format(time.time() - start))
-    return subg_dict
+    if reshuffle:
+        return subg_dict, orig_nids, orig_eids
+    else:
+        return subg_dict, None, None
 
 
 def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):

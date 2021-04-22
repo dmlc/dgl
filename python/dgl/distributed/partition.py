@@ -11,6 +11,7 @@ from ..convert import to_homogeneous
 from ..random import choice as random_choice
 from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 from ..transform import metis_partition_assignment, partition_graph_with_halo
+from ..partition import reshuffle_graph
 from .graph_partition_book import BasicPartitionBook, RangePartitionBook
 
 def _get_inner_node_mask(graph, ntype_id):
@@ -211,7 +212,7 @@ def load_partition_book(part_config, part_id, graph=None):
                 part_metadata['graph_name'], ntypes, etypes
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
-                    reshuffle=True, balance_ntypes=None, balance_edges=False):
+                    reshuffle=True, balance_ntypes=None, balance_edges=False, return_mapping=False):
     ''' Partition a graph for distributed training and store the partitions on files.
 
     The partitioning occurs in three steps: 1) run a partition algorithm (e.g., Metis) to
@@ -382,6 +383,18 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     balance_edges : bool
         Indicate whether to balance the edges in each partition. This argument is used by
         the Metis algorithm.
+    return_mapping : bool
+        If `reshuffle=True`, this indicates to return the mapping between shuffled node/edge IDs
+        and the original node/edge IDs.
+
+    Returns
+    -------
+    Tensor, optional
+        1D tensor that indicates the mapping between shuffled node IDs and the original node IDs
+        if `return_mapping=True`.
+    Tensor, optional
+        1D tensor that indicates the mapping between shuffled edge IDs and the original edge IDs
+        if `return_mapping=True`.
 
     Examples
     --------
@@ -440,21 +453,26 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             parts[0] = sim_g.clone()
             parts[0].ndata[NID] = parts[0].ndata['orig_id'] = F.arange(0, sim_g.number_of_nodes())
             parts[0].edata[EID] = parts[0].edata['orig_id'] = F.arange(0, sim_g.number_of_edges())
+            orig_nids = parts[0].ndata['orig_id']
+            orig_eids = parts[0].edata['orig_id']
         else:
             parts[0] = sim_g.clone()
-            parts[0].ndata[NID] = F.arange(0, sim_g.number_of_nodes())
-            parts[0].edata[EID] = F.arange(0, sim_g.number_of_edges())
+            orig_nids = parts[0].ndata[NID] = F.arange(0, sim_g.number_of_nodes())
+            orig_eids = parts[0].edata[EID] = F.arange(0, sim_g.number_of_edges())
         parts[0].ndata['inner_node'] = F.ones((sim_g.number_of_nodes(),), F.int8, F.cpu())
         parts[0].edata['inner_edge'] = F.ones((sim_g.number_of_edges(),), F.int8, F.cpu())
-    elif part_method == 'metis':
+    elif part_method in ('metis', 'random'):
         sim_g, balance_ntypes = get_homogeneous(g, balance_ntypes)
-        node_parts = metis_partition_assignment(sim_g, num_parts, balance_ntypes=balance_ntypes,
-                                                balance_edges=balance_edges)
-        parts = partition_graph_with_halo(sim_g, node_parts, num_hops, reshuffle=reshuffle)
-    elif part_method == 'random':
-        sim_g, _ = get_homogeneous(g, balance_ntypes)
-        node_parts = random_choice(num_parts, sim_g.number_of_nodes())
-        parts = partition_graph_with_halo(sim_g, node_parts, num_hops, reshuffle=reshuffle)
+        if part_method == 'metis':
+            node_parts = metis_partition_assignment(sim_g, num_parts, balance_ntypes=balance_ntypes,
+                                                    balance_edges=balance_edges)
+        else:
+            node_parts = random_choice(num_parts, sim_g.number_of_nodes())
+        parts, orig_nids, orig_eids = partition_graph_with_halo(sim_g, node_parts, num_hops,
+                                                                reshuffle=reshuffle)
+        if not reshuffle:
+            orig_nids = F.arange(0, sim_g.number_of_nodes())
+            orig_eids = F.arange(0, sim_g.number_of_edges())
     else:
         raise Exception('Unknown partitioning method: ' + part_method)
 
@@ -709,3 +727,6 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         num_cuts = 0
     print('There are {} edges in the graph and {} edge cuts for {} partitions.'.format(
         g.number_of_edges(), num_cuts, num_parts))
+
+    if return_mapping:
+        return orig_nids, orig_eids

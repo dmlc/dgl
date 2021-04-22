@@ -159,8 +159,8 @@ def check_partition(g, part_method, reshuffle):
     num_parts = 4
     num_hops = 2
 
-    partition_graph(g, 'test', num_parts, '/tmp/partition', num_hops=num_hops,
-                    part_method=part_method, reshuffle=reshuffle)
+    orig_nids, orig_eids = partition_graph(g, 'test', num_parts, '/tmp/partition', num_hops=num_hops,
+                                           part_method=part_method, reshuffle=reshuffle, return_mapping=True)
     part_sizes = []
     for i in range(num_parts):
         part_g, node_feats, edge_feats, gpb, _, ntypes, etypes = load_partition('/tmp/partition/test.json', i)
@@ -195,6 +195,18 @@ def check_partition(g, part_method, reshuffle):
         local_edges1 = gpb.partid2eids(i)
         assert F.dtype(local_edges1) in (F.int32, F.int64)
         assert np.all(np.sort(F.asnumpy(local_edges)) == np.sort(F.asnumpy(local_edges1)))
+
+        # Verify the mapping between the reshuffled IDs and the original IDs.
+        part_src_ids, part_dst_ids = part_g.edges()
+        part_src_ids = part_g.ndata[dgl.NID][part_src_ids]
+        part_dst_ids = part_g.ndata[dgl.NID][part_dst_ids]
+        part_eids = part_g.edata[dgl.EID]
+        orig_src_ids = orig_nids[part_src_ids]
+        orig_dst_ids = orig_nids[part_dst_ids]
+        orig_eids1 = orig_eids[part_eids]
+        orig_eids2 = g.edge_ids(orig_src_ids, orig_dst_ids)
+        assert F.shape(orig_eids1)[0] == F.shape(orig_eids2)[0]
+        assert np.all(F.asnumpy(orig_eids1) == F.asnumpy(orig_eids2))
 
         if reshuffle:
             part_g.ndata['feats'] = F.gather_row(g.ndata['feats'], part_g.ndata['orig_id'])
