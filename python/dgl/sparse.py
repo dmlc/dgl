@@ -401,7 +401,7 @@ def csrsum(As, A_weights):
     """Return a graph whose adjacency matrix is the sparse matrix summation
     of the given list of graphs.
 
-    Note that the edge weights of all graphs must be scalar, i.e. the arrays in 
+    Note that the edge weights of all graphs must be scalar, i.e. the arrays in
     :attr:`A_weights` must be 1D vectors.
 
     Parameters
