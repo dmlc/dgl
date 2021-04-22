@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import copy
-import dgl
 import time
 
 from ogb.graphproppred import DglGraphPropPredDataset, collate_dgl
@@ -128,11 +127,11 @@ if __name__ == '__main__':
     # dataset
     parser.add_argument('--dataset', type=str, default='ogbg-molhiv', help='Name of OGB dataset.')
     # training
-    parser.add_argument('--gpu', type=int, default=-1, help='GPU index.')
+    parser.add_argument('--gpu', type=int, default=-1, help='GPU index, -1 for CPU.')
     parser.add_argument('--epochs', type=int, default=300, help='Number of epochs to train.')
     parser.add_argument('--lr', type=float, default=0.01, help='Learning rate.')
-    parser.add_argument('--dropout', type=float, default=0.5, help='Dropout rate.')
-    parser.add_argument('--batch-size', type=int, default=32, help='Batch size.')
+    parser.add_argument('--dropout', type=float, default=0.2, help='Dropout rate.')
+    parser.add_argument('--batch-size', type=int, default=2048, help='Batch size.')
     # model
     parser.add_argument('--num-layers', type=int, default=7, help='Number of GNN layers.')
     parser.add_argument('--hid-dim', type=int, default=256, help='Hidden channel size.')

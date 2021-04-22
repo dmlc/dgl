@@ -28,10 +28,14 @@ Open Graph Benchmark(OGB). Dataset summary:
 Train a model which follows the original hyperparameters on different datasets.
 ```bash
 # ogbg-molhiv
-python main.py --gpu 0 --learn-beta --batch-size 2048 --dropout 0.2
+python main.py --gpu 0 --learn-beta
 ```
 
 ### Performance
+
+* Table 6: Numbers associated with "Table 6" are the ones from table 6 in the paper.
+* Author: Numbers associated with "Author" are the ones we got by running the original code.
+* DGL: Numbers associated with "DGL" are the ones we got by running the DGL example.
 
 |     Dataset      | ogbg-molhiv |
 | :--------------: | :---------: |
