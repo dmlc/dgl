@@ -1,3 +1,5 @@
+"""Node2vec random walk"""
+
 from .._ffi.function import _init_api
 from .. import backend as F
 from .. import ndarray as nd
@@ -7,7 +9,7 @@ from .. import utils
 def node2vec_randomwalk(g, nodes, p, q, walk_length, prob=None):
     """
     Generate random walk traces from an array of starting nodes based on the node2vec model.
-    Node2vec paper: `"node2vec: Scalable Feature Learning for Networks"<https://arxiv.org/abs/1607.00653>`
+    Paper:`"node2vec: Scalable Feature Learning for Networks"<https://arxiv.org/abs/1607.00653>`
 
     The returned traces all have length ``walk_length + 1``, where the first node
     is the starting node itself.
