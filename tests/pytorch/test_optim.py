@@ -204,8 +204,8 @@ def test_multiprocess_sparse_adam_zero_step(num_workers):
         p.join()
 
 if __name__ == '__main__':
-    #test_sparse_adam()
-    #test_sparse_adam_zero_step()
+    test_sparse_adam()
+    test_sparse_adam_zero_step()
 
     test_multiprocess_sparse_adam(2)
     test_multiprocess_sparse_adam(4)
