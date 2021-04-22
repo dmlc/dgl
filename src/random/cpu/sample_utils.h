@@ -258,6 +258,7 @@ class TreeSampler: public BaseSampler<Idx> {
   std::vector<DType> weight;    // accumulated likelihood of subtrees.
   int64_t N;
   int64_t num_leafs;
+  const DType *decrease;
 
  public:
   void ResetState(FloatArray prob) {
@@ -270,7 +271,8 @@ class TreeSampler: public BaseSampler<Idx> {
       weight[i] = weight[i * 2] + weight[i * 2 + 1];
   }
 
-  explicit TreeSampler(RandomEngine *re, FloatArray prob): re(re) {
+  explicit TreeSampler(RandomEngine *re, FloatArray prob, const DType* decrease = nullptr)
+    : re(re), decrease(decrease) {
     num_leafs = 1;
     while (num_leafs < prob->shape[0])
       num_leafs *= 2;
@@ -279,6 +281,17 @@ class TreeSampler: public BaseSampler<Idx> {
     ResetState(prob);
   }
 
+  /* Pick an element from the given distribution and update the tree.
+   *
+   * The parameter decrease is an array of which the length is the number of categories.
+   * Every time an element in the category x is picked, the weight of this category is subtracted
+   * by decrease[x]. It is used to support the case where a category might contains multiple
+   * candidates and decrease[x] is the weight of one candidate of the category x.
+   *
+   * When decrease == nullptr, it means there is only one candidate in each category and will
+   * directly set the weight of the chosen category as 0.
+   *
+   */
   Idx Draw() {
     int64_t cur = 1;
     DType p = re->Uniform<DType>(0, weight[cur]);
@@ -296,7 +309,7 @@ class TreeSampler: public BaseSampler<Idx> {
     if (!replace) {
       while (cur >= 1) {
         if (cur >= num_leafs)
-          weight[cur] = 0.;
+          weight[cur] = this->decrease ? weight[cur] - this->decrease[rst] : 0.;
         else
           weight[cur] = weight[cur * 2] + weight[cur * 2 + 1];
         cur /= 2;
