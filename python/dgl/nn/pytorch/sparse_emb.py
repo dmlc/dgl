@@ -171,6 +171,17 @@ class NodeEmbedding: # NodeEmbedding
         """
         return self._num_embeddings
 
+    @property
+    def embedding_dim(self):
+        """Return the dimension of embeddings.
+
+        Returns
+        -------
+        int
+            The dimension of embeddings.
+        """
+        return self._embedding_dim
+
     def set_optm_state(self, state):
         """Store the optimizer related state tensor.
 

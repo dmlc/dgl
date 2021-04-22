@@ -77,8 +77,10 @@ class SparseGradOptimizer(abc.ABC):
                 for i, data in emb._trace:
                     idx.append(i)
                     grad.append(data.grad.data)
-                idx = th.cat(idx, dim=0)
-                grad = th.cat(grad, dim=0)
+                idx = th.cat(idx, dim=0) if len(idx) != 0 else \
+                    th.zeros((0,), dtype=th.long, device=th.device('cpu'))
+                grad = th.cat(grad, dim=0) if len(grad) != 0 else \
+                    th.zeros((0, emb.embedding_dim), dtype=th.float32, device=th.device('cpu'))
 
                 device = grad.device
                 idx_dtype = idx.dtype
