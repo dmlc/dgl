@@ -113,7 +113,7 @@ pipeline {
               alwaysPull true
           }
       }
-      when { triggeredBy issueCommentTrigger }
+      when { triggeredBy 'issueCommentTrigger' }
       steps {
         checkout scm
         script {
