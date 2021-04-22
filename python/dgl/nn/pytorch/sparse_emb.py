@@ -222,7 +222,7 @@ class NodeEmbedding: # NodeEmbedding
         self._trace = []
 
     @property
-    def emb_tensor(self):
+    def weight(self):
         """Return the tensor storing the node embeddings
 
         Returns

@@ -77,6 +77,13 @@ class SparseGradOptimizer(abc.ABC):
                 for i, data in emb._trace:
                     idx.append(i)
                     grad.append(data.grad.data)
+                # If the sparse embedding is not used in the previous forward step
+                # The idx and grad will be empty, initialize them as empty tensors to
+                # avoid crashing the optimizer step logic.
+                #
+                # Note: we cannot skip the gradient exchange and update steps as other
+                # working processes may send gradient update requests corresponding
+                # to certain embedding to this process.
                 idx = th.cat(idx, dim=0) if len(idx) != 0 else \
                     th.zeros((0,), dtype=th.long, device=th.device('cpu'))
                 grad = th.cat(grad, dim=0) if len(grad) != 0 else \
@@ -279,7 +286,7 @@ class SparseAdagrad(SparseGradOptimizer):
             if self._rank <= 0:
                 emb_name = emb.name
                 state = create_shared_mem_array(emb_name+'_state', \
-                    emb.emb_tensor.shape, th.float32).zero_()
+                    emb.weight.shape, th.float32).zero_()
             if self._rank == 0:
                 if self._world_size > 1:
                     emb.store.set(emb_name+'_opt', emb_name)
@@ -288,7 +295,7 @@ class SparseAdagrad(SparseGradOptimizer):
                 emb_name = emb.name
                 emb.store.wait([emb_name+'_opt'])
                 state = get_shared_mem_array(emb_name+'_state', \
-                    emb.emb_tensor.shape, th.float32)
+                    emb.weight.shape, th.float32)
             emb.set_optm_state(state)
 
     def update(self, idx, grad, emb):
@@ -324,7 +331,7 @@ class SparseAdagrad(SparseGradOptimizer):
 
         std_values = grad_state.add_(eps).sqrt_()
         tmp = clr * grad_values / std_values
-        emb.emb_tensor[state_idx] -= tmp.to(state_dev)
+        emb.weight[state_idx] -= tmp.to(state_dev)
 
 class SparseAdam(SparseGradOptimizer):
     r''' Node embedding optimizer using the Adam algorithm.
@@ -385,11 +392,11 @@ class SparseAdam(SparseGradOptimizer):
             if self._rank <= 0:
                 emb_name = emb.name
                 state_step = create_shared_mem_array(emb_name+'_step', \
-                    (emb.emb_tensor.shape[0],), th.float32).zero_()
+                    (emb.weight.shape[0],), th.float32).zero_()
                 state_mem = create_shared_mem_array(emb_name+'_mem', \
-                    emb.emb_tensor.shape, th.float32).zero_()
+                    emb.weight.shape, th.float32).zero_()
                 state_power = create_shared_mem_array(emb_name+'_power', \
-                    emb.emb_tensor.shape, th.float32).zero_()
+                    emb.weight.shape, th.float32).zero_()
             if self._rank == 0:
                 emb_name = emb.name
                 if self._world_size > 1:
@@ -399,11 +406,11 @@ class SparseAdam(SparseGradOptimizer):
                 emb_name = emb.name
                 emb.store.wait([emb_name+'_opt'])
                 state_step = get_shared_mem_array(emb_name+'_step', \
-                    (emb.emb_tensor.shape[0],), th.float32)
+                    (emb.weight.shape[0],), th.float32)
                 state_mem = get_shared_mem_array(emb_name+'_mem', \
-                    emb.emb_tensor.shape, th.float32)
+                    emb.weight.shape, th.float32)
                 state_power = get_shared_mem_array(emb_name+'_power', \
-                    emb.emb_tensor.shape, th.float32)
+                    emb.weight.shape, th.float32)
 
             state = (state_step, state_mem, state_power)
             emb.set_optm_state(state)
@@ -460,4 +467,4 @@ class SparseAdam(SparseGradOptimizer):
                                                             state_step)).unsqueeze(1)
             std_values = clr * update_mem_corr / (th.sqrt(update_power_corr) + eps)
 
-            emb.emb_tensor[state_idx] -= std_values.to(state_dev)
+            emb.weight[state_idx] -= std_values.to(state_dev)
