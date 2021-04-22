@@ -146,7 +146,6 @@ def check_hetero_partition(hg, part_method):
     assert len(orig_nids) == len(hg.ntypes)
     assert len(orig_eids) == len(hg.etypes)
     for ntype in hg.ntypes:
-        print(ntype, len(orig_nids[ntype]), hg.number_of_nodes(ntype))
         assert len(orig_nids[ntype]) == hg.number_of_nodes(ntype)
     for etype in hg.etypes:
         assert len(orig_eids[etype]) == hg.number_of_edges(etype)

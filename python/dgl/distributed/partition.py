@@ -484,10 +484,10 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     for ntype in g.ntypes}
             orig_eids = {etype: F.boolean_mask(orig_eids, orig_etype == g.get_etype_id(etype)) \
                     for etype in g.etypes}
-        elif not reshuffle and len(g.etypes) == 1:
+        elif not reshuffle and len(g.etypes) == 1 and return_mapping:
             orig_nids = F.arange(0, sim_g.number_of_nodes())
             orig_eids = F.arange(0, sim_g.number_of_edges())
-        elif not reshuffle:
+        elif not reshuffle and return_mapping:
             orig_nids = {ntype: F.arange(0, g.number_of_nodes(ntype)) for ntype in g.ntypes}
             orig_eids = {etype: F.arange(0, g.number_of_edges(etype)) for etype in g.etypes}
     else:
