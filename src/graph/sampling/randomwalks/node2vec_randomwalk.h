@@ -99,7 +99,7 @@ std::pair<dgl_id_t, bool> Node2vecRandomWalkStep(
                 if (next_node == pre) {
                     if (r < prob0)
                         break;
-                } else if (has_edge_between<IdxType>(edges, next_node, pre)){
+                } else if (has_edge_between<IdxType>(edges, next_node, pre)) {
                     if (r < prob1)
                         break;
                 } else if (r < prob2) {
@@ -133,7 +133,7 @@ std::pair<dgl_id_t, bool> Node2vecRandomWalkStep(
                 } else if (has_edge_between<IdxType>(edges, next_node, pre)) {
                     if (r < prob1)
                         break;
-                } else if (r < prob2){
+                } else if (r < prob2) {
                     break;
                 }
             }
