@@ -165,7 +165,6 @@ pipeline {
         }
       }
     }
-    }
     stage('Lint Check') {
       agent {
         docker {
