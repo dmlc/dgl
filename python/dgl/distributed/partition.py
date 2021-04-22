@@ -473,7 +473,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             node_parts = random_choice(num_parts, sim_g.number_of_nodes())
         parts, orig_nids, orig_eids = partition_graph_with_halo(sim_g, node_parts, num_hops,
                                                                 reshuffle=reshuffle)
-        if reshuffle and return_mapping and len(g.etypes) > 1:
+        is_hetero = len(g.etypes) > 1 or len(g.ntypes) > 1
+        if reshuffle and return_mapping and is_hetero:
             # Get the type IDs
             orig_ntype = F.gather_row(sim_g.ndata[NTYPE], orig_nids)
             orig_etype = F.gather_row(sim_g.edata[ETYPE], orig_eids)
@@ -484,7 +485,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     for ntype in g.ntypes}
             orig_eids = {etype: F.boolean_mask(orig_eids, orig_etype == g.get_etype_id(etype)) \
                     for etype in g.etypes}
-        elif not reshuffle and len(g.etypes) == 1 and return_mapping:
+        elif not reshuffle and not is_hetero and return_mapping:
             orig_nids = F.arange(0, sim_g.number_of_nodes())
             orig_eids = F.arange(0, sim_g.number_of_edges())
         elif not reshuffle and return_mapping:

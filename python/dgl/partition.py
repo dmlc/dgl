@@ -351,6 +351,6 @@ def metis_partition(g, k, extra_cached_hops=0, reshuffle=False,
         return None
 
     # Then we split the original graph into parts based on the METIS partitioning results.
-    return partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle)
+    return partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle)[0]
 
 _init_api("dgl.partition")
