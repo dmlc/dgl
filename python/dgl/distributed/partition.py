@@ -475,13 +475,15 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                                                                 reshuffle=reshuffle)
         if reshuffle and return_mapping and len(g.etypes) > 1:
             # Get the type IDs
-            orig_ntype = sim_g.ndata[NTYPE][orig_nids]
-            orig_etype = sim_g.edata[ETYPE][orig_eids]
+            orig_ntype = F.gather_row(sim_g.ndata[NTYPE], orig_nids)
+            orig_etype = F.gather_row(sim_g.edata[ETYPE], orig_eids)
             # Mapping between shuffled global IDs to original per-type IDs
-            orig_nids = sim_g.ndata[NID][orig_nids]
-            orig_eids = sim_g.edata[EID][orig_eids]
-            orig_nids = {ntype: orig_nids[orig_ntype == g.get_ntype_id(ntype)] for ntype in g.ntypes}
-            orig_eids = {etype: orig_eids[orig_etype == g.get_etype_id(etype)] for etype in g.etypes}
+            orig_nids = F.gather_row(sim_g.ndata[NID], orig_nids)
+            orig_eids = F.gather_row(sim_g.edata[EID], orig_eids)
+            orig_nids = {ntype: F.boolean_mask(orig_nids, orig_ntype == g.get_ntype_id(ntype)) \
+                    for ntype in g.ntypes}
+            orig_eids = {etype: F.boolean_mask(orig_eids, orig_etype == g.get_etype_id(etype)) \
+                    for etype in g.etypes}
         elif not reshuffle and len(g.etypes) == 1:
             orig_nids = F.arange(0, sim_g.number_of_nodes())
             orig_eids = F.arange(0, sim_g.number_of_edges())

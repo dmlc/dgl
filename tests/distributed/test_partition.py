@@ -157,8 +157,8 @@ def check_hetero_partition(hg, part_method):
         # These are partition-local IDs.
         part_src_ids, part_dst_ids = part_g.edges()
         # These are reshuffled global homogeneous IDs.
-        part_src_ids = part_g.ndata[dgl.NID][part_src_ids]
-        part_dst_ids = part_g.ndata[dgl.NID][part_dst_ids]
+        part_src_ids = F.gather_row(part_g.ndata[dgl.NID], part_src_ids)
+        part_dst_ids = F.gather_row(part_g.ndata[dgl.NID], part_dst_ids)
         part_eids = part_g.edata[dgl.EID]
         # These are reshuffled per-type IDs.
         src_ntype_ids, part_src_ids = gpb.map_to_per_ntype(part_src_ids)
@@ -166,18 +166,18 @@ def check_hetero_partition(hg, part_method):
         etype_ids, part_eids = gpb.map_to_per_etype(part_eids)
         # These are original per-type IDs.
         for etype_id, etype in enumerate(hg.etypes):
-            part_src_ids1 = part_src_ids[etype_ids == etype_id]
-            src_ntype_ids1 = src_ntype_ids[etype_ids == etype_id]
-            part_dst_ids1 = part_dst_ids[etype_ids == etype_id]
-            dst_ntype_ids1 = dst_ntype_ids[etype_ids == etype_id]
-            part_eids1 = part_eids[etype_ids == etype_id]
+            part_src_ids1 = F.boolean_mask(part_src_ids, etype_ids == etype_id)
+            src_ntype_ids1 = F.boolean_mask(src_ntype_ids, etype_ids == etype_id)
+            part_dst_ids1 = F.boolean_mask(part_dst_ids, etype_ids == etype_id)
+            dst_ntype_ids1 = F.boolean_mask(dst_ntype_ids, etype_ids == etype_id)
+            part_eids1 = F.boolean_mask(part_eids, etype_ids == etype_id)
             assert np.all(F.asnumpy(src_ntype_ids1 == src_ntype_ids1[0]))
             assert np.all(F.asnumpy(dst_ntype_ids1 == dst_ntype_ids1[0]))
-            src_ntype = hg.ntypes[src_ntype_ids1[0]]
-            dst_ntype = hg.ntypes[dst_ntype_ids1[0]]
-            orig_src_ids1 = orig_nids[src_ntype][part_src_ids1]
-            orig_dst_ids1 = orig_nids[dst_ntype][part_dst_ids1]
-            orig_eids1 = orig_eids[etype][part_eids1]
+            src_ntype = hg.ntypes[F.as_scalar(src_ntype_ids1[0])]
+            dst_ntype = hg.ntypes[F.as_scalar(dst_ntype_ids1[0])]
+            orig_src_ids1 = F.gather_row(orig_nids[src_ntype], part_src_ids1)
+            orig_dst_ids1 = F.gather_row(orig_nids[dst_ntype], part_dst_ids1)
+            orig_eids1 = F.gather_row(orig_eids[etype], part_eids1)
             orig_eids2 = hg.edge_ids(orig_src_ids1, orig_dst_ids1, etype=etype)
             assert len(orig_eids1) == len(orig_eids2)
             assert np.all(F.asnumpy(orig_eids1) == F.asnumpy(orig_eids2))
@@ -233,12 +233,12 @@ def check_partition(g, part_method, reshuffle):
 
         # Verify the mapping between the reshuffled IDs and the original IDs.
         part_src_ids, part_dst_ids = part_g.edges()
-        part_src_ids = part_g.ndata[dgl.NID][part_src_ids]
-        part_dst_ids = part_g.ndata[dgl.NID][part_dst_ids]
+        part_src_ids = F.gather_row(part_g.ndata[dgl.NID], part_src_ids)
+        part_dst_ids = F.gather_row(part_g.ndata[dgl.NID], part_dst_ids)
         part_eids = part_g.edata[dgl.EID]
-        orig_src_ids = orig_nids[part_src_ids]
-        orig_dst_ids = orig_nids[part_dst_ids]
-        orig_eids1 = orig_eids[part_eids]
+        orig_src_ids = F.gather_row(orig_nids, part_src_ids)
+        orig_dst_ids = F.gather_row(orig_nids, part_dst_ids)
+        orig_eids1 = F.gather_row(orig_eids, part_eids)
         orig_eids2 = g.edge_ids(orig_src_ids, orig_dst_ids)
         assert F.shape(orig_eids1)[0] == F.shape(orig_eids2)[0]
         assert np.all(F.asnumpy(orig_eids1) == F.asnumpy(orig_eids2))
