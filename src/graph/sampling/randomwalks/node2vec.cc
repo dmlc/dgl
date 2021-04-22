@@ -66,8 +66,8 @@ DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingNode2vec")
     *rv = result;
 });
 
-} // namespace
+}  // namespace
 
-} // namespace sampling
+}  // namespace sampling
 
-} // namespace dgl
+}  // namespace dgl

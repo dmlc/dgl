@@ -6,7 +6,6 @@
 
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
-#include <vector>
 #include "node2vec_randomwalk.h"
 
 

@@ -8,14 +8,14 @@
 #ifndef DGL_GRAPH_SAMPLING_RANDOMWALKS_NODE2VEC_RANDOMWALK_H_
 #define DGL_GRAPH_SAMPLING_RANDOMWALKS_NODE2VEC_RANDOMWALK_H_
 
+#include <dgl/array.h>
+#include <dgl/base_heterograph.h>
+#include <dgl/random.h>
 #include <utility>
 #include <vector>
 #include <functional>
 #include <cmath>
 #include <algorithm>
-#include <dgl/array.h>
-#include <dgl/base_heterograph.h>
-#include <dgl/random.h>
 #include "metapath_randomwalk.h"
 
 
@@ -94,20 +94,20 @@ std::pair<dgl_id_t, bool> Node2vecRandomWalkStep(
         } else {
             while (true) {
                 idx = RandomEngine::ThreadLocal()->RandInt(size);
-                r = RandomEngine::ThreadLocal()->Uniform(0.,1.);
+                r = RandomEngine::ThreadLocal()->Uniform(0., 1.);
                 next_node = succ[idx];
                 if (next_node == pre) {
                     if (r < prob0)
                         break;
-                } else if (has_edge_between<IdxType>(edges, next_node,pre)){
+                } else if (has_edge_between<IdxType>(edges, next_node, pre)){
                     if (r < prob1)
                         break;
-                } else if(r < prob2) {
+                } else if (r < prob2) {
                     break;
                 }
             }
         }
-    } else{
+    } else {
         const IdxType *all_eids = static_cast<IdxType *>(edges[2]->data);
         const IdxType *eids = all_eids + offsets[curr];
         FloatArray prob_selected;
@@ -122,19 +122,20 @@ std::pair<dgl_id_t, bool> Node2vecRandomWalkStep(
         if (len == 0) {
             idx = RandomEngine::ThreadLocal()->Choice<IdxType>(prob_selected);
             next_node = succ[idx];
-        } else{
+        } else {
             while (true) {
                 idx = RandomEngine::ThreadLocal()->Choice<IdxType>(prob_selected);
-                r = RandomEngine::ThreadLocal()->Uniform(0.,1.);
+                r = RandomEngine::ThreadLocal()->Uniform(0., 1.);
                 next_node = succ[idx];
                 if (next_node == pre) {
                     if (r < prob0)
                         break;
-                } else if (has_edge_between<IdxType>(edges,next_node,pre)) {
+                } else if (has_edge_between<IdxType>(edges, next_node, pre)) {
                     if (r < prob1)
                         break;
-                } else if (r < prob2)
+                } else if (r < prob2){
                     break;
+                }
             }
         }
     }
@@ -207,4 +208,4 @@ IdArray Node2vecRandomWalk(
 };  // namespace sampling
 
 };  // namespace dgl
-#endif  //DGL_GRAPH_SAMPLING_RANDOMWALKS_NODE2VEC_RANDOMWALK_H_
+#endif  // DGL_GRAPH_SAMPLING_RANDOMWALKS_NODE2VEC_RANDOMWALK_H_
