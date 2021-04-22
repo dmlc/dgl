@@ -25,11 +25,11 @@ void CheckNode2vecInputs(
         const double p,
         const double q,
         const int64_t walk_length,
-        const FloatArray &prob){
+        const FloatArray &prob) {
     CHECK_INT(seeds, "seeds");
-    CHECK_NDIM(seeds,1,"seeds");
-    CHECK_FLOAT(prob,"probability");
-    CHECK_NDIM(prob,1,"probability");
+    CHECK_NDIM(seeds, 1, "seeds");
+    CHECK_FLOAT(prob, "probability");
+    CHECK_NDIM(prob, 1, "probability");
 }
 
 IdArray Node2vec(
@@ -39,12 +39,12 @@ IdArray Node2vec(
         const double q,
         const int64_t walk_length,
         const FloatArray &prob) {
-    CheckNode2vecInputs(hg,seeds,p,q,walk_length,prob);
+    CheckNode2vecInputs(hg, seeds, p, q, walk_length, prob);
 
     IdArray vids;
     ATEN_XPU_SWITCH(hg->Context().device_type, XPU, "Node2vec", {
             ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
-                    vids = impl::Node2vec<XPU, IdxType>(hg,seeds,p,q,walk_length,prob);
+                    vids = impl::Node2vec<XPU, IdxType>(hg, seeds, p, q, walk_length, prob);
             });
     });
 
@@ -61,12 +61,13 @@ DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingNode2vec")
     FloatArray prob = args[5];
 
 
-    auto result = sampling::Node2vec(hg.sptr(),seeds,p,q,walk_length,prob);
+    auto result = sampling::Node2vec(hg.sptr(), seeds, p, q, walk_length, prob);
 
     *rv = result;
 });
 
-}
-}
-}
+} // namespace
 
+} // namespace sampling
+
+} // namespace dgl

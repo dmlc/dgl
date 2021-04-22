@@ -5,19 +5,18 @@
  */
 
 
-#ifndef DGL_GRAPH_SAMPLING_RANDOMWALKS_NODE2VEC_RANDOMWALK_H
-#define DGL_GRAPH_SAMPLING_RANDOMWALKS_NODE2VEC_RANDOMWALK_H
+#ifndef DGL_GRAPH_SAMPLING_RANDOMWALKS_NODE2VEC_RANDOMWALK_H_
+#define DGL_GRAPH_SAMPLING_RANDOMWALKS_NODE2VEC_RANDOMWALK_H_
 
-
-#include <dgl/array.h>
-#include <dgl/base_heterograph.h>
-#include <dgl/random.h>
 #include <utility>
 #include <vector>
 #include <functional>
 #include <cmath>
-#include "metapath_randomwalk.h"
 #include <algorithm>
+#include <dgl/array.h>
+#include <dgl/base_heterograph.h>
+#include <dgl/random.h>
+#include "metapath_randomwalk.h"
 
 
 namespace dgl {
@@ -49,13 +48,13 @@ template<typename IdxType>
 bool has_edge_between(
         const std::vector<IdArray> &edges,
         dgl_id_t u,
-        dgl_id_t v){
+        dgl_id_t v) {
     const IdxType *offsets = static_cast<IdxType *>(edges[0]->data);
     const IdxType *all_succ = static_cast<IdxType *>(edges[1]->data);
     const IdxType *u_succ = all_succ + offsets[u];
     const int64_t size = offsets[u + 1] - offsets[u];
 
-    return std::find(u_succ,u_succ+size,v) != u_succ+size;
+    return std::find(u_succ, u_succ+size, v) != u_succ+size;
 }
 
 
@@ -70,7 +69,6 @@ std::pair<dgl_id_t, bool> Node2vecRandomWalkStep(
         const std::vector<IdArray>  &edges,
         const FloatArray &probs,
         TerminatePredicate<IdxType> terminate) {
-
     const IdxType *offsets = static_cast<IdxType *>(edges[0]->data);
     const IdxType *all_succ = static_cast<IdxType *>(edges[1]->data);
     const IdxType *succ = all_succ + offsets[curr];
@@ -83,7 +81,7 @@ std::pair<dgl_id_t, bool> Node2vecRandomWalkStep(
 
     IdxType idx = 0;
     // Exist repeated computing problem
-    double max_prob = std::max({1/p,1.0,1/q});
+    double max_prob = std::max({1/p, 1.0, 1/q});
     double prob0 = 1 / p / max_prob;
     double prob1 = 1 / max_prob;
     double prob2 = 1 / q / max_prob;
@@ -101,11 +99,12 @@ std::pair<dgl_id_t, bool> Node2vecRandomWalkStep(
                 if (next_node == pre) {
                     if (r < prob0)
                         break;
-                }else if (has_edge_between<IdxType>(edges,next_node,pre)){ //  efficient has_egde_between()
-                    if (r<prob1)
+                } else if (has_edge_between<IdxType>(edges, next_node,pre)){
+                    if (r < prob1)
                         break;
-                }else if(r < prob2)
+                } else if(r < prob2) {
                     break;
+                }
             }
         }
     } else{
@@ -148,7 +147,7 @@ template<DLDeviceType XPU, typename IdxType>
 IdArray Node2vecGenericRandomWalk(
         const IdArray seeds,
         int64_t walk_length,
-        Node2vecStepFunc<IdxType> step){
+        Node2vecStepFunc<IdxType> step) {
     int64_t num_seeds = seeds->shape[0];
     walk_length = walk_length + 1;  //
 
@@ -164,9 +163,8 @@ IdArray Node2vecGenericRandomWalk(
         dgl_id_t pre = curr;
         traces_data[seed_id * walk_length] = curr;
 
-        for(i=0; i < walk_length; ++i){
-            // TODO: pre node initialize
-            const auto &succ = step(traces_data + seed_id * walk_length,curr,pre,i);
+        for (i = 0; i < walk_length; ++i) {
+            const auto &succ = step(traces_data + seed_id * walk_length, curr, pre, i);
             pre = curr;
             curr = succ.first;
             traces_data[seed_id*walk_length+i+1] = curr;
@@ -190,7 +188,7 @@ IdArray Node2vecRandomWalk(
         const FloatArray &prob,
         TerminatePredicate<IdxType> terminate){
     std::vector<IdArray> edges;
-    edges = g->GetAdj(0, true, "csr"); // Node2vec only support homogeneous graph.
+    edges = g->GetAdj(0, true, "csr");  // homogeneous graph.
 
     Node2vecStepFunc<IdxType > step =
         [&edges, &prob, p, q, terminate]
@@ -199,8 +197,7 @@ IdArray Node2vecRandomWalk(
                 data, curr, pre, p, q, len, edges, prob, terminate);
     };
 
-    return Node2vecGenericRandomWalk<XPU, IdxType>(seeds,walk_length,step);
-
+    return Node2vecGenericRandomWalk<XPU, IdxType>(seeds, walk_length, step);
 }
 
 };  // namespace
@@ -210,4 +207,4 @@ IdArray Node2vecRandomWalk(
 };  // namespace sampling
 
 };  // namespace dgl
-#endif //DGL_GRAPH_SAMPLING_RANDOMWALKS_NODE2VEC_RANDOMWALK_H
+#endif  //DGL_GRAPH_SAMPLING_RANDOMWALKS_NODE2VEC_RANDOMWALK_H_

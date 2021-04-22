@@ -27,13 +27,12 @@ IdArray Node2vec(
         const double q,
         const int64_t walk_length,
         const FloatArray &prob) {
-
     TerminatePredicate<IdxType> terminate =
             [] (IdxType *data, dgl_id_t curr, int64_t len) {
                 return false;
             };
 
-    return Node2vecRandomWalk<XPU, IdxType>(hg,seeds,p,q,walk_length,prob,terminate);
+    return Node2vecRandomWalk<XPU, IdxType>(hg, seeds, p, q, walk_length, prob, terminate);
 }
 
 template
