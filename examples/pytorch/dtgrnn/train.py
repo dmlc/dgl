@@ -17,12 +17,28 @@ from utils import NormalizationLayer, masked_mae_loss, get_learning_rate
 batch_cnt = [0]
 
 
-def train(model, graph, dataloader, optimizer, scheduler, normalizer, loss_fn, device, minimum_lr, max_grad_norm):
+def train(model, graph, dataloader, optimizer, scheduler, normalizer, loss_fn, device, args):
     total_loss = []
     graph = graph.to(device)
     model.train()
+    batch_size = args.batch_size
     for i, (x, y) in enumerate(dataloader):
         optimizer.zero_grad()
+        # Padding: Since the diffusion graph is precmputed we need to pad the batch so that
+        # each batch have same batch size
+        if x.shape[0] != batch_size:
+            x_buff = torch.zeros(
+                batch_size, x.shape[1], x.shape[2], x.shape[3])
+            y_buff = torch.zeros(
+                batch_size, x.shape[1], x.shape[2], x.shape[3])
+            x_buff[:x.shape[0], :, :, :] = x
+            x_buff[x.shape[0]:, :, :,
+                   :] = x[-1].repeat(batch_size-x.shape[0], 1, 1, 1)
+            y_buff[:x.shape[0], :, :, :] = y
+            y_buff[x.shape[0]:, :, :,
+                   :] = y[-1].repeat(batch_size-x.shape[0], 1, 1, 1)
+            x = x_buff
+            y = y_buff
         # Permute the dimension for shaping
         x = x.permute(1, 0, 2, 3)
         y = y.permute(1, 0, 2, 3)
@@ -32,27 +48,44 @@ def train(model, graph, dataloader, optimizer, scheduler, normalizer, loss_fn, d
         y_norm = normalizer.normalize(y).reshape(
             x.shape[0], -1, x.shape[3]).float().to(device)
         y = y.reshape(y.shape[0], -1, y.shape[3]).float().to(device)
-        batch_size = x.shape[1]
+
         batch_graph = dgl.batch([graph]*batch_size)
         output = model(batch_graph, x_norm, y_norm, batch_cnt[0], device)
         # Denormalization for loss compute
         y_pred = normalizer.denormalize(output)
         loss = loss_fn(y_pred, y)
         loss.backward()
-        nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+        nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
         optimizer.step()
-        if get_learning_rate(optimizer) > minimum_lr:
+        if get_learning_rate(optimizer) > args.minimum_lr:
             scheduler.step()
         total_loss.append(float(loss))
         batch_cnt[0] += 1
+        print("Batch: ", i)
     return np.mean(total_loss)
 
 
-def eval(model, graph, dataloader, normalizer, loss_fn, device):
+def eval(model, graph, dataloader, normalizer, loss_fn, device, args):
     total_loss = []
     graph = graph.to(device)
     model.eval()
+    batch_size = args.batch_size
     for i, (x, y) in enumerate(dataloader):
+        # Padding: Since the diffusion graph is precmputed we need to pad the batch so that
+        # each batch have same batch size
+        if x.shape[0] != batch_size:
+            x_buff = torch.zeros(
+                batch_size, x.shape[1], x.shape[2], x.shape[3])
+            y_buff = torch.zeros(
+                batch_size, x.shape[1], x.shape[2], x.shape[3])
+            x_buff[:x.shape[0], :, :, :] = x
+            x_buff[x.shape[0]:, :, :,
+                   :] = x[-1].repeat(batch_size-x.shape[0], 1, 1, 1)
+            y_buff[:x.shape[0], :, :, :] = y
+            y_buff[x.shape[0]:, :, :,
+                   :] = y[-1].repeat(batch_size-x.shape[0], 1, 1, 1)
+            x = x_buff
+            y = y_buff
         # Permute the order of dimension
         x = x.permute(1, 0, 2, 3)
         y = y.permute(1, 0, 2, 3)
@@ -62,7 +95,7 @@ def eval(model, graph, dataloader, normalizer, loss_fn, device):
         y_norm = normalizer.normalize(y).reshape(
             x.shape[0], -1, x.shape[3]).float().to(device)
         y = y.reshape(x.shape[0], -1, x.shape[3]).to(device)
-        batch_size = x.shape[1]
+
         batch_graph = dgl.batch([graph]*batch_size)
         output = model(batch_graph, x_norm, y_norm, i, device)
         y_pred = normalizer.denormalize(output)
@@ -124,8 +157,13 @@ if __name__ == "__main__":
         test_data, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
     normalizer = NormalizationLayer(train_data.mean, train_data.std)
 
-    net = partial(DiffConv, k=args.diffsteps) if args.model == 'dcrnn' else partial(
-        GatedGAT, map_feats=64, num_heads=args.num_heads)
+    if args.model == 'dcrnn':
+        batch_g = dgl.batch([g]*args.batch_size).to(device)
+        out_gs, in_gs = DiffConv.attach_graph(batch_g, args.diffsteps)
+        net = partial(DiffConv, k=args.diffsteps,
+                      in_graph_list=in_gs, out_graph_list=out_gs)
+    elif args.model == 'gaan':
+        net = partial(GatedGAT, map_feats=64, num_heads=args.num_heads)
 
     dcrnn = GraphRNN(in_feats=2,
                      out_feats=64,
@@ -141,9 +179,11 @@ if __name__ == "__main__":
 
     for e in range(args.epochs):
         train_loss = train(dcrnn, g, train_loader, optimizer, scheduler,
-                           normalizer, loss_fn, device, args.minimum_lr, args.max_grad_norm)
-        valid_loss = eval(dcrnn, g, valid_loader, normalizer, loss_fn, device)
-        test_loss = eval(dcrnn, g, test_loader, normalizer, loss_fn, device)
+                           normalizer, loss_fn, device, args)
+        valid_loss = eval(dcrnn, g, valid_loader,
+                          normalizer, loss_fn, device, args)
+        test_loss = eval(dcrnn, g, test_loader,
+                         normalizer, loss_fn, device, args)
         print("Epoch: {} Train Loss: {} Valid Loss: {} Test Loss: {}".format(e,
                                                                              train_loss,
                                                                              valid_loss,

@@ -1,7 +1,7 @@
 # Discrete Temporal Dynamic Graph with recurrent structure
 ## DGL Implementation of DCRNN and GaAN paper.
 
-This DGL example implements the GNN model proposed in the paper [DCRNN](https://arxiv.org/abs/1707.01926) and [GaAN](https://arxiv.org/pdf/1803.07294). 
+This DGL example implements the GNN model proposed in the paper [Diffusion Convolutional Recurrent Neural Network: Data-Driven Traffic Forecasting](https://arxiv.org/abs/1707.01926) and [GaAN:Gated Attention Networks for Learning on Large and Spatiotemporal Graphs](https://arxiv.org/pdf/1803.07294). 
 
 Model implementor
 ----------------------
@@ -67,5 +67,5 @@ Performance on METR-LA
 | GaAN paper      | 3.16 |
 
 
-Notice that Any Graph Convolution module can be plugged into the recurrent discrete temporal dynamic graph template to test performance Simply replace DiffConv or GaAN.
+Notice that Any Graph Convolution module can be plugged into the recurrent discrete temporal dynamic graph template to test performance; simply replace DiffConv or GaAN.
 

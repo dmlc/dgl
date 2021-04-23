@@ -26,11 +26,8 @@ class DiffConv(nn.Module):
         direction of diffusion convolution
         From paper default both direction
     '''
-    in_graph_list = []
-    out_graph_list = []
-    init = True
 
-    def __init__(self, in_feats, out_feats, k, dir='both'):
+    def __init__(self, in_feats, out_feats, k, in_graph_list, out_graph_list, dir='both'):
         super(DiffConv, self).__init__()
         self.in_feats = in_feats
         self.out_feats = out_feats
@@ -42,27 +39,30 @@ class DiffConv(nn.Module):
             self.project_fcs.append(
                 nn.Linear(self.in_feats, self.out_feats, bias=False))
         self.merger = nn.Parameter(torch.randn(self.num_graphs+1))
+        self.in_graph_list = in_graph_list
+        self.out_graph_list = out_graph_list
 
     @staticmethod
     def attach_graph(g, k):
         device = g.device
-        DiffConv.out_graph_list = []
-        DiffConv.in_graph_list = []
+        out_graph_list = []
+        in_graph_list = []
         wadj, ind, outd = DiffConv.get_weight_matrix(g)
         adj = sparse.coo_matrix(wadj/outd.cpu().numpy())
         outg = dgl.from_scipy(adj, eweight_name='weight').to(device)
         outg.edata['weight'] = outg.edata['weight'].float().to(device)
-        DiffConv.out_graph_list.append(outg)
+        out_graph_list.append(outg)
         for i in range(k-1):
-            DiffConv.out_graph_list.append(DiffConv.diffuse(
-                DiffConv.out_graph_list[-1], wadj, outd))
+            out_graph_list.append(DiffConv.diffuse(
+                out_graph_list[-1], wadj, outd))
         adj = sparse.coo_matrix(wadj.T/ind.cpu().numpy())
         ing = dgl.from_scipy(adj, eweight_name='weight').to(device)
         ing.edata['weight'] = ing.edata['weight'].float().to(device)
-        DiffConv.in_graph_list.append(ing)
+        in_graph_list.append(ing)
         for i in range(k-1):
-            DiffConv.in_graph_list.append(DiffConv.diffuse(
-                DiffConv.in_graph_list[-1], wadj.T, ind))
+            in_graph_list.append(DiffConv.diffuse(
+                in_graph_list[-1], wadj.T, ind))
+        return out_graph_list, in_graph_list
 
     @staticmethod
     def get_weight_matrix(g):
@@ -86,18 +86,13 @@ class DiffConv(nn.Module):
         return ret_graph
 
     def forward(self, g, x):
-        if DiffConv.init == True:
-            DiffConv.attach_graph(g, self.k)
-            DiffConv.init = False
-        if g.num_nodes() != DiffConv.in_graph_list[0].num_nodes():
-            DiffConv.attach_graph(g, self.k)
         feat_list = []
         if self.dir == 'both':
-            graph_list = DiffConv.in_graph_list+DiffConv.out_graph_list
+            graph_list = self.in_graph_list+self.out_graph_list
         elif self.dir == 'in':
-            graph_list = DiffConv.in_graph_list
+            graph_list = self.in_graph_list
         elif self.dir == 'out':
-            graph_list = DiffConv.out_graph_list
+            graph_list = self.out_graph_list
 
         for i in range(self.num_graphs):
             g = graph_list[i]
