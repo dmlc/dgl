@@ -1,6 +1,6 @@
 # DGL Implementation of the TAHIN
 
-This DGL example implements the TAHIN module proposed in the paper [HCDIR](https://arxiv.org/pdf/2007.15293.pdf). 
+This DGL example implements the TAHIN module proposed in the paper [HCDIR](https://arxiv.org/pdf/2007.15293.pdf). Since the code and dataset have not been published yet, we implement its main idea and emperiment on two other datasets.
 
 Example implementor
 ----------------------
@@ -14,6 +14,8 @@ Dependencies
 Datasets
 ---------------------------------------
 The datasets used can be downloaded from [here](https://github.com/librahu/HIN-Datasets-for-Recommendation-and-Network-Embedding). For the experiments, all the positive edges are fetched and the same number of negative edges are randomly sampled. The edges are then shuffled and splitted into train/validate/test at a ratio of 6:2:2. The positive edges that appear in the validation and test sets are then removed from the original graph.
+
+The original graph statistics:
 
 **Movielens** 
 
@@ -72,10 +74,10 @@ Performance
 -------------------------
 **Results**
 
-| Dataset |          Amazon          |         Movielens        |
+| Dataset |         Movielens        |          Amazon          |
 |---------| ------------------------ | ------------------------ |
 |  Metric |    HAN     /    TAHIN    |    HAN     /    TAHIN    |
-|   AUC   |   0.8470   /   0.8442    |   0.9297   /   0.9392    |
-|   ACC   |   0.7672   /   0.7619    |   0.8627   /   0.8683    |
-|    F1   |   0.7628   /   0.7499    |   0.8631   /   0.8707    |
-| Logloss |   0.5311   /   0.5150    |   0.3689   /   0.3266    |
+|   AUC   |   0.9297   /   0.9392    |   0.8470   /   0.8442    |
+|   ACC   |   0.8627   /   0.8683    |   0.7672   /   0.7619    |
+|    F1   |   0.8631   /   0.8707    |   0.7628   /   0.7499    |
+| Logloss |   0.3689   /   0.3266    |   0.5311   /   0.5150    |
