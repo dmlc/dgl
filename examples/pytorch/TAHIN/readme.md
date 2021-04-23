@@ -4,7 +4,7 @@ This DGL example implements the TAHIN module proposed in the paper [HCDIR](https
 
 Example implementor
 ----------------------
-This example was implemented by [KounianhuaDu](https://github.com/KounianhuaDu) at the AWS Shanghai AI Lab.
+This example was implemented by [KounianhuaDu](https://github.com/KounianhuaDu) during her software development intern time at the AWS Shanghai AI Lab.
 
 Dependencies
 ----------------------
