@@ -27,5 +27,6 @@ def evaluate_f1_score(pred, label):
 def evaluate_logloss(pred, label):
     res = log_loss(y_true=label, y_pred=pred,eps=1e-7, normalize=True)
     return res
+    
 
 

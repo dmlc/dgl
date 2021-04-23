@@ -5,8 +5,8 @@ import torch.nn.functional as F
 import dgl
 import dgl.function as fn
 from dgl.nn.pytorch import GATConv
-from dgl.nn.functional import edge_softmax
 
+#Semantic attention in the metapath-based aggregation (the same as that in the HAN)
 class SemanticAttention(nn.Module):
     def __init__(self, in_size, hidden_size=128):
         super(SemanticAttention, self).__init__()
@@ -24,6 +24,7 @@ class SemanticAttention(nn.Module):
 
         return (beta * z).sum(1)                       # (N, D * K)
 
+#Metapath-based aggregation (the same as the HANLayer)
 class HANLayer(nn.Module):
     def __init__(self, meta_paths, in_size, out_size, layer_num_heads, dropout):
         super(HANLayer, self).__init__()
@@ -57,6 +58,7 @@ class HANLayer(nn.Module):
 
         return self.semantic_attention(semantic_embeddings)                            # (N, D * K)
 
+#Relational neighbor aggregation
 class RelationalAGG(nn.Module):
     def __init__(self, g, in_size, out_size, dropout=0.1):
         super(RelationalAGG, self).__init__()
@@ -101,6 +103,7 @@ class RelationalAGG(nn.Module):
         #second update to obtain h1
         g.multi_update_all(funcs, 'sum') 
 
+        #apply activation, layernorm, and dropout
         feat_dict={}
         for ntype in g.ntypes:
             feat_dict[ntype] = self.dropout(self.layernorm(F.relu_(g.nodes[ntype].data['h']))) #apply activation, layernorm, and dropout
@@ -121,7 +124,8 @@ class TAHIN(nn.Module):
         self.RelationalAGG = RelationalAGG(g, in_size, out_size)
 
         #metapath-based aggregation modules for user and item, this produces h2
-        self.meta_paths = meta_paths #metapaths used in metapath-based aggregation
+        self.meta_paths = meta_paths 
+        #one HANLayer for user, one HANLayer for item
         self.hans = nn.ModuleDict({
             key: HANLayer(value, in_size, out_size, num_heads, dropout) for key, value in self.meta_paths.items()
         })

@@ -15,50 +15,47 @@ def process_amazon(root_path):
     #Construct graph from raw data.
     # load data of amazon
     data_path = os.path.join(root_path, 'Amazon')
-    _data_list = ['item_view.dat', 'user_item.dat', 'item_brand.dat', 'item_category.dat']
-
+    
     # item_view
     item_view_src=[]
     item_view_dst=[]
-    with open(data_path + '/' + _data_list[0]) as fin:
+    with open(os.path.join(data_path, 'item_view.dat')) as fin:
         for line in fin.readlines():
             _line = line.strip().split(',')
-            _item, _view= int(_line[0]), int(_line[1])
-            item_view_src.append(_item)
-            item_view_dst.append(_view)
+            item, view= int(_line[0]), int(_line[1])
+            item_view_src.append(item)
+            item_view_dst.append(view)
 
     # user_item
     user_item_src=[]
     user_item_dst=[]
-    user_item_link=0
-    with open(data_path + '/' + _data_list[1]) as fin:
+    with open(os.path.join(data_path, 'user_item.dat')) as fin:
         for line in fin.readlines():
             _line = line.strip().split('\t')
-            _user, _item, _rate = int(_line[0]), int(_line[1]), int(_line[2])
-            if _rate > 3:
-                user_item_src.append(_user)
-                user_item_dst.append(_item)  
-                user_item_link = user_item_link + 1
+            user, item, rate = int(_line[0]), int(_line[1]), int(_line[2])
+            if rate > 3:
+                user_item_src.append(user)
+                user_item_dst.append(item)
 
     # item_brand
     item_brand_src=[]
     item_brand_dst=[]
-    with open(data_path + '/' + _data_list[2]) as fin:
+    with open(os.path.join(data_path, 'item_brand.dat')) as fin:
         for line in fin.readlines():
             _line = line.strip().split(',')
-            _item, _brand= int(_line[0]), int(_line[1])
-            item_brand_src.append(_item)
-            item_brand_dst.append(_brand)
+            item, brand= int(_line[0]), int(_line[1])
+            item_brand_src.append(item)
+            item_brand_dst.append(brand)
 
     # item_category
     item_category_src=[]
     item_category_dst=[]
-    with open(data_path + '/' + _data_list[3]) as fin:
+    with open(os.path.join(data_path, 'item_category.dat')) as fin:
         for line in fin.readlines():
             _line = line.strip().split(',')
-            _item, _category= int(_line[0]), int(_line[1])
-            item_category_src.append(_item)
-            item_category_dst.append(_category)
+            item, category= int(_line[0]), int(_line[1])
+            item_category_src.append(item)
+            item_category_dst.append(category)
 
     #build graph
     hg = dgl.heterograph({
@@ -323,3 +320,4 @@ def load_data(dataset, batch_size=128, num_workers = 10, root_path = './data'):
     test_loader= DataLoader(dataset=test_set, batch_size = batch_size, shuffle=True, num_workers = num_workers)
 
     return hg, train_loader, eval_loader, test_loader, meta_paths, user_key, item_key
+    
