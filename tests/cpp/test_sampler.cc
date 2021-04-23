@@ -227,3 +227,56 @@ TEST(RandomTest, TestUniformChoice) {
   _TestUniformChoice<int32_t>(re);
   _TestUniformChoice<int64_t>(re);
 }
+
+template <typename Idx, typename FloatType>
+void _TestBiasedChoice(RandomEngine* re) {
+  re->SetSeed(42);
+  // num == 0
+  {
+    Idx split[] = {0, 1, 2};
+    FloatArray bias = NDArray::FromVector(std::vector<FloatType>({1, 3}));
+    IdArray rst = re->BiasedChoice<Idx, FloatType>(0, split, bias, true);
+    ASSERT_EQ(rst->shape[0], 0);
+  }
+  // basic test
+  {
+    Idx sample_num = 100000;
+    Idx population = 1000000;
+    Idx split[] = {0, population/2, population};
+    FloatArray bias = NDArray::FromVector(std::vector<FloatType>({1, 3}));
+
+    IdArray rst = re->BiasedChoice<Idx, FloatType>(sample_num, split, bias, true);
+    auto rst_data = static_cast<Idx *>(rst->data);
+    Idx larger = 0;
+    for (Idx i = 0 ; i < sample_num ; ++i)
+      if (rst_data[i] >= population / 2)
+        larger++;
+    ASSERT_LE(fabs((double)larger / sample_num - 0.75), 1e-2);
+  }
+  // without replacement
+  {
+    Idx sample_num = 500;
+    Idx population = 1000;
+    Idx split[] = {0, sample_num, population};
+    FloatArray bias = NDArray::FromVector(std::vector<FloatType>({1, 0}));
+
+    IdArray rst = re->BiasedChoice<Idx, FloatType>(sample_num, split, bias, false);
+    auto rst_data = static_cast<Idx *>(rst->data);
+
+    std::set<Idx> idxset;
+    for (int64_t i = 0; i < sample_num; ++i) {
+      Idx x = rst_data[i];
+      ASSERT_LT(x, sample_num);
+      idxset.insert(x);
+    }
+    ASSERT_EQ(idxset.size(), sample_num);
+  }
+}
+
+TEST(RandomTest, TestBiasedChoice) {
+  RandomEngine* re = RandomEngine::ThreadLocal();
+  _TestBiasedChoice<int32_t, float>(re);
+  _TestBiasedChoice<int64_t, float>(re);
+  _TestBiasedChoice<int32_t, double>(re);
+  _TestBiasedChoice<int64_t, double>(re);
+}
