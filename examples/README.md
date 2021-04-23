@@ -91,7 +91,8 @@ The folder contains example implementations of selected research papers related 
 | [GNNExplainer: Generating Explanations for Graph Neural Networks](#gnnexplainer) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
 | [Interaction Networks for Learning about Objects, Relations and Physics](#graphsim) |  |                                 |:heavy_check_mark:                 |                    |                    |
 | [Representation Learning on Graphs with Jumping Knowledge Networks](#jknet) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
-
+| [Diffusion Convolutional Recurrent Neural Network: Data-Driven Traffic Forcasting](#dcrnn) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [GaAN: Gated Attention Networks for Learning on large and Spatiotemporal Graphs](#gaan) |                     |                                  | :heavy_check_mark:        |                    |                    |
 ## 2021
 
 - <a name="bgnn"></a> Ivanov et al. Boost then Convolve: Gradient Boosting Meets Graph Neural Networks. [Paper link](https://openreview.net/forum?id=ebS5NUfoMKL). 
@@ -268,6 +269,9 @@ The folder contains example implementations of selected research papers related 
     - Example code: [pytorch](../examples/pytorch/jknet)
     - Tags: message passing, neighborhood
 
+- <a name="gaan"></a> Zhang et al. GaAN: Gated Attention Networks for Learning on Large and Spatiotemporal Graphs. [Paper link](https://arxiv.org/abs/1803.07294).
+    - Example code: [pytorch](../examples/pytorch/dtgrnn)
+    - Tags: Static discrete temporal graph, traffic forcasting
 
 ## 2017
 
@@ -322,6 +326,10 @@ The folder contains example implementations of selected research papers related 
 - <a name="schnet"></a> Schütt et al. SchNet: A continuous-filter convolutional neural network for modeling quantum interactions. [Paper link](https://arxiv.org/abs/1706.08566).
     - Example code: [PyTorch](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/alchemy)
     - Tags: molecules, quantum chemistry
+
+- <a name="dcrnn"></a> Li et al. Diffusion Convolutional Recurrent Neural Network: Data-Driven Traffic Forcasting. [Paper link](https://arxiv.org/abs/1707.01926).
+    - Example code: [Pytorch](../examples/pytorch/dtgrnn)
+    - Tags: Static discrete temporal graph, traffic forcasting.
 
 ## 2016
 
