@@ -405,10 +405,6 @@ class EdgeGATConv(nn.Module):
             e = self.leaky_relu(graph.edata['e'])
             graph.edata['a'] = self.attn_drop(edge_softmax(graph, e))
             graph.edata['efeat'] = edge_feat
-            '''
-            graph.update_all(fn.u_mul_e('ft','a','m'),
-                             fn.sum('m','ft'))
-            '''
             graph.update_all(self.msg_fn, fn.sum('m', 'ft'))
             rst = graph.ndata['ft']
             if self.residual:

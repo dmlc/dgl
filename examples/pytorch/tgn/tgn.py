@@ -82,8 +82,3 @@ class TGN(nn.Module):
     def restore_memory(self, memory_checkpoint):
         self.memory.memory = memory_checkpoint['memory']
         self.memory.last_update_time = memory_checkpoint['last_t']
-
-    def get_temporal_weight(self):
-        weight = copy.deepcopy(
-            self.temporal_encoder.w.weight.detach().numpy().reshape(-1))
-        return weight
