@@ -91,7 +91,7 @@ The folder contains example implementations of selected research papers related 
 | [GNNExplainer: Generating Explanations for Graph Neural Networks](#gnnexplainer) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
 | [Interaction Networks for Learning about Objects, Relations and Physics](#graphsim) |  |                                 |:heavy_check_mark:                 |                    |                    |
 | [Representation Learning on Graphs with Jumping Knowledge Networks](#jknet) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
-| [A Heterogeneous Information Network based Cross DomainInsurance Recommendation System for Cold Start Users](#tahin) |  |     :heavy_check_mark:       |                 |                    |                    |
+| [A Heterogeneous Information Network based Cross Domain Insurance Recommendation System for Cold Start Users](#tahin) |  |     :heavy_check_mark:       |                 |                    |                    |
 
 ## 2021
 
