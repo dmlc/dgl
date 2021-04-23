@@ -167,276 +167,278 @@ pipeline {
     }
     stage('CI'){
       when { not {triggeredBy 'IssueCommentCause'} }
-      stage('Lint Check') {
-        agent {
-          docker {
-            label 'linux-c52x-node'
-            image 'dgllib/dgl-ci-lint'
-            alwaysPull true
+      stages{
+        stage('Lint Check') {
+          agent {
+            docker {
+              label 'linux-c52x-node'
+              image 'dgllib/dgl-ci-lint'
+              alwaysPull true
+            }
+          }
+          steps {
+            init_git()
+            sh 'bash tests/scripts/task_lint.sh'
+          }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
           }
         }
-        steps {
-          init_git()
-          sh 'bash tests/scripts/task_lint.sh'
+        stage('Build') {
+          parallel {
+            stage('CPU Build') {
+              agent {
+                docker {
+                  label 'linux-c52x-node'
+                  image 'dgllib/dgl-ci-cpu:conda'
+                  alwaysPull true
+                }
+              }
+              steps {
+                build_dgl_linux('cpu')
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('GPU Build') {
+              agent {
+                docker {
+                  label 'linux-c52x-node'
+                  image 'dgllib/dgl-ci-gpu:conda'
+                  args '-u root'
+                  alwaysPull true
+                }
+              }
+              steps {
+                // sh "nvidia-smi"
+                build_dgl_linux('gpu')
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('CPU Build (Win64)') {
+              // Windows build machines are manually added to Jenkins master with
+              // "windows" label as permanent agents.
+              agent { label 'windows' }
+              steps {
+                build_dgl_win64('cpu')
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+          // Currently we don't have Windows GPU build machines
+          }
         }
-        post {
-          always {
-            cleanWs disableDeferredWipeout: true, deleteDirs: true
-          }
-        }
-      }
-      stage('Build') {
-        parallel {
-          stage('CPU Build') {
-            agent {
-              docker {
-                label 'linux-c52x-node'
-                image 'dgllib/dgl-ci-cpu:conda'
-                alwaysPull true
+        stage('Test') {
+          parallel {
+            stage('C++ CPU') {
+              agent {
+                docker {
+                  label 'linux-c52x-node'
+                  image 'dgllib/dgl-ci-cpu:conda'
+                  alwaysPull true
+                }
               }
-            }
-            steps {
-              build_dgl_linux('cpu')
-            }
-            post {
-              always {
-                cleanWs disableDeferredWipeout: true, deleteDirs: true
+              steps {
+                cpp_unit_test_linux()
               }
-            }
-          }
-          stage('GPU Build') {
-            agent {
-              docker {
-                label 'linux-c52x-node'
-                image 'dgllib/dgl-ci-gpu:conda'
-                args '-u root'
-                alwaysPull true
-              }
-            }
-            steps {
-              // sh "nvidia-smi"
-              build_dgl_linux('gpu')
-            }
-            post {
-              always {
-                cleanWs disableDeferredWipeout: true, deleteDirs: true
-              }
-            }
-          }
-          stage('CPU Build (Win64)') {
-            // Windows build machines are manually added to Jenkins master with
-            // "windows" label as permanent agents.
-            agent { label 'windows' }
-            steps {
-              build_dgl_win64('cpu')
-            }
-            post {
-              always {
-                cleanWs disableDeferredWipeout: true, deleteDirs: true
-              }
-            }
-          }
-        // Currently we don't have Windows GPU build machines
-        }
-      }
-      stage('Test') {
-        parallel {
-          stage('C++ CPU') {
-            agent {
-              docker {
-                label 'linux-c52x-node'
-                image 'dgllib/dgl-ci-cpu:conda'
-                alwaysPull true
-              }
-            }
-            steps {
-              cpp_unit_test_linux()
-            }
-            post {
-              always {
-                cleanWs disableDeferredWipeout: true, deleteDirs: true
-              }
-            }
-          }
-          stage('C++ CPU (Win64)') {
-            agent { label 'windows' }
-            steps {
-              cpp_unit_test_win64()
-            }
-            post {
-              always {
-                cleanWs disableDeferredWipeout: true, deleteDirs: true
-              }
-            }
-          }
-          stage('Tensorflow CPU') {
-            agent {
-              docker {
-                label 'linux-c52x-node'
-                image 'dgllib/dgl-ci-cpu:conda'
-                alwaysPull true
-              }
-            }
-            stages {
-              stage('Unit test') {
-                steps {
-                  unit_test_linux('tensorflow', 'cpu')
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
             }
-            post {
-              always {
-                cleanWs disableDeferredWipeout: true, deleteDirs: true
+            stage('C++ CPU (Win64)') {
+              agent { label 'windows' }
+              steps {
+                cpp_unit_test_win64()
               }
-            }
-          }
-          stage('Tensorflow GPU') {
-            agent {
-              docker {
-                label 'linux-gpu-node'
-                image 'dgllib/dgl-ci-gpu:conda'
-                args '--runtime nvidia'
-                alwaysPull true
-              }
-            }
-            stages {
-              stage('Unit test') {
-                steps {
-                  unit_test_linux('tensorflow', 'gpu')
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
             }
-            post {
-              always {
-                cleanWs disableDeferredWipeout: true, deleteDirs: true
-              }
-            }
-          }
-          stage('Torch CPU') {
-            agent {
-              docker {
-                label 'linux-c52x-node'
-                image 'dgllib/dgl-ci-cpu:conda'
-                alwaysPull true
-              }
-            }
-            stages {
-              stage('Unit test') {
-                steps {
-                  unit_test_linux('pytorch', 'cpu')
+            stage('Tensorflow CPU') {
+              agent {
+                docker {
+                  label 'linux-c52x-node'
+                  image 'dgllib/dgl-ci-cpu:conda'
+                  alwaysPull true
                 }
               }
-              stage('Example test') {
-                steps {
-                  example_test_linux('pytorch', 'cpu')
+              stages {
+                stage('Unit test') {
+                  steps {
+                    unit_test_linux('tensorflow', 'cpu')
+                  }
                 }
               }
-              stage('Tutorial test') {
-                steps {
-                  tutorial_test_linux('pytorch')
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
             }
-            post {
-              always {
-                cleanWs disableDeferredWipeout: true, deleteDirs: true
-              }
-            }
-          }
-          stage('Torch CPU (Win64)') {
-            agent { label 'windows' }
-            stages {
-              stage('Unit test') {
-                steps {
-                  unit_test_win64('pytorch', 'cpu')
+            stage('Tensorflow GPU') {
+              agent {
+                docker {
+                  label 'linux-gpu-node'
+                  image 'dgllib/dgl-ci-gpu:conda'
+                  args '--runtime nvidia'
+                  alwaysPull true
                 }
               }
-              stage('Example test') {
-                steps {
-                  example_test_win64('pytorch', 'cpu')
+              stages {
+                stage('Unit test') {
+                  steps {
+                    unit_test_linux('tensorflow', 'gpu')
+                  }
                 }
               }
-            }
-            post {
-              always {
-                cleanWs disableDeferredWipeout: true, deleteDirs: true
-              }
-            }
-          }
-          stage('Torch GPU') {
-            agent {
-              docker {
-                label 'linux-gpu-node'
-                image 'dgllib/dgl-ci-gpu:conda'
-                args '--runtime nvidia'
-                alwaysPull true
-              }
-            }
-            stages {
-              stage('Unit test') {
-                steps {
-                  sh 'nvidia-smi'
-                  unit_test_linux('pytorch', 'gpu')
-                }
-              }
-              stage('Example test') {
-                steps {
-                  example_test_linux('pytorch', 'gpu')
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
             }
-            post {
-              always {
-                cleanWs disableDeferredWipeout: true, deleteDirs: true
-              }
-            }
-          }
-          stage('MXNet CPU') {
-            agent {
-              docker {
-                label 'linux-c52x-node'
-                image 'dgllib/dgl-ci-cpu:conda'
-                alwaysPull true
-              }
-            }
-            stages {
-              stage('Unit test') {
-                steps {
-                  unit_test_linux('mxnet', 'cpu')
+            stage('Torch CPU') {
+              agent {
+                docker {
+                  label 'linux-c52x-node'
+                  image 'dgllib/dgl-ci-cpu:conda'
+                  alwaysPull true
                 }
               }
-            //stage("Tutorial test") {
-            //  steps {
-            //    tutorial_test_linux("mxnet")
-            //  }
-            //}
-            }
-            post {
-              always {
-                cleanWs disableDeferredWipeout: true, deleteDirs: true
+              stages {
+                stage('Unit test') {
+                  steps {
+                    unit_test_linux('pytorch', 'cpu')
+                  }
+                }
+                stage('Example test') {
+                  steps {
+                    example_test_linux('pytorch', 'cpu')
+                  }
+                }
+                stage('Tutorial test') {
+                  steps {
+                    tutorial_test_linux('pytorch')
+                  }
+                }
               }
-            }
-          }
-          stage('MXNet GPU') {
-            agent {
-              docker {
-                label 'linux-gpu-node'
-                image 'dgllib/dgl-ci-gpu:conda'
-                args '--runtime nvidia'
-                alwaysPull true
-              }
-            }
-            stages {
-              stage('Unit test') {
-                steps {
-                  sh 'nvidia-smi'
-                  unit_test_linux('mxnet', 'gpu')
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
             }
-            post {
-              always {
-                cleanWs disableDeferredWipeout: true, deleteDirs: true
+            stage('Torch CPU (Win64)') {
+              agent { label 'windows' }
+              stages {
+                stage('Unit test') {
+                  steps {
+                    unit_test_win64('pytorch', 'cpu')
+                  }
+                }
+                stage('Example test') {
+                  steps {
+                    example_test_win64('pytorch', 'cpu')
+                  }
+                }
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('Torch GPU') {
+              agent {
+                docker {
+                  label 'linux-gpu-node'
+                  image 'dgllib/dgl-ci-gpu:conda'
+                  args '--runtime nvidia'
+                  alwaysPull true
+                }
+              }
+              stages {
+                stage('Unit test') {
+                  steps {
+                    sh 'nvidia-smi'
+                    unit_test_linux('pytorch', 'gpu')
+                  }
+                }
+                stage('Example test') {
+                  steps {
+                    example_test_linux('pytorch', 'gpu')
+                  }
+                }
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('MXNet CPU') {
+              agent {
+                docker {
+                  label 'linux-c52x-node'
+                  image 'dgllib/dgl-ci-cpu:conda'
+                  alwaysPull true
+                }
+              }
+              stages {
+                stage('Unit test') {
+                  steps {
+                    unit_test_linux('mxnet', 'cpu')
+                  }
+                }
+              //stage("Tutorial test") {
+              //  steps {
+              //    tutorial_test_linux("mxnet")
+              //  }
+              //}
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('MXNet GPU') {
+              agent {
+                docker {
+                  label 'linux-gpu-node'
+                  image 'dgllib/dgl-ci-gpu:conda'
+                  args '--runtime nvidia'
+                  alwaysPull true
+                }
+              }
+              stages {
+                stage('Unit test') {
+                  steps {
+                    sh 'nvidia-smi'
+                    unit_test_linux('mxnet', 'gpu')
+                  }
+                }
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
               }
             }
           }
