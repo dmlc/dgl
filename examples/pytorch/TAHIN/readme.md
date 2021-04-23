@@ -27,7 +27,6 @@ The datasets used can be downloaded from [here](https://github.com/librahu/HIN-D
 | Movie          | 1,682         |
 | Genre          | 18            |
 
-### Relation Statistics
 | Relation            |#Relation      |
 | :-------------:     |:-------------:|
 | User - Movie        | 100,000       |
@@ -40,7 +39,7 @@ The datasets used can be downloaded from [here](https://github.com/librahu/HIN-D
 **Amazon** 
 
 (Source : http://jmcauley.ucsd.edu/data/amazon/)
-### Entity Statistics
+
 | Entity         |#Entity        |
 | :-------------:|:-------------:|
 | User           | 6,170         |
@@ -49,7 +48,6 @@ The datasets used can be downloaded from [here](https://github.com/librahu/HIN-D
 | Category       | 22            |
 | Brand          | 334           |
 
-## Relation Statistics
 | Relation          |#Relation      |
 | :-------------:   |:-------------:|
 | User - Item       | 195,791       |
