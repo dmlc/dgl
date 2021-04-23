@@ -72,7 +72,7 @@ python main.py --dataset movielens --gpu 0
 
 Performance
 -------------------------
-**Link Prediction Results**
+**Results**
 
 | Dataset |          Amazon          |         Movielens        |
 |---------| ------------------------ | ------------------------ |
