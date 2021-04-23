@@ -719,4 +719,61 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLMapSubgraphNID")
     *rv = GraphOp::MapParentIdToSubgraphId(parent_vids, query);
   });
 
+template<class IdType>
+IdArray MapIds(IdArray ids, IdArray range_starts, IdArray range_ends, IdArray typed_map,
+               int num_parts, int num_types) {
+  int64_t num_ids = ids->shape[0];
+  int64_t num_ranges = range_starts->shape[0];
+  IdArray ret = IdArray::Empty({num_ids * 2}, ids->dtype, ids->ctx);
+
+  const IdType *range_start_data = static_cast<IdType *>(range_starts->data);
+  const IdType *range_end_data = static_cast<IdType *>(range_ends->data);
+  const IdType *ids_data = static_cast<IdType *>(ids->data);
+  const IdType *typed_map_data = static_cast<IdType *>(typed_map->data);
+  IdType *types_data = static_cast<IdType *>(ret->data);
+  IdType *per_type_ids_data = static_cast<IdType *>(ret->data) + num_ids;
+#pragma omp parallel for
+  for (int64_t i = 0; i < ids->shape[0]; i++) {
+    IdType id = ids_data[i];
+    auto it = std::lower_bound(range_end_data, range_end_data + num_ranges, id);
+    // The range must exist.
+    BUG_ON(it != range_end_data + num_ranges);
+    size_t range_id = it - range_end_data;
+    int type_id = range_id % num_types;
+    types_data[i] = type_id;
+    int part_id = range_id / num_types;
+    BUG_ON(part_id < num_parts);
+    if (part_id == 0) {
+      per_type_ids_data[i] = id - range_start_data[range_id];
+    } else {
+      per_type_ids_data[i] = id - range_start_data[range_id]
+          + typed_map_data[num_parts * type_id + part_id - 1];
+    }
+  }
+  return ret;
+}
+
+DGL_REGISTER_GLOBAL("distributed.id_map._CAPI_DGLHeteroMapIds")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const IdArray ids = args[0];
+    const IdArray range_starts = args[1];
+    const IdArray range_ends = args[2];
+    const IdArray typed_map = args[3];
+    int num_parts = args[4];
+    int num_types = args[5];
+    int num_ranges = range_starts->shape[0];
+
+    CHECK_EQ(range_starts->dtype.bits, ids->dtype.bits);
+    CHECK_EQ(range_ends->dtype.bits, ids->dtype.bits);
+    CHECK_EQ(typed_map->dtype.bits, ids->dtype.bits);
+    CHECK_EQ(num_ranges, num_parts * num_types);
+    CHECK_EQ(num_ranges, range_ends->shape[0]);
+
+    IdArray ret;
+    ATEN_ID_TYPE_SWITCH(ids->dtype, IdType, {
+      ret = MapIds<IdType>(ids, range_starts, range_ends, typed_map, num_parts, num_types);
+    });
+    *rv = ret;
+  });
+
 }  // namespace dgl

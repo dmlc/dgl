@@ -4,7 +4,7 @@ import torch as th
 from torch import nn
 
 from .... import function as fn
-from ....ops import edge_softmax
+from ...functional import edge_softmax
 from ....base import DGLError
 from ..utils import Identity
 from ....utils import expand_as_pair
@@ -60,6 +60,8 @@ class GATConv(nn.Module):
         causing silent performance regression. This module will raise a DGLError if it detects
         0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
         and let the users handle it by themselves. Defaults: ``False``.
+    bias : bool, optional
+        If True, learns a bias term. Defaults: ``True``.
 
     Note
     ----
@@ -73,8 +75,8 @@ class GATConv(nn.Module):
 
     Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
     since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree``
-    to ``True`` for those cases to unblock the code and handle zere-in-degree nodes manually.
-    A common practise to handle this is to filter out the nodes with zere-in-degree when use
+    to ``True`` for those cases to unblock the code and handle zero-in-degree nodes manually.
+    A common practise to handle this is to filter out the nodes with zero-in-degree when use
     after conv.
 
     Examples
@@ -141,7 +143,8 @@ class GATConv(nn.Module):
                  negative_slope=0.2,
                  residual=False,
                  activation=None,
-                 allow_zero_in_degree=False):
+                 allow_zero_in_degree=False,
+                 bias=True):
         super(GATConv, self).__init__()
         self._num_heads = num_heads
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
@@ -160,6 +163,10 @@ class GATConv(nn.Module):
         self.feat_drop = nn.Dropout(feat_drop)
         self.attn_drop = nn.Dropout(attn_drop)
         self.leaky_relu = nn.LeakyReLU(negative_slope)
+        if bias:
+            self.bias = nn.Parameter(th.FloatTensor(size=(num_heads * out_feats,)))
+        else:
+            self.register_buffer('bias', None)
         if residual:
             if self._in_dst_feats != out_feats:
                 self.res_fc = nn.Linear(
@@ -191,6 +198,7 @@ class GATConv(nn.Module):
             nn.init.xavier_normal_(self.fc_dst.weight, gain=gain)
         nn.init.xavier_normal_(self.attn_l, gain=gain)
         nn.init.xavier_normal_(self.attn_r, gain=gain)
+        nn.init.constant_(self.bias, 0)
         if isinstance(self.res_fc, nn.Linear):
             nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
 
@@ -260,9 +268,11 @@ class GATConv(nn.Module):
                 h_src = self.feat_drop(feat[0])
                 h_dst = self.feat_drop(feat[1])
                 if not hasattr(self, 'fc_src'):
-                    self.fc_src, self.fc_dst = self.fc, self.fc
-                feat_src = self.fc_src(h_src).view(-1, self._num_heads, self._out_feats)
-                feat_dst = self.fc_dst(h_dst).view(-1, self._num_heads, self._out_feats)
+                    feat_src = self.fc(h_src).view(-1, self._num_heads, self._out_feats)
+                    feat_dst = self.fc(h_dst).view(-1, self._num_heads, self._out_feats)
+                else:
+                    feat_src = self.fc_src(h_src).view(-1, self._num_heads, self._out_feats)
+                    feat_dst = self.fc_dst(h_dst).view(-1, self._num_heads, self._out_feats)
             else:
                 h_src = h_dst = self.feat_drop(feat)
                 feat_src = feat_dst = self.fc(h_src).view(
@@ -294,8 +304,11 @@ class GATConv(nn.Module):
             rst = graph.dstdata['ft']
             # residual
             if self.res_fc is not None:
-                resval = self.res_fc(h_dst).view(h_dst.shape[0], -1, self._out_feats)
+                resval = self.res_fc(h_dst).view(h_dst.shape[0], self._num_heads, self._out_feats)
                 rst = rst + resval
+            # bias
+            if self.bias is not None:
+                rst = rst + self.bias.view(1, self._num_heads, self._out_feats)
             # activation
             if self.activation:
                 rst = self.activation(rst)

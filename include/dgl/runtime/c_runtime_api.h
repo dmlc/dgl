@@ -33,7 +33,7 @@
 #endif
 
 // DGL version
-#define DGL_VERSION "0.6"
+#define DGL_VERSION "0.7"
 
 
 // DGL Runtime is DLPack compatible.
@@ -539,6 +539,11 @@ DGL_DLL int DGLStreamStreamSynchronize(int device_type,
                                        int device_id,
                                        DGLStreamHandle src,
                                        DGLStreamHandle dst);
+
+/*!
+ * \brief Load tensor adapter.
+ */
+DGL_DLL void DGLLoadTensorAdapter(const char *path);
 
 /*!
  * \brief Bug report macro.

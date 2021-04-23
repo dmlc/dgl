@@ -321,6 +321,18 @@ def test_unbatch2(idtype):
     check_graph_equal(g2, gg2)
     check_graph_equal(g3, gg3)
 
+@parametrize_dtype
+def test_batch_keeps_empty_data(idtype):
+    g1 = dgl.heterograph({("a", "to", "a"): ([], [])}).astype(idtype).to(F.ctx())
+    g1.nodes["a"].data["nh"] = F.tensor([])
+    g1.edges[("a", "to", "a")].data["eh"] = F.tensor([]) 
+    g2 = dgl.heterograph({("a", "to", "a"): ([], [])}).astype(idtype).to(F.ctx())
+    g2.nodes["a"].data["nh"] = F.tensor([])
+    g2.edges[("a", "to", "a")].data["eh"] = F.tensor([]) 
+    g = dgl.batch([g1, g2])
+    assert "nh" in g.nodes["a"].data
+    assert "eh" in g.edges[("a", "to", "a")].data
+
 if __name__ == '__main__':
     #test_topology('int32')
     #test_batching_batched('int32')

@@ -174,31 +174,32 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Create a graph from COO arrays */
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-      IdArray row, IdArray col, dgl_format_code_t formats = all_code);
+      IdArray row, IdArray col, bool row_sorted = false,
+      bool col_sorted = false, dgl_format_code_t formats = ALL_CODE);
 
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, const aten::COOMatrix& mat,
-      dgl_format_code_t formats = all_code);
+      dgl_format_code_t formats = ALL_CODE);
 
   /*! \brief Create a graph from (out) CSR arrays */
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids,
-      dgl_format_code_t formats = all_code);
+      dgl_format_code_t formats = ALL_CODE);
 
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_vtypes, const aten::CSRMatrix& mat,
-      dgl_format_code_t formats = all_code);
+      dgl_format_code_t formats = ALL_CODE);
 
   /*! \brief Create a graph from (in) CSC arrays */
   static HeteroGraphPtr CreateFromCSC(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids,
-      dgl_format_code_t formats = all_code);
+      dgl_format_code_t formats = ALL_CODE);
 
   static HeteroGraphPtr CreateFromCSC(
       int64_t num_vtypes, const aten::CSRMatrix& mat,
-      dgl_format_code_t formats = all_code);
+      dgl_format_code_t formats = ALL_CODE);
 
   /*! \brief Convert the graph to use the given number of bits for storage */
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
@@ -276,6 +277,12 @@ class UnitGraph : public BaseHeteroGraph {
    */
   std::tuple<UnitGraphPtr, IdArray, IdArray>ToSimple() const;
 
+  void InvalidateCSR();
+
+  void InvalidateCSC();
+
+  void InvalidateCOO();
+
  private:
   friend class Serializer;
   friend class HeteroGraph;
@@ -292,7 +299,7 @@ class UnitGraph : public BaseHeteroGraph {
    * \param coo coo
    */
   UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
-            dgl_format_code_t formats = all_code);
+            dgl_format_code_t formats = ALL_CODE);
 
   /*!
    * \brief constructor
@@ -311,7 +318,7 @@ class UnitGraph : public BaseHeteroGraph {
       bool has_in_csr,
       bool has_out_csr,
       bool has_coo,
-      dgl_format_code_t formats = all_code);
+      dgl_format_code_t formats = ALL_CODE);
 
   /*! \return Return any existing format. */
   HeteroGraphPtr GetAny() const;

@@ -20,7 +20,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
-from pyinstrument import Profiler
 
 def load_subtensor(g, seeds, input_nodes, device):
     """
@@ -186,9 +185,6 @@ def run(args, device, data):
 
     # Training loop
     iter_tput = []
-    profiler = Profiler()
-    if args.close_profiler == False:
-        profiler.start()
     epoch = 0
     for epoch in range(args.num_epochs):
         tic = time.time()
@@ -253,12 +249,9 @@ def run(args, device, data):
                                          g.ndata['labels'], val_nid, test_nid, args.batch_size_eval, device)
             print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc,
                                                                                   time.time() - start))
-    if args.close_profiler == False:
-        profiler.stop()
-        print(profiler.output_text(unicode=True, color=True))
 
 def main(args):
-    dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
+    dgl.distributed.initialize(args.ip_config)
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
     g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
@@ -295,7 +288,6 @@ if __name__ == '__main__':
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
     parser.add_argument('--part_config', type=str, help='The path to the partition config file')
     parser.add_argument('--num_clients', type=int, help='The number of clients')
-    parser.add_argument('--num_servers', type=int, default=1, help='The number of servers')
     parser.add_argument('--n_classes', type=int, help='the number of classes')
     parser.add_argument('--num_gpus', type=int, default=-1, 
                         help="the number of GPU device. Use -1 for CPU training")
@@ -309,16 +301,9 @@ if __name__ == '__main__':
     parser.add_argument('--eval_every', type=int, default=5)
     parser.add_argument('--lr', type=float, default=0.003)
     parser.add_argument('--dropout', type=float, default=0.5)
-    parser.add_argument('--num_workers', type=int, default=4,
-        help="Number of sampling processes. Use 0 for no extra process.")
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
-    parser.add_argument('--close_profiler', action='store_true', help='Close pyinstrument profiler')
     args = parser.parse_args()
-    assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')), \
-    'The num_workers should be the same value with DGL_NUM_SAMPLER.'
-    assert args.num_servers == int(os.environ.get('DGL_NUM_SERVER')), \
-    'The num_servers should be the same value with DGL_NUM_SERVER.'
 
     print(args)
     main(args)

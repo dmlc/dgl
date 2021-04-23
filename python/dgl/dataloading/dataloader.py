@@ -1,18 +1,21 @@
 """Data loaders"""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from abc import ABC, abstractproperty, abstractmethod
+import re
 import numpy as np
 from .. import transform
 from ..base import NID, EID
 from .. import backend as F
 from .. import utils
+from ..batch import batch
 from ..convert import heterograph
+from ..heterograph import DGLHeteroGraph as DGLGraph
 from ..distributed.dist_graph import DistGraph
 
 # pylint: disable=unused-argument
 def assign_block_eids(block, frontier):
-    """Assigns edge IDs from the original graph to the block.
+    """Assigns edge IDs from the original graph to the message flow graph (MFG).
 
     See also
     --------
@@ -114,8 +117,8 @@ class BlockSampler(object):
     """Abstract class specifying the neighborhood sampling strategy for DGL data loaders.
 
     The main method for BlockSampler is :meth:`sample_blocks`,
-    which generates a list of blocks for a multi-layer GNN given a set of seed nodes to
-    have their outputs computed.
+    which generates a list of message flow graphs (MFGs) for a multi-layer GNN given a set of
+    seed nodes to have their outputs computed.
 
     The default implementation of :meth:`sample_blocks` is
     to repeat :attr:`num_layers` times the following procedure from the last layer to the first
@@ -130,13 +133,13 @@ class BlockSampler(object):
       reverse edges.  This is controlled by the argument :attr:`exclude_eids` in
       :meth:`sample_blocks` method.
 
-    * Convert the frontier into a block.
+    * Convert the frontier into a MFG.
 
     * Optionally assign the IDs of the edges in the original graph selected in the first step
-      to the block, controlled by the argument ``return_eids`` in
+      to the MFG, controlled by the argument ``return_eids`` in
       :meth:`sample_blocks` method.
 
-    * Prepend the block to the block list to be returned.
+    * Prepend the MFG to the MFG list to be returned.
 
     All subclasses should override :meth:`sample_frontier`
     method while specifying the number of layers to sample in :attr:`num_layers` argument.
@@ -146,19 +149,21 @@ class BlockSampler(object):
     num_layers : int
         The number of layers to sample.
     return_eids : bool, default False
-        Whether to return the edge IDs involved in message passing in the block.
+        Whether to return the edge IDs involved in message passing in the MFG.
         If True, the edge IDs will be stored as an edge feature named ``dgl.EID``.
 
     Notes
     -----
-    For the concept of frontiers and blocks, please refer to User Guide Section 6 [TODO].
+    For the concept of frontiers and MFGs, please refer to
+    :ref:`User Guide Section 6 <guide-minibatch>` and
+    :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
-    def __init__(self, num_layers, return_eids):
+    def __init__(self, num_layers, return_eids=False):
         self.num_layers = num_layers
         self.return_eids = return_eids
 
     def sample_frontier(self, block_id, g, seed_nodes):
-        """Generate the frontier given the output nodes.
+        """Generate the frontier given the destination nodes.
 
         The subclasses should override this function.
 
@@ -169,7 +174,7 @@ class BlockSampler(object):
         g : DGLGraph
             The original graph.
         seed_nodes : Tensor or dict[ntype, Tensor]
-            The output nodes by node type.
+            The destination nodes by node type.
 
             If the graph only has one node type, one can just specify a single tensor
             of node IDs.
@@ -181,19 +186,21 @@ class BlockSampler(object):
 
         Notes
         -----
-        For the concept of frontiers and blocks, please refer to User Guide Section 6 [TODO].
+        For the concept of frontiers and MFGs, please refer to
+        :ref:`User Guide Section 6 <guide-minibatch>` and
+        :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
         """
         raise NotImplementedError
 
     def sample_blocks(self, g, seed_nodes, exclude_eids=None):
-        """Generate the a list of blocks given the output nodes.
+        """Generate the a list of MFGs given the destination nodes.
 
         Parameters
         ----------
         g : DGLGraph
             The original graph.
         seed_nodes : Tensor or dict[ntype, Tensor]
-            The output nodes by node type.
+            The destination nodes by node type.
 
             If the graph only has one node type, one can just specify a single tensor
             of node IDs.
@@ -203,11 +210,13 @@ class BlockSampler(object):
         Returns
         -------
         list[DGLGraph]
-            The blocks generated for computing the multi-layer GNN output.
+            The MFGs generated for computing the multi-layer GNN output.
 
         Notes
         -----
-        For the concept of frontiers and blocks, please refer to User Guide Section 6 [TODO].
+        For the concept of frontiers and MFGs, please refer to
+        :ref:`User Guide Section 6 <guide-minibatch>` and
+        :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
         """
         blocks = []
         exclude_eids = (
@@ -227,7 +236,8 @@ class BlockSampler(object):
                     # to the mapping from the new graph to the old frontier.
                     # So we need to test if located_eids is empty, and do the remapping ourselves.
                     if len(located_eids) > 0:
-                        frontier = transform.remove_edges(frontier, located_eids)
+                        frontier = transform.remove_edges(
+                            frontier, located_eids, store_ids=True)
                         frontier.edata[EID] = F.gather_row(parent_eids, frontier.edata[EID])
                 else:
                     # (BarclayII) remove_edges only accepts removing one type of edges,
@@ -235,7 +245,8 @@ class BlockSampler(object):
                     new_eids = parent_eids.copy()
                     for k, v in located_eids.items():
                         if len(v) > 0:
-                            frontier = transform.remove_edges(frontier, v, etype=k)
+                            frontier = transform.remove_edges(
+                                frontier, v, etype=k, store_ids=True)
                             new_eids[k] = F.gather_row(parent_eids[k], frontier.edges[k].data[EID])
                     frontier.edata[EID] = new_eids
 
@@ -246,8 +257,6 @@ class BlockSampler(object):
 
             seed_nodes = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
 
-            # Pre-generate CSR format so that it can be used in training directly
-            block.create_formats_()
             blocks.insert(0, block)
         return blocks
 
@@ -256,11 +265,13 @@ class Collator(ABC):
 
     Provides a :attr:`dataset` object containing the collection of all nodes or edges,
     as well as a :attr:`collate` method that combines a set of items from
-    :attr:`dataset` and obtains the blocks.
+    :attr:`dataset` and obtains the message flow graphs (MFGs).
 
     Notes
     -----
-    For the concept of blocks, please refer to User Guide Section 6 [TODO].
+    For the concept of MFGs, please refer to
+    :ref:`User Guide Section 6 <guide-minibatch>` and
+    :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
     @abstractproperty
     def dataset(self):
@@ -269,7 +280,7 @@ class Collator(ABC):
 
     @abstractmethod
     def collate(self, items):
-        """Combines the items from the dataset object and obtains the list of blocks.
+        """Combines the items from the dataset object and obtains the list of MFGs.
 
         Parameters
         ----------
@@ -278,9 +289,30 @@ class Collator(ABC):
 
         Notes
         -----
-        For the concept of blocks, please refer to User Guide Section 6 [TODO].
+        For the concept of MFGs, please refer to
+        :ref:`User Guide Section 6 <guide-minibatch>` and
+        :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
         """
         raise NotImplementedError
+
+# TODO(BarclayII): DistGraph.idtype and DistGraph.device are in the code, however
+# the underlying DGLGraph object could be None.  I was unable to figure out how
+# to properly implement those two properties so I'm working around that.  If the
+# graph is a DistGraph, I assume that the dtype and device of the data should
+# be the same as the graph already.
+#
+# After idtype and device get properly implemented, we should remove these two
+# _prepare_* functions.
+
+def _prepare_tensor_dict(g, data, name, is_distributed):
+    if is_distributed:
+        x = F.tensor(next(iter(data.values())))
+        return {k: F.copy_to(F.astype(v, F.dtype(x)), F.context(x)) for k, v in data.items()}
+    else:
+        return utils.prepare_tensor_dict(g, data, name)
+
+def _prepare_tensor(g, data, name, is_distributed):
+    return F.tensor(data) if is_distributed else utils.prepare_tensor(g, data, name)
 
 class NodeCollator(Collator):
     """DGL collator to combine nodes and their computation dependencies within a minibatch for
@@ -308,6 +340,12 @@ class NodeCollator(Collator):
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, output_nodes, blocks in dataloader:
     ...     train_on(input_nodes, output_nodes, blocks)
+
+    Notes
+    -----
+    For the concept of MFGs, please refer to
+    :ref:`User Guide Section 6 <guide-minibatch>` and
+    :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
     def __init__(self, g, nids, block_sampler):
         self.g = g
@@ -315,20 +353,21 @@ class NodeCollator(Collator):
         if not isinstance(nids, Mapping):
             assert len(g.ntypes) == 1, \
                 "nids should be a dict of node type and ids for graph with multiple node types"
-        self.nids = nids
         self.block_sampler = block_sampler
 
         if isinstance(nids, Mapping):
-            self._dataset = utils.FlattenedDict(nids)
+            self.nids = _prepare_tensor_dict(g, nids, 'nids', self._is_distributed)
+            self._dataset = utils.FlattenedDict(self.nids)
         else:
-            self._dataset = nids
+            self.nids = _prepare_tensor(g, nids, 'nids', self._is_distributed)
+            self._dataset = self.nids
 
     @property
     def dataset(self):
         return self._dataset
 
     def collate(self, items):
-        """Find the list of blocks necessary for computing the representation of given
+        """Find the list of MFGs necessary for computing the representation of given
         nodes for a node classification/regression task.
 
         Parameters
@@ -349,21 +388,16 @@ class NodeCollator(Collator):
 
             If the original graph has multiple node types, return a dictionary of
             node type names and node ID tensors.  Otherwise, return a single tensor.
-        blocks : list[DGLGraph]
-            The list of blocks necessary for computing the representation.
+        MFGs : list[DGLGraph]
+            The list of MFGs necessary for computing the representation.
         """
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
+            items = _prepare_tensor_dict(self.g, items, 'items', self._is_distributed)
+        else:
+            items = _prepare_tensor(self.g, items, 'items', self._is_distributed)
 
-        # TODO(BarclayII) Because DistGraph doesn't have idtype and device implemented,
-        # this function does not work.  I'm again skipping this step as a workaround.
-        # We need to fix this.
-        if not self._is_distributed:
-            if isinstance(items, dict):
-                items = utils.prepare_tensor_dict(self.g, items, 'items')
-            else:
-                items = utils.prepare_tensor(self.g, items, 'items')
         blocks = self.block_sampler.sample_blocks(self.g, items)
         output_nodes = blocks[-1].dstdata[NID]
         input_nodes = blocks[0].srcdata[NID]
@@ -386,7 +420,7 @@ class EdgeCollator(Collator):
     * If a negative sampler is given, another graph that contains the "negative edges",
       connecting the source and destination nodes yielded from the given negative sampler.
 
-    * A list of blocks necessary for computing the representation of the incident nodes
+    * A list of MFGs necessary for computing the representation of the incident nodes
       of the edges in the minibatch.
 
     Parameters
@@ -419,7 +453,11 @@ class EdgeCollator(Collator):
 
         If ``g_sampling`` is given, ``exclude`` is ignored and will be always ``None``.
     reverse_eids : Tensor or dict[etype, Tensor], optional
-        The mapping from original edge ID to its reverse edge ID.
+        A tensor of reverse edge ID mapping.  The i-th element indicates the ID of
+        the i-th edge's reverse edge.
+
+        If the graph is heterogeneous, this argument requires a dictionary of edge
+        types and the reverse edge ID mapping tensors.
 
         Required and only used when ``exclude`` is set to ``reverse_id``.
 
@@ -533,15 +571,21 @@ class EdgeCollator(Collator):
     ...     collator.dataset, collate_fn=collator.collate,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
-    ...     train_on(input_nodse, pair_graph, neg_pair_graph, blocks)
+    ...     train_on(input_nodes, pair_graph, neg_pair_graph, blocks)
+
+    Notes
+    -----
+    For the concept of MFGs, please refer to
+    :ref:`User Guide Section 6 <guide-minibatch>` and
+    :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
     def __init__(self, g, eids, block_sampler, g_sampling=None, exclude=None,
                  reverse_eids=None, reverse_etypes=None, negative_sampler=None):
         self.g = g
+        self._is_distributed = isinstance(g, DistGraph)
         if not isinstance(eids, Mapping):
             assert len(g.etypes) == 1, \
                 "eids should be a dict of etype and ids for graph with multiple etypes"
-        self.eids = eids
         self.block_sampler = block_sampler
 
         # One may wish to iterate over the edges in one graph while perform sampling in
@@ -561,9 +605,11 @@ class EdgeCollator(Collator):
         self.negative_sampler = negative_sampler
 
         if isinstance(eids, Mapping):
-            self._dataset = utils.FlattenedDict(eids)
+            self.eids = _prepare_tensor_dict(g, eids, 'eids', self._is_distributed)
+            self._dataset = utils.FlattenedDict(self.eids)
         else:
-            self._dataset = eids
+            self.eids = _prepare_tensor(g, eids, 'eids', self._is_distributed)
+            self._dataset = self.eids
 
     @property
     def dataset(self):
@@ -573,9 +619,9 @@ class EdgeCollator(Collator):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-            items = utils.prepare_tensor_dict(self.g_sampling, items, 'items')
+            items = _prepare_tensor_dict(self.g_sampling, items, 'items', self._is_distributed)
         else:
-            items = utils.prepare_tensor(self.g_sampling, items, 'items')
+            items = _prepare_tensor(self.g_sampling, items, 'items', self._is_distributed)
 
         pair_graph = self.g.edge_subgraph(items)
         seed_nodes = pair_graph.ndata[NID]
@@ -597,9 +643,9 @@ class EdgeCollator(Collator):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-            items = utils.prepare_tensor_dict(self.g_sampling, items, 'items')
+            items = _prepare_tensor_dict(self.g_sampling, items, 'items', self._is_distributed)
         else:
-            items = utils.prepare_tensor(self.g_sampling, items, 'items')
+            items = _prepare_tensor(self.g_sampling, items, 'items', self._is_distributed)
 
         pair_graph = self.g.edge_subgraph(items, preserve_nodes=True)
         induced_edges = pair_graph.edata[EID]
@@ -670,9 +716,88 @@ class EdgeCollator(Collator):
             Note that the metagraph of this graph will be identical to that of the original
             graph.
         blocks : list[DGLGraph]
-            The list of blocks necessary for computing the representation of the edges.
+            The list of MFGs necessary for computing the representation of the edges.
         """
         if self.negative_sampler is None:
             return self._collate(items)
         else:
             return self._collate_with_negative_sampling(items)
+
+class GraphCollator(object):
+    """Given a set of graphs as well as their graph-level data, the collate function will batch the
+    graphs into a batched graph, and stack the tensors into a single bigger tensor.  If the
+    example is a container (such as sequences or mapping), the collate function preserves
+    the structure and collates each of the elements recursively.
+
+    If the set of graphs has no graph-level data, the collate function will yield a batched graph.
+
+    Examples
+    --------
+    To train a GNN for graph classification on a set of graphs in ``dataset`` (assume
+    the backend is PyTorch):
+
+    >>> dataloader = dgl.dataloading.GraphDataLoader(
+    ...     dataset, batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for batched_graph, labels in dataloader:
+    ...     train_on(batched_graph, labels)
+    """
+    def __init__(self):
+        self.graph_collate_err_msg_format = (
+            "graph_collate: batch must contain DGLGraph, tensors, numpy arrays, "
+            "numbers, dicts or lists; found {}")
+        self.np_str_obj_array_pattern = re.compile(r'[SaUO]')
+
+    #This implementation is based on torch.utils.data._utils.collate.default_collate
+    def collate(self, items):
+        """This function is similar to ``torch.utils.data._utils.collate.default_collate``.
+        It combines the sampled graphs and corresponding graph-level data
+        into a batched graph and tensors.
+
+        Parameters
+        ----------
+        items : list of data points or tuples
+            Elements in the list are expected to have the same length.
+            Each sub-element will be batched as a batched graph, or a
+            batched tensor correspondingly.
+
+        Returns
+        -------
+        A tuple of the batching results.
+        """
+        elem = items[0]
+        elem_type = type(elem)
+        if isinstance(elem, DGLGraph):
+            batched_graphs = batch(items)
+            return batched_graphs
+        elif F.is_tensor(elem):
+            return F.stack(items, 0)
+        elif elem_type.__module__ == 'numpy' and elem_type.__name__ != 'str_' \
+                and elem_type.__name__ != 'string_':
+            if elem_type.__name__ == 'ndarray' or elem_type.__name__ == 'memmap':
+                # array of string classes and object
+                if self.np_str_obj_array_pattern.search(elem.dtype.str) is not None:
+                    raise TypeError(self.graph_collate_err_msg_format.format(elem.dtype))
+
+                return self.collate([F.tensor(b) for b in items])
+            elif elem.shape == ():  # scalars
+                return F.tensor(items)
+        elif isinstance(elem, float):
+            return F.tensor(items, dtype=F.float64)
+        elif isinstance(elem, int):
+            return F.tensor(items)
+        elif isinstance(elem, (str, bytes)):
+            return items
+        elif isinstance(elem, Mapping):
+            return {key: self.collate([d[key] for d in items]) for key in elem}
+        elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
+            return elem_type(*(self.collate(samples) for samples in zip(*items)))
+        elif isinstance(elem, Sequence):
+            # check to make sure that the elements in batch have consistent size
+            item_iter = iter(items)
+            elem_size = len(next(item_iter))
+            if not all(len(elem) == elem_size for elem in item_iter):
+                raise RuntimeError('each element in list of batch should be of equal size')
+            transposed = zip(*items)
+            return [self.collate(samples) for samples in transposed]
+
+        raise TypeError(self.graph_collate_err_msg_format.format(elem_type))

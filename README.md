@@ -4,12 +4,13 @@
 
 [![PyPi Latest Release](https://img.shields.io/pypi/v/dgl.svg)](https://pypi.org/project/dgl/)
 [![Conda Latest Release](https://anaconda.org/dglteam/dgl/badges/version.svg)](https://anaconda.org/dglteam/dgl)
-[![Build Status](http://ci.dgl.ai:80/buildStatus/icon?job=DGL/master)](http://ci.dgl.ai:80/job/DGL/job/master/)
+[![Build Status](https://ci.dgl.ai/buildStatus/icon?job=DGL/master)](https://ci.dgl.ai/job/DGL/job/master/)
 [![Benchmark by ASV](http://img.shields.io/badge/benchmarked%20by-asv-green.svg?style=flat)](https://asv.dgl.ai/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
-Documentation ([Latest](https://docs.dgl.ai/en/latest/) | [Stable](https://docs.dgl.ai)) | [DGL at a glance](https://docs.dgl.ai/tutorials/basics/1_first.html#sphx-glr-tutorials-basics-1-first-py) | [Model Tutorials](https://docs.dgl.ai/tutorials/models/index.html) | [Discussion Forum](https://discuss.dgl.ai) | [Slack Channel](https://join.slack.com/t/deep-graph-library/shared_invite/zt-eb4ict1g-xcg3PhZAFAB8p6dtKuP6xQ)
+Documentation ([Latest](https://docs.dgl.ai/en/latest/) | [Stable](https://docs.dgl.ai)) | [DGL at a glance](https://docs.dgl.ai/tutorials/basics/1_first.html#sphx-glr-tutorials-basics-1-first-py) | [Model Tutorials](https://docs.dgl.ai/tutorials/models/index.html) | [Official Examples](examples/README.md) | [Discussion Forum](https://discuss.dgl.ai) | [Slack Channel](https://join.slack.com/t/deep-graph-library/shared_invite/zt-eb4ict1g-xcg3PhZAFAB8p6dtKuP6xQ)
 
+**For a full list of official DGL examples, see [here](examples).**
 
 DGL is an easy-to-use, high performance and scalable Python package for deep learning on graphs. DGL is framework agnostic, meaning if a deep graph model is a component of an end-to-end application, the rest of the logics can be implemented in any major frameworks, such as PyTorch, Apache MXNet or TensorFlow.
 
@@ -20,13 +21,11 @@ DGL is an easy-to-use, high performance and scalable Python package for deep lea
 </p>
 
 ## <img src="http://data.dgl.ai/asset/image/new.png" width="30">DGL News
+**02/26/2021**: The new **v0.6.0 release** includes distributed heterogeneous graph support, 13 more model examples, a Chinese translation of user guide thank to community support, and a new tutorial.  See our [release note](https://github.com/dmlc/dgl/releases/tag/v0.6.0) for more details.
+
 **09/05/2020**: We invite you to participate in the survey [here](https://forms.gle/Ej3jHCocACmb49Gp8) to make DGL better fit for your needs.  Thanks!
 
 **08/21/2020**: The new **v0.5.0 release** includes distributed GNN training, overhauled documentation and user guide, and several more features.  We have also submitted some models to the [OGB](https://ogb.stanford.edu) leaderboard.  See our [release note](https://github.com/dmlc/dgl/releases/tag/0.5.0) for more details.
-
-**06/11/2020**: Amazon Shanghai AI Lab and AWS Deep Engine Science team working along with academic collaborators from the University of Minnesota, The Ohio State University, and Hunan University have created the **[Drug Repurposing Knowledge Graph (DRKG)](https://github.com/gnn4dr/DRKG)** and a set of machine learning tools, [DGL-KE](https://github.com/awslabs/dgl-ke), that can be used to prioritize drugs for repurposing studies. 
-DRKG is a comprehensive biological knowledge graph that relates human genes, compounds, biological processes, drug side effects, diseases and symptoms. DRKG includes, curates, and normalizes information from six publicly available databases and data that were collected from recent publications related to Covid-19. It has 97,238 entities belonging to 13 types of entities, and 5,874,261 triplets belonging to 107 types of relations. 
-More about the dataset is in this [blogpost](https://www.dgl.ai/news/2020/06/09/covid.html).
 
 ## Using DGL
 
@@ -200,6 +199,8 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Combining Reinforcement Learning and Constraint Programming for Combinatorial Optimization**](https://arxiv.org/pdf/2006.01610.pdf), *Quentin Cappart, Thierry Moisan, Louis-Martin Rousseau1, Isabeau Prémont-Schwarz, and Andre Cire*
 
+1. [**Therapeutics Data Commons: Machine Learning Datasets and Tasks for Therapeutics**](https://arxiv.org/abs/2102.09548) ([code repo](https://github.com/mims-harvard/TDC)), *Kexin Huang, Tianfan Fu, Wenhao Gao, Yue Zhao, Yusuf Roohani, Jure Leskovec, Connor W. Coley, Cao Xiao, Jimeng Sun, Marinka Zitnik*
+
 1. [**Sparse Graph Attention Networks**](https://arxiv.org/abs/1912.00552), *Yang Ye, Shihao Ji*
 
 1. [**On Self-Distilling Graph Neural Network**](https://arxiv.org/pdf/2011.02255.pdf), *Yuzhao Chen, Yatao Bian, Xi Xiao, Yu Rong, Tingyang Xu, Junzhou Huang*
@@ -242,11 +243,11 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**A graph auto-encoder model for miRNA-disease associations prediction**](https://academic.oup.com/bib/advance-article-abstract/doi/10.1093/bib/bbaa240/5929824?redirectedFrom=fulltext), *Zhengwei Li, Jiashu Li, Ru Nie, Zhu-Hong You, Wenzheng Bao*
 
-1. [**Graph convolutional regression of cardiac depolarization from sparse endocardial maps**](https://arxiv.org/abs/2009.14068), *Felix Meister, Tiziano Passerini, Chloé Audigier, Èric Lluch, Viorel Mihalef, Hiroshi Ashikaga, Andreas Maier, Henry Halperin, Tommaso Mansi*
+1. [**Graph convolutional regression of cardiac depolarization from sparse endocardial maps**](https://arxiv.org/abs/2009.14068), STACOM 2020 workshop, *Felix Meister, Tiziano Passerini, Chloé Audigier, Èric Lluch, Viorel Mihalef, Hiroshi Ashikaga, Andreas Maier, Henry Halperin, Tommaso Mansi*
 
 1. [**AttnIO: Knowledge Graph Exploration with In-and-Out Attention Flow for Knowledge-Grounded Dialogue**](https://www.aclweb.org/anthology/2020.emnlp-main.280/), EMNLP'20, *Jaehun Jung, Bokyung Son, Sungwon Lyu*
 
-1. [**Learning from Non-Binary Constituency Trees via Tensor Decomposition**](https://arxiv.org/abs/2011.00860), COLING'20, *Daniele Castellana, Davide Bacciu*
+1. [**Learning from Non-Binary Constituency Trees via Tensor Decomposition**](https://github.com/danielecastellana22/tensor-tree-nn), COLING'20, *Daniele Castellana, Davide Bacciu*
 
 1. [**Inducing Alignment Structure with Gated Graph Attention Networks for Sentence Matching**](https://arxiv.org/abs/2010.07668), *Peng Cui, Le Hu, Yuanchao Liu*
 
@@ -260,7 +261,7 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Improving Learning to Branch via Reinforcement Learning**](https://openreview.net/forum?id=z4D7-PTxTb), *Haoran Sun, Wenbo Chen, Hui Li, Le Song*
 
-1. [**A Practical Guide to Graph Neural Networks**](https://arxiv.org/pdf/2010.05234.pdf), *Issac Ronald Ward, Jack Joyner, Casey Lickfold, Stash Rowe, Yulan Guo, Mohammed Bennamoun*, [code](https://github.com/isolabs/gnn-tutorial)
+1. [**A Practical Guide to Graph Neural Networks**](https://arxiv.org/pdf/2010.05234.pdf), *Isaac Ronald Ward, Jack Joyner, Casey Lickfold, Stash Rowe, Yulan Guo, Mohammed Bennamoun*, [code](https://github.com/isolabs/gnn-tutorial)
 
 1. [**APAN: Asynchronous Propagation Attention Network for Real-time Temporal Graph Embedding**](https://arxiv.org/pdf/2011.11545.pdf), SIGMOD'21, *Xuhong Wang, Ding Lyu, Mengjian Li, Yang Xia, Qi Yang, Xinwen Wang, Xinguang Wang, Ping Cui, Yupu Yang, Bowen Sun, Zhenyu Guo, Junkui Li*
 
@@ -268,6 +269,53 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Computing Graph Neural Networks: A Survey from Algorithms to Accelerators**](https://arxiv.org/pdf/2010.00130.pdf), *Sergi Abadal, Akshay Jain, Robert Guirado, Jorge López-Alonso, Eduard Alarcón*
 
+1. [**NHK_STRL at WNUT-2020 Task 2: GATs with Syntactic Dependencies as Edges and CTC-based Loss for Text Classification**](https://www.aclweb.org/anthology/2020.wnut-1.43.pdf), *Yuki Yasuda, Taichi Ishiwatari, Taro Miyazaki, Jun Goto*
+
+1. [**Relation-aware Graph Attention Networks with Relational Position Encodings for Emotion Recognition in Conversations**](https://www.aclweb.org/anthology/2020.emnlp-main.597.pdf), *Taichi Ishiwatari, Yuki Yasuda, Taro Miyazaki, Jun Goto*
+
+1. [**PGM-Explainer: Probabilistic Graphical Model Explanations for Graph Neural Networks**](https://proceedings.neurips.cc/paper/2020/file/8fb134f258b1f7865a6ab2d935a897c9-Paper.pdf), *Minh N. Vu, My T. Thai*
+
+1. [**A Generalization of Transformer Networks to Graphs**](https://arxiv.org/pdf/2012.09699.pdf), *Vijay Prakash Dwivedi, Xavier Bresson* 
+
+1. [**Discourse-Aware Neural Extractive Text Summarization**](https://www.aclweb.org/anthology/2020.acl-main.451.pdf), ACL'20, *Jiacheng Xu, Zhe Gan, Yu Cheng, Jingjing Liu*
+
+1. [**Learning Robust Node Representations on Graphs**](https://arxiv.org/abs/2008.11416), *Xu Chen, Ya Zhang, Ivor Tsang, Yuangang Pan*
+
+1. [**Adaptive Graph Diffusion Networks with Hop-wise Attention**](https://arxiv.org/abs/2012.15024), *Chuxiong Sun, Guoshi Wu*
+
+1. [**The Photoswitch Dataset: A Molecular Machine Learning Benchmark for the Advancement of Synthetic Chemistry**](https://arxiv.org/abs/2008.03226), *Aditya R. Thawani, Ryan-Rhys Griffiths, Arian Jamasb, Anthony Bourached, Penelope Jones, William McCorkindale, Alexander A. Aldrick, Alpha A. Lee*
+
+1. [**A community-powered search of machine learning strategy space to find NMR property prediction models**](https://arxiv.org/abs/2008.05994), *Lars A. Bratholm, Will Gerrard, Brandon Anderson, Shaojie Bai, Sunghwan Choi, Lam Dang, Pavel Hanchar, Addison Howard, Guillaume Huard, Sanghoon Kim, Zico Kolter, Risi Kondor, Mordechai Kornbluth, Youhan Lee, Youngsoo Lee, Jonathan P. Mailoa, Thanh Tu Nguyen, Milos Popovic, Goran Rakocevic, Walter Reade, Wonho Song, Luka Stojanovic, Erik H. Thiede, Nebojsa Tijanic, Andres Torrubia, Devin Willmott, Craig P. Butts, David R. Glowacki, Kaggle participants*
+
+1. [**Adaptive Layout Decomposition with Graph Embedding Neural Networks**](http://www.cse.cuhk.edu.hk/~byu/papers/C98-DAC2020-MPL-Selector.pdf), *Wei Li, Jialu Xia, Yuzhe Ma, Jialu Li, Yibo Lin, Bei Yu*, DAC'20
+
+1. [**Transfer Learning with Graph Neural Networks for Optoelectronic Properties of Conjugated Oligomers**](https://aip.scitation.org/doi/10.1063/5.0037863), J. Chem. Phys. 154, *Chee-Kong Lee, Chengqiang Lu, Yue Yu, Qiming Sun, Chang-Yu Hsieh, Shengyu Zhang, Qi Liu, and  Liang Shi*
+
+1. [**Jet tagging in the Lund plane with graph networks**](https://link.springer.com/article/10.1007/JHEP03(2021)052), Journal of High Energy Physics 2021, *Frédéric A. Dreyer and Huilin Qu* 
+
+1. [**Global Attention Improves Graph Networks Generalization**](https://arxiv.org/abs/2006.07846), *Omri Puny, Heli Ben-Hamu, and Yaron Lipman*
+
+1. [**Learning over Families of Sets -- Hypergraph Representation Learning for Higher Order Tasks**](https://arxiv.org/abs/2101.07773), SDM 2021, *Balasubramaniam Srinivasan, Da Zheng, and George Karypis*
+
+1. [**SSFG: Stochastically Scaling Features and Gradients for Regularizing Graph Convolution Networks**](https://arxiv.org/abs/2102.10338), *Haimin Zhang, Min Xu*
+
+1. [**Application and evaluation of knowledge graph embeddings in biomedical data**](https://peerj.com/articles/cs-341/), PeerJ Computer Science 7:e341, *Mona Alshahrani​, Maha A. Thafar, Magbubah Essack*
+
+1. [**MoTSE: an interpretable task similarity estimator for small molecular property prediction tasks**](https://www.biorxiv.org/content/10.1101/2021.01.13.426608v2), bioRxiv 2021.01.13.426608, *Han Li, Xinyi Zhao, Shuya Li, Fangping Wan, Dan Zhao, Jianyang Zeng*
+
+1. [**Reinforcement Learning For Data Poisoning on Graph Neural Networks**](https://arxiv.org/abs/2102.06800), *Jacob Dineen, A S M Ahsan-Ul Haque, Matthew Bielskas*
+
+1. [**Generalising Recursive Neural Models by Tensor Decomposition**](https://github.com/danielecastellana22/tensor-tree-nn), IJCNN'20, *Daniele Castellana, Davide Bacciu*
+
+1. [**Tensor Decompositions in Recursive Neural Networks for Tree-Structured Data**](https://github.com/danielecastellana22/tensor-tree-nn), ESANN'20, *Daniele Castellana, Davide Bacciu*
+
+1. [**Combining Self-Organizing and Graph Neural Networks for Modeling Deformable Objects in Robotic Manipulation**](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7806087/), Frotiers in Robotics and AI, *Valencia, Angel J., and Pierre Payeur*
+
+1. [**Joint stroke classification and text line grouping in online handwritten documents with edge pooling attention networks**](https://www.sciencedirect.com/science/article/abs/pii/S0031320321000467), Pattern Recognition, *Jun-Yu Ye, Yan-Ming Zhang, Qing Yang, Cheng-Lin Liu*
+
+1. [**Toward Accurate Predictions of Atomic Properties via Quantum Mechanics Descriptors Augmented Graph Convolutional Neural Network: Application of This Novel Approach in NMR Chemical Shifts Predictions**](https://pubs.acs.org/doi/full/10.1021/acs.jpclett.0c02654), The Journal of Physical Chemistry Letters, *Peng Gao, Jie Zhang, Yuzhu Sun, and Jianguo Yu*
+
+1. [**A Graph Neural Network to Model User Comfort in Robot Navigation**](https://arxiv.org/abs/2102.08863), *Pilar Bachiller, Daniel Rodriguez-Criado, Ronit R. Jorvekar, Pablo Bustos, Diego R. Faria, Luis J. Manso*
 
 </details>
 
@@ -288,12 +336,11 @@ Right now, DGL works on [PyTorch](https://pytorch.org) 1.5.0+, [MXNet](https://m
 
 ```
 conda install -c dglteam dgl           # cpu version
-conda install -c dglteam dgl-cuda9.0   # CUDA 9.0
 conda install -c dglteam dgl-cuda9.2   # CUDA 9.2
-conda install -c dglteam dgl-cuda10.0  # CUDA 10.0
 conda install -c dglteam dgl-cuda10.1  # CUDA 10.1
 conda install -c dglteam dgl-cuda10.2  # CUDA 10.2
 conda install -c dglteam dgl-cuda11.0  # CUDA 11.0
+conda install -c dglteam dgl-cuda11.1  # CUDA 11.1
 ```
 
 ### Using pip
@@ -302,12 +349,11 @@ conda install -c dglteam dgl-cuda11.0  # CUDA 11.0
 |           | Latest Nightly Build Version  | Stable Version          |
 |-----------|-------------------------------|-------------------------|
 | CPU       | `pip install --pre dgl`       | `pip install dgl`       |
-| CUDA 9.0  | `pip install --pre dgl-cu90`  | `pip install dgl-cu90`  |
 | CUDA 9.2  | `pip install --pre dgl-cu92`  | `pip install dgl-cu92`  |
-| CUDA 10.0 | `pip install --pre dgl-cu100` | `pip install dgl-cu100` |
 | CUDA 10.1 | `pip install --pre dgl-cu101` | `pip install dgl-cu101` |
 | CUDA 10.2 | `pip install --pre dgl-cu102` | `pip install dgl-cu102` |
 | CUDA 11.0 | `pip install --pre dgl-cu110` | `pip install dgl-cu110` |
+| CUDA 11.1 | `pip install --pre dgl-cu111` | `pip install dgl-cu111` |
 
 ### Built from source code
 

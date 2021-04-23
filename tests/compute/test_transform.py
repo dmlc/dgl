@@ -504,7 +504,7 @@ def get_nodeflow(g, node_ids, num_layers):
 def test_partition_with_halo():
     g = create_large_graph(1000)
     node_part = np.random.choice(4, g.number_of_nodes())
-    subgs = dgl.transform.partition_graph_with_halo(g, node_part, 2, reshuffle=True)
+    subgs, _, _ = dgl.transform.partition_graph_with_halo(g, node_part, 2, reshuffle=True)
     for part_id, subg in subgs.items():
         node_ids = np.nonzero(node_part == part_id)[0]
         lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
@@ -772,6 +772,14 @@ def test_to_simple(idtype):
     assert 'h' not in sg.ndata
     assert 'h' not in sg.edata
 
+    # test coalesce edge feature
+    sg = dgl.to_simple(g, copy_edata=True, aggregator='arbitrary')
+    assert F.allclose(sg.edata['h'][1], F.tensor([4.]))
+    sg = dgl.to_simple(g, copy_edata=True, aggregator='sum')
+    assert F.allclose(sg.edata['h'][1], F.tensor([10.]))
+    sg = dgl.to_simple(g, copy_edata=True, aggregator='mean')
+    assert F.allclose(sg.edata['h'][1], F.tensor([5.]))
+
     # heterogeneous graph
     g = dgl.heterograph({
         ('user', 'follow', 'user'): ([0, 1, 2, 1, 1, 1],
@@ -821,7 +829,6 @@ def test_to_simple(idtype):
     assert 'h' not in sg.nodes['user'].data
     assert 'hh' not in sg.nodes['user'].data
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 @parametrize_dtype
 def test_to_block(idtype):
     def check(g, bg, ntype, etype, dst_nodes, include_dst_in_src=True):
@@ -838,6 +845,7 @@ def test_to_block(idtype):
         induced_src = bg.srcdata[dgl.NID]
         induced_dst = bg.dstdata[dgl.NID]
         induced_eid = bg.edata[dgl.EID]
+
         bg_src, bg_dst = bg.all_edges(order='eid')
         src_ans, dst_ans = g.all_edges(order='eid')
 
@@ -860,7 +868,7 @@ def test_to_block(idtype):
     g = dgl.heterograph({
         ('A', 'AA', 'A'): ([0, 2, 1, 3], [1, 3, 2, 4]),
         ('A', 'AB', 'B'): ([0, 1, 3, 1], [1, 3, 5, 6]),
-        ('B', 'BA', 'A'): ([2, 3], [3, 2])}, idtype=idtype)
+        ('B', 'BA', 'A'): ([2, 3], [3, 2])}, idtype=idtype, device=F.ctx())
     g.nodes['A'].data['x'] = F.randn((5, 10))
     g.nodes['B'].data['x'] = F.randn((7, 5))
     g.edges['AA'].data['x'] = F.randn((4, 3))
