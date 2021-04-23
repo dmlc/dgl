@@ -130,7 +130,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch', default=128, type=int, help='Batch size')
     parser.add_argument('--gpu', type=int, default='0', help='Set GPU Ids : Eg: For CPU = -1, For Single GPU = 0')
     parser.add_argument('--epochs', type=int, default=500, help='Maximum number of epochs')
-    parser.add_argument('--wd', type=float, default=0.0009, help='L2 Regularization for Optimizer')
+    parser.add_argument('--wd', type=float, default=0, help='L2 Regularization for Optimizer')
     parser.add_argument('--lr', type=float, default=0.001, help='Learning Rate')
     parser.add_argument('--num_workers', type=int, default=10, help='Number of processes to construct batches')
     parser.add_argument('--early_stop', default=15, type=int, help='Patience for early stop.')
