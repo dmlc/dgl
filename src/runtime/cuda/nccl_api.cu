@@ -767,7 +767,7 @@ NDArray SparsePull(
   device->FreeWorkspace(ctx, send_idx);
 
   // convert requested indices to local indices depending on partition
-  {
+  if (response_prefix_host.back() > 0) {
     const dim3 block(128);
     const dim3 grid((response_prefix_host.back()+block.x-1)/block.x);
     _ConvertToLocalByRemainder<<<grid, block, 0, stream>>>(
@@ -777,19 +777,21 @@ NDArray SparsePull(
   // and then index select them into place
   DType * filled_response_value = static_cast<DType*>(device->AllocWorkspace(ctx,
       response_prefix_host.back()*num_feat*sizeof(DType)));
-  {
+  if (request_prefix_host.back() > 0) {
     dim3 block(256, 1);
     while (block.x >= 2*num_feat) {
         block.x /= 2;
         block.y *= 2;
     }
     const dim3 grid((request_prefix_host.back()+block.y-1)/block.y);
+
     aten::impl::IndexSelectMultiKernel<<<grid, block, 0, stream>>>(
         static_cast<const DType*>(local_tensor->data),
         num_feat,
         recv_idx,
         response_prefix_host.back(),
         filled_response_value);
+    CUDA_CALL(cudaGetLastError());
   }
   device->FreeWorkspace(ctx, recv_idx);
 
@@ -821,7 +823,7 @@ NDArray SparsePull(
 
   // finally, we need to permute the values back into the requested order
   NDArray result = NDArray::Empty(value_shape, local_tensor->dtype, ctx);
-  {
+  if (num_in > 0) {
     dim3 block(256, 1);
     while (block.x >= 2*num_feat) {
         block.x /= 2;
@@ -835,6 +837,7 @@ NDArray SparsePull(
         num_in,
         perm,
         static_cast<DType*>(result->data));
+    CUDA_CALL(cudaGetLastError());
   }
   device->FreeWorkspace(ctx, filled_request_value);
   device->FreeWorkspace(ctx, perm);
