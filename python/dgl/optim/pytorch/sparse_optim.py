@@ -173,6 +173,8 @@ class SparseGradOptimizer(abc.ABC):
             for emb in self._params: # pylint: disable=too-many-nested-blocks
                 emb_name = emb.name
                 if self._world_size > 1:
+                    # The first element in shared_emb[emb_name][0] is the local idx
+                    device = shared_emb[emb_name][0][0].device
                     # gather gradients from all other processes
                     for i in range(self._world_size):
                         if i != self._rank:
