@@ -1,12 +1,14 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cuda/dispatcher.cuh
- * \brief Dispatches to CUDA functions by data types.
+ * \brief Templates to dispatch into different cuSPARSE routines based on the type
+ *        argument.
  */
-#ifndef DGL_ARRAY_CUDA_DISPATCHER_CUH_
-#define DGL_ARRAY_CUDA_DISPATCHER_CUH_
+#ifndef DGL_ARRAY_CUDA_CUSPARSE_DISPATCHER_CUH_
+#define DGL_ARRAY_CUDA_CUSPARSE_DISPATCHER_CUH_
 
 #include <cusparse.h>
+#include <dgl/runtime/c_runtime_api.h>
 
 namespace dgl {
 namespace aten {
@@ -16,7 +18,7 @@ template <typename DType>
 struct CSRGEMM {
   template <typename... Args>
   static inline cusparseStatus_t bufferSizeExt(Args... args) {
-    BUG_ON(false) << "This piece of code should not be reached.";
+    BUG_IF_FAIL(false) << "This piece of code should not be reached.";
     return 0;
   }
 
@@ -27,7 +29,7 @@ struct CSRGEMM {
 
   template <typename... Args>
   static inline cusparseStatus_t compute(Args... args) {
-    BUG_ON(false) << "This piece of code should not be reached.";
+    BUG_IF_FAIL(false) << "This piece of code should not be reached.";
     return 0;
   }
 };
@@ -73,7 +75,7 @@ template <typename DType>
 struct CSRGEAM {
   template <typename... Args>
   static inline cusparseStatus_t bufferSizeExt(Args... args) {
-    BUG_ON(false) << "This piece of code should not be reached.";
+    BUG_IF_FAIL(false) << "This piece of code should not be reached.";
     return 0;
   }
 
@@ -84,7 +86,7 @@ struct CSRGEAM {
 
   template <typename... Args>
   static inline cusparseStatus_t compute(Args... args) {
-    BUG_ON(false) << "This piece of code should not be reached.";
+    BUG_IF_FAIL(false) << "This piece of code should not be reached.";
     return 0;
   }
 };
@@ -128,4 +130,4 @@ struct CSRGEAM<double> {
 };  // namespace aten
 };  // namespace dgl
 
-#endif  // DGL_ARRAY_CUDA_DISPATCHER_CUH_
+#endif  // DGL_ARRAY_CUDA_CUSPARSE_DISPATCHER_CUH_

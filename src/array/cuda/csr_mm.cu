@@ -6,7 +6,7 @@
 #include <dgl/array.h>
 #include <dgl/runtime/device_api.h>
 #include "./functor.cuh"
-#include "./dispatcher.cuh"
+#include "./cusparse_dispatcher.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 
 namespace dgl {

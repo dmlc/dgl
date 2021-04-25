@@ -37,6 +37,11 @@ NDArray CSRGetData(
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const int nt = cuda::FindNumThreads(rstlen);
   const int nb = (rstlen + nt - 1) / nt;
+  bool return_eids = IsNullArray(weights);
+  if (return_eids)
+    BUG_IF_FAIL(DLDataTypeTraits<DType>::dtype == rows->dtype) <<
+      "DType does not match row's dtype.";
+
   // TODO(minjie): use binary search for sorted csr
   CUDA_KERNEL_CALL(cuda::_LinearSearchKernel,
       nb, nt, 0, thr_entry->stream,
@@ -44,7 +49,7 @@ NDArray CSRGetData(
       CSRHasData(csr)? csr.data.Ptr<IdType>() : nullptr,
       rows.Ptr<IdType>(), cols.Ptr<IdType>(),
       row_stride, col_stride, rstlen,
-      IsNullArray(weights) ? nullptr : weights.Ptr<DType>(), filler, rst.Ptr<DType>());
+      return_eids ? nullptr : weights.Ptr<DType>(), filler, rst.Ptr<DType>());
   return rst;
 }
 

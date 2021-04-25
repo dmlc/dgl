@@ -58,6 +58,9 @@ NDArray CSRGetData(
   const int64_t retlen = std::max(rowlen, collen);
   bool return_eids = IsNullArray(weights);
   const DType* weight_data = return_eids ? nullptr : weights.Ptr<DType>();
+  if (return_eids)
+    BUG_IF_FAIL(DLDataTypeTraits<DType>::dtype == rows->dtype) <<
+      "DType does not match row's dtype.";
 
   NDArray ret = Full(filler, retlen, rows->ctx);
   DType* ret_data = ret.Ptr<DType>();
