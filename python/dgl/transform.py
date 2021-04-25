@@ -177,7 +177,7 @@ def _knn_graph_topk(x, k):
     offset = F.arange(0, n_samples, ctx=ctx) * n_points
     offset = F.unsqueeze(offset, 1)
     src = F.reshape(k_indices, (n_samples, n_points * k))
-    src = F.unsqueeze(src, 0) + offset 
+    src = F.unsqueeze(src, 0) + offset
     dst = F.repeat(F.arange(0, n_points, ctx=ctx), k, dim=0)
     dst = F.unsqueeze(dst, 0) + offset
     return convert.graph((F.reshape(src, (-1,)), F.reshape(dst, (-1,))))
