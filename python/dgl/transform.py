@@ -170,21 +170,16 @@ def _knn_graph_topk(x, k):
         x = F.unsqueeze(x, 0)
     n_samples, n_points, _ = F.shape(x)
 
+    ctx = F.context(x)
     dist = pairwise_squared_distance(x)
     k_indices = F.argtopk(dist, k, 2, descending=False)
-    dst = F.copy_to(k_indices, F.cpu())
-
-    src = F.zeros_like(dst) + F.reshape(F.arange(0, n_points), (1, -1, 1))
-
-    per_sample_offset = F.reshape(F.arange(0, n_samples) * n_points, (-1, 1, 1))
-    dst += per_sample_offset
-    src += per_sample_offset
-    dst = F.reshape(dst, (-1,))
-    src = F.reshape(src, (-1,))
-    adj = sparse.csr_matrix(
-        (F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))),
-        shape=(n_samples * n_points, n_samples * n_points))
-    return convert.from_scipy(adj)
+    src = F.reshape(k_indices, (n_samples, n_points * k))
+    dst = F.repeat(F.arange(0, n_points, ctx=ctx), k, dim=0)
+    # index offset for each sample
+    offset = F.arange(0, n_samples, ctx=ctx) * n_points
+    # add offset to index via broadcasting
+    dst = F.unsqueeze(dst, 0) + F.unsqueeze(offset, 1)
+    return convert.graph((F.reshape(src, (-1,)), F.reshape(dst, (-1,))))
 
 #pylint: disable=invalid-name
 def segmented_knn_graph(x, k, segs, algorithm='topk'):
