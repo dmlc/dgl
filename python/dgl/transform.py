@@ -173,12 +173,13 @@ def _knn_graph_topk(x, k):
     ctx = F.context(x)
     dist = pairwise_squared_distance(x)
     k_indices = F.argtopk(dist, k, 2, descending=False)
-    src = F.reshape(k_indices, (n_samples, n_points * k))
-    dst = F.repeat(F.arange(0, n_points, ctx=ctx), k, dim=0)
     # index offset for each sample
     offset = F.arange(0, n_samples, ctx=ctx) * n_points
-    # add offset to index via broadcasting
-    dst = F.unsqueeze(dst, 0) + F.unsqueeze(offset, 1)
+    offset = F.unsqueeze(offset, 1)
+    src = F.reshape(k_indices, (n_samples, n_points * k))
+    src = F.unsqueeze(src, 0) + offset 
+    dst = F.repeat(F.arange(0, n_points, ctx=ctx), k, dim=0)
+    dst = F.unsqueeze(dst, 0) + offset
     return convert.graph((F.reshape(src, (-1,)), F.reshape(dst, (-1,))))
 
 #pylint: disable=invalid-name
