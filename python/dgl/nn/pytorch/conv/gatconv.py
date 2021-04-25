@@ -304,7 +304,8 @@ class GATConv(nn.Module):
             rst = graph.dstdata['ft']
             # residual
             if self.res_fc is not None:
-                resval = self.res_fc(h_dst).view(h_dst.shape[0], self._num_heads, self._out_feats)
+                # Use -1 rather than self._num_heads to handle broadcasting
+                resval = self.res_fc(h_dst).view(h_dst.shape[0], -1, self._out_feats)
                 rst = rst + resval
             # bias
             if self.bias is not None:
