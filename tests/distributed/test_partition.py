@@ -39,7 +39,7 @@ def create_random_graph(n):
     return dgl.from_scipy(arr)
 
 def create_random_hetero():
-    num_nodes = {'n1': 10000, 'n2': 10010, 'n3': 10020}
+    num_nodes = {'n1': 1000, 'n2': 1010, 'n3': 1020}
     etypes = [('n1', 'r1', 'n2'),
               ('n1', 'r2', 'n3'),
               ('n2', 'r3', 'n3')]
@@ -138,6 +138,7 @@ def check_hetero_partition(hg, part_method):
     hg.nodes['n1'].data['labels'] = F.arange(0, hg.number_of_nodes('n1'))
     hg.nodes['n1'].data['feats'] = F.tensor(np.random.randn(hg.number_of_nodes('n1'), 10), F.float32)
     hg.edges['r1'].data['feats'] = F.tensor(np.random.randn(hg.number_of_edges('r1'), 10), F.float32)
+    hg.edges['r1'].data['labels'] = F.arange(0, hg.number_of_edges('r1'))
     num_parts = 4
     num_hops = 1
 
@@ -151,7 +152,7 @@ def check_hetero_partition(hg, part_method):
         assert len(orig_eids[etype]) == hg.number_of_edges(etype)
     parts = []
     shuffled_labels = []
-    shuffled_edata = []
+    shuffled_elabels = []
     for i in range(num_parts):
         part_g, node_feats, edge_feats, gpb, _, ntypes, etypes = load_partition('/tmp/partition/test.json', i)
         # Verify the mapping between the reshuffled IDs and the original IDs.
@@ -186,17 +187,17 @@ def check_hetero_partition(hg, part_method):
         verify_graph_feats(hg, part_g, node_feats)
 
         shuffled_labels.append(node_feats['n1/labels'])
-        shuffled_edata.append(edge_feats['r1/feats'])
+        shuffled_elabels.append(edge_feats['r1/labels'])
     verify_hetero_graph(hg, parts)
 
     shuffled_labels = F.cat(shuffled_labels, 0)
-    shuffled_edata = F.cat(shuffled_edata, 0)
+    shuffled_elabels = F.cat(shuffled_elabels, 0)
     orig_labels = F.zeros(F.shape(shuffled_labels), F.dtype(shuffled_labels), F.cpu())
-    orig_edata = F.zeros(F.shape(shuffled_edata), F.dtype(shuffled_edata), F.cpu())
+    orig_elabels = F.zeros(F.shape(shuffled_elabels), F.dtype(shuffled_elabels), F.cpu())
     orig_labels[orig_nids['n1']] = shuffled_labels
-    orig_edata[orig_eids['r1']] = shuffled_edata
+    orig_elabels[orig_eids['r1']] = shuffled_elabels
     assert np.all(F.asnumpy(orig_labels) == F.asnumpy(hg.nodes['n1'].data['labels']))
-    assert np.all(F.asnumpy(orig_edata) == F.asnumpy(hg.edges['r1'].data['feats']))
+    assert np.all(F.asnumpy(orig_elabels) == F.asnumpy(hg.edges['r1'].data['labels']))
 
 def check_partition(g, part_method, reshuffle):
     g.ndata['labels'] = F.arange(0, g.number_of_nodes())
@@ -316,7 +317,7 @@ def check_partition(g, part_method, reshuffle):
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_partition():
-    g = create_random_graph(10000)
+    g = create_random_graph(1000)
     check_partition(g, 'metis', False)
     check_partition(g, 'metis', True)
     check_partition(g, 'random', False)
