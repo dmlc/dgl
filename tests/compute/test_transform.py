@@ -504,7 +504,7 @@ def get_nodeflow(g, node_ids, num_layers):
 def test_partition_with_halo():
     g = create_large_graph(1000)
     node_part = np.random.choice(4, g.number_of_nodes())
-    subgs = dgl.transform.partition_graph_with_halo(g, node_part, 2, reshuffle=True)
+    subgs, _, _ = dgl.transform.partition_graph_with_halo(g, node_part, 2, reshuffle=True)
     for part_id, subg in subgs.items():
         node_ids = np.nonzero(node_part == part_id)[0]
         lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
