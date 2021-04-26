@@ -174,6 +174,8 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     # This creaets a subgraph from subgraphs returned from the CAPI above.
     def create_subgraph(subg, induced_nodes, induced_edges):
         subg1 = DGLHeteroGraph(gidx=subg.graph, ntypes=['_N'], etypes=['_E'])
+        # If IDs are shuffled, we should shuffled edges. This will help us collect edge data
+        # from the distributed graph after training.
         if reshuffle:
             sorted_edges, index = F.sort_1d(induced_edges[0])
             subg1 = edge_subgraph(subg1, index, preserve_nodes=True)
