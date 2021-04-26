@@ -7,7 +7,6 @@ from .heterograph import DGLHeteroGraph
 from . import backend as F
 from . import utils
 from .base import EID, NID, NTYPE, ETYPE
-from .subgraph import edge_subgraph
 
 __all__ = ["metis_partition", "metis_partition_assignment",
            "partition_graph_with_halo"]
@@ -174,14 +173,8 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     # This creaets a subgraph from subgraphs returned from the CAPI above.
     def create_subgraph(subg, induced_nodes, induced_edges):
         subg1 = DGLHeteroGraph(gidx=subg.graph, ntypes=['_N'], etypes=['_E'])
-        if reshuffle:
-            sorted_edges, index = F.sort_1d(induced_edges[0])
-            subg1 = edge_subgraph(subg1, index, preserve_nodes=True)
-            subg1.ndata[NID] = induced_nodes[0]
-            subg1.edata[EID] = sorted_edges
-        else:
-            subg1.ndata[NID] = induced_nodes[0]
-            subg1.edata[EID] = induced_edges[0]
+        subg1.ndata[NID] = induced_nodes[0]
+        subg1.edata[EID] = induced_edges[0]
         return subg1
 
     for i, subg in enumerate(subgs):
