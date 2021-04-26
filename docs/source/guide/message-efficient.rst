@@ -32,7 +32,7 @@ implementation would be like:
 
     linear = nn.Parameter(torch.FloatTensor(size=(1, node_feat_dim * 2)))
     def concat_message_function(edges):
-         return {'cat_feat': torch.cat([edges.src['feat'], edges.dst['feat']])}
+         return {'cat_feat': torch.cat([edges.src.ndata['feat'], edges.dst.ndata['feat']])}
     g.apply_edges(concat_message_function)
     g.edata['out'] = g.edata['cat_feat'] * linear
 
