@@ -258,22 +258,18 @@ the same as single-process sampling.
 Split workloads
 ~~~~~~~~~~~~~~~
 
-To train a model, users first need to split the dataset into training, validation and test sets.
-For distributed training, this step is usually done before we invoke :func:`dgl.distributed.partition_graph`
-to partition a graph. We recommend to store the data split in boolean arrays as node data or edge data.
-For node classification tasks, the length of these boolean arrays is the number of nodes in a graph
-and each of their elements indicates the existence of a node in a training/validation/test set.
-Similar boolean arrays should be used for link prediction tasks.
-:func:`dgl.distributed.partition_graph` splits these boolean arrays (because they are stored as
-the node data or edge data of the graph) based on the graph partitioning
-result and store them with graph partitions.
-
-During distributed training, users need to assign training nodes/edges to each trainer. Similarly,
+Users need to split the training set so that each trainer works on its own subset. Similarly,
 we also need to split the validation and test set in the same way.
+
+For distributed training and evaluation, the recommended approach is to use boolean arrays to
+indicate the training/validation/test set. For node classification tasks, the length of these
+boolean arrays is the number of nodes in a graph and each of their elements indicates the existence
+of a node in a training/validation/test set. Similar boolean arrays should be used for
+link prediction tasks.
+
 DGL provides :func:`~dgl.distributed.node_split` and :func:`~dgl.distributed.edge_split` to
 split the training, validation and test set at runtime for distributed training. The two functions
-take the boolean arrays constructed before graph partitioning as input, split them and
-return a portion for the local trainer.
+take the boolean arrays as input, split them and return a portion for the local trainer.
 By default, they ensure that all portions have the same number of nodes/edges. This is
 important for synchronous SGD, which assumes each trainer has the same number of mini-batches.
 
