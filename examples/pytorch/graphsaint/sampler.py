@@ -37,17 +37,19 @@ class SAINTSampler(object):
             self.subgraphs = []
             self.N, sampled_nodes = 0, 0
 
-            start_time = time.time()
+            t = time.perf_counter()
             while sampled_nodes < self.train_g.num_nodes() * num_repeat:
                 subgraph = self.__sample__()
                 self.subgraphs.append(subgraph)
                 sampled_nodes += subgraph.shape[0]
                 self.N += 1
-            end_time = time.time()
-            print("The time of sampling {} subgraph: {:.5f} sec".format(self.N, end_time - start_time))
-
+            print(f'Sampling time: [{time.perf_counter() - t:.2f}s]')
             np.save(graph_fn, self.subgraphs)
+
+            t = time.perf_counter()
+            self.__counter__()
             aggr_norm, loss_norm = self.__compute_norm__()
+            print(f'Normalization time: [{time.perf_counter() - t:.2f}s]')
             np.save(norm_fn, (aggr_norm, loss_norm))
 
         self.train_g.ndata['l_n'] = th.Tensor(loss_norm)
@@ -66,15 +68,15 @@ class SAINTSampler(object):
         self.edge_counter = None
         self.g = None
 
-    def __counter__(self, sampled_nodes):
+    def __counter__(self):
 
-        self.node_counter[sampled_nodes] += 1
+        for sampled_nodes in self.subgraphs:
+            sampled_nodes = th.from_numpy(sampled_nodes)
+            self.node_counter[sampled_nodes] += 1
 
-        in_edges, out_edges = self.train_g.in_edges(sampled_nodes, form="eid"),\
-                              self.train_g.out_edges(sampled_nodes, form="eid")
-
-        sampled_edges = th.cat([in_edges, out_edges])
-        self.edge_counter[sampled_edges] += 1
+            subg = self.train_g.subgraph(sampled_nodes)
+            sampled_edges = subg.edata[dgl.EID]
+            self.edge_counter[sampled_edges] += 1
 
     def __generate_fn__(self):
         raise NotImplementedError
@@ -137,8 +139,6 @@ class SAINTNodeSampler(SAINTSampler):
             self.prob = self.train_g.in_degrees().float().clamp(min=1)
 
         sampled_nodes = th.multinomial(self.prob, num_samples=self.node_budget, replacement=True).unique()
-        self.__counter__(sampled_nodes)
-
         return sampled_nodes.numpy()
 
 
@@ -165,7 +165,6 @@ class SAINTEdgeSampler(SAINTSampler):
 
         sampled_src, sampled_dst = self.train_g.find_edges(sampled_edges)
         sampled_nodes = th.cat([sampled_src, sampled_dst]).unique()
-        self.__counter__(sampled_nodes)
         return sampled_nodes.numpy()
 
 
@@ -186,7 +185,6 @@ class SAINTRandomWalkSampler(SAINTSampler):
         traces, types = random_walk(self.train_g, nodes=sampled_roots, length=self.length)
         sampled_nodes, _, _, _ = pack_traces(traces, types)
         sampled_nodes = sampled_nodes.unique()
-        self.__counter__(sampled_nodes)
         return sampled_nodes.numpy()
 
 
