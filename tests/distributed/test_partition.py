@@ -215,14 +215,14 @@ def check_hetero_partition(hg, part_method):
         shuffled_elabels.append(edge_feats['r1/labels'])
     verify_hetero_graph(hg, parts)
 
-    shuffled_labels = F.cat(shuffled_labels, 0)
-    shuffled_elabels = F.cat(shuffled_elabels, 0)
-    orig_labels = F.zeros(F.shape(shuffled_labels), F.dtype(shuffled_labels), F.cpu())
-    orig_elabels = F.zeros(F.shape(shuffled_elabels), F.dtype(shuffled_elabels), F.cpu())
-    orig_labels[orig_nids['n1']] = shuffled_labels
-    orig_elabels[orig_eids['r1']] = shuffled_elabels
-    assert np.all(F.asnumpy(orig_labels) == F.asnumpy(hg.nodes['n1'].data['labels']))
-    assert np.all(F.asnumpy(orig_elabels) == F.asnumpy(hg.edges['r1'].data['labels']))
+    shuffled_labels = F.asnumpy(F.cat(shuffled_labels, 0))
+    shuffled_elabels = F.asnumpy(F.cat(shuffled_elabels, 0))
+    orig_labels = F.asnumpy(F.zeros(F.shape(shuffled_labels), F.dtype(shuffled_labels), F.cpu()))
+    orig_elabels = F.asnumpy(F.zeros(F.shape(shuffled_elabels), F.dtype(shuffled_elabels), F.cpu()))
+    orig_labels[F.asnumpy(orig_nids['n1'])] = shuffled_labels
+    orig_elabels[F.asnumpy(orig_eids['r1'])] = shuffled_elabels
+    assert np.all(orig_labels == F.asnumpy(hg.nodes['n1'].data['labels']))
+    assert np.all(orig_elabels == F.asnumpy(hg.edges['r1'].data['labels']))
 
 def check_partition(g, part_method, reshuffle):
     g.ndata['labels'] = F.arange(0, g.number_of_nodes())
@@ -321,14 +321,14 @@ def check_partition(g, part_method, reshuffle):
 
     # Verify that we can reconstruct node/edge data for original IDs.
     if reshuffle:
-        shuffled_labels = F.cat(shuffled_labels, 0)
-        shuffled_edata = F.cat(shuffled_edata, 0)
-        orig_labels = F.zeros(F.shape(shuffled_labels), F.dtype(shuffled_labels), F.cpu())
-        orig_edata = F.zeros(F.shape(shuffled_edata), F.dtype(shuffled_edata), F.cpu())
-        orig_labels[orig_nids] = shuffled_labels
-        orig_edata[orig_eids] = shuffled_edata
-        assert np.all(F.asnumpy(orig_labels) == F.asnumpy(g.ndata['labels']))
-        assert np.all(F.asnumpy(orig_edata) == F.asnumpy(g.edata['feats']))
+        shuffled_labels = F.asnumpy(F.cat(shuffled_labels, 0))
+        shuffled_edata = F.asnumpy(F.cat(shuffled_edata, 0))
+        orig_labels = F.asnumpy(F.zeros(F.shape(shuffled_labels), F.dtype(shuffled_labels), F.cpu()))
+        orig_edata = F.asnumpy(F.zeros(F.shape(shuffled_edata), F.dtype(shuffled_edata), F.cpu()))
+        orig_labels[F.asnumpy(orig_nids)] = shuffled_labels
+        orig_edata[F.asnumpy(orig_eids)] = shuffled_edata
+        assert np.all(orig_labels == F.asnumpy(g.ndata['labels']))
+        assert np.all(orig_edata == F.asnumpy(g.edata['feats']))
 
     if reshuffle:
         node_map = []
