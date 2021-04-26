@@ -217,8 +217,8 @@ def check_hetero_partition(hg, part_method):
 
     shuffled_labels = F.asnumpy(F.cat(shuffled_labels, 0))
     shuffled_elabels = F.asnumpy(F.cat(shuffled_elabels, 0))
-    orig_labels = F.asnumpy(F.zeros(F.shape(shuffled_labels), F.dtype(shuffled_labels), F.cpu()))
-    orig_elabels = F.asnumpy(F.zeros(F.shape(shuffled_elabels), F.dtype(shuffled_elabels), F.cpu()))
+    orig_labels = np.zeros(shuffled_labels.shape, dtype=shuffled_labels.dtype)
+    orig_elabels = np.zeros(shuffled_elabels.shape, dtype=shuffled_elabels.dtype)
     orig_labels[F.asnumpy(orig_nids['n1'])] = shuffled_labels
     orig_elabels[F.asnumpy(orig_eids['r1'])] = shuffled_elabels
     assert np.all(orig_labels == F.asnumpy(hg.nodes['n1'].data['labels']))
@@ -323,8 +323,8 @@ def check_partition(g, part_method, reshuffle):
     if reshuffle:
         shuffled_labels = F.asnumpy(F.cat(shuffled_labels, 0))
         shuffled_edata = F.asnumpy(F.cat(shuffled_edata, 0))
-        orig_labels = F.asnumpy(F.zeros(F.shape(shuffled_labels), F.dtype(shuffled_labels), F.cpu()))
-        orig_edata = F.asnumpy(F.zeros(F.shape(shuffled_edata), F.dtype(shuffled_edata), F.cpu()))
+        orig_labels = np.zeros(shuffled_labels.shape, dtype=shuffled_labels.dtype)
+        orig_edata = np.zeros(shuffled_edata.shape, dtype=shuffled_edata.dtype)
         orig_labels[F.asnumpy(orig_nids)] = shuffled_labels
         orig_edata[F.asnumpy(orig_eids)] = shuffled_edata
         assert np.all(orig_labels == F.asnumpy(g.ndata['labels']))
