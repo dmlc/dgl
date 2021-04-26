@@ -97,15 +97,14 @@ class GCN2Conv(nn.Module):
     """
 
     def __init__(self,
-            in_feats,
-            alpha=0.1,
-            hyper_lambda=1,
-            layer=1,
-            share_weights=True,
-            allow_zero_in_degree=False,
-            bias=True,
-            activation=None,
-        ):
+                in_feats,
+                alpha=0.1,
+                hyper_lambda=1,
+                layer=1,
+                share_weights=True,
+                allow_zero_in_degree=False,
+                bias=True,
+                activation=None):
         super().__init__()
 
         self._in_feats = in_feats
